@@ -1,83 +1,74 @@
 # Deploy LFAMILIA STORE dari HP
 
-Panduan ini memakai GitHub sebagai penyimpan source dan Cloudflare Workers sebagai hosting. Keduanya dapat dimulai dengan paket gratis, tetapi transaksi nyata tetap memerlukan saldo DigiFlazz dan biaya penyedia pembayaran.
+Panduan ini memakai Termux, GitHub, Cloudflare Workers, dan D1.
 
-## 1. Siapkan source
+## 1. Source
 
-1. Unduh dan ekstrak ZIP LFAMILIA STORE di HP.
-2. Pastikan hasil ekstrak langsung berisi `package.json`, folder `app`, dan folder `components`—bukan folder berlapis dua kali.
-3. Jangan mengisi `.env.example` dengan API key asli.
+Ekstrak ZIP sampai folder `LFAMILIA-STORE` langsung berisi `package.json`, `app`, `components`, `drizzle`, dan `wrangler.jsonc`.
 
-## 2. Buat repository GitHub
+Jangan memasukkan credential ke `.env.example` atau file source lain.
 
-1. Buka GitHub, tekan **New repository**.
-2. Nama repository: `lfamilia-store`.
-3. Pilih **Private** jika source belum ingin dilihat publik.
-4. Jangan centang pembuatan README karena file tersebut sudah tersedia.
-5. Unggah seluruh isi folder hasil ekstrak, lalu commit ke branch `main`.
-
-Jika unggah folder melalui browser HP sulit, gunakan Termux:
+## 2. GitHub dari Termux
 
 ```bash
-pkg update
-pkg install git gh nodejs-lts
-termux-setup-storage
-gh auth login
-cd /storage/emulated/0/Download/lfamilia-store-source
-git init
+cd /storage/emulated/0/Download/LFAMILIA-STORE
+git config --global --add safe.directory /storage/emulated/0/Download/LFAMILIA-STORE
+git status
 git add .
-git commit -m "Website awal LFAMILIA STORE"
+git commit -m "Tambah stok kode otomatis"
 git branch -M main
-git remote add origin https://github.com/NAMA-ANDA/lfamilia-store.git
-git push -u origin main
+git push origin main
 ```
 
-Ganti `NAMA-ANDA` dengan username GitHub.
+Jika folder belum menjadi repository, jalankan `git init` sebelum `git add .`. Jangan menjalankan `git init` lagi bila `git status` sudah bekerja.
 
-## 3. Hubungkan ke Cloudflare
+## 3. Cloudflare Git build
 
-1. Masuk ke dashboard Cloudflare.
-2. Buka **Workers & Pages**, lalu pilih pembuatan aplikasi dari repository Git.
-3. Hubungkan akun GitHub dan pilih repository `lfamilia-store`.
-4. Pilih **Workers**. Jika formulir meminta *output directory* untuk Pages, kembali dan pilih alur Workers.
-5. Gunakan konfigurasi build berikut:
+Gunakan:
 
 | Pengaturan | Nilai |
-| --- | --- |
+|---|---|
 | Production branch | `main` |
 | Root directory | `/` |
 | Build command | `npm run build` |
 | Deploy command | `npx wrangler deploy` |
 | Node.js | `22.13.0` atau lebih baru |
 
-6. Simpan dan tunggu build selesai.
-7. Cloudflare akan memberi alamat seperti `lfamilia-store.NAMA-SUBDOMAIN.workers.dev`.
+Setiap push ke `main` akan memicu build baru.
 
-Perubahan yang di-commit ke branch `main` selanjutnya dapat dideploy otomatis oleh Cloudflare.
+## 4. Migrasi D1 production
 
-## 4. Domain sendiri (opsional)
+Login Wrangler dari Termux, lalu jalankan satu kali:
 
-Setelah website aktif, buka Worker LFAMILIA STORE → **Settings** → **Domains & Routes** → **Add custom domain**. Domain berbayar tidak wajib untuk menguji website.
+```bash
+npx wrangler login
+npx wrangler d1 migrations apply lfamilia-store-db --remote
+```
 
-## 5. Saat API akan dipasang
+Setelah sukses, jangan mengulang atau menghapus file migrasi lama secara manual. Wrangler akan mengetahui migrasi yang sudah diterapkan.
 
-Tambahkan nilai rahasia di Cloudflare Worker → **Settings** → **Variables and Secrets**. Jangan memasukkannya ke GitHub.
+## 5. Rahasia dan callback
 
-Nilai yang nanti diperlukan antara lain:
+Tambahkan secret serta variable melalui Cloudflare Worker → Settings → Variables and Secrets. Daftar lengkap ada di `INTEGRATION-SETUP.md`.
 
-- `DIGIFLAZZ_USERNAME`
-- `DIGIFLAZZ_API_KEY`
-- `DIGIFLAZZ_WEBHOOK_SECRET`
-- `MIDTRANS_SERVER_KEY`
-- `MIDTRANS_CLIENT_KEY`
-- `MIDTRANS_IS_PRODUCTION`
+Mulai dengan:
 
-Mulai dari akun sandbox Midtrans. Jangan mengaktifkan transaksi nyata sebelum webhook, validasi nominal, idempotensi, refund, dan kontrol admin selesai diuji.
+- `IPAYMU_ENV=sandbox`
+- `DIGIFLAZZ_ENV=development`
+- `PUBLIC_BASE_URL=https://domain-toko-anda`
+- `VOUCHER_DELIVERY_CHANNEL=both`
+
+Sebelum mengimpor kode, isi `VOUCHER_ENCRYPTION_KEY` sebagai Secret minimal 32 karakter. Jangan pernah menggantinya setelah stok tersimpan. Konfigurasi email Resend dan WhatsApp Cloud API dijelaskan di `INTEGRATION-SETUP.md`.
+
+## 6. Admin
+
+Lindungi `/admin*` dan `/api/admin*` menggunakan Cloudflare Access, hanya untuk email pemilik. Jangan membuka panel admin sebelum Access aktif.
 
 ## Masalah umum
 
-- **Build gagal karena Node terlalu lama:** atur `NODE_VERSION` ke `22.13.0` atau versi 22 yang lebih baru.
-- **Cloudflare meminta folder output:** Anda berada di alur Pages; gunakan Workers.
-- **Repository tidak terlihat:** periksa izin aplikasi Cloudflare di GitHub.
-- **Website masih bertuliskan demo:** memang sengaja; hapus label hanya setelah API dan database benar-benar aman serta teruji.
-
+- `dubious ownership`: jalankan perintah `safe.directory` pada langkah 2 dengan path folder yang benar.
+- Build gagal karena Node lama: set Node ke versi 22 atau lebih baru.
+- Cloudflare meminta output directory: gunakan alur Workers, bukan Pages.
+- Produk otomatis tidak bisa dibayar: isi provider dan SKU untuk nominal tersebut dari admin.
+- Kode tidak terkirim: periksa stok, Resend/WhatsApp, lalu tekan Kirim kode pada pesanan atau Kirim ulang pada tab Voucher.
+- Masih ada banner mode pengembangan: memang sengaja sampai sandbox, callback, SKU, dan harga lulus pengujian.

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Zap } from "lucide-react";
+import { ArrowUpRight, Clock3, Zap } from "lucide-react";
 import type { StoreProduct } from "@/lib/store-data";
 import { formatRupiah } from "@/lib/store-data";
 
@@ -14,7 +14,7 @@ export function ProductCard({ product }: { product: StoreProduct }) {
       </div>
       <div className="px-2 pb-2 pt-4">
         <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-bold tracking-tight text-white sm:text-base">{product.name}</h3><p className="mt-1 text-[11px] text-white/36">{product.publisher}</p></div><span className="grid size-8 shrink-0 place-items-center rounded-full bg-white/[0.06] text-white/45 transition group-hover:bg-[#b9ff35] group-hover:text-[#091006]"><ArrowUpRight className="size-4" /></span></div>
-        <div className="mt-4 flex items-end justify-between gap-2 border-t border-white/[0.07] pt-3"><div><span className="block text-[9px] uppercase tracking-wider text-white/30">Mulai</span><strong className="mt-0.5 block text-xs text-[#d8ff8d]">{formatRupiah(lowest)}</strong></div>{product.instant && <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase text-white/38"><Zap className="size-3 text-[#b9ff35]" /> Instan</span>}</div>
+        <div className="mt-4 flex items-end justify-between gap-2 border-t border-white/[0.07] pt-3"><div><span className="block text-[9px] uppercase tracking-wider text-white/30">Mulai</span><strong className="mt-0.5 block text-xs text-[#d8ff8d]">{formatRupiah(lowest)}</strong></div>{product.fulfillmentType === "manual" ? <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase text-amber-300/60"><Clock3 className="size-3" /> Manual</span> : <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase text-white/38"><Zap className="size-3 text-[#b9ff35]" /> Otomatis</span>}</div>
       </div>
     </Link>
   );

@@ -11,7 +11,9 @@
     "start": "vinext start",
     "check": "vinext check",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "deploy": "vinext deploy"
+    "deploy": "vinext deploy",
+    "db:generate": "drizzle-kit generate",
+    "test": "npm run build && node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -5,18 +5,20 @@ import { Gamepad2, Search, Ticket, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ProductCard } from "@/components/product-card";
 import { StoreLayout } from "@/components/store-layout";
-import { products, type ProductCategory } from "@/lib/store-data";
+import { useStoreProducts } from "@/hooks/use-store-products";
+import type { ProductCategory } from "@/lib/store-data";
 
 type Filter = "all" | ProductCategory;
 
 export default function CatalogPage() {
+  const { products, databaseReady } = useStoreProducts();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => products.filter((product) => {
     const inCategory = filter === "all" || product.category === filter;
     const term = query.trim().toLowerCase();
     return inCategory && (!term || `${product.name} ${product.publisher}`.toLowerCase().includes(term));
-  }), [filter, query]);
+  }), [filter, products, query]);
 
   return (
     <StoreLayout>
@@ -34,7 +36,7 @@ export default function CatalogPage() {
           <div className="relative w-full sm:max-w-sm"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-white/30" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari Mobile Legends, Steam..." className="h-11 rounded-xl border-white/10 bg-white/[0.035] pl-10 pr-10 text-sm text-white placeholder:text-white/25" />{query && <button type="button" onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white" aria-label="Hapus pencarian"><X className="size-4" /></button>}</div>
         </div>
 
-        <div className="mt-8 flex items-center justify-between border-b border-white/[0.07] pb-4 text-xs"><span className="font-semibold text-white/55">{filtered.length} produk ditemukan</span><span className="text-white/28">Harga demo</span></div>
+        <div className="mt-8 flex items-center justify-between border-b border-white/[0.07] pb-4 text-xs"><span className="font-semibold text-white/55">{filtered.length} produk ditemukan</span><span className="text-white/28">{databaseReady ? "Dikelola admin" : "Data awal"}</span></div>
         {filtered.length ? (
           <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">{filtered.map((product) => <ProductCard key={product.slug} product={product} />)}</div>
         ) : (
@@ -44,4 +46,3 @@ export default function CatalogPage() {
     </StoreLayout>
   );
 }
-

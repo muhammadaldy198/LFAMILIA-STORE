@@ -142,6 +142,31 @@ textarea {
   font-weight: 700;
 }
 
+.admin-input {
+  height: 2.5rem;
+  border-color: rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.035);
+  color: white;
+  font-size: 0.75rem;
+}
+
+.admin-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.checkout-input {
+  height: 3rem;
+  border-color: rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.035);
+  color: white;
+}
+
+.checkout-input::placeholder {
+  color: rgba(255, 255, 255, 0.22);
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -153,26 +178,27 @@ html {
 
 .site-shell {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 64px 64px;
+    radial-gradient(circle at 18% 7%, rgba(185, 255, 53, 0.04), transparent 25%),
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: auto, 72px 72px, 72px 72px;
 }
 
 .hero-glow {
   position: absolute;
-  top: -180px;
-  right: -260px;
+  top: -230px;
+  right: -170px;
   width: 680px;
   height: 680px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(185, 255, 53, 0.16), rgba(39, 71, 31, 0.05) 45%, transparent 70%);
+  background: radial-gradient(circle, rgba(185, 255, 53, 0.13), rgba(39, 71, 31, 0.04) 45%, transparent 70%);
   filter: blur(2px);
   pointer-events: none;
 }
 
 @media (max-width: 640px) {
   .site-shell {
-    background-size: 42px 42px;
+    background-size: auto, 48px 48px, 48px 48px;
   }
 
   .hero-glow {

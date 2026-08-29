@@ -1,55 +1,52 @@
 # LFAMILIA STORE
 
-Frontend toko top up game dan voucher digital bergaya gelap-neon, dibuat dengan Next.js 16, React 19, Tailwind CSS 4, Vinext, dan Cloudflare Workers.
+Website top up game responsif untuk Cloudflare Workers + D1, dibuat dengan Next.js 16, React 19, Tailwind CSS 4, dan Vinext.
 
-## Status saat ini
+## Yang sudah tersedia
 
-Website ini sudah memiliki tampilan dan alur demo lengkap, tetapi **belum menerima pembayaran dan belum mengirim produk sungguhan**. Harga, akun, checkout, invoice, laporan, dan data admin masih berupa data contoh.
+- Beranda, katalog, pencarian, checkout, FAQ, kontak, dan kalkulator game.
+- Data akun berada di langkah pertama checkout dan dapat memeriksa nickname lewat API yang dikonfigurasi.
+- Pembayaran iPaymu: Virtual Account bank, DANA, ShopeePay, dan QRIS; biaya iPaymu diarahkan ke pembeli.
+- Produk otomatis multi-provider: adapter DigiFlazz dan VIPayment.
+- Stok kode internal terenkripsi untuk REDFINGER/lisensi, dengan reservasi atomik dan pengiriman Email/WhatsApp otomatis.
+- Produk manual: antrean admin untuk Roblox Via Login, Gamepass, Gift in Game, dan produk manual lain.
+- Pelacakan invoice D1 dengan data tujuan disamarkan.
+- Admin tersembunyi dari navigasi utama, dengan proteksi Cloudflare Access.
+- Webhook bertanda tangan dan pencatatan event untuk mencegah pengiriman ganda setelah callback pembayaran berulang.
 
-Halaman yang tersedia:
+Kode integrasi sudah siap, tetapi toko tidak boleh menerima transaksi nyata sebelum migrasi D1, secret, SKU, harga, callback, dan Cloudflare Access selesai diuji.
 
-- Beranda dan katalog game + voucher
-- Pencarian dan filter produk
-- Checkout responsif dengan simulasi biaya admin
-- Pelacakan invoice demo `DEMO-20260828-001`
-- Login, daftar, dan area pelanggan demo
-- Panel admin: ringkasan, pesanan, produk, voucher, konten, pelanggan, laporan, dan pengaturan
-- FAQ, privasi, syarat, dan kebijakan refund
+## Menjalankan dari komputer atau Termux
 
-## Menjalankan di komputer atau Termux
-
-Persyaratan: Node.js 22 atau lebih baru.
+Memerlukan Node.js 22 atau lebih baru.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Buka alamat yang ditampilkan di terminal. Pemeriksaan sebelum upload:
+Pemeriksaan source:
 
 ```bash
 npm run lint
 npm run build
+npm test
 ```
 
-## Deploy ke Cloudflare Workers
+## Deploy Cloudflare
 
-Untuk deploy manual pertama kali:
+Pengaturan build GitHub:
 
-```bash
-npx wrangler login
-npm run deploy
-```
+| Pengaturan | Nilai |
+|---|---|
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy` |
+| Root directory | `/` |
 
-Untuk deploy otomatis dari GitHub, ikuti [panduan dari HP](docs/DEPLOY-DARI-HP.md).
+Ikuti [panduan deploy dari HP](docs/DEPLOY-DARI-HP.md), lalu lanjutkan [konfigurasi integrasi](INTEGRATION-SETUP.md).
 
-## Integrasi berikutnya
-
-Rencana backend DigiFlazz, Midtrans QRIS, database, keamanan webhook, serta biaya admin dijelaskan di [docs/RENCANA-API.md](docs/RENCANA-API.md).
-
-Jangan pernah menyimpan Server Key, API key, password, atau webhook secret di source GitHub. Gunakan menu **Variables and Secrets** di Cloudflare.
+Jangan simpan API key, VA merchant, webhook secret, password pelanggan, PIN, atau OTP di GitHub.
 
 ## Lisensi
 
-Kode khusus LFAMILIA STORE menggunakan lisensi MIT. Komponen pihak ketiga tetap mengikuti lisensinya masing-masing.
-
+Kode khusus LFAMILIA STORE menggunakan lisensi MIT. Komponen pihak ketiga mengikuti lisensinya masing-masing.

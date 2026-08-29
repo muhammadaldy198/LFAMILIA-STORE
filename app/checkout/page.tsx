@@ -1,92 +1,284 @@
 "use client";
 
-import { FormEvent, Suspense, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AlertCircle, ArrowLeft, BadgeCheck, CheckCircle2, CreditCard, Info, LockKeyhole, QrCode, ShieldCheck } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  BadgeCheck,
+  CheckCircle2,
+  Copy,
+  CreditCard,
+  ExternalLink,
+  Info,
+  Landmark,
+  LoaderCircle,
+  LockKeyhole,
+  QrCode,
+  ShieldCheck,
+  WalletCards,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StoreLayout } from "@/components/store-layout";
-import { formatRupiah, products } from "@/lib/store-data";
+import { useStoreProducts } from "@/hooks/use-store-products";
+import { paymentChannels, paymentGroups, type PaymentMethodCode } from "@/lib/payment-methods";
+import { formatRupiah } from "@/lib/store-data";
+
+const nicknameSupported = new Set(["mobile-legends", "free-fire", "genshin-impact", "valorant"]);
+
+type NicknameState = {
+  status: "idle" | "loading" | "success" | "error";
+  key?: string;
+  nickname?: string;
+  country?: string | null;
+  message?: string;
+};
+
+type PaymentResult = {
+  referenceId: string;
+  paymentNo: string | null;
+  paymentName: string | null;
+  paymentUrl: string | null;
+  fee: number;
+  total: number;
+  expiredAt: string | null;
+  fulfillmentType: "automatic" | "manual";
+  providerCode: string | null;
+};
+
+const groupIcons = { va: Landmark, ewallet: WalletCards, qris: QrCode };
 
 export default function CheckoutPage() {
   return (
     <Suspense fallback={<StoreLayout><main className="mx-auto min-h-[70vh] max-w-7xl px-4 py-14 text-sm text-white/40">Memuat formulir pemesanan…</main></StoreLayout>}>
-      <CheckoutContent />
+      <CheckoutRoute />
     </Suspense>
   );
 }
 
+function CheckoutRoute() {
+  const searchParams = useSearchParams();
+  return <CheckoutContent key={searchParams.get("product") ?? "default"} />;
+}
+
 function CheckoutContent() {
+  const { products } = useStoreProducts();
   const searchParams = useSearchParams();
   const requestedProduct = searchParams.get("product");
-  const initialProduct = requestedProduct && products.some((item) => item.slug === requestedProduct) ? requestedProduct : products[0].slug;
-  const [productSlug, setProductSlug] = useState(initialProduct);
+  const product = useMemo(() => products.find((item) => item.slug === requestedProduct) ?? products[0], [products, requestedProduct]);
   const [packageId, setPackageId] = useState("");
   const [destination, setDestination] = useState("");
   const [server, setServer] = useState("");
+  const [buyerName, setBuyerName] = useState("");
+  const [buyerEmail, setBuyerEmail] = useState("");
   const [contact, setContact] = useState("");
+  const [customerNotes, setCustomerNotes] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodCode>("qris");
+  const [paymentChannel, setPaymentChannel] = useState("mpm");
   const [agreed, setAgreed] = useState(false);
-  const [created, setCreated] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [payment, setPayment] = useState<PaymentResult | null>(null);
   const [error, setError] = useState("");
+  const [nickname, setNickname] = useState<NicknameState>({ status: "idle" });
 
-  const product = useMemo(() => products.find((item) => item.slug === productSlug) ?? products[0], [productSlug]);
   const selectedPackage = product.packages.find((item) => item.id === packageId);
   const subtotal = selectedPackage?.price ?? 0;
-  const adminFee = subtotal ? Math.ceil(subtotal / (1 - 0.007) - subtotal) : 0;
-  const total = subtotal + adminFee;
+  const isManual = product.fulfillmentType === "manual";
+  const isVoucherStock = selectedPackage?.providerCode === "voucher-stock";
+  const providerReady = isManual || Boolean(selectedPackage?.providerCode && selectedPackage?.providerSku);
+  const canCheckNickname = nicknameSupported.has(product.slug);
+  const lookupNeedsServer = product.slug === "mobile-legends";
+  const lookupKey = `${product.slug}:${destination.trim()}:${server.trim()}`;
+  const visibleNickname: NicknameState = nickname.key === lookupKey ? nickname : { status: "idle" };
+  const channels = paymentChannels.filter((item) => item.method === paymentMethod);
 
-  function changeProduct(slug: string) {
-    setProductSlug(slug); setPackageId(""); setDestination(""); setServer(""); setCreated(false); setError("");
+  useEffect(() => {
+    const cleanId = destination.trim();
+    const cleanServer = server.trim();
+    if (!canCheckNickname || cleanId.length < 4 || (lookupNeedsServer && cleanServer.length < 1)) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setNickname({ status: "loading", key: lookupKey });
+      try {
+        const response = await fetch("/api/nickname", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ game: product.slug, userId: cleanId, server: cleanServer || undefined }),
+          signal: controller.signal,
+        });
+        const data = await response.json() as { nickname?: string; country?: string | null; error?: string };
+        if (!response.ok || !data.nickname) throw new Error(data.error ?? "ID atau Server tidak ditemukan.");
+        setNickname({ status: "success", key: lookupKey, nickname: data.nickname, country: data.country });
+      } catch (reason) {
+        if (controller.signal.aborted) return;
+        setNickname({ status: "error", key: lookupKey, message: reason instanceof Error ? reason.message : "Nickname gagal diperiksa." });
+      }
+    }, 700);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [canCheckNickname, destination, lookupKey, lookupNeedsServer, product.slug, server]);
+
+  function chooseMethod(method: PaymentMethodCode) {
+    setPaymentMethod(method);
+    setPaymentChannel(paymentChannels.find((item) => item.method === method)?.channel ?? "");
+    setPayment(null);
   }
 
-  function submitOrder(event: FormEvent) {
+  async function submitOrder(event: FormEvent) {
     event.preventDefault();
-    if (!destination.trim() || (product.needsServer && !server.trim()) || !contact.trim() || !packageId || !agreed) {
-      setError("Lengkapi data tujuan, nominal, kontak, dan persetujuan terlebih dahulu.");
+    if (!destination.trim() || (product.needsServer && !server.trim()) || !buyerName.trim() || !buyerEmail.trim() || !contact.trim() || !packageId || !agreed) {
+      setError("Lengkapi data akun, nominal, identitas pembeli, pembayaran, dan persetujuan.");
       return;
     }
-    setError(""); setCreated(true);
+    if (canCheckNickname && visibleNickname.status !== "success") {
+      setError("Tunggu sampai nickname akun berhasil diverifikasi.");
+      return;
+    }
+    if (!providerReady) {
+      setError("Produk otomatis ini belum memiliki provider dan SKU. Atur dahulu dari panel admin.");
+      return;
+    }
+    setSubmitting(true);
+    setPayment(null);
+    setError("");
+    try {
+      const response = await fetch("/api/payments/ipaymu/create", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          productSlug: product.slug,
+          packageSku: packageId,
+          destination: destination.trim(),
+          server: server.trim() || undefined,
+          nickname: visibleNickname.nickname,
+          buyerName: buyerName.trim(),
+          buyerEmail: buyerEmail.trim(),
+          buyerPhone: contact.replace(/[\s()-]/g, ""),
+          customerNotes: customerNotes.trim() || undefined,
+          paymentMethod,
+          paymentChannel,
+        }),
+      });
+      const data = await response.json() as PaymentResult & { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Pembayaran gagal dibuat.");
+      setPayment(data);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Pembayaran gagal dibuat.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
     <StoreLayout>
-      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
         <Link href="/catalog" className="inline-flex items-center gap-2 text-xs font-semibold text-white/42 hover:text-white"><ArrowLeft className="size-4" /> Kembali ke katalog</Link>
-        <div className="mt-7 grid items-start gap-6 lg:grid-cols-[1fr_380px]">
-          <form onSubmit={submitOrder} className="space-y-5">
+        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_380px]">
+          <form id="checkout-form" onSubmit={submitOrder} className="space-y-5">
             <section className="panel overflow-hidden">
-              <div className="flex items-center gap-4 border-b border-white/[0.08] p-5 sm:p-6"><span className={`grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${product.accent} text-xl font-black`}>{product.initials}</span><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#b9ff35]">Form pemesanan</p><h1 className="mt-1 truncate text-xl font-black sm:text-2xl">{product.name}</h1><p className="mt-1 text-xs text-white/36">{product.publisher}</p></div></div>
+              <div className="flex items-center justify-between gap-4 border-b border-white/[0.08] bg-white/[0.02] p-5 sm:p-6">
+                <StepTitle number="1" title="Masukkan Data Akun" description="Nickname diperiksa otomatis jika game mendukung." />
+                <div className="hidden items-center gap-3 sm:flex"><span className={`grid size-10 place-items-center rounded-xl bg-gradient-to-br ${product.accent} text-xs font-black`}>{product.initials}</span><div className="max-w-36"><strong className="block truncate text-xs">{product.name}</strong><Link href="/catalog" className="mt-1 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link></div></div>
+              </div>
               <div className="p-5 sm:p-6">
-                <label className="field-label" htmlFor="product">Pilih produk</label>
-                <select id="product" value={productSlug} onChange={(event) => changeProduct(event.target.value)} className="h-11 w-full rounded-xl border border-white/10 bg-[#151924] px-3 text-sm text-white outline-none focus:border-[#b9ff35]">{products.map((item) => <option value={item.slug} key={item.slug}>{item.name}</option>)}</select>
+                <div className="mb-5 flex items-center gap-3 sm:hidden"><span className={`grid size-10 place-items-center rounded-xl bg-gradient-to-br ${product.accent} text-xs font-black`}>{product.initials}</span><div><strong className="block text-xs">{product.name}</strong><Link href="/catalog" className="mt-1 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link></div></div>
+                <div className={product.needsServer ? "grid gap-4 sm:grid-cols-2" : "grid gap-4"}>
+                  <Field label={product.inputLabel}><Input value={destination} onChange={(event) => { setDestination(event.target.value); setPayment(null); setError(""); }} placeholder={product.inputPlaceholder} autoComplete="off" className="checkout-input" /></Field>
+                  {product.needsServer && <Field label="Server / Zone ID"><Input inputMode="numeric" value={server} onChange={(event) => { setServer(event.target.value.replace(/\D/g, "")); setPayment(null); setError(""); }} placeholder="Contoh: 1234" autoComplete="off" className="checkout-input" /></Field>}
+                </div>
+                {canCheckNickname ? <NicknameResult state={visibleNickname} /> : <p className="mt-4 flex items-start gap-2 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-[10px] leading-5 text-white/32"><Info className="mt-0.5 size-3.5 shrink-0 text-[#b9ff35]" /> Verifikasi nickname otomatis belum tersedia. Periksa kembali data sebelum membayar.</p>}
+                {product.manualInstructions && <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3 text-[10px] leading-5 text-amber-100/65"><strong className="block text-amber-200">Instruksi produk manual</strong>{product.manualInstructions}</div>}
               </div>
             </section>
 
-            <section className="panel p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><span className="grid size-7 place-items-center rounded-lg bg-[#b9ff35] text-xs font-black text-[#091006]">1</span><div><h2 className="font-bold">Masukkan data tujuan</h2><p className="mt-0.5 text-[11px] text-white/35">Pastikan data benar sebelum melanjutkan.</p></div></div><div className={product.needsServer ? "grid gap-4 sm:grid-cols-2" : "grid gap-4"}><div><label className="field-label" htmlFor="destination">{product.inputLabel}</label><Input id="destination" value={destination} onChange={(event) => setDestination(event.target.value)} placeholder={product.inputPlaceholder} className="h-11 rounded-xl border-white/10 bg-white/[0.035] text-white placeholder:text-white/22" /></div>{product.needsServer && <div><label className="field-label" htmlFor="server">Server / Zone ID</label><Input id="server" value={server} onChange={(event) => setServer(event.target.value)} placeholder="Contoh: 1234" className="h-11 rounded-xl border-white/10 bg-white/[0.035] text-white placeholder:text-white/22" /></div>}</div></section>
+            <section className="panel p-5 sm:p-6">
+              <StepTitle number="2" title="Pilih nominal" description={isManual ? "Pesanan diproses admin setelah pembayaran." : isVoucherStock ? "Satu kode stok dikirim otomatis setelah pembayaran." : "Pesanan diteruskan otomatis ke provider."} />
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">{product.packages.map((item) => {
+                const ready = isManual || Boolean(item.providerCode && item.providerSku);
+                return <button key={item.id} type="button" onClick={() => { setPackageId(item.id); setPayment(null); }} className={`relative min-h-24 rounded-2xl border p-3 text-left transition ${packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.2)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}>
+                  {item.note && <span className="absolute right-2 top-2 rounded-full bg-[#b9ff35] px-2 py-0.5 text-[8px] font-black uppercase text-[#091006]">{item.note}</span>}
+                  <strong className="block pr-8 text-xs leading-5">{item.label}</strong><span className="mt-2 block text-[11px] font-bold text-[#cfff72]">{formatRupiah(item.price)}</span>
+                  {!ready && <span className="mt-2 block text-[8px] font-semibold text-amber-300/70">SKU belum diatur</span>}
+                </button>;
+              })}</div>
+            </section>
 
-            <section className="panel p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><span className="grid size-7 place-items-center rounded-lg bg-[#b9ff35] text-xs font-black text-[#091006]">2</span><div><h2 className="font-bold">Pilih nominal</h2><p className="mt-0.5 text-[11px] text-white/35">Semua harga masih data demo.</p></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{product.packages.map((item) => <button key={item.id} type="button" onClick={() => setPackageId(item.id)} className={`relative min-h-24 rounded-2xl border p-3 text-left transition ${packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.2)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}>{item.note && <span className="absolute right-2 top-2 rounded-full bg-[#b9ff35] px-2 py-0.5 text-[8px] font-black uppercase text-[#091006]">{item.note}</span>}<strong className="block pr-8 text-xs leading-5">{item.label}</strong><span className="mt-2 block text-[11px] font-bold text-[#cfff72]">{formatRupiah(item.price)}</span></button>)}</div></section>
+            <section className="panel p-5 sm:p-6">
+              <StepTitle number="3" title="Pilih pembayaran iPaymu" description="Biaya layanan dibebankan kepada pembeli." />
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">{paymentGroups.map((group) => {
+                const Icon = groupIcons[group.code];
+                const selected = paymentMethod === group.code;
+                return <button key={group.code} type="button" onClick={() => chooseMethod(group.code)} className={`rounded-2xl border p-4 text-left transition ${selected ? "border-[#b9ff35] bg-[#b9ff35]/[0.08]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}><div className="flex items-center justify-between"><span className={`grid size-9 place-items-center rounded-xl ${selected ? "bg-[#b9ff35] text-[#091006]" : "bg-white/[0.06] text-white/55"}`}><Icon className="size-4" /></span>{selected && <CheckCircle2 className="size-4 text-[#b9ff35]" />}</div><strong className="mt-3 block text-xs">{group.name}</strong><p className="mt-1 text-[9px] leading-4 text-white/32">{group.description}</p></button>;
+              })}</div>
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">{channels.map((channel) => <button key={channel.channel} type="button" onClick={() => { setPaymentChannel(channel.channel); setPayment(null); }} className={`rounded-xl border px-3 py-3 text-left text-[10px] font-bold transition ${paymentChannel === channel.channel ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.08] text-[#d8ff8d]" : "border-white/[0.08] bg-white/[0.02] text-white/45 hover:text-white"}`}>{channel.name}</button>)}</div>
+            </section>
 
-            <section className="panel p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><span className="grid size-7 place-items-center rounded-lg bg-[#b9ff35] text-xs font-black text-[#091006]">3</span><div><h2 className="font-bold">Pembayaran & kontak</h2><p className="mt-0.5 text-[11px] text-white/35">QRIS melalui Midtrans akan diaktifkan nanti.</p></div></div><div className="rounded-2xl border border-[#b9ff35]/35 bg-[#b9ff35]/[0.06] p-4"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-white text-black"><QrCode className="size-6" /></span><div className="flex-1"><strong className="text-sm">QRIS</strong><p className="mt-1 text-[10px] text-white/38">Bayar dari aplikasi bank atau dompet digital</p></div><CheckCircle2 className="size-5 text-[#b9ff35]" /></div></div><div className="mt-4"><label className="field-label" htmlFor="contact">Nomor WhatsApp</label><Input id="contact" inputMode="tel" value={contact} onChange={(event) => setContact(event.target.value)} placeholder="Contoh: 081234567890" className="h-11 rounded-xl border-white/10 bg-white/[0.035] text-white placeholder:text-white/22" /><p className="mt-2 flex items-start gap-1.5 text-[10px] leading-4 text-white/30"><Info className="mt-0.5 size-3 shrink-0" /> Invoice dan perubahan status akan dikirim ke nomor ini setelah integrasi aktif.</p></div></section>
+            <section className="panel p-5 sm:p-6">
+              <StepTitle number="4" title="Data pembeli" description="Digunakan untuk invoice dan status transaksi." />
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <Field label="Nama lengkap"><Input value={buyerName} onChange={(event) => setBuyerName(event.target.value)} placeholder="Nama pembeli" className="checkout-input" /></Field>
+                <Field label="Nomor WhatsApp"><Input inputMode="tel" value={contact} onChange={(event) => setContact(event.target.value)} placeholder="081234567890" className="checkout-input" /></Field>
+                <Field label="Email"><Input type="email" value={buyerEmail} onChange={(event) => setBuyerEmail(event.target.value)} placeholder="nama@email.com" className="checkout-input" /></Field>
+                <Field label="Catatan (opsional)"><Input value={customerNotes} onChange={(event) => setCustomerNotes(event.target.value)} placeholder={isManual ? "Nama item atau instruksi aman" : "Catatan pesanan"} className="checkout-input" /></Field>
+              </div>
+              <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-4 text-white/30"><ShieldCheck className="mt-0.5 size-3 shrink-0" /> Jangan pernah memasukkan password, PIN, atau kode OTP ke catatan.</p>
+            </section>
 
             <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 text-xs leading-5 text-white/45"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-1 size-4 accent-[#b9ff35]" /><span>Saya sudah memeriksa data tujuan dan menyetujui <Link href="/terms" className="font-semibold text-[#cfff72] hover:underline">syarat transaksi</Link>.</span></label>
             {error && <div className="flex items-start gap-2 rounded-xl border border-red-400/20 bg-red-400/[0.07] p-3 text-xs leading-5 text-red-200"><AlertCircle className="mt-0.5 size-4 shrink-0" />{error}</div>}
-            <Button type="submit" className="h-12 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75] lg:hidden">Buat pesanan demo</Button>
+            <Button disabled={submitting} type="submit" className="h-12 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75] lg:hidden">{submitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <LockKeyhole className="mr-2 size-4" />}Buat pembayaran</Button>
           </form>
 
           <aside className="panel p-5 lg:sticky lg:top-28">
-            <div className="flex items-center justify-between"><h2 className="font-bold">Ringkasan pesanan</h2><span className="rounded-full bg-amber-400/10 px-2.5 py-1 text-[9px] font-black uppercase text-amber-300">Demo</span></div>
+            <div className="flex items-center justify-between"><h2 className="font-bold">Ringkasan pesanan</h2><span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${isManual ? "bg-amber-400/10 text-amber-300" : "bg-[#b9ff35]/10 text-[#d8ff8d]"}`}>{isManual ? "Manual" : "Otomatis"}</span></div>
             <div className="my-5 h-px bg-white/[0.08]" />
-            <dl className="space-y-3 text-xs"><div className="flex justify-between gap-4"><dt className="text-white/38">Produk</dt><dd className="text-right font-semibold">{product.name}</dd></div><div className="flex justify-between gap-4"><dt className="text-white/38">Nominal</dt><dd className="text-right font-semibold">{selectedPackage?.label ?? "Belum dipilih"}</dd></div><div className="flex justify-between gap-4"><dt className="text-white/38">Harga</dt><dd>{formatRupiah(subtotal)}</dd></div><div className="flex justify-between gap-4"><dt className="text-white/38">Estimasi biaya admin</dt><dd>{formatRupiah(adminFee)}</dd></div></dl>
+            <dl className="space-y-3 text-xs">
+              <SummaryRow label="Produk" value={product.name} />
+              {visibleNickname.nickname && <SummaryRow label="Nickname" value={visibleNickname.nickname} highlight />}
+              <SummaryRow label="Nominal" value={selectedPackage?.label ?? "Belum dipilih"} />
+              <SummaryRow label="Harga" value={formatRupiah(subtotal)} />
+              <SummaryRow label="Biaya iPaymu" value={payment ? formatRupiah(payment.fee) : "Dihitung iPaymu"} />
+              <SummaryRow label="Proses" value={isManual ? "Antrean admin" : isVoucherStock ? "Kirim kode otomatis" : (selectedPackage?.providerCode || "Provider belum diatur")} />
+            </dl>
             <div className="my-5 h-px bg-white/[0.08]" />
-            <div className="flex items-end justify-between"><span className="text-sm font-bold">Total</span><strong className="text-xl font-black text-[#b9ff35]">{formatRupiah(total)}</strong></div>
-            <p className="mt-3 rounded-xl bg-white/[0.035] p-3 text-[9px] leading-4 text-white/30">Biaya admin di atas hanya simulasi 0,7%. Nilai final harus mengikuti persetujuan dan perhitungan resmi Midtrans saat API dipasang.</p>
-            <Button type="button" onClick={(event) => submitOrder(event as unknown as FormEvent)} className="mt-5 hidden h-12 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75] lg:flex"><LockKeyhole className="mr-2 size-4" />Buat pesanan demo</Button>
-            <div className="mt-4 flex items-center justify-center gap-4 text-[9px] text-white/30"><span className="inline-flex items-center gap-1"><ShieldCheck className="size-3" /> Data aman</span><span className="inline-flex items-center gap-1"><CreditCard className="size-3" /> QRIS</span></div>
-            {created && <div className="mt-5 rounded-2xl border border-[#b9ff35]/30 bg-[#b9ff35]/[0.08] p-4"><BadgeCheck className="size-6 text-[#b9ff35]" /><h3 className="mt-3 text-sm font-black">Simulasi berhasil</h3><p className="mt-1 text-[11px] leading-5 text-white/45">Invoice demo dibuat. Tidak ada pembayaran atau pesanan asli yang dikirim.</p><Link href="/track" className="mt-3 inline-block text-xs font-bold text-[#cfff72] hover:underline">Lihat contoh status →</Link></div>}
+            <div className="flex items-end justify-between"><span className="text-sm font-bold">Total</span><strong className="text-xl font-black text-[#b9ff35]">{formatRupiah(payment?.total ?? subtotal)}</strong></div>
+            <p className="mt-3 rounded-xl bg-white/[0.035] p-3 text-[9px] leading-4 text-white/30">iPaymu menambahkan biaya layanan ke pembeli dengan pengaturan <span className="font-bold text-white/45">BUYER</span>. Nilai final tampil setelah pembayaran dibuat.</p>
+            <Button form="checkout-form" disabled={submitting} type="submit" className="mt-5 hidden h-12 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75] lg:flex">{submitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <LockKeyhole className="mr-2 size-4" />}Buat pembayaran</Button>
+            <div className="mt-4 flex items-center justify-center gap-4 text-[9px] text-white/30"><span className="inline-flex items-center gap-1"><ShieldCheck className="size-3" /> Data aman</span><span className="inline-flex items-center gap-1"><CreditCard className="size-3" /> iPaymu</span></div>
+            {payment && <PaymentBox payment={payment} />}
           </aside>
         </div>
       </main>
     </StoreLayout>
   );
+}
+
+function StepTitle({ number, title, description }: { number: string; title: string; description: string }) {
+  return <div className="flex items-center gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#b9ff35] text-sm font-black text-[#091006]">{number}</span><div><h2 className="font-bold">{title}</h2><p className="mt-0.5 text-[11px] text-white/35">{description}</p></div></div>;
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label><span className="field-label">{label}</span>{children}</label>;
+}
+
+function SummaryRow({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+  return <div className="flex justify-between gap-4"><dt className="text-white/38">{label}</dt><dd className={`max-w-52 truncate text-right font-semibold ${highlight ? "text-[#cfff72]" : ""}`}>{value}</dd></div>;
+}
+
+function PaymentBox({ payment }: { payment: PaymentResult }) {
+  const fulfillmentMessage = payment.fulfillmentType === "manual"
+    ? "Setelah lunas, pesanan masuk antrean admin."
+    : payment.providerCode === "voucher-stock"
+      ? "Setelah lunas, satu kode stok dikirim otomatis ke email/WhatsApp pembeli."
+      : "Setelah lunas, pesanan diteruskan otomatis ke provider.";
+  return <div className="mt-5 rounded-2xl border border-[#b9ff35]/30 bg-[#b9ff35]/[0.08] p-4"><BadgeCheck className="size-6 text-[#b9ff35]" /><h3 className="mt-3 text-sm font-black">Pembayaran dibuat</h3><p className="mt-1 break-all text-[10px] text-white/45">{payment.referenceId}</p>{payment.paymentNo && <div className="mt-3 rounded-xl bg-black/20 p-3"><span className="text-[9px] uppercase tracking-wider text-white/35">{payment.paymentName || "Nomor pembayaran"}</span><div className="mt-1 flex items-center justify-between gap-2"><strong className="break-all text-sm text-[#d8ff8d]">{payment.paymentNo}</strong><button type="button" onClick={() => void navigator.clipboard.writeText(payment.paymentNo!)} className="shrink-0 text-white/45 hover:text-white" aria-label="Salin nomor pembayaran"><Copy className="size-4" /></button></div></div>}{payment.expiredAt && <p className="mt-3 text-[9px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}{payment.paymentUrl && <Button asChild className="mt-4 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]"><a href={payment.paymentUrl} target="_blank" rel="noreferrer">Lanjut bayar <ExternalLink className="ml-2 size-4" /></a></Button>}<p className="mt-3 flex items-start gap-2 text-[9px] leading-4 text-white/38">{payment.fulfillmentType === "automatic" ? <Zap className="mt-0.5 size-3 shrink-0 text-[#b9ff35]" /> : <Info className="mt-0.5 size-3 shrink-0 text-amber-300" />}{fulfillmentMessage}</p></div>;
+}
+
+function NicknameResult({ state }: { state: NicknameState }) {
+  if (state.status === "loading") return <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#b9ff35]/15 bg-[#b9ff35]/[0.05] p-3 text-xs text-white/48"><LoaderCircle className="size-4 animate-spin text-[#b9ff35]" />Memeriksa ID dan Server…</div>;
+  if (state.status === "success") return <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-400/30 bg-emerald-400/[0.08] p-4"><BadgeCheck className="mt-0.5 size-5 shrink-0 text-emerald-400" /><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-300/70">Akun ditemukan</p><strong className="mt-1 block break-words text-sm text-emerald-200">{state.nickname}</strong>{state.country && <p className="mt-1 text-[10px] text-emerald-100/55">dari {state.country}{state.country.toLowerCase() === "indonesia" ? " 🇮🇩" : ""}</p>}</div></div>;
+  if (state.status === "error") return <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-400/25 bg-red-400/[0.07] p-4"><AlertCircle className="mt-0.5 size-5 shrink-0 text-red-300" /><div><p className="text-xs font-bold text-red-200">Akun belum terverifikasi</p><p className="mt-1 text-[10px] leading-5 text-red-100/55">{state.message}</p></div></div>;
+  return <div className="mt-4 flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-[10px] leading-5 text-white/32"><Info className="mt-0.5 size-3.5 shrink-0 text-[#b9ff35]" />Nickname akan tampil otomatis setelah User ID dan Server yang diperlukan terisi.</div>;
 }

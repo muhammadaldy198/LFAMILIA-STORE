@@ -1,61 +1,64 @@
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, Clock3, CreditCard, Gamepad2, Search, ShieldCheck, Zap } from "lucide-react";
+import { ArrowRight, Clock3, CreditCard, Gamepad2, Headphones, ReceiptText, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ProductCard } from "@/components/product-card";
+import { HomeProductBrowser } from "@/components/home-product-browser";
+import { QuickTools } from "@/components/quick-tools";
 import { StoreLayout } from "@/components/store-layout";
-import { products } from "@/lib/store-data";
 
-const benefits = [
-  { icon: Zap, title: "Proses otomatis", text: "Pesanan diteruskan setelah pembayaran terverifikasi." },
-  { icon: ShieldCheck, title: "Pembayaran aman", text: "Rencana pembayaran QRIS diproses melalui Midtrans." },
-  { icon: Clock3, title: "Bisa kapan saja", text: "Website menerima pesanan online selama 24 jam." },
+const steps = [
+  { number: "01", title: "Pilih produk", text: "Cari game atau voucher yang kamu inginkan.", icon: Gamepad2 },
+  { number: "02", title: "Isi data", text: "Masukkan ID dan pilih nominal top up.", icon: ReceiptText },
+  { number: "03", title: "Bayar aman", text: "Selesaikan pembayaran sesuai total pesanan.", icon: CreditCard },
+  { number: "04", title: "Pesanan diproses", text: "Status dapat dipantau melalui nomor invoice.", icon: Zap },
 ];
 
 export default function Home() {
-  const popular = products.filter((product) => product.popular).slice(0, 6);
   return (
     <StoreLayout>
       <main>
-        <section className="relative overflow-hidden">
+        <section className="relative overflow-hidden border-b border-white/[0.07]">
           <div className="hero-glow" aria-hidden="true" />
-          <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-14 sm:px-6 sm:pb-24 sm:pt-20 lg:grid-cols-[1.08fr_.92fr] lg:px-8 lg:py-28">
-            <div className="relative z-10">
-              <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#b9ff35]/25 bg-[#b9ff35]/[0.08] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[#d4ff83] sm:text-[11px]"><span className="size-1.5 rounded-full bg-[#b9ff35] shadow-[0_0_10px_#b9ff35]" /> Top up game Indonesia</p>
-              <h1 className="max-w-4xl text-balance text-[clamp(3.15rem,9vw,7rem)] font-black leading-[0.86] tracking-[-0.07em]">MAIN LEBIH LAMA.<span className="mt-2 block text-[#b9ff35]">ISI LEBIH CEPAT.</span></h1>
-              <p className="mt-7 max-w-xl text-base leading-7 text-white/56 sm:text-lg sm:leading-8">Top up game dan beli voucher digital dalam beberapa langkah. Cepat, praktis, dan mudah dipantau dari HP.</p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Button asChild className="h-12 rounded-xl bg-[#b9ff35] px-6 font-bold text-[#091006] hover:bg-[#d0ff75]"><Link href="/catalog"><Gamepad2 className="mr-2 size-4" />Pilih produk</Link></Button>
-                <Button asChild variant="outline" className="h-12 rounded-xl border-white/12 bg-white/[0.035] px-6 text-white hover:bg-white/[0.08] hover:text-white"><Link href="/track"><Search className="mr-2 size-4" />Cek transaksi</Link></Button>
-              </div>
-              <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-white/38"><span className="inline-flex items-center gap-1.5"><BadgeCheck className="size-3.5 text-[#b9ff35]" /> Tanpa registrasi untuk membeli</span><span className="inline-flex items-center gap-1.5"><CreditCard className="size-3.5 text-[#b9ff35]" /> QRIS segera tersedia</span></div>
-            </div>
-
-            <div className="relative mx-auto hidden w-full max-w-md lg:block">
-              <div className="absolute -inset-10 rounded-full bg-[#b9ff35]/10 blur-3xl" />
-              <div className="relative rotate-2 rounded-[34px] border border-white/10 bg-[#0d1019]/95 p-5 shadow-2xl shadow-black/50">
-                <div className="flex items-center justify-between border-b border-white/[0.08] pb-4"><div><p className="text-[10px] uppercase tracking-[0.2em] text-white/32">Pesanan demo</p><p className="mt-1 text-sm font-bold">Mobile Legends</p></div><span className="rounded-full bg-[#b9ff35]/10 px-3 py-1.5 text-[10px] font-bold text-[#cfff72]">SIAP DIPROSES</span></div>
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  {["59 Diamonds", "ID •••• 6789", "QRIS", "Rp17.624"].map((item, index) => <div key={item} className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4"><span className="text-[9px] uppercase tracking-wider text-white/28">{["Produk", "Tujuan", "Pembayaran", "Total"][index]}</span><strong className="mt-2 block text-sm">{item}</strong></div>)}
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+            <div className="relative overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#10131b] p-6 sm:p-9 lg:grid lg:grid-cols-[1.15fr_.85fr] lg:items-center lg:gap-10 lg:p-12">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(185,255,53,.13),transparent_34%)]" />
+              <div className="relative z-10">
+                <p className="inline-flex items-center gap-2 rounded-full border border-[#b9ff35]/20 bg-[#b9ff35]/[0.08] px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#d9ff92]"><Sparkles className="size-3.5" /> LFAMILIA STORE</p>
+                <h1 className="mt-5 max-w-3xl text-balance text-[clamp(2.55rem,7vw,5.5rem)] font-black leading-[0.92] tracking-[-0.06em]">Top up favoritmu,<span className="block text-[#b9ff35]">sat set tanpa ribet.</span></h1>
+                <p className="mt-5 max-w-xl text-sm leading-7 text-white/48 sm:text-base">Game, voucher, dan kalkulator dalam satu website LFAMILIA yang nyaman digunakan kapan saja.</p>
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                  <Button asChild className="h-12 rounded-xl bg-[#b9ff35] px-6 font-black text-[#091006] hover:bg-[#d0ff75]"><Link href="#produk"><Gamepad2 className="mr-2 size-4" />Top up sekarang</Link></Button>
+                  <Button asChild variant="outline" className="h-12 rounded-xl border-white/10 bg-white/[0.035] px-6 text-white hover:bg-white/[0.08] hover:text-white"><Link href="/track"><ReceiptText className="mr-2 size-4 text-[#b9ff35]" />Cek transaksi</Link></Button>
                 </div>
-                <div className="mt-5 rounded-2xl bg-[#b9ff35] p-4 text-[#091006]"><div className="flex items-center justify-between"><span className="text-xs font-bold">Alur otomatis</span><Zap className="size-4" /></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/15"><div className="h-full w-3/4 rounded-full bg-[#091006]" /></div><p className="mt-2 text-[10px] font-medium opacity-65">Bayar → verifikasi → produk dikirim</p></div>
+                <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-[10px] font-medium text-white/35 sm:text-[11px]"><span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5 text-[#b9ff35]" /> Pemesanan 24/7</span><span className="inline-flex items-center gap-1.5"><ShieldCheck className="size-3.5 text-[#b9ff35]" /> Data terlindungi</span><span className="inline-flex items-center gap-1.5"><Headphones className="size-3.5 text-[#b9ff35]" /> Bantuan pelanggan</span></div>
+              </div>
+
+              <div className="relative z-10 mt-9 lg:mt-0">
+                <div className="rounded-[24px] border border-white/10 bg-[#090b11]/80 p-4 shadow-2xl shadow-black/30 sm:p-5">
+                  <div className="flex items-center justify-between border-b border-white/[0.08] pb-4"><div><p className="text-[9px] uppercase tracking-[0.2em] text-white/30">Pesanan populer</p><strong className="mt-1 block text-sm">Mobile Legends</strong></div><span className="rounded-full bg-[#b9ff35]/10 px-3 py-1.5 text-[9px] font-bold text-[#cfff72]">PROSES CEPAT</span></div>
+                  <div className="mt-4 grid grid-cols-2 gap-3">{[["59 Diamonds", "Produk"], ["User ID + Zone", "Tujuan"], ["iPaymu", "Pembayaran"], ["24/7", "Otomatis"]].map(([value, label]) => <div key={label} className="rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4"><span className="text-[9px] uppercase tracking-wider text-white/27">{label}</span><strong className="mt-2 block text-xs sm:text-sm">{value}</strong></div>)}</div>
+                  <div className="mt-4 rounded-2xl border border-[#b9ff35]/15 bg-[#b9ff35]/[0.07] p-4"><div className="flex items-center justify-between text-xs font-bold text-[#d9ff92]"><span>LFAMILIA Secure Flow</span><ShieldCheck className="size-4" /></div><div className="mt-3 grid grid-cols-4 gap-1.5">{[0, 1, 2, 3].map((item) => <span key={item} className="h-1.5 rounded-full bg-[#b9ff35]" />)}</div></div>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="border-y border-white/[0.07] bg-white/[0.018]"><div className="mx-auto grid max-w-7xl grid-cols-3 px-4 py-6 sm:px-6 lg:px-8">{[["9+", "Produk demo"], ["24/7", "Pemesanan"], ["QRIS", "Pembayaran"]].map(([value, label]) => <div key={value} className="border-r border-white/[0.08] px-2 text-center last:border-r-0 sm:px-6"><strong className="block text-xl font-black sm:text-2xl">{value}</strong><span className="mt-1 block text-[9px] text-white/32 sm:text-xs">{label}</span></div>)}</div></section>
-
-        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
-          <div className="mb-8 flex items-end justify-between gap-4"><div><p className="eyebrow">Paling dicari</p><h2 className="section-title">Produk populer</h2></div><Link href="/catalog" className="hidden items-center gap-2 text-sm font-bold text-[#cfff72] hover:text-white sm:flex">Semua produk <ArrowRight className="size-4" /></Link></div>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">{popular.map((product) => <ProductCard key={product.slug} product={product} />)}</div>
-          <Button asChild variant="outline" className="mt-6 w-full rounded-xl border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] sm:hidden"><Link href="/catalog">Lihat semua produk <ArrowRight className="ml-2 size-4" /></Link></Button>
+        <section className="mx-auto max-w-7xl px-4 pt-12 sm:px-6 sm:pt-16 lg:px-8">
+          <div className="mb-6"><p className="eyebrow">Menu cepat</p><h2 className="text-2xl font-black tracking-tight sm:text-3xl">Semua yang kamu butuhkan</h2></div>
+          <QuickTools />
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8">
-          <div className="overflow-hidden rounded-[30px] border border-white/[0.09] bg-[#0b0e16] p-6 sm:p-10">
-            <p className="eyebrow">Kenapa LFAMILIA</p><h2 className="section-title max-w-xl">Dibuat supaya top up tidak merepotkan.</h2>
-            <div className="mt-10 grid gap-5 md:grid-cols-3">{benefits.map(({ icon: Icon, title, text }, index) => <article key={title} className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"><div className="flex items-center justify-between"><span className="grid size-10 place-items-center rounded-xl bg-[#b9ff35]/10 text-[#b9ff35]"><Icon className="size-5" /></span><span className="font-mono text-[10px] text-white/20">0{index + 1}</span></div><h3 className="mt-6 font-bold">{title}</h3><p className="mt-2 text-sm leading-6 text-white/40">{text}</p></article>)}</div>
+        <HomeProductBrowser />
+
+        <section className="border-y border-white/[0.07] bg-white/[0.018]">
+          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="eyebrow">Cara top up</p><h2 className="section-title">Empat langkah sederhana</h2></div><Link href="/faq" className="inline-flex items-center gap-2 text-xs font-bold text-[#cfff72]">Pelajari lebih lanjut <ArrowRight className="size-4" /></Link></div>
+            <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{steps.map(({ number, title, text, icon: Icon }) => <article key={number} className="rounded-2xl border border-white/[0.08] bg-[#0d1017] p-5"><div className="flex items-center justify-between"><span className="grid size-10 place-items-center rounded-xl bg-[#b9ff35]/[0.09] text-[#cfff72]"><Icon className="size-5" /></span><span className="font-mono text-[10px] text-white/20">{number}</span></div><h3 className="mt-5 text-sm font-bold">{title}</h3><p className="mt-2 text-xs leading-5 text-white/36">{text}</p></article>)}</div>
           </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
+          <div className="flex flex-col items-start justify-between gap-6 overflow-hidden rounded-[28px] border border-[#b9ff35]/20 bg-[#b9ff35]/[0.07] p-7 sm:flex-row sm:items-center sm:p-10"><div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#cfff72]">Butuh bantuan?</p><h2 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">Tim LFAMILIA siap membantu.</h2><p className="mt-3 max-w-xl text-sm leading-6 text-white/42">Sampaikan pertanyaan mengenai produk, pembayaran, atau status pesanan melalui pusat bantuan.</p></div><Button asChild className="h-12 shrink-0 rounded-xl bg-[#b9ff35] px-6 font-black text-[#091006] hover:bg-[#d0ff75]"><Link href="/contact"><Headphones className="mr-2 size-4" />Hubungi Kami</Link></Button></div>
         </section>
       </main>
     </StoreLayout>

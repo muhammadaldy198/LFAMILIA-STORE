@@ -8,6 +8,22 @@
     "directory": "dist/client",
     "not_found_handling": "none",
     "binding": "ASSETS"
-  }
+  },
+  "vars": {
+    "NICKNAME_API_URL": "https://api.isan.eu.org/nickname",
+    "IPAYMU_ENV": "sandbox",
+    "DIGIFLAZZ_ENV": "development",
+    "VOUCHER_DELIVERY_CHANNEL": "both",
+    "WHATSAPP_VOUCHER_TEMPLATE": "lfamilia_voucher_delivery",
+    "WHATSAPP_TEMPLATE_LANGUAGE": "id",
+    "WHATSAPP_GRAPH_VERSION": "v23.0"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lfamilia-store-db",
+      "database_id": "d13939fa-c5c6-4c0e-868a-912bb875fc8d",
+      "migrations_dir": "drizzle"
+    }
+  ]
 }
-
