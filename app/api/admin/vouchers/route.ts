@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getAdminEmail, unauthorizedResponse } from "@/lib/server/admin";
+import { requireAdminSession } from "@/lib/server/admin";
 import { fulfillAutomaticOrder, getOrderById } from "@/lib/server/orders";
 import { importVoucherCodes, listVoucherDashboard, revealVoucherCode } from "@/lib/server/vouchers";
 
@@ -27,7 +27,8 @@ function message(error: unknown, fallback: string) {
 }
 
 export async function GET(request: Request) {
-  if (!getAdminEmail(request)) return unauthorizedResponse();
+  const access = await requireAdminSession(request, "owner");
+  if (access instanceof Response) return access;
   try {
     return Response.json(await listVoucherDashboard(), { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
@@ -36,7 +37,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!getAdminEmail(request)) return unauthorizedResponse();
+  const access = await requireAdminSession(request, "owner");
+  if (access instanceof Response) return access;
   try {
     const body = await request.json();
     if (body?.action === "reveal") {
@@ -51,7 +53,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!getAdminEmail(request)) return unauthorizedResponse();
+  const access = await requireAdminSession(request, "owner");
+  if (access instanceof Response) return access;
   try {
     const input = retrySchema.parse(await request.json());
     const order = await getOrderById(input.orderId);

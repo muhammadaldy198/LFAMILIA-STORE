@@ -76,3 +76,29 @@ test("delivery attempts are unique per order and channel", () => {
     (order_id, voucher_code_id, channel, status, attempts)
     VALUES ('order-a', ?, 'email', 'sent', 1)`).run(codeId), /UNIQUE/i);
 });
+
+test("final storefront migration creates editable content, promotions, and admin roles", () => {
+  const db = migratedDatabase();
+  const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name));
+  for (const table of ["store_settings", "product_categories", "product_notices", "discount_vouchers", "flash_sales", "admin_users", "faq_entries"]) {
+    assert.ok(tables.has(table), `${table} should exist`);
+  }
+  const owner = db.prepare("SELECT email, role, is_active FROM admin_users LIMIT 1").get();
+  assert.equal(owner.email, "muhammadaldy198@gmail.com");
+  assert.equal(owner.role, "owner");
+  assert.equal(owner.is_active, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM product_categories").get().count, 4);
+});
+
+test("product notices cascade and flash sales can be scheduled repeatedly", () => {
+  const db = migratedDatabase();
+  const productId = Number(db.prepare(`INSERT INTO products (
+    slug, name, publisher, category, initials, accent, input_label, input_placeholder
+  ) VALUES ('test-game', 'Test Game', 'Studio', 'game', 'TG', 'from-black to-white', 'User ID', 'Masukkan ID') RETURNING id`).get().id);
+  db.prepare("INSERT INTO product_notices (product_id, title, body) VALUES (?, 'Jam layanan', 'Buka pukul 09.00')").run(productId);
+  db.prepare("INSERT INTO flash_sales (product_slug, package_sku, sale_price, starts_at, ends_at) VALUES ('test-game', 'sku-1', 9000, '2026-08-01T00:00:00.000Z', '2026-08-02T00:00:00.000Z')").run();
+  db.prepare("INSERT INTO flash_sales (product_slug, package_sku, sale_price, starts_at, ends_at) VALUES ('test-game', 'sku-1', 8000, '2026-09-01T00:00:00.000Z', '2026-09-02T00:00:00.000Z')").run();
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM flash_sales").get().count, 2);
+  db.prepare("DELETE FROM products WHERE id = ?").run(productId);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM product_notices").get().count, 0);
+});

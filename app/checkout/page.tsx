@@ -18,11 +18,14 @@ import {
   QrCode,
   ShieldCheck,
   WalletCards,
+  X,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StoreLayout } from "@/components/store-layout";
+import { ProductArtwork } from "@/components/product-artwork";
 import { useStoreProducts } from "@/hooks/use-store-products";
 import { paymentChannels, paymentGroups, type PaymentMethodCode } from "@/lib/payment-methods";
 import { formatRupiah } from "@/lib/store-data";
@@ -47,6 +50,21 @@ type PaymentResult = {
   expiredAt: string | null;
   fulfillmentType: "automatic" | "manual";
   providerCode: string | null;
+  basePrice: number;
+  sellingPrice: number;
+  discountAmount: number;
+  voucherCode: string | null;
+  flashSaleId: number | null;
+};
+
+type PromotionQuote = {
+  basePrice: number;
+  sellingPrice: number;
+  discountAmount: number;
+  finalPrice: number;
+  voucherCode: string | null;
+  flashSaleId: number | null;
+  flashSaleEndsAt: string | null;
 };
 
 const groupIcons = { va: Landmark, ewallet: WalletCards, qris: QrCode };
@@ -69,7 +87,8 @@ function CheckoutContent() {
   const searchParams = useSearchParams();
   const requestedProduct = searchParams.get("product");
   const product = useMemo(() => products.find((item) => item.slug === requestedProduct) ?? products[0], [products, requestedProduct]);
-  const [packageId, setPackageId] = useState("");
+  const requestedPackage = searchParams.get("package");
+  const [packageId, setPackageId] = useState(() => requestedPackage && product.packages.some((item) => item.id === requestedPackage) ? requestedPackage : "");
   const [destination, setDestination] = useState("");
   const [server, setServer] = useState("");
   const [buyerName, setBuyerName] = useState("");
@@ -83,9 +102,16 @@ function CheckoutContent() {
   const [payment, setPayment] = useState<PaymentResult | null>(null);
   const [error, setError] = useState("");
   const [nickname, setNickname] = useState<NicknameState>({ status: "idle" });
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [noticeIndex, setNoticeIndex] = useState(0);
+  const [hideNotice, setHideNotice] = useState(false);
+  const [voucherCode, setVoucherCode] = useState("");
+  const [voucherMessage, setVoucherMessage] = useState("");
+  const [quote, setQuote] = useState<PromotionQuote | null>(null);
+  const [applyingVoucher, setApplyingVoucher] = useState(false);
 
   const selectedPackage = product.packages.find((item) => item.id === packageId);
-  const subtotal = selectedPackage?.price ?? 0;
+  const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
   const isManual = product.fulfillmentType === "manual";
   const isVoucherStock = selectedPackage?.providerCode === "voucher-stock";
   const providerReady = isManual || Boolean(selectedPackage?.providerCode && selectedPackage?.providerSku);
@@ -94,6 +120,27 @@ function CheckoutContent() {
   const lookupKey = `${product.slug}:${destination.trim()}:${server.trim()}`;
   const visibleNickname: NicknameState = nickname.key === lookupKey ? nickname : { status: "idle" };
   const channels = paymentChannels.filter((item) => item.method === paymentMethod);
+  const notices = (product.notices ?? []).filter((item) => item.isActive !== false);
+  const noticeSignature = noticeVersion(notices);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setNoticeIndex(0);
+      setHideNotice(false);
+      if (!notices.length) { setNoticeOpen(false); return; }
+      const key = `lfamilia-notice:${product.slug}:${noticeSignature}`;
+      const hiddenUntil = Number(window.localStorage.getItem(key) || 0);
+      setNoticeOpen(hiddenUntil < Date.now());
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [noticeSignature, notices.length, product.slug]);
+
+  useEffect(() => {
+    if (!selectedPackage) return;
+    const controller = new AbortController();
+    void requestQuote(product.slug, selectedPackage.id, "", controller.signal).then(setQuote).catch(() => undefined);
+    return () => controller.abort();
+  }, [product.slug, selectedPackage]);
 
   useEffect(() => {
     const cleanId = destination.trim();
@@ -124,6 +171,36 @@ function CheckoutContent() {
     setPaymentMethod(method);
     setPaymentChannel(paymentChannels.find((item) => item.method === method)?.channel ?? "");
     setPayment(null);
+  }
+
+  function choosePackage(id: string) {
+    setPackageId(id);
+    setPayment(null);
+    setVoucherCode("");
+    setVoucherMessage("");
+    setQuote(null);
+  }
+
+  function closeNotice() {
+    if (hideNotice) window.localStorage.setItem(`lfamilia-notice:${product.slug}:${noticeSignature}`, String(Date.now() + 7 * 24 * 60 * 60 * 1000));
+    setNoticeOpen(false);
+  }
+
+  async function applyVoucher() {
+    if (!selectedPackage) { setVoucherMessage("Pilih nominal terlebih dahulu."); return; }
+    setApplyingVoucher(true);
+    setVoucherMessage("");
+    try {
+      const nextQuote = await requestQuote(product.slug, selectedPackage.id, voucherCode);
+      setQuote(nextQuote);
+      setVoucherCode(nextQuote.voucherCode ?? "");
+      setVoucherMessage(nextQuote.voucherCode ? `Voucher ${nextQuote.voucherCode} berhasil digunakan.` : "Harga promo sudah diperbarui.");
+    } catch (reason) {
+      setQuote(null);
+      setVoucherMessage(reason instanceof Error ? reason.message : "Voucher tidak dapat digunakan.");
+    } finally {
+      setApplyingVoucher(false);
+    }
   }
 
   async function submitOrder(event: FormEvent) {
@@ -159,6 +236,7 @@ function CheckoutContent() {
           customerNotes: customerNotes.trim() || undefined,
           paymentMethod,
           paymentChannel,
+          voucherCode: voucherCode.trim() || undefined,
         }),
       });
       const data = await response.json() as PaymentResult & { error?: string };
@@ -180,10 +258,10 @@ function CheckoutContent() {
             <section className="panel overflow-hidden">
               <div className="flex items-center justify-between gap-4 border-b border-white/[0.08] bg-white/[0.02] p-5 sm:p-6">
                 <StepTitle number="1" title="Masukkan Data Akun" description="Nickname diperiksa otomatis jika game mendukung." />
-                <div className="hidden items-center gap-3 sm:flex"><span className={`grid size-10 place-items-center rounded-xl bg-gradient-to-br ${product.accent} text-xs font-black`}>{product.initials}</span><div className="max-w-36"><strong className="block truncate text-xs">{product.name}</strong><Link href="/catalog" className="mt-1 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link></div></div>
+                <div className="hidden items-center gap-3 sm:flex"><span className="block size-10 overflow-hidden rounded-xl"><ProductArtwork product={product} compact /></span><div className="max-w-36"><strong className="block truncate text-xs">{product.name}</strong><Link href="/catalog" className="mt-1 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link></div></div>
               </div>
               <div className="p-5 sm:p-6">
-                <div className="mb-5 flex items-center gap-3 sm:hidden"><span className={`grid size-10 place-items-center rounded-xl bg-gradient-to-br ${product.accent} text-xs font-black`}>{product.initials}</span><div><strong className="block text-xs">{product.name}</strong><Link href="/catalog" className="mt-1 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link></div></div>
+                <div className="mb-5 flex items-center gap-3 sm:hidden"><span className="block size-10 overflow-hidden rounded-xl"><ProductArtwork product={product} compact /></span><div><strong className="block text-xs">{product.name}</strong><Link href="/catalog" className="mt-1 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link></div></div>
                 <div className={product.needsServer ? "grid gap-4 sm:grid-cols-2" : "grid gap-4"}>
                   <Field label={product.inputLabel}><Input value={destination} onChange={(event) => { setDestination(event.target.value); setPayment(null); setError(""); }} placeholder={product.inputPlaceholder} autoComplete="off" className="checkout-input" /></Field>
                   {product.needsServer && <Field label="Server / Zone ID"><Input inputMode="numeric" value={server} onChange={(event) => { setServer(event.target.value.replace(/\D/g, "")); setPayment(null); setError(""); }} placeholder="Contoh: 1234" autoComplete="off" className="checkout-input" /></Field>}
@@ -197,12 +275,13 @@ function CheckoutContent() {
               <StepTitle number="2" title="Pilih nominal" description={isManual ? "Pesanan diproses admin setelah pembayaran." : isVoucherStock ? "Satu kode stok dikirim otomatis setelah pembayaran." : "Pesanan diteruskan otomatis ke provider."} />
               <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">{product.packages.map((item) => {
                 const ready = isManual || Boolean(item.providerCode && item.providerSku);
-                return <button key={item.id} type="button" onClick={() => { setPackageId(item.id); setPayment(null); }} className={`relative min-h-24 rounded-2xl border p-3 text-left transition ${packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.2)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}>
+                return <button key={item.id} type="button" onClick={() => choosePackage(item.id)} className={`relative min-h-24 rounded-2xl border p-3 text-left transition ${packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.2)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}>
                   {item.note && <span className="absolute right-2 top-2 rounded-full bg-[#b9ff35] px-2 py-0.5 text-[8px] font-black uppercase text-[#091006]">{item.note}</span>}
                   <strong className="block pr-8 text-xs leading-5">{item.label}</strong><span className="mt-2 block text-[11px] font-bold text-[#cfff72]">{formatRupiah(item.price)}</span>
                   {!ready && <span className="mt-2 block text-[8px] font-semibold text-amber-300/70">SKU belum diatur</span>}
                 </button>;
               })}</div>
+              <div className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4"><label className="field-label" htmlFor="voucher-code">Kode voucher diskon</label><div className="flex gap-2"><Input id="voucher-code" value={voucherCode} onChange={(event) => { setVoucherCode(event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "")); setVoucherMessage(""); }} placeholder="Masukkan kode promo" className="checkout-input font-mono uppercase" /><Button type="button" onClick={() => void applyVoucher()} disabled={applyingVoucher || !packageId} variant="outline" className="h-12 shrink-0 rounded-xl border-white/10 bg-white/[0.04] px-4 text-white hover:bg-white/[0.08] hover:text-white">{applyingVoucher ? <LoaderCircle className="size-4 animate-spin" /> : "Gunakan"}</Button></div>{voucherMessage && <p className={`mt-2 text-[10px] ${quote?.voucherCode ? "text-[#cfff72]" : "text-amber-200"}`}>{voucherMessage}</p>}</div>
             </section>
 
             <section className="panel p-5 sm:p-6">
@@ -239,6 +318,8 @@ function CheckoutContent() {
               {visibleNickname.nickname && <SummaryRow label="Nickname" value={visibleNickname.nickname} highlight />}
               <SummaryRow label="Nominal" value={selectedPackage?.label ?? "Belum dipilih"} />
               <SummaryRow label="Harga" value={formatRupiah(subtotal)} />
+              {quote && quote.sellingPrice < quote.basePrice && <SummaryRow label="Flash sale" value={`-${formatRupiah(quote.basePrice - quote.sellingPrice)}`} highlight />}
+              {quote && quote.discountAmount > 0 && <SummaryRow label={`Voucher ${quote.voucherCode ?? ""}`} value={`-${formatRupiah(quote.discountAmount)}`} highlight />}
               <SummaryRow label="Biaya iPaymu" value={payment ? formatRupiah(payment.fee) : "Dihitung iPaymu"} />
               <SummaryRow label="Proses" value={isManual ? "Antrean admin" : isVoucherStock ? "Kirim kode otomatis" : (selectedPackage?.providerCode || "Provider belum diatur")} />
             </dl>
@@ -251,8 +332,37 @@ function CheckoutContent() {
           </aside>
         </div>
       </main>
+      <Dialog open={noticeOpen} onOpenChange={(open) => { if (!open) closeNotice(); else setNoticeOpen(true); }}>
+        <DialogContent className="max-w-lg overflow-hidden border-white/10 bg-[#080b14] p-0 text-white" showCloseButton={false}>
+          {notices.length > 0 && <><div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-4"><span className="font-mono text-xs text-white/40">{noticeIndex + 1}/{notices.length}</span><button type="button" onClick={closeNotice} className="rounded-lg p-1.5 text-white/55 hover:bg-white/[0.06] hover:text-white" aria-label="Tutup informasi"><X className="size-5" /></button></div><div className="px-6 py-6"><DialogHeader><DialogTitle className="text-left text-lg font-black uppercase leading-7">{formatNotice(notices[noticeIndex].title, product)}</DialogTitle><DialogDescription className="whitespace-pre-line text-left text-sm leading-7 text-white/64">{formatNotice(notices[noticeIndex].body, product)}</DialogDescription></DialogHeader>{notices.length > 1 && <div className="mt-6 flex items-center justify-between gap-3"><Button type="button" variant="outline" disabled={noticeIndex === 0} onClick={() => setNoticeIndex((value) => Math.max(0, value - 1))} className="border-white/10 bg-white/[0.03] text-white">Sebelumnya</Button><Button type="button" disabled={noticeIndex === notices.length - 1} onClick={() => setNoticeIndex((value) => Math.min(notices.length - 1, value + 1))} className="bg-[#b9ff35] text-[#091006]">Berikutnya</Button></div>}</div><label className="flex cursor-pointer items-center gap-3 border-t border-white/[0.08] px-6 py-5 text-xs text-white/45"><input type="checkbox" checked={hideNotice} onChange={(event) => setHideNotice(event.target.checked)} className="size-4 accent-[#b9ff35]" />Jangan tampilkan lagi dalam 7 hari</label></>}
+        </DialogContent>
+      </Dialog>
     </StoreLayout>
   );
+}
+
+function formatNotice(value: string, product: { manualOpenTime?: string; manualCloseTime?: string; manualTimezone?: string }) {
+  const zone = product.manualTimezone === "Asia/Makassar" ? "WITA" : product.manualTimezone === "Asia/Jayapura" ? "WIT" : "WIB";
+  return value
+    .replaceAll("{{jam_buka}}", product.manualOpenTime ?? "-")
+    .replaceAll("{{jam_tutup}}", product.manualCloseTime ?? "-")
+    .replaceAll("{{zona_waktu}}", zone);
+}
+
+function noticeVersion(notices: Array<{ title: string; body: string }>) {
+  let hash = 2166136261;
+  for (const character of notices.map((item) => `${item.title}\n${item.body}`).join("\n---\n")) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+async function requestQuote(productSlug: string, packageSku: string, voucherCode = "", signal?: AbortSignal) {
+  const response = await fetch("/api/promotions/quote", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ productSlug, packageSku, voucherCode: voucherCode || undefined }), signal });
+  const data = await response.json() as PromotionQuote & { error?: string };
+  if (!response.ok) throw new Error(data.error ?? "Harga promo gagal dihitung.");
+  return data;
 }
 
 function StepTitle({ number, title, description }: { number: string; title: string; description: string }) {

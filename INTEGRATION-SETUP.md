@@ -12,7 +12,7 @@ Jalankan migrasi production satu kali:
 npx wrangler d1 migrations apply lfamilia-store-db --remote
 ```
 
-Jangan menghapus migrasi `0000`, `0001`, atau `0002`. Setelah migrasi berhasil, buka `/admin`, masuk melalui Cloudflare Access, lalu tekan tombol impor data awal pada tab Produk.
+Jangan menghapus migrasi `0000`, `0001`, `0002`, atau `0003`. Setelah migrasi berhasil, buka `/admin`, masuk melalui Cloudflare Access, lalu tekan tombol **Lengkapi katalog utama** pada tab Produk. Tindakan ini menambahkan produk/nominal yang belum ada tanpa menimpa perubahan Anda.
 
 ## 2. Secret Cloudflare Worker
 
@@ -38,6 +38,7 @@ Tambahkan Variable biasa:
 | `PUBLIC_BASE_URL` | `https://domain-toko-anda` tanpa `/` terakhir |
 | `IPAYMU_ENV` | `sandbox` |
 | `DIGIFLAZZ_ENV` | `development` |
+| `OWNER_EMAIL` | Email Pemilik utama yang sama dengan Cloudflare Access |
 | `NICKNAME_API_URL` | URL API validasi nickname yang Anda izinkan |
 | `VOUCHER_DELIVERY_CHANNEL` | `email`, `whatsapp`, atau `both` |
 | `RESEND_FROM_EMAIL` | Pengirim dari domain email yang sudah diverifikasi |
@@ -68,14 +69,16 @@ Di `/admin` buka tab **Produk**.
 - Produk manual: pilih tipe Manual dan isi instruksi. Setelah lunas, pesanan masuk tab Pesanan dan admin menandainya selesai.
 - `target_template` mendukung `{{destination}}` dan `{{server}}`. Contoh Mobile Legends: `{{destination}}{{server}}` untuk DigiFlazz.
 
-Harga Roblox manual bawaan hanyalah contoh. Ganti harga dan instruksinya sebelum toko menerima pembayaran nyata.
+Verifikasi harga, margin, jam operasional, dan instruksi setiap produk sebelum menerima pembayaran.
 
 ## 5. Keamanan admin
 
-Admin tidak ditautkan dari toko utama. Lindungi dua pola berikut dengan Cloudflare Access dan hanya izinkan email pemilik:
+Admin tidak ditautkan dari toko utama. Lindungi dua pola berikut dengan Cloudflare Access dan hanya izinkan email Pemilik/Staff yang dipercaya:
 
 - `/admin*`
 - `/api/admin*`
+
+Login memakai identitas email Cloudflare Access (kode sekali pakai atau identity provider), sehingga website tidak menyimpan password admin. Setelah email diizinkan oleh Access, daftarkan email yang sama di **Admin → Tim admin** dan pilih role **Pemilik** atau **Staff**. Tetapkan `OWNER_EMAIL` ke email Pemilik utama.
 
 Jangan membuka admin sebelum Access aktif. Bila memakai custom domain, pastikan alamat alternatif `workers.dev` tidak menjadi jalan masuk publik yang tidak dilindungi.
 

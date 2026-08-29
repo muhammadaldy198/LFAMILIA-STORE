@@ -1,4 +1,6 @@
-export type ProductCategory = "game" | "voucher";
+// Categories are managed from the admin panel, so this intentionally remains
+// open-ended instead of limiting the catalog to a fixed set of slugs.
+export type ProductCategory = string;
 
 export type ProductPackage = {
   id: string;
@@ -11,11 +13,20 @@ export type ProductPackage = {
 
 export type FulfillmentType = "automatic" | "manual";
 
+export type ProductNotice = {
+  id?: number | null;
+  title: string;
+  body: string;
+  isActive?: boolean;
+  sortOrder?: number;
+};
+
 export type StoreProduct = {
   slug: string;
   name: string;
   publisher: string;
   category: ProductCategory;
+  imageUrl?: string;
   initials: string;
   accent: string;
   popular?: boolean;
@@ -23,9 +34,13 @@ export type StoreProduct = {
   fulfillmentType: FulfillmentType;
   targetTemplate: string;
   manualInstructions?: string;
+  manualOpenTime?: string;
+  manualCloseTime?: string;
+  manualTimezone?: string;
   needsServer?: boolean;
   inputLabel: string;
   inputPlaceholder: string;
+  notices?: ProductNotice[];
   packages: ProductPackage[];
 };
 
@@ -125,6 +140,8 @@ export const products: StoreProduct[] = [
     accent: "from-[#6d7b91] via-[#303845] to-[#11151c]", popular: true, instant: false,
     fulfillmentType: "manual", targetTemplate: "{{destination}}",
     manualInstructions: "Masukkan link Gamepass yang benar. Pesanan diperiksa admin dan diproses manual setelah pembayaran.",
+    manualOpenTime: "09:00", manualCloseTime: "21:00", manualTimezone: "Asia/Jakarta",
+    notices: [{ title: "JAM OPERASIONAL {{jam_buka}} – {{jam_tutup}} {{zona_waktu}}", body: "Estimasi proses 30 menit sampai 2 jam.\n\nProduk ini diproses manual. Admin akan menghubungi melalui WhatsApp setelah pembayaran berhasil." }],
     inputLabel: "Link Gamepass", inputPlaceholder: "https://www.roblox.com/game-pass/...",
     packages: [
       { id: "roblox-gp-100", label: "100 Robux via Gamepass", price: 20000, note: "Manual" },
@@ -137,6 +154,8 @@ export const products: StoreProduct[] = [
     accent: "from-[#ff5a5f] via-[#a6213f] to-[#35101f]", instant: false,
     fulfillmentType: "manual", targetTemplate: "{{destination}}",
     manualInstructions: "Masukkan username dan nama item yang ingin diterima. Admin akan menghubungi melalui WhatsApp untuk jadwal pengiriman.",
+    manualOpenTime: "09:00", manualCloseTime: "21:00", manualTimezone: "Asia/Jakarta",
+    notices: [{ title: "JAM OPERASIONAL {{jam_buka}} – {{jam_tutup}} {{zona_waktu}}", body: "Estimasi proses mengikuti antrean admin.\n\nPastikan username dan nama item sudah benar. Admin akan menghubungi melalui WhatsApp setelah pembayaran berhasil." }],
     inputLabel: "Username Roblox", inputPlaceholder: "Masukkan username Roblox",
     packages: [
       { id: "roblox-gift-small", label: "Gift in Game — Paket S", price: 25000, note: "Manual" },
@@ -149,6 +168,8 @@ export const products: StoreProduct[] = [
     accent: "from-[#8d69ff] via-[#5531a5] to-[#24154d]", instant: false,
     fulfillmentType: "manual", targetTemplate: "{{destination}}",
     manualInstructions: "Masukkan username saja—jangan pernah masukkan password atau kode OTP di website. Detail aman akan dikonfirmasi admin melalui WhatsApp.",
+    manualOpenTime: "09:00", manualCloseTime: "21:00", manualTimezone: "Asia/Jakarta",
+    notices: [{ title: "JAM OPERASIONAL {{jam_buka}} – {{jam_tutup}} {{zona_waktu}}", body: "Estimasi proses 30 menit sampai 2 jam.\n\nProduk ini diproses via login. Jangan pernah mengirim OTP melalui form website; admin akan menghubungi melalui WhatsApp setelah pembayaran berhasil." }],
     inputLabel: "Username Roblox (tanpa password)", inputPlaceholder: "Masukkan username Roblox",
     packages: [
       { id: "roblox-login-100", label: "100 Robux Via Login", price: 18000, note: "Manual" },
@@ -156,11 +177,160 @@ export const products: StoreProduct[] = [
       { id: "roblox-login-1000", label: "1.000 Robux Via Login", price: 165000 },
     ],
   },
+  {
+    slug: "call-of-duty-mobile", name: "Call of Duty Mobile", publisher: "Activision", category: "game", initials: "COD",
+    accent: "from-[#f5cf55] via-[#6d5b25] to-[#17150d]", popular: true, instant: true,
+    fulfillmentType: "automatic", targetTemplate: "{{destination}}",
+    inputLabel: "Player ID", inputPlaceholder: "Masukkan Player ID",
+    packages: [
+      { id: "codm-31", label: "31 CP", price: 6000 }, { id: "codm-63", label: "63 CP", price: 11500 },
+      { id: "codm-128", label: "128 CP", price: 22500, note: "Populer" }, { id: "codm-645", label: "645 CP", price: 108000 },
+    ],
+  },
+  {
+    slug: "wild-rift", name: "League of Legends: Wild Rift", publisher: "Riot Games", category: "game", initials: "WR",
+    accent: "from-[#59d7e8] via-[#196b9c] to-[#112951]", instant: true,
+    fulfillmentType: "automatic", targetTemplate: "{{destination}}",
+    inputLabel: "Riot ID", inputPlaceholder: "Contoh: Player#TAG",
+    packages: [
+      { id: "wr-425", label: "425 Wild Cores", price: 49000 }, { id: "wr-1000", label: "1.000 Wild Cores", price: 109000, note: "Populer" },
+      { id: "wr-2050", label: "2.050 Wild Cores", price: 219000 },
+    ],
+  },
+  {
+    slug: "arena-of-valor", name: "Arena of Valor", publisher: "Garena", category: "game", initials: "AOV",
+    accent: "from-[#eecc72] via-[#7b4d2b] to-[#251711]", instant: true,
+    fulfillmentType: "automatic", targetTemplate: "{{destination}}",
+    inputLabel: "Player ID", inputPlaceholder: "Masukkan Player ID",
+    packages: [
+      { id: "aov-40", label: "40 Vouchers", price: 10000 }, { id: "aov-90", label: "90 Vouchers", price: 21000 },
+      { id: "aov-230", label: "230 Vouchers", price: 51000, note: "Populer" },
+    ],
+  },
+  {
+    slug: "fc-mobile", name: "EA SPORTS FC Mobile", publisher: "Electronic Arts", category: "game", initials: "FC",
+    accent: "from-[#54e884] via-[#16835c] to-[#0b2821]", instant: true,
+    fulfillmentType: "automatic", targetTemplate: "{{destination}}",
+    inputLabel: "User ID", inputPlaceholder: "Masukkan User ID",
+    packages: [
+      { id: "fcm-40", label: "40 FC Points", price: 9000 }, { id: "fcm-100", label: "100 FC Points", price: 21000 },
+      { id: "fcm-520", label: "520 FC Points", price: 99000, note: "Populer" },
+    ],
+  },
+  {
+    slug: "efootball", name: "eFootball", publisher: "Konami", category: "game", initials: "EF",
+    accent: "from-[#397cff] via-[#4531c8] to-[#171450]", instant: true,
+    fulfillmentType: "automatic", targetTemplate: "{{destination}}",
+    inputLabel: "User ID", inputPlaceholder: "Masukkan User ID eFootball",
+    packages: [
+      { id: "ef-130", label: "130 Coins", price: 19000 }, { id: "ef-300", label: "300 Coins", price: 42000, note: "Populer" },
+      { id: "ef-550", label: "550 Coins", price: 75000 },
+    ],
+  },
+  {
+    slug: "point-blank", name: "Point Blank", publisher: "Zepetto", category: "game", initials: "PB",
+    accent: "from-[#ef6d55] via-[#8a2d2a] to-[#2c1112]", instant: true,
+    fulfillmentType: "automatic", targetTemplate: "{{destination}}",
+    inputLabel: "User ID", inputPlaceholder: "Masukkan User ID Point Blank",
+    packages: [
+      { id: "pb-1200", label: "1.200 Cash", price: 10000 }, { id: "pb-2400", label: "2.400 Cash", price: 20000 },
+      { id: "pb-6000", label: "6.000 Cash", price: 50000, note: "Populer" },
+    ],
+  },
+  {
+    slug: "garena-shells", name: "Garena Shells", publisher: "Garena", category: "voucher", initials: "GS",
+    accent: "from-[#ee524b] via-[#a51f28] to-[#390d16]", popular: true, instant: true,
+    fulfillmentType: "automatic", targetTemplate: "{{destination}}",
+    inputLabel: "Nomor WhatsApp / email", inputPlaceholder: "Untuk menerima kode voucher",
+    packages: [
+      { id: "gs-33", label: "33 Shells", price: 11000 }, { id: "gs-66", label: "66 Shells", price: 21000 },
+      { id: "gs-165", label: "165 Shells", price: 51000, note: "Populer" },
+    ],
+  },
+  {
+    slug: "razer-gold", name: "Razer Gold", publisher: "Razer", category: "voucher", initials: "RZ",
+    accent: "from-[#7dff59] via-[#19813a] to-[#0d2c20]", instant: true,
+    fulfillmentType: "automatic", targetTemplate: "{{destination}}",
+    inputLabel: "Nomor WhatsApp / email", inputPlaceholder: "Untuk menerima PIN voucher",
+    packages: [
+      { id: "rz-20", label: "Razer Gold Rp20.000", price: 22000 }, { id: "rz-50", label: "Razer Gold Rp50.000", price: 53500, note: "Populer" },
+      { id: "rz-100", label: "Razer Gold Rp100.000", price: 106000 },
+    ],
+  },
+  {
+    slug: "unipin-voucher", name: "UniPin Voucher", publisher: "UniPin", category: "voucher", initials: "UP",
+    accent: "from-[#ff785a] via-[#bf3e4e] to-[#43172b]", instant: true,
+    fulfillmentType: "automatic", targetTemplate: "{{destination}}",
+    inputLabel: "Nomor WhatsApp / email", inputPlaceholder: "Untuk menerima kode voucher",
+    packages: [
+      { id: "up-20", label: "UniPin Rp20.000", price: 22000 }, { id: "up-50", label: "UniPin Rp50.000", price: 53500 },
+      { id: "up-100", label: "UniPin Rp100.000", price: 106000, note: "Populer" },
+    ],
+  },
+  {
+    slug: "xbox-gift-card", name: "Xbox Gift Card", publisher: "Microsoft", category: "voucher", initials: "XB",
+    accent: "from-[#69cc67] via-[#248239] to-[#14341d]", instant: true,
+    fulfillmentType: "automatic", targetTemplate: "{{destination}}",
+    inputLabel: "Nomor WhatsApp / email", inputPlaceholder: "Untuk menerima kode voucher",
+    packages: [
+      { id: "xbox-100", label: "Xbox Rp100.000", price: 109000 }, { id: "xbox-200", label: "Xbox Rp200.000", price: 216000, note: "Populer" },
+    ],
+  },
+  {
+    slug: "nintendo-eshop", name: "Nintendo eShop", publisher: "Nintendo", category: "voucher", initials: "NS",
+    accent: "from-[#ff6969] via-[#c83045] to-[#481522]", instant: true,
+    fulfillmentType: "automatic", targetTemplate: "{{destination}}",
+    inputLabel: "Nomor WhatsApp / email", inputPlaceholder: "Untuk menerima kode voucher",
+    packages: [
+      { id: "nintendo-10", label: "Nintendo eShop $10", price: 175000 }, { id: "nintendo-20", label: "Nintendo eShop $20", price: 338000, note: "Populer" },
+    ],
+  },
+  {
+    slug: "redfinger", name: "REDFINGER Cloud Phone", publisher: "REDFINGER", category: "voucher", initials: "RF",
+    accent: "from-[#ff576c] via-[#962d68] to-[#321947]", popular: true, instant: true,
+    fulfillmentType: "automatic", targetTemplate: "{{destination}}",
+    inputLabel: "Email tujuan", inputPlaceholder: "Email untuk menerima lisensi",
+    packages: [
+      { id: "rf-7", label: "Paket 7 Hari", price: 35000, providerCode: "voucher-stock", providerSku: "redfinger-7-hari" },
+      { id: "rf-30", label: "Paket 30 Hari", price: 110000, note: "Populer", providerCode: "voucher-stock", providerSku: "redfinger-30-hari" },
+      { id: "rf-90", label: "Paket 90 Hari", price: 295000, providerCode: "voucher-stock", providerSku: "redfinger-90-hari" },
+    ],
+  },
 ];
 
-export const demoOrder = {
-  id: "DEMO-20260828-001", product: "Mobile Legends", item: "59 Diamonds", destination: "123456789 (1234)",
-  amount: 17624, status: "Berhasil", createdAt: "28 Agustus 2026, 14.32 WIB",
+export type StorefrontSettings = {
+  storeName: string;
+  storeShortName: string;
+  tagline: string;
+  logoUrl?: string;
+  announcement?: string;
+  bannerEnabled: boolean;
+  bannerEyebrow: string;
+  bannerTitle: string;
+  bannerHighlight: string;
+  bannerDescription: string;
+  bannerImageUrl?: string;
+  bannerCtaLabel: string;
+  bannerCtaHref: string;
+  supportWhatsapp?: string;
+  supportEmail?: string;
+  instagramUrl?: string;
+  supportHours: string;
+};
+
+export const defaultStorefrontSettings: StorefrontSettings = {
+  storeName: "LFAMILIA STORE",
+  storeShortName: "LF",
+  tagline: "Top up favoritmu, sat set tanpa ribet.",
+  announcement: "Pemesanan tersedia 24 jam",
+  bannerEnabled: true,
+  bannerEyebrow: "Top up & voucher digital",
+  bannerTitle: "Top up favoritmu,",
+  bannerHighlight: "sat set tanpa ribet.",
+  bannerDescription: "Game, voucher, promo, dan kalkulator dalam satu website LFAMILIA yang nyaman digunakan kapan saja.",
+  bannerCtaLabel: "Top up sekarang",
+  bannerCtaHref: "#produk",
+  supportHours: "Setiap hari, 09.00–23.00 WIB",
 };
 
 export const faqs = [
@@ -169,9 +339,9 @@ export const faqs = [
   { question: "Metode pembayaran apa yang tersedia?", answer: "LFAMILIA STORE menggunakan iPaymu untuk Virtual Account bank, DANA, ShopeePay, dan QRIS. Biaya layanan pembayaran dibebankan kepada pembeli." },
   { question: "Apa perbedaan produk otomatis dan manual?", answer: "Produk otomatis diteruskan ke provider resmi seperti DigiFlazz atau VIPayment setelah pembayaran terverifikasi. Produk manual masuk antrean admin dan diproses sesuai instruksi serta jadwal layanan." },
   { question: "Bagaimana kode voucher atau lisensi dikirim?", answer: "Untuk produk berlabel Stok Kode Internal, sistem mereservasi satu kode setelah pembayaran lunas lalu mengirimkannya otomatis ke email dan/atau WhatsApp pembeli. Kode tidak tampil di halaman cek transaksi publik." },
-  { question: "Apakah harga di website ini sudah final?", answer: "Belum. Semua harga saat ini adalah data demo untuk menguji tampilan. Harga final akan mengikuti harga pemasok dan margin toko setelah API diaktifkan." },
+  { question: "Apakah harga di website sudah termasuk biaya pembayaran?", answer: "Harga produk tampil sebelum biaya layanan pembayaran. Biaya dari channel iPaymu dihitung dan ditampilkan pada ringkasan pembayaran." },
   { question: "Bagaimana jika saya salah memasukkan User ID?", answer: "Periksa kembali data tujuan sebelum membayar. Produk digital yang telah sukses dikirim ke tujuan yang dimasukkan umumnya tidak dapat dibatalkan." },
-  { question: "Di mana saya bisa melihat status pesanan?", answer: "Buka menu Cek Transaksi dan masukkan nomor invoice dari checkout. Untuk mencoba tampilannya tanpa transaksi, gunakan DEMO-20260828-001." },
+  { question: "Di mana saya bisa melihat status pesanan?", answer: "Buka menu Cek Transaksi dan masukkan nomor invoice yang diterima setelah checkout." },
 ];
 
 export function formatRupiah(value: number) {

@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Gamepad2, Headphones, Home, ReceiptText, Wrench } from "lucide-react";
+import { Flame, Gamepad2, Headphones, Home, ReceiptText } from "lucide-react";
 
 const items = [
   { href: "/", label: "Beranda", icon: Home },
   { href: "/catalog", label: "Top Up", icon: Gamepad2 },
-  { href: "/tools", label: "Kalkulator", icon: Wrench },
+  { href: "/promo", label: "Promo", icon: Flame },
   { href: "/track", label: "Transaksi", icon: ReceiptText },
   { href: "/contact", label: "Bantuan", icon: Headphones },
 ];

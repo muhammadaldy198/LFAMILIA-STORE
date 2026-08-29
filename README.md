@@ -1,52 +1,36 @@
 # LFAMILIA STORE
 
-Website top up game responsif untuk Cloudflare Workers + D1, dibuat dengan Next.js 16, React 19, Tailwind CSS 4, dan Vinext.
+Toko top up digital berbasis Cloudflare Workers dan D1. Aplikasi mencakup katalog, checkout iPaymu, pemenuhan otomatis, antrean manual, flash sale, voucher diskon, stok kode terenkripsi, pelacakan transaksi, serta panel admin dua tingkat.
 
-## Yang sudah tersedia
+## Fitur utama
 
-- Beranda, katalog, pencarian, checkout, FAQ, kontak, dan kalkulator game.
-- Data akun berada di langkah pertama checkout dan dapat memeriksa nickname lewat API yang dikonfigurasi.
-- Pembayaran iPaymu: Virtual Account bank, DANA, ShopeePay, dan QRIS; biaya iPaymu diarahkan ke pembeli.
-- Produk otomatis multi-provider: adapter DigiFlazz dan VIPayment.
-- Stok kode internal terenkripsi untuk REDFINGER/lisensi, dengan reservasi atomik dan pengiriman Email/WhatsApp otomatis.
-- Produk manual: antrean admin untuk Roblox Via Login, Gamepass, Gift in Game, dan produk manual lain.
-- Pelacakan invoice D1 dengan data tujuan disamarkan.
-- Admin tersembunyi dari navigasi utama, dengan proteksi Cloudflare Access.
-- Webhook bertanda tangan dan pencatatan event untuk mencegah pengiriman ganda setelah callback pembayaran berulang.
+- Katalog dinamis dengan gambar, kategori, urutan, status, nominal, dan harga yang dikelola dari panel admin.
+- Pop-up informasi multi-slide per produk, termasuk jam operasional produk manual dan pilihan sembunyikan selama tujuh hari.
+- Banner Home, logo, pengumuman, FAQ, dan kategori yang dapat diedit tanpa mengubah source.
+- Flash sale terjadwal, kuota promo, kode voucher rupiah/persentase, minimum transaksi, dan batas potongan.
+- Pembayaran iPaymu dengan perhitungan harga ulang di server.
+- Adapter DigiFlazz, VIPayment, dan Stok Kode Internal.
+- Pemilik dan Staff melalui identitas Cloudflare Access. Keuangan, harga/provider, promo, stok kode, tim, integrasi, dan penghapusan dibatasi untuk Pemilik.
+- Kode digital disimpan terenkripsi dan dapat dikirim melalui Resend dan WhatsApp Cloud API.
 
-Kode integrasi sudah siap, tetapi toko tidak boleh menerima transaksi nyata sebelum migrasi D1, secret, SKU, harga, callback, dan Cloudflare Access selesai diuji.
+## Menjalankan proyek
 
-## Menjalankan dari komputer atau Termux
-
-Memerlukan Node.js 22 atau lebih baru.
+Prasyarat: Node.js `>=22.13.0` dan akun Cloudflare dengan Workers serta D1.
 
 ```bash
-npm install
-npm run dev
-```
-
-Pemeriksaan source:
-
-```bash
-npm run lint
+npm ci
 npm run build
 npm test
 ```
 
-## Deploy Cloudflare
+Konfigurasi Worker berada di `wrangler.jsonc`. Binding database harus bernama `DB`. Terapkan seluruh migrasi di folder `drizzle` secara berurutan; instalasi terbaru wajib menyertakan `0003_final_storefront.sql`.
 
-Pengaturan build GitHub:
+Panduan secret, callback, Cloudflare Access, provider, dan pengiriman kode tersedia di [INTEGRATION-SETUP.md](./INTEGRATION-SETUP.md).
 
-| Pengaturan | Nilai |
-|---|---|
-| Build command | `npm run build` |
-| Deploy command | `npx wrangler deploy` |
-| Root directory | `/` |
+## Keamanan
 
-Ikuti [panduan deploy dari HP](docs/DEPLOY-DARI-HP.md), lalu lanjutkan [konfigurasi integrasi](INTEGRATION-SETUP.md).
-
-Jangan simpan API key, VA merchant, webhook secret, password pelanggan, PIN, atau OTP di GitHub.
-
-## Lisensi
-
-Kode khusus LFAMILIA STORE menggunakan lisensi MIT. Komponen pihak ketiga mengikuti lisensinya masing-masing.
+- Jangan simpan VA, API key, webhook secret, atau kunci enkripsi di GitHub.
+- Jangan meminta password, PIN, atau OTP pelanggan melalui formulir maupun catatan pesanan.
+- Lindungi `/admin*` dan `/api/admin*` dengan Cloudflare Access.
+- Tambahkan email admin di Cloudflare Access dan di tab **Tim admin** dengan role yang sesuai.
+- Rahasia pembayaran/provider hanya dikelola melalui Cloudflare Worker Settings.

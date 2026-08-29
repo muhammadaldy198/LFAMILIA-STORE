@@ -1,11 +1,11 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock3, Copy, Loader2, PackageCheck, Search, TimerReset, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Copy, Loader2, PackageCheck, Search, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StoreLayout } from "@/components/store-layout";
-import { demoOrder, formatRupiah } from "@/lib/store-data";
+import { formatRupiah } from "@/lib/store-data";
 
 type TrackedOrder = {
   referenceId: string;
@@ -37,21 +37,6 @@ const fulfillmentLabels: Record<string, string> = {
   error: "Pengiriman gagal",
   failed: "Pengiriman gagal",
 };
-
-function demoResult(): TrackedOrder {
-  return {
-    referenceId: demoOrder.id,
-    productName: demoOrder.product,
-    packageLabel: demoOrder.item,
-    destination: demoOrder.destination,
-    total: demoOrder.amount,
-    paymentStatus: "paid",
-    fulfillmentStatus: "success",
-    fulfillmentType: "automatic",
-    createdAt: "2026-08-28T07:31:00.000Z",
-    updatedAt: "2026-08-28T07:32:00.000Z",
-  };
-}
 
 function dateLabel(value: string) {
   const date = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
@@ -96,11 +81,6 @@ export default function TrackPage() {
       setError("Masukkan nomor invoice terlebih dahulu.");
       return;
     }
-    if (referenceId === demoOrder.id) {
-      setOrder(demoResult());
-      return;
-    }
-
     setLoading(true);
     try {
       const response = await fetch("/api/orders/status", {
@@ -116,12 +96,6 @@ export default function TrackPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function useDemo() {
-    setInvoice(demoOrder.id);
-    setError("");
-    setOrder(demoResult());
   }
 
   function copyId() {
@@ -150,7 +124,6 @@ export default function TrackPage() {
               {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Search className="mr-2 size-4" />}{loading ? "Mencari" : "Cari"}
             </Button>
           </div>
-          <button type="button" onClick={useDemo} className="mt-3 inline-flex items-center gap-2 text-[11px] font-semibold text-[#cfff72] hover:underline"><TimerReset className="size-3.5" /> Coba invoice demo: {demoOrder.id}</button>
         </form>
 
         {error && <div role="alert" className="panel mt-5 p-8 text-center"><Search className="mx-auto size-8 text-white/18" /><h2 className="mt-4 font-bold">Invoice tidak ditemukan</h2><p className="mt-2 text-sm leading-6 text-white/38">{error}</p></div>}

@@ -11,6 +11,7 @@ import {
 } from "@/lib/server/orders";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
+import { quotePromotion } from "@/lib/server/promotions";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ const schema = z.object({
   customerNotes: z.string().trim().max(500).optional(),
   paymentMethod: z.enum(["va", "ewallet", "qris"]),
   paymentChannel: z.string().trim().min(2).max(30),
+  voucherCode: z.string().trim().max(40).optional(),
 });
 
 function publicBaseUrl(request: Request) {
@@ -48,6 +50,7 @@ export async function POST(request: Request) {
     if (item.providerCode === "voucher-stock" && item.providerSku && !await hasAvailableVoucherStock(item.providerSku)) {
       return Response.json({ error: "Stok kode untuk paket ini sedang habis." }, { status: 409 });
     }
+    const promotion = await quotePromotion(item.productSlug, item.packageSku, item.price, input.voucherCode);
 
     const identity = createOrderIdentity();
     referenceId = identity.referenceId;
@@ -63,6 +66,7 @@ export async function POST(request: Request) {
       customerNotes: input.customerNotes || null,
       paymentMethod: input.paymentMethod,
       paymentChannel: input.paymentChannel,
+      promotion,
     });
 
     const baseUrl = publicBaseUrl(request);
@@ -70,13 +74,13 @@ export async function POST(request: Request) {
       name: input.buyerName,
       phone: input.buyerPhone,
       email: input.buyerEmail,
-      amount: item.price,
+      amount: promotion.finalPrice,
       notifyUrl: `${baseUrl}/api/payments/ipaymu/callback`,
       referenceId: identity.referenceId,
       paymentMethod: input.paymentMethod,
       paymentChannel: input.paymentChannel,
       productName: `${item.productName} - ${item.packageLabel}`,
-      productPrice: item.price,
+      productPrice: promotion.finalPrice,
     });
     await updateIpaymuPayment({
       referenceId: identity.referenceId,
@@ -106,6 +110,11 @@ export async function POST(request: Request) {
       expiredAt: payment.expiredAt,
       fulfillmentType: item.fulfillmentType,
       providerCode: item.providerCode,
+      basePrice: promotion.basePrice,
+      sellingPrice: promotion.sellingPrice,
+      discountAmount: promotion.discountAmount,
+      voucherCode: promotion.voucherCode,
+      flashSaleId: promotion.flashSaleId,
     }, { status: 201 });
   } catch (error) {
     const message = error instanceof z.ZodError

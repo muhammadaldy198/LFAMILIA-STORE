@@ -16,7 +16,7 @@ type Order = {
   server: string | null;
   buyer_name: string;
   buyer_phone: string;
-  total: number;
+  total: number | null;
   payment_status: string;
   fulfillment_type: "automatic" | "manual";
   fulfillment_status: string;
@@ -32,15 +32,17 @@ export function AdminOrderManager() {
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [role, setRole] = useState<"owner" | "staff">("staff");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const response = await fetch("/api/admin/orders", { cache: "no-store" });
-      const data = await response.json() as { orders?: Order[]; error?: string };
+      const data = await response.json() as { orders?: Order[]; role?: "owner" | "staff"; error?: string };
       if (!response.ok) throw new Error(data.error ?? "Pesanan gagal dimuat.");
       setOrders(data.orders ?? []);
+      setRole(data.role ?? "staff");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Pesanan gagal dimuat.");
     } finally {
@@ -51,9 +53,9 @@ export function AdminOrderManager() {
   useEffect(() => {
     let active = true;
     void fetch("/api/admin/orders", { cache: "no-store" }).then(async (response) => {
-      const data = await response.json() as { orders?: Order[]; error?: string };
+      const data = await response.json() as { orders?: Order[]; role?: "owner" | "staff"; error?: string };
       if (!response.ok) throw new Error(data.error ?? "Pesanan gagal dimuat.");
-      if (active) setOrders(data.orders ?? []);
+      if (active) { setOrders(data.orders ?? []); setRole(data.role ?? "staff"); }
     }).catch((reason) => {
       if (active) setError(reason instanceof Error ? reason.message : "Pesanan gagal dimuat.");
     }).finally(() => {
@@ -115,9 +117,9 @@ export function AdminOrderManager() {
     {error && <div className="mb-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-xs text-red-200">{error}</div>}
     {loading ? <div className="flex min-h-40 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat pesanan…</div> : visible.length === 0 ? <div className="rounded-xl border border-dashed border-white/10 p-10 text-center text-xs text-white/30">Belum ada pesanan yang cocok.</div> : <div className="overflow-x-auto rounded-xl border border-white/[0.08]"><Table><TableHeader><TableRow className="border-white/[0.08] hover:bg-transparent"><TableHead className="text-[10px] text-white/35">Invoice</TableHead><TableHead className="text-[10px] text-white/35">Produk</TableHead><TableHead className="text-[10px] text-white/35">Pelanggan</TableHead><TableHead className="text-[10px] text-white/35">Total</TableHead><TableHead className="text-[10px] text-white/35">Pembayaran</TableHead><TableHead className="text-[10px] text-white/35">Pemenuhan</TableHead><TableHead className="text-right text-[10px] text-white/35">Aksi</TableHead></TableRow></TableHeader><TableBody>{visible.map((order) => {
       const manualReady = order.fulfillment_type === "manual" && order.payment_status === "paid" && order.fulfillment_status === "manual_pending";
-      const voucherRetry = order.provider_code === "voucher-stock" && order.payment_status === "paid" && order.fulfillment_status !== "success";
+      const voucherRetry = role === "owner" && order.provider_code === "voucher-stock" && order.payment_status === "paid" && order.fulfillment_status !== "success";
       const wa = order.buyer_phone.replace(/\D/g, "").replace(/^0/, "62");
-      return <TableRow key={order.id} className="border-white/[0.07] hover:bg-white/[0.025]"><TableCell><strong className="text-[10px] text-white">{order.reference_id}</strong><p className="mt-1 text-[8px] text-white/25">{order.created_at}</p></TableCell><TableCell><strong className="text-xs">{order.product_name}</strong><p className="mt-1 text-[9px] text-white/35">{order.package_label}</p><p className="mt-1 text-[9px] text-[#cfff72]">{order.destination}{order.server ? ` (${order.server})` : ""}</p></TableCell><TableCell><span className="text-xs text-white/55">{order.buyer_name}</span><a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 text-[9px] text-[#cfff72]">WhatsApp <ExternalLink className="size-2.5" /></a></TableCell><TableCell className="text-xs text-[#d8ff8d]">{formatRupiah(order.total)}</TableCell><TableCell><StatusBadge value={order.payment_status} /></TableCell><TableCell><StatusBadge value={order.fulfillment_status} /><p className="mt-1 max-w-40 truncate text-[8px] text-white/25">{order.provider_code || "manual"}{order.provider_message ? ` • ${order.provider_message}` : ""}</p></TableCell><TableCell className="text-right"><div className="flex justify-end gap-1">{manualReady && <Button type="button" disabled={workingId === order.id} onClick={() => void completeManual(order.id)} size="sm" className="rounded-lg bg-[#b9ff35] text-[9px] font-black text-[#091006] hover:bg-[#d0ff75]">{workingId === order.id ? <LoaderCircle className="size-3 animate-spin" /> : <><CheckCircle2 className="mr-1 size-3" />Selesai</>}</Button>}{voucherRetry && <Button type="button" disabled={workingId === order.id} onClick={() => void retryVoucher(order.id)} size="sm" className="rounded-lg bg-amber-300 text-[9px] font-black text-[#171006] hover:bg-amber-200">{workingId === order.id ? <LoaderCircle className="size-3 animate-spin" /> : <><RotateCcw className="mr-1 size-3" />Kirim kode</>}</Button>}</div></TableCell></TableRow>;
+      return <TableRow key={order.id} className="border-white/[0.07] hover:bg-white/[0.025]"><TableCell><strong className="text-[10px] text-white">{order.reference_id}</strong><p className="mt-1 text-[8px] text-white/25">{order.created_at}</p></TableCell><TableCell><strong className="text-xs">{order.product_name}</strong><p className="mt-1 text-[9px] text-white/35">{order.package_label}</p><p className="mt-1 text-[9px] text-[#cfff72]">{order.destination}{order.server ? ` (${order.server})` : ""}</p></TableCell><TableCell><span className="text-xs text-white/55">{order.buyer_name}</span><a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 text-[9px] text-[#cfff72]">WhatsApp <ExternalLink className="size-2.5" /></a></TableCell><TableCell className="text-xs text-[#d8ff8d]">{order.total === null ? "Khusus Pemilik" : formatRupiah(order.total)}</TableCell><TableCell><StatusBadge value={order.payment_status} /></TableCell><TableCell><StatusBadge value={order.fulfillment_status} /><p className="mt-1 max-w-40 truncate text-[8px] text-white/25">{order.provider_code || "manual"}{order.provider_message ? ` • ${order.provider_message}` : ""}</p></TableCell><TableCell className="text-right"><div className="flex justify-end gap-1">{manualReady && <Button type="button" disabled={workingId === order.id} onClick={() => void completeManual(order.id)} size="sm" className="rounded-lg bg-[#b9ff35] text-[9px] font-black text-[#091006] hover:bg-[#d0ff75]">{workingId === order.id ? <LoaderCircle className="size-3 animate-spin" /> : <><CheckCircle2 className="mr-1 size-3" />Selesai</>}</Button>}{voucherRetry && <Button type="button" disabled={workingId === order.id} onClick={() => void retryVoucher(order.id)} size="sm" className="rounded-lg bg-amber-300 text-[9px] font-black text-[#171006] hover:bg-amber-200">{workingId === order.id ? <LoaderCircle className="size-3 animate-spin" /> : <><RotateCcw className="mr-1 size-3" />Kirim kode</>}</Button>}</div></TableCell></TableRow>;
     })}</TableBody></Table></div>}
   </div>;
 }

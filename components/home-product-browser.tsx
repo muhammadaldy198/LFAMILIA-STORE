@@ -2,17 +2,19 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Gamepad2, Search, Ticket, X } from "lucide-react";
+import { ArrowRight, Gamepad2, Grid3X3, Play, Search, Smartphone, Ticket, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ProductCard } from "@/components/product-card";
 import { useStoreProducts } from "@/hooks/use-store-products";
+import { useStorefront } from "@/hooks/use-storefront";
 import type { ProductCategory } from "@/lib/store-data";
 
 type Filter = "all" | ProductCategory;
 
 export function HomeProductBrowser() {
   const { products, databaseReady } = useStoreProducts();
+  const { categories } = useStorefront();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const visible = useMemo(() => {
@@ -29,12 +31,23 @@ export function HomeProductBrowser() {
       </div>
       <div className="mt-6 flex items-center justify-between gap-4 border-b border-white/[0.07] pb-4">
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {([[["all", "Semua", Search], ["game", "Game", Gamepad2], ["voucher", "Voucher", Ticket]]].flat() as Array<readonly [Filter, string, typeof Search]>).map(([value, label, Icon]) => <button key={value} type="button" onClick={() => setFilter(value)} className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3.5 text-[11px] font-bold transition ${filter === value ? "border-[#b9ff35] bg-[#b9ff35] text-[#091006]" : "border-white/10 bg-white/[0.025] text-white/45 hover:text-white"}`}><Icon className="size-3.5" />{label}</button>)}
+          {[
+            { value: "all", label: "Semua", icon: Search },
+            ...categories.filter((item) => item.isActive).map((item) => ({ value: item.slug, label: item.name, icon: categoryIcon(item.icon, item.slug) })),
+          ].map(({ value, label, icon: Icon }) => <button key={value} type="button" onClick={() => setFilter(value)} className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3.5 text-[11px] font-bold transition ${filter === value ? "border-[#b9ff35] bg-[#b9ff35] text-[#091006]" : "border-white/10 bg-white/[0.025] text-white/45 hover:text-white"}`}><Icon className="size-3.5" />{label}</button>)}
         </div>
-        <span className="hidden text-[10px] text-white/25 sm:block">{databaseReady ? "Katalog diperbarui admin" : "Katalog awal"}</span>
+        <span className="hidden text-[10px] text-white/25 sm:block">{databaseReady ? "Katalog terbaru" : "Memuat katalog"}</span>
       </div>
       {visible.length ? <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">{visible.map((product) => <ProductCard key={product.slug} product={product} />)}</div> : <div className="panel mt-6 py-14 text-center"><Search className="mx-auto size-7 text-white/20" /><p className="mt-3 text-sm text-white/40">Produk tidak ditemukan.</p></div>}
       <div className="mt-8 flex justify-center"><Button asChild variant="outline" className="h-11 rounded-xl border-white/10 bg-white/[0.03] px-5 text-white hover:bg-white/[0.08] hover:text-white"><Link href="/catalog">Lihat semua produk <ArrowRight className="ml-2 size-4" /></Link></Button></div>
     </section>
   );
+}
+
+function categoryIcon(icon: string, slug: string) {
+  if (icon === "gamepad" || slug === "game") return Gamepad2;
+  if (icon === "ticket" || slug === "voucher") return Ticket;
+  if (icon === "play" || slug === "entertainment") return Play;
+  if (icon === "smartphone" || slug === "pulsa") return Smartphone;
+  return Grid3X3;
 }

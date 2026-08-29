@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getAdminEmail, unauthorizedResponse } from "@/lib/server/admin";
+import { requireAdminSession } from "@/lib/server/admin";
 import { deleteProduct, readProducts, saveProduct } from "@/lib/server/products";
 
 export const dynamic = "force-dynamic";
@@ -15,12 +15,21 @@ const packageSchema = z.object({
   sortOrder: z.number().int().min(0).default(0),
 });
 
+const noticeSchema = z.object({
+  id: z.number().int().positive().nullable().optional(),
+  title: z.string().trim().min(2).max(180),
+  body: z.string().trim().min(2).max(2000),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().int().min(0).default(0),
+});
+
 const productSchema = z.object({
   dbId: z.number().int().positive().nullable().optional(),
   slug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(80),
   name: z.string().trim().min(2).max(80),
   publisher: z.string().trim().max(80).default(""),
-  category: z.enum(["game", "voucher"]),
+  category: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(60),
+  imageUrl: z.string().trim().url().max(500).optional().or(z.literal("")),
   initials: z.string().trim().min(1).max(3),
   accent: z.string().trim().min(5).max(160),
   inputLabel: z.string().trim().min(2).max(80),
@@ -31,9 +40,13 @@ const productSchema = z.object({
   fulfillmentType: z.enum(["automatic", "manual"]),
   targetTemplate: z.string().trim().min(3).max(120),
   manualInstructions: z.string().trim().max(500).optional(),
+  manualOpenTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  manualCloseTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  manualTimezone: z.string().trim().max(60).default("Asia/Jakarta"),
   isActive: z.boolean().default(true),
   sortOrder: z.number().int().min(0).max(10_000).default(0),
   packages: z.array(packageSchema).min(1).max(50),
+  notices: z.array(noticeSchema).max(10).default([]),
 });
 
 function validateStockKeys(input: z.infer<typeof productSchema>) {
@@ -44,22 +57,20 @@ function validateStockKeys(input: z.infer<typeof productSchema>) {
   }
 }
 
-function requireAdmin(request: Request) {
-  return Boolean(getAdminEmail(request));
-}
-
 export async function GET(request: Request) {
-  if (!requireAdmin(request)) return unauthorizedResponse();
+  const access = await requireAdminSession(request, "staff");
+  if (access instanceof Response) return access;
   try {
     const products = await readProducts(true);
-    return Response.json({ products, databaseReady: true, seeded: products.length > 0, adminEmail: getAdminEmail(request) });
+    return Response.json({ products, databaseReady: true, seeded: products.length > 0, adminEmail: access.email, role: access.role });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Database belum siap.", databaseReady: false }, { status: 503 });
   }
 }
 
 export async function POST(request: Request) {
-  if (!requireAdmin(request)) return unauthorizedResponse();
+  const access = await requireAdminSession(request, "owner");
+  if (access instanceof Response) return access;
   try {
     const input = productSchema.parse(await request.json());
     validateStockKeys(input);
@@ -72,7 +83,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!requireAdmin(request)) return unauthorizedResponse();
+  const access = await requireAdminSession(request, "owner");
+  if (access instanceof Response) return access;
   try {
     const input = productSchema.extend({ dbId: z.number().int().positive() }).parse(await request.json());
     validateStockKeys(input);
@@ -85,7 +97,8 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!requireAdmin(request)) return unauthorizedResponse();
+  const access = await requireAdminSession(request, "owner");
+  if (access instanceof Response) return access;
   const id = Number(new URL(request.url).searchParams.get("id"));
   if (!Number.isInteger(id) || id < 1) return Response.json({ error: "ID produk tidak valid." }, { status: 400 });
   await deleteProduct(id);

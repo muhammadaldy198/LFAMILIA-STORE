@@ -31,7 +31,8 @@ export async function POST(request: Request) {
     }
     const status = mapIpaymuStatus(validation.normalized);
     const callbackAmount = Number(validation.normalized.amount ?? validation.normalized.total ?? 0);
-    if (status === "paid" && callbackAmount > 0 && callbackAmount !== order.total && callbackAmount !== order.subtotal) {
+    const productAmount = Math.max(1, order.subtotal - order.discount_amount);
+    if (status === "paid" && callbackAmount > 0 && callbackAmount !== order.total && callbackAmount !== productAmount) {
       return Response.json({ ok: true, ignored: "amount_mismatch" });
     }
     await recordOrderEvent({

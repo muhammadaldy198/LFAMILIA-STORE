@@ -8,7 +8,8 @@ export const products = sqliteTable(
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     publisher: text("publisher").notNull().default(""),
-    category: text("category", { enum: ["game", "voucher"] }).notNull(),
+    category: text("category").notNull(),
+    imageUrl: text("image_url"),
     initials: text("initials").notNull(),
     accent: text("accent").notNull(),
     inputLabel: text("input_label").notNull(),
@@ -19,6 +20,9 @@ export const products = sqliteTable(
     fulfillmentType: text("fulfillment_type", { enum: ["automatic", "manual"] }).notNull().default("automatic"),
     targetTemplate: text("target_template").notNull().default("{{destination}}{{server}}"),
     manualInstructions: text("manual_instructions"),
+    manualOpenTime: text("manual_open_time"),
+    manualCloseTime: text("manual_close_time"),
+    manualTimezone: text("manual_timezone").notNull().default("Asia/Jakarta"),
     isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -52,6 +56,21 @@ export const productPackages = sqliteTable(
   ],
 );
 
+export const productNotices = sqliteTable(
+  "product_notices",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("product_notices_product_active_sort_idx").on(table.productId, table.isActive, table.sortOrder)],
+);
+
 export const orders = sqliteTable(
   "orders",
   {
@@ -73,7 +92,11 @@ export const orders = sqliteTable(
     buyerEmail: text("buyer_email").notNull(),
     buyerPhone: text("buyer_phone").notNull(),
     customerNotes: text("customer_notes"),
+    baseSubtotal: integer("base_subtotal").notNull().default(0),
     subtotal: integer("subtotal").notNull(),
+    discountAmount: integer("discount_amount").notNull().default(0),
+    voucherCode: text("voucher_code"),
+    flashSaleId: integer("flash_sale_id"),
     adminFee: integer("admin_fee").notNull().default(0),
     total: integer("total").notNull(),
     paymentMethod: text("payment_method").notNull(),
@@ -158,4 +181,110 @@ export const voucherDeliveries = sqliteTable(
     uniqueIndex("voucher_deliveries_order_channel_unique").on(table.orderId, table.channel),
     index("voucher_deliveries_status_updated_idx").on(table.status, table.updatedAt),
   ],
+);
+
+export const storeSettings = sqliteTable("store_settings", {
+  id: integer("id").primaryKey(),
+  storeName: text("store_name").notNull(),
+  storeShortName: text("store_short_name").notNull(),
+  tagline: text("tagline").notNull(),
+  logoUrl: text("logo_url"),
+  announcement: text("announcement"),
+  bannerEnabled: integer("banner_enabled", { mode: "boolean" }).notNull().default(true),
+  bannerEyebrow: text("banner_eyebrow").notNull(),
+  bannerTitle: text("banner_title").notNull(),
+  bannerHighlight: text("banner_highlight").notNull(),
+  bannerDescription: text("banner_description").notNull(),
+  bannerImageUrl: text("banner_image_url"),
+  bannerCtaLabel: text("banner_cta_label").notNull(),
+  bannerCtaHref: text("banner_cta_href").notNull(),
+  supportWhatsapp: text("support_whatsapp"),
+  supportEmail: text("support_email"),
+  instagramUrl: text("instagram_url"),
+  supportHours: text("support_hours").notNull(),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const productCategories = sqliteTable(
+  "product_categories",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    icon: text("icon").notNull().default("grid"),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [uniqueIndex("product_categories_slug_unique").on(table.slug), index("product_categories_active_sort_idx").on(table.isActive, table.sortOrder)],
+);
+
+export const discountVouchers = sqliteTable(
+  "discount_vouchers",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    discountType: text("discount_type", { enum: ["fixed", "percentage"] }).notNull(),
+    discountValue: integer("discount_value").notNull(),
+    minPurchase: integer("min_purchase").notNull().default(0),
+    maxDiscount: integer("max_discount"),
+    usageLimit: integer("usage_limit"),
+    usedCount: integer("used_count").notNull().default(0),
+    startsAt: text("starts_at").notNull(),
+    endsAt: text("ends_at").notNull(),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [uniqueIndex("discount_vouchers_code_unique").on(table.code), index("discount_vouchers_active_period_idx").on(table.isActive, table.startsAt, table.endsAt)],
+);
+
+export const flashSales = sqliteTable(
+  "flash_sales",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    productSlug: text("product_slug").notNull(),
+    packageSku: text("package_sku").notNull(),
+    salePrice: integer("sale_price").notNull(),
+    badge: text("badge").notNull().default("Flash Sale"),
+    startsAt: text("starts_at").notNull(),
+    endsAt: text("ends_at").notNull(),
+    stockLimit: integer("stock_limit"),
+    soldCount: integer("sold_count").notNull().default(0),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("flash_sales_product_package_idx").on(table.productSlug, table.packageSku), index("flash_sales_active_period_idx").on(table.isActive, table.startsAt, table.endsAt)],
+);
+
+export const adminUsers = sqliteTable(
+  "admin_users",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    email: text("email").notNull(),
+    name: text("name").notNull(),
+    role: text("role", { enum: ["owner", "staff"] }).notNull(),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [uniqueIndex("admin_users_email_unique").on(table.email), index("admin_users_role_active_idx").on(table.role, table.isActive)],
+);
+
+export const faqEntries = sqliteTable(
+  "faq_entries",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    question: text("question").notNull(),
+    answer: text("answer").notNull(),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("faq_entries_active_sort_idx").on(table.isActive, table.sortOrder)],
 );

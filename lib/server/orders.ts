@@ -2,6 +2,7 @@ import { getD1 } from "@/db";
 import { getFallbackProducts } from "@/lib/server/products";
 import { getProviderAdapter } from "@/lib/server/providers";
 import type { ProviderResult } from "@/lib/server/providers/types";
+import { consumeOrderPromotion, type PromotionQuote } from "@/lib/server/promotions";
 
 export type PurchasableItem = {
   productSlug: string;
@@ -36,7 +37,11 @@ export type OrderRecord = {
   buyer_email: string;
   buyer_phone: string;
   customer_notes: string | null;
+  base_subtotal: number;
   subtotal: number;
+  discount_amount: number;
+  voucher_code: string | null;
+  flash_sale_id: number | null;
   admin_fee: number;
   total: number;
   payment_method: string;
@@ -143,6 +148,7 @@ export async function insertPendingOrder(input: {
   customerNotes: string | null;
   paymentMethod: string;
   paymentChannel: string;
+  promotion: PromotionQuote;
 }) {
   const db = getD1();
   if (input.item.fulfillmentType === "automatic") {
@@ -155,14 +161,17 @@ export async function insertPendingOrder(input: {
       id, reference_id, product_slug, product_name, package_sku, package_label,
       provider_code, provider_sku, fulfillment_type, target_template, destination, server,
       nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes,
-      subtotal, admin_fee, total, payment_method, payment_channel
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+      base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
+      admin_fee, total, payment_method, payment_channel
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
   ).bind(
     input.id, input.referenceId, input.item.productSlug, input.item.productName,
     input.item.packageSku, input.item.packageLabel, input.item.providerCode, input.item.providerSku,
     input.item.fulfillmentType, input.item.targetTemplate, input.destination, input.server,
     input.nickname, customerNo, input.buyerName, input.buyerEmail, input.buyerPhone,
-    input.customerNotes, input.item.price, input.item.price, input.paymentMethod, input.paymentChannel,
+    input.customerNotes, input.promotion.basePrice, input.promotion.sellingPrice,
+    input.promotion.discountAmount, input.promotion.voucherCode, input.promotion.flashSaleId,
+    input.promotion.finalPrice, input.paymentMethod, input.paymentChannel,
   ).run();
 }
 
@@ -219,7 +228,9 @@ export async function applyPaymentStatus(order: OrderRecord, status: "paid" | "p
       `UPDATE orders SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND payment_status <> 'paid'`,
     ).bind(nextFulfillment, order.id).run();
-    return Number(result.meta.changes ?? 0) > 0;
+    const changed = Number(result.meta.changes ?? 0) > 0;
+    if (changed) await consumeOrderPromotion(order.voucher_code, order.flash_sale_id);
+    return changed;
   }
   await db.prepare(
     `UPDATE orders SET payment_status = ?, updated_at = CURRENT_TIMESTAMP
