@@ -1,0 +1,42 @@
+name: Terapkan source final LFAMILIA
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - LFAMILIA-STORE-v6-final-admin.zip
+
+permissions:
+  contents: write
+
+jobs:
+  apply-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Replace repository source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f LFAMILIA-STORE-v6-final-admin.zip
+          staging="$RUNNER_TEMP/lfamilia-source"
+          mkdir -p "$staging"
+          unzip -q LFAMILIA-STORE-v6-final-admin.zip -d "$staging"
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='LICENSE' \
+            "$staging/LFAMILIA-STORE/" ./
+          rm -f LFAMILIA-STORE-v6-final-admin.zip
+          rm -f .github/workflows/apply-lfamilia-source.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Finalisasi katalog dan panel admin"
+          git push
