@@ -1,11 +1,13 @@
 import { hashHex, hmacHex, safeEqual } from "@/lib/server/crypto";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { randomUUID } from "node:crypto";
 
 type IpaymuEnv = {
   IPAYMU_ENV?: string;
   IPAYMU_VA?: string;
   IPAYMU_API_KEY?: string;
   IPAYMU_API_BASE_URL?: string;
+  IPAYMU_RELAY_SECRET?: string;
 };
 
 export type IpaymuDirectResult = {
@@ -42,7 +44,20 @@ function runtimeConfig() {
   const apiKey = runtime.IPAYMU_API_KEY?.trim();
   if (!va || !apiKey) throw new Error("Secret iPaymu VA dan API Key belum dikonfigurasi.");
   const defaultBase = runtime.IPAYMU_ENV === "production" ? "https://my.ipaymu.com" : "https://sandbox.ipaymu.com";
-  return { va, apiKey, baseUrl: (runtime.IPAYMU_API_BASE_URL?.trim() || defaultBase).replace(/\/$/, "") };
+  const baseUrl = (runtime.IPAYMU_API_BASE_URL?.trim() || defaultBase).replace(/\/$/, "");
+  const relaySecret = runtime.IPAYMU_RELAY_SECRET?.trim();
+  let parsedBase: URL;
+  try {
+    parsedBase = new URL(baseUrl);
+  } catch {
+    throw new Error("IPAYMU_API_BASE_URL tidak valid.");
+  }
+  if (parsedBase.protocol !== "https:") throw new Error("Endpoint iPaymu wajib memakai HTTPS.");
+  const isOfficialHost = parsedBase.hostname === "my.ipaymu.com" || parsedBase.hostname === "sandbox.ipaymu.com";
+  if (!isOfficialHost && (!relaySecret || relaySecret.length < 32)) {
+    throw new Error("IPAYMU_RELAY_SECRET minimal 32 karakter wajib diisi untuk relay IP statis.");
+  }
+  return { va, apiKey, baseUrl, relaySecret: isOfficialHost ? undefined : relaySecret };
 }
 
 function timestamp() {
@@ -61,7 +76,7 @@ export async function createIpaymuDirectPayment(input: {
   productName: string;
   productPrice: number;
 }) {
-  const { va, apiKey, baseUrl } = runtimeConfig();
+  const { va, apiKey, baseUrl, relaySecret } = runtimeConfig();
   const body = {
     name: input.name,
     phone: input.phone,
@@ -80,15 +95,26 @@ export async function createIpaymuDirectPayment(input: {
   const rawBody = JSON.stringify(body);
   const bodyHash = hashHex("sha256", rawBody);
   const signature = hmacHex("sha256", apiKey, `POST:${va}:${bodyHash}:${apiKey}`);
-  const response = await fetch(`${baseUrl}/api/v2/payment/direct`, {
+  const requestPath = "/api/v2/payment/direct";
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    accept: "application/json",
+    va,
+    signature,
+    timestamp: timestamp(),
+  };
+  if (relaySecret) {
+    const relayTimestamp = Math.floor(Date.now() / 1000).toString();
+    const relayNonce = randomUUID();
+    const relayPayload = `${relayTimestamp}\n${relayNonce}\nPOST\n${requestPath}\n${rawBody}`;
+    headers["x-lfamilia-relay-secret"] = relaySecret;
+    headers["x-lfamilia-relay-timestamp"] = relayTimestamp;
+    headers["x-lfamilia-relay-nonce"] = relayNonce;
+    headers["x-lfamilia-relay-signature"] = hmacHex("sha256", relaySecret, relayPayload);
+  }
+  const response = await fetch(`${baseUrl}${requestPath}`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json",
-      va,
-      signature,
-      timestamp: timestamp(),
-    },
+    headers,
     body: rawBody,
     signal: AbortSignal.timeout(15_000),
   });

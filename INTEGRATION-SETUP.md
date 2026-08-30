@@ -22,6 +22,7 @@ Tambahkan sebagai **Secret**, bukan Variable biasa dan bukan file GitHub:
 |---|---|
 | `IPAYMU_VA` | Nomor VA merchant iPaymu |
 | `IPAYMU_API_KEY` | API Key iPaymu |
+| `IPAYMU_RELAY_SECRET` | Secret acak minimal 32 karakter yang sama dengan relay IP statis |
 | `DIGIFLAZZ_USERNAME` | Username buyer DigiFlazz |
 | `DIGIFLAZZ_API_KEY` | Production/development API key DigiFlazz |
 | `DIGIFLAZZ_WEBHOOK_SECRET` | Secret webhook DigiFlazz |
@@ -37,6 +38,7 @@ Tambahkan Variable biasa:
 |---|---|
 | `PUBLIC_BASE_URL` | `https://domain-toko-anda` tanpa `/` terakhir |
 | `IPAYMU_ENV` | `sandbox` |
+| `IPAYMU_API_BASE_URL` | Saat production: `https://ipaymu-relay.lfamiliastore.my.id` |
 | `DIGIFLAZZ_ENV` | `development` |
 | `OWNER_EMAIL` | Email Pemilik utama yang sama dengan Cloudflare Access |
 | `NICKNAME_API_URL` | URL API validasi nickname yang Anda izinkan |
@@ -47,7 +49,7 @@ Tambahkan Variable biasa:
 | `WHATSAPP_TEMPLATE_LANGUAGE` | Kode bahasa template, contoh `id` |
 | `WHATSAPP_GRAPH_VERSION` | Versi Graph API, contoh `v23.0` |
 
-`IPAYMU_API_BASE_URL`, `DIGIFLAZZ_API_URL`, dan `VIPPAYMENT_API_URL` hanya perlu diisi bila memakai endpoint resmi yang berbeda atau relay ber-IP statis.
+`DIGIFLAZZ_API_URL` dan `VIPPAYMENT_API_URL` hanya perlu diisi bila memakai endpoint resmi yang berbeda atau relay ber-IP statis.
 
 ## 3. Callback dan webhook
 
@@ -95,6 +97,8 @@ Saat iPaymu menyatakan pembayaran lunas, satu baris stok direservasi secara atom
 ## 7. Syarat IP provider
 
 iPaymu Direct production meminta domain terdaftar dan IP statis. DigiFlazz juga memakai whitelist IP untuk koneksi buyer. Sebelum beralih ke production, konfirmasikan IP keluar Worker kepada kedua provider. Jika mereka meminta satu IP statis khusus, arahkan request outbound melalui relay/VPS kecil ber-IP statis; callback tetap diterima oleh Worker.
+
+Paket relay siap pakai tersedia di `infra/ipaymu-relay`. Gunakan IPv4 publik VPS pada formulir iPaymu, arahkan DNS `ipaymu-relay.lfamiliastore.my.id` ke VPS, lalu pasang nilai `IPAYMU_RELAY_SECRET` yang sama di Worker dan VPS. Jangan mengarahkan callback melalui relay.
 
 ## 8. Menambah provider lain
 
