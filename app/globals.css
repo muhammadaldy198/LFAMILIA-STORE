@@ -176,6 +176,10 @@ html {
   color: #091006;
 }
 
+.pixel-art {
+  image-rendering: pixelated;
+}
+
 .site-shell {
   background-image:
     radial-gradient(circle at 18% 7%, rgba(185, 255, 53, 0.04), transparent 25%),

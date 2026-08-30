@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import { deleteProduct, readProducts, saveProduct } from "@/lib/server/products";
+import { isAllowedMediaUrl } from "@/lib/media-url";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ const productSchema = z.object({
   name: z.string().trim().min(2).max(80),
   publisher: z.string().trim().max(80).default(""),
   category: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(60),
-  imageUrl: z.string().trim().url().max(500).optional().or(z.literal("")),
+  imageUrl: z.string().trim().max(500).refine(isAllowedMediaUrl, "URL gambar tidak valid.").optional().or(z.literal("")),
   initials: z.string().trim().min(1).max(3),
   accent: z.string().trim().min(5).max(160),
   inputLabel: z.string().trim().min(2).max(80),

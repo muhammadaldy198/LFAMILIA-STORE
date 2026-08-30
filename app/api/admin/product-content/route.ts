@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import { saveProductContent } from "@/lib/server/products";
+import { isAllowedMediaUrl } from "@/lib/media-url";
 
 const noticeSchema = z.object({
   title: z.string().trim().min(2).max(180),
@@ -11,7 +12,7 @@ const noticeSchema = z.object({
 
 const schema = z.object({
   dbId: z.number().int().positive(),
-  imageUrl: z.string().trim().url().max(500).optional().or(z.literal("")),
+  imageUrl: z.string().trim().max(500).refine(isAllowedMediaUrl, "URL gambar tidak valid.").optional().or(z.literal("")),
   manualInstructions: z.string().trim().max(500).optional(),
   manualOpenTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().or(z.literal("")),
   manualCloseTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().or(z.literal("")),

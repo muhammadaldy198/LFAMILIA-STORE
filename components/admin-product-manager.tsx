@@ -14,6 +14,7 @@ import { providerOptions } from "@/lib/provider-options";
 import type { ManagedProduct } from "@/lib/server/products";
 import { ProductArtwork } from "@/components/product-artwork";
 import type { ProductCategoryRecord } from "@/lib/server/storefront";
+import { AdminMediaUpload } from "@/components/admin-media-upload";
 
 type DraftPackage = ManagedProduct["packages"][number];
 
@@ -250,7 +251,7 @@ export function AdminProductManager() {
               <Field label="Slug URL"><Input required value={draft.slug} onChange={(event) => updateDraft("slug", slugify(event.target.value))} className="admin-input" placeholder="mobile-legends" /></Field>
               <Field label="Publisher"><Input value={draft.publisher} onChange={(event) => updateDraft("publisher", event.target.value)} className="admin-input" placeholder="Moonton" /></Field>
               <Field label="Kategori"><select value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white">{(categories.length ? categories : [{ slug: "game", name: "Top Up Game" }, { slug: "voucher", name: "Voucher & Gift Card" }]).map((category) => <option key={category.slug} value={category.slug}>{category.name}</option>)}</select></Field></>}
-              <Field label="URL gambar produk" wide><Input type="url" value={draft.imageUrl ?? ""} onChange={(event) => updateDraft("imageUrl", event.target.value)} className="admin-input" placeholder="https://.../gambar-produk.webp" /><span className="mt-1.5 block text-[9px] text-white/28">Gunakan gambar persegi atau landscape. Jika URL kosong, kartu memakai inisial dan warna.</span></Field>
+              <div className="sm:col-span-2"><AdminMediaUpload label="Gambar produk" value={draft.imageUrl ?? ""} onChange={(value) => updateDraft("imageUrl", value)} help="Unggah dari HP atau tempel URL HTTPS. Jika kosong, kartu memakai inisial 8-bit dan warna produk." /></div>
               {role === "owner" && <><Field label="Inisial kartu"><Input required maxLength={3} value={draft.initials} onChange={(event) => updateDraft("initials", event.target.value.toUpperCase())} className="admin-input" placeholder="ML" /></Field>
               <Field label="Urutan"><Input type="number" min={0} value={draft.sortOrder} onChange={(event) => updateDraft("sortOrder", Number(event.target.value))} className="admin-input" /></Field>
               <Field label="Label tujuan"><Input required value={draft.inputLabel} onChange={(event) => updateDraft("inputLabel", event.target.value)} className="admin-input" placeholder="User ID" /></Field>
