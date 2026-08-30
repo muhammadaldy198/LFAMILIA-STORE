@@ -80,7 +80,7 @@ test("delivery attempts are unique per order and channel", () => {
 test("final storefront migration creates editable content, promotions, and admin roles", () => {
   const db = migratedDatabase();
   const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name));
-  for (const table of ["store_settings", "product_categories", "product_notices", "discount_vouchers", "flash_sales", "admin_users", "faq_entries"]) {
+  for (const table of ["store_settings", "product_categories", "product_notices", "discount_vouchers", "flash_sales", "admin_users", "faq_entries", "media_assets"]) {
     assert.ok(tables.has(table), `${table} should exist`);
   }
   const owner = db.prepare("SELECT email, role, is_active FROM admin_users LIMIT 1").get();

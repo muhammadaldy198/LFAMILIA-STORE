@@ -1,6 +1,7 @@
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 const MAX_MEDIA_BYTES = 6 * 1024 * 1024;
+const MAX_D1_MEDIA_BYTES = 1_800_000;
 const mediaTypes: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -9,7 +10,7 @@ const mediaTypes: Record<string, string> = {
 };
 
 type StoredMedia = {
-  body: ReadableStream<Uint8Array>;
+  body: BodyInit;
   httpEtag?: string;
   writeHttpMetadata(headers: Headers): void;
 };
@@ -19,10 +20,34 @@ type MediaBucket = {
   get(key: string): Promise<StoredMedia | null>;
 };
 
-function getMediaBucket() {
-  const bucket = getRuntimeEnv<{ BUCKET?: MediaBucket }>().BUCKET;
-  if (!bucket) throw new Error("Penyimpanan media belum aktif.");
-  return bucket;
+type MediaStatement = {
+  bind(...values: Array<string | number | ArrayBuffer | null>): MediaStatement;
+  run(): Promise<unknown>;
+  first<T>(): Promise<T | null>;
+};
+
+type MediaDatabase = {
+  prepare(query: string): MediaStatement;
+};
+
+type MediaBindings = {
+  BUCKET?: MediaBucket;
+  DB?: MediaDatabase;
+};
+
+function getMediaBindings() {
+  return getRuntimeEnv<MediaBindings>();
+}
+
+async function ensureMediaTable(database: MediaDatabase) {
+  await database.prepare(`CREATE TABLE IF NOT EXISTS media_assets (
+    media_key TEXT PRIMARY KEY,
+    content_type TEXT NOT NULL,
+    data BLOB NOT NULL,
+    etag TEXT NOT NULL,
+    original_name TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`).run();
 }
 
 function hasExpectedSignature(bytes: Uint8Array, type: string) {
@@ -43,14 +68,48 @@ export async function uploadStoreMedia(file: File) {
   if (!hasExpectedSignature(new Uint8Array(buffer), file.type)) throw new Error("Isi file tidak cocok dengan format gambarnya.");
 
   const key = `media-${crypto.randomUUID()}.${extension}`;
-  await getMediaBucket().put(key, buffer, {
-    httpMetadata: { contentType: file.type, cacheControl: "public, max-age=31536000, immutable" },
-    customMetadata: { originalName: file.name.slice(0, 180) },
-  });
+  const { BUCKET: bucket, DB: database } = getMediaBindings();
+  if (bucket) {
+    await bucket.put(key, buffer, {
+      httpMetadata: { contentType: file.type, cacheControl: "public, max-age=31536000, immutable" },
+      customMetadata: { originalName: file.name.slice(0, 180) },
+    });
+  } else if (database) {
+    if (buffer.byteLength > MAX_D1_MEDIA_BYTES) throw new Error("Gambar terlalu besar. Coba unggah ulang agar dikompres otomatis.");
+    await ensureMediaTable(database);
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", buffer));
+    const etag = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    await database.prepare(`INSERT INTO media_assets
+      (media_key, content_type, data, etag, original_name)
+      VALUES (?, ?, ?, ?, ?)`)
+      .bind(key, file.type, buffer, etag, file.name.slice(0, 180))
+      .run();
+  } else {
+    throw new Error("Penyimpanan media belum aktif.");
+  }
   return key;
 }
 
 export async function readStoreMedia(key: string) {
   if (!/^media-[0-9a-f-]{36}\.(?:jpg|png|webp|gif)$/.test(key)) return null;
-  return getMediaBucket().get(key);
+  const { BUCKET: bucket, DB: database } = getMediaBindings();
+  const bucketObject = bucket ? await bucket.get(key) : null;
+  if (bucketObject) return bucketObject;
+  if (!database) {
+    if (!bucket) throw new Error("Penyimpanan media belum aktif.");
+    return null;
+  }
+
+  await ensureMediaTable(database);
+  const row = await database.prepare("SELECT content_type, data, etag FROM media_assets WHERE media_key = ?")
+    .bind(key)
+    .first<{ content_type: string; data: ArrayBuffer; etag: string }>();
+  if (!row) return null;
+  return {
+    body: row.data,
+    httpEtag: `"${row.etag}"`,
+    writeHttpMetadata(headers: Headers) {
+      headers.set("Content-Type", row.content_type);
+    },
+  } satisfies StoredMedia;
 }

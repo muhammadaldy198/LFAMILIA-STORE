@@ -27,8 +27,9 @@ export function AdminMediaUpload({
     setUploading(true);
     setError("");
     try {
+      const preparedFile = await optimizeImage(file);
       const form = new FormData();
-      form.set("file", file);
+      form.set("file", preparedFile);
       const response = await fetch("/api/admin/media", { method: "POST", body: form });
       const data = await response.json() as { url?: string; error?: string };
       if (!response.ok || !data.url) throw new Error(data.error || "Gambar gagal diunggah.");
@@ -64,4 +65,27 @@ export function AdminMediaUpload({
       {error && <span className="mt-1.5 block text-[10px] text-red-300">{error}</span>}
     </div>
   );
+}
+
+async function optimizeImage(file: File) {
+  const targetBytes = 1_700_000;
+  if (file.type === "image/gif" || file.size <= targetBytes) return file;
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    for (const plan of [{ maxSide: 1600, quality: 0.82 }, { maxSide: 1200, quality: 0.7 }]) {
+      const scale = Math.min(1, plan.maxSide / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Browser tidak dapat memproses gambar ini.");
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", plan.quality));
+      if (blob && blob.size <= targetBytes) return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.webp`, { type: "image/webp" });
+    }
+  } finally {
+    bitmap.close();
+  }
+  throw new Error("Gambar masih terlalu besar setelah dikompres. Pilih gambar lain.");
 }

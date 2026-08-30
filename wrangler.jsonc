@@ -26,11 +26,5 @@
       "database_id": "d13939fa-c5c6-4c0e-868a-912bb875fc8d",
       "migrations_dir": "drizzle"
     }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "BUCKET",
-      "bucket_name": "lfamilia-store-media"
-    }
   ]
 }
