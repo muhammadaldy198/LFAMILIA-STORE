@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Flame, Gamepad2, Headphones, Home, ReceiptText } from "lucide-react";
+import { Gamepad2, Home, Newspaper, Trophy, UserRound } from "lucide-react";
 
 const items = [
   { href: "/", label: "Beranda", icon: Home },
   { href: "/catalog", label: "Top Up", icon: Gamepad2 },
-  { href: "/promo", label: "Promo", icon: Flame },
-  { href: "/track", label: "Transaksi", icon: ReceiptText },
-  { href: "/contact", label: "Bantuan", icon: Headphones },
+  { href: "/news", label: "Berita", icon: Newspaper },
+  { href: "/leaderboard", label: "Peringkat", icon: Trophy },
+  { href: "/account", label: "Akun", icon: UserRound },
 ];
 
 export function MobileBottomNav() {

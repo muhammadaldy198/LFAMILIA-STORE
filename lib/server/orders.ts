@@ -20,6 +20,7 @@ export type PurchasableItem = {
 
 export type OrderRecord = {
   id: string;
+  customer_id: string | null;
   reference_id: string;
   product_slug: string;
   product_name: string;
@@ -148,6 +149,7 @@ export async function insertPendingOrder(input: {
   customerNotes: string | null;
   paymentMethod: string;
   paymentChannel: string;
+  customerId?: string | null;
   promotion: PromotionQuote;
 }) {
   const db = getD1();
@@ -158,14 +160,14 @@ export async function insertPendingOrder(input: {
   const customerNo = renderCustomerNo(input.item.targetTemplate, input.destination, input.server);
   await db.prepare(
     `INSERT INTO orders (
-      id, reference_id, product_slug, product_name, package_sku, package_label,
+      id, customer_id, reference_id, product_slug, product_name, package_sku, package_label,
       provider_code, provider_sku, fulfillment_type, target_template, destination, server,
       nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes,
       base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
       admin_fee, total, payment_method, payment_channel
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
   ).bind(
-    input.id, input.referenceId, input.item.productSlug, input.item.productName,
+    input.id, input.customerId ?? null, input.referenceId, input.item.productSlug, input.item.productName,
     input.item.packageSku, input.item.packageLabel, input.item.providerCode, input.item.providerSku,
     input.item.fulfillmentType, input.item.targetTemplate, input.destination, input.server,
     input.nickname, customerNo, input.buyerName, input.buyerEmail, input.buyerPhone,
@@ -209,7 +211,7 @@ export async function markPaymentCreationFailed(referenceId: string, message: st
 
 export async function recordOrderEvent(input: {
   orderId: string;
-  source: "ipaymu" | "digiflazz" | "vippayment" | "voucher_stock" | "admin";
+  source: "ipaymu" | "wallet" | "digiflazz" | "vippayment" | "voucher_stock" | "admin";
   eventId: string;
   status: string;
   payload: unknown;

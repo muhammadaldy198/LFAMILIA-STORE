@@ -1,13 +1,15 @@
 import { getD1 } from "@/db";
 import { products as fallbackProducts, type ProductNotice, type ProductPackage, type StoreProduct } from "@/lib/store-data";
 
+const fallbackProductBySlug = new Map(fallbackProducts.map((product) => [product.slug, product]));
+
 export type ManagedPackage = ProductPackage & {
   dbId: number | null;
   isActive: boolean;
   sortOrder: number;
 };
 
-export type ManagedProduct = StoreProduct & {
+export type ManagedProduct = Omit<StoreProduct, "packages" | "notices"> & {
   dbId: number | null;
   isActive: boolean;
   sortOrder: number;
@@ -28,6 +30,7 @@ type ProductRow = {
   publisher: string;
   category: string;
   image_url: string | null;
+  banner_url: string | null;
   initials: string;
   accent: string;
   input_label: string;
@@ -91,11 +94,11 @@ export function getFallbackProducts(): ManagedProduct[] {
 export async function readProducts(includeInactive = false): Promise<ManagedProduct[]> {
   const db = getD1();
   const productSql = includeInactive
-    ? `SELECT id, slug, name, publisher, category, image_url, initials, accent, input_label, input_placeholder,
+    ? `SELECT id, slug, name, publisher, category, image_url, banner_url, initials, accent, input_label, input_placeholder,
         needs_server, popular, instant, fulfillment_type, target_template, manual_instructions,
         manual_open_time, manual_close_time, manual_timezone, is_active, sort_order
        FROM products ORDER BY sort_order ASC, name ASC`
-    : `SELECT id, slug, name, publisher, category, image_url, initials, accent, input_label, input_placeholder,
+    : `SELECT id, slug, name, publisher, category, image_url, banner_url, initials, accent, input_label, input_placeholder,
         needs_server, popular, instant, fulfillment_type, target_template, manual_instructions,
         manual_open_time, manual_close_time, manual_timezone, is_active, sort_order
        FROM products WHERE is_active = 1 ORDER BY sort_order ASC, name ASC`;
@@ -116,13 +119,16 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
   const packageRows = packageResult.results as PackageRow[];
   const noticeRows = noticeResult.results as NoticeRow[];
 
-  return (productResult.results as ProductRow[]).map((row) => ({
+  return (productResult.results as ProductRow[]).map((row) => {
+    const bundled = fallbackProductBySlug.get(row.slug);
+    return {
     dbId: row.id,
     slug: row.slug,
     name: row.name,
     publisher: row.publisher,
     category: row.category,
-    imageUrl: row.image_url ?? undefined,
+    imageUrl: row.image_url ?? bundled?.imageUrl,
+    bannerUrl: row.banner_url ?? row.image_url ?? bundled?.bannerUrl ?? bundled?.imageUrl,
     initials: row.initials,
     accent: row.accent,
     inputLabel: row.input_label,
@@ -156,7 +162,8 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
       isActive: Boolean(item.is_active),
       sortOrder: item.sort_order,
     })),
-  }));
+    };
+  });
 }
 
 type ProductWrite = Omit<ManagedProduct, "dbId" | "packages" | "notices"> & {
@@ -172,6 +179,7 @@ export async function saveProduct(input: ProductWrite, id?: number) {
     input.publisher,
     input.category,
     input.imageUrl ?? null,
+    input.bannerUrl ?? null,
     input.initials,
     input.accent,
     input.inputLabel,
@@ -191,17 +199,17 @@ export async function saveProduct(input: ProductWrite, id?: number) {
 
   if (id) {
     await db.prepare(
-      `UPDATE products SET slug = ?, name = ?, publisher = ?, category = ?, image_url = ?, initials = ?, accent = ?,
+      `UPDATE products SET slug = ?, name = ?, publisher = ?, category = ?, image_url = ?, banner_url = ?, initials = ?, accent = ?,
        input_label = ?, input_placeholder = ?, needs_server = ?, popular = ?, instant = ?, fulfillment_type = ?,
        target_template = ?, manual_instructions = ?, manual_open_time = ?, manual_close_time = ?, manual_timezone = ?, is_active = ?,
        sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     ).bind(...values, id).run();
   } else {
     await db.prepare(
-      `INSERT INTO products (slug, name, publisher, category, image_url, initials, accent, input_label,
+      `INSERT INTO products (slug, name, publisher, category, image_url, banner_url, initials, accent, input_label,
        input_placeholder, needs_server, popular, instant, fulfillment_type, target_template,
        manual_instructions, manual_open_time, manual_close_time, manual_timezone, is_active, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(...values).run();
   }
 
@@ -229,6 +237,7 @@ export async function saveProduct(input: ProductWrite, id?: number) {
 export async function saveProductContent(input: {
   id: number;
   imageUrl?: string;
+  bannerUrl?: string;
   manualInstructions?: string;
   manualOpenTime?: string;
   manualCloseTime?: string;
@@ -239,10 +248,11 @@ export async function saveProductContent(input: {
   const exists = await db.prepare("SELECT id FROM products WHERE id = ? LIMIT 1").bind(input.id).first<{ id: number }>();
   if (!exists) throw new Error("Produk tidak ditemukan.");
   await db.prepare(
-    `UPDATE products SET image_url = ?, manual_instructions = ?, manual_open_time = ?,
+    `UPDATE products SET image_url = ?, banner_url = ?, manual_instructions = ?, manual_open_time = ?,
      manual_close_time = ?, manual_timezone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
   ).bind(
     input.imageUrl || null,
+    input.bannerUrl || null,
     input.manualInstructions || null,
     input.manualOpenTime || null,
     input.manualCloseTime || null,
@@ -266,13 +276,13 @@ export async function seedFallbackProducts() {
   const db = getD1();
   const source = getFallbackProducts();
   const productStatements = source.map((item) => db.prepare(
-    `INSERT INTO products (slug, name, publisher, category, image_url, initials, accent, input_label,
+    `INSERT INTO products (slug, name, publisher, category, image_url, banner_url, initials, accent, input_label,
      input_placeholder, needs_server, popular, instant, fulfillment_type, target_template,
      manual_instructions, manual_open_time, manual_close_time, manual_timezone, is_active, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(slug) DO NOTHING`,
   ).bind(
-    item.slug, item.name, item.publisher, item.category, item.imageUrl ?? null, item.initials, item.accent,
+    item.slug, item.name, item.publisher, item.category, item.imageUrl ?? null, item.bannerUrl ?? null, item.initials, item.accent,
     item.inputLabel, item.inputPlaceholder, item.needsServer ? 1 : 0, item.popular ? 1 : 0,
     item.instant ? 1 : 0, item.fulfillmentType, item.targetTemplate, item.manualInstructions ?? null,
     item.manualOpenTime ?? null, item.manualCloseTime ?? null, item.manualTimezone ?? "Asia/Jakarta", 1, item.sortOrder,

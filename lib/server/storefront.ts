@@ -18,6 +18,7 @@ type SettingsRow = {
   support_whatsapp: string | null;
   support_email: string | null;
   instagram_url: string | null;
+  discord_url: string | null;
   support_hours: string;
 };
 
@@ -59,6 +60,7 @@ export async function readStorefrontSettings(): Promise<StorefrontSettings> {
       supportWhatsapp: row.support_whatsapp ?? undefined,
       supportEmail: row.support_email ?? undefined,
       instagramUrl: row.instagram_url ?? undefined,
+      discordUrl: row.discord_url ?? undefined,
       supportHours: row.support_hours,
     };
   } catch {
@@ -72,8 +74,8 @@ export async function saveStorefrontSettings(input: StorefrontSettings) {
       id, store_name, store_short_name, tagline, logo_url, announcement, banner_enabled,
       banner_eyebrow, banner_title, banner_highlight, banner_description, banner_image_url,
       banner_cta_label, banner_cta_href, support_whatsapp, support_email, instagram_url,
-      support_hours, updated_at
-    ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      discord_url, support_hours, updated_at
+    ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(id) DO UPDATE SET
       store_name = excluded.store_name, store_short_name = excluded.store_short_name,
       tagline = excluded.tagline, logo_url = excluded.logo_url, announcement = excluded.announcement,
@@ -82,7 +84,8 @@ export async function saveStorefrontSettings(input: StorefrontSettings) {
       banner_description = excluded.banner_description, banner_image_url = excluded.banner_image_url,
       banner_cta_label = excluded.banner_cta_label, banner_cta_href = excluded.banner_cta_href,
       support_whatsapp = excluded.support_whatsapp, support_email = excluded.support_email,
-      instagram_url = excluded.instagram_url, support_hours = excluded.support_hours,
+      instagram_url = excluded.instagram_url, discord_url = excluded.discord_url,
+      support_hours = excluded.support_hours,
       updated_at = CURRENT_TIMESTAMP`,
   ).bind(
     input.storeName, input.storeShortName, input.tagline, input.logoUrl || null,
@@ -90,7 +93,7 @@ export async function saveStorefrontSettings(input: StorefrontSettings) {
     input.bannerTitle, input.bannerHighlight, input.bannerDescription,
     input.bannerImageUrl || null, input.bannerCtaLabel, input.bannerCtaHref,
     input.supportWhatsapp || null, input.supportEmail || null, input.instagramUrl || null,
-    input.supportHours,
+    input.discordUrl || null, input.supportHours,
   ).run();
 }
 
@@ -139,7 +142,13 @@ export async function readFaqs(includeInactive = false): Promise<FaqRecord[]> {
       `SELECT id, question, answer, is_active, sort_order FROM faq_entries
        ${includeInactive ? "" : "WHERE is_active = 1"} ORDER BY sort_order ASC, id ASC`,
     ).all<{ id: number; question: string; answer: string; is_active: number; sort_order: number }>();
-    if (result.results.length) return result.results.map((row) => ({ id: row.id, question: row.question, answer: row.answer, isActive: Boolean(row.is_active), sortOrder: row.sort_order }));
+    if (result.results.length) return result.results.map((row) => ({
+      id: row.id,
+      question: sanitizeLegacyProviderName(row.question),
+      answer: sanitizeLegacyProviderName(row.answer),
+      isActive: Boolean(row.is_active),
+      sortOrder: row.sort_order,
+    }));
   } catch {
     // Fall back to bundled FAQ content until the migration is applied.
   }
@@ -161,4 +170,8 @@ export async function saveFaq(input: Omit<FaqRecord, "id">, id?: number) {
 
 export async function deleteFaq(id: number) {
   await getD1().prepare("DELETE FROM faq_entries WHERE id = ?").bind(id).run();
+}
+
+function sanitizeLegacyProviderName(value: string) {
+  return value.replace(/iPaymu/gi, "gateway pembayaran");
 }

@@ -17,6 +17,7 @@ import type { ProductCategoryRecord } from "@/lib/server/storefront";
 import { AdminMediaUpload } from "@/components/admin-media-upload";
 
 type DraftPackage = ManagedProduct["packages"][number];
+type DraftNotice = ManagedProduct["notices"][number];
 
 const emptyProduct: ManagedProduct = {
   dbId: null,
@@ -25,6 +26,7 @@ const emptyProduct: ManagedProduct = {
   publisher: "",
   category: "game",
   imageUrl: "",
+  bannerUrl: "",
   initials: "",
   accent: "from-[#b9ff35] to-[#347a21]",
   inputLabel: "User ID",
@@ -110,7 +112,7 @@ export function AdminProductManager() {
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  function updatePackage(index: number, key: keyof DraftPackage, value: string | number | boolean) {
+  function updatePackage<K extends keyof DraftPackage>(index: number, key: K, value: DraftPackage[K]) {
     setDraft((current) => ({
       ...current,
       packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item),
@@ -135,7 +137,7 @@ export function AdminProductManager() {
     }));
   }
 
-  function updateNotice(index: number, key: "title" | "body" | "isActive", value: string | boolean) {
+  function updateNotice<K extends keyof DraftNotice>(index: number, key: K, value: DraftNotice[K]) {
     setDraft((current) => ({ ...current, notices: current.notices.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item) }));
   }
 
@@ -252,6 +254,7 @@ export function AdminProductManager() {
               <Field label="Publisher"><Input value={draft.publisher} onChange={(event) => updateDraft("publisher", event.target.value)} className="admin-input" placeholder="Moonton" /></Field>
               <Field label="Kategori"><select value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white">{(categories.length ? categories : [{ slug: "game", name: "Top Up Game" }, { slug: "voucher", name: "Voucher & Gift Card" }]).map((category) => <option key={category.slug} value={category.slug}>{category.name}</option>)}</select></Field></>}
               <div className="sm:col-span-2"><AdminMediaUpload label="Gambar produk" value={draft.imageUrl ?? ""} onChange={(value) => updateDraft("imageUrl", value)} help="Unggah dari HP atau tempel URL HTTPS. Jika kosong, kartu memakai inisial 8-bit dan warna produk." /></div>
+              <div className="sm:col-span-2"><AdminMediaUpload label="Banner halaman produk" value={draft.bannerUrl ?? ""} onChange={(value) => updateDraft("bannerUrl", value)} help="Banner landscape tampil di atas halaman pemilihan nominal. Jika kosong, gambar produk digunakan." /></div>
               {role === "owner" && <><Field label="Inisial kartu"><Input required maxLength={3} value={draft.initials} onChange={(event) => updateDraft("initials", event.target.value.toUpperCase())} className="admin-input" placeholder="ML" /></Field>
               <Field label="Urutan"><Input type="number" min={0} value={draft.sortOrder} onChange={(event) => updateDraft("sortOrder", Number(event.target.value))} className="admin-input" /></Field>
               <Field label="Label tujuan"><Input required value={draft.inputLabel} onChange={(event) => updateDraft("inputLabel", event.target.value)} className="admin-input" placeholder="User ID" /></Field>

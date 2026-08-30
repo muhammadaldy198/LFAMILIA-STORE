@@ -22,6 +22,7 @@ const schema = z.object({
   supportWhatsapp: z.string().trim().regex(/^\+?[0-9]{8,16}$/).optional().or(z.literal("")),
   supportEmail: z.string().trim().email().max(150).optional().or(z.literal("")),
   instagramUrl: optionalUrl,
+  discordUrl: optionalUrl,
   supportHours: z.string().trim().min(3).max(120),
 });
 

@@ -190,7 +190,7 @@ export async function listVoucherDashboard() {
   const stockMap = new Map<string, StockCountRow & { labels: string[] }>();
   for (const row of countResult.results) stockMap.set(row.stock_key, { ...row, labels: [] });
   for (const row of packageResult.results) {
-    const current = stockMap.get(row.stock_key) ?? { stock_key: row.stock_key, available: 0, reserved: 0, delivered: 0, voided: 0, total: 0, labels: [] };
+    const current: StockCountRow & { labels: string[] } = stockMap.get(row.stock_key) ?? { stock_key: row.stock_key, available: 0, reserved: 0, delivered: 0, voided: 0, total: 0, labels: [] };
     current.labels.push(`${row.product_name} — ${row.package_label}`);
     stockMap.set(row.stock_key, current);
   }

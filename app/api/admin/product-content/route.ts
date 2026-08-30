@@ -13,6 +13,7 @@ const noticeSchema = z.object({
 const schema = z.object({
   dbId: z.number().int().positive(),
   imageUrl: z.string().trim().max(500).refine(isAllowedMediaUrl, "URL gambar tidak valid.").optional().or(z.literal("")),
+  bannerUrl: z.string().trim().max(500).refine(isAllowedMediaUrl, "URL banner tidak valid.").optional().or(z.literal("")),
   manualInstructions: z.string().trim().max(500).optional(),
   manualOpenTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().or(z.literal("")),
   manualCloseTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().or(z.literal("")),
@@ -28,6 +29,7 @@ export async function PUT(request: Request) {
     await saveProductContent({
       id: input.dbId,
       imageUrl: input.imageUrl,
+      bannerUrl: input.bannerUrl,
       manualInstructions: input.manualInstructions,
       manualOpenTime: input.manualOpenTime,
       manualCloseTime: input.manualCloseTime,

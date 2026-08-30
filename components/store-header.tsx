@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calculator, Flame, Gamepad2, Headphones, Menu, ReceiptText } from "lucide-react";
+import { Calculator, Gamepad2, Headphones, Menu, Newspaper, ReceiptText, TicketPercent, Trophy, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { StoreSearch } from "@/components/store-search";
@@ -10,7 +10,9 @@ import { useStorefront } from "@/hooks/use-storefront";
 
 const navItems = [
   { href: "/catalog", label: "Top Up", icon: Gamepad2 },
-  { href: "/promo", label: "Promo", icon: Flame },
+  { href: "/promo", label: "Voucher", icon: TicketPercent },
+  { href: "/news", label: "Berita", icon: Newspaper },
+  { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/tools", label: "Kalkulator", icon: Calculator },
   { href: "/track", label: "Transaksi", icon: ReceiptText },
 ];
@@ -29,6 +31,7 @@ export function StoreHeader() {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <StoreSearch mobile />
+          <Button asChild variant="outline" className="hidden h-10 rounded-xl border-white/10 bg-white/[0.035] px-3 text-xs font-bold text-white hover:bg-white/[0.08] hover:text-white sm:inline-flex"><Link href="/account"><UserRound className="mr-2 size-4 text-[#b9ff35]" />Akun</Link></Button>
           <Button asChild variant="outline" className="hidden h-10 rounded-xl border-white/10 bg-white/[0.035] px-3 text-xs font-bold text-white hover:bg-white/[0.08] hover:text-white sm:inline-flex"><Link href="/contact"><Headphones className="mr-2 size-4 text-[#b9ff35]" />Hubungi</Link></Button>
           <Sheet>
             <SheetTrigger asChild><Button variant="ghost" size="icon" className="rounded-xl text-white xl:hidden" aria-label="Buka menu"><Menu className="size-5" /></Button></SheetTrigger>
@@ -38,6 +41,7 @@ export function StoreHeader() {
                 <SheetClose asChild><Link href="/" className="rounded-xl px-4 py-3.5 text-sm font-semibold text-white/70 hover:bg-white/[0.06]">Beranda</Link></SheetClose>
                 {navItems.map(({ href, label, icon: Icon }) => <SheetClose asChild key={href}><Link href={href} className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-semibold text-white/70 hover:bg-white/[0.06] hover:text-white"><Icon className="size-4 text-[#b9ff35]" />{label}</Link></SheetClose>)}
                 <SheetClose asChild><Link href="/contact" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-semibold text-white/70 hover:bg-white/[0.06]"><Headphones className="size-4 text-[#b9ff35]" />Hubungi Kami</Link></SheetClose>
+                <SheetClose asChild><Link href="/account" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-semibold text-white/70 hover:bg-white/[0.06]"><UserRound className="size-4 text-[#b9ff35]" />Akun Saya</Link></SheetClose>
                 <div className="my-3 h-px bg-white/[0.08]" />
                 <SheetClose asChild><Link href="/track" className="flex items-center gap-3 rounded-xl bg-[#b9ff35] px-4 py-3.5 text-sm font-bold text-[#091006]"><ReceiptText className="size-4" /> Cek pesanan</Link></SheetClose>
               </nav>

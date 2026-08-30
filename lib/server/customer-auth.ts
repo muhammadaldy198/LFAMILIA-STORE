@@ -1,0 +1,156 @@
+import { getD1 } from "@/db";
+
+const COOKIE_NAME = "lfamilia_session";
+const SESSION_DAYS = 30;
+const PASSWORD_ITERATIONS = 210_000;
+
+export type CustomerSession = {
+  id: string;
+  email: string;
+  name: string;
+  phone: string;
+  balance: number;
+  leaderboardOptIn: boolean;
+};
+
+type CustomerRow = {
+  id: string;
+  email: string;
+  name: string;
+  phone: string;
+  password_hash: string;
+  password_salt: string;
+  balance: number;
+  leaderboard_opt_in: number;
+  is_active: number;
+};
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function bytesToHex(bytes: Uint8Array) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function randomToken(bytes = 32) {
+  const value = crypto.getRandomValues(new Uint8Array(bytes));
+  return btoa(String.fromCharCode(...value)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, "");
+}
+
+async function sha256(value: string) {
+  return bytesToHex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
+}
+
+async function passwordDigest(password: string, saltHex: string) {
+  const salt = new Uint8Array(saltHex.match(/.{1,2}/g)?.map((part) => Number.parseInt(part, 16)) ?? []);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: PASSWORD_ITERATIONS }, key, 256);
+  return bytesToHex(new Uint8Array(bits));
+}
+
+function constantTimeEqual(left: string, right: string) {
+  if (left.length !== right.length) return false;
+  let mismatch = 0;
+  for (let index = 0; index < left.length; index += 1) mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return mismatch === 0;
+}
+
+function cookieValue(request: Request) {
+  const cookie = request.headers.get("cookie") ?? "";
+  for (const part of cookie.split(";")) {
+    const [name, ...value] = part.trim().split("=");
+    if (name === COOKIE_NAME) return decodeURIComponent(value.join("="));
+  }
+  return null;
+}
+
+function publicCustomer(row: CustomerRow): CustomerSession {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    phone: row.phone,
+    balance: Number(row.balance || 0),
+    leaderboardOptIn: Boolean(row.leaderboard_opt_in),
+  };
+}
+
+export async function registerCustomer(input: { email: string; name: string; phone: string; password: string }) {
+  const db = getD1();
+  const email = normalizeEmail(input.email);
+  const existing = await db.prepare("SELECT id FROM customer_users WHERE email = ? LIMIT 1").bind(email).first<{ id: string }>();
+  if (existing) throw new Error("Email sudah terdaftar. Silakan masuk.");
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltHex = bytesToHex(salt);
+  const passwordHash = await passwordDigest(input.password, saltHex);
+  const id = crypto.randomUUID();
+  await db.prepare(
+    `INSERT INTO customer_users (id, email, name, phone, password_hash, password_salt)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).bind(id, email, input.name.trim(), input.phone.trim(), passwordHash, saltHex).run();
+  return createCustomerSession(id);
+}
+
+export async function loginCustomer(emailInput: string, password: string) {
+  const db = getD1();
+  const row = await db.prepare(
+    `SELECT id, email, name, phone, password_hash, password_salt, balance, leaderboard_opt_in, is_active
+     FROM customer_users WHERE email = ? LIMIT 1`,
+  ).bind(normalizeEmail(emailInput)).first<CustomerRow>();
+  if (!row || !row.is_active) throw new Error("Email atau password salah.");
+  const digest = await passwordDigest(password, row.password_salt);
+  if (!constantTimeEqual(digest, row.password_hash)) throw new Error("Email atau password salah.");
+  await db.prepare("UPDATE customer_users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(row.id).run();
+  return createCustomerSession(row.id);
+}
+
+async function createCustomerSession(customerId: string) {
+  const db = getD1();
+  const token = randomToken();
+  const tokenHash = await sha256(token);
+  const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000).toISOString();
+  await db.prepare("INSERT INTO customer_sessions (id, customer_id, token_hash, expires_at) VALUES (?, ?, ?, ?)")
+    .bind(crypto.randomUUID(), customerId, tokenHash, expiresAt).run();
+  const row = await db.prepare(
+    `SELECT id, email, name, phone, password_hash, password_salt, balance, leaderboard_opt_in, is_active
+     FROM customer_users WHERE id = ? LIMIT 1`,
+  ).bind(customerId).first<CustomerRow>();
+  if (!row) throw new Error("Akun pelanggan tidak ditemukan.");
+  return { customer: publicCustomer(row), token, expiresAt };
+}
+
+export function customerSessionCookie(token: string, expiresAt: string) {
+  return `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=${new Date(expiresAt).toUTCString()}`;
+}
+
+export function clearCustomerSessionCookie() {
+  return `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+}
+
+export async function getCustomerSession(request: Request): Promise<CustomerSession | null> {
+  const token = cookieValue(request);
+  if (!token) return null;
+  const tokenHash = await sha256(token);
+  const row = await getD1().prepare(
+    `SELECT u.id, u.email, u.name, u.phone, u.password_hash, u.password_salt,
+      u.balance, u.leaderboard_opt_in, u.is_active
+     FROM customer_sessions s
+     JOIN customer_users u ON u.id = s.customer_id
+     WHERE s.token_hash = ? AND s.expires_at > CURRENT_TIMESTAMP AND u.is_active = 1
+     LIMIT 1`,
+  ).bind(tokenHash).first<CustomerRow>();
+  return row ? publicCustomer(row) : null;
+}
+
+export async function requireCustomerSession(request: Request) {
+  const customer = await getCustomerSession(request);
+  if (!customer) return Response.json({ error: "Silakan masuk ke akun terlebih dahulu." }, { status: 401 });
+  return customer;
+}
+
+export async function deleteCustomerSession(request: Request) {
+  const token = cookieValue(request);
+  if (!token) return;
+  await getD1().prepare("DELETE FROM customer_sessions WHERE token_hash = ?").bind(await sha256(token)).run();
+}

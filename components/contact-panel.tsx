@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { Camera, Check, Clipboard, Clock3, Mail, MessageCircle } from "lucide-react";
+import { Camera, Check, Clipboard, Clock3, Mail, MessageCircle, MessagesSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useStorefront } from "@/hooks/use-storefront";
@@ -25,6 +25,7 @@ export function ContactPanel() {
   const channels = [
     ...(whatsapp ? [{ icon: MessageCircle, title: "WhatsApp", text: settings.supportWhatsapp!, href: `https://wa.me/${whatsapp}` }] : []),
     ...(settings.instagramUrl ? [{ icon: Camera, title: "Instagram", text: settings.instagramUrl.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "@").replace(/\/$/, ""), href: settings.instagramUrl }] : []),
+    ...(settings.discordUrl ? [{ icon: MessagesSquare, title: "Discord", text: "Gabung server komunitas LFAMILIA", href: settings.discordUrl }] : []),
     ...(settings.supportEmail ? [{ icon: Mail, title: "Email", text: settings.supportEmail, href: `mailto:${settings.supportEmail}` }] : []),
   ];
 

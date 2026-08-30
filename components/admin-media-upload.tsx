@@ -67,7 +67,7 @@ export function AdminMediaUpload({
   );
 }
 
-async function optimizeImage(file: File) {
+export async function optimizeImage(file: File) {
   const targetBytes = 1_700_000;
   if (file.type === "image/gif" || file.size <= targetBytes) return file;
 

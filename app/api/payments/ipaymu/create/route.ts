@@ -12,6 +12,7 @@ import {
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
 import { quotePromotion } from "@/lib/server/promotions";
+import { getCustomerSession } from "@/lib/server/customer-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
   try {
     const input = schema.parse(await request.json());
     if (!findPaymentChannel(input.paymentMethod, input.paymentChannel)) {
-      return Response.json({ error: "Metode pembayaran iPaymu tidak valid." }, { status: 400 });
+      return Response.json({ error: "Metode pembayaran tidak valid." }, { status: 400 });
     }
     const item = await resolvePurchasableItem(input.productSlug, input.packageSku);
     if (!item) return Response.json({ error: "Produk atau nominal tidak tersedia." }, { status: 404 });
@@ -54,6 +55,7 @@ export async function POST(request: Request) {
 
     const identity = createOrderIdentity();
     referenceId = identity.referenceId;
+    const customer = await getCustomerSession(request);
     await insertPendingOrder({
       ...identity,
       item,
@@ -66,6 +68,7 @@ export async function POST(request: Request) {
       customerNotes: input.customerNotes || null,
       paymentMethod: input.paymentMethod,
       paymentChannel: input.paymentChannel,
+      customerId: customer?.id ?? null,
       promotion,
     });
 

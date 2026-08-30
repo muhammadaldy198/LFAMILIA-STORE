@@ -102,3 +102,27 @@ test("product notices cascade and flash sales can be scheduled repeatedly", () =
   db.prepare("DELETE FROM products WHERE id = ?").run(productId);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM product_notices").get().count, 0);
 });
+
+test("customer experience migration creates accounts, wallet, reviews, banners, popups, and news", () => {
+  const db = migratedDatabase();
+  const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name));
+  for (const table of ["customer_users", "customer_sessions", "wallet_settings", "wallet_topups", "wallet_transactions", "product_reviews", "home_banners", "site_popups", "news_articles"]) {
+    assert.ok(tables.has(table), `${table} should exist`);
+  }
+  const productColumns = new Set(db.prepare("PRAGMA table_info(products)").all().map((row) => row.name));
+  const orderColumns = new Set(db.prepare("PRAGMA table_info(orders)").all().map((row) => row.name));
+  const settingsColumns = new Set(db.prepare("PRAGMA table_info(store_settings)").all().map((row) => row.name));
+  assert.ok(productColumns.has("banner_url"));
+  assert.ok(orderColumns.has("customer_id"));
+  assert.ok(settingsColumns.has("discord_url"));
+
+  db.prepare(`INSERT INTO customer_users (id, email, name, phone, password_hash, password_salt)
+    VALUES ('customer-a', 'buyer@example.com', 'Buyer Test', '628123456789', 'hash', 'salt')`).run();
+  assert.equal(db.prepare("SELECT leaderboard_opt_in FROM customer_users WHERE id = 'customer-a'").get().leaderboard_opt_in, 0);
+  db.prepare(`INSERT INTO wallet_transactions
+    (id, customer_id, direction, amount, balance_before, balance_after, reference, description)
+    VALUES ('wallet-a', 'customer-a', 'credit', 10000, 0, 10000, 'topup:one', 'Top up')`).run();
+  assert.throws(() => db.prepare(`INSERT INTO wallet_transactions
+    (id, customer_id, direction, amount, balance_before, balance_after, reference, description)
+    VALUES ('wallet-b', 'customer-a', 'credit', 10000, 10000, 20000, 'topup:one', 'Duplikat')`).run(), /UNIQUE/i);
+});

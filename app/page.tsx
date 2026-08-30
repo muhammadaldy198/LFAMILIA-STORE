@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { HomeProductBrowser } from "@/components/home-product-browser";
 import { QuickTools } from "@/components/quick-tools";
 import { StoreLayout } from "@/components/store-layout";
-import { HomeHero } from "@/components/home-hero";
-import { PromotionShowcase } from "@/components/promotion-showcase";
+import { GlobalHomePopup } from "@/components/global-home-popup";
+import { HomeBannerCarousel } from "@/components/home-banner-carousel";
+import { PopularNow } from "@/components/popular-now";
 
 const steps = [
   { number: "01", title: "Pilih produk", text: "Cari game atau voucher yang kamu inginkan.", icon: Gamepad2 },
@@ -18,9 +19,9 @@ export default function Home() {
   return (
     <StoreLayout>
       <main>
-        <HomeHero />
-
-        <PromotionShowcase />
+        <HomeBannerCarousel />
+        <PopularNow />
+        <GlobalHomePopup />
 
         <section className="mx-auto max-w-7xl px-4 pt-12 sm:px-6 sm:pt-16 lg:px-8">
           <div className="mb-6"><p className="eyebrow">Menu cepat</p><h2 className="text-2xl font-black tracking-tight sm:text-3xl">Semua yang kamu butuhkan</h2></div>

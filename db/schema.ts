@@ -1,6 +1,43 @@
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
+export const customerUsers = sqliteTable(
+  "customer_users",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    name: text("name").notNull(),
+    phone: text("phone").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    passwordSalt: text("password_salt").notNull(),
+    balance: integer("balance").notNull().default(0),
+    leaderboardOptIn: integer("leaderboard_opt_in", { mode: "boolean" }).notNull().default(false),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    lastLoginAt: text("last_login_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("customer_users_email_unique").on(table.email),
+    index("customer_users_leaderboard_idx").on(table.leaderboardOptIn, table.isActive),
+  ],
+);
+
+export const customerSessions = sqliteTable(
+  "customer_sessions",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id").notNull().references(() => customerUsers.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("customer_sessions_token_unique").on(table.tokenHash),
+    index("customer_sessions_customer_expiry_idx").on(table.customerId, table.expiresAt),
+  ],
+);
+
 export const products = sqliteTable(
   "products",
   {
@@ -10,6 +47,7 @@ export const products = sqliteTable(
     publisher: text("publisher").notNull().default(""),
     category: text("category").notNull(),
     imageUrl: text("image_url"),
+    bannerUrl: text("banner_url"),
     initials: text("initials").notNull(),
     accent: text("accent").notNull(),
     inputLabel: text("input_label").notNull(),
@@ -75,6 +113,7 @@ export const orders = sqliteTable(
   "orders",
   {
     id: text("id").primaryKey(),
+    customerId: text("customer_id").references(() => customerUsers.id, { onDelete: "set null" }),
     referenceId: text("reference_id").notNull(),
     productSlug: text("product_slug").notNull(),
     productName: text("product_name").notNull(),
@@ -120,6 +159,7 @@ export const orders = sqliteTable(
     uniqueIndex("orders_provider_ref_id_unique").on(table.providerCode, table.providerRefId),
     index("orders_payment_fulfillment_idx").on(table.paymentStatus, table.fulfillmentStatus),
     index("orders_created_at_idx").on(table.createdAt),
+    index("orders_customer_created_idx").on(table.customerId, table.createdAt),
   ],
 );
 
@@ -128,7 +168,7 @@ export const orderEvents = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
-    source: text("source", { enum: ["ipaymu", "digiflazz", "vippayment", "voucher_stock", "admin"] }).notNull(),
+    source: text("source", { enum: ["ipaymu", "wallet", "digiflazz", "vippayment", "voucher_stock", "admin"] }).notNull(),
     eventId: text("event_id").notNull(),
     status: text("status").notNull(),
     payloadJson: text("payload_json").notNull(),
@@ -201,9 +241,127 @@ export const storeSettings = sqliteTable("store_settings", {
   supportWhatsapp: text("support_whatsapp"),
   supportEmail: text("support_email"),
   instagramUrl: text("instagram_url"),
+  discordUrl: text("discord_url"),
   supportHours: text("support_hours").notNull(),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const walletSettings = sqliteTable("wallet_settings", {
+  id: integer("id").primaryKey(),
+  isEnabled: integer("is_enabled", { mode: "boolean" }).notNull().default(false),
+  methodName: text("method_name").notNull().default("Transfer Bank"),
+  accountName: text("account_name").notNull().default(""),
+  accountNumber: text("account_number").notNull().default(""),
+  instructions: text("instructions").notNull().default(""),
+  minTopup: integer("min_topup").notNull().default(10000),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const walletTopups = sqliteTable(
+  "wallet_topups",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id").notNull().references(() => customerUsers.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+    senderName: text("sender_name").notNull(),
+    paymentMethod: text("payment_method").notNull(),
+    proofUrl: text("proof_url").notNull(),
+    status: text("status", { enum: ["pending", "approved", "rejected"] }).notNull().default("pending"),
+    adminNotes: text("admin_notes"),
+    reviewedBy: text("reviewed_by"),
+    reviewedAt: text("reviewed_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("wallet_topups_customer_created_idx").on(table.customerId, table.createdAt), index("wallet_topups_status_created_idx").on(table.status, table.createdAt)],
+);
+
+export const walletTransactions = sqliteTable(
+  "wallet_transactions",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id").notNull().references(() => customerUsers.id, { onDelete: "cascade" }),
+    direction: text("direction", { enum: ["credit", "debit"] }).notNull(),
+    amount: integer("amount").notNull(),
+    balanceBefore: integer("balance_before").notNull(),
+    balanceAfter: integer("balance_after").notNull(),
+    reference: text("reference").notNull(),
+    description: text("description").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [uniqueIndex("wallet_transactions_reference_unique").on(table.reference), index("wallet_transactions_customer_created_idx").on(table.customerId, table.createdAt)],
+);
+
+export const productReviews = sqliteTable(
+  "product_reviews",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    customerId: text("customer_id").notNull().references(() => customerUsers.id, { onDelete: "cascade" }),
+    productSlug: text("product_slug").notNull(),
+    rating: integer("rating").notNull(),
+    title: text("title"),
+    body: text("body").notNull(),
+    isVerifiedPurchase: integer("is_verified_purchase", { mode: "boolean" }).notNull().default(false),
+    isVisible: integer("is_visible", { mode: "boolean" }).notNull().default(true),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [uniqueIndex("product_reviews_customer_product_unique").on(table.customerId, table.productSlug), index("product_reviews_product_visible_idx").on(table.productSlug, table.isVisible, table.createdAt)],
+);
+
+export const homeBanners = sqliteTable(
+  "home_banners",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    title: text("title").notNull(),
+    subtitle: text("subtitle").notNull().default(""),
+    imageUrl: text("image_url").notNull(),
+    ctaLabel: text("cta_label").notNull().default("Lihat produk"),
+    ctaHref: text("cta_href").notNull().default("#produk"),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("home_banners_active_sort_idx").on(table.isActive, table.sortOrder)],
+);
+
+export const sitePopups = sqliteTable(
+  "site_popups",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    primaryLabel: text("primary_label"),
+    primaryHref: text("primary_href"),
+    secondaryLabel: text("secondary_label"),
+    secondaryHref: text("secondary_href"),
+    dismissDays: integer("dismiss_days").notNull().default(7),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("site_popups_active_sort_idx").on(table.isActive, table.sortOrder)],
+);
+
+export const newsArticles = sqliteTable(
+  "news_articles",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    summary: text("summary").notNull().default(""),
+    body: text("body").notNull(),
+    coverUrl: text("cover_url"),
+    isPublished: integer("is_published", { mode: "boolean" }).notNull().default(false),
+    publishedAt: text("published_at"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [uniqueIndex("news_articles_slug_unique").on(table.slug), index("news_articles_published_sort_idx").on(table.isPublished, table.publishedAt, table.sortOrder)],
+);
 
 export const productCategories = sqliteTable(
   "product_categories",

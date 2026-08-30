@@ -27,6 +27,7 @@ export type StoreProduct = {
   publisher: string;
   category: ProductCategory;
   imageUrl?: string;
+  bannerUrl?: string;
   initials: string;
   accent: string;
   popular?: boolean;
@@ -41,10 +42,12 @@ export type StoreProduct = {
   inputLabel: string;
   inputPlaceholder: string;
   notices?: ProductNotice[];
+  ratingAverage?: number;
+  ratingCount?: number;
   packages: ProductPackage[];
 };
 
-export const products: StoreProduct[] = [
+const productDefinitions: StoreProduct[] = [
   {
     slug: "mobile-legends", name: "Mobile Legends", publisher: "Moonton", category: "game", initials: "ML",
     accent: "from-[#5577ff] via-[#314fc0] to-[#16276c]", popular: true, instant: true, needsServer: true,
@@ -298,6 +301,12 @@ export const products: StoreProduct[] = [
   },
 ];
 
+export const products: StoreProduct[] = productDefinitions.map((product) => ({
+  ...product,
+  imageUrl: product.imageUrl ?? `/products/${product.slug}-cover.webp`,
+  bannerUrl: product.bannerUrl ?? `/products/${product.slug}-banner.webp`,
+}));
+
 export type StorefrontSettings = {
   storeName: string;
   storeShortName: string;
@@ -315,6 +324,7 @@ export type StorefrontSettings = {
   supportWhatsapp?: string;
   supportEmail?: string;
   instagramUrl?: string;
+  discordUrl?: string;
   supportHours: string;
 };
 
@@ -338,10 +348,10 @@ export const defaultStorefrontSettings: StorefrontSettings = {
 export const faqs = [
   { question: "Bagaimana cara melakukan top up?", answer: "Pilih produk, isi data akun game, pilih nominal, lalu lakukan pembayaran. Saat integrasi aktif, pesanan diproses otomatis setelah pembayaran terverifikasi." },
   { question: "Berapa lama pesanan diproses?", answer: "Target proses otomatis adalah beberapa menit setelah pembayaran berhasil. Gangguan dari publisher atau pemasok dapat membuat proses lebih lama." },
-  { question: "Metode pembayaran apa yang tersedia?", answer: "LFAMILIA STORE menggunakan iPaymu untuk Virtual Account bank, DANA, ShopeePay, dan QRIS. Biaya layanan pembayaran dibebankan kepada pembeli." },
+  { question: "Metode pembayaran apa yang tersedia?", answer: "LFAMILIA STORE menyediakan Virtual Account bank, dompet digital, QRIS, dan saldo akun sesuai layanan yang sedang aktif. Biaya layanan ditampilkan sebelum pembayaran dibuat." },
   { question: "Apa perbedaan produk otomatis dan manual?", answer: "Produk otomatis diteruskan ke provider resmi seperti DigiFlazz atau VIPayment setelah pembayaran terverifikasi. Produk manual masuk antrean admin dan diproses sesuai instruksi serta jadwal layanan." },
   { question: "Bagaimana kode voucher atau lisensi dikirim?", answer: "Untuk produk berlabel Stok Kode Internal, sistem mereservasi satu kode setelah pembayaran lunas lalu mengirimkannya otomatis ke email dan/atau WhatsApp pembeli. Kode tidak tampil di halaman cek transaksi publik." },
-  { question: "Apakah harga di website sudah termasuk biaya pembayaran?", answer: "Harga produk tampil sebelum biaya layanan pembayaran. Biaya dari channel iPaymu dihitung dan ditampilkan pada ringkasan pembayaran." },
+  { question: "Apakah harga di website sudah termasuk biaya pembayaran?", answer: "Harga produk tampil sebelum biaya layanan pembayaran. Biaya channel dihitung dan ditampilkan pada ringkasan sebelum transaksi dilanjutkan." },
   { question: "Bagaimana jika saya salah memasukkan User ID?", answer: "Periksa kembali data tujuan sebelum membayar. Produk digital yang telah sukses dikirim ke tujuan yang dimasukkan umumnya tidak dapat dibatalkan." },
   { question: "Di mana saya bisa melihat status pesanan?", answer: "Buka menu Cek Transaksi dan masukkan nomor invoice yang diterima setelah checkout." },
 ];

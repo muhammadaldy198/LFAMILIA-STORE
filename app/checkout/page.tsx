@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -26,9 +27,11 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StoreLayout } from "@/components/store-layout";
 import { ProductArtwork } from "@/components/product-artwork";
+import { ProductReviews } from "@/components/product-reviews";
 import { useStoreProducts } from "@/hooks/use-store-products";
 import { paymentChannels, paymentGroups, type PaymentMethodCode } from "@/lib/payment-methods";
 import { formatRupiah } from "@/lib/store-data";
+import type { CustomerSession } from "@/lib/server/customer-auth";
 
 const nicknameSupported = new Set(["mobile-legends", "free-fire", "genshin-impact", "valorant"]);
 
@@ -55,6 +58,8 @@ type PaymentResult = {
   discountAmount: number;
   voucherCode: string | null;
   flashSaleId: number | null;
+  paymentStatus?: "paid" | "pending";
+  balanceAfter?: number;
 };
 
 type PromotionQuote = {
@@ -67,7 +72,9 @@ type PromotionQuote = {
   flashSaleEndsAt: string | null;
 };
 
-const groupIcons = { va: Landmark, ewallet: WalletCards, qris: QrCode };
+type CheckoutPaymentMethod = PaymentMethodCode | "wallet";
+const checkoutGroups = [...paymentGroups, { code: "wallet" as const, name: "Saldo LFAMILIA", description: "Bayar langsung dari saldo akun" }];
+const groupIcons = { va: Landmark, ewallet: WalletCards, qris: QrCode, wallet: WalletCards };
 
 export default function CheckoutPage() {
   return (
@@ -95,7 +102,7 @@ function CheckoutContent() {
   const [buyerEmail, setBuyerEmail] = useState("");
   const [contact, setContact] = useState("");
   const [customerNotes, setCustomerNotes] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodCode>("qris");
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("qris");
   const [paymentChannel, setPaymentChannel] = useState("mpm");
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -109,6 +116,7 @@ function CheckoutContent() {
   const [voucherMessage, setVoucherMessage] = useState("");
   const [quote, setQuote] = useState<PromotionQuote | null>(null);
   const [applyingVoucher, setApplyingVoucher] = useState(false);
+  const [account, setAccount] = useState<CustomerSession | null>(null);
 
   const selectedPackage = product.packages.find((item) => item.id === packageId);
   const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
@@ -119,7 +127,7 @@ function CheckoutContent() {
   const lookupNeedsServer = product.slug === "mobile-legends";
   const lookupKey = `${product.slug}:${destination.trim()}:${server.trim()}`;
   const visibleNickname: NicknameState = nickname.key === lookupKey ? nickname : { status: "idle" };
-  const channels = paymentChannels.filter((item) => item.method === paymentMethod);
+  const channels = paymentMethod === "wallet" ? [] : paymentChannels.filter((item) => item.method === paymentMethod);
   const notices = (product.notices ?? []).filter((item) => item.isActive !== false);
   const noticeSignature = noticeVersion(notices);
 
@@ -134,6 +142,18 @@ function CheckoutContent() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [noticeSignature, notices.length, product.slug]);
+
+  useEffect(() => {
+    void fetch("/api/account", { cache: "no-store" }).then(async (response) => {
+      if (!response.ok) return;
+      const data = await response.json() as { customer?: CustomerSession };
+      if (!data.customer) return;
+      setAccount(data.customer);
+      setBuyerName((value) => value || data.customer!.name);
+      setBuyerEmail((value) => value || data.customer!.email);
+      setContact((value) => value || data.customer!.phone);
+    }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!selectedPackage) return;
@@ -167,9 +187,9 @@ function CheckoutContent() {
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [canCheckNickname, destination, lookupKey, lookupNeedsServer, product.slug, server]);
 
-  function chooseMethod(method: PaymentMethodCode) {
+  function chooseMethod(method: CheckoutPaymentMethod) {
     setPaymentMethod(method);
-    setPaymentChannel(paymentChannels.find((item) => item.method === method)?.channel ?? "");
+    setPaymentChannel(method === "wallet" ? "lfamilia-balance" : paymentChannels.find((item) => item.method === method)?.channel ?? "");
     setPayment(null);
   }
 
@@ -221,7 +241,7 @@ function CheckoutContent() {
     setPayment(null);
     setError("");
     try {
-      const response = await fetch("/api/payments/ipaymu/create", {
+      const response = await fetch(paymentMethod === "wallet" ? "/api/payments/wallet/create" : "/api/payments/ipaymu/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -242,6 +262,7 @@ function CheckoutContent() {
       const data = await response.json() as PaymentResult & { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Pembayaran gagal dibuat.");
       setPayment(data);
+      if (data.balanceAfter != null) setAccount((current) => current ? { ...current, balance: data.balanceAfter! } : current);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Pembayaran gagal dibuat.");
     } finally {
@@ -253,6 +274,12 @@ function CheckoutContent() {
     <StoreLayout>
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
         <Link href="/catalog" className="inline-flex items-center gap-2 text-xs font-semibold text-white/42 hover:text-white"><ArrowLeft className="size-4" /> Kembali ke katalog</Link>
+        <section className="relative mt-5 min-h-52 overflow-hidden rounded-[26px] border border-white/10 bg-[#10131b] sm:min-h-64">
+          {(product.bannerUrl || product.imageUrl) && <img src={product.bannerUrl || product.imageUrl} alt={`Banner ${product.name}`} className="absolute inset-0 size-full object-cover" />}
+          <div className={`absolute inset-0 bg-gradient-to-br ${product.accent} opacity-75`} />
+          {(product.bannerUrl || product.imageUrl) && <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/48 to-black/10" />}
+          <div className="relative z-10 flex min-h-52 items-end p-6 sm:min-h-64 sm:p-8"><div><span className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/68">{product.publisher}</span><h1 className="mt-4 text-3xl font-black tracking-[-0.04em] sm:text-5xl">{product.name}</h1><p className="mt-3 text-xs text-white/52">Pilih nominal, isi data tujuan, lalu selesaikan pembayaran dengan aman.</p></div></div>
+        </section>
         <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_380px]">
           <form id="checkout-form" onSubmit={submitOrder} className="space-y-5">
             <section className="panel overflow-hidden">
@@ -285,12 +312,14 @@ function CheckoutContent() {
             </section>
 
             <section className="panel p-5 sm:p-6">
-              <StepTitle number="3" title="Pilih pembayaran iPaymu" description="Biaya layanan dibebankan kepada pembeli." />
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">{paymentGroups.map((group) => {
+              <StepTitle number="3" title="Pilih metode pembayaran" description="Biaya layanan dan total akhir ditampilkan dengan jelas." />
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{checkoutGroups.map((group) => {
                 const Icon = groupIcons[group.code];
                 const selected = paymentMethod === group.code;
-                return <button key={group.code} type="button" onClick={() => chooseMethod(group.code)} className={`rounded-2xl border p-4 text-left transition ${selected ? "border-[#b9ff35] bg-[#b9ff35]/[0.08]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}><div className="flex items-center justify-between"><span className={`grid size-9 place-items-center rounded-xl ${selected ? "bg-[#b9ff35] text-[#091006]" : "bg-white/[0.06] text-white/55"}`}><Icon className="size-4" /></span>{selected && <CheckCircle2 className="size-4 text-[#b9ff35]" />}</div><strong className="mt-3 block text-xs">{group.name}</strong><p className="mt-1 text-[9px] leading-4 text-white/32">{group.description}</p></button>;
+                const disabled = group.code === "wallet" && !account;
+                return <button key={group.code} type="button" disabled={disabled} onClick={() => chooseMethod(group.code)} className={`rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${selected ? "border-[#b9ff35] bg-[#b9ff35]/[0.08]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}><div className="flex items-center justify-between"><span className={`grid size-9 place-items-center rounded-xl ${selected ? "bg-[#b9ff35] text-[#091006]" : "bg-white/[0.06] text-white/55"}`}><Icon className="size-4" /></span>{selected && <CheckCircle2 className="size-4 text-[#b9ff35]" />}</div><strong className="mt-3 block text-xs">{group.name}</strong><p className="mt-1 text-[9px] leading-4 text-white/32">{group.code === "wallet" && account ? `Saldo ${formatRupiah(account.balance)}` : group.code === "wallet" ? "Masuk akun untuk memakai saldo" : group.description}</p></button>;
               })}</div>
+              {!account && <p className="mt-3 text-[10px] text-white/35">Ingin membayar memakai saldo? <Link href="/login" className="font-bold text-[#cfff72]">Masuk atau daftar akun</Link>.</p>}
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">{channels.map((channel) => <button key={channel.channel} type="button" onClick={() => { setPaymentChannel(channel.channel); setPayment(null); }} className={`rounded-xl border px-3 py-3 text-left text-[10px] font-bold transition ${paymentChannel === channel.channel ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.08] text-[#d8ff8d]" : "border-white/[0.08] bg-white/[0.02] text-white/45 hover:text-white"}`}>{channel.name}</button>)}</div>
             </section>
 
@@ -318,19 +347,20 @@ function CheckoutContent() {
               {visibleNickname.nickname && <SummaryRow label="Nickname" value={visibleNickname.nickname} highlight />}
               <SummaryRow label="Nominal" value={selectedPackage?.label ?? "Belum dipilih"} />
               <SummaryRow label="Harga" value={formatRupiah(subtotal)} />
-              {quote && quote.sellingPrice < quote.basePrice && <SummaryRow label="Flash sale" value={`-${formatRupiah(quote.basePrice - quote.sellingPrice)}`} highlight />}
+              {quote && quote.sellingPrice < quote.basePrice && <SummaryRow label="Harga promo" value={`-${formatRupiah(quote.basePrice - quote.sellingPrice)}`} highlight />}
               {quote && quote.discountAmount > 0 && <SummaryRow label={`Voucher ${quote.voucherCode ?? ""}`} value={`-${formatRupiah(quote.discountAmount)}`} highlight />}
-              <SummaryRow label="Biaya iPaymu" value={payment ? formatRupiah(payment.fee) : "Dihitung iPaymu"} />
+              <SummaryRow label="Biaya layanan" value={paymentMethod === "wallet" ? formatRupiah(0) : payment ? formatRupiah(payment.fee) : "Dihitung otomatis"} />
               <SummaryRow label="Proses" value={isManual ? "Antrean admin" : isVoucherStock ? "Kirim kode otomatis" : (selectedPackage?.providerCode || "Provider belum diatur")} />
             </dl>
             <div className="my-5 h-px bg-white/[0.08]" />
             <div className="flex items-end justify-between"><span className="text-sm font-bold">Total</span><strong className="text-xl font-black text-[#b9ff35]">{formatRupiah(payment?.total ?? subtotal)}</strong></div>
-            <p className="mt-3 rounded-xl bg-white/[0.035] p-3 text-[9px] leading-4 text-white/30">iPaymu menambahkan biaya layanan ke pembeli dengan pengaturan <span className="font-bold text-white/45">BUYER</span>. Nilai final tampil setelah pembayaran dibuat.</p>
+            <p className="mt-3 rounded-xl bg-white/[0.035] p-3 text-[9px] leading-4 text-white/30">Biaya layanan, jika ada, dihitung oleh channel yang dipilih dan ditampilkan sebelum kamu melanjutkan pembayaran.</p>
             <Button form="checkout-form" disabled={submitting} type="submit" className="mt-5 hidden h-12 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75] lg:flex">{submitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <LockKeyhole className="mr-2 size-4" />}Buat pembayaran</Button>
-            <div className="mt-4 flex items-center justify-center gap-4 text-[9px] text-white/30"><span className="inline-flex items-center gap-1"><ShieldCheck className="size-3" /> Data aman</span><span className="inline-flex items-center gap-1"><CreditCard className="size-3" /> iPaymu</span></div>
+            <div className="mt-4 flex items-center justify-center gap-4 text-[9px] text-white/30"><span className="inline-flex items-center gap-1"><ShieldCheck className="size-3" /> Data aman</span><span className="inline-flex items-center gap-1"><CreditCard className="size-3" /> Pembayaran terlindungi</span></div>
             {payment && <PaymentBox payment={payment} />}
           </aside>
         </div>
+        <ProductReviews productSlug={product.slug} />
       </main>
       <Dialog open={noticeOpen} onOpenChange={(open) => { if (!open) closeNotice(); else setNoticeOpen(true); }}>
         <DialogContent className="max-w-lg overflow-hidden border-white/10 bg-[#080b14] p-0 text-white" showCloseButton={false}>
@@ -383,7 +413,7 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
     : payment.providerCode === "voucher-stock"
       ? "Setelah lunas, satu kode stok dikirim otomatis ke email/WhatsApp pembeli."
       : "Setelah lunas, pesanan diteruskan otomatis ke provider.";
-  return <div className="mt-5 rounded-2xl border border-[#b9ff35]/30 bg-[#b9ff35]/[0.08] p-4"><BadgeCheck className="size-6 text-[#b9ff35]" /><h3 className="mt-3 text-sm font-black">Pembayaran dibuat</h3><p className="mt-1 break-all text-[10px] text-white/45">{payment.referenceId}</p>{payment.paymentNo && <div className="mt-3 rounded-xl bg-black/20 p-3"><span className="text-[9px] uppercase tracking-wider text-white/35">{payment.paymentName || "Nomor pembayaran"}</span><div className="mt-1 flex items-center justify-between gap-2"><strong className="break-all text-sm text-[#d8ff8d]">{payment.paymentNo}</strong><button type="button" onClick={() => void navigator.clipboard.writeText(payment.paymentNo!)} className="shrink-0 text-white/45 hover:text-white" aria-label="Salin nomor pembayaran"><Copy className="size-4" /></button></div></div>}{payment.expiredAt && <p className="mt-3 text-[9px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}{payment.paymentUrl && <Button asChild className="mt-4 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]"><a href={payment.paymentUrl} target="_blank" rel="noreferrer">Lanjut bayar <ExternalLink className="ml-2 size-4" /></a></Button>}<p className="mt-3 flex items-start gap-2 text-[9px] leading-4 text-white/38">{payment.fulfillmentType === "automatic" ? <Zap className="mt-0.5 size-3 shrink-0 text-[#b9ff35]" /> : <Info className="mt-0.5 size-3 shrink-0 text-amber-300" />}{fulfillmentMessage}</p></div>;
+  return <div className="mt-5 rounded-2xl border border-[#b9ff35]/30 bg-[#b9ff35]/[0.08] p-4"><BadgeCheck className="size-6 text-[#b9ff35]" /><h3 className="mt-3 text-sm font-black">{payment.paymentStatus === "paid" ? "Pembayaran berhasil" : "Pembayaran dibuat"}</h3><p className="mt-1 break-all text-[10px] text-white/45">{payment.referenceId}</p>{payment.paymentNo && <div className="mt-3 rounded-xl bg-black/20 p-3"><span className="text-[9px] uppercase tracking-wider text-white/35">{payment.paymentName || "Nomor pembayaran"}</span><div className="mt-1 flex items-center justify-between gap-2"><strong className="break-all text-sm text-[#d8ff8d]">{payment.paymentNo}</strong><button type="button" onClick={() => void navigator.clipboard.writeText(payment.paymentNo!)} className="shrink-0 text-white/45 hover:text-white" aria-label="Salin nomor pembayaran"><Copy className="size-4" /></button></div></div>}{payment.balanceAfter != null && <p className="mt-3 rounded-xl bg-black/20 p-3 text-[10px] text-white/55">Sisa saldo: <strong className="text-[#d8ff8d]">{formatRupiah(payment.balanceAfter)}</strong></p>}{payment.expiredAt && <p className="mt-3 text-[9px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}{payment.paymentUrl && <Button asChild className="mt-4 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]"><a href={payment.paymentUrl} target="_blank" rel="noreferrer">Lanjut bayar <ExternalLink className="ml-2 size-4" /></a></Button>}<p className="mt-3 flex items-start gap-2 text-[9px] leading-4 text-white/38">{payment.fulfillmentType === "automatic" ? <Zap className="mt-0.5 size-3 shrink-0 text-[#b9ff35]" /> : <Info className="mt-0.5 size-3 shrink-0 text-amber-300" />}{fulfillmentMessage}</p></div>;
 }
 
 function NicknameResult({ state }: { state: NicknameState }) {

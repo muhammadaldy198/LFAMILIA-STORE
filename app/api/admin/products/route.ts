@@ -31,6 +31,7 @@ const productSchema = z.object({
   publisher: z.string().trim().max(80).default(""),
   category: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(60),
   imageUrl: z.string().trim().max(500).refine(isAllowedMediaUrl, "URL gambar tidak valid.").optional().or(z.literal("")),
+  bannerUrl: z.string().trim().max(500).refine(isAllowedMediaUrl, "URL banner tidak valid.").optional().or(z.literal("")),
   initials: z.string().trim().min(1).max(3),
   accent: z.string().trim().min(5).max(160),
   inputLabel: z.string().trim().min(2).max(80),

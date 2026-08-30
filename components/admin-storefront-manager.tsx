@@ -94,6 +94,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
       <Field label="WhatsApp bantuan"><Input inputMode="tel" value={settings.supportWhatsapp ?? ""} onChange={(event) => updateSetting("supportWhatsapp", event.target.value.replace(/[^+0-9]/g, ""))} className="admin-input" placeholder="628123456789" /></Field>
       <Field label="Email bantuan"><Input type="email" value={settings.supportEmail ?? ""} onChange={(event) => updateSetting("supportEmail", event.target.value)} className="admin-input" placeholder="support@domain.com" /></Field>
       <Field label="URL Instagram"><Input type="url" value={settings.instagramUrl ?? ""} onChange={(event) => updateSetting("instagramUrl", event.target.value)} className="admin-input" placeholder="https://instagram.com/..." /></Field>
+      <Field label="URL Discord server"><Input type="url" value={settings.discordUrl ?? ""} onChange={(event) => updateSetting("discordUrl", event.target.value)} className="admin-input" placeholder="https://discord.gg/..." /></Field>
       <Field label="Jam dukungan"><Input value={settings.supportHours} onChange={(event) => updateSetting("supportHours", event.target.value)} className="admin-input" /></Field>
     </div></section>
 
