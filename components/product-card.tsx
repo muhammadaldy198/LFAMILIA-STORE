@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Clock3, Star, Zap } from "lucide-react";
+import { Clock3, Star, Zap } from "lucide-react";
 import type { StoreProduct } from "@/lib/store-data";
 import { formatRupiah } from "@/lib/store-data";
 import { ProductArtwork } from "@/components/product-artwork";
@@ -7,15 +7,16 @@ import { ProductArtwork } from "@/components/product-artwork";
 export function ProductCard({ product }: { product: StoreProduct }) {
   const lowest = Math.min(...product.packages.map((item) => item.price));
   return (
-    <Link href={`/checkout?product=${product.slug}`} className="group block rounded-[24px] border border-white/[0.09] bg-[#0d1019] p-3 transition duration-300 hover:-translate-y-1 hover:border-[#b9ff35]/35 hover:shadow-[0_20px_70px_-35px_rgba(185,255,53,0.28)]">
-      <div className="relative flex aspect-[1.35] items-end overflow-hidden rounded-[18px]">
+    <Link href={`/checkout?product=${product.slug}`} className="group block min-w-0 transition duration-300 hover:-translate-y-1">
+      <div className="relative aspect-[3/4] overflow-hidden rounded-[16px] border border-white/[0.1] bg-[#0d1019] shadow-[0_14px_32px_-22px_rgba(0,0,0,0.9)] transition group-hover:border-[#b9ff35]/40 group-hover:shadow-[0_20px_45px_-24px_rgba(185,255,53,0.32)] sm:rounded-[20px]">
         <ProductArtwork product={product} />
-        <div className="absolute inset-0 bg-[linear-gradient(125deg,transparent_15%,rgba(255,255,255,0.16)_48%,transparent_70%)] opacity-50 transition duration-500 group-hover:translate-x-8" />
-        <span className="absolute right-3 top-3 z-30 rounded-full border border-white/20 bg-black/35 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-white/85 backdrop-blur">{product.category === "game" ? "Game" : product.category === "voucher" ? "Voucher" : product.category}</span>
+        <div className="absolute inset-0 z-20 bg-gradient-to-t from-black via-black/5 to-black/10" />
+        <span className="absolute right-2 top-2 z-30 rounded-full border border-white/20 bg-black/45 px-1.5 py-0.5 text-[7px] font-extrabold uppercase tracking-wider text-white/85 backdrop-blur sm:right-3 sm:top-3 sm:px-2 sm:py-1 sm:text-[8px]">{product.category === "game" ? "Game" : product.category === "voucher" ? "Voucher" : product.category}</span>
+        <div className="absolute inset-x-0 bottom-0 z-30 p-2.5 sm:p-3.5"><h3 className="line-clamp-2 text-[11px] font-black leading-tight tracking-tight text-white sm:text-sm">{product.name}</h3><p className="mt-1 truncate text-[8px] text-white/55 sm:text-[10px]">{product.publisher}</p></div>
       </div>
-      <div className="px-2 pb-2 pt-4">
-        <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-bold tracking-tight text-white sm:text-base">{product.name}</h3><div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1"><p className="truncate text-[11px] text-white/36">{product.publisher}</p><span className={`inline-flex shrink-0 items-center gap-1 text-[10px] ${product.ratingCount ? "text-amber-300" : "text-white/28"}`}><Star className={`size-3 ${product.ratingCount ? "fill-current" : ""}`} />{product.ratingCount ? <>{Number(product.ratingAverage || 0).toFixed(1)} <span className="text-white/25">({product.ratingCount})</span></> : "Belum dinilai"}</span></div></div><span className="grid size-8 shrink-0 place-items-center rounded-full bg-white/[0.06] text-white/45 transition group-hover:bg-[#b9ff35] group-hover:text-[#091006]"><ArrowUpRight className="size-4" /></span></div>
-        <div className="mt-4 flex items-end justify-between gap-2 border-t border-white/[0.07] pt-3"><div><span className="block text-[9px] uppercase tracking-wider text-white/30">Mulai</span><strong className="mt-0.5 block text-xs text-[#d8ff8d]">{formatRupiah(lowest)}</strong></div>{product.fulfillmentType === "manual" ? <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase text-amber-300/60"><Clock3 className="size-3" /> Manual</span> : <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase text-white/38"><Zap className="size-3 text-[#b9ff35]" /> Otomatis</span>}</div>
+      <div className="px-0.5 pt-2 sm:px-1 sm:pt-2.5">
+        <strong className="block truncate text-[9px] font-black text-[#d8ff8d] sm:text-xs">{formatRupiah(lowest)}</strong>
+        <div className="mt-1 flex min-w-0 items-center justify-between gap-1 text-[7px] sm:text-[9px]"><span className={`inline-flex min-w-0 items-center gap-1 truncate ${product.ratingCount ? "text-amber-300" : "text-white/28"}`}><Star className={`size-2.5 shrink-0 sm:size-3 ${product.ratingCount ? "fill-current" : ""}`} />{product.ratingCount ? `${Number(product.ratingAverage || 0).toFixed(1)} (${product.ratingCount})` : "Belum dinilai"}</span>{product.fulfillmentType === "manual" ? <Clock3 className="size-2.5 shrink-0 text-amber-300/70 sm:size-3" /> : <Zap className="size-2.5 shrink-0 text-[#b9ff35] sm:size-3" />}</div>
       </div>
     </Link>
   );

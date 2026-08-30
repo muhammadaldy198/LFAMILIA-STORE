@@ -20,7 +20,7 @@ export function HomeProductBrowser() {
   const visible = useMemo(() => {
     const term = query.trim().toLowerCase();
     return products.filter((product) => (filter === "all" || product.category === filter)
-      && (!term || `${product.name} ${product.publisher}`.toLowerCase().includes(term))).slice(0, 8);
+      && (!term || `${product.name} ${product.publisher}`.toLowerCase().includes(term))).slice(0, 12);
   }, [filter, products, query]);
 
   return (
@@ -38,7 +38,7 @@ export function HomeProductBrowser() {
         </div>
         <span className="hidden text-[10px] text-white/25 sm:block">{databaseReady ? "Katalog terbaru" : "Memuat katalog"}</span>
       </div>
-      {visible.length ? <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">{visible.map((product) => <ProductCard key={product.slug} product={product} />)}</div> : <div className="panel mt-6 py-14 text-center"><Search className="mx-auto size-7 text-white/20" /><p className="mt-3 text-sm text-white/40">Produk tidak ditemukan.</p></div>}
+      {visible.length ? <div className="mt-6 grid grid-cols-3 gap-x-2.5 gap-y-5 sm:grid-cols-4 sm:gap-4 lg:grid-cols-6">{visible.map((product) => <ProductCard key={product.slug} product={product} />)}</div> : <div className="panel mt-6 py-14 text-center"><Search className="mx-auto size-7 text-white/20" /><p className="mt-3 text-sm text-white/40">Produk tidak ditemukan.</p></div>}
       <div className="mt-8 flex justify-center"><Button asChild variant="outline" className="h-11 rounded-xl border-white/10 bg-white/[0.03] px-5 text-white hover:bg-white/[0.08] hover:text-white"><Link href="/catalog">Lihat semua produk <ArrowRight className="ml-2 size-4" /></Link></Button></div>
     </section>
   );

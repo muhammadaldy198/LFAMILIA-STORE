@@ -41,7 +41,7 @@ export default function CatalogPage() {
 
         <div className="mt-8 flex items-center justify-between border-b border-white/[0.07] pb-4 text-xs"><span className="font-semibold text-white/55">{filtered.length} produk ditemukan</span><span className="text-white/28">{databaseReady ? "Katalog terbaru" : "Memuat katalog"}</span></div>
         {filtered.length ? (
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">{filtered.map((product) => <ProductCard key={product.slug} product={product} />)}</div>
+          <div className="mt-6 grid grid-cols-3 gap-x-2.5 gap-y-5 sm:grid-cols-4 sm:gap-4 lg:grid-cols-6">{filtered.map((product) => <ProductCard key={product.slug} product={product} />)}</div>
         ) : (
           <div className="panel mt-6 px-6 py-16 text-center"><Search className="mx-auto size-8 text-white/20" /><h2 className="mt-4 font-bold">Produk tidak ditemukan</h2><p className="mt-2 text-sm text-white/38">Coba kata pencarian atau kategori lain.</p></div>
         )}

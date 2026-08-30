@@ -5,6 +5,7 @@ export type HomeBannerRecord = {
   title: string;
   subtitle: string;
   imageUrl: string;
+  mobileImageUrl?: string;
   ctaLabel: string;
   ctaHref: string;
   isActive: boolean;
@@ -42,20 +43,38 @@ export async function listHomeBanners(includeInactive = false): Promise<HomeBann
      FROM home_banners ${includeInactive ? "" : "WHERE is_active = 1"}
      ORDER BY sort_order ASC, id ASC`,
   ).all<{ id: number; title: string; subtitle: string; image_url: string; cta_label: string; cta_href: string; is_active: number; sort_order: number }>();
-  return result.results.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, imageUrl: row.image_url, ctaLabel: row.cta_label, ctaHref: row.cta_href, isActive: Boolean(row.is_active), sortOrder: row.sort_order }));
+  return result.results.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, ...decodeBannerImages(row.image_url), ctaLabel: row.cta_label, ctaHref: row.cta_href, isActive: Boolean(row.is_active), sortOrder: row.sort_order }));
 }
 
 export async function saveHomeBanner(input: Omit<HomeBannerRecord, "id">, id?: number) {
   const db = getD1();
+  const storedImages = encodeBannerImages(input.imageUrl, input.mobileImageUrl);
   if (id) {
     await db.prepare("UPDATE home_banners SET title = ?, subtitle = ?, image_url = ?, cta_label = ?, cta_href = ?, is_active = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .bind(input.title, input.subtitle, input.imageUrl, input.ctaLabel, input.ctaHref, input.isActive ? 1 : 0, input.sortOrder, id).run();
+      .bind(input.title, input.subtitle, storedImages, input.ctaLabel, input.ctaHref, input.isActive ? 1 : 0, input.sortOrder, id).run();
     return id;
   }
   const row = await db.prepare("INSERT INTO home_banners (title, subtitle, image_url, cta_label, cta_href, is_active, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id")
-    .bind(input.title, input.subtitle, input.imageUrl, input.ctaLabel, input.ctaHref, input.isActive ? 1 : 0, input.sortOrder).first<{ id: number }>();
+    .bind(input.title, input.subtitle, storedImages, input.ctaLabel, input.ctaHref, input.isActive ? 1 : 0, input.sortOrder).first<{ id: number }>();
   if (!row) throw new Error("Banner gagal disimpan.");
   return row.id;
+}
+
+function encodeBannerImages(imageUrl: string, mobileImageUrl?: string) {
+  const mobile = mobileImageUrl?.trim();
+  if (!mobile || mobile === imageUrl) return imageUrl;
+  return JSON.stringify({ desktop: imageUrl, mobile });
+}
+
+function decodeBannerImages(value: string): Pick<HomeBannerRecord, "imageUrl" | "mobileImageUrl"> {
+  if (!value.trim().startsWith("{")) return { imageUrl: value };
+  try {
+    const parsed = JSON.parse(value) as { desktop?: unknown; mobile?: unknown };
+    if (typeof parsed.desktop !== "string" || !parsed.desktop) return { imageUrl: value };
+    return { imageUrl: parsed.desktop, mobileImageUrl: typeof parsed.mobile === "string" && parsed.mobile ? parsed.mobile : undefined };
+  } catch {
+    return { imageUrl: value };
+  }
 }
 
 export async function listSitePopups(includeInactive = false): Promise<SitePopupRecord[]> {
