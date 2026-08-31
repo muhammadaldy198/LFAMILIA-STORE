@@ -3,7 +3,7 @@ import { getD1 } from "@/db";
 const ADMIN_CREDENTIAL_PREFIX = "__lfadmin__:";
 const ADMIN_COOKIE_NAME = "lfamilia_admin_session";
 const ADMIN_SESSION_HOURS = 12;
-const PASSWORD_ITERATIONS = 210_000;
+const PASSWORD_ITERATIONS = 100_000;
 
 export type PasswordAdminSession = {
   id: number;
