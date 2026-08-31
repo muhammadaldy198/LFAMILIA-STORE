@@ -15,8 +15,15 @@ function authorizeOwner(request: Request) {
 
 export async function GET(request: Request) {
   if (!authorizeOwner(request)) return Response.json({ error: "Gunakan email Pemilik melalui Cloudflare Access." }, { status: 403 });
-  const state = await getOwnerCredentialState();
-  return Response.json(state, { headers: { "Cache-Control": "no-store" } });
+  try {
+    const state = await getOwnerCredentialState();
+    return Response.json(state, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return Response.json({ error: "Database akun admin belum dapat diperiksa. Coba muat ulang halaman." }, {
+      status: 500,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
 }
 
 export async function POST(request: Request) {

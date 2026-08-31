@@ -18,8 +18,8 @@ export default function OwnerSetupPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    void fetch("/api/admin/auth/setup", { cache: "no-store" }).then(async (response) => {
-      const data = await response.json();
+    void fetch("/admin/setup/credential", { cache: "no-store", credentials: "same-origin" }).then(async (response) => {
+      const data = await readSetupResponse(response);
       if (!response.ok) throw new Error(data.error);
       setConfigured(Boolean(data.configured));
       if (data.username) setUsername(data.username);
@@ -32,12 +32,13 @@ export default function OwnerSetupPage() {
     if (password !== confirmation) { setError("Konfirmasi password tidak sama."); return; }
     setSaving(true); setError("");
     try {
-      const response = await fetch("/api/admin/auth/setup", {
+      const response = await fetch("/admin/setup/credential", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ username, name, password }),
       });
-      const data = await response.json();
+      const data = await readSetupResponse(response);
       if (!response.ok) throw new Error(data.error || "Setup gagal.");
       window.location.assign("/panel");
     } catch (reason) {
@@ -69,4 +70,18 @@ export default function OwnerSetupPage() {
       </main>
     </StoreLayout>
   );
+}
+
+async function readSetupResponse(response: Response) {
+  const body = await response.text();
+  if (!body) {
+    throw new Error("Cloudflare tidak mengirim respons setup. Muat ulang halaman lalu coba lagi.");
+  }
+  try {
+    return JSON.parse(body) as { error?: string; configured?: boolean; username?: string; name?: string };
+  } catch {
+    throw new Error(response.redirected
+      ? "Sesi Cloudflare Access perlu diperbarui. Muat ulang halaman dan masuk kembali."
+      : "Respons setup tidak valid. Muat ulang halaman lalu coba lagi.");
+  }
 }
