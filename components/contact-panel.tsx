@@ -39,22 +39,19 @@ export function ContactPanel() {
   }
 
   const channels = [
-    ...(whatsapp ? [{ icon: MessageCircle, title: "WhatsApp", text: settings.supportWhatsapp!, href: `https://wa.me/${whatsapp}`, action: "Mulai chat" }] : []),
-    ...(settings.supportEmail ? [{ icon: Mail, title: "Email", text: settings.supportEmail, href: `mailto:${settings.supportEmail}`, action: "Kirim email" }] : []),
-    ...(settings.instagramUrl ? [{ icon: Camera, title: "Instagram", text: settings.instagramUrl.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "@").replace(/\/$/, ""), href: settings.instagramUrl, action: "Buka profil" }] : []),
-    ...(settings.discordUrl ? [{ icon: MessagesSquare, title: "Discord", text: "Komunitas LFAMILIA", href: settings.discordUrl, action: "Gabung server" }] : []),
+    { icon: MessageCircle, title: "WhatsApp", text: settings.supportWhatsapp || "Belum diaktifkan", href: whatsapp ? `https://wa.me/${whatsapp}` : undefined, action: "Mulai chat" },
+    { icon: Mail, title: "Email", text: settings.supportEmail || "Belum diaktifkan", href: settings.supportEmail ? `mailto:${settings.supportEmail}` : undefined, action: "Kirim email" },
+    { icon: Camera, title: "Instagram", text: settings.instagramUrl ? settings.instagramUrl.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "@").replace(/\/$/, "") : "Belum diaktifkan", href: settings.instagramUrl, action: "Buka profil" },
+    { icon: MessagesSquare, title: "Discord", text: settings.discordUrl ? "Komunitas LFAMILIA" : "Belum diaktifkan", href: settings.discordUrl, action: "Gabung server" },
   ];
 
   return (
     <div className="grid gap-5 lg:grid-cols-[.82fr_1.18fr]">
       <div className="space-y-3">
-        {channels.length ? channels.map(({ icon: Icon, title, text, href, action }) => (
-          <a key={title} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noreferrer" : undefined} className="group flex items-center gap-4 rounded-2xl border border-white/[0.08] bg-[#10131b] p-5 transition hover:border-[#b9ff35]/30 hover:bg-[#121720]">
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#b9ff35]/[0.09] text-[#cfff72]"><Icon className="size-5" /></span>
-            <div className="min-w-0 flex-1"><h2 className="text-sm font-black">{title}</h2><p className="mt-1 truncate text-xs text-white/38">{text}</p></div>
-            <span className="hidden items-center gap-1 text-[10px] font-bold text-white/30 transition group-hover:text-[#b9ff35] sm:flex">{action}<ExternalLink className="size-3" /></span>
-          </a>
-        )) : <div className="rounded-2xl border border-white/[0.08] bg-[#10131b] p-5"><h2 className="text-sm font-black">Kanal dukungan sedang offline</h2><p className="mt-2 text-xs leading-5 text-white/38">Cek kembali halaman ini sebelum mengirim pertanyaan.</p></div>}
+        {channels.map(({ icon: Icon, title, text, href, action }) => {
+          const content = <><span className={`grid size-11 shrink-0 place-items-center rounded-xl ${href ? "bg-[#b9ff35]/[0.09] text-[#cfff72]" : "bg-white/[0.035] text-white/25"}`}><Icon className="size-5" /></span><div className="min-w-0 flex-1"><h2 className="text-sm font-black">{title}</h2><p className="mt-1 truncate text-xs text-white/38">{text}</p></div>{href && <span className="hidden items-center gap-1 text-[10px] font-bold text-white/30 transition group-hover:text-[#b9ff35] sm:flex">{action}<ExternalLink className="size-3" /></span>}</>;
+          return href ? <a key={title} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noreferrer" : undefined} className="group flex items-center gap-4 rounded-2xl border border-white/[0.08] bg-[#10131b] p-5 transition hover:border-[#b9ff35]/30 hover:bg-[#121720]">{content}</a> : <div key={title} aria-disabled="true" className="flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-[#10131b]/70 p-5 opacity-75">{content}</div>;
+        })}
         <div className="flex items-start gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5"><Clock3 className="mt-0.5 size-4 text-[#b9ff35]" /><p className="text-xs leading-5 text-white/38">Jam dukungan: {settings.supportHours}</p></div>
       </div>
 
@@ -65,7 +62,7 @@ export function ContactPanel() {
         <label className="mt-4 block"><span className="field-label">Nomor invoice (opsional)</span><Input value={invoice} onChange={(event) => setInvoice(event.target.value)} placeholder="LF-2026..." className="h-12 rounded-xl border-white/10 bg-white/[0.035] text-white placeholder:text-white/22" /></label>
         <label className="mt-4 block"><span className="field-label">Pesan</span><textarea required value={message} onChange={(event) => setMessage(event.target.value)} rows={5} placeholder="Jelaskan pertanyaan atau masalah..." className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.035] p-3 text-sm text-white outline-none placeholder:text-white/22 focus:border-[#b9ff35]/45" /></label>
         <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
-          <Button type="submit" className="h-12 rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]"><Send className="mr-2 size-4" />{whatsapp ? "Kirim lewat WhatsApp" : settings.supportEmail ? "Kirim lewat email" : "Siapkan pesan"}</Button>
+          <Button type="submit" className="h-12 rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]"><Send className="mr-2 size-4" />{whatsapp ? "Kirim lewat WhatsApp" : settings.supportEmail ? "Kirim lewat email" : "Salin pesan bantuan"}</Button>
           <Button type="button" onClick={() => void copyPreparedMessage()} variant="outline" className="h-12 rounded-xl border-white/10 bg-white/[0.025] px-5 text-white hover:bg-white/[0.08] hover:text-white">{copied ? <Check className="mr-2 size-4" /> : <Clipboard className="mr-2 size-4" />}{copied ? "Tersalin" : "Salin"}</Button>
         </div>
         <p className="mt-5 flex items-start gap-2 text-[10px] leading-5 text-white/30"><ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-[#b9ff35]" />Jangan cantumkan password, PIN, kode OTP, atau data kartu pembayaran. Informasi yang kamu isi hanya disusun di perangkatmu sampai kamu memilih kanal tujuan.</p>
