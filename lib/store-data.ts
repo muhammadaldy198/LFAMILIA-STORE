@@ -50,6 +50,7 @@ export type StoreProduct = {
 const productDefinitions: StoreProduct[] = [
   {
     slug: "mobile-legends", name: "Mobile Legends", publisher: "Moonton", category: "game", initials: "ML",
+    imageUrl: "/products/mobile-legends-card.webp",
     accent: "from-[#5577ff] via-[#314fc0] to-[#16276c]", popular: true, instant: true, needsServer: true,
     fulfillmentType: "automatic", targetTemplate: "{{destination}}{{server}}",
     inputLabel: "User ID", inputPlaceholder: "Contoh: 123456789",
@@ -61,6 +62,7 @@ const productDefinitions: StoreProduct[] = [
   },
   {
     slug: "free-fire", name: "Free Fire", publisher: "Garena", category: "game", initials: "FF",
+    imageUrl: "/products/free-fire-card.webp",
     accent: "from-[#ffad32] via-[#ea6825] to-[#7c2714]", popular: true, instant: true,
     fulfillmentType: "automatic", targetTemplate: "{{destination}}",
     inputLabel: "Player ID", inputPlaceholder: "Contoh: 1234567890",
@@ -72,6 +74,7 @@ const productDefinitions: StoreProduct[] = [
   },
   {
     slug: "pubg-mobile", name: "PUBG Mobile", publisher: "Level Infinite", category: "game", initials: "PM",
+    imageUrl: "/products/pubg-mobile-card.webp",
     accent: "from-[#f3ca52] via-[#b48624] to-[#4f3510]", popular: true, instant: true,
     fulfillmentType: "automatic", targetTemplate: "{{destination}}",
     inputLabel: "Player ID", inputPlaceholder: "Contoh: 51234567890",
@@ -82,6 +85,7 @@ const productDefinitions: StoreProduct[] = [
   },
   {
     slug: "honor-of-kings", name: "Honor of Kings", publisher: "Level Infinite", category: "game", initials: "HK",
+    imageUrl: "/products/honor-of-kings-card.webp",
     accent: "from-[#f6d878] via-[#7c4fc9] to-[#2b174c]", instant: true,
     fulfillmentType: "automatic", targetTemplate: "{{destination}}",
     inputLabel: "User ID", inputPlaceholder: "Masukkan User ID",
@@ -92,6 +96,7 @@ const productDefinitions: StoreProduct[] = [
   },
   {
     slug: "genshin-impact", name: "Genshin Impact", publisher: "HoYoverse", category: "game", initials: "GI",
+    imageUrl: "/products/genshin-impact-card.webp",
     accent: "from-[#87d7e7] via-[#597db9] to-[#242b5b]",
     fulfillmentType: "automatic", targetTemplate: "{{destination}}",
     inputLabel: "UID", inputPlaceholder: "Contoh: 800123456",
@@ -103,6 +108,7 @@ const productDefinitions: StoreProduct[] = [
   },
   {
     slug: "valorant", name: "Valorant", publisher: "Riot Games", category: "game", initials: "VL",
+    imageUrl: "/products/valorant-card.webp",
     accent: "from-[#ff5f65] via-[#c42f50] to-[#5b1530]", inputLabel: "Riot ID", inputPlaceholder: "Contoh: Player#TAG",
     fulfillmentType: "automatic", targetTemplate: "{{destination}}",
     packages: [
@@ -182,6 +188,7 @@ const productDefinitions: StoreProduct[] = [
   },
   {
     slug: "call-of-duty-mobile", name: "Call of Duty Mobile", publisher: "Activision", category: "game", initials: "COD",
+    imageUrl: "/products/call-of-duty-mobile-card.webp",
     accent: "from-[#f5cf55] via-[#6d5b25] to-[#17150d]", popular: true, instant: true,
     fulfillmentType: "automatic", targetTemplate: "{{destination}}",
     inputLabel: "Player ID", inputPlaceholder: "Masukkan Player ID",
@@ -303,7 +310,7 @@ const productDefinitions: StoreProduct[] = [
 
 export const products: StoreProduct[] = productDefinitions.map((product) => ({
   ...product,
-  imageUrl: product.imageUrl ?? `/products/${product.slug}-cover.webp`,
+  imageUrl: product.imageUrl ?? `/products/${product.slug}-card.webp`,
   bannerUrl: product.bannerUrl ?? `/products/${product.slug}-banner.webp`,
 }));
 
