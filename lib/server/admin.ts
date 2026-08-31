@@ -1,26 +1,13 @@
-import { getD1 } from "@/db";
+import { getPasswordAdminSession, type PasswordAdminSession } from "@/lib/server/admin-auth";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 export type AdminRole = "owner" | "staff";
 
-export type AdminSession = {
-  id: number | null;
-  email: string;
-  name: string;
-  role: AdminRole;
-};
+export type AdminSession = PasswordAdminSession;
 
 type RuntimeEnv = {
   OWNER_EMAIL?: string;
   ALLOW_DEV_ADMIN_HEADER?: string;
-};
-
-type AdminRow = {
-  id: number;
-  email: string;
-  name: string;
-  role: AdminRole;
-  is_active: number;
 };
 
 function normalizeEmail(value: string | null | undefined) {
@@ -37,27 +24,21 @@ export function getAccessEmail(request: Request) {
   return null;
 }
 
+export function getOwnerEmail() {
+  return normalizeEmail(getRuntimeEnv<RuntimeEnv>().OWNER_EMAIL) ?? "muhammadaldy198@gmail.com";
+}
+
 export async function getAdminSession(request: Request): Promise<AdminSession | null> {
-  const email = getAccessEmail(request);
-  if (!email) return null;
-  const ownerEmail = normalizeEmail(getRuntimeEnv<RuntimeEnv>().OWNER_EMAIL) ?? "muhammadaldy198@gmail.com";
-
-  try {
-    const row = await getD1().prepare(
-      "SELECT id, email, name, role, is_active FROM admin_users WHERE lower(email) = ? LIMIT 1",
-    ).bind(email).first<AdminRow>();
-    if (row?.is_active) return { id: row.id, email: row.email, name: row.name, role: row.role };
-  } catch {
-    if (email === ownerEmail) return { id: null, email, name: "Pemilik LFAMILIA", role: "owner" };
-  }
-
-  if (email === ownerEmail) return { id: null, email, name: "Pemilik LFAMILIA", role: "owner" };
-  return null;
+  return getPasswordAdminSession(request);
 }
 
 export async function requireAdminSession(request: Request, minimumRole: AdminRole = "staff") {
   const session = await getAdminSession(request);
   if (!session) return Response.json({ error: "Akses admin tidak ditemukan atau sudah dinonaktifkan." }, { status: 401 });
+  if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+    const origin = request.headers.get("origin");
+    if (origin && origin !== new URL(request.url).origin) return Response.json({ error: "Permintaan admin ditolak." }, { status: 403 });
+  }
   if (minimumRole === "owner" && session.role !== "owner") {
     return Response.json({ error: "Tindakan ini hanya dapat dilakukan oleh Pemilik." }, { status: 403 });
   }

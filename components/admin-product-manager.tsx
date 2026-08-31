@@ -93,7 +93,7 @@ export function AdminProductManager() {
   }, []);
 
   useEffect(() => {
-    void fetch("/api/admin/categories", { cache: "no-store" }).then((response) => response.json()).then((data: { categories?: ProductCategoryRecord[] }) => setCategories(data.categories ?? []));
+    void fetch("/api/panel/categories", { cache: "no-store" }).then((response) => response.json()).then((data: { categories?: ProductCategoryRecord[] }) => setCategories(data.categories ?? []));
   }, []);
 
   function openNew() {
@@ -175,7 +175,7 @@ export function AdminProductManager() {
     };
     try {
       const staffContentOnly = role === "staff";
-      const response = await fetch(staffContentOnly ? "/api/admin/product-content" : "/api/admin/products", {
+      const response = await fetch(staffContentOnly ? "/api/panel/product-content" : "/api/panel/products", {
         method: staffContentOnly ? "PUT" : draft.dbId ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
@@ -196,7 +196,7 @@ export function AdminProductManager() {
     setSeeding(true);
     setError("");
     try {
-      const response = await fetch("/api/admin/products/seed", { method: "POST" });
+      const response = await fetch("/api/panel/products/seed", { method: "POST" });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Katalog utama gagal diimpor.");
       setMessage("Katalog utama berhasil dilengkapi tanpa menimpa perubahan yang sudah ada.");
@@ -210,7 +210,7 @@ export function AdminProductManager() {
 
   async function removeProduct(id: number) {
     setError("");
-    const response = await fetch(`/api/admin/products?id=${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/panel/products?id=${id}`, { method: "DELETE" });
     const data = await response.json() as { error?: string };
     if (!response.ok) {
       setError(data.error ?? "Produk gagal dihapus.");
@@ -286,7 +286,7 @@ function slugify(value: string) {
 }
 
 async function requestProducts() {
-  const response = await fetch("/api/admin/products", { cache: "no-store" });
+  const response = await fetch("/api/panel/products", { cache: "no-store" });
   const data = await response.json() as { products?: ManagedProduct[]; databaseReady?: boolean; role?: "owner" | "staff"; error?: string };
   if (!response.ok) throw new Error(data.error ?? "Produk gagal dimuat.");
   return data;

@@ -2,7 +2,21 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Box, FileQuestion, LayoutDashboard, LoaderCircle, LockKeyhole, ReceiptText, Settings, ShieldCheck, ShoppingBag, TicketPercent, Users, WalletCards } from "lucide-react";
+import {
+  Box,
+  FileQuestion,
+  LayoutDashboard,
+  LoaderCircle,
+  LockKeyhole,
+  LogOut,
+  ReceiptText,
+  Settings,
+  ShieldCheck,
+  ShoppingBag,
+  TicketPercent,
+  Users,
+  WalletCards,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminOrderManager } from "@/components/admin-order-manager";
@@ -16,32 +30,173 @@ import { AdminVoucherManager } from "@/components/admin-voucher-manager";
 import { AdminWalletManager } from "@/components/admin-wallet-manager";
 import { StoreLayout } from "@/components/store-layout";
 
-type Session = { id: number | null; email: string; name: string; role: "owner" | "staff" };
+type Session = { id: number; email: string; name: string; role: "owner" | "staff" };
 
 const baseNav = [
-  ["overview", "Ringkasan", LayoutDashboard], ["orders", "Pesanan", ReceiptText], ["products", "Produk", Box], ["content", "Konten", FileQuestion],
+  ["overview", "Ringkasan", LayoutDashboard],
+  ["orders", "Pesanan", ReceiptText],
+  ["products", "Produk", Box],
+  ["content", "Konten", FileQuestion],
 ] as const;
+
 const ownerNav = [
-  ["promotions", "Voucher diskon", TicketPercent], ["wallet", "Saldo pelanggan", WalletCards], ["vouchers", "Stok kode", TicketPercent], ["team", "Tim admin", Users], ["settings", "Integrasi", Settings],
+  ["promotions", "Voucher diskon", TicketPercent],
+  ["wallet", "Saldo pelanggan", WalletCards],
+  ["vouchers", "Stok kode", TicketPercent],
+  ["team", "Tim admin", Users],
+  ["settings", "Integrasi", Settings],
 ] as const;
 
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => { void fetch("/api/admin/session", { cache: "no-store" }).then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error); setSession(data.session); }).catch((reason) => setError(reason instanceof Error ? reason.message : "Akses admin gagal diperiksa.")).finally(() => setLoading(false)); }, []);
-  if (loading) return <StoreLayout><main className="mx-auto flex min-h-[70vh] max-w-7xl items-center justify-center px-4 text-xs text-white/40"><LoaderCircle className="mr-2 size-4 animate-spin" />Memeriksa akses admin…</main></StoreLayout>;
-  if (!session) return <StoreLayout><main className="mx-auto grid min-h-[70vh] max-w-xl place-items-center px-4"><div className="panel w-full p-7 text-center"><LockKeyhole className="mx-auto size-8 text-amber-300" /><h1 className="mt-4 text-xl font-black">Akses admin ditolak</h1><p className="mt-3 text-sm leading-6 text-white/42">{error || "Email ini belum terdaftar sebagai Pemilik atau Staff aktif."}</p></div></main></StoreLayout>;
+
+  useEffect(() => {
+    let active = true;
+
+    void fetch("/api/panel/session", { cache: "no-store" })
+      .then(async (response) => {
+        if (response.status === 401) {
+          window.location.replace("/panel/login");
+          return null;
+        }
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error);
+        return data.session as Session;
+      })
+      .then((nextSession) => {
+        if (active && nextSession) setSession(nextSession);
+      })
+      .catch((reason) => {
+        if (active) setError(reason instanceof Error ? reason.message : "Akses admin gagal diperiksa.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function logout() {
+    setLoggingOut(true);
+    try {
+      await fetch("/api/panel/auth/logout", { method: "POST" });
+    } finally {
+      window.location.replace("/panel/login");
+    }
+  }
+
+  if (loading) {
+    return (
+      <StoreLayout>
+        <main className="mx-auto flex min-h-[70vh] max-w-7xl items-center justify-center px-4 text-xs text-white/40">
+          <LoaderCircle className="mr-2 size-4 animate-spin" />
+          Memeriksa akses admin…
+        </main>
+      </StoreLayout>
+    );
+  }
+
+  if (!session) {
+    return (
+      <StoreLayout>
+        <main className="mx-auto grid min-h-[70vh] max-w-xl place-items-center px-4">
+          <div className="panel w-full p-7 text-center">
+            <LockKeyhole className="mx-auto size-8 text-amber-300" />
+            <h1 className="mt-4 text-xl font-black">Panel tidak dapat dibuka</h1>
+            <p className="mt-3 text-sm leading-6 text-white/42">{error || "Silakan masuk kembali dengan ID admin."}</p>
+            <Button asChild className="mt-5 rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#ceff73]">
+              <Link href="/panel/login">Ke halaman masuk</Link>
+            </Button>
+          </div>
+        </main>
+      </StoreLayout>
+    );
+  }
+
   const isOwner = session.role === "owner";
   const nav = isOwner ? [...baseNav, ...ownerNav] : baseNav;
-  return <StoreLayout><main className="mx-auto min-h-[75vh] max-w-7xl px-4 py-8 sm:px-6 lg:px-8"><div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="eyebrow !mb-0">Panel pengelola</p><span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${isOwner ? "bg-[#b9ff35]/10 text-[#d8ff8d]" : "bg-blue-400/10 text-blue-300"}`}>{isOwner ? "Pemilik" : "Staff"}</span></div><h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">Admin LFAMILIA STORE</h1><p className="mt-2 text-xs text-white/35">Masuk sebagai {session.name} • {session.email}</p></div><Button asChild variant="outline" className="w-fit rounded-xl border-white/10 bg-white/[0.035] text-white hover:bg-white/[0.08] hover:text-white"><Link href="/"><ShoppingBag className="mr-2 size-4" />Lihat toko</Link></Button></div><Tabs defaultValue="overview" className="grid items-start gap-5 lg:grid-cols-[220px_1fr]"><TabsList className="flex h-auto w-full gap-2 overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#0d1019] p-2 lg:sticky lg:top-28 lg:flex-col lg:items-stretch">{nav.map(([value, label, Icon]) => <TabsTrigger key={value} value={value} className="h-10 shrink-0 justify-start rounded-xl px-3 text-xs text-white/42 data-[state=active]:bg-[#b9ff35] data-[state=active]:text-[#091006]"><Icon className="mr-2 size-4" />{label}</TabsTrigger>)}</TabsList><div className="min-w-0">
-    <TabsContent value="overview" className="mt-0"><AdminOverview /></TabsContent>
-    <TabsContent value="orders" className="mt-0"><AdminSection title="Daftar pesanan" description="Pantau pembayaran, provider otomatis, dan antrean manual."><AdminOrderManager /></AdminSection></TabsContent>
-    <TabsContent value="products" className="mt-0"><AdminSection title="Katalog produk" description={isOwner ? "Kelola gambar, pop-up informasi, jam operasional, nominal, harga, dan SKU provider." : "Staff dapat memperbarui gambar, jam layanan, instruksi, dan pop-up. Harga serta provider hanya tersedia untuk Pemilik."}><AdminProductManager /></AdminSection></TabsContent>
-    <TabsContent value="content" className="mt-0 space-y-5"><AdminSection title="Identitas & kontak" description="Kelola logo, kontak, Discord, kategori, dan FAQ."><AdminStorefrontManager role={session.role} /></AdminSection><AdminSection title="Banner, pop-up, berita & ulasan" description="Semua konten pengalaman pelanggan dapat diedit dari sini tanpa mengubah kode."><AdminExperienceManager role={session.role} /></AdminSection></TabsContent>
-    {isOwner && <><TabsContent value="promotions" className="mt-0"><AdminSection title="Voucher diskon" description="Atur kode, periode, minimum pembelian, kuota, dan batas diskon."><AdminPromotionManager role="owner" /></AdminSection></TabsContent><TabsContent value="wallet" className="mt-0"><AdminSection title="Saldo pelanggan" description="Atur tujuan transfer dan setujui top up hanya setelah bukti pembayaran diperiksa."><AdminWalletManager /></AdminSection></TabsContent><TabsContent value="vouchers" className="mt-0"><AdminSection title="Stok kode otomatis" description="Kode digital terenkripsi, pengiriman, dan percobaan ulang hanya dapat diakses Pemilik."><AdminVoucherManager /></AdminSection></TabsContent><TabsContent value="team" className="mt-0"><AdminSection title="Pemilik & Staff" description="Atur dua tingkat akses tanpa menyimpan password di website."><AdminTeamManager /></AdminSection></TabsContent><TabsContent value="settings" className="mt-0"><AdminSection title="Integrasi rahasia" description="Secret pembayaran dan provider dikelola melalui Cloudflare agar tidak pernah tampil di browser."><div className="grid gap-4 sm:grid-cols-2"><SettingCard title="Cloudflare D1" status="Terhubung" text="Katalog, konten, akun, tim, pesanan, saldo, dan stok kode tersimpan di database." /><SettingCard title="Cloudflare Access" status="Wajib" text="Melindungi /admin dan /api/admin sebelum permintaan mencapai aplikasi." /><SettingCard title="Gateway pembayaran" status="Secret Cloudflare" text="Virtual Account, dompet digital, QRIS, dan callback pembayaran." /><SettingCard title="DigiFlazz" status="Secret Cloudflare" text="Produk otomatis menggunakan SKU per nominal dan callback tervalidasi." /><SettingCard title="VIPayment" status="Secret Cloudflare" text="Provider alternatif resmi untuk produk otomatis." /><SettingCard title="Pengiriman kode" status="Khusus Pemilik" text="Email dan WhatsApp mengirim voucher tanpa memperlihatkan stok ke Staff." /></div><div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-4 text-[10px] leading-5 text-amber-100/60"><ShieldCheck className="mb-2 size-4 text-amber-300" />Secret tidak dapat diedit dari panel agar Staff, browser, dan kode frontend tidak pernah dapat membacanya. Perubahan secret dilakukan Pemilik melalui Cloudflare Worker Settings.</div></AdminSection></TabsContent></>}
-  </div></Tabs></main></StoreLayout>;
+
+  return (
+    <StoreLayout>
+      <main className="mx-auto min-h-[75vh] max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="eyebrow !mb-0">Panel pengelola</p>
+              <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${isOwner ? "bg-[#b9ff35]/10 text-[#d8ff8d]" : "bg-blue-400/10 text-blue-300"}`}>
+                {isOwner ? "Pemilik" : "Staff"}
+              </span>
+            </div>
+            <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">Admin LFAMILIA STORE</h1>
+            <p className="mt-2 text-xs text-white/35">Masuk sebagai {session.name} • ID: {session.email}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" className="rounded-xl border-white/10 bg-white/[0.035] text-white hover:bg-white/[0.08] hover:text-white">
+              <Link href="/"><ShoppingBag className="mr-2 size-4" />Lihat toko</Link>
+            </Button>
+            <Button type="button" variant="outline" disabled={loggingOut} onClick={() => void logout()} className="rounded-xl border-red-300/15 bg-red-300/[0.04] text-red-100 hover:bg-red-300/[0.1] hover:text-white">
+              {loggingOut ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <LogOut className="mr-2 size-4" />}
+              Keluar
+            </Button>
+          </div>
+        </div>
+
+        <Tabs defaultValue="overview" className="grid items-start gap-5 lg:grid-cols-[220px_1fr]">
+          <TabsList className="flex h-auto w-full gap-2 overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#0d1019] p-2 lg:sticky lg:top-28 lg:flex-col lg:items-stretch">
+            {nav.map(([value, label, Icon]) => (
+              <TabsTrigger key={value} value={value} className="h-10 shrink-0 justify-start rounded-xl px-3 text-xs text-white/42 data-[state=active]:bg-[#b9ff35] data-[state=active]:text-[#091006]">
+                <Icon className="mr-2 size-4" />{label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          <div className="min-w-0">
+            <TabsContent value="overview" className="mt-0"><AdminOverview /></TabsContent>
+            <TabsContent value="orders" className="mt-0"><AdminSection title="Daftar pesanan" description="Pantau pembayaran, provider otomatis, dan antrean manual."><AdminOrderManager /></AdminSection></TabsContent>
+            <TabsContent value="products" className="mt-0"><AdminSection title="Katalog produk" description={isOwner ? "Kelola gambar, pop-up informasi, jam operasional, nominal, harga, dan SKU provider." : "Staff dapat memperbarui gambar, jam layanan, instruksi, dan pop-up. Harga serta provider hanya tersedia untuk Pemilik."}><AdminProductManager /></AdminSection></TabsContent>
+            <TabsContent value="content" className="mt-0 space-y-5"><AdminSection title="Identitas & kontak" description="Kelola logo, kontak, Discord, kategori, dan FAQ."><AdminStorefrontManager role={session.role} /></AdminSection><AdminSection title="Banner, pop-up, berita & ulasan" description="Semua konten pengalaman pelanggan dapat diedit dari sini tanpa mengubah kode."><AdminExperienceManager role={session.role} /></AdminSection></TabsContent>
+            {isOwner && (
+              <>
+                <TabsContent value="promotions" className="mt-0"><AdminSection title="Voucher diskon" description="Atur kode, periode, minimum pembelian, kuota, dan batas diskon."><AdminPromotionManager role="owner" /></AdminSection></TabsContent>
+                <TabsContent value="wallet" className="mt-0"><AdminSection title="Saldo pelanggan" description="Atur tujuan transfer dan setujui top up hanya setelah bukti pembayaran diperiksa."><AdminWalletManager /></AdminSection></TabsContent>
+                <TabsContent value="vouchers" className="mt-0"><AdminSection title="Stok kode otomatis" description="Kode digital terenkripsi, pengiriman, dan percobaan ulang hanya dapat diakses Pemilik."><AdminVoucherManager /></AdminSection></TabsContent>
+                <TabsContent value="team" className="mt-0"><AdminSection title="Pemilik & Staff" description="Buat ID login Staff, atur peran, dan ganti password tanpa memperlihatkan password lama."><AdminTeamManager /></AdminSection></TabsContent>
+                <TabsContent value="settings" className="mt-0">
+                  <AdminSection title="Keamanan & integrasi" description="Login panel terpisah dari pelanggan; secret provider tetap dikelola aman melalui Cloudflare.">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <SettingCard title="Login ID & password" status="Aktif" text="Pemilik dan Staff memakai sesi panel khusus yang terpisah dari akun pelanggan." />
+                      <SettingCard title="Pemulihan Pemilik" status="Cloudflare Access" text="Halaman /admin/setup hanya dapat dibuka melalui email Pemilik yang dilindungi Cloudflare." />
+                      <SettingCard title="Cloudflare D1" status="Terhubung" text="Katalog, konten, akun, tim, pesanan, saldo, dan stok kode tersimpan di database." />
+                      <SettingCard title="Gateway pembayaran" status="Secret Cloudflare" text="Virtual Account, dompet digital, QRIS, dan callback pembayaran." />
+                      <SettingCard title="DigiFlazz" status="Secret Cloudflare" text="Produk otomatis menggunakan SKU per nominal dan callback tervalidasi." />
+                      <SettingCard title="VIPayment" status="Secret Cloudflare" text="Provider alternatif resmi untuk produk otomatis." />
+                      <SettingCard title="Pengiriman kode" status="Khusus Pemilik" text="Email dan WhatsApp mengirim voucher tanpa memperlihatkan stok ke Staff." />
+                    </div>
+                    <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-4 text-[10px] leading-5 text-amber-100/60">
+                      <ShieldCheck className="mb-2 size-4 text-amber-300" />
+                      Password disimpan sebagai hash dan tidak dapat dibaca kembali. Secret pembayaran maupun provider juga tidak pernah ditampilkan di browser.
+                    </div>
+                  </AdminSection>
+                </TabsContent>
+              </>
+            )}
+          </div>
+        </Tabs>
+      </main>
+    </StoreLayout>
+  );
 }
 
-function AdminSection({ title, description, children }: { title: string; description: string; children: React.ReactNode }) { return <section className="panel overflow-hidden"><div className="border-b border-white/[0.08] p-5"><h2 className="font-bold">{title}</h2><p className="mt-1 text-[10px] text-white/30">{description}</p></div><div className="p-4 sm:p-5">{children}</div></section>; }
-function SettingCard({ title, status, text }: { title: string; status: string; text: string }) { return <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4"><div className="flex items-start justify-between gap-3"><strong className="text-sm">{title}</strong><span className="rounded-full bg-white/[0.06] px-2 py-1 text-[8px] font-bold text-white/45">{status}</span></div><p className="mt-3 text-[10px] leading-5 text-white/30">{text}</p></div>; }
+function AdminSection({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+  return <section className="panel overflow-hidden"><div className="border-b border-white/[0.08] p-5"><h2 className="font-bold">{title}</h2><p className="mt-1 text-[10px] text-white/30">{description}</p></div><div className="p-4 sm:p-5">{children}</div></section>;
+}
+
+function SettingCard({ title, status, text }: { title: string; status: string; text: string }) {
+  return <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4"><div className="flex items-start justify-between gap-3"><strong className="text-sm">{title}</strong><span className="rounded-full bg-white/[0.06] px-2 py-1 text-[8px] font-bold text-white/45">{status}</span></div><p className="mt-3 text-[10px] leading-5 text-white/30">{text}</p></div>;
+}

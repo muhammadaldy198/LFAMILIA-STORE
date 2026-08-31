@@ -23,7 +23,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
     setLoading(true); setError("");
     try {
       const [settingsResponse, categoryResponse, faqResponse] = await Promise.all([
-        fetch("/api/admin/storefront", { cache: "no-store" }), fetch("/api/admin/categories", { cache: "no-store" }), fetch("/api/admin/faqs", { cache: "no-store" }),
+        fetch("/api/panel/storefront", { cache: "no-store" }), fetch("/api/panel/categories", { cache: "no-store" }), fetch("/api/panel/faqs", { cache: "no-store" }),
       ]);
       const [settingsData, categoryData, faqData] = await Promise.all([settingsResponse.json(), categoryResponse.json(), faqResponse.json()]);
       if (!settingsResponse.ok) throw new Error(settingsData.error);
@@ -38,7 +38,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
   async function saveSettings() {
     setSaving("settings"); setError("");
     try {
-      const response = await fetch("/api/admin/storefront", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(settings) });
+      const response = await fetch("/api/panel/storefront", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(settings) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error);
       setMessage("Identitas, banner, dan kanal bantuan berhasil disimpan.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengaturan gagal disimpan."); }
@@ -48,7 +48,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
   async function saveCategory(item: ProductCategoryRecord) {
     setSaving(`category-${item.id ?? "new"}`); setError("");
     try {
-      const response = await fetch("/api/admin/categories", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(item) });
+      const response = await fetch("/api/panel/categories", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(item) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error);
       setMessage("Kategori berhasil disimpan."); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Kategori gagal disimpan."); }
@@ -56,7 +56,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
   }
 
   async function removeCategory(id: number) {
-    const response = await fetch(`/api/admin/categories?id=${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/panel/categories?id=${id}`, { method: "DELETE" });
     const data = await response.json(); if (!response.ok) { setError(data.error); return; }
     setMessage("Kategori berhasil dihapus."); await load();
   }
@@ -64,14 +64,14 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
   async function saveFaq(item: FaqRecord) {
     setSaving(`faq-${item.id ?? "new"}`); setError("");
     try {
-      const response = await fetch("/api/admin/faqs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(item) });
+      const response = await fetch("/api/panel/faqs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(item) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error);
       setMessage("FAQ berhasil disimpan."); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "FAQ gagal disimpan."); }
     finally { setSaving(""); }
   }
 
-  async function removeFaq(id: number) { const response = await fetch(`/api/admin/faqs?id=${id}`, { method: "DELETE" }); const data = await response.json(); if (!response.ok) { setError(data.error); return; } setMessage("FAQ berhasil dihapus."); await load(); }
+  async function removeFaq(id: number) { const response = await fetch(`/api/panel/faqs?id=${id}`, { method: "DELETE" }); const data = await response.json(); if (!response.ok) { setError(data.error); return; } setMessage("FAQ berhasil dihapus."); await load(); }
 
   if (loading) return <div className="flex min-h-56 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat konten…</div>;
   return <div className="space-y-6">

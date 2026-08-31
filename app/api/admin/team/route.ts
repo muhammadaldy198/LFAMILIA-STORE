@@ -1,19 +1,21 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
 import { requireAdminSession } from "@/lib/server/admin";
+import { createAdminCredential, deleteAdminCredential, isValidAdminId, normalizeAdminId, updateAdminCredential } from "@/lib/server/admin-auth";
 
 const schema = z.object({
   id: z.number().int().positive().nullable().optional(),
-  email: z.string().trim().email().max(150).transform((value) => value.toLowerCase()),
+  username: z.string().trim().min(3, "ID admin minimal 3 karakter.").max(32).refine(isValidAdminId, "ID admin hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda minus.").transform(normalizeAdminId),
   name: z.string().trim().min(2).max(80),
   role: z.enum(["owner", "staff"]),
   isActive: z.boolean().default(true),
+  password: z.string().max(72).optional().default(""),
 });
 
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
-  const result = await getD1().prepare("SELECT id, email, name, role, is_active, created_at, updated_at FROM admin_users ORDER BY role ASC, name ASC").all();
+  const result = await getD1().prepare("SELECT id, email AS username, name, role, is_active, created_at, updated_at FROM admin_users ORDER BY role ASC, name ASC").all();
   return Response.json({ users: result.results.map((row) => ({ ...row, isActive: Boolean(row.is_active) })) });
 }
 
@@ -23,16 +25,28 @@ export async function POST(request: Request) {
   try {
     const input = schema.parse(await request.json());
     const db = getD1();
+    if (input.password && input.password.length < 10) throw new Error("Password minimal 10 karakter.");
     if (input.id) {
-      const current = await db.prepare("SELECT role, is_active FROM admin_users WHERE id = ?").bind(input.id).first<{ role: "owner" | "staff"; is_active: number }>();
+      const current = await db.prepare("SELECT email, role, is_active FROM admin_users WHERE id = ?").bind(input.id).first<{ email: string; role: "owner" | "staff"; is_active: number }>();
       if (!current) throw new Error("Admin tidak ditemukan.");
       if (current.role === "owner" && current.is_active && (input.role !== "owner" || !input.isActive)) await ensureAnotherOwner(input.id);
+      const duplicate = await db.prepare("SELECT id FROM admin_users WHERE lower(email) = ? AND id <> ? LIMIT 1").bind(input.username, input.id).first<{ id: number }>();
+      if (duplicate) throw new Error("ID admin sudah digunakan.");
+      await updateAdminCredential(current.email, { username: input.username, name: input.name, password: input.password || undefined, isActive: input.isActive });
       await db.prepare("UPDATE admin_users SET email = ?, name = ?, role = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-        .bind(input.email, input.name, input.role, input.isActive ? 1 : 0, input.id).run();
+        .bind(input.username, input.name, input.role, input.isActive ? 1 : 0, input.id).run();
       return Response.json({ ok: true, id: input.id });
     }
-    const row = await db.prepare("INSERT INTO admin_users (email, name, role, is_active) VALUES (?, ?, ?, ?) RETURNING id")
-      .bind(input.email, input.name, input.role, input.isActive ? 1 : 0).first<{ id: number }>();
+    if (input.password.length < 10) throw new Error("Password wajib diisi minimal 10 karakter untuk admin baru.");
+    await createAdminCredential({ username: input.username, name: input.name, password: input.password, isActive: input.isActive });
+    let row: { id: number } | null = null;
+    try {
+      row = await db.prepare("INSERT INTO admin_users (email, name, role, is_active) VALUES (?, ?, ?, ?) RETURNING id")
+        .bind(input.username, input.name, input.role, input.isActive ? 1 : 0).first<{ id: number }>();
+    } catch (error) {
+      await deleteAdminCredential(input.username).catch(() => undefined);
+      throw error;
+    }
     return Response.json({ ok: true, id: row?.id }, { status: 201 });
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Admin gagal disimpan.";
@@ -46,8 +60,10 @@ export async function DELETE(request: Request) {
   try {
     const id = Number(new URL(request.url).searchParams.get("id"));
     if (!Number.isInteger(id) || id < 1) throw new Error("ID admin tidak valid.");
-    const row = await getD1().prepare("SELECT role FROM admin_users WHERE id = ?").bind(id).first<{ role: "owner" | "staff" }>();
+    const row = await getD1().prepare("SELECT email, role FROM admin_users WHERE id = ?").bind(id).first<{ email: string; role: "owner" | "staff" }>();
+    if (!row) throw new Error("Admin tidak ditemukan.");
     if (row?.role === "owner") await ensureAnotherOwner(id);
+    await deleteAdminCredential(row.email);
     await getD1().prepare("DELETE FROM admin_users WHERE id = ?").bind(id).run();
     return Response.json({ ok: true });
   } catch (error) {

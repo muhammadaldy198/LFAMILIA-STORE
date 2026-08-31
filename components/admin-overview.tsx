@@ -20,7 +20,7 @@ const labels: Record<string, string> = {
 export function AdminOverview() {
   const [data, setData] = useState<Summary | null>(null);
   const [error, setError] = useState("");
-  useEffect(() => { void fetch("/api/admin/summary", { cache: "no-store" }).then(async (response) => { const json = await response.json(); if (!response.ok) throw new Error(json.error); setData(json); }).catch((reason) => setError(reason instanceof Error ? reason.message : "Ringkasan gagal dimuat.")); }, []);
+  useEffect(() => { void fetch("/api/panel/summary", { cache: "no-store" }).then(async (response) => { const json = await response.json(); if (!response.ok) throw new Error(json.error); setData(json); }).catch((reason) => setError(reason instanceof Error ? reason.message : "Ringkasan gagal dimuat.")); }, []);
   const maxOrders = useMemo(() => Math.max(1, ...(data?.chart.map((item) => item.orders) ?? [1])), [data]);
   if (!data && !error) return <div className="panel flex min-h-56 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat data toko…</div>;
   if (error) return <div className="panel p-6 text-sm text-red-200">{error}</div>;

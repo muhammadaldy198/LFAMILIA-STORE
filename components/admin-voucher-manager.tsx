@@ -67,7 +67,7 @@ export function AdminVoucherManager() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/admin/vouchers", { cache: "no-store" });
+      const response = await fetch("/api/panel/vouchers", { cache: "no-store" });
       const data = await response.json() as DashboardResponse;
       if (!response.ok) throw new Error(data.error || "Stok kode gagal dimuat.");
       const nextStocks = data.stocks ?? [];
@@ -84,7 +84,7 @@ export function AdminVoucherManager() {
 
   useEffect(() => {
     let active = true;
-    void fetch("/api/admin/vouchers", { cache: "no-store" }).then(async (response) => {
+    void fetch("/api/panel/vouchers", { cache: "no-store" }).then(async (response) => {
       const data = await response.json() as DashboardResponse;
       if (!response.ok) throw new Error(data.error || "Stok kode gagal dimuat.");
       if (!active) return;
@@ -118,7 +118,7 @@ export function AdminVoucherManager() {
     setError("");
     setMessage("");
     try {
-      const response = await fetch("/api/admin/vouchers", {
+      const response = await fetch("/api/panel/vouchers", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "import", stockKey, codes: values }),
@@ -139,7 +139,7 @@ export function AdminVoucherManager() {
     setWorkingOrder(orderId);
     setError("");
     try {
-      const response = await fetch("/api/admin/vouchers", {
+      const response = await fetch("/api/panel/vouchers", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "reveal", orderId }),
@@ -159,7 +159,7 @@ export function AdminVoucherManager() {
     setError("");
     setMessage("");
     try {
-      const response = await fetch("/api/admin/vouchers", {
+      const response = await fetch("/api/panel/vouchers", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "retry", orderId }),

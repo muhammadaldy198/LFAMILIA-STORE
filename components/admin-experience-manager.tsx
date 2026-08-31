@@ -26,8 +26,8 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
     setLoading(true); setError("");
     try {
       const [contentResponse, reviewResponse] = await Promise.all([
-        fetch("/api/admin/content", { cache: "no-store" }),
-        fetch("/api/admin/reviews", { cache: "no-store" }),
+        fetch("/api/panel/content", { cache: "no-store" }),
+        fetch("/api/panel/reviews", { cache: "no-store" }),
       ]);
       const [contentData, reviewData] = await Promise.all([contentResponse.json(), reviewResponse.json()]);
       if (!contentResponse.ok) throw new Error(contentData.error || "Konten gagal dimuat.");
@@ -42,7 +42,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
   async function save(kind: ManagedKind, item: HomeBannerRecord | SitePopupRecord | NewsRecord, key: string) {
     setSaving(key); setError(""); setMessage("");
     try {
-      const response = await fetch("/api/admin/content", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, item }) });
+      const response = await fetch("/api/panel/content", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, item }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || "Konten gagal disimpan.");
       setMessage(kind === "banner" ? "Banner Home berhasil disimpan." : kind === "popup" ? "Pop-up Home berhasil disimpan." : "Berita berhasil disimpan.");
       await load();
@@ -52,7 +52,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
 
   async function remove(kind: ManagedKind, id: number) {
     if (!window.confirm("Hapus konten ini secara permanen?")) return;
-    const response = await fetch(`/api/admin/content?kind=${kind}&id=${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/panel/content?kind=${kind}&id=${id}`, { method: "DELETE" });
     const data = await response.json(); if (!response.ok) { setError(data.error || "Konten gagal dihapus."); return; }
     setMessage("Konten berhasil dihapus."); await load();
   }
@@ -60,7 +60,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
   async function moderate(review: ProductReview) {
     setSaving(`review-${review.id}`);
     try {
-      const response = await fetch("/api/admin/reviews", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: review.id, isVisible: !review.isVisible }) });
+      const response = await fetch("/api/panel/reviews", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: review.id, isVisible: !review.isVisible }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || "Ulasan gagal diperbarui.");
       setReviews((current) => current.map((item) => item.id === review.id ? { ...item, isVisible: !item.isVisible } : item));
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Ulasan gagal diperbarui."); }
