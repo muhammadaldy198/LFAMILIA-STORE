@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Camera, Headphones, MessageCircle } from "lucide-react";
+import { Camera, Headphones, MessageCircle, MessagesSquare } from "lucide-react";
 import { StoreBrand } from "@/components/store-brand";
 import { useStorefront } from "@/hooks/use-storefront";
 
 const groups = [
   { title: "Layanan", items: [["Top Up Game", "/catalog"], ["Promo", "/promo"], ["Cek Transaksi", "/track"], ["Hubungi Kami", "/contact"]] },
   { title: "Kalkulator", items: [["Win Rate", "/tools/win-rate"], ["Zodiac", "/tools/zodiac"], ["Magic Wheel", "/tools/magic-wheel"], ["Semua Alat", "/tools"]] },
-  { title: "Informasi", items: [["Pertanyaan umum", "/faq"], ["Syarat & ketentuan", "/terms"], ["Kebijakan refund", "/refund"], ["Kebijakan privasi", "/privacy"]] },
+  { title: "Informasi", items: [["Pertanyaan umum", "/faq"], ["Syarat & ketentuan", "/terms"], ["Kebijakan pengembalian dana", "/refund"], ["Kebijakan privasi", "/privacy"]] },
 ];
 
 export function StoreFooter() {
@@ -18,6 +18,7 @@ export function StoreFooter() {
     { href: whatsapp ? `https://wa.me/${whatsapp}` : "/contact", label: "Hubungi melalui WhatsApp", icon: MessageCircle },
     { href: settings.instagramUrl || "/contact", label: "Instagram LFAMILIA", icon: Camera },
     { href: settings.supportEmail ? `mailto:${settings.supportEmail}` : "/contact", label: "Email bantuan", icon: Headphones },
+    { href: settings.discordUrl || "/contact", label: "Discord LFAMILIA", icon: MessagesSquare },
   ];
   return (
     <footer className="border-t border-white/[0.08] bg-[#05070b]">

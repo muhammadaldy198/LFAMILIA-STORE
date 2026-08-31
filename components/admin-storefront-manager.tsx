@@ -40,7 +40,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
     try {
       const response = await fetch("/api/admin/storefront", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(settings) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error);
-      setMessage("Identitas dan banner toko berhasil disimpan.");
+      setMessage("Identitas, banner, dan kanal bantuan berhasil disimpan.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengaturan gagal disimpan."); }
     finally { setSaving(""); }
   }
@@ -77,7 +77,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
   return <div className="space-y-6">
     {message && <div className="rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.06] p-3 text-xs text-[#d8ff8d]">{message}</div>}
     {error && <div className="rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-xs text-red-200">{error}</div>}
-    <section className="rounded-2xl border border-white/[0.08] bg-white/[0.015] p-4 sm:p-5"><div className="flex items-start justify-between gap-4"><div><h3 className="font-bold">Identitas toko & banner Home</h3><p className="mt-1 text-[10px] text-white/30">Semua teks dan media utama dapat diubah tanpa menyentuh kode.</p></div><Button onClick={() => void saveSettings()} disabled={saving === "settings"} className="rounded-xl bg-[#b9ff35] text-xs font-black text-[#091006] hover:bg-[#d0ff75]">{saving === "settings" ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}Simpan</Button></div><div className="mt-5 grid gap-4 sm:grid-cols-2">
+    <section className="rounded-2xl border border-white/[0.08] bg-white/[0.015] p-4 sm:p-5"><div className="flex items-start justify-between gap-4"><div><h3 className="font-bold">Identitas toko, banner & kanal bantuan</h3><p className="mt-1 text-[10px] text-white/30">Semua teks, media utama, dan kontak publik dapat diubah tanpa menyentuh kode.</p></div><Button onClick={() => void saveSettings()} disabled={saving === "settings"} className="rounded-xl bg-[#b9ff35] text-xs font-black text-[#091006] hover:bg-[#d0ff75]">{saving === "settings" ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}Simpan</Button></div><div className="mt-5 grid gap-4 sm:grid-cols-2">
       <Field label="Nama toko"><Input value={settings.storeName} onChange={(event) => updateSetting("storeName", event.target.value)} className="admin-input" /></Field>
       <Field label="Inisial logo"><Input value={settings.storeShortName} maxLength={6} onChange={(event) => updateSetting("storeShortName", event.target.value.toUpperCase())} className="admin-input" /></Field>
       <div className="sm:col-span-2"><AdminMediaUpload label="Logo toko" value={settings.logoUrl} onChange={(value) => updateSetting("logoUrl", value)} help="Unggah JPG, PNG, WEBP, atau GIF maksimal 6 MB. Logo persegi paling cocok." previewClassName="aspect-square max-w-40" /></div>
@@ -91,6 +91,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
       <Field label="Tujuan tombol"><Input value={settings.bannerCtaHref} onChange={(event) => updateSetting("bannerCtaHref", event.target.value)} className="admin-input" placeholder="#produk atau /catalog" /></Field>
       <div className="sm:col-span-2"><AdminMediaUpload label="Gambar banner Home" value={settings.bannerImageUrl} onChange={(value) => updateSetting("bannerImageUrl", value)} help="Gunakan gambar landscape; teks banner tetap dapat diedit terpisah." /></div>
       <Field label="Deskripsi banner" wide><Textarea value={settings.bannerDescription} onChange={(event) => updateSetting("bannerDescription", event.target.value)} className="min-h-24 rounded-xl border-white/10 bg-white/[0.025] text-xs text-white" /></Field>
+      <div className="mt-2 border-t border-white/[0.08] pt-5 sm:col-span-2"><h4 className="text-xs font-bold text-white/75">Kanal bantuan publik</h4><p className="mt-1 text-[10px] leading-5 text-white/30">Owner dan staff dapat mengubah WhatsApp, email, Instagram, Discord, serta jam dukungan yang tampil di halaman Contact.</p></div>
       <Field label="WhatsApp bantuan"><Input inputMode="tel" value={settings.supportWhatsapp ?? ""} onChange={(event) => updateSetting("supportWhatsapp", event.target.value.replace(/[^+0-9]/g, ""))} className="admin-input" placeholder="628123456789" /></Field>
       <Field label="Email bantuan"><Input type="email" value={settings.supportEmail ?? ""} onChange={(event) => updateSetting("supportEmail", event.target.value)} className="admin-input" placeholder="support@domain.com" /></Field>
       <Field label="URL Instagram"><Input type="url" value={settings.instagramUrl ?? ""} onChange={(event) => updateSetting("instagramUrl", event.target.value)} className="admin-input" placeholder="https://instagram.com/..." /></Field>

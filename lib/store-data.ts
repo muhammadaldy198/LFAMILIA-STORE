@@ -353,14 +353,16 @@ export const defaultStorefrontSettings: StorefrontSettings = {
 };
 
 export const faqs = [
-  { question: "Bagaimana cara melakukan top up?", answer: "Pilih produk, isi data akun game, pilih nominal, lalu lakukan pembayaran. Saat integrasi aktif, pesanan diproses otomatis setelah pembayaran terverifikasi." },
-  { question: "Berapa lama pesanan diproses?", answer: "Target proses otomatis adalah beberapa menit setelah pembayaran berhasil. Gangguan dari publisher atau pemasok dapat membuat proses lebih lama." },
-  { question: "Metode pembayaran apa yang tersedia?", answer: "LFAMILIA STORE menyediakan Virtual Account bank, dompet digital, QRIS, dan saldo akun sesuai layanan yang sedang aktif. Biaya layanan ditampilkan sebelum pembayaran dibuat." },
-  { question: "Apa perbedaan produk otomatis dan manual?", answer: "Produk otomatis diteruskan ke provider resmi seperti DigiFlazz atau VIPayment setelah pembayaran terverifikasi. Produk manual masuk antrean admin dan diproses sesuai instruksi serta jadwal layanan." },
-  { question: "Bagaimana kode voucher atau lisensi dikirim?", answer: "Untuk produk berlabel Stok Kode Internal, sistem mereservasi satu kode setelah pembayaran lunas lalu mengirimkannya otomatis ke email dan/atau WhatsApp pembeli. Kode tidak tampil di halaman cek transaksi publik." },
-  { question: "Apakah harga di website sudah termasuk biaya pembayaran?", answer: "Harga produk tampil sebelum biaya layanan pembayaran. Biaya channel dihitung dan ditampilkan pada ringkasan sebelum transaksi dilanjutkan." },
-  { question: "Bagaimana jika saya salah memasukkan User ID?", answer: "Periksa kembali data tujuan sebelum membayar. Produk digital yang telah sukses dikirim ke tujuan yang dimasukkan umumnya tidak dapat dibatalkan." },
-  { question: "Di mana saya bisa melihat status pesanan?", answer: "Buka menu Cek Transaksi dan masukkan nomor invoice yang diterima setelah checkout." },
+  { question: "Bagaimana cara melakukan top up?", answer: "Pilih produk, isi data tujuan dengan benar, pilih nominal, lalu selesaikan pembayaran. Pesanan otomatis mulai diproses setelah pembayaran terverifikasi." },
+  { question: "Di mana saya dapat melihat status pesanan?", answer: "Buka menu Cek Transaksi lalu masukkan nomor invoice yang diterima setelah checkout. Simpan nomor invoice sampai produk berhasil diterima." },
+  { question: "Mengapa pembayaran berhasil tetapi status masih menunggu?", answer: "Konfirmasi dari kanal pembayaran terkadang memerlukan waktu. Jangan melakukan pembayaran kedua untuk invoice yang sama. Jika status belum berubah setelah beberapa saat, kirim nomor invoice dan bukti pembayaran melalui halaman Hubungi Kami." },
+  { question: "Apa arti status sedang diproses?", answer: "Pembayaran telah diterima dan pesanan sedang diteruskan ke pemasok atau antrean admin. Gangguan publisher, pemasok, atau jaringan dapat membuat proses lebih lama dari biasanya." },
+  { question: "Bagaimana jika status pesanan gagal atau refund?", answer: "Tim akan memeriksa apakah pesanan dapat diproses ulang atau perlu dikembalikan. Ketentuan lengkap, bukti yang dibutuhkan, dan estimasi penanganan tersedia pada halaman Kebijakan Pengembalian Dana." },
+  { question: "Apa perbedaan produk otomatis dan manual?", answer: "Produk otomatis diteruskan ke penyedia setelah pembayaran terverifikasi. Produk manual masuk antrean admin dan diproses mengikuti petunjuk serta jam layanan pada halaman produk." },
+  { question: "Bagaimana kode voucher atau lisensi dikirim?", answer: "Kode dikirim melalui kanal privat yang tercantum pada pesanan setelah pembayaran lunas. Kode tidak ditampilkan pada halaman Cek Transaksi publik. Jaga kerahasiaan kode setelah diterima." },
+  { question: "Apakah harga sudah termasuk biaya pembayaran?", answer: "Harga produk ditampilkan terpisah dari biaya kanal pembayaran. Total akhir selalu ditampilkan pada ringkasan sebelum kamu membuat atau membayar invoice." },
+  { question: "Apakah pesanan dapat dibatalkan?", answer: "Pesanan yang belum dibayar dapat kedaluwarsa otomatis. Pesanan yang sudah diproses atau berhasil dikirim umumnya tidak dapat dibatalkan. Lihat Kebijakan Pengembalian Dana untuk kondisi yang dapat ditinjau." },
+  { question: "Bagaimana jika saya salah memasukkan User ID atau server?", answer: "Segera hubungi bantuan jika pesanan belum diproses, tetapi penghentian tidak dapat dijamin. Produk yang telah berhasil dikirim sesuai data pada invoice umumnya tidak dapat dipindahkan atau direfund." },
 ];
 
 export function formatRupiah(value: number) {
