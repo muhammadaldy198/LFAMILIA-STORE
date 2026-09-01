@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
-import { listWalletTopups, readWalletSettings, reviewWalletTopup, saveWalletSettings } from "@/lib/server/wallet";
+import {
+  listWalletTopups,
+  readWalletSettings,
+  reviewWalletTopup,
+  saveWalletSettings,
+} from "@/lib/server/wallet";
 
 const settingsSchema = z.object({
   isEnabled: z.boolean(),
@@ -13,12 +18,16 @@ const settingsSchema = z.object({
   manualQrisName: z.string().trim().min(2).max(80),
   manualQrisImageUrl: z.string().trim().max(500),
   ipaymuTopupEnabled: z.boolean(),
+  ipaymuCheckoutEnabled: z.boolean(),
 });
 
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
-  return Response.json({ settings: await readWalletSettings(), topups: await listWalletTopups() });
+  return Response.json({
+    settings: await readWalletSettings(),
+    topups: await listWalletTopups(),
+  });
 }
 
 export async function PUT(request: Request) {
@@ -28,12 +37,21 @@ export async function PUT(request: Request) {
     await saveWalletSettings(settingsSchema.parse(await request.json()));
     return Response.json({ ok: true });
   } catch (error) {
-    const message = error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Pengaturan saldo gagal disimpan.";
+    const message =
+      error instanceof z.ZodError
+        ? error.issues[0]?.message
+        : error instanceof Error
+          ? error.message
+          : "Pengaturan saldo gagal disimpan.";
     return Response.json({ error: message }, { status: 400 });
   }
 }
 
-const reviewSchema = z.object({ id: z.string().uuid(), decision: z.enum(["approved", "rejected"]), notes: z.string().trim().max(300).optional() });
+const reviewSchema = z.object({
+  id: z.string().uuid(),
+  decision: z.enum(["approved", "rejected"]),
+  notes: z.string().trim().max(300).optional(),
+});
 
 export async function PATCH(request: Request) {
   const access = await requireAdminSession(request, "owner");
@@ -43,7 +61,12 @@ export async function PATCH(request: Request) {
     await reviewWalletTopup({ ...input, adminEmail: access.email });
     return Response.json({ ok: true });
   } catch (error) {
-    const message = error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Top up gagal ditinjau.";
+    const message =
+      error instanceof z.ZodError
+        ? error.issues[0]?.message
+        : error instanceof Error
+          ? error.message
+          : "Top up gagal ditinjau.";
     return Response.json({ error: message }, { status: 400 });
   }
 }
