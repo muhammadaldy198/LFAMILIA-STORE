@@ -28,7 +28,7 @@ export function AdminWalletManager() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/panel/wallet", { cache: "no-store" }); const data = await response.json();
+      const response = await fetch("/api/panel/wallet", { cache: "no-store" }); const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || "Saldo pelanggan gagal dimuat.");
       setSettings(data.settings ?? fallback); setTopups(data.topups ?? []);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Saldo pelanggan gagal dimuat."); }
@@ -40,7 +40,7 @@ export function AdminWalletManager() {
     setSaving("settings"); setError("");
     try {
       const response = await fetch("/api/panel/wallet", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(settings) });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error || "Pengaturan saldo gagal disimpan.");
+      const data = await readJson(response); if (!response.ok) throw new Error(data.error || "Pengaturan saldo gagal disimpan.");
       setMessage("Pengaturan top up saldo berhasil disimpan.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengaturan saldo gagal disimpan."); }
     finally { setSaving(""); }
@@ -51,7 +51,7 @@ export function AdminWalletManager() {
     setSaving(item.id); setError("");
     try {
       const response = await fetch("/api/panel/wallet", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: item.id, decision, notes }) });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error || "Top up gagal ditinjau.");
+      const data = await readJson(response); if (!response.ok) throw new Error(data.error || "Top up gagal ditinjau.");
       setMessage(decision === "approved" ? "Top up disetujui dan saldo pelanggan bertambah." : "Top up ditolak."); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Top up gagal ditinjau."); }
     finally { setSaving(""); }
@@ -69,3 +69,4 @@ export function AdminWalletManager() {
 function Field({ label, wide = false, children }: { label: string; wide?: boolean; children: React.ReactNode }) { return <label className={wide ? "sm:col-span-2" : ""}><span className="field-label">{label}</span>{children}</label>; }
 function Status({ value }: { value: TopupRow["status"] }) { const style = value === "approved" ? "bg-[#b9ff35]/10 text-[#d8ff8d]" : value === "rejected" ? "bg-red-400/10 text-red-200" : "bg-amber-300/10 text-amber-200"; return <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${style}`}>{value === "approved" ? "Disetujui" : value === "rejected" ? "Ditolak" : "Menunggu"}</span>; }
 function proofKey(value: string) { return value.split("/").pop() || value; }
+async function readJson(response: Response): Promise<Record<string, unknown>> { const raw = await response.text(); if (!raw) return { error: "Server mengembalikan respons kosong. Coba muat ulang." }; try { return JSON.parse(raw) as Record<string, unknown>; } catch { return { error: "Server mengembalikan respons tidak valid." }; } }
