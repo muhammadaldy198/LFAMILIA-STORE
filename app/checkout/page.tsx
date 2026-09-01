@@ -446,7 +446,7 @@ function CheckoutContent() {
           ? "/api/payments/wallet/create"
           : paymentMethod === "manual_qris" || paymentMethod === "manual_bank"
             ? "/api/payments/manual/create"
-            : "/api/payments/ipaymu/create";
+            : "/api/payments/midtrans/create";
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
