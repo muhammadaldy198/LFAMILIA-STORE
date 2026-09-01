@@ -10,13 +10,13 @@ import { Switch } from "@/components/ui/switch";
 import type { ManagedPaymentChannel } from "@/lib/server/payment-channels";
 
 const fallback: ManagedPaymentChannel[] = [
+  ["qris", "qris", "QRIS"],
+  ["ewallet", "dana", "DANA"],
+  ["ewallet", "shopeepay", "ShopeePay"],
   ["va", "bca", "BCA"],
   ["va", "mandiri", "Mandiri"],
   ["va", "bni", "BNI"],
   ["va", "bri", "BRI"],
-  ["ewallet", "dana", "DANA"],
-  ["ewallet", "shopeepay", "ShopeePay"],
-  ["qris", "mpm", "QRIS"],
 ].map(([method, channel, name], sortOrder) => ({
   id: null,
   method: method as ManagedPaymentChannel["method"],
@@ -127,8 +127,7 @@ export function AdminPaymentMethodManager() {
         </p>
       )}
       <p className="text-xs leading-5 text-white/38">
-        Aktifkan hanya metode yang benar-benar tersedia di Midtrans. Gambar
-        ditampilkan pada checkout pelanggan.
+        Urutan checkout pelanggan: Koin LFAMILIA → QRIS langsung → E-Wallet → Transfer Bank. Aktifkan hanya channel Midtrans yang benar-benar tersedia; logo tampil sebagai preview sebelum pelanggan membuka pilihan.
       </p>
       {items.map((item, index) => (
         <section
