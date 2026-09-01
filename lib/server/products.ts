@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { products as fallbackProducts, type ProductNotice, type ProductPackage, type StoreProduct } from "@/lib/store-data";
 
 const fallbackProductBySlug = new Map(fallbackProducts.map((product) => [product.slug, product]));
@@ -100,6 +101,7 @@ export function getFallbackProducts(): ManagedProduct[] {
 }
 
 export async function readProducts(includeInactive = false): Promise<ManagedProduct[]> {
+  await ensureLegacyDatabaseColumns();
   const db = getD1();
   try { await db.prepare("SELECT banner_url FROM products LIMIT 1").first(); } catch { await db.prepare("ALTER TABLE products ADD COLUMN banner_url text").run(); }
   const productSql = includeInactive
@@ -185,6 +187,7 @@ type ProductWrite = Omit<ManagedProduct, "dbId" | "packages" | "notices"> & {
 };
 
 export async function saveProduct(input: ProductWrite, id?: number) {
+  await ensureLegacyDatabaseColumns();
   const db = getD1();
   const values = [
     input.slug,
