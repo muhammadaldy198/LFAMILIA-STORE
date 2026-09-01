@@ -29,7 +29,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
         fetch("/api/panel/content", { cache: "no-store" }),
         fetch("/api/panel/reviews", { cache: "no-store" }),
       ]);
-      const [contentData, reviewData] = await Promise.all([contentResponse.json(), reviewResponse.json()]);
+      const [contentData, reviewData] = await Promise.all([readJson(contentResponse), readJson(reviewResponse)]);
       if (!contentResponse.ok) throw new Error(contentData.error || "Konten gagal dimuat.");
       if (!reviewResponse.ok) throw new Error(reviewData.error || "Ulasan gagal dimuat.");
       setBanners(contentData.banners ?? []); setPopups(contentData.popups ?? []); setNews(contentData.news ?? []); setReviews(reviewData.reviews ?? []);
@@ -43,7 +43,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
     setSaving(key); setError(""); setMessage("");
     try {
       const response = await fetch("/api/panel/content", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, item }) });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error || "Konten gagal disimpan.");
+      const data = await readJson(response); if (!response.ok) throw new Error(data.error || "Konten gagal disimpan.");
       setMessage(kind === "banner" ? "Banner Home berhasil disimpan." : kind === "popup" ? "Pop-up Home berhasil disimpan." : "Berita berhasil disimpan.");
       await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Konten gagal disimpan."); }
@@ -53,7 +53,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
   async function remove(kind: ManagedKind, id: number) {
     if (!window.confirm("Hapus konten ini secara permanen?")) return;
     const response = await fetch(`/api/panel/content?kind=${kind}&id=${id}`, { method: "DELETE" });
-    const data = await response.json(); if (!response.ok) { setError(data.error || "Konten gagal dihapus."); return; }
+    const data = await readJson(response); if (!response.ok) { setError(data.error || "Konten gagal dihapus."); return; }
     setMessage("Konten berhasil dihapus."); await load();
   }
 
@@ -61,7 +61,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
     setSaving(`review-${review.id}`);
     try {
       const response = await fetch("/api/panel/reviews", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: review.id, isVisible: !review.isVisible }) });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error || "Ulasan gagal diperbarui.");
+      const data = await readJson(response); if (!response.ok) throw new Error(data.error || "Ulasan gagal diperbarui.");
       setReviews((current) => current.map((item) => item.id === review.id ? { ...item, isVisible: !item.isVisible } : item));
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Ulasan gagal diperbarui."); }
     finally { setSaving(""); }
@@ -101,3 +101,4 @@ function emptyNews(sortOrder: number): NewsRecord { return { id: null, slug: "",
 function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 function toLocalDate(value?: string) { if (!value) return ""; const date = new Date(value); if (Number.isNaN(date.getTime())) return ""; const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 16); }
 function updateAt<T>(setter: React.Dispatch<React.SetStateAction<T[]>>, index: number, patch: Partial<T>) { setter((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item)); }
+async function readJson(response: Response): Promise<Record<string, unknown>> { const raw = await response.text(); if (!raw) return { error: "Server mengembalikan respons kosong. Coba muat ulang." }; try { return JSON.parse(raw) as Record<string, unknown>; } catch { return { error: "Server mengembalikan respons tidak valid." }; } }
