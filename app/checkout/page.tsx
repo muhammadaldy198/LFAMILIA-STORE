@@ -29,7 +29,7 @@ import { StoreLayout } from "@/components/store-layout";
 import { ProductArtwork } from "@/components/product-artwork";
 import { ProductReviews } from "@/components/product-reviews";
 import { useStoreProducts } from "@/hooks/use-store-products";
-import { paymentChannels, paymentGroups, type PaymentMethodCode } from "@/lib/payment-methods";
+import { paymentChannels, paymentGroups, type PaymentChannel, type PaymentMethodCode } from "@/lib/payment-methods";
 import { formatRupiah } from "@/lib/store-data";
 import type { CustomerSession } from "@/lib/server/customer-auth";
 
@@ -73,6 +73,7 @@ type PromotionQuote = {
 };
 
 type CheckoutPaymentMethod = PaymentMethodCode | "wallet";
+type DisplayPaymentChannel = PaymentChannel & { imageUrl?: string };
 const checkoutGroups = [...paymentGroups, { code: "wallet" as const, name: "Saldo LFAMILIA", description: "Bayar langsung dari saldo akun" }];
 const groupIcons = { va: Landmark, ewallet: WalletCards, qris: QrCode, wallet: WalletCards };
 
@@ -117,6 +118,7 @@ function CheckoutContent() {
   const [quote, setQuote] = useState<PromotionQuote | null>(null);
   const [applyingVoucher, setApplyingVoucher] = useState(false);
   const [account, setAccount] = useState<CustomerSession | null>(null);
+  const [availableChannels, setAvailableChannels] = useState<DisplayPaymentChannel[]>(paymentChannels);
 
   const selectedPackage = product.packages.find((item) => item.id === packageId);
   const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
@@ -127,9 +129,17 @@ function CheckoutContent() {
   const lookupNeedsServer = product.slug === "mobile-legends";
   const lookupKey = `${product.slug}:${destination.trim()}:${server.trim()}`;
   const visibleNickname: NicknameState = nickname.key === lookupKey ? nickname : { status: "idle" };
-  const channels = paymentMethod === "wallet" ? [] : paymentChannels.filter((item) => item.method === paymentMethod);
+  const channels = paymentMethod === "wallet" ? [] : availableChannels.filter((item) => item.method === paymentMethod);
   const notices = (product.notices ?? []).filter((item) => item.isActive !== false);
   const noticeSignature = noticeVersion(notices);
+
+  useEffect(() => {
+    void fetch("/api/payment-methods", { cache: "no-store" }).then(async (response) => {
+      if (!response.ok) return;
+      const data = await response.json() as { channels?: DisplayPaymentChannel[] };
+      if (data.channels?.length) setAvailableChannels(data.channels);
+    }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -189,7 +199,7 @@ function CheckoutContent() {
 
   function chooseMethod(method: CheckoutPaymentMethod) {
     setPaymentMethod(method);
-    setPaymentChannel(method === "wallet" ? "lfamilia-balance" : paymentChannels.find((item) => item.method === method)?.channel ?? "");
+    setPaymentChannel(method === "wallet" ? "lfamilia-balance" : availableChannels.find((item) => item.method === method)?.channel ?? "");
     setPayment(null);
   }
 
@@ -320,7 +330,7 @@ function CheckoutContent() {
                 return <button key={group.code} type="button" disabled={disabled} onClick={() => chooseMethod(group.code)} className={`rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${selected ? "border-[#b9ff35] bg-[#b9ff35]/[0.08]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}><div className="flex items-center justify-between"><span className={`grid size-9 place-items-center rounded-xl ${selected ? "bg-[#b9ff35] text-[#091006]" : "bg-white/[0.06] text-white/55"}`}><Icon className="size-4" /></span>{selected && <CheckCircle2 className="size-4 text-[#b9ff35]" />}</div><strong className="mt-3 block text-xs">{group.name}</strong><p className="mt-1 text-[9px] leading-4 text-white/32">{group.code === "wallet" && account ? `Saldo ${formatRupiah(account.balance)}` : group.code === "wallet" ? "Masuk akun untuk memakai saldo" : group.description}</p></button>;
               })}</div>
               {!account && <p className="mt-3 text-[10px] text-white/35">Ingin membayar memakai saldo? <Link href="/login" className="font-bold text-[#cfff72]">Masuk atau daftar akun</Link>.</p>}
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">{channels.map((channel) => <button key={channel.channel} type="button" onClick={() => { setPaymentChannel(channel.channel); setPayment(null); }} className={`rounded-xl border px-3 py-3 text-left text-[10px] font-bold transition ${paymentChannel === channel.channel ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.08] text-[#d8ff8d]" : "border-white/[0.08] bg-white/[0.02] text-white/45 hover:text-white"}`}>{channel.name}</button>)}</div>
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">{channels.map((channel) => <button key={channel.channel} type="button" onClick={() => { setPaymentChannel(channel.channel); setPayment(null); }} className={`flex min-h-14 items-center gap-2 rounded-xl border px-3 py-3 text-left text-[10px] font-bold transition ${paymentChannel === channel.channel ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.08] text-[#d8ff8d]" : "border-white/[0.08] bg-white/[0.02] text-white/45 hover:text-white"}`}>{channel.imageUrl ? <img src={channel.imageUrl} alt="" className="size-8 rounded-lg object-contain" /> : <span className="grid size-8 place-items-center rounded-lg bg-white/[0.07] text-[8px] font-black text-white/80">{channel.name.slice(0, 3)}</span>}<span>{channel.name}</span></button>)}</div>
             </section>
 
             <section className="panel p-5 sm:p-6">
