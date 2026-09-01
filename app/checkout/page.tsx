@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
-  ArrowLeft,
   BadgeCheck,
   CheckCircle2,
   Copy,
@@ -486,13 +485,7 @@ function CheckoutContent() {
 
   return (
     <StoreLayout>
-      <main className="mx-auto max-w-7xl px-4 pb-[11rem] pt-8 sm:px-6 sm:py-12 lg:px-8">
-        <Link
-          href="/catalog"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-white/42 hover:text-white"
-        >
-          <ArrowLeft className="size-4" /> Kembali ke katalog
-        </Link>
+      <main className="mx-auto max-w-7xl px-4 pb-[11rem] pt-3 sm:px-6 sm:py-8 lg:px-8">
         <section className="relative mt-5 -mx-4 h-52 overflow-hidden bg-[#10131b] sm:-mx-6 sm:h-72 lg:-mx-8 lg:h-80">
           {(product.bannerUrl || product.imageUrl) && (
             <img
@@ -507,8 +500,8 @@ function CheckoutContent() {
           <span className="absolute -top-12 left-5 block aspect-[3/3] size-24 overflow-hidden rounded-[22px] border-4 border-[#14171e] shadow-2xl [perspective:800px] [transform:rotateY(-14deg)_rotateZ(-3deg)] sm:-top-14 sm:left-8 sm:size-28">
             <ProductArtwork product={product} compact />
           </span>
-          <div className="flex min-h-36 flex-col justify-between gap-5 pl-32 pt-0 sm:min-h-28 sm:flex-row sm:items-end sm:justify-between sm:pl-36">
-            <div>
+          <div className="space-y-5">
+            <div className="min-h-20 pl-32 sm:min-h-24 sm:pl-36">
               <h1 className="text-sm font-black uppercase tracking-[0.08em] text-white sm:text-base">
                 {product.name}
               </h1>
@@ -516,7 +509,7 @@ function CheckoutContent() {
                 {product.publisher}
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-3 text-center text-[9px] text-white/48 sm:w-[360px]">
+            <div className="grid grid-cols-3 gap-3 text-center text-[9px] text-white/48">
               <span>
                 <Zap className="mx-auto mb-1 size-4 text-[#cfff72]" />
                 Proses cepat
