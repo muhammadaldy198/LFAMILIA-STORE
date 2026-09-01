@@ -284,15 +284,14 @@ function CheckoutContent() {
     <StoreLayout>
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
         <Link href="/catalog" className="inline-flex items-center gap-2 text-xs font-semibold text-white/42 hover:text-white"><ArrowLeft className="size-4" /> Kembali ke katalog</Link>
-        <section className="relative mt-5 min-h-52 overflow-hidden rounded-[26px] border border-white/10 bg-[#10131b] sm:min-h-64">
+        <section className="relative mt-5 min-h-56 overflow-hidden rounded-[26px] border border-white/10 bg-[#10131b] sm:min-h-72">
           {(product.bannerUrl || product.imageUrl) && <img src={product.bannerUrl || product.imageUrl} alt={`Banner ${product.name}`} className="absolute inset-0 size-full object-cover" />}
-          <div className={`absolute inset-0 bg-gradient-to-br ${product.accent} opacity-75`} />
-          {(product.bannerUrl || product.imageUrl) && <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/48 to-black/10" />}
-          <div className="relative z-10 flex min-h-52 items-end p-6 sm:min-h-64 sm:p-8"><div><span className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/68">{product.publisher}</span><h1 className="mt-4 text-3xl font-black tracking-[-0.04em] sm:text-5xl">{product.name}</h1><p className="mt-3 text-xs text-white/52">Pilih nominal, isi data tujuan, lalu selesaikan pembayaran dengan aman.</p></div></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-[#10131b]/65 via-transparent to-transparent" />
         </section>
-        <section className="relative z-10 mx-2 -mt-7 overflow-hidden rounded-2xl border border-white/[0.10] bg-[#10131b]/95 p-4 shadow-2xl backdrop-blur sm:mx-6 sm:-mt-9 sm:p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4"><span className="block size-16 shrink-0 overflow-hidden rounded-2xl border border-white/10 shadow-lg sm:size-20"><ProductArtwork product={product} compact /></span><div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#cfff72]">Top up game</p><h2 className="mt-1 text-lg font-black sm:text-xl">{product.name}</h2><p className="mt-1 text-xs text-white/45">{product.publisher}</p></div></div>
+        <section className="relative z-10 mx-3 -mt-11 overflow-visible rounded-2xl border border-white/[0.10] bg-[#10131b] px-5 pb-5 pt-16 shadow-2xl sm:mx-6 sm:-mt-14 sm:px-7 sm:pb-6 sm:pt-20">
+          <span className="absolute -top-12 left-5 block size-24 overflow-hidden rounded-[22px] border-4 border-[#10131b] shadow-2xl sm:-top-14 sm:left-7 sm:size-28"><ProductArtwork product={product} compact /></span>
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#cfff72]">{product.publisher}</p><h1 className="mt-2 text-2xl font-black tracking-[-0.04em] sm:text-3xl">{product.name}</h1></div>
             <div className="grid grid-cols-3 gap-3 text-center text-[9px] text-white/48 sm:w-[360px]"><span><Zap className="mx-auto mb-1 size-4 text-[#cfff72]" />Proses cepat</span><span><ShieldCheck className="mx-auto mb-1 size-4 text-[#cfff72]" />Pembayaran aman</span><span><BadgeCheck className="mx-auto mb-1 size-4 text-[#cfff72]" />Status realtime</span></div>
           </div>
         </section>
