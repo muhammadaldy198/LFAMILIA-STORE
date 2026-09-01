@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { defaultStorefrontSettings, faqs as fallbackFaqs, type StorefrontSettings } from "@/lib/store-data";
 
 type SettingsRow = {
@@ -41,6 +42,7 @@ export type FaqRecord = {
 
 export async function readStorefrontSettings(): Promise<StorefrontSettings> {
   try {
+    await ensureLegacyDatabaseColumns();
     const row = await getD1().prepare("SELECT * FROM store_settings WHERE id = 1").first<SettingsRow>();
     if (!row) return defaultStorefrontSettings;
     return {
@@ -69,6 +71,7 @@ export async function readStorefrontSettings(): Promise<StorefrontSettings> {
 }
 
 export async function saveStorefrontSettings(input: StorefrontSettings) {
+  await ensureLegacyDatabaseColumns();
   await getD1().prepare(
     `INSERT INTO store_settings (
       id, store_name, store_short_name, tagline, logo_url, announcement, banner_enabled,
