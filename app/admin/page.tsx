@@ -9,6 +9,7 @@ import {
   LoaderCircle,
   LockKeyhole,
   LogOut,
+  Menu,
   ReceiptText,
   Settings,
   ShieldCheck,
@@ -59,6 +60,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -144,6 +146,7 @@ export default function AdminPage() {
             <p className="mt-2 text-xs text-white/35">{isOwner ? "Kontrol toko, katalog, keuangan, pembayaran, dan tim." : "Pantau operasional pesanan dan informasi katalog."} • {session.name}</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => setMenuOpen(true)} variant="outline" className="rounded-xl border-white/10 bg-white/[0.035] text-white lg:hidden"><Menu className="size-4" /></Button>
             <Button asChild variant="outline" className="rounded-xl border-white/10 bg-white/[0.035] text-white hover:bg-white/[0.08] hover:text-white">
               <Link href="/"><ShoppingBag className="mr-2 size-4" />Lihat toko</Link>
             </Button>
@@ -155,9 +158,10 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue="overview" className="grid items-start gap-5 lg:grid-cols-[220px_1fr]">
-          <TabsList className="flex h-auto w-full gap-2 overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#0d1019] p-2 lg:sticky lg:top-28 lg:flex-col lg:items-stretch">
+          {menuOpen && <button type="button" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-40 bg-black/65 lg:hidden" aria-label="Tutup menu" />}
+          <TabsList className={`z-50 h-auto gap-2 rounded-2xl border border-white/[0.08] bg-[#0d1019] p-2 ${menuOpen ? "fixed inset-y-0 left-0 flex w-72 flex-col rounded-none" : "hidden"} lg:sticky lg:top-28 lg:flex lg:w-full lg:flex-col lg:items-stretch`}>
             {nav.map(([value, label, Icon]) => (
-              <TabsTrigger key={value} value={value} className="h-10 shrink-0 justify-start rounded-xl px-3 text-xs text-white/42 data-[state=active]:bg-[#b9ff35] data-[state=active]:text-[#091006]">
+              <TabsTrigger key={value} value={value} onClick={() => setMenuOpen(false)} className="h-10 shrink-0 justify-start rounded-xl px-3 text-xs text-white/42 data-[state=active]:bg-[#b9ff35] data-[state=active]:text-[#091006]">
                 <Icon className="mr-2 size-4" />{label}
               </TabsTrigger>
             ))}
