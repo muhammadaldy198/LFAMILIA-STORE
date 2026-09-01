@@ -290,6 +290,12 @@ function CheckoutContent() {
           {(product.bannerUrl || product.imageUrl) && <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/48 to-black/10" />}
           <div className="relative z-10 flex min-h-52 items-end p-6 sm:min-h-64 sm:p-8"><div><span className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/68">{product.publisher}</span><h1 className="mt-4 text-3xl font-black tracking-[-0.04em] sm:text-5xl">{product.name}</h1><p className="mt-3 text-xs text-white/52">Pilih nominal, isi data tujuan, lalu selesaikan pembayaran dengan aman.</p></div></div>
         </section>
+        <section className="relative z-10 mx-2 -mt-7 overflow-hidden rounded-2xl border border-white/[0.10] bg-[#10131b]/95 p-4 shadow-2xl backdrop-blur sm:mx-6 sm:-mt-9 sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4"><span className="block size-16 shrink-0 overflow-hidden rounded-2xl border border-white/10 shadow-lg sm:size-20"><ProductArtwork product={product} compact /></span><div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#cfff72]">Top up game</p><h2 className="mt-1 text-lg font-black sm:text-xl">{product.name}</h2><p className="mt-1 text-xs text-white/45">{product.publisher}</p></div></div>
+            <div className="grid grid-cols-3 gap-3 text-center text-[9px] text-white/48 sm:w-[360px]"><span><Zap className="mx-auto mb-1 size-4 text-[#cfff72]" />Proses cepat</span><span><ShieldCheck className="mx-auto mb-1 size-4 text-[#cfff72]" />Pembayaran aman</span><span><BadgeCheck className="mx-auto mb-1 size-4 text-[#cfff72]" />Status realtime</span></div>
+          </div>
+        </section>
         <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_380px]">
           <form id="checkout-form" onSubmit={submitOrder} className="space-y-5">
             <section className="panel overflow-hidden">
@@ -405,8 +411,8 @@ async function requestQuote(productSlug: string, packageSku: string, voucherCode
   return data;
 }
 
-function StepTitle({ number, title, description }: { number: string; title: string; description: string }) {
-  return <div className="flex items-center gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#b9ff35] text-sm font-black text-[#091006]">{number}</span><div><h2 className="font-bold">{title}</h2><p className="mt-0.5 text-[11px] text-white/35">{description}</p></div></div>;
+function StepTitle({ title, description }: { number: string; title: string; description: string }) {
+  return <div><h2 className="font-bold">{title}</h2><p className="mt-1 text-[11px] text-white/35">{description}</p></div>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
