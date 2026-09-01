@@ -90,6 +90,7 @@ export async function POST(request: Request) {
       {
         orderId: identity.id,
         referenceId: identity.referenceId,
+        paymentMethod: input.paymentMethod,
         paymentNo: isQris ? "Scan QRIS sesuai total" : settings.accountNumber,
         paymentName: isQris
           ? settings.manualQrisName
