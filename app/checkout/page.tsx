@@ -722,6 +722,15 @@ function CheckoutContent() {
                           <CheckCircle2 className="size-4 text-[#b9ff35]" />
                         )}
                       </button>
+                      {group.code !== "wallet" && (
+                        <div className="flex min-h-10 items-center gap-2 overflow-hidden border-t border-white/[0.08] bg-black/10 px-4 py-2">
+                          {group.code === "qris" ? (
+                            <span className="text-[10px] font-bold text-white/75">QRIS • DANA • GoPay • ShopeePay • OVO</span>
+                          ) : (
+                            availableChannels.filter((channel) => channel.method === group.code).slice(0, 7).map((channel) => channel.imageUrl ? <img key={channel.channel} src={channel.imageUrl} alt={channel.name} className="h-5 max-w-14 object-contain" /> : <span key={channel.channel} className="rounded bg-white/[0.08] px-1.5 py-1 text-[8px] font-bold text-white/65">{channel.name}</span>)
+                          )}
+                        </div>
+                      )}
                       {selected && isGatewayMethod && group.code !== "qris" && (
                         <div className="grid grid-cols-2 gap-2 border-t border-white/[0.08] bg-black/10 p-3 sm:grid-cols-3">
                           {availableChannels
