@@ -7,7 +7,6 @@ export type AdminSession = PasswordAdminSession;
 
 type RuntimeEnv = {
   OWNER_EMAIL?: string;
-  ALLOW_DEV_ADMIN_HEADER?: string;
 };
 
 function normalizeEmail(value: string | null | undefined) {
@@ -15,12 +14,8 @@ function normalizeEmail(value: string | null | undefined) {
 }
 
 export function getAccessEmail(request: Request) {
-  const env = getRuntimeEnv<RuntimeEnv>();
   const cloudflareEmail = normalizeEmail(request.headers.get("cf-access-authenticated-user-email"));
   if (cloudflareEmail) return cloudflareEmail;
-  if (env.ALLOW_DEV_ADMIN_HEADER === "true") {
-    return normalizeEmail(request.headers.get("x-lfamilia-admin-email"));
-  }
   return null;
 }
 
