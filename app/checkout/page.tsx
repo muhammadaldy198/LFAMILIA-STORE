@@ -680,14 +680,6 @@ function CheckoutContent() {
                   );
                 })}
               </div>
-                {voucherMessage && (
-                  <p
-                    className={`mt-2 text-[10px] ${quote?.voucherCode ? "text-[#cfff72]" : "text-amber-200"}`}
-                  >
-                    {voucherMessage}
-                  </p>
-                )}
-              </div>
             </section>
 
             <section className="panel p-5 sm:p-6">
