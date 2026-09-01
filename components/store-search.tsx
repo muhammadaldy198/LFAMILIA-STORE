@@ -13,6 +13,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useStoreProducts } from "@/hooks/use-store-products";
+import { ProductArtwork } from "@/components/product-artwork";
 
 export function StoreSearch({ mobile = false }: { mobile?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -59,7 +60,7 @@ export function StoreSearch({ mobile = false }: { mobile?: boolean }) {
                   onSelect={() => chooseProduct(product.slug)}
                   className="my-1 cursor-pointer rounded-xl px-3 py-3 text-white/75 data-[selected=true]:bg-[#b9ff35]/10 data-[selected=true]:text-white"
                 >
-                  <span className={`grid size-9 place-items-center rounded-lg bg-gradient-to-br ${product.accent} text-[10px] font-black text-white`}>{product.initials}</span>
+                  <span className="block w-10 shrink-0 aspect-[2/3] overflow-hidden rounded-lg"><ProductArtwork product={product} compact /></span>
                   <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{product.name}</strong><span className="text-[10px] text-white/30">{product.publisher}</span></span>
                   <Icon className="size-4 text-[#b9ff35]" />
                 </CommandItem>
