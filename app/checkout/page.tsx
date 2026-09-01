@@ -157,6 +157,9 @@ function CheckoutContent() {
   const [buyerEmail, setBuyerEmail] = useState("");
   const [contact, setContact] = useState("");
   const [customerNotes, setCustomerNotes] = useState("");
+  const [activeTab, setActiveTab] = useState<"transaction" | "details">("transaction");
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(true);
   const [paymentMethod, setPaymentMethod] =
     useState<CheckoutPaymentMethod>("manual_qris");
   const [paymentChannel, setPaymentChannel] = useState("manual_qris");
@@ -198,16 +201,10 @@ function CheckoutContent() {
     paymentMethod === "ewallet" ||
     paymentMethod === "qris";
   const checkoutGroups = [
-    ...(walletSettings?.midtransCheckoutEnabled ? paymentGroups : []),
+    { code: "wallet" as const, name: "Koin LFAMILIA", description: "Bayar langsung dari saldo akun" },
+    ...(walletSettings?.midtransCheckoutEnabled ? paymentGroups.filter((item) => item.code === "qris" || item.code === "ewallet" || item.code === "va") : []),
     ...(walletSettings?.manualQrisEnabled ? [manualPaymentGroups[0]] : []),
-    ...(walletSettings?.isEnabled && walletSettings.accountNumber
-      ? [manualPaymentGroups[1]]
-      : []),
-    {
-      code: "wallet" as const,
-      name: "Saldo LFAMILIA",
-      description: "Bayar langsung dari saldo akun",
-    },
+    ...(walletSettings?.isEnabled && walletSettings.accountNumber ? [manualPaymentGroups[1]] : []),
   ];
   const channels = isGatewayMethod
     ? availableChannels.filter((item) => item.method === paymentMethod)
@@ -411,17 +408,23 @@ function CheckoutContent() {
     }
   }
 
-  async function submitOrder(event: FormEvent) {
+  function requestConfirmation(event: FormEvent) {
     event.preventDefault();
-    if (
-      !destination.trim() ||
-      (product.needsServer && !server.trim()) ||
-      !buyerName.trim() ||
-      !buyerEmail.trim() ||
-      !contact.trim() ||
-      !packageId ||
-      !agreed
-    ) {
+    if (!destination.trim() || (product.needsServer && !server.trim()) || !buyerEmail.trim() || !contact.trim() || !packageId) {
+      setError("Lengkapi data akun, nominal, email, nomor WhatsApp, dan pembayaran.");
+      return;
+    }
+    if (canCheckNickname && visibleNickname.status !== "success") {
+      setError("Tunggu sampai nickname akun berhasil diverifikasi.");
+      return;
+    }
+    setError("");
+    setConfirmationOpen(true);
+  }
+
+  async function submitOrder(event?: FormEvent) {
+    event?.preventDefault();
+    if (!destination.trim() || (product.needsServer && !server.trim()) || !buyerEmail.trim() || !contact.trim() || !packageId || !agreed) {
       setError(
         "Lengkapi data akun, nominal, identitas pembeli, pembayaran, dan persetujuan.",
       );
@@ -456,10 +459,10 @@ function CheckoutContent() {
           destination: destination.trim(),
           server: server.trim() || undefined,
           nickname: visibleNickname.nickname,
-          buyerName: buyerName.trim(),
+          buyerName: buyerName.trim() || buyerEmail.trim().split("@")[0] || "Pelanggan",
           buyerEmail: buyerEmail.trim(),
           buyerPhone: contact.replace(/[\s()-]/g, ""),
-          customerNotes: customerNotes.trim() || undefined,
+          customerNotes: undefined,
           paymentMethod,
           paymentChannel,
           voucherCode: voucherCode.trim() || undefined,
@@ -493,21 +496,21 @@ function CheckoutContent() {
         >
           <ArrowLeft className="size-4" /> Kembali ke katalog
         </Link>
-        <section className="relative mt-5 min-h-56 overflow-hidden rounded-[26px] border border-white/10 bg-[#10131b] sm:min-h-72">
+        <section className="relative mt-5 h-52 overflow-hidden bg-[#10131b] sm:h-72 lg:h-80">
           {(product.bannerUrl || product.imageUrl) && (
             <img
               src={product.bannerUrl || product.imageUrl}
               alt={`Banner ${product.name}`}
-              className="absolute inset-0 size-full object-cover"
+              className="absolute inset-0 size-full object-cover object-center"
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#10131b]/65 via-transparent to-transparent" />
         </section>
-        <section className="relative z-10 mx-3 -mt-11 overflow-visible rounded-2xl border border-white/[0.10] bg-[#10131b] px-5 pb-5 pt-6 shadow-2xl sm:mx-6 sm:-mt-14 sm:px-7 sm:pb-6 sm:pt-7">
-          <span className="absolute left-5 top-6 block size-20 -rotate-[4deg] overflow-hidden rounded-[18px] border-4 border-[#10131b] shadow-2xl sm:left-7 sm:top-7 sm:size-24">
+        <section className="relative z-10 -mt-1 overflow-visible border-y border-white/[0.10] bg-[#14171e] px-5 py-5 shadow-2xl sm:px-8">
+          <span className="absolute -top-12 left-5 block size-24 -rotate-[5deg] overflow-hidden rounded-[22px] border-4 border-[#14171e] shadow-2xl sm:-top-14 sm:left-8 sm:size-28">
             <ProductArtwork product={product} compact />
           </span>
-          <div className="flex min-h-20 flex-col gap-4 pl-24 sm:min-h-24 sm:pl-28">
+          <div className="flex flex-col gap-5 pt-12 sm:flex-row sm:items-end sm:justify-between sm:pl-36 sm:pt-1">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#cfff72]">
                 {product.publisher}
@@ -523,17 +526,21 @@ function CheckoutContent() {
               </span>
               <span>
                 <ShieldCheck className="mx-auto mb-1 size-4 text-[#cfff72]" />
-                Pembayaran aman
+                Layanan Chat 24/7
               </span>
               <span>
                 <BadgeCheck className="mx-auto mb-1 size-4 text-[#cfff72]" />
-                Status realtime
+                Pembayaran aman
               </span>
             </div>
           </div>
         </section>
-        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_380px]">
-          <form id="checkout-form" onSubmit={submitOrder} className="space-y-5">
+        <div className="mx-auto mt-5 grid max-w-7xl grid-cols-2 rounded-xl bg-white/[0.06] p-1 text-sm font-bold">
+          <button type="button" onClick={() => setActiveTab("transaction")} className={`rounded-lg py-3 ${activeTab === "transaction" ? "bg-[#b9ff35] text-[#091006]" : "text-white/55"}`}>Transaksi</button>
+          <button type="button" onClick={() => setActiveTab("details")} className={`rounded-lg py-3 ${activeTab === "details" ? "bg-[#b9ff35] text-[#091006]" : "text-white/55"}`}>Keterangan</button>
+        </div>
+        {activeTab === "transaction" ? <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_380px]">
+          <form id="checkout-form" onSubmit={requestConfirmation} className="space-y-5">
             <section className="panel overflow-hidden">
               <div className="flex items-center justify-between gap-4 border-b border-white/[0.08] bg-white/[0.02] p-5 sm:p-6">
                 <StepTitle
@@ -542,7 +549,7 @@ function CheckoutContent() {
                   description="Nickname diperiksa otomatis jika game mendukung."
                 />
                 <div className="hidden items-center gap-3 sm:flex">
-                  <span className="block w-8 aspect-[2/3] overflow-hidden rounded-xl">
+                  <span className="block size-10 overflow-hidden rounded-xl aspect-square">
                     <ProductArtwork product={product} compact />
                   </span>
                   <div className="max-w-36">
@@ -560,7 +567,7 @@ function CheckoutContent() {
               </div>
               <div className="p-5 sm:p-6">
                 <div className="mb-5 flex items-center gap-3 sm:hidden">
-                  <span className="block w-8 aspect-[2/3] overflow-hidden rounded-xl">
+                  <span className="block size-10 overflow-hidden rounded-xl aspect-square">
                     <ProductArtwork product={product} compact />
                   </span>
                   <div>
@@ -673,39 +680,6 @@ function CheckoutContent() {
                   );
                 })}
               </div>
-              <div className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
-                <label className="field-label" htmlFor="voucher-code">
-                  Kode voucher diskon
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    id="voucher-code"
-                    value={voucherCode}
-                    onChange={(event) => {
-                      setVoucherCode(
-                        event.target.value
-                          .toUpperCase()
-                          .replace(/[^A-Z0-9_-]/g, ""),
-                      );
-                      setVoucherMessage("");
-                    }}
-                    placeholder="Masukkan kode promo"
-                    className="checkout-input font-mono uppercase"
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => void applyVoucher()}
-                    disabled={applyingVoucher || !packageId}
-                    variant="outline"
-                    className="h-12 shrink-0 rounded-xl border-white/10 bg-white/[0.04] px-4 text-white hover:bg-white/[0.08] hover:text-white"
-                  >
-                    {applyingVoucher ? (
-                      <LoaderCircle className="size-4 animate-spin" />
-                    ) : (
-                      "Gunakan"
-                    )}
-                  </Button>
-                </div>
                 {voucherMessage && (
                   <p
                     className={`mt-2 text-[10px] ${quote?.voucherCode ? "text-[#cfff72]" : "text-amber-200"}`}
@@ -822,69 +796,17 @@ function CheckoutContent() {
                 description="Digunakan untuk invoice dan status transaksi."
               />
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <Field label="Nama lengkap">
-                  <Input
-                    value={buyerName}
-                    onChange={(event) => setBuyerName(event.target.value)}
-                    placeholder="Nama pembeli"
-                    className="checkout-input"
-                  />
-                </Field>
-                <Field label="Nomor WhatsApp">
-                  <Input
-                    inputMode="tel"
-                    value={contact}
-                    onChange={(event) => setContact(event.target.value)}
-                    placeholder="081234567890"
-                    className="checkout-input"
-                  />
-                </Field>
-                <Field label="Email">
-                  <Input
-                    type="email"
-                    value={buyerEmail}
-                    onChange={(event) => setBuyerEmail(event.target.value)}
-                    placeholder="nama@email.com"
-                    className="checkout-input"
-                  />
-                </Field>
-                <Field label="Catatan (opsional)">
-                  <Input
-                    value={customerNotes}
-                    onChange={(event) => setCustomerNotes(event.target.value)}
-                    placeholder={
-                      isManual
-                        ? "Nama item atau instruksi aman"
-                        : "Catatan pesanan"
-                    }
-                    className="checkout-input"
-                  />
-                </Field>
+                <Field label="Email"><Input type="email" value={buyerEmail} onChange={(event) => setBuyerEmail(event.target.value)} placeholder="nama@email.com" className="checkout-input" /></Field>
+                <Field label="Nomor WhatsApp"><Input inputMode="tel" value={contact} onChange={(event) => setContact(event.target.value)} placeholder="081234567890" className="checkout-input" /></Field>
               </div>
-              <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-4 text-white/30">
-                <ShieldCheck className="mt-0.5 size-3 shrink-0" /> Jangan pernah
-                memasukkan password, PIN, atau kode OTP ke catatan.
-              </p>
+              <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-4 text-white/30"><ShieldCheck className="mt-0.5 size-3 shrink-0" /> Kami hanya memakai email dan WhatsApp untuk invoice serta status transaksi.</p>
             </section>
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 text-xs leading-5 text-white/45">
-              <input
-                type="checkbox"
-                checked={agreed}
-                onChange={(event) => setAgreed(event.target.checked)}
-                className="mt-1 size-4 accent-[#b9ff35]"
-              />
-              <span>
-                Saya sudah memeriksa data tujuan dan menyetujui{" "}
-                <Link
-                  href="/terms"
-                  className="font-semibold text-[#cfff72] hover:underline"
-                >
-                  syarat transaksi
-                </Link>
-                .
-              </span>
-            </label>
+            <section className="panel p-5 sm:p-6">
+              <StepTitle number="5" title="Kode voucher" description="Masukkan kode promo setelah data kontak." />
+              <div className="mt-5 flex gap-2"><Input id="voucher-code" value={voucherCode} onChange={(event) => { setVoucherCode(event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "")); setVoucherMessage(""); }} placeholder="Masukkan kode promo" className="checkout-input font-mono uppercase" /><Button type="button" onClick={() => void applyVoucher()} disabled={applyingVoucher || !packageId} variant="outline" className="h-12 shrink-0 rounded-xl border-white/10 bg-white/[0.04] px-4 text-white hover:bg-white/[0.08] hover:text-white">{applyingVoucher ? <LoaderCircle className="size-4 animate-spin" /> : "Gunakan"}</Button></div>
+              {voucherMessage && <p className={`mt-2 text-[10px] ${quote?.voucherCode ? "text-[#cfff72]" : "text-amber-200"}`}>{voucherMessage}</p>}
+            </section>
             {error && (
               <div className="flex items-start gap-2 rounded-xl border border-red-400/20 bg-red-400/[0.07] p-3 text-xs leading-5 text-red-200">
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
@@ -894,7 +816,7 @@ function CheckoutContent() {
             <Button
               disabled={submitting}
               type="submit"
-              className="h-12 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75] lg:hidden"
+              className="hidden h-12 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]"
             >
               {submitting ? (
                 <LoaderCircle className="mr-2 size-4 animate-spin" />
@@ -905,7 +827,7 @@ function CheckoutContent() {
             </Button>
           </form>
 
-          <aside className="panel p-5 lg:sticky lg:top-28">
+          <aside className="hidden panel p-5 lg:sticky lg:top-28 lg:block">
             <div className="flex items-center justify-between">
               <h2 className="font-bold">Ringkasan pesanan</h2>
               <span
@@ -1000,9 +922,38 @@ function CheckoutContent() {
             </div>
             {payment && <PaymentBox payment={payment} />}
           </aside>
-        </div>
-        <ProductReviews productSlug={product.slug} />
+        </div> : (
+          <section className="mt-6 space-y-5">
+            <article className="panel p-5 sm:p-6"><h2 className="text-lg font-black">Deskripsi {product.name}</h2><p className="mt-3 whitespace-pre-line text-sm leading-7 text-white/60">{(product as { description?: string }).description || `Top up ${product.name} cepat, aman, dan diproses otomatis setelah pembayaran berhasil.`}</p></article>
+            <ProductReviews productSlug={product.slug} />
+            <article className="panel p-5 sm:p-6"><h2 className="text-lg font-black">Pertanyaan umum</h2><div className="mt-4 space-y-2">{["Bagaimana cara top up?","Metode pembayaran apa saja yang tersedia?","Berapa lama proses pesanan?","Apakah transaksi aman?"].map((question) => <details key={question} className="rounded-xl bg-white/[0.04] p-4"><summary className="cursor-pointer text-sm font-bold">{question}</summary><p className="pt-3 text-sm leading-6 text-white/55">Lengkapi data akun, pilih nominal dan metode pembayaran, lalu konfirmasi pesanan. Status transaksi dapat diperiksa setelah pembayaran dibuat.</p></details>)}</div></article>
+          </section>
+        )}
       </main>
+      {activeTab === "transaction" && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#101217]/95 p-3 backdrop-blur lg:hidden">
+          {summaryOpen && (
+            <div className="mx-auto mb-3 max-w-xl rounded-2xl border border-white/[0.12] bg-[#191b20] p-4 shadow-2xl">
+              <button type="button" onClick={() => setSummaryOpen(false)} className="flex w-full items-center gap-3 text-left">
+                <span className="block size-11 shrink-0 overflow-hidden rounded-lg"><ProductArtwork product={product} compact /></span>
+                <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{product.name}</strong><span className="block truncate text-xs text-white/50">{selectedPackage?.label ?? "Pilih nominal"}</span></span>
+                <strong className="text-sm text-[#cfff72]">{formatRupiah(subtotal)}</strong>
+              </button>
+              <dl className="mt-3 space-y-2 border-t border-white/10 pt-3 text-xs"><SummaryRow label="Harga" value={formatRupiah(subtotal)} /><SummaryRow label="Jumlah Pembelian" value="1" /><SummaryRow label="Biaya" value={formatRupiah(0)} /><SummaryRow label="Total Pembayaran" value={formatRupiah(subtotal)} highlight /></dl>
+            </div>
+          )}
+          {!summaryOpen && <button type="button" onClick={() => setSummaryOpen(true)} className="mx-auto mb-2 block text-xs font-bold text-white/75">Tampilkan ringkasan pesanan</button>}
+          <Button form="checkout-form" type="submit" disabled={submitting} className="mx-auto h-12 w-full max-w-xl rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]"><LockKeyhole className="mr-2 size-4" />Pesan Sekarang</Button>
+        </div>
+      )}
+      <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
+        <DialogContent className="max-w-md border-white/10 bg-[#191b20] text-white" showCloseButton={false}>
+          <DialogHeader><div className="mx-auto grid size-14 place-items-center rounded-full bg-[#b9ff35]/15"><CheckCircle2 className="size-8 text-[#b9ff35]" /></div><DialogTitle className="pt-3 text-center text-lg font-black">Buat Pesanan</DialogTitle><DialogDescription className="text-center text-xs leading-5 text-white/55">Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai.</DialogDescription></DialogHeader>
+          <dl className="rounded-xl bg-black/15 p-4 text-xs"><SummaryRow label="Username" value={visibleNickname.nickname || "-"} /><SummaryRow label="ID" value={destination || "-"} />{product.needsServer && <SummaryRow label="Server" value={server || "-"} />}<SummaryRow label="Item" value={selectedPackage?.label ?? "-"} /><SummaryRow label="Produk" value={product.name} /><SummaryRow label="Payment" value={checkoutGroups.find((item) => item.code === paymentMethod)?.name ?? "-"} /></dl>
+          <label className="flex cursor-pointer items-start gap-3 text-xs leading-5 text-white/60"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-0.5 size-4 accent-[#b9ff35]" />Dengan melanjutkan, saya menyetujui syarat & ketentuan yang berlaku.</label>
+          <div className="grid grid-cols-2 gap-3"><Button type="button" onClick={() => { setConfirmationOpen(false); void submitOrder(); }} disabled={!agreed || submitting} className="bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]">{submitting ? "Memproses..." : "Pesan Sekarang"}</Button><Button type="button" variant="outline" onClick={() => setConfirmationOpen(false)} className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">Batalkan</Button></div>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={noticeOpen}
         onOpenChange={(open) => {
