@@ -1,7 +1,9 @@
 import * as categories from "@/app/api/admin/categories/route";
 import * as content from "@/app/api/admin/content/route";
+import * as digiflazzPricing from "@/app/api/admin/digiflazz-pricing/route";
 import * as faqs from "@/app/api/admin/faqs/route";
 import * as media from "@/app/api/admin/media/route";
+import * as paymentMethods from "@/app/api/admin/payment-methods/route";
 import * as orders from "@/app/api/admin/orders/route";
 import * as productContent from "@/app/api/admin/product-content/route";
 import * as products from "@/app/api/admin/products/route";
@@ -9,6 +11,7 @@ import * as productSeed from "@/app/api/admin/products/seed/route";
 import * as promotions from "@/app/api/admin/promotions/route";
 import * as reviews from "@/app/api/admin/reviews/route";
 import * as session from "@/app/api/admin/session/route";
+import * as support from "@/app/api/admin/support/route";
 import * as storefront from "@/app/api/admin/storefront/route";
 import * as summary from "@/app/api/admin/summary/route";
 import * as team from "@/app/api/admin/team/route";
@@ -24,8 +27,10 @@ type RouteContext = { params: Promise<{ path: string[] }> };
 const routes: Record<string, RouteHandlers> = {
   categories: { GET: categories.GET, POST: categories.POST, DELETE: categories.DELETE },
   content: { GET: content.GET, POST: content.POST, DELETE: content.DELETE },
+  "digiflazz-pricing": { GET: digiflazzPricing.GET, POST: digiflazzPricing.POST },
   faqs: { GET: faqs.GET, POST: faqs.POST, DELETE: faqs.DELETE },
   media: { POST: media.POST },
+  "payment-methods": { GET: paymentMethods.GET, POST: paymentMethods.POST, DELETE: paymentMethods.DELETE },
   orders: { GET: orders.GET, PATCH: orders.PATCH },
   "product-content": { PUT: productContent.PUT },
   products: { GET: products.GET, POST: products.POST, PATCH: products.PATCH, DELETE: products.DELETE },
@@ -33,6 +38,7 @@ const routes: Record<string, RouteHandlers> = {
   promotions: { GET: promotions.GET, POST: promotions.POST, DELETE: promotions.DELETE },
   reviews: { GET: reviews.GET, PATCH: reviews.PATCH },
   session: { GET: session.GET },
+  support: { GET: support.GET, PATCH: support.PATCH },
   storefront: { GET: storefront.GET, PUT: storefront.PUT },
   summary: { GET: summary.GET },
   team: { GET: team.GET, POST: team.POST, DELETE: team.DELETE },
