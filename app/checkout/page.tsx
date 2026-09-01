@@ -75,6 +75,7 @@ type PaymentResult = {
   discountAmount: number;
   voucherCode: string | null;
   flashSaleId: number | null;
+  paymentMethod?: string;
   paymentStatus?: "paid" | "pending";
   balanceAfter?: number;
 };
@@ -1194,6 +1195,7 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
       : payment.providerCode === "voucher-stock"
         ? "Setelah lunas, satu kode stok dikirim otomatis ke email/WhatsApp pembeli."
         : "Setelah lunas, pesanan diteruskan otomatis ke provider.";
+  const isManualQris = payment.paymentMethod === "manual_qris";
   return (
     <div className="mt-5 rounded-2xl border border-[#b9ff35]/30 bg-[#b9ff35]/[0.08] p-4">
       <BadgeCheck className="size-6 text-[#b9ff35]" />
@@ -1235,12 +1237,21 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
           </strong>
         </p>
       )}
+      {isManualQris && payment.paymentUrl && (
+        <div className="mt-4 rounded-xl bg-white p-3">
+          <img
+            src={payment.paymentUrl}
+            alt="QRIS pembayaran"
+            className="mx-auto aspect-square w-full max-w-64 object-contain"
+          />
+        </div>
+      )}
       {payment.expiredAt && (
         <p className="mt-3 text-[9px] text-white/35">
           Berlaku sampai {payment.expiredAt}
         </p>
       )}
-      {payment.paymentUrl && (
+      {payment.paymentUrl && !isManualQris && (
         <Button
           asChild
           className="mt-4 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]"
