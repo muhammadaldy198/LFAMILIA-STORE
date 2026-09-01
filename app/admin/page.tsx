@@ -16,6 +16,8 @@ import {
   TicketPercent,
   Users,
   WalletCards,
+  CreditCard,
+  MessageCircleMore,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -28,6 +30,9 @@ import { AdminStorefrontManager } from "@/components/admin-storefront-manager";
 import { AdminTeamManager } from "@/components/admin-team-manager";
 import { AdminVoucherManager } from "@/components/admin-voucher-manager";
 import { AdminWalletManager } from "@/components/admin-wallet-manager";
+import { AdminPaymentMethodManager } from "@/components/admin-payment-method-manager";
+import { AdminSupportManager } from "@/components/admin-support-manager";
+import { AdminDigiflazzPricing } from "@/components/admin-digiflazz-pricing";
 import { StoreLayout } from "@/components/store-layout";
 
 type Session = { id: number; email: string; name: string; role: "owner" | "staff" };
@@ -35,6 +40,7 @@ type Session = { id: number; email: string; name: string; role: "owner" | "staff
 const baseNav = [
   ["overview", "Ringkasan", LayoutDashboard],
   ["orders", "Pesanan", ReceiptText],
+  ["support", "Bantuan", MessageCircleMore],
   ["products", "Produk", Box],
   ["content", "Konten", FileQuestion],
 ] as const;
@@ -42,6 +48,7 @@ const baseNav = [
 const ownerNav = [
   ["promotions", "Voucher diskon", TicketPercent],
   ["wallet", "Saldo pelanggan", WalletCards],
+  ["payments", "Pembayaran", CreditCard],
   ["vouchers", "Stok kode", TicketPercent],
   ["team", "Tim admin", Users],
   ["settings", "Integrasi", Settings],
@@ -133,8 +140,8 @@ export default function AdminPage() {
                 {isOwner ? "Pemilik" : "Staff"}
               </span>
             </div>
-            <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">Admin LFAMILIA STORE</h1>
-            <p className="mt-2 text-xs text-white/35">Masuk sebagai {session.name} • ID: {session.email}</p>
+            <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">{isOwner ? "Dashboard Pemilik" : "Dashboard Staff"}</h1>
+            <p className="mt-2 text-xs text-white/35">{isOwner ? "Kontrol toko, katalog, keuangan, pembayaran, dan tim." : "Pantau operasional pesanan dan informasi katalog."} • {session.name}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline" className="rounded-xl border-white/10 bg-white/[0.035] text-white hover:bg-white/[0.08] hover:text-white">
@@ -159,12 +166,14 @@ export default function AdminPage() {
           <div className="min-w-0">
             <TabsContent value="overview" className="mt-0"><AdminOverview /></TabsContent>
             <TabsContent value="orders" className="mt-0"><AdminSection title="Daftar pesanan" description="Pantau pembayaran, provider otomatis, dan antrean manual."><AdminOrderManager /></AdminSection></TabsContent>
+            <TabsContent value="support" className="mt-0"><AdminSection title="Bantuan & refund" description="Tanggapi kendala pelanggan dan pantau status pengajuan refund."><AdminSupportManager /></AdminSection></TabsContent>
             <TabsContent value="products" className="mt-0"><AdminSection title="Katalog produk" description={isOwner ? "Kelola gambar, pop-up informasi, jam operasional, nominal, harga, dan SKU provider." : "Staff dapat memperbarui gambar, jam layanan, instruksi, dan pop-up. Harga serta provider hanya tersedia untuk Pemilik."}><AdminProductManager /></AdminSection></TabsContent>
             <TabsContent value="content" className="mt-0 space-y-5"><AdminSection title="Identitas & kontak" description="Kelola logo, kontak, Discord, kategori, dan FAQ."><AdminStorefrontManager role={session.role} /></AdminSection><AdminSection title="Banner, pop-up, berita & ulasan" description="Semua konten pengalaman pelanggan dapat diedit dari sini tanpa mengubah kode."><AdminExperienceManager role={session.role} /></AdminSection></TabsContent>
             {isOwner && (
               <>
                 <TabsContent value="promotions" className="mt-0"><AdminSection title="Voucher diskon" description="Atur kode, periode, minimum pembelian, kuota, dan batas diskon."><AdminPromotionManager role="owner" /></AdminSection></TabsContent>
                 <TabsContent value="wallet" className="mt-0"><AdminSection title="Saldo pelanggan" description="Atur tujuan transfer dan setujui top up hanya setelah bukti pembayaran diperiksa."><AdminWalletManager /></AdminSection></TabsContent>
+                <TabsContent value="payments" className="mt-0"><AdminSection title="Metode pembayaran" description="Kelola metode, logo, urutan, dan status aktif checkout."><AdminPaymentMethodManager /></AdminSection></TabsContent>
                 <TabsContent value="vouchers" className="mt-0"><AdminSection title="Stok kode otomatis" description="Kode digital terenkripsi, pengiriman, dan percobaan ulang hanya dapat diakses Pemilik."><AdminVoucherManager /></AdminSection></TabsContent>
                 <TabsContent value="team" className="mt-0"><AdminSection title="Pemilik & Staff" description="Buat ID login Staff, atur peran, dan ganti password tanpa memperlihatkan password lama."><AdminTeamManager /></AdminSection></TabsContent>
                 <TabsContent value="settings" className="mt-0">
@@ -178,6 +187,7 @@ export default function AdminPage() {
                       <SettingCard title="VIPayment" status="Secret Cloudflare" text="Provider alternatif resmi untuk produk otomatis." />
                       <SettingCard title="Pengiriman kode" status="Khusus Pemilik" text="Email dan WhatsApp mengirim voucher tanpa memperlihatkan stok ke Staff." />
                     </div>
+                    <div className="mt-5"><AdminDigiflazzPricing /></div>
                     <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-4 text-[10px] leading-5 text-amber-100/60">
                       <ShieldCheck className="mb-2 size-4 text-amber-300" />
                       Password disimpan sebagai hash dan tidak dapat dibaca kembali. Secret pembayaran maupun provider juga tidak pernah ditampilkan di browser.

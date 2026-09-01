@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { findPaymentChannel } from "@/lib/payment-methods";
+import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
 import { createIpaymuDirectPayment } from "@/lib/server/ipaymu";
 import {
   createOrderIdentity,
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   let referenceId: string | null = null;
   try {
     const input = schema.parse(await request.json());
-    if (!findPaymentChannel(input.paymentMethod, input.paymentChannel)) {
+    if (!await isPaymentChannelAvailable(input.paymentMethod, input.paymentChannel)) {
       return Response.json({ error: "Metode pembayaran tidak valid." }, { status: 400 });
     }
     const item = await resolvePurchasableItem(input.productSlug, input.packageSku);

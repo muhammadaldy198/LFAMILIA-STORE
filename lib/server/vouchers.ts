@@ -383,3 +383,15 @@ export async function fulfillVoucherStockOrder(order: ProviderOrder): Promise<Pr
     raw: { voucherCodeId: voucher.id, stockKey: voucher.stock_key, deliveries: outcomes },
   };
 }
+
+export async function listCustomerVoucherCodes(customerId: string) {
+  const rows = await getD1().prepare(
+    `SELECT vc.id, vc.stock_key, vc.code_ciphertext, vc.code_iv, vc.code_tag, vc.code_hash, vc.status, vc.order_id, vc.reserved_at, vc.delivered_at, vc.created_at,
+            o.reference_id, o.product_name, o.package_label
+     FROM voucher_codes vc JOIN orders o ON o.id = vc.order_id
+     WHERE o.customer_id = ? AND vc.status = 'delivered' AND o.payment_status = 'paid'
+     ORDER BY vc.delivered_at DESC LIMIT 50`,
+  ).bind(customerId).all<VoucherCodeRow & { reference_id: string; product_name: string; package_label: string }>();
+  const secret = encryptionSecret();
+  return rows.results.map((row) => ({ id: row.id, referenceId: row.reference_id, productName: row.product_name, packageLabel: row.package_label, code: decryptCode(row, secret), deliveredAt: row.delivered_at }));
+}

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
+import { listCustomerVoucherCodes } from "@/lib/server/vouchers";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,8 @@ export async function GET(request: Request) {
     db.prepare("SELECT id, direction, amount, balance_before, balance_after, reference, description, created_at FROM wallet_transactions WHERE customer_id = ? ORDER BY created_at DESC LIMIT 60").bind(customer.id),
     db.prepare("SELECT id, reference_id, product_name, package_label, total, payment_status, fulfillment_status, created_at FROM orders WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50").bind(customer.id),
   ]);
-  return Response.json({ customer, topups: topups.results, transactions: transactions.results, orders: orders.results });
+  const vouchers = await listCustomerVoucherCodes(customer.id).catch(() => []);
+  return Response.json({ customer, topups: topups.results, transactions: transactions.results, orders: orders.results, vouchers });
 }
 
 const profileSchema = z.object({
