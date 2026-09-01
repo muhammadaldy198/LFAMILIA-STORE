@@ -821,7 +821,7 @@ function CheckoutContent() {
               ) : (
                 <LockKeyhole className="mr-2 size-4" />
               )}
-              Buat pembayaran
+              Pesan Sekarang
             </Button>
           </form>
 
@@ -908,7 +908,7 @@ function CheckoutContent() {
               ) : (
                 <LockKeyhole className="mr-2 size-4" />
               )}
-              Buat pembayaran
+              Pesan Sekarang
             </Button>
             <div className="mt-4 flex items-center justify-center gap-4 text-[9px] text-white/30">
               <span className="inline-flex items-center gap-1">
