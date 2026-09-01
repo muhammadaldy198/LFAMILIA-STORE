@@ -193,12 +193,12 @@ function CheckoutContent() {
   const lookupKey = `${product.slug}:${destination.trim()}:${server.trim()}`;
   const visibleNickname: NicknameState =
     nickname.key === lookupKey ? nickname : { status: "idle" };
-  const isIpaymuMethod =
+  const isGatewayMethod =
     paymentMethod === "va" ||
     paymentMethod === "ewallet" ||
     paymentMethod === "qris";
   const checkoutGroups = [
-    ...(walletSettings?.ipaymuCheckoutEnabled ? paymentGroups : []),
+    ...(walletSettings?.midtransCheckoutEnabled ? paymentGroups : []),
     ...(walletSettings?.manualQrisEnabled ? [manualPaymentGroups[0]] : []),
     ...(walletSettings?.isEnabled && walletSettings.accountNumber
       ? [manualPaymentGroups[1]]
@@ -209,7 +209,7 @@ function CheckoutContent() {
       description: "Bayar langsung dari saldo akun",
     },
   ];
-  const channels = isIpaymuMethod
+  const channels = isGatewayMethod
     ? availableChannels.filter((item) => item.method === paymentMethod)
     : [];
   const notices = (product.notices ?? []).filter(
@@ -345,7 +345,7 @@ function CheckoutContent() {
     if (walletSettings.manualQrisEnabled) chooseMethod("manual_qris");
     else if (walletSettings.isEnabled && walletSettings.accountNumber)
       chooseMethod("manual_bank");
-    else if (walletSettings.ipaymuCheckoutEnabled) chooseMethod("qris");
+    else if (walletSettings.midtransCheckoutEnabled) chooseMethod("qris");
     else chooseMethod("wallet");
   }, [walletSettings, paymentMethod]);
 
@@ -759,7 +759,7 @@ function CheckoutContent() {
                           <CheckCircle2 className="size-4 text-[#b9ff35]" />
                         )}
                       </button>
-                      {selected && isIpaymuMethod && (
+                      {selected && isGatewayMethod && (
                         <div className="grid grid-cols-2 gap-2 border-t border-white/[0.08] bg-black/10 p-3 sm:grid-cols-3">
                           {availableChannels
                             .filter((channel) => channel.method === group.code)
