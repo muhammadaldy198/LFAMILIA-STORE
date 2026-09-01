@@ -2,6 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { setRuntimeEnv } from "../lib/server/runtime-env";
+import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 
 interface Env {
   ASSETS: Fetcher;
@@ -22,6 +23,8 @@ interface ExecutionContext {
     getIdentity(): Promise<{ email?: string | null }>;
   };
 }
+
+interface ScheduledEvent { cron: string; }
 
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
@@ -78,6 +81,10 @@ const worker = {
     }
 
     return handler.fetch(request, env, ctx);
+  },
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    setRuntimeEnv(env);
+    ctx.waitUntil(syncDigiflazzPrices().catch(() => undefined));
   },
 };
 
