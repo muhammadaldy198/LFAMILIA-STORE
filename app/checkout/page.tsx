@@ -202,7 +202,7 @@ function CheckoutContent() {
     paymentMethod === "qris";
   const checkoutGroups = [
     { code: "wallet" as const, name: "Koin LFAMILIA", description: "Bayar langsung dari saldo akun" },
-    ...(walletSettings?.midtransCheckoutEnabled ? paymentGroups.filter((item) => item.code === "qris" || item.code === "ewallet" || item.code === "va") : []),
+    ...paymentGroups.filter((item) => item.code === "qris" || item.code === "ewallet" || item.code === "va"),
   ];
   const channels = isGatewayMethod
     ? availableChannels.filter((item) => item.method === paymentMethod)
