@@ -57,6 +57,8 @@ export type OrderRecord = {
   ipaymu_payment_name: string | null;
   ipaymu_payment_url: string | null;
   ipaymu_expired_at: string | null;
+  midtrans_transaction_id: string | null;
+  midtrans_payment_url: string | null;
   provider_ref_id: string | null;
   provider_status: string | null;
   provider_message: string | null;
@@ -265,6 +267,28 @@ export async function updateIpaymuPayment(input: {
       input.paymentName,
       input.paymentUrl,
       input.expiredAt,
+      input.fee,
+      input.total,
+      input.referenceId,
+    )
+    .run();
+}
+
+export async function updateMidtransPayment(input: {
+  referenceId: string;
+  transactionId: string | null;
+  paymentUrl: string | null;
+  fee: number;
+  total: number;
+}) {
+  await getD1()
+    .prepare(
+      `UPDATE orders SET midtrans_transaction_id = ?, midtrans_payment_url = ?, admin_fee = ?, total = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE reference_id = ?`,
+    )
+    .bind(
+      input.transactionId,
+      input.paymentUrl,
       input.fee,
       input.total,
       input.referenceId,
