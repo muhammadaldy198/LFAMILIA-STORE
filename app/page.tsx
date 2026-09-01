@@ -7,6 +7,7 @@ import { StoreLayout } from "@/components/store-layout";
 import { GlobalHomePopup } from "@/components/global-home-popup";
 import { HomeBannerCarousel } from "@/components/home-banner-carousel";
 import { PopularNow } from "@/components/popular-now";
+import { HomeNewsPreview } from "@/components/home-news-preview";
 
 const steps = [
   { number: "01", title: "Pilih produk", text: "Cari game atau voucher yang kamu inginkan.", icon: Gamepad2 },
@@ -29,6 +30,8 @@ export default function Home() {
         </section>
 
         <HomeProductBrowser />
+
+        <HomeNewsPreview />
 
         <section className="border-y border-white/[0.07] bg-white/[0.018]">
           <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
