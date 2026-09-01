@@ -18,6 +18,8 @@ import * as team from "@/app/api/admin/team/route";
 import * as vouchers from "@/app/api/admin/vouchers/route";
 import * as wallet from "@/app/api/admin/wallet/route";
 import * as walletProof from "@/app/api/admin/wallet/proof/route";
+import { getAdminSession } from "@/lib/server/admin";
+import { recordAdminActivity } from "@/lib/server/security";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type Handler = (request: Request) => Response | Promise<Response>;
@@ -53,7 +55,12 @@ async function dispatch(request: Request, context: RouteContext, method: Method)
   if (!handlers) return Response.json({ error: "Endpoint panel tidak ditemukan." }, { status: 404 });
   const handler = handlers[method];
   if (!handler) return Response.json({ error: "Metode tidak diizinkan." }, { status: 405, headers: { Allow: Object.keys(handlers).join(", ") } });
-  return handler(request);
+  const response = await handler(request);
+  if (!["GET", "HEAD", "OPTIONS"].includes(method) && response.ok) {
+    const admin = await getAdminSession(request);
+    if (admin) await recordAdminActivity(admin, method, path.join("/"));
+  }
+  return response;
 }
 
 export function GET(request: Request, context: RouteContext) { return dispatch(request, context, "GET"); }
