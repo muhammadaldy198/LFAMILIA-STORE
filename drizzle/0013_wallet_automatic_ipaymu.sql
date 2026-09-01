@@ -2,6 +2,7 @@ ALTER TABLE wallet_settings ADD COLUMN manual_qris_enabled INTEGER DEFAULT 0 NOT
 ALTER TABLE wallet_settings ADD COLUMN manual_qris_name TEXT DEFAULT 'QRIS Manual' NOT NULL;
 ALTER TABLE wallet_settings ADD COLUMN manual_qris_image_url TEXT;
 ALTER TABLE wallet_settings ADD COLUMN ipaymu_topup_enabled INTEGER DEFAULT 0 NOT NULL;
+ALTER TABLE wallet_settings ADD COLUMN ipaymu_checkout_enabled INTEGER DEFAULT 0 NOT NULL;
 
 ALTER TABLE wallet_topups ADD COLUMN source TEXT DEFAULT 'manual' NOT NULL;
 ALTER TABLE wallet_topups ADD COLUMN reference_id TEXT;
