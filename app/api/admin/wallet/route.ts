@@ -17,8 +17,8 @@ const settingsSchema = z.object({
   manualQrisEnabled: z.boolean(),
   manualQrisName: z.string().trim().min(2).max(80),
   manualQrisImageUrl: z.string().trim().max(500),
-  ipaymuTopupEnabled: z.boolean(),
-  ipaymuCheckoutEnabled: z.boolean(),
+  midtransTopupEnabled: z.boolean(),
+  midtransCheckoutEnabled: z.boolean(),
 });
 
 export async function GET(request: Request) {
