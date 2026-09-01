@@ -9,6 +9,10 @@ const settingsSchema = z.object({
   accountNumber: z.string().trim().max(100),
   instructions: z.string().trim().max(600),
   minTopup: z.number().int().min(1000).max(100_000_000),
+  manualQrisEnabled: z.boolean(),
+  manualQrisName: z.string().trim().min(2).max(80),
+  manualQrisImageUrl: z.string().trim().max(500),
+  ipaymuTopupEnabled: z.boolean(),
 });
 
 export async function GET(request: Request) {
