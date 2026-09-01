@@ -531,7 +531,7 @@ function CheckoutContent() {
         </div>
         {activeTab === "transaction" ? <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_380px]">
           <form id="checkout-form" onSubmit={requestConfirmation} className="space-y-5">
-            <section className="panel overflow-hidden">
+            <section className="overflow-hidden rounded-2xl border border-white/[0.10] bg-[#454a50]">
               <div className="flex items-center justify-between gap-4 border-b border-white/[0.08] bg-white/[0.02] p-5 sm:p-6">
                 <StepTitle
                   number="1"
@@ -627,7 +627,7 @@ function CheckoutContent() {
               </div>
             </section>
 
-            <section className="panel p-5 sm:p-6">
+            <section className="rounded-2xl border border-white/[0.10] bg-[#454a50] p-5 sm:p-6">
               <StepTitle
                 number="2"
                 title="Pilih nominal"
@@ -672,7 +672,7 @@ function CheckoutContent() {
               </div>
             </section>
 
-            <section className="panel p-5 sm:p-6">
+            <section className="rounded-2xl border border-white/[0.10] bg-[#454a50] p-5 sm:p-6">
               <StepTitle
                 number="3"
                 title="Pilih metode pembayaran"
@@ -780,7 +780,7 @@ function CheckoutContent() {
               )}
             </section>
 
-            <section className="panel p-5 sm:p-6">
+            <section className="rounded-2xl border border-white/[0.10] bg-[#454a50] p-5 sm:p-6">
               <StepTitle
                 number="4"
                 title="Data pembeli"
@@ -793,7 +793,7 @@ function CheckoutContent() {
               <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-4 text-white/30"><ShieldCheck className="mt-0.5 size-3 shrink-0" /> Kami hanya memakai email dan WhatsApp untuk invoice serta status transaksi.</p>
             </section>
 
-            <section className="panel p-5 sm:p-6">
+            <section className="rounded-2xl border border-white/[0.10] bg-[#454a50] p-5 sm:p-6">
               <StepTitle number="5" title="Kode voucher" description="Masukkan kode promo setelah data kontak." />
               <div className="mt-5 flex gap-2"><Input id="voucher-code" value={voucherCode} onChange={(event) => { setVoucherCode(event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "")); setVoucherMessage(""); }} placeholder="Masukkan kode promo" className="checkout-input font-mono uppercase" /><Button type="button" onClick={() => void applyVoucher()} disabled={applyingVoucher || !packageId} variant="outline" className="h-12 shrink-0 rounded-xl border-white/10 bg-white/[0.04] px-4 text-white hover:bg-white/[0.08] hover:text-white">{applyingVoucher ? <LoaderCircle className="size-4 animate-spin" /> : "Gunakan"}</Button></div>
               {voucherMessage && <p className={`mt-2 text-[10px] ${quote?.voucherCode ? "text-[#cfff72]" : "text-amber-200"}`}>{voucherMessage}</p>}
@@ -807,7 +807,7 @@ function CheckoutContent() {
             <Button
               disabled={submitting}
               type="submit"
-              className="hidden h-12 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]"
+              className="hidden h-12 w-full rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]"
             >
               {submitting ? (
                 <LoaderCircle className="mr-2 size-4 animate-spin" />
@@ -894,7 +894,7 @@ function CheckoutContent() {
               form="checkout-form"
               disabled={submitting}
               type="submit"
-              className="mt-5 hidden h-12 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75] lg:flex"
+              className="mt-5 hidden h-12 w-full rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b] lg:flex"
             >
               {submitting ? (
                 <LoaderCircle className="mr-2 size-4 animate-spin" />
@@ -915,9 +915,9 @@ function CheckoutContent() {
           </aside>
         </div> : (
           <section className="mt-6 space-y-5">
-            <article className="panel p-5 sm:p-6"><h2 className="text-lg font-black">Deskripsi {product.name}</h2><p className="mt-3 whitespace-pre-line text-sm leading-7 text-white/60">{(product as { description?: string }).description || `Top up ${product.name} cepat, aman, dan diproses otomatis setelah pembayaran berhasil.`}</p></article>
+            <article className="rounded-2xl border border-white/[0.10] bg-[#454a50] p-5 sm:p-6"><h2 className="text-lg font-black">Deskripsi {product.name}</h2><p className="mt-3 whitespace-pre-line text-sm leading-7 text-white/60">{(product as { description?: string }).description || `Top up ${product.name} cepat, aman, dan diproses otomatis setelah pembayaran berhasil.`}</p></article>
             <ProductReviews productSlug={product.slug} />
-            <article className="panel p-5 sm:p-6"><h2 className="text-lg font-black">Pertanyaan umum</h2><div className="mt-4 space-y-2">{["Bagaimana cara top up?","Metode pembayaran apa saja yang tersedia?","Berapa lama proses pesanan?","Apakah transaksi aman?"].map((question) => <details key={question} className="rounded-xl bg-white/[0.04] p-4"><summary className="cursor-pointer text-sm font-bold">{question}</summary><p className="pt-3 text-sm leading-6 text-white/55">Lengkapi data akun, pilih nominal dan metode pembayaran, lalu konfirmasi pesanan. Status transaksi dapat diperiksa setelah pembayaran dibuat.</p></details>)}</div></article>
+            <article className="rounded-2xl border border-white/[0.10] bg-[#454a50] p-5 sm:p-6"><h2 className="text-lg font-black">Pertanyaan umum</h2><div className="mt-4 space-y-2">{["Bagaimana cara top up?","Metode pembayaran apa saja yang tersedia?","Berapa lama proses pesanan?","Apakah transaksi aman?"].map((question) => <details key={question} className="rounded-xl bg-white/[0.04] p-4"><summary className="cursor-pointer text-sm font-bold">{question}</summary><p className="pt-3 text-sm leading-6 text-white/55">Lengkapi data akun, pilih nominal dan metode pembayaran, lalu konfirmasi pesanan. Status transaksi dapat diperiksa setelah pembayaran dibuat.</p></details>)}</div></article>
           </section>
         )}
       </main>
@@ -934,7 +934,7 @@ function CheckoutContent() {
             </div>
           )}
           {!summaryOpen && <button type="button" onClick={() => setSummaryOpen(true)} className="mx-auto mb-2 block text-xs font-bold text-white/75">Tampilkan ringkasan pesanan</button>}
-          <Button form="checkout-form" type="submit" disabled={submitting} className="mx-auto h-12 w-full max-w-xl rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]"><LockKeyhole className="mr-2 size-4" />Pesan Sekarang</Button>
+          <Button form="checkout-form" type="submit" disabled={submitting} className="mx-auto h-12 w-full max-w-xl rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]"><LockKeyhole className="mr-2 size-4" />Pesan Sekarang</Button>
         </div>
       )}
       <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
@@ -942,7 +942,7 @@ function CheckoutContent() {
           <DialogHeader><div className="mx-auto grid size-14 place-items-center rounded-full bg-[#b9ff35]/15"><CheckCircle2 className="size-8 text-[#b9ff35]" /></div><DialogTitle className="pt-3 text-center text-lg font-black">Buat Pesanan</DialogTitle><DialogDescription className="text-center text-xs leading-5 text-white/55">Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai.</DialogDescription></DialogHeader>
           <dl className="rounded-xl bg-black/15 p-4 text-xs"><SummaryRow label="Username" value={visibleNickname.nickname || "-"} /><SummaryRow label="ID" value={destination || "-"} />{product.needsServer && <SummaryRow label="Server" value={server || "-"} />}<SummaryRow label="Item" value={selectedPackage?.label ?? "-"} /><SummaryRow label="Produk" value={product.name} /><SummaryRow label="Payment" value={checkoutGroups.find((item) => item.code === paymentMethod)?.name ?? "-"} /></dl>
           <label className="flex cursor-pointer items-start gap-3 text-xs leading-5 text-white/60"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-0.5 size-4 accent-[#b9ff35]" />Dengan melanjutkan, saya menyetujui syarat & ketentuan yang berlaku.</label>
-          <div className="grid grid-cols-2 gap-3"><Button type="button" onClick={() => { setConfirmationOpen(false); void submitOrder(); }} disabled={!agreed || submitting} className="bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]">{submitting ? "Memproses..." : "Pesan Sekarang"}</Button><Button type="button" variant="outline" onClick={() => setConfirmationOpen(false)} className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">Batalkan</Button></div>
+          <div className="grid grid-cols-2 gap-3"><Button type="button" onClick={() => { setConfirmationOpen(false); void submitOrder(); }} disabled={!agreed || submitting} className="bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">{submitting ? "Memproses..." : "Pesan Sekarang"}</Button><Button type="button" variant="outline" onClick={() => setConfirmationOpen(false)} className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">Batalkan</Button></div>
         </DialogContent>
       </Dialog>
       <Dialog
@@ -1079,6 +1079,7 @@ async function requestQuote(
 }
 
 function StepTitle({
+  number,
   title,
   description,
 }: {
@@ -1087,9 +1088,12 @@ function StepTitle({
   description: string;
 }) {
   return (
-    <div>
-      <h2 className="font-bold">{title}</h2>
-      <p className="mt-1 text-[11px] text-white/35">{description}</p>
+    <div className="flex items-start gap-4">
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#bca17d] text-lg font-black text-white">{number}</span>
+      <div>
+        <h2 className="pt-1 font-bold">{title}</h2>
+        <p className="mt-1 text-[11px] text-white/50">{description}</p>
+      </div>
     </div>
   );
 }
@@ -1196,7 +1200,7 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
       {payment.paymentUrl && !isManualQris && (
         <Button
           asChild
-          className="mt-4 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]"
+          className="mt-4 w-full rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]"
         >
           <a href={payment.paymentUrl} target="_blank" rel="noreferrer">
             Lanjut bayar <ExternalLink className="ml-2 size-4" />
