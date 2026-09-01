@@ -159,9 +159,9 @@ export default function AdminPage() {
 
         <Tabs defaultValue="overview" className="grid items-start gap-5 lg:grid-cols-[220px_1fr]">
           {menuOpen && <button type="button" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-40 bg-black/65 lg:hidden" aria-label="Tutup menu" />}
-          <TabsList className={`z-50 h-auto gap-2 rounded-2xl border border-white/[0.08] bg-[#0d1019] p-2 ${menuOpen ? "fixed inset-y-0 left-0 flex w-72 flex-col rounded-none" : "hidden"} lg:sticky lg:top-28 lg:flex lg:w-full lg:flex-col lg:items-stretch`}>
+          <TabsList className={`z-50 h-auto gap-2 rounded-2xl border border-white/[0.08] bg-[#0d1019] p-2 ${menuOpen ? "fixed inset-y-0 left-0 !flex !w-72 !flex-col !items-stretch !rounded-none !bg-[#0d1019] shadow-2xl" : "hidden"} lg:sticky lg:top-28 lg:!flex lg:!w-full lg:!flex-col lg:!items-stretch`}>
             {nav.map(([value, label, Icon]) => (
-              <TabsTrigger key={value} value={value} onClick={() => setMenuOpen(false)} className="h-10 shrink-0 justify-start rounded-xl px-3 text-xs text-white/42 data-[state=active]:bg-[#b9ff35] data-[state=active]:text-[#091006]">
+              <TabsTrigger key={value} value={value} onClick={() => setMenuOpen(false)} className="h-10 w-full shrink-0 justify-start rounded-xl px-3 text-xs text-white/42 data-[state=active]:bg-[#b9ff35] data-[state=active]:text-[#091006]">
                 <Icon className="mr-2 size-4" />{label}
               </TabsTrigger>
             ))}
