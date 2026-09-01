@@ -11,8 +11,8 @@ export type WalletSettings = {
   manualQrisEnabled: boolean;
   manualQrisName: string;
   manualQrisImageUrl: string;
-  ipaymuTopupEnabled: boolean;
-  ipaymuCheckoutEnabled: boolean;
+  midtransTopupEnabled: boolean;
+  midtransCheckoutEnabled: boolean;
 };
 
 const fallbackSettings: WalletSettings = {
@@ -25,8 +25,8 @@ const fallbackSettings: WalletSettings = {
   manualQrisEnabled: false,
   manualQrisName: "QRIS Manual",
   manualQrisImageUrl: "",
-  ipaymuTopupEnabled: false,
-  ipaymuCheckoutEnabled: false,
+  midtransTopupEnabled: false,
+  midtransCheckoutEnabled: false,
 };
 
 export async function readWalletSettings(): Promise<WalletSettings> {
@@ -44,8 +44,8 @@ export async function readWalletSettings(): Promise<WalletSettings> {
         manual_qris_enabled: number;
         manual_qris_name: string;
         manual_qris_image_url: string | null;
-        ipaymu_topup_enabled: number;
-        ipaymu_checkout_enabled: number;
+        midtrans_topup_enabled: number;
+        midtrans_checkout_enabled: number;
       }>();
     if (!row) return fallbackSettings;
     return {
@@ -58,8 +58,8 @@ export async function readWalletSettings(): Promise<WalletSettings> {
       manualQrisEnabled: Boolean(row.manual_qris_enabled),
       manualQrisName: row.manual_qris_name || "QRIS Manual",
       manualQrisImageUrl: row.manual_qris_image_url || "",
-      ipaymuTopupEnabled: Boolean(row.ipaymu_topup_enabled),
-      ipaymuCheckoutEnabled: Boolean(row.ipaymu_checkout_enabled),
+      midtransTopupEnabled: Boolean(row.midtrans_topup_enabled),
+      midtransCheckoutEnabled: Boolean(row.midtrans_checkout_enabled),
     };
   } catch {
     return fallbackSettings;
@@ -70,13 +70,13 @@ export async function saveWalletSettings(input: WalletSettings) {
   await ensureLegacyDatabaseColumns();
   await getD1()
     .prepare(
-      `INSERT INTO wallet_settings (id, is_enabled, method_name, account_name, account_number, instructions, min_topup, manual_qris_enabled, manual_qris_name, manual_qris_image_url, ipaymu_topup_enabled, ipaymu_checkout_enabled, updated_at)
+      `INSERT INTO wallet_settings (id, is_enabled, method_name, account_name, account_number, instructions, min_topup, manual_qris_enabled, manual_qris_name, manual_qris_image_url, midtrans_topup_enabled, midtrans_checkout_enabled, updated_at)
      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
      ON CONFLICT(id) DO UPDATE SET is_enabled = excluded.is_enabled, method_name = excluded.method_name,
       account_name = excluded.account_name, account_number = excluded.account_number,
       instructions = excluded.instructions, min_topup = excluded.min_topup,
       manual_qris_enabled = excluded.manual_qris_enabled, manual_qris_name = excluded.manual_qris_name,
-      manual_qris_image_url = excluded.manual_qris_image_url, ipaymu_topup_enabled = excluded.ipaymu_topup_enabled, ipaymu_checkout_enabled = excluded.ipaymu_checkout_enabled,
+      manual_qris_image_url = excluded.manual_qris_image_url, midtrans_topup_enabled = excluded.midtrans_topup_enabled, midtrans_checkout_enabled = excluded.midtrans_checkout_enabled,
       updated_at = CURRENT_TIMESTAMP`,
     )
     .bind(
@@ -89,8 +89,8 @@ export async function saveWalletSettings(input: WalletSettings) {
       input.manualQrisEnabled ? 1 : 0,
       input.manualQrisName,
       input.manualQrisImageUrl || null,
-      input.ipaymuTopupEnabled ? 1 : 0,
-      input.ipaymuCheckoutEnabled ? 1 : 0,
+      input.midtransTopupEnabled ? 1 : 0,
+      input.midtransCheckoutEnabled ? 1 : 0,
     )
     .run();
 }
@@ -120,7 +120,7 @@ export async function createWalletTopup(input: {
   return id;
 }
 
-export async function createIpaymuWalletTopup(input: {
+export async function createMidtransWalletTopup(input: {
   customerId: string;
   amount: number;
   name: string;
@@ -133,7 +133,7 @@ export async function createIpaymuWalletTopup(input: {
   await getD1()
     .prepare(
       `INSERT INTO wallet_topups (id, customer_id, amount, sender_name, payment_method, proof_url, source, reference_id)
-     VALUES (?, ?, ?, ?, ?, '', 'ipaymu', ?)`,
+     VALUES (?, ?, ?, ?, ?, '', 'midtrans', ?)`,
     )
     .bind(
       id,
@@ -147,7 +147,7 @@ export async function createIpaymuWalletTopup(input: {
   return id;
 }
 
-export async function updateIpaymuWalletTopup(input: {
+export async function updateMidtransWalletTopup(input: {
   referenceId: string;
   transactionId: string | null;
   paymentNo: string | null;
@@ -159,16 +159,12 @@ export async function updateIpaymuWalletTopup(input: {
 }) {
   await getD1()
     .prepare(
-      `UPDATE wallet_topups SET ipaymu_transaction_id = ?, ipaymu_payment_no = ?, ipaymu_payment_name = ?,
-      ipaymu_payment_url = ?, ipaymu_expired_at = ?, payment_fee = ?, payment_total = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE reference_id = ? AND source = 'ipaymu'`,
+      `UPDATE wallet_topups SET midtrans_transaction_id = ?, midtrans_payment_url = ?, payment_fee = ?, payment_total = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE reference_id = ? AND source = 'midtrans'`,
     )
     .bind(
       input.transactionId,
-      input.paymentNo,
-      input.paymentName,
       input.paymentUrl,
-      input.expiredAt,
       input.fee,
       input.total,
       input.referenceId,
@@ -176,12 +172,12 @@ export async function updateIpaymuWalletTopup(input: {
     .run();
 }
 
-export async function getIpaymuWalletTopup(referenceId: string) {
+export async function getMidtransWalletTopup(referenceId: string) {
   await ensureLegacyDatabaseColumns();
   return getD1()
     .prepare(
-      `SELECT id, customer_id, amount, status, ipaymu_transaction_id FROM wallet_topups
-     WHERE reference_id = ? AND source = 'ipaymu' LIMIT 1`,
+      `SELECT id, customer_id, amount, status, midtrans_transaction_id FROM wallet_topups
+     WHERE reference_id = ? AND source = 'midtrans' LIMIT 1`,
     )
     .bind(referenceId)
     .first<{
@@ -189,22 +185,22 @@ export async function getIpaymuWalletTopup(referenceId: string) {
       customer_id: string;
       amount: number;
       status: string;
-      ipaymu_transaction_id: string | null;
+      midtrans_transaction_id: string | null;
     }>();
 }
 
-export async function applyIpaymuWalletTopup(input: {
+export async function applyMidtransWalletTopup(input: {
   referenceId: string;
   status: "paid" | "pending" | "expired" | "failed";
   transactionId: string | null;
   callbackAmount: number;
 }) {
-  const topup = await getIpaymuWalletTopup(input.referenceId);
+  const topup = await getMidtransWalletTopup(input.referenceId);
   if (!topup) return { found: false, credited: false };
   if (
-    topup.ipaymu_transaction_id &&
+    topup.midtrans_transaction_id &&
     input.transactionId &&
-    topup.ipaymu_transaction_id !== input.transactionId
+    topup.midtrans_transaction_id !== input.transactionId
   )
     return { found: true, credited: false, ignored: "transaction_mismatch" };
   if (
@@ -229,13 +225,13 @@ export async function applyIpaymuWalletTopup(input: {
         .bind(
           crypto.randomUUID(),
           reference,
-          `Top up otomatis iPaymu ${topup.id.slice(0, 8).toUpperCase()}`,
+          `Top up otomatis Midtrans ${topup.id.slice(0, 8).toUpperCase()}`,
           topup.customer_id,
           topup.id,
         ),
       db
         .prepare(
-          "UPDATE wallet_topups SET status = 'approved', reviewed_by = 'ipaymu-callback', reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
+          "UPDATE wallet_topups SET status = 'approved', reviewed_by = 'midtrans-callback', reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
         )
         .bind(topup.id),
       db
@@ -253,8 +249,8 @@ export async function applyIpaymuWalletTopup(input: {
       )
       .bind(
         input.status === "expired"
-          ? "Pembayaran iPaymu kedaluwarsa."
-          : "Pembayaran iPaymu gagal.",
+          ? "Pembayaran Midtrans kedaluwarsa."
+          : "Pembayaran Midtrans gagal.",
         topup.id,
       )
       .run();
