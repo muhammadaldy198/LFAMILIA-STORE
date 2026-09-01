@@ -509,12 +509,12 @@ function CheckoutContent() {
           </span>
           <div className="flex min-h-36 flex-col justify-between gap-5 pl-32 pt-0 sm:min-h-28 sm:flex-row sm:items-end sm:justify-between sm:pl-36">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#cfff72]">
-                {product.publisher}
-              </p>
-              <h1 className="mt-2 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
+              <h1 className="text-sm font-black uppercase tracking-[0.08em] text-white sm:text-base">
                 {product.name}
               </h1>
+              <p className="mt-2 text-xs font-medium text-white/68">
+                {product.publisher}
+              </p>
             </div>
             <div className="grid grid-cols-3 gap-3 text-center text-[9px] text-white/48 sm:w-[360px]">
               <span>
