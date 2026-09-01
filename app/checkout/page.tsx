@@ -161,8 +161,8 @@ function CheckoutContent() {
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [paymentMethod, setPaymentMethod] =
-    useState<CheckoutPaymentMethod>("manual_qris");
-  const [paymentChannel, setPaymentChannel] = useState("manual_qris");
+    useState<CheckoutPaymentMethod>("qris");
+  const [paymentChannel, setPaymentChannel] = useState("qris");
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [payment, setPayment] = useState<PaymentResult | null>(null);
@@ -203,8 +203,6 @@ function CheckoutContent() {
   const checkoutGroups = [
     { code: "wallet" as const, name: "Koin LFAMILIA", description: "Bayar langsung dari saldo akun" },
     ...(walletSettings?.midtransCheckoutEnabled ? paymentGroups.filter((item) => item.code === "qris" || item.code === "ewallet" || item.code === "va") : []),
-    ...(walletSettings?.manualQrisEnabled ? [manualPaymentGroups[0]] : []),
-    ...(walletSettings?.isEnabled && walletSettings.accountNumber ? [manualPaymentGroups[1]] : []),
   ];
   const channels = isGatewayMethod
     ? availableChannels.filter((item) => item.method === paymentMethod)
@@ -339,10 +337,7 @@ function CheckoutContent() {
     if (!walletSettings) return;
     const enabled = checkoutGroups.map((group) => group.code);
     if (enabled.includes(paymentMethod)) return;
-    if (walletSettings.manualQrisEnabled) chooseMethod("manual_qris");
-    else if (walletSettings.isEnabled && walletSettings.accountNumber)
-      chooseMethod("manual_bank");
-    else if (walletSettings.midtransCheckoutEnabled) chooseMethod("qris");
+    if (walletSettings.midtransCheckoutEnabled) chooseMethod("qris");
     else chooseMethod("wallet");
   }, [walletSettings, paymentMethod]);
 
@@ -351,10 +346,12 @@ function CheckoutContent() {
     setPaymentChannel(
       method === "wallet"
         ? "lfamilia-balance"
-        : method === "manual_qris" || method === "manual_bank"
-          ? method
-          : (availableChannels.find((item) => item.method === method)
-              ?.channel ?? ""),
+        : method === "qris"
+          ? "qris"
+          : method === "manual_qris" || method === "manual_bank"
+            ? method
+            : (availableChannels.find((item) => item.method === method)
+                ?.channel ?? ""),
     );
     setPayment(null);
   }
@@ -489,28 +486,28 @@ function CheckoutContent() {
 
   return (
     <StoreLayout>
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 pb-[11rem] pt-8 sm:px-6 sm:py-12 lg:px-8">
         <Link
           href="/catalog"
           className="inline-flex items-center gap-2 text-xs font-semibold text-white/42 hover:text-white"
         >
           <ArrowLeft className="size-4" /> Kembali ke katalog
         </Link>
-        <section className="relative mt-5 h-52 overflow-hidden bg-[#10131b] sm:h-72 lg:h-80">
+        <section className="relative mt-5 -mx-4 h-52 overflow-hidden bg-[#10131b] sm:-mx-6 sm:h-72 lg:-mx-8 lg:h-80">
           {(product.bannerUrl || product.imageUrl) && (
             <img
               src={product.bannerUrl || product.imageUrl}
               alt={`Banner ${product.name}`}
-              className="absolute inset-0 size-full object-cover object-center"
+              className="absolute inset-0 size-full scale-[1.32] object-cover object-center sm:scale-100"
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#10131b]/65 via-transparent to-transparent" />
         </section>
-        <section className="relative z-10 -mt-1 overflow-visible border-y border-white/[0.10] bg-[#14171e] px-5 py-5 shadow-2xl sm:px-8">
-          <span className="absolute -top-12 left-5 block size-24 -rotate-[5deg] overflow-hidden rounded-[22px] border-4 border-[#14171e] shadow-2xl sm:-top-14 sm:left-8 sm:size-28">
+        <section className="relative z-10 -mx-4 -mt-1 overflow-visible border-y border-white/[0.10] bg-[#14171e] px-5 py-5 shadow-2xl sm:-mx-6 sm:px-8 lg:-mx-8">
+          <span className="absolute -top-12 left-5 block aspect-[3/3] size-24 overflow-hidden rounded-[22px] border-4 border-[#14171e] shadow-2xl [perspective:800px] [transform:rotateY(-14deg)_rotateZ(-3deg)] sm:-top-14 sm:left-8 sm:size-28">
             <ProductArtwork product={product} compact />
           </span>
-          <div className="flex flex-col gap-5 pt-12 sm:flex-row sm:items-end sm:justify-between sm:pl-36 sm:pt-1">
+          <div className="flex min-h-36 flex-col justify-between gap-5 pl-32 pt-0 sm:min-h-28 sm:flex-row sm:items-end sm:justify-between sm:pl-36">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#cfff72]">
                 {product.publisher}
@@ -725,7 +722,7 @@ function CheckoutContent() {
                           <CheckCircle2 className="size-4 text-[#b9ff35]" />
                         )}
                       </button>
-                      {selected && isGatewayMethod && (
+                      {selected && isGatewayMethod && group.code !== "qris" && (
                         <div className="grid grid-cols-2 gap-2 border-t border-white/[0.08] bg-black/10 p-3 sm:grid-cols-3">
                           {availableChannels
                             .filter((channel) => channel.method === group.code)
