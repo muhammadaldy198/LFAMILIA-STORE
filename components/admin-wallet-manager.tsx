@@ -168,7 +168,7 @@ export function AdminWalletManager({
                 <h3 className="font-bold">Checkout manual & gateway</h3>
                 <p className="mt-1 max-w-xl text-[10px] leading-5 text-white/30">
                   Atur QRIS manual, transfer bank, dan kapan checkout otomatis
-                  iPaymu ditampilkan ke pelanggan.
+                  Midtrans ditampilkan ke pelanggan.
                 </p>
               </div>
             </div>
@@ -307,11 +307,11 @@ export function AdminWalletManager({
             <label className="flex items-center justify-between rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.04] p-3 text-xs text-white/70 sm:col-span-2">
               <span>
                 <strong className="block">
-                  Aktifkan checkout otomatis iPaymu
+                  Aktifkan checkout otomatis Midtrans
                 </strong>
                 <span className="mt-1 block text-[10px] text-white/35">
-                  Nyalakan setelah akun iPaymu Production siap; matikan QRIS
-                  manual bila sudah tidak dipakai.
+                  Nyalakan setelah Midtrans Production siap; matikan QRIS manual
+                  bila sudah tidak dipakai.
                 </span>
               </span>
               <Switch
