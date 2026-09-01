@@ -42,8 +42,8 @@ const fallback: WalletSettings = {
   manualQrisEnabled: false,
   manualQrisName: "QRIS Manual",
   manualQrisImageUrl: "",
-  ipaymuTopupEnabled: false,
-  ipaymuCheckoutEnabled: false,
+  midtransTopupEnabled: false,
+  midtransCheckoutEnabled: false,
 };
 
 export function AdminWalletManager({
@@ -288,18 +288,18 @@ export function AdminWalletManager({
             <label className="flex items-center justify-between rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.04] p-3 text-xs text-white/70 sm:col-span-2">
               <span>
                 <strong className="block">
-                  Aktifkan top up saldo otomatis iPaymu
+                  Aktifkan top up saldo otomatis Midtrans
                 </strong>
                 <span className="mt-1 block text-[10px] text-white/35">
-                  Hanya aktif jika Secret iPaymu dan callback sudah benar.
+                  Hanya aktif jika Secret Midtrans dan callback sudah benar.
                 </span>
               </span>
               <Switch
-                checked={settings.ipaymuTopupEnabled}
+                checked={settings.midtransTopupEnabled}
                 onCheckedChange={(checked) =>
                   setSettings((current) => ({
                     ...current,
-                    ipaymuTopupEnabled: checked,
+                    midtransTopupEnabled: checked,
                   }))
                 }
               />
@@ -315,11 +315,11 @@ export function AdminWalletManager({
                 </span>
               </span>
               <Switch
-                checked={settings.ipaymuCheckoutEnabled}
+                checked={settings.midtransCheckoutEnabled}
                 onCheckedChange={(checked) =>
                   setSettings((current) => ({
                     ...current,
-                    ipaymuCheckoutEnabled: checked,
+                    midtransCheckoutEnabled: checked,
                   }))
                 }
               />
