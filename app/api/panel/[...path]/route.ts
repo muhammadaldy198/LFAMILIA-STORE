@@ -20,6 +20,7 @@ import * as wallet from "@/app/api/admin/wallet/route";
 import * as walletProof from "@/app/api/admin/wallet/proof/route";
 import { getAdminSession } from "@/lib/server/admin";
 import { recordAdminActivity } from "@/lib/server/security";
+import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type Handler = (request: Request) => Response | Promise<Response>;
@@ -50,6 +51,7 @@ const routes: Record<string, RouteHandlers> = {
 };
 
 async function dispatch(request: Request, context: RouteContext, method: Method) {
+  await ensureLegacyDatabaseColumns();
   const { path } = await context.params;
   const handlers = routes[path.join("/")];
   if (!handlers) return Response.json({ error: "Endpoint panel tidak ditemukan." }, { status: 404 });
