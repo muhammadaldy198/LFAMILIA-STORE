@@ -19,6 +19,7 @@ import {
   WalletCards,
   CreditCard,
   MessageCircleMore,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,7 +34,6 @@ import { AdminVoucherManager } from "@/components/admin-voucher-manager";
 import { AdminWalletManager } from "@/components/admin-wallet-manager";
 import { AdminPaymentMethodManager } from "@/components/admin-payment-method-manager";
 import { AdminSupportManager } from "@/components/admin-support-manager";
-import { AdminDigiflazzPricing } from "@/components/admin-digiflazz-pricing";
 import { StoreLayout } from "@/components/store-layout";
 
 type Session = { id: number; email: string; name: string; role: "owner" | "staff" };
@@ -61,6 +61,7 @@ export default function AdminPage() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     let active = true;
@@ -157,9 +158,24 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="overview" className="grid items-start gap-5 lg:grid-cols-[220px_1fr]">
-          {menuOpen && <button type="button" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-40 bg-black/65 lg:hidden" aria-label="Tutup menu" />}
-          <TabsList className={`z-50 h-auto gap-2 rounded-2xl border border-white/[0.08] bg-[#0d1019] p-2 ${menuOpen ? "fixed inset-y-0 left-0 !flex !w-72 !flex-col !items-stretch !rounded-none !bg-[#0d1019] shadow-2xl" : "hidden"} lg:sticky lg:top-28 lg:!flex lg:!w-full lg:!flex-col lg:!items-stretch`}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="grid items-start gap-5 lg:grid-cols-[220px_1fr]">
+          {menuOpen && <>
+            <button type="button" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-40 bg-black/70 lg:hidden" aria-label="Tutup menu" />
+            <aside className="fixed inset-y-0 left-0 z-50 w-[82vw] max-w-72 overflow-y-auto border-r border-white/[0.1] bg-[#0d1019] p-3 shadow-2xl lg:hidden">
+              <div className="mb-4 flex items-center justify-between px-2 pt-1">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c9ff70]">Menu panel</p>
+                <Button type="button" variant="ghost" size="icon" onClick={() => setMenuOpen(false)} className="size-9 text-white/70 hover:bg-white/10 hover:text-white"><X className="size-4" /></Button>
+              </div>
+              <div className="space-y-1">
+                {nav.map(([value, label, Icon]) => (
+                  <button key={value} type="button" onClick={() => { setActiveTab(value); setMenuOpen(false); }} className={`flex h-11 w-full items-center rounded-xl px-3 text-left text-sm font-medium transition ${activeTab === value ? "bg-[#b9ff35] text-[#091006]" : "text-white/65 hover:bg-white/[0.08] hover:text-white"}`}>
+                    <Icon className="mr-3 size-4" />{label}
+                  </button>
+                ))}
+              </div>
+            </aside>
+          </>}
+          <TabsList className="hidden h-auto gap-2 rounded-2xl border border-white/[0.08] bg-[#0d1019] p-2 lg:sticky lg:top-28 lg:!flex lg:!w-full lg:!flex-col lg:!items-stretch">
             {nav.map(([value, label, Icon]) => (
               <TabsTrigger key={value} value={value} onClick={() => setMenuOpen(false)} className="h-10 w-full shrink-0 justify-start rounded-xl px-3 text-xs text-white/42 data-[state=active]:bg-[#b9ff35] data-[state=active]:text-[#091006]">
                 <Icon className="mr-2 size-4" />{label}
@@ -191,7 +207,6 @@ export default function AdminPage() {
                       <SettingCard title="VIPayment" status="Secret Cloudflare" text="Provider alternatif resmi untuk produk otomatis." />
                       <SettingCard title="Pengiriman kode" status="Khusus Pemilik" text="Email dan WhatsApp mengirim voucher tanpa memperlihatkan stok ke Staff." />
                     </div>
-                    <div className="mt-5"><AdminDigiflazzPricing /></div>
                     <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-4 text-[10px] leading-5 text-amber-100/60">
                       <ShieldCheck className="mb-2 size-4 text-amber-300" />
                       Password disimpan sebagai hash dan tidak dapat dibaca kembali. Secret pembayaran maupun provider juga tidak pernah ditampilkan di browser.
