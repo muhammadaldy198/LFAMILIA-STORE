@@ -486,43 +486,31 @@ function CheckoutContent() {
   return (
     <StoreLayout>
       <main className="mx-auto max-w-7xl px-4 pb-[11rem] pt-3 sm:px-6 sm:py-8 lg:px-8">
-        <section className="relative mt-5 -mx-4 h-52 overflow-hidden bg-[#10131b] sm:-mx-6 sm:h-72 lg:-mx-8 lg:h-80">
+        <section className="relative mt-3 -mx-4 h-56 overflow-hidden bg-[#10131b] sm:-mx-6 sm:h-72 lg:-mx-8 lg:h-80">
           {(product.bannerUrl || product.imageUrl) && (
             <img
               src={product.bannerUrl || product.imageUrl}
               alt={`Banner ${product.name}`}
-              className="absolute inset-0 size-full scale-[1.32] object-cover object-center sm:scale-100"
+              className="absolute inset-0 size-full object-cover object-center"
             />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#10131b]/65 via-transparent to-transparent" />
         </section>
-        <section className="relative z-10 -mx-4 -mt-1 overflow-visible border-y border-white/[0.10] bg-[#202224] [background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.035)_0,rgba(255,255,255,.035)_32px,transparent_32px,transparent_64px)] px-5 py-5 shadow-2xl sm:-mx-6 sm:px-8 lg:-mx-8">
-          <span className="absolute -top-12 left-5 block aspect-[3/3] size-32 overflow-hidden rounded-[24px] border-4 border-[#202224] shadow-2xl [perspective:800px] [transform:rotateY(-10deg)_rotateZ(-2deg)] sm:-top-16 sm:left-8 sm:size-36">
+        <section className="relative z-10 -mx-4 min-h-[196px] overflow-visible border-y border-white/[0.10] bg-[#202224] px-5 py-5 shadow-2xl sm:-mx-6 sm:px-8 lg:-mx-8">
+          <span className="absolute -top-16 left-5 block aspect-[3/3] size-32 overflow-hidden rounded-[24px] border-4 border-[#202224] shadow-2xl [perspective:800px] [transform:rotateY(-10deg)_rotateZ(-2deg)] sm:-top-18 sm:left-8 sm:size-36">
             <ProductArtwork product={product} compact />
           </span>
-          <div className="space-y-5">
-            <div className="min-h-28 pl-36 sm:min-h-28 sm:pl-44">
-              <h1 className="text-sm font-black uppercase tracking-[0.08em] text-white sm:text-base">
-                {product.name}
-              </h1>
-              <p className="mt-2 text-xs font-medium text-white/68">
-                {product.publisher}
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-3 text-center text-[9px] text-white/48">
-              <span>
-                <Zap className="mx-auto mb-1 size-4 text-[#cfff72]" />
-                Proses cepat
-              </span>
-              <span>
-                <ShieldCheck className="mx-auto mb-1 size-4 text-[#cfff72]" />
-                Layanan Chat 24/7
-              </span>
-              <span>
-                <BadgeCheck className="mx-auto mb-1 size-4 text-[#cfff72]" />
-                Pembayaran aman
-              </span>
-            </div>
+          <div className="pl-36 pt-2 sm:pl-44">
+            <h1 className="text-sm font-black uppercase tracking-[0.08em] text-white sm:text-base">
+              {product.name}
+            </h1>
+            <p className="mt-2 text-xs font-medium text-white/68">
+              {product.publisher}
+            </p>
+          </div>
+          <div className="absolute inset-x-5 bottom-5 grid grid-cols-3 gap-3 text-center text-[9px] text-white/60 sm:inset-x-8">
+            <span><Zap className="mx-auto mb-1 size-4 text-[#cfff72]" />Proses cepat</span>
+            <span><ShieldCheck className="mx-auto mb-1 size-4 text-[#cfff72]" />Layanan Chat 24/7</span>
+            <span><BadgeCheck className="mx-auto mb-1 size-4 text-[#cfff72]" />Pembayaran aman</span>
           </div>
         </section>
         <div className="mx-auto mt-5 grid max-w-7xl grid-cols-2 rounded-xl bg-white/[0.06] p-1 text-sm font-bold">
