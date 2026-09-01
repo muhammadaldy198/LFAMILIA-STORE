@@ -2,6 +2,7 @@ import { hashHex } from "@/lib/server/crypto";
 import { mapIpaymuStatus, parseIpaymuCallback, validateIpaymuCallback } from "@/lib/server/ipaymu";
 import { applyPaymentStatus, fulfillAutomaticOrder, getOrderByReference, recordOrderEvent } from "@/lib/server/orders";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { applyIpaymuWalletTopup, getIpaymuWalletTopup } from "@/lib/server/wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,14 @@ export async function POST(request: Request) {
     if (!validation.valid) return Response.json({ error: "Signature callback tidak valid." }, { status: 401 });
     const referenceId = String(validation.normalized.reference_id ?? "");
     if (!referenceId) return Response.json({ error: "Reference ID tidak ada." }, { status: 400 });
+    const walletTopup = await getIpaymuWalletTopup(referenceId);
+    if (walletTopup) {
+      const status = mapIpaymuStatus(validation.normalized);
+      const callbackTransactionId = validation.normalized.trx_id == null ? null : String(validation.normalized.trx_id);
+      const callbackAmount = Number(validation.normalized.amount ?? validation.normalized.total ?? 0);
+      const result = await applyIpaymuWalletTopup({ referenceId, status, transactionId: callbackTransactionId, callbackAmount });
+      return Response.json({ ok: true, walletTopup: result });
+    }
     const order = await getOrderByReference(referenceId);
     if (!order) return Response.json({ ok: true, ignored: "order_not_found" });
 
