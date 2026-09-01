@@ -9,6 +9,10 @@ import {
   validateMidtransNotification,
 } from "@/lib/server/midtrans";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import {
+  applyMidtransWalletTopup,
+  getMidtransWalletTopup,
+} from "@/lib/server/wallet";
 
 export const dynamic = "force-dynamic";
 type RuntimeEnv = { PUBLIC_BASE_URL?: string };
@@ -30,10 +34,23 @@ export async function POST(request: Request) {
         { error: "Signature Midtrans tidak valid." },
         { status: 401 },
       );
-    const order = await getOrderByReference(validation.orderId);
-    if (!order) return Response.json({ ok: true, ignored: "order_not_found" });
     const status = mapMidtransStatus(payload);
     const amount = Number(validation.grossAmount);
+    const walletTopup = await getMidtransWalletTopup(validation.orderId);
+    if (walletTopup) {
+      const result = await applyMidtransWalletTopup({
+        referenceId: validation.orderId,
+        status,
+        transactionId:
+          typeof payload.transaction_id === "string"
+            ? payload.transaction_id
+            : null,
+        callbackAmount: amount,
+      });
+      return Response.json({ ok: true, walletTopup: result });
+    }
+    const order = await getOrderByReference(validation.orderId);
+    if (!order) return Response.json({ ok: true, ignored: "order_not_found" });
     if (
       status === "paid" &&
       (!Number.isFinite(amount) || amount !== order.total)
