@@ -7,6 +7,10 @@ export type ManagedPackage = ProductPackage & {
   dbId: number | null;
   isActive: boolean;
   sortOrder: number;
+  supplierPrice?: number | null;
+  pricingMode?: "manual" | "auto";
+  marginType?: "fixed" | "percent";
+  marginValue?: number;
 };
 
 export type ManagedProduct = Omit<StoreProduct, "packages" | "notices"> & {
@@ -57,6 +61,10 @@ type PackageRow = {
   note: string | null;
   provider_code: string | null;
   provider_sku: string | null;
+  supplier_price: number | null;
+  pricing_mode: "manual" | "auto" | null;
+  margin_type: "fixed" | "percent" | null;
+  margin_value: number | null;
   is_active: number;
   sort_order: number;
 };
@@ -93,6 +101,7 @@ export function getFallbackProducts(): ManagedProduct[] {
 
 export async function readProducts(includeInactive = false): Promise<ManagedProduct[]> {
   const db = getD1();
+  try { await db.prepare("SELECT banner_url FROM products LIMIT 1").first(); } catch { await db.prepare("ALTER TABLE products ADD COLUMN banner_url text").run(); }
   const productSql = includeInactive
     ? `SELECT id, slug, name, publisher, category, image_url, banner_url, initials, accent, input_label, input_placeholder,
         needs_server, popular, instant, fulfillment_type, target_template, manual_instructions,
@@ -103,9 +112,9 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
         manual_open_time, manual_close_time, manual_timezone, is_active, sort_order
        FROM products WHERE is_active = 1 ORDER BY sort_order ASC, name ASC`;
   const packageSql = includeInactive
-    ? `SELECT id, product_id, sku, label, price, note, provider_code, provider_sku, is_active, sort_order
+    ? `SELECT id, product_id, sku, label, price, note, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
        FROM product_packages ORDER BY sort_order ASC, id ASC`
-    : `SELECT id, product_id, sku, label, price, note, provider_code, provider_sku, is_active, sort_order
+    : `SELECT id, product_id, sku, label, price, note, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
        FROM product_packages WHERE is_active = 1 ORDER BY sort_order ASC, id ASC`;
   const noticeSql = includeInactive
     ? `SELECT id, product_id, title, body, is_active, sort_order FROM product_notices ORDER BY sort_order ASC, id ASC`
@@ -159,6 +168,10 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
       note: item.note ?? undefined,
       providerCode: item.provider_code ?? undefined,
       providerSku: item.provider_sku ?? undefined,
+      supplierPrice: item.supplier_price,
+      pricingMode: item.pricing_mode ?? "auto",
+      marginType: item.margin_type ?? "fixed",
+      marginValue: item.margin_value ?? 0,
       isActive: Boolean(item.is_active),
       sortOrder: item.sort_order,
     })),
@@ -219,9 +232,9 @@ export async function saveProduct(input: ProductWrite, id?: number) {
   const packageStatements = [
     db.prepare("DELETE FROM product_packages WHERE product_id = ?").bind(productRow.id),
     ...input.packages.map((item, index) => db.prepare(
-      `INSERT INTO product_packages (product_id, sku, label, price, note, provider_code, provider_sku, is_active, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(productRow.id, item.id, item.label, item.price, item.note ?? null, item.providerCode ?? null, item.providerSku ?? null, item.isActive ? 1 : 0, index)),
+      `INSERT INTO product_packages (product_id, sku, label, price, note, provider_code, provider_sku, pricing_mode, margin_type, margin_value, is_active, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(productRow.id, item.id, item.label, item.price, item.note ?? null, item.providerCode ?? null, item.providerSku ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index)),
   ];
   await db.batch(packageStatements);
   const noticeStatements = [
