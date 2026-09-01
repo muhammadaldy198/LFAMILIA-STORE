@@ -27,6 +27,7 @@ const emptyProduct: ManagedProduct = {
   category: "game",
   imageUrl: "",
   bannerUrl: "",
+  description: "",
   initials: "",
   accent: "from-[#b9ff35] to-[#347a21]",
   inputLabel: "User ID",
@@ -254,6 +255,7 @@ export function AdminProductManager() {
               <Field label="Publisher"><Input value={draft.publisher} onChange={(event) => updateDraft("publisher", event.target.value)} className="admin-input" placeholder="Moonton" /></Field>
               <Field label="Kategori"><select value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white">{(categories.length ? categories : [{ slug: "game", name: "Top Up Game" }, { slug: "voucher", name: "Voucher & Gift Card" }]).map((category) => <option key={category.slug} value={category.slug}>{category.name}</option>)}</select></Field></>}
               <div className="sm:col-span-2"><AdminMediaUpload label="Gambar produk (wajib kotak 1:1)" value={draft.imageUrl ?? ""} onChange={(value) => updateDraft("imageUrl", value)} help="Gunakan gambar kotak 1:1, misalnya 1080 × 1080. Checkout dan pencarian menampilkan penuh; beranda otomatis memotong bagian tengah menjadi 2:3." /></div>
+              <div className="sm:col-span-2"><Field label="Deskripsi produk" wide><Textarea value={draft.description ?? ""} onChange={(event) => updateDraft("description", event.target.value)} className="min-h-28 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 py-2 text-xs text-white" placeholder="Deskripsi khusus produk ini yang tampil di tab Keterangan." /></Field></div>
               <div className="sm:col-span-2"><AdminMediaUpload label="Banner halaman produk" value={draft.bannerUrl ?? ""} onChange={(value) => updateDraft("bannerUrl", value)} help="Banner penuh di atas checkout. Gunakan banner landscape; desktop menampilkan lebar penuh, ponsel otomatis memotong sisi kiri/kanan dengan fokus di tengah. Jika kosong, gambar produk digunakan." /></div>
               {role === "owner" && <><Field label="Inisial kartu"><Input required maxLength={3} value={draft.initials} onChange={(event) => updateDraft("initials", event.target.value.toUpperCase())} className="admin-input" placeholder="ML" /></Field>
               <Field label="Urutan"><Input type="number" min={0} value={draft.sortOrder} onChange={(event) => updateDraft("sortOrder", Number(event.target.value))} className="admin-input" /></Field>
