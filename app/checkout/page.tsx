@@ -496,8 +496,8 @@ function CheckoutContent() {
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#10131b]/65 via-transparent to-transparent" />
         </section>
-        <section className="relative z-10 -mx-4 -mt-1 overflow-visible border-y border-white/[0.10] bg-[#14171e] px-5 py-5 shadow-2xl sm:-mx-6 sm:px-8 lg:-mx-8">
-          <span className="absolute -top-12 left-5 block aspect-[3/3] size-32 overflow-hidden rounded-[24px] border-4 border-[#14171e] shadow-2xl [perspective:800px] [transform:rotateY(-10deg)_rotateZ(-2deg)] sm:-top-16 sm:left-8 sm:size-36">
+        <section className="relative z-10 -mx-4 -mt-1 overflow-visible border-y border-white/[0.10] bg-[#202224] [background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.035)_0,rgba(255,255,255,.035)_32px,transparent_32px,transparent_64px)] px-5 py-5 shadow-2xl sm:-mx-6 sm:px-8 lg:-mx-8">
+          <span className="absolute -top-12 left-5 block aspect-[3/3] size-32 overflow-hidden rounded-[24px] border-4 border-[#202224] shadow-2xl [perspective:800px] [transform:rotateY(-10deg)_rotateZ(-2deg)] sm:-top-16 sm:left-8 sm:size-36">
             <ProductArtwork product={product} compact />
           </span>
           <div className="space-y-5">
@@ -526,8 +526,8 @@ function CheckoutContent() {
           </div>
         </section>
         <div className="mx-auto mt-5 grid max-w-7xl grid-cols-2 rounded-xl bg-white/[0.06] p-1 text-sm font-bold">
-          <button type="button" onClick={() => setActiveTab("transaction")} className={`rounded-lg py-3 ${activeTab === "transaction" ? "bg-[#b9ff35] text-[#091006]" : "text-white/55"}`}>Transaksi</button>
-          <button type="button" onClick={() => setActiveTab("details")} className={`rounded-lg py-3 ${activeTab === "details" ? "bg-[#b9ff35] text-[#091006]" : "text-white/55"}`}>Keterangan</button>
+          <button type="button" onClick={() => setActiveTab("transaction")} className={`rounded-lg py-3 ${activeTab === "transaction" ? "bg-[#bca17d] text-white" : "text-white/55"}`}>Transaksi</button>
+          <button type="button" onClick={() => setActiveTab("details")} className={`rounded-lg py-3 ${activeTab === "details" ? "bg-[#bca17d] text-white" : "text-white/55"}`}>Keterangan</button>
         </div>
         {activeTab === "transaction" ? <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_380px]">
           <form id="checkout-form" onSubmit={requestConfirmation} className="space-y-5">
