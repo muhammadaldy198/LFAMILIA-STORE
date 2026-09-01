@@ -60,7 +60,7 @@ export function StoreSearch({ mobile = false }: { mobile?: boolean }) {
                   onSelect={() => chooseProduct(product.slug)}
                   className="my-1 cursor-pointer rounded-xl px-3 py-3 text-white/75 data-[selected=true]:bg-[#b9ff35]/10 data-[selected=true]:text-white"
                 >
-                  <span className="block w-10 shrink-0 aspect-[2/3] overflow-hidden rounded-lg"><ProductArtwork product={product} compact /></span>
+                  <span className="block size-10 shrink-0 -rotate-[4deg] overflow-hidden rounded-lg"><ProductArtwork product={product} compact /></span>
                   <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{product.name}</strong><span className="text-[10px] text-white/30">{product.publisher}</span></span>
                   <Icon className="size-4 text-[#b9ff35]" />
                 </CommandItem>
