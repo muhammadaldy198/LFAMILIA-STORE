@@ -9,7 +9,7 @@ import {
   markPaymentCreationFailed,
   recordOrderEvent,
   resolvePurchasableItem,
-  updateIpaymuPayment,
+  updateMidtransPayment,
 } from "@/lib/server/orders";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
@@ -114,13 +114,10 @@ export async function POST(request: Request) {
       paymentChannel: input.paymentChannel,
       finishUrl: `${baseUrl}/track?invoice=${encodeURIComponent(identity.referenceId)}`,
     });
-    await updateIpaymuPayment({
+    await updateMidtransPayment({
       referenceId: identity.referenceId,
       transactionId: payment.transactionId,
-      paymentNo: null,
-      paymentName: "Midtrans Snap",
       paymentUrl: payment.paymentUrl,
-      expiredAt: null,
       fee: 0,
       total: promotion.finalPrice,
     });
