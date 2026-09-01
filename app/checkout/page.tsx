@@ -503,11 +503,11 @@ function CheckoutContent() {
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#10131b]/65 via-transparent to-transparent" />
         </section>
-        <section className="relative z-10 mx-3 -mt-11 overflow-visible rounded-2xl border border-white/[0.10] bg-[#10131b] px-5 pb-5 pt-24 shadow-2xl sm:mx-6 sm:-mt-14 sm:px-7 sm:pb-6 sm:pt-28">
-          <span className="absolute -top-14 left-5 block w-20 aspect-[2/3] overflow-hidden rounded-[18px] border-4 border-[#10131b] shadow-2xl sm:-top-16 sm:left-7 sm:w-24">
+        <section className="relative z-10 mx-3 -mt-11 overflow-visible rounded-2xl border border-white/[0.10] bg-[#10131b] px-5 pb-5 pt-6 shadow-2xl sm:mx-6 sm:-mt-14 sm:px-7 sm:pb-6 sm:pt-7">
+          <span className="absolute left-5 top-6 block size-20 -rotate-[4deg] overflow-hidden rounded-[18px] border-4 border-[#10131b] shadow-2xl sm:left-7 sm:top-7 sm:size-24">
             <ProductArtwork product={product} compact />
           </span>
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex min-h-20 flex-col gap-4 pl-24 sm:min-h-24 sm:pl-28">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#cfff72]">
                 {product.publisher}
