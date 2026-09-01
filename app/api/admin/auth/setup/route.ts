@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { adminSessionCookie, configurePrimaryOwner, getOwnerCredentialState, isValidAdminId } from "@/lib/server/admin-auth";
 import { getAccessEmail, getOwnerEmail } from "@/lib/server/admin";
+import { allowRequest } from "@/lib/server/security";
 
 const schema = z.object({
   username: z.string().trim().min(3, "ID admin minimal 3 karakter.").max(32).refine(isValidAdminId, "ID hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda minus."),
@@ -15,20 +16,15 @@ function authorizeOwner(request: Request) {
 
 export async function GET(request: Request) {
   if (!authorizeOwner(request)) return Response.json({ error: "Gunakan email Pemilik melalui Cloudflare Access." }, { status: 403 });
-  try {
-    const state = await getOwnerCredentialState();
-    return Response.json(state, { headers: { "Cache-Control": "no-store" } });
-  } catch {
-    return Response.json({ error: "Database akun admin belum dapat diperiksa. Coba muat ulang halaman." }, {
-      status: 500,
-      headers: { "Cache-Control": "no-store" },
-    });
-  }
+  const state = await getOwnerCredentialState();
+  return Response.json(state, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
   const accessEmail = authorizeOwner(request);
   if (!accessEmail) return Response.json({ error: "Setup hanya dapat dilakukan oleh email Pemilik." }, { status: 403 });
+  const rate = await allowRequest(request, "owner-setup", 3, 900);
+  if (!rate.allowed) return Response.json({ error: "Terlalu banyak percobaan setup. Coba lagi 15 menit." }, { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(rate.retryAfter) } });
   try {
     const input = schema.parse(await request.json());
     const session = await configurePrimaryOwner({ accessEmail, ...input });
