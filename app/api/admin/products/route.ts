@@ -12,6 +12,9 @@ const packageSchema = z.object({
   note: z.string().trim().max(40).optional(),
   providerCode: z.string().trim().regex(/^[a-z0-9-]+$/).max(40).optional(),
   providerSku: z.string().trim().max(100).optional(),
+  pricingMode: z.enum(["manual", "auto"]).default("auto"),
+  marginType: z.enum(["fixed", "percent"]).default("fixed"),
+  marginValue: z.number().int().min(0).max(1_000_000).default(0),
   isActive: z.boolean().default(true),
   sortOrder: z.number().int().min(0).default(0),
 });
