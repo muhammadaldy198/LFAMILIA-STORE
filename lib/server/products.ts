@@ -15,6 +15,7 @@ export type ManagedPackage = ProductPackage & {
 };
 
 export type ManagedProduct = Omit<StoreProduct, "packages" | "notices"> & {
+  description?: string;
   dbId: number | null;
   isActive: boolean;
   sortOrder: number;
@@ -36,6 +37,7 @@ type ProductRow = {
   category: string;
   image_url: string | null;
   banner_url: string | null;
+  description: string | null;
   initials: string;
   accent: string;
   input_label: string;
@@ -104,12 +106,13 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
   await ensureLegacyDatabaseColumns();
   const db = getD1();
   try { await db.prepare("SELECT banner_url FROM products LIMIT 1").first(); } catch { await db.prepare("ALTER TABLE products ADD COLUMN banner_url text").run(); }
+  try { await db.prepare("SELECT description FROM products LIMIT 1").first(); } catch { await db.prepare("ALTER TABLE products ADD COLUMN description text").run(); }
   const productSql = includeInactive
-    ? `SELECT id, slug, name, publisher, category, image_url, banner_url, initials, accent, input_label, input_placeholder,
+    ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder,
         needs_server, popular, instant, fulfillment_type, target_template, manual_instructions,
         manual_open_time, manual_close_time, manual_timezone, is_active, sort_order
        FROM products ORDER BY sort_order ASC, name ASC`
-    : `SELECT id, slug, name, publisher, category, image_url, banner_url, initials, accent, input_label, input_placeholder,
+    : `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder,
         needs_server, popular, instant, fulfillment_type, target_template, manual_instructions,
         manual_open_time, manual_close_time, manual_timezone, is_active, sort_order
        FROM products WHERE is_active = 1 ORDER BY sort_order ASC, name ASC`;
@@ -140,6 +143,7 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
     category: row.category,
     imageUrl: row.image_url ?? bundled?.imageUrl,
     bannerUrl: row.banner_url ?? row.image_url ?? bundled?.bannerUrl ?? bundled?.imageUrl,
+    description: row.description ?? undefined,
     initials: row.initials,
     accent: row.accent,
     inputLabel: row.input_label,
@@ -196,6 +200,7 @@ export async function saveProduct(input: ProductWrite, id?: number) {
     input.category,
     input.imageUrl ?? null,
     input.bannerUrl ?? null,
+    input.description?.trim() || null,
     input.initials,
     input.accent,
     input.inputLabel,
@@ -215,17 +220,17 @@ export async function saveProduct(input: ProductWrite, id?: number) {
 
   if (id) {
     await db.prepare(
-      `UPDATE products SET slug = ?, name = ?, publisher = ?, category = ?, image_url = ?, banner_url = ?, initials = ?, accent = ?,
+      `UPDATE products SET slug = ?, name = ?, publisher = ?, category = ?, image_url = ?, banner_url = ?, description = ?, initials = ?, accent = ?,
        input_label = ?, input_placeholder = ?, needs_server = ?, popular = ?, instant = ?, fulfillment_type = ?,
        target_template = ?, manual_instructions = ?, manual_open_time = ?, manual_close_time = ?, manual_timezone = ?, is_active = ?,
        sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     ).bind(...values, id).run();
   } else {
     await db.prepare(
-      `INSERT INTO products (slug, name, publisher, category, image_url, banner_url, initials, accent, input_label,
+      `INSERT INTO products (slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label,
        input_placeholder, needs_server, popular, instant, fulfillment_type, target_template,
        manual_instructions, manual_open_time, manual_close_time, manual_timezone, is_active, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(...values).run();
   }
 
@@ -254,6 +259,7 @@ export async function saveProductContent(input: {
   id: number;
   imageUrl?: string;
   bannerUrl?: string;
+  description?: string;
   manualInstructions?: string;
   manualOpenTime?: string;
   manualCloseTime?: string;
@@ -264,11 +270,12 @@ export async function saveProductContent(input: {
   const exists = await db.prepare("SELECT id FROM products WHERE id = ? LIMIT 1").bind(input.id).first<{ id: number }>();
   if (!exists) throw new Error("Produk tidak ditemukan.");
   await db.prepare(
-    `UPDATE products SET image_url = ?, banner_url = ?, manual_instructions = ?, manual_open_time = ?,
+    `UPDATE products SET image_url = ?, banner_url = ?, description = ?, manual_instructions = ?, manual_open_time = ?,
      manual_close_time = ?, manual_timezone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
   ).bind(
     input.imageUrl || null,
     input.bannerUrl || null,
+    input.description?.trim() || null,
     input.manualInstructions || null,
     input.manualOpenTime || null,
     input.manualCloseTime || null,
@@ -292,13 +299,13 @@ export async function seedFallbackProducts() {
   const db = getD1();
   const source = getFallbackProducts();
   const productStatements = source.map((item) => db.prepare(
-    `INSERT INTO products (slug, name, publisher, category, image_url, banner_url, initials, accent, input_label,
+    `INSERT INTO products (slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label,
      input_placeholder, needs_server, popular, instant, fulfillment_type, target_template,
      manual_instructions, manual_open_time, manual_close_time, manual_timezone, is_active, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(slug) DO NOTHING`,
   ).bind(
-    item.slug, item.name, item.publisher, item.category, item.imageUrl ?? null, item.bannerUrl ?? null, item.initials, item.accent,
+    item.slug, item.name, item.publisher, item.category, item.imageUrl ?? null, item.bannerUrl ?? null, item.description ?? null, item.initials, item.accent,
     item.inputLabel, item.inputPlaceholder, item.needsServer ? 1 : 0, item.popular ? 1 : 0,
     item.instant ? 1 : 0, item.fulfillmentType, item.targetTemplate, item.manualInstructions ?? null,
     item.manualOpenTime ?? null, item.manualCloseTime ?? null, item.manualTimezone ?? "Asia/Jakarta", 1, item.sortOrder,
