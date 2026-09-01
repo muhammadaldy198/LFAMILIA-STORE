@@ -24,6 +24,19 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["product_packages", "margin_type", "margin_type TEXT DEFAULT 'fixed' NOT NULL"],
   ["product_packages", "margin_value", "margin_value INTEGER DEFAULT 0 NOT NULL"],
   ["product_packages", "supplier_synced_at", "supplier_synced_at TEXT"],
+  ["wallet_settings", "manual_qris_enabled", "manual_qris_enabled INTEGER DEFAULT 0 NOT NULL"],
+  ["wallet_settings", "manual_qris_name", "manual_qris_name TEXT DEFAULT 'QRIS Manual' NOT NULL"],
+  ["wallet_settings", "manual_qris_image_url", "manual_qris_image_url TEXT"],
+  ["wallet_settings", "ipaymu_topup_enabled", "ipaymu_topup_enabled INTEGER DEFAULT 0 NOT NULL"],
+  ["wallet_topups", "source", "source TEXT DEFAULT 'manual' NOT NULL"],
+  ["wallet_topups", "reference_id", "reference_id TEXT"],
+  ["wallet_topups", "ipaymu_transaction_id", "ipaymu_transaction_id TEXT"],
+  ["wallet_topups", "ipaymu_payment_no", "ipaymu_payment_no TEXT"],
+  ["wallet_topups", "ipaymu_payment_name", "ipaymu_payment_name TEXT"],
+  ["wallet_topups", "ipaymu_payment_url", "ipaymu_payment_url TEXT"],
+  ["wallet_topups", "ipaymu_expired_at", "ipaymu_expired_at TEXT"],
+  ["wallet_topups", "payment_fee", "payment_fee INTEGER DEFAULT 0 NOT NULL"],
+  ["wallet_topups", "payment_total", "payment_total INTEGER DEFAULT 0 NOT NULL"],
 ];
 
 /** Repairs columns from old, partially-applied D1 migrations without dropping any data. */
