@@ -289,6 +289,7 @@ export async function recordOrderEvent(input: {
   orderId: string;
   source:
     | "ipaymu"
+    | "midtrans"
     | "wallet"
     | "digiflazz"
     | "vippayment"
