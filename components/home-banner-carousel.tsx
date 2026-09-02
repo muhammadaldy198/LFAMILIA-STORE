@@ -40,7 +40,7 @@ export function HomeBannerCarousel() {
       <Link
         href={banner.ctaHref || "/catalog"}
         aria-label={banner.title || "Buka banner promo"}
-        className="group relative block h-[132px] overflow-hidden rounded-[12px] border border-white/10 bg-[#10131b] sm:h-[184px] sm:rounded-[14px] lg:h-[218px]"
+        className="group relative block h-[148px] overflow-hidden rounded-[12px] border border-white/10 bg-[#10131b] sm:h-[204px] sm:rounded-[14px] lg:h-[240px]"
       >
         <picture>
           <source media="(max-width: 639px)" srcSet={mobileImageUrl} />
