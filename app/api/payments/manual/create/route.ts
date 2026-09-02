@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getCustomerSession } from "@/lib/server/customer-auth";
+import { getMemberTierProfile } from "@/lib/server/member-tiers";
 import { quotePromotion } from "@/lib/server/promotions";
 import {
   createOrderIdentity,
@@ -62,14 +63,18 @@ export async function POST(request: Request) {
         { error: "Stok kode untuk paket ini sedang habis." },
         { status: 409 },
       );
+    const customer = await getCustomerSession(request);
+    const membership = customer ? await getMemberTierProfile(customer.id) : null;
     const promotion = await quotePromotion(
       item.productSlug,
       item.packageSku,
       item.price,
       input.voucherCode,
+      membership
+        ? { tier: membership.tier, discountPercent: membership.setting.discountPercent }
+        : null,
     );
     const identity = createOrderIdentity();
-    const customer = await getCustomerSession(request);
     await insertPendingOrder({
       ...identity,
       item,
@@ -107,6 +112,9 @@ export async function POST(request: Request) {
         discountAmount: promotion.discountAmount,
         voucherCode: promotion.voucherCode,
         flashSaleId: promotion.flashSaleId,
+        memberTier: promotion.memberTier,
+        memberDiscountPercent: promotion.memberDiscountPercent,
+        discountSource: promotion.discountSource,
       },
       { status: 201 },
     );
