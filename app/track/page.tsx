@@ -11,11 +11,12 @@ type TrackedOrder = {
   referenceId: string;
   productName: string;
   packageLabel: string;
-  destination: string;
+  destination: string | null;
   total: number;
   paymentStatus: string;
   fulfillmentStatus: string;
   fulfillmentType: "automatic" | "manual";
+  voucherCode?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -71,12 +72,14 @@ export default function TrackPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   async function search(event: FormEvent) {
     event.preventDefault();
     const referenceId = invoice.trim().toUpperCase();
     setOrder(null);
     setError("");
+    setCopiedCode(false);
     if (!referenceId) {
       setError("Masukkan nomor invoice terlebih dahulu.");
       return;
@@ -103,6 +106,13 @@ export default function TrackPage() {
     void navigator.clipboard?.writeText(order.referenceId);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
+  }
+
+  function copyVoucherCode() {
+    if (!order?.voucherCode) return;
+    void navigator.clipboard?.writeText(order.voucherCode);
+    setCopiedCode(true);
+    window.setTimeout(() => setCopiedCode(false), 1500);
   }
 
   const status = order ? statusPresentation(order) : null;
@@ -135,7 +145,24 @@ export default function TrackPage() {
           </div>
           <div className="p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.035] p-3"><span className="break-all font-mono text-xs text-white/60">{order.referenceId}</span><button type="button" onClick={copyId} className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-[#cfff72]"><Copy className="size-3" />{copied ? "Tersalin" : "Salin"}</button></div>
-            <dl className="mt-5 grid gap-4 text-xs sm:grid-cols-2">{[["Produk", order.productName], ["Item", order.packageLabel], ["Tujuan", order.destination], ["Total", formatRupiah(order.total)]].map(([label, value]) => <div key={label} className="border-b border-white/[0.07] pb-4"><dt className="text-white/32">{label}</dt><dd className="mt-1.5 font-bold">{value}</dd></div>)}</dl>
+            <dl className="mt-5 grid gap-4 text-xs sm:grid-cols-2">{[["Produk", order.productName], ["Item", order.packageLabel], ...(order.destination ? [["Tujuan", order.destination]] : []), ["Total", formatRupiah(order.total)]].map(([label, value]) => <div key={label} className="border-b border-white/[0.07] pb-4"><dt className="text-white/32">{label}</dt><dd className="mt-1.5 font-bold">{value}</dd></div>)}</dl>
+
+            {order.voucherCode && (
+              <div className="mt-5 rounded-xl border border-[#b9ff35]/25 bg-[#b9ff35]/[0.07] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[#cfff72]">Kode Voucher</span>
+                    <p className="mt-1 text-[9px] text-white/38">Simpan kode ini dan jangan bagikan kepada orang lain.</p>
+                  </div>
+                  <CheckCircle2 className="size-5 shrink-0 text-[#b9ff35]" />
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-black/20 p-3">
+                  <strong className="break-all font-mono text-sm text-[#d8ff8d]">{order.voucherCode}</strong>
+                  <button type="button" onClick={copyVoucherCode} className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-[#cfff72]"><Copy className="size-3.5" />{copiedCode ? "Tersalin" : "Salin kode"}</button>
+                </div>
+              </div>
+            )}
+
             <div className="mt-6 grid grid-cols-[24px_1fr] gap-x-3 gap-y-1 text-xs">
               <span className={`mt-0.5 grid size-5 place-items-center rounded-full ${order.paymentStatus === "paid" ? "bg-[#b9ff35] text-[#091006]" : "bg-white/10 text-white/45"}`}>{order.paymentStatus === "paid" ? <CheckCircle2 className="size-3" /> : <Clock3 className="size-3" />}</span>
               <div><strong>{paymentLabels[order.paymentStatus] || "Status pembayaran diperbarui"}</strong><p className="mt-1 text-[10px] text-white/32">{dateLabel(order.createdAt)}</p></div>
