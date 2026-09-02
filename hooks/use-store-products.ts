@@ -5,8 +5,7 @@ import { products as fallbackProducts, type StoreProduct } from "@/lib/store-dat
 
 function normalizeProviderReadiness(product: StoreProduct): StoreProduct {
   if (product.fulfillmentType !== "automatic") return product;
-  const activePackages = product.packages.filter((item) => item.isActive !== false);
-  const providerReady = activePackages.length > 0 && activePackages.every((item) => Boolean(item.providerCode && item.providerSku));
+  const providerReady = product.packages.length > 0 && product.packages.every((item) => Boolean(item.providerCode && item.providerSku));
   if (providerReady) return product;
   return { ...product, fulfillmentType: "manual", instant: false };
 }
