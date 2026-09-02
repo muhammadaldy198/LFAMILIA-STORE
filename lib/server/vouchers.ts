@@ -203,7 +203,7 @@ export async function listVoucherDashboard() {
       encryptionReady: Boolean(config.VOUCHER_ENCRYPTION_KEY && config.VOUCHER_ENCRYPTION_KEY.trim().length >= 32),
       emailReady: Boolean(config.RESEND_API_KEY && config.RESEND_FROM_EMAIL),
       whatsappReady: Boolean(config.WHATSAPP_ACCESS_TOKEN && config.WHATSAPP_PHONE_NUMBER_ID && config.WHATSAPP_VOUCHER_TEMPLATE),
-      deliveryChannel: parseDeliveryChannels(config.VOUCHER_DELIVERY_CHANNEL).join("+") || "both",
+      deliveryChannel: parseDeliveryChannels(config.VOUCHER_DELIVERY_CHANNEL).join("+") || "website",
     },
   };
 }
@@ -249,9 +249,11 @@ async function reserveCode(orderId: string, stockKeyInput: string) {
 }
 
 function parseDeliveryChannels(value?: string): DeliveryChannel[] {
-  if (value?.toLowerCase() === "email") return ["email"];
-  if (value?.toLowerCase() === "whatsapp") return ["whatsapp"];
-  return ["email", "whatsapp"];
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "email") return ["email"];
+  if (normalized === "whatsapp") return ["whatsapp"];
+  if (normalized === "both" || normalized === "email+whatsapp" || normalized === "whatsapp+email") return ["email", "whatsapp"];
+  return [];
 }
 
 async function existingDeliveryStatus(orderId: string, channel: DeliveryChannel) {
@@ -365,22 +367,27 @@ function escapeHtml(value: string) {
 export async function fulfillVoucherStockOrder(order: ProviderOrder): Promise<ProviderResult> {
   const voucher = await reserveCode(order.id, order.providerSku);
   const code = decryptCode(voucher, encryptionSecret());
-  const channels = parseDeliveryChannels(runtime().VOUCHER_DELIVERY_CHANNEL);
-  const outcomes = await Promise.all(channels.map((channel) => deliverChannel(order, voucher, code, channel)));
-  const sent = outcomes.filter((outcome) => outcome.status === "sent");
-  if (sent.length < 1) throw new Error(outcomes.map((outcome) => `${outcome.channel}: ${outcome.message}`).join(" | "));
 
   await getD1().prepare(
     `UPDATE voucher_codes SET status = 'delivered', delivered_at = COALESCE(delivered_at, CURRENT_TIMESTAMP)
      WHERE id = ? AND order_id = ?`,
   ).bind(voucher.id, order.id).run();
 
+  const channels = parseDeliveryChannels(runtime().VOUCHER_DELIVERY_CHANNEL);
+  const outcomes = channels.length
+    ? await Promise.all(channels.map((channel) => deliverChannel(order, voucher, code, channel)))
+    : [];
+  const sent = outcomes.filter((outcome) => outcome.status === "sent");
+  const extraMessage = sent.length
+    ? ` Notifikasi tambahan terkirim via ${sent.map((outcome) => outcome.channel).join(" + ")}.`
+    : "";
+
   return {
     externalId: `stock-${voucher.id}`,
     status: "success",
-    message: `Kode dikirim via ${sent.map((outcome) => outcome.channel).join(" + ")}.`,
+    message: `Kode tersedia di website.${extraMessage}`,
     serialNumber: `STOCK-${voucher.id}`,
-    raw: { voucherCodeId: voucher.id, stockKey: voucher.stock_key, deliveries: outcomes },
+    raw: { voucherCodeId: voucher.id, stockKey: voucher.stock_key, websiteDelivery: true, deliveries: outcomes },
   };
 }
 
