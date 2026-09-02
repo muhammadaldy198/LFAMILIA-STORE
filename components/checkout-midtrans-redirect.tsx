@@ -4,6 +4,19 @@ import { useEffect } from "react";
 
 const orderReference = /LF(?:-\d{8}-[A-F0-9]{8,12}|\d{6}[A-F0-9]{12})/g;
 
+function snapTokenFromUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const parts = url.pathname.split("/").filter(Boolean);
+    const redirectionIndex = parts.lastIndexOf("redirection");
+    if (redirectionIndex >= 0 && parts[redirectionIndex + 1])
+      return decodeURIComponent(parts[redirectionIndex + 1]);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function findMidtransPayment() {
   for (const anchor of Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"))) {
     try {
@@ -15,7 +28,11 @@ function findMidtransPayment() {
         const matches = document.body.textContent?.match(orderReference) ?? [];
         const referenceId = matches.at(-1);
         if (!referenceId) return null;
-        return { paymentUrl: url.toString(), invoice: referenceId };
+        return {
+          paymentUrl: url.toString(),
+          invoice: referenceId,
+          snapToken: snapTokenFromUrl(url.toString()),
+        };
       }
     } catch {
       // Abaikan href yang tidak valid.
@@ -41,10 +58,17 @@ export function CheckoutMidtransRedirect() {
             `lfamilia-payment:${payment.invoice}`,
             payment.paymentUrl,
           );
+          if (payment.snapToken)
+            window.sessionStorage.setItem(
+              `lfamilia-snap-token:${payment.invoice}`,
+              payment.snapToken,
+            );
         } catch {
           // Session storage hanya fallback, bukan syarat pembayaran.
         }
-        window.location.assign(`/payment?invoice=${encodeURIComponent(payment.invoice)}`);
+        const params = new URLSearchParams({ invoice: payment.invoice });
+        if (payment.snapToken) params.set("token", payment.snapToken);
+        window.location.assign(`/payment?${params.toString()}`);
       });
     }
 
