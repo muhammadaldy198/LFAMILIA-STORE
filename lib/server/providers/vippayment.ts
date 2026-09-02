@@ -1,6 +1,6 @@
 import { hashHex } from "@/lib/server/crypto";
 import type { ProviderAdapter, ProviderResult } from "@/lib/server/providers/types";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getRuntimeEnv, requireRuntimeValue } from "@/lib/server/runtime-env";
 
 type VipPaymentEnv = {
   VIPPAYMENT_API_ID?: string;
@@ -30,9 +30,9 @@ export const vipPaymentAdapter: ProviderAdapter = {
   name: "VIPayment",
   async fulfill(order) {
     const runtime = getRuntimeEnv<VipPaymentEnv>();
-    const apiId = runtime.VIPPAYMENT_API_ID?.trim();
-    const apiKey = runtime.VIPPAYMENT_API_KEY?.trim();
-    if (!apiId || !apiKey) throw new Error("Secret VIPayment belum dikonfigurasi.");
+    const apiId = requireRuntimeValue(runtime.VIPPAYMENT_API_ID, "VIPPAYMENT_API_ID");
+    const apiKey = requireRuntimeValue(runtime.VIPPAYMENT_API_KEY, "VIPPAYMENT_API_KEY");
+    const apiUrl = requireRuntimeValue(runtime.VIPPAYMENT_API_URL, "VIPPAYMENT_API_URL");
 
     const form = new URLSearchParams({
       key: apiKey,
@@ -44,7 +44,7 @@ export const vipPaymentAdapter: ProviderAdapter = {
     if (order.server) form.set("data_zone", order.server);
     if (order.customerNotes) form.set("post_additional_data", order.customerNotes);
 
-    const response = await fetch(runtime.VIPPAYMENT_API_URL?.trim() || "https://vip-reseller.co.id/api/game-feature", {
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
       body: form,
