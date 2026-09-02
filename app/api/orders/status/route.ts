@@ -6,32 +6,40 @@ import type { OrderRecord } from "@/lib/server/orders";
 export const dynamic = "force-dynamic";
 
 const legacyReference = /^LF-\d{8}-[A-F0-9]{8,12}$/;
+const compactReference = /^LF\d{6}[A-F0-9]{12}$/;
 const publicReference = /^LF[A-F0-9]{8,12}$/;
 
 const schema = z.object({
   referenceId: z.string().trim().toUpperCase().refine(
-    (value) => legacyReference.test(value) || publicReference.test(value),
+    (value) =>
+      legacyReference.test(value) ||
+      compactReference.test(value) ||
+      publicReference.test(value),
     "Format invoice tidak valid.",
   ),
 });
 
 function publicReferenceId(value: string) {
-  if (publicReference.test(value)) return value;
+  if (compactReference.test(value) || publicReference.test(value)) return value;
   const token = value.split("-").at(-1) ?? value;
   return `LF${token}`;
 }
 
 async function resolveOrder(referenceId: string) {
   const db = getD1();
-  if (legacyReference.test(referenceId)) {
-    return db.prepare("SELECT * FROM orders WHERE reference_id = ? LIMIT 1")
-      .bind(referenceId)
+  const exact = await db.prepare("SELECT * FROM orders WHERE reference_id = ? LIMIT 1")
+    .bind(referenceId)
+    .first<OrderRecord>();
+  if (exact) return exact;
+
+  if (publicReference.test(referenceId)) {
+    const token = referenceId.slice(2);
+    return db.prepare("SELECT * FROM orders WHERE reference_id LIKE ? LIMIT 1")
+      .bind(`%-${token}`)
       .first<OrderRecord>();
   }
-  const token = referenceId.slice(2);
-  return db.prepare("SELECT * FROM orders WHERE reference_id LIKE ? LIMIT 1")
-    .bind(`%-${token}`)
-    .first<OrderRecord>();
+
+  return null;
 }
 
 function maskDestination(value: string, server: string | null) {
