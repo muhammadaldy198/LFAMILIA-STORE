@@ -49,16 +49,25 @@ const productSchema = z.object({
   manualOpenTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   manualCloseTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   manualTimezone: z.string().trim().max(60).default("Asia/Jakarta"),
+  packageTabsEnabled: z.boolean().default(false),
+  packageTabs: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
   isActive: z.boolean().default(true),
   sortOrder: z.number().int().min(0).max(10_000).default(0),
   packages: z.array(packageSchema).min(1).max(50),
   notices: z.array(noticeSchema).max(10).default([]),
 });
 
-function validateStockKeys(input: z.infer<typeof productSchema>) {
+function validateProduct(input: z.infer<typeof productSchema>) {
+  const tabs = input.packageTabs.map((item) => item.trim());
+  if (new Set(tabs.map((item) => item.toLowerCase())).size !== tabs.length) {
+    throw new Error("Nama tab nominal tidak boleh duplikat.");
+  }
   for (const item of input.packages) {
     if (item.providerCode === "voucher-stock" && (!item.providerSku || !/^[a-z0-9][a-z0-9._:-]{1,99}$/.test(item.providerSku))) {
       throw new Error("Kunci stok internal hanya boleh berisi huruf kecil, angka, titik, garis, titik dua, atau underscore.");
+    }
+    if (input.packageTabsEnabled && item.group && !tabs.includes(item.group.trim())) {
+      throw new Error(`Tab nominal "${item.group}" belum dibuat pada produk ini.`);
     }
   }
 }
@@ -79,7 +88,7 @@ export async function POST(request: Request) {
   if (access instanceof Response) return access;
   try {
     const input = productSchema.parse(await request.json());
-    validateStockKeys(input);
+    validateProduct(input);
     const id = await saveProduct(input);
     return Response.json({ ok: true, id }, { status: 201 });
   } catch (error) {
@@ -93,7 +102,7 @@ export async function PATCH(request: Request) {
   if (access instanceof Response) return access;
   try {
     const input = productSchema.extend({ dbId: z.number().int().positive() }).parse(await request.json());
-    validateStockKeys(input);
+    validateProduct(input);
     await saveProduct(input, input.dbId);
     return Response.json({ ok: true });
   } catch (error) {
