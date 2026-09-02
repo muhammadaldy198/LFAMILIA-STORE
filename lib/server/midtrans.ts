@@ -35,7 +35,8 @@ function runtimeConfig() {
 }
 
 function enabledPayments(method: string, channel: string) {
-  if (method === "qris") return ["qris"];
+  if (method === "qris") return ["other_qris"];
+
   if (method === "ewallet") {
     const map: Record<string, string> = {
       gopay: "gopay",
@@ -43,8 +44,12 @@ function enabledPayments(method: string, channel: string) {
       dana: "dana",
       ovo: "ovo",
     };
-    return map[channel] ? [map[channel]] : undefined;
+    const payment = map[channel];
+    if (!payment)
+      throw new Error(`Channel e-wallet ${channel} belum didukung Midtrans Snap.`);
+    return [payment];
   }
+
   if (method === "va") {
     const map: Record<string, string> = {
       bca: "bca_va",
@@ -52,10 +57,26 @@ function enabledPayments(method: string, channel: string) {
       bri: "bri_va",
       permata: "permata_va",
       mandiri: "echannel",
+      bsi: "bsi_va",
+      cimb: "cimb_va",
+      danamon: "danamon_va",
     };
-    return map[channel] ? [map[channel]] : undefined;
+    const payment = map[channel];
+    if (!payment)
+      throw new Error(`Channel VA ${channel} belum didukung Midtrans Snap.`);
+    return [payment];
   }
-  return undefined;
+
+  throw new Error("Metode pembayaran belum didukung Midtrans Snap.");
+}
+
+export function isMidtransChannelSupported(method: string, channel: string) {
+  try {
+    enabledPayments(method, channel);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function createMidtransSnapPayment(input: {
@@ -90,7 +111,7 @@ export async function createMidtransSnapPayment(input: {
       phone: input.buyerPhone,
     },
     callbacks: { finish: input.finishUrl },
-    ...(payments ? { enabled_payments: payments } : {}),
+    enabled_payments: payments,
   };
   const response = await fetch(endpoint, {
     method: "POST",
@@ -108,7 +129,9 @@ export async function createMidtransSnapPayment(input: {
       payload.status_message || "Midtrans menolak pembuatan pembayaran.",
     );
   return {
-    transactionId: payload.token ?? null,
+    // Snap create mengembalikan token, bukan transaction_id. transaction_id asli
+    // baru tersedia dari notification callback Midtrans.
+    transactionId: null,
     paymentUrl: payload.redirect_url,
     raw: payload,
   } satisfies MidtransPaymentResult;
