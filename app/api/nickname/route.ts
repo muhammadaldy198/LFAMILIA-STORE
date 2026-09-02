@@ -1,14 +1,13 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 export const dynamic = "force-dynamic";
 
 const games = {
-  "mobile-legends": { endpoint: "ml", needsServer: true, numeric: true },
-  "free-fire": { endpoint: "ff", needsServer: false, numeric: true },
-  "genshin-impact": { endpoint: "gi", needsServer: false, numeric: true },
-  valorant: { endpoint: "valo", needsServer: false, numeric: false },
+  "mobile-legends": { endpoint: "ml", needsServer: true, numeric: true, melostoreCode: "mobile-legends" },
+  "free-fire": { endpoint: "ff", needsServer: false, numeric: true, melostoreCode: "free-fire" },
+  "genshin-impact": { endpoint: "gi", needsServer: false, numeric: true, melostoreCode: "genshin-impact" },
+  valorant: { endpoint: "valo", needsServer: false, numeric: false, melostoreCode: "valorant" },
 } as const;
 
 const requestSchema = z.object({
@@ -22,13 +21,9 @@ type GameSlug = keyof typeof games;
 type RuntimeEnv = {
   NICKNAME_API_URL?: string;
   NICKNAME_API_KEY?: string;
-  JAGOANITEM_API_ID?: string;
-  JAGOANITEM_API_KEY?: string;
-  JAGOANITEM_API_URL?: string;
-  JAGOANITEM_GAME_CODE_MOBILE_LEGENDS?: string;
-  JAGOANITEM_GAME_CODE_FREE_FIRE?: string;
-  JAGOANITEM_GAME_CODE_GENSHIN_IMPACT?: string;
-  JAGOANITEM_GAME_CODE_VALORANT?: string;
+  MELOSTORE_API_KEY?: string;
+  MELOSTORE_SECRET_KEY?: string;
+  MELOSTORE_API_URL?: string;
 };
 
 type ProviderResponse = {
@@ -41,15 +36,17 @@ type ProviderResponse = {
   data?: { name?: unknown; nickname?: unknown; username?: unknown };
 };
 
-type JagoanItemResponse = {
-  status?: boolean;
-  result?: boolean;
-  msg?: unknown;
+type MelostoreResponse = {
+  success?: boolean;
   message?: unknown;
+  error?: unknown;
   data?: {
-    nickname?: unknown;
-    name?: unknown;
+    game_code?: unknown;
+    customer_target?: unknown;
+    customer_target_zone?: unknown;
     username?: unknown;
+    nickname?: unknown;
+    region?: unknown;
     country?: unknown;
   };
 };
@@ -67,17 +64,16 @@ export async function POST(request: Request) {
     }
 
     const runtime = getRuntimeEnv<RuntimeEnv>();
-    const apiId = runtime.JAGOANITEM_API_ID?.trim();
-    const apiKey = runtime.JAGOANITEM_API_KEY?.trim();
-    const gameCode = getJagoanItemGameCode(runtime, input.game);
+    const apiKey = runtime.MELOSTORE_API_KEY?.trim();
+    const secretKey = runtime.MELOSTORE_SECRET_KEY?.trim();
 
-    if (apiId && apiKey && gameCode) {
-      return await lookupJagoanItem({
+    if (apiKey && secretKey) {
+      return await lookupMelostore({
         runtime,
-        apiId,
         apiKey,
-        gameCode,
+        secretKey,
         game: input.game,
+        gameCode: game.melostoreCode,
         userId: input.userId,
         server: input.server,
       });
@@ -110,105 +106,84 @@ export async function POST(request: Request) {
   }
 }
 
-async function lookupJagoanItem({
+async function lookupMelostore({
   runtime,
-  apiId,
   apiKey,
-  gameCode,
+  secretKey,
   game,
+  gameCode,
   userId,
   server,
 }: {
   runtime: RuntimeEnv;
-  apiId: string;
   apiKey: string;
-  gameCode: string;
+  secretKey: string;
   game: GameSlug;
+  gameCode: string;
   userId: string;
   server?: string;
 }) {
-  const endpoint =
-    runtime.JAGOANITEM_API_URL?.trim() ||
-    "https://jagoanitem.com/api/get-everything";
-  const signature = createHash("md5")
-    .update(`${apiId}${apiKey}`)
-    .digest("hex");
+  const baseUrl = (runtime.MELOSTORE_API_URL?.trim() || "https://api.melostore.id").replace(/\/$/, "");
+  const endpoint = `${baseUrl}/api/v1/h2h/check-nickname`;
 
-  const body = new URLSearchParams({
-    api_id: apiId,
-    api_key: apiKey,
-    signature,
-    type: "nickname",
-    target_id: userId,
+  const body: {
+    game_code: string;
+    customer_target: string;
+    customer_target_zone?: string;
+  } = {
     game_code: gameCode,
-  });
-  if (server) body.set("target_server", server);
+    customer_target: userId,
+  };
+  if (server) body.customer_target_zone = server;
 
   const upstream = await fetch(endpoint, {
     method: "POST",
     headers: {
       accept: "application/json",
-      "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+      "content-type": "application/json",
+      "X-API-Key": apiKey,
+      "X-Secret-Key": secretKey,
     },
-    body,
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(8_000),
   });
 
-  let data: JagoanItemResponse;
+  let data: MelostoreResponse;
   try {
-    data = (await upstream.json()) as JagoanItemResponse;
+    data = (await upstream.json()) as MelostoreResponse;
   } catch {
-    throw new Error("JagoanItem mengembalikan respons yang tidak valid.");
+    throw new Error("Melostore mengembalikan respons yang tidak valid.");
   }
 
-  const providerMessage = [data.msg, data.message].find(
-    (value): value is string =>
-      typeof value === "string" && value.trim().length > 0,
+  const providerMessage = [data.message, data.error].find(
+    (value): value is string => typeof value === "string" && value.trim().length > 0,
   )?.trim();
 
-  if (!upstream.ok || data.status === false || data.result === false) {
-    const lowerMessage = providerMessage?.toLowerCase() || "";
-
-    if (lowerMessage.includes("whitelist")) {
-      throw new Error(
-        "JagoanItem menolak IP Cloudflare Worker karena belum masuk whitelist. Endpoint perlu dilewatkan melalui VPS relay dengan IP statis.",
-      );
-    }
-    if (lowerMessage.includes("signature")) {
-      throw new Error(
-        "Signature JagoanItem tidak valid. Periksa API ID dan API Key.",
-      );
-    }
-    if (lowerMessage.includes("api id") || lowerMessage.includes("api key")) {
-      throw new Error("API ID atau API Key JagoanItem tidak valid.");
+  if (!upstream.ok || data.success === false) {
+    if (upstream.status === 401 || upstream.status === 403) {
+      throw new Error("API Key atau Secret Key Melostore tidak valid atau akses H2H ditolak.");
     }
 
     return Response.json(
-      { error: providerMessage || "ID atau Server tidak ditemukan di JagoanItem." },
-      { status: upstream.status === 404 ? 404 : 502 },
+      { error: providerMessage || "ID atau Server tidak ditemukan di Melostore." },
+      { status: upstream.status === 404 || upstream.status === 422 ? 404 : 502 },
     );
   }
 
-  const rawName = [
-    data.data?.nickname,
-    data.data?.name,
-    data.data?.username,
-  ].find(
-    (value): value is string =>
-      typeof value === "string" && value.trim().length > 0,
+  const rawName = [data.data?.username, data.data?.nickname].find(
+    (value): value is string => typeof value === "string" && value.trim().length > 0,
   );
 
   if (!rawName) {
     return Response.json(
-      { error: "Nickname tidak ditemukan pada jawaban JagoanItem." },
+      { error: "Nickname tidak ditemukan pada jawaban Melostore." },
       { status: 404 },
     );
   }
 
-  const country =
-    typeof data.data?.country === "string" && data.data.country.trim()
-      ? data.data.country.trim()
-      : null;
+  const country = [data.data?.region, data.data?.country].find(
+    (value): value is string => typeof value === "string" && value.trim().length > 0,
+  )?.trim() ?? null;
 
   return Response.json({
     nickname: rawName.trim(),
@@ -216,7 +191,7 @@ async function lookupJagoanItem({
     game,
     userId,
     server: server ?? null,
-    provider: "jagoanitem",
+    provider: "melostore",
   });
 }
 
@@ -311,17 +286,4 @@ async function lookupFallbackProvider({
     server: server ?? null,
     provider: "fallback",
   });
-}
-
-function getJagoanItemGameCode(runtime: RuntimeEnv, game: GameSlug) {
-  switch (game) {
-    case "mobile-legends":
-      return runtime.JAGOANITEM_GAME_CODE_MOBILE_LEGENDS?.trim() || "";
-    case "free-fire":
-      return runtime.JAGOANITEM_GAME_CODE_FREE_FIRE?.trim() || "";
-    case "genshin-impact":
-      return runtime.JAGOANITEM_GAME_CODE_GENSHIN_IMPACT?.trim() || "";
-    case "valorant":
-      return runtime.JAGOANITEM_GAME_CODE_VALORANT?.trim() || "";
-  }
 }
