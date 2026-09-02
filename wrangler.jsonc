@@ -4,22 +4,12 @@
   "compatibility_date": "2026-08-28",
   "compatibility_flags": ["nodejs_compat"],
   "main": "./worker/index.ts",
+  "keep_vars": true,
   "triggers": { "crons": ["*/15 * * * *"] },
   "assets": {
     "directory": "dist/client",
     "not_found_handling": "none",
     "binding": "ASSETS"
-  },
-  "vars": {
-    "PUBLIC_BASE_URL": "https://lfamiliastore.my.id",
-    "MIDTRANS_ENV": "sandbox",
-    "NICKNAME_API_URL": "https://api.isan.eu.org/nickname",
-    "DIGIFLAZZ_ENV": "development",
-    "OWNER_EMAIL": "muhammadaldy198@gmail.com",
-    "VOUCHER_DELIVERY_CHANNEL": "website",
-    "WHATSAPP_VOUCHER_TEMPLATE": "lfamilia_voucher_delivery",
-    "WHATSAPP_TEMPLATE_LANGUAGE": "id",
-    "WHATSAPP_GRAPH_VERSION": "v23.0"
   },
   "d1_databases": [
     {
