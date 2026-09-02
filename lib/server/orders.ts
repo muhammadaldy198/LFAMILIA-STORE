@@ -145,10 +145,10 @@ export function renderCustomerNo(
 
 export function createOrderIdentity() {
   const id = crypto.randomUUID();
-  const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  const date = new Date().toISOString().slice(2, 10).replaceAll("-", "");
   return {
     id,
-    referenceId: `LF-${date}-${id.replaceAll("-", "").slice(0, 12).toUpperCase()}`,
+    referenceId: `LF${date}${id.replaceAll("-", "").slice(0, 12).toUpperCase()}`,
   };
 }
 
