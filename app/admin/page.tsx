@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminOrderManager } from "@/components/admin-order-manager";
 import { AdminOverview } from "@/components/admin-overview";
 import { AdminExperienceManager } from "@/components/admin-experience-manager";
+import { AdminMemberManager } from "@/components/admin-member-manager";
 import { AdminProductManager } from "@/components/admin-product-manager";
 import { AdminPromotionManager } from "@/components/admin-promotion-manager";
 import { AdminStorefrontManager } from "@/components/admin-storefront-manager";
@@ -53,6 +54,7 @@ const baseNav = [
 
 const ownerNav = [
   ["promotions", "Voucher diskon", TicketPercent],
+  ["members", "Member & Privilege", ShieldCheck],
   ["wallet", "Saldo pelanggan", WalletCards],
   ["payments", "Pembayaran", CreditCard],
   ["vouchers", "Stok kode", TicketPercent],
@@ -323,6 +325,14 @@ export default function AdminPage() {
                     description="Atur kode, periode, minimum pembelian, kuota, dan batas diskon."
                   >
                     <AdminPromotionManager role="owner" />
+                  </AdminSection>
+                </TabsContent>
+                <TabsContent value="members" className="mt-0">
+                  <AdminSection
+                    title="Member & privilege"
+                    description="Role BASIC, GOLD, DIAMOND, dan PLATINUM dihitung otomatis dari total order lunas semua metode pembayaran."
+                  >
+                    <AdminMemberManager />
                   </AdminSection>
                 </TabsContent>
                 <TabsContent value="wallet" className="mt-0">
