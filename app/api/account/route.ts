@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
+import { getMemberTierProfile } from "@/lib/server/member-tiers";
 import { listCustomerVoucherCodes } from "@/lib/server/vouchers";
 
 export const dynamic = "force-dynamic";
@@ -9,13 +10,14 @@ export async function GET(request: Request) {
   const customer = await requireCustomerSession(request);
   if (customer instanceof Response) return customer;
   const db = getD1();
-  const [topups, transactions, orders] = await db.batch([
-    db.prepare("SELECT id, amount, sender_name, payment_method, proof_url, status, admin_notes, created_at FROM wallet_topups WHERE customer_id = ? ORDER BY created_at DESC LIMIT 40").bind(customer.id),
-    db.prepare("SELECT id, direction, amount, balance_before, balance_after, reference, description, created_at FROM wallet_transactions WHERE customer_id = ? ORDER BY created_at DESC LIMIT 60").bind(customer.id),
-    db.prepare("SELECT id, reference_id, product_name, package_label, total, payment_status, fulfillment_status, created_at FROM orders WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50").bind(customer.id),
+  const [topups, transactions, orders, membership] = await Promise.all([
+    db.prepare("SELECT id, amount, sender_name, payment_method, proof_url, status, admin_notes, created_at FROM wallet_topups WHERE customer_id = ? ORDER BY created_at DESC LIMIT 40").bind(customer.id).all(),
+    db.prepare("SELECT id, direction, amount, balance_before, balance_after, reference, description, created_at FROM wallet_transactions WHERE customer_id = ? ORDER BY created_at DESC LIMIT 60").bind(customer.id).all(),
+    db.prepare("SELECT id, reference_id, product_name, package_label, total, payment_status, fulfillment_status, created_at FROM orders WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50").bind(customer.id).all(),
+    getMemberTierProfile(customer.id),
   ]);
   const vouchers = await listCustomerVoucherCodes(customer.id).catch(() => []);
-  return Response.json({ customer, topups: topups.results, transactions: transactions.results, orders: orders.results, vouchers });
+  return Response.json({ customer, membership, topups: topups.results, transactions: transactions.results, orders: orders.results, vouchers });
 }
 
 const profileSchema = z.object({
