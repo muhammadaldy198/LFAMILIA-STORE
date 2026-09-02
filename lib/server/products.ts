@@ -6,6 +6,7 @@ const fallbackProductBySlug = new Map(fallbackProducts.map((product) => [product
 
 export type ManagedPackage = ProductPackage & {
   dbId: number | null;
+  group?: string;
   isActive: boolean;
   sortOrder: number;
   supplierPrice?: number | null;
@@ -62,6 +63,7 @@ type PackageRow = {
   label: string;
   price: number;
   note: string | null;
+  package_group: string | null;
   provider_code: string | null;
   provider_sku: string | null;
   supplier_price: number | null;
@@ -117,9 +119,9 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
         manual_open_time, manual_close_time, manual_timezone, is_active, sort_order
        FROM products WHERE is_active = 1 ORDER BY sort_order ASC, name ASC`;
   const packageSql = includeInactive
-    ? `SELECT id, product_id, sku, label, price, note, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
+    ? `SELECT id, product_id, sku, label, price, note, package_group, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
        FROM product_packages ORDER BY sort_order ASC, id ASC`
-    : `SELECT id, product_id, sku, label, price, note, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
+    : `SELECT id, product_id, sku, label, price, note, package_group, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
        FROM product_packages WHERE is_active = 1 ORDER BY sort_order ASC, id ASC`;
   const noticeSql = includeInactive
     ? `SELECT id, product_id, title, body, is_active, sort_order FROM product_notices ORDER BY sort_order ASC, id ASC`
@@ -172,6 +174,7 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
       label: item.label,
       price: item.price,
       note: item.note ?? undefined,
+      group: item.package_group ?? undefined,
       providerCode: item.provider_code ?? undefined,
       providerSku: item.provider_sku ?? undefined,
       supplierPrice: item.supplier_price,
@@ -240,9 +243,9 @@ export async function saveProduct(input: ProductWrite, id?: number) {
   const packageStatements = [
     db.prepare("DELETE FROM product_packages WHERE product_id = ?").bind(productRow.id),
     ...input.packages.map((item, index) => db.prepare(
-      `INSERT INTO product_packages (product_id, sku, label, price, note, provider_code, provider_sku, pricing_mode, margin_type, margin_value, is_active, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(productRow.id, item.id, item.label, item.price, item.note ?? null, item.providerCode ?? null, item.providerSku ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index)),
+      `INSERT INTO product_packages (product_id, sku, label, price, note, package_group, provider_code, provider_sku, pricing_mode, margin_type, margin_value, is_active, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(productRow.id, item.id, item.label, item.price, item.note ?? null, item.group?.trim() || null, item.providerCode ?? null, item.providerSku ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index)),
   ];
   await db.batch(packageStatements);
   const noticeStatements = [
@@ -316,10 +319,10 @@ export async function seedFallbackProducts() {
   const idBySlug = new Map(idRows.results.map((row) => [row.slug, row.id]));
 
   const packageStatements = source.flatMap((product) => product.packages.map((item, index) => db.prepare(
-    `INSERT INTO product_packages (product_id, sku, label, price, note, provider_code, provider_sku, is_active, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO product_packages (product_id, sku, label, price, note, package_group, provider_code, provider_sku, is_active, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(sku) DO NOTHING`,
-  ).bind(idBySlug.get(product.slug), item.id, item.label, item.price, item.note ?? null, item.providerCode ?? null, item.providerSku ?? null, 1, index)));
+  ).bind(idBySlug.get(product.slug), item.id, item.label, item.price, item.note ?? null, null, item.providerCode ?? null, item.providerSku ?? null, 1, index)));
   await db.batch(packageStatements);
   const noticeCounts = await db.prepare("SELECT product_id, COUNT(*) AS count FROM product_notices GROUP BY product_id").all<{ product_id: number; count: number }>();
   const productsWithNotices = new Set(noticeCounts.results.filter((row) => row.count > 0).map((row) => row.product_id));
