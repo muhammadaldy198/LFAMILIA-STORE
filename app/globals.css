@@ -217,3 +217,5 @@ body .rounded-xl { border-radius: 0.625rem; }
 body .rounded-lg { border-radius: 0.5rem; }
 /* global compact density */
 body [class~="p-6"]{padding:1rem}body [class~="p-5"]{padding:.75rem}body [class~="py-5"]{padding-top:.75rem;padding-bottom:.75rem}body [class~="gap-6"]{gap:1rem}body [class~="space-y-5"]>:not([hidden])~:not([hidden]){margin-top:.75rem}
+/* global thin panels */
+body [class~="p-4"]{padding:.625rem}body [class~="py-4"]{padding-top:.625rem;padding-bottom:.625rem}body [class~="px-5"]{padding-left:.75rem;padding-right:.75rem}body [class~="gap-5"]{gap:.75rem}body [class~="mt-5"]{margin-top:.75rem}body [class~="mb-5"]{margin-bottom:.75rem}.checkout-input{height:2.25rem!important;padding-top:.35rem!important;padding-bottom:.35rem!important}.admin-input{height:2.125rem!important;padding-top:.3rem!important;padding-bottom:.3rem!important}
