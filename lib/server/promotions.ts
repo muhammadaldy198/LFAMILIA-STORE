@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import type { MemberTier } from "@/lib/server/member-tiers";
 
 export type DiscountVoucher = {
   id: number;
@@ -129,9 +130,19 @@ export type PromotionQuote = {
   voucherCode: string | null;
   flashSaleId: number | null;
   flashSaleEndsAt: string | null;
+  memberTier: MemberTier | null;
+  memberDiscountPercent: number;
+  memberDiscountAmount: number;
+  discountSource: "voucher" | "member" | null;
 };
 
-export async function quotePromotion(productSlug: string, packageSku: string, basePrice: number, voucherCode?: string | null): Promise<PromotionQuote> {
+export async function quotePromotion(
+  productSlug: string,
+  packageSku: string,
+  basePrice: number,
+  voucherCode?: string | null,
+  member?: { tier?: MemberTier | null; discountPercent?: number } | null,
+): Promise<PromotionQuote> {
   const db = getD1();
   const now = new Date().toISOString();
   const flash = await db.prepare(
@@ -140,24 +151,33 @@ export async function quotePromotion(productSlug: string, packageSku: string, ba
        AND (stock_limit IS NULL OR sold_count < stock_limit) LIMIT 1`,
   ).bind(productSlug, packageSku, now, now).first<{ id: number; sale_price: number; ends_at: string }>();
   const sellingPrice = flash && flash.sale_price < basePrice ? flash.sale_price : basePrice;
-  let discountAmount = 0;
-  let appliedCode: string | null = null;
+  let voucherDiscountAmount = 0;
+  let voucher: VoucherRow | null = null;
 
   if (voucherCode?.trim()) {
     const code = voucherCode.trim().toUpperCase();
-    const voucher = await db.prepare(
+    voucher = await db.prepare(
       `SELECT * FROM discount_vouchers WHERE code = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
        AND (usage_limit IS NULL OR used_count < usage_limit) LIMIT 1`,
     ).bind(code, now, now).first<VoucherRow>();
     if (!voucher) throw new Error("Kode voucher tidak aktif, sudah habis, atau tidak ditemukan.");
     if (sellingPrice < voucher.min_purchase) throw new Error(`Minimum transaksi voucher ini Rp${voucher.min_purchase.toLocaleString("id-ID")}.`);
-    discountAmount = voucher.discount_type === "fixed"
+    voucherDiscountAmount = voucher.discount_type === "fixed"
       ? voucher.discount_value
       : Math.floor(sellingPrice * voucher.discount_value / 100);
-    if (voucher.max_discount !== null) discountAmount = Math.min(discountAmount, voucher.max_discount);
-    discountAmount = Math.min(discountAmount, Math.max(0, sellingPrice - 1));
-    appliedCode = voucher.code;
+    if (voucher.max_discount !== null) voucherDiscountAmount = Math.min(voucherDiscountAmount, voucher.max_discount);
+    voucherDiscountAmount = Math.min(voucherDiscountAmount, Math.max(0, sellingPrice - 1));
   }
+
+  const memberDiscountPercent = Math.max(0, Math.min(100, Number(member?.discountPercent ?? 0)));
+  const memberDiscountAmount = Math.min(
+    Math.floor(sellingPrice * memberDiscountPercent / 100),
+    Math.max(0, sellingPrice - 1),
+  );
+  const useMemberDiscount = memberDiscountAmount > 0 && memberDiscountAmount >= voucherDiscountAmount;
+  const discountAmount = useMemberDiscount ? memberDiscountAmount : voucherDiscountAmount;
+  const discountSource = discountAmount > 0 ? (useMemberDiscount ? "member" : "voucher") : null;
+  const appliedCode = discountSource === "voucher" ? voucher?.code ?? null : null;
 
   return {
     basePrice,
@@ -167,6 +187,10 @@ export async function quotePromotion(productSlug: string, packageSku: string, ba
     voucherCode: appliedCode,
     flashSaleId: flash?.id ?? null,
     flashSaleEndsAt: flash?.ends_at ?? null,
+    memberTier: member?.tier ?? null,
+    memberDiscountPercent,
+    memberDiscountAmount,
+    discountSource,
   };
 }
 
