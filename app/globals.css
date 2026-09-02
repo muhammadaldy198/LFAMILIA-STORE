@@ -42,7 +42,7 @@
   --chart-3: #104e64;
   --chart-4: #ffb900;
   --chart-5: #fe9a00;
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --sidebar: #fafafa;
   --sidebar-foreground: #171717;
   --sidebar-primary: #171717;
@@ -210,3 +210,8 @@ html {
     right: -430px;
   }
 }
+/* Tampilan ringkas untuk toko dan panel admin. */
+body .rounded-3xl { border-radius: 0.875rem; }
+body .rounded-2xl { border-radius: 0.75rem; }
+body .rounded-xl { border-radius: 0.625rem; }
+body .rounded-lg { border-radius: 0.5rem; }
