@@ -1,6 +1,6 @@
 import { getD1 } from "@/db";
 import { hashHex } from "@/lib/server/crypto";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getRuntimeEnv, requireRuntimeValue } from "@/lib/server/runtime-env";
 
 type Env = { DIGIFLAZZ_USERNAME?: string; DIGIFLAZZ_API_KEY?: string; DIGIFLAZZ_PRICE_LIST_URL?: string };
 export type PricingSettings = { isAutoSync: boolean; marginType: "fixed" | "percent"; marginValue: number };
@@ -10,10 +10,12 @@ export async function savePricingSettings(input: PricingSettings) { await getD1(
 function sale(cost: number, type: "fixed" | "percent", value: number) { return type === "percent" ? Math.ceil(cost * (100 + value) / 100) : cost + value; }
 
 export async function syncDigiflazzPrices() {
-  const env = getRuntimeEnv<Env>(); const username = env.DIGIFLAZZ_USERNAME?.trim(); const key = env.DIGIFLAZZ_API_KEY?.trim();
-  if (!username || !key) throw new Error("Secret DigiFlazz belum dikonfigurasi.");
+  const env = getRuntimeEnv<Env>();
+  const username = requireRuntimeValue(env.DIGIFLAZZ_USERNAME, "DIGIFLAZZ_USERNAME");
+  const key = requireRuntimeValue(env.DIGIFLAZZ_API_KEY, "DIGIFLAZZ_API_KEY");
+  const priceListUrl = requireRuntimeValue(env.DIGIFLAZZ_PRICE_LIST_URL, "DIGIFLAZZ_PRICE_LIST_URL");
   const settings = await getPricingSettings(); if (!settings.isAutoSync) return { updated: 0, skipped: true };
-  const response = await fetch(env.DIGIFLAZZ_PRICE_LIST_URL?.trim() || "https://api.digiflazz.com/v1/price-list", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify({ cmd: "prepaid", username, sign: hashHex("md5", `${username}${key}pricelist`) }), signal: AbortSignal.timeout(20_000) });
+  const response = await fetch(priceListUrl, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify({ cmd: "prepaid", username, sign: hashHex("md5", `${username}${key}pricelist`) }), signal: AbortSignal.timeout(20_000) });
   const payload = await response.json() as { data?: Array<{ buyer_sku_code?: string; price?: number; buyer_product_status?: boolean; seller_product_status?: boolean }> }; if (!response.ok || !payload.data) throw new Error("Daftar harga DigiFlazz tidak valid.");
   const source = new Map(payload.data.filter((item) => item.buyer_sku_code && Number.isFinite(item.price)).map((item) => [item.buyer_sku_code!, item]));
   const rows = await getD1().prepare("SELECT id, provider_sku, pricing_mode, margin_type, margin_value FROM product_packages WHERE provider_code = 'digiflazz' AND provider_sku IS NOT NULL").all<{ id: number; provider_sku: string; pricing_mode: string; margin_type: "fixed" | "percent"; margin_value: number }>();
