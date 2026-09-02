@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
+import { getMemberTierProfile } from "@/lib/server/member-tiers";
 import { quotePromotion } from "@/lib/server/promotions";
 import {
   applyPaymentStatus,
@@ -41,7 +42,14 @@ export async function POST(request: Request) {
     if (!item) return Response.json({ error: "Produk atau nominal tidak tersedia." }, { status: 404 });
     if (item.needsServer && !input.server) return Response.json({ error: "Server / Zone ID wajib diisi." }, { status: 400 });
     if (item.providerCode === "voucher-stock" && item.providerSku && !await hasAvailableVoucherStock(item.providerSku)) return Response.json({ error: "Stok kode untuk paket ini sedang habis." }, { status: 409 });
-    const promotion = await quotePromotion(item.productSlug, item.packageSku, item.price, input.voucherCode);
+    const membership = await getMemberTierProfile(customer.id);
+    const promotion = await quotePromotion(
+      item.productSlug,
+      item.packageSku,
+      item.price,
+      input.voucherCode,
+      { tier: membership.tier, discountPercent: membership.setting.discountPercent },
+    );
     const identity = createOrderIdentity();
     referenceId = identity.referenceId;
     await insertPendingOrder({ ...identity, item, destination: input.destination, server: input.server || null, nickname: input.nickname || null, buyerName: input.buyerName, buyerEmail: input.buyerEmail, buyerPhone: input.buyerPhone, customerNotes: input.customerNotes || null, paymentMethod: "wallet", paymentChannel: "lfamilia-balance", customerId: customer.id, promotion });
@@ -54,7 +62,7 @@ export async function POST(request: Request) {
       const configured = getRuntimeEnv<RuntimeEnv>().PUBLIC_BASE_URL?.trim();
       await fulfillAutomaticOrder(identity.id, new URL(configured || request.url).origin);
     }
-    return Response.json({ orderId: identity.id, referenceId: identity.referenceId, paymentNo: null, paymentName: "Saldo LFAMILIA", paymentUrl: null, fee: 0, total: promotion.finalPrice, expiredAt: null, paymentStatus: "paid", balanceAfter, fulfillmentType: item.fulfillmentType, providerCode: item.providerCode, basePrice: promotion.basePrice, sellingPrice: promotion.sellingPrice, discountAmount: promotion.discountAmount, voucherCode: promotion.voucherCode, flashSaleId: promotion.flashSaleId }, { status: 201 });
+    return Response.json({ orderId: identity.id, referenceId: identity.referenceId, paymentNo: null, paymentName: "Saldo LFAMILIA", paymentUrl: null, fee: 0, total: promotion.finalPrice, expiredAt: null, paymentStatus: "paid", balanceAfter, fulfillmentType: item.fulfillmentType, providerCode: item.providerCode, basePrice: promotion.basePrice, sellingPrice: promotion.sellingPrice, discountAmount: promotion.discountAmount, voucherCode: promotion.voucherCode, flashSaleId: promotion.flashSaleId, memberTier: promotion.memberTier, memberDiscountPercent: promotion.memberDiscountPercent, discountSource: promotion.discountSource }, { status: 201 });
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message || "Data checkout tidak valid." : error instanceof Error ? error.message : "Pembayaran saldo gagal.";
     if (referenceId) await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
