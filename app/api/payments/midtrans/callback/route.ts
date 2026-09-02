@@ -17,6 +17,13 @@ import {
 export const dynamic = "force-dynamic";
 type RuntimeEnv = { PUBLIC_BASE_URL?: string };
 
+export async function GET() {
+  return Response.json(
+    { ok: true, service: "midtrans-notification", method: "POST" },
+    { headers: { "Cache-Control": "no-store" } },
+  );
+}
+
 export async function POST(request: Request) {
   let payload: Record<string, unknown>;
   try {
