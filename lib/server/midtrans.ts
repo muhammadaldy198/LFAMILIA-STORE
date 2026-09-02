@@ -1,9 +1,10 @@
 import { hashHex, safeEqual } from "@/lib/server/crypto";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getRuntimeEnv, requireRuntimeChoice, requireRuntimeValue } from "@/lib/server/runtime-env";
 
 type MidtransRuntime = {
   MIDTRANS_ENV?: string;
   MIDTRANS_SERVER_KEY?: string;
+  MIDTRANS_SNAP_API_URL?: string;
 };
 
 type SnapResponse = {
@@ -20,18 +21,10 @@ export type MidtransPaymentResult = {
 
 function runtimeConfig() {
   const runtime = getRuntimeEnv<MidtransRuntime>();
-  const serverKey = runtime.MIDTRANS_SERVER_KEY?.trim();
-  if (!serverKey)
-    throw new Error(
-      "MIDTRANS_SERVER_KEY belum dikonfigurasi sebagai Cloudflare Secret.",
-    );
-  const sandbox = runtime.MIDTRANS_ENV?.toLowerCase() !== "production";
-  return {
-    serverKey,
-    endpoint: sandbox
-      ? "https://app.sandbox.midtrans.com/snap/v1/transactions"
-      : "https://app.midtrans.com/snap/v1/transactions",
-  };
+  const serverKey = requireRuntimeValue(runtime.MIDTRANS_SERVER_KEY, "MIDTRANS_SERVER_KEY");
+  const environment = requireRuntimeChoice(runtime.MIDTRANS_ENV, "MIDTRANS_ENV", ["sandbox", "production"] as const);
+  const endpoint = requireRuntimeValue(runtime.MIDTRANS_SNAP_API_URL, "MIDTRANS_SNAP_API_URL");
+  return { serverKey, environment, endpoint };
 }
 
 function enabledPayments(method: string, channel: string) {
