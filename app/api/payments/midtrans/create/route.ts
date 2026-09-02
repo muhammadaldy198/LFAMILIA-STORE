@@ -47,6 +47,10 @@ export async function POST(request: Request) {
   let referenceId: string | null = null;
   try {
     const input = schema.parse(await request.json());
+    const paymentChannel =
+      input.paymentMethod === "qris" && input.paymentChannel === "qris"
+        ? "mpm"
+        : input.paymentChannel;
     const settings = await readWalletSettings();
     if (!settings.midtransCheckoutEnabled)
       return Response.json(
@@ -56,7 +60,7 @@ export async function POST(request: Request) {
     if (
       !(await isPaymentChannelAvailable(
         input.paymentMethod,
-        input.paymentChannel,
+        paymentChannel,
       ))
     )
       return Response.json(
@@ -110,7 +114,7 @@ export async function POST(request: Request) {
       buyerPhone: input.buyerPhone,
       customerNotes: input.customerNotes || null,
       paymentMethod: input.paymentMethod,
-      paymentChannel: input.paymentChannel,
+      paymentChannel,
       customerId: customer?.id ?? null,
       promotion,
     });
@@ -123,7 +127,7 @@ export async function POST(request: Request) {
       buyerEmail: input.buyerEmail,
       buyerPhone: input.buyerPhone,
       paymentMethod: input.paymentMethod,
-      paymentChannel: input.paymentChannel,
+      paymentChannel,
       finishUrl: `${baseUrl}/track?invoice=${encodeURIComponent(identity.referenceId)}`,
     });
     await updateMidtransPayment({
