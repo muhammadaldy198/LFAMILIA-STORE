@@ -18,6 +18,8 @@ export type ManagedPackage = ProductPackage & {
 export type ManagedProduct = Omit<StoreProduct, "packages" | "notices"> & {
   description?: string;
   dbId: number | null;
+  packageTabsEnabled: boolean;
+  packageTabs: string[];
   isActive: boolean;
   sortOrder: number;
   packages: ManagedPackage[];
@@ -52,6 +54,8 @@ type ProductRow = {
   manual_open_time: string | null;
   manual_close_time: string | null;
   manual_timezone: string;
+  package_tabs_enabled: number;
+  package_tabs_json: string | null;
   is_active: number;
   sort_order: number;
 };
@@ -83,10 +87,22 @@ type NoticeRow = {
   sort_order: number;
 };
 
+function parsePackageTabs(value: string | null) {
+  try {
+    const parsed = JSON.parse(value || "[]") as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return Array.from(new Set(parsed.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean))).slice(0, 20);
+  } catch {
+    return [];
+  }
+}
+
 export function getFallbackProducts(): ManagedProduct[] {
   return fallbackProducts.map((product, productIndex) => ({
     ...product,
     dbId: null,
+    packageTabsEnabled: false,
+    packageTabs: [],
     isActive: true,
     sortOrder: productIndex,
     notices: (product.notices ?? []).map((item, noticeIndex) => ({
@@ -112,11 +128,11 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
   const productSql = includeInactive
     ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder,
         needs_server, popular, instant, fulfillment_type, target_template, manual_instructions,
-        manual_open_time, manual_close_time, manual_timezone, is_active, sort_order
+        manual_open_time, manual_close_time, manual_timezone, package_tabs_enabled, package_tabs_json, is_active, sort_order
        FROM products ORDER BY sort_order ASC, name ASC`
     : `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder,
         needs_server, popular, instant, fulfillment_type, target_template, manual_instructions,
-        manual_open_time, manual_close_time, manual_timezone, is_active, sort_order
+        manual_open_time, manual_close_time, manual_timezone, package_tabs_enabled, package_tabs_json, is_active, sort_order
        FROM products WHERE is_active = 1 ORDER BY sort_order ASC, name ASC`;
   const packageSql = includeInactive
     ? `SELECT id, product_id, sku, label, price, note, package_group, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
@@ -159,6 +175,8 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
     manualOpenTime: row.manual_open_time ?? undefined,
     manualCloseTime: row.manual_close_time ?? undefined,
     manualTimezone: row.manual_timezone || "Asia/Jakarta",
+    packageTabsEnabled: Boolean(row.package_tabs_enabled),
+    packageTabs: parsePackageTabs(row.package_tabs_json),
     isActive: Boolean(row.is_active),
     sortOrder: row.sort_order,
     notices: noticeRows.filter((item) => item.product_id === row.id).map((item) => ({
@@ -196,6 +214,7 @@ type ProductWrite = Omit<ManagedProduct, "dbId" | "packages" | "notices"> & {
 export async function saveProduct(input: ProductWrite, id?: number) {
   await ensureLegacyDatabaseColumns();
   const db = getD1();
+  const packageTabs = Array.from(new Set((input.packageTabs ?? []).map((item) => item.trim()).filter(Boolean))).slice(0, 20);
   const values = [
     input.slug,
     input.name,
@@ -217,6 +236,8 @@ export async function saveProduct(input: ProductWrite, id?: number) {
     input.manualOpenTime ?? null,
     input.manualCloseTime ?? null,
     input.manualTimezone ?? "Asia/Jakarta",
+    input.packageTabsEnabled ? 1 : 0,
+    JSON.stringify(packageTabs),
     input.isActive ? 1 : 0,
     input.sortOrder,
   ];
@@ -225,15 +246,15 @@ export async function saveProduct(input: ProductWrite, id?: number) {
     await db.prepare(
       `UPDATE products SET slug = ?, name = ?, publisher = ?, category = ?, image_url = ?, banner_url = ?, description = ?, initials = ?, accent = ?,
        input_label = ?, input_placeholder = ?, needs_server = ?, popular = ?, instant = ?, fulfillment_type = ?,
-       target_template = ?, manual_instructions = ?, manual_open_time = ?, manual_close_time = ?, manual_timezone = ?, is_active = ?,
-       sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+       target_template = ?, manual_instructions = ?, manual_open_time = ?, manual_close_time = ?, manual_timezone = ?,
+       package_tabs_enabled = ?, package_tabs_json = ?, is_active = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     ).bind(...values, id).run();
   } else {
     await db.prepare(
       `INSERT INTO products (slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label,
        input_placeholder, needs_server, popular, instant, fulfillment_type, target_template,
-       manual_instructions, manual_open_time, manual_close_time, manual_timezone, is_active, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       manual_instructions, manual_open_time, manual_close_time, manual_timezone, package_tabs_enabled, package_tabs_json, is_active, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(...values).run();
   }
 
@@ -304,14 +325,14 @@ export async function seedFallbackProducts() {
   const productStatements = source.map((item) => db.prepare(
     `INSERT INTO products (slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label,
      input_placeholder, needs_server, popular, instant, fulfillment_type, target_template,
-     manual_instructions, manual_open_time, manual_close_time, manual_timezone, is_active, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     manual_instructions, manual_open_time, manual_close_time, manual_timezone, package_tabs_enabled, package_tabs_json, is_active, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(slug) DO NOTHING`,
   ).bind(
     item.slug, item.name, item.publisher, item.category, item.imageUrl ?? null, item.bannerUrl ?? null, item.description ?? null, item.initials, item.accent,
     item.inputLabel, item.inputPlaceholder, item.needsServer ? 1 : 0, item.popular ? 1 : 0,
     item.instant ? 1 : 0, item.fulfillmentType, item.targetTemplate, item.manualInstructions ?? null,
-    item.manualOpenTime ?? null, item.manualCloseTime ?? null, item.manualTimezone ?? "Asia/Jakarta", 1, item.sortOrder,
+    item.manualOpenTime ?? null, item.manualCloseTime ?? null, item.manualTimezone ?? "Asia/Jakarta", 0, "[]", 1, item.sortOrder,
   ));
   await db.batch(productStatements);
 
