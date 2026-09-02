@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getRuntimeEnv, requireRuntimeValue } from "@/lib/server/runtime-env";
 
 export const dynamic = "force-dynamic";
 
@@ -134,9 +134,7 @@ async function lookupMelostore({
   userId: string;
   server?: string;
 }) {
-  const baseUrl = (
-    runtime.MELOSTORE_API_URL?.trim() || "https://api.melostore.id"
-  ).replace(/\/$/, "");
+  const baseUrl = requireRuntimeValue(runtime.MELOSTORE_API_URL, "MELOSTORE_API_URL").replace(/\/$/, "");
   const endpoint = `${baseUrl}/api/v1/h2h/check-nickname`;
 
   const body: {
@@ -243,9 +241,7 @@ async function lookupFallbackProvider({
   userId: string;
   server?: string;
 }) {
-  const baseUrl = (
-    runtime.NICKNAME_API_URL?.trim() || "https://api.isan.eu.org/nickname"
-  ).replace(/\/$/, "");
+  const baseUrl = requireRuntimeValue(runtime.NICKNAME_API_URL, "NICKNAME_API_URL").replace(/\/$/, "");
   const url = new URL(`${baseUrl}/${endpoint}`);
   url.searchParams.set("id", userId);
   if (server) url.searchParams.set("server", server);
