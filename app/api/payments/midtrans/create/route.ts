@@ -28,10 +28,7 @@ const schema = z.object({
   nickname: z.string().trim().max(100).optional(),
   buyerName: z.string().trim().min(2).max(100),
   buyerEmail: z.string().trim().email().max(150),
-  buyerPhone: z
-    .string()
-    .trim()
-    .regex(/^\+?[0-9]{8,16}$/),
+  buyerPhone: z.string().trim().regex(/^\+?[0-9]{8,16}$/),
   customerNotes: z.string().trim().max(500).optional(),
   paymentMethod: z.enum(["va", "ewallet", "qris"]),
   paymentChannel: z.string().trim().min(2).max(30),
@@ -43,53 +40,30 @@ function publicBaseUrl(request: Request) {
   return new URL(configured || request.url).origin;
 }
 
+function publicInvoice(referenceId: string) {
+  const token = referenceId.split("-").at(-1) ?? referenceId.replace(/^LF/, "");
+  return `LF${token}`;
+}
+
 export async function POST(request: Request) {
   let referenceId: string | null = null;
   try {
     const input = schema.parse(await request.json());
-    const paymentChannel =
-      input.paymentMethod === "qris" && input.paymentChannel === "qris"
-        ? "mpm"
-        : input.paymentChannel;
+    const paymentChannel = input.paymentMethod === "qris" && input.paymentChannel === "qris" ? "mpm" : input.paymentChannel;
     const settings = await readWalletSettings();
     if (!settings.midtransCheckoutEnabled)
-      return Response.json(
-        { error: "Checkout Midtrans belum diaktifkan oleh Pemilik." },
-        { status: 403 },
-      );
-    if (
-      !(await isPaymentChannelAvailable(
-        input.paymentMethod,
-        paymentChannel,
-      ))
-    )
-      return Response.json(
-        { error: "Metode pembayaran tidak valid." },
-        { status: 400 },
-      );
-    const item = await resolvePurchasableItem(
-      input.productSlug,
-      input.packageSku,
-    );
+      return Response.json({ error: "Checkout Midtrans belum diaktifkan oleh Pemilik." }, { status: 403 });
+    if (!(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel)))
+      return Response.json({ error: "Metode pembayaran tidak valid." }, { status: 400 });
+
+    const item = await resolvePurchasableItem(input.productSlug, input.packageSku);
     if (!item)
-      return Response.json(
-        { error: "Produk atau nominal tidak tersedia." },
-        { status: 404 },
-      );
+      return Response.json({ error: "Produk atau nominal tidak tersedia." }, { status: 404 });
     if (item.needsServer && !input.server)
-      return Response.json(
-        { error: "Server / Zone ID wajib diisi." },
-        { status: 400 },
-      );
-    if (
-      item.providerCode === "voucher-stock" &&
-      item.providerSku &&
-      !(await hasAvailableVoucherStock(item.providerSku))
-    )
-      return Response.json(
-        { error: "Stok kode untuk paket ini sedang habis." },
-        { status: 409 },
-      );
+      return Response.json({ error: "Server / Zone ID wajib diisi." }, { status: 400 });
+    if (item.providerCode === "voucher-stock" && item.providerSku && !(await hasAvailableVoucherStock(item.providerSku)))
+      return Response.json({ error: "Stok kode untuk paket ini sedang habis." }, { status: 409 });
+
     const customer = await getCustomerSession(request);
     const membership = customer ? await getMemberTierProfile(customer.id) : null;
     const promotion = await quotePromotion(
@@ -97,9 +71,7 @@ export async function POST(request: Request) {
       item.packageSku,
       item.price,
       input.voucherCode,
-      membership
-        ? { tier: membership.tier, discountPercent: membership.setting.discountPercent }
-        : null,
+      membership ? { tier: membership.tier, discountPercent: membership.setting.discountPercent } : null,
     );
     const identity = createOrderIdentity();
     referenceId = identity.referenceId;
@@ -118,7 +90,9 @@ export async function POST(request: Request) {
       customerId: customer?.id ?? null,
       promotion,
     });
+
     const baseUrl = publicBaseUrl(request);
+    const invoice = publicInvoice(identity.referenceId);
     const payment = await createMidtransSnapPayment({
       referenceId: identity.referenceId,
       amount: promotion.finalPrice,
@@ -128,7 +102,7 @@ export async function POST(request: Request) {
       buyerPhone: input.buyerPhone,
       paymentMethod: input.paymentMethod,
       paymentChannel,
-      finishUrl: `${baseUrl}/track?invoice=${encodeURIComponent(identity.referenceId)}`,
+      finishUrl: `${baseUrl}/payment?invoice=${encodeURIComponent(invoice)}`,
     });
     await updateMidtransPayment({
       referenceId: identity.referenceId,
@@ -144,43 +118,35 @@ export async function POST(request: Request) {
       status: "pending",
       payload: payment.raw,
     });
-    return Response.json(
-      {
-        orderId: identity.id,
-        referenceId: identity.referenceId,
-        paymentNo: null,
-        paymentName: "Midtrans Snap",
-        paymentUrl: payment.paymentUrl,
-        fee: 0,
-        total: promotion.finalPrice,
-        expiredAt: null,
-        fulfillmentType: item.fulfillmentType,
-        providerCode: item.providerCode,
-        basePrice: promotion.basePrice,
-        sellingPrice: promotion.sellingPrice,
-        discountAmount: promotion.discountAmount,
-        voucherCode: promotion.voucherCode,
-        flashSaleId: promotion.flashSaleId,
-        memberTier: promotion.memberTier,
-        memberDiscountPercent: promotion.memberDiscountPercent,
-        discountSource: promotion.discountSource,
-      },
-      { status: 201 },
-    );
+
+    return Response.json({
+      orderId: identity.id,
+      referenceId: identity.referenceId,
+      publicInvoice: invoice,
+      paymentNo: null,
+      paymentName: "Midtrans Snap",
+      paymentUrl: payment.paymentUrl,
+      fee: 0,
+      total: promotion.finalPrice,
+      expiredAt: null,
+      fulfillmentType: item.fulfillmentType,
+      providerCode: item.providerCode,
+      basePrice: promotion.basePrice,
+      sellingPrice: promotion.sellingPrice,
+      discountAmount: promotion.discountAmount,
+      voucherCode: promotion.voucherCode,
+      flashSaleId: promotion.flashSaleId,
+      memberTier: promotion.memberTier,
+      memberDiscountPercent: promotion.memberDiscountPercent,
+      discountSource: promotion.discountSource,
+    }, { status: 201 });
   } catch (error) {
-    const message =
-      error instanceof z.ZodError
-        ? error.issues[0]?.message || "Data checkout tidak valid."
-        : error instanceof Error
-          ? error.message
-          : "Pembayaran Midtrans gagal dibuat.";
-    if (referenceId)
-      await markPaymentCreationFailed(referenceId, message).catch(
-        () => undefined,
-      );
-    return Response.json(
-      { error: message },
-      { status: error instanceof z.ZodError ? 400 : 503 },
-    );
+    const message = error instanceof z.ZodError
+      ? error.issues[0]?.message || "Data checkout tidak valid."
+      : error instanceof Error
+        ? error.message
+        : "Pembayaran Midtrans gagal dibuat.";
+    if (referenceId) await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
+    return Response.json({ error: message }, { status: error instanceof z.ZodError ? 400 : 503 });
   }
 }
