@@ -1,5 +1,8 @@
 import { getD1 } from "@/db";
-import { listCustomerVoucherCodes } from "@/lib/server/vouchers";
+import {
+  listCustomerVoucherCodes,
+  revealVoucherCode,
+} from "@/lib/server/vouchers";
 
 type ProviderVoucherRow = {
   id: string;
@@ -8,6 +11,14 @@ type ProviderVoucherRow = {
   package_label: string;
   provider_serial_number: string;
   updated_at: string;
+};
+
+type WebsiteVoucherOrderRow = {
+  id: string;
+  reference_id: string;
+  payment_status: string;
+  provider_code: string | null;
+  provider_serial_number: string | null;
 };
 
 function stableNumericId(value: string) {
@@ -57,4 +68,28 @@ export async function listCustomerWebsiteVoucherCodes(customerId: string) {
         new Date(left.deliveredAt ?? 0).getTime(),
     )
     .slice(0, 50);
+}
+
+export async function getWebsiteVoucherCodeByReference(referenceId: string) {
+  const order = await getD1()
+    .prepare(
+      `SELECT o.id, o.reference_id, o.payment_status, o.provider_code,
+              o.provider_serial_number
+       FROM orders o
+       JOIN products p ON p.slug = o.product_slug
+       WHERE o.reference_id = ? AND p.category = 'voucher'
+       LIMIT 1`,
+    )
+    .bind(referenceId)
+    .first<WebsiteVoucherOrderRow>();
+
+  if (!order || order.payment_status !== "paid") return null;
+
+  if (order.provider_code === "voucher-stock") {
+    const voucher = await revealVoucherCode(order.id).catch(() => null);
+    return voucher?.code ?? null;
+  }
+
+  const serial = order.provider_serial_number?.trim();
+  return serial || null;
 }
