@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
+import { listCustomerWebsiteVoucherCodes } from "@/lib/server/customer-voucher-codes";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
-import { listCustomerVoucherCodes } from "@/lib/server/vouchers";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     db.prepare("SELECT id, reference_id, product_name, package_label, total, payment_status, fulfillment_status, created_at FROM orders WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50").bind(customer.id).all(),
     getMemberTierProfile(customer.id),
   ]);
-  const vouchers = await listCustomerVoucherCodes(customer.id).catch(() => []);
+  const vouchers = await listCustomerWebsiteVoucherCodes(customer.id).catch(() => []);
   return Response.json({ customer, membership, topups: topups.results, transactions: transactions.results, orders: orders.results, vouchers });
 }
 
