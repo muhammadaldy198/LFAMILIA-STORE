@@ -10,6 +10,8 @@ type PackageTabProduct = {
   }>;
 };
 
+const tabbedProductSlug = "roblox-gift-in-game";
+
 function groupName(value?: string) {
   return value?.trim() || "Umum";
 }
@@ -40,9 +42,8 @@ export function CheckoutPackageTabs() {
 
     function enhance() {
       const productSlug = new URL(window.location.href).searchParams.get("product") ?? "";
-      const product = products.find((item) => item.slug === productSlug);
       const form = document.querySelector<HTMLFormElement>("#checkout-form");
-      if (!product || !form || !product.packages.length) return;
+      if (!form) return;
 
       const section = Array.from(form.querySelectorAll<HTMLElement>("section")).find((item) =>
         item.querySelector("h2")?.textContent?.toLowerCase().includes("pilih nominal"),
@@ -58,6 +59,18 @@ export function CheckoutPackageTabs() {
         (child): child is HTMLButtonElement => child instanceof HTMLButtonElement,
       );
       if (!packageButtons.length) return;
+
+      if (productSlug !== tabbedProductSlug) {
+        section.querySelector<HTMLElement>("[data-lf-package-tabs]")?.remove();
+        packageButtons.forEach((button) => {
+          button.style.display = "";
+        });
+        activeGroup = "";
+        return;
+      }
+
+      const product = products.find((item) => item.slug === productSlug);
+      if (!product || !product.packages.length) return;
 
       const groups = Array.from(new Set(product.packages.map((item) => groupName(item.group))));
       let tabs = section.querySelector<HTMLElement>("[data-lf-package-tabs]");
