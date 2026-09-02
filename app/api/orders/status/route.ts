@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
 import { getOrderByReference } from "@/lib/server/orders";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,14 @@ function maskDestination(value: string, server: string | null) {
   return server ? `${visible} (${server})` : visible;
 }
 
+function maskReferenceId(value: string) {
+  const parts = value.split("-");
+  const token = parts.at(-1) ?? "";
+  const visibleTail = token.slice(-4);
+  const hidden = "•".repeat(Math.max(token.length - visibleTail.length, 4));
+  return `${parts.slice(0, -1).join("-")}-${hidden}${visibleTail}`;
+}
+
 export async function POST(request: Request) {
   try {
     const { referenceId } = schema.parse(await request.json());
@@ -23,9 +32,13 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invoice tidak ditemukan." }, { status: 404 });
     }
 
+    const voucherCode = order.payment_status === "paid"
+      ? await getWebsiteVoucherCodeByReference(referenceId).catch(() => null)
+      : null;
+
     return Response.json({
       order: {
-        referenceId: order.reference_id,
+        referenceId: maskReferenceId(order.reference_id),
         productName: order.product_name,
         packageLabel: order.package_label,
         destination: maskDestination(order.destination, order.server),
@@ -33,6 +46,7 @@ export async function POST(request: Request) {
         paymentStatus: order.payment_status,
         fulfillmentStatus: order.fulfillment_status,
         fulfillmentType: order.fulfillment_type,
+        voucherCode,
         createdAt: order.created_at,
         updatedAt: order.updated_at,
       },
