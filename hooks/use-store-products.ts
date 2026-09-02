@@ -3,23 +3,8 @@
 import { useEffect, useState } from "react";
 import { products as fallbackProducts, type StoreProduct } from "@/lib/store-data";
 
-function normalizeStorefrontProduct(product: StoreProduct): StoreProduct {
-  const category = product.category.trim().toLowerCase();
-  const whatsappOnly = category.includes("voucher") || category.includes("gift");
-
-  if (!whatsappOnly) return product;
-
-  return {
-    ...product,
-    inputLabel: "Nomor WhatsApp",
-    inputPlaceholder: "Contoh: 081234567890",
-  };
-}
-
-const normalizedFallbackProducts = fallbackProducts.map(normalizeStorefrontProduct);
-
 export function useStoreProducts() {
-  const [products, setProducts] = useState<StoreProduct[]>(normalizedFallbackProducts);
+  const [products, setProducts] = useState<StoreProduct[]>(fallbackProducts);
   const [databaseReady, setDatabaseReady] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -30,7 +15,7 @@ export function useStoreProducts() {
         const response = await fetch("/api/products", { cache: "no-store" });
         const data = await response.json() as { products?: StoreProduct[]; databaseReady?: boolean };
         if (active && data.products?.length) {
-          setProducts(data.products.map(normalizeStorefrontProduct));
+          setProducts(data.products);
           setDatabaseReady(Boolean(data.databaseReady));
         }
       } finally {
