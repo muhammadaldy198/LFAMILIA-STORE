@@ -8,6 +8,8 @@ import {
   AlertCircle,
   BadgeCheck,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Copy,
   CreditCard,
   ExternalLink,
@@ -158,7 +160,7 @@ function CheckoutContent() {
   const [customerNotes, setCustomerNotes] = useState("");
   const [activeTab, setActiveTab] = useState<"transaction" | "details">("transaction");
   const [confirmationOpen, setConfirmationOpen] = useState(false);
-  const [summaryOpen, setSummaryOpen] = useState(true);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] =
     useState<CheckoutPaymentMethod>("qris");
   const [paymentChannel, setPaymentChannel] = useState("qris");
@@ -485,8 +487,8 @@ function CheckoutContent() {
 
   return (
     <StoreLayout>
-      <main className="mx-auto max-w-7xl px-4 pb-[11rem] pt-3 sm:px-6 sm:py-8 lg:px-8">
-        <section className="relative mt-3 -mx-4 h-56 overflow-hidden bg-[#10131b] sm:-mx-6 sm:h-72 lg:-mx-8 lg:h-80">
+      <main className="mx-auto max-w-7xl px-4 pb-[9rem] pt-3 sm:px-6 sm:py-7 lg:px-8">
+        <section className="relative mt-2 -mx-4 h-48 overflow-hidden bg-[#10131b] sm:-mx-6 sm:h-64 lg:-mx-8 lg:h-72">
           {(product.bannerUrl || product.imageUrl) && (
             <img
               src={product.bannerUrl || product.imageUrl}
@@ -495,436 +497,406 @@ function CheckoutContent() {
             />
           )}
         </section>
-        <section className="relative z-10 -mx-4 min-h-[142px] overflow-visible border-y border-white/[0.10] bg-[#202224] px-5 py-5 shadow-2xl sm:-mx-6 sm:px-8 lg:-mx-8">
-          <span className="absolute -top-16 left-5 block aspect-[3/3] size-32 overflow-hidden rounded-[24px] border-4 border-[#202224] shadow-2xl [perspective:800px] [transform:rotateY(-10deg)_rotateZ(-2deg)] sm:-top-16 sm:left-8 sm:size-36">
+
+        <section className="relative z-10 -mx-4 min-h-[118px] overflow-visible border-y border-white/[0.10] bg-[#202224] px-4 py-3 shadow-xl sm:-mx-6 sm:px-6 lg:-mx-8">
+          <span className="absolute -top-12 left-4 block aspect-square size-24 overflow-hidden rounded-[14px] border-[3px] border-[#202224] shadow-xl sm:-top-14 sm:left-6 sm:size-28">
             <ProductArtwork product={product} compact />
           </span>
-          <div className="pl-36 pt-2 sm:pl-44">
-            <h1 className="text-sm font-black uppercase tracking-[0.08em] text-white sm:text-base">
+          <div className="pl-28 pt-1 sm:pl-32">
+            <h1 className="text-sm font-black uppercase tracking-[0.06em] text-white sm:text-base">
               {product.name}
             </h1>
-            <p className="mt-2 text-xs font-medium text-white/68">
+            <p className="mt-1 text-[10px] font-medium text-white/55 sm:text-xs">
               {product.publisher}
             </p>
           </div>
-          <div className="absolute inset-x-5 bottom-5 grid grid-cols-3 gap-3 text-center text-[9px] text-white/60 sm:inset-x-8">
-            <span><Zap className="mx-auto mb-1 size-4 text-[#cfff72]" />Proses cepat</span>
-            <span><ShieldCheck className="mx-auto mb-1 size-4 text-[#cfff72]" />Layanan Chat 24/7</span>
-            <span><BadgeCheck className="mx-auto mb-1 size-4 text-[#cfff72]" />Pembayaran aman</span>
+          <div className="absolute inset-x-4 bottom-3 grid grid-cols-3 gap-2 text-center text-[8px] text-white/50 sm:inset-x-6 sm:text-[9px]">
+            <span><Zap className="mx-auto mb-0.5 size-3.5 text-[#cfff72]" />Proses cepat</span>
+            <span><ShieldCheck className="mx-auto mb-0.5 size-3.5 text-[#cfff72]" />Chat 24/7</span>
+            <span><BadgeCheck className="mx-auto mb-0.5 size-3.5 text-[#cfff72]" />Pembayaran aman</span>
           </div>
         </section>
-        <div className="mx-auto mt-5 grid max-w-7xl grid-cols-2 rounded-xl bg-white/[0.06] p-1 text-sm font-bold">
-          <button type="button" onClick={() => setActiveTab("transaction")} className={`rounded-lg py-3 ${activeTab === "transaction" ? "bg-[#bca17d] text-white" : "text-white/55"}`}>Transaksi</button>
-          <button type="button" onClick={() => setActiveTab("details")} className={`rounded-lg py-3 ${activeTab === "details" ? "bg-[#bca17d] text-white" : "text-white/55"}`}>Keterangan</button>
+
+        <div className="mx-auto mt-3 grid max-w-7xl grid-cols-2 rounded-lg border border-white/[0.07] bg-white/[0.04] p-1 text-xs font-bold">
+          <button type="button" onClick={() => setActiveTab("transaction")} className={`rounded-md py-2 transition ${activeTab === "transaction" ? "bg-[#bca17d] text-white" : "text-white/50 hover:text-white"}`}>Transaksi</button>
+          <button type="button" onClick={() => setActiveTab("details")} className={`rounded-md py-2 transition ${activeTab === "details" ? "bg-[#bca17d] text-white" : "text-white/50 hover:text-white"}`}>Keterangan</button>
         </div>
-        {activeTab === "transaction" ? <div className="mt-4 grid items-start gap-3 lg:grid-cols-[1fr_380px]">
-          <form id="checkout-form" onSubmit={requestConfirmation} className="space-y-3">
-            <section className="overflow-hidden rounded-lg border border-white/[0.10] bg-[#454a50]">
-              <div className="flex items-center justify-between gap-4 border-b border-white/[0.08] bg-white/[0.02] p-3 sm:p-4">
-                <StepTitle
-                  number="1"
-                  title="Masukkan Data Akun"
-                  description="Nickname diperiksa otomatis jika game mendukung."
-                />
-                <div className="hidden items-center gap-3 sm:flex">
-                  <span className="block size-10 overflow-hidden rounded-xl aspect-square">
-                    <ProductArtwork product={product} compact />
-                  </span>
-                  <div className="max-w-36">
-                    <strong className="block truncate text-xs">
-                      {product.name}
-                    </strong>
-                    <Link
-                      href="/catalog"
-                      className="mt-1 block text-[9px] font-semibold text-[#cfff72]"
-                    >
-                      Ganti produk
-                    </Link>
+
+        {activeTab === "transaction" ? (
+          <div className="mt-3 grid items-start gap-3 lg:grid-cols-[1fr_360px]">
+            <form id="checkout-form" onSubmit={requestConfirmation} className="space-y-3">
+              <section className="overflow-hidden rounded-lg border border-white/[0.10] bg-[#2f3338]">
+                <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] bg-white/[0.025] px-3 py-2.5 sm:px-4">
+                  <StepTitle
+                    number="1"
+                    title="Masukkan Data Akun"
+                    description="Isi ID tujuan dengan benar. Nickname diperiksa otomatis jika didukung."
+                  />
+                  <div className="hidden items-center gap-2 sm:flex">
+                    <span className="block size-9 overflow-hidden rounded-lg aspect-square">
+                      <ProductArtwork product={product} compact />
+                    </span>
+                    <div className="max-w-36">
+                      <strong className="block truncate text-[11px]">{product.name}</strong>
+                      <Link href="/catalog" className="mt-0.5 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="p-3 sm:p-4">
-                <div className="mb-5 flex items-center gap-3 sm:hidden">
-                  <span className="block size-10 overflow-hidden rounded-xl aspect-square">
-                    <ProductArtwork product={product} compact />
-                  </span>
-                  <div>
-                    <strong className="block text-xs">{product.name}</strong>
-                    <Link
-                      href="/catalog"
-                      className="mt-1 block text-[9px] font-semibold text-[#cfff72]"
-                    >
-                      Ganti produk
-                    </Link>
+                <div className="p-3 sm:p-4">
+                  <div className="mb-3 flex items-center gap-2 sm:hidden">
+                    <span className="block size-9 overflow-hidden rounded-lg aspect-square"><ProductArtwork product={product} compact /></span>
+                    <div className="min-w-0 flex-1">
+                      <strong className="block truncate text-[11px]">{product.name}</strong>
+                      <Link href="/catalog" className="mt-0.5 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link>
+                    </div>
                   </div>
-                </div>
-                <div
-                  className={
-                    product.needsServer
-                      ? "grid gap-4 sm:grid-cols-2"
-                      : "grid gap-4"
-                  }
-                >
-                  <Field label={product.inputLabel}>
-                    <Input
-                      value={destination}
-                      onChange={(event) => {
-                        setDestination(event.target.value);
-                        setPayment(null);
-                        setError("");
-                      }}
-                      placeholder={product.inputPlaceholder}
-                      autoComplete="off"
-                      className="checkout-input"
-                    />
-                  </Field>
-                  {product.needsServer && (
-                    <Field label="Server / Zone ID">
+
+                  <div className={product.needsServer ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
+                    <Field label={product.inputLabel}>
                       <Input
-                        inputMode="numeric"
-                        value={server}
+                        value={destination}
                         onChange={(event) => {
-                          setServer(event.target.value.replace(/\D/g, ""));
+                          setDestination(event.target.value);
                           setPayment(null);
                           setError("");
                         }}
-                        placeholder="Contoh: 1234"
+                        placeholder={product.inputPlaceholder}
                         autoComplete="off"
                         className="checkout-input"
                       />
                     </Field>
+                    {product.needsServer && (
+                      <Field label="Server / Zone ID">
+                        <Input
+                          inputMode="numeric"
+                          value={server}
+                          onChange={(event) => {
+                            setServer(event.target.value.replace(/\D/g, ""));
+                            setPayment(null);
+                            setError("");
+                          }}
+                          placeholder="Contoh: 1234"
+                          autoComplete="off"
+                          className="checkout-input"
+                        />
+                      </Field>
+                    )}
+                  </div>
+
+                  {canCheckNickname ? (
+                    <NicknameResult state={visibleNickname} />
+                  ) : (
+                    <p className="mt-3 flex items-start gap-2 rounded-lg border border-white/[0.07] bg-white/[0.025] p-2.5 text-[10px] leading-4 text-white/40">
+                      <Info className="mt-0.5 size-3.5 shrink-0 text-[#b9ff35]" />
+                      Verifikasi nickname otomatis belum tersedia. Periksa kembali data sebelum membayar.
+                    </p>
+                  )}
+
+                  {product.manualInstructions && (
+                    <div className="mt-3 rounded-lg border border-amber-300/20 bg-amber-300/[0.06] p-2.5 text-[10px] leading-4 text-amber-100/70">
+                      <strong className="mb-1 block text-amber-200">Instruksi produk manual</strong>
+                      {product.manualInstructions}
+                    </div>
                   )}
                 </div>
-                {canCheckNickname ? (
-                  <NicknameResult state={visibleNickname} />
-                ) : (
-                  <p className="mt-4 flex items-start gap-2 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-[10px] leading-5 text-white/32">
-                    <Info className="mt-0.5 size-3.5 shrink-0 text-[#b9ff35]" />{" "}
-                    Verifikasi nickname otomatis belum tersedia. Periksa kembali
-                    data sebelum membayar.
-                  </p>
-                )}
-                {product.manualInstructions && (
-                  <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3 text-[10px] leading-5 text-amber-100/65">
-                    <strong className="block text-amber-200">
-                      Instruksi produk manual
-                    </strong>
-                    {product.manualInstructions}
-                  </div>
-                )}
-              </div>
-            </section>
+              </section>
 
-            <section className="rounded-lg border border-white/[0.10] bg-[#454a50] p-3 sm:p-4">
-              <StepTitle
-                number="2"
-                title="Pilih nominal"
-                description={
-                  isManual
-                    ? "Pesanan diproses admin setelah pembayaran."
-                    : isVoucherStock
-                      ? "Satu kode stok dikirim otomatis setelah pembayaran."
-                      : "Pesanan diteruskan otomatis ke provider."
-                }
-              />
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {product.packages.map((item) => {
-                  const ready =
-                    isManual || Boolean(item.providerCode && item.providerSku);
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => choosePackage(item.id)}
-                      className={`relative min-h-24 rounded-lg border p-3 text-left transition ${packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.2)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}
-                    >
-                      {item.note && (
-                        <span className="absolute right-2 top-2 rounded-full bg-[#b9ff35] px-2 py-0.5 text-[8px] font-black uppercase text-[#091006]">
-                          {item.note}
-                        </span>
-                      )}
-                      <strong className="block pr-8 text-xs leading-5">
-                        {item.label}
-                      </strong>
-                      <span className="mt-2 block text-[11px] font-bold text-[#cfff72]">
-                        {formatRupiah(item.price)}
-                      </span>
-                      {!ready && (
-                        <span className="mt-2 block text-[8px] font-semibold text-amber-300/70">
-                          SKU belum diatur
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="rounded-lg border border-white/[0.10] bg-[#454a50] p-3 sm:p-4">
-              <StepTitle
-                number="3"
-                title="Pilih metode pembayaran"
-                description="Metode yang aktif ditampilkan di sini."
-              />
-              <div className="mt-5 space-y-3">
-                {checkoutGroups.map((group) => {
-                  const Icon = groupIcons[group.code];
-                  const selected = paymentMethod === group.code;
-                  const disabled = group.code === "wallet" && !account;
-                  return (
-                    <div
-                      key={group.code}
-                      className={`overflow-hidden rounded-lg border transition ${selected ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.06]" : "border-white/[0.09] bg-white/[0.025]"}`}
-                    >
+              <section className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4">
+                <StepTitle
+                  number="2"
+                  title="Pilih Nominal"
+                  description={
+                    isManual
+                      ? "Pesanan diproses admin setelah pembayaran."
+                      : isVoucherStock
+                        ? "Satu kode stok dikirim otomatis setelah pembayaran."
+                        : "Pesanan diteruskan otomatis ke provider."
+                  }
+                />
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {product.packages.map((item) => {
+                    const ready = isManual || Boolean(item.providerCode && item.providerSku);
+                    return (
                       <button
+                        key={item.id}
                         type="button"
-                        disabled={disabled}
-                        onClick={() => chooseMethod(group.code)}
-                        className="flex w-full items-center gap-3 p-4 text-left disabled:cursor-not-allowed disabled:opacity-45"
+                        onClick={() => choosePackage(item.id)}
+                        className={`relative min-h-[72px] rounded-lg border px-3 py-2.5 text-left transition ${packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.18)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}
                       >
-                        <span
-                          className={`grid size-10 place-items-center rounded-xl ${selected ? "bg-[#b9ff35] text-[#091006]" : "bg-white/[0.06] text-white/55"}`}
-                        >
-                          <Icon className="size-4" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <strong className="block text-xs">
-                            {group.name}
-                          </strong>
-                          <span className="mt-1 block text-[9px] text-white/35">
-                            {group.code === "wallet" && account
-                              ? `Saldo ${formatRupiah(account.balance)}`
-                              : group.code === "wallet"
-                                ? "Masuk akun untuk memakai saldo"
-                                : group.description}
-                          </span>
-                        </span>
-                        {selected && (
-                          <CheckCircle2 className="size-4 text-[#b9ff35]" />
-                        )}
-                      </button>
-                      {group.code !== "wallet" && (
-                        <div className="flex min-h-10 items-center gap-2 overflow-hidden border-t border-white/[0.08] bg-black/10 px-4 py-2">
-                          {group.code === "qris" ? (
-                            <span className="text-[10px] font-bold text-white/75">QRIS • DANA • GoPay • ShopeePay • OVO</span>
-                          ) : (
-                            availableChannels.filter((channel) => channel.method === group.code).slice(0, 7).map((channel) => channel.imageUrl ? <img key={channel.channel} src={channel.imageUrl} alt={channel.name} className="h-5 max-w-14 object-contain" /> : <span key={channel.channel} className="rounded bg-white/[0.08] px-1.5 py-1 text-[8px] font-bold text-white/65">{channel.name}</span>)
+                        <div className="flex items-start justify-between gap-2">
+                          <strong className="min-w-0 flex-1 text-[11px] leading-4 sm:text-xs">{item.label}</strong>
+                          {item.note && (
+                            <span className="shrink-0 rounded bg-[#b9ff35] px-1.5 py-0.5 text-[7px] font-black uppercase text-[#091006]">{item.note}</span>
                           )}
                         </div>
-                      )}
-                      {selected && isGatewayMethod && group.code !== "qris" && (
-                        <div className="grid grid-cols-2 gap-2 border-t border-white/[0.08] bg-black/10 p-3 sm:grid-cols-3">
-                          {availableChannels
-                            .filter((channel) => channel.method === group.code)
-                            .map((channel) => (
-                              <button
-                                key={channel.channel}
-                                type="button"
-                                onClick={() => {
-                                  setPaymentChannel(channel.channel);
-                                  setPayment(null);
-                                }}
-                                className={`flex min-h-14 items-center gap-2 rounded-xl border px-3 py-2 text-left text-[10px] font-bold transition ${paymentChannel === channel.channel ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.10] text-[#d8ff8d]" : "border-white/[0.08] bg-white/[0.02] text-white/45 hover:text-white"}`}
-                              >
-                                {channel.imageUrl ? (
-                                  <img
-                                    src={channel.imageUrl}
-                                    alt=""
-                                    className="size-8 rounded-lg object-contain"
-                                  />
-                                ) : (
-                                  <span className="grid size-8 place-items-center rounded-lg bg-white/[0.07] text-[8px] font-black text-white/80">
-                                    {channel.name.slice(0, 3)}
-                                  </span>
-                                )}
-                                <span className="truncate">{channel.name}</span>
-                              </button>
-                            ))}
-                        </div>
-                      )}
-                      {selected &&
-                        (group.code === "manual_qris" ||
-                          group.code === "manual_bank") && (
-                          <p className="border-t border-white/[0.08] bg-black/10 px-4 py-3 text-[10px] leading-5 text-white/45">
+                        <span className="mt-1.5 block text-[10px] font-black text-[#cfff72] sm:text-[11px]">{formatRupiah(item.price)}</span>
+                        {!ready && <span className="mt-1 block text-[8px] font-semibold text-amber-300/70">SKU belum diatur</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4">
+                <StepTitle
+                  number="3"
+                  title="Pilih Pembayaran"
+                  description="Pilih metode, lalu pilih channel jika tersedia."
+                />
+                <div className="mt-3 space-y-2">
+                  {checkoutGroups.map((group) => {
+                    const Icon = groupIcons[group.code];
+                    const selected = paymentMethod === group.code;
+                    const disabled = group.code === "wallet" && !account;
+                    return (
+                      <div
+                        key={group.code}
+                        className={`overflow-hidden rounded-lg border transition ${selected ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.06]" : "border-white/[0.09] bg-white/[0.025]"}`}
+                      >
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => chooseMethod(group.code)}
+                          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${selected ? "bg-[#b9ff35] text-[#091006]" : "bg-white/[0.06] text-white/55"}`}>
+                            <Icon className="size-3.5" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <strong className="block text-[11px] sm:text-xs">{group.name}</strong>
+                            <span className="mt-0.5 block truncate text-[9px] text-white/40">
+                              {group.code === "wallet" && account
+                                ? `Saldo ${formatRupiah(account.balance)}`
+                                : group.code === "wallet"
+                                  ? "Masuk akun untuk memakai saldo"
+                                  : group.description}
+                            </span>
+                          </span>
+                          {selected && <CheckCircle2 className="size-4 shrink-0 text-[#b9ff35]" />}
+                        </button>
+
+                        {group.code !== "wallet" && (
+                          <div className="flex min-h-8 items-center gap-2 overflow-hidden border-t border-white/[0.08] bg-black/10 px-3 py-1.5">
+                            {group.code === "qris" ? (
+                              <span className="truncate text-[9px] font-bold text-white/65">QRIS • DANA • GoPay • ShopeePay • OVO</span>
+                            ) : (
+                              availableChannels
+                                .filter((channel) => channel.method === group.code)
+                                .slice(0, 7)
+                                .map((channel) =>
+                                  channel.imageUrl ? (
+                                    <img key={channel.channel} src={channel.imageUrl} alt={channel.name} className="h-4 max-w-12 object-contain" />
+                                  ) : (
+                                    <span key={channel.channel} className="rounded bg-white/[0.08] px-1.5 py-0.5 text-[7px] font-bold text-white/65">{channel.name}</span>
+                                  ),
+                                )
+                            )}
+                          </div>
+                        )}
+
+                        {selected && isGatewayMethod && group.code !== "qris" && (
+                          <div className="grid grid-cols-2 gap-2 border-t border-white/[0.08] bg-black/10 p-2.5 sm:grid-cols-3">
+                            {availableChannels
+                              .filter((channel) => channel.method === group.code)
+                              .map((channel) => (
+                                <button
+                                  key={channel.channel}
+                                  type="button"
+                                  onClick={() => {
+                                    setPaymentChannel(channel.channel);
+                                    setPayment(null);
+                                  }}
+                                  className={`flex min-h-[44px] items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[9px] font-bold transition ${paymentChannel === channel.channel ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.10] text-[#d8ff8d]" : "border-white/[0.08] bg-white/[0.02] text-white/45 hover:text-white"}`}
+                                >
+                                  {channel.imageUrl ? (
+                                    <img src={channel.imageUrl} alt="" className="size-7 rounded-md object-contain" />
+                                  ) : (
+                                    <span className="grid size-7 place-items-center rounded-md bg-white/[0.07] text-[7px] font-black text-white/80">{channel.name.slice(0, 3)}</span>
+                                  )}
+                                  <span className="truncate">{channel.name}</span>
+                                </button>
+                              ))}
+                          </div>
+                        )}
+
+                        {selected && (group.code === "manual_qris" || group.code === "manual_bank") && (
+                          <p className="border-t border-white/[0.08] bg-black/10 px-3 py-2 text-[9px] leading-4 text-white/45">
                             {group.code === "manual_qris"
                               ? "QRIS dan total pembayaran akan muncul setelah pesanan dibuat."
                               : "Nomor rekening dan total transfer akan muncul setelah pesanan dibuat."}{" "}
-                            Pemilik mengonfirmasi pembayaran sebelum pesanan
-                            diproses.
+                            Pemilik mengonfirmasi pembayaran sebelum pesanan diproses.
                           </p>
                         )}
-                    </div>
-                  );
-                })}
-              </div>
-              {!account && (
-                <p className="mt-3 text-[10px] text-white/35">
-                  Ingin membayar memakai saldo?{" "}
-                  <Link href="/login" className="font-bold text-[#cfff72]">
-                    Masuk atau daftar akun
-                  </Link>
-                  .
+                      </div>
+                    );
+                  })}
+                </div>
+                {!account && (
+                  <p className="mt-2.5 text-[9px] text-white/40">
+                    Ingin membayar memakai saldo? <Link href="/login" className="font-bold text-[#cfff72]">Masuk atau daftar akun</Link>.
+                  </p>
+                )}
+              </section>
+
+              <section className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4">
+                <StepTitle
+                  number="4"
+                  title="Data Pembeli & Voucher"
+                  description="Email dan WhatsApp digunakan untuk invoice serta status transaksi."
+                />
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Field label="Email">
+                    <Input type="email" value={buyerEmail} onChange={(event) => setBuyerEmail(event.target.value)} placeholder="nama@email.com" className="checkout-input" />
+                  </Field>
+                  <Field label="Nomor WhatsApp">
+                    <Input inputMode="tel" value={contact} onChange={(event) => setContact(event.target.value)} placeholder="081234567890" className="checkout-input" />
+                  </Field>
+                </div>
+                <div className="mt-3 border-t border-white/[0.08] pt-3">
+                  <span className="field-label">Kode voucher</span>
+                  <div className="flex gap-2">
+                    <Input
+                      id="voucher-code"
+                      value={voucherCode}
+                      onChange={(event) => {
+                        setVoucherCode(event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""));
+                        setVoucherMessage("");
+                      }}
+                      placeholder="Masukkan kode promo"
+                      className="checkout-input font-mono uppercase"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => void applyVoucher()}
+                      disabled={applyingVoucher || !packageId}
+                      variant="outline"
+                      className="h-9 shrink-0 rounded-lg border-white/10 bg-white/[0.04] px-3 text-[10px] text-white hover:bg-white/[0.08] hover:text-white"
+                    >
+                      {applyingVoucher ? <LoaderCircle className="size-4 animate-spin" /> : "Gunakan"}
+                    </Button>
+                  </div>
+                  {voucherMessage && <p className={`mt-1.5 text-[9px] ${quote?.voucherCode ? "text-[#cfff72]" : "text-amber-200"}`}>{voucherMessage}</p>}
+                </div>
+                <p className="mt-2.5 flex items-start gap-1.5 text-[9px] leading-4 text-white/32">
+                  <ShieldCheck className="mt-0.5 size-3 shrink-0" /> Kami hanya memakai kontak untuk invoice dan status transaksi.
                 </p>
-              )}
-            </section>
+              </section>
 
-            <section className="rounded-lg border border-white/[0.10] bg-[#454a50] p-3 sm:p-4">
-              <StepTitle
-                number="4"
-                title="Data pembeli"
-                description="Digunakan untuk invoice dan status transaksi."
-              />
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <Field label="Email"><Input type="email" value={buyerEmail} onChange={(event) => setBuyerEmail(event.target.value)} placeholder="nama@email.com" className="checkout-input" /></Field>
-                <Field label="Nomor WhatsApp"><Input inputMode="tel" value={contact} onChange={(event) => setContact(event.target.value)} placeholder="081234567890" className="checkout-input" /></Field>
+              {error && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-400/30 bg-red-400/[0.08] p-3 text-[11px] leading-4 text-red-100">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-300" />
+                  <span><strong className="block text-red-200">Periksa kembali checkout</strong><span className="mt-0.5 block text-red-100/70">{error}</span></span>
+                </div>
+              )}
+
+              <Button disabled={submitting} type="submit" className="hidden h-10 w-full rounded-lg bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">
+                {submitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <LockKeyhole className="mr-2 size-4" />}
+                Pesan Sekarang
+              </Button>
+            </form>
+
+            <aside className="hidden panel p-3 lg:sticky lg:top-24 lg:block">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-black">Ringkasan Pesanan</h2>
+                <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${isManual ? "bg-amber-400/10 text-amber-300" : "bg-[#b9ff35]/10 text-[#d8ff8d]"}`}>
+                  {isManual ? "Manual" : "Otomatis"}
+                </span>
               </div>
-              <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-4 text-white/30"><ShieldCheck className="mt-0.5 size-3 shrink-0" /> Kami hanya memakai email dan WhatsApp untuk invoice serta status transaksi.</p>
-            </section>
-
-            <section className="rounded-lg border border-white/[0.10] bg-[#454a50] p-3 sm:p-4">
-              <StepTitle number="5" title="Kode voucher" description="Masukkan kode promo setelah data kontak." />
-              <div className="mt-5 flex gap-2"><Input id="voucher-code" value={voucherCode} onChange={(event) => { setVoucherCode(event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "")); setVoucherMessage(""); }} placeholder="Masukkan kode promo" className="checkout-input font-mono uppercase" /><Button type="button" onClick={() => void applyVoucher()} disabled={applyingVoucher || !packageId} variant="outline" className="h-12 shrink-0 rounded-xl border-white/10 bg-white/[0.04] px-4 text-white hover:bg-white/[0.08] hover:text-white">{applyingVoucher ? <LoaderCircle className="size-4 animate-spin" /> : "Gunakan"}</Button></div>
-              {voucherMessage && <p className={`mt-2 text-[10px] ${quote?.voucherCode ? "text-[#cfff72]" : "text-amber-200"}`}>{voucherMessage}</p>}
-            </section>
-            {error && (
-              <div className="flex items-start gap-2 rounded-xl border border-red-400/20 bg-red-400/[0.07] p-3 text-xs leading-5 text-red-200">
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                {error}
+              <div className="my-3 h-px bg-white/[0.08]" />
+              <dl className="space-y-2.5 text-[11px]">
+                <SummaryRow label="Produk" value={product.name} />
+                {visibleNickname.nickname && <SummaryRow label="Nickname" value={visibleNickname.nickname} highlight />}
+                <SummaryRow label="Nominal" value={selectedPackage?.label ?? "Belum dipilih"} />
+                <SummaryRow label="Harga" value={formatRupiah(subtotal)} />
+                {quote && quote.sellingPrice < quote.basePrice && <SummaryRow label="Harga promo" value={`-${formatRupiah(quote.basePrice - quote.sellingPrice)}`} highlight />}
+                {quote && quote.discountAmount > 0 && <SummaryRow label={`Voucher ${quote.voucherCode ?? ""}`} value={`-${formatRupiah(quote.discountAmount)}`} highlight />}
+                <SummaryRow
+                  label="Biaya layanan"
+                  value={paymentMethod === "wallet" || paymentMethod === "manual_qris" || paymentMethod === "manual_bank" ? formatRupiah(0) : payment ? formatRupiah(payment.fee) : "Dihitung otomatis"}
+                />
+                <SummaryRow
+                  label="Proses"
+                  value={isManual ? "Antrean admin" : isVoucherStock ? "Kirim kode otomatis" : selectedPackage?.providerCode || "Provider belum diatur"}
+                />
+              </dl>
+              <div className="my-3 h-px bg-white/[0.08]" />
+              <div className="flex items-end justify-between gap-3">
+                <span className="text-xs font-bold">Total</span>
+                <strong className="text-lg font-black text-[#b9ff35]">{formatRupiah(payment?.total ?? subtotal)}</strong>
               </div>
-            )}
-            <Button
-              disabled={submitting}
-              type="submit"
-              className="hidden h-12 w-full rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]"
-            >
-              {submitting ? (
-                <LoaderCircle className="mr-2 size-4 animate-spin" />
-              ) : (
-                <LockKeyhole className="mr-2 size-4" />
-              )}
-              Pesan Sekarang
-            </Button>
-          </form>
-
-          <aside className="hidden panel p-3 lg:sticky lg:top-28 lg:block">
-            <div className="flex items-center justify-between">
-              <h2 className="font-bold">Ringkasan pesanan</h2>
-              <span
-                className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${isManual ? "bg-amber-400/10 text-amber-300" : "bg-[#b9ff35]/10 text-[#d8ff8d]"}`}
-              >
-                {isManual ? "Manual" : "Otomatis"}
-              </span>
-            </div>
-            <div className="my-5 h-px bg-white/[0.08]" />
-            <dl className="space-y-3 text-xs">
-              <SummaryRow label="Produk" value={product.name} />
-              {visibleNickname.nickname && (
-                <SummaryRow
-                  label="Nickname"
-                  value={visibleNickname.nickname}
-                  highlight
-                />
-              )}
-              <SummaryRow
-                label="Nominal"
-                value={selectedPackage?.label ?? "Belum dipilih"}
-              />
-              <SummaryRow label="Harga" value={formatRupiah(subtotal)} />
-              {quote && quote.sellingPrice < quote.basePrice && (
-                <SummaryRow
-                  label="Harga promo"
-                  value={`-${formatRupiah(quote.basePrice - quote.sellingPrice)}`}
-                  highlight
-                />
-              )}
-              {quote && quote.discountAmount > 0 && (
-                <SummaryRow
-                  label={`Voucher ${quote.voucherCode ?? ""}`}
-                  value={`-${formatRupiah(quote.discountAmount)}`}
-                  highlight
-                />
-              )}
-              <SummaryRow
-                label="Biaya layanan"
-                value={
-                  paymentMethod === "wallet" ||
-                  paymentMethod === "manual_qris" ||
-                  paymentMethod === "manual_bank"
-                    ? formatRupiah(0)
-                    : payment
-                      ? formatRupiah(payment.fee)
-                      : "Dihitung otomatis"
-                }
-              />
-              <SummaryRow
-                label="Proses"
-                value={
-                  isManual
-                    ? "Antrean admin"
-                    : isVoucherStock
-                      ? "Kirim kode otomatis"
-                      : selectedPackage?.providerCode || "Provider belum diatur"
-                }
-              />
-            </dl>
-            <div className="my-5 h-px bg-white/[0.08]" />
-            <div className="flex items-end justify-between">
-              <span className="text-sm font-bold">Total</span>
-              <strong className="text-xl font-black text-[#b9ff35]">
-                {formatRupiah(payment?.total ?? subtotal)}
-              </strong>
-            </div>
-            <p className="mt-3 rounded-xl bg-white/[0.035] p-3 text-[9px] leading-4 text-white/30">
-              Biaya layanan, jika ada, dihitung oleh channel yang dipilih dan
-              ditampilkan sebelum kamu melanjutkan pembayaran.
-            </p>
-            <Button
-              form="checkout-form"
-              disabled={submitting}
-              type="submit"
-              className="mt-5 hidden h-12 w-full rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b] lg:flex"
-            >
-              {submitting ? (
-                <LoaderCircle className="mr-2 size-4 animate-spin" />
-              ) : (
-                <LockKeyhole className="mr-2 size-4" />
-              )}
-              Pesan Sekarang
-            </Button>
-            <div className="mt-4 flex items-center justify-center gap-4 text-[9px] text-white/30">
-              <span className="inline-flex items-center gap-1">
-                <ShieldCheck className="size-3" /> Data aman
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <CreditCard className="size-3" /> Pembayaran terlindungi
-              </span>
-            </div>
-            {payment && <PaymentBox payment={payment} />}
-          </aside>
-        </div> : (
-          <section className="mt-4 space-y-3">
-            <article className="rounded-lg border border-white/[0.10] bg-[#454a50] p-3 sm:p-4"><h2 className="text-lg font-black">Deskripsi {product.name}</h2><p className="mt-3 whitespace-pre-line text-sm leading-7 text-white/60">{(product as { description?: string }).description || `Top up ${product.name} cepat, aman, dan diproses otomatis setelah pembayaran berhasil.`}</p></article>
+              <p className="mt-2 rounded-lg bg-white/[0.035] p-2.5 text-[8px] leading-4 text-white/35">Biaya layanan, jika ada, dihitung oleh channel yang dipilih dan ditampilkan sebelum pembayaran.</p>
+              <Button form="checkout-form" disabled={submitting} type="submit" className="mt-3 hidden h-10 w-full rounded-lg bg-[#bca17d] font-black text-white hover:bg-[#d1b18b] lg:flex">
+                {submitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <LockKeyhole className="mr-2 size-4" />}
+                Pesan Sekarang
+              </Button>
+              <div className="mt-2.5 flex items-center justify-center gap-3 text-[8px] text-white/30">
+                <span className="inline-flex items-center gap-1"><ShieldCheck className="size-3" /> Data aman</span>
+                <span className="inline-flex items-center gap-1"><CreditCard className="size-3" /> Pembayaran terlindungi</span>
+              </div>
+              {payment && <PaymentBox payment={payment} />}
+            </aside>
+          </div>
+        ) : (
+          <section className="mt-3 space-y-3">
+            <article className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4"><h2 className="text-base font-black">Deskripsi {product.name}</h2><p className="mt-2 whitespace-pre-line text-xs leading-6 text-white/60">{(product as { description?: string }).description || `Top up ${product.name} cepat, aman, dan diproses otomatis setelah pembayaran berhasil.`}</p></article>
             <ProductReviews productSlug={product.slug} />
-            <article className="rounded-lg border border-white/[0.10] bg-[#454a50] p-3 sm:p-4"><h2 className="text-lg font-black">Pertanyaan umum</h2><div className="mt-4 space-y-2">{["Bagaimana cara top up?","Metode pembayaran apa saja yang tersedia?","Berapa lama proses pesanan?","Apakah transaksi aman?"].map((question) => <details key={question} className="rounded-xl bg-white/[0.04] p-4"><summary className="cursor-pointer text-sm font-bold">{question}</summary><p className="pt-3 text-sm leading-6 text-white/55">Lengkapi data akun, pilih nominal dan metode pembayaran, lalu konfirmasi pesanan. Status transaksi dapat diperiksa setelah pembayaran dibuat.</p></details>)}</div></article>
+            <article className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4"><h2 className="text-base font-black">Pertanyaan umum</h2><div className="mt-3 space-y-2">{["Bagaimana cara top up?","Metode pembayaran apa saja yang tersedia?","Berapa lama proses pesanan?","Apakah transaksi aman?"].map((question) => <details key={question} className="rounded-lg bg-white/[0.04] p-3"><summary className="cursor-pointer text-xs font-bold">{question}</summary><p className="pt-2 text-xs leading-5 text-white/55">Lengkapi data akun, pilih nominal dan metode pembayaran, lalu konfirmasi pesanan. Status transaksi dapat diperiksa setelah pembayaran dibuat.</p></details>)}</div></article>
           </section>
         )}
       </main>
+
       {activeTab === "transaction" && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#101217]/95 p-3 backdrop-blur lg:hidden">
-          {summaryOpen && (
-            <div className="mx-auto mb-3 max-w-xl rounded-lg border border-white/[0.12] bg-[#191b20] p-4 shadow-2xl">
-              <button type="button" onClick={() => setSummaryOpen(false)} className="flex w-full items-center gap-3 text-left">
-                <span className="block size-11 shrink-0 overflow-hidden rounded-lg"><ProductArtwork product={product} compact /></span>
-                <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{product.name}</strong><span className="block truncate text-xs text-white/50">{selectedPackage?.label ?? "Pilih nominal"}</span></span>
-                <strong className="text-sm text-[#cfff72]">{formatRupiah(subtotal)}</strong>
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#101217]/95 px-3 py-2.5 backdrop-blur lg:hidden">
+          <div className="mx-auto max-w-xl">
+            {summaryOpen ? (
+              <div className="mb-2 rounded-lg border border-white/[0.12] bg-[#191b20] shadow-2xl">
+                <button
+                  type="button"
+                  onClick={() => setSummaryOpen(false)}
+                  aria-expanded="true"
+                  className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left"
+                >
+                  <span className="block size-9 shrink-0 overflow-hidden rounded-lg"><ProductArtwork product={product} compact /></span>
+                  <span className="min-w-0 flex-1">
+                    <strong className="block truncate text-[11px]">Ringkasan pesanan</strong>
+                    <span className="block truncate text-[9px] text-white/45">{product.name} • {selectedPackage?.label ?? "Pilih nominal"}</span>
+                  </span>
+                  <strong className="shrink-0 text-xs text-[#cfff72]">{formatRupiah(subtotal)}</strong>
+                  <ChevronDown className="size-4 shrink-0 text-white/55" />
+                </button>
+                <dl className="space-y-2 border-t border-white/10 px-3 py-2.5 text-[10px]">
+                  <SummaryRow label="Harga" value={formatRupiah(subtotal)} />
+                  <SummaryRow label="Jumlah" value="1" />
+                  <SummaryRow label="Biaya" value={payment ? formatRupiah(payment.fee) : "Dihitung otomatis"} />
+                  <SummaryRow label="Total Pembayaran" value={formatRupiah(payment?.total ?? subtotal)} highlight />
+                </dl>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setSummaryOpen(true)}
+                aria-expanded="false"
+                className="mb-2 flex w-full items-center justify-between rounded-lg border border-white/[0.10] bg-white/[0.04] px-3 py-2 text-left"
+              >
+                <span className="min-w-0">
+                  <strong className="block text-[11px]">Ringkasan pesanan</strong>
+                  <span className="block text-[9px] text-white/40">Ketuk untuk melihat rincian</span>
+                </span>
+                <span className="ml-auto flex items-center gap-2 pl-3">
+                  <strong className="text-xs text-[#cfff72]">{formatRupiah(subtotal)}</strong>
+                  <ChevronUp className="size-4 text-white/60" />
+                </span>
               </button>
-              <dl className="mt-3 space-y-2 border-t border-white/10 pt-3 text-xs"><SummaryRow label="Harga" value={formatRupiah(subtotal)} /><SummaryRow label="Jumlah Pembelian" value="1" /><SummaryRow label="Biaya" value={formatRupiah(0)} /><SummaryRow label="Total Pembayaran" value={formatRupiah(subtotal)} highlight /></dl>
-            </div>
-          )}
-          {!summaryOpen && <button type="button" onClick={() => setSummaryOpen(true)} className="mx-auto mb-2 block text-xs font-bold text-white/75">Tampilkan ringkasan pesanan</button>}
-          <Button form="checkout-form" type="submit" disabled={submitting} className="mx-auto h-12 w-full max-w-xl rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]"><LockKeyhole className="mr-2 size-4" />Pesan Sekarang</Button>
+            )}
+
+            <Button form="checkout-form" type="submit" disabled={submitting} className="h-10 w-full rounded-lg bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">
+              {submitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <LockKeyhole className="mr-2 size-4" />}
+              Pesan Sekarang
+            </Button>
+          </div>
         </div>
       )}
+
       <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
         <DialogContent className="max-w-md border-white/10 bg-[#191b20] text-white" showCloseButton={false}>
           <DialogHeader><div className="mx-auto grid size-14 place-items-center rounded-full bg-[#b9ff35]/15"><CheckCircle2 className="size-8 text-[#b9ff35]" /></div><DialogTitle className="pt-3 text-center text-lg font-black">Buat Pesanan</DialogTitle><DialogDescription className="text-center text-xs leading-5 text-white/55">Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai.</DialogDescription></DialogHeader>
@@ -933,6 +905,7 @@ function CheckoutContent() {
           <div className="grid grid-cols-2 gap-3"><Button type="button" onClick={() => { setConfirmationOpen(false); void submitOrder(); }} disabled={!agreed || submitting} className="bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">{submitting ? "Memproses..." : "Pesan Sekarang"}</Button><Button type="button" variant="outline" onClick={() => setConfirmationOpen(false)} className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">Batalkan</Button></div>
         </DialogContent>
       </Dialog>
+
       <Dialog
         open={noticeOpen}
         onOpenChange={(open) => {
@@ -940,69 +913,27 @@ function CheckoutContent() {
           else setNoticeOpen(true);
         }}
       >
-        <DialogContent
-          className="max-w-lg overflow-hidden border-white/10 bg-[#080b14] p-0 text-white"
-          showCloseButton={false}
-        >
+        <DialogContent className="max-w-lg overflow-hidden border-white/10 bg-[#080b14] p-0 text-white" showCloseButton={false}>
           {notices.length > 0 && (
             <>
               <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-4">
-                <span className="font-mono text-xs text-white/40">
-                  {noticeIndex + 1}/{notices.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={closeNotice}
-                  className="rounded-lg p-1.5 text-white/55 hover:bg-white/[0.06] hover:text-white"
-                  aria-label="Tutup informasi"
-                >
-                  <X className="size-5" />
-                </button>
+                <span className="font-mono text-xs text-white/40">{noticeIndex + 1}/{notices.length}</span>
+                <button type="button" onClick={closeNotice} className="rounded-lg p-1.5 text-white/55 hover:bg-white/[0.06] hover:text-white" aria-label="Tutup informasi"><X className="size-5" /></button>
               </div>
               <div className="px-6 py-6">
                 <DialogHeader>
-                  <DialogTitle className="text-left text-lg font-black uppercase leading-7">
-                    {formatNotice(notices[noticeIndex].title, product)}
-                  </DialogTitle>
-                  <DialogDescription className="whitespace-pre-line text-left text-sm leading-7 text-white/64">
-                    {formatNotice(notices[noticeIndex].body, product)}
-                  </DialogDescription>
+                  <DialogTitle className="text-left text-lg font-black uppercase leading-7">{formatNotice(notices[noticeIndex].title, product)}</DialogTitle>
+                  <DialogDescription className="whitespace-pre-line text-left text-sm leading-7 text-white/64">{formatNotice(notices[noticeIndex].body, product)}</DialogDescription>
                 </DialogHeader>
                 {notices.length > 1 && (
                   <div className="mt-4 flex items-center justify-between gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={noticeIndex === 0}
-                      onClick={() =>
-                        setNoticeIndex((value) => Math.max(0, value - 1))
-                      }
-                      className="border-white/10 bg-white/[0.03] text-white"
-                    >
-                      Sebelumnya
-                    </Button>
-                    <Button
-                      type="button"
-                      disabled={noticeIndex === notices.length - 1}
-                      onClick={() =>
-                        setNoticeIndex((value) =>
-                          Math.min(notices.length - 1, value + 1),
-                        )
-                      }
-                      className="bg-[#b9ff35] text-[#091006]"
-                    >
-                      Berikutnya
-                    </Button>
+                    <Button type="button" variant="outline" disabled={noticeIndex === 0} onClick={() => setNoticeIndex((value) => Math.max(0, value - 1))} className="border-white/10 bg-white/[0.03] text-white">Sebelumnya</Button>
+                    <Button type="button" disabled={noticeIndex === notices.length - 1} onClick={() => setNoticeIndex((value) => Math.min(notices.length - 1, value + 1))} className="bg-[#b9ff35] text-[#091006]">Berikutnya</Button>
                   </div>
                 )}
               </div>
               <label className="flex cursor-pointer items-center gap-3 border-t border-white/[0.08] px-6 py-5 text-xs text-white/45">
-                <input
-                  type="checkbox"
-                  checked={hideNotice}
-                  onChange={(event) => setHideNotice(event.target.checked)}
-                  className="size-4 accent-[#b9ff35]"
-                />
+                <input type="checkbox" checked={hideNotice} onChange={(event) => setHideNotice(event.target.checked)} className="size-4 accent-[#b9ff35]" />
                 Jangan tampilkan lagi dalam 7 hari
               </label>
             </>
@@ -1076,23 +1007,17 @@ function StepTitle({
   description: string;
 }) {
   return (
-    <div className="flex items-start gap-4">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#bca17d] text-lg font-black text-white">{number}</span>
-      <div>
-        <h2 className="pt-1 font-bold">{title}</h2>
-        <p className="mt-1 text-[11px] text-white/50">{description}</p>
+    <div className="flex items-start gap-2.5">
+      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-[#bca17d] text-xs font-black text-white">{number}</span>
+      <div className="min-w-0">
+        <h2 className="text-[12px] font-black leading-4 sm:text-[13px]">{title}</h2>
+        <p className="mt-0.5 text-[9px] leading-4 text-white/45 sm:text-[10px]">{description}</p>
       </div>
     </div>
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label>
       <span className="field-label">{label}</span>
@@ -1113,11 +1038,7 @@ function SummaryRow({
   return (
     <div className="flex justify-between gap-4">
       <dt className="text-white/38">{label}</dt>
-      <dd
-        className={`max-w-52 truncate text-right font-semibold ${highlight ? "text-[#cfff72]" : ""}`}
-      >
-        {value}
-      </dd>
+      <dd className={`max-w-52 truncate text-right font-semibold ${highlight ? "text-[#cfff72]" : ""}`}>{value}</dd>
     </div>
   );
 }
@@ -1131,76 +1052,27 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
         : "Setelah lunas, pesanan diteruskan otomatis ke provider.";
   const isManualQris = payment.paymentMethod === "manual_qris";
   return (
-    <div className="mt-5 rounded-lg border border-[#b9ff35]/30 bg-[#b9ff35]/[0.08] p-4">
-      <BadgeCheck className="size-6 text-[#b9ff35]" />
-      <h3 className="mt-3 text-sm font-black">
-        {payment.paymentStatus === "paid"
-          ? "Pembayaran berhasil"
-          : "Pembayaran dibuat"}
-      </h3>
-      <p className="mt-1 break-all text-[10px] text-white/45">
-        {payment.referenceId}
-      </p>
+    <div className="mt-4 rounded-lg border border-[#b9ff35]/30 bg-[#b9ff35]/[0.08] p-3">
+      <BadgeCheck className="size-5 text-[#b9ff35]" />
+      <h3 className="mt-2 text-xs font-black">{payment.paymentStatus === "paid" ? "Pembayaran berhasil" : "Pembayaran dibuat"}</h3>
+      <p className="mt-1 break-all text-[9px] text-white/45">{payment.referenceId}</p>
       {payment.paymentNo && (
-        <div className="mt-3 rounded-xl bg-black/20 p-3">
-          <span className="text-[9px] uppercase tracking-wider text-white/35">
-            {payment.paymentName || "Nomor pembayaran"}
-          </span>
+        <div className="mt-2.5 rounded-lg bg-black/20 p-2.5">
+          <span className="text-[8px] uppercase tracking-wider text-white/35">{payment.paymentName || "Nomor pembayaran"}</span>
           <div className="mt-1 flex items-center justify-between gap-2">
-            <strong className="break-all text-sm text-[#d8ff8d]">
-              {payment.paymentNo}
-            </strong>
-            <button
-              type="button"
-              onClick={() =>
-                void navigator.clipboard.writeText(payment.paymentNo!)
-              }
-              className="shrink-0 text-white/45 hover:text-white"
-              aria-label="Salin nomor pembayaran"
-            >
-              <Copy className="size-4" />
-            </button>
+            <strong className="break-all text-xs text-[#d8ff8d]">{payment.paymentNo}</strong>
+            <button type="button" onClick={() => void navigator.clipboard.writeText(payment.paymentNo!)} className="shrink-0 text-white/45 hover:text-white" aria-label="Salin nomor pembayaran"><Copy className="size-4" /></button>
           </div>
         </div>
       )}
-      {payment.balanceAfter != null && (
-        <p className="mt-3 rounded-xl bg-black/20 p-3 text-[10px] text-white/55">
-          Sisa saldo:{" "}
-          <strong className="text-[#d8ff8d]">
-            {formatRupiah(payment.balanceAfter)}
-          </strong>
-        </p>
-      )}
-      {isManualQris && payment.paymentUrl && (
-        <div className="mt-4 rounded-xl bg-white p-3">
-          <img
-            src={payment.paymentUrl}
-            alt="QRIS pembayaran"
-            className="mx-auto aspect-square w-full max-w-64 object-contain"
-          />
-        </div>
-      )}
-      {payment.expiredAt && (
-        <p className="mt-3 text-[9px] text-white/35">
-          Berlaku sampai {payment.expiredAt}
-        </p>
-      )}
+      {payment.balanceAfter != null && <p className="mt-2.5 rounded-lg bg-black/20 p-2.5 text-[9px] text-white/55">Sisa saldo: <strong className="text-[#d8ff8d]">{formatRupiah(payment.balanceAfter)}</strong></p>}
+      {isManualQris && payment.paymentUrl && <div className="mt-3 rounded-lg bg-white p-2.5"><img src={payment.paymentUrl} alt="QRIS pembayaran" className="mx-auto aspect-square w-full max-w-64 object-contain" /></div>}
+      {payment.expiredAt && <p className="mt-2.5 text-[8px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}
       {payment.paymentUrl && !isManualQris && (
-        <Button
-          asChild
-          className="mt-4 w-full rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]"
-        >
-          <a href={payment.paymentUrl} target="_blank" rel="noreferrer">
-            Lanjut bayar <ExternalLink className="ml-2 size-4" />
-          </a>
-        </Button>
+        <Button asChild className="mt-3 w-full rounded-lg bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]"><a href={payment.paymentUrl} target="_blank" rel="noreferrer">Lanjut bayar <ExternalLink className="ml-2 size-4" /></a></Button>
       )}
-      <p className="mt-3 flex items-start gap-2 text-[9px] leading-4 text-white/38">
-        {payment.fulfillmentType === "automatic" ? (
-          <Zap className="mt-0.5 size-3 shrink-0 text-[#b9ff35]" />
-        ) : (
-          <Info className="mt-0.5 size-3 shrink-0 text-amber-300" />
-        )}
+      <p className="mt-2.5 flex items-start gap-2 text-[8px] leading-4 text-white/38">
+        {payment.fulfillmentType === "automatic" ? <Zap className="mt-0.5 size-3 shrink-0 text-[#b9ff35]" /> : <Info className="mt-0.5 size-3 shrink-0 text-amber-300" />}
         {fulfillmentMessage}
       </p>
     </div>
@@ -1210,50 +1082,36 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
 function NicknameResult({ state }: { state: NicknameState }) {
   if (state.status === "loading")
     return (
-      <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#b9ff35]/15 bg-[#b9ff35]/[0.05] p-3 text-xs text-white/48">
+      <div className="mt-3 flex items-center gap-2.5 rounded-lg border border-[#b9ff35]/15 bg-[#b9ff35]/[0.05] p-2.5 text-[10px] text-white/55">
         <LoaderCircle className="size-4 animate-spin text-[#b9ff35]" />
         Memeriksa ID dan Server…
       </div>
     );
   if (state.status === "success")
     return (
-      <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-400/30 bg-emerald-400/[0.08] p-4">
-        <BadgeCheck className="mt-0.5 size-5 shrink-0 text-emerald-400" />
+      <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-emerald-400/30 bg-emerald-400/[0.08] p-2.5">
+        <BadgeCheck className="mt-0.5 size-4 shrink-0 text-emerald-400" />
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-300/70">
-            Akun ditemukan
-          </p>
-          <strong className="mt-1 block break-words text-sm text-emerald-200">
-            {state.nickname}
-          </strong>
-          {state.country && (
-            <p className="mt-1 text-[10px] text-emerald-100/55">
-              dari {state.country}
-              {state.country.toLowerCase() === "indonesia" ? " 🇮🇩" : ""}
-            </p>
-          )}
+          <p className="text-[8px] font-bold uppercase tracking-[0.14em] text-emerald-300/70">Akun ditemukan</p>
+          <strong className="mt-0.5 block break-words text-xs text-emerald-200">{state.nickname}</strong>
+          {state.country && <p className="mt-0.5 text-[9px] text-emerald-100/55">dari {state.country}{state.country.toLowerCase() === "indonesia" ? " 🇮🇩" : ""}</p>}
         </div>
       </div>
     );
   if (state.status === "error")
     return (
-      <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-400/25 bg-red-400/[0.07] p-4">
-        <AlertCircle className="mt-0.5 size-5 shrink-0 text-red-300" />
+      <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-red-400/30 bg-red-400/[0.08] p-2.5">
+        <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-300" />
         <div>
-          <p className="text-xs font-bold text-red-200">
-            Akun belum terverifikasi
-          </p>
-          <p className="mt-1 text-[10px] leading-5 text-red-100/55">
-            {state.message}
-          </p>
+          <p className="text-[10px] font-bold text-red-200">Akun belum terverifikasi</p>
+          <p className="mt-0.5 text-[9px] leading-4 text-red-100/60">{state.message}</p>
         </div>
       </div>
     );
   return (
-    <div className="mt-4 flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-[10px] leading-5 text-white/32">
+    <div className="mt-3 flex items-start gap-2 rounded-lg border border-white/[0.07] bg-white/[0.025] p-2.5 text-[9px] leading-4 text-white/40">
       <Info className="mt-0.5 size-3.5 shrink-0 text-[#b9ff35]" />
-      Nickname akan tampil otomatis setelah User ID dan Server yang diperlukan
-      terisi.
+      Nickname akan tampil otomatis setelah User ID dan Server yang diperlukan terisi.
     </div>
   );
 }
