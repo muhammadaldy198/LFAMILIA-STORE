@@ -29,3 +29,13 @@ export function requireRuntimeChoice<T extends string>(
   }
   return normalized as T;
 }
+
+export function getPublicBaseUrl() {
+  const runtime = getRuntimeEnv<{ PUBLIC_BASE_URL?: string }>();
+  const configured = requireRuntimeValue(runtime.PUBLIC_BASE_URL, "PUBLIC_BASE_URL");
+  try {
+    return new URL(configured).origin;
+  } catch {
+    throw new Error("PUBLIC_BASE_URL di Cloudflare bukan URL yang valid.");
+  }
+}
