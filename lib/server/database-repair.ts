@@ -23,6 +23,16 @@ const columns: Array<[table: string, column: string, definition: string]> = [
     "target_template TEXT DEFAULT '{{destination}}{{server}}' NOT NULL",
   ],
   ["products", "manual_instructions", "manual_instructions TEXT"],
+  [
+    "products",
+    "package_tabs_enabled",
+    "package_tabs_enabled INTEGER DEFAULT 0 NOT NULL",
+  ],
+  [
+    "products",
+    "package_tabs_json",
+    "package_tabs_json TEXT DEFAULT '[]' NOT NULL",
+  ],
   ["orders", "base_subtotal", "base_subtotal INTEGER DEFAULT 0 NOT NULL"],
   ["orders", "discount_amount", "discount_amount INTEGER DEFAULT 0 NOT NULL"],
   ["orders", "voucher_code", "voucher_code TEXT"],
