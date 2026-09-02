@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-const legacyReference = /LF-\d{8}-[A-F0-9]{8,12}/g;
+const orderReference = /LF(?:-\d{8}-[A-F0-9]{8,12}|\d{6}[A-F0-9]{12})/g;
 
 function findMidtransPayment() {
   for (const anchor of Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"))) {
@@ -12,12 +12,10 @@ function findMidtransPayment() {
         url.protocol === "https:" &&
         (url.hostname === "midtrans.com" || url.hostname.endsWith(".midtrans.com"))
       ) {
-        const matches = document.body.textContent?.match(legacyReference) ?? [];
+        const matches = document.body.textContent?.match(orderReference) ?? [];
         const referenceId = matches.at(-1);
         if (!referenceId) return null;
-        const token = referenceId.split("-").at(-1);
-        if (!token) return null;
-        return { paymentUrl: url.toString(), invoice: `LF${token}` };
+        return { paymentUrl: url.toString(), invoice: referenceId };
       }
     } catch {
       // Abaikan href yang tidak valid.
