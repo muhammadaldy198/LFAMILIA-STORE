@@ -10,6 +10,7 @@ const packageSchema = z.object({
   label: z.string().trim().min(2).max(100),
   price: z.number().int().min(1).max(100_000_000),
   note: z.string().trim().max(40).optional(),
+  group: z.string().trim().max(60).optional(),
   providerCode: z.string().trim().regex(/^[a-z0-9-]+$/).max(40).optional(),
   providerSku: z.string().trim().max(100).optional(),
   pricingMode: z.enum(["manual", "auto"]).default("auto"),
