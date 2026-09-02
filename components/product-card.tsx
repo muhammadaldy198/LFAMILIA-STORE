@@ -12,7 +12,7 @@ export function ProductCard({ product }: { product: StoreProduct }) {
       href={`/checkout?product=${product.slug}`}
       className="group block min-w-0 transition duration-200 hover:-translate-y-0.5"
     >
-      <div className="relative aspect-[4/5] overflow-hidden rounded-[10px] border border-white/[0.1] bg-[#0d1019] shadow-[0_10px_24px_-18px_rgba(0,0,0,0.9)] transition group-hover:border-[#b9ff35]/40 group-hover:shadow-[0_14px_28px_-20px_rgba(185,255,53,0.3)] sm:rounded-[12px]">
+      <div className="relative aspect-[2/3] overflow-hidden rounded-[10px] border border-white/[0.1] bg-[#0d1019] shadow-[0_10px_24px_-18px_rgba(0,0,0,0.9)] transition group-hover:border-[#b9ff35]/40 group-hover:shadow-[0_14px_28px_-20px_rgba(185,255,53,0.3)] sm:rounded-[12px]">
         <ProductArtwork product={product} />
         <div className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-t from-black/18 via-transparent to-white/[0.035]" />
         <span className="absolute right-[6px] top-[6px] z-30 grid size-[20px] place-items-center rounded-full border border-white/10 bg-black/55 backdrop-blur-sm">
