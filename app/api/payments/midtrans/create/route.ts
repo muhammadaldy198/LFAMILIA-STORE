@@ -12,13 +12,11 @@ import {
   resolvePurchasableItem,
   updateMidtransPayment,
 } from "@/lib/server/orders";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
 import { readWalletSettings } from "@/lib/server/wallet";
 
 export const dynamic = "force-dynamic";
-
-type RuntimeEnv = { PUBLIC_BASE_URL?: string };
 
 const schema = z.object({
   productSlug: z.string().trim().min(2).max(80),
@@ -34,11 +32,6 @@ const schema = z.object({
   paymentChannel: z.string().trim().min(2).max(30),
   voucherCode: z.string().trim().max(40).optional(),
 });
-
-function publicBaseUrl(request: Request) {
-  const configured = getRuntimeEnv<RuntimeEnv>().PUBLIC_BASE_URL?.trim();
-  return new URL(configured || request.url).origin;
-}
 
 function publicInvoice(referenceId: string) {
   const token = referenceId.split("-").at(-1) ?? referenceId.replace(/^LF/, "");
@@ -91,7 +84,7 @@ export async function POST(request: Request) {
       promotion,
     });
 
-    const baseUrl = publicBaseUrl(request);
+    const baseUrl = getPublicBaseUrl();
     const invoice = publicInvoice(identity.referenceId);
     const payment = await createMidtransSnapPayment({
       referenceId: identity.referenceId,
