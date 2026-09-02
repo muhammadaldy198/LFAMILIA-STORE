@@ -495,8 +495,8 @@ function CheckoutContent() {
             />
           )}
         </section>
-        <section className="relative z-10 -mx-4 min-h-[196px] overflow-visible border-y border-white/[0.10] bg-[#202224] px-5 py-5 shadow-2xl sm:-mx-6 sm:px-8 lg:-mx-8">
-          <span className="absolute -top-16 left-5 block aspect-[3/3] size-32 overflow-hidden rounded-[24px] border-4 border-[#202224] shadow-2xl [perspective:800px] [transform:rotateY(-10deg)_rotateZ(-2deg)] sm:-top-18 sm:left-8 sm:size-36">
+        <section className="relative z-10 -mx-4 min-h-[142px] overflow-visible border-y border-white/[0.10] bg-[#202224] px-5 py-5 shadow-2xl sm:-mx-6 sm:px-8 lg:-mx-8">
+          <span className="absolute -top-16 left-5 block aspect-[3/3] size-32 overflow-hidden rounded-[24px] border-4 border-[#202224] shadow-2xl [perspective:800px] [transform:rotateY(-10deg)_rotateZ(-2deg)] sm:-top-16 sm:left-8 sm:size-36">
             <ProductArtwork product={product} compact />
           </span>
           <div className="pl-36 pt-2 sm:pl-44">
