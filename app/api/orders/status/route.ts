@@ -35,13 +35,14 @@ export async function POST(request: Request) {
     const voucherCode = order.payment_status === "paid"
       ? await getWebsiteVoucherCodeByReference(referenceId).catch(() => null)
       : null;
+    const isInternalVoucherDestination = order.destination.trim() === "00000000";
 
     return Response.json({
       order: {
         referenceId: maskReferenceId(order.reference_id),
         productName: order.product_name,
         packageLabel: order.package_label,
-        destination: maskDestination(order.destination, order.server),
+        destination: isInternalVoucherDestination ? null : maskDestination(order.destination, order.server),
         total: order.total,
         paymentStatus: order.payment_status,
         fulfillmentStatus: order.fulfillment_status,
