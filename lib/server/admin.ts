@@ -1,5 +1,5 @@
 import { getPasswordAdminSession, type PasswordAdminSession } from "@/lib/server/admin-auth";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getRuntimeEnv, requireRuntimeValue } from "@/lib/server/runtime-env";
 
 export type AdminRole = "owner" | "staff";
 
@@ -20,7 +20,7 @@ export function getAccessEmail(request: Request) {
 }
 
 export function getOwnerEmail() {
-  return normalizeEmail(getRuntimeEnv<RuntimeEnv>().OWNER_EMAIL) ?? "muhammadaldy198@gmail.com";
+  return requireRuntimeValue(getRuntimeEnv<RuntimeEnv>().OWNER_EMAIL, "OWNER_EMAIL").toLowerCase();
 }
 
 export async function getAdminSession(request: Request): Promise<AdminSession | null> {
