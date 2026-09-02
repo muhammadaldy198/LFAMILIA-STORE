@@ -219,7 +219,9 @@ export function CheckoutUiEnhancer() {
       style.textContent = `
         [data-lf-checkout-banner-image="true"] {
           object-fit: cover !important;
-          object-position: center center !important;
+          object-position: 50% 50% !important;
+          width: 100% !important;
+          height: 100% !important;
         }
 
         [data-lf-account-grid="true"] {
@@ -231,62 +233,69 @@ export function CheckoutUiEnhancer() {
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
-          gap: 0.4rem !important;
+          gap: 0.48rem !important;
           white-space: nowrap;
+          font-weight: 600;
         }
 
         [data-lf-product-features="true"] > span > svg {
-          margin-bottom: 0 !important;
+          margin: 0 !important;
           flex-shrink: 0;
         }
 
         @media (max-width: 639px) {
           [data-lf-checkout-banner="true"] {
-            height: 15rem !important;
+            width: calc(100% + 2rem) !important;
+            height: auto !important;
+            aspect-ratio: 16 / 9 !important;
           }
 
           [data-lf-product-hero="true"] {
-            min-height: 9.75rem !important;
+            min-height: 8.75rem !important;
             padding-top: 0.75rem !important;
             padding-bottom: 0.75rem !important;
           }
 
           [data-lf-product-art="true"] {
-            width: 8rem !important;
-            height: 8rem !important;
-            top: -4.35rem !important;
-            left: 1.5rem !important;
-            border-radius: 1rem !important;
+            width: 8.5rem !important;
+            height: 8.5rem !important;
+            top: -4.5rem !important;
+            left: 1.35rem !important;
+            border-radius: 1.15rem !important;
             border-width: 3px !important;
+            box-shadow: 0 12px 30px rgba(0,0,0,.38) !important;
           }
 
           [data-lf-product-info="true"] {
-            padding-left: 10.25rem !important;
-            padding-top: 2.35rem !important;
+            padding-left: 10.85rem !important;
+            padding-top: 2.7rem !important;
           }
 
           [data-lf-product-info="true"] h1 {
-            font-size: 1rem !important;
-            line-height: 1.2 !important;
-            letter-spacing: 0.04em !important;
+            font-size: 1.04rem !important;
+            line-height: 1.15 !important;
+            letter-spacing: 0.045em !important;
           }
 
           [data-lf-product-info="true"] p {
-            margin-top: 0.4rem !important;
-            font-size: 0.75rem !important;
+            margin-top: 0.42rem !important;
+            font-size: 0.76rem !important;
+            line-height: 1.15 !important;
           }
 
           [data-lf-product-features="true"] {
             left: 1rem !important;
             right: 1rem !important;
-            bottom: 0.85rem !important;
-            gap: 0.35rem !important;
+            bottom: 0.72rem !important;
+            display: grid !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 0.2rem !important;
             font-size: 0.62rem !important;
           }
 
           [data-lf-product-features="true"] > span > svg {
-            width: 0.95rem !important;
-            height: 0.95rem !important;
+            width: 1rem !important;
+            height: 1rem !important;
           }
 
           [data-lf-account-grid="true"] {
@@ -296,20 +305,26 @@ export function CheckoutUiEnhancer() {
           [data-lf-account-grid="true"] input {
             min-width: 0 !important;
             width: 100% !important;
+            font-size: 0.86rem !important;
           }
         }
 
         @media (min-width: 640px) {
+          [data-lf-checkout-banner="true"] {
+            aspect-ratio: 16 / 7 !important;
+            height: auto !important;
+          }
+
           [data-lf-product-art="true"] {
-            width: 8.75rem !important;
-            height: 8.75rem !important;
-            top: -4.75rem !important;
-            border-radius: 1.1rem !important;
+            width: 9.25rem !important;
+            height: 9.25rem !important;
+            top: -5rem !important;
+            border-radius: 1.2rem !important;
           }
 
           [data-lf-product-info="true"] {
-            padding-left: 10.75rem !important;
-            padding-top: 2.25rem !important;
+            padding-left: 11.5rem !important;
+            padding-top: 2.7rem !important;
           }
         }
       `;
