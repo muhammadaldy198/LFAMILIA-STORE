@@ -1,6 +1,6 @@
 import { hashHex } from "@/lib/server/crypto";
 import type { ProviderAdapter, ProviderResult } from "@/lib/server/providers/types";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getRuntimeEnv, requireRuntimeChoice, requireRuntimeValue } from "@/lib/server/runtime-env";
 
 type DigiFlazzEnv = {
   DIGIFLAZZ_USERNAME?: string;
@@ -31,9 +31,10 @@ export const digiflazzAdapter: ProviderAdapter = {
   name: "DigiFlazz",
   async fulfill(order, publicBaseUrl) {
     const runtime = getRuntimeEnv<DigiFlazzEnv>();
-    const username = runtime.DIGIFLAZZ_USERNAME?.trim();
-    const apiKey = runtime.DIGIFLAZZ_API_KEY?.trim();
-    if (!username || !apiKey) throw new Error("Secret DigiFlazz belum dikonfigurasi.");
+    const username = requireRuntimeValue(runtime.DIGIFLAZZ_USERNAME, "DIGIFLAZZ_USERNAME");
+    const apiKey = requireRuntimeValue(runtime.DIGIFLAZZ_API_KEY, "DIGIFLAZZ_API_KEY");
+    const environment = requireRuntimeChoice(runtime.DIGIFLAZZ_ENV, "DIGIFLAZZ_ENV", ["development", "production"] as const);
+    const apiUrl = requireRuntimeValue(runtime.DIGIFLAZZ_API_URL, "DIGIFLAZZ_API_URL");
 
     const body = {
       username,
@@ -41,11 +42,11 @@ export const digiflazzAdapter: ProviderAdapter = {
       customer_no: order.customerNo,
       ref_id: order.referenceId,
       sign: hashHex("md5", `${username}${apiKey}${order.referenceId}`),
-      testing: runtime.DIGIFLAZZ_ENV !== "production",
+      testing: environment === "development",
       max_price: order.subtotal,
       cb_url: `${publicBaseUrl}/api/fulfillment/digiflazz/callback`,
     };
-    const response = await fetch(runtime.DIGIFLAZZ_API_URL?.trim() || "https://api.digiflazz.com/v1/transaction", {
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify(body),
