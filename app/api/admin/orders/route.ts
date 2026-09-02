@@ -5,7 +5,7 @@ import {
   confirmManualOrderPayment,
   listOrders,
 } from "@/lib/server/orders";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 
 export const dynamic = "force-dynamic";
 
@@ -64,13 +64,7 @@ export async function PATCH(request: Request) {
           { error: "Konfirmasi pembayaran manual hanya untuk Pemilik." },
           { status: 403 },
         );
-      const configured = getRuntimeEnv<{
-        PUBLIC_BASE_URL?: string;
-      }>().PUBLIC_BASE_URL?.trim();
-      await confirmManualOrderPayment(
-        input.id,
-        new URL(configured || request.url).origin,
-      );
+      await confirmManualOrderPayment(input.id, getPublicBaseUrl());
     } else await completeManualOrder(input.id, access.email);
     return Response.json({ ok: true });
   } catch (error) {
