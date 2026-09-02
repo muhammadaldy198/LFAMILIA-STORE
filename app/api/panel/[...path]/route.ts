@@ -3,6 +3,7 @@ import * as content from "@/app/api/admin/content/route";
 import * as digiflazzPricing from "@/app/api/admin/digiflazz-pricing/route";
 import * as faqs from "@/app/api/admin/faqs/route";
 import * as media from "@/app/api/admin/media/route";
+import * as members from "@/app/api/admin/members/route";
 import * as paymentMethods from "@/app/api/admin/payment-methods/route";
 import * as orders from "@/app/api/admin/orders/route";
 import * as productContent from "@/app/api/admin/product-content/route";
@@ -33,6 +34,7 @@ const routes: Record<string, RouteHandlers> = {
   "digiflazz-pricing": { GET: digiflazzPricing.GET, POST: digiflazzPricing.POST },
   faqs: { GET: faqs.GET, POST: faqs.POST, DELETE: faqs.DELETE },
   media: { POST: media.POST },
+  members: { GET: members.GET, PUT: members.PUT },
   "payment-methods": { GET: paymentMethods.GET, POST: paymentMethods.POST, DELETE: paymentMethods.DELETE },
   orders: { GET: orders.GET, PATCH: orders.PATCH },
   "product-content": { PUT: productContent.PUT },
