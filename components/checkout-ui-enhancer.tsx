@@ -100,7 +100,8 @@ export function CheckoutUiEnhancer() {
           arrow.className = "ml-1 grid size-6 shrink-0 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-[11px] font-black text-white/60 transition";
           header.appendChild(arrow);
         }
-        arrow.textContent = open ? "▲" : "▼";
+        const nextArrow = open ? "▲" : "▼";
+        if (arrow.textContent !== nextArrow) arrow.textContent = nextArrow;
         arrow.setAttribute("aria-hidden", "true");
 
         if (!wiredHeaders.has(header)) {
@@ -151,7 +152,12 @@ export function CheckoutUiEnhancer() {
     }
 
     const observer = new MutationObserver(schedule);
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class"],
+    });
     schedule();
 
     return () => {
