@@ -12,12 +12,11 @@ import {
   recordOrderEvent,
   resolvePurchasableItem,
 } from "@/lib/server/orders";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
 import { spendWallet } from "@/lib/server/wallet";
 
 export const dynamic = "force-dynamic";
-type RuntimeEnv = { PUBLIC_BASE_URL?: string };
 
 const schema = z.object({
   productSlug: z.string().trim().min(2).max(80),
@@ -59,8 +58,7 @@ export async function POST(request: Request) {
     const firstPaid = await applyPaymentStatus(order, "paid");
     await recordOrderEvent({ orderId: identity.id, source: "wallet", eventId: `wallet-${identity.id}`, status: "paid", payload: { amount: promotion.finalPrice, balanceAfter } });
     if (firstPaid && item.fulfillmentType === "automatic") {
-      const configured = getRuntimeEnv<RuntimeEnv>().PUBLIC_BASE_URL?.trim();
-      await fulfillAutomaticOrder(identity.id, new URL(configured || request.url).origin);
+      await fulfillAutomaticOrder(identity.id, getPublicBaseUrl());
     }
     return Response.json({ orderId: identity.id, referenceId: identity.referenceId, paymentNo: null, paymentName: "Saldo LFAMILIA", paymentUrl: null, fee: 0, total: promotion.finalPrice, expiredAt: null, paymentStatus: "paid", balanceAfter, fulfillmentType: item.fulfillmentType, providerCode: item.providerCode, basePrice: promotion.basePrice, sellingPrice: promotion.sellingPrice, discountAmount: promotion.discountAmount, voucherCode: promotion.voucherCode, flashSaleId: promotion.flashSaleId, memberTier: promotion.memberTier, memberDiscountPercent: promotion.memberDiscountPercent, discountSource: promotion.discountSource }, { status: 201 });
   } catch (error) {
