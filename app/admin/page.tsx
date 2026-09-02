@@ -28,6 +28,7 @@ import { AdminOverview } from "@/components/admin-overview";
 import { AdminExperienceManager } from "@/components/admin-experience-manager";
 import { AdminMemberManager } from "@/components/admin-member-manager";
 import { AdminProductManager } from "@/components/admin-product-manager";
+import { AdminProductDeliveryManager } from "@/components/admin-product-delivery-manager";
 import { AdminPromotionManager } from "@/components/admin-promotion-manager";
 import { AdminStorefrontManager } from "@/components/admin-storefront-manager";
 import { AdminTeamManager } from "@/components/admin-team-manager";
@@ -296,10 +297,11 @@ export default function AdminPage() {
                 title="Katalog produk"
                 description={
                   isOwner
-                    ? "Kelola gambar, pop-up informasi, jam operasional, nominal, harga, dan SKU provider."
+                    ? "Kelola tipe pengiriman, data tujuan, gambar, pop-up informasi, nominal, harga, dan SKU provider."
                     : "Staff dapat memperbarui gambar, jam layanan, instruksi, dan pop-up. Harga serta provider hanya tersedia untuk Pemilik."
                 }
               >
+                {isOwner && <AdminProductDeliveryManager />}
                 <AdminProductManager />
               </AdminSection>
             </TabsContent>
@@ -352,7 +354,7 @@ export default function AdminPage() {
                   </AdminSection>
                   <AdminSection
                     title="QRIS, transfer bank & gateway"
-                  description="Atur metode checkout manual dan toggle Midtrans."
+                    description="Atur metode checkout manual dan toggle Midtrans."
                   >
                     <AdminWalletManager view="checkout" />
                   </AdminSection>
