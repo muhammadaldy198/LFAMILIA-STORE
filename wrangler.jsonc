@@ -11,6 +11,8 @@
     "binding": "ASSETS"
   },
   "vars": {
+    "PUBLIC_BASE_URL": "https://lfamiliastore.my.id",
+    "MIDTRANS_ENV": "sandbox",
     "NICKNAME_API_URL": "https://api.isan.eu.org/nickname",
     "DIGIFLAZZ_ENV": "development",
     "OWNER_EMAIL": "muhammadaldy198@gmail.com",
