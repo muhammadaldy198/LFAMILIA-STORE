@@ -4,13 +4,13 @@ import { useEffect } from "react";
 
 type PackageTabProduct = {
   slug: string;
+  packageTabsEnabled?: boolean;
+  packageTabs?: string[];
   packages: Array<{
     id: string;
     group?: string;
   }>;
 };
-
-const tabbedProductSlug = "roblox-gift-in-game";
 
 function groupName(value?: string) {
   return value?.trim() || "Umum";
@@ -42,6 +42,7 @@ export function CheckoutPackageTabs() {
 
     function enhance() {
       const productSlug = new URL(window.location.href).searchParams.get("product") ?? "";
+      const product = products.find((item) => item.slug === productSlug);
       const form = document.querySelector<HTMLFormElement>("#checkout-form");
       if (!form) return;
 
@@ -60,7 +61,7 @@ export function CheckoutPackageTabs() {
       );
       if (!packageButtons.length) return;
 
-      if (productSlug !== tabbedProductSlug) {
+      if (!product || !product.packageTabsEnabled || !product.packages.length) {
         section.querySelector<HTMLElement>("[data-lf-package-tabs]")?.remove();
         packageButtons.forEach((button) => {
           button.style.display = "";
@@ -69,10 +70,14 @@ export function CheckoutPackageTabs() {
         return;
       }
 
-      const product = products.find((item) => item.slug === productSlug);
-      if (!product || !product.packages.length) return;
-
-      const groups = Array.from(new Set(product.packages.map((item) => groupName(item.group))));
+      const assignedGroups = Array.from(new Set(product.packages.map((item) => groupName(item.group))));
+      const configuredGroups = (product.packageTabs ?? [])
+        .map((item) => item.trim())
+        .filter((item) => item && assignedGroups.includes(item));
+      const groups = [
+        ...configuredGroups,
+        ...assignedGroups.filter((item) => !configuredGroups.includes(item)),
+      ];
       let tabs = section.querySelector<HTMLElement>("[data-lf-package-tabs]");
 
       if (groups.length < 2) {
