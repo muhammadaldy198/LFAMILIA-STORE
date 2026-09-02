@@ -2,7 +2,9 @@
 
 import { useEffect } from "react";
 
-function findMidtransPaymentUrl() {
+const legacyReference = /LF-\d{8}-[A-F0-9]{8,12}/g;
+
+function findMidtransPayment() {
   for (const anchor of Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"))) {
     try {
       const url = new URL(anchor.href, window.location.origin);
@@ -10,7 +12,12 @@ function findMidtransPaymentUrl() {
         url.protocol === "https:" &&
         (url.hostname === "midtrans.com" || url.hostname.endsWith(".midtrans.com"))
       ) {
-        return url.toString();
+        const matches = document.body.textContent?.match(legacyReference) ?? [];
+        const referenceId = matches.at(-1);
+        if (!referenceId) return null;
+        const token = referenceId.split("-").at(-1);
+        if (!token) return null;
+        return { paymentUrl: url.toString(), invoice: `LF${token}` };
       }
     } catch {
       // Abaikan href yang tidak valid.
@@ -28,10 +35,18 @@ export function CheckoutMidtransRedirect() {
       if (redirected || frame) return;
       frame = window.requestAnimationFrame(() => {
         frame = 0;
-        const paymentUrl = findMidtransPaymentUrl();
-        if (!paymentUrl) return;
+        const payment = findMidtransPayment();
+        if (!payment) return;
         redirected = true;
-        window.location.assign(paymentUrl);
+        try {
+          window.sessionStorage.setItem(
+            `lfamilia-payment:${payment.invoice}`,
+            payment.paymentUrl,
+          );
+        } catch {
+          // Session storage hanya fallback, bukan syarat pembayaran.
+        }
+        window.location.assign(`/payment?invoice=${encodeURIComponent(payment.invoice)}`);
       });
     }
 
