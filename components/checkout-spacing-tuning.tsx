@@ -19,7 +19,7 @@ export function CheckoutSpacingTuning() {
           }
 
           [data-lf-product-info="true"] {
-            padding-top: 2.2rem !important;
+            padding-top: 1.7rem !important;
           }
 
           [data-lf-product-features="true"] {
