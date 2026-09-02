@@ -6,6 +6,11 @@ import { getMemberTierProfile } from "@/lib/server/member-tiers";
 
 export const dynamic = "force-dynamic";
 
+function publicReferenceId(value: string) {
+  const token = value.split("-").at(-1) ?? value.replace(/^LF/, "");
+  return `LF${token}`;
+}
+
 export async function GET(request: Request) {
   const customer = await requireCustomerSession(request);
   if (customer instanceof Response) return customer;
@@ -13,11 +18,18 @@ export async function GET(request: Request) {
   const [topups, transactions, orders, membership] = await Promise.all([
     db.prepare("SELECT id, amount, sender_name, payment_method, proof_url, status, admin_notes, created_at FROM wallet_topups WHERE customer_id = ? ORDER BY created_at DESC LIMIT 40").bind(customer.id).all(),
     db.prepare("SELECT id, direction, amount, balance_before, balance_after, reference, description, created_at FROM wallet_transactions WHERE customer_id = ? ORDER BY created_at DESC LIMIT 60").bind(customer.id).all(),
-    db.prepare("SELECT id, reference_id, product_name, package_label, total, payment_status, fulfillment_status, created_at FROM orders WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50").bind(customer.id).all(),
+    db.prepare("SELECT id, reference_id, product_name, package_label, total, payment_status, fulfillment_status, created_at FROM orders WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50").bind(customer.id).all<{ id: string; reference_id: string; product_name: string; package_label: string; total: number; payment_status: string; fulfillment_status: string; created_at: string }>(),
     getMemberTierProfile(customer.id),
   ]);
   const vouchers = await listCustomerWebsiteVoucherCodes(customer.id).catch(() => []);
-  return Response.json({ customer, membership, topups: topups.results, transactions: transactions.results, orders: orders.results, vouchers });
+  return Response.json({
+    customer,
+    membership,
+    topups: topups.results,
+    transactions: transactions.results,
+    orders: orders.results.map((order) => ({ ...order, reference_id: publicReferenceId(order.reference_id) })),
+    vouchers: vouchers.map((voucher) => ({ ...voucher, referenceId: publicReferenceId(voucher.referenceId) })),
+  });
 }
 
 const profileSchema = z.object({
