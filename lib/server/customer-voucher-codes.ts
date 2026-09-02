@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import { ensureProductDeliveryTable } from "@/lib/server/product-delivery";
 import {
   listCustomerVoucherCodes,
   revealVoucherCode,
@@ -30,38 +31,61 @@ function stableNumericId(value: string) {
   return Math.abs(hash | 0) + 1_000_000_000;
 }
 
+function voucherModeSql() {
+  return `COALESCE(
+    dm.mode,
+    CASE
+      WHEN p.fulfillment_type = 'manual' THEN 'manual'
+      WHEN LOWER(p.category) = 'voucher' THEN 'voucher'
+      ELSE 'direct'
+    END
+  ) = 'voucher'`;
+}
+
 export async function listCustomerWebsiteVoucherCodes(customerId: string) {
-  const [stockCodes, providerResult] = await Promise.all([
+  await ensureProductDeliveryTable();
+  const db = getD1();
+  const [stockCodes, eligibleResult, providerResult] = await Promise.all([
     listCustomerVoucherCodes(customerId).catch(() => []),
-    getD1()
-      .prepare(
-        `SELECT o.id, o.reference_id, o.product_name, o.package_label,
-                o.provider_serial_number, o.updated_at
-         FROM orders o
-         JOIN products p ON p.slug = o.product_slug
-         WHERE o.customer_id = ?
-           AND o.payment_status = 'paid'
-           AND p.category = 'voucher'
-           AND o.provider_code <> 'voucher-stock'
-           AND o.provider_serial_number IS NOT NULL
-           AND TRIM(o.provider_serial_number) <> ''
-         ORDER BY o.updated_at DESC
-         LIMIT 50`,
-      )
-      .bind(customerId)
-      .all<ProviderVoucherRow>(),
+    db.prepare(
+      `SELECT o.reference_id
+       FROM orders o
+       JOIN products p ON p.slug = o.product_slug
+       LEFT JOIN product_delivery_modes dm ON dm.product_slug = p.slug
+       WHERE o.customer_id = ?
+         AND o.payment_status = 'paid'
+         AND ${voucherModeSql()}`,
+    ).bind(customerId).all<{ reference_id: string }>(),
+    db.prepare(
+      `SELECT o.id, o.reference_id, o.product_name, o.package_label,
+              o.provider_serial_number, o.updated_at
+       FROM orders o
+       WHERE o.customer_id = ?
+         AND o.payment_status = 'paid'
+         AND o.provider_code <> 'voucher-stock'
+         AND o.provider_serial_number IS NOT NULL
+         AND TRIM(o.provider_serial_number) <> ''
+       ORDER BY o.updated_at DESC
+       LIMIT 50`,
+    ).bind(customerId).all<ProviderVoucherRow>(),
   ]);
 
-  const providerCodes = providerResult.results.map((row) => ({
-    id: stableNumericId(row.id),
-    referenceId: row.reference_id,
-    productName: row.product_name,
-    packageLabel: row.package_label,
-    code: row.provider_serial_number,
-    deliveredAt: row.updated_at,
-  }));
+  const eligibleReferences = new Set(eligibleResult.results.map((row) => row.reference_id));
+  const providerCodes = providerResult.results
+    .filter((row) => eligibleReferences.has(row.reference_id))
+    .map((row) => ({
+      id: stableNumericId(row.id),
+      referenceId: row.reference_id,
+      productName: row.product_name,
+      packageLabel: row.package_label,
+      code: row.provider_serial_number,
+      deliveredAt: row.updated_at,
+    }));
 
-  return [...stockCodes, ...providerCodes]
+  return [
+    ...stockCodes.filter((row) => eligibleReferences.has(row.referenceId)),
+    ...providerCodes,
+  ]
     .sort(
       (left, right) =>
         new Date(right.deliveredAt ?? 0).getTime() -
@@ -71,13 +95,16 @@ export async function listCustomerWebsiteVoucherCodes(customerId: string) {
 }
 
 export async function getWebsiteVoucherCodeByReference(referenceId: string) {
+  await ensureProductDeliveryTable();
   const order = await getD1()
     .prepare(
       `SELECT o.id, o.reference_id, o.payment_status, o.provider_code,
               o.provider_serial_number
        FROM orders o
        JOIN products p ON p.slug = o.product_slug
-       WHERE o.reference_id = ? AND p.category = 'voucher'
+       LEFT JOIN product_delivery_modes dm ON dm.product_slug = p.slug
+       WHERE o.reference_id = ?
+         AND ${voucherModeSql()}
        LIMIT 1`,
     )
     .bind(referenceId)
