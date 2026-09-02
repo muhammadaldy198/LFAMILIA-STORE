@@ -1,6 +1,6 @@
 # LFAMILIA STORE
 
-Toko top up digital berbasis Cloudflare Workers dan D1. Aplikasi mencakup katalog, checkout iPaymu, pemenuhan otomatis, antrean manual, flash sale, voucher diskon, stok kode terenkripsi, pelacakan transaksi, serta panel admin dua tingkat.
+Toko top up digital berbasis Cloudflare Workers dan D1. Aplikasi mencakup katalog, checkout Midtrans, pemenuhan otomatis, antrean manual, flash sale, voucher diskon, stok kode terenkripsi, pelacakan transaksi, serta panel admin dua tingkat.
 
 ## Fitur utama
 
@@ -8,7 +8,7 @@ Toko top up digital berbasis Cloudflare Workers dan D1. Aplikasi mencakup katalo
 - Pop-up informasi multi-slide per produk, termasuk jam operasional produk manual dan pilihan sembunyikan selama tujuh hari.
 - Banner Home, logo, pengumuman, FAQ, dan kategori yang dapat diedit tanpa mengubah source.
 - Flash sale terjadwal, kuota promo, kode voucher rupiah/persentase, minimum transaksi, dan batas potongan.
-- Pembayaran iPaymu dengan perhitungan harga ulang di server.
+- Pembayaran Midtrans dengan perhitungan harga ulang di server.
 - Adapter DigiFlazz, VIPayment, dan Stok Kode Internal.
 - Pemilik dan Staff melalui identitas Cloudflare Access. Keuangan, harga/provider, promo, stok kode, tim, integrasi, dan penghapusan dibatasi untuk Pemilik.
 - Kode digital disimpan terenkripsi dan dapat dikirim melalui Resend dan WhatsApp Cloud API.
@@ -29,7 +29,7 @@ Panduan secret, callback, Cloudflare Access, provider, dan pengiriman kode terse
 
 ## Keamanan
 
-- Jangan simpan VA, API key, webhook secret, atau kunci enkripsi di GitHub.
+- Jangan simpan API key, secret pembayaran, webhook secret, atau kunci enkripsi di GitHub.
 - Jangan meminta password, PIN, atau OTP pelanggan melalui formulir maupun catatan pesanan.
 - Lindungi `/admin*` dan `/api/admin*` dengan Cloudflare Access.
 - Tambahkan email admin di Cloudflare Access dan di tab **Tim admin** dengan role yang sesuai.

@@ -12,7 +12,6 @@
   },
   "vars": {
     "NICKNAME_API_URL": "https://api.isan.eu.org/nickname",
-    "IPAYMU_ENV": "sandbox",
     "DIGIFLAZZ_ENV": "development",
     "OWNER_EMAIL": "muhammadaldy198@gmail.com",
     "VOUCHER_DELIVERY_CHANNEL": "both",

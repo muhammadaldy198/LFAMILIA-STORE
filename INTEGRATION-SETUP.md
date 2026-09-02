@@ -12,7 +12,7 @@ Jalankan migrasi production satu kali:
 npx wrangler d1 migrations apply lfamilia-store-db --remote
 ```
 
-Jangan menghapus migrasi `0000`, `0001`, `0002`, atau `0003`. Setelah migrasi berhasil, buka `/admin`, masuk melalui Cloudflare Access, lalu tekan tombol **Lengkapi katalog utama** pada tab Produk. Tindakan ini menambahkan produk/nominal yang belum ada tanpa menimpa perubahan Anda.
+Jangan menghapus migrasi lama yang sudah pernah diterapkan. Setelah migrasi berhasil, buka `/admin`, masuk melalui Cloudflare Access, lalu tekan tombol **Lengkapi katalog utama** pada tab Produk. Tindakan ini menambahkan produk/nominal yang belum ada tanpa menimpa perubahan Anda.
 
 ## 2. Secret Cloudflare Worker
 
@@ -20,9 +20,9 @@ Tambahkan sebagai **Secret**, bukan Variable biasa dan bukan file GitHub:
 
 | Nama | Isi |
 |---|---|
-| `IPAYMU_VA` | Nomor VA merchant iPaymu |
-| `IPAYMU_API_KEY` | API Key iPaymu |
-| `IPAYMU_RELAY_SECRET` | Secret acak minimal 32 karakter yang sama dengan relay IP statis |
+| `MIDTRANS_SERVER_KEY` | Server Key Midtrans sandbox/production |
+| `MELOSTORE_API_KEY` | API Key H2H Melostore untuk validasi nickname |
+| `MELOSTORE_SECRET_KEY` | Secret Key H2H Melostore untuk validasi nickname |
 | `DIGIFLAZZ_USERNAME` | Username buyer DigiFlazz |
 | `DIGIFLAZZ_API_KEY` | Production/development API key DigiFlazz |
 | `DIGIFLAZZ_WEBHOOK_SECRET` | Secret webhook DigiFlazz |
@@ -37,11 +37,10 @@ Tambahkan Variable biasa:
 | Nama | Nilai awal |
 |---|---|
 | `PUBLIC_BASE_URL` | `https://domain-toko-anda` tanpa `/` terakhir |
-| `IPAYMU_ENV` | `sandbox` |
-| `IPAYMU_API_BASE_URL` | Saat production: `https://ipaymu-relay.lfamiliastore.my.id` |
+| `MIDTRANS_ENV` | `sandbox` |
 | `DIGIFLAZZ_ENV` | `development` |
 | `OWNER_EMAIL` | Email Pemilik utama yang sama dengan Cloudflare Access |
-| `NICKNAME_API_URL` | URL API validasi nickname yang Anda izinkan |
+| `NICKNAME_API_URL` | URL fallback validasi nickname bila Melostore belum dikonfigurasi |
 | `VOUCHER_DELIVERY_CHANNEL` | `email`, `whatsapp`, atau `both` |
 | `RESEND_FROM_EMAIL` | Pengirim dari domain email yang sudah diverifikasi |
 | `WHATSAPP_PHONE_NUMBER_ID` | Phone Number ID dari Meta |
@@ -49,7 +48,7 @@ Tambahkan Variable biasa:
 | `WHATSAPP_TEMPLATE_LANGUAGE` | Kode bahasa template, contoh `id` |
 | `WHATSAPP_GRAPH_VERSION` | Versi Graph API, contoh `v23.0` |
 
-`DIGIFLAZZ_API_URL` dan `VIPPAYMENT_API_URL` hanya perlu diisi bila memakai endpoint resmi yang berbeda atau relay ber-IP statis.
+`DIGIFLAZZ_API_URL`, `VIPPAYMENT_API_URL`, dan `MELOSTORE_API_URL` hanya perlu diisi bila memakai endpoint resmi yang berbeda.
 
 ## 3. Callback dan webhook
 
@@ -57,11 +56,11 @@ Gunakan domain publik yang sama dengan `PUBLIC_BASE_URL`:
 
 | Layanan | URL |
 |---|---|
-| iPaymu Notify URL | `https://domain-toko-anda/api/payments/ipaymu/callback` |
+| Midtrans notification | `https://domain-toko-anda/api/payments/midtrans/callback` |
 | DigiFlazz webhook | `https://domain-toko-anda/api/fulfillment/digiflazz/callback` |
 | VIPayment webhook | `https://domain-toko-anda/api/fulfillment/vippayment/callback` |
 
-Aplikasi memeriksa signature callback sebelum mengubah status. Callback pembayaran yang sudah pernah diproses tidak akan mengirim produk untuk kedua kali.
+Aplikasi memeriksa callback pembayaran sebelum mengubah status. Callback yang sudah pernah diproses tidak akan mengirim produk untuk kedua kali.
 
 ## 4. Produk otomatis dan manual
 
@@ -92,13 +91,11 @@ Jangan membuka admin sebelum Access aktif. Bila memakai custom domain, pastikan 
 4. Di Admin → Produk, buat produk voucher seperti REDFINGER. Pilih proses Otomatis, provider **Stok Kode Internal**, lalu isi kunci stok seperti `redfinger-30-hari` pada setiap paket.
 5. Di Admin → Voucher, pilih kunci stok yang sama dan tempel kode satu per baris.
 
-Saat iPaymu menyatakan pembayaran lunas, satu baris stok direservasi secara atomik. Kode disimpan terenkripsi, tidak dikirim dua kali oleh callback pembayaran yang sama, dan tidak pernah muncul di pelacakan invoice publik. Bila kedua kanal gagal, kode tetap berstatus reservasi agar admin dapat mencoba pengiriman ulang tanpa mengambil kode baru.
+Saat pembayaran terkonfirmasi lunas, satu baris stok direservasi secara atomik. Kode disimpan terenkripsi, tidak dikirim dua kali oleh callback pembayaran yang sama, dan tidak pernah muncul di pelacakan invoice publik. Bila kedua kanal gagal, kode tetap berstatus reservasi agar admin dapat mencoba pengiriman ulang tanpa mengambil kode baru.
 
 ## 7. Syarat IP provider
 
-iPaymu Direct production meminta domain terdaftar dan IP statis. DigiFlazz juga memakai whitelist IP untuk koneksi buyer. Sebelum beralih ke production, konfirmasikan IP keluar Worker kepada kedua provider. Jika mereka meminta satu IP statis khusus, arahkan request outbound melalui relay/VPS kecil ber-IP statis; callback tetap diterima oleh Worker.
-
-Paket relay siap pakai tersedia di `infra/ipaymu-relay`. Gunakan IPv4 publik VPS pada formulir iPaymu, arahkan DNS `ipaymu-relay.lfamiliastore.my.id` ke VPS, lalu pasang nilai `IPAYMU_RELAY_SECRET` yang sama di Worker dan VPS. Jangan mengarahkan callback melalui relay.
+DigiFlazz dapat memakai whitelist IP untuk koneksi buyer. Jika provider tertentu meminta satu IP statis khusus, arahkan hanya request provider tersebut melalui relay/VPS ber-IP statis; callback tetap diterima langsung oleh Worker.
 
 ## 8. Menambah provider lain
 
@@ -117,7 +114,7 @@ Arsitektur checkout dan tabel order tidak perlu diubah hanya untuk menambah adap
 - Migrasi D1 production berhasil.
 - Cloudflare Access aktif.
 - Harga, margin, dan SKU sudah diverifikasi.
-- iPaymu masih diuji di sandbox.
+- Midtrans diuji di sandbox sebelum beralih ke production.
 - DigiFlazz masih memakai `testing: true` sampai tes selesai.
 - Callback semua provider telah diuji.
 - Tidak ada secret di GitHub.
