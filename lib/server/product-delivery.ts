@@ -40,18 +40,63 @@ function normalizeMode(value: string | null, category: string, fulfillmentType: 
   return "direct";
 }
 
+async function ensureDefaultModes() {
+  const db = getD1();
+  await db.prepare(`INSERT INTO product_delivery_modes (product_slug, mode, updated_at)
+    SELECT p.slug,
+      CASE
+        WHEN p.fulfillment_type = 'manual' THEN 'manual'
+        WHEN LOWER(TRIM(p.category)) = 'voucher' THEN 'voucher'
+        ELSE 'direct'
+      END,
+      CURRENT_TIMESTAMP
+    FROM products p
+    WHERE NOT EXISTS (
+      SELECT 1 FROM product_delivery_modes dm WHERE dm.product_slug = p.slug
+    )`).run();
+}
+
 async function reconcileExplicitModes() {
   const db = getD1();
+  await ensureDefaultModes();
   await db.prepare(`UPDATE products
     SET fulfillment_type = CASE
       WHEN slug IN (SELECT product_slug FROM product_delivery_modes WHERE mode = 'manual') THEN 'manual'
-      WHEN slug IN (SELECT product_slug FROM product_delivery_modes WHERE mode IN ('direct', 'voucher')) THEN 'automatic'
-      ELSE fulfillment_type
+      WHEN slug IN (SELECT product_slug FROM product_delivery_modes WHERE mode IN ('direct', 'voucher'))
+        AND EXISTS (
+          SELECT 1 FROM product_packages pp
+          WHERE pp.product_id = products.id AND pp.is_active = 1
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM product_packages pp
+          WHERE pp.product_id = products.id
+            AND pp.is_active = 1
+            AND (
+              pp.provider_code IS NULL OR TRIM(pp.provider_code) = '' OR
+              pp.provider_sku IS NULL OR TRIM(pp.provider_sku) = ''
+            )
+        )
+      THEN 'automatic'
+      ELSE 'manual'
     END,
     instant = CASE
       WHEN slug IN (SELECT product_slug FROM product_delivery_modes WHERE mode = 'manual') THEN 0
-      WHEN slug IN (SELECT product_slug FROM product_delivery_modes WHERE mode IN ('direct', 'voucher')) THEN 1
-      ELSE instant
+      WHEN slug IN (SELECT product_slug FROM product_delivery_modes WHERE mode IN ('direct', 'voucher'))
+        AND EXISTS (
+          SELECT 1 FROM product_packages pp
+          WHERE pp.product_id = products.id AND pp.is_active = 1
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM product_packages pp
+          WHERE pp.product_id = products.id
+            AND pp.is_active = 1
+            AND (
+              pp.provider_code IS NULL OR TRIM(pp.provider_code) = '' OR
+              pp.provider_sku IS NULL OR TRIM(pp.provider_sku) = ''
+            )
+        )
+      THEN 1
+      ELSE 0
     END,
     needs_server = CASE
       WHEN slug IN (SELECT product_slug FROM product_delivery_modes WHERE mode = 'voucher') THEN 0
@@ -113,12 +158,20 @@ export async function saveProductDeliveryConfig(input: {
 }) {
   await ensureProductDeliveryTable();
   const db = getD1();
-  const product = await db.prepare("SELECT slug FROM products WHERE slug = ? LIMIT 1")
+  const product = await db.prepare("SELECT id, slug FROM products WHERE slug = ? LIMIT 1")
     .bind(input.slug)
-    .first<{ slug: string }>();
+    .first<{ id: number; slug: string }>();
   if (!product) throw new Error("Produk tidak ditemukan.");
 
-  const automatic = input.mode !== "manual";
+  const readiness = await db.prepare(`SELECT
+      COUNT(*) AS active_count,
+      SUM(CASE WHEN provider_code IS NULL OR TRIM(provider_code) = '' OR provider_sku IS NULL OR TRIM(provider_sku) = '' THEN 1 ELSE 0 END) AS missing_count
+    FROM product_packages
+    WHERE product_id = ? AND is_active = 1`)
+    .bind(product.id)
+    .first<{ active_count: number; missing_count: number | null }>();
+  const providerReady = Number(readiness?.active_count ?? 0) > 0 && Number(readiness?.missing_count ?? 0) === 0;
+  const automatic = input.mode !== "manual" && providerReady;
   const isVoucher = input.mode === "voucher";
   const inputLabel = input.inputLabel?.trim() || "User ID";
   const inputPlaceholder = input.inputPlaceholder?.trim() || "Masukkan User ID";
