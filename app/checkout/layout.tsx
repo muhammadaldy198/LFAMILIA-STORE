@@ -1,3 +1,4 @@
+import { CheckoutMidtransRedirect } from "@/components/checkout-midtrans-redirect";
 import { CheckoutUiEnhancer } from "@/components/checkout-ui-enhancer";
 import { CheckoutSpacingTuning } from "@/components/checkout-spacing-tuning";
 import { CheckoutPackageTabs } from "@/components/checkout-package-tabs";
@@ -10,6 +11,7 @@ export default function CheckoutLayout({ children }: { children: React.ReactNode
       <CheckoutSpacingTuning />
       <CheckoutPackageTabs />
       <CheckoutVoucherMode />
+      <CheckoutMidtransRedirect />
       {children}
     </>
   );
