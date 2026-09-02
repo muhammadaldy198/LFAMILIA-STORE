@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { getD1 } from "@/db";
 import { hmacHex } from "@/lib/server/crypto";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getRuntimeEnv, requireRuntimeValue } from "@/lib/server/runtime-env";
 import type { ProviderOrder, ProviderResult } from "@/lib/server/providers/types";
 
 type VoucherRuntimeEnv = {
@@ -9,11 +9,13 @@ type VoucherRuntimeEnv = {
   VOUCHER_DELIVERY_CHANNEL?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
+  RESEND_API_URL?: string;
   WHATSAPP_ACCESS_TOKEN?: string;
   WHATSAPP_PHONE_NUMBER_ID?: string;
   WHATSAPP_VOUCHER_TEMPLATE?: string;
   WHATSAPP_TEMPLATE_LANGUAGE?: string;
   WHATSAPP_GRAPH_VERSION?: string;
+  WHATSAPP_GRAPH_BASE_URL?: string;
 };
 
 type VoucherCodeRow = {
@@ -78,9 +80,9 @@ function runtime() {
 }
 
 function encryptionSecret() {
-  const secret = runtime().VOUCHER_ENCRYPTION_KEY?.trim();
-  if (!secret || secret.length < 32) {
-    throw new Error("VOUCHER_ENCRYPTION_KEY minimal 32 karakter belum dikonfigurasi.");
+  const secret = requireRuntimeValue(runtime().VOUCHER_ENCRYPTION_KEY, "VOUCHER_ENCRYPTION_KEY");
+  if (secret.length < 32) {
+    throw new Error("VOUCHER_ENCRYPTION_KEY minimal 32 karakter.");
   }
   return secret;
 }
@@ -201,9 +203,9 @@ export async function listVoucherDashboard() {
     deliveries: deliveryResult.results,
     config: {
       encryptionReady: Boolean(config.VOUCHER_ENCRYPTION_KEY && config.VOUCHER_ENCRYPTION_KEY.trim().length >= 32),
-      emailReady: Boolean(config.RESEND_API_KEY && config.RESEND_FROM_EMAIL),
-      whatsappReady: Boolean(config.WHATSAPP_ACCESS_TOKEN && config.WHATSAPP_PHONE_NUMBER_ID && config.WHATSAPP_VOUCHER_TEMPLATE),
-      deliveryChannel: parseDeliveryChannels(config.VOUCHER_DELIVERY_CHANNEL).join("+") || "website",
+      emailReady: Boolean(config.RESEND_API_KEY && config.RESEND_FROM_EMAIL && config.RESEND_API_URL),
+      whatsappReady: Boolean(config.WHATSAPP_ACCESS_TOKEN && config.WHATSAPP_PHONE_NUMBER_ID && config.WHATSAPP_VOUCHER_TEMPLATE && config.WHATSAPP_TEMPLATE_LANGUAGE && config.WHATSAPP_GRAPH_VERSION && config.WHATSAPP_GRAPH_BASE_URL),
+      deliveryChannel: config.VOUCHER_DELIVERY_CHANNEL?.trim().toLowerCase() || null,
     },
   };
 }
@@ -248,12 +250,13 @@ async function reserveCode(orderId: string, stockKeyInput: string) {
   throw new Error(`Stok kode ${stockKey} habis.`);
 }
 
-function parseDeliveryChannels(value?: string): DeliveryChannel[] {
-  const normalized = value?.trim().toLowerCase();
+function parseDeliveryChannels(value: string): DeliveryChannel[] {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "website") return [];
   if (normalized === "email") return ["email"];
   if (normalized === "whatsapp") return ["whatsapp"];
   if (normalized === "both" || normalized === "email+whatsapp" || normalized === "whatsapp+email") return ["email", "whatsapp"];
-  return [];
+  throw new Error("VOUCHER_DELIVERY_CHANNEL harus website, email, whatsapp, atau both.");
 }
 
 async function existingDeliveryStatus(orderId: string, channel: DeliveryChannel) {
@@ -297,11 +300,11 @@ async function deliverChannel(order: ProviderOrder, voucher: VoucherCodeRow, cod
 
 async function sendEmail(order: ProviderOrder, code: string): Promise<DeliveryOutcome> {
   const config = runtime();
-  const apiKey = config.RESEND_API_KEY?.trim();
-  const from = config.RESEND_FROM_EMAIL?.trim();
-  if (!apiKey || !from) throw new Error("Resend belum dikonfigurasi.");
+  const apiKey = requireRuntimeValue(config.RESEND_API_KEY, "RESEND_API_KEY");
+  const from = requireRuntimeValue(config.RESEND_FROM_EMAIL, "RESEND_FROM_EMAIL");
+  const apiUrl = requireRuntimeValue(config.RESEND_API_URL, "RESEND_API_URL");
 
-  const response = await fetch("https://api.resend.com/emails", {
+  const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
       authorization: `Bearer ${apiKey}`,
@@ -323,13 +326,14 @@ async function sendEmail(order: ProviderOrder, code: string): Promise<DeliveryOu
 
 async function sendWhatsApp(order: ProviderOrder, code: string): Promise<DeliveryOutcome> {
   const config = runtime();
-  const token = config.WHATSAPP_ACCESS_TOKEN?.trim();
-  const phoneId = config.WHATSAPP_PHONE_NUMBER_ID?.trim();
-  const template = config.WHATSAPP_VOUCHER_TEMPLATE?.trim();
-  if (!token || !phoneId || !template) throw new Error("WhatsApp Cloud API belum dikonfigurasi.");
+  const token = requireRuntimeValue(config.WHATSAPP_ACCESS_TOKEN, "WHATSAPP_ACCESS_TOKEN");
+  const phoneId = requireRuntimeValue(config.WHATSAPP_PHONE_NUMBER_ID, "WHATSAPP_PHONE_NUMBER_ID");
+  const template = requireRuntimeValue(config.WHATSAPP_VOUCHER_TEMPLATE, "WHATSAPP_VOUCHER_TEMPLATE");
+  const language = requireRuntimeValue(config.WHATSAPP_TEMPLATE_LANGUAGE, "WHATSAPP_TEMPLATE_LANGUAGE");
+  const version = requireRuntimeValue(config.WHATSAPP_GRAPH_VERSION, "WHATSAPP_GRAPH_VERSION");
+  const graphBaseUrl = requireRuntimeValue(config.WHATSAPP_GRAPH_BASE_URL, "WHATSAPP_GRAPH_BASE_URL").replace(/\/$/, "");
 
-  const version = config.WHATSAPP_GRAPH_VERSION?.trim() || "v23.0";
-  const response = await fetch(`https://graph.facebook.com/${version}/${encodeURIComponent(phoneId)}/messages`, {
+  const response = await fetch(`${graphBaseUrl}/${version}/${encodeURIComponent(phoneId)}/messages`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify({
@@ -338,7 +342,7 @@ async function sendWhatsApp(order: ProviderOrder, code: string): Promise<Deliver
       type: "template",
       template: {
         name: template,
-        language: { code: config.WHATSAPP_TEMPLATE_LANGUAGE?.trim() || "id" },
+        language: { code: language },
         components: [{
           type: "body",
           parameters: [order.buyerName, order.productName, order.packageLabel, code, order.referenceId]
@@ -373,7 +377,8 @@ export async function fulfillVoucherStockOrder(order: ProviderOrder): Promise<Pr
      WHERE id = ? AND order_id = ?`,
   ).bind(voucher.id, order.id).run();
 
-  const channels = parseDeliveryChannels(runtime().VOUCHER_DELIVERY_CHANNEL);
+  const deliveryChannel = requireRuntimeValue(runtime().VOUCHER_DELIVERY_CHANNEL, "VOUCHER_DELIVERY_CHANNEL");
+  const channels = parseDeliveryChannels(deliveryChannel);
   const outcomes = channels.length
     ? await Promise.all(channels.map((channel) => deliverChannel(order, voucher, code, channel)))
     : [];
