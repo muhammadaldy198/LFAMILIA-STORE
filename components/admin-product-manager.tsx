@@ -41,6 +41,8 @@ const emptyProduct: ManagedProduct = {
   manualOpenTime: "09:00",
   manualCloseTime: "21:00",
   manualTimezone: "Asia/Jakarta",
+  packageTabsEnabled: false,
+  packageTabs: [],
   isActive: true,
   sortOrder: 0,
   notices: [],
@@ -123,12 +125,54 @@ export function AdminProductManager() {
   function addPackage() {
     setDraft((current) => ({
       ...current,
-      packages: [...current.packages, { dbId: null, id: "", label: "", price: 0, group: "", pricingMode: "auto", marginType: "fixed", marginValue: 0, isActive: true, sortOrder: current.packages.length }],
+      packages: [...current.packages, { dbId: null, id: "", label: "", price: 0, group: current.packageTabsEnabled ? current.packageTabs[0] ?? "" : "", pricingMode: "auto", marginType: "fixed", marginValue: 0, isActive: true, sortOrder: current.packages.length }],
     }));
   }
 
   function removePackage(index: number) {
     setDraft((current) => ({ ...current, packages: current.packages.filter((_, itemIndex) => itemIndex !== index) }));
+  }
+
+  function addPackageTab() {
+    setDraft((current) => {
+      const existing = new Set(current.packageTabs.map((item) => item.toLowerCase()));
+      let name = "Tab baru";
+      let suffix = 2;
+      while (existing.has(name.toLowerCase())) name = `Tab baru ${suffix++}`;
+      return { ...current, packageTabs: [...current.packageTabs, name] };
+    });
+  }
+
+  function updatePackageTab(index: number, value: string) {
+    setDraft((current) => {
+      const previous = current.packageTabs[index];
+      return {
+        ...current,
+        packageTabs: current.packageTabs.map((item, itemIndex) => itemIndex === index ? value : item),
+        packages: current.packages.map((item) => item.group === previous ? { ...item, group: value } : item),
+      };
+    });
+  }
+
+  function removePackageTab(index: number) {
+    setDraft((current) => {
+      const removed = current.packageTabs[index];
+      return {
+        ...current,
+        packageTabs: current.packageTabs.filter((_, itemIndex) => itemIndex !== index),
+        packages: current.packages.map((item) => item.group === removed ? { ...item, group: "" } : item),
+      };
+    });
+  }
+
+  function movePackageTab(index: number, direction: -1 | 1) {
+    setDraft((current) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.packageTabs.length) return current;
+      const packageTabs = [...current.packageTabs];
+      [packageTabs[index], packageTabs[nextIndex]] = [packageTabs[nextIndex], packageTabs[index]];
+      return { ...current, packageTabs };
+    });
   }
 
   function addNotice() {
@@ -160,10 +204,12 @@ export function AdminProductManager() {
     event.preventDefault();
     setSaving(true);
     setError("");
+    const packageTabs = draft.packageTabs.map((item) => item.trim()).filter(Boolean);
     const payload = {
       ...draft,
       slug: slugify(draft.slug || draft.name),
       initials: draft.initials.toUpperCase(),
+      packageTabs,
       packages: draft.packages.map((item, index) => ({
         ...item,
         id: slugify(item.id || `${draft.slug || draft.name}-${item.label || index + 1}`),
@@ -270,7 +316,11 @@ export function AdminProductManager() {
             </div>
             {role === "owner" && <div className="grid grid-cols-2 gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 sm:grid-cols-4">{[["Aktif", "isActive"], ["Populer", "popular"], ["Instan", "instant"], ["Butuh server", "needsServer"]].map(([label, key]) => <label key={key} className="flex items-center justify-between gap-2 text-[11px] text-white/55"><span>{label}</span><Switch checked={Boolean(draft[key as keyof ManagedProduct])} onCheckedChange={(checked) => updateDraft(key as keyof ManagedProduct, checked as never)} /></label>)}</div>}
             <div className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="flex items-center gap-2 text-sm font-bold"><BellRing className="size-4 text-[#b9ff35]" />Pop-up informasi produk</h3><p className="mt-1 text-[10px] text-white/30">Muncul sebelum pelanggan memilih nominal. Tambahkan slide sebanyak kebutuhan dan atur urutannya.</p><p className="mt-1 text-[9px] text-[#cfff72]/55">Token jam: {"{{jam_buka}}"}, {"{{jam_tutup}}"}, dan {"{{zona_waktu}}"}.</p></div><Button type="button" onClick={addNotice} size="sm" variant="outline" className="shrink-0 rounded-lg border-white/10 bg-white/[0.03] text-[10px] text-white hover:bg-white/[0.08] hover:text-white"><Plus className="mr-1 size-3.5" />Tambah slide</Button></div><div className="mt-3 space-y-3">{draft.notices.length ? draft.notices.map((notice, index) => <div key={`${notice.id}-${index}`} className="rounded-xl border border-white/[0.08] bg-[#111620] p-3"><div className="flex items-center gap-2"><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/[0.05] text-[9px] font-bold text-white/40">{index + 1}</span><div className="flex shrink-0 flex-col"><button type="button" disabled={index === 0} onClick={() => moveNotice(index, -1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser slide ke atas"><ChevronUp className="size-3.5" /></button><button type="button" disabled={index === draft.notices.length - 1} onClick={() => moveNotice(index, 1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser slide ke bawah"><ChevronDown className="size-3.5" /></button></div><Input required value={notice.title} onChange={(event) => updateNotice(index, "title", event.target.value)} className="admin-input" placeholder="JAM OPERASIONAL 09.00 – 23.00 WIB" /><Switch checked={notice.isActive} onCheckedChange={(checked) => updateNotice(index, "isActive", checked)} /><Button type="button" onClick={() => removeNotice(index)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></div><Textarea required value={notice.body} onChange={(event) => updateNotice(index, "body", event.target.value)} className="mt-2 min-h-28 rounded-xl border-white/10 bg-white/[0.025] text-xs text-white" placeholder={"Estimasi proses 30 menit sampai 2 jam.\n\nAdmin akan menghubungi melalui WhatsApp setelah pembayaran."} /></div>) : <div className="rounded-xl border border-dashed border-white/10 py-6 text-center text-[10px] text-white/28">Tidak ada pop-up untuk produk ini.</div>}</div></div>
-            {role === "owner" && <div className="mt-5"><div className="flex items-center justify-between"><div><h3 className="text-sm font-bold">Nominal & harga</h3><p className="mt-1 text-[10px] text-white/30">Isi Tab / game pada nominal yang ingin dikelompokkan. Jika hanya satu kelompok, checkout tetap tampil seperti biasa.</p></div><Button type="button" onClick={addPackage} size="sm" variant="outline" className="rounded-lg border-white/10 bg-white/[0.03] text-[10px] text-white hover:bg-white/[0.08] hover:text-white"><PackagePlus className="mr-1.5 size-3.5" />Tambah nominal</Button></div><div className="mt-3 space-y-3">{draft.packages.map((item, index) => <div key={`${item.dbId}-${index}`} className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3"><div className="grid gap-2 sm:grid-cols-[130px_1fr_150px_110px_32px]"><Input value={item.group ?? ""} onChange={(event) => updatePackage(index, "group", event.target.value)} className="admin-input" placeholder="Tab / game" /><Input required value={item.label} onChange={(event) => updatePackage(index, "label", event.target.value)} className="admin-input" placeholder="59 Diamonds" /><Input required type="number" min={1} value={item.price || ""} onChange={(event) => updatePackage(index, "price", Number(event.target.value))} className="admin-input" placeholder="Harga jual" /><Input value={item.note ?? ""} onChange={(event) => updatePackage(index, "note", event.target.value)} className="admin-input" placeholder="Populer" /><Button type="button" disabled={draft.packages.length === 1} onClick={() => removePackage(index)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></div>{draft.fulfillmentType === "automatic" && <><div className="mt-2 grid gap-2 sm:grid-cols-2"><select value={item.providerCode ?? ""} onChange={(event) => updatePackage(index, "providerCode", event.target.value)} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white"><option value="">Pilih provider</option>{providerOptions.map((provider) => <option key={provider.code} value={provider.code}>{provider.name}</option>)}</select><Input value={item.providerSku ?? ""} onChange={(event) => updatePackage(index, "providerSku", item.providerCode === "voucher-stock" ? event.target.value.toLowerCase().replace(/[^a-z0-9._:-]/g, "-") : event.target.value)} className="admin-input" placeholder="SKU provider" /></div>{item.providerCode === "digiflazz" && <div className="mt-2 grid gap-2 sm:grid-cols-3"><select value={item.marginType ?? "fixed"} onChange={(event) => updatePackage(index, "marginType", event.target.value as "fixed" | "percent")} className="h-10 rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white"><option value="fixed">Margin Rupiah</option><option value="percent">Margin Persen</option></select><Input type="number" min={0} value={item.marginValue ?? 0} onChange={(event) => updatePackage(index, "marginValue", Number(event.target.value))} className="admin-input" placeholder="Margin" /><span className="rounded-xl border border-[#b9ff35]/15 bg-[#b9ff35]/[0.05] px-3 py-2 text-[10px] text-[#d8ff8d]">Modal: {item.supplierPrice ? formatRupiah(item.supplierPrice) : "Belum sinkron"}</span></div>}</>}</div>)}</div></div>}
+            {role === "owner" && <div className="mt-5"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-bold">Nominal & harga</h3><p className="mt-1 text-[10px] text-white/30">Tab nominal bisa diaktifkan terpisah untuk setiap produk.</p></div><Button type="button" onClick={addPackage} size="sm" variant="outline" className="rounded-lg border-white/10 bg-white/[0.03] text-[10px] text-white hover:bg-white/[0.08] hover:text-white"><PackagePlus className="mr-1.5 size-3.5" />Tambah nominal</Button></div>
+              <div className="mt-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3"><label className="flex items-center justify-between gap-3"><span><strong className="block text-[11px]">Pisahkan nominal dengan tab</strong><span className="mt-0.5 block text-[9px] text-white/35">Aktifkan hanya jika produk ini perlu beberapa kelompok nominal.</span></span><Switch checked={draft.packageTabsEnabled} onCheckedChange={(checked) => updateDraft("packageTabsEnabled", checked)} /></label>
+                {draft.packageTabsEnabled && <div className="mt-3 border-t border-white/[0.07] pt-3"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-bold text-white/55">Tab produk ini</span><Button type="button" onClick={addPackageTab} size="sm" variant="outline" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-2.5 text-[9px] text-white hover:bg-white/[0.08] hover:text-white"><Plus className="mr-1 size-3" />Tambah tab</Button></div><div className="mt-2 space-y-2">{draft.packageTabs.length ? draft.packageTabs.map((tab, tabIndex) => <div key={`${tabIndex}-${tab}`} className="flex items-center gap-2"><div className="flex shrink-0 flex-col"><button type="button" disabled={tabIndex === 0} onClick={() => movePackageTab(tabIndex, -1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser tab ke atas"><ChevronUp className="size-3.5" /></button><button type="button" disabled={tabIndex === draft.packageTabs.length - 1} onClick={() => movePackageTab(tabIndex, 1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser tab ke bawah"><ChevronDown className="size-3.5" /></button></div><Input required value={tab} onChange={(event) => updatePackageTab(tabIndex, event.target.value)} className="admin-input" placeholder="Contoh: Fish It" /><Button type="button" onClick={() => removePackageTab(tabIndex)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></div>) : <div className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-[9px] text-white/30">Belum ada tab. Tekan Tambah tab.</div>}</div></div>}
+              </div>
+              <div className="mt-3 space-y-3">{draft.packages.map((item, index) => <div key={`${item.dbId}-${index}`} className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3"><div className={draft.packageTabsEnabled ? "grid gap-2 sm:grid-cols-[130px_1fr_150px_110px_32px]" : "grid gap-2 sm:grid-cols-[1fr_150px_110px_32px]"}>{draft.packageTabsEnabled && <select value={item.group ?? ""} onChange={(event) => updatePackage(index, "group", event.target.value)} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white" disabled={!draft.packageTabs.length}><option value="">{draft.packageTabs.length ? "Pilih tab" : "Buat tab dulu"}</option>{draft.packageTabs.map((tab, tabIndex) => <option key={`${tab}-${tabIndex}`} value={tab}>{tab}</option>)}</select>}<Input required value={item.label} onChange={(event) => updatePackage(index, "label", event.target.value)} className="admin-input" placeholder="59 Diamonds" /><Input required type="number" min={1} value={item.price || ""} onChange={(event) => updatePackage(index, "price", Number(event.target.value))} className="admin-input" placeholder="Harga jual" /><Input value={item.note ?? ""} onChange={(event) => updatePackage(index, "note", event.target.value)} className="admin-input" placeholder="Populer" /><Button type="button" disabled={draft.packages.length === 1} onClick={() => removePackage(index)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></div>{draft.fulfillmentType === "automatic" && <><div className="mt-2 grid gap-2 sm:grid-cols-2"><select value={item.providerCode ?? ""} onChange={(event) => updatePackage(index, "providerCode", event.target.value)} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white"><option value="">Pilih provider</option>{providerOptions.map((provider) => <option key={provider.code} value={provider.code}>{provider.name}</option>)}</select><Input value={item.providerSku ?? ""} onChange={(event) => updatePackage(index, "providerSku", item.providerCode === "voucher-stock" ? event.target.value.toLowerCase().replace(/[^a-z0-9._:-]/g, "-") : event.target.value)} className="admin-input" placeholder="SKU provider" /></div>{item.providerCode === "digiflazz" && <div className="mt-2 grid gap-2 sm:grid-cols-3"><select value={item.marginType ?? "fixed"} onChange={(event) => updatePackage(index, "marginType", event.target.value as "fixed" | "percent")} className="h-10 rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white"><option value="fixed">Margin Rupiah</option><option value="percent">Margin Persen</option></select><Input type="number" min={0} value={item.marginValue ?? 0} onChange={(event) => updatePackage(index, "marginValue", Number(event.target.value))} className="admin-input" placeholder="Margin" /><span className="rounded-xl border border-[#b9ff35]/15 bg-[#b9ff35]/[0.05] px-3 py-2 text-[10px] text-[#d8ff8d]">Modal: {item.supplierPrice ? formatRupiah(item.supplierPrice) : "Belum sinkron"}</span></div>}</>}</div>)}</div></div>}
             {error && <p className="mt-4 rounded-xl bg-red-400/[0.07] p-3 text-xs text-red-200">{error}</p>}
             <DialogFooter className="mt-5"><Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white">Batal</Button><Button disabled={saving} className="bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]">{saving && <LoaderCircle className="mr-2 size-4 animate-spin" />}{role === "staff" ? "Simpan informasi" : "Simpan produk"}</Button></DialogFooter>
           </form>
