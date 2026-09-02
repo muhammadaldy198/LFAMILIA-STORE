@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useStoreProducts } from "@/hooks/use-store-products";
 
 const INTERNAL_VOUCHER_DESTINATION = "00000000";
+type DeliveryMode = "direct" | "voucher" | "manual";
 
 function setReactInputValue(input: HTMLInputElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(
@@ -28,6 +29,22 @@ function setStepNumber(section: HTMLElement, number: number) {
 
 export function CheckoutVoucherMode() {
   const { products } = useStoreProducts();
+  const [deliveryModes, setDeliveryModes] = useState<Record<string, DeliveryMode>>({});
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/product-delivery-modes", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = await response.json() as { products?: Array<{ slug: string; mode: DeliveryMode }> };
+        if (!active) return;
+        setDeliveryModes(Object.fromEntries((data.products ?? []).map((item) => [item.slug, item.mode])));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let frame = 0;
@@ -47,7 +64,13 @@ export function CheckoutVoucherMode() {
 
       const slug = new URL(window.location.href).searchParams.get("product");
       const product = products.find((item) => item.slug === slug) ?? products[0];
-      const isVoucher = product?.category.trim().toLowerCase() === "voucher";
+      const fallbackMode: DeliveryMode = product?.fulfillmentType === "manual"
+        ? "manual"
+        : product?.category.trim().toLowerCase() === "voucher"
+          ? "voucher"
+          : "direct";
+      const mode = slug ? deliveryModes[slug] ?? fallbackMode : fallbackMode;
+      const isVoucher = mode === "voucher";
       const sections = Array.from(form.querySelectorAll<HTMLElement>(":scope > section"));
       const accountSection = sections.find(
         (section) => sectionTitle(section) === "Masukkan Data Akun",
@@ -121,7 +144,7 @@ export function CheckoutVoucherMode() {
       observer.disconnect();
       if (frame) window.cancelAnimationFrame(frame);
     };
-  }, [products]);
+  }, [deliveryModes, products]);
 
   return null;
 }
