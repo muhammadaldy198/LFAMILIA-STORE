@@ -9,12 +9,36 @@ type PaymentChannelPreview = {
   imageUrl?: string;
 };
 
+type ExtraNicknameState = {
+  status: "idle" | "loading" | "success" | "error";
+  key?: string;
+  nickname?: string;
+  country?: string | null;
+  message?: string;
+};
+
+const additionalNicknameGames = new Set([
+  "pubg-mobile",
+  "honor-of-kings",
+  "call-of-duty-mobile",
+  "wild-rift",
+  "arena-of-valor",
+  "fc-mobile",
+  "efootball",
+  "point-blank",
+]);
+
 export function CheckoutUiEnhancer() {
   useEffect(() => {
     let disposed = false;
     let frame = 0;
+    let nicknameTimer = 0;
+    let nicknameController: AbortController | null = null;
+    let extraNickname: ExtraNicknameState = { status: "idle" };
     let channels: PaymentChannelPreview[] = [];
     const wiredHeaders = new WeakSet<HTMLButtonElement>();
+    const wiredNicknameInputs = new WeakSet<HTMLInputElement>();
+    const wiredWhatsappInputs = new WeakSet<HTMLInputElement>();
     const expandedMethods = new Set<string>();
 
     ensureStyles();
@@ -43,6 +67,8 @@ export function CheckoutUiEnhancer() {
 
       enhanceProductHero(main);
       makeAccountFieldsParallel(form);
+      enforceWhatsappDestination(form);
+      enhanceAdditionalNickname(form);
       enhancePaymentGroups(form);
     }
 
@@ -95,6 +121,161 @@ export function CheckoutUiEnhancer() {
 
       if (!accountGrid) return;
       accountGrid.dataset.lfAccountGrid = "true";
+    }
+
+    function enforceWhatsappDestination(form: HTMLFormElement) {
+      const firstSection = form.querySelector<HTMLElement>("section");
+      if (!firstSection) return;
+
+      const destinationLabel = Array.from(firstSection.querySelectorAll<HTMLLabelElement>("label")).find(
+        (label) => label.textContent?.trim().toLowerCase().startsWith("nomor whatsapp"),
+      );
+      const input = destinationLabel?.querySelector<HTMLInputElement>("input");
+      if (!input) return;
+
+      input.inputMode = "tel";
+      input.autocomplete = "tel";
+      input.placeholder = "Contoh: 081234567890";
+      input.maxLength = 17;
+      input.setAttribute("pattern", "\\+?[0-9]{8,16}");
+
+      if (wiredWhatsappInputs.has(input)) return;
+      wiredWhatsappInputs.add(input);
+      input.addEventListener("input", () => {
+        const original = input.value;
+        const hasPlus = original.trim().startsWith("+");
+        const digits = original.replace(/\D/g, "").slice(0, 16);
+        const next = `${hasPlus ? "+" : ""}${digits}`;
+        if (original !== next) input.value = next;
+      });
+    }
+
+    function enhanceAdditionalNickname(form: HTMLFormElement) {
+      const productSlug = new URL(window.location.href).searchParams.get("product") ?? "";
+      if (!additionalNicknameGames.has(productSlug)) return;
+
+      const firstSection = form.querySelector<HTMLElement>("section");
+      if (!firstSection) return;
+
+      const inputs = Array.from(firstSection.querySelectorAll<HTMLInputElement>("input.checkout-input"));
+      const destinationInput = inputs[0];
+      if (!destinationInput) return;
+
+      const serverInput = inputs.find((input) => input !== destinationInput && input.inputMode === "numeric");
+      let resultRow = firstSection.querySelector<HTMLElement>("[data-lf-extra-nickname]");
+      if (!resultRow) {
+        resultRow = Array.from(firstSection.querySelectorAll<HTMLParagraphElement>("p")).find((paragraph) =>
+          paragraph.textContent?.toLowerCase().includes("verifikasi nickname otomatis belum tersedia"),
+        );
+        if (!resultRow) return;
+        resultRow.dataset.lfExtraNickname = "true";
+      }
+
+      const key = `${productSlug}:${destinationInput.value.trim()}:${serverInput?.value.trim() ?? ""}`;
+      renderExtraNickname(resultRow, extraNickname.key === key ? extraNickname : { status: "idle" });
+
+      const wire = (input: HTMLInputElement) => {
+        if (wiredNicknameInputs.has(input)) return;
+        wiredNicknameInputs.add(input);
+        input.addEventListener("input", requestExtraNicknameLookup);
+      };
+      wire(destinationInput);
+      if (serverInput) wire(serverInput);
+    }
+
+    function requestExtraNicknameLookup() {
+      window.clearTimeout(nicknameTimer);
+      nicknameController?.abort();
+      nicknameController = null;
+
+      const productSlug = new URL(window.location.href).searchParams.get("product") ?? "";
+      if (!additionalNicknameGames.has(productSlug)) return;
+
+      const form = document.querySelector<HTMLFormElement>("#checkout-form");
+      const firstSection = form?.querySelector<HTMLElement>("section");
+      if (!firstSection) return;
+      const inputs = Array.from(firstSection.querySelectorAll<HTMLInputElement>("input.checkout-input"));
+      const destinationInput = inputs[0];
+      if (!destinationInput) return;
+      const serverInput = inputs.find((input) => input !== destinationInput && input.inputMode === "numeric");
+      const userId = destinationInput.value.trim();
+      const server = serverInput?.value.trim() ?? "";
+      const key = `${productSlug}:${userId}:${server}`;
+
+      if (userId.length < 2) {
+        extraNickname = { status: "idle", key };
+        schedule();
+        return;
+      }
+
+      nicknameTimer = window.setTimeout(async () => {
+        extraNickname = { status: "loading", key };
+        schedule();
+        const controller = new AbortController();
+        nicknameController = controller;
+
+        try {
+          const response = await fetch("/api/nickname", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              game: productSlug,
+              userId,
+              server: server || undefined,
+            }),
+            signal: controller.signal,
+          });
+          const data = (await response.json()) as {
+            nickname?: string;
+            country?: string | null;
+            error?: string;
+          };
+          if (!response.ok || !data.nickname) {
+            throw new Error(data.error ?? "Nickname tidak ditemukan.");
+          }
+          extraNickname = {
+            status: "success",
+            key,
+            nickname: data.nickname,
+            country: data.country,
+          };
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          extraNickname = {
+            status: "error",
+            key,
+            message: error instanceof Error ? error.message : "Nickname gagal diperiksa.",
+          };
+        } finally {
+          if (nicknameController === controller) nicknameController = null;
+          schedule();
+        }
+      }, 700);
+    }
+
+    function renderExtraNickname(row: HTMLElement, state: ExtraNicknameState) {
+      const signature = `${state.status}:${state.nickname ?? ""}:${state.country ?? ""}:${state.message ?? ""}`;
+      if (row.dataset.lfNicknameSignature === signature) return;
+      row.dataset.lfNicknameSignature = signature;
+
+      if (state.status === "success") {
+        row.className = "mt-3 rounded-lg border border-[#b9ff35]/25 bg-[#b9ff35]/[0.06] p-2.5 text-[10px] font-semibold leading-4 text-[#d8ff8d]";
+        row.textContent = `✓ Nickname: ${state.nickname}${state.country ? ` • ${state.country}` : ""}`;
+        return;
+      }
+      if (state.status === "loading") {
+        row.className = "mt-3 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2.5 text-[10px] leading-4 text-white/50";
+        row.textContent = "Memeriksa nickname melalui Melostore…";
+        return;
+      }
+      if (state.status === "error") {
+        row.className = "mt-3 rounded-lg border border-amber-300/20 bg-amber-300/[0.05] p-2.5 text-[10px] leading-4 text-amber-100/70";
+        row.textContent = `Nickname belum terverifikasi: ${state.message ?? "Periksa kembali ID."}`;
+        return;
+      }
+
+      row.className = "mt-3 rounded-lg border border-white/[0.07] bg-white/[0.025] p-2.5 text-[10px] leading-4 text-white/40";
+      row.textContent = "Nickname akan diperiksa otomatis melalui Melostore setelah ID diisi.";
     }
 
     function enhancePaymentGroups(form: HTMLFormElement) {
@@ -343,6 +524,8 @@ export function CheckoutUiEnhancer() {
     return () => {
       disposed = true;
       observer.disconnect();
+      window.clearTimeout(nicknameTimer);
+      nicknameController?.abort();
       if (frame) window.cancelAnimationFrame(frame);
     };
   }, []);
