@@ -55,7 +55,7 @@ export function AdminMediaUpload({
       </div>
       <div className="flex gap-2">
         <Input aria-label={`${label} URL`} value={value ?? ""} onChange={(event) => onChange(event.target.value)} className="admin-input min-w-0" placeholder="URL gambar atau unggah dari HP" />
-        <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(event) => void upload(event.target.files?.[0])} />
+        <input ref={inputRef} type="file" accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(event) => void upload(event.target.files?.[0])} />
         <Button type="button" variant="outline" disabled={uploading} onClick={() => inputRef.current?.click()} aria-label={`Unggah ${label.toLowerCase()}`} className="shrink-0 border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white">
           {uploading ? <LoaderCircle className="size-4 animate-spin" /> : <Upload className="size-4" />}
           <span className="ml-2 hidden sm:inline">Unggah</span>
@@ -68,12 +68,12 @@ export function AdminMediaUpload({
 }
 
 export async function optimizeImage(file: File) {
-  const targetBytes = 1_700_000;
+  const targetBytes = 1_500_000;
   if (file.type === "image/gif" || file.size <= targetBytes) return file;
 
   const bitmap = await createImageBitmap(file);
   try {
-    for (const plan of [{ maxSide: 1600, quality: 0.82 }, { maxSide: 1200, quality: 0.7 }]) {
+    for (const plan of [{ maxSide: 1600, quality: 0.82 }, { maxSide: 1280, quality: 0.72 }, { maxSide: 960, quality: 0.62 }, { maxSide: 720, quality: 0.54 }]) {
       const scale = Math.min(1, plan.maxSide / Math.max(bitmap.width, bitmap.height));
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.round(bitmap.width * scale));
@@ -87,5 +87,5 @@ export async function optimizeImage(file: File) {
   } finally {
     bitmap.close();
   }
-  throw new Error("Gambar masih terlalu besar setelah dikompres. Pilih gambar lain.");
+  throw new Error("Gambar masih terlalu besar setelah dikompres. Gunakan JPG/PNG/WebP maksimal 6 MB.");
 }
