@@ -8,14 +8,13 @@ import {
   mapMidtransStatus,
   validateMidtransNotification,
 } from "@/lib/server/midtrans";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import {
   applyMidtransWalletTopup,
   getMidtransWalletTopup,
 } from "@/lib/server/wallet";
 
 export const dynamic = "force-dynamic";
-type RuntimeEnv = { PUBLIC_BASE_URL?: string };
 
 export async function GET() {
   return Response.json(
@@ -74,11 +73,7 @@ export async function POST(request: Request) {
     });
     const firstPaid = await applyPaymentStatus(order, status);
     if (firstPaid && order.fulfillment_type === "automatic") {
-      const configured = getRuntimeEnv<RuntimeEnv>().PUBLIC_BASE_URL?.trim();
-      await fulfillAutomaticOrder(
-        order.id,
-        new URL(configured || request.url).origin,
-      );
+      await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
     }
     return Response.json({ ok: true });
   } catch (error) {
