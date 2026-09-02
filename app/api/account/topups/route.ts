@@ -3,7 +3,7 @@ import { requireCustomerSession } from "@/lib/server/customer-auth";
 import { uploadStoreMedia } from "@/lib/server/media";
 import { createMidtransSnapPayment } from "@/lib/server/midtrans";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest } from "@/lib/server/security";
 import {
   createMidtransWalletTopup,
@@ -11,8 +11,6 @@ import {
   readWalletSettings,
   updateMidtransWalletTopup,
 } from "@/lib/server/wallet";
-
-type RuntimeEnv = { PUBLIC_BASE_URL?: string };
 
 const automaticSchema = z.object({
   mode: z.literal("midtrans"),
@@ -58,7 +56,6 @@ export async function POST(request: Request) {
         paymentChannel: input.paymentChannel,
         referenceId,
       });
-      const configured = getRuntimeEnv<RuntimeEnv>().PUBLIC_BASE_URL?.trim();
       try {
         const payment = await createMidtransSnapPayment({
           buyerName: customer.name,
@@ -69,7 +66,7 @@ export async function POST(request: Request) {
           paymentMethod: input.paymentMethod,
           paymentChannel: input.paymentChannel,
           productName: "Top up Saldo LFAMILIA",
-          finishUrl: `${new URL(configured || request.url).origin}/account`,
+          finishUrl: `${getPublicBaseUrl()}/account`,
         });
         await updateMidtransWalletTopup({
           referenceId,
