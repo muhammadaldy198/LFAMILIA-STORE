@@ -22,7 +22,8 @@ function setStepNumber(section: HTMLElement, number: number) {
   const heading = section.querySelector("h2");
   const step = heading?.parentElement?.parentElement;
   const badge = step?.querySelector<HTMLElement>(":scope > span");
-  if (badge) badge.textContent = String(number);
+  const next = String(number);
+  if (badge && badge.textContent !== next) badge.textContent = next;
 }
 
 export function CheckoutVoucherMode() {
@@ -76,8 +77,10 @@ export function CheckoutVoucherMode() {
         setReactInputValue(destinationInput, INTERNAL_VOUCHER_DESTINATION);
       }
 
-      accountSection.dataset.lfVoucherHidden = "true";
-      accountSection.style.display = "none";
+      if (accountSection.dataset.lfVoucherHidden !== "true") {
+        accountSection.dataset.lfVoucherHidden = "true";
+        accountSection.style.display = "none";
+      }
 
       const visibleSteps = sections.filter(
         (section) => section !== accountSection && Boolean(section.querySelector("h2")),
@@ -89,7 +92,8 @@ export function CheckoutVoucherMode() {
 
         for (const paragraph of Array.from(dialog.querySelectorAll<HTMLParagraphElement>("p"))) {
           if (paragraph.textContent?.includes("Pastikan data akun dan produk")) {
-            paragraph.textContent = "Pastikan produk, nominal, dan pembayaran yang kamu pilih sudah sesuai.";
+            const next = "Pastikan produk, nominal, dan pembayaran yang kamu pilih sudah sesuai.";
+            if (paragraph.textContent !== next) paragraph.textContent = next;
           }
         }
 
@@ -98,7 +102,10 @@ export function CheckoutVoucherMode() {
         for (const row of Array.from(summary.children)) {
           if (!(row instanceof HTMLElement)) continue;
           const label = row.querySelector("dt")?.textContent?.trim();
-          if (label === "Username" || label === "ID" || label === "Server") {
+          if (
+            (label === "Username" || label === "ID" || label === "Server") &&
+            row.style.display !== "none"
+          ) {
             row.style.display = "none";
           }
         }
