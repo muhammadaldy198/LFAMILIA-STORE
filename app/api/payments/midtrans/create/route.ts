@@ -14,6 +14,7 @@ import {
 } from "@/lib/server/orders";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
+import { readWalletSettings } from "@/lib/server/wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,12 @@ export async function POST(request: Request) {
   let referenceId: string | null = null;
   try {
     const input = schema.parse(await request.json());
+    const settings = await readWalletSettings();
+    if (!settings.midtransCheckoutEnabled)
+      return Response.json(
+        { error: "Checkout Midtrans belum diaktifkan oleh Pemilik." },
+        { status: 403 },
+      );
     if (
       !(await isPaymentChannelAvailable(
         input.paymentMethod,
