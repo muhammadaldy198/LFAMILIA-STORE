@@ -3,20 +3,18 @@ import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 export const dynamic = "force-dynamic";
 
-const games = {
-  "mobile-legends": { endpoint: "ml", needsServer: true, numeric: true, melostoreCode: "mobile-legends" },
-  "free-fire": { endpoint: "ff", needsServer: false, numeric: true, melostoreCode: "free-fire" },
-  "genshin-impact": { endpoint: "gi", needsServer: false, numeric: true, melostoreCode: "genshin-impact" },
-  valorant: { endpoint: "valo", needsServer: false, numeric: false, melostoreCode: "valorant" },
+const fallbackGames = {
+  "mobile-legends": { endpoint: "ml" },
+  "free-fire": { endpoint: "ff" },
+  "genshin-impact": { endpoint: "gi" },
+  valorant: { endpoint: "valo" },
 } as const;
 
 const requestSchema = z.object({
-  game: z.enum(["mobile-legends", "free-fire", "genshin-impact", "valorant"]),
-  userId: z.string().trim().min(4).max(32),
-  server: z.string().trim().min(1).max(20).optional(),
+  game: z.string().trim().min(2).max(80).regex(/^[a-z0-9-]+$/, "Kode game tidak valid."),
+  userId: z.string().trim().min(2).max(80),
+  server: z.string().trim().min(1).max(40).optional(),
 });
-
-type GameSlug = keyof typeof games;
 
 type RuntimeEnv = {
   NICKNAME_API_URL?: string;
@@ -39,7 +37,13 @@ type ProviderResponse = {
 type MelostoreResponse = {
   success?: boolean;
   message?: unknown;
-  error?: unknown;
+  error?:
+    | unknown
+    | {
+        code?: unknown;
+        message?: unknown;
+        category?: unknown;
+      };
   data?: {
     game_code?: unknown;
     customer_target?: unknown;
@@ -54,13 +58,15 @@ type MelostoreResponse = {
 export async function POST(request: Request) {
   try {
     const input = requestSchema.parse(await request.json());
-    const game = games[input.game];
 
-    if (game.numeric && !/^\d+$/.test(input.userId)) {
-      return Response.json({ error: "User ID harus berupa angka." }, { status: 400 });
-    }
-    if (game.needsServer && (!input.server || !/^\d+$/.test(input.server))) {
-      return Response.json({ error: "Server / Zone ID wajib diisi dengan angka." }, { status: 400 });
+    if (
+      input.game === "mobile-legends" &&
+      (!input.server || !/^\d+$/.test(input.server))
+    ) {
+      return Response.json(
+        { error: "Server / Zone ID wajib diisi dengan angka." },
+        { status: 400 },
+      );
     }
 
     const runtime = getRuntimeEnv<RuntimeEnv>();
@@ -73,16 +79,23 @@ export async function POST(request: Request) {
         apiKey,
         secretKey,
         game: input.game,
-        gameCode: game.melostoreCode,
         userId: input.userId,
         server: input.server,
       });
     }
 
+    const fallback = fallbackGames[input.game as keyof typeof fallbackGames];
+    if (!fallback) {
+      return Response.json(
+        { error: "Kredensial Melostore belum tersedia untuk memeriksa game ini." },
+        { status: 503 },
+      );
+    }
+
     return await lookupFallbackProvider({
       runtime,
       game: input.game,
-      endpoint: game.endpoint,
+      endpoint: fallback.endpoint,
       userId: input.userId,
       server: input.server,
     });
@@ -111,19 +124,19 @@ async function lookupMelostore({
   apiKey,
   secretKey,
   game,
-  gameCode,
   userId,
   server,
 }: {
   runtime: RuntimeEnv;
   apiKey: string;
   secretKey: string;
-  game: GameSlug;
-  gameCode: string;
+  game: string;
   userId: string;
   server?: string;
 }) {
-  const baseUrl = (runtime.MELOSTORE_API_URL?.trim() || "https://api.melostore.id").replace(/\/$/, "");
+  const baseUrl = (
+    runtime.MELOSTORE_API_URL?.trim() || "https://api.melostore.id"
+  ).replace(/\/$/, "");
   const endpoint = `${baseUrl}/api/v1/h2h/check-nickname`;
 
   const body: {
@@ -131,7 +144,7 @@ async function lookupMelostore({
     customer_target: string;
     customer_target_zone?: string;
   } = {
-    game_code: gameCode,
+    game_code: game,
     customer_target: userId,
   };
   if (server) body.customer_target_zone = server;
@@ -155,23 +168,41 @@ async function lookupMelostore({
     throw new Error("Melostore mengembalikan respons yang tidak valid.");
   }
 
-  const providerMessage = [data.message, data.error].find(
-    (value): value is string => typeof value === "string" && value.trim().length > 0,
-  )?.trim();
+  const errorMessage =
+    data.error &&
+    typeof data.error === "object" &&
+    "message" in data.error &&
+    typeof data.error.message === "string"
+      ? data.error.message.trim()
+      : "";
+  const providerMessage =
+    typeof data.message === "string" && data.message.trim()
+      ? data.message.trim()
+      : errorMessage;
 
   if (!upstream.ok || data.success === false) {
     if (upstream.status === 401 || upstream.status === 403) {
-      throw new Error("API Key atau Secret Key Melostore tidak valid atau akses H2H ditolak.");
+      throw new Error(
+        "API Key atau Secret Key Melostore tidak valid atau akses H2H ditolak.",
+      );
     }
 
     return Response.json(
       { error: providerMessage || "ID atau Server tidak ditemukan di Melostore." },
-      { status: upstream.status === 404 || upstream.status === 422 ? 404 : 502 },
+      {
+        status:
+          upstream.status === 400 ||
+          upstream.status === 404 ||
+          upstream.status === 422
+            ? 404
+            : 502,
+      },
     );
   }
 
   const rawName = [data.data?.username, data.data?.nickname].find(
-    (value): value is string => typeof value === "string" && value.trim().length > 0,
+    (value): value is string =>
+      typeof value === "string" && value.trim().length > 0,
   );
 
   if (!rawName) {
@@ -181,9 +212,13 @@ async function lookupMelostore({
     );
   }
 
-  const country = [data.data?.region, data.data?.country].find(
-    (value): value is string => typeof value === "string" && value.trim().length > 0,
-  )?.trim() ?? null;
+  const country =
+    [data.data?.region, data.data?.country]
+      .find(
+        (value): value is string =>
+          typeof value === "string" && value.trim().length > 0,
+      )
+      ?.trim() ?? null;
 
   return Response.json({
     nickname: rawName.trim(),
@@ -203,14 +238,13 @@ async function lookupFallbackProvider({
   server,
 }: {
   runtime: RuntimeEnv;
-  game: GameSlug;
+  game: string;
   endpoint: string;
   userId: string;
   server?: string;
 }) {
   const baseUrl = (
-    runtime.NICKNAME_API_URL?.trim() ||
-    "https://api.isan.eu.org/nickname"
+    runtime.NICKNAME_API_URL?.trim() || "https://api.isan.eu.org/nickname"
   ).replace(/\/$/, "");
   const url = new URL(`${baseUrl}/${endpoint}`);
   url.searchParams.set("id", userId);
