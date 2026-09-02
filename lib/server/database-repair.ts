@@ -29,6 +29,7 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["orders", "flash_sale_id", "flash_sale_id INTEGER"],
   ["orders", "customer_id", "customer_id TEXT"],
   ["store_settings", "discord_url", "discord_url TEXT"],
+  ["product_packages", "package_group", "package_group TEXT"],
   ["product_packages", "provider_code", "provider_code TEXT"],
   ["product_packages", "provider_sku", "provider_sku TEXT"],
   ["product_packages", "supplier_price", "supplier_price INTEGER"],
