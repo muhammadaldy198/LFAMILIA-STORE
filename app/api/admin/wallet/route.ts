@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
+import { notifyWalletTopupSuccessById } from "@/lib/server/transaction-notifications";
 import {
   listWalletTopups,
   readWalletSettings,
@@ -59,6 +60,11 @@ export async function PATCH(request: Request) {
   try {
     const input = reviewSchema.parse(await request.json());
     await reviewWalletTopup({ ...input, adminEmail: access.email });
+    if (input.decision === "approved") {
+      await notifyWalletTopupSuccessById(input.id).catch((error) =>
+        console.error("Notifikasi top up manual gagal:", error),
+      );
+    }
     return Response.json({ ok: true });
   } catch (error) {
     const message =
