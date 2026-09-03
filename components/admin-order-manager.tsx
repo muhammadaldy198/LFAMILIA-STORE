@@ -36,6 +36,8 @@ type Order = {
   fulfillment_status: string;
   provider_code: string | null;
   provider_message: string | null;
+  provider_serial_number: string | null;
+  delivery_mode: "direct" | "voucher" | "manual";
   created_at: string;
 };
 
@@ -45,6 +47,7 @@ export function AdminOrderManager() {
   const [status, setStatus] = useState("all");
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<string | null>(null);
+  const [serialNumbers, setSerialNumbers] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [role, setRole] = useState<"owner" | "staff">("staff");
 
@@ -114,18 +117,36 @@ export function AdminOrderManager() {
     );
   }, [orders, query, status]);
 
-  async function completeManual(id: string) {
-    setWorkingId(id);
+  async function completeManual(order: Order) {
+    const voucherManual = order.delivery_mode === "voucher";
+    const serialNumber = serialNumbers[order.id]?.trim() ?? "";
+    if (voucherManual && !serialNumber) {
+      setError("Kode voucher / serial wajib diisi sebelum pesanan diselesaikan.");
+      return;
+    }
+
+    setWorkingId(order.id);
     setError("");
     try {
       const response = await fetch("/api/panel/orders", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id, action: "complete_manual" }),
+        body: JSON.stringify({
+          id: order.id,
+          action: "complete_manual",
+          ...(voucherManual ? { serialNumber } : {}),
+        }),
       });
       const data = (await response.json()) as { error?: string };
       if (!response.ok)
         throw new Error(data.error ?? "Pesanan gagal diperbarui.");
+      if (voucherManual) {
+        setSerialNumbers((current) => {
+          const next = { ...current };
+          delete next[order.id];
+          return next;
+        });
+      }
       await load();
     } catch (reason) {
       setError(
@@ -268,6 +289,8 @@ export function AdminOrderManager() {
                   order.fulfillment_type === "manual" &&
                   order.payment_status === "paid" &&
                   order.fulfillment_status === "manual_pending";
+                const voucherManualReady =
+                  manualReady && order.delivery_mode === "voucher";
                 const manualPaymentPending =
                   role === "owner" &&
                   order.payment_method.startsWith("manual_") &&
@@ -332,63 +355,92 @@ export function AdminOrderManager() {
                           ? ` • ${order.provider_message}`
                           : ""}
                       </p>
+                      {order.delivery_mode === "voucher" && order.provider_serial_number && (
+                        <div className="mt-2 rounded-md border border-[#b9ff35]/15 bg-[#b9ff35]/[0.05] px-2 py-1.5 text-left">
+                          <span className="block text-[8px] font-bold uppercase tracking-wider text-[#cfff72]">
+                            Kode voucher
+                          </span>
+                          <span className="mt-0.5 block break-all font-mono text-[9px] text-white/75">
+                            {order.provider_serial_number}
+                          </span>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {manualPaymentPending && (
-                          <Button
-                            type="button"
-                            disabled={workingId === order.id}
-                            onClick={() => void confirmManualPayment(order.id)}
-                            size="sm"
-                            className="rounded-lg bg-sky-300 text-[9px] font-black text-[#08131c] hover:bg-sky-200"
-                          >
-                            {workingId === order.id ? (
-                              <LoaderCircle className="size-3 animate-spin" />
-                            ) : (
-                              <>
-                                <CheckCircle2 className="mr-1 size-3" />
-                                Terima bayar
-                              </>
-                            )}
-                          </Button>
+                      <div className="flex flex-col items-end gap-2">
+                        {voucherManualReady && (
+                          <Input
+                            value={serialNumbers[order.id] ?? ""}
+                            onChange={(event) =>
+                              setSerialNumbers((current) => ({
+                                ...current,
+                                [order.id]: event.target.value,
+                              }))
+                            }
+                            placeholder="Kode voucher / serial"
+                            autoComplete="off"
+                            className="h-8 w-44 rounded-lg border-[#b9ff35]/20 bg-[#b9ff35]/[0.04] font-mono text-[9px] text-white placeholder:font-sans placeholder:text-white/25"
+                          />
                         )}
-                        {manualReady && (
-                          <Button
-                            type="button"
-                            disabled={workingId === order.id}
-                            onClick={() => void completeManual(order.id)}
-                            size="sm"
-                            className="rounded-lg bg-[#b9ff35] text-[9px] font-black text-[#091006] hover:bg-[#d0ff75]"
-                          >
-                            {workingId === order.id ? (
-                              <LoaderCircle className="size-3 animate-spin" />
-                            ) : (
-                              <>
-                                <CheckCircle2 className="mr-1 size-3" />
-                                Selesai
-                              </>
-                            )}
-                          </Button>
-                        )}
-                        {voucherRetry && (
-                          <Button
-                            type="button"
-                            disabled={workingId === order.id}
-                            onClick={() => void retryVoucher(order.id)}
-                            size="sm"
-                            className="rounded-lg bg-amber-300 text-[9px] font-black text-[#171006] hover:bg-amber-200"
-                          >
-                            {workingId === order.id ? (
-                              <LoaderCircle className="size-3 animate-spin" />
-                            ) : (
-                              <>
-                                <RotateCcw className="mr-1 size-3" />
-                                Kirim kode
-                              </>
-                            )}
-                          </Button>
-                        )}
+                        <div className="flex justify-end gap-1">
+                          {manualPaymentPending && (
+                            <Button
+                              type="button"
+                              disabled={workingId === order.id}
+                              onClick={() => void confirmManualPayment(order.id)}
+                              size="sm"
+                              className="rounded-lg bg-sky-300 text-[9px] font-black text-[#08131c] hover:bg-sky-200"
+                            >
+                              {workingId === order.id ? (
+                                <LoaderCircle className="size-3 animate-spin" />
+                              ) : (
+                                <>
+                                  <CheckCircle2 className="mr-1 size-3" />
+                                  Terima bayar
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          {manualReady && (
+                            <Button
+                              type="button"
+                              disabled={
+                                workingId === order.id ||
+                                (voucherManualReady && !(serialNumbers[order.id]?.trim()))
+                              }
+                              onClick={() => void completeManual(order)}
+                              size="sm"
+                              className="rounded-lg bg-[#b9ff35] text-[9px] font-black text-[#091006] hover:bg-[#d0ff75] disabled:opacity-45"
+                            >
+                              {workingId === order.id ? (
+                                <LoaderCircle className="size-3 animate-spin" />
+                              ) : (
+                                <>
+                                  <CheckCircle2 className="mr-1 size-3" />
+                                  {voucherManualReady ? "Kirim & Selesaikan" : "Selesai"}
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          {voucherRetry && (
+                            <Button
+                              type="button"
+                              disabled={workingId === order.id}
+                              onClick={() => void retryVoucher(order.id)}
+                              size="sm"
+                              className="rounded-lg bg-amber-300 text-[9px] font-black text-[#171006] hover:bg-amber-200"
+                            >
+                              {workingId === order.id ? (
+                                <LoaderCircle className="size-3 animate-spin" />
+                              ) : (
+                                <>
+                                  <RotateCcw className="mr-1 size-3" />
+                                  Kirim kode
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                   </TableRow>
