@@ -1,14 +1,18 @@
 import {
+  mapMidtransStatus,
+  validateMidtransNotification,
+} from "@/lib/server/midtrans";
+import {
   applyPaymentStatus,
   fulfillAutomaticOrder,
   getOrderByReference,
   recordOrderEvent,
 } from "@/lib/server/orders";
-import {
-  mapMidtransStatus,
-  validateMidtransNotification,
-} from "@/lib/server/midtrans";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
+import {
+  notifyOrderPaymentSuccess,
+  notifyWalletTopupSuccessById,
+} from "@/lib/server/transaction-notifications";
 import {
   applyMidtransWalletTopup,
   getMidtransWalletTopup,
@@ -53,6 +57,11 @@ export async function POST(request: Request) {
             : null,
         callbackAmount: amount,
       });
+      if (result.credited) {
+        await notifyWalletTopupSuccessById(walletTopup.id, validation.orderId).catch(
+          (error) => console.error("Notifikasi top up Midtrans gagal:", error),
+        );
+      }
       return Response.json({ ok: true, walletTopup: result });
     }
     const order = await getOrderByReference(validation.orderId);
@@ -72,8 +81,13 @@ export async function POST(request: Request) {
       payload,
     });
     const firstPaid = await applyPaymentStatus(order, status);
-    if (firstPaid && order.fulfillment_type === "automatic") {
-      await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
+    if (firstPaid) {
+      await notifyOrderPaymentSuccess(order).catch((error) =>
+        console.error("Notifikasi pembelian Midtrans gagal:", error),
+      );
+      if (order.fulfillment_type === "automatic") {
+        await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
+      }
     }
     return Response.json({ ok: true });
   } catch (error) {
