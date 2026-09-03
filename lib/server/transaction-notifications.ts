@@ -1,0 +1,171 @@
+import { getD1 } from "@/db";
+import { getRuntimeEnv } from "@/lib/server/runtime-env";
+
+type NotificationRuntimeEnv = {
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
+  RESEND_API_URL?: string;
+  WHATSAPP_ACCESS_TOKEN?: string;
+  WHATSAPP_PHONE_NUMBER_ID?: string;
+  WHATSAPP_TRANSACTION_TEMPLATE?: string;
+  WHATSAPP_TEMPLATE_LANGUAGE?: string;
+  WHATSAPP_GRAPH_VERSION?: string;
+  WHATSAPP_GRAPH_BASE_URL?: string;
+};
+
+type NotificationInput = {
+  kind: "order" | "wallet_topup";
+  name: string;
+  email: string;
+  phone: string;
+  detail: string;
+  amount: number;
+  referenceId: string;
+};
+
+function rupiah(value: number) {
+  return `Rp${Math.max(0, Math.round(value)).toLocaleString("id-ID")}`;
+}
+
+function normalizeWhatsApp(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
+  if (digits.startsWith("8")) return `62${digits}`;
+  return digits;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  })[character] || character);
+}
+
+async function sendEmail(input: NotificationInput, config: NotificationRuntimeEnv) {
+  const apiKey = config.RESEND_API_KEY?.trim();
+  const from = config.RESEND_FROM_EMAIL?.trim();
+  const apiUrl = config.RESEND_API_URL?.trim();
+  if (!apiKey || !from || !apiUrl || !input.email.trim()) return { skipped: true };
+
+  const typeLabel = input.kind === "wallet_topup" ? "Top up saldo" : "Pembelian";
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+      "idempotency-key": `lfamilia-success-${input.kind}-${input.referenceId}`,
+    },
+    body: JSON.stringify({
+      from,
+      to: [input.email.trim()],
+      subject: `${typeLabel} berhasil — ${input.referenceId}`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#151515"><h1>LFAMILIA STORE</h1><p>Halo ${escapeHtml(input.name)},</p><p><strong>${escapeHtml(typeLabel)} berhasil.</strong></p><p>${escapeHtml(input.detail)}</p><p>Total: <strong>${escapeHtml(rupiah(input.amount))}</strong></p><p>Referensi: <strong>${escapeHtml(input.referenceId)}</strong></p><p>Terima kasih telah menggunakan LFAMILIA STORE.</p></div>`,
+    }),
+    signal: AbortSignal.timeout(12_000),
+  });
+  const payload = await response.json().catch(() => ({})) as { id?: string; message?: string };
+  if (!response.ok) throw new Error(payload.message || "Resend menolak notifikasi transaksi.");
+  return { skipped: false, providerId: payload.id ?? null };
+}
+
+async function sendWhatsApp(input: NotificationInput, config: NotificationRuntimeEnv) {
+  const token = config.WHATSAPP_ACCESS_TOKEN?.trim();
+  const phoneId = config.WHATSAPP_PHONE_NUMBER_ID?.trim();
+  const template = config.WHATSAPP_TRANSACTION_TEMPLATE?.trim();
+  const language = config.WHATSAPP_TEMPLATE_LANGUAGE?.trim();
+  const version = config.WHATSAPP_GRAPH_VERSION?.trim();
+  const graphBaseUrl = config.WHATSAPP_GRAPH_BASE_URL?.trim().replace(/\/$/, "");
+  const to = normalizeWhatsApp(input.phone);
+  if (!token || !phoneId || !template || !language || !version || !graphBaseUrl || !to) {
+    return { skipped: true };
+  }
+
+  const typeLabel = input.kind === "wallet_topup" ? "Top up saldo" : "Pembelian";
+  const response = await fetch(`${graphBaseUrl}/${version}/${encodeURIComponent(phoneId)}/messages`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: {
+        name: template,
+        language: { code: language },
+        components: [{
+          type: "body",
+          parameters: [
+            input.name,
+            typeLabel,
+            input.detail,
+            rupiah(input.amount),
+            input.referenceId,
+          ].map((text) => ({ type: "text", text })),
+        }],
+      },
+    }),
+    signal: AbortSignal.timeout(12_000),
+  });
+  const payload = await response.json().catch(() => ({})) as {
+    messages?: Array<{ id?: string }>;
+    error?: { message?: string };
+  };
+  if (!response.ok) throw new Error(payload.error?.message || "WhatsApp menolak notifikasi transaksi.");
+  return { skipped: false, providerId: payload.messages?.[0]?.id ?? null };
+}
+
+async function notify(input: NotificationInput) {
+  const config = getRuntimeEnv<NotificationRuntimeEnv>();
+  const results = await Promise.allSettled([
+    sendEmail(input, config),
+    sendWhatsApp(input, config),
+  ]);
+  for (const result of results) {
+    if (result.status === "rejected") {
+      console.error("Notifikasi transaksi LFAMILIA gagal:", result.reason);
+    }
+  }
+}
+
+export async function notifyOrderPaymentSuccess(order: {
+  buyer_name: string;
+  buyer_email: string;
+  buyer_phone: string;
+  product_name: string;
+  package_label: string;
+  total: number;
+  reference_id: string;
+}) {
+  await notify({
+    kind: "order",
+    name: order.buyer_name,
+    email: order.buyer_email,
+    phone: order.buyer_phone,
+    detail: `${order.product_name} — ${order.package_label}`,
+    amount: order.total,
+    referenceId: order.reference_id,
+  });
+}
+
+export async function notifyWalletTopupSuccess(input: {
+  customerId: string;
+  amount: number;
+  referenceId: string;
+}) {
+  const customer = await getD1()
+    .prepare("SELECT name, email, phone, balance FROM customer_users WHERE id = ? LIMIT 1")
+    .bind(input.customerId)
+    .first<{ name: string; email: string; phone: string; balance: number }>();
+  if (!customer) return;
+  await notify({
+    kind: "wallet_topup",
+    name: customer.name,
+    email: customer.email,
+    phone: customer.phone,
+    detail: `Saldo LFAMILIA sudah bertambah. Saldo sekarang ${rupiah(customer.balance)}.`,
+    amount: input.amount,
+    referenceId: input.referenceId,
+  });
+}
