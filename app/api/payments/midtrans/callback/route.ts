@@ -10,7 +10,7 @@ import {
 } from "@/lib/server/orders";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import {
-  notifyOrderPaymentSuccess,
+  notifyOrderFulfillmentSuccessById,
   notifyWalletTopupSuccessById,
 } from "@/lib/server/transaction-notifications";
 import {
@@ -81,13 +81,11 @@ export async function POST(request: Request) {
       payload,
     });
     const firstPaid = await applyPaymentStatus(order, status);
-    if (firstPaid) {
-      await notifyOrderPaymentSuccess(order).catch((error) =>
-        console.error("Notifikasi pembelian Midtrans gagal:", error),
+    if (firstPaid && order.fulfillment_type === "automatic") {
+      await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
+      await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
+        console.error("Notifikasi pesanan selesai Midtrans gagal:", error),
       );
-      if (order.fulfillment_type === "automatic") {
-        await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
-      }
     }
     return Response.json({ ok: true });
   } catch (error) {
