@@ -13,7 +13,7 @@ import {
 } from "@/lib/server/orders";
 import { quotePromotion } from "@/lib/server/promotions";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
-import { notifyOrderPaymentSuccess } from "@/lib/server/transaction-notifications";
+import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
 import { spendWallet } from "@/lib/server/wallet";
 
@@ -58,13 +58,11 @@ export async function POST(request: Request) {
     if (!order) throw new Error("Pesanan tidak ditemukan setelah dibuat.");
     const firstPaid = await applyPaymentStatus(order, "paid");
     await recordOrderEvent({ orderId: identity.id, source: "wallet", eventId: `wallet-${identity.id}`, status: "paid", payload: { amount: promotion.finalPrice, balanceAfter } });
-    if (firstPaid) {
-      await notifyOrderPaymentSuccess(order).catch((error) =>
-        console.error("Notifikasi pembelian saldo gagal:", error),
+    if (firstPaid && item.fulfillmentType === "automatic") {
+      await fulfillAutomaticOrder(identity.id, getPublicBaseUrl());
+      await notifyOrderFulfillmentSuccessById(identity.id).catch((error) =>
+        console.error("Notifikasi pesanan selesai saldo gagal:", error),
       );
-      if (item.fulfillmentType === "automatic") {
-        await fulfillAutomaticOrder(identity.id, getPublicBaseUrl());
-      }
     }
     return Response.json({ orderId: identity.id, referenceId: identity.referenceId, paymentNo: null, paymentName: "Saldo LFAMILIA", paymentUrl: null, fee: 0, total: promotion.finalPrice, expiredAt: null, paymentStatus: "paid", balanceAfter, fulfillmentType: item.fulfillmentType, providerCode: item.providerCode, basePrice: promotion.basePrice, sellingPrice: promotion.sellingPrice, discountAmount: promotion.discountAmount, voucherCode: promotion.voucherCode, flashSaleId: promotion.flashSaleId, memberTier: promotion.memberTier, memberDiscountPercent: promotion.memberDiscountPercent, discountSource: promotion.discountSource }, { status: 201 });
   } catch (error) {
