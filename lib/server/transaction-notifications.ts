@@ -149,23 +149,36 @@ export async function notifyOrderPaymentSuccess(order: {
   });
 }
 
-export async function notifyWalletTopupSuccess(input: {
-  customerId: string;
-  amount: number;
-  referenceId: string;
-}) {
-  const customer = await getD1()
-    .prepare("SELECT name, email, phone, balance FROM customer_users WHERE id = ? LIMIT 1")
-    .bind(input.customerId)
-    .first<{ name: string; email: string; phone: string; balance: number }>();
-  if (!customer) return;
+export async function notifyWalletTopupSuccessById(
+  topupId: string,
+  referenceId?: string,
+) {
+  const row = await getD1()
+    .prepare(
+      `SELECT t.id, t.amount, t.reference_id, t.status,
+      u.name, u.email, u.phone, u.balance
+      FROM wallet_topups t JOIN customer_users u ON u.id = t.customer_id
+      WHERE t.id = ? LIMIT 1`,
+    )
+    .bind(topupId)
+    .first<{
+      id: string;
+      amount: number;
+      reference_id: string | null;
+      status: string;
+      name: string;
+      email: string;
+      phone: string;
+      balance: number;
+    }>();
+  if (!row || row.status !== "approved") return;
   await notify({
     kind: "wallet_topup",
-    name: customer.name,
-    email: customer.email,
-    phone: customer.phone,
-    detail: `Saldo LFAMILIA sudah bertambah. Saldo sekarang ${rupiah(customer.balance)}.`,
-    amount: input.amount,
-    referenceId: input.referenceId,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    detail: `Saldo LFAMILIA sudah bertambah. Saldo sekarang ${rupiah(row.balance)}.`,
+    amount: row.amount,
+    referenceId: referenceId || row.reference_id || `TOPUP-${row.id.slice(0, 8).toUpperCase()}`,
   });
 }
