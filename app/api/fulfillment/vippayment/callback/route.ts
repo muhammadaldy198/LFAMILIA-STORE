@@ -1,6 +1,7 @@
 import { hashHex, safeEqual } from "@/lib/server/crypto";
 import { applyProviderWebhook } from "@/lib/server/orders";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { notifyOrderFulfillmentSuccessByProviderRef } from "@/lib/server/transaction-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -31,17 +32,23 @@ export async function POST(request: Request) {
   }
   const data = payload.data;
   if (!data?.trxid) return Response.json({ error: "Transaction ID VIPayment tidak ada." }, { status: 400 });
+  const status = mapStatus(data.status);
   await applyProviderWebhook({
     providerCode: "vippayment",
     providerRefId: data.trxid,
     eventId: `vippayment-${hashHex("sha256", rawBody)}`,
     result: {
       externalId: data.trxid,
-      status: mapStatus(data.status),
+      status,
       message: data.note || `Status VIPayment: ${data.status ?? "waiting"}`,
       serialNumber: null,
       raw: payload,
     },
   });
+  if (status === "success") {
+    await notifyOrderFulfillmentSuccessByProviderRef("vippayment", data.trxid).catch(
+      (error) => console.error("Notifikasi pesanan selesai VIPayment gagal:", error),
+    );
+  }
   return Response.json({ ok: true });
 }
