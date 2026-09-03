@@ -3,9 +3,11 @@ import { requireAdminSession } from "@/lib/server/admin";
 import {
   completeManualOrder,
   confirmManualOrderPayment,
+  getOrderById,
   listOrders,
 } from "@/lib/server/orders";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
+import { notifyOrderPaymentSuccess } from "@/lib/server/transaction-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +66,15 @@ export async function PATCH(request: Request) {
           { error: "Konfirmasi pembayaran manual hanya untuk Pemilik." },
           { status: 403 },
         );
-      await confirmManualOrderPayment(input.id, getPublicBaseUrl());
+      const firstPaid = await confirmManualOrderPayment(input.id, getPublicBaseUrl());
+      if (firstPaid) {
+        const order = await getOrderById(input.id);
+        if (order) {
+          await notifyOrderPaymentSuccess(order).catch((error) =>
+            console.error("Notifikasi pembayaran manual gagal:", error),
+          );
+        }
+      }
     } else await completeManualOrder(input.id, access.email);
     return Response.json({ ok: true });
   } catch (error) {
