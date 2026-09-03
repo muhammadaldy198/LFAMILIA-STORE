@@ -1,6 +1,7 @@
 import { hashHex, hmacHex, safeEqual } from "@/lib/server/crypto";
 import { applyProviderWebhook } from "@/lib/server/orders";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { notifyOrderFulfillmentSuccessByProviderRef } from "@/lib/server/transaction-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -29,17 +30,23 @@ export async function POST(request: Request) {
   }
   const data = payload.data;
   if (!data?.ref_id) return Response.json({ error: "Ref ID DigiFlazz tidak ada." }, { status: 400 });
+  const status = mapStatus(data.status);
   await applyProviderWebhook({
     providerCode: "digiflazz",
     providerRefId: data.ref_id,
     eventId: `digiflazz-${hashHex("sha256", rawBody)}`,
     result: {
       externalId: data.ref_id,
-      status: mapStatus(data.status),
+      status,
       message: data.message || `Status DigiFlazz: ${data.status ?? "pending"}`,
       serialNumber: data.sn || null,
       raw: payload,
     },
   });
+  if (status === "success") {
+    await notifyOrderFulfillmentSuccessByProviderRef("digiflazz", data.ref_id).catch(
+      (error) => console.error("Notifikasi pesanan selesai DigiFlazz gagal:", error),
+    );
+  }
   return Response.json({ ok: true });
 }
