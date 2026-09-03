@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 type NotificationRuntimeEnv = {
@@ -184,12 +185,17 @@ export async function notifyOrderFulfillmentSuccessById(orderId: string) {
     }>();
   if (!order || order.fulfillment_status !== "success") return;
 
+  const voucherCode = await getWebsiteVoucherCodeByReference(order.reference_id).catch(() => null);
+  const detail = voucherCode
+    ? `${order.product_name} — ${order.package_label}. Produk berhasil dikirim. Kode voucher: ${voucherCode}`
+    : `${order.product_name} — ${order.package_label}. Produk berhasil dikirim.`;
+
   const input: NotificationInput = {
     kind: "order",
     name: order.buyer_name,
     email: order.buyer_email,
     phone: order.buyer_phone,
-    detail: `${order.product_name} — ${order.package_label}. Produk berhasil dikirim.`,
+    detail,
     amount: order.total,
     referenceId: order.reference_id,
   };
