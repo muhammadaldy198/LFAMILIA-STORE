@@ -143,6 +143,7 @@ export async function POST(request: Request) {
       total: promotion.finalPrice,
       expiredAt: payment.expiredAt,
       paymentMethod: input.paymentMethod,
+      midtransMode: payment.mode,
       fulfillmentType: item.fulfillmentType,
       providerCode: item.providerCode,
       basePrice: promotion.basePrice,
