@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { getCustomerSession } from "@/lib/server/customer-auth";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
-import { createMidtransSnapPayment } from "@/lib/server/midtrans";
+import {
+  createMidtransPayment,
+  getMidtransMode,
+  isMidtransChannelSupported,
+} from "@/lib/server/midtrans";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
 import { quotePromotion } from "@/lib/server/promotions";
 import {
@@ -46,8 +50,19 @@ export async function POST(request: Request) {
     const settings = await readWalletSettings();
     if (!settings.midtransCheckoutEnabled)
       return Response.json({ error: "Checkout Midtrans belum diaktifkan oleh Pemilik." }, { status: 403 });
-    if (!(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel)))
-      return Response.json({ error: "Metode pembayaran tidak valid." }, { status: 400 });
+    const midtransMode = getMidtransMode();
+    if (
+      !(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel)) ||
+      !isMidtransChannelSupported(
+        input.paymentMethod,
+        paymentChannel,
+        midtransMode,
+      )
+    )
+      return Response.json(
+        { error: "Metode pembayaran tidak tersedia pada mode Midtrans aktif." },
+        { status: 400 },
+      );
 
     const item = await resolvePurchasableItem(input.productSlug, input.packageSku);
     if (!item)
@@ -86,7 +101,7 @@ export async function POST(request: Request) {
 
     const baseUrl = getPublicBaseUrl();
     const invoice = publicInvoice(identity.referenceId);
-    const payment = await createMidtransSnapPayment({
+    const payment = await createMidtransPayment({
       referenceId: identity.referenceId,
       amount: promotion.finalPrice,
       productName: `${item.productName} - ${item.packageLabel}`,
@@ -96,11 +111,16 @@ export async function POST(request: Request) {
       paymentMethod: input.paymentMethod,
       paymentChannel,
       finishUrl: `${baseUrl}/payment?invoice=${encodeURIComponent(invoice)}`,
+      deviceId: request.headers.get("user-agent") || undefined,
     });
     await updateMidtransPayment({
       referenceId: identity.referenceId,
+      mode: payment.mode,
       transactionId: payment.transactionId,
+      paymentNo: payment.paymentNo,
+      paymentName: payment.paymentName,
       paymentUrl: payment.paymentUrl,
+      expiredAt: payment.expiredAt,
       fee: 0,
       total: promotion.finalPrice,
     });
@@ -116,12 +136,13 @@ export async function POST(request: Request) {
       orderId: identity.id,
       referenceId: identity.referenceId,
       publicInvoice: invoice,
-      paymentNo: null,
-      paymentName: "Midtrans Snap",
+      paymentNo: payment.paymentNo,
+      paymentName: payment.paymentName,
       paymentUrl: payment.paymentUrl,
       fee: 0,
       total: promotion.finalPrice,
-      expiredAt: null,
+      expiredAt: payment.expiredAt,
+      paymentMethod: input.paymentMethod,
       fulfillmentType: item.fulfillmentType,
       providerCode: item.providerCode,
       basePrice: promotion.basePrice,
