@@ -115,6 +115,25 @@ const groupIcons = {
   manual_bank: Landmark,
 };
 
+const ipaymuSupportedChannels = new Set([
+  "va:bag",
+  "va:bca",
+  "va:bpd_bali",
+  "va:bni",
+  "va:cimb",
+  "va:mandiri",
+  "va:bmi",
+  "va:bri",
+  "va:bsi",
+  "va:permata",
+  "va:danamon",
+  "va:btn",
+  "ewallet:dana",
+  "ewallet:shopeepay",
+  "qris:mpm",
+]);
+
+
 export default function CheckoutPage() {
   return (
     <Suspense
@@ -201,9 +220,12 @@ function CheckoutContent() {
     paymentMethod === "va" ||
     paymentMethod === "ewallet" ||
     paymentMethod === "qris";
-  const automaticCheckoutReady = Boolean(
-    walletSettings?.midtransCheckoutEnabled || walletSettings?.ipaymuCheckoutEnabled,
-  );
+  const activeCheckoutGateway = walletSettings?.midtransCheckoutEnabled
+    ? "midtrans"
+    : walletSettings?.ipaymuCheckoutEnabled
+      ? "ipaymu"
+      : null;
+  const automaticCheckoutReady = Boolean(activeCheckoutGateway);
   const checkoutGroups = [
     { code: "wallet" as const, name: "Koin LFAMILIA", description: "Bayar langsung dari saldo akun" },
     ...(automaticCheckoutReady
@@ -217,7 +239,12 @@ function CheckoutContent() {
       : []),
   ];
   const channels = isGatewayMethod
-    ? availableChannels.filter((item) => item.method === paymentMethod)
+    ? availableChannels.filter(
+        (item) =>
+          item.method === paymentMethod &&
+          (activeCheckoutGateway !== "ipaymu" ||
+            ipaymuSupportedChannels.has(`${item.method}:${item.channel}`)),
+      )
     : [];
   const notices = (product.notices ?? []).filter(
     (item) => item.isActive !== false,
@@ -462,9 +489,9 @@ function CheckoutContent() {
           ? "/api/payments/wallet/create"
           : paymentMethod === "manual_qris" || paymentMethod === "manual_bank"
             ? "/api/payments/manual/create"
-            : walletSettings?.midtransCheckoutEnabled
-              ? "/api/payments/midtrans/create"
-              : "/api/payments/ipaymu/create";
+            : activeCheckoutGateway === "ipaymu"
+              ? "/api/payments/ipaymu/create"
+              : "/api/payments/midtrans/create";
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
