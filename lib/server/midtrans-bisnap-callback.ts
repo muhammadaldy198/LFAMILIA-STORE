@@ -23,6 +23,40 @@ export type MidtransBisnapCallbackKind =
   | "qris"
   | "virtual-account";
 
+function serviceCode(kind: MidtransBisnapCallbackKind) {
+  if (kind === "direct-debit") return "56";
+  if (kind === "qris") return "52";
+  return "25";
+}
+
+function callbackResponse(
+  body: Record<string, unknown>,
+  status = 200,
+) {
+  return Response.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+      "X-TIMESTAMP": new Date().toISOString(),
+    },
+  });
+}
+
+function errorResponse(
+  kind: MidtransBisnapCallbackKind,
+  status: 400 | 401 | 404,
+  message: string,
+) {
+  const service = serviceCode(kind);
+  const responseCode =
+    status === 401
+      ? `401${service}00`
+      : status === 404
+        ? `404${service}13`
+        : `400${service}00`;
+  return callbackResponse({ responseCode, responseMessage: message }, status);
+}
+
 function successPayload(
   kind: MidtransBisnapCallbackKind,
   payload: Record<string, unknown>,
@@ -41,15 +75,17 @@ function successPayload(
     };
   }
 
-  const va = (payload.virtualAccountData ?? {}) as Record<string, unknown>;
+  const nested = (payload.virtualAccountData ?? {}) as Record<string, unknown>;
   return {
     responseCode: "2002500",
     responseMessage: "Successful",
     virtualAccountData: {
-      partnerServiceId: va.partnerServiceId ?? "",
-      customerNo: va.customerNo ?? "",
-      virtualAccountNo: va.virtualAccountNo ?? "",
-      trxId: va.trxId ?? "",
+      partnerServiceId:
+        nested.partnerServiceId ?? payload.partnerServiceId ?? "",
+      customerNo: nested.customerNo ?? payload.customerNo ?? "",
+      virtualAccountNo:
+        nested.virtualAccountNo ?? payload.virtualAccountNo ?? "",
+      trxId: nested.trxId ?? payload.trxId ?? "",
     },
   };
 }
@@ -59,8 +95,8 @@ function referenceId(
   payload: Record<string, unknown>,
 ) {
   if (kind === "virtual-account") {
-    const va = (payload.virtualAccountData ?? {}) as Record<string, unknown>;
-    return String(va.trxId ?? payload.trxId ?? "").trim();
+    const nested = (payload.virtualAccountData ?? {}) as Record<string, unknown>;
+    return String(nested.trxId ?? payload.trxId ?? "").trim();
   }
   return String(payload.originalPartnerReferenceNo ?? "").trim();
 }
@@ -70,8 +106,7 @@ function providerTransactionId(
   payload: Record<string, unknown>,
 ) {
   if (kind === "virtual-account") {
-    const va = (payload.virtualAccountData ?? {}) as Record<string, unknown>;
-    return String(va.trxId ?? payload.trxId ?? "").trim() || null;
+    return String(payload.referenceNo ?? payload.trxId ?? "").trim() || null;
   }
   return String(payload.originalReferenceNo ?? "").trim() || null;
 }
@@ -81,9 +116,9 @@ function transactionStatus(
   payload: Record<string, unknown>,
 ) {
   if (kind === "virtual-account") {
-    const va = (payload.virtualAccountData ?? {}) as Record<string, unknown>;
+    const nested = (payload.virtualAccountData ?? {}) as Record<string, unknown>;
     const additionalInfo =
-      (va.additionalInfo ?? payload.additionalInfo ?? {}) as Record<
+      (nested.additionalInfo ?? payload.additionalInfo ?? {}) as Record<
         string,
         unknown
       >;
@@ -130,12 +165,10 @@ export async function handleMidtransBisnapCallback(
   });
 
   if (!validation.valid) {
-    return Response.json(
-      {
-        responseCode: "4010000",
-        responseMessage: "Unauthorized. Signature is invalid",
-      },
-      { status: 401 },
+    return errorResponse(
+      kind,
+      401,
+      "Unauthorized. Signature is invalid",
     );
   }
 
@@ -143,23 +176,15 @@ export async function handleMidtransBisnapCallback(
   try {
     payload = JSON.parse(rawBody) as Record<string, unknown>;
   } catch {
-    return Response.json(
-      {
-        responseCode: "4000000",
-        responseMessage: "Invalid JSON payload",
-      },
-      { status: 400 },
-    );
+    return errorResponse(kind, 400, "Invalid JSON payload");
   }
 
   const reference = referenceId(kind, payload);
   if (!reference) {
-    return Response.json(
-      {
-        responseCode: "4000000",
-        responseMessage: "Partner reference number is required",
-      },
-      { status: 400 },
+    return errorResponse(
+      kind,
+      400,
+      "Partner reference number is required",
     );
   }
 
@@ -176,6 +201,10 @@ export async function handleMidtransBisnapCallback(
       callbackAmount: amount,
     });
 
+    if (result.ignored === "amount_mismatch") {
+      return errorResponse(kind, 404, "Invalid Amount");
+    }
+
     if (result.credited) {
       await notifyWalletTopupSuccessById(walletTopup.id, reference).catch(
         (error) =>
@@ -183,20 +212,19 @@ export async function handleMidtransBisnapCallback(
       );
     }
 
-    return Response.json(successPayload(kind, payload));
+    return callbackResponse(successPayload(kind, payload));
   }
 
   const order = await getOrderByReference(reference);
   if (!order) {
-    return Response.json(successPayload(kind, payload));
+    return callbackResponse(successPayload(kind, payload));
   }
 
   if (
     status === "paid" &&
-    amount > 0 &&
-    (!Number.isFinite(amount) || amount !== order.total)
+    (!Number.isFinite(amount) || amount <= 0 || amount !== order.total)
   ) {
-    return Response.json(successPayload(kind, payload));
+    return errorResponse(kind, 404, "Invalid Amount");
   }
 
   await recordOrderEvent({
@@ -219,5 +247,5 @@ export async function handleMidtransBisnapCallback(
     );
   }
 
-  return Response.json(successPayload(kind, payload));
+  return callbackResponse(successPayload(kind, payload));
 }
