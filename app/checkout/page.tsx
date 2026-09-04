@@ -157,12 +157,10 @@ function CheckoutContent() {
       ? requestedPackage
       : "",
   );
-  const [destination, setDestination] = useState("");
-  const [server, setServer] = useState("");
+  const [customerInputValues, setCustomerInputValues] = useState<Record<string, string>>({});
   const [buyerName, setBuyerName] = useState("");
   const [buyerEmail, setBuyerEmail] = useState("");
   const [contact, setContact] = useState("");
-  const [customerNotes, setCustomerNotes] = useState("");
   const [activeTab, setActiveTab] = useState<"transaction" | "details">("transaction");
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -196,6 +194,15 @@ function CheckoutContent() {
   const selectedPackage = product.packages.find(
     (item) => item.id === packageId,
   );
+  const productInputFields = useMemo(
+    () => product.inputFields ?? [
+      { id: "account-id", label: product.inputLabel, placeholder: product.inputPlaceholder, required: true },
+      ...(product.needsServer ? [{ id: "server-zone", label: "Server / Zone ID", placeholder: "Contoh: 1234", required: true }] : []),
+    ],
+    [product.inputFields, product.inputLabel, product.inputPlaceholder, product.needsServer],
+  );
+  const destination = productInputFields[0] ? (customerInputValues[productInputFields[0].id] ?? "") : "";
+  const server = productInputFields[1] ? (customerInputValues[productInputFields[1].id] ?? "") : "";
   const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
   const isManual = product.fulfillmentType === "manual";
   const isVoucherStock = selectedPackage?.providerCode === "voucher-stock";
@@ -461,8 +468,8 @@ function CheckoutContent() {
 
   function requestConfirmation(event: FormEvent) {
     event.preventDefault();
-    if (!destination.trim() || (product.needsServer && !server.trim()) || !buyerEmail.trim() || !contact.trim() || !packageId) {
-      setError("Lengkapi data akun, nominal, email, nomor WhatsApp, dan pembayaran.");
+    if (productInputFields.some((field) => field.required !== false && !(customerInputValues[field.id] ?? "").trim()) || !buyerEmail.trim() || !contact.trim() || !packageId) {
+      setError("Lengkapi data yang wajib, nominal, email, nomor WhatsApp, dan pembayaran.");
       return;
     }
     if (canCheckNickname && visibleNickname.status !== "success") {
@@ -475,9 +482,9 @@ function CheckoutContent() {
 
   async function submitOrder(event?: FormEvent) {
     event?.preventDefault();
-    if (!destination.trim() || (product.needsServer && !server.trim()) || !buyerEmail.trim() || !contact.trim() || !packageId || !agreed) {
+    if (productInputFields.some((field) => field.required !== false && !(customerInputValues[field.id] ?? "").trim()) || !buyerEmail.trim() || !contact.trim() || !packageId || !agreed) {
       setError(
-        "Lengkapi data akun, nominal, identitas pembeli, pembayaran, dan persetujuan.",
+        "Lengkapi data yang wajib, nominal, identitas pembeli, pembayaran, dan persetujuan.",
       );
       return;
     }
@@ -515,6 +522,10 @@ function CheckoutContent() {
           packageSku: packageId,
           destination: destination.trim(),
           server: server.trim() || undefined,
+          customerInputs: productInputFields.map((field) => ({
+            id: field.id,
+            value: (customerInputValues[field.id] ?? "").trim(),
+          })),
           nickname: visibleNickname.nickname,
           buyerName: buyerName.trim() || buyerEmail.trim().split("@")[0] || "Pelanggan",
           buyerEmail: buyerEmail.trim(),
@@ -610,37 +621,27 @@ function CheckoutContent() {
                     </div>
                   </div>
 
-                  <div className={product.needsServer ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
-                    <Field label={product.inputLabel}>
-                      <Input
-                        value={destination}
-                        onChange={(event) => {
-                          setDestination(event.target.value);
-                          setPayment(null);
-                          setError("");
-                        }}
-                        placeholder={product.inputPlaceholder}
-                        autoComplete="off"
-                        className="checkout-input"
-                      />
-                    </Field>
-                    {product.needsServer && (
-                      <Field label="Server / Zone ID">
-                        <Input
-                          inputMode="numeric"
-                          value={server}
-                          onChange={(event) => {
-                            setServer(event.target.value.replace(/\D/g, ""));
-                            setPayment(null);
-                            setError("");
-                          }}
-                          placeholder="Contoh: 1234"
-                          autoComplete="off"
-                          className="checkout-input"
-                        />
-                      </Field>
-                    )}
-                  </div>
+                  {productInputFields.length ? (
+                    <div className={productInputFields.length > 1 ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
+                      {productInputFields.map((field) => (
+                        <Field key={field.id} label={`${field.label}${field.required === false ? " (opsional)" : ""}`}>
+                          <Input
+                            value={customerInputValues[field.id] ?? ""}
+                            onChange={(event) => {
+                              setCustomerInputValues((current) => ({ ...current, [field.id]: event.target.value }));
+                              setPayment(null);
+                              setError("");
+                            }}
+                            placeholder={field.placeholder || `Masukkan ${field.label}`}
+                            autoComplete="off"
+                            className="checkout-input"
+                          />
+                        </Field>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-white/40">Produk ini tidak memerlukan data akun tambahan.</p>
+                  )}
 
                   {canCheckNickname ? (
                     <NicknameResult state={visibleNickname} />
@@ -959,7 +960,7 @@ function CheckoutContent() {
       <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
         <DialogContent className="max-w-md border-white/10 bg-[#191b20] text-white" showCloseButton={false}>
           <DialogHeader><div className="mx-auto grid size-14 place-items-center rounded-full bg-[#b9ff35]/15"><CheckCircle2 className="size-8 text-[#b9ff35]" /></div><DialogTitle className="pt-3 text-center text-lg font-black">Buat Pesanan</DialogTitle><DialogDescription className="text-center text-xs leading-5 text-white/55">Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai.</DialogDescription></DialogHeader>
-          <dl className="rounded-xl bg-black/15 p-4 text-xs"><SummaryRow label="Username" value={visibleNickname.nickname || "-"} /><SummaryRow label="ID" value={destination || "-"} />{product.needsServer && <SummaryRow label="Server" value={server || "-"} />}<SummaryRow label="Item" value={selectedPackage?.label ?? "-"} /><SummaryRow label="Produk" value={product.name} /><SummaryRow label="Payment" value={checkoutGroups.find((item) => item.code === paymentMethod)?.name ?? "-"} /></dl>
+          <dl className="rounded-xl bg-black/15 p-4 text-xs">{visibleNickname.nickname && <SummaryRow label="Username" value={visibleNickname.nickname} />}{productInputFields.map((field) => <SummaryRow key={field.id} label={field.label} value={(customerInputValues[field.id] ?? "").trim() || "-"} />)}<SummaryRow label="Item" value={selectedPackage?.label ?? "-"} /><SummaryRow label="Produk" value={product.name} /><SummaryRow label="Payment" value={checkoutGroups.find((item) => item.code === paymentMethod)?.name ?? "-"} /></dl>
           <label className="flex cursor-pointer items-start gap-3 text-xs leading-5 text-white/60"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-0.5 size-4 accent-[#b9ff35]" />Dengan melanjutkan, saya menyetujui syarat & ketentuan yang berlaku.</label>
           <div className="grid grid-cols-2 gap-3"><Button type="button" onClick={() => { setConfirmationOpen(false); void submitOrder(); }} disabled={!agreed || submitting} className="bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">{submitting ? "Memproses..." : "Pesan Sekarang"}</Button><Button type="button" variant="outline" onClick={() => setConfirmationOpen(false)} className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">Batalkan</Button></div>
         </DialogContent>

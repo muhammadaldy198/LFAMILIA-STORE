@@ -29,6 +29,7 @@ type Order = {
   server: string | null;
   buyer_name: string;
   buyer_phone: string;
+  customer_inputs_json?: string;
   total: number | null;
   payment_method: string;
   payment_status: string;
@@ -111,7 +112,7 @@ export function AdminOrderManager() {
           order.payment_status === status ||
           order.fulfillment_status === status) &&
         (!term ||
-          `${order.reference_id} ${order.product_name} ${order.buyer_name} ${order.destination}`
+          `${order.reference_id} ${order.product_name} ${order.buyer_name} ${order.destination} ${parseOrderInputs(order).map((item) => item.value).join(" ")}`
             .toLowerCase()
             .includes(term)),
     );
@@ -321,10 +322,7 @@ export function AdminOrderManager() {
                       <p className="mt-1 text-[9px] text-white/35">
                         {order.package_label}
                       </p>
-                      <p className="mt-1 text-[9px] text-[#cfff72]">
-                        {order.destination}
-                        {order.server ? ` (${order.server})` : ""}
-                      </p>
+                      <div className="mt-1 space-y-0.5">{parseOrderInputs(order).map((field) => <p key={field.label} className="text-[9px] text-[#cfff72]"><span className="text-white/30">{field.label}: </span>{field.value || "-"}</p>)}</div>
                     </TableCell>
                     <TableCell>
                       <span className="text-xs text-white/55">
@@ -479,4 +477,22 @@ function StatusBadge({ value }: { value: string }) {
       {labels[value] ?? value}
     </span>
   );
+}
+
+
+function parseOrderInputs(order: Order) {
+  try {
+    const parsed = JSON.parse(order.customer_inputs_json || "[]") as Array<{ label?: string; value?: string }>;
+    if (Array.isArray(parsed) && parsed.length) {
+      return parsed
+        .filter((item) => item && typeof item.label === "string")
+        .map((item) => ({ label: item.label || "Data", value: item.value || "" }));
+    }
+  } catch {
+    // Legacy fallback below.
+  }
+  return [
+    { label: "Data akun", value: order.destination },
+    ...(order.server ? [{ label: "Server / Zone", value: order.server }] : []),
+  ];
 }

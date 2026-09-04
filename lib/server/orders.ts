@@ -1,5 +1,6 @@
 import { getD1 } from "@/db";
 import { getFallbackProducts } from "@/lib/server/products";
+import type { ProductInputField } from "@/lib/store-data";
 import { getProviderAdapter } from "@/lib/server/providers";
 import type { ProviderResult } from "@/lib/server/providers/types";
 import {
@@ -13,6 +14,7 @@ export type PurchasableItem = {
   needsServer: boolean;
   fulfillmentType: "automatic" | "manual";
   targetTemplate: string;
+  inputFields: ProductInputField[];
   manualInstructions: string | null;
   packageSku: string;
   packageLabel: string;
@@ -41,6 +43,7 @@ export type OrderRecord = {
   buyer_email: string;
   buyer_phone: string;
   customer_notes: string | null;
+  customer_inputs_json: string;
   base_subtotal: number;
   subtotal: number;
   discount_amount: number;
@@ -77,6 +80,9 @@ type StoredItemRow = {
   needs_server: number;
   fulfillment_type: "automatic" | "manual";
   target_template: string;
+  input_label: string;
+  input_placeholder: string;
+  input_fields_json: string | null;
   manual_instructions: string | null;
   package_sku: string;
   package_label: string;
@@ -84,6 +90,64 @@ type StoredItemRow = {
   provider_code: string | null;
   provider_sku: string | null;
 };
+
+function parseProductInputFields(
+  value: string | null,
+  inputLabel: string,
+  inputPlaceholder: string,
+  needsServer: boolean,
+): ProductInputField[] {
+  if (value !== null) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+          .map((item, index) => ({
+            id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : `field-${index + 1}`,
+            label: typeof item.label === "string" ? item.label.trim() : "",
+            placeholder: typeof item.placeholder === "string" ? item.placeholder.trim() : "",
+            required: item.required !== false,
+          }))
+          .filter((item) => item.label)
+          .slice(0, 12);
+      }
+    } catch {
+      // Legacy fallback below.
+    }
+  }
+  return [
+    { id: "account-id", label: inputLabel, placeholder: inputPlaceholder, required: true },
+    ...(needsServer ? [{ id: "server-zone", label: "Server / Zone ID", placeholder: "Contoh: 1234", required: true }] : []),
+  ];
+}
+
+export type CustomerInputValue = {
+  id: string;
+  label: string;
+  value: string;
+};
+
+export function normalizeCustomerInputs(
+  item: PurchasableItem,
+  submitted: Array<{ id: string; value: string }> | undefined,
+  legacyDestination = "",
+  legacyServer: string | null = null,
+) {
+  const byId = new Map((submitted ?? []).map((entry) => [entry.id, entry.value.trim()]));
+  const values = item.inputFields.map((field, index) => {
+    const fallback = index === 0 ? legacyDestination.trim() : index === 1 ? legacyServer?.trim() ?? "" : "";
+    const value = (byId.get(field.id) ?? fallback).trim();
+    if (field.required !== false && !value) throw new Error(`${field.label} wajib diisi.`);
+    if (value.length > 300) throw new Error(`${field.label} terlalu panjang.`);
+    return { id: field.id, label: field.label, value };
+  });
+  return {
+    values,
+    destination: values[0]?.value || "-",
+    server: values[1]?.value || null,
+  };
+}
 
 export async function resolvePurchasableItem(
   productSlug: string,
@@ -93,7 +157,7 @@ export async function resolvePurchasableItem(
   const row = await db
     .prepare(
       `SELECT p.slug AS product_slug, p.name AS product_name, p.needs_server,
-      p.fulfillment_type, p.target_template, p.manual_instructions,
+      p.fulfillment_type, p.target_template, p.input_label, p.input_placeholder, p.input_fields_json, p.manual_instructions,
       pp.sku AS package_sku, pp.label AS package_label, pp.price, pp.provider_code, pp.provider_sku
      FROM products p
      JOIN product_packages pp ON pp.product_id = p.id
@@ -109,6 +173,7 @@ export async function resolvePurchasableItem(
       needsServer: Boolean(row.needs_server),
       fulfillmentType: row.fulfillment_type,
       targetTemplate: row.target_template,
+      inputFields: parseProductInputFields(row.input_fields_json, row.input_label, row.input_placeholder, Boolean(row.needs_server)),
       manualInstructions: row.manual_instructions,
       packageSku: row.package_sku,
       packageLabel: row.package_label,
@@ -129,6 +194,7 @@ export async function resolvePurchasableItem(
     needsServer: Boolean(fallback.needsServer),
     fulfillmentType: fallback.fulfillmentType,
     targetTemplate: fallback.targetTemplate,
+    inputFields: fallback.inputFields ?? [],
     manualInstructions: fallback.manualInstructions ?? null,
     packageSku: packageItem.id,
     packageLabel: packageItem.label,
@@ -172,6 +238,7 @@ export async function insertPendingOrder(input: {
   buyerEmail: string;
   buyerPhone: string;
   customerNotes: string | null;
+  customerInputs: CustomerInputValue[];
   paymentMethod: string;
   paymentChannel: string;
   customerId?: string | null;
@@ -198,10 +265,10 @@ export async function insertPendingOrder(input: {
       `INSERT INTO orders (
       id, customer_id, reference_id, product_slug, product_name, package_sku, package_label,
       provider_code, provider_sku, fulfillment_type, target_template, destination, server,
-      nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes,
+      nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json,
       base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
       admin_fee, total, payment_method, payment_channel
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
     )
     .bind(
       input.id,
@@ -223,6 +290,7 @@ export async function insertPendingOrder(input: {
       input.buyerEmail,
       input.buyerPhone,
       input.customerNotes,
+      JSON.stringify(input.customerInputs),
       input.promotion.basePrice,
       input.promotion.sellingPrice,
       input.promotion.discountAmount,

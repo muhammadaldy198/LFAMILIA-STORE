@@ -63,6 +63,7 @@ export async function GET(request: Request) {
               server: order.server,
               buyer_name: order.buyer_name,
               buyer_phone: order.buyer_phone,
+              customer_inputs_json: order.customer_inputs_json,
               total: null,
               payment_method: order.payment_method,
               payment_status: order.payment_status,

@@ -10,6 +10,7 @@ import { quotePromotion } from "@/lib/server/promotions";
 import {
   createOrderIdentity,
   insertPendingOrder,
+  normalizeCustomerInputs,
   markPaymentCreationFailed,
   recordOrderEvent,
   resolvePurchasableItem,
@@ -24,8 +25,12 @@ export const dynamic = "force-dynamic";
 const schema = z.object({
   productSlug: z.string().trim().min(2).max(80),
   packageSku: z.string().trim().min(2).max(100),
-  destination: z.string().trim().min(2).max(150),
+  destination: z.string().trim().max(150).optional().default(""),
   server: z.string().trim().max(40).optional(),
+  customerInputs: z.array(z.object({
+    id: z.string().trim().min(1).max(60),
+    value: z.string().trim().max(300),
+  })).max(12).default([]),
   nickname: z.string().trim().max(100).optional(),
   buyerName: z.string().trim().min(2).max(100),
   buyerEmail: z.string().trim().email().max(150),
@@ -72,11 +77,6 @@ export async function POST(request: Request) {
         { error: "Produk atau nominal tidak tersedia." },
         { status: 404 },
       );
-    if (item.needsServer && !input.server)
-      return Response.json(
-        { error: "Server / Zone ID wajib diisi." },
-        { status: 400 },
-      );
     if (
       item.providerCode === "voucher-stock" &&
       item.providerSku &&
@@ -102,18 +102,20 @@ export async function POST(request: Request) {
         : null,
     );
 
+    const customerData = normalizeCustomerInputs(item, input.customerInputs, input.destination, input.server || null);
     const identity = createOrderIdentity();
     referenceId = identity.referenceId;
     await insertPendingOrder({
       ...identity,
       item,
-      destination: input.destination,
-      server: input.server || null,
+      destination: customerData.destination,
+      server: customerData.server,
       nickname: input.nickname || null,
       buyerName: input.buyerName,
       buyerEmail: input.buyerEmail,
       buyerPhone: input.buyerPhone,
       customerNotes: input.customerNotes || null,
+      customerInputs: customerData.values,
       paymentMethod: input.paymentMethod,
       paymentChannel,
       customerId: customer?.id ?? null,
