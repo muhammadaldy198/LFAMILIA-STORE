@@ -130,7 +130,7 @@ function PaymentContent() {
     if (snapToken || !order?.paymentUrl) return;
     const token = snapTokenFromUrl(order.paymentUrl);
     if (token) setSnapToken(token);
-  }, [order?.paymentGateway, order?.paymentUrl, snapToken]);
+  }, [order?.paymentGateway, order?.midtransMode, order?.paymentUrl, snapToken]);
 
   useEffect(() => {
     if (!snapToken) return;
