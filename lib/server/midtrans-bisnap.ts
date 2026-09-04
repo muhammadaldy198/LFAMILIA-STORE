@@ -670,7 +670,13 @@ function notificationStringToSign(
   rawBody: string,
   requestTimestamp: string,
 ) {
-  const bodyHash = hashHex("sha256", rawBody).toLowerCase();
+  let bodyForHash = rawBody;
+  try {
+    bodyForHash = JSON.stringify(JSON.parse(rawBody));
+  } catch {
+    // Payload non-JSON akan gagal diproses oleh callback setelah verifikasi.
+  }
+  const bodyHash = hashHex("sha256", bodyForHash).toLowerCase();
   return `POST:${path}:${bodyHash}:${requestTimestamp}`;
 }
 
