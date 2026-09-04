@@ -295,11 +295,11 @@ export function AdminProductManager() {
       setError("Sync provider saat ini tersedia untuk nominal DigiFlazz.");
       return;
     }
-    if (!entry.dbId) {
+    if (!item.dbId || !entry.id) {
       setError("Simpan nominal terlebih dahulu sebelum melakukan sync provider.");
       return;
     }
-    setSyncingPackage(entry.dbId);
+    setSyncingPackage(entry.dbId ?? index + 1);
     setError("");
     try {
       const saved = await saveCatalogProduct(item, "Nominal disimpan. Menyinkronkan DigiFlazz…");
@@ -307,7 +307,7 @@ export function AdminProductManager() {
       const response = await fetch("/api/panel/digiflazz-pricing", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ packageId: entry.dbId }),
+        body: JSON.stringify({ productId: item.dbId, packageSku: entry.id }),
       });
       const data = await response.json() as { error?: string; result?: { updated?: number } };
       if (!response.ok) throw new Error(data.error ?? "Sync provider gagal.");
@@ -492,7 +492,7 @@ export function AdminProductManager() {
                           <label><span className="field-label">Jenis margin</span><select value={entry.marginType ?? "fixed"} onChange={(event) => updateCatalogPackage(key, index, "marginType", event.target.value as "fixed" | "percent")} className="admin-input"><option value="fixed">Margin Rupiah</option><option value="percent">Margin Persen</option></select></label>
                           <label><span className="field-label">Margin</span><Input type="number" min={0} value={entry.marginValue ?? 0} onChange={(event) => updateCatalogPackage(key, index, "marginValue", Number(event.target.value))} className="admin-input" /></label>
                           <div><span className="field-label">Modal supplier</span><div className="flex h-10 items-center rounded-xl border border-white/10 bg-white/[0.025] px-3 text-[10px] text-[#d8ff8d]">{entry.supplierPrice ? formatRupiah(entry.supplierPrice) : "Belum sinkron"}</div></div>
-                          <Button type="button" disabled={!entry.dbId || syncingPackage === entry.dbId || catalogSaving === key} onClick={() => void syncCatalogPackage(item, index)} variant="outline" className="mt-auto h-10 rounded-xl border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] px-3 text-[9px] text-[#d8ff8d]">{syncingPackage === entry.dbId ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}Sync provider</Button>
+                          <Button type="button" disabled={!item.dbId || !entry.id || syncingPackage === (entry.dbId ?? index + 1) || catalogSaving === key} onClick={() => void syncCatalogPackage(item, index)} variant="outline" className="mt-auto h-10 rounded-xl border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] px-3 text-[9px] text-[#d8ff8d]">{syncingPackage === (entry.dbId ?? index + 1) ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}Sync provider</Button>
                         </div>}
                         <div className="mt-2 flex justify-end gap-2">
                           <Button type="button" disabled={catalogSaving === key} onClick={() => void saveCatalogProduct(item)} size="sm" className="h-8 rounded-lg bg-[#b9ff35] px-3 text-[9px] font-black text-[#091006]">{catalogSaving === key && <LoaderCircle className="mr-1 size-3 animate-spin" />}Simpan nominal</Button>

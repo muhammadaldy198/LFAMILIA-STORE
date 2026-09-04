@@ -74,16 +74,16 @@ async function fetchPriceList() {
   );
 }
 
-async function syncRows(packageId?: number) {
+async function syncRows(target?: { productId: number; packageSku: string }) {
   const source = await fetchPriceList();
-  const query = packageId
-    ? "SELECT id, provider_sku, margin_type, margin_value FROM product_packages WHERE id = ? AND provider_code = 'digiflazz' AND provider_sku IS NOT NULL"
+  const query = target
+    ? "SELECT id, provider_sku, margin_type, margin_value FROM product_packages WHERE product_id = ? AND sku = ? AND provider_code = 'digiflazz' AND provider_sku IS NOT NULL"
     : "SELECT id, provider_sku, margin_type, margin_value FROM product_packages WHERE provider_code = 'digiflazz' AND provider_sku IS NOT NULL";
   const prepared = getD1().prepare(query);
-  const rows = packageId
-    ? await prepared.bind(packageId).all<{ id: number; provider_sku: string; margin_type: "fixed" | "percent"; margin_value: number }>()
+  const rows = target
+    ? await prepared.bind(target.productId, target.packageSku).all<{ id: number; provider_sku: string; margin_type: "fixed" | "percent"; margin_value: number }>()
     : await prepared.all<{ id: number; provider_sku: string; margin_type: "fixed" | "percent"; margin_value: number }>();
-  if (packageId && !rows.results.length)
+  if (target && !rows.results.length)
     throw new Error("Nominal DigiFlazz belum memiliki SKU provider yang valid.");
 
   const updates = rows.results.flatMap((item) => {
@@ -103,7 +103,7 @@ async function syncRows(packageId?: number) {
     ];
   });
   if (updates.length) await getD1().batch(updates);
-  if (packageId && updates.length === 0)
+  if (target && updates.length === 0)
     throw new Error("SKU nominal tidak ditemukan pada price list DigiFlazz.");
   return { updated: updates.length, skipped: false };
 }
@@ -114,6 +114,6 @@ export async function syncDigiflazzPrices(options: { force?: boolean } = {}) {
   return syncRows();
 }
 
-export async function syncDigiflazzPackage(packageId: number) {
-  return syncRows(packageId);
+export async function syncDigiflazzPackage(productId: number, packageSku: string) {
+  return syncRows({ productId, packageSku });
 }

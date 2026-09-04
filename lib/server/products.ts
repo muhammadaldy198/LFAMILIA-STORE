@@ -302,9 +302,9 @@ export async function saveProduct(input: ProductWrite, id?: number) {
   const packageStatements = [
     db.prepare("DELETE FROM product_packages WHERE product_id = ?").bind(productRow.id),
     ...input.packages.map((item, index) => db.prepare(
-      `INSERT INTO product_packages (product_id, sku, label, price, note, package_group, provider_code, provider_sku, pricing_mode, margin_type, margin_value, is_active, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(productRow.id, item.id, item.label, item.price, item.note ?? null, item.group?.trim() || null, item.providerCode ?? null, item.providerSku ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index)),
+      `INSERT INTO product_packages (product_id, sku, label, price, note, package_group, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(productRow.id, item.id, item.label, item.price, item.note ?? null, item.group?.trim() || null, item.providerCode ?? null, item.providerSku ?? null, item.supplierPrice ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index)),
   ];
   await db.batch(packageStatements);
   const noticeStatements = [

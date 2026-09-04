@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 const schema = z.object({
   isAutoSync: z.boolean().optional(),
   syncNow: z.boolean().optional(),
-  packageId: z.number().int().positive().optional(),
+  productId: z.number().int().positive().optional(),
+  packageSku: z.string().trim().min(2).max(100).optional(),
 });
 
 export async function GET(request: Request) {
@@ -31,8 +32,8 @@ export async function POST(request: Request) {
   try {
     const input = schema.parse(await request.json());
     if (typeof input.isAutoSync === "boolean") await savePricingSettings({ isAutoSync: input.isAutoSync });
-    const result = input.packageId
-      ? await syncDigiflazzPackage(input.packageId)
+    const result = input.productId && input.packageSku
+      ? await syncDigiflazzPackage(input.productId, input.packageSku)
       : input.syncNow
         ? await syncDigiflazzPrices({ force: true })
         : null;
