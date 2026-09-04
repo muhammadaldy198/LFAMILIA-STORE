@@ -1,18 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  CheckCircle2,
-  ExternalLink,
-  LoaderCircle,
-  Save,
-  WalletCards,
-  XCircle,
-} from "lucide-react";
+import { Edit3, LoaderCircle, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatRupiah } from "@/lib/store-data";
 import type { WalletSettings } from "@/lib/server/wallet";
 
@@ -22,503 +17,115 @@ type TopupRow = {
   sender_name: string;
   payment_method: string;
   proof_url: string;
-  status: "pending" | "approved" | "rejected";
+  status: string;
   admin_notes: string | null;
-  reviewed_by: string | null;
-  reviewed_at: string | null;
   created_at: string;
   customer_name: string;
   customer_email: string;
-  customer_balance: number;
 };
+
+type EditTarget = "midtrans" | "ipaymu" | "manual-bank" | "manual-qris";
 
 const fallback: WalletSettings = {
-  isEnabled: false,
-  methodName: "Transfer Bank",
-  accountName: "",
-  accountNumber: "",
-  instructions: "Kirim sesuai nominal lalu unggah bukti pembayaran.",
-  minTopup: 10_000,
-  manualQrisEnabled: false,
-  manualQrisName: "QRIS Manual",
-  manualQrisImageUrl: "",
-  midtransTopupEnabled: false,
-  midtransCheckoutEnabled: false,
-  ipaymuTopupEnabled: false,
-  ipaymuCheckoutEnabled: false,
+  isEnabled: false, methodName: "Transfer Bank", accountName: "", accountNumber: "",
+  instructions: "Ikuti instruksi pembayaran yang tampil.", minTopup: 10_000,
+  manualQrisEnabled: false, manualQrisName: "QRIS Manual", manualQrisImageUrl: "",
+  midtransTopupEnabled: false, midtransCheckoutEnabled: false,
+  ipaymuTopupEnabled: false, ipaymuCheckoutEnabled: false,
 };
 
-export function AdminWalletManager({
-  view = "topups",
-}: {
-  view?: "topups" | "checkout";
-}) {
+export function AdminWalletManager({ view = "topups" }: { view?: "topups" | "checkout" }) {
   const [settings, setSettings] = useState<WalletSettings>(fallback);
   const [topups, setTopups] = useState<TopupRow[]>([]);
+  const [editing, setEditing] = useState<EditTarget | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState("");
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     try {
       const response = await fetch("/api/panel/wallet", { cache: "no-store" });
       const data = await readJson(response);
-      if (!response.ok)
-        throw new Error(data.error || "Saldo pelanggan gagal dimuat.");
-      setSettings(data.settings ?? fallback);
-      setTopups(data.topups ?? []);
+      if (!response.ok) throw new Error(String(data.error || "Pengaturan pembayaran gagal dimuat."));
+      setSettings((data.settings as WalletSettings | undefined) ?? fallback);
+      setTopups((data.topups as TopupRow[] | undefined) ?? []);
     } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : "Pengaturan pembayaran gagal dimuat.",
-      );
-    } finally {
-      setLoading(false);
-    }
+      setError(reason instanceof Error ? reason.message : "Pengaturan pembayaran gagal dimuat.");
+    } finally { setLoading(false); }
   }, []);
-  useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   async function saveSettings() {
-    setSaving("settings");
-    setError("");
+    setSaving(true); setError("");
     try {
-      const response = await fetch("/api/panel/wallet", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(settings),
-      });
+      const response = await fetch("/api/panel/wallet", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(settings) });
       const data = await readJson(response);
-      if (!response.ok)
-        throw new Error(data.error || "Pengaturan saldo gagal disimpan.");
-      setMessage("Pengaturan top up saldo berhasil disimpan.");
-    } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : "Pengaturan saldo gagal disimpan.",
-      );
-    } finally {
-      setSaving("");
-    }
-  }
-
-  async function review(item: TopupRow, decision: "approved" | "rejected") {
-    const notes =
-      window.prompt(
-        decision === "approved"
-          ? "Catatan persetujuan (opsional)"
-          : "Alasan penolakan (opsional)",
-        "",
-      ) ?? undefined;
-    setSaving(item.id);
-    setError("");
-    try {
-      const response = await fetch("/api/panel/wallet", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: item.id, decision, notes }),
-      });
-      const data = await readJson(response);
-      if (!response.ok) throw new Error(data.error || "Top up gagal ditinjau.");
-      setMessage(
-        decision === "approved"
-          ? "Top up disetujui dan saldo pelanggan bertambah."
-          : "Top up ditolak.",
-      );
+      if (!response.ok) throw new Error(String(data.error || "Pengaturan gagal disimpan."));
+      setMessage("Pengaturan pembayaran berhasil disimpan.");
+      setEditing(null);
       await load();
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Top up gagal ditinjau.",
-      );
-    } finally {
-      setSaving("");
-    }
+      setError(reason instanceof Error ? reason.message : "Pengaturan gagal disimpan.");
+    } finally { setSaving(false); }
   }
 
-  if (loading)
-    return (
-      <div className="flex min-h-56 items-center justify-center text-xs text-white/35">
-        <LoaderCircle className="mr-2 size-4 animate-spin" />
-        Memuat pengaturan…
+  if (loading) return <div className="flex min-h-40 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat pengaturan…</div>;
+
+  if (view === "topups") {
+    return <div className="space-y-3">
+      <div><strong className="text-xs">Riwayat top up saldo</strong><p className="mt-1 text-[9px] text-white/30">Top up baru diproses otomatis oleh payment gateway. Tidak ada persetujuan manual.</p></div>
+      {error && <div className="rounded-lg border border-red-400/20 bg-red-400/[0.05] p-3 text-xs text-red-200">{error}</div>}
+      <div className="overflow-x-auto rounded-lg border border-white/[0.08]">
+        <Table><TableHeader><TableRow className="border-white/[0.08] hover:bg-transparent"><TableHead className="text-[10px] text-white/35">Pelanggan</TableHead><TableHead className="text-[10px] text-white/35">Nominal</TableHead><TableHead className="text-[10px] text-white/35">Pembayaran</TableHead><TableHead className="text-[10px] text-white/35">Status</TableHead><TableHead className="text-[10px] text-white/35">Waktu</TableHead></TableRow></TableHeader><TableBody>{topups.length ? topups.map((item) => <TableRow key={item.id} className="border-white/[0.07]"><TableCell><strong className="text-xs">{item.customer_name}</strong><p className="text-[8px] text-white/25">{item.customer_email}</p></TableCell><TableCell className="text-xs font-bold text-[#d8ff8d]">{formatRupiah(item.amount)}</TableCell><TableCell className="text-[10px] text-white/45">{item.payment_method || "Gateway otomatis"}</TableCell><TableCell><TopupStatus value={item.status} /></TableCell><TableCell className="text-[9px] text-white/30">{new Date(item.created_at).toLocaleString("id-ID")}</TableCell></TableRow>) : <TableRow><TableCell colSpan={5} className="py-8 text-center text-xs text-white/28">Belum ada riwayat top up.</TableCell></TableRow>}</TableBody></Table>
       </div>
-    );
-  return (
-    <div className="space-y-6">
-      {message && (
-        <div className="rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.06] p-3 text-xs text-[#d8ff8d]">
-          {message}
-        </div>
-      )}
-      {error && (
-        <div className="rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-xs text-red-200">
-          {error}
-        </div>
-      )}
-      {view === "checkout" && (
-        <section className="rounded-2xl border border-white/[0.08] bg-white/[0.015] p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <WalletCards className="mt-0.5 size-5 text-[#cfff72]" />
-              <div>
-                <h3 className="font-bold">Checkout manual & gateway</h3>
-                <p className="mt-1 max-w-xl text-[10px] leading-5 text-white/30">
-                  Atur pembayaran manual serta ON/OFF gateway Midtrans dan iPaymu.
-                </p>
-              </div>
-            </div>
-            <Button
-              type="button"
-              disabled={saving === "settings"}
-              onClick={() => void saveSettings()}
-              className="bg-[#b9ff35] text-xs font-black text-[#091006]"
-            >
-              {saving === "settings" ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <Save className="size-4" />
-              )}
-              Simpan
-            </Button>
-          </div>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <label className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 text-xs text-white/60 sm:col-span-2">
-              <span>Aktifkan transfer bank manual di checkout</span>
-              <Switch
-                checked={settings.isEnabled}
-                onCheckedChange={(checked) =>
-                  setSettings((current) => ({ ...current, isEnabled: checked }))
-                }
-              />
-            </label>
-            <Field label="Nama bank/metode">
-              <Input
-                value={settings.methodName}
-                onChange={(event) =>
-                  setSettings((current) => ({
-                    ...current,
-                    methodName: event.target.value,
-                  }))
-                }
-                className="admin-input"
-                placeholder="BCA / Transfer Bank"
-              />
-            </Field>
-            <Field label="Minimal top up">
-              <Input
-                type="number"
-                min={1000}
-                value={settings.minTopup}
-                onChange={(event) =>
-                  setSettings((current) => ({
-                    ...current,
-                    minTopup: Number(event.target.value),
-                  }))
-                }
-                className="admin-input"
-              />
-            </Field>
-            <Field label="Nama pemilik rekening">
-              <Input
-                value={settings.accountName}
-                onChange={(event) =>
-                  setSettings((current) => ({
-                    ...current,
-                    accountName: event.target.value,
-                  }))
-                }
-                className="admin-input"
-              />
-            </Field>
-            <Field label="Nomor rekening / akun">
-              <Input
-                value={settings.accountNumber}
-                onChange={(event) =>
-                  setSettings((current) => ({
-                    ...current,
-                    accountNumber: event.target.value,
-                  }))
-                }
-                className="admin-input"
-              />
-            </Field>
-            <label className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 text-xs text-white/60 sm:col-span-2">
-              <span>Aktifkan QRIS manual</span>
-              <Switch
-                checked={settings.manualQrisEnabled}
-                onCheckedChange={(checked) =>
-                  setSettings((current) => ({
-                    ...current,
-                    manualQrisEnabled: checked,
-                  }))
-                }
-              />
-            </label>
-            <Field label="Nama QRIS">
-              <Input
-                value={settings.manualQrisName}
-                onChange={(event) =>
-                  setSettings((current) => ({
-                    ...current,
-                    manualQrisName: event.target.value,
-                  }))
-                }
-                className="admin-input"
-                placeholder="QRIS LFAMILIA"
-              />
-            </Field>
-            <Field label="URL gambar QRIS">
-              <Input
-                value={settings.manualQrisImageUrl}
-                onChange={(event) =>
-                  setSettings((current) => ({
-                    ...current,
-                    manualQrisImageUrl: event.target.value,
-                  }))
-                }
-                className="admin-input"
-                placeholder="https://..."
-              />
-            </Field>
-            <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
-              <div className="rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.04] p-3">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <strong className="block text-xs text-white/85">Midtrans</strong>
-                    <span className="mt-0.5 block text-[9px] text-white/35">
-                      Gateway utama yang sedang digunakan.
-                    </span>
-                  </div>
-                  <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${settings.midtransCheckoutEnabled || settings.midtransTopupEnabled ? "bg-[#b9ff35]/12 text-[#d8ff8d]" : "bg-white/[0.05] text-white/35"}`}>
-                    {settings.midtransCheckoutEnabled || settings.midtransTopupEnabled ? "ON" : "OFF"}
-                  </span>
-                </div>
-                <label className="flex items-center justify-between gap-3 border-t border-white/[0.07] py-2 text-[10px] text-white/60">
-                  <span>Checkout</span>
-                  <Switch
-                    checked={settings.midtransCheckoutEnabled}
-                    onCheckedChange={(checked) =>
-                      setSettings((current) => ({
-                        ...current,
-                        midtransCheckoutEnabled: checked,
-                      }))
-                    }
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 border-t border-white/[0.07] pt-2 text-[10px] text-white/60">
-                  <span>Top up saldo</span>
-                  <Switch
-                    checked={settings.midtransTopupEnabled}
-                    onCheckedChange={(checked) =>
-                      setSettings((current) => ({
-                        ...current,
-                        midtransTopupEnabled: checked,
-                      }))
-                    }
-                  />
-                </label>
-              </div>
+    </div>;
+  }
 
-              <div className="rounded-xl border border-white/[0.10] bg-white/[0.025] p-3">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <strong className="block text-xs text-white/85">iPaymu</strong>
-                    <span className="mt-0.5 block text-[9px] text-white/35">
-                      Aktifkan setelah integrasi dan credential iPaymu siap.
-                    </span>
-                  </div>
-                  <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${settings.ipaymuCheckoutEnabled || settings.ipaymuTopupEnabled ? "bg-[#b9ff35]/12 text-[#d8ff8d]" : "bg-white/[0.05] text-white/35"}`}>
-                    {settings.ipaymuCheckoutEnabled || settings.ipaymuTopupEnabled ? "ON" : "OFF"}
-                  </span>
-                </div>
-                <label className="flex items-center justify-between gap-3 border-t border-white/[0.07] py-2 text-[10px] text-white/60">
-                  <span>Checkout</span>
-                  <Switch
-                    checked={settings.ipaymuCheckoutEnabled}
-                    onCheckedChange={(checked) =>
-                      setSettings((current) => ({
-                        ...current,
-                        ipaymuCheckoutEnabled: checked,
-                      }))
-                    }
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 border-t border-white/[0.07] pt-2 text-[10px] text-white/60">
-                  <span>Top up saldo</span>
-                  <Switch
-                    checked={settings.ipaymuTopupEnabled}
-                    onCheckedChange={(checked) =>
-                      setSettings((current) => ({
-                        ...current,
-                        ipaymuTopupEnabled: checked,
-                      }))
-                    }
-                  />
-                </label>
-              </div>
-            </div>
-            <Field label="Instruksi pelanggan" wide>
-              <Textarea
-                value={settings.instructions}
-                onChange={(event) =>
-                  setSettings((current) => ({
-                    ...current,
-                    instructions: event.target.value,
-                  }))
-                }
-                className="min-h-24 rounded-xl border-white/10 bg-white/[0.025] text-xs text-white"
-              />
-            </Field>
-          </div>
-        </section>
-      )}
-      {view === "topups" && (
-        <section className="rounded-2xl border border-white/[0.08] bg-white/[0.015] p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-bold">Permintaan top up</h3>
-              <p className="mt-1 text-[10px] text-white/30">
-                Periksa nominal, pengirim, dan bukti sebelum menyetujui.
-              </p>
-            </div>
-            <span className="rounded-full bg-white/[0.05] px-2.5 py-1 text-[9px] text-white/40">
-              {topups.filter((item) => item.status === "pending").length}{" "}
-              menunggu
-            </span>
-          </div>
-          <div className="mt-4 space-y-3">
-            {topups.length ? (
-              topups.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4"
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <strong className="text-sm">
-                          {item.customer_name}
-                        </strong>
-                        <Status value={item.status} />
-                      </div>
-                      <p className="mt-1 text-[10px] text-white/35">
-                        {item.customer_email} • pengirim {item.sender_name}
-                      </p>
-                      <strong className="mt-3 block text-lg text-[#d8ff8d]">
-                        {formatRupiah(item.amount)}
-                      </strong>
-                      <p className="mt-1 text-[10px] text-white/35">
-                        {item.payment_method} •{" "}
-                        {new Date(item.created_at).toLocaleString("id-ID")}
-                      </p>
-                      <a
-                        href={`/api/panel/wallet/proof?key=${encodeURIComponent(proofKey(item.proof_url))}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-blue-300 hover:text-blue-200"
-                      >
-                        Lihat bukti pembayaran
-                        <ExternalLink className="size-3.5" />
-                      </a>
-                      {item.admin_notes && (
-                        <p className="mt-3 rounded-lg bg-white/[0.03] px-3 py-2 text-[10px] text-white/38">
-                          Catatan: {item.admin_notes}
-                        </p>
-                      )}
-                    </div>
-                    {item.status === "pending" && (
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={saving === item.id}
-                          onClick={() => void review(item, "rejected")}
-                          className="border-red-400/20 bg-red-400/[0.05] text-red-200"
-                        >
-                          <XCircle className="size-4" />
-                          Tolak
-                        </Button>
-                        <Button
-                          type="button"
-                          disabled={saving === item.id}
-                          onClick={() => void review(item, "approved")}
-                          className="bg-[#b9ff35] font-black text-[#091006]"
-                        >
-                          {saving === item.id ? (
-                            <LoaderCircle className="size-4 animate-spin" />
-                          ) : (
-                            <CheckCircle2 className="size-4" />
-                          )}
-                          Setujui
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-xl border border-dashed border-white/10 py-10 text-center text-xs text-white/28">
-                Belum ada permintaan top up saldo.
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+  const rows: Array<{ key: EditTarget; name: string; type: string; active: boolean; detail: string }> = [
+    { key: "midtrans", name: "Midtrans", type: "Payment Gateway", active: settings.midtransCheckoutEnabled || settings.midtransTopupEnabled, detail: `Checkout ${settings.midtransCheckoutEnabled ? "ON" : "OFF"} • Top up ${settings.midtransTopupEnabled ? "ON" : "OFF"}` },
+    { key: "ipaymu", name: "iPaymu", type: "Payment Gateway", active: settings.ipaymuCheckoutEnabled || settings.ipaymuTopupEnabled, detail: `Checkout ${settings.ipaymuCheckoutEnabled ? "ON" : "OFF"} • Top up ${settings.ipaymuTopupEnabled ? "ON" : "OFF"}` },
+    { key: "manual-bank", name: settings.methodName || "Transfer Bank", type: "Pembayaran Manual", active: settings.isEnabled, detail: settings.accountNumber ? `${settings.accountName} • ${settings.accountNumber}` : "Rekening belum diisi" },
+    { key: "manual-qris", name: settings.manualQrisName || "QRIS Manual", type: "Pembayaran Manual", active: settings.manualQrisEnabled, detail: settings.manualQrisImageUrl ? "QRIS sudah dipasang" : "Gambar QRIS belum dipasang" },
+  ];
+
+  return <div className="space-y-3">
+    {message && <div className="rounded-lg border border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] p-3 text-xs text-[#d8ff8d]">{message}</div>}
+    {error && <div className="rounded-lg border border-red-400/20 bg-red-400/[0.05] p-3 text-xs text-red-200">{error}</div>}
+    <div className="overflow-x-auto rounded-lg border border-white/[0.08]">
+      <Table><TableHeader><TableRow className="border-white/[0.08] hover:bg-transparent"><TableHead className="text-[10px] text-white/35">Pembayaran</TableHead><TableHead className="text-[10px] text-white/35">Jenis</TableHead><TableHead className="text-[10px] text-white/35">Status</TableHead><TableHead className="text-right text-[10px] text-white/35">Aksi</TableHead></TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.key} className="border-white/[0.07]"><TableCell><strong className="text-xs">{row.name}</strong><p className="mt-0.5 text-[8px] text-white/28">{row.detail}</p></TableCell><TableCell className="text-[10px] text-white/45">{row.type}</TableCell><TableCell><span className={row.active ? "text-[9px] font-bold text-[#d8ff8d]" : "text-[9px] text-white/30"}>{row.active ? "Aktif" : "Nonaktif"}</span></TableCell><TableCell className="text-right"><Button type="button" onClick={() => setEditing(row.key)} variant="ghost" size="icon-sm" className="text-white/45 hover:text-white"><Edit3 className="size-3.5" /></Button></TableCell></TableRow>)}</TableBody></Table>
     </div>
-  );
+
+    <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
+      <DialogContent className="border-white/10 bg-[#10141d] text-white sm:max-w-lg">
+        <DialogHeader><DialogTitle>{editing === "midtrans" ? "Midtrans" : editing === "ipaymu" ? "iPaymu" : editing === "manual-bank" ? "Transfer bank manual" : "QRIS manual"}</DialogTitle><DialogDescription className="text-white/38">Ubah pengaturan lalu simpan.</DialogDescription></DialogHeader>
+        <div className="space-y-3">
+          {editing === "midtrans" && <><Toggle label="Aktif untuk checkout" value={settings.midtransCheckoutEnabled} onChange={(value) => setSettings((current) => ({ ...current, midtransCheckoutEnabled: value }))} /><Toggle label="Aktif untuk top up saldo" value={settings.midtransTopupEnabled} onChange={(value) => setSettings((current) => ({ ...current, midtransTopupEnabled: value }))} /><MinTopup settings={settings} setSettings={setSettings} /></>}
+          {editing === "ipaymu" && <><Toggle label="Aktif untuk checkout" value={settings.ipaymuCheckoutEnabled} onChange={(value) => setSettings((current) => ({ ...current, ipaymuCheckoutEnabled: value }))} /><Toggle label="Aktif untuk top up saldo" value={settings.ipaymuTopupEnabled} onChange={(value) => setSettings((current) => ({ ...current, ipaymuTopupEnabled: value }))} /><MinTopup settings={settings} setSettings={setSettings} /></>}
+          {editing === "manual-bank" && <><Toggle label="Aktif di checkout" value={settings.isEnabled} onChange={(value) => setSettings((current) => ({ ...current, isEnabled: value }))} /><Field label="Nama bank / metode"><Input value={settings.methodName} onChange={(e) => setSettings((c) => ({ ...c, methodName: e.target.value }))} className="admin-input" /></Field><Field label="Nama pemilik rekening"><Input value={settings.accountName} onChange={(e) => setSettings((c) => ({ ...c, accountName: e.target.value }))} className="admin-input" /></Field><Field label="Nomor rekening"><Input value={settings.accountNumber} onChange={(e) => setSettings((c) => ({ ...c, accountNumber: e.target.value }))} className="admin-input" /></Field><Field label="Instruksi"><Textarea value={settings.instructions} onChange={(e) => setSettings((c) => ({ ...c, instructions: e.target.value }))} className="min-h-20 rounded-xl border-white/10 bg-white/[0.025] text-xs text-white" /></Field></>}
+          {editing === "manual-qris" && <><Toggle label="Aktif di checkout" value={settings.manualQrisEnabled} onChange={(value) => setSettings((current) => ({ ...current, manualQrisEnabled: value }))} /><Field label="Nama QRIS"><Input value={settings.manualQrisName} onChange={(e) => setSettings((c) => ({ ...c, manualQrisName: e.target.value }))} className="admin-input" /></Field><Field label="URL gambar QRIS"><Input value={settings.manualQrisImageUrl} onChange={(e) => setSettings((c) => ({ ...c, manualQrisImageUrl: e.target.value }))} className="admin-input" /></Field></>}
+        </div>
+        <DialogFooter><Button type="button" variant="outline" onClick={() => setEditing(null)} className="border-white/10 bg-white/[0.03] text-white">Batal</Button><Button type="button" disabled={saving} onClick={() => void saveSettings()} className="bg-[#b9ff35] font-black text-[#091006]">{saving ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}Simpan</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </div>;
 }
 
-function Field({
-  label,
-  wide = false,
-  children,
-}: {
-  label: string;
-  wide?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className={wide ? "sm:col-span-2" : ""}>
-      <span className="field-label">{label}</span>
-      {children}
-    </label>
-  );
+function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange(value: boolean): void }) {
+  return <label className="flex items-center justify-between border-b border-white/[0.07] py-3 text-xs text-white/60"><span>{label}</span><Switch checked={value} onCheckedChange={onChange} /></label>;
 }
-function Status({ value }: { value: TopupRow["status"] }) {
-  const style =
-    value === "approved"
-      ? "bg-[#b9ff35]/10 text-[#d8ff8d]"
-      : value === "rejected"
-        ? "bg-red-400/10 text-red-200"
-        : "bg-amber-300/10 text-amber-200";
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${style}`}
-    >
-      {value === "approved"
-        ? "Disetujui"
-        : value === "rejected"
-          ? "Ditolak"
-          : "Menunggu"}
-    </span>
-  );
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label><span className="field-label">{label}</span>{children}</label>; }
+function MinTopup({ settings, setSettings }: { settings: WalletSettings; setSettings: React.Dispatch<React.SetStateAction<WalletSettings>> }) {
+  return <Field label="Minimal top up saldo"><Input type="number" min={1000} value={settings.minTopup} onChange={(e) => setSettings((c) => ({ ...c, minTopup: Number(e.target.value) }))} className="admin-input" /></Field>;
 }
-function proofKey(value: string) {
-  return value.split("/").pop() || value;
+function TopupStatus({ value }: { value: string }) {
+  const paid = value === "approved" || value === "paid";
+  const failed = value === "rejected" || value === "failed" || value === "expired";
+  return <span className={paid ? "text-[9px] font-bold text-[#d8ff8d]" : failed ? "text-[9px] font-bold text-red-200" : "text-[9px] font-bold text-amber-200"}>{paid ? "Berhasil" : failed ? "Gagal" : "Menunggu"}</span>;
 }
 async function readJson(response: Response): Promise<Record<string, unknown>> {
   const raw = await response.text();
-  if (!raw)
-    return { error: "Server mengembalikan respons kosong. Coba muat ulang." };
-  try {
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return { error: "Server mengembalikan respons tidak valid." };
-  }
+  try { return raw ? JSON.parse(raw) as Record<string, unknown> : { error: "Respons server kosong." }; }
+  catch { return { error: "Respons server tidak valid." }; }
 }
