@@ -57,13 +57,21 @@ const providerDefinitions = [
   {
     name: "midtrans-bisnap",
     host: optionalEnv("MIDTRANS_BISNAP_RELAY_HOST").toLowerCase(),
-    upstream: normalizeOrigin(
-      optionalEnv("MIDTRANS_BISNAP_UPSTREAM_ORIGIN"),
-      "MIDTRANS_BISNAP_UPSTREAM_ORIGIN",
+    sandboxUpstream: normalizeOrigin(
+      optionalEnv("MIDTRANS_BISNAP_SANDBOX_UPSTREAM_ORIGIN"),
+      "MIDTRANS_BISNAP_SANDBOX_UPSTREAM_ORIGIN",
     ),
-    authUpstream: normalizeOrigin(
-      optionalEnv("MIDTRANS_BISNAP_AUTH_UPSTREAM_ORIGIN"),
-      "MIDTRANS_BISNAP_AUTH_UPSTREAM_ORIGIN",
+    sandboxAuthUpstream: normalizeOrigin(
+      optionalEnv("MIDTRANS_BISNAP_SANDBOX_AUTH_UPSTREAM_ORIGIN"),
+      "MIDTRANS_BISNAP_SANDBOX_AUTH_UPSTREAM_ORIGIN",
+    ),
+    productionUpstream: normalizeOrigin(
+      optionalEnv("MIDTRANS_BISNAP_PRODUCTION_UPSTREAM_ORIGIN"),
+      "MIDTRANS_BISNAP_PRODUCTION_UPSTREAM_ORIGIN",
+    ),
+    productionAuthUpstream: normalizeOrigin(
+      optionalEnv("MIDTRANS_BISNAP_PRODUCTION_AUTH_UPSTREAM_ORIGIN"),
+      "MIDTRANS_BISNAP_PRODUCTION_AUTH_UPSTREAM_ORIGIN",
     ),
     authPathPrefix: optionalEnv("MIDTRANS_BISNAP_AUTH_PATH_PREFIX"),
   },
@@ -88,6 +96,7 @@ const hopByHopHeaders = new Set([
   "upgrade",
   "cookie",
   "x-lfamilia-relay-token",
+  "x-lfamilia-bisnap-environment",
 ]);
 
 function json(res, status, payload) {
@@ -184,16 +193,28 @@ function isMethodAllowed(provider, method) {
   return method === "POST";
 }
 
-function resolveProviderUpstream(provider, requestUrl) {
-  if (
-    provider.name === "midtrans-bisnap" &&
-    provider.authUpstream &&
+function resolveProviderUpstream(provider, req) {
+  if (provider.name !== "midtrans-bisnap") return provider.upstream;
+
+  const environment = String(
+    req.headers["x-lfamilia-bisnap-environment"] || "",
+  ).toLowerCase();
+  if (environment !== "sandbox" && environment !== "production") return "";
+
+  const requestUrl = req.url || "/";
+  const useAuthOrigin =
     provider.authPathPrefix &&
-    requestUrl.startsWith(provider.authPathPrefix)
-  ) {
-    return provider.authUpstream;
+    requestUrl.startsWith(provider.authPathPrefix);
+
+  if (environment === "sandbox") {
+    return useAuthOrigin
+      ? provider.sandboxAuthUpstream
+      : provider.sandboxUpstream;
   }
-  return provider.upstream;
+
+  return useAuthOrigin
+    ? provider.productionAuthUpstream
+    : provider.productionUpstream;
 }
 
 const server = createServer(async (req, res) => {
@@ -207,7 +228,15 @@ const server = createServer(async (req, res) => {
       configured: Object.fromEntries(
         providerDefinitions.map((provider) => [
           provider.name,
-          Boolean(provider.host && provider.upstream),
+          provider.name === "midtrans-bisnap"
+            ? Boolean(
+                provider.host &&
+                  provider.sandboxUpstream &&
+                  provider.sandboxAuthUpstream &&
+                  provider.productionUpstream &&
+                  provider.productionAuthUpstream,
+              )
+            : Boolean(provider.host && provider.upstream),
         ]),
       ),
     });
@@ -230,7 +259,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const providerUpstream = resolveProviderUpstream(provider, req.url || "/");
+  const providerUpstream = resolveProviderUpstream(provider, req);
   if (!providerUpstream) {
     json(res, 503, { error: "Upstream provider belum dikonfigurasi." });
     return;
