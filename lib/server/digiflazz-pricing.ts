@@ -3,7 +3,12 @@ import { hashHex } from "@/lib/server/crypto";
 import { withProviderRelayHeaders } from "@/lib/server/provider-relay";
 import { getRuntimeEnv, requireRuntimeValue } from "@/lib/server/runtime-env";
 
-type Env = { DIGIFLAZZ_USERNAME?: string; DIGIFLAZZ_API_KEY?: string; DIGIFLAZZ_PRICE_LIST_URL?: string };
+type Env = {
+  DIGIFLAZZ_USERNAME?: string;
+  DIGIFLAZZ_API_KEY?: string;
+  DIGIFLAZZ_PRODUCTION_API_KEY?: string;
+  DIGIFLAZZ_PRICE_LIST_URL?: string;
+};
 export type PricingSettings = { isAutoSync: boolean; marginType: "fixed" | "percent"; marginValue: number };
 
 export async function getPricingSettings(): Promise<PricingSettings> { const row = await getD1().prepare("SELECT is_auto_sync, margin_type, margin_value FROM digiflazz_pricing_settings WHERE id = 1").first<{ is_auto_sync: number; margin_type: "fixed" | "percent"; margin_value: number }>(); return { isAutoSync: row?.is_auto_sync !== 0, marginType: row?.margin_type ?? "fixed", marginValue: row?.margin_value ?? 0 }; }
@@ -13,7 +18,11 @@ function sale(cost: number, type: "fixed" | "percent", value: number) { return t
 export async function syncDigiflazzPrices() {
   const env = getRuntimeEnv<Env>();
   const username = requireRuntimeValue(env.DIGIFLAZZ_USERNAME, "DIGIFLAZZ_USERNAME");
-  const key = requireRuntimeValue(env.DIGIFLAZZ_API_KEY, "DIGIFLAZZ_API_KEY");
+  const developmentKey = requireRuntimeValue(
+    env.DIGIFLAZZ_API_KEY,
+    "DIGIFLAZZ_API_KEY",
+  );
+  const key = env.DIGIFLAZZ_PRODUCTION_API_KEY?.trim() || developmentKey;
   const priceListUrl = requireRuntimeValue(env.DIGIFLAZZ_PRICE_LIST_URL, "DIGIFLAZZ_PRICE_LIST_URL");
   const settings = await getPricingSettings(); if (!settings.isAutoSync) return { updated: 0, skipped: true };
   const response = await fetch(priceListUrl, { method: "POST", headers: withProviderRelayHeaders(priceListUrl, { "content-type": "application/json", accept: "application/json" }), body: JSON.stringify({ cmd: "prepaid", username, sign: hashHex("md5", `${username}${key}pricelist`) }), signal: AbortSignal.timeout(20_000) });
