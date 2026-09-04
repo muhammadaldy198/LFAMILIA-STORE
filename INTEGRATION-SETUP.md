@@ -22,12 +22,15 @@ Tambahkan sebagai **Secret**, bukan Variable biasa dan bukan file GitHub:
 
 | Nama | Isi |
 |---|---|
-| `MIDTRANS_SERVER_KEY` | Server Key Midtrans sandbox/production |
+| `MIDTRANS_SERVER_KEY` | Server Key Midtrans aktif; prefix `SB-` otomatis memilih Sandbox |
 | `MELOSTORE_API_KEY` | API Key H2H Melostore untuk validasi nickname |
 | `MELOSTORE_SECRET_KEY` | Secret Key H2H Melostore untuk validasi nickname |
 | `NICKNAME_API_KEY` | API key fallback nickname bila penyedia fallback membutuhkannya; opsional |
 | `DIGIFLAZZ_USERNAME` | Username buyer DigiFlazz |
-| `DIGIFLAZZ_API_KEY` | Production/development API key DigiFlazz |
+| `DIGIFLAZZ_API_KEY` | Development API key DigiFlazz |
+| `DIGIFLAZZ_PRODUCTION_API_KEY` | Production API key DigiFlazz; bila diisi aplikasi otomatis beralih Production |
+| `IPAYMU_VA` | VA aktif iPaymu |
+| `IPAYMU_API_KEY` | API Key aktif iPaymu |
 | `DIGIFLAZZ_WEBHOOK_SECRET` | Secret webhook DigiFlazz |
 | `PROVIDER_RELAY_TOKEN` | Secret acak minimal 32 karakter, sama dengan `RELAY_TOKEN` pada VPS provider relay |
 | `VIPPAYMENT_API_ID` | API ID VIPayment |
@@ -41,11 +44,12 @@ Tambahkan sebagai **Variable biasa**. Nilai berikut adalah konfigurasi Sandbox/D
 | Nama | Nilai Sandbox/Development |
 |---|---|
 | `PUBLIC_BASE_URL` | `https://lfamiliastore.my.id` |
-| `MIDTRANS_ENV` | `sandbox` |
-| `MIDTRANS_CLIENT_KEY` | Client Key Sandbox dari dashboard Midtrans |
-| `MIDTRANS_SNAP_API_URL` | `https://app.sandbox.midtrans.com/snap/v1/transactions` |
-| `MIDTRANS_SNAP_SCRIPT_URL` | `https://app.sandbox.midtrans.com/snap/snap.js` |
-| `DIGIFLAZZ_ENV` | `development` |
+| `MIDTRANS_CLIENT_KEY` | Client Key aktif; prefix `SB-` otomatis memilih Sandbox |
+| `MIDTRANS_SNAP_SANDBOX_API_URL` | `https://app.sandbox.midtrans.com/snap/v1/transactions` |
+| `MIDTRANS_SNAP_PRODUCTION_API_URL` | `https://app.midtrans.com/snap/v1/transactions` |
+| `MIDTRANS_SNAP_SANDBOX_SCRIPT_URL` | `https://app.sandbox.midtrans.com/snap/snap.js` |
+| `MIDTRANS_SNAP_PRODUCTION_SCRIPT_URL` | `https://app.midtrans.com/snap/snap.js` |
+| `IPAYMU_API_URL` | `https://ipaymu-relay.lfamiliastore.my.id/api/v2/payment/direct` |
 | `DIGIFLAZZ_API_URL` | Direct: `https://api.digiflazz.com/v1/transaction`; setelah relay aktif: `https://digiflazz-relay.lfamiliastore.my.id/v1/transaction` |
 | `DIGIFLAZZ_PRICE_LIST_URL` | Direct: `https://api.digiflazz.com/v1/price-list`; setelah relay aktif: `https://digiflazz-relay.lfamiliastore.my.id/v1/price-list` |
 | `PROVIDER_RELAY_HOSTS` | `digiflazz-relay.lfamiliastore.my.id,ipaymu-relay.lfamiliastore.my.id,bisnap-relay.lfamiliastore.my.id` |
@@ -62,15 +66,11 @@ Tambahkan sebagai **Variable biasa**. Nilai berikut adalah konfigurasi Sandbox/D
 | `WHATSAPP_GRAPH_VERSION` | Versi Graph API yang sedang digunakan, misalnya `v23.0` |
 | `WHATSAPP_GRAPH_BASE_URL` | `https://graph.facebook.com` |
 
-Untuk pindah Midtrans ke Production, kode repo tidak perlu diubah. Ganti Variable/Secret Cloudflare berikut:
+Untuk pindah Midtrans ke Production, cukup ganti `MIDTRANS_SERVER_KEY` dan `MIDTRANS_CLIENT_KEY` ke key Production. Endpoint dipilih otomatis dari prefix key sehingga URL tidak perlu diubah.
 
-- `MIDTRANS_ENV` → `production`
-- `MIDTRANS_CLIENT_KEY` → Client Key Production
-- `MIDTRANS_SERVER_KEY` → Server Key Production
-- `MIDTRANS_SNAP_API_URL` → `https://app.midtrans.com/snap/v1/transactions`
-- `MIDTRANS_SNAP_SCRIPT_URL` → `https://app.midtrans.com/snap/snap.js`
+Untuk DigiFlazz Production, cukup isi `DIGIFLAZZ_PRODUCTION_API_KEY`. Selama secret itu kosong, aplikasi memakai `DIGIFLAZZ_API_KEY` sebagai Development key dan mengirim transaksi testing.
 
-Untuk DigiFlazz Production, ubah `DIGIFLAZZ_ENV` menjadi `production` dan gunakan credential Production. Endpoint tetap dikendalikan melalui Variable Cloudflare.
+Untuk iPaymu Production, URL relay tetap sama. Ganti `IPAYMU_VA` dan `IPAYMU_API_KEY` ke credential Production. iPaymu memang menerbitkan VA dan API Key berbeda antara Sandbox dan Production.
 
 ## 3. Callback dan webhook
 
@@ -158,7 +158,7 @@ Arsitektur checkout dan tabel order tidak perlu diubah hanya untuk menambah adap
 - Cloudflare Access aktif.
 - Harga, margin, dan SKU sudah diverifikasi.
 - Midtrans diuji di sandbox sebelum beralih ke production.
-- DigiFlazz tetap `development` sampai tes selesai, lalu diubah ke `production` dari Cloudflare.
+- DigiFlazz tetap Development selama `DIGIFLAZZ_PRODUCTION_API_KEY` belum diisi.
 - Callback semua provider telah diuji.
 - Tidak ada secret atau konfigurasi environment operasional di GitHub.
 - Tidak pernah meminta password, PIN, atau OTP pelanggan.
