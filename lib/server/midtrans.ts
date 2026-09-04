@@ -240,7 +240,6 @@ export async function createMidtransPayment(input: {
   paymentMethod: string;
   paymentChannel: string;
   finishUrl: string;
-  deviceId?: string;
 }) {
   const mode = getMidtransMode();
   if (mode === "snap") return createMidtransSnapPayment(input);
