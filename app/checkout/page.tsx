@@ -213,18 +213,19 @@ function CheckoutContent() {
     paymentMethod === "qris";
   const activeCheckoutGateway = gatewayConfig.gateway;
   const automaticCheckoutReady = Boolean(activeCheckoutGateway);
-  const availableGatewayMethods = new Set(
-    availableChannels.map((item) => item.method),
-  );
-  const gatewayPaymentGroups = automaticCheckoutReady
-    ? paymentGroups
-        .filter((item) => availableGatewayMethods.has(item.code))
-        .sort(
-          (left, right) =>
-            ["qris", "ewallet", "va"].indexOf(left.code) -
-            ["qris", "ewallet", "va"].indexOf(right.code),
-        )
-    : [];
+  const gatewayPaymentGroups = useMemo(() => {
+    if (!automaticCheckoutReady) return [];
+    const availableGatewayMethods = new Set(
+      availableChannels.map((item) => item.method),
+    );
+    return paymentGroups
+      .filter((item) => availableGatewayMethods.has(item.code))
+      .sort(
+        (left, right) =>
+          ["qris", "ewallet", "va"].indexOf(left.code) -
+          ["qris", "ewallet", "va"].indexOf(right.code),
+      );
+  }, [automaticCheckoutReady, availableChannels]);
   const checkoutGroups = [
     {
       code: "wallet" as const,
