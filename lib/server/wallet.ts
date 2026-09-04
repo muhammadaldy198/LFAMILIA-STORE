@@ -160,6 +160,7 @@ export async function createMidtransWalletTopup(input: {
 
 export async function updateMidtransWalletTopup(input: {
   referenceId: string;
+  mode: "snap" | "bisnap";
   transactionId: string | null;
   paymentNo: string | null;
   paymentName: string | null;
@@ -168,14 +169,21 @@ export async function updateMidtransWalletTopup(input: {
   fee: number;
   total: number;
 }) {
+  await ensureLegacyDatabaseColumns();
   await getD1()
     .prepare(
-      `UPDATE wallet_topups SET midtrans_transaction_id = ?, midtrans_payment_url = ?, payment_fee = ?, payment_total = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE reference_id = ? AND source = 'midtrans'`,
+      `UPDATE wallet_topups SET midtrans_transaction_id = ?, midtrans_payment_no = ?,
+       midtrans_payment_name = ?, midtrans_payment_url = ?, midtrans_expired_at = ?,
+       midtrans_mode = ?, payment_fee = ?, payment_total = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE reference_id = ? AND source = 'midtrans'`,
     )
     .bind(
       input.transactionId,
+      input.paymentNo,
+      input.paymentName,
       input.paymentUrl,
+      input.expiredAt,
+      input.mode,
       input.fee,
       input.total,
       input.referenceId,
