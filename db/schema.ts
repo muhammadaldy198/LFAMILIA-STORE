@@ -168,7 +168,7 @@ export const orderEvents = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
-    source: text("source", { enum: ["ipaymu", "wallet", "digiflazz", "vippayment", "voucher_stock", "admin"] }).notNull(),
+    source: text("source", { enum: ["midtrans", "ipaymu", "wallet", "digiflazz", "vippayment", "voucher_stock", "admin"] }).notNull(),
     eventId: text("event_id").notNull(),
     status: text("status").notNull(),
     payloadJson: text("payload_json").notNull(),
