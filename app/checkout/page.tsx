@@ -760,14 +760,6 @@ function CheckoutContent() {
                           </div>
                         )}
 
-                        {selected && (group.code === "manual_qris" || group.code === "manual_bank") && (
-                          <p className="border-t border-white/[0.08] bg-black/10 px-3 py-2 text-[9px] leading-4 text-white/45">
-                            {group.code === "manual_qris"
-                              ? "QRIS dan total pembayaran akan muncul setelah pesanan dibuat."
-                              : "Nomor rekening dan total transfer akan muncul setelah pesanan dibuat."}{" "}
-                            Pemilik mengonfirmasi pembayaran sebelum pesanan diproses.
-                          </p>
-                        )}
                       </div>
                     );
                   })}
