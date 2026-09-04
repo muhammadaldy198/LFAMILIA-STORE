@@ -36,6 +36,7 @@ import { AdminVoucherManager } from "@/components/admin-voucher-manager";
 import { AdminWalletManager } from "@/components/admin-wallet-manager";
 import { AdminPaymentMethodManager } from "@/components/admin-payment-method-manager";
 import { AdminSupportManager } from "@/components/admin-support-manager";
+import { AdminDigiflazzPricing } from "@/components/admin-digiflazz-pricing";
 import { StoreLayout } from "@/components/store-layout";
 
 type Session = {
@@ -375,7 +376,7 @@ export default function AdminPage() {
                     <AdminTeamManager />
                   </AdminSection>
                 </TabsContent>
-                <TabsContent value="settings" className="mt-0">
+                <TabsContent value="settings" className="mt-0 space-y-5">
                   <AdminSection
                     title="Keamanan & integrasi"
                     description="Login panel terpisah dari pelanggan; secret provider tetap dikelola aman melalui Cloudflare."
@@ -423,6 +424,12 @@ export default function AdminPage() {
                       kembali. Secret pembayaran maupun provider juga tidak
                       pernah ditampilkan di browser.
                     </div>
+                  </AdminSection>
+                  <AdminSection
+                    title="Harga otomatis DigiFlazz"
+                    description="Sinkronkan daftar harga DigiFlazz dan atur margin penjualan."
+                  >
+                    <AdminDigiflazzPricing />
                   </AdminSection>
                 </TabsContent>
               </>
