@@ -88,10 +88,30 @@ export async function POST(request: Request) {
         paymentStatus: order.payment_status,
         fulfillmentStatus: order.fulfillment_status,
         fulfillmentType: order.fulfillment_type,
-        paymentGateway: order.ipaymu_transaction_id || order.ipaymu_payment_url ? "ipaymu" : order.midtrans_transaction_id || order.midtrans_payment_url ? "midtrans" : null,
+        paymentGateway:
+          order.ipaymu_transaction_id || order.ipaymu_payment_url
+            ? "ipaymu"
+            : order.midtrans_transaction_id ||
+                order.midtrans_payment_url ||
+                order.midtrans_payment_no
+              ? "midtrans"
+              : null,
+        midtransMode: order.midtrans_mode === "bisnap" ? "bisnap" : order.midtrans_mode === "snap" ? "snap" : null,
+        paymentNo:
+          order.payment_status === "pending"
+            ? order.ipaymu_payment_no || order.midtrans_payment_no
+            : null,
+        paymentName:
+          order.payment_status === "pending"
+            ? order.ipaymu_payment_name || order.midtrans_payment_name
+            : null,
         paymentUrl:
           order.payment_status === "pending"
             ? order.ipaymu_payment_url || order.midtrans_payment_url
+            : null,
+        expiredAt:
+          order.payment_status === "pending"
+            ? order.ipaymu_expired_at || order.midtrans_expired_at
             : null,
         voucherCode,
         createdAt: order.created_at,
