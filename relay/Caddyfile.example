@@ -3,19 +3,19 @@
 }
 
 (lfamilia_provider_relay) {
-  reverse_proxy 127.0.0.1:8788 {
+  reverse_proxy {$RELAY_UPSTREAM} {
     header_up Host {host}
   }
 }
 
-digiflazz-relay.lfamiliastore.my.id {
+{$DIGIFLAZZ_RELAY_HOST} {
   import lfamilia_provider_relay
 }
 
-ipaymu-relay.lfamiliastore.my.id {
+{$IPAYMU_RELAY_HOST} {
   import lfamilia_provider_relay
 }
 
-bisnap-relay.lfamiliastore.my.id {
+{$MIDTRANS_BISNAP_RELAY_HOST} {
   import lfamilia_provider_relay
 }
