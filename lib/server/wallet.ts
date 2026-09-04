@@ -269,6 +269,152 @@ export async function applyMidtransWalletTopup(input: {
   return { found: true, credited: false };
 }
 
+
+export async function createIpaymuWalletTopup(input: {
+  customerId: string;
+  amount: number;
+  name: string;
+  paymentMethod: string;
+  paymentChannel: string;
+  referenceId: string;
+}) {
+  await ensureLegacyDatabaseColumns();
+  const id = crypto.randomUUID();
+  await getD1()
+    .prepare(
+      `INSERT INTO wallet_topups (id, customer_id, amount, sender_name, payment_method, proof_url, source, reference_id)
+       VALUES (?, ?, ?, ?, ?, '', 'ipaymu', ?)`,
+    )
+    .bind(
+      id,
+      input.customerId,
+      input.amount,
+      input.name,
+      `${input.paymentMethod}:${input.paymentChannel}`,
+      input.referenceId,
+    )
+    .run();
+  return id;
+}
+
+export async function updateIpaymuWalletTopup(input: {
+  referenceId: string;
+  transactionId: string | null;
+  paymentNo: string | null;
+  paymentName: string | null;
+  paymentUrl: string | null;
+  expiredAt: string | null;
+  fee: number;
+  total: number;
+}) {
+  await ensureLegacyDatabaseColumns();
+  await getD1()
+    .prepare(
+      `UPDATE wallet_topups SET ipaymu_transaction_id = ?, ipaymu_payment_no = ?, ipaymu_payment_name = ?,
+       ipaymu_payment_url = ?, ipaymu_expired_at = ?, payment_fee = ?, payment_total = ?,
+       updated_at = CURRENT_TIMESTAMP WHERE reference_id = ? AND source = 'ipaymu'`,
+    )
+    .bind(
+      input.transactionId,
+      input.paymentNo,
+      input.paymentName,
+      input.paymentUrl,
+      input.expiredAt,
+      input.fee,
+      input.total,
+      input.referenceId,
+    )
+    .run();
+}
+
+export async function getIpaymuWalletTopup(referenceId: string) {
+  await ensureLegacyDatabaseColumns();
+  return getD1()
+    .prepare(
+      `SELECT id, customer_id, amount, status, ipaymu_transaction_id FROM wallet_topups
+       WHERE reference_id = ? AND source = 'ipaymu' LIMIT 1`,
+    )
+    .bind(referenceId)
+    .first<{
+      id: string;
+      customer_id: string;
+      amount: number;
+      status: string;
+      ipaymu_transaction_id: string | null;
+    }>();
+}
+
+export async function applyIpaymuWalletTopup(input: {
+  referenceId: string;
+  status: "paid" | "pending" | "expired" | "failed";
+  transactionId: string | null;
+  callbackAmount: number;
+}) {
+  const topup = await getIpaymuWalletTopup(input.referenceId);
+  if (!topup) return { found: false, credited: false };
+  if (
+    topup.ipaymu_transaction_id &&
+    input.transactionId &&
+    topup.ipaymu_transaction_id !== input.transactionId
+  )
+    return { found: true, credited: false, ignored: "transaction_mismatch" };
+  if (
+    input.status === "paid" &&
+    input.callbackAmount > 0 &&
+    input.callbackAmount < topup.amount
+  )
+    return { found: true, credited: false, ignored: "amount_mismatch" };
+
+  const db = getD1();
+  if (input.status === "paid") {
+    const reference = `topup:${topup.id}`;
+    await db.batch([
+      db
+        .prepare(
+          `INSERT INTO wallet_transactions (id, customer_id, direction, amount, balance_before, balance_after, reference, description)
+           SELECT ?, t.customer_id, 'credit', t.amount, ledger.balance, ledger.balance + t.amount, ?, ?
+           FROM wallet_topups t CROSS JOIN (
+             SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0) AS balance
+             FROM wallet_transactions WHERE customer_id = ?
+           ) ledger WHERE t.id = ? AND t.status = 'pending'`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          reference,
+          `Top up otomatis iPaymu ${topup.id.slice(0, 8).toUpperCase()}`,
+          topup.customer_id,
+          topup.id,
+        ),
+      db
+        .prepare(
+          "UPDATE wallet_topups SET status = 'approved', reviewed_by = 'ipaymu-callback', reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
+        )
+        .bind(topup.id),
+      db
+        .prepare(
+          "UPDATE customer_users SET balance = (SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0) FROM wallet_transactions WHERE customer_id = ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        )
+        .bind(topup.customer_id, topup.customer_id),
+    ]);
+    return { found: true, credited: topup.status === "pending" };
+  }
+
+  if (input.status === "expired" || input.status === "failed") {
+    await db
+      .prepare(
+        "UPDATE wallet_topups SET status = 'rejected', admin_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
+      )
+      .bind(
+        input.status === "expired"
+          ? "Pembayaran iPaymu kedaluwarsa."
+          : "Pembayaran iPaymu gagal.",
+        topup.id,
+      )
+      .run();
+  }
+  return { found: true, credited: false };
+}
+
 export async function listWalletTopups(limit = 200) {
   const result = await getD1()
     .prepare(
