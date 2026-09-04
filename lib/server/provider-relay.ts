@@ -5,6 +5,8 @@ type ProviderRelayEnv = {
   PROVIDER_RELAY_HOSTS?: string;
 };
 
+export type RelayProvider = "digiflazz" | "ipaymu" | "midtrans-bisnap";
+
 function relayHosts(value?: string) {
   return new Set(
     (value ?? "")
@@ -17,6 +19,7 @@ function relayHosts(value?: string) {
 export function withProviderRelayHeaders(
   url: string,
   headers: Record<string, string>,
+  route?: { provider: RelayProvider; environment: string },
 ) {
   const runtime = getRuntimeEnv<ProviderRelayEnv>();
   const token = runtime.PROVIDER_RELAY_TOKEN?.trim();
@@ -31,8 +34,14 @@ export function withProviderRelayHeaders(
 
   if (!relayHosts(runtime.PROVIDER_RELAY_HOSTS).has(hostname)) return headers;
 
-  return {
+  const next: Record<string, string> = {
     ...headers,
     "x-lfamilia-relay-token": token,
   };
+
+  if (route) {
+    next[`x-lfamilia-${route.provider}-environment`] = route.environment;
+  }
+
+  return next;
 }
