@@ -69,19 +69,10 @@ const providerDefinitions = [
       optionalEnv("MIDTRANS_BISNAP_SANDBOX_UPSTREAM_ORIGIN"),
       "MIDTRANS_BISNAP_SANDBOX_UPSTREAM_ORIGIN",
     ),
-    sandboxAuthUpstream: normalizeOrigin(
-      optionalEnv("MIDTRANS_BISNAP_SANDBOX_AUTH_UPSTREAM_ORIGIN"),
-      "MIDTRANS_BISNAP_SANDBOX_AUTH_UPSTREAM_ORIGIN",
-    ),
     productionUpstream: normalizeOrigin(
       optionalEnv("MIDTRANS_BISNAP_PRODUCTION_UPSTREAM_ORIGIN"),
       "MIDTRANS_BISNAP_PRODUCTION_UPSTREAM_ORIGIN",
     ),
-    productionAuthUpstream: normalizeOrigin(
-      optionalEnv("MIDTRANS_BISNAP_PRODUCTION_AUTH_UPSTREAM_ORIGIN"),
-      "MIDTRANS_BISNAP_PRODUCTION_AUTH_UPSTREAM_ORIGIN",
-    ),
-    authPathPrefix: optionalEnv("MIDTRANS_BISNAP_AUTH_PATH_PREFIX"),
   },
 ];
 
@@ -235,20 +226,8 @@ function resolveProviderUpstream(provider, req) {
   ).toLowerCase();
   if (environment !== "sandbox" && environment !== "production") return "";
 
-  const requestUrl = req.url || "/";
-  const useAuthOrigin =
-    provider.authPathPrefix &&
-    requestUrl.startsWith(provider.authPathPrefix);
-
-  if (environment === "sandbox") {
-    return useAuthOrigin
-      ? provider.sandboxAuthUpstream
-      : provider.sandboxUpstream;
-  }
-
-  return useAuthOrigin
-    ? provider.productionAuthUpstream
-    : provider.productionUpstream;
+  if (environment === "sandbox") return provider.sandboxUpstream;
+  return provider.productionUpstream;
 }
 
 function providerConfigured(provider) {
@@ -271,10 +250,7 @@ function providerConfigured(provider) {
   return Boolean(
     provider.host &&
       provider.sandboxUpstream &&
-      provider.sandboxAuthUpstream &&
-      provider.productionUpstream &&
-      provider.productionAuthUpstream &&
-      provider.authPathPrefix,
+      provider.productionUpstream,
   );
 }
 
