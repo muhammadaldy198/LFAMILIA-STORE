@@ -354,7 +354,7 @@ export default function AdminPage() {
                   </AdminSection>
                   <AdminSection
                     title="QRIS, transfer bank & gateway"
-                    description="Atur metode checkout manual dan toggle Midtrans."
+                    description="Atur metode checkout manual serta ON/OFF Midtrans dan iPaymu."
                   >
                     <AdminWalletManager view="checkout" />
                   </AdminSection>
