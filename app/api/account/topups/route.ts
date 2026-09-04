@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
 import { uploadStoreMedia } from "@/lib/server/media";
-import { createMidtransSnapPayment } from "@/lib/server/midtrans";
+import {
+  createMidtransPayment,
+  getMidtransMode,
+  isMidtransChannelSupported,
+} from "@/lib/server/midtrans";
 import {
   createIpaymuDirectPayment,
   isIpaymuChannelSupported,
@@ -50,6 +54,8 @@ export async function POST(request: Request) {
         throw new Error(
           `Minimum top up Rp${settings.minTopup.toLocaleString("id-ID")}.`,
         );
+      const midtransMode =
+        input.mode === "midtrans" ? getMidtransMode() : null;
       if (
         !(await isPaymentChannelAvailable(
           input.paymentMethod,
@@ -59,6 +65,13 @@ export async function POST(request: Request) {
           !isIpaymuChannelSupported(
             input.paymentMethod,
             input.paymentChannel,
+          )) ||
+        (input.mode === "midtrans" &&
+          midtransMode &&
+          !isMidtransChannelSupported(
+            input.paymentMethod,
+            input.paymentChannel,
+            midtransMode,
           ))
       )
         throw new Error("Metode pembayaran otomatis tidak tersedia.");
@@ -118,7 +131,7 @@ export async function POST(request: Request) {
         paymentChannel: input.paymentChannel,
         referenceId,
       });
-      const payment = await createMidtransSnapPayment({
+      const payment = await createMidtransPayment({
         buyerName: customer.name,
         buyerPhone: customer.phone,
         buyerEmail: customer.email,
@@ -128,14 +141,16 @@ export async function POST(request: Request) {
         paymentChannel: input.paymentChannel,
         productName: "Top up Saldo LFAMILIA",
         finishUrl: `${getPublicBaseUrl()}/account`,
+        deviceId: request.headers.get("user-agent") || undefined,
       });
       await updateMidtransWalletTopup({
         referenceId,
+        mode: payment.mode,
         transactionId: payment.transactionId,
-        paymentNo: null,
-        paymentName: "Midtrans Snap",
+        paymentNo: payment.paymentNo,
+        paymentName: payment.paymentName,
         paymentUrl: payment.paymentUrl,
-        expiredAt: null,
+        expiredAt: payment.expiredAt,
         fee: 0,
         total: input.amount,
       });
@@ -144,10 +159,12 @@ export async function POST(request: Request) {
           ok: true,
           mode: "midtrans",
           referenceId,
+          paymentNo: payment.paymentNo,
+          paymentName: payment.paymentName,
           paymentUrl: payment.paymentUrl,
           total: input.amount,
           fee: 0,
-          expiredAt: null,
+          expiredAt: payment.expiredAt,
         },
         { status: 201 },
       );
