@@ -44,6 +44,8 @@ const fallback: WalletSettings = {
   manualQrisImageUrl: "",
   midtransTopupEnabled: false,
   midtransCheckoutEnabled: false,
+  ipaymuTopupEnabled: false,
+  ipaymuCheckoutEnabled: false,
 };
 
 export function AdminWalletManager({
@@ -167,8 +169,7 @@ export function AdminWalletManager({
               <div>
                 <h3 className="font-bold">Checkout manual & gateway</h3>
                 <p className="mt-1 max-w-xl text-[10px] leading-5 text-white/30">
-                  Atur QRIS manual, transfer bank, dan kapan checkout otomatis
-                  Midtrans ditampilkan ke pelanggan.
+                  Atur pembayaran manual serta ON/OFF gateway Midtrans dan iPaymu.
                 </p>
               </div>
             </div>
@@ -285,45 +286,83 @@ export function AdminWalletManager({
                 placeholder="https://..."
               />
             </Field>
-            <label className="flex items-center justify-between rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.04] p-3 text-xs text-white/70 sm:col-span-2">
-              <span>
-                <strong className="block">
-                  Aktifkan top up saldo otomatis Midtrans
-                </strong>
-                <span className="mt-1 block text-[10px] text-white/35">
-                  Hanya aktif jika Secret Midtrans dan callback sudah benar.
-                </span>
-              </span>
-              <Switch
-                checked={settings.midtransTopupEnabled}
-                onCheckedChange={(checked) =>
-                  setSettings((current) => ({
-                    ...current,
-                    midtransTopupEnabled: checked,
-                  }))
-                }
-              />
-            </label>
-            <label className="flex items-center justify-between rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.04] p-3 text-xs text-white/70 sm:col-span-2">
-              <span>
-                <strong className="block">
-                  Aktifkan checkout otomatis Midtrans
-                </strong>
-                <span className="mt-1 block text-[10px] text-white/35">
-                  Nyalakan setelah Midtrans Production siap; matikan QRIS manual
-                  bila sudah tidak dipakai.
-                </span>
-              </span>
-              <Switch
-                checked={settings.midtransCheckoutEnabled}
-                onCheckedChange={(checked) =>
-                  setSettings((current) => ({
-                    ...current,
-                    midtransCheckoutEnabled: checked,
-                  }))
-                }
-              />
-            </label>
+            <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
+              <div className="rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.04] p-3">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <strong className="block text-xs text-white/85">Midtrans</strong>
+                    <span className="mt-0.5 block text-[9px] text-white/35">
+                      Gateway utama yang sedang digunakan.
+                    </span>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${settings.midtransCheckoutEnabled || settings.midtransTopupEnabled ? "bg-[#b9ff35]/12 text-[#d8ff8d]" : "bg-white/[0.05] text-white/35"}`}>
+                    {settings.midtransCheckoutEnabled || settings.midtransTopupEnabled ? "ON" : "OFF"}
+                  </span>
+                </div>
+                <label className="flex items-center justify-between gap-3 border-t border-white/[0.07] py-2 text-[10px] text-white/60">
+                  <span>Checkout</span>
+                  <Switch
+                    checked={settings.midtransCheckoutEnabled}
+                    onCheckedChange={(checked) =>
+                      setSettings((current) => ({
+                        ...current,
+                        midtransCheckoutEnabled: checked,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 border-t border-white/[0.07] pt-2 text-[10px] text-white/60">
+                  <span>Top up saldo</span>
+                  <Switch
+                    checked={settings.midtransTopupEnabled}
+                    onCheckedChange={(checked) =>
+                      setSettings((current) => ({
+                        ...current,
+                        midtransTopupEnabled: checked,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="rounded-xl border border-white/[0.10] bg-white/[0.025] p-3">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <strong className="block text-xs text-white/85">iPaymu</strong>
+                    <span className="mt-0.5 block text-[9px] text-white/35">
+                      Aktifkan setelah integrasi dan credential iPaymu siap.
+                    </span>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${settings.ipaymuCheckoutEnabled || settings.ipaymuTopupEnabled ? "bg-[#b9ff35]/12 text-[#d8ff8d]" : "bg-white/[0.05] text-white/35"}`}>
+                    {settings.ipaymuCheckoutEnabled || settings.ipaymuTopupEnabled ? "ON" : "OFF"}
+                  </span>
+                </div>
+                <label className="flex items-center justify-between gap-3 border-t border-white/[0.07] py-2 text-[10px] text-white/60">
+                  <span>Checkout</span>
+                  <Switch
+                    checked={settings.ipaymuCheckoutEnabled}
+                    onCheckedChange={(checked) =>
+                      setSettings((current) => ({
+                        ...current,
+                        ipaymuCheckoutEnabled: checked,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 border-t border-white/[0.07] pt-2 text-[10px] text-white/60">
+                  <span>Top up saldo</span>
+                  <Switch
+                    checked={settings.ipaymuTopupEnabled}
+                    onCheckedChange={(checked) =>
+                      setSettings((current) => ({
+                        ...current,
+                        ipaymuTopupEnabled: checked,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+            </div>
             <Field label="Instruksi pelanggan" wide>
               <Textarea
                 value={settings.instructions}
