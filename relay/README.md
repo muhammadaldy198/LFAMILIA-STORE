@@ -1,16 +1,12 @@
 # LFAMILIA Provider Relay
 
-Relay ini dijalankan di VPS ber-IP publik statis. Satu proses Node menerima tiga hostname:
+Relay ini dijalankan di VPS ber-IP publik statis dan seluruh konfigurasi operasional dibaca dari environment. Tidak ada hostname provider, upstream API, bind address, port, timeout, atau token yang dijadikan fallback di source relay.
 
-- `digiflazz-relay.lfamiliastore.my.id`
-- `ipaymu-relay.lfamiliastore.my.id`
-- `bisnap-relay.lfamiliastore.my.id`
-
-Midtrans Snap biasa tidak perlu melewati relay dan tetap dapat memakai endpoint Midtrans langsung.
+Midtrans Snap biasa tetap dapat berjalan langsung dari Worker ke Midtrans. Relay dipakai hanya untuk integrasi yang membutuhkan IP keluar statis.
 
 ## Keamanan
 
-Relay bukan open proxy. Semua request provider wajib berupa `POST` dan membawa header:
+Relay bukan open proxy. Request provider wajib berupa `POST` dan membawa header:
 
 `X-LFAMILIA-Relay-Token: <secret>`
 
@@ -18,24 +14,29 @@ Token hanya disimpan sebagai secret pada VPS dan Cloudflare Worker. Body, author
 
 ## Environment VPS
 
-Buat `/etc/lfamilia-relay.env` dan jangan commit nilainya:
+Buat `/etc/lfamilia-relay.env` dan isi nilainya sendiri. Jangan commit file ini:
 
 ```env
-HOST=127.0.0.1
-PORT=8788
-RELAY_TOKEN=SECRET_ACAK_MINIMAL_32_KARAKTER
+RELAY_BIND_HOST=<bind-host>
+RELAY_BIND_PORT=<bind-port>
+RELAY_UPSTREAM=<caddy-reverse-proxy-target>
+RELAY_TOKEN=<secret-random-min-32-char>
+RELAY_MAX_BODY_BYTES=<max-request-bytes>
+RELAY_UPSTREAM_TIMEOUT_MS=<provider-timeout-ms>
+RELAY_REQUEST_TIMEOUT_BUFFER_MS=<request-timeout-buffer-ms>
+RELAY_HEADERS_TIMEOUT_MS=<headers-timeout-ms>
 
-DIGIFLAZZ_RELAY_HOST=digiflazz-relay.lfamiliastore.my.id
-DIGIFLAZZ_UPSTREAM_ORIGIN=https://api.digiflazz.com
+DIGIFLAZZ_RELAY_HOST=<digiflazz-relay-host>
+DIGIFLAZZ_UPSTREAM_ORIGIN=<digiflazz-api-origin>
 
-IPAYMU_RELAY_HOST=ipaymu-relay.lfamiliastore.my.id
-IPAYMU_UPSTREAM_ORIGIN=
+IPAYMU_RELAY_HOST=<ipaymu-relay-host>
+IPAYMU_UPSTREAM_ORIGIN=<ipaymu-api-origin>
 
-MIDTRANS_BISNAP_RELAY_HOST=bisnap-relay.lfamiliastore.my.id
-MIDTRANS_BISNAP_UPSTREAM_ORIGIN=
+MIDTRANS_BISNAP_RELAY_HOST=<midtrans-bisnap-relay-host>
+MIDTRANS_BISNAP_UPSTREAM_ORIGIN=<midtrans-bisnap-api-origin>
 ```
 
-Biarkan upstream iPaymu dan BI-SNAP kosong sampai endpoint resmi untuk akun tersebut sudah dipastikan.
+Provider yang belum siap boleh memiliki hostname tetapi upstream-nya dikosongkan; relay akan mengembalikan status konfigurasi belum tersedia dan tidak meneruskan request.
 
 ## systemd
 
@@ -61,19 +62,14 @@ PrivateTmp=true
 WantedBy=multi-user.target
 ```
 
-Salin `server.mjs` ke `/opt/lfamilia-relay/server.mjs`, lalu gunakan Caddyfile contoh pada folder ini.
+Caddy juga membaca hostname dan target reverse proxy dari environment melalui `relay/Caddyfile.example`.
 
 ## Cloudflare Worker
 
-Setelah relay DigiFlazz aktif:
+Cloudflare menyimpan konfigurasi relay sebagai Variable/Secret, bukan source code:
 
 - Secret `PROVIDER_RELAY_TOKEN` = nilai yang sama dengan `RELAY_TOKEN` di VPS.
-- Variable `PROVIDER_RELAY_HOSTS` = `digiflazz-relay.lfamiliastore.my.id,ipaymu-relay.lfamiliastore.my.id,bisnap-relay.lfamiliastore.my.id`
-- `DIGIFLAZZ_API_URL` = `https://digiflazz-relay.lfamiliastore.my.id/v1/transaction`
-- `DIGIFLAZZ_PRICE_LIST_URL` = `https://digiflazz-relay.lfamiliastore.my.id/v1/price-list`
+- Variable `PROVIDER_RELAY_HOSTS` = daftar hostname relay yang diizinkan, dipisahkan koma.
+- `DIGIFLAZZ_API_URL` dan `DIGIFLAZZ_PRICE_LIST_URL` diarahkan ke hostname relay DigiFlazz setelah relay aktif.
 
-Callback DigiFlazz tetap langsung ke:
-
-`https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback`
-
-Jangan mengubah URL Midtrans Snap saat ini hanya karena relay sudah dipasang. BI-SNAP dan iPaymu baru diarahkan ke relay setelah integrasi provider masing-masing siap.
+Callback provider tetap langsung ke domain publik LFAMILIA. Jangan mengubah URL Midtrans Snap hanya karena VPS relay sudah tersedia. BI-SNAP dan iPaymu baru diaktifkan setelah credential dan endpoint resmi masing-masing siap.
