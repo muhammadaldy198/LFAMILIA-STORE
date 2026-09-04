@@ -41,9 +41,13 @@ const providerDefinitions = [
   {
     name: "digiflazz",
     host: optionalEnv("DIGIFLAZZ_RELAY_HOST").toLowerCase(),
-    upstream: normalizeOrigin(
-      optionalEnv("DIGIFLAZZ_UPSTREAM_ORIGIN"),
-      "DIGIFLAZZ_UPSTREAM_ORIGIN",
+    developmentUpstream: normalizeOrigin(
+      optionalEnv("DIGIFLAZZ_DEVELOPMENT_UPSTREAM_ORIGIN"),
+      "DIGIFLAZZ_DEVELOPMENT_UPSTREAM_ORIGIN",
+    ),
+    productionUpstream: normalizeOrigin(
+      optionalEnv("DIGIFLAZZ_PRODUCTION_UPSTREAM_ORIGIN"),
+      "DIGIFLAZZ_PRODUCTION_UPSTREAM_ORIGIN",
     ),
   },
   {
@@ -57,7 +61,6 @@ const providerDefinitions = [
       optionalEnv("IPAYMU_PRODUCTION_UPSTREAM_ORIGIN"),
       "IPAYMU_PRODUCTION_UPSTREAM_ORIGIN",
     ),
-    sandboxVa: optionalEnv("IPAYMU_SANDBOX_VA"),
   },
   {
     name: "midtrans-bisnap",
@@ -88,6 +91,13 @@ const providers = new Map(
     .map((provider) => [provider.host, provider]),
 );
 
+const internalHeaders = new Set([
+  "x-lfamilia-relay-token",
+  "x-lfamilia-digiflazz-environment",
+  "x-lfamilia-ipaymu-environment",
+  "x-lfamilia-midtrans-bisnap-environment",
+]);
+
 const hopByHopHeaders = new Set([
   "connection",
   "content-length",
@@ -100,8 +110,7 @@ const hopByHopHeaders = new Set([
   "transfer-encoding",
   "upgrade",
   "cookie",
-  "x-lfamilia-relay-token",
-  "x-lfamilia-bisnap-environment",
+  ...internalHeaders,
 ]);
 
 function json(res, status, payload) {
@@ -199,18 +208,30 @@ function isMethodAllowed(provider, method) {
 }
 
 function resolveProviderUpstream(provider, req) {
-  if (provider.name === "ipaymu") {
-    const va = String(req.headers.va || "").trim();
-    if (!va || !provider.sandboxUpstream || !provider.productionUpstream) return "";
-    return va === provider.sandboxVa
-      ? provider.sandboxUpstream
-      : provider.productionUpstream;
+  if (provider.name === "digiflazz") {
+    const environment = String(
+      req.headers["x-lfamilia-digiflazz-environment"] || "",
+    ).toLowerCase();
+
+    if (environment === "development") return provider.developmentUpstream;
+    if (environment === "production") return provider.productionUpstream;
+    return "";
   }
 
-  if (provider.name !== "midtrans-bisnap") return provider.upstream;
+  if (provider.name === "ipaymu") {
+    const environment = String(
+      req.headers["x-lfamilia-ipaymu-environment"] || "",
+    ).toLowerCase();
+
+    if (environment === "sandbox") return provider.sandboxUpstream;
+    if (environment === "production") return provider.productionUpstream;
+    return "";
+  }
+
+  if (provider.name !== "midtrans-bisnap") return "";
 
   const environment = String(
-    req.headers["x-lfamilia-bisnap-environment"] || "",
+    req.headers["x-lfamilia-midtrans-bisnap-environment"] || "",
   ).toLowerCase();
   if (environment !== "sandbox" && environment !== "production") return "";
 
@@ -230,6 +251,33 @@ function resolveProviderUpstream(provider, req) {
     : provider.productionUpstream;
 }
 
+function providerConfigured(provider) {
+  if (provider.name === "digiflazz") {
+    return Boolean(
+      provider.host &&
+        provider.developmentUpstream &&
+        provider.productionUpstream,
+    );
+  }
+
+  if (provider.name === "ipaymu") {
+    return Boolean(
+      provider.host &&
+        provider.sandboxUpstream &&
+        provider.productionUpstream,
+    );
+  }
+
+  return Boolean(
+    provider.host &&
+      provider.sandboxUpstream &&
+      provider.sandboxAuthUpstream &&
+      provider.productionUpstream &&
+      provider.productionAuthUpstream &&
+      provider.authPathPrefix,
+  );
+}
+
 const server = createServer(async (req, res) => {
   const startedAt = Date.now();
   const hostname = requestHostname(req);
@@ -241,22 +289,7 @@ const server = createServer(async (req, res) => {
       configured: Object.fromEntries(
         providerDefinitions.map((provider) => [
           provider.name,
-          provider.name === "ipaymu"
-            ? Boolean(
-                provider.host &&
-                  provider.sandboxUpstream &&
-                  provider.productionUpstream &&
-                  provider.sandboxVa,
-              )
-            : provider.name === "midtrans-bisnap"
-              ? Boolean(
-                  provider.host &&
-                    provider.sandboxUpstream &&
-                    provider.sandboxAuthUpstream &&
-                    provider.productionUpstream &&
-                    provider.productionAuthUpstream,
-                )
-              : Boolean(provider.host && provider.upstream),
+          providerConfigured(provider),
         ]),
       ),
     });
@@ -281,7 +314,9 @@ const server = createServer(async (req, res) => {
 
   const providerUpstream = resolveProviderUpstream(provider, req);
   if (!providerUpstream) {
-    json(res, 503, { error: "Upstream provider belum dikonfigurasi." });
+    json(res, 503, {
+      error: "Environment atau upstream provider belum dikonfigurasi.",
+    });
     return;
   }
 
@@ -333,7 +368,8 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.requestTimeout = UPSTREAM_TIMEOUT_MS + requirePositiveInt("RELAY_REQUEST_TIMEOUT_BUFFER_MS");
+server.requestTimeout =
+  UPSTREAM_TIMEOUT_MS + requirePositiveInt("RELAY_REQUEST_TIMEOUT_BUFFER_MS");
 server.headersTimeout = requirePositiveInt("RELAY_HEADERS_TIMEOUT_MS");
 server.listen(PORT, HOST, () => {
   process.stdout.write(
