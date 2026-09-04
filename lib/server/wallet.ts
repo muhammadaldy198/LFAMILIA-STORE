@@ -13,6 +13,8 @@ export type WalletSettings = {
   manualQrisImageUrl: string;
   midtransTopupEnabled: boolean;
   midtransCheckoutEnabled: boolean;
+  ipaymuTopupEnabled: boolean;
+  ipaymuCheckoutEnabled: boolean;
 };
 
 const fallbackSettings: WalletSettings = {
@@ -27,6 +29,8 @@ const fallbackSettings: WalletSettings = {
   manualQrisImageUrl: "",
   midtransTopupEnabled: false,
   midtransCheckoutEnabled: false,
+  ipaymuTopupEnabled: false,
+  ipaymuCheckoutEnabled: false,
 };
 
 export async function readWalletSettings(): Promise<WalletSettings> {
@@ -46,6 +50,8 @@ export async function readWalletSettings(): Promise<WalletSettings> {
         manual_qris_image_url: string | null;
         midtrans_topup_enabled: number;
         midtrans_checkout_enabled: number;
+        ipaymu_topup_enabled: number;
+        ipaymu_checkout_enabled: number;
       }>();
     if (!row) return fallbackSettings;
     return {
@@ -60,6 +66,8 @@ export async function readWalletSettings(): Promise<WalletSettings> {
       manualQrisImageUrl: row.manual_qris_image_url || "",
       midtransTopupEnabled: Boolean(row.midtrans_topup_enabled),
       midtransCheckoutEnabled: Boolean(row.midtrans_checkout_enabled),
+      ipaymuTopupEnabled: Boolean(row.ipaymu_topup_enabled),
+      ipaymuCheckoutEnabled: Boolean(row.ipaymu_checkout_enabled),
     };
   } catch {
     return fallbackSettings;
@@ -70,13 +78,14 @@ export async function saveWalletSettings(input: WalletSettings) {
   await ensureLegacyDatabaseColumns();
   await getD1()
     .prepare(
-      `INSERT INTO wallet_settings (id, is_enabled, method_name, account_name, account_number, instructions, min_topup, manual_qris_enabled, manual_qris_name, manual_qris_image_url, midtrans_topup_enabled, midtrans_checkout_enabled, updated_at)
-     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `INSERT INTO wallet_settings (id, is_enabled, method_name, account_name, account_number, instructions, min_topup, manual_qris_enabled, manual_qris_name, manual_qris_image_url, midtrans_topup_enabled, midtrans_checkout_enabled, ipaymu_topup_enabled, ipaymu_checkout_enabled, updated_at)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
      ON CONFLICT(id) DO UPDATE SET is_enabled = excluded.is_enabled, method_name = excluded.method_name,
       account_name = excluded.account_name, account_number = excluded.account_number,
       instructions = excluded.instructions, min_topup = excluded.min_topup,
       manual_qris_enabled = excluded.manual_qris_enabled, manual_qris_name = excluded.manual_qris_name,
       manual_qris_image_url = excluded.manual_qris_image_url, midtrans_topup_enabled = excluded.midtrans_topup_enabled, midtrans_checkout_enabled = excluded.midtrans_checkout_enabled,
+      ipaymu_topup_enabled = excluded.ipaymu_topup_enabled, ipaymu_checkout_enabled = excluded.ipaymu_checkout_enabled,
       updated_at = CURRENT_TIMESTAMP`,
     )
     .bind(
@@ -91,6 +100,8 @@ export async function saveWalletSettings(input: WalletSettings) {
       input.manualQrisImageUrl || null,
       input.midtransTopupEnabled ? 1 : 0,
       input.midtransCheckoutEnabled ? 1 : 0,
+      input.ipaymuTopupEnabled ? 1 : 0,
+      input.ipaymuCheckoutEnabled ? 1 : 0,
     )
     .run();
 }
