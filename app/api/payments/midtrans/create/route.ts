@@ -111,7 +111,6 @@ export async function POST(request: Request) {
       paymentMethod: input.paymentMethod,
       paymentChannel,
       finishUrl: `${baseUrl}/payment?invoice=${encodeURIComponent(invoice)}`,
-      deviceId: request.headers.get("user-agent") || undefined,
     });
     await updateMidtransPayment({
       referenceId: identity.referenceId,
