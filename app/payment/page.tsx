@@ -17,6 +17,7 @@ type PaymentOrder = {
   paymentChannel: string;
   paymentStatus: string;
   fulfillmentStatus: string;
+  paymentGateway: "midtrans" | "ipaymu" | null;
   paymentUrl: string | null;
   createdAt: string;
   updatedAt: string;
@@ -116,10 +117,11 @@ function PaymentContent() {
   }, [invoice, snapToken]);
 
   useEffect(() => {
+    if (order?.paymentGateway !== "midtrans") return;
     if (snapToken || !order?.paymentUrl) return;
     const token = snapTokenFromUrl(order.paymentUrl);
     if (token) setSnapToken(token);
-  }, [order?.paymentUrl, snapToken]);
+  }, [order?.paymentGateway, order?.paymentUrl, snapToken]);
 
   useEffect(() => {
     if (!snapToken) return;
@@ -226,7 +228,7 @@ function PaymentContent() {
                 {paid ? <CheckCircle2 className="size-5" /> : <ShieldCheck className="size-5" />}
               </span>
             </div>
-            <p className="mt-2 text-xs leading-5 text-white/45">Pembayaran diproses melalui Midtrans. Data transaksi tetap tercatat di LFAMILIA STORE.</p>
+            <p className="mt-2 text-xs leading-5 text-white/45">Pembayaran diproses melalui {order.paymentGateway === "ipaymu" ? "iPaymu" : "Midtrans"}. Data transaksi tetap tercatat di LFAMILIA STORE.</p>
           </div>
 
           <div className="p-5 sm:p-6">
