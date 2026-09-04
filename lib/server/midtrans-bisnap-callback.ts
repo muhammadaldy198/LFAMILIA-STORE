@@ -106,7 +106,8 @@ function providerTransactionId(
   payload: Record<string, unknown>,
 ) {
   if (kind === "virtual-account") {
-    return String(payload.referenceNo ?? payload.trxId ?? "").trim() || null;
+    const nested = (payload.virtualAccountData ?? {}) as Record<string, unknown>;
+    return String(nested.trxId ?? payload.trxId ?? "").trim() || null;
   }
   return String(payload.originalReferenceNo ?? "").trim() || null;
 }
@@ -201,7 +202,7 @@ export async function handleMidtransBisnapCallback(
       callbackAmount: amount,
     });
 
-    if (result.ignored === "amount_mismatch") {
+    if ("ignored" in result && result.ignored === "amount_mismatch") {
       return errorResponse(kind, 404, "Invalid Amount");
     }
 
