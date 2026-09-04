@@ -129,9 +129,31 @@ export function isMidtransSnapChannelSupported(
   }
 }
 
-// Dipakai endpoint daftar channel. OVO tetap tersedia melalui Midtrans.
-export function isMidtransChannelSupported(method: string, channel: string) {
-  return isMidtransSnapChannelSupported(method, channel);
+function isMidtransBisnapChannelSupported(method: string, channel: string) {
+  if (method === "qris") return channel === "mpm";
+  if (method === "ewallet")
+    return channel === "gopay" || channel === "shopeepay" || channel === "dana";
+  if (method === "va")
+    return new Set([
+      "bca",
+      "bni",
+      "bri",
+      "permata",
+      "mandiri",
+      "cimb",
+      "danamon",
+    ]).has(channel);
+  return false;
+}
+
+export function isMidtransChannelSupported(
+  method: string,
+  channel: string,
+  mode: MidtransMode = getMidtransMode(),
+) {
+  return mode === "bisnap"
+    ? isMidtransBisnapChannelSupported(method, channel)
+    : isMidtransSnapChannelSupported(method, channel);
 }
 
 export async function createMidtransSnapPayment(input: {
