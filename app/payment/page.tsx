@@ -262,7 +262,11 @@ function PaymentContent() {
                   {!openingPayment && (snapReady ? <ShieldCheck className="ml-2 size-4" /> : <ExternalLink className="ml-2 size-4" />)}
                 </Button>
                 <p className="mt-2 text-center text-[9px] text-white/30">
-                  {snapReady ? "Pembayaran dibuka di atas halaman LFAMILIA." : "Jika popup belum aktif, pembayaran dibuka melalui halaman Midtrans."}
+                  {order.paymentGateway === "ipaymu"
+                    ? "Pembayaran dibuka melalui halaman iPaymu."
+                    : snapReady
+                      ? "Pembayaran dibuka di atas halaman LFAMILIA."
+                      : "Jika popup belum aktif, pembayaran dibuka melalui halaman Midtrans."}
                 </p>
               </>
             )}
