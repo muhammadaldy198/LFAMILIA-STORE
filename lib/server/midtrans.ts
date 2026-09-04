@@ -129,6 +129,11 @@ export function isMidtransSnapChannelSupported(
   }
 }
 
+// Dipakai endpoint daftar channel. OVO tetap tersedia melalui Midtrans.
+export function isMidtransChannelSupported(method: string, channel: string) {
+  return isMidtransSnapChannelSupported(method, channel);
+}
+
 export async function createMidtransSnapPayment(input: {
   referenceId: string;
   amount: number;
@@ -204,14 +209,8 @@ export function validateMidtransNotification(
   const signature = String(input.signature_key ?? "");
 
   const candidates = [
-    [
-      "sandbox",
-      config.MIDTRANS_SNAP_SANDBOX_SERVER_KEY?.trim(),
-    ],
-    [
-      "production",
-      config.MIDTRANS_SNAP_PRODUCTION_SERVER_KEY?.trim(),
-    ],
+    ["sandbox", config.MIDTRANS_SNAP_SANDBOX_SERVER_KEY?.trim()],
+    ["production", config.MIDTRANS_SNAP_PRODUCTION_SERVER_KEY?.trim()],
   ] as const;
 
   for (const [environment, serverKey] of candidates) {
