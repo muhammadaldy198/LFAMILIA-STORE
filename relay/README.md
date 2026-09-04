@@ -34,9 +34,11 @@ IPAYMU_UPSTREAM_ORIGIN=<ipaymu-api-origin>
 
 MIDTRANS_BISNAP_RELAY_HOST=<midtrans-bisnap-relay-host>
 MIDTRANS_BISNAP_UPSTREAM_ORIGIN=<midtrans-bisnap-api-origin>
+MIDTRANS_BISNAP_AUTH_UPSTREAM_ORIGIN=<midtrans-bisnap-auth-origin>
+MIDTRANS_BISNAP_AUTH_PATH_PREFIX=<midtrans-bisnap-auth-path-prefix>
 ```
 
-Provider yang belum siap boleh memiliki hostname tetapi upstream-nya dikosongkan; relay akan mengembalikan status konfigurasi belum tersedia dan tidak meneruskan request.
+Provider yang belum siap boleh memiliki hostname tetapi upstream-nya dikosongkan; relay akan mengembalikan status konfigurasi belum tersedia dan tidak meneruskan request. Relay BI-SNAP mendukung GET dan POST; auth-code dapat diarahkan ke origin terpisah melalui `MIDTRANS_BISNAP_AUTH_UPSTREAM_ORIGIN` dan `MIDTRANS_BISNAP_AUTH_PATH_PREFIX`.
 
 ## systemd
 
