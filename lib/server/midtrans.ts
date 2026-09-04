@@ -1,10 +1,10 @@
 import { hashHex, safeEqual } from "@/lib/server/crypto";
-import { getRuntimeEnv, requireRuntimeChoice, requireRuntimeValue } from "@/lib/server/runtime-env";
+import { getRuntimeEnv, requireRuntimeValue } from "@/lib/server/runtime-env";
 
 type MidtransRuntime = {
-  MIDTRANS_ENV?: string;
   MIDTRANS_SERVER_KEY?: string;
-  MIDTRANS_SNAP_API_URL?: string;
+  MIDTRANS_SNAP_SANDBOX_API_URL?: string;
+  MIDTRANS_SNAP_PRODUCTION_API_URL?: string;
 };
 
 type SnapResponse = {
@@ -21,9 +21,19 @@ export type MidtransPaymentResult = {
 
 function runtimeConfig() {
   const runtime = getRuntimeEnv<MidtransRuntime>();
-  const serverKey = requireRuntimeValue(runtime.MIDTRANS_SERVER_KEY, "MIDTRANS_SERVER_KEY");
-  const environment = requireRuntimeChoice(runtime.MIDTRANS_ENV, "MIDTRANS_ENV", ["sandbox", "production"] as const);
-  const endpoint = requireRuntimeValue(runtime.MIDTRANS_SNAP_API_URL, "MIDTRANS_SNAP_API_URL");
+  const serverKey = requireRuntimeValue(
+    runtime.MIDTRANS_SERVER_KEY,
+    "MIDTRANS_SERVER_KEY",
+  );
+  const environment = serverKey.startsWith("SB-") ? "sandbox" : "production";
+  const endpoint = requireRuntimeValue(
+    environment === "sandbox"
+      ? runtime.MIDTRANS_SNAP_SANDBOX_API_URL
+      : runtime.MIDTRANS_SNAP_PRODUCTION_API_URL,
+    environment === "sandbox"
+      ? "MIDTRANS_SNAP_SANDBOX_API_URL"
+      : "MIDTRANS_SNAP_PRODUCTION_API_URL",
+  );
   return { serverKey, environment, endpoint };
 }
 
