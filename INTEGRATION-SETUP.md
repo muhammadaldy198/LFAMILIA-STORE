@@ -29,6 +29,7 @@ Tambahkan sebagai **Secret**, bukan Variable biasa dan bukan file GitHub:
 | `DIGIFLAZZ_USERNAME` | Username buyer DigiFlazz |
 | `DIGIFLAZZ_API_KEY` | Production/development API key DigiFlazz |
 | `DIGIFLAZZ_WEBHOOK_SECRET` | Secret webhook DigiFlazz |
+| `PROVIDER_RELAY_TOKEN` | Secret acak minimal 32 karakter, sama dengan `RELAY_TOKEN` pada VPS provider relay |
 | `VIPPAYMENT_API_ID` | API ID VIPayment |
 | `VIPPAYMENT_API_KEY` | API Key VIPayment |
 | `VOUCHER_ENCRYPTION_KEY` | Secret acak minimal 32 karakter; jangan pernah diganti setelah stok diimpor |
@@ -45,8 +46,9 @@ Tambahkan sebagai **Variable biasa**. Nilai berikut adalah konfigurasi Sandbox/D
 | `MIDTRANS_SNAP_API_URL` | `https://app.sandbox.midtrans.com/snap/v1/transactions` |
 | `MIDTRANS_SNAP_SCRIPT_URL` | `https://app.sandbox.midtrans.com/snap/snap.js` |
 | `DIGIFLAZZ_ENV` | `development` |
-| `DIGIFLAZZ_API_URL` | `https://api.digiflazz.com/v1/transaction` |
-| `DIGIFLAZZ_PRICE_LIST_URL` | `https://api.digiflazz.com/v1/price-list` |
+| `DIGIFLAZZ_API_URL` | Direct: `https://api.digiflazz.com/v1/transaction`; setelah relay aktif: `https://digiflazz-relay.lfamiliastore.my.id/v1/transaction` |
+| `DIGIFLAZZ_PRICE_LIST_URL` | Direct: `https://api.digiflazz.com/v1/price-list`; setelah relay aktif: `https://digiflazz-relay.lfamiliastore.my.id/v1/price-list` |
+| `PROVIDER_RELAY_HOSTS` | `digiflazz-relay.lfamiliastore.my.id,ipaymu-relay.lfamiliastore.my.id,bisnap-relay.lfamiliastore.my.id` |
 | `OWNER_EMAIL` | Email Pemilik utama yang sama dengan akun admin |
 | `NICKNAME_API_URL` | `https://api.isan.eu.org/nickname` |
 | `MELOSTORE_API_URL` | `https://api.melostore.id` |
@@ -114,9 +116,28 @@ Jangan membuka admin sebelum Access aktif. Bila memakai custom domain, pastikan 
 
 Saat pembayaran terkonfirmasi lunas, satu baris stok direservasi secara atomik. Kode disimpan terenkripsi, tidak dikirim dua kali oleh callback pembayaran yang sama, dan tidak pernah muncul di pelacakan invoice publik. Bila kanal notifikasi tambahan gagal, kode tetap tersedia di website.
 
-## 7. Syarat IP provider
+## 7. Syarat IP provider dan VPS relay
 
-DigiFlazz dapat memakai whitelist IP untuk koneksi buyer. Jika provider tertentu meminta satu IP statis khusus, arahkan hanya request provider tersebut melalui relay/VPS ber-IP statis; callback tetap diterima langsung oleh Worker.
+Satu VPS ber-IP publik statis dapat dipakai sebagai relay pusat untuk DigiFlazz, iPaymu, dan Midtrans BI-SNAP. Source relay tersedia di folder `relay/`.
+
+Hostname yang disiapkan:
+
+- `digiflazz-relay.lfamiliastore.my.id`
+- `ipaymu-relay.lfamiliastore.my.id`
+- `bisnap-relay.lfamiliastore.my.id`
+
+Midtrans Snap biasa tetap langsung dari Worker ke Midtrans. Jangan memindahkan Snap ke relay hanya karena VPS tersedia.
+
+Untuk mengaktifkan DigiFlazz melalui VPS:
+
+1. Jalankan `relay/server.mjs` pada VPS di `127.0.0.1:8788`.
+2. Pasang konfigurasi Caddy dari `relay/Caddyfile.example`.
+3. Buat secret VPS `RELAY_TOKEN`, lalu simpan nilai yang sama sebagai Cloudflare Secret `PROVIDER_RELAY_TOKEN`.
+4. Isi `PROVIDER_RELAY_HOSTS` dengan tiga hostname relay.
+5. Ubah `DIGIFLAZZ_API_URL` dan `DIGIFLAZZ_PRICE_LIST_URL` ke hostname relay DigiFlazz.
+6. Daftarkan IP publik VPS sebagai IP koneksi DigiFlazz sesuai environment yang dipakai.
+
+Callback provider tetap diterima langsung oleh Worker pada domain utama LFAMILIA dan tidak perlu melewati VPS. Upstream iPaymu dan BI-SNAP pada VPS dibiarkan kosong sampai akun dan endpoint resmi masing-masing siap.
 
 ## 8. Menambah provider lain
 
