@@ -1,9 +1,73 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
-import { deletePaymentChannel, listPaymentChannels, savePaymentChannel } from "@/lib/server/payment-channels";
+import {
+  deletePaymentChannel,
+  listPaymentChannels,
+  savePaymentChannel,
+  syncPaymentChannelsForGateway,
+} from "@/lib/server/payment-channels";
 import { isAllowedMediaUrl } from "@/lib/media-url";
+import { readWalletSettings } from "@/lib/server/wallet";
 
-const schema = z.object({ id: z.number().int().positive().nullable().optional(), method: z.enum(["va", "ewallet", "qris"]), channel: z.string().trim().regex(/^[a-z0-9_]+$/).max(30), name: z.string().trim().min(2).max(80), description: z.string().trim().max(160), imageUrl: z.string().trim().max(500).refine(isAllowedMediaUrl, "URL gambar tidak valid.").optional().or(z.literal("")), isActive: z.boolean(), sortOrder: z.number().int().min(0).max(10000) });
-export async function GET(request: Request) { const access = await requireAdminSession(request, "owner"); if (access instanceof Response) return access; return Response.json({ channels: await listPaymentChannels(true) }); }
-export async function POST(request: Request) { const access = await requireAdminSession(request, "owner"); if (access instanceof Response) return access; try { const input = schema.parse(await request.json()); const id = await savePaymentChannel(input); return Response.json({ ok: true, id }); } catch (error) { return Response.json({ error: error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Metode pembayaran gagal disimpan." }, { status: 400 }); } }
-export async function DELETE(request: Request) { const access = await requireAdminSession(request, "owner"); if (access instanceof Response) return access; const id = Number(new URL(request.url).searchParams.get("id")); if (!Number.isInteger(id) || id < 1) return Response.json({ error: "Metode pembayaran tidak valid." }, { status: 400 }); await deletePaymentChannel(id); return Response.json({ ok: true }); }
+const channelSchema = z.object({
+  id: z.number().int().positive().nullable().optional(),
+  method: z.enum(["va", "ewallet", "qris"]),
+  channel: z.string().trim().regex(/^[a-z0-9_]+$/).max(30),
+  name: z.string().trim().min(2).max(80),
+  description: z.string().trim().max(160),
+  imageUrl: z.string().trim().max(500).refine(isAllowedMediaUrl, "URL gambar tidak valid.").optional().or(z.literal("")),
+  isActive: z.boolean(),
+  sortOrder: z.number().int().min(0).max(10000),
+});
+
+async function activeGateway() {
+  const settings = await readWalletSettings();
+  return settings.midtransCheckoutEnabled
+    ? "midtrans" as const
+    : settings.ipaymuCheckoutEnabled
+      ? "ipaymu" as const
+      : null;
+}
+
+export async function GET(request: Request) {
+  const access = await requireAdminSession(request, "owner");
+  if (access instanceof Response) return access;
+  return Response.json({
+    channels: await listPaymentChannels(true),
+    gateway: await activeGateway(),
+  });
+}
+
+export async function POST(request: Request) {
+  const access = await requireAdminSession(request, "owner");
+  if (access instanceof Response) return access;
+  try {
+    const raw = await request.json();
+    if (raw?.action === "sync") {
+      const gateway = await activeGateway();
+      if (!gateway) throw new Error("Aktifkan Midtrans atau iPaymu untuk checkout terlebih dahulu.");
+      return Response.json({ ok: true, ...(await syncPaymentChannelsForGateway(gateway)) });
+    }
+    const input = channelSchema.parse(raw);
+    const id = await savePaymentChannel(input);
+    return Response.json({ ok: true, id });
+  } catch (error) {
+    return Response.json({
+      error: error instanceof z.ZodError
+        ? error.issues[0]?.message
+        : error instanceof Error
+          ? error.message
+          : "Metode pembayaran gagal disimpan.",
+    }, { status: 400 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const access = await requireAdminSession(request, "owner");
+  if (access instanceof Response) return access;
+  const id = Number(new URL(request.url).searchParams.get("id"));
+  if (!Number.isInteger(id) || id < 1)
+    return Response.json({ error: "Metode pembayaran tidak valid." }, { status: 400 });
+  await deletePaymentChannel(id);
+  return Response.json({ ok: true });
+}

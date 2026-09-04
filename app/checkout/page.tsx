@@ -91,33 +91,18 @@ type PromotionQuote = {
   flashSaleEndsAt: string | null;
 };
 
-type CheckoutPaymentMethod =
-  PaymentMethodCode | "wallet" | "manual_qris" | "manual_bank";
+type CheckoutPaymentMethod = PaymentMethodCode | "wallet";
 type DisplayPaymentChannel = PaymentChannel & { imageUrl?: string };
 type CheckoutGatewayConfig = {
   gateway: "midtrans" | "ipaymu" | null;
   midtransMode: "snap" | "bisnap" | null;
   environment: "sandbox" | "production" | null;
 };
-const manualPaymentGroups = [
-  {
-    code: "manual_qris" as const,
-    name: "QRIS",
-    description: "Scan QRIS toko, lalu pembayaran diperiksa Pemilik",
-  },
-  {
-    code: "manual_bank" as const,
-    name: "Transfer bank",
-    description: "Transfer ke rekening toko, lalu pembayaran diperiksa Pemilik",
-  },
-];
 const groupIcons = {
   va: Landmark,
   ewallet: WalletCards,
   qris: QrCode,
   wallet: WalletCards,
-  manual_qris: QrCode,
-  manual_bank: Landmark,
 };
 
 export default function CheckoutPage() {
@@ -409,10 +394,8 @@ function CheckoutContent() {
     setPaymentChannel(
       method === "wallet"
         ? "lfamilia-balance"
-        : method === "manual_qris" || method === "manual_bank"
-          ? method
-          : (availableChannels.find((item) => item.method === method)
-              ?.channel ?? ""),
+        : (availableChannels.find((item) => item.method === method)
+            ?.channel ?? ""),
     );
     setPayment(null);
   }
@@ -505,13 +488,11 @@ function CheckoutContent() {
       const endpoint =
         paymentMethod === "wallet"
           ? "/api/payments/wallet/create"
-          : paymentMethod === "manual_qris" || paymentMethod === "manual_bank"
-            ? "/api/payments/manual/create"
-            : activeCheckoutGateway === "ipaymu"
-              ? "/api/payments/ipaymu/create"
-              : activeCheckoutGateway === "midtrans"
-                ? "/api/payments/midtrans/create"
-                : null;
+          : activeCheckoutGateway === "ipaymu"
+            ? "/api/payments/ipaymu/create"
+            : activeCheckoutGateway === "midtrans"
+              ? "/api/payments/midtrans/create"
+              : null;
       if (!endpoint)
         throw new Error("Payment gateway checkout sedang tidak aktif.");
       const response = await fetch(endpoint, {
@@ -1110,7 +1091,6 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
       : payment.providerCode === "voucher-stock"
         ? "Setelah lunas, satu kode stok dikirim otomatis ke email/WhatsApp pembeli."
         : "Setelah lunas, pesanan diteruskan otomatis ke provider.";
-  const isManualQris = payment.paymentMethod === "manual_qris";
   const isBisnapQris =
     payment.midtransMode === "bisnap" &&
     payment.paymentMethod === "qris";
@@ -1129,9 +1109,9 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
         </div>
       )}
       {payment.balanceAfter != null && <p className="mt-2.5 rounded-lg bg-black/20 p-2.5 text-[9px] text-white/55">Sisa saldo: <strong className="text-[#d8ff8d]">{formatRupiah(payment.balanceAfter)}</strong></p>}
-      {(isManualQris || isBisnapQris) && payment.paymentUrl && <div className="mt-3 rounded-lg bg-white p-2.5"><img src={payment.paymentUrl} alt="QRIS pembayaran" className="mx-auto aspect-square w-full max-w-64 object-contain" /></div>}
+      {isBisnapQris && payment.paymentUrl && <div className="mt-3 rounded-lg bg-white p-2.5"><img src={payment.paymentUrl} alt="QRIS pembayaran" className="mx-auto aspect-square w-full max-w-64 object-contain" /></div>}
       {payment.expiredAt && <p className="mt-2.5 text-[8px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}
-      {payment.paymentUrl && !isManualQris && !isBisnapQris && (
+      {payment.paymentUrl && !isBisnapQris && (
         <Button asChild className="mt-3 w-full rounded-lg bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]"><a href={payment.paymentUrl} target="_blank" rel="noreferrer">Lanjut bayar <ExternalLink className="ml-2 size-4" /></a></Button>
       )}
       <p className="mt-2.5 flex items-start gap-2 text-[8px] leading-4 text-white/38">

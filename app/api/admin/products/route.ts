@@ -61,11 +61,14 @@ const productSchema = z.object({
   packageTabs: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
   isActive: z.boolean().default(true),
   sortOrder: z.number().int().min(0).max(10_000).default(0),
-  packages: z.array(packageSchema).min(1).max(50),
+  packages: z.array(packageSchema).max(50).default([]),
   notices: z.array(noticeSchema).max(10).default([]),
 });
 
 function validateProduct(input: z.infer<typeof productSchema>) {
+  if (input.isActive && input.packages.length === 0) {
+    throw new Error("Tambahkan minimal satu nominal dari katalog sebelum mengaktifkan produk.");
+  }
   const fieldIds = input.inputFields.map((item) => item.id);
   if (new Set(fieldIds).size !== fieldIds.length) {
     throw new Error("Nama kolom data pelanggan tidak boleh duplikat.");
