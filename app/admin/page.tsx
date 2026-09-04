@@ -297,7 +297,7 @@ export default function AdminPage() {
                 title="Katalog produk"
                 description={
                   isOwner
-                    ? "Kelola tipe pengiriman, data tujuan, gambar, pop-up informasi, nominal, harga, dan SKU provider."
+                    ? "Kelola produk, data yang diisi pelanggan, gambar, pop-up informasi, nominal, harga, dan provider."
                     : "Staff dapat memperbarui gambar, jam layanan, instruksi, dan pop-up. Harga serta provider hanya tersedia untuk Pemilik."
                 }
               >
@@ -331,17 +331,20 @@ export default function AdminPage() {
                 <TabsContent value="members" className="mt-0">
                   <AdminSection
                     title="Member & privilege"
-                    description="Role BASIC, GOLD, DIAMOND, dan PLATINUM dihitung otomatis dari total order lunas semua metode pembayaran."
+                    description="Atur diskon dan benefit untuk BASIC, GOLD, DIAMOND, dan PLATINUM."
                   >
-                    <AdminMemberManager />
+                    <AdminMemberManager view="privileges" />
                   </AdminSection>
                 </TabsContent>
                 <TabsContent value="wallet" className="mt-0">
                   <AdminSection
                     title="Saldo pelanggan"
-                    description="Tinjau dan setujui permintaan top up pelanggan."
+                    description="Kelola saldo dan role customer. Top up pelanggan diproses otomatis oleh payment gateway."
                   >
-                    <AdminWalletManager view="topups" />
+                    <div className="space-y-5">
+                      <AdminMemberManager view="customers" />
+                      <AdminWalletManager view="topups" />
+                    </div>
                   </AdminSection>
                 </TabsContent>
                 <TabsContent value="payments" className="mt-0 space-y-5">
