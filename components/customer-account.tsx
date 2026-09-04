@@ -759,20 +759,23 @@ function TopupForm({
   );
   const bankReady = Boolean(settings?.isEnabled && settings.accountNumber);
   const qrisReady = Boolean(settings?.manualQrisEnabled);
-  const automaticReady = Boolean(settings?.midtransTopupEnabled);
+  const automaticReady = Boolean(
+    settings?.midtransTopupEnabled || settings?.ipaymuTopupEnabled,
+  );
   async function submit(event: FormEvent) {
     event.preventDefault();
     onError("");
     setSaving(true);
     try {
       if (mode === "midtrans") {
+        const gateway = settings?.midtransTopupEnabled ? "midtrans" : "ipaymu";
         const channel =
           autoMethod === "qris" ? "mpm" : autoMethod === "va" ? "bca" : "dana";
         const response = await fetch("/api/account/topups", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            mode: "midtrans",
+            mode: gateway,
             amount: Number(amount),
             paymentMethod: autoMethod,
             paymentChannel: channel,
@@ -788,7 +791,7 @@ function TopupForm({
           window.location.assign(data.paymentUrl);
           return;
         }
-        throw new Error("Midtrans tidak mengirim tautan pembayaran.");
+        throw new Error("Gateway pembayaran tidak mengirim tautan pembayaran.");
       }
       if (!proof) throw new Error("Pilih bukti pembayaran.");
       const form = new FormData();
@@ -834,8 +837,8 @@ function TopupForm({
     >
       <h2 className="font-bold">Top up saldo</h2>
       <p className="mt-2 text-xs leading-5 text-white/40">
-        Pilih manual untuk transfer ke akun toko, atau Midtrans agar saldo masuk
-        otomatis setelah bayar.
+        Pilih manual untuk transfer ke akun toko, atau gateway otomatis agar saldo
+        masuk setelah pembayaran terkonfirmasi.
       </p>
       <div className="mt-4 grid grid-cols-3 gap-2">
         {bankReady && (
