@@ -757,6 +757,15 @@ function TopupForm({
   const [autoMethod, setAutoMethod] = useState<"qris" | "va" | "ewallet">(
     "qris",
   );
+  const [autoPayment, setAutoPayment] = useState<{
+    referenceId?: string;
+    midtransMode?: "snap" | "bisnap";
+    paymentMethod?: "qris" | "va" | "ewallet";
+    paymentNo?: string | null;
+    paymentName?: string | null;
+    paymentUrl?: string | null;
+    expiredAt?: string | null;
+  } | null>(null);
   const bankReady = Boolean(settings?.isEnabled && settings.accountNumber);
   const qrisReady = Boolean(settings?.manualQrisEnabled);
   const automaticReady = Boolean(
@@ -786,15 +795,29 @@ function TopupForm({
         });
         const data = (await response.json()) as {
           error?: string;
-          paymentUrl?: string;
+          referenceId?: string;
+          midtransMode?: "snap" | "bisnap";
+          paymentMethod?: "qris" | "va" | "ewallet";
+          paymentNo?: string | null;
+          paymentName?: string | null;
+          paymentUrl?: string | null;
+          expiredAt?: string | null;
         };
         if (!response.ok)
           throw new Error(data.error ?? "Pembayaran otomatis gagal dibuat.");
-        if (data.paymentUrl) {
+
+        const isBisnapQris =
+          data.midtransMode === "bisnap" &&
+          data.paymentMethod === "qris";
+        if (data.paymentUrl && !isBisnapQris) {
           window.location.assign(data.paymentUrl);
           return;
         }
-        throw new Error("Gateway pembayaran tidak mengirim tautan pembayaran.");
+        if (data.paymentNo || data.paymentUrl) {
+          setAutoPayment(data);
+          return;
+        }
+        throw new Error("Gateway pembayaran tidak mengirim detail pembayaran.");
       }
       if (!proof) throw new Error("Pilih bukti pembayaran.");
       const form = new FormData();
@@ -938,6 +961,54 @@ function TopupForm({
               </button>
             ))}
           </div>
+        </div>
+      )}
+      {mode === "midtrans" && autoPayment && (
+        <div className="mt-4 rounded-xl border border-white/[0.08] bg-black/20 p-4">
+          <strong className="text-xs">Pembayaran top up dibuat</strong>
+          {autoPayment.referenceId && (
+            <p className="mt-1 break-all text-[9px] text-white/40">
+              {autoPayment.referenceId}
+            </p>
+          )}
+          {autoPayment.paymentNo && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-black/25 p-3">
+              <div>
+                <span className="block text-[8px] uppercase tracking-wider text-white/35">
+                  {autoPayment.paymentName || "Nomor pembayaran"}
+                </span>
+                <strong className="mt-1 block break-all text-xs text-[#d8ff8d]">
+                  {autoPayment.paymentNo}
+                </strong>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  void navigator.clipboard.writeText(autoPayment.paymentNo!)
+                }
+                className="shrink-0 text-white/45"
+                aria-label="Salin nomor pembayaran"
+              >
+                <Copy className="size-4" />
+              </button>
+            </div>
+          )}
+          {autoPayment.midtransMode === "bisnap" &&
+            autoPayment.paymentMethod === "qris" &&
+            autoPayment.paymentUrl && (
+              <div className="mt-3 rounded-xl bg-white p-2">
+                <img
+                  src={autoPayment.paymentUrl}
+                  alt="QRIS top up Midtrans"
+                  className="mx-auto aspect-square w-full max-w-56 object-contain"
+                />
+              </div>
+            )}
+          {autoPayment.expiredAt && (
+            <p className="mt-2 text-[9px] text-white/35">
+              Berlaku sampai {autoPayment.expiredAt}
+            </p>
+          )}
         </div>
       )}
       {settings?.instructions && mode !== "midtrans" && (
