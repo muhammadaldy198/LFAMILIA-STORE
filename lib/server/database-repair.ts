@@ -80,6 +80,16 @@ const columns: Array<[table: string, column: string, definition: string]> = [
     "midtrans_checkout_enabled",
     "midtrans_checkout_enabled INTEGER DEFAULT 0 NOT NULL",
   ],
+  [
+    "wallet_settings",
+    "ipaymu_topup_enabled",
+    "ipaymu_topup_enabled INTEGER DEFAULT 0 NOT NULL",
+  ],
+  [
+    "wallet_settings",
+    "ipaymu_checkout_enabled",
+    "ipaymu_checkout_enabled INTEGER DEFAULT 0 NOT NULL",
+  ],
   ["wallet_topups", "source", "source TEXT DEFAULT 'manual' NOT NULL"],
   ["wallet_topups", "reference_id", "reference_id TEXT"],
   ["wallet_topups", "midtrans_transaction_id", "midtrans_transaction_id TEXT"],
