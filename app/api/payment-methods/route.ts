@@ -31,13 +31,20 @@ export async function GET() {
     }
   }
 
-  const channels = gateway
-    ? (await listPaymentChannels(false)).filter((item) =>
-        gateway === "ipaymu"
-          ? isIpaymuChannelSupported(item.method, item.channel)
-          : isMidtransChannelSupported(item.method, item.channel),
-      )
-    : [];
+  const channels =
+    gateway === "ipaymu"
+      ? (await listPaymentChannels(false)).filter((item) =>
+          isIpaymuChannelSupported(item.method, item.channel),
+        )
+      : gateway === "midtrans" && midtransMode && environment
+        ? (await listPaymentChannels(false)).filter((item) =>
+            isMidtransChannelSupported(
+              item.method,
+              item.channel,
+              midtransMode,
+            ),
+          )
+        : [];
 
   return Response.json(
     {
