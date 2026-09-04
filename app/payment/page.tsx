@@ -7,6 +7,8 @@ import { useSearchParams } from "next/navigation";
 import { BadgeCheck, CheckCircle2, Clock3, Copy, ExternalLink, LoaderCircle, ReceiptText, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StoreLayout } from "@/components/store-layout";
+import { StoreBrand } from "@/components/store-brand";
+import { useStorefront } from "@/hooks/use-storefront";
 import { formatRupiah } from "@/lib/store-data";
 
 type PaymentOrder = {
@@ -73,6 +75,7 @@ export default function PaymentPage() {
 }
 
 function PaymentContent() {
+  const { settings } = useStorefront();
   const searchParams = useSearchParams();
   const invoice = (searchParams.get("invoice") ?? "").trim().toUpperCase();
   const querySnapToken = (searchParams.get("token") ?? "").trim();
@@ -232,6 +235,24 @@ function PaymentContent() {
       <main className="mx-auto min-h-[76vh] max-w-xl px-4 py-8 sm:py-12">
         <section className="overflow-hidden rounded-2xl border border-white/[0.09] bg-[#15181f] shadow-2xl">
           <div className="border-b border-white/[0.08] bg-gradient-to-br from-[#b9ff35]/12 via-transparent to-transparent p-5 sm:p-6">
+            <div className="mb-5 flex items-center justify-between gap-4 border-b border-white/[0.07] pb-4">
+              <div className="flex items-center gap-2.5">
+                <StoreBrand settings={settings} compact />
+              </div>
+              <button
+                type="button"
+                onClick={copyInvoice}
+                className="rounded-lg border border-white/[0.08] bg-black/20 px-3 py-2 text-right"
+                aria-label="Salin nomor invoice"
+              >
+                <span className="block text-[8px] font-bold uppercase tracking-[0.16em] text-white/35">
+                  Invoice
+                </span>
+                <span className="mt-0.5 block max-w-40 truncate font-mono text-[10px] font-black text-[#d8ff8d]">
+                  {order.referenceId}
+                </span>
+              </button>
+            </div>
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#cfff72]">LFAMILIA PAYMENT</p>
