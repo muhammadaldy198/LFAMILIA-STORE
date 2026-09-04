@@ -213,17 +213,25 @@ function CheckoutContent() {
     paymentMethod === "qris";
   const activeCheckoutGateway = gatewayConfig.gateway;
   const automaticCheckoutReady = Boolean(activeCheckoutGateway);
+  const availableGatewayMethods = new Set(
+    availableChannels.map((item) => item.method),
+  );
+  const gatewayPaymentGroups = automaticCheckoutReady
+    ? paymentGroups
+        .filter((item) => availableGatewayMethods.has(item.code))
+        .sort(
+          (left, right) =>
+            ["qris", "ewallet", "va"].indexOf(left.code) -
+            ["qris", "ewallet", "va"].indexOf(right.code),
+        )
+    : [];
   const checkoutGroups = [
-    { code: "wallet" as const, name: "Koin LFAMILIA", description: "Bayar langsung dari saldo akun" },
-    ...(automaticCheckoutReady
-      ? paymentGroups
-          .filter((item) => item.code === "qris" || item.code === "ewallet" || item.code === "va")
-          .sort(
-            (left, right) =>
-              ["qris", "ewallet", "va"].indexOf(left.code) -
-              ["qris", "ewallet", "va"].indexOf(right.code),
-          )
-      : []),
+    {
+      code: "wallet" as const,
+      name: "Koin LFAMILIA",
+      description: "Bayar langsung dari saldo akun",
+    },
+    ...gatewayPaymentGroups,
   ];
   const channels = isGatewayMethod
     ? availableChannels.filter((item) => item.method === paymentMethod)
@@ -363,9 +371,15 @@ function CheckoutContent() {
     if (!walletSettings) return;
     const enabled = checkoutGroups.map((group) => group.code);
     if (enabled.includes(paymentMethod)) return;
-    if (activeCheckoutGateway) chooseMethod("qris");
+    if (activeCheckoutGateway && gatewayPaymentGroups.length)
+      chooseMethod(gatewayPaymentGroups[0].code);
     else chooseMethod("wallet");
-  }, [walletSettings, activeCheckoutGateway, paymentMethod]);
+  }, [
+    walletSettings,
+    activeCheckoutGateway,
+    paymentMethod,
+    gatewayPaymentGroups,
+  ]);
 
   function chooseMethod(method: CheckoutPaymentMethod) {
     setPaymentMethod(method);
