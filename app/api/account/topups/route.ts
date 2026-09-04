@@ -2,7 +2,10 @@ import { z } from "zod";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
 import { uploadStoreMedia } from "@/lib/server/media";
 import { createMidtransSnapPayment } from "@/lib/server/midtrans";
-import { createIpaymuDirectPayment } from "@/lib/server/ipaymu";
+import {
+  createIpaymuDirectPayment,
+  isIpaymuChannelSupported,
+} from "@/lib/server/ipaymu";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest } from "@/lib/server/security";
@@ -51,7 +54,12 @@ export async function POST(request: Request) {
         !(await isPaymentChannelAvailable(
           input.paymentMethod,
           input.paymentChannel,
-        ))
+        )) ||
+        (input.mode === "ipaymu" &&
+          !isIpaymuChannelSupported(
+            input.paymentMethod,
+            input.paymentChannel,
+          ))
       )
         throw new Error("Metode pembayaran otomatis tidak tersedia.");
 
