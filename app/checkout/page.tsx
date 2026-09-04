@@ -845,7 +845,7 @@ function CheckoutContent() {
                 {quote && quote.discountAmount > 0 && <SummaryRow label={`Voucher ${quote.voucherCode ?? ""}`} value={`-${formatRupiah(quote.discountAmount)}`} highlight />}
                 <SummaryRow
                   label="Biaya layanan"
-                  value={paymentMethod === "wallet" || paymentMethod === "manual_qris" || paymentMethod === "manual_bank" ? formatRupiah(0) : payment ? formatRupiah(payment.fee) : "Dihitung otomatis"}
+                  value={paymentMethod === "wallet" ? formatRupiah(0) : payment ? formatRupiah(payment.fee) : "Dihitung otomatis"}
                 />
                 <SummaryRow
                   label="Proses"

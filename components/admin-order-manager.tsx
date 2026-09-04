@@ -158,30 +158,6 @@ export function AdminOrderManager() {
     }
   }
 
-  async function confirmManualPayment(id: string) {
-    setWorkingId(id);
-    setError("");
-    try {
-      const response = await fetch("/api/panel/orders", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id, action: "confirm_manual_payment" }),
-      });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok)
-        throw new Error(data.error ?? "Pembayaran gagal dikonfirmasi.");
-      await load();
-    } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : "Pembayaran gagal dikonfirmasi.",
-      );
-    } finally {
-      setWorkingId(null);
-    }
-  }
-
   async function retryVoucher(id: string) {
     setWorkingId(id);
     setError("");
@@ -292,10 +268,6 @@ export function AdminOrderManager() {
                   order.fulfillment_status === "manual_pending";
                 const voucherManualReady =
                   manualReady && order.delivery_mode === "voucher";
-                const manualPaymentPending =
-                  role === "owner" &&
-                  order.payment_method.startsWith("manual_") &&
-                  order.payment_status === "pending";
                 const voucherRetry =
                   role === "owner" &&
                   order.provider_code === "voucher-stock" &&
@@ -381,24 +353,6 @@ export function AdminOrderManager() {
                           />
                         )}
                         <div className="flex justify-end gap-1">
-                          {manualPaymentPending && (
-                            <Button
-                              type="button"
-                              disabled={workingId === order.id}
-                              onClick={() => void confirmManualPayment(order.id)}
-                              size="sm"
-                              className="rounded-lg bg-sky-300 text-[9px] font-black text-[#08131c] hover:bg-sky-200"
-                            >
-                              {workingId === order.id ? (
-                                <LoaderCircle className="size-3 animate-spin" />
-                              ) : (
-                                <>
-                                  <CheckCircle2 className="mr-1 size-3" />
-                                  Terima bayar
-                                </>
-                              )}
-                            </Button>
-                          )}
                           {manualReady && (
                             <Button
                               type="button"

@@ -3,13 +3,11 @@ import { getD1 } from "@/db";
 import { requireAdminSession } from "@/lib/server/admin";
 import {
   completeManualOrder,
-  confirmManualOrderPayment,
   getOrderById,
   listOrders,
   recordOrderEvent,
 } from "@/lib/server/orders";
 import { ensureProductDeliveryTable } from "@/lib/server/product-delivery";
-import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 
 export const dynamic = "force-dynamic";
@@ -89,7 +87,7 @@ export async function GET(request: Request) {
 
 const actionSchema = z.object({
   id: z.string().uuid(),
-  action: z.enum(["complete_manual", "confirm_manual_payment"]),
+  action: z.literal("complete_manual"),
   serialNumber: z.string().trim().min(1).max(500).optional(),
 });
 
@@ -144,16 +142,7 @@ export async function PATCH(request: Request) {
   if (access instanceof Response) return access;
   try {
     const input = actionSchema.parse(await request.json());
-    if (input.action === "confirm_manual_payment") {
-      if (access.role !== "owner")
-        return Response.json(
-          { error: "Konfirmasi pembayaran manual hanya untuk Pemilik." },
-          { status: 403 },
-        );
-      await confirmManualOrderPayment(input.id, getPublicBaseUrl());
-    } else {
-      await completeManualVoucher(input.id, input.serialNumber, access.email);
-    }
+    await completeManualVoucher(input.id, input.serialNumber, access.email);
     await notifyOrderFulfillmentSuccessById(input.id).catch((error) =>
       console.error("Notifikasi pesanan selesai manual gagal:", error),
     );
