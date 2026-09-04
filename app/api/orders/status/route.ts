@@ -88,7 +88,11 @@ export async function POST(request: Request) {
         paymentStatus: order.payment_status,
         fulfillmentStatus: order.fulfillment_status,
         fulfillmentType: order.fulfillment_type,
-        paymentUrl: order.payment_status === "pending" ? order.midtrans_payment_url : null,
+        paymentGateway: order.ipaymu_transaction_id || order.ipaymu_payment_url ? "ipaymu" : order.midtrans_transaction_id || order.midtrans_payment_url ? "midtrans" : null,
+        paymentUrl:
+          order.payment_status === "pending"
+            ? order.ipaymu_payment_url || order.midtrans_payment_url
+            : null,
         voucherCode,
         createdAt: order.created_at,
         updatedAt: order.updated_at,
