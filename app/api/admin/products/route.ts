@@ -20,6 +20,13 @@ const packageSchema = z.object({
   sortOrder: z.number().int().min(0).default(0),
 });
 
+const inputFieldSchema = z.object({
+  id: z.string().trim().regex(/^[a-z0-9-]+$/).max(60),
+  label: z.string().trim().min(1).max(80),
+  placeholder: z.string().trim().max(120).optional().default(""),
+  required: z.boolean().default(true),
+});
+
 const noticeSchema = z.object({
   id: z.number().int().positive().nullable().optional(),
   title: z.string().trim().min(2).max(180),
@@ -40,6 +47,7 @@ const productSchema = z.object({
   accent: z.string().trim().min(5).max(160),
   inputLabel: z.string().trim().min(2).max(80),
   inputPlaceholder: z.string().trim().min(2).max(120),
+  inputFields: z.array(inputFieldSchema).max(12).default([]),
   needsServer: z.boolean().default(false),
   popular: z.boolean().default(false),
   instant: z.boolean().default(false),
@@ -58,6 +66,10 @@ const productSchema = z.object({
 });
 
 function validateProduct(input: z.infer<typeof productSchema>) {
+  const fieldIds = input.inputFields.map((item) => item.id);
+  if (new Set(fieldIds).size !== fieldIds.length) {
+    throw new Error("Nama kolom data pelanggan tidak boleh duplikat.");
+  }
   const tabs = input.packageTabs.map((item) => item.trim());
   if (new Set(tabs.map((item) => item.toLowerCase())).size !== tabs.length) {
     throw new Error("Nama tab nominal tidak boleh duplikat.");

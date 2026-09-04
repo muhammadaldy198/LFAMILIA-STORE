@@ -28,7 +28,6 @@ import { AdminOverview } from "@/components/admin-overview";
 import { AdminExperienceManager } from "@/components/admin-experience-manager";
 import { AdminMemberManager } from "@/components/admin-member-manager";
 import { AdminProductManager } from "@/components/admin-product-manager";
-import { AdminProductDeliveryManager } from "@/components/admin-product-delivery-manager";
 import { AdminPromotionManager } from "@/components/admin-promotion-manager";
 import { AdminStorefrontManager } from "@/components/admin-storefront-manager";
 import { AdminTeamManager } from "@/components/admin-team-manager";
@@ -302,7 +301,6 @@ export default function AdminPage() {
                     : "Staff dapat memperbarui gambar, jam layanan, instruksi, dan pop-up. Harga serta provider hanya tersedia untuk Pemilik."
                 }
               >
-                {isOwner && <AdminProductDeliveryManager />}
                 <AdminProductManager />
               </AdminSection>
             </TabsContent>
@@ -348,16 +346,16 @@ export default function AdminPage() {
                 </TabsContent>
                 <TabsContent value="payments" className="mt-0 space-y-5">
                   <AdminSection
-                    title="Metode pembayaran"
-                    description="Kelola metode, logo, urutan, dan status aktif checkout."
-                  >
-                    <AdminPaymentMethodManager />
-                  </AdminSection>
-                  <AdminSection
-                    title="QRIS, transfer bank & gateway"
-                    description="Atur metode checkout manual serta ON/OFF Midtrans dan iPaymu."
+                    title="Payment gateway & pembayaran manual"
+                    description="Gateway dan pembayaran manual diletakkan paling atas. Klik ikon pensil untuk mengubah pengaturan."
                   >
                     <AdminWalletManager view="checkout" />
+                  </AdminSection>
+                  <AdminSection
+                    title="Metode pembayaran"
+                    description="Daftar metode dibuat ringkas. Klik ikon pensil untuk mengubah logo dan detail."
+                  >
+                    <AdminPaymentMethodManager />
                   </AdminSection>
                 </TabsContent>
                 <TabsContent value="vouchers" className="mt-0">

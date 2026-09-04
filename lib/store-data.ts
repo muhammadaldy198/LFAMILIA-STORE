@@ -21,6 +21,13 @@ export type ProductNotice = {
   sortOrder?: number;
 };
 
+export type ProductInputField = {
+  id: string;
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+};
+
 export type StoreProduct = {
   slug: string;
   name: string;
@@ -38,6 +45,7 @@ export type StoreProduct = {
   manualOpenTime?: string;
   manualCloseTime?: string;
   manualTimezone?: string;
+  inputFields?: ProductInputField[];
   needsServer?: boolean;
   inputLabel: string;
   inputPlaceholder: string;
@@ -310,6 +318,22 @@ const productDefinitions: StoreProduct[] = [
 
 export const products: StoreProduct[] = productDefinitions.map((product) => ({
   ...product,
+  inputFields: product.inputFields ?? [
+    {
+      id: "account-id",
+      label: product.inputLabel,
+      placeholder: product.inputPlaceholder,
+      required: true,
+    },
+    ...(product.needsServer
+      ? [{
+          id: "server-zone",
+          label: "Server / Zone ID",
+          placeholder: "Contoh: 1234",
+          required: true,
+        }]
+      : []),
+  ],
   imageUrl: product.imageUrl ?? `/products/${product.slug}-card.webp`,
   bannerUrl: product.bannerUrl ?? `/products/${product.slug}-banner.webp`,
 }));

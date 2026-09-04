@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, Fragment, useCallback, useEffect, useState } from "react";
 import { BellRing, ChevronDown, ChevronUp, Database, Edit3, LoaderCircle, PackagePlus, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ const emptyProduct: ManagedProduct = {
   accent: "from-[#b9ff35] to-[#347a21]",
   inputLabel: "User ID",
   inputPlaceholder: "Masukkan User ID",
+  inputFields: [{ id: "user-id", label: "User ID", placeholder: "Masukkan User ID", required: true }],
   needsServer: false,
   popular: false,
   instant: true,
@@ -61,6 +62,7 @@ export function AdminProductManager() {
   const [error, setError] = useState("");
   const [role, setRole] = useState<"owner" | "staff">("staff");
   const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
+  const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -190,6 +192,28 @@ export function AdminProductManager() {
     setDraft((current) => ({ ...current, notices: current.notices.filter((_, itemIndex) => itemIndex !== index) }));
   }
 
+  function addInputField() {
+    setDraft((current) => {
+      const inputFields = current.inputFields ?? [];
+      let suffix = inputFields.length + 1;
+      let id = `kolom-${suffix}`;
+      const ids = new Set(inputFields.map((item) => item.id));
+      while (ids.has(id)) id = `kolom-${++suffix}`;
+      return { ...current, inputFields: [...inputFields, { id, label: "", placeholder: "", required: true }] };
+    });
+  }
+
+  function updateInputField(index: number, patch: Partial<NonNullable<ManagedProduct["inputFields"]>[number]>) {
+    setDraft((current) => ({
+      ...current,
+      inputFields: (current.inputFields ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item),
+    }));
+  }
+
+  function removeInputField(index: number) {
+    setDraft((current) => ({ ...current, inputFields: (current.inputFields ?? []).filter((_, itemIndex) => itemIndex !== index) }));
+  }
+
   function moveNotice(index: number, direction: -1 | 1) {
     setDraft((current) => {
       const nextIndex = index + direction;
@@ -210,15 +234,23 @@ export function AdminProductManager() {
       slug: slugify(draft.slug || draft.name),
       initials: draft.initials.toUpperCase(),
       packageTabs,
-      packages: draft.packages.map((item, index) => ({
+      inputFields: (draft.inputFields ?? []).map((item, index) => ({
         ...item,
-        id: slugify(item.id || `${draft.slug || draft.name}-${item.label || index + 1}`),
-        price: Number(item.price),
-        group: item.group?.trim() || undefined,
-        providerCode: item.providerCode || undefined,
-        providerSku: item.providerSku || undefined,
-        sortOrder: index,
-      })),
+        id: slugify(item.id || item.label || `kolom-${index + 1}`),
+        label: item.label.trim(),
+        placeholder: item.placeholder?.trim() || "",
+        required: item.required !== false,
+      })).filter((item) => item.label),
+      inputLabel: draft.inputFields?.[0]?.label?.trim() || "Data pelanggan",
+      inputPlaceholder: draft.inputFields?.[0]?.placeholder?.trim() || "Tidak diperlukan",
+      needsServer: Boolean(draft.inputFields?.[1]),
+      targetTemplate: draft.inputFields && draft.inputFields.length > 1 ? "{{destination}}{{server}}" : "{{destination}}",
+      packages: draft.packages.map((item, index) => {
+        const id = slugify(item.id || `${draft.slug || draft.name}-${item.label || index + 1}`);
+        const providerCode = item.providerCode || (draft.category === "voucher" ? "voucher-stock" : undefined);
+        const providerSku = item.providerSku || (providerCode === "voucher-stock" ? id : undefined);
+        return { ...item, id, price: Number(item.price), group: item.group?.trim() || undefined, providerCode, providerSku, sortOrder: index };
+      }),
       notices: draft.notices.map((item, index) => ({ ...item, sortOrder: index })),
     };
     try {
@@ -288,7 +320,26 @@ export function AdminProductManager() {
       <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
         <Table>
           <TableHeader><TableRow className="border-white/[0.08] hover:bg-transparent"><TableHead className="text-[10px] text-white/35">Produk</TableHead><TableHead className="text-[10px] text-white/35">Harga mulai</TableHead><TableHead className="text-[10px] text-white/35">Proses</TableHead><TableHead className="text-[10px] text-white/35">Status</TableHead><TableHead className="text-right text-[10px] text-white/35">Aksi</TableHead></TableRow></TableHeader>
-          <TableBody>{items.map((item) => <TableRow key={item.dbId ?? item.slug} className="border-white/[0.07] hover:bg-white/[0.025]"><TableCell><div className="flex items-center gap-3"><span className="block size-9 overflow-hidden rounded-lg"><ProductArtwork product={item} compact /></span><div><strong className="text-xs">{item.name}</strong><p className="mt-1 text-[9px] text-white/28">{item.category} • {item.publisher}</p></div></div></TableCell><TableCell className="text-xs text-[#d8ff8d]">{formatRupiah(Math.min(...item.packages.map((entry) => entry.price)))}</TableCell><TableCell className="text-xs text-white/42">{item.fulfillmentType === "manual" ? "Manual" : `${item.packages.filter((entry) => entry.providerSku).length}/${item.packages.length} SKU`}</TableCell><TableCell><span className={`rounded-full px-2 py-1 text-[9px] font-bold ${item.isActive ? "bg-[#b9ff35]/10 text-[#d8ff8d]" : "bg-white/[0.06] text-white/35"}`}>{item.isActive ? "Aktif" : "Nonaktif"}</span></TableCell><TableCell><div className="flex justify-end gap-1"><Button onClick={() => openEdit(item)} variant="ghost" size="icon-sm" className="text-white/45 hover:bg-white/[0.08] hover:text-white" aria-label={`Edit ${item.name}`}><Edit3 className="size-3.5" /></Button>{role === "owner" && item.dbId && <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon-sm" className="text-red-300/45 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></AlertDialogTrigger><AlertDialogContent className="border-white/10 bg-[#10141d] text-white"><AlertDialogHeader><AlertDialogTitle>Hapus {item.name}?</AlertDialogTitle><AlertDialogDescription className="text-white/42">Produk dan semua nominalnya akan dihapus dari katalog. Tindakan ini tidak dapat dibatalkan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">Batal</AlertDialogCancel><AlertDialogAction onClick={() => void removeProduct(item.dbId!)} className="bg-red-500 text-white hover:bg-red-400">Hapus</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}</div></TableCell></TableRow>)}</TableBody>
+          <TableBody>{items.map((item) => {
+            const key = String(item.dbId ?? item.slug);
+            const expanded = expandedProduct === key;
+            return <Fragment key={key}>
+              <TableRow className="border-white/[0.07] hover:bg-white/[0.025]">
+                <TableCell><div className="flex items-center gap-3"><span className="block size-9 overflow-hidden rounded-lg"><ProductArtwork product={item} compact /></span><div><strong className="text-xs">{item.name}</strong><p className="mt-1 text-[9px] text-white/28">{item.category} • {item.publisher}</p></div></div></TableCell>
+                <TableCell className="text-xs text-[#d8ff8d]">{formatRupiah(Math.min(...item.packages.map((entry) => entry.price)))}</TableCell>
+                <TableCell className="text-xs text-white/42">{item.fulfillmentType === "manual" ? "Manual" : `${item.packages.filter((entry) => entry.providerSku).length}/${item.packages.length} SKU`}</TableCell>
+                <TableCell><span className={`rounded-full px-2 py-1 text-[9px] font-bold ${item.isActive ? "bg-[#b9ff35]/10 text-[#d8ff8d]" : "bg-white/[0.06] text-white/35"}`}>{item.isActive ? "Aktif" : "Nonaktif"}</span></TableCell>
+                <TableCell><div className="flex justify-end gap-1">
+                  <Button type="button" onClick={() => setExpandedProduct(expanded ? null : key)} variant="ghost" size="icon-sm" className="text-white/45 hover:bg-white/[0.08] hover:text-white" aria-label={expanded ? "Tutup daftar harga" : "Buka daftar harga"}>{expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}</Button>
+                  <Button onClick={() => openEdit(item)} variant="ghost" size="icon-sm" className="text-white/45 hover:bg-white/[0.08] hover:text-white" aria-label={`Edit ${item.name}`}><Edit3 className="size-3.5" /></Button>
+                  {role === "owner" && item.dbId && <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon-sm" className="text-red-300/45 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></AlertDialogTrigger><AlertDialogContent className="border-white/10 bg-[#10141d] text-white"><AlertDialogHeader><AlertDialogTitle>Hapus {item.name}?</AlertDialogTitle><AlertDialogDescription className="text-white/42">Produk dan semua nominalnya akan dihapus dari katalog. Tindakan ini tidak dapat dibatalkan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">Batal</AlertDialogCancel><AlertDialogAction onClick={() => void removeProduct(item.dbId!)} className="bg-red-500 text-white hover:bg-red-400">Hapus</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
+                </div></TableCell>
+              </TableRow>
+              {expanded && <TableRow className="border-white/[0.07] bg-black/15 hover:bg-black/15"><TableCell colSpan={5} className="p-0">
+                <div className="overflow-x-auto px-3 py-2"><table className="w-full min-w-[680px] text-left text-[10px]"><thead className="text-white/30"><tr><th className="py-2">Nominal</th><th>Provider</th><th>Modal</th><th>Margin</th><th>Harga jual</th><th>Status</th></tr></thead><tbody>{item.packages.map((entry) => <tr key={entry.id} className="border-t border-white/[0.06]"><td className="py-2 font-semibold text-white/75">{entry.label}</td><td className="text-white/40">{entry.providerCode === "voucher-stock" ? "Stok kode LFAMILIA" : entry.providerCode || "Belum diatur"}</td><td className="text-white/40">{entry.supplierPrice ? formatRupiah(entry.supplierPrice) : "-"}</td><td className="text-white/40">{entry.providerCode === "digiflazz" ? (entry.marginType === "percent" ? `${entry.marginValue ?? 0}%` : formatRupiah(entry.marginValue ?? 0)) : "-"}</td><td className="font-bold text-[#d8ff8d]">{formatRupiah(entry.price)}</td><td className={entry.isActive ? "text-[#d8ff8d]" : "text-white/30"}>{entry.isActive ? "Aktif" : "Nonaktif"}</td></tr>)}</tbody></table></div>
+              </TableCell></TableRow>}
+            </Fragment>;
+          })}</TableBody>
         </Table>
       </div>
 
@@ -306,15 +357,15 @@ export function AdminProductManager() {
               <div className="sm:col-span-2"><AdminMediaUpload label="Banner halaman produk" value={draft.bannerUrl ?? ""} onChange={(value) => updateDraft("bannerUrl", value)} help="Banner penuh di atas checkout. Gunakan banner landscape; desktop menampilkan lebar penuh, ponsel otomatis memotong sisi kiri/kanan dengan fokus di tengah. Jika kosong, gambar produk digunakan." previewClassName="h-24 sm:h-28" /></div>
               {role === "owner" && <><Field label="Inisial kartu"><Input required maxLength={3} value={draft.initials} onChange={(event) => updateDraft("initials", event.target.value.toUpperCase())} className="admin-input" placeholder="ML" /></Field>
               <Field label="Urutan"><Input type="number" min={0} value={draft.sortOrder} onChange={(event) => updateDraft("sortOrder", Number(event.target.value))} className="admin-input" /></Field>
-              <Field label="Label tujuan"><Input required value={draft.inputLabel} onChange={(event) => updateDraft("inputLabel", event.target.value)} className="admin-input" placeholder="User ID" /></Field>
-              <Field label="Contoh tujuan"><Input required value={draft.inputPlaceholder} onChange={(event) => updateDraft("inputPlaceholder", event.target.value)} className="admin-input" placeholder="Masukkan User ID" /></Field>
-              <Field label="Jenis proses"><select value={draft.fulfillmentType} onChange={(event) => { const value = event.target.value as "automatic" | "manual"; updateDraft("fulfillmentType", value); updateDraft("instant", value === "automatic"); if (value === "manual" && draft.notices.length === 0) updateDraft("notices", [{ id: null, title: "JAM OPERASIONAL {{jam_buka}} – {{jam_tutup}} {{zona_waktu}}", body: "Estimasi proses 30 menit sampai 2 jam.\n\nAdmin akan menghubungi melalui WhatsApp setelah pembayaran berhasil.", isActive: true, sortOrder: 0 }]); }} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white"><option value="automatic">Otomatis via API</option><option value="manual">Manual oleh admin</option></select></Field>
-              <Field label="Format tujuan provider"><Input required value={draft.targetTemplate} onChange={(event) => updateDraft("targetTemplate", event.target.value)} className="admin-input" placeholder="{{destination}}{{server}}" /></Field></>}
+              <Field label="Jenis proses" wide><select value={draft.fulfillmentType} onChange={(event) => { const value = event.target.value as "automatic" | "manual"; updateDraft("fulfillmentType", value); updateDraft("instant", value === "automatic"); if (value === "manual" && draft.notices.length === 0) updateDraft("notices", [{ id: null, title: "JAM OPERASIONAL {{jam_buka}} – {{jam_tutup}} {{zona_waktu}}", body: "Estimasi proses 30 menit sampai 2 jam.\n\nAdmin akan menghubungi melalui WhatsApp setelah pembayaran berhasil.", isActive: true, sortOrder: 0 }]); }} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white"><option value="automatic">Otomatis via provider</option><option value="manual">Manual oleh admin</option></select></Field></>}
               {draft.fulfillmentType === "manual" && <Field label="Instruksi manual" wide><Input value={draft.manualInstructions ?? ""} onChange={(event) => updateDraft("manualInstructions", event.target.value)} className="admin-input" placeholder="Instruksi aman untuk pelanggan, tanpa meminta password atau OTP" /></Field>}
               {draft.fulfillmentType === "manual" && <><Field label="Jam buka"><Input type="time" required value={draft.manualOpenTime ?? "09:00"} onChange={(event) => updateDraft("manualOpenTime", event.target.value)} className="admin-input" /></Field><Field label="Jam tutup"><Input type="time" required value={draft.manualCloseTime ?? "21:00"} onChange={(event) => updateDraft("manualCloseTime", event.target.value)} className="admin-input" /></Field><Field label="Zona waktu" wide><select value={draft.manualTimezone ?? "Asia/Jakarta"} onChange={(event) => updateDraft("manualTimezone", event.target.value)} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white"><option value="Asia/Jakarta">WIB — Asia/Jakarta</option><option value="Asia/Makassar">WITA — Asia/Makassar</option><option value="Asia/Jayapura">WIT — Asia/Jayapura</option></select></Field></>}
               {role === "owner" && <Field label="Warna kartu" wide><select value={draft.accent} onChange={(event) => updateDraft("accent", event.target.value)} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white"><option value="from-[#5577ff] via-[#314fc0] to-[#16276c]">Biru</option><option value="from-[#ffad32] via-[#ea6825] to-[#7c2714]">Oranye</option><option value="from-[#ff5f65] via-[#c42f50] to-[#5b1530]">Merah</option><option value="from-[#58d68d] via-[#2b8f9a] to-[#174862]">Hijau</option><option value="from-[#f6d878] via-[#7c4fc9] to-[#2b174c]">Ungu</option><option value="from-[#b9ff35] to-[#347a21]">Neon</option></select></Field>}
             </div>
-            {role === "owner" && <div className="grid grid-cols-2 gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 sm:grid-cols-4">{[["Aktif", "isActive"], ["Populer", "popular"], ["Instan", "instant"], ["Butuh server", "needsServer"]].map(([label, key]) => <label key={key} className="flex items-center justify-between gap-2 text-[11px] text-white/55"><span>{label}</span><Switch checked={Boolean(draft[key as keyof ManagedProduct])} onCheckedChange={(checked) => updateDraft(key as keyof ManagedProduct, checked as never)} /></label>)}</div>}
+            {role === "owner" && <>
+              <div className="grid grid-cols-2 gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 sm:grid-cols-3">{[["Aktif", "isActive"], ["Populer", "popular"], ["Instan", "instant"]].map(([label, key]) => <label key={key} className="flex items-center justify-between gap-2 text-[11px] text-white/55"><span>{label}</span><Switch checked={Boolean(draft[key as keyof ManagedProduct])} onCheckedChange={(checked) => updateDraft(key as keyof ManagedProduct, checked as never)} /></label>)}</div>
+              <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.08]"><div className="flex items-center justify-between gap-3 border-b border-white/[0.08] px-3 py-2.5"><div><h3 className="text-xs font-bold">Data yang diisi pelanggan</h3><p className="mt-0.5 text-[9px] text-white/30">Buat kolom sendiri sesuai kebutuhan produk.</p></div><Button type="button" onClick={addInputField} size="sm" variant="outline" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-2.5 text-[9px] text-white"><Plus className="mr-1 size-3" />Tambah kolom</Button></div><div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-[10px]"><thead className="bg-white/[0.025] text-white/30"><tr><th className="px-3 py-2">Nama kolom</th><th className="px-3 py-2">Contoh isi</th><th className="px-3 py-2 text-center">Wajib</th><th className="px-3 py-2 text-right">Aksi</th></tr></thead><tbody>{(draft.inputFields ?? []).map((field, index) => <tr key={field.id} className="border-t border-white/[0.06]"><td className="p-2"><Input required value={field.label} onChange={(event) => updateInputField(index, { label: event.target.value, id: slugify(event.target.value) || field.id })} className="admin-input" placeholder="User ID / Username / Email" /></td><td className="p-2"><Input value={field.placeholder ?? ""} onChange={(event) => updateInputField(index, { placeholder: event.target.value })} className="admin-input" placeholder="Contoh: 123456789" /></td><td className="p-2 text-center"><Switch checked={field.required !== false} onCheckedChange={(checked) => updateInputField(index, { required: checked })} /></td><td className="p-2 text-right"><Button type="button" onClick={() => removeInputField(index)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></td></tr>)}{!(draft.inputFields ?? []).length && <tr><td colSpan={4} className="px-3 py-5 text-center text-[10px] text-white/28">Produk ini tidak meminta data tambahan dari pelanggan.</td></tr>}</tbody></table></div></div>
+            </>}
             <div className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="flex items-center gap-2 text-sm font-bold"><BellRing className="size-4 text-[#b9ff35]" />Pop-up informasi produk</h3><p className="mt-1 text-[10px] text-white/30">Muncul sebelum pelanggan memilih nominal. Tambahkan slide sebanyak kebutuhan dan atur urutannya.</p><p className="mt-1 text-[9px] text-[#cfff72]/55">Token jam: {"{{jam_buka}}"}, {"{{jam_tutup}}"}, dan {"{{zona_waktu}}"}.</p></div><Button type="button" onClick={addNotice} size="sm" variant="outline" className="shrink-0 rounded-lg border-white/10 bg-white/[0.03] text-[10px] text-white hover:bg-white/[0.08] hover:text-white"><Plus className="mr-1 size-3.5" />Tambah slide</Button></div><div className="mt-3 space-y-3">{draft.notices.length ? draft.notices.map((notice, index) => <div key={`${notice.id}-${index}`} className="rounded-xl border border-white/[0.08] bg-[#111620] p-3"><div className="flex items-center gap-2"><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/[0.05] text-[9px] font-bold text-white/40">{index + 1}</span><div className="flex shrink-0 flex-col"><button type="button" disabled={index === 0} onClick={() => moveNotice(index, -1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser slide ke atas"><ChevronUp className="size-3.5" /></button><button type="button" disabled={index === draft.notices.length - 1} onClick={() => moveNotice(index, 1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser slide ke bawah"><ChevronDown className="size-3.5" /></button></div><Input required value={notice.title} onChange={(event) => updateNotice(index, "title", event.target.value)} className="admin-input" placeholder="JAM OPERASIONAL 09.00 – 23.00 WIB" /><Switch checked={notice.isActive} onCheckedChange={(checked) => updateNotice(index, "isActive", checked)} /><Button type="button" onClick={() => removeNotice(index)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></div><Textarea required value={notice.body} onChange={(event) => updateNotice(index, "body", event.target.value)} className="mt-2 min-h-28 rounded-xl border-white/10 bg-white/[0.025] text-xs text-white" placeholder={"Estimasi proses 30 menit sampai 2 jam.\n\nAdmin akan menghubungi melalui WhatsApp setelah pembayaran."} /></div>) : <div className="rounded-xl border border-dashed border-white/10 py-6 text-center text-[10px] text-white/28">Tidak ada pop-up untuk produk ini.</div>}</div></div>
             {role === "owner" && <div className="mt-5"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-bold">Nominal & harga</h3><p className="mt-1 text-[10px] text-white/30">Tab nominal bisa diaktifkan terpisah untuk setiap produk.</p></div><Button type="button" onClick={addPackage} size="sm" variant="outline" className="rounded-lg border-white/10 bg-white/[0.03] text-[10px] text-white hover:bg-white/[0.08] hover:text-white"><PackagePlus className="mr-1.5 size-3.5" />Tambah nominal</Button></div>
               <div className="mt-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3"><label className="flex items-center justify-between gap-3"><span><strong className="block text-[11px]">Pisahkan nominal dengan tab</strong><span className="mt-0.5 block text-[9px] text-white/35">Aktifkan hanya jika produk ini perlu beberapa kelompok nominal.</span></span><Switch checked={draft.packageTabsEnabled} onCheckedChange={(checked) => updateDraft("packageTabsEnabled", checked)} /></label>

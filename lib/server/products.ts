@@ -1,6 +1,6 @@
 import { getD1 } from "@/db";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
-import { products as fallbackProducts, type ProductNotice, type ProductPackage, type StoreProduct } from "@/lib/store-data";
+import { products as fallbackProducts, type ProductInputField, type ProductNotice, type ProductPackage, type StoreProduct } from "@/lib/store-data";
 
 const fallbackProductBySlug = new Map(fallbackProducts.map((product) => [product.slug, product]));
 
@@ -45,6 +45,7 @@ type ProductRow = {
   accent: string;
   input_label: string;
   input_placeholder: string;
+  input_fields_json: string | null;
   needs_server: number;
   popular: number;
   instant: number;
@@ -87,6 +88,39 @@ type NoticeRow = {
   sort_order: number;
 };
 
+function parseInputFields(
+  value: string | null,
+  inputLabel: string,
+  inputPlaceholder: string,
+  needsServer: boolean,
+): ProductInputField[] {
+  if (value !== null) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+          .map((item, index) => ({
+            id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : `field-${index + 1}`,
+            label: typeof item.label === "string" ? item.label.trim() : "",
+            placeholder: typeof item.placeholder === "string" ? item.placeholder.trim() : "",
+            required: item.required !== false,
+          }))
+          .filter((item) => item.label)
+          .slice(0, 12);
+      }
+    } catch {
+      // Legacy fallback below.
+    }
+  }
+  return [
+    { id: "account-id", label: inputLabel, placeholder: inputPlaceholder, required: true },
+    ...(needsServer
+      ? [{ id: "server-zone", label: "Server / Zone ID", placeholder: "Contoh: 1234", required: true }]
+      : []),
+  ];
+}
+
 function parsePackageTabs(value: string | null) {
   try {
     const parsed = JSON.parse(value || "[]") as unknown;
@@ -126,11 +160,11 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
   try { await db.prepare("SELECT banner_url FROM products LIMIT 1").first(); } catch { await db.prepare("ALTER TABLE products ADD COLUMN banner_url text").run(); }
   try { await db.prepare("SELECT description FROM products LIMIT 1").first(); } catch { await db.prepare("ALTER TABLE products ADD COLUMN description text").run(); }
   const productSql = includeInactive
-    ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder,
+    ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json,
         needs_server, popular, instant, fulfillment_type, target_template, manual_instructions,
         manual_open_time, manual_close_time, manual_timezone, package_tabs_enabled, package_tabs_json, is_active, sort_order
        FROM products ORDER BY sort_order ASC, name ASC`
-    : `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder,
+    : `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json,
         needs_server, popular, instant, fulfillment_type, target_template, manual_instructions,
         manual_open_time, manual_close_time, manual_timezone, package_tabs_enabled, package_tabs_json, is_active, sort_order
        FROM products WHERE is_active = 1 ORDER BY sort_order ASC, name ASC`;
@@ -166,6 +200,7 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
     accent: row.accent,
     inputLabel: row.input_label,
     inputPlaceholder: row.input_placeholder,
+    inputFields: parseInputFields(row.input_fields_json, row.input_label, row.input_placeholder, Boolean(row.needs_server)),
     needsServer: Boolean(row.needs_server),
     popular: Boolean(row.popular),
     instant: Boolean(row.instant),
@@ -260,6 +295,9 @@ export async function saveProduct(input: ProductWrite, id?: number) {
 
   const productRow = await db.prepare("SELECT id FROM products WHERE slug = ?").bind(input.slug).first<{ id: number }>();
   if (!productRow) throw new Error("Produk tidak ditemukan setelah disimpan.");
+  await db.prepare("UPDATE products SET input_fields_json = ? WHERE id = ?")
+    .bind(JSON.stringify(input.inputFields ?? []), productRow.id)
+    .run();
 
   const packageStatements = [
     db.prepare("DELETE FROM product_packages WHERE product_id = ?").bind(productRow.id),
@@ -338,6 +376,12 @@ export async function seedFallbackProducts() {
 
   const idRows = await db.prepare("SELECT id, slug FROM products").all<{ id: number; slug: string }>();
   const idBySlug = new Map(idRows.results.map((row) => [row.slug, row.id]));
+  await db.batch(source.flatMap((item) => {
+    const productId = idBySlug.get(item.slug);
+    return productId
+      ? [db.prepare("UPDATE products SET input_fields_json = COALESCE(input_fields_json, ?) WHERE id = ?").bind(JSON.stringify(item.inputFields ?? []), productId)]
+      : [];
+  }));
 
   const packageStatements = source.flatMap((product) => product.packages.map((item, index) => db.prepare(
     `INSERT INTO product_packages (product_id, sku, label, price, note, package_group, provider_code, provider_sku, is_active, sort_order)
