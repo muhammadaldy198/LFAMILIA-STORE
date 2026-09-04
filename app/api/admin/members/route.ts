@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import {
+  addMemberBalance,
   listMembersWithTiers,
   listMemberTierSettings,
   saveMemberTierSettings,
+  setMemberRole,
 } from "@/lib/server/member-tiers";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +53,32 @@ export async function PUT(request: Request) {
         : error instanceof Error
           ? error.message
           : "Pengaturan privilege gagal disimpan.";
+    return Response.json({ error: message }, { status: 400 });
+  }
+}
+
+
+const memberActionSchema = z.object({
+  customerId: z.string().uuid(),
+  role: z.enum(["automatic", "basic", "gold", "diamond", "platinum"]),
+  addBalance: z.number().int().min(0).max(100_000_000).default(0),
+  reason: z.string().trim().max(300).optional(),
+});
+
+export async function PATCH(request: Request) {
+  const access = await requireAdminSession(request, "owner");
+  if (access instanceof Response) return access;
+  try {
+    const input = memberActionSchema.parse(await request.json());
+    await setMemberRole(input.customerId, input.role);
+    if (input.addBalance > 0) {
+      await addMemberBalance({ customerId: input.customerId, amount: input.addBalance, adminEmail: access.email, reason: input.reason });
+    }
+    return Response.json({ ok: true, members: await listMembersWithTiers() });
+  } catch (error) {
+    const message = error instanceof z.ZodError
+      ? error.issues[0]?.message || "Perubahan member tidak valid."
+      : error instanceof Error ? error.message : "Member gagal diperbarui.";
     return Response.json({ error: message }, { status: 400 });
   }
 }
