@@ -49,10 +49,15 @@ const providerDefinitions = [
   {
     name: "ipaymu",
     host: optionalEnv("IPAYMU_RELAY_HOST").toLowerCase(),
-    upstream: normalizeOrigin(
-      optionalEnv("IPAYMU_UPSTREAM_ORIGIN"),
-      "IPAYMU_UPSTREAM_ORIGIN",
+    sandboxUpstream: normalizeOrigin(
+      optionalEnv("IPAYMU_SANDBOX_UPSTREAM_ORIGIN"),
+      "IPAYMU_SANDBOX_UPSTREAM_ORIGIN",
     ),
+    productionUpstream: normalizeOrigin(
+      optionalEnv("IPAYMU_PRODUCTION_UPSTREAM_ORIGIN"),
+      "IPAYMU_PRODUCTION_UPSTREAM_ORIGIN",
+    ),
+    sandboxVa: optionalEnv("IPAYMU_SANDBOX_VA"),
   },
   {
     name: "midtrans-bisnap",
@@ -194,6 +199,14 @@ function isMethodAllowed(provider, method) {
 }
 
 function resolveProviderUpstream(provider, req) {
+  if (provider.name === "ipaymu") {
+    const va = String(req.headers.va || "").trim();
+    if (!va || !provider.sandboxUpstream || !provider.productionUpstream) return "";
+    return va === provider.sandboxVa
+      ? provider.sandboxUpstream
+      : provider.productionUpstream;
+  }
+
   if (provider.name !== "midtrans-bisnap") return provider.upstream;
 
   const environment = String(
@@ -228,15 +241,22 @@ const server = createServer(async (req, res) => {
       configured: Object.fromEntries(
         providerDefinitions.map((provider) => [
           provider.name,
-          provider.name === "midtrans-bisnap"
+          provider.name === "ipaymu"
             ? Boolean(
                 provider.host &&
                   provider.sandboxUpstream &&
-                  provider.sandboxAuthUpstream &&
                   provider.productionUpstream &&
-                  provider.productionAuthUpstream,
+                  provider.sandboxVa,
               )
-            : Boolean(provider.host && provider.upstream),
+            : provider.name === "midtrans-bisnap"
+              ? Boolean(
+                  provider.host &&
+                    provider.sandboxUpstream &&
+                    provider.sandboxAuthUpstream &&
+                    provider.productionUpstream &&
+                    provider.productionAuthUpstream,
+                )
+              : Boolean(provider.host && provider.upstream),
         ]),
       ),
     });
