@@ -1,8 +1,18 @@
 import { hashHex, safeEqual } from "@/lib/server/crypto";
-import { getRuntimeEnv, requireRuntimeValue } from "@/lib/server/runtime-env";
+import {
+  getRuntimeEnv,
+  requireRuntimeChoice,
+  requireRuntimeValue,
+} from "@/lib/server/runtime-env";
+
+export type MidtransEnvironment = "sandbox" | "production";
+export type MidtransMode = "snap" | "bisnap";
 
 type MidtransRuntime = {
-  MIDTRANS_SERVER_KEY?: string;
+  MIDTRANS_MODE?: string;
+  MIDTRANS_ENV?: string;
+  MIDTRANS_SNAP_SANDBOX_SERVER_KEY?: string;
+  MIDTRANS_SNAP_PRODUCTION_SERVER_KEY?: string;
   MIDTRANS_SNAP_SANDBOX_API_URL?: string;
   MIDTRANS_SNAP_PRODUCTION_API_URL?: string;
 };
@@ -16,28 +26,58 @@ type SnapResponse = {
 export type MidtransPaymentResult = {
   transactionId: string | null;
   paymentUrl: string;
-  raw: SnapResponse;
+  raw: unknown;
 };
 
-function runtimeConfig() {
-  const runtime = getRuntimeEnv<MidtransRuntime>();
-  const serverKey = requireRuntimeValue(
-    runtime.MIDTRANS_SERVER_KEY,
-    "MIDTRANS_SERVER_KEY",
-  );
-  const environment = serverKey.startsWith("SB-") ? "sandbox" : "production";
-  const endpoint = requireRuntimeValue(
-    environment === "sandbox"
-      ? runtime.MIDTRANS_SNAP_SANDBOX_API_URL
-      : runtime.MIDTRANS_SNAP_PRODUCTION_API_URL,
-    environment === "sandbox"
-      ? "MIDTRANS_SNAP_SANDBOX_API_URL"
-      : "MIDTRANS_SNAP_PRODUCTION_API_URL",
-  );
-  return { serverKey, environment, endpoint };
+function runtime() {
+  return getRuntimeEnv<MidtransRuntime>();
 }
 
-function enabledPayments(method: string, channel: string) {
+export function getMidtransMode() {
+  return requireRuntimeChoice(runtime().MIDTRANS_MODE, "MIDTRANS_MODE", [
+    "snap",
+    "bisnap",
+  ] as const);
+}
+
+export function getMidtransEnvironment() {
+  return requireRuntimeChoice(runtime().MIDTRANS_ENV, "MIDTRANS_ENV", [
+    "sandbox",
+    "production",
+  ] as const);
+}
+
+function snapConfig(environment = getMidtransEnvironment()) {
+  const config = runtime();
+
+  if (environment === "sandbox") {
+    return {
+      environment,
+      serverKey: requireRuntimeValue(
+        config.MIDTRANS_SNAP_SANDBOX_SERVER_KEY,
+        "MIDTRANS_SNAP_SANDBOX_SERVER_KEY",
+      ),
+      endpoint: requireRuntimeValue(
+        config.MIDTRANS_SNAP_SANDBOX_API_URL,
+        "MIDTRANS_SNAP_SANDBOX_API_URL",
+      ),
+    };
+  }
+
+  return {
+    environment,
+    serverKey: requireRuntimeValue(
+      config.MIDTRANS_SNAP_PRODUCTION_SERVER_KEY,
+      "MIDTRANS_SNAP_PRODUCTION_SERVER_KEY",
+    ),
+    endpoint: requireRuntimeValue(
+      config.MIDTRANS_SNAP_PRODUCTION_API_URL,
+      "MIDTRANS_SNAP_PRODUCTION_API_URL",
+    ),
+  };
+}
+
+function enabledSnapPayments(method: string, channel: string) {
   if (method === "qris") return ["other_qris"];
 
   if (method === "ewallet") {
@@ -49,7 +89,9 @@ function enabledPayments(method: string, channel: string) {
     };
     const payment = map[channel];
     if (!payment)
-      throw new Error(`Channel e-wallet ${channel} belum didukung Midtrans Snap.`);
+      throw new Error(
+        `Channel e-wallet ${channel} belum didukung Midtrans Snap.`,
+      );
     return [payment];
   }
 
@@ -66,16 +108,21 @@ function enabledPayments(method: string, channel: string) {
     };
     const payment = map[channel];
     if (!payment)
-      throw new Error(`Channel VA ${channel} belum didukung Midtrans Snap.`);
+      throw new Error(
+        `Channel VA ${channel} belum didukung Midtrans Snap.`,
+      );
     return [payment];
   }
 
   throw new Error("Metode pembayaran belum didukung Midtrans Snap.");
 }
 
-export function isMidtransChannelSupported(method: string, channel: string) {
+export function isMidtransSnapChannelSupported(
+  method: string,
+  channel: string,
+) {
   try {
-    enabledPayments(method, channel);
+    enabledSnapPayments(method, channel);
     return true;
   } catch {
     return false;
@@ -93,8 +140,12 @@ export async function createMidtransSnapPayment(input: {
   paymentChannel: string;
   finishUrl: string;
 }) {
-  const { serverKey, endpoint } = runtimeConfig();
-  const payments = enabledPayments(input.paymentMethod, input.paymentChannel);
+  const { serverKey, endpoint } = snapConfig();
+  const payments = enabledSnapPayments(
+    input.paymentMethod,
+    input.paymentChannel,
+  );
+
   const body = {
     transaction_details: {
       order_id: input.referenceId,
@@ -116,6 +167,7 @@ export async function createMidtransSnapPayment(input: {
     callbacks: { finish: input.finishUrl },
     enabled_payments: payments,
   };
+
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -126,34 +178,59 @@ export async function createMidtransSnapPayment(input: {
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(15_000),
   });
+
   const payload = (await response.json().catch(() => ({}))) as SnapResponse;
+
   if (!response.ok || !payload.redirect_url)
     throw new Error(
-      payload.status_message || "Midtrans menolak pembuatan pembayaran.",
+      payload.status_message ||
+        "Midtrans menolak pembuatan pembayaran Snap.",
     );
+
   return {
-    // Snap create mengembalikan token, bukan transaction_id. transaction_id asli
-    // baru tersedia dari notification callback Midtrans.
     transactionId: null,
     paymentUrl: payload.redirect_url,
     raw: payload,
   } satisfies MidtransPaymentResult;
 }
 
-export function validateMidtransNotification(input: Record<string, unknown>) {
-  const { serverKey } = runtimeConfig();
+export function validateMidtransNotification(
+  input: Record<string, unknown>,
+) {
+  const config = runtime();
   const orderId = String(input.order_id ?? "");
   const statusCode = String(input.status_code ?? "");
   const grossAmount = String(input.gross_amount ?? "");
   const signature = String(input.signature_key ?? "");
-  const expected = hashHex(
-    "sha512",
-    `${orderId}${statusCode}${grossAmount}${serverKey}`,
-  );
-  return {
-    valid:
+
+  const candidates = [
+    [
+      "sandbox",
+      config.MIDTRANS_SNAP_SANDBOX_SERVER_KEY?.trim(),
+    ],
+    [
+      "production",
+      config.MIDTRANS_SNAP_PRODUCTION_SERVER_KEY?.trim(),
+    ],
+  ] as const;
+
+  for (const [environment, serverKey] of candidates) {
+    if (!serverKey) continue;
+    const expected = hashHex(
+      "sha512",
+      `${orderId}${statusCode}${grossAmount}${serverKey}`,
+    );
+    if (
       Boolean(orderId && statusCode && grossAmount) &&
-      safeEqual(signature, expected),
+      safeEqual(signature, expected)
+    ) {
+      return { valid: true, environment, orderId, grossAmount };
+    }
+  }
+
+  return {
+    valid: false,
+    environment: null,
     orderId,
     grossAmount,
   };
@@ -162,9 +239,14 @@ export function validateMidtransNotification(input: Record<string, unknown>) {
 export function mapMidtransStatus(input: Record<string, unknown>) {
   const status = String(input.transaction_status ?? "").toLowerCase();
   const fraud = String(input.fraud_status ?? "accept").toLowerCase();
-  if (status === "settlement" || (status === "capture" && fraud === "accept"))
+
+  if (
+    status === "settlement" ||
+    (status === "capture" && fraud === "accept")
+  )
     return "paid" as const;
   if (status === "expire") return "expired" as const;
-  if (["deny", "cancel", "failure"].includes(status)) return "failed" as const;
+  if (["deny", "cancel", "failure"].includes(status))
+    return "failed" as const;
   return "pending" as const;
 }
