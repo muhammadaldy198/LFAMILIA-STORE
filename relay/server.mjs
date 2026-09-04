@@ -1,27 +1,74 @@
 import { createServer } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 
-const PORT = Number(process.env.PORT || 8788);
-const HOST = process.env.HOST || "127.0.0.1";
-const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 1_048_576);
-const UPSTREAM_TIMEOUT_MS = Number(process.env.UPSTREAM_TIMEOUT_MS || 20_000);
+function requireEnv(name) {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`Environment ${name} wajib diisi.`);
+  return value;
+}
 
-const relayToken = (process.env.RELAY_TOKEN || "").trim();
+function optionalEnv(name) {
+  return process.env[name]?.trim() || "";
+}
 
-const providers = new Map([
-  [
-    (process.env.DIGIFLAZZ_RELAY_HOST || "digiflazz-relay.lfamiliastore.my.id").toLowerCase(),
-    process.env.DIGIFLAZZ_UPSTREAM_ORIGIN || "https://api.digiflazz.com",
-  ],
-  [
-    (process.env.IPAYMU_RELAY_HOST || "ipaymu-relay.lfamiliastore.my.id").toLowerCase(),
-    process.env.IPAYMU_UPSTREAM_ORIGIN || "",
-  ],
-  [
-    (process.env.MIDTRANS_BISNAP_RELAY_HOST || "bisnap-relay.lfamiliastore.my.id").toLowerCase(),
-    process.env.MIDTRANS_BISNAP_UPSTREAM_ORIGIN || "",
-  ],
-]);
+function requirePositiveInt(name) {
+  const value = Number(requireEnv(name));
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`Environment ${name} harus berupa integer positif.`);
+  }
+  return value;
+}
+
+function normalizeOrigin(value, name) {
+  if (!value) return "";
+  const url = new URL(value);
+  if (url.protocol !== "https:") {
+    throw new Error(`${name} wajib menggunakan HTTPS.`);
+  }
+  url.pathname = "/";
+  url.search = "";
+  url.hash = "";
+  return url.origin;
+}
+
+const HOST = requireEnv("RELAY_BIND_HOST");
+const PORT = requirePositiveInt("RELAY_BIND_PORT");
+const MAX_BODY_BYTES = requirePositiveInt("RELAY_MAX_BODY_BYTES");
+const UPSTREAM_TIMEOUT_MS = requirePositiveInt("RELAY_UPSTREAM_TIMEOUT_MS");
+const relayToken = requireEnv("RELAY_TOKEN");
+
+const providerDefinitions = [
+  {
+    name: "digiflazz",
+    host: optionalEnv("DIGIFLAZZ_RELAY_HOST").toLowerCase(),
+    upstream: normalizeOrigin(
+      optionalEnv("DIGIFLAZZ_UPSTREAM_ORIGIN"),
+      "DIGIFLAZZ_UPSTREAM_ORIGIN",
+    ),
+  },
+  {
+    name: "ipaymu",
+    host: optionalEnv("IPAYMU_RELAY_HOST").toLowerCase(),
+    upstream: normalizeOrigin(
+      optionalEnv("IPAYMU_UPSTREAM_ORIGIN"),
+      "IPAYMU_UPSTREAM_ORIGIN",
+    ),
+  },
+  {
+    name: "midtrans-bisnap",
+    host: optionalEnv("MIDTRANS_BISNAP_RELAY_HOST").toLowerCase(),
+    upstream: normalizeOrigin(
+      optionalEnv("MIDTRANS_BISNAP_UPSTREAM_ORIGIN"),
+      "MIDTRANS_BISNAP_UPSTREAM_ORIGIN",
+    ),
+  },
+];
+
+const providers = new Map(
+  providerDefinitions
+    .filter((provider) => provider.host)
+    .map((provider) => [provider.host, provider]),
+);
 
 const hopByHopHeaders = new Set([
   "connection",
@@ -49,7 +96,7 @@ function json(res, status, payload) {
 }
 
 function safeTokenEqual(received) {
-  if (!relayToken || !received) return false;
+  if (!received) return false;
   const expectedBuffer = Buffer.from(relayToken);
   const receivedBuffer = Buffer.from(String(received));
   if (expectedBuffer.length !== receivedBuffer.length) return false;
@@ -64,7 +111,7 @@ function requestHostname(req) {
 }
 
 function buildUpstreamUrl(req, upstreamOrigin) {
-  const incoming = new URL(req.url || "/", "http://relay.invalid");
+  const incoming = new URL(req.url || "/", "http://relay.local");
   const upstream = new URL(upstreamOrigin);
   upstream.pathname = incoming.pathname;
   upstream.search = incoming.search;
@@ -133,11 +180,12 @@ const server = createServer(async (req, res) => {
     json(res, 200, {
       ok: true,
       service: "lfamilia-provider-relay",
-      configured: {
-        digiflazz: Boolean(providers.get(process.env.DIGIFLAZZ_RELAY_HOST?.toLowerCase() || "digiflazz-relay.lfamiliastore.my.id")),
-        ipaymu: Boolean(process.env.IPAYMU_UPSTREAM_ORIGIN),
-        midtransBisnap: Boolean(process.env.MIDTRANS_BISNAP_UPSTREAM_ORIGIN),
-      },
+      configured: Object.fromEntries(
+        providerDefinitions.map((provider) => [
+          provider.name,
+          Boolean(provider.host && provider.upstream),
+        ]),
+      ),
     });
     return;
   }
@@ -152,19 +200,20 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const upstreamOrigin = providers.get(hostname);
-  if (!upstreamOrigin) {
-    json(res, providers.has(hostname) ? 503 : 404, {
-      error: providers.has(hostname)
-        ? "Upstream provider belum dikonfigurasi."
-        : "Host relay tidak dikenal.",
-    });
+  const provider = providers.get(hostname);
+  if (!provider) {
+    json(res, 404, { error: "Host relay tidak dikenal." });
+    return;
+  }
+
+  if (!provider.upstream) {
+    json(res, 503, { error: "Upstream provider belum dikonfigurasi." });
     return;
   }
 
   try {
     const body = await readBody(req);
-    const target = buildUpstreamUrl(req, upstreamOrigin);
+    const target = buildUpstreamUrl(req, provider.upstream);
     const upstream = await fetch(target, {
       method: "POST",
       headers: forwardHeaders(req),
@@ -183,8 +232,8 @@ const server = createServer(async (req, res) => {
     process.stdout.write(
       JSON.stringify({
         time: new Date().toISOString(),
-        host: hostname,
-        path: new URL(req.url || "/", "http://relay.invalid").pathname,
+        provider: provider.name,
+        path: new URL(req.url || "/", "http://relay.local").pathname,
         status: upstream.status,
         elapsedMs: Date.now() - startedAt,
       }) + "\n",
@@ -201,8 +250,8 @@ const server = createServer(async (req, res) => {
     process.stderr.write(
       JSON.stringify({
         time: new Date().toISOString(),
-        host: hostname,
-        path: new URL(req.url || "/", "http://relay.invalid").pathname,
+        provider: provider.name,
+        path: new URL(req.url || "/", "http://relay.local").pathname,
         error: error instanceof Error ? error.name : "UnknownError",
         elapsedMs: Date.now() - startedAt,
       }) + "\n",
@@ -210,8 +259,8 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.requestTimeout = UPSTREAM_TIMEOUT_MS + 5_000;
-server.headersTimeout = 10_000;
+server.requestTimeout = UPSTREAM_TIMEOUT_MS + requirePositiveInt("RELAY_REQUEST_TIMEOUT_BUFFER_MS");
+server.headersTimeout = requirePositiveInt("RELAY_HEADERS_TIMEOUT_MS");
 server.listen(PORT, HOST, () => {
   process.stdout.write(
     `LFAMILIA provider relay listening on http://${HOST}:${PORT}\n`,
