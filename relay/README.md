@@ -36,10 +36,7 @@ IPAYMU_PRODUCTION_UPSTREAM_ORIGIN=<production-origin>
 
 MIDTRANS_BISNAP_RELAY_HOST=<relay-host>
 MIDTRANS_BISNAP_SANDBOX_UPSTREAM_ORIGIN=<sandbox-origin>
-MIDTRANS_BISNAP_SANDBOX_AUTH_UPSTREAM_ORIGIN=<sandbox-auth-origin>
 MIDTRANS_BISNAP_PRODUCTION_UPSTREAM_ORIGIN=<production-origin>
-MIDTRANS_BISNAP_PRODUCTION_AUTH_UPSTREAM_ORIGIN=<production-auth-origin>
-MIDTRANS_BISNAP_AUTH_PATH_PREFIX=<auth-path-prefix>
 ```
 
 Tidak ada VA iPaymu di VPS. Tidak ada API key provider di VPS. Environment dipilih oleh Worker melalui header internal yang dilindungi relay token.
