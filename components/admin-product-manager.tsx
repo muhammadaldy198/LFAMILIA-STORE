@@ -65,6 +65,7 @@ export function AdminProductManager() {
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
   const [catalogSaving, setCatalogSaving] = useState<string | null>(null);
   const [syncingPackage, setSyncingPackage] = useState<number | null>(null);
+  const [editingPackageKey, setEditingPackageKey] = useState<string | null>(null);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -144,6 +145,7 @@ export function AdminProductManager() {
   function addCatalogPackage(item: ManagedProduct) {
     const key = itemKey(item);
     setExpandedProduct(key);
+    setEditingPackageKey(`${key}:${item.packages.length}`);
     updateCatalogProduct(key, (current) => ({
       ...current,
       packages: [
@@ -475,32 +477,90 @@ export function AdminProductManager() {
                     </div>)}</div>
                   </div>}
 
-                  <div className="divide-y divide-white/[0.07]">
-                    {item.packages.map((entry, index) => <div key={`${entry.dbId ?? "new"}-${index}`} className="py-3">
-                      {role === "owner" ? <>
-                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_120px_110px]">
-                          <label><span className="field-label">Nominal</span><Input value={entry.label} onChange={(event) => updateCatalogPackage(key, index, "label", event.target.value)} className="admin-input" placeholder="59 Diamonds" /></label>
-                          <label><span className="field-label">Tab pemisah</span><select value={entry.group ?? ""} onChange={(event) => updateCatalogPackage(key, index, "group", event.target.value)} className="admin-input"><option value="">Tanpa tab</option>{item.packageTabs.map((tab, tabIndex) => <option key={`${tab}-${tabIndex}`} value={tab}>{tab}</option>)}</select></label>
-                          <label><span className="field-label">Harga jual</span><Input type="number" min={1} value={entry.price || ""} onChange={(event) => updateCatalogPackage(key, index, "price", Number(event.target.value))} className="admin-input" /></label>
-                          <label><span className="field-label">Status</span><select value={entry.isActive ? "1" : "0"} onChange={(event) => updateCatalogPackage(key, index, "isActive", event.target.value === "1")} className="admin-input"><option value="1">Aktif</option><option value="0">Nonaktif</option></select></label>
-                        </div>
-                        {item.fulfillmentType === "automatic" && <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1.2fr]">
-                          <label><span className="field-label">Provider</span><select value={entry.providerCode ?? ""} onChange={(event) => updateCatalogPackage(key, index, "providerCode", event.target.value || undefined)} className="admin-input"><option value="">Pilih provider</option>{providerOptions.map((provider) => <option key={provider.code} value={provider.code}>{provider.name}</option>)}</select></label>
-                          <label><span className="field-label">SKU provider</span><Input value={entry.providerSku ?? ""} onChange={(event) => updateCatalogPackage(key, index, "providerSku", entry.providerCode === "voucher-stock" ? event.target.value.toLowerCase().replace(/[^a-z0-9._:-]/g, "-") : event.target.value)} className="admin-input" placeholder="SKU provider" /></label>
-                        </div>}
-                        {entry.providerCode === "digiflazz" && <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-[160px_140px_1fr_auto]">
-                          <label><span className="field-label">Jenis margin</span><select value={entry.marginType ?? "fixed"} onChange={(event) => updateCatalogPackage(key, index, "marginType", event.target.value as "fixed" | "percent")} className="admin-input"><option value="fixed">Margin Rupiah</option><option value="percent">Margin Persen</option></select></label>
-                          <label><span className="field-label">Margin</span><Input type="number" min={0} value={entry.marginValue ?? 0} onChange={(event) => updateCatalogPackage(key, index, "marginValue", Number(event.target.value))} className="admin-input" /></label>
-                          <div><span className="field-label">Modal supplier</span><div className="flex h-10 items-center rounded-xl border border-white/10 bg-white/[0.025] px-3 text-[10px] text-[#d8ff8d]">{entry.supplierPrice ? formatRupiah(entry.supplierPrice) : "Belum sinkron"}</div></div>
-                          <Button type="button" disabled={!item.dbId || !entry.id || syncingPackage === (entry.dbId ?? index + 1) || catalogSaving === key} onClick={() => void syncCatalogPackage(item, index)} variant="outline" className="mt-auto h-10 rounded-xl border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] px-3 text-[9px] text-[#d8ff8d]">{syncingPackage === (entry.dbId ?? index + 1) ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}Sync provider</Button>
-                        </div>}
-                        <div className="mt-2 flex justify-end gap-2">
-                          <Button type="button" disabled={catalogSaving === key} onClick={() => void saveCatalogProduct(item)} size="sm" className="h-8 rounded-lg bg-[#b9ff35] px-3 text-[9px] font-black text-[#091006]">{catalogSaving === key && <LoaderCircle className="mr-1 size-3 animate-spin" />}Simpan nominal</Button>
-                          <Button type="button" onClick={() => void removeCatalogPackage(item, index)} variant="ghost" size="sm" className="h-8 px-2 text-[9px] text-red-300/60 hover:text-red-200"><Trash2 className="mr-1 size-3" />Hapus</Button>
-                        </div>
-                      </> : <div className="grid grid-cols-[1fr_auto] gap-3 text-[10px]"><div><strong className="text-white/70">{entry.label}</strong><p className="mt-0.5 text-white/30">{entry.group || "Tanpa tab"} • {entry.providerCode || "Manual"}</p></div><strong className="text-[#d8ff8d]">{formatRupiah(entry.price)}</strong></div>}
-                    </div>)}
-                    {!item.packages.length && <div className="py-6 text-center text-[10px] text-white/30">Belum ada nominal. Tekan + pada produk atau tombol Tambah nominal.</div>}
+                  <div className="pt-3">
+                    <div className="overflow-x-auto rounded-lg border border-white/[0.07]">
+                      <table className="w-full min-w-[940px] text-left text-[10px]">
+                        <thead className="bg-white/[0.02] text-white/30">
+                          <tr>
+                            <th className="px-3 py-2">Nominal</th>
+                            <th className="px-3 py-2">Tab</th>
+                            <th className="px-3 py-2">Provider</th>
+                            <th className="px-3 py-2">Modal</th>
+                            <th className="px-3 py-2">Margin</th>
+                            <th className="px-3 py-2">Harga jual</th>
+                            <th className="px-3 py-2">Status</th>
+                            <th className="px-3 py-2">Sync</th>
+                            <th className="px-3 py-2 text-right">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {item.packages.map((entry, index) => {
+                            const editorKey = `${key}:${index}`;
+                            const editing = editingPackageKey === editorKey;
+                            const canSync = entry.providerCode === "digiflazz";
+                            const syncKey = entry.dbId ?? index + 1;
+                            return <Fragment key={`${entry.dbId ?? "new"}-${index}`}>
+                              <tr className="border-t border-white/[0.06]">
+                                <td className="px-3 py-2 font-semibold text-white/75">{entry.label || <span className="text-amber-200/60">Nominal baru</span>}</td>
+                                <td className="px-3 py-2 text-white/40">{entry.group || "Tanpa tab"}</td>
+                                <td className="px-3 py-2 text-white/40">{entry.providerCode === "voucher-stock" ? "Stok kode LFAMILIA" : entry.providerCode || "Belum diatur"}</td>
+                                <td className="px-3 py-2 text-white/40">{entry.supplierPrice ? formatRupiah(entry.supplierPrice) : "-"}</td>
+                                <td className="px-3 py-2 text-white/40">{entry.providerCode === "digiflazz" ? (entry.marginType === "percent" ? `${entry.marginValue ?? 0}%` : formatRupiah(entry.marginValue ?? 0)) : "-"}</td>
+                                <td className="px-3 py-2 font-bold text-[#d8ff8d]">{entry.price ? formatRupiah(entry.price) : "-"}</td>
+                                <td className={`px-3 py-2 ${entry.isActive ? "text-[#d8ff8d]" : "text-white/30"}`}>{entry.isActive ? "Aktif" : "Nonaktif"}</td>
+                                <td className="px-3 py-2">
+                                  <Button
+                                    type="button"
+                                    disabled={!canSync || !item.dbId || !entry.id || syncingPackage === syncKey || catalogSaving === key}
+                                    onClick={() => void syncCatalogPackage(item, index)}
+                                    variant="outline"
+                                    size="sm"
+                                    title={canSync ? "Sync nominal ini dengan DigiFlazz" : "Sync tersedia setelah provider nominal dipilih ke DigiFlazz"}
+                                    className="h-7 rounded-md border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] px-2 text-[8px] text-[#d8ff8d] disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-white/20"
+                                  >
+                                    {syncingPackage === syncKey ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}
+                                    Sync
+                                  </Button>
+                                </td>
+                                <td className="px-3 py-2">
+                                  {role === "owner" ? <div className="flex justify-end gap-1">
+                                    <Button type="button" onClick={() => setEditingPackageKey(editing ? null : editorKey)} variant="ghost" size="icon-sm" className={editing ? "text-[#d8ff8d]" : "text-white/45 hover:text-white"} aria-label={`Edit nominal ${entry.label || index + 1}`}><Edit3 className="size-3.5" /></Button>
+                                    <Button type="button" onClick={() => void removeCatalogPackage(item, index)} variant="ghost" size="icon-sm" className="text-red-300/45 hover:text-red-200" aria-label={`Hapus nominal ${entry.label || index + 1}`}><Trash2 className="size-3.5" /></Button>
+                                  </div> : <span className="block text-right text-white/20">-</span>}
+                                </td>
+                              </tr>
+                              {role === "owner" && editing && <tr className="border-t border-white/[0.06] bg-white/[0.012]">
+                                <td colSpan={9} className="p-3">
+                                  <div className="grid grid-cols-[1.25fr_1fr_120px_110px] gap-2">
+                                    <label><span className="field-label">Nominal</span><Input value={entry.label} onChange={(event) => updateCatalogPackage(key, index, "label", event.target.value)} className="admin-input" placeholder="59 Diamonds" /></label>
+                                    <label><span className="field-label">Tab pemisah</span><select value={entry.group ?? ""} onChange={(event) => updateCatalogPackage(key, index, "group", event.target.value)} className="admin-input"><option value="">Tanpa tab</option>{item.packageTabs.map((tab, tabIndex) => <option key={`${tab}-${tabIndex}`} value={tab}>{tab}</option>)}</select></label>
+                                    <label><span className="field-label">Harga jual</span><Input type="number" min={1} value={entry.price || ""} onChange={(event) => updateCatalogPackage(key, index, "price", Number(event.target.value))} className="admin-input" /></label>
+                                    <label><span className="field-label">Status</span><select value={entry.isActive ? "1" : "0"} onChange={(event) => updateCatalogPackage(key, index, "isActive", event.target.value === "1")} className="admin-input"><option value="1">Aktif</option><option value="0">Nonaktif</option></select></label>
+                                  </div>
+
+                                  {item.fulfillmentType === "automatic" && <div className="mt-2 grid grid-cols-2 gap-2">
+                                    <label><span className="field-label">Provider</span><select value={entry.providerCode ?? ""} onChange={(event) => updateCatalogPackage(key, index, "providerCode", event.target.value || undefined)} className="admin-input"><option value="">Pilih provider</option>{providerOptions.map((provider) => <option key={provider.code} value={provider.code}>{provider.name}</option>)}</select></label>
+                                    <label><span className="field-label">SKU provider</span><Input value={entry.providerSku ?? ""} onChange={(event) => updateCatalogPackage(key, index, "providerSku", entry.providerCode === "voucher-stock" ? event.target.value.toLowerCase().replace(/[^a-z0-9._:-]/g, "-") : event.target.value)} className="admin-input" placeholder="SKU provider" /></label>
+                                  </div>}
+
+                                  {entry.providerCode === "digiflazz" && <div className="mt-2 grid grid-cols-[160px_140px_1fr] gap-2">
+                                    <label><span className="field-label">Jenis margin</span><select value={entry.marginType ?? "fixed"} onChange={(event) => updateCatalogPackage(key, index, "marginType", event.target.value as "fixed" | "percent")} className="admin-input"><option value="fixed">Margin Rupiah</option><option value="percent">Margin Persen</option></select></label>
+                                    <label><span className="field-label">Margin</span><Input type="number" min={0} value={entry.marginValue ?? 0} onChange={(event) => updateCatalogPackage(key, index, "marginValue", Number(event.target.value))} className="admin-input" /></label>
+                                    <div><span className="field-label">Modal supplier</span><div className="flex h-8 items-center rounded-lg border border-white/10 bg-white/[0.025] px-3 text-[10px] text-[#d8ff8d]">{entry.supplierPrice ? formatRupiah(entry.supplierPrice) : "Belum sinkron"}</div></div>
+                                  </div>}
+
+                                  <div className="mt-2 flex justify-end gap-2">
+                                    <Button type="button" variant="ghost" size="sm" onClick={() => setEditingPackageKey(null)} className="h-8 px-3 text-[9px] text-white/45">Tutup</Button>
+                                    <Button type="button" disabled={catalogSaving === key} onClick={() => void saveCatalogProduct(item)} size="sm" className="h-8 rounded-lg bg-[#b9ff35] px-3 text-[9px] font-black text-[#091006]">{catalogSaving === key && <LoaderCircle className="mr-1 size-3 animate-spin" />}Simpan nominal</Button>
+                                  </div>
+                                </td>
+                              </tr>}
+                            </Fragment>;
+                          })}
+                          {!item.packages.length && <tr><td colSpan={9} className="px-3 py-6 text-center text-[10px] text-white/30">Belum ada nominal. Tekan + pada produk atau tombol Tambah nominal.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </TableCell></TableRow>}
@@ -510,23 +570,23 @@ export function AdminProductManager() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[92dvh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] overflow-y-auto overflow-x-hidden border-white/10 bg-[#10141d] p-4 text-white sm:max-w-2xl sm:p-6">
+        <DialogContent className="left-2 right-2 top-2 bottom-2 h-auto w-auto max-w-none translate-x-0 translate-y-0 gap-3 overflow-y-auto overflow-x-hidden rounded-xl border-white/10 bg-[#10141d] p-3 text-white sm:bottom-auto sm:left-[50%] sm:right-auto sm:top-[50%] sm:max-h-[90vh] sm:w-full sm:max-w-2xl sm:translate-x-[-50%] sm:translate-y-[-50%] sm:p-5">
           <form onSubmit={save}>
-            <DialogHeader><DialogTitle>{role === "staff" ? `Edit informasi ${draft.name}` : draft.dbId ? "Edit produk" : "Tambah produk"}</DialogTitle><DialogDescription className="text-white/38">{role === "staff" ? "Staff dapat mengubah media, jam layanan, instruksi, dan pop-up tanpa akses ke harga atau provider." : "Data ini akan digunakan oleh katalog dan checkout."}</DialogDescription></DialogHeader>
-            <div className="grid gap-3 py-3 sm:grid-cols-2">
+            <DialogHeader className="pr-8 text-left"><DialogTitle className="text-base sm:text-lg">{role === "staff" ? `Edit informasi ${draft.name}` : draft.dbId ? "Edit produk" : "Tambah produk"}</DialogTitle><DialogDescription className="text-[10px] leading-4 text-white/38 sm:text-xs">{role === "staff" ? "Staff dapat mengubah media, jam layanan, instruksi, dan pop-up tanpa akses ke harga atau provider." : "Data ini akan digunakan oleh katalog dan checkout."}</DialogDescription></DialogHeader>
+            <div className="grid gap-2.5 py-2 sm:grid-cols-2">
               {role === "owner" && <><Field label="Nama produk"><Input required value={draft.name} onChange={(event) => { updateDraft("name", event.target.value); if (!draft.dbId) updateDraft("slug", slugify(event.target.value)); }} className="admin-input" placeholder="Mobile Legends" /></Field>
               <Field label="Slug URL"><Input required value={draft.slug} onChange={(event) => updateDraft("slug", slugify(event.target.value))} className="admin-input" placeholder="mobile-legends" /></Field>
               <Field label="Publisher"><Input value={draft.publisher} onChange={(event) => updateDraft("publisher", event.target.value)} className="admin-input" placeholder="Moonton" /></Field>
-              <Field label="Kategori"><select value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white">{(categories.length ? categories : [{ slug: "game", name: "Top Up Game" }, { slug: "voucher", name: "Voucher & Gift Card" }]).map((category) => <option key={category.slug} value={category.slug}>{category.name}</option>)}</select></Field></>}
+              <Field label="Kategori"><select value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#171c27] px-3 text-xs text-white sm:h-10 sm:rounded-xl">{(categories.length ? categories : [{ slug: "game", name: "Top Up Game" }, { slug: "voucher", name: "Voucher & Gift Card" }]).map((category) => <option key={category.slug} value={category.slug}>{category.name}</option>)}</select></Field></>}
               <div className="sm:col-span-2"><AdminMediaUpload label="Gambar produk (wajib kotak 1:1)" value={draft.imageUrl ?? ""} onChange={(value) => updateDraft("imageUrl", value)} help="Gunakan gambar kotak 1:1, misalnya 1080 × 1080. Checkout dan pencarian menampilkan penuh; beranda otomatis memotong bagian tengah menjadi 2:3." previewClassName="h-24 sm:h-28" /></div>
-              <div className="sm:col-span-2"><Field label="Deskripsi produk" wide><Textarea value={draft.description ?? ""} onChange={(event) => updateDraft("description", event.target.value)} className="min-h-28 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 py-2 text-xs text-white" placeholder="Deskripsi khusus produk ini yang tampil di tab Keterangan." /></Field></div>
+              <div className="sm:col-span-2"><Field label="Deskripsi produk" wide><Textarea value={draft.description ?? ""} onChange={(event) => updateDraft("description", event.target.value)} className="min-h-24 w-full rounded-lg border border-white/10 bg-[#171c27] px-3 py-2 text-xs text-white sm:min-h-28 sm:rounded-xl" placeholder="Deskripsi khusus produk ini yang tampil di tab Keterangan." /></Field></div>
               <div className="sm:col-span-2"><AdminMediaUpload label="Banner halaman produk" value={draft.bannerUrl ?? ""} onChange={(value) => updateDraft("bannerUrl", value)} help="Banner penuh di atas checkout. Gunakan banner landscape; desktop menampilkan lebar penuh, ponsel otomatis memotong sisi kiri/kanan dengan fokus di tengah. Jika kosong, gambar produk digunakan." previewClassName="h-24 sm:h-28" /></div>
               {role === "owner" && <><Field label="Inisial kartu"><Input required maxLength={3} value={draft.initials} onChange={(event) => updateDraft("initials", event.target.value.toUpperCase())} className="admin-input" placeholder="ML" /></Field>
               <Field label="Urutan"><Input type="number" min={0} value={draft.sortOrder} onChange={(event) => updateDraft("sortOrder", Number(event.target.value))} className="admin-input" /></Field>
-              <Field label="Jenis proses" wide><select value={draft.fulfillmentType} onChange={(event) => { const value = event.target.value as "automatic" | "manual"; updateDraft("fulfillmentType", value); updateDraft("instant", value === "automatic"); if (value === "manual" && draft.notices.length === 0) updateDraft("notices", [{ id: null, title: "JAM OPERASIONAL {{jam_buka}} – {{jam_tutup}} {{zona_waktu}}", body: "Estimasi proses 30 menit sampai 2 jam.\n\nAdmin akan menghubungi melalui WhatsApp setelah pembayaran berhasil.", isActive: true, sortOrder: 0 }]); }} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white"><option value="automatic">Otomatis via provider</option><option value="manual">Manual oleh admin</option></select></Field></>}
+              <Field label="Jenis proses" wide><select value={draft.fulfillmentType} onChange={(event) => { const value = event.target.value as "automatic" | "manual"; updateDraft("fulfillmentType", value); updateDraft("instant", value === "automatic"); if (value === "manual" && draft.notices.length === 0) updateDraft("notices", [{ id: null, title: "JAM OPERASIONAL {{jam_buka}} – {{jam_tutup}} {{zona_waktu}}", body: "Estimasi proses 30 menit sampai 2 jam.\n\nAdmin akan menghubungi melalui WhatsApp setelah pembayaran berhasil.", isActive: true, sortOrder: 0 }]); }} className="h-9 w-full rounded-lg border border-white/10 bg-[#171c27] px-3 text-xs text-white sm:h-10 sm:rounded-xl"><option value="automatic">Otomatis via provider</option><option value="manual">Manual oleh admin</option></select></Field></>}
               {draft.fulfillmentType === "manual" && <Field label="Instruksi manual" wide><Input value={draft.manualInstructions ?? ""} onChange={(event) => updateDraft("manualInstructions", event.target.value)} className="admin-input" placeholder="Instruksi aman untuk pelanggan, tanpa meminta password atau OTP" /></Field>}
-              {draft.fulfillmentType === "manual" && <><Field label="Jam buka"><Input type="time" required value={draft.manualOpenTime ?? "09:00"} onChange={(event) => updateDraft("manualOpenTime", event.target.value)} className="admin-input" /></Field><Field label="Jam tutup"><Input type="time" required value={draft.manualCloseTime ?? "21:00"} onChange={(event) => updateDraft("manualCloseTime", event.target.value)} className="admin-input" /></Field><Field label="Zona waktu" wide><select value={draft.manualTimezone ?? "Asia/Jakarta"} onChange={(event) => updateDraft("manualTimezone", event.target.value)} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white"><option value="Asia/Jakarta">WIB — Asia/Jakarta</option><option value="Asia/Makassar">WITA — Asia/Makassar</option><option value="Asia/Jayapura">WIT — Asia/Jayapura</option></select></Field></>}
-              {role === "owner" && <Field label="Warna kartu" wide><select value={draft.accent} onChange={(event) => updateDraft("accent", event.target.value)} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs text-white"><option value="from-[#5577ff] via-[#314fc0] to-[#16276c]">Biru</option><option value="from-[#ffad32] via-[#ea6825] to-[#7c2714]">Oranye</option><option value="from-[#ff5f65] via-[#c42f50] to-[#5b1530]">Merah</option><option value="from-[#58d68d] via-[#2b8f9a] to-[#174862]">Hijau</option><option value="from-[#f6d878] via-[#7c4fc9] to-[#2b174c]">Ungu</option><option value="from-[#b9ff35] to-[#347a21]">Neon</option></select></Field>}
+              {draft.fulfillmentType === "manual" && <><Field label="Jam buka"><Input type="time" required value={draft.manualOpenTime ?? "09:00"} onChange={(event) => updateDraft("manualOpenTime", event.target.value)} className="admin-input" /></Field><Field label="Jam tutup"><Input type="time" required value={draft.manualCloseTime ?? "21:00"} onChange={(event) => updateDraft("manualCloseTime", event.target.value)} className="admin-input" /></Field><Field label="Zona waktu" wide><select value={draft.manualTimezone ?? "Asia/Jakarta"} onChange={(event) => updateDraft("manualTimezone", event.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#171c27] px-3 text-xs text-white sm:h-10 sm:rounded-xl"><option value="Asia/Jakarta">WIB — Asia/Jakarta</option><option value="Asia/Makassar">WITA — Asia/Makassar</option><option value="Asia/Jayapura">WIT — Asia/Jayapura</option></select></Field></>}
+              {role === "owner" && <Field label="Warna kartu" wide><select value={draft.accent} onChange={(event) => updateDraft("accent", event.target.value)} className="h-9 w-full rounded-lg border border-white/10 bg-[#171c27] px-3 text-xs text-white sm:h-10 sm:rounded-xl"><option value="from-[#5577ff] via-[#314fc0] to-[#16276c]">Biru</option><option value="from-[#ffad32] via-[#ea6825] to-[#7c2714]">Oranye</option><option value="from-[#ff5f65] via-[#c42f50] to-[#5b1530]">Merah</option><option value="from-[#58d68d] via-[#2b8f9a] to-[#174862]">Hijau</option><option value="from-[#f6d878] via-[#7c4fc9] to-[#2b174c]">Ungu</option><option value="from-[#b9ff35] to-[#347a21]">Neon</option></select></Field>}
             </div>
             {role === "owner" && <>
               <div className="grid grid-cols-2 gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 sm:grid-cols-3">{[["Aktif", "isActive"], ["Populer", "popular"], ["Instan", "instant"]].map(([label, key]) => <label key={key} className="flex items-center justify-between gap-2 text-[11px] text-white/55"><span>{label}</span><Switch checked={Boolean(draft[key as keyof ManagedProduct])} onCheckedChange={(checked) => updateDraft(key as keyof ManagedProduct, checked as never)} /></label>)}</div>
@@ -534,7 +594,7 @@ export function AdminProductManager() {
             </>}
             <div className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="flex items-center gap-2 text-sm font-bold"><BellRing className="size-4 text-[#b9ff35]" />Pop-up informasi produk</h3><p className="mt-1 text-[10px] text-white/30">Muncul sebelum pelanggan memilih nominal. Tambahkan slide sebanyak kebutuhan dan atur urutannya.</p><p className="mt-1 text-[9px] text-[#cfff72]/55">Token jam: {"{{jam_buka}}"}, {"{{jam_tutup}}"}, dan {"{{zona_waktu}}"}.</p></div><Button type="button" onClick={addNotice} size="sm" variant="outline" className="shrink-0 rounded-lg border-white/10 bg-white/[0.03] text-[10px] text-white hover:bg-white/[0.08] hover:text-white"><Plus className="mr-1 size-3.5" />Tambah slide</Button></div><div className="mt-3 space-y-3">{draft.notices.length ? draft.notices.map((notice, index) => <div key={`${notice.id}-${index}`} className="rounded-xl border border-white/[0.08] bg-[#111620] p-3"><div className="flex items-center gap-2"><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/[0.05] text-[9px] font-bold text-white/40">{index + 1}</span><div className="flex shrink-0 flex-col"><button type="button" disabled={index === 0} onClick={() => moveNotice(index, -1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser slide ke atas"><ChevronUp className="size-3.5" /></button><button type="button" disabled={index === draft.notices.length - 1} onClick={() => moveNotice(index, 1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser slide ke bawah"><ChevronDown className="size-3.5" /></button></div><Input required value={notice.title} onChange={(event) => updateNotice(index, "title", event.target.value)} className="admin-input" placeholder="JAM OPERASIONAL 09.00 – 23.00 WIB" /><Switch checked={notice.isActive} onCheckedChange={(checked) => updateNotice(index, "isActive", checked)} /><Button type="button" onClick={() => removeNotice(index)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></div><Textarea required value={notice.body} onChange={(event) => updateNotice(index, "body", event.target.value)} className="mt-2 min-h-28 rounded-xl border-white/10 bg-white/[0.025] text-xs text-white" placeholder={"Estimasi proses 30 menit sampai 2 jam.\n\nAdmin akan menghubungi melalui WhatsApp setelah pembayaran."} /></div>) : <div className="rounded-xl border border-dashed border-white/10 py-6 text-center text-[10px] text-white/28">Tidak ada pop-up untuk produk ini.</div>}</div></div>
                         {error && <p className="mt-4 rounded-xl bg-red-400/[0.07] p-3 text-xs text-red-200">{error}</p>}
-            <DialogFooter className="mt-5"><Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white">Batal</Button><Button disabled={saving} className="bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]">{saving && <LoaderCircle className="mr-2 size-4 animate-spin" />}{role === "staff" ? "Simpan informasi" : "Simpan produk"}</Button></DialogFooter>
+            <DialogFooter className="sticky bottom-0 z-10 -mx-3 mt-4 border-t border-white/[0.08] bg-[#10141d]/95 px-3 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0"><Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white">Batal</Button><Button disabled={saving} className="bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]">{saving && <LoaderCircle className="mr-2 size-4 animate-spin" />}{role === "staff" ? "Simpan informasi" : "Simpan produk"}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
