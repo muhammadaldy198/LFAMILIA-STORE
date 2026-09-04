@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useState } from "react";
-import { CreditCard, Edit3, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
+import { CreditCard, Edit3, LoaderCircle, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { AdminMediaUpload } from "@/components/admin-media-upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,30 +11,27 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ManagedPaymentChannel } from "@/lib/server/payment-channels";
 
-const fallback: ManagedPaymentChannel[] = [
-  ["va", "bca", "BCA"], ["va", "mandiri", "Mandiri"], ["va", "bni", "BNI"], ["va", "bri", "BRI"],
-  ["ewallet", "dana", "DANA"], ["ewallet", "gopay", "GoPay"], ["ewallet", "ovo", "OVO"], ["ewallet", "shopeepay", "ShopeePay"],
-  ["qris", "mpm", "QRIS"],
-].map(([method, channel, name], sortOrder) => ({
-  id: null, method: method as ManagedPaymentChannel["method"], channel, name,
-  description: "", imageUrl: "", isActive: true, sortOrder,
-}));
+type Gateway = "midtrans" | "ipaymu" | null;
 
 export function AdminPaymentMethodManager() {
   const [items, setItems] = useState<ManagedPaymentChannel[]>([]);
+  const [gateway, setGateway] = useState<Gateway>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
+  const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
       const response = await fetch("/api/panel/payment-methods", { cache: "no-store" });
       const data = await readJson(response);
       if (!response.ok) throw new Error(String(data.error || "Metode pembayaran gagal dimuat."));
-      setItems((data.channels as ManagedPaymentChannel[] | undefined) ?? fallback);
+      setItems((data.channels as ManagedPaymentChannel[] | undefined) ?? []);
+      setGateway((data.gateway as Gateway | undefined) ?? null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Metode pembayaran gagal dimuat.");
     } finally {
@@ -50,10 +47,41 @@ export function AdminPaymentMethodManager() {
 
   function add() {
     setItems((current) => {
-      const next = [...current, { id: null, method: "va", channel: "", name: "", description: "", imageUrl: "", isActive: false, sortOrder: current.length }];
+      const next = [...current, {
+        id: null,
+        method: "va" as const,
+        channel: "",
+        name: "",
+        description: "",
+        imageUrl: "",
+        isActive: false,
+        sortOrder: current.length,
+      }];
       window.setTimeout(() => setEditing(next.length - 1), 0);
       return next;
     });
+  }
+
+  async function syncGateway() {
+    setSyncing(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/panel/payment-methods", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "sync" }),
+      });
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(String(data.error || "Sinkron metode pembayaran gagal."));
+      const syncedGateway = data.gateway === "ipaymu" ? "iPaymu" : "Midtrans";
+      setMessage(`Metode pembayaran ${syncedGateway} berhasil disinkronkan.`);
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Sinkron metode pembayaran gagal.");
+    } finally {
+      setSyncing(false);
+    }
   }
 
   async function save(index: number) {
@@ -62,7 +90,9 @@ export function AdminPaymentMethodManager() {
     setError("");
     try {
       const response = await fetch("/api/panel/payment-methods", {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(item),
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(item),
       });
       const data = await readJson(response);
       if (!response.ok) throw new Error(String(data.error || "Metode pembayaran gagal disimpan."));
@@ -71,14 +101,19 @@ export function AdminPaymentMethodManager() {
       await load();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Metode pembayaran gagal disimpan.");
-    } finally { setSaving(""); }
+    } finally {
+      setSaving("");
+    }
   }
 
   async function remove(index: number) {
     const item = items[index];
     if (!item.id || !window.confirm(`Hapus ${item.name}?`)) return;
     const response = await fetch(`/api/panel/payment-methods?id=${item.id}`, { method: "DELETE" });
-    if (!response.ok) { setError("Metode pembayaran gagal dihapus."); return; }
+    if (!response.ok) {
+      setError("Metode pembayaran gagal dihapus.");
+      return;
+    }
     setEditing(null);
     await load();
   }
@@ -86,22 +121,37 @@ export function AdminPaymentMethodManager() {
   if (loading) return <div className="flex min-h-40 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat metode pembayaran…</div>;
 
   const item = editing == null ? null : items[editing];
+  const gatewayLabel = gateway === "midtrans" ? "Midtrans" : gateway === "ipaymu" ? "iPaymu" : "gateway";
+
   return <div className="space-y-3">
-    <div className="flex items-center justify-between gap-3">
-      <p className="text-[10px] text-white/35">Metode yang tampil di checkout pelanggan.</p>
-      <Button type="button" onClick={add} size="sm" className="h-8 bg-[#b9ff35] px-3 text-[9px] font-black text-[#091006]"><Plus className="mr-1 size-3" />Tambah metode</Button>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <p className="text-[10px] text-white/35">Metode checkout mengikuti payment gateway yang sedang aktif.</p>
+      <div className="flex gap-2">
+        <Button type="button" disabled={syncing || !gateway} onClick={() => void syncGateway()} variant="outline" size="sm" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-3 text-[9px] text-white">
+          {syncing ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}
+          Sync {gatewayLabel}
+        </Button>
+        <Button type="button" onClick={add} size="sm" className="h-8 bg-[#b9ff35] px-3 text-[9px] font-black text-[#091006]"><Plus className="mr-1 size-3" />Tambah metode</Button>
+      </div>
     </div>
+    {!gateway && <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.05] p-3 text-[10px] text-amber-100/65">Aktifkan Midtrans atau iPaymu untuk checkout sebelum melakukan sync.</p>}
     {message && <p className="rounded-lg border border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] p-3 text-xs text-[#d8ff8d]">{message}</p>}
     {error && <p className="rounded-lg border border-red-400/20 bg-red-400/[0.05] p-3 text-xs text-red-200">{error}</p>}
+
     <div className="overflow-x-auto rounded-lg border border-white/[0.08]">
       <Table>
         <TableHeader><TableRow className="border-white/[0.08] hover:bg-transparent"><TableHead className="text-[10px] text-white/35">Metode</TableHead><TableHead className="text-[10px] text-white/35">Jenis</TableHead><TableHead className="text-[10px] text-white/35">Status</TableHead><TableHead className="text-right text-[10px] text-white/35">Aksi</TableHead></TableRow></TableHeader>
-        <TableBody>{items.map((entry, index) => <TableRow key={entry.id ?? `${entry.channel}-${index}`} className="border-white/[0.07] hover:bg-white/[0.025]"><TableCell><div className="flex items-center gap-2.5">{entry.imageUrl ? <img src={entry.imageUrl} alt="" className="size-8 rounded-md bg-white object-contain p-1" /> : <span className="grid size-8 place-items-center rounded-md bg-white/[0.05]"><CreditCard className="size-3.5 text-white/35" /></span>}<div><strong className="text-xs">{entry.name || "Metode baru"}</strong><p className="text-[8px] text-white/25">{entry.description || entry.channel || "Belum diatur"}</p></div></div></TableCell><TableCell className="text-[10px] text-white/45">{entry.method === "va" ? "Virtual Account" : entry.method === "ewallet" ? "E-Wallet" : "QRIS"}</TableCell><TableCell><span className={entry.isActive ? "text-[9px] font-bold text-[#d8ff8d]" : "text-[9px] text-white/30"}>{entry.isActive ? "Aktif" : "Nonaktif"}</span></TableCell><TableCell className="text-right"><Button type="button" onClick={() => setEditing(index)} variant="ghost" size="icon-sm" className="text-white/45 hover:text-white" aria-label={`Edit ${entry.name}`}><Edit3 className="size-3.5" /></Button></TableCell></TableRow>)}</TableBody>
+        <TableBody>{items.map((entry, index) => <TableRow key={entry.id ?? `${entry.channel}-${index}`} className="border-white/[0.07] hover:bg-white/[0.025]">
+          <TableCell><div className="flex items-center gap-2.5">{entry.imageUrl ? <img src={entry.imageUrl} alt="" className="size-8 rounded-md bg-white object-contain p-1" /> : <span className="grid size-8 place-items-center rounded-md bg-white/[0.05]"><CreditCard className="size-3.5 text-white/35" /></span>}<div><strong className="text-xs">{entry.name || "Metode baru"}</strong><p className="text-[8px] text-white/25">{entry.description || entry.channel || "Belum diatur"}</p></div></div></TableCell>
+          <TableCell className="text-[10px] text-white/45">{entry.method === "va" ? "Virtual Account" : entry.method === "ewallet" ? "E-Wallet" : "QRIS"}</TableCell>
+          <TableCell><span className={entry.isActive ? "text-[9px] font-bold text-[#d8ff8d]" : "text-[9px] text-white/30"}>{entry.isActive ? "Aktif" : "Nonaktif"}</span></TableCell>
+          <TableCell className="text-right"><Button type="button" onClick={() => setEditing(index)} variant="ghost" size="icon-sm" className="text-white/45 hover:text-white"><Edit3 className="size-3.5" /></Button></TableCell>
+        </TableRow>)}</TableBody>
       </Table>
     </div>
 
     <Dialog open={editing != null} onOpenChange={(open) => !open && setEditing(null)}>
-      {item && editing != null && <DialogContent className="border-white/10 bg-[#10141d] text-white sm:max-w-xl">
+      {item && editing != null && <DialogContent className="w-[calc(100vw-1rem)] max-w-xl overflow-x-hidden border-white/10 bg-[#10141d] text-white">
         <DialogHeader><DialogTitle>Edit metode pembayaran</DialogTitle><DialogDescription className="text-white/38">Ubah detail hanya saat diperlukan.</DialogDescription></DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2"><AdminMediaUpload label="Logo pembayaran" value={item.imageUrl ?? ""} onChange={(imageUrl) => update(editing, { imageUrl })} help="Logo yang tampil di checkout." previewClassName="h-20" /></div>

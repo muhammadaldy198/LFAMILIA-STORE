@@ -349,8 +349,8 @@ export default function AdminPage() {
                 </TabsContent>
                 <TabsContent value="payments" className="mt-0 space-y-5">
                   <AdminSection
-                    title="Payment gateway & pembayaran manual"
-                    description="Gateway dan pembayaran manual diletakkan paling atas. Klik ikon pensil untuk mengubah pengaturan."
+                    title="Payment gateway"
+                    description="Midtrans dan iPaymu diletakkan paling atas. Klik ikon pensil untuk mengubah pengaturan."
                   >
                     <AdminWalletManager view="checkout" />
                   </AdminSection>
