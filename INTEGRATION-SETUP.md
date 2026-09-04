@@ -16,61 +16,48 @@ npx wrangler d1 migrations apply lfamilia-store-db --remote
 
 Jangan menghapus migrasi lama yang sudah pernah diterapkan. Setelah migrasi berhasil, buka `/admin`, masuk melalui Cloudflare Access, lalu tekan tombol **Lengkapi katalog utama** pada tab Produk. Tindakan ini menambahkan produk/nominal yang belum ada tanpa menimpa perubahan Anda.
 
-## 2. Secret Cloudflare Worker
+## 2. Cloudflare Variables/Secrets provider
 
-Tambahkan sebagai **Secret**, bukan Variable biasa dan bukan file GitHub:
+Gunakan matriks final pada `PROVIDER-CONFIG.md`.
 
-| Nama | Isi |
-|---|---|
-| `MIDTRANS_SERVER_KEY` | Server Key Midtrans aktif; prefix `SB-` otomatis memilih Sandbox |
-| `MELOSTORE_API_KEY` | API Key H2H Melostore untuk validasi nickname |
-| `MELOSTORE_SECRET_KEY` | Secret Key H2H Melostore untuk validasi nickname |
-| `NICKNAME_API_KEY` | API key fallback nickname bila penyedia fallback membutuhkannya; opsional |
-| `DIGIFLAZZ_USERNAME` | Username buyer DigiFlazz |
-| `DIGIFLAZZ_API_KEY` | Development API key DigiFlazz |
-| `DIGIFLAZZ_PRODUCTION_API_KEY` | Production API key DigiFlazz; bila diisi aplikasi otomatis beralih Production |
-| `IPAYMU_VA` | VA aktif iPaymu |
-| `IPAYMU_API_KEY` | API Key aktif iPaymu |
-| `DIGIFLAZZ_WEBHOOK_SECRET` | Secret webhook DigiFlazz |
-| `PROVIDER_RELAY_TOKEN` | Secret acak minimal 32 karakter, sama dengan `RELAY_TOKEN` pada VPS provider relay |
-| `VIPPAYMENT_API_ID` | API ID VIPayment |
-| `VIPPAYMENT_API_KEY` | API Key VIPayment |
-| `VOUCHER_ENCRYPTION_KEY` | Secret acak minimal 32 karakter; jangan pernah diganti setelah stok diimpor |
-| `RESEND_API_KEY` | API key Resend untuk pengiriman kode lewat email |
-| `WHATSAPP_ACCESS_TOKEN` | Token Meta WhatsApp Cloud API |
+Aturan konfigurasi:
 
-Tambahkan sebagai **Variable biasa**. Nilai berikut adalah konfigurasi Sandbox/Development LFAMILIA saat ini:
+- Sandbox/Development dan Production memiliki slot credential terpisah.
+- Production credential boleh kosong selama onboarding belum selesai.
+- Environment aktif hanya ditentukan oleh `MIDTRANS_ENV`, `MIDTRANS_MODE`, `IPAYMU_ENV`, dan `DIGIFLAZZ_ENV`.
+- Source tidak memilih environment dari prefix key, keberadaan Production key, VA, atau fallback endpoint.
+- Setelah Production credential tersedia, isi slot Production dan ubah selector di Cloudflare saja.
 
-| Nama | Nilai Sandbox/Development |
-|---|---|
-| `PUBLIC_BASE_URL` | `https://lfamiliastore.my.id` |
-| `MIDTRANS_CLIENT_KEY` | Client Key aktif; prefix `SB-` otomatis memilih Sandbox |
-| `MIDTRANS_SNAP_SANDBOX_API_URL` | `https://app.sandbox.midtrans.com/snap/v1/transactions` |
-| `MIDTRANS_SNAP_PRODUCTION_API_URL` | `https://app.midtrans.com/snap/v1/transactions` |
-| `MIDTRANS_SNAP_SANDBOX_SCRIPT_URL` | `https://app.sandbox.midtrans.com/snap/snap.js` |
-| `MIDTRANS_SNAP_PRODUCTION_SCRIPT_URL` | `https://app.midtrans.com/snap/snap.js` |
-| `IPAYMU_API_URL` | `https://ipaymu-relay.lfamiliastore.my.id/api/v2/payment/direct` |
-| `DIGIFLAZZ_API_URL` | Direct: `https://api.digiflazz.com/v1/transaction`; setelah relay aktif: `https://digiflazz-relay.lfamiliastore.my.id/v1/transaction` |
-| `DIGIFLAZZ_PRICE_LIST_URL` | Direct: `https://api.digiflazz.com/v1/price-list`; setelah relay aktif: `https://digiflazz-relay.lfamiliastore.my.id/v1/price-list` |
-| `PROVIDER_RELAY_HOSTS` | `digiflazz-relay.lfamiliastore.my.id,ipaymu-relay.lfamiliastore.my.id,bisnap-relay.lfamiliastore.my.id` |
-| `OWNER_EMAIL` | Email Pemilik utama yang sama dengan akun admin |
-| `NICKNAME_API_URL` | `https://api.isan.eu.org/nickname` |
-| `MELOSTORE_API_URL` | `https://api.melostore.id` |
-| `VIPPAYMENT_API_URL` | `https://vip-reseller.co.id/api/game-feature` |
-| `VOUCHER_DELIVERY_CHANNEL` | `website` |
-| `RESEND_FROM_EMAIL` | Pengirim dari domain email yang sudah diverifikasi |
-| `RESEND_API_URL` | `https://api.resend.com/emails` |
-| `WHATSAPP_PHONE_NUMBER_ID` | Phone Number ID dari Meta |
-| `WHATSAPP_VOUCHER_TEMPLATE` | Nama template WhatsApp yang sudah disetujui, misalnya `lfamilia_voucher_delivery` |
-| `WHATSAPP_TEMPLATE_LANGUAGE` | Kode bahasa template, misalnya `id` |
-| `WHATSAPP_GRAPH_VERSION` | Versi Graph API yang sedang digunakan, misalnya `v23.0` |
-| `WHATSAPP_GRAPH_BASE_URL` | `https://graph.facebook.com` |
+Secret integrasi non-provider yang tetap digunakan:
 
-Untuk pindah Midtrans ke Production, cukup ganti `MIDTRANS_SERVER_KEY` dan `MIDTRANS_CLIENT_KEY` ke key Production. Endpoint dipilih otomatis dari prefix key sehingga URL tidak perlu diubah.
+```text
+MELOSTORE_API_KEY
+MELOSTORE_SECRET_KEY
+NICKNAME_API_KEY
+VIPPAYMENT_API_ID
+VIPPAYMENT_API_KEY
+VOUCHER_ENCRYPTION_KEY
+RESEND_API_KEY
+WHATSAPP_ACCESS_TOKEN
+```
 
-Untuk DigiFlazz Production, cukup isi `DIGIFLAZZ_PRODUCTION_API_KEY`. Selama secret itu kosong, aplikasi memakai `DIGIFLAZZ_API_KEY` sebagai Development key dan mengirim transaksi testing.
+Variable umum yang tetap digunakan:
 
-Untuk iPaymu Production, URL relay tetap sama. Ganti `IPAYMU_VA` dan `IPAYMU_API_KEY` ke credential Production. iPaymu memang menerbitkan VA dan API Key berbeda antara Sandbox dan Production.
+```text
+PUBLIC_BASE_URL
+OWNER_EMAIL
+NICKNAME_API_URL
+MELOSTORE_API_URL
+VIPPAYMENT_API_URL
+VOUCHER_DELIVERY_CHANNEL
+RESEND_FROM_EMAIL
+RESEND_API_URL
+WHATSAPP_PHONE_NUMBER_ID
+WHATSAPP_VOUCHER_TEMPLATE
+WHATSAPP_TEMPLATE_LANGUAGE
+WHATSAPP_GRAPH_VERSION
+WHATSAPP_GRAPH_BASE_URL
+```
 
 ## 3. Callback dan webhook
 
@@ -118,26 +105,19 @@ Saat pembayaran terkonfirmasi lunas, satu baris stok direservasi secara atomik. 
 
 ## 7. Syarat IP provider dan VPS relay
 
-Satu VPS ber-IP publik statis dapat dipakai sebagai relay pusat untuk DigiFlazz, iPaymu, dan Midtrans BI-SNAP. Source relay tersedia di folder `relay/`.
+DigiFlazz, iPaymu, dan Midtrans BI-SNAP dapat menggunakan satu VPS relay ber-IP keluar statis. Konfigurasi final relay ada pada `relay/README.md`.
 
-Hostname yang disiapkan:
+VPS disiapkan untuk seluruh environment sejak awal. Worker mengirim environment eksplisit pada setiap request relay.
 
-- `digiflazz-relay.lfamiliastore.my.id`
-- `ipaymu-relay.lfamiliastore.my.id`
-- `bisnap-relay.lfamiliastore.my.id`
+Saat berpindah ke Production:
 
-Midtrans Snap biasa tetap langsung dari Worker ke Midtrans. Jangan memindahkan Snap ke relay hanya karena VPS tersedia.
+1. isi credential Production di Cloudflare;
+2. ubah selector environment di Cloudflare;
+3. jangan mengubah source repo;
+4. jangan mengubah Caddy;
+5. jangan SSH ke VPS hanya untuk mengganti environment.
 
-Untuk mengaktifkan DigiFlazz melalui VPS:
-
-1. Jalankan `relay/server.mjs` pada VPS di `127.0.0.1:8788`.
-2. Pasang konfigurasi Caddy dari `relay/Caddyfile.example`.
-3. Buat secret VPS `RELAY_TOKEN`, lalu simpan nilai yang sama sebagai Cloudflare Secret `PROVIDER_RELAY_TOKEN`.
-4. Isi `PROVIDER_RELAY_HOSTS` dengan tiga hostname relay.
-5. Ubah `DIGIFLAZZ_API_URL` dan `DIGIFLAZZ_PRICE_LIST_URL` ke hostname relay DigiFlazz.
-6. Daftarkan IP publik VPS sebagai IP koneksi DigiFlazz sesuai environment yang dipakai.
-
-Callback provider tetap diterima langsung oleh Worker pada domain utama LFAMILIA dan tidak perlu melewati VPS. Upstream iPaymu dan BI-SNAP pada VPS dibiarkan kosong sampai akun dan endpoint resmi masing-masing siap.
+Callback provider tetap masuk langsung ke `PUBLIC_BASE_URL`. Midtrans Snap tetap dapat berjalan langsung dari Worker.
 
 ## 8. Menambah provider lain
 
@@ -157,8 +137,8 @@ Arsitektur checkout dan tabel order tidak perlu diubah hanya untuk menambah adap
 - Migrasi D1 production berhasil.
 - Cloudflare Access aktif.
 - Harga, margin, dan SKU sudah diverifikasi.
-- Midtrans diuji di sandbox sebelum beralih ke production.
-- DigiFlazz tetap Development selama `DIGIFLAZZ_PRODUCTION_API_KEY` belum diisi.
+- Midtrans diuji di Sandbox sebelum `MIDTRANS_ENV` diubah ke `production`.
+- `DIGIFLAZZ_ENV=development` sampai Production memang ingin diaktifkan.
 - Callback semua provider telah diuji.
 - Tidak ada secret atau konfigurasi environment operasional di GitHub.
 - Tidak pernah meminta password, PIN, atau OTP pelanggan.
