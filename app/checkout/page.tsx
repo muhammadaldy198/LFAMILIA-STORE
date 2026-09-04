@@ -37,7 +37,6 @@ import { ProductArtwork } from "@/components/product-artwork";
 import { ProductReviews } from "@/components/product-reviews";
 import { useStoreProducts } from "@/hooks/use-store-products";
 import {
-  paymentChannels,
   paymentGroups,
   type PaymentChannel,
   type PaymentMethodCode,
@@ -77,6 +76,7 @@ type PaymentResult = {
   voucherCode: string | null;
   flashSaleId: number | null;
   paymentMethod?: string;
+  midtransMode?: "snap" | "bisnap";
   paymentStatus?: "paid" | "pending";
   balanceAfter?: number;
 };
@@ -1110,6 +1110,9 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
         ? "Setelah lunas, satu kode stok dikirim otomatis ke email/WhatsApp pembeli."
         : "Setelah lunas, pesanan diteruskan otomatis ke provider.";
   const isManualQris = payment.paymentMethod === "manual_qris";
+  const isBisnapQris =
+    payment.midtransMode === "bisnap" &&
+    payment.paymentMethod === "qris";
   return (
     <div className="mt-4 rounded-lg border border-[#b9ff35]/30 bg-[#b9ff35]/[0.08] p-3">
       <BadgeCheck className="size-5 text-[#b9ff35]" />
@@ -1125,9 +1128,9 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
         </div>
       )}
       {payment.balanceAfter != null && <p className="mt-2.5 rounded-lg bg-black/20 p-2.5 text-[9px] text-white/55">Sisa saldo: <strong className="text-[#d8ff8d]">{formatRupiah(payment.balanceAfter)}</strong></p>}
-      {isManualQris && payment.paymentUrl && <div className="mt-3 rounded-lg bg-white p-2.5"><img src={payment.paymentUrl} alt="QRIS pembayaran" className="mx-auto aspect-square w-full max-w-64 object-contain" /></div>}
+      {(isManualQris || isBisnapQris) && payment.paymentUrl && <div className="mt-3 rounded-lg bg-white p-2.5"><img src={payment.paymentUrl} alt="QRIS pembayaran" className="mx-auto aspect-square w-full max-w-64 object-contain" /></div>}
       {payment.expiredAt && <p className="mt-2.5 text-[8px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}
-      {payment.paymentUrl && !isManualQris && (
+      {payment.paymentUrl && !isManualQris && !isBisnapQris && (
         <Button asChild className="mt-3 w-full rounded-lg bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]"><a href={payment.paymentUrl} target="_blank" rel="noreferrer">Lanjut bayar <ExternalLink className="ml-2 size-4" /></a></Button>
       )}
       <p className="mt-2.5 flex items-start gap-2 text-[8px] leading-4 text-white/38">
