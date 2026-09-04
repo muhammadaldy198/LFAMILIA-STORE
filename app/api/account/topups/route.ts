@@ -158,7 +158,10 @@ export async function POST(request: Request) {
         {
           ok: true,
           mode: "midtrans",
+          midtransMode: payment.mode,
           referenceId,
+          paymentMethod: input.paymentMethod,
+          paymentChannel: input.paymentChannel,
           paymentNo: payment.paymentNo,
           paymentName: payment.paymentName,
           paymentUrl: payment.paymentUrl,
