@@ -2,8 +2,10 @@ import {
   createHash,
   createHmac,
   createPrivateKey,
+  createPublicKey,
   sign as cryptoSign,
   timingSafeEqual,
+  verify as cryptoVerify,
 } from "node:crypto";
 
 export function hashHex(
@@ -34,6 +36,24 @@ export function signRsaSha256Base64(privateKeyPem: string, value: string) {
   return cryptoSign("RSA-SHA256", Buffer.from(value, "utf8"), key).toString(
     "base64",
   );
+}
+
+export function verifyRsaSha256Base64(
+  publicKeyPem: string,
+  value: string,
+  signatureBase64: string,
+) {
+  try {
+    const key = createPublicKey(publicKeyPem);
+    return cryptoVerify(
+      "RSA-SHA256",
+      Buffer.from(value, "utf8"),
+      key,
+      Buffer.from(signatureBase64, "base64"),
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function safeEqual(left: string | null | undefined, right: string) {
