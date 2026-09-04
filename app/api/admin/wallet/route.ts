@@ -20,6 +20,8 @@ const settingsSchema = z.object({
   manualQrisImageUrl: z.string().trim().max(500),
   midtransTopupEnabled: z.boolean(),
   midtransCheckoutEnabled: z.boolean(),
+  ipaymuTopupEnabled: z.boolean(),
+  ipaymuCheckoutEnabled: z.boolean(),
 });
 
 export async function GET(request: Request) {
