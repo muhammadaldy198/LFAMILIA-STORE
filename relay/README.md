@@ -1,50 +1,65 @@
 # LFAMILIA Provider Relay
 
-Relay ini dijalankan di VPS ber-IP publik statis dan seluruh konfigurasi operasional dibaca dari environment. Tidak ada hostname provider, upstream API, bind address, port, timeout, atau token yang dijadikan fallback di source relay.
+Relay berjalan di VPS ber-IP publik statis. Source relay tidak memiliki fallback hostname, upstream provider, bind address, port, timeout, token, environment, VA, API key, atau credential provider.
 
-Midtrans Snap biasa tetap dapat berjalan langsung dari Worker ke Midtrans. Relay dipakai hanya untuk integrasi yang membutuhkan IP keluar statis.
+Semua nilai operasional relay dibaca dari `/etc/lfamilia-relay.env`.
 
-## Keamanan
+## Routing
 
-Relay bukan open proxy. Request provider wajib berupa `POST` dan membawa header:
+Worker selalu mengirim environment secara eksplisit:
 
-`X-LFAMILIA-Relay-Token: <secret>`
+- DigiFlazz: `development` atau `production`
+- iPaymu: `sandbox` atau `production`
+- Midtrans BI-SNAP: `sandbox` atau `production`
 
-Token hanya disimpan sebagai secret pada VPS dan Cloudflare Worker. Body, authorization header, signature, dan credential provider tidak dicatat ke log relay.
+Relay menolak request yang environment-nya tidak valid atau upstream environment tersebut belum dikonfigurasi. Relay tidak menggunakan pola "selain sandbox = production".
 
 ## Environment VPS
-
-Buat `/etc/lfamilia-relay.env` dan isi nilainya sendiri. Jangan commit file ini:
 
 ```env
 RELAY_BIND_HOST=<bind-host>
 RELAY_BIND_PORT=<bind-port>
 RELAY_UPSTREAM=<caddy-reverse-proxy-target>
-RELAY_TOKEN=<secret-random-min-32-char>
+RELAY_TOKEN=<secret-random>
 RELAY_MAX_BODY_BYTES=<max-request-bytes>
 RELAY_UPSTREAM_TIMEOUT_MS=<provider-timeout-ms>
 RELAY_REQUEST_TIMEOUT_BUFFER_MS=<request-timeout-buffer-ms>
 RELAY_HEADERS_TIMEOUT_MS=<headers-timeout-ms>
 
-DIGIFLAZZ_RELAY_HOST=<digiflazz-relay-host>
-DIGIFLAZZ_UPSTREAM_ORIGIN=<digiflazz-api-origin>
+DIGIFLAZZ_RELAY_HOST=<relay-host>
+DIGIFLAZZ_DEVELOPMENT_UPSTREAM_ORIGIN=<development-origin>
+DIGIFLAZZ_PRODUCTION_UPSTREAM_ORIGIN=<production-origin>
 
-IPAYMU_RELAY_HOST=<ipaymu-relay-host>
-IPAYMU_SANDBOX_UPSTREAM_ORIGIN=<ipaymu-sandbox-origin>
-IPAYMU_PRODUCTION_UPSTREAM_ORIGIN=<ipaymu-production-origin>
-IPAYMU_SANDBOX_VA=<ipaymu-sandbox-va>
+IPAYMU_RELAY_HOST=<relay-host>
+IPAYMU_SANDBOX_UPSTREAM_ORIGIN=<sandbox-origin>
+IPAYMU_PRODUCTION_UPSTREAM_ORIGIN=<production-origin>
 
-MIDTRANS_BISNAP_RELAY_HOST=<midtrans-bisnap-relay-host>
-MIDTRANS_BISNAP_UPSTREAM_ORIGIN=<midtrans-bisnap-api-origin>
-MIDTRANS_BISNAP_AUTH_UPSTREAM_ORIGIN=<midtrans-bisnap-auth-origin>
-MIDTRANS_BISNAP_AUTH_PATH_PREFIX=<midtrans-bisnap-auth-path-prefix>
+MIDTRANS_BISNAP_RELAY_HOST=<relay-host>
+MIDTRANS_BISNAP_SANDBOX_UPSTREAM_ORIGIN=<sandbox-origin>
+MIDTRANS_BISNAP_SANDBOX_AUTH_UPSTREAM_ORIGIN=<sandbox-auth-origin>
+MIDTRANS_BISNAP_PRODUCTION_UPSTREAM_ORIGIN=<production-origin>
+MIDTRANS_BISNAP_PRODUCTION_AUTH_UPSTREAM_ORIGIN=<production-auth-origin>
+MIDTRANS_BISNAP_AUTH_PATH_PREFIX=<auth-path-prefix>
 ```
 
-Provider yang belum siap boleh memiliki hostname tetapi upstream-nya dikosongkan; relay akan mengembalikan status konfigurasi belum tersedia dan tidak meneruskan request. Relay iPaymu memilih Sandbox saat header VA sama dengan `IPAYMU_SANDBOX_VA`; VA lainnya diarahkan ke Production, sehingga perpindahan iPaymu tidak memerlukan perubahan VPS. Relay BI-SNAP mendukung GET dan POST; auth-code dapat diarahkan ke origin terpisah melalui `MIDTRANS_BISNAP_AUTH_UPSTREAM_ORIGIN` dan `MIDTRANS_BISNAP_AUTH_PATH_PREFIX`.
+Tidak ada VA iPaymu di VPS. Tidak ada API key provider di VPS. Environment dipilih oleh Worker melalui header internal yang dilindungi relay token.
+
+## Authentication relay
+
+Cloudflare Worker menyimpan:
+
+```text
+PROVIDER_RELAY_TOKEN
+PROVIDER_RELAY_HOSTS
+```
+
+`PROVIDER_RELAY_TOKEN` harus sama dengan `RELAY_TOKEN` di VPS.
+
+Header internal relay tidak diteruskan ke provider.
 
 ## systemd
 
-Contoh unit `/etc/systemd/system/lfamilia-relay.service`:
+Unit service hanya menunjuk file env dan source relay:
 
 ```ini
 [Unit]
@@ -66,14 +81,49 @@ PrivateTmp=true
 WantedBy=multi-user.target
 ```
 
-Caddy juga membaca hostname dan target reverse proxy dari environment melalui `relay/Caddyfile.example`.
+Tidak ada domain, IP, port, upstream, atau token yang ditulis langsung di unit service.
 
-## Cloudflare Worker
+## Caddy
 
-Cloudflare menyimpan konfigurasi relay sebagai Variable/Secret, bukan source code:
+`relay/Caddyfile.example` membaca hostname dan target reverse proxy dari environment:
 
-- Secret `PROVIDER_RELAY_TOKEN` = nilai yang sama dengan `RELAY_TOKEN` di VPS.
-- Variable `PROVIDER_RELAY_HOSTS` = daftar hostname relay yang diizinkan, dipisahkan koma.
-- `DIGIFLAZZ_API_URL` dan `DIGIFLAZZ_PRICE_LIST_URL` diarahkan ke hostname relay DigiFlazz setelah relay aktif.
+```caddy
+{
+  admin off
+}
 
-Callback provider tetap langsung ke domain publik LFAMILIA. Jangan mengubah URL Midtrans Snap hanya karena VPS relay sudah tersedia. BI-SNAP dan iPaymu baru diaktifkan setelah credential dan endpoint resmi masing-masing siap.
+(lfamilia_provider_relay) {
+  reverse_proxy {$RELAY_UPSTREAM} {
+    header_up Host {host}
+  }
+}
+
+{$DIGIFLAZZ_RELAY_HOST} {
+  import lfamilia_provider_relay
+}
+
+{$IPAYMU_RELAY_HOST} {
+  import lfamilia_provider_relay
+}
+
+{$MIDTRANS_BISNAP_RELAY_HOST} {
+  import lfamilia_provider_relay
+}
+```
+
+## Pergantian Production
+
+VPS disiapkan untuk seluruh environment sejak awal. Setelah credential Production tersedia, perubahan dilakukan pada Cloudflare:
+
+1. isi credential Production;
+2. ubah selector environment;
+3. Worker mengirim environment baru ke relay;
+4. relay memakai upstream Production yang sudah tersedia di env VPS.
+
+Tidak perlu mengubah source relay, Caddy, systemd, atau SSH ke VPS saat pergantian environment.
+
+## Callback
+
+Callback provider masuk langsung ke domain publik Worker, bukan melalui VPS relay.
+
+Midtrans Snap tetap dapat berjalan langsung Worker ke Midtrans. BI-SNAP, DigiFlazz, dan iPaymu dapat memakai relay bila membutuhkan IP keluar statis.
