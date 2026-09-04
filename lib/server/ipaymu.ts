@@ -8,6 +8,28 @@ type IpaymuRuntime = {
   IPAYMU_API_URL?: string;
 };
 
+export function isIpaymuChannelSupported(method: string, channel: string) {
+  if (method === "qris") return channel === "mpm";
+  if (method === "ewallet") return channel === "dana" || channel === "shopeepay";
+  if (method === "va") {
+    return new Set([
+      "bag",
+      "bca",
+      "bpd_bali",
+      "bni",
+      "cimb",
+      "mandiri",
+      "bmi",
+      "bri",
+      "bsi",
+      "permata",
+      "danamon",
+      "btn",
+    ]).has(channel);
+  }
+  return false;
+}
+
 export type IpaymuDirectResult = {
   transactionId: string | null;
   referenceId: string;
