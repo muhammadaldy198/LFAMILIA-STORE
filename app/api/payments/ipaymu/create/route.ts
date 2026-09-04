@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { getCustomerSession } from "@/lib/server/customer-auth";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
-import { createIpaymuDirectPayment } from "@/lib/server/ipaymu";
+import {
+  createIpaymuDirectPayment,
+  isIpaymuChannelSupported,
+} from "@/lib/server/ipaymu";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
 import { quotePromotion } from "@/lib/server/promotions";
 import {
@@ -54,9 +57,12 @@ export async function POST(request: Request) {
         { status: 403 },
       );
 
-    if (!(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel)))
+    if (
+      !isIpaymuChannelSupported(input.paymentMethod, paymentChannel) ||
+      !(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel))
+    )
       return Response.json(
-        { error: "Metode pembayaran tidak valid." },
+        { error: "Metode pembayaran iPaymu tidak tersedia." },
         { status: 400 },
       );
 
