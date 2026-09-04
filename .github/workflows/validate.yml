@@ -1,0 +1,28 @@
+name: Validasi LFAMILIA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: npm run install:ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
