@@ -473,7 +473,6 @@ async function transactionalPost<T>(
   url: string,
   body: unknown,
   externalId: string,
-  deviceId?: string,
 ) {
   const token = await accessToken(config);
   const rawBody = JSON.stringify(body);
@@ -498,7 +497,7 @@ async function transactionalPost<T>(
         "x-partner-id": config.partnerId,
         "x-external-id": externalId,
         "channel-id": config.channelId,
-        "x-device-id": deviceId?.trim() || config.deviceId,
+        "x-device-id": config.deviceId,
       },
       { provider: "midtrans-bisnap", environment: config.environment },
     ),
@@ -530,7 +529,6 @@ export async function createMidtransBisnapPayment(input: {
   paymentMethod: string;
   paymentChannel: string;
   finishUrl: string;
-  deviceId?: string;
 }) {
   const config = environmentConfig();
   const externalId = safeExternalId(input.referenceId);
@@ -577,8 +575,7 @@ export async function createMidtransBisnapPayment(input: {
           items: [item],
         },
       },
-      externalId,
-      input.deviceId,
+      externalId
     );
 
     return {
@@ -604,8 +601,7 @@ export async function createMidtransBisnapPayment(input: {
           acquirer: config.qrisAcquirer,
         },
       },
-      externalId,
-      input.deviceId,
+      externalId
     );
 
     return {
@@ -647,8 +643,7 @@ export async function createMidtransBisnapPayment(input: {
           items: [item],
         },
       },
-      externalId,
-      input.deviceId,
+      externalId
     );
 
     return {
