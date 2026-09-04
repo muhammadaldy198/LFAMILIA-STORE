@@ -60,7 +60,9 @@ Callback BI-SNAP:
 ```text
 <PUBLIC_BASE_URL>/v1.0/debit/notify
 <PUBLIC_BASE_URL>/v1.0/qr/qr-mpm-notify
-<PUBLIC_BASE_URL>/v1.0/transfer-va/payment
+
+Virtual Account BI-SNAP tetap memakai notification legacy Midtrans:
+<PUBLIC_BASE_URL>/api/payments/midtrans/callback
 ```
 
 ## iPaymu
