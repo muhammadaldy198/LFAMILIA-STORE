@@ -141,7 +141,6 @@ export async function POST(request: Request) {
         paymentChannel: input.paymentChannel,
         productName: "Top up Saldo LFAMILIA",
         finishUrl: `${getPublicBaseUrl()}/account`,
-        deviceId: request.headers.get("user-agent") || undefined,
       });
       await updateMidtransWalletTopup({
         referenceId,
