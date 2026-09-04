@@ -18,8 +18,6 @@ type Runtime = {
 
   MIDTRANS_BISNAP_TIMEZONE_OFFSET?: string;
   MIDTRANS_BISNAP_CURRENCY?: string;
-  MIDTRANS_BISNAP_COUNTRY_CODE?: string;
-  MIDTRANS_BISNAP_LOCALE?: string;
   MIDTRANS_BISNAP_DEVICE_ID?: string;
   MIDTRANS_BISNAP_PAYMENT_EXPIRY_MINUTES?: string;
   MIDTRANS_BISNAP_TOKEN_EXPIRY_SAFETY_SECONDS?: string;
@@ -73,8 +71,6 @@ type EnvironmentConfig = {
   publicKey?: string;
   timezoneOffset: string;
   currency: string;
-  countryCode: string;
-  locale: string;
   deviceId: string;
   paymentExpiryMinutes: number;
   tokenExpirySafetySeconds: number;
@@ -170,14 +166,6 @@ function commonConfig(config: Runtime) {
     currency: requireRuntimeValue(
       config.MIDTRANS_BISNAP_CURRENCY,
       "MIDTRANS_BISNAP_CURRENCY",
-    ),
-    countryCode: requireRuntimeValue(
-      config.MIDTRANS_BISNAP_COUNTRY_CODE,
-      "MIDTRANS_BISNAP_COUNTRY_CODE",
-    ),
-    locale: requireRuntimeValue(
-      config.MIDTRANS_BISNAP_LOCALE,
-      "MIDTRANS_BISNAP_LOCALE",
     ),
     deviceId: requireRuntimeValue(
       config.MIDTRANS_BISNAP_DEVICE_ID,
@@ -407,6 +395,24 @@ function paymentMethod(channel: string) {
   return value;
 }
 
+function vaBank(channel: string) {
+  const map: Record<string, string> = {
+    bca: "BCA",
+    bni: "BNI",
+    bri: "BRI",
+    cimb: "CIMB",
+    mandiri: "Mandiri",
+    permata: "Permata",
+    danamon: "Danamon",
+  };
+  const value = map[channel];
+  if (!value)
+    throw new Error(
+      `Bank VA ${channel} belum didukung pada Midtrans BI-SNAP.`,
+    );
+  return value;
+}
+
 function isSuccessfulCode(code?: string) {
   return Boolean(code && (code.startsWith("200") || code.startsWith("202")));
 }
@@ -537,7 +543,7 @@ export async function createMidtransBisnapPayment(input: {
   const item = {
     id: externalId,
     price: totalAmount,
-    quantity: 1,
+    quantity: "1",
     name: input.productName.slice(0, 50),
   };
 
@@ -596,10 +602,6 @@ export async function createMidtransBisnapPayment(input: {
         validityPeriod: expiryTimestamp(config),
         additionalInfo: {
           acquirer: config.qrisAcquirer,
-          customerDetails: customer,
-          items: [item],
-          countryCode: config.countryCode,
-          locale: config.locale,
         },
       },
       externalId,
@@ -637,7 +639,7 @@ export async function createMidtransBisnapPayment(input: {
         expiredDate: expiryTimestamp(config),
         additionalInfo: {
           merchantId: config.merchantId,
-          bank: input.paymentChannel,
+          bank: vaBank(input.paymentChannel),
           flags: {
             shouldRandomizeVaNumber: config.vaRandomize,
           },
