@@ -201,9 +201,20 @@ function CheckoutContent() {
     paymentMethod === "va" ||
     paymentMethod === "ewallet" ||
     paymentMethod === "qris";
+  const automaticCheckoutReady = Boolean(
+    walletSettings?.midtransCheckoutEnabled || walletSettings?.ipaymuCheckoutEnabled,
+  );
   const checkoutGroups = [
     { code: "wallet" as const, name: "Koin LFAMILIA", description: "Bayar langsung dari saldo akun" },
-    ...paymentGroups.filter((item) => item.code === "qris" || item.code === "ewallet" || item.code === "va").sort((left, right) => ["qris", "ewallet", "va"].indexOf(left.code) - ["qris", "ewallet", "va"].indexOf(right.code)),
+    ...(automaticCheckoutReady
+      ? paymentGroups
+          .filter((item) => item.code === "qris" || item.code === "ewallet" || item.code === "va")
+          .sort(
+            (left, right) =>
+              ["qris", "ewallet", "va"].indexOf(left.code) -
+              ["qris", "ewallet", "va"].indexOf(right.code),
+          )
+      : []),
   ];
   const channels = isGatewayMethod
     ? availableChannels.filter((item) => item.method === paymentMethod)
@@ -338,7 +349,11 @@ function CheckoutContent() {
     if (!walletSettings) return;
     const enabled = checkoutGroups.map((group) => group.code);
     if (enabled.includes(paymentMethod)) return;
-    if (walletSettings.midtransCheckoutEnabled) chooseMethod("qris");
+    if (
+      walletSettings.midtransCheckoutEnabled ||
+      walletSettings.ipaymuCheckoutEnabled
+    )
+      chooseMethod("qris");
     else chooseMethod("wallet");
   }, [walletSettings, paymentMethod]);
 
@@ -447,7 +462,9 @@ function CheckoutContent() {
           ? "/api/payments/wallet/create"
           : paymentMethod === "manual_qris" || paymentMethod === "manual_bank"
             ? "/api/payments/manual/create"
-            : "/api/payments/midtrans/create";
+            : walletSettings?.midtransCheckoutEnabled
+              ? "/api/payments/midtrans/create"
+              : "/api/payments/ipaymu/create";
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
