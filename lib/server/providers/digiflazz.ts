@@ -1,13 +1,19 @@
 import { hashHex } from "@/lib/server/crypto";
 import type { ProviderAdapter, ProviderResult } from "@/lib/server/providers/types";
 import { withProviderRelayHeaders } from "@/lib/server/provider-relay";
-import { getRuntimeEnv, requireRuntimeValue } from "@/lib/server/runtime-env";
+import {
+  getRuntimeEnv,
+  requireRuntimeChoice,
+  requireRuntimeValue,
+} from "@/lib/server/runtime-env";
 
 type DigiFlazzEnv = {
+  DIGIFLAZZ_ENV?: string;
   DIGIFLAZZ_USERNAME?: string;
-  DIGIFLAZZ_API_KEY?: string;
+  DIGIFLAZZ_DEVELOPMENT_API_KEY?: string;
   DIGIFLAZZ_PRODUCTION_API_KEY?: string;
-  DIGIFLAZZ_API_URL?: string;
+  DIGIFLAZZ_DEVELOPMENT_API_URL?: string;
+  DIGIFLAZZ_PRODUCTION_API_URL?: string;
 };
 
 type DigiFlazzResponse = {
@@ -20,6 +26,36 @@ type DigiFlazzResponse = {
   };
 };
 
+function runtimeConfig() {
+  const runtime = getRuntimeEnv<DigiFlazzEnv>();
+  const environment = requireRuntimeChoice(
+    runtime.DIGIFLAZZ_ENV,
+    "DIGIFLAZZ_ENV",
+    ["development", "production"] as const,
+  );
+  const username = requireRuntimeValue(
+    runtime.DIGIFLAZZ_USERNAME,
+    "DIGIFLAZZ_USERNAME",
+  );
+  const apiKey = requireRuntimeValue(
+    environment === "development"
+      ? runtime.DIGIFLAZZ_DEVELOPMENT_API_KEY
+      : runtime.DIGIFLAZZ_PRODUCTION_API_KEY,
+    environment === "development"
+      ? "DIGIFLAZZ_DEVELOPMENT_API_KEY"
+      : "DIGIFLAZZ_PRODUCTION_API_KEY",
+  );
+  const apiUrl = requireRuntimeValue(
+    environment === "development"
+      ? runtime.DIGIFLAZZ_DEVELOPMENT_API_URL
+      : runtime.DIGIFLAZZ_PRODUCTION_API_URL,
+    environment === "development"
+      ? "DIGIFLAZZ_DEVELOPMENT_API_URL"
+      : "DIGIFLAZZ_PRODUCTION_API_URL",
+  );
+  return { environment, username, apiKey, apiUrl };
+}
+
 function mapStatus(value?: string): ProviderResult["status"] {
   const status = value?.toLowerCase();
   if (status === "sukses") return "success";
@@ -31,16 +67,7 @@ export const digiflazzAdapter: ProviderAdapter = {
   code: "digiflazz",
   name: "DigiFlazz",
   async fulfill(order, publicBaseUrl) {
-    const runtime = getRuntimeEnv<DigiFlazzEnv>();
-    const username = requireRuntimeValue(runtime.DIGIFLAZZ_USERNAME, "DIGIFLAZZ_USERNAME");
-    const developmentApiKey = requireRuntimeValue(
-      runtime.DIGIFLAZZ_API_KEY,
-      "DIGIFLAZZ_API_KEY",
-    );
-    const productionApiKey = runtime.DIGIFLAZZ_PRODUCTION_API_KEY?.trim();
-    const apiKey = productionApiKey || developmentApiKey;
-    const environment = productionApiKey ? "production" : "development";
-    const apiUrl = requireRuntimeValue(runtime.DIGIFLAZZ_API_URL, "DIGIFLAZZ_API_URL");
+    const { environment, username, apiKey, apiUrl } = runtimeConfig();
 
     const body = {
       username,
@@ -52,19 +79,30 @@ export const digiflazzAdapter: ProviderAdapter = {
       max_price: order.subtotal,
       cb_url: `${publicBaseUrl}/api/fulfillment/digiflazz/callback`,
     };
+
     const response = await fetch(apiUrl, {
       method: "POST",
-      headers: withProviderRelayHeaders(apiUrl, { "content-type": "application/json", accept: "application/json" }),
+      headers: withProviderRelayHeaders(
+        apiUrl,
+        { "content-type": "application/json", accept: "application/json" },
+        { provider: "digiflazz", environment },
+      ),
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15_000),
     });
-    const payload = await response.json() as DigiFlazzResponse;
+
+    const payload = (await response.json()) as DigiFlazzResponse;
     const data = payload.data;
-    if (!response.ok || !data) throw new Error("DigiFlazz tidak memberikan jawaban transaksi yang valid.");
+    if (!response.ok || !data)
+      throw new Error(
+        "DigiFlazz tidak memberikan jawaban transaksi yang valid.",
+      );
+
     return {
       externalId: data.ref_id ?? order.referenceId,
       status: mapStatus(data.status),
-      message: data.message ?? `Status DigiFlazz: ${data.status ?? "tidak diketahui"}`,
+      message:
+        data.message ?? `Status DigiFlazz: ${data.status ?? "tidak diketahui"}`,
       serialNumber: data.sn || null,
       raw: payload,
     };
