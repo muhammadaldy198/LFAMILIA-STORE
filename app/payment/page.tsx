@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -18,7 +19,11 @@ type PaymentOrder = {
   paymentStatus: string;
   fulfillmentStatus: string;
   paymentGateway: "midtrans" | "ipaymu" | null;
+  midtransMode: "snap" | "bisnap" | null;
+  paymentNo: string | null;
+  paymentName: string | null;
   paymentUrl: string | null;
+  expiredAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -117,7 +122,11 @@ function PaymentContent() {
   }, [invoice, snapToken]);
 
   useEffect(() => {
-    if (order?.paymentGateway !== "midtrans") return;
+    if (
+      order?.paymentGateway !== "midtrans" ||
+      order.midtransMode !== "snap"
+    )
+      return;
     if (snapToken || !order?.paymentUrl) return;
     const token = snapTokenFromUrl(order.paymentUrl);
     if (token) setSnapToken(token);
@@ -213,6 +222,10 @@ function PaymentContent() {
 
   const paid = order.paymentStatus === "paid";
   const failed = ["failed", "expired"].includes(order.paymentStatus);
+  const isBisnapQris =
+    order.paymentGateway === "midtrans" &&
+    order.midtransMode === "bisnap" &&
+    order.paymentMethod === "qris";
 
   return (
     <StoreLayout>
@@ -249,12 +262,51 @@ function PaymentContent() {
               <Row label="Total pembayaran" value={formatRupiah(order.total)} strong />
             </dl>
 
+            {!paid && !failed && order.paymentNo && (
+              <div className="mt-5 rounded-xl border border-white/[0.08] bg-black/20 p-3">
+                <span className="text-[9px] uppercase tracking-wider text-white/35">
+                  {order.paymentName || "Nomor pembayaran"}
+                </span>
+                <div className="mt-1.5 flex items-center justify-between gap-3">
+                  <strong className="break-all text-sm text-[#d8ff8d]">
+                    {order.paymentNo}
+                  </strong>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void navigator.clipboard.writeText(order.paymentNo!)
+                    }
+                    className="shrink-0 text-white/45 hover:text-white"
+                    aria-label="Salin nomor pembayaran"
+                  >
+                    <Copy className="size-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!paid && !failed && isBisnapQris && order.paymentUrl && (
+              <div className="mt-5 rounded-xl bg-white p-3">
+                <img
+                  src={order.paymentUrl}
+                  alt="QRIS pembayaran Midtrans"
+                  className="mx-auto aspect-square w-full max-w-72 object-contain"
+                />
+              </div>
+            )}
+
+            {!paid && !failed && order.expiredAt && (
+              <p className="mt-3 text-center text-[9px] text-white/35">
+                Berlaku sampai {order.expiredAt}
+              </p>
+            )}
+
             <div className="mt-5 flex items-center gap-2 rounded-xl bg-white/[0.035] p-3 text-[10px] text-white/48">
               {paid ? <BadgeCheck className="size-4 shrink-0 text-[#b9ff35]" /> : <Clock3 className="size-4 shrink-0 text-sky-300" />}
               <span>{paid ? "Pembayaran sudah diterima. Status pesanan akan diperbarui otomatis." : failed ? "Transaksi ini tidak dapat dilanjutkan. Buat checkout baru bila diperlukan." : "Status diperiksa otomatis setiap 3 detik."}</span>
             </div>
 
-            {!paid && !failed && order.paymentUrl && (
+            {!paid && !failed && order.paymentUrl && !isBisnapQris && (
               <>
                 <Button type="button" onClick={payNow} disabled={openingPayment} className="mt-5 h-12 w-full rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">
                   {openingPayment ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : null}
