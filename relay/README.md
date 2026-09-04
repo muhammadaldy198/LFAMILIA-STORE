@@ -30,7 +30,9 @@ DIGIFLAZZ_RELAY_HOST=<digiflazz-relay-host>
 DIGIFLAZZ_UPSTREAM_ORIGIN=<digiflazz-api-origin>
 
 IPAYMU_RELAY_HOST=<ipaymu-relay-host>
-IPAYMU_UPSTREAM_ORIGIN=<ipaymu-api-origin>
+IPAYMU_SANDBOX_UPSTREAM_ORIGIN=<ipaymu-sandbox-origin>
+IPAYMU_PRODUCTION_UPSTREAM_ORIGIN=<ipaymu-production-origin>
+IPAYMU_SANDBOX_VA=<ipaymu-sandbox-va>
 
 MIDTRANS_BISNAP_RELAY_HOST=<midtrans-bisnap-relay-host>
 MIDTRANS_BISNAP_UPSTREAM_ORIGIN=<midtrans-bisnap-api-origin>
@@ -38,7 +40,7 @@ MIDTRANS_BISNAP_AUTH_UPSTREAM_ORIGIN=<midtrans-bisnap-auth-origin>
 MIDTRANS_BISNAP_AUTH_PATH_PREFIX=<midtrans-bisnap-auth-path-prefix>
 ```
 
-Provider yang belum siap boleh memiliki hostname tetapi upstream-nya dikosongkan; relay akan mengembalikan status konfigurasi belum tersedia dan tidak meneruskan request. Relay BI-SNAP mendukung GET dan POST; auth-code dapat diarahkan ke origin terpisah melalui `MIDTRANS_BISNAP_AUTH_UPSTREAM_ORIGIN` dan `MIDTRANS_BISNAP_AUTH_PATH_PREFIX`.
+Provider yang belum siap boleh memiliki hostname tetapi upstream-nya dikosongkan; relay akan mengembalikan status konfigurasi belum tersedia dan tidak meneruskan request. Relay iPaymu memilih Sandbox saat header VA sama dengan `IPAYMU_SANDBOX_VA`; VA lainnya diarahkan ke Production, sehingga perpindahan iPaymu tidak memerlukan perubahan VPS. Relay BI-SNAP mendukung GET dan POST; auth-code dapat diarahkan ke origin terpisah melalui `MIDTRANS_BISNAP_AUTH_UPSTREAM_ORIGIN` dan `MIDTRANS_BISNAP_AUTH_PATH_PREFIX`.
 
 ## systemd
 
