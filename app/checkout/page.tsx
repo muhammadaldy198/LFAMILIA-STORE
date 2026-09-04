@@ -371,7 +371,19 @@ function CheckoutContent() {
   useEffect(() => {
     if (!walletSettings) return;
     const enabled = checkoutGroups.map((group) => group.code);
-    if (enabled.includes(paymentMethod)) return;
+    if (enabled.includes(paymentMethod)) {
+      if (
+        isGatewayMethod &&
+        !availableChannels.some(
+          (item) =>
+            item.method === paymentMethod &&
+            item.channel === paymentChannel,
+        )
+      ) {
+        chooseMethod(paymentMethod);
+      }
+      return;
+    }
     if (activeCheckoutGateway && gatewayPaymentGroups.length)
       chooseMethod(gatewayPaymentGroups[0].code);
     else chooseMethod("wallet");
@@ -379,6 +391,9 @@ function CheckoutContent() {
     walletSettings,
     activeCheckoutGateway,
     paymentMethod,
+    paymentChannel,
+    isGatewayMethod,
+    availableChannels,
     gatewayPaymentGroups,
   ]);
 
