@@ -1,5 +1,6 @@
 import { hashHex } from "@/lib/server/crypto";
 import type { ProviderAdapter, ProviderResult } from "@/lib/server/providers/types";
+import { withProviderRelayHeaders } from "@/lib/server/provider-relay";
 import { getRuntimeEnv, requireRuntimeChoice, requireRuntimeValue } from "@/lib/server/runtime-env";
 
 type DigiFlazzEnv = {
@@ -48,7 +49,7 @@ export const digiflazzAdapter: ProviderAdapter = {
     };
     const response = await fetch(apiUrl, {
       method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json" },
+      headers: withProviderRelayHeaders(apiUrl, { "content-type": "application/json", accept: "application/json" }),
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15_000),
     });
