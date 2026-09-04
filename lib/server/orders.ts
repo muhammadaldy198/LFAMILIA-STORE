@@ -54,6 +54,11 @@ export type OrderRecord = {
   fulfillment_status: string;
   midtrans_transaction_id: string | null;
   midtrans_payment_url: string | null;
+  ipaymu_transaction_id: string | null;
+  ipaymu_payment_no: string | null;
+  ipaymu_payment_name: string | null;
+  ipaymu_payment_url: string | null;
+  ipaymu_expired_at: string | null;
   provider_ref_id: string | null;
   provider_status: string | null;
   provider_message: string | null;
@@ -262,6 +267,35 @@ export async function updateMidtransPayment(input: {
     .run();
 }
 
+export async function updateIpaymuPayment(input: {
+  referenceId: string;
+  transactionId: string | null;
+  paymentNo: string | null;
+  paymentName: string | null;
+  paymentUrl: string | null;
+  expiredAt: string | null;
+  fee: number;
+  total: number;
+}) {
+  await getD1()
+    .prepare(
+      `UPDATE orders SET ipaymu_transaction_id = ?, ipaymu_payment_no = ?, ipaymu_payment_name = ?,
+       ipaymu_payment_url = ?, ipaymu_expired_at = ?, admin_fee = ?, total = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE reference_id = ?`,
+    )
+    .bind(
+      input.transactionId,
+      input.paymentNo,
+      input.paymentName,
+      input.paymentUrl,
+      input.expiredAt,
+      input.fee,
+      input.total,
+      input.referenceId,
+    )
+    .run();
+}
+
 export async function markPaymentCreationFailed(
   referenceId: string,
   message: string,
@@ -279,6 +313,7 @@ export async function recordOrderEvent(input: {
   orderId: string;
   source:
     | "midtrans"
+    | "ipaymu"
     | "wallet"
     | "digiflazz"
     | "vippayment"
