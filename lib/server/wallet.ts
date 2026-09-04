@@ -224,8 +224,9 @@ export async function applyMidtransWalletTopup(input: {
     return { found: true, credited: false, ignored: "transaction_mismatch" };
   if (
     input.status === "paid" &&
-    input.callbackAmount > 0 &&
-    input.callbackAmount < topup.amount
+    (!Number.isFinite(input.callbackAmount) ||
+      input.callbackAmount <= 0 ||
+      input.callbackAmount !== topup.amount)
   )
     return { found: true, credited: false, ignored: "amount_mismatch" };
   const db = getD1();
