@@ -94,6 +94,11 @@ type PromotionQuote = {
 type CheckoutPaymentMethod =
   PaymentMethodCode | "wallet" | "manual_qris" | "manual_bank";
 type DisplayPaymentChannel = PaymentChannel & { imageUrl?: string };
+type CheckoutGatewayConfig = {
+  gateway: "midtrans" | "ipaymu" | null;
+  midtransMode: "snap" | "bisnap" | null;
+  environment: "sandbox" | "production" | null;
+};
 const manualPaymentGroups = [
   {
     code: "manual_qris" as const,
@@ -114,25 +119,6 @@ const groupIcons = {
   manual_qris: QrCode,
   manual_bank: Landmark,
 };
-
-const ipaymuSupportedChannels = new Set([
-  "va:bag",
-  "va:bca",
-  "va:bpd_bali",
-  "va:bni",
-  "va:cimb",
-  "va:mandiri",
-  "va:bmi",
-  "va:bri",
-  "va:bsi",
-  "va:permata",
-  "va:danamon",
-  "va:btn",
-  "ewallet:dana",
-  "ewallet:shopeepay",
-  "qris:mpm",
-]);
-
 
 export default function CheckoutPage() {
   return (
@@ -197,7 +183,12 @@ function CheckoutContent() {
   const [applyingVoucher, setApplyingVoucher] = useState(false);
   const [account, setAccount] = useState<CustomerSession | null>(null);
   const [availableChannels, setAvailableChannels] =
-    useState<DisplayPaymentChannel[]>(paymentChannels);
+    useState<DisplayPaymentChannel[]>([]);
+  const [gatewayConfig, setGatewayConfig] = useState<CheckoutGatewayConfig>({
+    gateway: null,
+    midtransMode: null,
+    environment: null,
+  });
   const [walletSettings, setWalletSettings] = useState<WalletSettings | null>(
     null,
   );
@@ -220,11 +211,7 @@ function CheckoutContent() {
     paymentMethod === "va" ||
     paymentMethod === "ewallet" ||
     paymentMethod === "qris";
-  const activeCheckoutGateway = walletSettings?.midtransCheckoutEnabled
-    ? "midtrans"
-    : walletSettings?.ipaymuCheckoutEnabled
-      ? "ipaymu"
-      : null;
+  const activeCheckoutGateway = gatewayConfig.gateway;
   const automaticCheckoutReady = Boolean(activeCheckoutGateway);
   const checkoutGroups = [
     { code: "wallet" as const, name: "Koin LFAMILIA", description: "Bayar langsung dari saldo akun" },
@@ -239,12 +226,7 @@ function CheckoutContent() {
       : []),
   ];
   const channels = isGatewayMethod
-    ? availableChannels.filter(
-        (item) =>
-          item.method === paymentMethod &&
-          (activeCheckoutGateway !== "ipaymu" ||
-            ipaymuSupportedChannels.has(`${item.method}:${item.channel}`)),
-      )
+    ? availableChannels.filter((item) => item.method === paymentMethod)
     : [];
   const notices = (product.notices ?? []).filter(
     (item) => item.isActive !== false,
@@ -255,10 +237,15 @@ function CheckoutContent() {
     void fetch("/api/payment-methods", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) return;
-        const data = (await response.json()) as {
+        const data = (await response.json()) as CheckoutGatewayConfig & {
           channels?: DisplayPaymentChannel[];
         };
-        if (data.channels?.length) setAvailableChannels(data.channels);
+        setAvailableChannels(data.channels ?? []);
+        setGatewayConfig({
+          gateway: data.gateway ?? null,
+          midtransMode: data.midtransMode ?? null,
+          environment: data.environment ?? null,
+        });
       })
       .catch(() => undefined);
   }, []);
@@ -376,25 +363,19 @@ function CheckoutContent() {
     if (!walletSettings) return;
     const enabled = checkoutGroups.map((group) => group.code);
     if (enabled.includes(paymentMethod)) return;
-    if (
-      walletSettings.midtransCheckoutEnabled ||
-      walletSettings.ipaymuCheckoutEnabled
-    )
-      chooseMethod("qris");
+    if (activeCheckoutGateway) chooseMethod("qris");
     else chooseMethod("wallet");
-  }, [walletSettings, paymentMethod]);
+  }, [walletSettings, activeCheckoutGateway, paymentMethod]);
 
   function chooseMethod(method: CheckoutPaymentMethod) {
     setPaymentMethod(method);
     setPaymentChannel(
       method === "wallet"
         ? "lfamilia-balance"
-        : method === "qris"
-          ? "qris"
-          : method === "manual_qris" || method === "manual_bank"
-            ? method
-            : (availableChannels.find((item) => item.method === method)
-                ?.channel ?? ""),
+        : method === "manual_qris" || method === "manual_bank"
+          ? method
+          : (availableChannels.find((item) => item.method === method)
+              ?.channel ?? ""),
     );
     setPayment(null);
   }
@@ -491,7 +472,11 @@ function CheckoutContent() {
             ? "/api/payments/manual/create"
             : activeCheckoutGateway === "ipaymu"
               ? "/api/payments/ipaymu/create"
-              : "/api/payments/midtrans/create";
+              : activeCheckoutGateway === "midtrans"
+                ? "/api/payments/midtrans/create"
+                : null;
+      if (!endpoint)
+        throw new Error("Payment gateway checkout sedang tidak aktif.");
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
