@@ -762,6 +762,9 @@ function TopupForm({
   const automaticReady = Boolean(
     settings?.midtransTopupEnabled || settings?.ipaymuTopupEnabled,
   );
+  const automaticGatewayName = settings?.midtransTopupEnabled
+    ? "Midtrans"
+    : "iPaymu";
   async function submit(event: FormEvent) {
     event.preventDefault();
     onError("");
@@ -919,7 +922,7 @@ function TopupForm({
       )}
       {mode === "midtrans" && automaticReady && (
         <div className="mt-4 rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.06] p-4">
-          <strong className="block text-sm">Top up otomatis Midtrans</strong>
+          <strong className="block text-sm">Top up otomatis {automaticGatewayName}</strong>
           <p className="mt-1 text-[10px] text-white/42">
             Saldo masuk otomatis setelah pembayaran sukses.
           </p>
