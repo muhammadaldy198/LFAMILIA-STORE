@@ -61,6 +61,11 @@ const providerDefinitions = [
       optionalEnv("MIDTRANS_BISNAP_UPSTREAM_ORIGIN"),
       "MIDTRANS_BISNAP_UPSTREAM_ORIGIN",
     ),
+    authUpstream: normalizeOrigin(
+      optionalEnv("MIDTRANS_BISNAP_AUTH_UPSTREAM_ORIGIN"),
+      "MIDTRANS_BISNAP_AUTH_UPSTREAM_ORIGIN",
+    ),
+    authPathPrefix: optionalEnv("MIDTRANS_BISNAP_AUTH_PATH_PREFIX"),
   },
 ];
 
@@ -172,6 +177,25 @@ function responseHeaders(upstream) {
   return headers;
 }
 
+function isMethodAllowed(provider, method) {
+  if (provider.name === "midtrans-bisnap") {
+    return method === "GET" || method === "POST";
+  }
+  return method === "POST";
+}
+
+function resolveProviderUpstream(provider, requestUrl) {
+  if (
+    provider.name === "midtrans-bisnap" &&
+    provider.authUpstream &&
+    provider.authPathPrefix &&
+    requestUrl.startsWith(provider.authPathPrefix)
+  ) {
+    return provider.authUpstream;
+  }
+  return provider.upstream;
+}
+
 const server = createServer(async (req, res) => {
   const startedAt = Date.now();
   const hostname = requestHostname(req);
@@ -190,11 +214,6 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  if (req.method !== "POST") {
-    json(res, 405, { error: "Method tidak diizinkan." });
-    return;
-  }
-
   if (!safeTokenEqual(req.headers["x-lfamilia-relay-token"])) {
     json(res, 401, { error: "Relay token tidak valid." });
     return;
@@ -206,16 +225,22 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  if (!provider.upstream) {
+  if (!isMethodAllowed(provider, req.method)) {
+    json(res, 405, { error: "Method tidak diizinkan untuk provider ini." });
+    return;
+  }
+
+  const providerUpstream = resolveProviderUpstream(provider, req.url || "/");
+  if (!providerUpstream) {
     json(res, 503, { error: "Upstream provider belum dikonfigurasi." });
     return;
   }
 
   try {
-    const body = await readBody(req);
-    const target = buildUpstreamUrl(req, provider.upstream);
+    const body = req.method === "GET" ? undefined : await readBody(req);
+    const target = buildUpstreamUrl(req, providerUpstream);
     const upstream = await fetch(target, {
-      method: "POST",
+      method: req.method,
       headers: forwardHeaders(req),
       body,
       redirect: "manual",
