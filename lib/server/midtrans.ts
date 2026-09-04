@@ -1,3 +1,4 @@
+import { createMidtransBisnapPayment } from "@/lib/server/midtrans-bisnap";
 import { hashHex, safeEqual } from "@/lib/server/crypto";
 import {
   getRuntimeEnv,
@@ -24,8 +25,12 @@ type SnapResponse = {
 };
 
 export type MidtransPaymentResult = {
+  mode: MidtransMode;
   transactionId: string | null;
-  paymentUrl: string;
+  paymentNo: string | null;
+  paymentName: string | null;
+  paymentUrl: string | null;
+  expiredAt: string | null;
   raw: unknown;
 };
 
@@ -215,9 +220,35 @@ export async function createMidtransSnapPayment(input: {
     );
 
   return {
+    mode: "snap",
     transactionId: null,
+    paymentNo: null,
+    paymentName: "Midtrans Snap",
     paymentUrl: payload.redirect_url,
+    expiredAt: null,
     raw: payload,
+  } satisfies MidtransPaymentResult;
+}
+
+export async function createMidtransPayment(input: {
+  referenceId: string;
+  amount: number;
+  productName: string;
+  buyerName: string;
+  buyerEmail: string;
+  buyerPhone: string;
+  paymentMethod: string;
+  paymentChannel: string;
+  finishUrl: string;
+  deviceId?: string;
+}) {
+  const mode = getMidtransMode();
+  if (mode === "snap") return createMidtransSnapPayment(input);
+
+  const payment = await createMidtransBisnapPayment(input);
+  return {
+    mode,
+    ...payment,
   } satisfies MidtransPaymentResult;
 }
 
