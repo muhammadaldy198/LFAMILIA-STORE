@@ -206,17 +206,23 @@ export default function TrackPage() {
   }, []);
 
   useEffect(() => {
-    void loadPublicFeed();
+    const initial = window.setTimeout(() => void loadPublicFeed(), 0);
     const timer = window.setInterval(() => void loadPublicFeed(), 15_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+    };
   }, [loadPublicFeed]);
 
   useEffect(() => {
     const value = new URLSearchParams(window.location.search).get("invoice")?.trim().toUpperCase();
     if (!value) return;
-    setQuery(value);
-    setActiveReference(value);
-    void loadOrder(value);
+    const timer = window.setTimeout(() => {
+      setQuery(value);
+      setActiveReference(value);
+      void loadOrder(value);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadOrder]);
 
   useEffect(() => {
