@@ -1,24 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, LoaderCircle, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StoreLayout } from "@/components/store-layout";
 
-export function PanelLogin({ role }: { role: "owner" | "staff" }) {
+export function PanelLogin({ role, initialError = "" }: { role: "owner" | "staff"; initialError?: string }) {
   const owner = role === "owner";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const message = new URLSearchParams(window.location.search).get("error");
-    if (message) setError(message);
-  }, []);
+  const [error, setError] = useState(initialError);
 
   function beginSubmit() {
     setLoading(true);
