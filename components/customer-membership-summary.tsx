@@ -48,11 +48,12 @@ export function CustomerMembershipSummary() {
   }, []);
 
   useEffect(() => {
-    void load();
+    const initial = window.setTimeout(() => void load(), 0);
     const interval = window.setInterval(() => void load(), 10_000);
     const onFocus = () => void load();
     window.addEventListener("focus", onFocus);
     return () => {
+      window.clearTimeout(initial);
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
     };
