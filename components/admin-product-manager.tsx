@@ -65,7 +65,6 @@ export function AdminProductManager() {
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
   const [catalogSaving, setCatalogSaving] = useState<string | null>(null);
   const [syncingPackage, setSyncingPackage] = useState<number | null>(null);
-  const [editingPackageKey, setEditingPackageKey] = useState<string | null>(null);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -145,7 +144,6 @@ export function AdminProductManager() {
   function addCatalogPackage(item: ManagedProduct) {
     const key = itemKey(item);
     setExpandedProduct(key);
-    setEditingPackageKey(`${key}:${item.packages.length}`);
     updateCatalogProduct(key, (current) => ({
       ...current,
       packages: [
@@ -479,13 +477,13 @@ export function AdminProductManager() {
 
                   <div className="pt-3">
                     <div className="overflow-x-auto rounded-lg border border-white/[0.07]">
-                      <table className="w-full min-w-[940px] text-left text-[10px]">
+                      <table className="w-full min-w-[1040px] text-left text-[10px]">
                         <thead className="bg-white/[0.02] text-white/30">
                           <tr>
                             <th className="px-3 py-2">Nominal</th>
                             <th className="px-3 py-2">Tab</th>
                             <th className="px-3 py-2">Provider</th>
-                            <th className="px-3 py-2">Modal</th>
+                            <th className="px-3 py-2">SKU</th>
                             <th className="px-3 py-2">Margin</th>
                             <th className="px-3 py-2">Harga jual</th>
                             <th className="px-3 py-2">Status</th>
@@ -495,67 +493,62 @@ export function AdminProductManager() {
                         </thead>
                         <tbody>
                           {item.packages.map((entry, index) => {
-                            const editorKey = `${key}:${index}`;
-                            const editing = editingPackageKey === editorKey;
                             const canSync = entry.providerCode === "digiflazz";
                             const syncKey = entry.dbId ?? index + 1;
-                            return <Fragment key={`${entry.dbId ?? "new"}-${index}`}>
-                              <tr className="border-t border-white/[0.06]">
-                                <td className="px-3 py-2 font-semibold text-white/75">{entry.label || <span className="text-amber-200/60">Nominal baru</span>}</td>
-                                <td className="px-3 py-2 text-white/40">{entry.group || "Tanpa tab"}</td>
-                                <td className="px-3 py-2 text-white/40">{entry.providerCode === "voucher-stock" ? "Stok kode LFAMILIA" : entry.providerCode || "Belum diatur"}</td>
-                                <td className="px-3 py-2 text-white/40">{entry.supplierPrice ? formatRupiah(entry.supplierPrice) : "-"}</td>
-                                <td className="px-3 py-2 text-white/40">{entry.providerCode === "digiflazz" ? (entry.marginType === "percent" ? `${entry.marginValue ?? 0}%` : formatRupiah(entry.marginValue ?? 0)) : "-"}</td>
-                                <td className="px-3 py-2 font-bold text-[#d8ff8d]">{entry.price ? formatRupiah(entry.price) : "-"}</td>
-                                <td className={`px-3 py-2 ${entry.isActive ? "text-[#d8ff8d]" : "text-white/30"}`}>{entry.isActive ? "Aktif" : "Nonaktif"}</td>
-                                <td className="px-3 py-2">
-                                  <Button
-                                    type="button"
-                                    disabled={!canSync || !item.dbId || !entry.id || syncingPackage === syncKey || catalogSaving === key}
-                                    onClick={() => void syncCatalogPackage(item, index)}
-                                    variant="outline"
-                                    size="sm"
-                                    title={canSync ? "Sync nominal ini dengan DigiFlazz" : "Sync tersedia setelah provider nominal dipilih ke DigiFlazz"}
-                                    className="h-7 rounded-md border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] px-2 text-[8px] text-[#d8ff8d] disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-white/20"
+                            return <tr key={`${entry.dbId ?? "new"}-${index}`} className="border-t border-white/[0.06]">
+                              <td className="px-3 py-2 font-semibold text-white/75">{entry.label || <span className="text-amber-200/60">Nominal baru</span>}</td>
+                              <td className="px-3 py-2 text-white/40">{entry.group || "Tanpa tab"}</td>
+                              <td className="px-3 py-2 text-white/40">{entry.providerCode === "voucher-stock" ? "Stok kode LFAMILIA" : entry.providerCode || "Belum diatur"}</td>
+                              <td className="px-3 py-2">
+                                {role === "owner" ? <Input
+                                  value={entry.providerSku ?? ""}
+                                  onChange={(event) => updateCatalogPackage(key, index, "providerSku", entry.providerCode === "voucher-stock" ? event.target.value.toLowerCase().replace(/[^a-z0-9._:-]/g, "-") : event.target.value)}
+                                  className="admin-input h-8 min-w-[150px]"
+                                  placeholder="SKU provider"
+                                /> : <span className="text-white/40">{entry.providerSku || "-"}</span>}
+                              </td>
+                              <td className="px-3 py-2">
+                                {role === "owner" ? <div className="flex min-w-[150px] items-center gap-1.5">
+                                  <select
+                                    value={entry.marginType ?? "fixed"}
+                                    onChange={(event) => updateCatalogPackage(key, index, "marginType", event.target.value as "fixed" | "percent")}
+                                    className="admin-input h-8 w-[72px] px-2 text-[9px]"
                                   >
-                                    {syncingPackage === syncKey ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}
-                                    Sync
-                                  </Button>
-                                </td>
-                                <td className="px-3 py-2">
-                                  {role === "owner" ? <div className="flex justify-end gap-1">
-                                    <Button type="button" onClick={() => setEditingPackageKey(editing ? null : editorKey)} variant="ghost" size="icon-sm" className={editing ? "text-[#d8ff8d]" : "text-white/45 hover:text-white"} aria-label={`Edit nominal ${entry.label || index + 1}`}><Edit3 className="size-3.5" /></Button>
-                                    <Button type="button" onClick={() => void removeCatalogPackage(item, index)} variant="ghost" size="icon-sm" className="text-red-300/45 hover:text-red-200" aria-label={`Hapus nominal ${entry.label || index + 1}`}><Trash2 className="size-3.5" /></Button>
-                                  </div> : <span className="block text-right text-white/20">-</span>}
-                                </td>
-                              </tr>
-                              {role === "owner" && editing && <tr className="border-t border-white/[0.06] bg-white/[0.012]">
-                                <td colSpan={9} className="p-3">
-                                  <div className="grid grid-cols-[1.25fr_1fr_120px_110px] gap-2">
-                                    <label><span className="field-label">Nominal</span><Input value={entry.label} onChange={(event) => updateCatalogPackage(key, index, "label", event.target.value)} className="admin-input" placeholder="59 Diamonds" /></label>
-                                    <label><span className="field-label">Tab pemisah</span><select value={entry.group ?? ""} onChange={(event) => updateCatalogPackage(key, index, "group", event.target.value)} className="admin-input"><option value="">Tanpa tab</option>{item.packageTabs.map((tab, tabIndex) => <option key={`${tab}-${tabIndex}`} value={tab}>{tab}</option>)}</select></label>
-                                    <label><span className="field-label">Harga jual</span><Input type="number" min={1} value={entry.price || ""} onChange={(event) => updateCatalogPackage(key, index, "price", Number(event.target.value))} className="admin-input" /></label>
-                                    <label><span className="field-label">Status</span><select value={entry.isActive ? "1" : "0"} onChange={(event) => updateCatalogPackage(key, index, "isActive", event.target.value === "1")} className="admin-input"><option value="1">Aktif</option><option value="0">Nonaktif</option></select></label>
-                                  </div>
-
-                                  {item.fulfillmentType === "automatic" && <div className="mt-2 grid grid-cols-2 gap-2">
-                                    <label><span className="field-label">Provider</span><select value={entry.providerCode ?? ""} onChange={(event) => updateCatalogPackage(key, index, "providerCode", event.target.value || undefined)} className="admin-input"><option value="">Pilih provider</option>{providerOptions.map((provider) => <option key={provider.code} value={provider.code}>{provider.name}</option>)}</select></label>
-                                    <label><span className="field-label">SKU provider</span><Input value={entry.providerSku ?? ""} onChange={(event) => updateCatalogPackage(key, index, "providerSku", entry.providerCode === "voucher-stock" ? event.target.value.toLowerCase().replace(/[^a-z0-9._:-]/g, "-") : event.target.value)} className="admin-input" placeholder="SKU provider" /></label>
-                                  </div>}
-
-                                  {entry.providerCode === "digiflazz" && <div className="mt-2 grid grid-cols-[160px_140px_1fr] gap-2">
-                                    <label><span className="field-label">Jenis margin</span><select value={entry.marginType ?? "fixed"} onChange={(event) => updateCatalogPackage(key, index, "marginType", event.target.value as "fixed" | "percent")} className="admin-input"><option value="fixed">Margin Rupiah</option><option value="percent">Margin Persen</option></select></label>
-                                    <label><span className="field-label">Margin</span><Input type="number" min={0} value={entry.marginValue ?? 0} onChange={(event) => updateCatalogPackage(key, index, "marginValue", Number(event.target.value))} className="admin-input" /></label>
-                                    <div><span className="field-label">Modal supplier</span><div className="flex h-8 items-center rounded-lg border border-white/10 bg-white/[0.025] px-3 text-[10px] text-[#d8ff8d]">{entry.supplierPrice ? formatRupiah(entry.supplierPrice) : "Belum sinkron"}</div></div>
-                                  </div>}
-
-                                  <div className="mt-2 flex justify-end gap-2">
-                                    <Button type="button" variant="ghost" size="sm" onClick={() => setEditingPackageKey(null)} className="h-8 px-3 text-[9px] text-white/45">Tutup</Button>
-                                    <Button type="button" disabled={catalogSaving === key} onClick={() => void saveCatalogProduct(item)} size="sm" className="h-8 rounded-lg bg-[#b9ff35] px-3 text-[9px] font-black text-[#091006]">{catalogSaving === key && <LoaderCircle className="mr-1 size-3 animate-spin" />}Simpan nominal</Button>
-                                  </div>
-                                </td>
-                              </tr>}
-                            </Fragment>;
+                                    <option value="fixed">Rp</option>
+                                    <option value="percent">%</option>
+                                  </select>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={entry.marginValue ?? 0}
+                                    onChange={(event) => updateCatalogPackage(key, index, "marginValue", Number(event.target.value))}
+                                    className="admin-input h-8 min-w-0 flex-1"
+                                  />
+                                </div> : <span className="text-white/40">{entry.marginType === "percent" ? `${entry.marginValue ?? 0}%` : formatRupiah(entry.marginValue ?? 0)}</span>}
+                              </td>
+                              <td className="px-3 py-2 font-bold text-[#d8ff8d]">{entry.price ? formatRupiah(entry.price) : "-"}</td>
+                              <td className={`px-3 py-2 ${entry.isActive ? "text-[#d8ff8d]" : "text-white/30"}`}>{entry.isActive ? "Aktif" : "Nonaktif"}</td>
+                              <td className="px-3 py-2">
+                                <Button
+                                  type="button"
+                                  disabled={!canSync || !item.dbId || !entry.id || syncingPackage === syncKey || catalogSaving === key}
+                                  onClick={() => void syncCatalogPackage(item, index)}
+                                  variant="outline"
+                                  size="sm"
+                                  title={canSync ? "Sync nominal ini dengan DigiFlazz" : "Sync tersedia untuk nominal DigiFlazz"}
+                                  className="h-7 rounded-md border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] px-2 text-[8px] text-[#d8ff8d] disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-white/20"
+                                >
+                                  {syncingPackage === syncKey ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}
+                                  Sync
+                                </Button>
+                              </td>
+                              <td className="px-3 py-2">
+                                {role === "owner" ? <div className="flex justify-end gap-1">
+                                  <Button type="button" disabled={catalogSaving === key} onClick={() => void saveCatalogProduct(item)} variant="ghost" size="sm" className="h-7 px-2 text-[8px] text-[#d8ff8d]">Simpan</Button>
+                                  <Button type="button" onClick={() => void removeCatalogPackage(item, index)} variant="ghost" size="icon-sm" className="text-red-300/45 hover:text-red-200" aria-label={`Hapus nominal ${entry.label || index + 1}`}><Trash2 className="size-3.5" /></Button>
+                                </div> : <span className="block text-right text-white/20">-</span>}
+                              </td>
+                            </tr>;
                           })}
                           {!item.packages.length && <tr><td colSpan={9} className="px-3 py-6 text-center text-[10px] text-white/30">Belum ada nominal. Tekan + pada produk atau tombol Tambah nominal.</td></tr>}
                         </tbody>
@@ -570,7 +563,7 @@ export function AdminProductManager() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="left-2 right-2 top-2 bottom-2 h-auto w-auto max-w-none translate-x-0 translate-y-0 gap-3 overflow-y-auto overflow-x-hidden rounded-xl border-white/10 bg-[#10141d] p-3 text-white sm:bottom-auto sm:left-[50%] sm:right-auto sm:top-[50%] sm:max-h-[90vh] sm:w-full sm:max-w-2xl sm:translate-x-[-50%] sm:translate-y-[-50%] sm:p-5">
+        <DialogContent className="max-h-[86dvh] w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)] gap-3 overflow-y-auto overflow-x-hidden rounded-xl border-white/10 bg-[#10141d] p-3 text-white sm:max-h-[90vh] sm:w-full sm:max-w-2xl sm:p-5">
           <form onSubmit={save}>
             <DialogHeader className="pr-8 text-left"><DialogTitle className="text-base sm:text-lg">{role === "staff" ? `Edit informasi ${draft.name}` : draft.dbId ? "Edit produk" : "Tambah produk"}</DialogTitle><DialogDescription className="text-[10px] leading-4 text-white/38 sm:text-xs">{role === "staff" ? "Staff dapat mengubah media, jam layanan, instruksi, dan pop-up tanpa akses ke harga atau provider." : "Data ini akan digunakan oleh katalog dan checkout."}</DialogDescription></DialogHeader>
             <div className="grid gap-2.5 py-2 sm:grid-cols-2">
