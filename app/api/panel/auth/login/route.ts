@@ -5,6 +5,7 @@ import { allowRequest } from "@/lib/server/security";
 const schema = z.object({
   username: z.string().trim().min(3).max(32).refine(isValidAdminId),
   password: z.string().min(10).max(72),
+  role: z.enum(["owner", "staff"]).optional(),
 });
 
 export async function POST(request: Request) {
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
   if (!rate.allowed) return Response.json({ error: "Terlalu banyak percobaan masuk. Coba lagi 15 menit." }, { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(rate.retryAfter) } });
   try {
     const input = schema.parse(await request.json());
-    const session = await loginAdmin(input.username, input.password);
+    const session = await loginAdmin(input.username, input.password, input.role);
     return Response.json({ admin: session.admin }, {
       headers: {
         "Cache-Control": "no-store",
