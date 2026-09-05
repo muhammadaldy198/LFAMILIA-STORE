@@ -259,15 +259,7 @@ export const storeSettings = sqliteTable("store_settings", {
 
 export const walletSettings = sqliteTable("wallet_settings", {
   id: integer("id").primaryKey(),
-  isEnabled: integer("is_enabled", { mode: "boolean" }).notNull().default(false),
-  methodName: text("method_name").notNull().default("Transfer Bank"),
-  accountName: text("account_name").notNull().default(""),
-  accountNumber: text("account_number").notNull().default(""),
-  instructions: text("instructions").notNull().default(""),
   minTopup: integer("min_topup").notNull().default(10000),
-  manualQrisEnabled: integer("manual_qris_enabled", { mode: "boolean" }).notNull().default(false),
-  manualQrisName: text("manual_qris_name").notNull().default("QRIS Manual"),
-  manualQrisImageUrl: text("manual_qris_image_url"),
   midtransTopupEnabled: integer("midtrans_topup_enabled", { mode: "boolean" }).notNull().default(false),
   midtransCheckoutEnabled: integer("midtrans_checkout_enabled", { mode: "boolean" }).notNull().default(false),
   ipaymuTopupEnabled: integer("ipaymu_topup_enabled", { mode: "boolean" }).notNull().default(false),
