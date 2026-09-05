@@ -1,8 +1,7 @@
 import { getD1 } from "@/db";
 
 const ADMIN_CREDENTIAL_PREFIX = "__lfadmin__:";
-const ADMIN_COOKIE_NAME = "lfamilia_admin_session";
-const STAFF_COOKIE_NAME = "lfamilia_staff_session";
+export const PANEL_COOKIE_NAME = "lfamilia_panel_session";
 const ADMIN_SESSION_HOURS = 12;
 const PASSWORD_ITERATIONS = 100_000;
 
@@ -142,29 +141,19 @@ async function createAdminSession(credentialId: string) {
   return { token: `${encodedPayload}.${signature}`, expiresAt: expiresAt.toISOString() };
 }
 
-function sessionCookie(cookieName: string, token: string, expiresAt: string) {
-  return `${cookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=${new Date(expiresAt).toUTCString()}`;
+export function panelSessionCookie(token: string, expiresAt: string) {
+  return `${PANEL_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=${new Date(expiresAt).toUTCString()}`;
 }
 
-function clearSessionCookie(cookieName: string) {
-  return `${cookieName}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+export function clearPanelSessionCookie() {
+  return `${PANEL_COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 }
 
-export function adminSessionCookie(token: string, expiresAt: string) {
-  return sessionCookie(ADMIN_COOKIE_NAME, token, expiresAt);
-}
-
-export function staffSessionCookie(token: string, expiresAt: string) {
-  return sessionCookie(STAFF_COOKIE_NAME, token, expiresAt);
-}
-
-export function clearAdminSessionCookie() {
-  return clearSessionCookie(ADMIN_COOKIE_NAME);
-}
-
-export function clearStaffSessionCookie() {
-  return clearSessionCookie(STAFF_COOKIE_NAME);
-}
+// Compatibility exports for older routes. Admin and Staff now share one role-bearing panel session cookie.
+export const adminSessionCookie = panelSessionCookie;
+export const staffSessionCookie = panelSessionCookie;
+export const clearAdminSessionCookie = clearPanelSessionCookie;
+export const clearStaffSessionCookie = clearPanelSessionCookie;
 
 export async function loginAdmin(usernameInput: string, password: string, expectedRole?: "owner" | "staff") {
   const username = normalizeAdminId(usernameInput);
@@ -195,8 +184,8 @@ export async function loginAdmin(usernameInput: string, password: string, expect
   };
 }
 
-async function sessionFromCookie(request: Request, cookieName: string): Promise<PasswordAdminSession | null> {
-  const token = cookieValue(request, cookieName);
+export async function getPanelSessionFromToken(token: string | null | undefined): Promise<PasswordAdminSession | null> {
+  if (!token) return null;
   if (!token) return null;
 
   const [encodedPayload, signature, extra] = token.split(".");
@@ -237,23 +226,20 @@ async function sessionFromCookie(request: Request, cookieName: string): Promise<
 }
 
 export async function getRolePanelSession(request: Request, expectedRole: "owner" | "staff") {
-  const cookieName = expectedRole === "owner" ? ADMIN_COOKIE_NAME : STAFF_COOKIE_NAME;
-  const session = await sessionFromCookie(request, cookieName);
+  const session = await getPanelSessionFromToken(cookieValue(request, PANEL_COOKIE_NAME));
   return session?.role === expectedRole ? session : null;
 }
 
 export async function getPasswordAdminSession(request: Request): Promise<PasswordAdminSession | null> {
-  const owner = await getRolePanelSession(request, "owner");
-  if (owner) return owner;
-  return getRolePanelSession(request, "staff");
+  return getPanelSessionFromToken(cookieValue(request, PANEL_COOKIE_NAME));
 }
 
 export async function deleteRolePanelSession(_request: Request, _role: "owner" | "staff") {
-  // Panel sessions are signed stateless cookies. Logout invalidates them by clearing the cookie.
+  // Stateless session: logout invalidates it by clearing PANEL_COOKIE_NAME.
 }
 
 export async function deleteAdminSession(_request: Request) {
-  // Panel sessions are signed stateless cookies. Logout invalidates them by clearing both cookies.
+  // Stateless session: logout invalidates it by clearing PANEL_COOKIE_NAME.
 }
 
 export async function getOwnerCredentialState() {
