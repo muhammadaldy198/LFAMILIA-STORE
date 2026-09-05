@@ -371,22 +371,27 @@ function CheckoutContent() {
   useEffect(() => {
     if (!walletSettings) return;
     const enabled = checkoutGroups.map((group) => group.code);
-    if (enabled.includes(paymentMethod)) {
-      if (
-        isGatewayMethod &&
-        !availableChannels.some(
-          (item) =>
-            item.method === paymentMethod &&
-            item.channel === paymentChannel,
-        )
-      ) {
+    const needsChannelCorrection =
+      enabled.includes(paymentMethod) &&
+      isGatewayMethod &&
+      !availableChannels.some(
+        (item) =>
+          item.method === paymentMethod &&
+          item.channel === paymentChannel,
+      );
+    const needsMethodCorrection = !enabled.includes(paymentMethod);
+    if (!needsChannelCorrection && !needsMethodCorrection) return;
+
+    const timer = window.setTimeout(() => {
+      if (needsChannelCorrection) {
         chooseMethod(paymentMethod);
+        return;
       }
-      return;
-    }
-    if (activeCheckoutGateway && gatewayPaymentGroups.length)
-      chooseMethod(gatewayPaymentGroups[0].code);
-    else chooseMethod("wallet");
+      if (activeCheckoutGateway && gatewayPaymentGroups.length)
+        chooseMethod(gatewayPaymentGroups[0].code);
+      else chooseMethod("wallet");
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [
     walletSettings,
     activeCheckoutGateway,
