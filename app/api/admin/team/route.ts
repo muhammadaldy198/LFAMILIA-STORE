@@ -5,7 +5,7 @@ import { createAdminCredential, deleteAdminCredential, isValidAdminId, normalize
 
 const schema = z.object({
   id: z.number().int().positive().nullable().optional(),
-  username: z.string().trim().min(3, "ID admin minimal 3 karakter.").max(32).refine(isValidAdminId, "ID admin hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda minus.").transform(normalizeAdminId),
+  username: z.string().trim().min(3, "ID login minimal 3 karakter.").max(32).refine(isValidAdminId, "ID login hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda minus.").transform(normalizeAdminId),
   name: z.string().trim().min(2).max(80),
   role: z.enum(["owner", "staff"]),
   isActive: z.boolean().default(true),
@@ -28,16 +28,16 @@ export async function POST(request: Request) {
     if (input.password && input.password.length < 10) throw new Error("Password minimal 10 karakter.");
     if (input.id) {
       const current = await db.prepare("SELECT email, role, is_active FROM admin_users WHERE id = ?").bind(input.id).first<{ email: string; role: "owner" | "staff"; is_active: number }>();
-      if (!current) throw new Error("Admin tidak ditemukan.");
+      if (!current) throw new Error("Akun panel tidak ditemukan.");
       if (current.role === "owner" && current.is_active && (input.role !== "owner" || !input.isActive)) await ensureAnotherOwner(input.id);
       const duplicate = await db.prepare("SELECT id FROM admin_users WHERE lower(email) = ? AND id <> ? LIMIT 1").bind(input.username, input.id).first<{ id: number }>();
-      if (duplicate) throw new Error("ID admin sudah digunakan.");
+      if (duplicate) throw new Error("ID login sudah digunakan.");
       await updateAdminCredential(current.email, { username: input.username, name: input.name, password: input.password || undefined, isActive: input.isActive });
       await db.prepare("UPDATE admin_users SET email = ?, name = ?, role = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
         .bind(input.username, input.name, input.role, input.isActive ? 1 : 0, input.id).run();
       return Response.json({ ok: true, id: input.id });
     }
-    if (input.password.length < 10) throw new Error("Password wajib diisi minimal 10 karakter untuk admin baru.");
+    if (input.password.length < 10) throw new Error("Password wajib diisi minimal 10 karakter untuk akun baru.");
     await createAdminCredential({ username: input.username, name: input.name, password: input.password, isActive: input.isActive });
     let row: { id: number } | null = null;
     try {
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
     return Response.json({ ok: true, id: row?.id }, { status: 201 });
   } catch (error) {
-    const message = error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Admin gagal disimpan.";
+    const message = error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Akun panel gagal disimpan.";
     return Response.json({ error: message }, { status: 400 });
   }
 }
@@ -59,15 +59,15 @@ export async function DELETE(request: Request) {
   if (access instanceof Response) return access;
   try {
     const id = Number(new URL(request.url).searchParams.get("id"));
-    if (!Number.isInteger(id) || id < 1) throw new Error("ID admin tidak valid.");
+    if (!Number.isInteger(id) || id < 1) throw new Error("ID login tidak valid.");
     const row = await getD1().prepare("SELECT email, role FROM admin_users WHERE id = ?").bind(id).first<{ email: string; role: "owner" | "staff" }>();
-    if (!row) throw new Error("Admin tidak ditemukan.");
+    if (!row) throw new Error("Akun panel tidak ditemukan.");
     if (row?.role === "owner") await ensureAnotherOwner(id);
     await deleteAdminCredential(row.email);
     await getD1().prepare("DELETE FROM admin_users WHERE id = ?").bind(id).run();
     return Response.json({ ok: true });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Admin gagal dihapus." }, { status: 400 });
+    return Response.json({ error: error instanceof Error ? error.message : "Akun panel gagal dihapus." }, { status: 400 });
   }
 }
 
