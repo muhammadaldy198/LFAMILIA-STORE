@@ -77,7 +77,7 @@ export function AdminDashboard({ expectedRole }: { expectedRole: "owner" | "staf
     void fetch("/api/panel/session", { cache: "no-store" })
       .then(async (response) => {
         if (response.status === 401) {
-          window.location.replace(expectedRole === "owner" ? "/panel/admin/login" : "/panel/staff/login");
+          window.location.replace(expectedRole === "owner" ? "/admin/panel/login" : "/staff/panel/login");
           return null;
         }
 
@@ -85,7 +85,7 @@ export function AdminDashboard({ expectedRole }: { expectedRole: "owner" | "staf
         if (!response.ok) throw new Error(data.error);
         const nextSession = data.session as Session;
         if (nextSession.role !== expectedRole) {
-          window.location.replace(nextSession.role === "owner" ? "/panel/admin" : "/panel/staff");
+          window.location.replace(nextSession.role === "owner" ? "/admin/panel" : "/staff/panel");
           return null;
         }
         return nextSession;
@@ -115,7 +115,7 @@ export function AdminDashboard({ expectedRole }: { expectedRole: "owner" | "staf
     try {
       await fetch("/api/panel/auth/logout", { method: "POST" });
     } finally {
-      window.location.replace(expectedRole === "owner" ? "/panel/admin/login" : "/panel/staff/login");
+      window.location.replace(expectedRole === "owner" ? "/admin/panel/login" : "/staff/panel/login");
     }
   }
 
@@ -146,7 +146,7 @@ export function AdminDashboard({ expectedRole }: { expectedRole: "owner" | "staf
               asChild
               className="mt-5 rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#ceff73]"
             >
-              <Link href={expectedRole === "owner" ? "/panel/admin/login" : "/panel/staff/login"}>Ke halaman masuk</Link>
+              <Link href={expectedRole === "owner" ? "/admin/panel/login" : "/staff/panel/login"}>Ke halaman masuk</Link>
             </Button>
           </div>
         </main>
