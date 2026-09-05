@@ -186,7 +186,6 @@ export async function loginAdmin(usernameInput: string, password: string, expect
 
 export async function getPanelSessionFromToken(token: string | null | undefined): Promise<PasswordAdminSession | null> {
   if (!token) return null;
-  if (!token) return null;
 
   const [encodedPayload, signature, extra] = token.split(".");
   if (!encodedPayload || !signature || extra) return null;
