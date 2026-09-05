@@ -20,23 +20,24 @@ export function PanelLogin({ role }: { role: "owner" | "staff" }) {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/panel/auth/login", {
+      const apiBase = owner ? "/api/admin/panel" : "/api/staff";
+      const response = await fetch(`${apiBase}/auth/login`, {
         method: "POST",
         credentials: "same-origin",
         cache: "no-store",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username, password, role }),
+        body: JSON.stringify({ username, password }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Login gagal.");
+      if (!response.ok) throw new Error(data.error || (owner ? "Login Admin gagal." : "Login Staff gagal."));
 
-      const verify = await fetch("/api/panel/session", {
+      const verify = await fetch(`${apiBase}/session`, {
         cache: "no-store",
         credentials: "same-origin",
       });
-      const verifyData = await verify.json().catch(() => null) as { session?: { role?: "owner" | "staff" }; error?: string } | null;
+      const verifyData = await verify.json().catch(() => null) as { session?: { role?: "owner" | "staff" } } | null;
       if (!verify.ok || verifyData?.session?.role !== role) {
-        throw new Error("Login berhasil, tetapi sesi panel gagal dibuat. Muat ulang halaman lalu coba masuk lagi.");
+        throw new Error(owner ? "Sesi Admin gagal dibuat. Coba masuk lagi." : "Sesi Staff gagal dibuat. Coba masuk lagi.");
       }
 
       window.location.replace(owner ? "/admin/panel" : "/staff/panel");
