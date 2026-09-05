@@ -37,7 +37,7 @@ export function AdminTeamManager() {
       if (!response.ok) throw new Error(data.error);
       setUsers(data.users ?? []);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Tim admin gagal dimuat.");
+      setError(reason instanceof Error ? reason.message : "Tim panel gagal dimuat.");
     } finally {
       setLoading(false);
     }
@@ -60,10 +60,10 @@ export function AdminTeamManager() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       setOpen(false);
-      setMessage(draft.id ? "Akun admin berhasil diperbarui." : "Akun admin baru berhasil dibuat.");
+      setMessage(draft.id ? "Akun panel berhasil diperbarui." : "Akun panel baru berhasil dibuat.");
       await load();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Admin gagal disimpan.");
+      setError(reason instanceof Error ? reason.message : "Akun panel gagal disimpan.");
     } finally {
       setSaving(false);
     }
@@ -73,7 +73,7 @@ export function AdminTeamManager() {
     const response = await fetch(`/api/panel/team?id=${id}`, { method: "DELETE" });
     const data = await response.json();
     if (!response.ok) { setError(data.error); return; }
-    setMessage("Admin berhasil dihapus.");
+    setMessage("Akun panel berhasil dihapus.");
     await load();
   }
 
@@ -82,8 +82,8 @@ export function AdminTeamManager() {
   return (
     <>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div><p className="text-xs font-semibold">{users.length} akun admin</p><p className="mt-1 text-[10px] text-white/30">Setiap Pemilik dan Staff masuk menggunakan ID serta password masing-masing.</p></div>
-        <Button onClick={() => { setDraft(empty); setOpen(true); }} className="rounded-xl bg-[#b9ff35] text-xs font-black text-[#091006]"><Plus className="mr-2 size-4" />Tambah admin</Button>
+        <div><p className="text-xs font-semibold">{users.length} akun panel</p><p className="mt-1 text-[10px] text-white/30">Setiap Pemilik dan Staff masuk menggunakan ID serta password masing-masing.</p></div>
+        <Button onClick={() => { setDraft(empty); setOpen(true); }} className="rounded-xl bg-[#b9ff35] text-xs font-black text-[#091006]"><Plus className="mr-2 size-4" />Tambah akun</Button>
       </div>
       {message && <div className="mb-4 rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.06] p-3 text-xs text-[#d8ff8d]">{message}</div>}
       {error && <div className="mb-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-xs text-red-200">{error}</div>}
@@ -98,7 +98,7 @@ export function AdminTeamManager() {
               <Button size="icon-sm" variant="ghost" onClick={() => { setDraft({ ...item, password: "" }); setOpen(true); }} className="text-white/50"><Edit3 className="size-3.5" /></Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild><Button size="icon-sm" variant="ghost" className="text-red-300"><Trash2 className="size-3.5" /></Button></AlertDialogTrigger>
-                <AlertDialogContent className="border-white/10 bg-[#10141d] text-white"><AlertDialogHeader><AlertDialogTitle>Hapus akses {item.name}?</AlertDialogTitle><AlertDialogDescription className="text-white/42">Akun dan seluruh sesi admin ini akan dihapus. Toko harus tetap memiliki setidaknya satu Pemilik aktif.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="border-white/10 bg-white/[0.03] text-white">Batal</AlertDialogCancel><AlertDialogAction onClick={() => void remove(item.id)} className="bg-red-500 text-white hover:bg-red-400">Hapus akses</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                <AlertDialogContent className="border-white/10 bg-[#10141d] text-white"><AlertDialogHeader><AlertDialogTitle>Hapus akses {item.name}?</AlertDialogTitle><AlertDialogDescription className="text-white/42">Akun dan seluruh sesi akun ini akan dihapus. Toko harus tetap memiliki setidaknya satu Pemilik aktif.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="border-white/10 bg-white/[0.03] text-white">Batal</AlertDialogCancel><AlertDialogAction onClick={() => void remove(item.id)} className="bg-red-500 text-white hover:bg-red-400">Hapus akses</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
               </AlertDialog>
             </div>
           </div>
@@ -109,15 +109,15 @@ export function AdminTeamManager() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="border-white/10 bg-[#10141d] text-white">
           <form onSubmit={save}>
-            <DialogHeader><DialogTitle>{draft.id ? "Edit admin" : "Tambah admin"}</DialogTitle><DialogDescription className="text-white/38">Pemilik memiliki akses penuh. Staff hanya menangani pesanan, produk aman, dan konten yang diizinkan.</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>{draft.id ? "Edit akun" : "Tambah akun"}</DialogTitle><DialogDescription className="text-white/38">Pemilik memiliki akses penuh. Staff hanya menangani pesanan, produk aman, dan konten yang diizinkan.</DialogDescription></DialogHeader>
             <div className="space-y-4 py-5">
               <label><span className="field-label">Nama</span><Input required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} className="admin-input" /></label>
-              <label><span className="field-label">ID admin</span><Input required minLength={3} maxLength={32} autoComplete="off" value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, "") })} placeholder="contoh: staff01" className="admin-input" /></label>
+              <label><span className="field-label">ID login</span><Input required minLength={3} maxLength={32} autoComplete="off" value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, "") })} placeholder="contoh: staff01" className="admin-input" /></label>
               <label><span className="field-label">{draft.id ? "Password baru (opsional)" : "Password sementara"}</span><Input required={!draft.id} minLength={draft.id ? undefined : 10} maxLength={72} type="password" autoComplete="new-password" value={draft.password ?? ""} onChange={(event) => setDraft({ ...draft, password: event.target.value })} placeholder={draft.id ? "Kosongkan jika tidak diganti" : "Minimal 10 karakter"} className="admin-input" /></label>
               <label><span className="field-label">Peran</span><select value={draft.role} onChange={(event) => setDraft({ ...draft, role: event.target.value as "owner" | "staff" })} className="h-10 w-full rounded-xl border border-white/10 bg-[#171c27] px-3 text-xs"><option value="staff">Staff</option><option value="owner">Pemilik</option></select></label>
               <label className="flex items-center justify-between rounded-xl border border-white/[0.08] p-3 text-xs text-white/55"><span>Akun aktif</span><Switch checked={draft.isActive} onCheckedChange={(checked) => setDraft({ ...draft, isActive: checked })} /></label>
             </div>
-            <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-white/10 bg-white/[0.03] text-white">Batal</Button><Button disabled={saving} className="bg-[#b9ff35] font-black text-[#091006]">{saving && <LoaderCircle className="mr-2 size-4 animate-spin" />}Simpan admin</Button></DialogFooter>
+            <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-white/10 bg-white/[0.03] text-white">Batal</Button><Button disabled={saving} className="bg-[#b9ff35] font-black text-[#091006]">{saving && <LoaderCircle className="mr-2 size-4 animate-spin" />}Simpan akun</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
