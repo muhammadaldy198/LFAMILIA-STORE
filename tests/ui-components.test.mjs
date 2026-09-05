@@ -106,5 +106,5 @@ test("media uploader exposes accessible URL and upload controls", async () => {
 
   assert.match(html, /aria-label="Logo toko URL"/);
   assert.match(html, /aria-label="Unggah logo toko"/);
-  assert.match(html, /accept="image\/jpeg,image\/png,image\/webp,image\/gif"/);
+  assert.match(html, /accept="\.jpg,\.jpeg,\.png,\.webp,\.gif,image\/jpeg,image\/png,image\/webp,image\/gif"/);
 });
