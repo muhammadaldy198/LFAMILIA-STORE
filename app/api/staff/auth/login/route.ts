@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { clearAdminSessionCookie, isValidAdminId, loginAdmin, staffSessionCookie } from "@/lib/server/admin-auth";
+import { isValidAdminId, loginAdmin, staffSessionCookie } from "@/lib/server/admin-auth";
 import { allowRequest } from "@/lib/server/security";
 
 const schema = z.object({
@@ -19,10 +19,15 @@ export async function POST(request: Request) {
   try {
     const input = schema.parse(await request.json());
     const session = await loginAdmin(input.username, input.password, "staff");
-    const headers = new Headers({ "Cache-Control": "no-store" });
-    headers.append("Set-Cookie", staffSessionCookie(session.token, session.expiresAt));
-    headers.append("Set-Cookie", clearAdminSessionCookie());
-    return Response.json({ staff: session.admin }, { headers });
+    return Response.json(
+      { staff: session.admin },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+          "Set-Cookie": staffSessionCookie(session.token, session.expiresAt),
+        },
+      },
+    );
   } catch (error) {
     await new Promise((resolve) => setTimeout(resolve, 600));
     const message =
