@@ -48,7 +48,7 @@ const routes: Record<string, RouteHandlers> = {
   summary: { GET: summary.GET },
   team: { GET: team.GET, POST: team.POST, DELETE: team.DELETE },
   vouchers: { GET: vouchers.GET, POST: vouchers.POST, PATCH: vouchers.PATCH },
-  wallet: { GET: wallet.GET, PUT: wallet.PUT, PATCH: wallet.PATCH },
+  wallet: { GET: wallet.GET, PUT: wallet.PUT },
   "wallet/proof": { GET: walletProof.GET },
 };
 
