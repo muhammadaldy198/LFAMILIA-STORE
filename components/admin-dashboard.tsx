@@ -6,7 +6,6 @@ import {
   Box,
   FileQuestion,
   LayoutDashboard,
-  LoaderCircle,
   LogOut,
   Menu,
   ReceiptText,
@@ -70,19 +69,8 @@ export function AdminDashboard({
   initialSession: Session;
 }) {
   const session = initialSession;
-  const [loggingOut, setLoggingOut] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
-
-  async function logout() {
-    setLoggingOut(true);
-    try {
-      const apiBase = expectedRole === "owner" ? "/api/admin/panel" : "/api/staff";
-      await fetch(`${apiBase}/auth/logout`, { method: "POST", credentials: "same-origin", cache: "no-store" });
-    } finally {
-      window.location.replace(expectedRole === "owner" ? "/admin/panel/login" : "/staff/panel/login");
-    }
-  }
 
   const isOwner = session.role === "owner";
   const nav = isOwner ? [...baseNav, ...ownerNav] : baseNav;
@@ -129,20 +117,16 @@ export function AdminDashboard({
                 Lihat toko
               </Link>
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={loggingOut}
-              onClick={() => void logout()}
-              className="rounded-xl border-red-300/15 bg-red-300/[0.04] text-red-100 hover:bg-red-300/[0.1] hover:text-white"
-            >
-              {loggingOut ? (
-                <LoaderCircle className="mr-2 size-4 animate-spin" />
-              ) : (
+            <form action={expectedRole === "owner" ? "/admin/panel/auth/logout" : "/staff/panel/auth/logout"} method="post">
+              <Button
+                type="submit"
+                variant="outline"
+                className="rounded-xl border-red-300/15 bg-red-300/[0.04] text-red-100 hover:bg-red-300/[0.1] hover:text-white"
+              >
                 <LogOut className="mr-2 size-4" />
-              )}
-              Keluar
-            </Button>
+                Keluar
+              </Button>
+            </form>
           </div>
         </div>
 
