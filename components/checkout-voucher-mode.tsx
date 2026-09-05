@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useStoreProducts } from "@/hooks/use-store-products";
 
 const INTERNAL_VOUCHER_DESTINATION = "00000000";
