@@ -26,15 +26,7 @@ type TopupRow = {
 type EditTarget = "midtrans" | "ipaymu";
 
 const fallback: WalletSettings = {
-  isEnabled: false,
-  methodName: "Transfer Bank",
-  accountName: "",
-  accountNumber: "",
-  instructions: "",
   minTopup: 10_000,
-  manualQrisEnabled: false,
-  manualQrisName: "QRIS Manual",
-  manualQrisImageUrl: "",
   midtransTopupEnabled: false,
   midtransCheckoutEnabled: false,
   ipaymuTopupEnabled: false,
@@ -72,16 +64,10 @@ export function AdminWalletManager({ view = "topups" }: { view?: "topups" | "che
     setSaving(true);
     setError("");
     try {
-      const payload = {
-        ...settings,
-        isEnabled: false,
-        manualQrisEnabled: false,
-        manualQrisImageUrl: "",
-      };
       const response = await fetch("/api/panel/wallet", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(settings),
       });
       const data = await readJson(response);
       if (!response.ok) throw new Error(String(data.error || "Pengaturan gagal disimpan."));
