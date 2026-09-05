@@ -2,15 +2,7 @@ import { getD1 } from "@/db";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 
 export type WalletSettings = {
-  isEnabled: boolean;
-  methodName: string;
-  accountName: string;
-  accountNumber: string;
-  instructions: string;
   minTopup: number;
-  manualQrisEnabled: boolean;
-  manualQrisName: string;
-  manualQrisImageUrl: string;
   midtransTopupEnabled: boolean;
   midtransCheckoutEnabled: boolean;
   ipaymuTopupEnabled: boolean;
@@ -18,15 +10,7 @@ export type WalletSettings = {
 };
 
 const fallbackSettings: WalletSettings = {
-  isEnabled: false,
-  methodName: "Transfer Bank",
-  accountName: "",
-  accountNumber: "",
-  instructions: "Kirim sesuai nominal lalu unggah bukti pembayaran.",
   minTopup: 10_000,
-  manualQrisEnabled: false,
-  manualQrisName: "QRIS Manual",
-  manualQrisImageUrl: "",
   midtransTopupEnabled: false,
   midtransCheckoutEnabled: false,
   ipaymuTopupEnabled: false,
@@ -37,17 +21,10 @@ export async function readWalletSettings(): Promise<WalletSettings> {
   try {
     await ensureLegacyDatabaseColumns();
     const row = await getD1()
-      .prepare("SELECT * FROM wallet_settings WHERE id = 1")
+      .prepare(`SELECT min_topup, midtrans_topup_enabled, midtrans_checkout_enabled,
+        ipaymu_topup_enabled, ipaymu_checkout_enabled FROM wallet_settings WHERE id = 1`)
       .first<{
-        is_enabled: number;
-        method_name: string;
-        account_name: string;
-        account_number: string;
-        instructions: string;
         min_topup: number;
-        manual_qris_enabled: number;
-        manual_qris_name: string;
-        manual_qris_image_url: string | null;
         midtrans_topup_enabled: number;
         midtrans_checkout_enabled: number;
         ipaymu_topup_enabled: number;
@@ -55,15 +32,7 @@ export async function readWalletSettings(): Promise<WalletSettings> {
       }>();
     if (!row) return fallbackSettings;
     return {
-      isEnabled: Boolean(row.is_enabled),
-      methodName: row.method_name,
-      accountName: row.account_name,
-      accountNumber: row.account_number,
-      instructions: row.instructions,
       minTopup: row.min_topup,
-      manualQrisEnabled: Boolean(row.manual_qris_enabled),
-      manualQrisName: row.manual_qris_name || "QRIS Manual",
-      manualQrisImageUrl: row.manual_qris_image_url || "",
       midtransTopupEnabled: Boolean(row.midtrans_topup_enabled),
       midtransCheckoutEnabled: Boolean(row.midtrans_checkout_enabled),
       ipaymuTopupEnabled: Boolean(row.ipaymu_topup_enabled),
@@ -78,57 +47,24 @@ export async function saveWalletSettings(input: WalletSettings) {
   await ensureLegacyDatabaseColumns();
   await getD1()
     .prepare(
-      `INSERT INTO wallet_settings (id, is_enabled, method_name, account_name, account_number, instructions, min_topup, manual_qris_enabled, manual_qris_name, manual_qris_image_url, midtrans_topup_enabled, midtrans_checkout_enabled, ipaymu_topup_enabled, ipaymu_checkout_enabled, updated_at)
-     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-     ON CONFLICT(id) DO UPDATE SET is_enabled = excluded.is_enabled, method_name = excluded.method_name,
-      account_name = excluded.account_name, account_number = excluded.account_number,
-      instructions = excluded.instructions, min_topup = excluded.min_topup,
-      manual_qris_enabled = excluded.manual_qris_enabled, manual_qris_name = excluded.manual_qris_name,
-      manual_qris_image_url = excluded.manual_qris_image_url, midtrans_topup_enabled = excluded.midtrans_topup_enabled, midtrans_checkout_enabled = excluded.midtrans_checkout_enabled,
-      ipaymu_topup_enabled = excluded.ipaymu_topup_enabled, ipaymu_checkout_enabled = excluded.ipaymu_checkout_enabled,
-      updated_at = CURRENT_TIMESTAMP`,
+      `INSERT INTO wallet_settings (id, min_topup, midtrans_topup_enabled, midtrans_checkout_enabled, ipaymu_topup_enabled, ipaymu_checkout_enabled, updated_at)
+       VALUES (1, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(id) DO UPDATE SET
+         min_topup = excluded.min_topup,
+         midtrans_topup_enabled = excluded.midtrans_topup_enabled,
+         midtrans_checkout_enabled = excluded.midtrans_checkout_enabled,
+         ipaymu_topup_enabled = excluded.ipaymu_topup_enabled,
+         ipaymu_checkout_enabled = excluded.ipaymu_checkout_enabled,
+         updated_at = CURRENT_TIMESTAMP`,
     )
     .bind(
-      input.isEnabled ? 1 : 0,
-      input.methodName,
-      input.accountName,
-      input.accountNumber,
-      input.instructions,
       input.minTopup,
-      input.manualQrisEnabled ? 1 : 0,
-      input.manualQrisName,
-      input.manualQrisImageUrl || null,
       input.midtransTopupEnabled ? 1 : 0,
       input.midtransCheckoutEnabled ? 1 : 0,
       input.ipaymuTopupEnabled ? 1 : 0,
       input.ipaymuCheckoutEnabled ? 1 : 0,
     )
     .run();
-}
-
-export async function createWalletTopup(input: {
-  customerId: string;
-  amount: number;
-  senderName: string;
-  paymentMethod: string;
-  proofUrl: string;
-}) {
-  const id = crypto.randomUUID();
-  await getD1()
-    .prepare(
-      `INSERT INTO wallet_topups (id, customer_id, amount, sender_name, payment_method, proof_url)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      id,
-      input.customerId,
-      input.amount,
-      input.senderName,
-      input.paymentMethod,
-      input.proofUrl,
-    )
-    .run();
-  return id;
 }
 
 export async function createMidtransWalletTopup(input: {
@@ -436,73 +372,6 @@ export async function listWalletTopups(limit = 200) {
     .bind(Math.min(Math.max(limit, 1), 500))
     .all();
   return result.results;
-}
-
-export async function reviewWalletTopup(input: {
-  id: string;
-  decision: "approved" | "rejected";
-  adminEmail: string;
-  notes?: string;
-}) {
-  const db = getD1();
-  const topup = await db
-    .prepare(
-      "SELECT id, customer_id, amount, status FROM wallet_topups WHERE id = ? LIMIT 1",
-    )
-    .bind(input.id)
-    .first<{
-      id: string;
-      customer_id: string;
-      amount: number;
-      status: string;
-    }>();
-  if (!topup) throw new Error("Permintaan top up tidak ditemukan.");
-  if (topup.status !== "pending")
-    throw new Error("Permintaan top up ini sudah ditinjau.");
-  if (input.decision === "rejected") {
-    await db
-      .prepare(
-        "UPDATE wallet_topups SET status = 'rejected', admin_notes = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
-      )
-      .bind(input.notes || null, input.adminEmail, input.id)
-      .run();
-    return;
-  }
-
-  const reference = `topup:${topup.id}`;
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO wallet_transactions (id, customer_id, direction, amount, balance_before, balance_after, reference, description)
-       SELECT ?, t.customer_id, 'credit', t.amount, ledger.balance, ledger.balance + t.amount, ?, ?
-       FROM wallet_topups t
-       CROSS JOIN (
-         SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0) AS balance
-         FROM wallet_transactions WHERE customer_id = ?
-       ) ledger
-       WHERE t.id = ? AND t.status = 'pending'`,
-      )
-      .bind(
-        crypto.randomUUID(),
-        reference,
-        `Top up saldo ${topup.id.slice(0, 8).toUpperCase()}`,
-        topup.customer_id,
-        topup.id,
-      ),
-    db
-      .prepare(
-        "UPDATE wallet_topups SET status = 'approved', admin_notes = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
-      )
-      .bind(input.notes || null, input.adminEmail, topup.id),
-    db
-      .prepare(
-        `UPDATE customer_users SET balance = (
-        SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0)
-        FROM wallet_transactions WHERE customer_id = ?
-       ), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      )
-      .bind(topup.customer_id, topup.customer_id),
-  ]);
 }
 
 export async function spendWallet(input: {
