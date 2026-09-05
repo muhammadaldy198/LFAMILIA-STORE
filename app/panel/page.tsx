@@ -18,7 +18,7 @@ export default function PanelRouterPage() {
       })
       .then((session) => {
         if (!active || !session?.role) return;
-        window.location.replace(session.role === "owner" ? "/panel/admin" : "/panel/staff");
+        window.location.replace(session.role === "owner" ? "/admin/panel" : "/staff/panel");
       })
       .catch(() => undefined)
       .finally(() => {
@@ -38,12 +38,12 @@ export default function PanelRouterPage() {
           </div>
           {checking && <div className="mb-4 flex items-center justify-center text-[10px] text-white/30"><LoaderCircle className="mr-2 size-3.5 animate-spin" />Memeriksa sesi…</div>}
           <div className="grid gap-3 sm:grid-cols-2">
-            <Link href="/panel/admin/login" className="rounded-2xl border border-[#b9ff35]/15 bg-[#b9ff35]/[0.04] p-5 transition hover:bg-[#b9ff35]/[0.08]">
+            <Link href="/admin/panel/login" className="rounded-2xl border border-[#b9ff35]/15 bg-[#b9ff35]/[0.04] p-5 transition hover:bg-[#b9ff35]/[0.08]">
               <span className="grid size-10 place-items-center rounded-xl bg-[#b9ff35]/10 text-[#d8ff8d]"><ShieldCheck className="size-5" /></span>
               <h2 className="mt-4 font-black">Panel Admin</h2>
               <p className="mt-2 text-[10px] leading-5 text-white/38">Akses Pemilik untuk keuangan, provider, integrasi, katalog, serta pembuatan ID dan password Staff.</p>
             </Link>
-            <Link href="/panel/staff/login" className="rounded-2xl border border-blue-300/15 bg-blue-300/[0.04] p-5 transition hover:bg-blue-300/[0.08]">
+            <Link href="/staff/panel/login" className="rounded-2xl border border-blue-300/15 bg-blue-300/[0.04] p-5 transition hover:bg-blue-300/[0.08]">
               <span className="grid size-10 place-items-center rounded-xl bg-blue-300/10 text-blue-200"><UserCog className="size-5" /></span>
               <h2 className="mt-4 font-black">Panel Staff</h2>
               <p className="mt-2 text-[10px] leading-5 text-white/38">Staff masuk langsung memakai ID dan password yang dibuat Admin, tanpa login Cloudflare.</p>
