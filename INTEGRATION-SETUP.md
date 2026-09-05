@@ -92,7 +92,7 @@ Panel operasional menggunakan ID admin + password dengan sesi terpisah dari akun
 - Pemilik dapat membuat/menonaktifkan akun Staff dan mengganti password dari tab **Tim admin**.
 - Password disimpan sebagai hash dan tidak pernah ditampilkan kembali.
 - Endpoint perubahan admin memeriksa sesi dan origin request.
-- Halaman pemulihan Pemilik di `/admin/setup` tetap harus dilindungi Cloudflare Access.
+- Area Admin `/admin/panel*` dan halaman pemulihan Pemilik `/admin/setup*` harus dilindungi Cloudflare Access.
 - `OWNER_EMAIL` digunakan untuk jalur pemulihan Pemilik, bukan sebagai password/login operasional.
 - Jangan mengekspos secret provider atau gateway ke browser.
 
