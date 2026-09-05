@@ -7,7 +7,6 @@ import {
   listOrders,
   recordOrderEvent,
 } from "@/lib/server/orders";
-import { ensureProductDeliveryTable } from "@/lib/server/product-delivery";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 
 export const dynamic = "force-dynamic";
@@ -15,20 +14,15 @@ export const dynamic = "force-dynamic";
 type DeliveryMode = "direct" | "voucher" | "manual";
 
 async function readDeliveryModes() {
-  await ensureProductDeliveryTable();
   const result = await getD1()
     .prepare(
-      `SELECT p.slug,
-       COALESCE(
-         dm.mode,
-         CASE
-           WHEN p.fulfillment_type = 'manual' THEN 'manual'
-           WHEN LOWER(TRIM(p.category)) = 'voucher' THEN 'voucher'
-           ELSE 'direct'
-         END
-       ) AS mode
-       FROM products p
-       LEFT JOIN product_delivery_modes dm ON dm.product_slug = p.slug`,
+      `SELECT slug,
+       CASE
+         WHEN LOWER(TRIM(category)) = 'voucher' THEN 'voucher'
+         WHEN fulfillment_type = 'manual' THEN 'manual'
+         ELSE 'direct'
+       END AS mode
+       FROM products`,
     )
     .all<{ slug: string; mode: DeliveryMode }>();
   return new Map(result.results.map((row) => [row.slug, row.mode]));
