@@ -1,5 +1,4 @@
 import { getD1 } from "@/db";
-import { ensureProductDeliveryTable } from "@/lib/server/product-delivery";
 import {
   listCustomerVoucherCodes,
   revealVoucherCode,
@@ -32,18 +31,10 @@ function stableNumericId(value: string) {
 }
 
 function voucherModeSql() {
-  return `COALESCE(
-    dm.mode,
-    CASE
-      WHEN p.fulfillment_type = 'manual' THEN 'manual'
-      WHEN LOWER(p.category) = 'voucher' THEN 'voucher'
-      ELSE 'direct'
-    END
-  ) = 'voucher'`;
+  return "LOWER(TRIM(p.category)) = 'voucher'";
 }
 
 export async function listCustomerWebsiteVoucherCodes(customerId: string) {
-  await ensureProductDeliveryTable();
   const db = getD1();
   const [stockCodes, eligibleResult, providerResult] = await Promise.all([
     listCustomerVoucherCodes(customerId).catch(() => []),
@@ -51,7 +42,6 @@ export async function listCustomerWebsiteVoucherCodes(customerId: string) {
       `SELECT o.reference_id
        FROM orders o
        JOIN products p ON p.slug = o.product_slug
-       LEFT JOIN product_delivery_modes dm ON dm.product_slug = p.slug
        WHERE o.customer_id = ?
          AND o.payment_status = 'paid'
          AND ${voucherModeSql()}`,
@@ -95,14 +85,12 @@ export async function listCustomerWebsiteVoucherCodes(customerId: string) {
 }
 
 export async function getWebsiteVoucherCodeByReference(referenceId: string) {
-  await ensureProductDeliveryTable();
   const order = await getD1()
     .prepare(
       `SELECT o.id, o.reference_id, o.payment_status, o.provider_code,
               o.provider_serial_number
        FROM orders o
        JOIN products p ON p.slug = o.product_slug
-       LEFT JOIN product_delivery_modes dm ON dm.product_slug = p.slug
        WHERE o.reference_id = ?
          AND ${voucherModeSql()}
        LIMIT 1`,
