@@ -1,5 +1,6 @@
+import { cookies } from "next/headers";
 import { z } from "zod";
-import { adminSessionCookie, isValidAdminId, loginAdmin } from "@/lib/server/admin-auth";
+import { PANEL_COOKIE_NAME, isValidAdminId, loginAdmin } from "@/lib/server/admin-auth";
 import { allowRequest } from "@/lib/server/security";
 
 const schema = z.object({
@@ -23,13 +24,18 @@ export async function POST(request: Request) {
       username: String(form.get("username") ?? ""),
       password: String(form.get("password") ?? ""),
     });
-    const session = await loginAdmin(input.username, input.password, "owner");
 
-    const headers = new Headers();
-    headers.set("Location", new URL("/admin/panel", request.url).toString());
-    headers.set("Cache-Control", "no-store");
-    headers.set("Set-Cookie", adminSessionCookie(session.token, session.expiresAt));
-    return new Response(null, { status: 303, headers });
+    const session = await loginAdmin(input.username, input.password, "owner");
+    const cookieStore = await cookies();
+    cookieStore.set(PANEL_COOKIE_NAME, session.token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      expires: new Date(session.expiresAt),
+    });
+
+    return Response.redirect(new URL("/admin/panel", request.url), 303);
   } catch (error) {
     const message =
       error instanceof z.ZodError
