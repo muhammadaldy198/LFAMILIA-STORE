@@ -31,15 +31,6 @@ export function PanelLogin({ role }: { role: "owner" | "staff" }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || (owner ? "Login Admin gagal." : "Login Staff gagal."));
 
-      const verify = await fetch(`${apiBase}/session`, {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      const verifyData = await verify.json().catch(() => null) as { session?: { role?: "owner" | "staff" } } | null;
-      if (!verify.ok || verifyData?.session?.role !== role) {
-        throw new Error(owner ? "Sesi Admin gagal dibuat. Coba masuk lagi." : "Sesi Staff gagal dibuat. Coba masuk lagi.");
-      }
-
       window.location.replace(owner ? "/admin/panel" : "/staff/panel");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Login gagal.");
