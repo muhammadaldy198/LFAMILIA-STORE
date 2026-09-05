@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { adminSessionCookie, isValidAdminId, loginAdmin } from "@/lib/server/admin-auth";
+import { adminSessionCookie, clearAdminSessionCookie, clearStaffSessionCookie, isValidAdminId, loginAdmin, staffSessionCookie } from "@/lib/server/admin-auth";
 import { allowRequest } from "@/lib/server/security";
 
 const schema = z.object({
@@ -14,15 +14,18 @@ export async function POST(request: Request) {
   try {
     const input = schema.parse(await request.json());
     const session = await loginAdmin(input.username, input.password, input.role);
-    return Response.json({ admin: session.admin }, {
-      headers: {
-        "Cache-Control": "no-store",
-        "Set-Cookie": adminSessionCookie(session.token, session.expiresAt),
-      },
-    });
+    const headers = new Headers({ "Cache-Control": "no-store" });
+    if (session.admin.role === "staff") {
+      headers.append("Set-Cookie", staffSessionCookie(session.token, session.expiresAt));
+      headers.append("Set-Cookie", clearAdminSessionCookie());
+    } else {
+      headers.append("Set-Cookie", adminSessionCookie(session.token, session.expiresAt));
+      headers.append("Set-Cookie", clearStaffSessionCookie());
+    }
+    return Response.json({ admin: session.admin }, { headers });
   } catch (error) {
     await new Promise((resolve) => setTimeout(resolve, 600));
-    const message = error instanceof z.ZodError ? "ID admin atau password tidak valid." : error instanceof Error ? error.message : "Login admin gagal.";
+    const message = error instanceof z.ZodError ? "ID atau password tidak valid." : error instanceof Error ? error.message : "Login panel gagal.";
     return Response.json({ error: message }, { status: error instanceof z.ZodError ? 400 : 401, headers: { "Cache-Control": "no-store" } });
   }
 }
