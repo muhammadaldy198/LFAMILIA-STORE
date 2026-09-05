@@ -1,5 +1,5 @@
-import { AdminDashboard } from "@/components/admin-dashboard";
+import { redirect } from "next/navigation";
 
-export default function PanelAdminPage() {
-  return <AdminDashboard expectedRole="owner" />;
+export default function LegacyRoute() {
+  redirect("/admin/panel");
 }
