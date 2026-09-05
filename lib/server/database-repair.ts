@@ -66,17 +66,6 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["product_packages", "supplier_synced_at", "supplier_synced_at TEXT"],
   [
     "wallet_settings",
-    "manual_qris_enabled",
-    "manual_qris_enabled INTEGER DEFAULT 0 NOT NULL",
-  ],
-  [
-    "wallet_settings",
-    "manual_qris_name",
-    "manual_qris_name TEXT DEFAULT 'QRIS Manual' NOT NULL",
-  ],
-  ["wallet_settings", "manual_qris_image_url", "manual_qris_image_url TEXT"],
-  [
-    "wallet_settings",
     "midtrans_topup_enabled",
     "midtrans_topup_enabled INTEGER DEFAULT 0 NOT NULL",
   ],
