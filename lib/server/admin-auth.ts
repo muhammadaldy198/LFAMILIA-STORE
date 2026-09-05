@@ -102,11 +102,11 @@ async function createAdminSession(credentialId: string) {
 }
 
 function sessionCookie(cookieName: string, token: string, expiresAt: string) {
-  return `${cookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Expires=${new Date(expiresAt).toUTCString()}`;
+  return `${cookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=${new Date(expiresAt).toUTCString()}`;
 }
 
 function clearSessionCookie(cookieName: string) {
-  return `${cookieName}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
+  return `${cookieName}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 }
 
 export function adminSessionCookie(token: string, expiresAt: string) {
