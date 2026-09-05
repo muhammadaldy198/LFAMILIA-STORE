@@ -87,7 +87,29 @@ const worker = {
       }, allowedWidths);
     }
 
-    return handler.fetch(request, env, ctx);
+    const response = await handler.fetch(request, env, ctx);
+
+    const isPanelPage =
+      url.pathname === "/panel" ||
+      url.pathname.startsWith("/panel/") ||
+      url.pathname === "/staff" ||
+      url.pathname.startsWith("/staff/") ||
+      url.pathname === "/admin" ||
+      url.pathname.startsWith("/admin/");
+
+    if (request.method === "GET" && isPanelPage) {
+      const headers = new Headers(response.headers);
+      headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+      headers.set("CDN-Cache-Control", "no-store");
+      headers.set("Cloudflare-CDN-Cache-Control", "no-store");
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
+
+    return response;
   },
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     setRuntimeEnv(env);
