@@ -37,6 +37,8 @@ const worker = {
     setRuntimeEnv(env);
     const url = new URL(request.url);
     const isAccessProtectedRequest =
+      url.pathname === "/admin/panel" ||
+      url.pathname.startsWith("/admin/panel/") ||
       url.pathname === "/admin/setup" ||
       url.pathname.startsWith("/admin/setup/") ||
       url.pathname === "/api/admin/auth/setup";
@@ -59,7 +61,7 @@ const worker = {
         }
 
         return new Response(
-          "<!doctype html><html lang=\"id\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Admin belum dilindungi</title><body style=\"margin:0;background:#07090f;color:#fff;font-family:system-ui;display:grid;min-height:100vh;place-items:center\"><main style=\"max-width:520px;padding:32px;text-align:center\"><h1 style=\"color:#b9ff35\">Admin belum dilindungi</h1><p style=\"color:#ffffff99;line-height:1.7\">Aktifkan Cloudflare Access hanya untuk /admin/setup* sebelum membuka setup Pemilik.</p><a href=\"/\" style=\"color:#b9ff35\">Kembali ke toko</a></main></body></html>",
+          "<!doctype html><html lang=\"id\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Admin belum dilindungi</title><body style=\"margin:0;background:#07090f;color:#fff;font-family:system-ui;display:grid;min-height:100vh;place-items:center\"><main style=\"max-width:520px;padding:32px;text-align:center\"><h1 style=\"color:#b9ff35\">Admin belum dilindungi</h1><p style=\"color:#ffffff99;line-height:1.7\">Aktifkan Cloudflare Access untuk /admin/panel* dan /admin/setup* sebelum membuka area Admin.</p><a href=\"/\" style=\"color:#b9ff35\">Kembali ke toko</a></main></body></html>",
           { status: 401, headers: { "content-type": "text/html; charset=utf-8" } },
         );
       }
