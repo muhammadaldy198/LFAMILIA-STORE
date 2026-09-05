@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, LoaderCircle, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,28 @@ export function PanelLogin({ role }: { role: "owner" | "staff" }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/panel/session", {
+      cache: "no-store",
+      credentials: "same-origin",
+    })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        const data = await response.json() as { session?: { role?: "owner" | "staff" } };
+        return data.session ?? null;
+      })
+      .then((session) => {
+        if (!active || !session?.role) return;
+        window.location.replace(session.role === "owner" ? "/admin/panel" : "/staff/panel");
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   async function login(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
@@ -22,12 +44,24 @@ export function PanelLogin({ role }: { role: "owner" | "staff" }) {
     try {
       const response = await fetch("/api/panel/auth/login", {
         method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ username, password, role }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Login gagal.");
-      window.location.assign(owner ? "/admin/panel" : "/staff/panel");
+
+      const verify = await fetch("/api/panel/session", {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      const verifyData = await verify.json().catch(() => null) as { session?: { role?: "owner" | "staff" }; error?: string } | null;
+      if (!verify.ok || verifyData?.session?.role !== role) {
+        throw new Error(verifyData?.error || "Sesi login belum tersimpan. Coba masuk sekali lagi.");
+      }
+
+      window.location.replace(owner ? "/admin/panel" : "/staff/panel");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Login gagal.");
     } finally {
