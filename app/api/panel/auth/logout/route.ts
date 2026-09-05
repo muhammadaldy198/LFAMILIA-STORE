@@ -1,11 +1,9 @@
-import { clearAdminSessionCookie, deleteAdminSession } from "@/lib/server/admin-auth";
+import { clearAdminSessionCookie, clearStaffSessionCookie, deleteAdminSession } from "@/lib/server/admin-auth";
 
 export async function POST(request: Request) {
   await deleteAdminSession(request).catch(() => undefined);
-  return Response.json({ ok: true }, {
-    headers: {
-      "Cache-Control": "no-store",
-      "Set-Cookie": clearAdminSessionCookie(),
-    },
-  });
+  const headers = new Headers({ "Cache-Control": "no-store" });
+  headers.append("Set-Cookie", clearAdminSessionCookie());
+  headers.append("Set-Cookie", clearStaffSessionCookie());
+  return Response.json({ ok: true }, { headers });
 }
