@@ -25,15 +25,22 @@ type CredentialRow = {
   credential_active: number;
 };
 
-type SessionCredentialRow = {
-  credential_email: string;
-};
-
-type SessionRow = {
+type SessionSigningRow = {
   admin_id: number;
   username: string;
   admin_name: string;
   role: "owner" | "staff";
+  admin_active: number;
+  credential_id: string;
+  credential_active: number;
+  password_hash: string;
+};
+
+type SessionTokenPayload = {
+  u: string;
+  r: "owner" | "staff";
+  e: number;
+  n: string;
 };
 
 export function normalizeAdminId(value: string) {
@@ -57,8 +64,26 @@ function randomToken(bytes = 32) {
   return btoa(String.fromCharCode(...value)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, "");
 }
 
-async function sha256(value: string) {
-  return bytesToHex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
+function base64UrlEncode(value: string) {
+  return btoa(value).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, "");
+}
+
+function base64UrlDecode(value: string) {
+  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  return atob(padded);
+}
+
+async function hmacHex(secret: string, value: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
+  return bytesToHex(new Uint8Array(signature));
 }
 
 async function passwordDigest(password: string, saltHex: string) {
@@ -91,14 +116,30 @@ function cookieValue(request: Request, cookieName: string) {
 }
 
 async function createAdminSession(credentialId: string) {
-  const token = randomToken();
-  const tokenHash = await sha256(token);
-  const expiresAt = new Date(Date.now() + ADMIN_SESSION_HOURS * 3_600_000).toISOString();
-  const db = getD1();
-  await db.prepare("DELETE FROM customer_sessions WHERE julianday(expires_at) <= julianday('now')").run();
-  await db.prepare("INSERT INTO customer_sessions (id, customer_id, token_hash, expires_at) VALUES (?, ?, ?, ?)")
-    .bind(crypto.randomUUID(), credentialId, tokenHash, expiresAt).run();
-  return { token, expiresAt };
+  const row = await getD1().prepare(
+    `SELECT a.id AS admin_id, a.email AS username, a.name AS admin_name, a.role,
+      a.is_active AS admin_active, c.id AS credential_id, c.is_active AS credential_active,
+      c.password_hash
+     FROM customer_users c
+     JOIN admin_users a ON c.email = (? || lower(a.email))
+     WHERE c.id = ?
+     LIMIT 1`,
+  ).bind(ADMIN_CREDENTIAL_PREFIX, credentialId).first<SessionSigningRow>();
+
+  if (!row || !row.admin_active || !row.credential_active) {
+    throw new Error("Akun panel tidak aktif.");
+  }
+
+  const expiresAt = new Date(Date.now() + ADMIN_SESSION_HOURS * 3_600_000);
+  const payload: SessionTokenPayload = {
+    u: normalizeAdminId(row.username),
+    r: row.role,
+    e: expiresAt.getTime(),
+    n: randomToken(12),
+  };
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signature = await hmacHex(row.password_hash, encodedPayload);
+  return { token: `${encodedPayload}.${signature}`, expiresAt: expiresAt.toISOString() };
 }
 
 function sessionCookie(cookieName: string, token: string, expiresAt: string) {
@@ -158,28 +199,41 @@ async function sessionFromCookie(request: Request, cookieName: string): Promise<
   const token = cookieValue(request, cookieName);
   if (!token) return null;
 
-  const db = getD1();
-  const credential = await db.prepare(
-    `SELECT c.email AS credential_email
-     FROM customer_sessions s
-     JOIN customer_users c ON c.id = s.customer_id
-     WHERE s.token_hash = ?
-       AND julianday(s.expires_at) > julianday('now')
-       AND c.is_active = 1
+  const [encodedPayload, signature, extra] = token.split(".");
+  if (!encodedPayload || !signature || extra) return null;
+
+  let payload: SessionTokenPayload;
+  try {
+    payload = JSON.parse(base64UrlDecode(encodedPayload)) as SessionTokenPayload;
+  } catch {
+    return null;
+  }
+
+  if (!payload.u || !["owner", "staff"].includes(payload.r) || !Number.isFinite(payload.e) || payload.e <= Date.now()) {
+    return null;
+  }
+
+  const row = await getD1().prepare(
+    `SELECT a.id AS admin_id, a.email AS username, a.name AS admin_name, a.role,
+      a.is_active AS admin_active, c.id AS credential_id, c.is_active AS credential_active,
+      c.password_hash
+     FROM admin_users a
+     JOIN customer_users c ON c.email = ?
+     WHERE lower(a.email) = ?
      LIMIT 1`,
-  ).bind(await sha256(token)).first<SessionCredentialRow>();
+  ).bind(credentialEmail(payload.u), normalizeAdminId(payload.u)).first<SessionSigningRow>();
 
-  if (!credential?.credential_email?.startsWith(ADMIN_CREDENTIAL_PREFIX)) return null;
+  if (!row || !row.admin_active || !row.credential_active || row.role !== payload.r) return null;
 
-  const username = credential.credential_email.slice(ADMIN_CREDENTIAL_PREFIX.length).toLowerCase();
-  const row = await db.prepare(
-    `SELECT id AS admin_id, email AS username, name AS admin_name, role
-     FROM admin_users
-     WHERE lower(email) = ? AND is_active = 1
-     LIMIT 1`,
-  ).bind(username).first<SessionRow>();
+  const expectedSignature = await hmacHex(row.password_hash, encodedPayload);
+  if (!constantTimeEqual(signature, expectedSignature)) return null;
 
-  return row ? { id: row.admin_id, email: row.username, name: row.admin_name, role: row.role } : null;
+  return {
+    id: row.admin_id,
+    email: row.username,
+    name: row.admin_name,
+    role: row.role,
+  };
 }
 
 export async function getRolePanelSession(request: Request, expectedRole: "owner" | "staff") {
@@ -194,16 +248,12 @@ export async function getPasswordAdminSession(request: Request): Promise<Passwor
   return getRolePanelSession(request, "staff");
 }
 
-export async function deleteRolePanelSession(request: Request, role: "owner" | "staff") {
-  const cookieName = role === "owner" ? ADMIN_COOKIE_NAME : STAFF_COOKIE_NAME;
-  const token = cookieValue(request, cookieName);
-  if (!token) return;
-  await getD1().prepare("DELETE FROM customer_sessions WHERE token_hash = ?").bind(await sha256(token)).run();
+export async function deleteRolePanelSession(_request: Request, _role: "owner" | "staff") {
+  // Panel sessions are signed stateless cookies. Logout invalidates them by clearing the cookie.
 }
 
-export async function deleteAdminSession(request: Request) {
-  await deleteRolePanelSession(request, "owner");
-  await deleteRolePanelSession(request, "staff");
+export async function deleteAdminSession(_request: Request) {
+  // Panel sessions are signed stateless cookies. Logout invalidates them by clearing both cookies.
 }
 
 export async function getOwnerCredentialState() {
