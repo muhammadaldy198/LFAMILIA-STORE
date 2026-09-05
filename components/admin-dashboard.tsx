@@ -98,7 +98,7 @@ export function AdminDashboard({ expectedRole }: { expectedRole: "owner" | "staf
           setError(
             reason instanceof Error
               ? reason.message
-              : "Akses admin gagal diperiksa.",
+              : expectedRole === "owner" ? "Akses admin gagal diperiksa." : "Akses staff gagal diperiksa.",
           );
       })
       .finally(() => {
@@ -124,7 +124,7 @@ export function AdminDashboard({ expectedRole }: { expectedRole: "owner" | "staf
       <StoreLayout>
         <main className="mx-auto flex min-h-[70vh] max-w-7xl items-center justify-center px-4 text-xs text-white/40">
           <LoaderCircle className="mr-2 size-4 animate-spin" />
-          Memeriksa akses admin…
+          {expectedRole === "owner" ? "Memeriksa akses admin…" : "Memeriksa akses staff…"}
         </main>
       </StoreLayout>
     );
@@ -140,7 +140,7 @@ export function AdminDashboard({ expectedRole }: { expectedRole: "owner" | "staf
               Panel tidak dapat dibuka
             </h1>
             <p className="mt-3 text-sm leading-6 text-white/42">
-              {error || "Silakan masuk kembali dengan ID admin."}
+              {error || (expectedRole === "owner" ? "Silakan masuk kembali dengan ID admin." : "Silakan masuk kembali dengan ID staff.")}
             </p>
             <Button
               asChild
