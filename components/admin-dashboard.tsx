@@ -74,7 +74,7 @@ export function AdminDashboard({ expectedRole }: { expectedRole: "owner" | "staf
   useEffect(() => {
     let active = true;
 
-    void fetch("/api/panel/session", { cache: "no-store" })
+    void fetch("/api/panel/session", { cache: "no-store", credentials: "same-origin" })
       .then(async (response) => {
         if (response.status === 401) {
           window.location.replace(expectedRole === "owner" ? "/admin/panel/login" : "/staff/panel/login");
@@ -113,7 +113,7 @@ export function AdminDashboard({ expectedRole }: { expectedRole: "owner" | "staf
   async function logout() {
     setLoggingOut(true);
     try {
-      await fetch("/api/panel/auth/logout", { method: "POST" });
+      await fetch("/api/panel/auth/logout", { method: "POST", credentials: "same-origin", cache: "no-store" });
     } finally {
       window.location.replace(expectedRole === "owner" ? "/admin/panel/login" : "/staff/panel/login");
     }
