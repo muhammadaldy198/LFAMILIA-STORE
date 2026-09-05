@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Box,
   FileQuestion,
   LayoutDashboard,
   LoaderCircle,
-  LockKeyhole,
   LogOut,
   Menu,
   ReceiptText,
@@ -63,53 +62,17 @@ const ownerNav = [
   ["settings", "Integrasi", Settings],
 ] as const;
 
-export function AdminDashboard({ expectedRole }: { expectedRole: "owner" | "staff" }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AdminDashboard({
+  expectedRole,
+  initialSession,
+}: {
+  expectedRole: "owner" | "staff";
+  initialSession: Session;
+}) {
+  const session = initialSession;
   const [loggingOut, setLoggingOut] = useState(false);
-  const [error, setError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
-
-  useEffect(() => {
-    let active = true;
-
-    const apiBase = expectedRole === "owner" ? "/api/admin/panel" : "/api/staff";
-    void fetch(`${apiBase}/session`, { cache: "no-store", credentials: "same-origin" })
-      .then(async (response) => {
-        if (response.status === 401) {
-          window.location.replace(expectedRole === "owner" ? "/admin/panel/login" : "/staff/panel/login");
-          return null;
-        }
-
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error);
-        const nextSession = data.session as Session;
-        if (nextSession.role !== expectedRole) {
-          window.location.replace(nextSession.role === "owner" ? "/admin/panel" : "/staff/panel");
-          return null;
-        }
-        return nextSession;
-      })
-      .then((nextSession) => {
-        if (active && nextSession) setSession(nextSession);
-      })
-      .catch((reason) => {
-        if (active)
-          setError(
-            reason instanceof Error
-              ? reason.message
-              : expectedRole === "owner" ? "Akses admin gagal diperiksa." : "Akses staff gagal diperiksa.",
-          );
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [expectedRole]);
 
   async function logout() {
     setLoggingOut(true);
@@ -119,41 +82,6 @@ export function AdminDashboard({ expectedRole }: { expectedRole: "owner" | "staf
     } finally {
       window.location.replace(expectedRole === "owner" ? "/admin/panel/login" : "/staff/panel/login");
     }
-  }
-
-  if (loading) {
-    return (
-      <StoreLayout>
-        <main className="mx-auto flex min-h-[70vh] max-w-7xl items-center justify-center px-4 text-xs text-white/40">
-          <LoaderCircle className="mr-2 size-4 animate-spin" />
-          {expectedRole === "owner" ? "Memeriksa akses admin…" : "Memeriksa akses staff…"}
-        </main>
-      </StoreLayout>
-    );
-  }
-
-  if (!session) {
-    return (
-      <StoreLayout>
-        <main className="mx-auto grid min-h-[70vh] max-w-xl place-items-center px-4">
-          <div className="panel w-full p-7 text-center">
-            <LockKeyhole className="mx-auto size-8 text-amber-300" />
-            <h1 className="mt-4 text-xl font-black">
-              Panel tidak dapat dibuka
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-white/42">
-              {error || (expectedRole === "owner" ? "Silakan masuk kembali dengan ID admin." : "Silakan masuk kembali dengan ID staff.")}
-            </p>
-            <Button
-              asChild
-              className="mt-5 rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#ceff73]"
-            >
-              <Link href={expectedRole === "owner" ? "/admin/panel/login" : "/staff/panel/login"}>Ke halaman masuk</Link>
-            </Button>
-          </div>
-        </main>
-      </StoreLayout>
-    );
   }
 
   const isOwner = session.role === "owner";
