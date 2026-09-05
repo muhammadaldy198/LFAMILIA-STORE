@@ -27,7 +27,7 @@ export function PanelLogin({ role }: { role: "owner" | "staff" }) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Login gagal.");
-      window.location.assign(owner ? "/panel/admin" : "/panel/staff");
+      window.location.assign(owner ? "/admin/panel" : "/staff/panel");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Login gagal.");
     } finally {
