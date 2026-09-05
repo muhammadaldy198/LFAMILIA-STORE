@@ -4,6 +4,6 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const session = await getAdminSession(request);
-  if (!session) return Response.json({ error: "Akses admin tidak ditemukan." }, { status: 401 });
+  if (!session) return Response.json({ error: "Sesi panel tidak ditemukan atau sudah berakhir." }, { status: 401 });
   return Response.json({ session }, { headers: { "Cache-Control": "no-store" } });
 }
