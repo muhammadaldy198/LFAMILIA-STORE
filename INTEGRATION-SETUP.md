@@ -14,7 +14,7 @@ Jalankan migrasi production satu kali:
 npx wrangler d1 migrations apply lfamilia-store-db --remote
 ```
 
-Jangan menghapus migrasi lama yang sudah pernah diterapkan. Setelah migrasi berhasil, buka `/admin`, masuk melalui Cloudflare Access, lalu tekan tombol **Lengkapi katalog utama** pada tab Produk. Tindakan ini menambahkan produk/nominal yang belum ada tanpa menimpa perubahan Anda.
+Jangan menghapus migrasi lama yang sudah pernah diterapkan. Setelah migrasi berhasil, masuk ke panel dengan ID admin + password, lalu tekan **Lengkapi katalog utama** pada tab Produk. Tindakan ini menambahkan produk/nominal yang belum ada tanpa menimpa perubahan yang sudah tersimpan.
 
 ## 2. Cloudflare Variables/Secrets provider
 
@@ -71,26 +71,30 @@ Gunakan domain publik yang sama dengan `PUBLIC_BASE_URL`:
 
 Aplikasi memeriksa callback pembayaran sebelum mengubah status. Callback yang sudah pernah diproses tidak akan mengirim produk untuk kedua kali.
 
-## 4. Produk otomatis dan manual
+## 4. Produk, nominal, dan provider
 
-Di `/admin` buka tab **Produk**.
+Di panel buka tab **Produk**.
 
-- Produk otomatis: pilih DigiFlazz atau VIPayment pada setiap nominal, lalu isi SKU persis seperti katalog provider.
-- Produk manual: pilih tipe Manual dan isi instruksi. Setelah lunas, pesanan masuk tab Pesanan dan admin menandainya selesai.
-- `target_template` mendukung `{{destination}}` dan `{{server}}`. Contoh Mobile Legends: `{{destination}}{{server}}` untuk DigiFlazz.
+- Daftar nominal tetap berbentuk tabel ringkas.
+- Setiap nominal memiliki **Provider**, **SKU**, **Margin**, **Harga jual**, **Status**, dan tombol **Sync**.
+- Untuk DigiFlazz, pilih provider DigiFlazz, isi SKU persis seperti price list, pilih margin Rupiah/Persen, simpan nominal, lalu gunakan **Sync** pada nominal tersebut.
+- Produk otomatis diproses melalui provider setelah pembayaran terverifikasi.
+- Produk manual dipilih melalui **Jenis proses → Manual oleh admin**, kemudian isi instruksi dan jam operasional. Setelah lunas, pesanan masuk antrean admin.
+- Produk kategori voucher tidak meminta data akun pada checkout dan kode hanya tersedia setelah pembayaran lunas.
+- `target_template` mendukung `{{destination}}` dan `{{server}}`.
 
-Verifikasi harga, margin, jam operasional, dan instruksi setiap produk sebelum menerima pembayaran.
+Verifikasi provider, SKU, margin, harga, jam operasional, dan instruksi sebelum menerima pembayaran.
 
 ## 5. Keamanan admin
 
-Admin tidak ditautkan dari toko utama. Lindungi dua pola berikut dengan Cloudflare Access dan hanya izinkan email Pemilik/Staff yang dipercaya:
+Panel operasional menggunakan ID admin + password dengan sesi terpisah dari akun pelanggan.
 
-- `/admin*`
-- `/api/admin*`
-
-Login memakai identitas email Cloudflare Access (kode sekali pakai atau identity provider), sehingga website tidak menyimpan password admin. Setelah email diizinkan oleh Access, daftarkan email yang sama di **Admin → Tim admin** dan pilih role **Pemilik** atau **Staff**. Tetapkan `OWNER_EMAIL` ke email Pemilik utama.
-
-Jangan membuka admin sebelum Access aktif. Bila memakai custom domain, pastikan alamat alternatif `workers.dev` tidak menjadi jalan masuk publik yang tidak dilindungi.
+- Pemilik dapat membuat/menonaktifkan akun Staff dan mengganti password dari tab **Tim admin**.
+- Password disimpan sebagai hash dan tidak pernah ditampilkan kembali.
+- Endpoint perubahan admin memeriksa sesi dan origin request.
+- Halaman pemulihan Pemilik di `/admin/setup` tetap harus dilindungi Cloudflare Access.
+- `OWNER_EMAIL` digunakan untuk jalur pemulihan Pemilik, bukan sebagai password/login operasional.
+- Jangan mengekspos secret provider atau gateway ke browser.
 
 ## 6. Stok kode REDFINGER atau lisensi
 
@@ -98,8 +102,8 @@ Jangan membuka admin sebelum Access aktif. Bila memakai custom domain, pastikan 
 2. Untuk pengiriman hanya lewat website, gunakan `VOUCHER_DELIVERY_CHANNEL=website`.
 3. Untuk email, verifikasi domain di Resend lalu isi `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, dan `RESEND_API_URL`.
 4. Untuk WhatsApp, isi seluruh Variable/Secret WhatsApp dan gunakan template dengan lima parameter berurutan: nama pembeli, nama produk, paket, kode, dan invoice. Template harus disetujui Meta.
-5. Di Admin → Produk, buat produk voucher seperti REDFINGER. Pilih proses Otomatis, provider **Stok Kode Internal**, lalu isi kunci stok seperti `redfinger-30-hari` pada setiap paket.
-6. Di Admin → Voucher, pilih kunci stok yang sama dan tempel kode satu per baris.
+5. Di panel → Produk, buat produk kategori voucher seperti REDFINGER. Pada setiap nominal pilih provider **Stok kode LFAMILIA** dan isi kunci stok seperti `redfinger-30-hari`.
+6. Di panel → Stok kode, pilih kunci stok yang sama dan tempel kode satu per baris.
 
 Saat pembayaran terkonfirmasi lunas, satu baris stok direservasi secara atomik. Kode disimpan terenkripsi, tidak dikirim dua kali oleh callback pembayaran yang sama, dan tidak pernah muncul di pelacakan invoice publik. Bila kanal notifikasi tambahan gagal, kode tetap tersedia di website.
 
