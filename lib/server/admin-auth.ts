@@ -24,6 +24,10 @@ type CredentialRow = {
   credential_active: number;
 };
 
+type SessionCredentialRow = {
+  credential_email: string;
+};
+
 type SessionRow = {
   admin_id: number;
   username: string;
@@ -90,7 +94,7 @@ async function createAdminSession(credentialId: string) {
   const tokenHash = await sha256(token);
   const expiresAt = new Date(Date.now() + ADMIN_SESSION_HOURS * 3_600_000).toISOString();
   const db = getD1();
-  await db.prepare("DELETE FROM customer_sessions WHERE expires_at <= CURRENT_TIMESTAMP").run();
+  await db.prepare("DELETE FROM customer_sessions WHERE julianday(expires_at) <= julianday('now')").run();
   await db.prepare("INSERT INTO customer_sessions (id, customer_id, token_hash, expires_at) VALUES (?, ?, ?, ?)")
     .bind(crypto.randomUUID(), credentialId, tokenHash, expiresAt).run();
   return { token, expiresAt };
@@ -136,15 +140,28 @@ export async function loginAdmin(usernameInput: string, password: string, expect
 export async function getPasswordAdminSession(request: Request): Promise<PasswordAdminSession | null> {
   const token = cookieValue(request);
   if (!token) return null;
-  const row = await getD1().prepare(
-    `SELECT a.id AS admin_id, a.email AS username, a.name AS admin_name, a.role
+
+  const db = getD1();
+  const credential = await db.prepare(
+    `SELECT c.email AS credential_email
      FROM customer_sessions s
      JOIN customer_users c ON c.id = s.customer_id
-     JOIN admin_users a ON c.email = (? || lower(a.email))
-     WHERE s.token_hash = ? AND s.expires_at > CURRENT_TIMESTAMP
-       AND c.is_active = 1 AND a.is_active = 1
+     WHERE s.token_hash = ?
+       AND julianday(s.expires_at) > julianday('now')
+       AND c.is_active = 1
      LIMIT 1`,
-  ).bind(ADMIN_CREDENTIAL_PREFIX, await sha256(token)).first<SessionRow>();
+  ).bind(await sha256(token)).first<SessionCredentialRow>();
+
+  if (!credential?.credential_email?.startsWith(ADMIN_CREDENTIAL_PREFIX)) return null;
+
+  const username = credential.credential_email.slice(ADMIN_CREDENTIAL_PREFIX.length).toLowerCase();
+  const row = await db.prepare(
+    `SELECT id AS admin_id, email AS username, name AS admin_name, role
+     FROM admin_users
+     WHERE lower(email) = ? AND is_active = 1
+     LIMIT 1`,
+  ).bind(username).first<SessionRow>();
+
   return row ? { id: row.admin_id, email: row.username, name: row.admin_name, role: row.role } : null;
 }
 
