@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function LegacyPanelLoginPage() {
-  redirect("/panel");
+  redirect("/staff/panel/login");
 }
