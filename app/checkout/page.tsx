@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -218,17 +218,25 @@ function CheckoutContent() {
           ["qris", "ewallet", "va"].indexOf(right.code),
       );
   }, [automaticCheckoutReady, availableChannels]);
-  const checkoutGroups = [
+  const checkoutGroups = useMemo(() => [
     {
       code: "wallet" as const,
       name: "Koin LFAMILIA",
       description: "Bayar langsung dari saldo akun",
     },
     ...gatewayPaymentGroups,
-  ];
-  const channels = isGatewayMethod
-    ? availableChannels.filter((item) => item.method === paymentMethod)
-    : [];
+  ], [gatewayPaymentGroups]);
+
+  const chooseMethod = useCallback((method: CheckoutPaymentMethod) => {
+    setPaymentMethod(method);
+    setPaymentChannel(
+      method === "wallet"
+        ? "lfamilia-balance"
+        : (availableChannels.find((item) => item.method === method)
+            ?.channel ?? ""),
+    );
+    setPayment(null);
+  }, [availableChannels]);
   const notices = (product.notices ?? []).filter(
     (item) => item.isActive !== false,
   );
@@ -387,18 +395,9 @@ function CheckoutContent() {
     isGatewayMethod,
     availableChannels,
     gatewayPaymentGroups,
+    checkoutGroups,
+    chooseMethod,
   ]);
-
-  function chooseMethod(method: CheckoutPaymentMethod) {
-    setPaymentMethod(method);
-    setPaymentChannel(
-      method === "wallet"
-        ? "lfamilia-balance"
-        : (availableChannels.find((item) => item.method === method)
-            ?.channel ?? ""),
-    );
-    setPayment(null);
-  }
 
   function choosePackage(id: string) {
     setPackageId(id);
