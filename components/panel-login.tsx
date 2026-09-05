@@ -60,8 +60,8 @@ export function PanelLogin({ role }: { role: "owner" | "staff" }) {
             <label className="mt-6 block"><span className="field-label">{owner ? "ID admin" : "ID staff"}</span><Input required autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ""))} placeholder={owner ? "contoh: owner" : "contoh: staff01"} className="h-12 rounded-xl border-white/10 bg-white/[0.035] text-white placeholder:text-white/22" /></label>
             <label className="mt-4 block"><span className="field-label">Password</span><div className="relative"><Input required minLength={10} maxLength={72} autoComplete="current-password" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Masukkan password" className="h-12 rounded-xl border-white/10 bg-white/[0.035] pr-12 text-white placeholder:text-white/22" /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"} className="absolute inset-y-0 right-0 grid w-12 place-items-center text-white/35 hover:text-white">{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button></div></label>
             <Button disabled={loading} className="mt-6 h-12 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006] hover:bg-[#d0ff75]">{loading ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <LockKeyhole className="mr-2 size-4" />}Masuk</Button>
-            <div className="mt-5 flex items-center justify-between gap-3 text-[10px] leading-5 text-white/28">
-              <Link href="/panel" className="text-[#b9ff35] hover:text-white">Pilih panel lain</Link>
+            <div className={`mt-5 flex items-center gap-3 text-[10px] leading-5 text-white/28 ${owner ? "justify-between" : "justify-end"}`}>
+              {owner && <Link href="/panel" className="text-[#b9ff35] hover:text-white">Pilih panel lain</Link>}
               <Link href="/" className="hover:text-white">Kembali ke toko</Link>
             </div>
           </form>
