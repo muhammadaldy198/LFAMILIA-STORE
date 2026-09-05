@@ -1,5 +1,5 @@
-import { PanelLogin } from "@/components/panel-login";
+import { redirect } from "next/navigation";
 
-export default function AdminPanelLoginPage() {
-  return <PanelLogin role="owner" />;
+export default function LegacyRoute() {
+  redirect("/admin/panel/login");
 }
