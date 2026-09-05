@@ -104,7 +104,7 @@ export function clearAdminSessionCookie() {
   return `${ADMIN_COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
 }
 
-export async function loginAdmin(usernameInput: string, password: string) {
+export async function loginAdmin(usernameInput: string, password: string, expectedRole?: "owner" | "staff") {
   const username = normalizeAdminId(usernameInput);
   const row = await getD1().prepare(
     `SELECT a.id AS admin_id, a.email AS username, a.name AS admin_name, a.role,
@@ -118,7 +118,10 @@ export async function loginAdmin(usernameInput: string, password: string) {
 
   const digest = await passwordDigest(password, row?.password_salt ?? "00000000000000000000000000000000");
   if (!row || !row.admin_active || !row.credential_active || !constantTimeEqual(digest, row.password_hash)) {
-    throw new Error("ID admin atau password salah.");
+    throw new Error("ID atau password salah.");
+  }
+  if (expectedRole && row.role !== expectedRole) {
+    throw new Error(expectedRole === "owner" ? "Akun ini bukan akun Admin/Pemilik." : "Akun ini bukan akun Staff.");
   }
 
   await getD1().prepare("UPDATE customer_users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
