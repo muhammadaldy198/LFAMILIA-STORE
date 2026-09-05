@@ -41,7 +41,9 @@ const worker = {
       url.pathname.startsWith("/admin/panel/") ||
       url.pathname === "/admin/setup" ||
       url.pathname.startsWith("/admin/setup/") ||
-      url.pathname === "/api/admin/auth/setup";
+      url.pathname === "/api/admin/auth/setup" ||
+      url.pathname === "/api/admin/panel" ||
+      url.pathname.startsWith("/api/admin/panel/");
 
     if (isAccessProtectedRequest) {
       let adminEmail: string | null = null;
