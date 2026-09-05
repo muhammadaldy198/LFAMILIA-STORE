@@ -43,7 +43,10 @@ export function AdminMemberManager({
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Data member gagal dimuat."); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   function updateTier(tier: MemberTier, patch: Partial<MemberTierSetting>) {
     setSettings((current) => current.map((item) => item.tier === tier ? { ...item, ...patch } : item));
