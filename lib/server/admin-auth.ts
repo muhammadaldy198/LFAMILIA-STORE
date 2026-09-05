@@ -2,6 +2,7 @@ import { getD1 } from "@/db";
 
 const ADMIN_CREDENTIAL_PREFIX = "__lfadmin__:";
 const ADMIN_COOKIE_NAME = "lfamilia_admin_session";
+const STAFF_COOKIE_NAME = "lfamilia_staff_session";
 const ADMIN_SESSION_HOURS = 12;
 const PASSWORD_ITERATIONS = 100_000;
 
@@ -80,11 +81,11 @@ async function passwordRecord(password: string) {
   return { passwordSalt, passwordHash: await passwordDigest(password, passwordSalt) };
 }
 
-function cookieValue(request: Request) {
+function cookieValue(request: Request, cookieName: string) {
   const cookie = request.headers.get("cookie") ?? "";
   for (const part of cookie.split(";")) {
     const [name, ...value] = part.trim().split("=");
-    if (name === ADMIN_COOKIE_NAME) return decodeURIComponent(value.join("="));
+    if (name === cookieName) return decodeURIComponent(value.join("="));
   }
   return null;
 }
@@ -100,12 +101,28 @@ async function createAdminSession(credentialId: string) {
   return { token, expiresAt };
 }
 
+function sessionCookie(cookieName: string, token: string, expiresAt: string) {
+  return `${cookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Expires=${new Date(expiresAt).toUTCString()}`;
+}
+
+function clearSessionCookie(cookieName: string) {
+  return `${cookieName}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
+}
+
 export function adminSessionCookie(token: string, expiresAt: string) {
-  return `${ADMIN_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Expires=${new Date(expiresAt).toUTCString()}`;
+  return sessionCookie(ADMIN_COOKIE_NAME, token, expiresAt);
+}
+
+export function staffSessionCookie(token: string, expiresAt: string) {
+  return sessionCookie(STAFF_COOKIE_NAME, token, expiresAt);
 }
 
 export function clearAdminSessionCookie() {
-  return `${ADMIN_COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
+  return clearSessionCookie(ADMIN_COOKIE_NAME);
+}
+
+export function clearStaffSessionCookie() {
+  return clearSessionCookie(STAFF_COOKIE_NAME);
 }
 
 export async function loginAdmin(usernameInput: string, password: string, expectedRole?: "owner" | "staff") {
@@ -137,8 +154,8 @@ export async function loginAdmin(usernameInput: string, password: string, expect
   };
 }
 
-export async function getPasswordAdminSession(request: Request): Promise<PasswordAdminSession | null> {
-  const token = cookieValue(request);
+async function sessionFromCookie(request: Request, cookieName: string): Promise<PasswordAdminSession | null> {
+  const token = cookieValue(request, cookieName);
   if (!token) return null;
 
   const db = getD1();
@@ -165,10 +182,28 @@ export async function getPasswordAdminSession(request: Request): Promise<Passwor
   return row ? { id: row.admin_id, email: row.username, name: row.admin_name, role: row.role } : null;
 }
 
-export async function deleteAdminSession(request: Request) {
-  const token = cookieValue(request);
+export async function getRolePanelSession(request: Request, expectedRole: "owner" | "staff") {
+  const cookieName = expectedRole === "owner" ? ADMIN_COOKIE_NAME : STAFF_COOKIE_NAME;
+  const session = await sessionFromCookie(request, cookieName);
+  return session?.role === expectedRole ? session : null;
+}
+
+export async function getPasswordAdminSession(request: Request): Promise<PasswordAdminSession | null> {
+  const owner = await getRolePanelSession(request, "owner");
+  if (owner) return owner;
+  return getRolePanelSession(request, "staff");
+}
+
+export async function deleteRolePanelSession(request: Request, role: "owner" | "staff") {
+  const cookieName = role === "owner" ? ADMIN_COOKIE_NAME : STAFF_COOKIE_NAME;
+  const token = cookieValue(request, cookieName);
   if (!token) return;
   await getD1().prepare("DELETE FROM customer_sessions WHERE token_hash = ?").bind(await sha256(token)).run();
+}
+
+export async function deleteAdminSession(request: Request) {
+  await deleteRolePanelSession(request, "owner");
+  await deleteRolePanelSession(request, "staff");
 }
 
 export async function getOwnerCredentialState() {
