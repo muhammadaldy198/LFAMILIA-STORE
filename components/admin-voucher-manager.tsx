@@ -39,7 +39,10 @@ export function AdminVoucherManager() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Stok kode gagal dimuat."); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   const totals = useMemo(() => stocks.reduce((r,s) => ({available:r.available+Number(s.available),reserved:r.reserved+Number(s.reserved),delivered:r.delivered+Number(s.delivered)}), {available:0,reserved:0,delivered:0}), [stocks]);
 
