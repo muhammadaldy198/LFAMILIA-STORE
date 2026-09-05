@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, LoaderCircle, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,28 +14,6 @@ export function PanelLogin({ role }: { role: "owner" | "staff" }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    void fetch("/api/panel/session", {
-      cache: "no-store",
-      credentials: "same-origin",
-    })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        const data = await response.json() as { session?: { role?: "owner" | "staff" } };
-        return data.session ?? null;
-      })
-      .then((session) => {
-        if (!active || !session?.role) return;
-        window.location.replace(session.role === "owner" ? "/admin/panel" : "/staff/panel");
-      })
-      .catch(() => undefined);
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   async function login(event: FormEvent) {
     event.preventDefault();
@@ -58,7 +36,7 @@ export function PanelLogin({ role }: { role: "owner" | "staff" }) {
       });
       const verifyData = await verify.json().catch(() => null) as { session?: { role?: "owner" | "staff" }; error?: string } | null;
       if (!verify.ok || verifyData?.session?.role !== role) {
-        throw new Error(verifyData?.error || "Sesi login belum tersimpan. Coba masuk sekali lagi.");
+        throw new Error("Login berhasil, tetapi sesi panel gagal dibuat. Muat ulang halaman lalu coba masuk lagi.");
       }
 
       window.location.replace(owner ? "/admin/panel" : "/staff/panel");
