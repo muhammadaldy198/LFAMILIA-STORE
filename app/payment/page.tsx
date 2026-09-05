@@ -112,16 +112,22 @@ function PaymentContent() {
     }
   }, [invoice]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   useEffect(() => {
     if (!invoice || snapToken) return;
-    try {
-      const stored = window.sessionStorage.getItem(`lfamilia-snap-token:${invoice}`);
-      if (stored) setSnapToken(stored);
-    } catch {
-      // Token query dan payment URL tetap menjadi fallback.
-    }
+    const timer = window.setTimeout(() => {
+      try {
+        const stored = window.sessionStorage.getItem(`lfamilia-snap-token:${invoice}`);
+        if (stored) setSnapToken(stored);
+      } catch {
+        // Token query dan payment URL tetap menjadi fallback.
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [invoice, snapToken]);
 
   useEffect(() => {
@@ -132,7 +138,9 @@ function PaymentContent() {
       return;
     if (snapToken || !order?.paymentUrl) return;
     const token = snapTokenFromUrl(order.paymentUrl);
-    if (token) setSnapToken(token);
+    if (!token) return;
+    const timer = window.setTimeout(() => setSnapToken(token), 0);
+    return () => window.clearTimeout(timer);
   }, [order?.paymentGateway, order?.midtransMode, order?.paymentUrl, snapToken]);
 
   useEffect(() => {
