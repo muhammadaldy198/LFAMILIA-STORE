@@ -1,4 +1,7 @@
-import { createMidtransBisnapPayment } from "@/lib/server/midtrans-bisnap";
+import {
+  createMidtransBisnapPayment,
+  getMidtransBisnapReadiness,
+} from "@/lib/server/midtrans-bisnap";
 import { hashHex, safeEqual } from "@/lib/server/crypto";
 import {
   getRuntimeEnv,
@@ -149,6 +152,31 @@ function isMidtransBisnapChannelSupported(method: string, channel: string) {
       "danamon",
     ]).has(channel);
   return false;
+}
+
+export function getMidtransReadiness() {
+  try {
+    const mode = getMidtransMode();
+    const environment = getMidtransEnvironment();
+    if (mode === "snap") {
+      snapConfig(environment);
+      return { ready: true as const, mode, environment, reason: null };
+    }
+    const bisnap = getMidtransBisnapReadiness();
+    return bisnap.ready
+      ? { ready: true as const, mode, environment, reason: null }
+      : { ready: false as const, mode, environment, reason: bisnap.reason };
+  } catch (error) {
+    return {
+      ready: false as const,
+      mode: null,
+      environment: null,
+      reason:
+        error instanceof Error
+          ? error.message
+          : "Konfigurasi Midtrans belum lengkap.",
+    };
+  }
 }
 
 export function isMidtransChannelSupported(
