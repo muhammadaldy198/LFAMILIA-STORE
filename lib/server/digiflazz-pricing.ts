@@ -1,6 +1,7 @@
 import { getD1 } from "@/db";
 import { hashHex } from "@/lib/server/crypto";
 import { withProviderRelayHeaders } from "@/lib/server/provider-relay";
+import { buildDigiflazzSellerMonitorStatement, ensureDigiflazzSellerMonitorTable } from "@/lib/server/digiflazz-monitor";
 import {
   getRuntimeEnv,
   requireRuntimeChoice,
@@ -62,8 +63,15 @@ async function fetchPriceList() {
     data?: Array<{
       buyer_sku_code?: string;
       price?: number;
+      seller_name?: string;
       buyer_product_status?: boolean;
       seller_product_status?: boolean;
+      unlimited_stock?: boolean;
+      stock?: number | string;
+      multi?: boolean;
+      start_cut_off?: string;
+      end_cut_off?: string;
+      desc?: string;
     }>;
   };
   if (!response.ok || !payload.data) throw new Error("Daftar harga DigiFlazz tidak valid.");
@@ -75,20 +83,45 @@ async function fetchPriceList() {
 }
 
 async function syncRows(target?: { productId: number; packageSku: string }) {
+  await ensureDigiflazzSellerMonitorTable();
   const source = await fetchPriceList();
   const query = target
-    ? "SELECT id, provider_sku, margin_type, margin_value FROM product_packages WHERE product_id = ? AND sku = ? AND provider_code = 'digiflazz' AND provider_sku IS NOT NULL"
-    : "SELECT id, provider_sku, margin_type, margin_value FROM product_packages WHERE provider_code = 'digiflazz' AND provider_sku IS NOT NULL";
+    ? `SELECT p.id, p.provider_sku, p.margin_type, p.margin_value,
+        m.seller_name AS previous_seller_name, m.baseline_price AS previous_baseline_price
+       FROM product_packages p
+       LEFT JOIN digiflazz_seller_monitor m ON m.package_id = p.id
+       WHERE p.product_id = ? AND p.sku = ? AND p.provider_code = 'digiflazz' AND p.provider_sku IS NOT NULL`
+    : `SELECT p.id, p.provider_sku, p.margin_type, p.margin_value,
+        m.seller_name AS previous_seller_name, m.baseline_price AS previous_baseline_price
+       FROM product_packages p
+       LEFT JOIN digiflazz_seller_monitor m ON m.package_id = p.id
+       WHERE p.provider_code = 'digiflazz' AND p.provider_sku IS NOT NULL`;
   const prepared = getD1().prepare(query);
+  type SyncRow = {
+    id: number;
+    provider_sku: string;
+    margin_type: "fixed" | "percent";
+    margin_value: number;
+    previous_seller_name: string | null;
+    previous_baseline_price: number | null;
+  };
   const rows = target
-    ? await prepared.bind(target.productId, target.packageSku).all<{ id: number; provider_sku: string; margin_type: "fixed" | "percent"; margin_value: number }>()
-    : await prepared.all<{ id: number; provider_sku: string; margin_type: "fixed" | "percent"; margin_value: number }>();
+    ? await prepared.bind(target.productId, target.packageSku).all<SyncRow>()
+    : await prepared.all<SyncRow>();
   if (target && !rows.results.length)
     throw new Error("Nominal DigiFlazz belum memiliki SKU provider yang valid.");
 
-  const updates = rows.results.flatMap((item) => {
+  let updated = 0;
+  const statements = rows.results.flatMap((item) => {
     const sourceItem = source.get(item.provider_sku);
     if (!sourceItem || !sourceItem.price) return [];
+    updated += 1;
+
+    const buyerProductStatus = sourceItem.buyer_product_status !== false;
+    const sellerProductStatus = sourceItem.seller_product_status !== false;
+    const unlimitedStock = sourceItem.unlimited_stock === true;
+    const stock = Number(sourceItem.stock ?? 0);
+
     return [
       getD1().prepare(`UPDATE product_packages
         SET supplier_price = ?, price = ?, supplier_synced_at = CURRENT_TIMESTAMP,
@@ -97,15 +130,30 @@ async function syncRows(target?: { productId: number; packageSku: string }) {
         .bind(
           sourceItem.price,
           sale(sourceItem.price, item.margin_type, item.margin_value),
-          sourceItem.buyer_product_status !== false && sourceItem.seller_product_status !== false ? 1 : 0,
+          buyerProductStatus && sellerProductStatus && (unlimitedStock || stock > 0) ? 1 : 0,
           item.id,
         ),
+      buildDigiflazzSellerMonitorStatement({
+        packageId: item.id,
+        sellerName: sourceItem.seller_name?.trim() || null,
+        currentPrice: Number(sourceItem.price),
+        previousSellerName: item.previous_seller_name,
+        previousBaselinePrice: item.previous_baseline_price,
+        buyerProductStatus,
+        sellerProductStatus,
+        unlimitedStock,
+        stock,
+        multi: sourceItem.multi === true,
+        startCutOff: sourceItem.start_cut_off || "00:00",
+        endCutOff: sourceItem.end_cut_off || "00:00",
+        description: sourceItem.desc?.trim() || "",
+      }),
     ];
   });
-  if (updates.length) await getD1().batch(updates);
-  if (target && updates.length === 0)
+  if (statements.length) await getD1().batch(statements);
+  if (target && updated === 0)
     throw new Error("SKU nominal tidak ditemukan pada price list DigiFlazz.");
-  return { updated: updates.length, skipped: false };
+  return { updated, skipped: false };
 }
 
 export async function syncDigiflazzPrices(options: { force?: boolean } = {}) {
