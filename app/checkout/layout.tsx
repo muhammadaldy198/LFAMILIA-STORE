@@ -4,6 +4,7 @@ import { CheckoutUiEnhancer } from "@/components/checkout-ui-enhancer";
 import { CheckoutSpacingTuning } from "@/components/checkout-spacing-tuning";
 import { CheckoutPackageTabs } from "@/components/checkout-package-tabs";
 import { CheckoutVoucherMode } from "@/components/checkout-voucher-mode";
+import { CheckoutSavedGameAccounts } from "@/components/checkout-saved-game-accounts";
 
 export default function CheckoutLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,6 +20,7 @@ export default function CheckoutLayout({ children }: { children: React.ReactNode
       <CheckoutSpacingTuning />
       <CheckoutPackageTabs />
       <CheckoutVoucherMode />
+      <CheckoutSavedGameAccounts />
       <CheckoutInvoiceReminder />
       <CheckoutMidtransRedirect />
       {children}
