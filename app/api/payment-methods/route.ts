@@ -1,11 +1,11 @@
 import {
-  getIpaymuReadiness,
+  getIpaymuOperationalReadiness,
   isIpaymuChannelSupported,
 } from "@/lib/server/ipaymu";
 import {
   getMidtransEnvironment,
   getMidtransMode,
-  getMidtransReadiness,
+  getMidtransOperationalReadiness,
   isMidtransChannelSupported,
 } from "@/lib/server/midtrans";
 import {
@@ -29,7 +29,10 @@ export async function GET() {
   const activeChannels = await listPaymentChannels(false);
   const gateways: CheckoutGateway[] = [];
 
-  const ipaymuReadiness = getIpaymuReadiness();
+  const [ipaymuReadiness, midtransReadiness] = await Promise.all([
+    getIpaymuOperationalReadiness(),
+    getMidtransOperationalReadiness(),
+  ]);
   if (settings.ipaymuCheckoutEnabled && ipaymuReadiness.ready) {
     gateways.push({
       code: "ipaymu",
@@ -42,7 +45,6 @@ export async function GET() {
     });
   }
 
-  const midtransReadiness = getMidtransReadiness();
   if (settings.midtransCheckoutEnabled && midtransReadiness.ready) {
     const midtransMode = getMidtransMode();
     const environment = getMidtransEnvironment();
