@@ -110,12 +110,20 @@ VOUCHER_ENCRYPTION_KEY
 
 `INTEGRATION_ENCRYPTION_KEY` tetap Cloudflare Secret root minimal 32 karakter dan tidak disimpan di D1.
 
-## Relay Cloudflare
+## VPS Relay
+
+Relay dikonfigurasi dari **Admin Panel → Integrasi & harga → VPS Relay** dan disimpan terenkripsi di D1.
+
+Field Admin Panel:
 
 ```text
-PROVIDER_RELAY_TOKEN
-PROVIDER_RELAY_HOSTS
+DigiFlazz Relay URL
+iPaymu Relay URL
+BI-SNAP Relay URL
+Relay Token
 ```
+
+Tidak perlu membuat `PROVIDER_RELAY_*` manual di Cloudflare. Worker membentuk runtime relay dari profile terenkripsi tersebut.
 
 ## Switching to Production
 
