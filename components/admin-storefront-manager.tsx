@@ -40,7 +40,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
     try {
       const response = await fetch("/api/panel/storefront", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(settings) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error);
-      setMessage("Identitas, banner, dan kanal bantuan berhasil disimpan.");
+      setMessage("Identitas, banner, kanal bantuan, dan Live Support berhasil disimpan.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengaturan gagal disimpan."); }
     finally { setSaving(""); }
   }
@@ -92,6 +92,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
       <div className="sm:col-span-2"><AdminMediaUpload label="Gambar banner Home" value={settings.bannerImageUrl} onChange={(value) => updateSetting("bannerImageUrl", value)} help="Gunakan gambar landscape; teks banner tetap dapat diedit terpisah." /></div>
       <Field label="Deskripsi banner" wide><Textarea value={settings.bannerDescription} onChange={(event) => updateSetting("bannerDescription", event.target.value)} className="min-h-24 rounded-xl border-white/10 bg-white/[0.025] text-xs text-white" /></Field>
       <div className="mt-2 border-t border-white/[0.08] pt-5 sm:col-span-2"><h4 className="text-xs font-bold text-white/75">Kanal bantuan publik</h4><p className="mt-1 text-[10px] leading-5 text-white/30">Owner dan staff dapat mengubah WhatsApp, email, Instagram, Discord, serta jam dukungan. Kanal yang belum diisi tampil sebagai belum diaktifkan di halaman Contact.</p></div>
+      <label className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 text-xs text-white/60 sm:col-span-2"><span><strong className="block text-white/75">Floating Live Support</strong><small className="mt-1 block text-[9px] font-normal text-white/30">Tampilkan tombol bantuan mengambang di halaman pelanggan.</small></span><Switch checked={settings.supportWidgetEnabled} onCheckedChange={(checked) => updateSetting("supportWidgetEnabled", checked)} /></label>
       <Field label="WhatsApp bantuan"><Input inputMode="tel" value={settings.supportWhatsapp ?? ""} onChange={(event) => updateSetting("supportWhatsapp", event.target.value.replace(/[^+0-9]/g, ""))} className="admin-input" placeholder="628123456789" /></Field>
       <Field label="Email bantuan"><Input type="email" value={settings.supportEmail ?? ""} onChange={(event) => updateSetting("supportEmail", event.target.value)} className="admin-input" placeholder="support@domain.com" /></Field>
       <Field label="URL Instagram"><Input type="url" value={settings.instagramUrl ?? ""} onChange={(event) => updateSetting("instagramUrl", event.target.value)} className="admin-input" placeholder="https://instagram.com/..." /></Field>
