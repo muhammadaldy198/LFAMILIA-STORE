@@ -352,6 +352,15 @@ export async function saveProductContent(input: {
   ]);
 }
 
+export async function updateProductPackageStatus(packageId: number, isActive: boolean) {
+  const db = getD1();
+  const result = await db.prepare(
+    "UPDATE product_packages SET is_active = ? WHERE id = ?",
+  ).bind(isActive ? 1 : 0, packageId).run();
+
+  if (!result.meta.changes) throw new Error("Nominal tidak ditemukan.");
+}
+
 export async function deleteProduct(id: number) {
   const db = getD1();
   await db.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
