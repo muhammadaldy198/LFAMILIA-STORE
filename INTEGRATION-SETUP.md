@@ -149,3 +149,8 @@ Arsitektur checkout dan tabel order tidak perlu diubah hanya untuk menambah adap
 - UI Admin/Staff memakai endpoint bersama `/api/panel/*` dan tetap diverifikasi oleh session + role pada server.
 - Jika kredensial Integration Manager tidak dapat didekripsi, panel menampilkan **Kunci enkripsi tidak cocok**. Jangan mengganti `INTEGRATION_ENCRYPTION_KEY` setelah credential tersimpan.
 - GitHub Actions menjalankan build, lint, test, dan test guard Cloudflare Access setiap push ke `main`.
+
+
+## 11. Migration owner bootstrap
+
+Migration `0020_remove_legacy_bootstrap_owner.sql` menghapus hanya akun Owner bootstrap lama yang belum pernah dibuatkan credential panel. Owner yang sudah dikonfigurasi tetap dipertahankan. Untuk instalasi baru atau recovery, pastikan Cloudflare Variable `OWNER_EMAIL` berisi email Pemilik yang diizinkan oleh Cloudflare Access, lalu buka `/admin/setup` untuk membuat ID Admin dan password.
