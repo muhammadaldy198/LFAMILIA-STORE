@@ -62,6 +62,14 @@ type Overview = {
   callbacks: Array<{ id: string; label: string; description: string; kind: "notification" | "callback" | "fallback"; url: string }>;
 };
 
+type RelayConnectionResult = {
+  provider: "digiflazz" | "ipaymu" | "midtrans-bisnap";
+  label: string;
+  connected: boolean;
+  status: number | null;
+  message: string;
+};
+
 const definitions: Definition[] = [
   {
     id: "midtrans-snap",
@@ -223,6 +231,8 @@ export function AdminIntegrationManager({
   const [openId, setOpenId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [relayTesting, setRelayTesting] = useState(false);
+  const [relayResults, setRelayResults] = useState<RelayConnectionResult[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -332,6 +342,31 @@ export function AdminIntegrationManager({
     }
   }
 
+  async function testRelayConnections() {
+    setRelayTesting(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/panel/integrations", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "test_relay" }),
+      });
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(String(data.error || "Tes koneksi relay gagal."));
+      const results = Array.isArray(data.relay) ? data.relay as RelayConnectionResult[] : [];
+      setRelayResults(results);
+      if (results.length && results.every((item) => item.connected)) {
+        setMessage("Semua relay terhubung dari Worker LFAMILIA.");
+      }
+    } catch (reason) {
+      setRelayResults([]);
+      setError(reason instanceof Error ? reason.message : "Tes koneksi relay gagal.");
+    } finally {
+      setRelayTesting(false);
+    }
+  }
+
   async function copy(value: string, label: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -378,9 +413,49 @@ export function AdminIntegrationManager({
       </section>}
 
       {view === "relay" && (
-        <div className="rounded-lg border border-sky-300/20 bg-sky-300/[0.045] p-3 text-[10px] leading-4 text-white/52">
-          Relay menghubungkan Worker LFAMILIA ke VPS ber-IP statis. Isi URL DigiFlazz, iPaymu, BI-SNAP, dan Relay Token di sini. Semua disimpan terenkripsi di D1; tidak perlu membuat PROVIDER_RELAY_* di Cloudflare.
-        </div>
+        <>
+          <div className="rounded-lg border border-sky-300/20 bg-sky-300/[0.045] p-3 text-[10px] leading-4 text-white/52">
+            Relay menghubungkan Worker LFAMILIA ke VPS ber-IP statis. Isi URL DigiFlazz, iPaymu, BI-SNAP, dan Relay Token di sini. Semua disimpan terenkripsi di D1; tidak perlu membuat PROVIDER_RELAY_* di Cloudflare.
+          </div>
+          <section className="rounded-lg border border-white/[0.08] bg-[#0d1019] p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-bold">Tes routing relay</p>
+                <p className="mt-0.5 text-[9px] text-white/35">Memeriksa Worker → VPS, hostname, token, dan status upstream tanpa membuat transaksi provider.</p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                disabled={relayTesting}
+                onClick={() => void testRelayConnections()}
+                className="shrink-0 bg-[#b9ff35] text-[#091006] hover:bg-[#d8ff8d]"
+              >
+                {relayTesting ? <LoaderCircle className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
+                {relayTesting ? "Menguji..." : "Tes Koneksi Relay"}
+              </Button>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              {(["DigiFlazz", "iPaymu", "Midtrans BI-SNAP"] as const).map((label) => {
+                const result = relayResults.find((item) => item.label === label);
+                return (
+                  <div key={label} className="rounded-md border border-white/[0.07] bg-white/[0.018] p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <strong className="text-[10px]">{label}</strong>
+                      <span className={result?.connected
+                        ? "rounded bg-[#b9ff35]/10 px-1.5 py-0.5 text-[8px] font-black text-[#d8ff8d]"
+                        : result
+                          ? "rounded bg-red-400/10 px-1.5 py-0.5 text-[8px] font-black text-red-200"
+                          : "rounded bg-white/[0.05] px-1.5 py-0.5 text-[8px] font-black text-white/30"}>
+                        {result?.connected ? "Connected" : result ? "Error" : "Belum dites"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[9px] leading-4 text-white/38">{result?.message || "Tekan Tes Koneksi Relay."}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </>
       )}
 
       <div className="space-y-2">
