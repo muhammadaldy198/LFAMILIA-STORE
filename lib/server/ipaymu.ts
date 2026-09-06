@@ -126,7 +126,29 @@ function activeConfig() {
   }
   if (parsed.protocol !== "https:")
     throw new Error("URL API iPaymu wajib HTTPS.");
+  if (!/\/api\/v2\/payment\/direct\/?$/i.test(parsed.pathname))
+    throw new Error("API URL iPaymu harus mengarah ke /api/v2/payment/direct.");
   return { ...selected, apiUrl: parsed.toString() };
+}
+
+export function getIpaymuReadiness() {
+  try {
+    const config = activeConfig();
+    return {
+      ready: true as const,
+      environment: config.environment,
+      reason: null,
+    };
+  } catch (error) {
+    return {
+      ready: false as const,
+      environment: null,
+      reason:
+        error instanceof Error
+          ? error.message
+          : "Konfigurasi iPaymu belum lengkap.",
+    };
+  }
 }
 
 function timestamp() {
