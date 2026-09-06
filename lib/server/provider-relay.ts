@@ -71,6 +71,119 @@ export function providerRelayRequest(
   };
 }
 
+export type RelayConnectionResult = {
+  provider: RelayProvider;
+  label: string;
+  connected: boolean;
+  status: number | null;
+  message: string;
+};
+
+async function testRelayConnection(
+  provider: RelayProvider,
+  label: string,
+): Promise<RelayConnectionResult> {
+  const runtime = getRuntimeEnv<ProviderRelayEnv>();
+  const token = runtime.PROVIDER_RELAY_TOKEN?.trim();
+  const origin = configuredOrigin(runtime, provider);
+
+  if (!origin) {
+    return { provider, label, connected: false, status: null, message: "URL relay belum diisi." };
+  }
+  if (!token) {
+    return { provider, label, connected: false, status: null, message: "Relay Token belum diisi." };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(origin);
+    if (parsed.protocol !== "https:") throw new Error("HTTPS required");
+  } catch {
+    return { provider, label, connected: false, status: null, message: "URL relay tidak valid atau bukan HTTPS." };
+  }
+
+  try {
+    const healthResponse = await fetch(new URL("/health", parsed.origin), {
+      method: "GET",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+    const health = await healthResponse.json().catch(() => null) as {
+      ok?: boolean;
+      configured?: Record<string, boolean>;
+    } | null;
+
+    if (!healthResponse.ok || health?.ok !== true) {
+      return {
+        provider,
+        label,
+        connected: false,
+        status: healthResponse.status,
+        message: "Health relay gagal.",
+      };
+    }
+
+    if (health.configured?.[provider] !== true) {
+      return {
+        provider,
+        label,
+        connected: false,
+        status: healthResponse.status,
+        message: "Upstream provider pada VPS belum lengkap.",
+      };
+    }
+
+    // HEAD is deliberately unsupported by relay/server.mjs. The relay checks
+    // token + hostname before returning 405, so this verifies Worker → VPS,
+    // the saved token, and the intended relay hostname without hitting a
+    // provider transaction endpoint.
+    const authResponse = await fetch(parsed.origin, {
+      method: "HEAD",
+      headers: { "x-lfamilia-relay-token": token },
+      cache: "no-store",
+      redirect: "manual",
+      signal: AbortSignal.timeout(8_000),
+    });
+
+    if (authResponse.status === 405) {
+      return { provider, label, connected: true, status: 405, message: "Connected" };
+    }
+    if (authResponse.status === 401) {
+      return { provider, label, connected: false, status: 401, message: "Relay Token tidak cocok dengan VPS." };
+    }
+    if (authResponse.status === 404) {
+      return { provider, label, connected: false, status: 404, message: "Hostname relay tidak dikenal oleh VPS." };
+    }
+
+    return {
+      provider,
+      label,
+      connected: false,
+      status: authResponse.status,
+      message: `Relay merespons HTTP ${authResponse.status}; token/host belum terverifikasi.`,
+    };
+  } catch (error) {
+    return {
+      provider,
+      label,
+      connected: false,
+      status: null,
+      message: error instanceof Error && error.name === "TimeoutError"
+        ? "Koneksi relay timeout."
+        : "Worker tidak dapat menghubungi relay.",
+    };
+  }
+}
+
+export async function testProviderRelayConnections() {
+  return Promise.all([
+    testRelayConnection("digiflazz", "DigiFlazz"),
+    testRelayConnection("ipaymu", "iPaymu"),
+    testRelayConnection("midtrans-bisnap", "Midtrans BI-SNAP"),
+  ]);
+}
+
 // Backward-compatible helper for code that only needs headers.
 export function withProviderRelayHeaders(
   url: string,
