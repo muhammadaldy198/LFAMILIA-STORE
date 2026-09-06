@@ -2,12 +2,12 @@ import { z } from "zod";
 import { getCustomerSession } from "@/lib/server/customer-auth";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
 import {
-  getIpaymuReadiness,
+  getIpaymuOperationalReadiness,
   isIpaymuChannelSupported,
 } from "@/lib/server/ipaymu";
 import {
   getMidtransMode,
-  getMidtransReadiness,
+  getMidtransOperationalReadiness,
   isMidtransChannelSupported,
 } from "@/lib/server/midtrans";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
@@ -70,8 +70,10 @@ export async function POST(request: Request) {
     );
 
     const settings = await readWalletSettings();
-    const ipaymuReadiness = getIpaymuReadiness();
-    const midtransReadiness = getMidtransReadiness();
+    const [ipaymuReadiness, midtransReadiness] = await Promise.all([
+      getIpaymuOperationalReadiness(),
+      getMidtransOperationalReadiness(),
+    ]);
 
     const canUseIpaymu =
       settings.ipaymuCheckoutEnabled &&
