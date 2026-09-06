@@ -45,6 +45,18 @@ export function isIpaymuChannelSupported(method: string, channel: string) {
   return false;
 }
 
+export class IpaymuProviderError extends Error {
+  readonly status: number;
+  readonly safeToFallback: boolean;
+
+  constructor(message: string, status: number, safeToFallback: boolean) {
+    super(message);
+    this.name = "IpaymuProviderError";
+    this.status = status;
+    this.safeToFallback = safeToFallback;
+  }
+}
+
 export type IpaymuDirectResult = {
   transactionId: string | null;
   referenceId: string;
@@ -241,9 +253,25 @@ export async function createIpaymuDirectPayment(input: {
   });
 
   const payload = (await response.json().catch(() => ({}))) as DirectResponse;
-  if (!response.ok || payload.Success === false || !payload.Data) {
-    throw new Error(
+  if (!response.ok) {
+    throw new IpaymuProviderError(
       payload.Message || "iPaymu menolak pembuatan pembayaran.",
+      response.status,
+      response.status >= 400 && response.status < 500,
+    );
+  }
+  if (payload.Success === false) {
+    throw new IpaymuProviderError(
+      payload.Message || "iPaymu menolak pembuatan pembayaran.",
+      422,
+      true,
+    );
+  }
+  if (!payload.Data) {
+    throw new IpaymuProviderError(
+      payload.Message || "Respons iPaymu tidak memuat data pembayaran.",
+      502,
+      false,
     );
   }
 
