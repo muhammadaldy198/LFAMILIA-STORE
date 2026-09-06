@@ -3,6 +3,7 @@ import { getCustomerSession } from "@/lib/server/customer-auth";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
 import { resolvePurchasableItem } from "@/lib/server/orders";
 import { quotePromotion } from "@/lib/server/promotions";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 const schema = z.object({
   productSlug: z.string().trim().min(2).max(80),
@@ -11,6 +12,10 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
+  const rate = await allowRequest(request, "promotion-quote", 60, 600);
+  if (!rate.allowed) return Response.json({ error: "Terlalu banyak permintaan harga. Coba lagi beberapa menit." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   try {
     const input = schema.parse(await request.json());
     const item = await resolvePurchasableItem(input.productSlug, input.packageSku);
