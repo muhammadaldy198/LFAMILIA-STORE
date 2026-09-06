@@ -4,7 +4,7 @@ import {
   signRsaSha256Base64,
   verifyRsaSha256Base64,
 } from "@/lib/server/crypto";
-import { withProviderRelayHeaders } from "@/lib/server/provider-relay";
+import { providerRelayRequest } from "@/lib/server/provider-relay";
 import {
   getRuntimeEnv,
   requireRuntimeChoice,
@@ -428,19 +428,20 @@ async function accessToken(config: EnvironmentConfig) {
   );
 
   const rawBody = JSON.stringify({ grantType: "client_credentials" });
-  const response = await fetch(config.accessTokenUrl, {
+  const relay = providerRelayRequest(
+    config.accessTokenUrl,
+    {
+      "content-type": "application/json",
+      accept: "application/json",
+      "x-timestamp": requestTimestamp,
+      "x-signature": signature,
+      "x-client-key": config.clientId,
+    },
+    { provider: "midtrans-bisnap", environment: config.environment },
+  );
+  const response = await fetch(relay.url, {
     method: "POST",
-    headers: withProviderRelayHeaders(
-      config.accessTokenUrl,
-      {
-        "content-type": "application/json",
-        accept: "application/json",
-        "x-timestamp": requestTimestamp,
-        "x-signature": signature,
-        "x-client-key": config.clientId,
-      },
-      { provider: "midtrans-bisnap", environment: config.environment },
-    ),
+    headers: relay.headers,
     body: rawBody,
     signal: AbortSignal.timeout(15_000),
   });
@@ -484,23 +485,24 @@ async function transactionalPost<T>(
     `POST:${endpointPath(url)}:${token}:${bodyHash}:${requestTimestamp}`,
   );
 
-  const response = await fetch(url, {
+  const relay = providerRelayRequest(
+    url,
+    {
+      "content-type": "application/json",
+      accept: "application/json",
+      authorization: `Bearer ${token}`,
+      "x-timestamp": requestTimestamp,
+      "x-signature": signature,
+      "x-partner-id": config.partnerId,
+      "x-external-id": externalId,
+      "channel-id": config.channelId,
+      "x-device-id": config.deviceId,
+    },
+    { provider: "midtrans-bisnap", environment: config.environment },
+  );
+  const response = await fetch(relay.url, {
     method: "POST",
-    headers: withProviderRelayHeaders(
-      url,
-      {
-        "content-type": "application/json",
-        accept: "application/json",
-        authorization: `Bearer ${token}`,
-        "x-timestamp": requestTimestamp,
-        "x-signature": signature,
-        "x-partner-id": config.partnerId,
-        "x-external-id": externalId,
-        "channel-id": config.channelId,
-        "x-device-id": config.deviceId,
-      },
-      { provider: "midtrans-bisnap", environment: config.environment },
-    ),
+    headers: relay.headers,
     body: rawBody,
     signal: AbortSignal.timeout(15_000),
   });
