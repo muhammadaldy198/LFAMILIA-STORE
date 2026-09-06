@@ -3,12 +3,6 @@ import {
   isIpaymuChannelSupported,
 } from "@/lib/server/ipaymu";
 import {
-  getMidtransEnvironment,
-  getMidtransMode,
-  getMidtransReadiness,
-  isMidtransChannelSupported,
-} from "@/lib/server/midtrans";
-import {
   listPaymentChannels,
   type ManagedPaymentChannel,
 } from "@/lib/server/payment-channels";
@@ -17,9 +11,8 @@ import { readWalletSettings } from "@/lib/server/wallet";
 export const dynamic = "force-dynamic";
 
 type CheckoutGateway = {
-  code: "midtrans" | "ipaymu";
+  code: "ipaymu";
   label: string;
-  midtransMode: "snap" | "bisnap" | null;
   environment: "sandbox" | "production" | null;
   channels: ManagedPaymentChannel[];
 };
@@ -27,70 +20,32 @@ type CheckoutGateway = {
 export async function GET() {
   const settings = await readWalletSettings();
   const activeChannels = await listPaymentChannels(false);
-  const gateways: CheckoutGateway[] = [];
-
-  // Storefront availability must be based on saved configuration only.
-  // Live relay probes belong in Admin diagnostics; a transient probe timeout
-  // must never hide payment methods from customers.
   const ipaymuReadiness = getIpaymuReadiness();
-  const midtransReadiness = getMidtransReadiness();
 
-  if (settings.ipaymuCheckoutEnabled && ipaymuReadiness.ready) {
-    gateways.push({
-      code: "ipaymu",
-      label: "iPaymu",
-      midtransMode: null,
-      environment: ipaymuReadiness.environment,
-      channels: activeChannels.filter((item) =>
-        isIpaymuChannelSupported(item.method, item.channel),
-      ),
-    });
-  }
-
-  if (settings.midtransCheckoutEnabled && midtransReadiness.ready) {
-    const midtransMode = getMidtransMode();
-    const environment = getMidtransEnvironment();
-    gateways.push({
-      code: "midtrans",
-      label: `Midtrans ${midtransMode === "bisnap" ? "BI-SNAP" : "Snap"} · ${environment === "production" ? "Production" : "Sandbox"}`,
-      midtransMode,
-      environment,
-      channels: activeChannels.filter((item) =>
-        isMidtransChannelSupported(
-          item.method,
-          item.channel,
-          midtransMode,
-        ),
-      ),
-    });
-  }
-
-  const primary = gateways[0] ?? null;
-  const allChannels = [
-    ...new Map(
-      gateways
-        .flatMap((gateway) => gateway.channels)
-        .map((channel) => [`${channel.method}:${channel.channel}`, channel]),
-    ).values(),
-  ];
+  const gateway: CheckoutGateway | null =
+    settings.ipaymuCheckoutEnabled && ipaymuReadiness.ready
+      ? {
+          code: "ipaymu",
+          label: "iPaymu",
+          environment: ipaymuReadiness.environment,
+          channels: activeChannels.filter((item) =>
+            isIpaymuChannelSupported(item.method, item.channel),
+          ),
+        }
+      : null;
 
   return Response.json(
     {
-      gateway: primary?.code ?? null,
-      midtransMode: primary?.midtransMode ?? null,
-      environment: primary?.environment ?? null,
-      channels: primary?.channels ?? [],
-      allChannels,
-      gateways,
-      fallbackGateway: gateways[1]?.code ?? null,
+      gateway: gateway?.code ?? null,
+      environment: gateway?.environment ?? null,
+      channels: gateway?.channels ?? [],
+      allChannels: gateway?.channels ?? [],
+      gateways: gateway ? [gateway] : [],
+      fallbackGateway: null,
       readiness: {
         ipaymu: {
           enabled: settings.ipaymuCheckoutEnabled,
           ready: ipaymuReadiness.ready,
-        },
-        midtrans: {
-          enabled: settings.midtransCheckoutEnabled,
-          ready: midtransReadiness.ready,
         },
       },
     },
