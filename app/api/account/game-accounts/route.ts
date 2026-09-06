@@ -58,13 +58,13 @@ async function readProduct(slug: string) {
   const row = await getD1().prepare(
     "SELECT slug, name, category, input_fields_json, input_label, needs_server FROM products WHERE slug = ? AND is_active = 1 LIMIT 1",
   ).bind(slug).first<ProductRow>();
-  if (!row || row.category.trim().toLowerCase() === "voucher") throw new Error("Produk game tidak ditemukan.");
+  if (!row || row.category.trim().toLowerCase() !== "game") throw new Error("Produk game tidak ditemukan.");
   return { row, fields: parseFields(row) };
 }
 
 const valueSchema = z.object({
   id: z.string().trim().min(1).max(60),
-  value: z.string().trim().min(1).max(300),
+  value: z.string().trim().max(300),
 });
 
 const payloadSchema = z.object({
