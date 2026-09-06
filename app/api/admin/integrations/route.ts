@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
 
 const profileInput = z.object({
   action: z.literal("save_profile"),
-  provider: z.enum(["ipaymu", "digiflazz", "vippayment", "melostore", "resend", "relay", "security"]),
-  mode: z.enum(["direct", "service"]),
+  provider: z.enum(["midtrans", "ipaymu", "digiflazz", "vippayment", "melostore", "resend", "relay", "security"]),
+  mode: z.enum(["snap", "bisnap", "direct", "service"]),
   environment: z.enum(["sandbox", "production", "development", "global"]),
   values: z.record(z.string().min(1).max(80), z.string().max(8_000)).default({}),
   clearFields: z.array(z.string().min(1).max(80)).max(24).default([]),
@@ -21,6 +21,8 @@ const profileInput = z.object({
 const selectionInput = z.object({
   action: z.literal("save_selections"),
   selections: z.object({
+    midtransMode: z.enum(["snap", "bisnap"]).optional(),
+    midtransEnvironment: z.enum(["sandbox", "production"]).optional(),
     ipaymuEnvironment: z.enum(["sandbox", "production"]).optional(),
     digiflazzEnvironment: z.enum(["development", "production"]).optional(),
     vippaymentEnvironment: z.enum(["sandbox", "production"]).optional(),
