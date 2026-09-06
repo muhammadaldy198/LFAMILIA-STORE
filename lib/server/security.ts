@@ -58,3 +58,26 @@ export async function recordAdminActivity(input: { id: number; name: string; rol
     // Activity logging must never block the operation the Owner or Staff requested.
   }
 }
+
+
+export function rejectCrossOriginMutation(request: Request) {
+  if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return null;
+
+  const fetchSite = request.headers.get("sec-fetch-site")?.toLowerCase();
+  if (fetchSite === "cross-site") {
+    return Response.json({ error: "Permintaan lintas situs ditolak." }, { status: 403 });
+  }
+
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      if (new URL(origin).origin !== new URL(request.url).origin) {
+        return Response.json({ error: "Permintaan lintas situs ditolak." }, { status: 403 });
+      }
+    } catch {
+      return Response.json({ error: "Origin permintaan tidak valid." }, { status: 403 });
+    }
+  }
+
+  return null;
+}
