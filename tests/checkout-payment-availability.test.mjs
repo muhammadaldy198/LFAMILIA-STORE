@@ -22,9 +22,11 @@ test("method and channel selection no longer stores a gateway in browser state",
   assert.doesNotMatch(source, /availableChannels/);
 });
 
-test("checkout enhancer reads combined gateway channels", () => {
-  assert.match(enhancer, /data\.allChannels/);
-  assert.match(enhancer, /data\.gateways\?\.flatMap/);
+test("legacy DOM controller no longer hides or toggles payment groups", () => {
+  assert.doesNotMatch(enhancer, /enhancePaymentGroups/);
+  assert.doesNotMatch(enhancer, /expandedMethods/);
+  assert.doesNotMatch(enhancer, /wiredHeaders/);
+  assert.doesNotMatch(enhancer, /fetch\("\/api\/payment-methods"/);
 });
 
 test("checkout shows a diagnostic instead of a blank payment section", () => {
