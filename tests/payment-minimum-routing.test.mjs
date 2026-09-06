@@ -5,6 +5,7 @@ import test from "node:test";
 
 const root = process.cwd();
 const checkout = fs.readFileSync(path.join(root, "app/checkout/page.tsx"), "utf8");
+const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/route.ts"), "utf8");
 const ipaymuRoute = fs.readFileSync(path.join(root, "app/api/payments/ipaymu/create/route.ts"), "utf8");
 const limits = fs.readFileSync(path.join(root, "lib/payment-limits.ts"), "utf8");
 
@@ -13,10 +14,17 @@ test("iPaymu checkout minimum is centralized", () => {
   assert.match(limits, /isIpaymuAmountSupported/);
 });
 
-test("checkout excludes iPaymu below minimum and prefers Midtrans", () => {
+test("checkout hides iPaymu-only channels below the minimum", () => {
   assert.match(checkout, /gateway\.code !== "ipaymu"/);
-  assert.match(checkout, /gateway\.code === "midtrans"/);
-  assert.match(checkout, /gateway\.channels\.find\(\(item\) => item\.method === "qris"\)/);
+  assert.match(checkout, /isIpaymuAmountSupported\(subtotal\)/);
+});
+
+test("server routing prefers ready iPaymu then uses Midtrans fallback", () => {
+  assert.match(autoRoute, /const canUseIpaymu/);
+  assert.match(autoRoute, /isIpaymuAmountSupported\(promotion\.finalPrice\)/);
+  assert.match(autoRoute, /return createIpaymuCheckout\(request\)/);
+  assert.match(autoRoute, /settings\.midtransCheckoutEnabled && midtransReadiness\.ready/);
+  assert.match(autoRoute, /return createMidtransCheckout\(request\)/);
 });
 
 test("iPaymu route rejects below-minimum amount before provider request", () => {
