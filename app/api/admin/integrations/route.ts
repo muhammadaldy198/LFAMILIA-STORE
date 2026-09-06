@@ -5,6 +5,7 @@ import {
   saveIntegrationProfile,
   saveIntegrationSelections,
 } from "@/lib/server/integration-config";
+import { testProviderRelayConnections } from "@/lib/server/provider-relay";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,11 @@ const selectionInput = z.object({
   }),
 });
 
-const schema = z.discriminatedUnion("action", [profileInput, selectionInput]);
+const relayTestInput = z.object({
+  action: z.literal("test_relay"),
+});
+
+const schema = z.discriminatedUnion("action", [profileInput, selectionInput, relayTestInput]);
 
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
@@ -50,6 +55,12 @@ export async function PUT(request: Request) {
   if (access instanceof Response) return access;
   try {
     const input = schema.parse(await request.json());
+    if (input.action === "test_relay") {
+      return Response.json(
+        { ok: true, relay: await testProviderRelayConnections() },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     if (input.action === "save_profile") {
       await saveIntegrationProfile(input);
     } else {
