@@ -41,6 +41,23 @@ export const customerSessions = sqliteTable(
   ],
 );
 
+export const customerGameAccounts = sqliteTable(
+  "customer_game_accounts",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id").notNull().references(() => customerUsers.id, { onDelete: "cascade" }),
+    productSlug: text("product_slug").notNull(),
+    label: text("label").notNull(),
+    valuesJson: text("values_json").notNull().default("[]"),
+    nickname: text("nickname"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("customer_game_accounts_customer_product_idx").on(table.customerId, table.productSlug, table.updatedAt),
+  ],
+);
+
 export const products = sqliteTable(
   "products",
   {
@@ -254,6 +271,7 @@ export const storeSettings = sqliteTable("store_settings", {
   instagramUrl: text("instagram_url"),
   discordUrl: text("discord_url"),
   supportHours: text("support_hours").notNull(),
+  supportWidgetEnabled: integer("support_widget_enabled", { mode: "boolean" }).notNull().default(true),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
