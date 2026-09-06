@@ -49,6 +49,14 @@ function routeUrl(originalUrl: string, relayOrigin: string) {
   return relay.toString();
 }
 
+export function isProviderRelayConfigured(provider: RelayProvider) {
+  const runtime = getRuntimeEnv<ProviderRelayEnv>();
+  return Boolean(
+    runtime.PROVIDER_RELAY_TOKEN?.trim() &&
+    configuredOrigin(runtime, provider),
+  );
+}
+
 export function providerRelayRequest(
   url: string,
   headers: Record<string, string>,
