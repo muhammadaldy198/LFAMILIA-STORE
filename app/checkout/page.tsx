@@ -307,19 +307,19 @@ function CheckoutContent() {
   useEffect(() => {
     if (!gatewayOptions.length) return;
 
-    const current = eligibleGatewayOptions.find(
-      (gateway) => gateway.code === activeCheckoutGateway,
-    );
-    if (current) return;
-
-    const next =
+    const preferred =
+      (isIpaymuAmountSupported(subtotal)
+        ? eligibleGatewayOptions.find((gateway) => gateway.code === "ipaymu")
+        : null) ??
       eligibleGatewayOptions.find((gateway) => gateway.code === "midtrans") ??
       eligibleGatewayOptions[0] ??
       null;
 
+    if (preferred?.code === activeCheckoutGateway) return;
+
     const timer = window.setTimeout(() => {
-      if (next) {
-        chooseGateway(next);
+      if (preferred) {
+        chooseGateway(preferred);
       } else {
         setActiveCheckoutGateway(null);
         setAvailableChannels([]);
@@ -337,6 +337,7 @@ function CheckoutContent() {
     eligibleGatewayOptions,
     gatewayOptions.length,
     paymentMethod,
+    subtotal,
   ]);
 
   useEffect(() => {
