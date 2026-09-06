@@ -352,6 +352,35 @@ export async function saveProductContent(input: {
   ]);
 }
 
+export async function updateProductPackageProvider(input: {
+  packageId: number;
+  providerCode: string | null;
+  providerSku: string | null;
+  pricingMode: "manual" | "auto";
+  marginType: "fixed" | "percent";
+  marginValue: number;
+}) {
+  const db = getD1();
+  const result = await db.prepare(
+    `UPDATE product_packages
+     SET provider_code = ?,
+         provider_sku = ?,
+         pricing_mode = ?,
+         margin_type = ?,
+         margin_value = ?
+     WHERE id = ?`,
+  ).bind(
+    input.providerCode,
+    input.providerSku,
+    input.pricingMode,
+    input.marginType,
+    input.marginValue,
+    input.packageId,
+  ).run();
+
+  if (!result.meta.changes) throw new Error("Nominal tidak ditemukan.");
+}
+
 export async function updateProductPackageStatus(packageId: number, isActive: boolean) {
   const db = getD1();
   const result = await db.prepare(
