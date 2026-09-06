@@ -42,7 +42,6 @@ import {
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
 import { formatRupiah } from "@/lib/store-data";
-import { IPAYMU_MIN_CHECKOUT_AMOUNT, isIpaymuAmountSupported } from "@/lib/payment-limits";
 import type { CustomerSession } from "@/lib/server/customer-auth";
 
 const nicknameSupported = new Set([
@@ -188,12 +187,7 @@ function CheckoutContent() {
   const destination = productInputFields[0] ? (customerInputValues[productInputFields[0].id] ?? "") : "";
   const server = productInputFields[1] ? (customerInputValues[productInputFields[1].id] ?? "") : "";
   const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
-  const eligibleGatewayOptions = useMemo(
-    () => gatewayOptions.filter((gateway) =>
-      gateway.code !== "ipaymu" || subtotal <= 0 || isIpaymuAmountSupported(subtotal),
-    ),
-    [gatewayOptions, subtotal],
-  );
+  const eligibleGatewayOptions = gatewayOptions;
   const isManual = product.fulfillmentType === "manual";
   const isVoucherStock = selectedPackage?.providerCode === "voucher-stock";
   const providerReady =
@@ -719,11 +713,6 @@ function CheckoutContent() {
                   title="Pilih Pembayaran"
                   description="Pilih metode pembayaran yang ingin digunakan."
                 />
-                {subtotal > 0 && subtotal < IPAYMU_MIN_CHECKOUT_AMOUNT && gatewayOptions.some((gateway) => gateway.code === "ipaymu") && (
-                  <div className="mt-3 rounded-md border border-amber-300/15 bg-amber-300/[0.05] px-2.5 py-2 text-[9px] leading-4 text-amber-100/70">
-                    Metode pembayaran yang tersedia sudah disesuaikan otomatis dengan nominal transaksi.
-                  </div>
-                )}
                 {!paymentMethodsLoaded && (
                   <div className="mt-3 flex items-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-[10px] text-white/45">
                     <LoaderCircle className="size-3.5 animate-spin" />
