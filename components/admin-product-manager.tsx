@@ -76,6 +76,7 @@ export function AdminProductManager() {
   const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
   const [catalogSaving, setCatalogSaving] = useState<string | null>(null);
+  const [packageProviderSaving, setPackageProviderSaving] = useState<number | null>(null);
   const [syncingPackage, setSyncingPackage] = useState<number | null>(null);
   const [packageStatusSaving, setPackageStatusSaving] = useState<number | null>(null);
   const [sellerMonitor, setSellerMonitor] = useState<DigiflazzMonitorPayload | null>(null);
@@ -368,21 +369,72 @@ export function AdminProductManager() {
     }
   }
 
+  async function saveCatalogPackageProvider(
+    item: ManagedProduct,
+    index: number,
+    options: { quiet?: boolean } = {},
+  ) {
+    const entry = item.packages[index];
+    if (!entry.dbId) {
+      setError("Simpan nominal terlebih dahulu sebelum mengatur provider/SKU.");
+      return false;
+    }
+
+    setPackageProviderSaving(entry.dbId);
+    if (!options.quiet) {
+      setError("");
+      setMessage("");
+    }
+
+    try {
+      const response = await fetch("/api/panel/product-package-provider", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          packageId: entry.dbId,
+          providerCode: entry.providerCode || null,
+          providerSku: entry.providerSku?.trim() || null,
+          pricingMode: entry.pricingMode ?? "auto",
+          marginType: entry.marginType ?? "fixed",
+          marginValue: Number(entry.marginValue ?? 0),
+        }),
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Provider/SKU nominal gagal disimpan.");
+      if (!options.quiet) {
+        setMessage(`SKU/provider ${entry.label} berhasil disimpan tanpa sync DigiFlazz.`);
+      }
+      return true;
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Provider/SKU nominal gagal disimpan.");
+      return false;
+    } finally {
+      setPackageProviderSaving(null);
+    }
+  }
+
   async function syncCatalogPackage(item: ManagedProduct, index: number) {
     const entry = item.packages[index];
     if (entry.providerCode !== "digiflazz") {
       setError("Sync provider saat ini tersedia untuk nominal DigiFlazz.");
       return;
     }
-    if (!item.dbId || !entry.id) {
+    if (!item.dbId || !entry.id || !entry.dbId) {
       setError("Simpan nominal terlebih dahulu sebelum melakukan sync provider.");
       return;
     }
-    setSyncingPackage(entry.dbId ?? index + 1);
+    if (!entry.providerSku?.trim()) {
+      setError("Isi SKU DigiFlazz lalu tekan Simpan SKU sebelum melakukan Sync.");
+      return;
+    }
+
+    setSyncingPackage(entry.dbId);
     setError("");
+    setMessage("");
     try {
-      const saved = await saveCatalogProduct(item, "Nominal disimpan. Menyinkronkan DigiFlazz…");
+      const saved = await saveCatalogPackageProvider(item, index, { quiet: true });
       if (!saved) return;
+
       const response = await fetch("/api/panel/digiflazz-pricing", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -588,7 +640,7 @@ export function AdminProductManager() {
                         </thead>
                         <tbody>
                           {item.packages.map((entry, index) => {
-                            const canSync = entry.providerCode === "digiflazz";
+                            const canSync = entry.providerCode === "digiflazz" && Boolean(entry.providerSku?.trim());
                             const syncKey = entry.dbId ?? index + 1;
                             return <tr key={`${entry.dbId ?? "new"}-${index}`} className="border-t border-white/[0.06]">
                               <td className="px-3 py-2 font-semibold text-white/75">{entry.label || <span className="text-amber-200/60">Nominal baru</span>}</td>
@@ -676,7 +728,18 @@ export function AdminProductManager() {
                               </td>
                               <td className="px-3 py-2">
                                 {role === "owner" ? <div className="flex justify-end gap-1">
-                                  <Button type="button" disabled={catalogSaving === key} onClick={() => void saveCatalogProduct(item)} variant="ghost" size="sm" className="h-7 px-2 text-[8px] text-[#d8ff8d]">Simpan</Button>
+                                  <Button
+                                    type="button"
+                                    disabled={!entry.dbId || packageProviderSaving === entry.dbId}
+                                    onClick={() => void saveCatalogPackageProvider(item, index)}
+                                    variant="ghost"
+                                    size="sm"
+                                    title="Simpan provider, SKU, pricing mode, dan margin tanpa memanggil DigiFlazz"
+                                    className="h-7 px-2 text-[8px] text-[#d8ff8d]"
+                                  >
+                                    {packageProviderSaving === entry.dbId ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : null}
+                                    Simpan SKU
+                                  </Button>
                                   <Button type="button" onClick={() => void removeCatalogPackage(item, index)} variant="ghost" size="icon-sm" className="text-red-300/45 hover:text-red-200" aria-label={`Hapus nominal ${entry.label || index + 1}`}><Trash2 className="size-3.5" /></Button>
                                 </div> : <span className="block text-right text-white/20">-</span>}
                               </td>
