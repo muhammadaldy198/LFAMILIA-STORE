@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import { deleteProduct, readProducts, saveProduct } from "@/lib/server/products";
 import { isAllowedMediaUrl } from "@/lib/media-url";
+import { readDigiflazzSellerMonitor } from "@/lib/server/digiflazz-monitor";
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +93,8 @@ export async function GET(request: Request) {
   if (access instanceof Response) return access;
   try {
     const products = await readProducts(true);
-    return Response.json({ products, databaseReady: true, seeded: products.length > 0, adminEmail: access.email, role: access.role });
+    const sellerMonitor = access.role === "owner" ? await readDigiflazzSellerMonitor() : null;
+    return Response.json({ products, databaseReady: true, seeded: products.length > 0, adminEmail: access.email, role: access.role, sellerMonitor });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Database belum siap.", databaseReady: false }, { status: 503 });
   }
