@@ -1,11 +1,11 @@
 import {
-  getIpaymuOperationalReadiness,
+  getIpaymuReadiness,
   isIpaymuChannelSupported,
 } from "@/lib/server/ipaymu";
 import {
   getMidtransEnvironment,
   getMidtransMode,
-  getMidtransOperationalReadiness,
+  getMidtransReadiness,
   isMidtransChannelSupported,
 } from "@/lib/server/midtrans";
 import {
@@ -29,10 +29,12 @@ export async function GET() {
   const activeChannels = await listPaymentChannels(false);
   const gateways: CheckoutGateway[] = [];
 
-  const [ipaymuReadiness, midtransReadiness] = await Promise.all([
-    getIpaymuOperationalReadiness(),
-    getMidtransOperationalReadiness(),
-  ]);
+  // Storefront availability must be based on saved configuration only.
+  // Live relay probes belong in Admin diagnostics; a transient probe timeout
+  // must never hide payment methods from customers.
+  const ipaymuReadiness = getIpaymuReadiness();
+  const midtransReadiness = getMidtransReadiness();
+
   if (settings.ipaymuCheckoutEnabled && ipaymuReadiness.ready) {
     gateways.push({
       code: "ipaymu",
