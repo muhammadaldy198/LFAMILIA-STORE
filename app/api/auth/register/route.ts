@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { customerSessionCookie, registerCustomer } from "@/lib/server/customer-auth";
-import { allowRequest } from "@/lib/server/security";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 const schema = z.object({
   name: z.string().trim().min(2, "Nama minimal 2 karakter.").max(80),
@@ -10,6 +10,8 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
   const rate = await allowRequest(request, "customer-register", 5, 3600);
   if (!rate.allowed) return Response.json({ error: "Terlalu banyak pendaftaran dari jaringan ini. Coba lagi nanti." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   try {
