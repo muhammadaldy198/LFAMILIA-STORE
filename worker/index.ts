@@ -28,6 +28,24 @@ interface ExecutionContext {
 
 interface ScheduledEvent { cron: string; }
 
+function withSecurityHeaders(response: Response, url: URL) {
+  const headers = new Headers(response.headers);
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  headers.set("X-Permitted-Cross-Domain-Policies", "none");
+  headers.set("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'self'; object-src 'none'");
+  if (url.protocol === "https:") {
+    headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
 // To route SVGs through the optimizer (with security headers), set
@@ -60,13 +78,13 @@ const worker = {
 
       if (!adminEmail) {
         if (url.pathname.startsWith("/api/")) {
-          return Response.json({ error: "Cloudflare Access belum memvalidasi area Admin." }, { status: 401 });
+          return withSecurityHeaders(Response.json({ error: "Cloudflare Access belum memvalidasi area Admin." }, { status: 401 }), url);
         }
 
-        return new Response(
-          "<!doctype html><html lang=\"id\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Admin belum dilindungi</title><body style=\"margin:0;background:#07090f;color:#fff;font-family:system-ui;display:grid;min-height:100vh;place-items:center\"><main style=\"max-width:520px;padding:32px;text-align:center\"><h1 style=\"color:#b9ff35\">Admin belum dilindungi</h1><p style=\"color:#ffffff99;line-height:1.7\">Aktifkan Cloudflare Access untuk /admin/panel* dan /admin/setup* sebelum membuka area Admin.</p><a href=\"/\" style=\"color:#b9ff35\">Kembali ke toko</a></main></body></html>",
+        return withSecurityHeaders(new Response(
+          "<!doctype html><html lang=\"id\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Admin belum dilindungi</title><body style=\"margin:0;background:#07090f;color:#fff;font-family:system-ui;display:grid;min-height:100vh;place-items:center\"><main style=\"max-width:520px;padding:32px;text-align:center\"><h1 style=\"color:#b9ff35\">Admin belum dilindungi</h1><p style=\"color:#ffffff99;line-height:1.7\">Aktifkan Cloudflare Access untuk /admin*, /api/admin*, dan area setup Pemilik sebelum membuka Admin.</p><a href=\"/\" style=\"color:#b9ff35\">Kembali ke toko</a></main></body></html>",
           { status: 401, headers: { "content-type": "text/html; charset=utf-8" } },
-        );
+        ), url);
       }
 
       const headers = new Headers(request.headers);
@@ -76,19 +94,19 @@ const worker = {
     }
 
     if (url.pathname === "/_vinext/image") {
-      if (!env.IMAGES) return new Response("Image optimization is unavailable.", { status: 404 });
+      if (!env.IMAGES) return withSecurityHeaders(new Response("Image optimization is unavailable.", { status: 404 }), url);
       const images = env.IMAGES;
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
-      return handleImageOptimization(request, {
+      return withSecurityHeaders(await handleImageOptimization(request, {
         fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
         transformImage: async (body, { width, format, quality }) => {
           const result = await images.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
           return result.response();
         },
-      }, allowedWidths);
+      }, allowedWidths), url);
     }
 
-    const response = await handler.fetch(request, env, ctx);
+    let response = await handler.fetch(request, env, ctx);
 
     const isPanelPage =
       url.pathname === "/panel" ||
@@ -103,14 +121,14 @@ const worker = {
       headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
       headers.set("CDN-Cache-Control", "no-store");
       headers.set("Cloudflare-CDN-Cache-Control", "no-store");
-      return new Response(response.body, {
+      response = new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
         headers,
       });
     }
 
-    return response;
+    return withSecurityHeaders(response, url);
   },
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
