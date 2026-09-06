@@ -65,6 +65,7 @@ export function AdminProductManager() {
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
   const [catalogSaving, setCatalogSaving] = useState<string | null>(null);
   const [syncingPackage, setSyncingPackage] = useState<number | null>(null);
+  const [packageStatusSaving, setPackageStatusSaving] = useState<number | null>(null);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -287,6 +288,36 @@ export function AdminProductManager() {
       return false;
     } finally {
       setCatalogSaving(null);
+    }
+  }
+
+  async function toggleCatalogPackageStatus(item: ManagedProduct, index: number, isActive: boolean) {
+    const entry = item.packages[index];
+    if (!entry.dbId) {
+      setError("Simpan nominal terlebih dahulu sebelum mengubah status.");
+      return;
+    }
+
+    const key = itemKey(item);
+    const previous = entry.isActive;
+    updateCatalogPackage(key, index, "isActive", isActive);
+    setPackageStatusSaving(entry.dbId);
+    setError("");
+
+    try {
+      const response = await fetch("/api/panel/product-package-status", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ packageId: entry.dbId, isActive }),
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Status nominal gagal diperbarui.");
+      setMessage(`${entry.label} sekarang ${isActive ? "aktif" : "nonaktif"}.`);
+    } catch (reason) {
+      updateCatalogPackage(key, index, "isActive", previous);
+      setError(reason instanceof Error ? reason.message : "Status nominal gagal diperbarui.");
+    } finally {
+      setPackageStatusSaving(null);
     }
   }
 
@@ -537,7 +568,19 @@ export function AdminProductManager() {
                                 </div> : <span className="text-white/40">{entry.marginType === "percent" ? `${entry.marginValue ?? 0}%` : formatRupiah(entry.marginValue ?? 0)}</span>}
                               </td>
                               <td className="px-3 py-2 font-bold text-[#d8ff8d]">{entry.price ? formatRupiah(entry.price) : "-"}</td>
-                              <td className={`px-3 py-2 ${entry.isActive ? "text-[#d8ff8d]" : "text-white/30"}`}>{entry.isActive ? "Aktif" : "Nonaktif"}</td>
+                              <td className="px-3 py-2">
+                                <label className="flex min-w-[88px] items-center gap-2">
+                                  <Switch
+                                    checked={entry.isActive}
+                                    disabled={!entry.dbId || packageStatusSaving === entry.dbId}
+                                    onCheckedChange={(checked) => void toggleCatalogPackageStatus(item, index, checked)}
+                                    aria-label={`${entry.isActive ? "Nonaktifkan" : "Aktifkan"} nominal ${entry.label}`}
+                                  />
+                                  <span className={`text-[9px] font-bold ${entry.isActive ? "text-[#d8ff8d]" : "text-white/30"}`}>
+                                    {packageStatusSaving === entry.dbId ? "Menyimpan…" : entry.isActive ? "Aktif" : "Nonaktif"}
+                                  </span>
+                                </label>
+                              </td>
                               <td className="px-3 py-2">
                                 <Button
                                   type="button"
@@ -575,7 +618,7 @@ export function AdminProductManager() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-[340px] gap-0 overflow-hidden rounded-xl border-white/10 bg-[#10141d] p-0 text-white sm:max-w-2xl">
           <form onSubmit={save} className="grid max-h-[68dvh] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-h-[86vh]">
-            <DialogHeader className="border-b border-white/[0.07] px-4 pb-3 pt-4 pr-10 text-left"><DialogTitle className="text-base sm:text-lg">{role === "staff" ? `Edit informasi ${draft.name}` : draft.dbId ? "Edit produk" : "Tambah produk"}</DialogTitle><DialogDescription className="text-[10px] leading-4 text-white/38 sm:text-xs">{role === "staff" ? "Staff dapat mengubah media, jam layanan, instruksi, dan pop-up tanpa akses ke harga atau provider." : "Data ini akan digunakan oleh katalog dan checkout."}</DialogDescription></DialogHeader>
+            <DialogHeader className="border-b border-white/[0.07] px-4 pb-3 pt-4 pr-10 text-left"><DialogTitle className="text-base sm:text-lg">{role === "staff" ? `Edit informasi ${draft.name}` : draft.dbId ? "Edit produk" : "Tambah produk"}</DialogTitle><DialogDescription className="text-[10px] leading-4 text-white/38 sm:text-xs">{role === "staff" ? "Staff dapat mengubah media, jam layanan, instruksi, pop-up, serta mengaktifkan atau menonaktifkan nominal tanpa akses ke harga atau provider." : "Data ini akan digunakan oleh katalog dan checkout."}</DialogDescription></DialogHeader>
             <div className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-4 py-3">
             <div className="grid min-w-0 gap-2.5 sm:grid-cols-2">
               {role === "owner" && <><Field label="Nama produk"><Input required value={draft.name} onChange={(event) => { updateDraft("name", event.target.value); if (!draft.dbId) updateDraft("slug", slugify(event.target.value)); }} className="admin-input" placeholder="Mobile Legends" /></Field>
