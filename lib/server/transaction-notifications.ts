@@ -6,12 +6,6 @@ type NotificationRuntimeEnv = {
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   RESEND_API_URL?: string;
-  WHATSAPP_ACCESS_TOKEN?: string;
-  WHATSAPP_PHONE_NUMBER_ID?: string;
-  WHATSAPP_TRANSACTION_TEMPLATE?: string;
-  WHATSAPP_TEMPLATE_LANGUAGE?: string;
-  WHATSAPP_GRAPH_VERSION?: string;
-  WHATSAPP_GRAPH_BASE_URL?: string;
 };
 
 type NotificationInput = {
@@ -28,12 +22,6 @@ function rupiah(value: number) {
   return `Rp${Math.max(0, Math.round(value)).toLocaleString("id-ID")}`;
 }
 
-function normalizeWhatsApp(value: string) {
-  const digits = value.replace(/\D/g, "");
-  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
-  if (digits.startsWith("8")) return `62${digits}`;
-  return digits;
-}
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -54,17 +42,6 @@ function emailReady(input: NotificationInput, config: NotificationRuntimeEnv) {
   );
 }
 
-function whatsappReady(input: NotificationInput, config: NotificationRuntimeEnv) {
-  return Boolean(
-    normalizeWhatsApp(input.phone) &&
-      config.WHATSAPP_ACCESS_TOKEN?.trim() &&
-      config.WHATSAPP_PHONE_NUMBER_ID?.trim() &&
-      config.WHATSAPP_TRANSACTION_TEMPLATE?.trim() &&
-      config.WHATSAPP_TEMPLATE_LANGUAGE?.trim() &&
-      config.WHATSAPP_GRAPH_VERSION?.trim() &&
-      config.WHATSAPP_GRAPH_BASE_URL?.trim(),
-  );
-}
 
 async function sendEmail(input: NotificationInput, config: NotificationRuntimeEnv) {
   const apiKey = config.RESEND_API_KEY!.trim();
@@ -90,50 +67,10 @@ async function sendEmail(input: NotificationInput, config: NotificationRuntimeEn
   if (!response.ok) throw new Error(payload.message || "Resend menolak notifikasi transaksi.");
 }
 
-async function sendWhatsApp(input: NotificationInput, config: NotificationRuntimeEnv) {
-  const token = config.WHATSAPP_ACCESS_TOKEN!.trim();
-  const phoneId = config.WHATSAPP_PHONE_NUMBER_ID!.trim();
-  const template = config.WHATSAPP_TRANSACTION_TEMPLATE!.trim();
-  const language = config.WHATSAPP_TEMPLATE_LANGUAGE!.trim();
-  const version = config.WHATSAPP_GRAPH_VERSION!.trim();
-  const graphBaseUrl = config.WHATSAPP_GRAPH_BASE_URL!.trim().replace(/\/$/, "");
-  const typeLabel = input.kind === "wallet_topup" ? "Top up saldo berhasil" : "Pesanan selesai";
-  const response = await fetch(`${graphBaseUrl}/${version}/${encodeURIComponent(phoneId)}/messages`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to: normalizeWhatsApp(input.phone),
-      type: "template",
-      template: {
-        name: template,
-        language: { code: language },
-        components: [{
-          type: "body",
-          parameters: [
-            input.name,
-            typeLabel,
-            input.detail,
-            rupiah(input.amount),
-            input.referenceId,
-          ].map((text) => ({ type: "text", text })),
-        }],
-      },
-    }),
-    signal: AbortSignal.timeout(12_000),
-  });
-  const payload = await response.json().catch(() => ({})) as {
-    messages?: Array<{ id?: string }>;
-    error?: { message?: string };
-  };
-  if (!response.ok) throw new Error(payload.error?.message || "WhatsApp menolak notifikasi transaksi.");
-}
-
 async function notify(input: NotificationInput) {
   const config = getRuntimeEnv<NotificationRuntimeEnv>();
   const tasks: Promise<void>[] = [];
   if (emailReady(input, config)) tasks.push(sendEmail(input, config));
-  if (whatsappReady(input, config)) tasks.push(sendWhatsApp(input, config));
   if (!tasks.length) return;
   const results = await Promise.allSettled(tasks);
   for (const result of results) {
@@ -143,7 +80,7 @@ async function notify(input: NotificationInput) {
   }
 }
 
-async function claimOrderChannel(orderId: string, referenceId: string, channel: "email" | "whatsapp") {
+async function claimOrderChannel(orderId: string, referenceId: string, channel: "email") {
   const result = await getD1()
     .prepare(
       `INSERT OR IGNORE INTO order_events (order_id, source, event_id, status, payload_json)
@@ -158,7 +95,7 @@ async function claimOrderChannel(orderId: string, referenceId: string, channel: 
   return Number(result.meta.changes ?? 0) > 0;
 }
 
-async function releaseOrderChannel(referenceId: string, channel: "email" | "whatsapp") {
+async function releaseOrderChannel(referenceId: string, channel: "email") {
   await getD1()
     .prepare("DELETE FROM order_events WHERE source = 'admin' AND event_id = ?")
     .bind(`customer-${channel}-order-success-${referenceId}`)
@@ -210,14 +147,6 @@ export async function notifyOrderFulfillmentSuccessById(orderId: string) {
     }
   }
 
-  if (whatsappReady(input, config) && await claimOrderChannel(order.id, order.reference_id, "whatsapp")) {
-    try {
-      await sendWhatsApp(input, config);
-    } catch (error) {
-      await releaseOrderChannel(order.reference_id, "whatsapp");
-      console.error("WhatsApp pesanan selesai gagal:", error);
-    }
-  }
 }
 
 export async function notifyOrderFulfillmentSuccessByProviderRef(
