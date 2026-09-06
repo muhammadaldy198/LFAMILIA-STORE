@@ -108,7 +108,7 @@ export function AdminOverview() {
     if (showRefreshing) setRefreshing(true);
     setError("");
     try {
-      const response = await fetch("/api/panel/summary?range=" + range, { cache: "no-store" });
+      const response = await fetch("/api/admin/summary?range=" + range, { cache: "no-store" });
       const payload = await response.json().catch(() => ({}));
       if (currentRequestId !== requestId.current) return;
       if (!response.ok) throw new Error(payload.error || "Dashboard gagal dimuat.");
