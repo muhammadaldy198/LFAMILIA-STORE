@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import {
   getIntegrationOverview,
+  saveGatewayToggles,
   saveIntegrationProfile,
   saveIntegrationSelections,
 } from "@/lib/server/integration-config";
@@ -10,9 +11,9 @@ export const dynamic = "force-dynamic";
 
 const profileInput = z.object({
   action: z.literal("save_profile"),
-  provider: z.enum(["midtrans", "ipaymu", "digiflazz", "vippayment"]),
-  mode: z.enum(["snap", "bisnap", "direct"]),
-  environment: z.enum(["sandbox", "production", "development"]),
+  provider: z.enum(["midtrans", "ipaymu", "digiflazz", "vippayment", "melostore", "resend", "relay", "security"]),
+  mode: z.enum(["snap", "bisnap", "direct", "service"]),
+  environment: z.enum(["sandbox", "production", "development", "global"]),
   values: z.record(z.string().min(1).max(80), z.string().max(8_000)).default({}),
   clearFields: z.array(z.string().min(1).max(80)).max(24).default([]),
 });
@@ -26,6 +27,12 @@ const selectionInput = z.object({
     digiflazzEnvironment: z.enum(["development", "production"]).optional(),
     vippaymentEnvironment: z.enum(["sandbox", "production"]).optional(),
   }),
+  gatewayToggles: z.object({
+    midtransCheckoutEnabled: z.boolean(),
+    midtransTopupEnabled: z.boolean(),
+    ipaymuCheckoutEnabled: z.boolean(),
+    ipaymuTopupEnabled: z.boolean(),
+  }).optional(),
 });
 
 const schema = z.discriminatedUnion("action", [profileInput, selectionInput]);
@@ -54,6 +61,7 @@ export async function PUT(request: Request) {
       await saveIntegrationProfile(input);
     } else {
       await saveIntegrationSelections(input.selections);
+      if (input.gatewayToggles) await saveGatewayToggles(input.gatewayToggles);
     }
     return Response.json({ ok: true, overview: await getIntegrationOverview() });
   } catch (error) {
