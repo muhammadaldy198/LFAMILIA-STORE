@@ -4,6 +4,7 @@ import handler from "vinext/server/app-router-entry";
 import { setRuntimeEnv } from "../lib/server/runtime-env";
 import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
+import { cleanupSecurityRateLimits } from "../lib/server/security";
 
 interface Env {
   ASSETS: Fetcher;
@@ -132,7 +133,10 @@ const worker = {
   },
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
-    ctx.waitUntil(syncDigiflazzPrices().catch(() => undefined));
+    ctx.waitUntil(Promise.all([
+      syncDigiflazzPrices().catch(() => undefined),
+      cleanupSecurityRateLimits().catch(() => undefined),
+    ]));
   },
 };
 
