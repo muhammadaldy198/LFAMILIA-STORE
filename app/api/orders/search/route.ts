@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +95,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
+  const rate = await allowRequest(request, "order-phone-search", 20, 600);
+  if (!rate.allowed) return Response.json(
+    { error: "Terlalu banyak pencarian transaksi. Coba lagi beberapa menit." },
+    { status: 429, headers: { "Retry-After": String(rate.retryAfter) } },
+  );
   try {
     const { phone } = schema.parse(await request.json());
     const variants = normalizePhoneVariants(phone);
@@ -115,7 +123,7 @@ export async function POST(request: Request) {
       .all<OrderSummaryRow>();
 
     return Response.json(
-      { orders: result.results.map((row) => mapSummary(row, true)) },
+      { orders: result.results.map((row) => mapSummary(row, false)) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
