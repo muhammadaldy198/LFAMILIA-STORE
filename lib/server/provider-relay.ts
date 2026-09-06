@@ -87,7 +87,7 @@ export type RelayConnectionResult = {
   message: string;
 };
 
-async function testRelayConnection(
+export async function testRelayConnection(
   provider: RelayProvider,
   label: string,
 ): Promise<RelayConnectionResult> {
@@ -182,6 +182,27 @@ async function testRelayConnection(
         : "Worker tidak dapat menghubungi relay.",
     };
   }
+}
+
+const relayProbeCache = new Map<
+  RelayProvider,
+  { expiresAt: number; result: RelayConnectionResult }
+>();
+
+export async function probeProviderRelay(
+  provider: RelayProvider,
+  label: string,
+  ttlMs = 30_000,
+) {
+  const cached = relayProbeCache.get(provider);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+
+  const result = await testRelayConnection(provider, label);
+  relayProbeCache.set(provider, {
+    expiresAt: Date.now() + Math.max(1_000, ttlMs),
+    result,
+  });
+  return result;
 }
 
 export async function testProviderRelayConnections() {
