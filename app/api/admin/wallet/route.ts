@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { getIpaymuReadiness } from "@/lib/server/ipaymu";
-import { getMidtransReadiness } from "@/lib/server/midtrans";
+import { getIpaymuOperationalReadiness } from "@/lib/server/ipaymu";
+import { getMidtransOperationalReadiness } from "@/lib/server/midtrans";
 import { requireAdminSession } from "@/lib/server/admin";
 import {
   listWalletTopups,
@@ -19,13 +19,16 @@ const settingsSchema = z.object({
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
+  const [settings, topups, ipaymu, midtrans] = await Promise.all([
+    readWalletSettings(),
+    listWalletTopups(),
+    getIpaymuOperationalReadiness(),
+    getMidtransOperationalReadiness(),
+  ]);
   return Response.json({
-    settings: await readWalletSettings(),
-    topups: await listWalletTopups(),
-    gatewayReadiness: {
-      ipaymu: getIpaymuReadiness(),
-      midtrans: getMidtransReadiness(),
-    },
+    settings,
+    topups,
+    gatewayReadiness: { ipaymu, midtrans },
   });
 }
 
