@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { getIpaymuReadiness } from "@/lib/server/ipaymu";
+import { getMidtransReadiness } from "@/lib/server/midtrans";
 import { requireAdminSession } from "@/lib/server/admin";
 import {
   listWalletTopups,
@@ -20,6 +22,10 @@ export async function GET(request: Request) {
   return Response.json({
     settings: await readWalletSettings(),
     topups: await listWalletTopups(),
+    gatewayReadiness: {
+      ipaymu: getIpaymuReadiness(),
+      midtrans: getMidtransReadiness(),
+    },
   });
 }
 
