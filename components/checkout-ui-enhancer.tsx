@@ -46,8 +46,23 @@ export function CheckoutUiEnhancer() {
     void fetch("/api/payment-methods", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) return;
-        const data = (await response.json()) as { channels?: PaymentChannelPreview[] };
-        channels = data.channels ?? [];
+        const data = (await response.json()) as {
+          channels?: PaymentChannelPreview[];
+          allChannels?: PaymentChannelPreview[];
+          gateways?: Array<{ channels?: PaymentChannelPreview[] }>;
+        };
+        const combined =
+          data.allChannels?.length
+            ? data.allChannels
+            : data.gateways?.flatMap((gateway) => gateway.channels ?? []) ?? data.channels ?? [];
+        channels = [
+          ...new Map(
+            combined.map((channel) => [
+              `${channel.method ?? ""}:${channel.channel ?? ""}`,
+              channel,
+            ]),
+          ).values(),
+        ];
         schedule();
       })
       .catch(() => undefined);
