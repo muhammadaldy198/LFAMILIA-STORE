@@ -24,6 +24,7 @@ const schema = z.object({
   instagramUrl: optionalUrl,
   discordUrl: optionalUrl,
   supportHours: z.string().trim().min(3).max(120),
+  supportWidgetEnabled: z.boolean(),
 });
 
 export async function GET(request: Request) {
