@@ -107,6 +107,14 @@ export async function loginCustomer(emailInput: string, password: string) {
 
 async function createCustomerSession(customerId: string) {
   const db = getD1();
+  await db.prepare("DELETE FROM customer_sessions WHERE expires_at <= CURRENT_TIMESTAMP").run().catch(() => undefined);
+  const oldSessions = await db.prepare(
+    "SELECT id FROM customer_sessions WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50",
+  ).bind(customerId).all<{ id: string }>();
+  const staleIds = oldSessions.results.slice(4).map((row) => row.id);
+  if (staleIds.length) {
+    await db.batch(staleIds.map((id) => db.prepare("DELETE FROM customer_sessions WHERE id = ?").bind(id))).catch(() => undefined);
+  }
   const token = randomToken();
   const tokenHash = await sha256(token);
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000).toISOString();
