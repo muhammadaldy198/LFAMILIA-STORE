@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getD1 } from "@/db";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
 import type { OrderRecord } from "@/lib/server/orders";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,10 @@ function maskDestination(value: string, server: string | null) {
 }
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
+  const rate = await allowRequest(request, "order-status", 60, 600);
+  if (!rate.allowed) return Response.json({ error: "Terlalu banyak pengecekan transaksi. Coba lagi beberapa menit." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   try {
     const { referenceId } = schema.parse(await request.json());
     const order = await resolveOrder(referenceId);
