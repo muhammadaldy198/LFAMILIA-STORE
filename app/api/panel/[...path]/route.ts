@@ -9,6 +9,7 @@ import * as paymentMethods from "@/app/api/admin/payment-methods/route";
 import * as orders from "@/app/api/admin/orders/route";
 import * as integrations from "@/app/api/admin/integrations/route";
 import * as productContent from "@/app/api/admin/product-content/route";
+import * as productPackageProvider from "@/app/api/admin/product-package-provider/route";
 import * as productPackageStatus from "@/app/api/admin/product-package-status/route";
 import * as products from "@/app/api/admin/products/route";
 import * as productSeed from "@/app/api/admin/products/seed/route";
@@ -43,6 +44,7 @@ const routes: Record<string, RouteHandlers> = {
   "payment-methods": { GET: paymentMethods.GET, POST: paymentMethods.POST, DELETE: paymentMethods.DELETE },
   orders: { GET: orders.GET, PATCH: orders.PATCH },
   "product-content": { PUT: productContent.PUT },
+  "product-package-provider": { PATCH: productPackageProvider.PATCH },
   "product-package-status": { PATCH: productPackageStatus.PATCH },
   products: { GET: products.GET, POST: products.POST, PATCH: products.PATCH, DELETE: products.DELETE },
   "products/seed": { POST: productSeed.POST },
