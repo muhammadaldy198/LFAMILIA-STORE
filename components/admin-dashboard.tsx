@@ -80,7 +80,7 @@ const ownerNavigation: NavigationGroup[] = [
   {
     label: "Kampanye & stok",
     items: [
-      { value: "promotions", label: "Promo & voucher", Icon: TicketPercent },
+      { value: "promotions", label: "Promo & diskon", Icon: TicketPercent },
       { value: "vouchers", label: "Stok kode digital", Icon: TicketPercent },
     ],
   },
@@ -298,7 +298,7 @@ export function AdminDashboard({
           {isOwner && (
             <>
               <TabsContent value="promotions" className="mt-0">
-                <AdminSection title="Promo & voucher" description="Atur kode promo dan harga promo terjadwal per nominal seperti menu Offers pada BagusPay.">
+                <AdminSection title="Promo & diskon" description="Atur kode diskon dan harga promo terjadwal per nominal. Stok kode digital tetap dikelola di menu terpisah.">
                   <AdminPromotionManager role="owner" />
                 </AdminSection>
               </TabsContent>
