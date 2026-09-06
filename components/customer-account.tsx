@@ -27,6 +27,7 @@ import type { CustomerSession } from "@/lib/server/customer-auth";
 import type { WalletSettings } from "@/lib/server/wallet";
 import { formatRupiah } from "@/lib/store-data";
 import { CustomerSupport } from "@/components/customer-support";
+import { CustomerGameAccounts } from "@/components/customer-game-accounts";
 
 type AccountData = {
   customer: CustomerSession;
@@ -313,6 +314,7 @@ function Dashboard({
     ["wallet", "Saldo"],
     ["orders", "Pesanan"],
     ["vouchers", "Kode"],
+    ["game-accounts", "Akun Game"],
     ["notifications", "Notifikasi"],
     ["support", "Bantuan"],
     ["profile", "Profil"],
@@ -434,6 +436,9 @@ function Dashboard({
           <TabsTrigger value="vouchers" className="rounded-xl px-4 text-xs">
             Kode
           </TabsTrigger>
+          <TabsTrigger value="game-accounts" className="rounded-xl px-4 text-xs">
+            Akun Game
+          </TabsTrigger>
           <TabsTrigger
             value="notifications"
             className="rounded-xl px-4 text-xs"
@@ -522,6 +527,9 @@ function Dashboard({
           </TabsContent>
           <TabsContent value="vouchers" className="mt-0">
             <VoucherCodes items={data.vouchers} />
+          </TabsContent>
+          <TabsContent value="game-accounts" className="mt-0">
+            <CustomerGameAccounts />
           </TabsContent>
           <TabsContent value="notifications" className="mt-0">
             <CustomerNotifications data={data} />
