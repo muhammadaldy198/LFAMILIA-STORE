@@ -10,7 +10,6 @@ Worker selalu mengirim environment secara eksplisit:
 
 - DigiFlazz: `development` atau `production`
 - iPaymu: `sandbox` atau `production`
-- Midtrans BI-SNAP: `sandbox` atau `production`
 
 Relay menolak request yang environment-nya tidak valid atau upstream environment tersebut belum dikonfigurasi. Relay tidak menggunakan pola "selain sandbox = production".
 
@@ -33,10 +32,6 @@ DIGIFLAZZ_PRODUCTION_UPSTREAM_ORIGIN=<production-origin>
 IPAYMU_RELAY_HOST=<relay-host>
 IPAYMU_SANDBOX_UPSTREAM_ORIGIN=<sandbox-origin>
 IPAYMU_PRODUCTION_UPSTREAM_ORIGIN=<production-origin>
-
-MIDTRANS_BISNAP_RELAY_HOST=<relay-host>
-MIDTRANS_BISNAP_SANDBOX_UPSTREAM_ORIGIN=<sandbox-origin>
-MIDTRANS_BISNAP_PRODUCTION_UPSTREAM_ORIGIN=<production-origin>
 ```
 
 Tidak ada VA iPaymu di VPS. Tidak ada API key provider di VPS. Environment dipilih oleh Worker melalui header internal yang dilindungi relay token.
@@ -97,10 +92,6 @@ Tidak ada domain, IP, port, upstream, atau token yang ditulis langsung di unit s
 {$IPAYMU_RELAY_HOST} {
   import lfamilia_provider_relay
 }
-
-{$MIDTRANS_BISNAP_RELAY_HOST} {
-  import lfamilia_provider_relay
-}
 ```
 
 ## Pergantian Production
@@ -118,4 +109,4 @@ Tidak perlu mengubah source relay, Caddy, systemd, atau SSH ke VPS saat perganti
 
 Callback provider masuk langsung ke domain publik Worker, bukan melalui VPS relay.
 
-Midtrans Snap tetap dapat berjalan langsung Worker ke Midtrans. BI-SNAP, DigiFlazz, dan iPaymu dapat memakai relay bila membutuhkan IP keluar statis.
+DigiFlazz dan iPaymu dapat memakai relay bila membutuhkan IP keluar statis.
