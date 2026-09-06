@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 
 type Provider = "midtrans" | "ipaymu" | "digiflazz" | "vippayment" | "melostore" | "resend" | "relay" | "security";
 type Mode = "snap" | "bisnap" | "direct" | "service";
@@ -58,12 +57,6 @@ type Overview = {
     ipaymuEnvironment: "sandbox" | "production";
     digiflazzEnvironment: "development" | "production";
     vippaymentEnvironment: "sandbox" | "production";
-  };
-  gatewayToggles: {
-    midtransCheckoutEnabled: boolean;
-    midtransTopupEnabled: boolean;
-    ipaymuCheckoutEnabled: boolean;
-    ipaymuTopupEnabled: boolean;
   };
   profiles: Profile[];
   callbacks: Array<{ id: string; label: string; description: string; kind: "notification" | "callback" | "fallback"; url: string }>;
@@ -219,7 +212,6 @@ function environmentLabel(environment: Environment) {
 export function AdminIntegrationManager() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [selections, setSelections] = useState<Overview["selections"] | null>(null);
-  const [gatewayToggles, setGatewayToggles] = useState<Overview["gatewayToggles"] | null>(null);
   const [formValues, setFormValues] = useState<Record<string, Record<string, string>>>({});
   const [selectedEnvironment, setSelectedEnvironment] = useState<Record<string, Environment>>({});
   const [openId, setOpenId] = useState<string | null>(null);
@@ -238,7 +230,6 @@ export function AdminIntegrationManager() {
       const next = data as unknown as Overview;
       setOverview(next);
       setSelections(next.selections);
-      setGatewayToggles(next.gatewayToggles);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Pengaturan integrasi gagal dimuat.");
     } finally {
@@ -295,7 +286,6 @@ export function AdminIntegrationManager() {
       const next = data.overview as Overview;
       setOverview(next);
       setSelections(next.selections);
-      setGatewayToggles(next.gatewayToggles);
       setFormValues((current) => ({ ...current, [key]: {} }));
       setMessage(`${definition.title} ${environmentLabel(environment)} tersimpan terenkripsi.`);
     } catch (reason) {
@@ -306,7 +296,7 @@ export function AdminIntegrationManager() {
   }
 
   async function saveSelections() {
-    if (!selections || !gatewayToggles) return;
+    if (!selections) return;
     setSaving("selections");
     setError("");
     setMessage("");
@@ -314,14 +304,13 @@ export function AdminIntegrationManager() {
       const response = await fetch("/api/panel/integrations", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "save_selections", selections, gatewayToggles }),
+        body: JSON.stringify({ action: "save_selections", selections }),
       });
       const data = await readJson(response);
       if (!response.ok) throw new Error(String(data.error || "Environment aktif gagal disimpan."));
       const next = data.overview as Overview;
       setOverview(next);
       setSelections(next.selections);
-      setGatewayToggles(next.gatewayToggles);
       setMessage("Mode dan environment aktif berhasil disimpan.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Environment aktif gagal disimpan.");
@@ -340,7 +329,7 @@ export function AdminIntegrationManager() {
   }
 
   if (loading) return <div className="flex min-h-40 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat integrasi…</div>;
-  if (!overview || !selections || !gatewayToggles) return <div className="rounded-md border border-red-400/20 bg-red-400/[0.05] p-3 text-xs text-red-100">{error || "Pengaturan integrasi tidak tersedia."}</div>;
+  if (!overview || !selections) return <div className="rounded-md border border-red-400/20 bg-red-400/[0.05] p-3 text-xs text-red-100">{error || "Pengaturan integrasi tidak tersedia."}</div>;
 
   return (
     <div className="space-y-3">
@@ -361,7 +350,7 @@ export function AdminIntegrationManager() {
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-bold">Mode yang dipakai toko</p>
-            <p className="mt-0.5 text-[10px] text-white/35">Pilih mode/environment lalu aktifkan provider yang benar-benar dipakai untuk checkout atau top up.</p>
+            <p className="mt-0.5 text-[10px] text-white/35">Pilih mode dan environment credential. Aktivasi checkout/top up hanya dikelola dari menu Pembayaran.</p>
           </div>
           <Button type="button" size="sm" disabled={saving === "selections"} onClick={() => void saveSelections()} className="shrink-0 bg-[#b9ff35] text-[#091006] hover:bg-[#d8ff8d]">
             {saving === "selections" ? <LoaderCircle className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}Simpan pilihan
@@ -372,10 +361,6 @@ export function AdminIntegrationManager() {
           <SelectField label="Environment Midtrans" value={selections.midtransEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, midtransEnvironment: value as "sandbox" | "production" } : current)} options={[['sandbox', 'Sandbox'], ['production', 'Production']]} />
           <SelectField label="Environment iPaymu" value={selections.ipaymuEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, ipaymuEnvironment: value as "sandbox" | "production" } : current)} options={[['sandbox', 'Sandbox'], ['production', 'Production']]} />
           <SelectField label="Environment DigiFlazz" value={selections.digiflazzEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, digiflazzEnvironment: value as "development" | "production" } : current)} options={[['development', 'Development'], ['production', 'Production']]} />
-        </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <ProviderToggleCard title="Midtrans" checkout={gatewayToggles.midtransCheckoutEnabled} topup={gatewayToggles.midtransTopupEnabled} onCheckout={(value) => setGatewayToggles((current) => current ? { ...current, midtransCheckoutEnabled: value } : current)} onTopup={(value) => setGatewayToggles((current) => current ? { ...current, midtransTopupEnabled: value } : current)} />
-          <ProviderToggleCard title="iPaymu" checkout={gatewayToggles.ipaymuCheckoutEnabled} topup={gatewayToggles.ipaymuTopupEnabled} onCheckout={(value) => setGatewayToggles((current) => current ? { ...current, ipaymuCheckoutEnabled: value } : current)} onTopup={(value) => setGatewayToggles((current) => current ? { ...current, ipaymuTopupEnabled: value } : current)} />
         </div>
       </section>
 
@@ -442,10 +427,6 @@ export function AdminIntegrationManager() {
 
 function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange(value: string): void; options: Array<[string, string]> }) {
   return <label><span className="field-label">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="admin-select h-9 w-full text-[10px]">{options.map(([item, text]) => <option key={item} value={item}>{text}</option>)}</select></label>;
-}
-
-function ProviderToggleCard({ title, checkout, topup, onCheckout, onTopup }: { title: string; checkout: boolean; topup: boolean; onCheckout(value: boolean): void; onTopup(value: boolean): void }) {
-  return <div className="rounded-md border border-white/[0.07] bg-black/10 p-2.5"><div className="mb-2 flex items-center justify-between"><strong className="text-[10px]">{title}</strong><span className={(checkout || topup) ? "text-[8px] font-black uppercase text-[#d8ff8d]" : "text-[8px] font-black uppercase text-white/28"}>{checkout || topup ? "Aktif" : "Nonaktif"}</span></div><label className="flex items-center justify-between py-1 text-[9px] text-white/48"><span>Checkout</span><Switch checked={checkout} onCheckedChange={onCheckout} /></label><label className="flex items-center justify-between py-1 text-[9px] text-white/48"><span>Top up saldo</span><Switch checked={topup} onCheckedChange={onTopup} /></label></div>;
 }
 
 function CredentialField({ field, value, onChange }: { field: Field; value: string; onChange(value: string): void }) {
