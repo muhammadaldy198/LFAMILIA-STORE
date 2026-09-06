@@ -224,9 +224,9 @@ function buildCallbacks(baseUrl: string) {
     { id: "midtrans-snap", label: "Midtrans Snap Notification URL", description: "Notification URL pada dashboard Midtrans.", kind: "notification" as const, url: route("/api/payments/midtrans/callback") },
     { id: "midtrans-bisnap-debit", label: "Midtrans BI-SNAP Direct Debit", description: "Debit notification URL BI-SNAP.", kind: "notification" as const, url: route("/v1.0/debit/notify") },
     { id: "midtrans-bisnap-qris", label: "Midtrans BI-SNAP QRIS", description: "QRIS MPM notification URL BI-SNAP.", kind: "notification" as const, url: route("/v1.0/qr/qr-mpm-notify") },
-    { id: "midtrans-fallback", label: "Midtrans Fallback URL", description: "Landing page umum bila dashboard meminta return/fallback URL.", kind: "fallback" as const, url: route("/payment") },
+    { id: "midtrans-fallback", label: "Midtrans Fallback URL", description: "Landing page umum bila dashboard meminta return/fallback URL.", kind: "fallback" as const, url: route("/track") },
     { id: "ipaymu", label: "iPaymu Callback / Notification URL", description: "Callback pembayaran otomatis iPaymu.", kind: "callback" as const, url: route("/api/payments/ipaymu/callback") },
-    { id: "ipaymu-fallback", label: "iPaymu Fallback URL", description: "Landing page umum bila provider meminta return/fallback URL.", kind: "fallback" as const, url: route("/payment") },
+    { id: "ipaymu-fallback", label: "iPaymu Fallback URL", description: "Landing page umum bila provider meminta return/fallback URL.", kind: "fallback" as const, url: route("/track") },
     { id: "digiflazz", label: "DigiFlazz Webhook", description: "Webhook status fulfillment DigiFlazz.", kind: "callback" as const, url: route("/api/fulfillment/digiflazz/callback") },
     { id: "vippayment", label: "VIPayment Webhook", description: "Webhook status fulfillment VIPayment.", kind: "callback" as const, url: route("/api/fulfillment/vippayment/callback") },
   ];
