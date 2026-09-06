@@ -43,14 +43,9 @@ Tidak ada VA iPaymu di VPS. Tidak ada API key provider di VPS. Environment dipil
 
 ## Authentication relay
 
-Cloudflare Worker menyimpan:
+Sisi Worker dikonfigurasi dari **Admin Panel → Integrasi & harga → VPS Relay**. URL relay per provider dan Relay Token disimpan terenkripsi di D1 lalu dihidrasi menjadi konfigurasi runtime Worker. Tidak perlu membuat `PROVIDER_RELAY_*` manual di Cloudflare.
 
-```text
-PROVIDER_RELAY_TOKEN
-PROVIDER_RELAY_HOSTS
-```
-
-`PROVIDER_RELAY_TOKEN` harus sama dengan `RELAY_TOKEN` di VPS.
+Nilai **Relay Token** di Admin Panel harus sama persis dengan `RELAY_TOKEN` di VPS.
 
 Header internal relay tidak diteruskan ke provider.
 
@@ -110,10 +105,10 @@ Tidak ada domain, IP, port, upstream, atau token yang ditulis langsung di unit s
 
 ## Pergantian Production
 
-VPS disiapkan untuk seluruh environment sejak awal. Setelah credential Production tersedia, perubahan dilakukan pada Cloudflare:
+VPS disiapkan untuk seluruh environment sejak awal. Setelah credential Production tersedia:
 
-1. isi credential Production;
-2. ubah selector environment;
+1. isi credential Production di Integration Manager Admin Panel;
+2. ubah selector environment ke Production di Admin Panel;
 3. Worker mengirim environment baru ke relay;
 4. relay memakai upstream Production yang sudah tersedia di env VPS.
 
