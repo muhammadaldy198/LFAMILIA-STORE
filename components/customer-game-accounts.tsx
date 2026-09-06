@@ -48,7 +48,10 @@ export function CustomerGameAccounts() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   function reset() {
     setEditingId(null); setProductSlug(""); setLabel(""); setNickname(""); setValues({}); setError("");
