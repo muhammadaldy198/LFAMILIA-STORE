@@ -5,7 +5,9 @@ import test from "node:test";
 
 const root = process.cwd();
 const ipaymu = fs.readFileSync(path.join(root, "lib/server/ipaymu.ts"), "utf8");
+const relay = fs.readFileSync(path.join(root, "lib/server/provider-relay.ts"), "utf8");
 const methods = fs.readFileSync(path.join(root, "app/api/payment-methods/route.ts"), "utf8");
+const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/route.ts"), "utf8");
 
 test("iPaymu uses official Direct Payment endpoints by default", () => {
   assert.match(ipaymu, /https:\/\/sandbox\.ipaymu\.com\/api\/v2\/payment\/direct/);
@@ -17,7 +19,16 @@ test("iPaymu production readiness requires configured static relay", () => {
   assert.match(ipaymu, /isProviderRelayConfigured\("ipaymu"\)/);
 });
 
-test("storefront advertises only ready gateways", () => {
+test("operational readiness probes relay authentication before routing", () => {
+  assert.match(ipaymu, /getIpaymuOperationalReadiness/);
+  assert.match(ipaymu, /probeProviderRelay\("ipaymu", "iPaymu"\)/);
+  assert.match(relay, /export async function probeProviderRelay/);
+  assert.match(autoRoute, /getIpaymuOperationalReadiness\(\)/);
+});
+
+test("storefront advertises only operationally ready gateways", () => {
+  assert.match(methods, /getIpaymuOperationalReadiness\(\)/);
+  assert.match(methods, /getMidtransOperationalReadiness\(\)/);
   assert.match(methods, /settings\.ipaymuCheckoutEnabled && ipaymuReadiness\.ready/);
   assert.match(methods, /settings\.midtransCheckoutEnabled && midtransReadiness\.ready/);
   assert.match(methods, /allChannels/);
