@@ -126,3 +126,8 @@ PROVIDER_RELAY_HOSTS
 5. Jangan mengubah Caddy.
 
 Tidak ada fallback otomatis ke Production karena key tersedia, prefix key, VA, atau nilai lainnya.
+
+
+## Security root
+
+Credential provider di Integration Manager dienkripsi sebelum masuk D1. Satu-satunya root secret yang wajib tetap berada di Cloudflare adalah `INTEGRATION_ENCRYPTION_KEY` (minimal 32 karakter). Jika root secret berubah, profile lama tidak dapat didekripsi dan panel akan menandainya sebagai **Kunci enkripsi tidak cocok**.
