@@ -59,3 +59,12 @@ test("customer sessions are bounded and stale rate-limit buckets are cleaned", (
   assert.match(read("lib/server/customer-auth.ts"), /oldSessions\.results\.slice\(4\)/);
   assert.match(read("worker/index.ts"), /cleanupSecurityRateLimits/);
 });
+
+
+test("customer login and registration support Cloudflare Turnstile", () => {
+  for (const file of ["app/api/auth/login/route.ts", "app/api/auth/register/route.ts"]) {
+    const source = read(file);
+    assert.match(source, /verifyTurnstile\(request, input\.turnstileToken\)/);
+  }
+  assert.match(read("lib/server/turnstile.ts"), /turnstile\/v0\/siteverify/);
+});
