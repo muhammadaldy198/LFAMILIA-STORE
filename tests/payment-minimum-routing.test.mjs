@@ -19,7 +19,7 @@ test("checkout hides iPaymu-only channels below the minimum", () => {
   assert.match(checkout, /isIpaymuAmountSupported\(subtotal\)/);
 });
 
-test("server routing prefers operational iPaymu and safely falls back to Midtrans", () => {
+test("server routing prefers configured iPaymu and safely falls back to Midtrans", () => {
   assert.match(autoRoute, /const canUseIpaymu/);
   assert.match(autoRoute, /isIpaymuAmountSupported\(promotion\.finalPrice\)/);
   assert.match(autoRoute, /const canUseMidtrans/);
