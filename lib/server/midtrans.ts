@@ -1,3 +1,4 @@
+import { isProviderRelayConfigured, probeProviderRelay } from "@/lib/server/provider-relay";
 import {
   createMidtransBisnapPayment,
   getMidtransBisnapReadiness,
@@ -177,6 +178,31 @@ export function getMidtransReadiness() {
           : "Konfigurasi Midtrans belum lengkap.",
     };
   }
+}
+
+export async function getMidtransOperationalReadiness() {
+  const configured = getMidtransReadiness();
+  if (!configured.ready) return configured;
+
+  if (
+    configured.mode === "bisnap" &&
+    isProviderRelayConfigured("midtrans-bisnap")
+  ) {
+    const relay = await probeProviderRelay(
+      "midtrans-bisnap",
+      "Midtrans BI-SNAP",
+    );
+    if (!relay.connected) {
+      return {
+        ready: false as const,
+        mode: configured.mode,
+        environment: configured.environment,
+        reason: relay.message,
+      };
+    }
+  }
+
+  return configured;
 }
 
 export function isMidtransChannelSupported(
