@@ -8,6 +8,7 @@ import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
+  BUCKET?: R2Bucket;
   IMAGES?: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
