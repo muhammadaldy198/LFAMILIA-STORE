@@ -350,8 +350,11 @@ export function AdminDashboard({
                     <SettingCard title="Pengiriman kode" status="Khusus Pemilik" text="Website dan email Resend mengirim voucher tanpa membuka stok ke Staff." />
                   </div>
                 </AdminSection>
+                <AdminSection title="VPS Relay" description="Hubungkan Worker LFAMILIA ke relay DigiFlazz, iPaymu, dan Midtrans BI-SNAP ber-IP statis.">
+                  <AdminIntegrationManager view="relay" />
+                </AdminSection>
                 <AdminSection title="Kredensial API & callback" description="Simpan API key terenkripsi, pilih Sandbox/Production, atur mode Snap atau BI-SNAP, dan salin URL callback provider.">
-                  <AdminIntegrationManager />
+                  <AdminIntegrationManager view="providers" />
                 </AdminSection>
                 <AdminSection title="Harga otomatis DigiFlazz" description="Sinkronkan daftar harga DigiFlazz dan atur margin penjualan per nominal.">
                   <AdminDigiflazzPricing />
