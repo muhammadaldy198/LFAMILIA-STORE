@@ -44,6 +44,7 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["customer_users", "tier_override", "tier_override TEXT"],
   ["customer_users", "tier_progress_bonus", "tier_progress_bonus INTEGER DEFAULT 0 NOT NULL"],
   ["store_settings", "discord_url", "discord_url TEXT"],
+  ["store_settings", "support_widget_enabled", "support_widget_enabled INTEGER DEFAULT 1 NOT NULL"],
   ["product_packages", "package_group", "package_group TEXT"],
   ["product_packages", "provider_code", "provider_code TEXT"],
   ["product_packages", "provider_sku", "provider_sku TEXT"],
