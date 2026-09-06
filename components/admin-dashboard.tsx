@@ -23,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminDigiflazzPricing } from "@/components/admin-digiflazz-pricing";
+import { AdminIntegrationManager } from "@/components/admin-integration-manager";
 import { AdminExperienceManager } from "@/components/admin-experience-manager";
 import { AdminMemberManager } from "@/components/admin-member-manager";
 import { AdminOrderManager } from "@/components/admin-order-manager";
@@ -346,6 +347,9 @@ export function AdminDashboard({
                     <SettingCard title="DigiFlazz & VIPayment" status="Secret Cloudflare" text="SKU per nominal dan callback provider tervalidasi." />
                     <SettingCard title="Pengiriman kode" status="Khusus Pemilik" text="Email serta WhatsApp mengirim voucher tanpa membuka stok ke Staff." />
                   </div>
+                </AdminSection>
+                <AdminSection title="Kredensial API & callback" description="Simpan API key terenkripsi, pilih Sandbox/Production, atur mode Snap atau BI-SNAP, dan salin URL callback provider.">
+                  <AdminIntegrationManager />
                 </AdminSection>
                 <AdminSection title="Harga otomatis DigiFlazz" description="Sinkronkan daftar harga DigiFlazz dan atur margin penjualan per nominal.">
                   <AdminDigiflazzPricing />

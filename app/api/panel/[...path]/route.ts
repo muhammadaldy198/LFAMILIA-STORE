@@ -7,6 +7,7 @@ import * as media from "@/app/api/admin/media/route";
 import * as members from "@/app/api/admin/members/route";
 import * as paymentMethods from "@/app/api/admin/payment-methods/route";
 import * as orders from "@/app/api/admin/orders/route";
+import * as integrations from "@/app/api/admin/integrations/route";
 import * as productContent from "@/app/api/admin/product-content/route";
 import * as productPackageStatus from "@/app/api/admin/product-package-status/route";
 import * as products from "@/app/api/admin/products/route";
@@ -35,6 +36,7 @@ const routes: Record<string, RouteHandlers> = {
   content: { GET: content.GET, POST: content.POST, DELETE: content.DELETE },
   "digiflazz-pricing": { GET: digiflazzPricing.GET, POST: digiflazzPricing.POST },
   "digiflazz-monitor": { GET: digiflazzMonitor.GET, POST: digiflazzMonitor.POST },
+  integrations: { GET: integrations.GET, PUT: integrations.PUT },
   faqs: { GET: faqs.GET, POST: faqs.POST, DELETE: faqs.DELETE },
   media: { POST: media.POST },
   members: { GET: members.GET, PUT: members.PUT, PATCH: members.PATCH },

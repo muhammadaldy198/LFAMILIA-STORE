@@ -2,6 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { setRuntimeEnv } from "../lib/server/runtime-env";
+import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 
 interface Env {
@@ -34,7 +35,7 @@ interface ScheduledEvent { cron: string; }
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    setRuntimeEnv(env);
+    setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
     const url = new URL(request.url);
     const isAccessProtectedRequest =
       url.pathname === "/admin/panel" ||
@@ -112,7 +113,7 @@ const worker = {
     return response;
   },
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    setRuntimeEnv(env);
+    setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
     ctx.waitUntil(syncDigiflazzPrices().catch(() => undefined));
   },
 };
