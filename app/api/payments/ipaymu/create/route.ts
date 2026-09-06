@@ -21,7 +21,6 @@ import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
 import { readWalletSettings } from "@/lib/server/wallet";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
-import { IPAYMU_MIN_CHECKOUT_AMOUNT, isIpaymuAmountSupported } from "@/lib/payment-limits";
 
 export const dynamic = "force-dynamic";
 
@@ -109,15 +108,6 @@ export async function POST(request: Request) {
         : null,
     );
 
-    if (!isIpaymuAmountSupported(promotion.finalPrice)) {
-      return Response.json(
-        {
-          error: `iPaymu hanya tersedia mulai Rp${IPAYMU_MIN_CHECKOUT_AMOUNT.toLocaleString("id-ID")}. Pilih Midtrans QRIS/e-wallet untuk nominal ini.`,
-        },
-        { status: 422 },
-      );
-    }
-
     const customerData = normalizeCustomerInputs(item, input.customerInputs, input.destination, input.server || null);
     const identity = createOrderIdentity();
     referenceId = identity.referenceId;
@@ -204,18 +194,13 @@ export async function POST(request: Request) {
           : "Pembayaran iPaymu gagal dibuat.";
     if (referenceId)
       await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
-    const safeFallback =
-      error instanceof IpaymuProviderError && error.safeToFallback;
     return Response.json(
-      {
-        error: message,
-        fallbackAllowed: safeFallback,
-      },
+      { error: message },
       {
         status:
           error instanceof z.ZodError
             ? 400
-            : safeFallback
+            : error instanceof IpaymuProviderError
               ? 502
               : 503,
       },
