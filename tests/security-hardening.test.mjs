@@ -68,3 +68,16 @@ test("customer login and registration support Cloudflare Turnstile", () => {
   }
   assert.match(read("lib/server/turnstile.ts"), /turnstile\/v0\/siteverify/);
 });
+
+
+test("phone transaction search never exposes full invoice references", () => {
+  const source = read("app/api/orders/search/route.ts");
+  assert.match(source, /mapSummary\(row, false\)/);
+  assert.match(source, /allowRequest\(request, "order-phone-search"/);
+});
+
+test("owner setup trusts only Worker-injected Access identity", () => {
+  const source = read("lib/server/admin.ts");
+  assert.match(source, /x-lfamilia-admin-email/);
+  assert.doesNotMatch(source, /cf-access-authenticated-user-email/);
+});
