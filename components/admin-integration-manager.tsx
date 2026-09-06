@@ -183,8 +183,10 @@ const definitions: Definition[] = [
     description: "Daftar hostname relay ber-IP statis dan token autentikasi Worker → VPS.",
     environments: ["global"],
     fields: [
-      { key: "hosts", label: "Relay Hosts", placeholder: "digiflazz-relay.domain.tld, ipaymu-relay.domain.tld" },
-      { key: "token", label: "Relay Token", secret: true },
+      { key: "digiflazzOrigin", label: "DigiFlazz Relay URL", inputMode: "url", placeholder: "https://digiflazz-relay.lfamiliastore.my.id" },
+      { key: "ipaymuOrigin", label: "iPaymu Relay URL", inputMode: "url", placeholder: "https://ipaymu-relay.lfamiliastore.my.id" },
+      { key: "bisnapOrigin", label: "BI-SNAP Relay URL", inputMode: "url", placeholder: "https://bisnap-relay.lfamiliastore.my.id" },
+      { key: "token", label: "Relay Token", secret: true, help: "Harus sama persis dengan RELAY_TOKEN pada VPS." },
     ],
   },
   {
@@ -377,7 +379,7 @@ export function AdminIntegrationManager({
 
       {view === "relay" && (
         <div className="rounded-lg border border-sky-300/20 bg-sky-300/[0.045] p-3 text-[10px] leading-4 text-white/52">
-          Relay menghubungkan Worker LFAMILIA ke VPS ber-IP statis. Isi ketiga hostname relay dan token yang sama dengan RELAY_TOKEN di VPS. API key provider tidak disimpan di VPS.
+          Relay menghubungkan Worker LFAMILIA ke VPS ber-IP statis. Isi URL DigiFlazz, iPaymu, BI-SNAP, dan Relay Token di sini. Semua disimpan terenkripsi di D1; tidak perlu membuat PROVIDER_RELAY_* di Cloudflare.
         </div>
       )}
 
