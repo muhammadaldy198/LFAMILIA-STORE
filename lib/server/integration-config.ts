@@ -24,6 +24,9 @@ type RuntimeLike = Record<string, unknown> & {
   VOUCHER_DELIVERY_CHANNEL?: string;
   PROVIDER_RELAY_TOKEN?: string;
   PROVIDER_RELAY_HOSTS?: string;
+  PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?: string;
+  PROVIDER_RELAY_IPAYMU_ORIGIN?: string;
+  PROVIDER_RELAY_MIDTRANS_BISNAP_ORIGIN?: string;
   VOUCHER_ENCRYPTION_KEY?: string;
 };
 
@@ -92,7 +95,7 @@ export const profileFields: Record<string, readonly string[]> = {
   "vippayment:direct": ["apiId", "apiKey", "apiUrl"],
   "melostore:service": ["apiKey", "secretKey", "apiUrl", "nicknameApiKey"],
   "resend:service": ["apiKey", "fromEmail", "apiUrl", "deliveryChannel"],
-  "relay:service": ["hosts", "token"],
+  "relay:service": ["digiflazzOrigin", "ipaymuOrigin", "bisnapOrigin", "hosts", "token"],
   "security:service": ["voucherEncryptionKey"],
 };
 
@@ -419,6 +422,9 @@ function applyResendConfig(target: Record<string, unknown>, config: Record<strin
   if (channel === "website" || channel === "email") target.VOUCHER_DELIVERY_CHANNEL = channel;
 }
 function applyRelayConfig(target: Record<string, unknown>, config: Record<string, string>) {
+  put(target, "PROVIDER_RELAY_DIGIFLAZZ_ORIGIN", config.digiflazzOrigin);
+  put(target, "PROVIDER_RELAY_IPAYMU_ORIGIN", config.ipaymuOrigin);
+  put(target, "PROVIDER_RELAY_MIDTRANS_BISNAP_ORIGIN", config.bisnapOrigin);
   put(target, "PROVIDER_RELAY_HOSTS", config.hosts);
   put(target, "PROVIDER_RELAY_TOKEN", config.token);
 }
