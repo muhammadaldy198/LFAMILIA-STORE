@@ -521,6 +521,26 @@ async function transactionalPost<T>(
   return payload;
 }
 
+export function getMidtransBisnapReadiness() {
+  try {
+    const config = environmentConfig();
+    return {
+      ready: true as const,
+      environment: config.environment,
+      reason: null,
+    };
+  } catch (error) {
+    return {
+      ready: false as const,
+      environment: null,
+      reason:
+        error instanceof Error
+          ? error.message
+          : "Konfigurasi Midtrans BI-SNAP belum lengkap.",
+    };
+  }
+}
+
 export async function createMidtransBisnapPayment(input: {
   referenceId: string;
   amount: number;
