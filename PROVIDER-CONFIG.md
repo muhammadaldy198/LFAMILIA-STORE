@@ -1,15 +1,17 @@
 # Provider Environment Matrix
 
-Konfigurasi provider LFAMILIA bersifat environment-explicit. Production credential boleh kosong sampai onboarding selesai. Source hanya membaca slot environment yang dipilih.
+Konfigurasi provider LFAMILIA bersifat environment-explicit. Credential dan pilihan environment operasional disimpan terenkripsi dari Admin Panel. Production credential boleh kosong sampai onboarding selesai. Nama variabel di bawah adalah nama runtime internal yang dibentuk dari konfigurasi panel, bukan daftar Variable/Secret yang harus dibuat manual di Cloudflare.
 
-## Selectors
+## Selector Admin Panel
 
-```text
-MIDTRANS_ENV=sandbox|production
-MIDTRANS_MODE=snap|bisnap
-IPAYMU_ENV=sandbox|production
-DIGIFLAZZ_ENV=development|production
-```
+Atur dari **Admin Panel → Integrasi & harga → Kredensial API & callback**:
+
+- Mode Midtrans: Snap atau BI-SNAP
+- Environment Midtrans: Sandbox atau Production
+- Environment iPaymu: Sandbox atau Production
+- Environment DigiFlazz: Development atau Production
+
+Runtime internal tetap memakai `MIDTRANS_ENV`, `MIDTRANS_MODE`, `IPAYMU_ENV`, dan `DIGIFLAZZ_ENV`, tetapi nilainya dihidrasi dari D1 oleh Integration Manager.
 
 ## Midtrans Snap
 
@@ -127,13 +129,12 @@ Tidak perlu membuat `PROVIDER_RELAY_*` manual di Cloudflare. Worker membentuk ru
 
 ## Switching to Production
 
-1. Isi slot Production di Cloudflare.
-2. Ubah selector terkait ke `production`.
-3. Jangan mengubah repo.
-4. Jangan mengubah VPS.
-5. Jangan mengubah Caddy.
+1. Buka **Admin Panel → Integrasi & harga → Kredensial API & callback**.
+2. Isi credential pada slot Production provider terkait.
+3. Ubah selector environment menjadi **Production** lalu simpan.
+4. Jangan mengubah repo, Caddy, atau service VPS hanya untuk berpindah environment.
 
-Tidak ada fallback otomatis ke Production karena key tersedia, prefix key, VA, atau nilai lainnya.
+Tidak ada fallback otomatis ke Production hanya karena credential Production sudah tersedia. `INTEGRATION_ENCRYPTION_KEY` tetap satu-satunya root secret integrasi yang wajib berada di Cloudflare.
 
 
 ## Security root
