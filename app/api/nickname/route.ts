@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getRuntimeEnv, requireRuntimeValue } from "@/lib/server/runtime-env";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,10 @@ type MelostoreResponse = {
 };
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
+  const rate = await allowRequest(request, "nickname-lookup", 30, 600);
+  if (!rate.allowed) return Response.json({ error: "Terlalu banyak pengecekan nickname. Coba lagi beberapa menit." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   try {
     const input = requestSchema.parse(await request.json());
 
