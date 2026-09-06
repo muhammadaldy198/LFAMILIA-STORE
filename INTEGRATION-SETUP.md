@@ -36,7 +36,7 @@ Gunakan domain publik yang sama dengan `PUBLIC_BASE_URL`:
 
 | Layanan | URL |
 |---|---|
-| Midtrans notification | `https://lfamiliastore.my.id/api/payments/midtrans/callback` |
+| iPaymu callback | `https://lfamiliastore.my.id/api/payments/ipaymu/callback` |
 | DigiFlazz webhook | `https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback` |
 | VIPayment webhook | `https://lfamiliastore.my.id/api/fulfillment/vippayment/callback` |
 
@@ -80,7 +80,7 @@ Saat pembayaran terkonfirmasi lunas, satu baris stok direservasi secara atomik. 
 
 ## 7. Syarat IP provider dan VPS relay
 
-DigiFlazz, iPaymu, dan Midtrans BI-SNAP dapat menggunakan satu VPS relay ber-IP keluar statis. URL relay per provider dan token Worker → VPS disimpan terenkripsi dari **Integrasi & harga → VPS Relay**. Tidak perlu membuat `PROVIDER_RELAY_*` manual di Cloudflare. Konfigurasi service VPS/Caddy tetap mengikuti `relay/README.md`.
+DigiFlazz dan iPaymu dapat menggunakan satu VPS relay ber-IP keluar statis. URL relay per provider dan token Worker → VPS disimpan terenkripsi dari **Integrasi & harga → VPS Relay**. Tidak perlu membuat `PROVIDER_RELAY_*` manual di Cloudflare. Konfigurasi service VPS/Caddy tetap mengikuti `relay/README.md`.
 
 VPS disiapkan untuk seluruh environment sejak awal. Worker mengirim environment eksplisit pada setiap request relay.
 
@@ -91,7 +91,7 @@ Saat berpindah ke Production:
 3. jangan mengubah source repo atau Caddy;
 4. jangan SSH ke VPS hanya untuk mengganti environment.
 
-Callback provider tetap masuk langsung ke `PUBLIC_BASE_URL`. Midtrans Snap tetap dapat berjalan langsung dari Worker.
+Callback provider tetap masuk langsung ke `PUBLIC_BASE_URL`.
 
 ## 8. Menambah provider lain
 
@@ -111,7 +111,6 @@ Arsitektur checkout dan tabel order tidak perlu diubah hanya untuk menambah adap
 - Migrasi D1 production berhasil.
 - Cloudflare Access aktif.
 - Harga, margin, dan SKU sudah diverifikasi.
-- Midtrans diuji di Sandbox sebelum selector Environment Midtrans di panel diubah ke Production.
 - DigiFlazz tetap memakai Development sampai selector Environment DigiFlazz di panel memang ingin diubah ke Production.
 - Callback semua provider telah diuji.
 - Tidak ada secret atau konfigurasi environment operasional di GitHub.
