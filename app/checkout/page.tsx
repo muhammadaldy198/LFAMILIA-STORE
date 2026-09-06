@@ -766,33 +766,11 @@ function CheckoutContent() {
                 <StepTitle
                   number="3"
                   title="Pilih Pembayaran"
-                  description="Pilih gateway, metode, lalu channel jika tersedia."
+                  description="Pilih metode pembayaran yang ingin digunakan."
                 />
-                {eligibleGatewayOptions.length > 1 && (
-                  <div className="mt-3 rounded-lg border border-white/[0.08] bg-black/10 p-2">
-                    <p className="px-1 text-[9px] font-bold text-white/45">Pilih gateway pembayaran</p>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      {eligibleGatewayOptions.map((gateway) => {
-                        const selectedGateway = activeCheckoutGateway === gateway.code;
-                        return (
-                          <button
-                            key={gateway.code}
-                            type="button"
-                            aria-pressed={selectedGateway}
-                            onClick={() => chooseGateway(gateway)}
-                            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left transition ${selectedGateway ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.10] text-[#d8ff8d]" : "border-white/[0.08] bg-white/[0.025] text-white/60 hover:text-white"}`}
-                          >
-                            <span className="text-[10px] font-black">{gateway.label}</span>
-                            <span className="text-[8px] text-white/40">{gateway.channels.length} channel</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
                 {subtotal > 0 && subtotal < IPAYMU_MIN_CHECKOUT_AMOUNT && gatewayOptions.some((gateway) => gateway.code === "ipaymu") && (
                   <div className="mt-3 rounded-md border border-amber-300/15 bg-amber-300/[0.05] px-2.5 py-2 text-[9px] leading-4 text-amber-100/70">
-                    Nominal di bawah {formatRupiah(IPAYMU_MIN_CHECKOUT_AMOUNT)} otomatis dialihkan dari iPaymu ke Midtrans jika tersedia.
+                    Metode pembayaran yang tersedia sudah disesuaikan otomatis dengan nominal transaksi.
                   </div>
                 )}
                 <div className="mt-3 space-y-2">
