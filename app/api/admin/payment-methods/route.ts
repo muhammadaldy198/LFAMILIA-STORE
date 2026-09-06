@@ -24,8 +24,8 @@ const channelSchema = z.object({
 async function activeGateways(): Promise<PaymentGatewayName[]> {
   const settings = await readWalletSettings();
   const gateways: PaymentGatewayName[] = [];
-  if (settings.midtransCheckoutEnabled) gateways.push("midtrans");
   if (settings.ipaymuCheckoutEnabled) gateways.push("ipaymu");
+  if (settings.midtransCheckoutEnabled) gateways.push("midtrans");
   return gateways;
 }
 
