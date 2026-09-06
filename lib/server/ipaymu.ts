@@ -121,7 +121,7 @@ function activeConfig() {
     parsed = new URL(selected.apiUrl);
   } catch {
     throw new Error(
-      `${environment === "sandbox" ? "IPAYMU_SANDBOX_API_URL" : "IPAYMU_PRODUCTION_API_URL"} di Cloudflare bukan URL yang valid.`,
+      `${environment === "sandbox" ? "IPAYMU_SANDBOX_API_URL" : "IPAYMU_PRODUCTION_API_URL"} pada konfigurasi iPaymu bukan URL yang valid.`,
     );
   }
   if (parsed.protocol !== "https:")
