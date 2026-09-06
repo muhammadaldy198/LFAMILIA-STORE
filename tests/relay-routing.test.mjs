@@ -41,3 +41,27 @@ test("admin exposes separate encrypted relay URLs and token", () => {
   }
   assert.match(source, /tidak perlu membuat PROVIDER_RELAY_\* di Cloudflare/);
 });
+
+
+test("relay probe verifies health and token without provider transaction", () => {
+  const relay = read("lib/server/provider-relay.ts");
+  assert.match(relay, /new URL\("\/health"/);
+  assert.match(relay, /method: "HEAD"/);
+  assert.match(relay, /authResponse\.status === 405/);
+  assert.match(relay, /Relay Token tidak cocok dengan VPS/);
+});
+
+test("owner integration endpoint exposes relay test action", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  assert.match(route, /z\.literal\("test_relay"\)/);
+  assert.match(route, /testProviderRelayConnections\(\)/);
+});
+
+test("admin relay view renders connection test button and provider statuses", () => {
+  const source = read("components/admin-integration-manager.tsx");
+  assert.match(source, /Tes Koneksi Relay/);
+  assert.match(source, /DigiFlazz/);
+  assert.match(source, /iPaymu/);
+  assert.match(source, /Midtrans BI-SNAP/);
+  assert.match(source, /Connected/);
+});
