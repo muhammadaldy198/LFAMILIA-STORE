@@ -16,6 +16,7 @@ test("checkout hides gateway/provider selector from customers", () => {
 test("gateway routing is handled server-side", () => {
   assert.match(source, /\/api\/payments\/auto\/create/);
   assert.match(autoRoute, /canUseIpaymu/);
-  assert.match(autoRoute, /return createIpaymuCheckout\(request\)/);
-  assert.match(autoRoute, /return createMidtransCheckout\(request\)/);
+  assert.match(autoRoute, /createIpaymuCheckout\(ipaymuRequest\)/);
+  assert.match(autoRoute, /fallbackAllowed/);
+  assert.match(autoRoute, /createMidtransCheckout\(midtransRequest\)/);
 });
