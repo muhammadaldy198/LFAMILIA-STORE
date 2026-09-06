@@ -202,7 +202,7 @@ export function AdminDashboard({
       </header>
 
       <main>
-        <Tabs value={activeTab} onValueChange={selectTab} className="mx-auto max-w-[1440px] gap-4 px-3 py-4 sm:px-5 lg:grid lg:grid-cols-[238px_minmax(0,1fr)]">
+        <Tabs orientation="vertical" value={activeTab} onValueChange={selectTab} className="mx-auto max-w-[1440px] gap-4 px-3 py-4 sm:px-5 lg:grid lg:grid-cols-[238px_minmax(0,1fr)]">
         {menuOpen && (
           <>
             <button
@@ -244,7 +244,7 @@ export function AdminDashboard({
           </>
         )}
 
-        <TabsList className="hidden h-[calc(100vh-5.5rem)] w-full flex-col items-stretch overflow-y-auto rounded-lg border border-white/[0.08] bg-[#0d1019] p-2 lg:sticky lg:top-[4.5rem] lg:!flex">
+        <TabsList className="hidden w-full flex-col items-stretch overflow-y-auto rounded-lg border border-white/[0.08] bg-[#0d1019] p-2 lg:sticky lg:top-[4.5rem] lg:!flex lg:!h-[calc(100vh-5.5rem)] lg:self-start">
           <div className="mb-2 rounded-md border border-white/[0.08] bg-white/[0.025] px-3 py-2.5">
             <p className="text-[10px] font-black tracking-[0.14em] text-white">LFAMILIA STORE</p>
             <p className="mt-0.5 text-[9px] text-white/34">{isOwner ? "Pemilik · akses penuh" : "Staff · operasional toko"}</p>
