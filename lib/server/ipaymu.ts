@@ -1,6 +1,7 @@
 import { hashHex, hmacHex, safeEqual } from "@/lib/server/crypto";
 import {
   isProviderRelayConfigured,
+  probeProviderRelay,
   providerRelayRequest,
 } from "@/lib/server/provider-relay";
 import {
@@ -161,6 +162,24 @@ export function getIpaymuReadiness() {
           : "Konfigurasi iPaymu belum lengkap.",
     };
   }
+}
+
+export async function getIpaymuOperationalReadiness() {
+  const configured = getIpaymuReadiness();
+  if (!configured.ready) return configured;
+
+  if (isProviderRelayConfigured("ipaymu")) {
+    const relay = await probeProviderRelay("ipaymu", "iPaymu");
+    if (!relay.connected) {
+      return {
+        ready: false as const,
+        environment: configured.environment,
+        reason: relay.message,
+      };
+    }
+  }
+
+  return configured;
 }
 
 function timestamp() {
