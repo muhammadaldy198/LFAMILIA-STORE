@@ -90,6 +90,26 @@ DIGIFLAZZ_PRODUCTION_PRICE_LIST_URL
 DIGIFLAZZ_WEBHOOK_SECRET
 ```
 
+## Service Integration Manager
+
+Selain provider pembayaran, panel dapat menyimpan terenkripsi:
+
+```text
+MELOSTORE_API_KEY
+MELOSTORE_SECRET_KEY
+MELOSTORE_API_URL
+NICKNAME_API_KEY
+RESEND_API_KEY
+RESEND_FROM_EMAIL
+RESEND_API_URL
+VOUCHER_DELIVERY_CHANNEL=website|email
+PROVIDER_RELAY_TOKEN
+PROVIDER_RELAY_HOSTS
+VOUCHER_ENCRYPTION_KEY
+```
+
+`INTEGRATION_ENCRYPTION_KEY` tetap Cloudflare Secret root minimal 32 karakter dan tidak disimpan di D1.
+
 ## Relay Cloudflare
 
 ```text
