@@ -135,6 +135,7 @@ export function AdminProductManager() {
   async function refreshSellerMonitor() {
     setMonitorRefreshing(true);
     setError("");
+    setMessage("");
     try {
       const response = await fetch("/api/panel/digiflazz-monitor", { method: "POST" });
       const data = await response.json() as DigiflazzMonitorPayload & { error?: string };
