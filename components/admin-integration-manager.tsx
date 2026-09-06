@@ -209,7 +209,11 @@ function environmentLabel(environment: Environment) {
   return environment === "development" ? "Development" : environment === "sandbox" ? "Sandbox" : "Production";
 }
 
-export function AdminIntegrationManager() {
+export function AdminIntegrationManager({
+  view = "providers",
+}: {
+  view?: "providers" | "relay";
+}) {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [selections, setSelections] = useState<Overview["selections"] | null>(null);
   const [formValues, setFormValues] = useState<Record<string, Record<string, string>>>({});
@@ -245,6 +249,13 @@ export function AdminIntegrationManager() {
   const profileMap = useMemo(() => new Map(
     (overview?.profiles ?? []).map((profile) => [`${profile.provider}:${profile.mode}:${profile.environment}`, profile]),
   ), [overview]);
+
+  const visibleDefinitions = useMemo(
+    () => definitions.filter((definition) =>
+      view === "relay" ? definition.provider === "relay" : definition.provider !== "relay",
+    ),
+    [view],
+  );
 
   function currentEnvironment(definition: Definition) {
     return selectedEnvironment[definition.id] ?? definition.environments[0];
@@ -346,7 +357,7 @@ export function AdminIntegrationManager() {
         </div>
       </div>
 
-      <section className="rounded-lg border border-white/[0.08] bg-white/[0.015] p-3">
+      {view === "providers" && <section className="rounded-lg border border-white/[0.08] bg-white/[0.015] p-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-bold">Mode yang dipakai toko</p>
@@ -362,10 +373,16 @@ export function AdminIntegrationManager() {
           <SelectField label="Environment iPaymu" value={selections.ipaymuEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, ipaymuEnvironment: value as "sandbox" | "production" } : current)} options={[['sandbox', 'Sandbox'], ['production', 'Production']]} />
           <SelectField label="Environment DigiFlazz" value={selections.digiflazzEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, digiflazzEnvironment: value as "development" | "production" } : current)} options={[['development', 'Development'], ['production', 'Production']]} />
         </div>
-      </section>
+      </section>}
+
+      {view === "relay" && (
+        <div className="rounded-lg border border-sky-300/20 bg-sky-300/[0.045] p-3 text-[10px] leading-4 text-white/52">
+          Relay menghubungkan Worker LFAMILIA ke VPS ber-IP statis. Isi ketiga hostname relay dan token yang sama dengan RELAY_TOKEN di VPS. API key provider tidak disimpan di VPS.
+        </div>
+      )}
 
       <div className="space-y-2">
-        {definitions.map((definition) => {
+        {visibleDefinitions.map((definition) => {
           const environment = currentEnvironment(definition);
           const key = profileKey(definition, environment);
           const saved = profileMap.get(key);
