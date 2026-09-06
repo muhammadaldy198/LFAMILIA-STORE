@@ -126,10 +126,7 @@ export function AdminProductManager() {
   }, []);
 
   useEffect(() => {
-    if (role !== "owner") {
-      setSellerMonitor(null);
-      return;
-    }
+    if (role !== "owner") return;
     void loadSellerMonitor().catch(() => undefined);
   }, [role, loadSellerMonitor]);
 
