@@ -1,6 +1,6 @@
 import { getD1 } from "@/db";
 import { hashHex } from "@/lib/server/crypto";
-import { withProviderRelayHeaders } from "@/lib/server/provider-relay";
+import { providerRelayRequest } from "@/lib/server/provider-relay";
 import { buildDigiflazzSellerMonitorStatement, ensureDigiflazzSellerMonitorTable } from "@/lib/server/digiflazz-monitor";
 import {
   getRuntimeEnv,
@@ -49,13 +49,14 @@ async function fetchPriceList() {
     environment === "development" ? env.DIGIFLAZZ_DEVELOPMENT_PRICE_LIST_URL : env.DIGIFLAZZ_PRODUCTION_PRICE_LIST_URL,
     environment === "development" ? "DIGIFLAZZ_DEVELOPMENT_PRICE_LIST_URL" : "DIGIFLAZZ_PRODUCTION_PRICE_LIST_URL",
   );
-  const response = await fetch(priceListUrl, {
+  const relay = providerRelayRequest(
+    priceListUrl,
+    { "content-type": "application/json", accept: "application/json" },
+    { provider: "digiflazz", environment },
+  );
+  const response = await fetch(relay.url, {
     method: "POST",
-    headers: withProviderRelayHeaders(
-      priceListUrl,
-      { "content-type": "application/json", accept: "application/json" },
-      { provider: "digiflazz", environment },
-    ),
+    headers: relay.headers,
     body: JSON.stringify({ cmd: "prepaid", username, sign: hashHex("md5", `${username}${key}pricelist`) }),
     signal: AbortSignal.timeout(20_000),
   });
