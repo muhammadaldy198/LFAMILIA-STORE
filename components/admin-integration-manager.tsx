@@ -13,10 +13,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
-type Provider = "midtrans" | "ipaymu" | "digiflazz" | "vippayment";
-type Mode = "snap" | "bisnap" | "direct";
-type Environment = "sandbox" | "production" | "development";
+type Provider = "midtrans" | "ipaymu" | "digiflazz" | "vippayment" | "melostore" | "resend" | "relay" | "security";
+type Mode = "snap" | "bisnap" | "direct" | "service";
+type Environment = "sandbox" | "production" | "development" | "global";
 
 type Field = {
   key: string;
@@ -57,8 +58,14 @@ type Overview = {
     digiflazzEnvironment: "development" | "production";
     vippaymentEnvironment: "sandbox" | "production";
   };
+  gatewayToggles: {
+    midtransCheckoutEnabled: boolean;
+    midtransTopupEnabled: boolean;
+    ipaymuCheckoutEnabled: boolean;
+    ipaymuTopupEnabled: boolean;
+  };
   profiles: Profile[];
-  callbacks: Array<{ id: string; label: string; description: string; url: string }>;
+  callbacks: Array<{ id: string; label: string; description: string; kind: "notification" | "callback" | "fallback"; url: string }>;
 };
 
 const definitions: Definition[] = [
@@ -146,6 +153,57 @@ const definitions: Definition[] = [
       { key: "apiUrl", label: "API URL", inputMode: "url" },
     ],
   },
+  {
+    id: "melostore",
+    provider: "melostore",
+    mode: "service",
+    title: "Melostore",
+    description: "Kredensial nickname checker dan endpoint Melostore.",
+    environments: ["global"],
+    fields: [
+      { key: "apiKey", label: "API Key", secret: true },
+      { key: "secretKey", label: "Secret Key", secret: true },
+      { key: "apiUrl", label: "API URL", inputMode: "url" },
+      { key: "nicknameApiKey", label: "Nickname API Key", secret: true, help: "Opsional jika endpoint nickname memakai key terpisah." },
+    ],
+  },
+  {
+    id: "resend",
+    provider: "resend",
+    mode: "service",
+    title: "Resend Email",
+    description: "Email transaksi dan pengiriman kode voucher. WhatsApp tidak digunakan lagi.",
+    environments: ["global"],
+    fields: [
+      { key: "apiKey", label: "API Key", secret: true },
+      { key: "fromEmail", label: "From Email", placeholder: "LFAMILIA <noreply@domain.tld>" },
+      { key: "apiUrl", label: "API URL", inputMode: "url", placeholder: "https://api.resend.com/emails" },
+      { key: "deliveryChannel", label: "Pengiriman voucher", placeholder: "website atau email", help: "Gunakan website untuk tampil di akun saja, atau email untuk website + email." },
+    ],
+  },
+  {
+    id: "relay",
+    provider: "relay",
+    mode: "service",
+    title: "VPS Relay",
+    description: "Daftar hostname relay ber-IP statis dan token autentikasi Worker → VPS.",
+    environments: ["global"],
+    fields: [
+      { key: "hosts", label: "Relay Hosts", placeholder: "digiflazz-relay.domain.tld, ipaymu-relay.domain.tld" },
+      { key: "token", label: "Relay Token", secret: true },
+    ],
+  },
+  {
+    id: "security",
+    provider: "security",
+    mode: "service",
+    title: "Encryption Key",
+    description: "Kunci enkripsi stok voucher. Root key Integration Manager tetap Cloudflare Secret.",
+    environments: ["global"],
+    fields: [
+      { key: "voucherEncryptionKey", label: "Voucher Encryption Key", secret: true, help: "Minimal 32 karakter. Jangan diganti setelah stok voucher terenkripsi tersimpan." },
+    ],
+  },
 ];
 
 function profileKey(definition: Definition, environment: Environment) {
@@ -153,12 +211,14 @@ function profileKey(definition: Definition, environment: Environment) {
 }
 
 function environmentLabel(environment: Environment) {
+  if (environment === "global") return "Global";
   return environment === "development" ? "Development" : environment === "sandbox" ? "Sandbox" : "Production";
 }
 
 export function AdminIntegrationManager() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [selections, setSelections] = useState<Overview["selections"] | null>(null);
+  const [gatewayToggles, setGatewayToggles] = useState<Overview["gatewayToggles"] | null>(null);
   const [formValues, setFormValues] = useState<Record<string, Record<string, string>>>({});
   const [selectedEnvironment, setSelectedEnvironment] = useState<Record<string, Environment>>({});
   const [openId, setOpenId] = useState<string | null>(null);
@@ -177,6 +237,8 @@ export function AdminIntegrationManager() {
       const next = data as unknown as Overview;
       setOverview(next);
       setSelections(next.selections);
+      setGatewayToggles(next.gatewayToggles);
+      setGatewayToggles(next.gatewayToggles);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Pengaturan integrasi gagal dimuat.");
     } finally {
@@ -233,6 +295,7 @@ export function AdminIntegrationManager() {
       const next = data.overview as Overview;
       setOverview(next);
       setSelections(next.selections);
+      setGatewayToggles(next.gatewayToggles);
       setFormValues((current) => ({ ...current, [key]: {} }));
       setMessage(`${definition.title} ${environmentLabel(environment)} tersimpan terenkripsi.`);
     } catch (reason) {
@@ -243,7 +306,7 @@ export function AdminIntegrationManager() {
   }
 
   async function saveSelections() {
-    if (!selections) return;
+    if (!selections || !gatewayToggles) return;
     setSaving("selections");
     setError("");
     setMessage("");
@@ -251,13 +314,14 @@ export function AdminIntegrationManager() {
       const response = await fetch("/api/panel/integrations", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "save_selections", selections }),
+        body: JSON.stringify({ action: "save_selections", selections, gatewayToggles }),
       });
       const data = await readJson(response);
       if (!response.ok) throw new Error(String(data.error || "Environment aktif gagal disimpan."));
       const next = data.overview as Overview;
       setOverview(next);
       setSelections(next.selections);
+      setGatewayToggles(next.gatewayToggles);
       setMessage("Mode dan environment aktif berhasil disimpan.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Environment aktif gagal disimpan.");
@@ -276,7 +340,7 @@ export function AdminIntegrationManager() {
   }
 
   if (loading) return <div className="flex min-h-40 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat integrasi…</div>;
-  if (!overview || !selections) return <div className="rounded-md border border-red-400/20 bg-red-400/[0.05] p-3 text-xs text-red-100">{error || "Pengaturan integrasi tidak tersedia."}</div>;
+  if (!overview || !selections || !gatewayToggles) return <div className="rounded-md border border-red-400/20 bg-red-400/[0.05] p-3 text-xs text-red-100">{error || "Pengaturan integrasi tidak tersedia."}</div>;
 
   return (
     <div className="space-y-3">
@@ -287,7 +351,7 @@ export function AdminIntegrationManager() {
         <div className="flex gap-2.5">
           <ShieldCheck className={overview.encryptionReady ? "mt-0.5 size-4 shrink-0 text-[#d8ff8d]" : "mt-0.5 size-4 shrink-0 text-amber-200"} />
           <div>
-            <p className="text-xs font-bold">Kredensial aman</p>
+            <p className="text-xs font-bold">Integration encryption key</p>
             <p className="mt-0.5 text-[10px] leading-4 text-white/52">{overview.encryptionHint}</p>
           </div>
         </div>
@@ -297,7 +361,7 @@ export function AdminIntegrationManager() {
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-bold">Mode yang dipakai toko</p>
-            <p className="mt-0.5 text-[10px] text-white/35">Simpan profile Sandbox/Production lebih dulu, lalu pilih profile aktif di sini. Aktivasi checkout dan top up tetap di menu Payment gateway.</p>
+            <p className="mt-0.5 text-[10px] text-white/35">Pilih mode/environment lalu aktifkan provider yang benar-benar dipakai untuk checkout atau top up.</p>
           </div>
           <Button type="button" size="sm" disabled={saving === "selections"} onClick={() => void saveSelections()} className="shrink-0 bg-[#b9ff35] text-[#091006] hover:bg-[#d8ff8d]">
             {saving === "selections" ? <LoaderCircle className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}Simpan pilihan
@@ -308,6 +372,10 @@ export function AdminIntegrationManager() {
           <SelectField label="Environment Midtrans" value={selections.midtransEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, midtransEnvironment: value as "sandbox" | "production" } : current)} options={[['sandbox', 'Sandbox'], ['production', 'Production']]} />
           <SelectField label="Environment iPaymu" value={selections.ipaymuEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, ipaymuEnvironment: value as "sandbox" | "production" } : current)} options={[['sandbox', 'Sandbox'], ['production', 'Production']]} />
           <SelectField label="Environment DigiFlazz" value={selections.digiflazzEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, digiflazzEnvironment: value as "development" | "production" } : current)} options={[['development', 'Development'], ['production', 'Production']]} />
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <ProviderToggleCard title="Midtrans" checkout={gatewayToggles.midtransCheckoutEnabled} topup={gatewayToggles.midtransTopupEnabled} onCheckout={(value) => setGatewayToggles((current) => current ? { ...current, midtransCheckoutEnabled: value } : current)} onTopup={(value) => setGatewayToggles((current) => current ? { ...current, midtransTopupEnabled: value } : current)} />
+          <ProviderToggleCard title="iPaymu" checkout={gatewayToggles.ipaymuCheckoutEnabled} topup={gatewayToggles.ipaymuTopupEnabled} onCheckout={(value) => setGatewayToggles((current) => current ? { ...current, ipaymuCheckoutEnabled: value } : current)} onTopup={(value) => setGatewayToggles((current) => current ? { ...current, ipaymuTopupEnabled: value } : current)} />
         </div>
       </section>
 
@@ -322,7 +390,8 @@ export function AdminIntegrationManager() {
             (definition.provider === "midtrans" && selections.midtransMode === definition.mode && selections.midtransEnvironment === environment) ||
             (definition.provider === "ipaymu" && selections.ipaymuEnvironment === environment) ||
             (definition.provider === "digiflazz" && selections.digiflazzEnvironment === environment) ||
-            (definition.provider === "vippayment" && selections.vippaymentEnvironment === environment);
+            (definition.provider === "vippayment" && selections.vippaymentEnvironment === environment) ||
+            ((definition.provider === "melostore" || definition.provider === "resend" || definition.provider === "relay" || definition.provider === "security") && Boolean(saved?.configured));
           return (
             <section key={definition.id} className="overflow-hidden rounded-lg border border-white/[0.08] bg-[#0d1019]">
               <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
@@ -347,7 +416,7 @@ export function AdminIntegrationManager() {
                   {definition.fields.map((field) => <CredentialField key={field.key} field={field} value={formValues[key]?.[field.key] ?? ""} onChange={(value) => updateField(definition, environment, field.key, value)} />)}
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/[0.07] pt-3">
-                  <p className="text-[9px] leading-4 text-white/34">Khusus BI-SNAP: seluruh field di atas diperlukan untuk API yang dipilih. Callback URL tersedia di bawah.</p>
+                  <p className="text-[9px] leading-4 text-white/34">{definition.id === "midtrans-bisnap" ? "BI-SNAP memakai field sesuai API yang diaktifkan; notification URL tersedia di bawah." : definition.id === "security" ? "Root INTEGRATION_ENCRYPTION_KEY tetap Cloudflare Secret; kunci voucher di sini disimpan terenkripsi." : "Nilai kosong tidak menimpa kredensial yang sudah tersimpan."}</p>
                   <Button type="button" size="sm" disabled={!overview.encryptionReady || saving === key} onClick={() => void saveProfile(definition)} className="shrink-0 bg-[#b9ff35] text-[#091006] hover:bg-[#d8ff8d]">
                     {saving === key ? <LoaderCircle className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}Simpan
                   </Button>
@@ -359,10 +428,10 @@ export function AdminIntegrationManager() {
       </div>
 
       <section className="rounded-lg border border-white/[0.08] bg-[#0d1019] p-3">
-        <div className="flex items-center gap-2"><Webhook className="size-3.5 text-[#d8ff8d]" /><div><p className="text-xs font-bold">Notification & callback URL</p><p className="text-[9px] text-white/35">Salin URL sesuai provider/mode lalu tempel ke dashboard provider.</p></div></div>
+        <div className="flex items-center gap-2"><Webhook className="size-3.5 text-[#d8ff8d]" /><div><p className="text-xs font-bold">Callback / Notification / Fallback URL</p><p className="text-[9px] text-white/35">Salin URL sesuai jenis yang diminta dashboard provider.</p></div></div>
         <div className="mt-3 space-y-2">
           {overview.callbacks.map((callback) => <div key={callback.id} className="flex flex-col gap-2 rounded-md border border-white/[0.07] bg-white/[0.018] p-2.5 sm:flex-row sm:items-center">
-            <div className="min-w-0 flex-1"><p className="text-[10px] font-bold">{callback.label}</p><p className="mt-0.5 text-[8px] text-white/34">{callback.description}</p><code className="mt-1 block break-all text-[9px] text-[#d8ff8d]">{callback.url}</code></div>
+            <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><p className="text-[10px] font-bold">{callback.label}</p><span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide text-white/40">{callback.kind}</span></div><p className="mt-0.5 text-[8px] text-white/34">{callback.description}</p><code className="mt-1 block break-all text-[9px] text-[#d8ff8d]">{callback.url}</code></div>
             <Button type="button" size="sm" variant="outline" onClick={() => void copy(callback.url, callback.label)} className="border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white"><Copy className="size-3.5" />Salin</Button>
           </div>)}
         </div>
@@ -373,6 +442,10 @@ export function AdminIntegrationManager() {
 
 function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange(value: string): void; options: Array<[string, string]> }) {
   return <label><span className="field-label">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="admin-select h-9 w-full text-[10px]">{options.map(([item, text]) => <option key={item} value={item}>{text}</option>)}</select></label>;
+}
+
+function ProviderToggleCard({ title, checkout, topup, onCheckout, onTopup }: { title: string; checkout: boolean; topup: boolean; onCheckout(value: boolean): void; onTopup(value: boolean): void }) {
+  return <div className="rounded-md border border-white/[0.07] bg-black/10 p-2.5"><div className="mb-2 flex items-center justify-between"><strong className="text-[10px]">{title}</strong><span className={(checkout || topup) ? "text-[8px] font-black uppercase text-[#d8ff8d]" : "text-[8px] font-black uppercase text-white/28"}>{checkout || topup ? "Aktif" : "Nonaktif"}</span></div><label className="flex items-center justify-between py-1 text-[9px] text-white/48"><span>Checkout</span><Switch checked={checkout} onCheckedChange={onCheckout} /></label><label className="flex items-center justify-between py-1 text-[9px] text-white/48"><span>Top up saldo</span><Switch checked={topup} onCheckedChange={onTopup} /></label></div>;
 }
 
 function CredentialField({ field, value, onChange }: { field: Field; value: string; onChange(value: string): void }) {
