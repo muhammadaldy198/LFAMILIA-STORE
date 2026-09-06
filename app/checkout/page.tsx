@@ -42,6 +42,7 @@ import {
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
 import { formatRupiah } from "@/lib/store-data";
+import { IPAYMU_MIN_CHECKOUT_AMOUNT, isIpaymuAmountSupported } from "@/lib/payment-limits";
 import type { CustomerSession } from "@/lib/server/customer-auth";
 
 const nicknameSupported = new Set([
@@ -75,6 +76,7 @@ type PaymentResult = {
   voucherCode: string | null;
   flashSaleId: number | null;
   paymentMethod?: string;
+  midtransMode?: "snap" | "bisnap";
   paymentStatus?: "paid" | "pending";
   balanceAfter?: number;
 };
@@ -92,14 +94,16 @@ type PromotionQuote = {
 type CheckoutPaymentMethod = PaymentMethodCode | "wallet";
 type DisplayPaymentChannel = PaymentChannel & { imageUrl?: string };
 type CheckoutGateway = {
-  code: "ipaymu";
+  code: "midtrans" | "ipaymu";
   label: string;
+  midtransMode: "snap" | "bisnap" | null;
   environment: "sandbox" | "production" | null;
   channels: DisplayPaymentChannel[];
 };
 
 type CheckoutGatewayConfig = {
-  gateway: "ipaymu" | null;
+  gateway: "midtrans" | "ipaymu" | null;
+  midtransMode: "snap" | "bisnap" | null;
   environment: "sandbox" | "production" | null;
   channels?: DisplayPaymentChannel[];
   gateways?: CheckoutGateway[];
@@ -187,7 +191,12 @@ function CheckoutContent() {
   const destination = productInputFields[0] ? (customerInputValues[productInputFields[0].id] ?? "") : "";
   const server = productInputFields[1] ? (customerInputValues[productInputFields[1].id] ?? "") : "";
   const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
-  const eligibleGatewayOptions = gatewayOptions;
+  const eligibleGatewayOptions = useMemo(
+    () => gatewayOptions.filter((gateway) =>
+      gateway.code !== "ipaymu" || subtotal <= 0 || isIpaymuAmountSupported(subtotal),
+    ),
+    [gatewayOptions, subtotal],
+  );
   const isManual = product.fulfillmentType === "manual";
   const isVoucherStock = selectedPackage?.providerCode === "voucher-stock";
   const providerReady =
@@ -265,7 +274,10 @@ function CheckoutContent() {
         const fallbackGateways: CheckoutGateway[] = data.gateway
           ? [{
               code: data.gateway,
-              label: "iPaymu",
+              label: data.gateway === "midtrans"
+                ? `Midtrans ${data.midtransMode === "bisnap" ? "BI-SNAP" : "Snap"}`
+                : "iPaymu",
+              midtransMode: data.midtransMode ?? null,
               environment: data.environment ?? null,
               channels: data.channels ?? [],
             }]
@@ -521,7 +533,7 @@ function CheckoutContent() {
       const endpoint =
         paymentMethod === "wallet"
           ? "/api/payments/wallet/create"
-          : "/api/payments/ipaymu/create";
+          : "/api/payments/auto/create";
       if (paymentMethod !== "wallet" && !paymentChannel)
         throw new Error("Pilih metode pembayaran yang tersedia.");
       const response = await fetch(endpoint, {
@@ -713,6 +725,11 @@ function CheckoutContent() {
                   title="Pilih Pembayaran"
                   description="Pilih metode pembayaran yang ingin digunakan."
                 />
+                {subtotal > 0 && subtotal < IPAYMU_MIN_CHECKOUT_AMOUNT && gatewayOptions.some((gateway) => gateway.code === "ipaymu") && (
+                  <div className="mt-3 rounded-md border border-amber-300/15 bg-amber-300/[0.05] px-2.5 py-2 text-[9px] leading-4 text-amber-100/70">
+                    Metode pembayaran yang tersedia sudah disesuaikan otomatis dengan nominal transaksi.
+                  </div>
+                )}
                 {!paymentMethodsLoaded && (
                   <div className="mt-3 flex items-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-[10px] text-white/45">
                     <LoaderCircle className="size-3.5 animate-spin" />
@@ -1123,6 +1140,9 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
       : payment.providerCode === "voucher-stock"
         ? "Setelah lunas, satu kode stok dikirim otomatis ke email/WhatsApp pembeli."
         : "Setelah lunas, pesanan diteruskan otomatis ke provider.";
+  const isBisnapQris =
+    payment.midtransMode === "bisnap" &&
+    payment.paymentMethod === "qris";
   return (
     <div className="mt-4 rounded-lg border border-[#b9ff35]/30 bg-[#b9ff35]/[0.08] p-3">
       <BadgeCheck className="size-5 text-[#b9ff35]" />
@@ -1138,9 +1158,9 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
         </div>
       )}
       {payment.balanceAfter != null && <p className="mt-2.5 rounded-lg bg-black/20 p-2.5 text-[9px] text-white/55">Sisa saldo: <strong className="text-[#d8ff8d]">{formatRupiah(payment.balanceAfter)}</strong></p>}
-      {payment.paymentMethod === "qris" && payment.paymentUrl && <div className="mt-3 rounded-lg bg-white p-2.5"><img src={payment.paymentUrl} alt="QRIS pembayaran" className="mx-auto aspect-square w-full max-w-64 object-contain" /></div>}
+      {isBisnapQris && payment.paymentUrl && <div className="mt-3 rounded-lg bg-white p-2.5"><img src={payment.paymentUrl} alt="QRIS pembayaran" className="mx-auto aspect-square w-full max-w-64 object-contain" /></div>}
       {payment.expiredAt && <p className="mt-2.5 text-[8px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}
-      {payment.paymentUrl && !payment.paymentMethod === "qris" && (
+      {payment.paymentUrl && !isBisnapQris && (
         <Button asChild className="mt-3 w-full rounded-lg bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]"><a href={payment.paymentUrl} target="_blank" rel="noreferrer">Lanjut bayar <ExternalLink className="ml-2 size-4" /></a></Button>
       )}
       <p className="mt-2.5 flex items-start gap-2 text-[8px] leading-4 text-white/38">
