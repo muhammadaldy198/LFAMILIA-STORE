@@ -88,14 +88,31 @@ export async function deletePaymentChannel(id: number) {
   await getD1().prepare("DELETE FROM payment_channels WHERE id = ?").bind(id).run();
 }
 
-export async function syncPaymentChannelsForGateway(gateway: PaymentGatewayName) {
-  const mode = gateway === "midtrans" ? getMidtransMode() : null;
+export async function syncPaymentChannelsForGateways(
+  gateways: PaymentGatewayName[],
+) {
+  const activeGateways = [...new Set(gateways)] as PaymentGatewayName[];
+  const primaryGateway = activeGateways[0];
+  if (!primaryGateway)
+    throw new Error("Aktifkan minimal satu payment gateway untuk sinkronisasi.");
+
+  const midtransMode = activeGateways.includes("midtrans")
+    ? getMidtransMode()
+    : null;
   const supported = paymentChannels.filter((item) =>
-    gateway === "midtrans"
-      ? isMidtransChannelSupported(item.method, item.channel, mode!)
-      : isIpaymuChannelSupported(item.method, item.channel),
+    activeGateways.some((gateway) =>
+      gateway === "midtrans"
+        ? isMidtransChannelSupported(
+            item.method,
+            item.channel,
+            midtransMode!,
+          )
+        : isIpaymuChannelSupported(item.method, item.channel),
+    ),
   );
-  const supportedKeys = new Set(supported.map((item) => `${item.method}:${item.channel}`));
+  const supportedKeys = new Set(
+    supported.map((item) => `${item.method}:${item.channel}`),
+  );
   const db = getD1();
   await db.batch(paymentChannels.map((item, index) =>
     db.prepare(`INSERT INTO payment_channels (method, channel, name, description, image_url, is_active, sort_order)
@@ -113,7 +130,17 @@ export async function syncPaymentChannelsForGateway(gateway: PaymentGatewayName)
         index,
       ),
   ));
-  return { gateway, mode, synced: supported.length, channels: await listPaymentChannels(true) };
+  return {
+    gateway: primaryGateway,
+    gateways: activeGateways,
+    mode: midtransMode,
+    synced: supported.length,
+    channels: await listPaymentChannels(true),
+  };
+}
+
+export async function syncPaymentChannelsForGateway(gateway: PaymentGatewayName) {
+  return syncPaymentChannelsForGateways([gateway]);
 }
 
 export async function isPaymentChannelAvailable(method: string, channel: string) {

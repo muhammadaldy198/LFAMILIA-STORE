@@ -4,7 +4,8 @@ import {
   deletePaymentChannel,
   listPaymentChannels,
   savePaymentChannel,
-  syncPaymentChannelsForGateway,
+  syncPaymentChannelsForGateways,
+  type PaymentGatewayName,
 } from "@/lib/server/payment-channels";
 import { isAllowedMediaUrl } from "@/lib/media-url";
 import { readWalletSettings } from "@/lib/server/wallet";
@@ -20,21 +21,22 @@ const channelSchema = z.object({
   sortOrder: z.number().int().min(0).max(10000),
 });
 
-async function activeGateway() {
+async function activeGateways(): Promise<PaymentGatewayName[]> {
   const settings = await readWalletSettings();
-  return settings.midtransCheckoutEnabled
-    ? "midtrans" as const
-    : settings.ipaymuCheckoutEnabled
-      ? "ipaymu" as const
-      : null;
+  const gateways: PaymentGatewayName[] = [];
+  if (settings.midtransCheckoutEnabled) gateways.push("midtrans");
+  if (settings.ipaymuCheckoutEnabled) gateways.push("ipaymu");
+  return gateways;
 }
 
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
+  const gateways = await activeGateways();
   return Response.json({
     channels: await listPaymentChannels(true),
-    gateway: await activeGateway(),
+    gateways,
+    gateway: gateways[0] ?? null,
   });
 }
 
@@ -44,9 +46,13 @@ export async function POST(request: Request) {
   try {
     const raw = await request.json();
     if (raw?.action === "sync") {
-      const gateway = await activeGateway();
-      if (!gateway) throw new Error("Aktifkan Midtrans atau iPaymu untuk checkout terlebih dahulu.");
-      return Response.json({ ok: true, ...(await syncPaymentChannelsForGateway(gateway)) });
+      const gateways = await activeGateways();
+      if (!gateways.length)
+        throw new Error("Aktifkan Midtrans atau iPaymu untuk checkout terlebih dahulu.");
+      return Response.json({
+        ok: true,
+        ...(await syncPaymentChannelsForGateways(gateways)),
+      });
     }
     const input = channelSchema.parse(raw);
     const id = await savePaymentChannel(input);

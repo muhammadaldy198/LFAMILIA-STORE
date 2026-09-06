@@ -93,10 +93,20 @@ type PromotionQuote = {
 
 type CheckoutPaymentMethod = PaymentMethodCode | "wallet";
 type DisplayPaymentChannel = PaymentChannel & { imageUrl?: string };
+type CheckoutGateway = {
+  code: "midtrans" | "ipaymu";
+  label: string;
+  midtransMode: "snap" | "bisnap" | null;
+  environment: "sandbox" | "production" | null;
+  channels: DisplayPaymentChannel[];
+};
+
 type CheckoutGatewayConfig = {
   gateway: "midtrans" | "ipaymu" | null;
   midtransMode: "snap" | "bisnap" | null;
   environment: "sandbox" | "production" | null;
+  channels?: DisplayPaymentChannel[];
+  gateways?: CheckoutGateway[];
 };
 const groupIcons = {
   va: Landmark,
@@ -167,11 +177,9 @@ function CheckoutContent() {
   const [account, setAccount] = useState<CustomerSession | null>(null);
   const [availableChannels, setAvailableChannels] =
     useState<DisplayPaymentChannel[]>([]);
-  const [gatewayConfig, setGatewayConfig] = useState<CheckoutGatewayConfig>({
-    gateway: null,
-    midtransMode: null,
-    environment: null,
-  });
+  const [gatewayOptions, setGatewayOptions] = useState<CheckoutGateway[]>([]);
+  const [activeCheckoutGateway, setActiveCheckoutGateway] =
+    useState<CheckoutGateway["code"] | null>(null);
   const [walletSettings, setWalletSettings] = useState<WalletSettings | null>(
     null,
   );
@@ -203,7 +211,6 @@ function CheckoutContent() {
     paymentMethod === "va" ||
     paymentMethod === "ewallet" ||
     paymentMethod === "qris";
-  const activeCheckoutGateway = gatewayConfig.gateway;
   const automaticCheckoutReady = Boolean(activeCheckoutGateway);
   const gatewayPaymentGroups = useMemo(() => {
     if (!automaticCheckoutReady) return [];
@@ -237,6 +244,25 @@ function CheckoutContent() {
     );
     setPayment(null);
   }, [availableChannels]);
+
+  const chooseGateway = useCallback((gateway: CheckoutGateway) => {
+    setActiveCheckoutGateway(gateway.code);
+    setAvailableChannels(gateway.channels);
+    if (paymentMethod !== "wallet") {
+      const currentChannelIsAvailable = gateway.channels.some(
+        (item) =>
+          item.method === paymentMethod && item.channel === paymentChannel,
+      );
+      if (!currentChannelIsAvailable) {
+        const replacement = gateway.channels[0];
+        setPaymentMethod(replacement?.method ?? "wallet");
+        setPaymentChannel(
+          replacement?.channel ?? "lfamilia-balance",
+        );
+      }
+    }
+    setPayment(null);
+  }, [paymentChannel, paymentMethod]);
   const notices = (product.notices ?? []).filter(
     (item) => item.isActive !== false,
   );
@@ -246,15 +272,25 @@ function CheckoutContent() {
     void fetch("/api/payment-methods", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) return;
-        const data = (await response.json()) as CheckoutGatewayConfig & {
-          channels?: DisplayPaymentChannel[];
-        };
-        setAvailableChannels(data.channels ?? []);
-        setGatewayConfig({
-          gateway: data.gateway ?? null,
-          midtransMode: data.midtransMode ?? null,
-          environment: data.environment ?? null,
-        });
+        const data = (await response.json()) as CheckoutGatewayConfig;
+        const fallbackGateways: CheckoutGateway[] = data.gateway
+          ? [{
+              code: data.gateway,
+              label: data.gateway === "midtrans"
+                ? `Midtrans ${data.midtransMode === "bisnap" ? "BI-SNAP" : "Snap"}`
+                : "iPaymu",
+              midtransMode: data.midtransMode ?? null,
+              environment: data.environment ?? null,
+              channels: data.channels ?? [],
+            }]
+          : [];
+        const gateways = data.gateways?.length
+          ? data.gateways
+          : fallbackGateways;
+        const primaryGateway = gateways[0] ?? null;
+        setGatewayOptions(gateways);
+        setActiveCheckoutGateway(primaryGateway?.code ?? null);
+        setAvailableChannels(primaryGateway?.channels ?? []);
       })
       .catch(() => undefined);
   }, []);
@@ -686,8 +722,30 @@ function CheckoutContent() {
                 <StepTitle
                   number="3"
                   title="Pilih Pembayaran"
-                  description="Pilih metode, lalu pilih channel jika tersedia."
+                  description="Pilih gateway, metode, lalu channel jika tersedia."
                 />
+                {gatewayOptions.length > 1 && (
+                  <div className="mt-3 rounded-lg border border-white/[0.08] bg-black/10 p-2">
+                    <p className="px-1 text-[9px] font-bold text-white/45">Pilih gateway pembayaran</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {gatewayOptions.map((gateway) => {
+                        const selectedGateway = activeCheckoutGateway === gateway.code;
+                        return (
+                          <button
+                            key={gateway.code}
+                            type="button"
+                            aria-pressed={selectedGateway}
+                            onClick={() => chooseGateway(gateway)}
+                            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left transition ${selectedGateway ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.10] text-[#d8ff8d]" : "border-white/[0.08] bg-white/[0.025] text-white/60 hover:text-white"}`}
+                          >
+                            <span className="text-[10px] font-black">{gateway.label}</span>
+                            <span className="text-[8px] text-white/40">{gateway.channels.length} channel</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="mt-3 space-y-2">
                   {checkoutGroups.map((group) => {
                     const Icon = groupIcons[group.code];

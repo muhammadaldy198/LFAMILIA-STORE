@@ -4,54 +4,70 @@ import {
   getMidtransMode,
   isMidtransChannelSupported,
 } from "@/lib/server/midtrans";
-import { listPaymentChannels } from "@/lib/server/payment-channels";
+import {
+  listPaymentChannels,
+  type ManagedPaymentChannel,
+} from "@/lib/server/payment-channels";
 import { readWalletSettings } from "@/lib/server/wallet";
 
 export const dynamic = "force-dynamic";
 
+type CheckoutGateway = {
+  code: "midtrans" | "ipaymu";
+  label: string;
+  midtransMode: "snap" | "bisnap" | null;
+  environment: "sandbox" | "production" | null;
+  channels: ManagedPaymentChannel[];
+};
+
 export async function GET() {
   const settings = await readWalletSettings();
+  const activeChannels = await listPaymentChannels(false);
+  const gateways: CheckoutGateway[] = [];
 
-  const gateway = settings.midtransCheckoutEnabled
-    ? "midtrans"
-    : settings.ipaymuCheckoutEnabled
-      ? "ipaymu"
-      : null;
-
-  let midtransMode: "snap" | "bisnap" | null = null;
-  let environment: "sandbox" | "production" | null = null;
-
-  if (gateway === "midtrans") {
+  if (settings.midtransCheckoutEnabled) {
     try {
-      midtransMode = getMidtransMode();
-      environment = getMidtransEnvironment();
+      const midtransMode = getMidtransMode();
+      const environment = getMidtransEnvironment();
+      gateways.push({
+        code: "midtrans",
+        label: `Midtrans ${midtransMode === "bisnap" ? "BI-SNAP" : "Snap"} · ${environment === "production" ? "Production" : "Sandbox"}`,
+        midtransMode,
+        environment,
+        channels: activeChannels.filter((item) =>
+          isMidtransChannelSupported(
+            item.method,
+            item.channel,
+            midtransMode,
+          ),
+        ),
+      });
     } catch {
-      midtransMode = null;
-      environment = null;
+      // Do not advertise a gateway that has no valid Midtrans runtime configuration.
     }
   }
 
-  const channels =
-    gateway === "ipaymu"
-      ? (await listPaymentChannels(false)).filter((item) =>
-          isIpaymuChannelSupported(item.method, item.channel),
-        )
-      : gateway === "midtrans" && midtransMode && environment
-        ? (await listPaymentChannels(false)).filter((item) =>
-            isMidtransChannelSupported(
-              item.method,
-              item.channel,
-              midtransMode,
-            ),
-          )
-        : [];
+  if (settings.ipaymuCheckoutEnabled) {
+    gateways.push({
+      code: "ipaymu",
+      label: "iPaymu",
+      midtransMode: null,
+      environment: null,
+      channels: activeChannels.filter((item) =>
+        isIpaymuChannelSupported(item.method, item.channel),
+      ),
+    });
+  }
 
+  const primary = gateways[0] ?? null;
   return Response.json(
     {
-      gateway,
-      midtransMode,
-      environment,
-      channels,
+      // Keep this shape for existing clients while newer checkout clients use gateways.
+      gateway: primary?.code ?? null,
+      midtransMode: primary?.midtransMode ?? null,
+      environment: primary?.environment ?? null,
+      channels: primary?.channels ?? [],
+      gateways,
     },
     { headers: { "Cache-Control": "no-store" } },
   );

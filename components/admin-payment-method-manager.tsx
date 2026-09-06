@@ -11,11 +11,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ManagedPaymentChannel } from "@/lib/server/payment-channels";
 
-type Gateway = "midtrans" | "ipaymu" | null;
+type Gateway = "midtrans" | "ipaymu";
 
 export function AdminPaymentMethodManager() {
   const [items, setItems] = useState<ManagedPaymentChannel[]>([]);
-  const [gateway, setGateway] = useState<Gateway>(null);
+  const [gateways, setGateways] = useState<Gateway[]>([]);
   const [editing, setEditing] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
@@ -31,7 +31,15 @@ export function AdminPaymentMethodManager() {
       const data = await readJson(response);
       if (!response.ok) throw new Error(String(data.error || "Metode pembayaran gagal dimuat."));
       setItems((data.channels as ManagedPaymentChannel[] | undefined) ?? []);
-      setGateway((data.gateway as Gateway | undefined) ?? null);
+      const nextGateways = Array.isArray(data.gateways)
+        ? data.gateways.filter(
+            (item): item is Gateway =>
+              item === "midtrans" || item === "ipaymu",
+          )
+        : data.gateway === "midtrans" || data.gateway === "ipaymu"
+          ? [data.gateway]
+          : [];
+      setGateways(nextGateways);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Metode pembayaran gagal dimuat.");
     } finally {
@@ -77,8 +85,10 @@ export function AdminPaymentMethodManager() {
       });
       const data = await readJson(response);
       if (!response.ok) throw new Error(String(data.error || "Sinkron metode pembayaran gagal."));
-      const syncedGateway = data.gateway === "ipaymu" ? "iPaymu" : "Midtrans";
-      setMessage(`Metode pembayaran ${syncedGateway} berhasil disinkronkan.`);
+      const syncedGateways = gateways
+        .map((gateway) => gateway === "ipaymu" ? "iPaymu" : "Midtrans")
+        .join(" + ");
+      setMessage(`Metode pembayaran ${syncedGateways || "gateway"} berhasil disinkronkan.`);
       await load();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sinkron metode pembayaran gagal.");
@@ -124,20 +134,24 @@ export function AdminPaymentMethodManager() {
   if (loading) return <div className="flex min-h-40 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat metode pembayaran…</div>;
 
   const item = editing == null ? null : items[editing];
-  const gatewayLabel = gateway === "midtrans" ? "Midtrans" : gateway === "ipaymu" ? "iPaymu" : "gateway";
+  const gatewayLabel = gateways.length
+    ? gateways
+        .map((gateway) => gateway === "ipaymu" ? "iPaymu" : "Midtrans")
+        .join(" + ")
+    : "gateway";
 
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-[10px] text-white/35">Metode checkout mengikuti payment gateway yang sedang aktif.</p>
+      <p className="text-[10px] text-white/35">Metode checkout mengikuti gateway aktif. Bila keduanya aktif, pelanggan dapat memilih gateway.</p>
       <div className="flex gap-2">
-        <Button type="button" disabled={syncing || !gateway} onClick={() => void syncGateway()} variant="outline" size="sm" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-3 text-[9px] text-white">
+        <Button type="button" disabled={syncing || gateways.length === 0} onClick={() => void syncGateway()} variant="outline" size="sm" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-3 text-[9px] text-white">
           {syncing ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}
           Sync {gatewayLabel}
         </Button>
         <Button type="button" onClick={add} size="sm" className="h-8 bg-[#b9ff35] px-3 text-[9px] font-black text-[#091006]"><Plus className="mr-1 size-3" />Tambah metode</Button>
       </div>
     </div>
-    {!gateway && <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.05] p-3 text-[10px] text-amber-100/65">Aktifkan Midtrans atau iPaymu untuk checkout sebelum melakukan sync.</p>}
+    {gateways.length === 0 && <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.05] p-3 text-[10px] text-amber-100/65">Aktifkan Midtrans atau iPaymu untuk checkout sebelum melakukan sync.</p>}
     {message && <p className="rounded-lg border border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] p-3 text-xs text-[#d8ff8d]">{message}</p>}
     {error && <p className="rounded-lg border border-red-400/20 bg-red-400/[0.05] p-3 text-xs text-red-200">{error}</p>}
 
