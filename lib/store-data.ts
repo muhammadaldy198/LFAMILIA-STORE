@@ -357,6 +357,7 @@ export type StorefrontSettings = {
   instagramUrl?: string;
   discordUrl?: string;
   supportHours: string;
+  supportWidgetEnabled: boolean;
 };
 
 export const defaultStorefrontSettings: StorefrontSettings = {
@@ -374,6 +375,7 @@ export const defaultStorefrontSettings: StorefrontSettings = {
   bannerCtaLabel: "Top up sekarang",
   bannerCtaHref: "#produk",
   supportHours: "Setiap hari, 09.00–23.00 WIB",
+  supportWidgetEnabled: true,
 };
 
 export const faqs = [
