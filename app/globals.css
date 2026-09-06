@@ -342,3 +342,36 @@ body main [data-slot="tabs-trigger"] {
   padding-top: 0.25rem !important;
   padding-bottom: 0.25rem !important;
 }
+
+.admin-select,
+.admin-readonly {
+  width: 100%;
+  min-height: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.4rem;
+  background: rgba(255, 255, 255, 0.035);
+  color: white;
+  font-size: 0.75rem;
+}
+
+.admin-select {
+  height: 2rem;
+  padding: 0 0.625rem;
+}
+
+.admin-select:focus {
+  outline: 2px solid rgba(185, 255, 53, 0.48);
+  outline-offset: 1px;
+}
+
+.admin-select option {
+  background: #0d1019;
+  color: white;
+}
+
+.admin-readonly {
+  display: flex;
+  align-items: center;
+  padding: 0 0.625rem;
+  color: rgba(255, 255, 255, 0.52);
+}
