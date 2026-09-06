@@ -3,6 +3,7 @@ import { getD1 } from "@/db";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
 import { listCustomerWebsiteVoucherCodes } from "@/lib/server/customer-voucher-codes";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
+import { rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,8 @@ const profileSchema = z.object({
 });
 
 export async function PATCH(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
   const customer = await requireCustomerSession(request);
   if (customer instanceof Response) return customer;
   try {
