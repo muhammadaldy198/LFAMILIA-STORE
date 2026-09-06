@@ -4,7 +4,7 @@ import { createMidtransPayment, getMidtransMode, isMidtransChannelSupported } fr
 import { createIpaymuDirectPayment, isIpaymuChannelSupported } from "@/lib/server/ipaymu";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
-import { allowRequest } from "@/lib/server/security";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 import { createIpaymuWalletTopup, createMidtransWalletTopup, readWalletSettings, updateIpaymuWalletTopup, updateMidtransWalletTopup } from "@/lib/server/wallet";
 
 const automaticSchema = z.object({
@@ -15,6 +15,8 @@ const automaticSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
   const customer = await requireCustomerSession(request);
   if (customer instanceof Response) return customer;
   const rate = await allowRequest(request, "wallet-topup", 8, 900);
