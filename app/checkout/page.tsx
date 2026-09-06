@@ -218,11 +218,23 @@ function CheckoutContent() {
     paymentMethod === "va" ||
     paymentMethod === "ewallet" ||
     paymentMethod === "qris";
-  const automaticCheckoutReady = Boolean(activeCheckoutGateway);
+  const checkoutGatewayCandidates = useMemo(
+    () => eligibleGatewayOptions.filter((gateway) => gateway.channels.length > 0),
+    [eligibleGatewayOptions],
+  );
+  const displayChannels = useMemo(() => {
+    const unique = new Map<string, DisplayPaymentChannel>();
+    for (const gateway of checkoutGatewayCandidates) {
+      for (const channel of gateway.channels) {
+        const key = `${channel.method}:${channel.channel}`;
+        if (!unique.has(key)) unique.set(key, channel);
+      }
+    }
+    return [...unique.values()];
+  }, [checkoutGatewayCandidates]);
   const gatewayPaymentGroups = useMemo(() => {
-    if (!automaticCheckoutReady) return [];
     const availableGatewayMethods = new Set(
-      availableChannels.map((item) => item.method),
+      displayChannels.map((item) => item.method),
     );
     return paymentGroups
       .filter((item) => availableGatewayMethods.has(item.code))
@@ -231,7 +243,7 @@ function CheckoutContent() {
           ["qris", "ewallet", "va"].indexOf(left.code) -
           ["qris", "ewallet", "va"].indexOf(right.code),
       );
-  }, [automaticCheckoutReady, availableChannels]);
+  }, [displayChannels]);
   const checkoutGroups = useMemo(() => [
     {
       code: "wallet" as const,
@@ -241,16 +253,42 @@ function CheckoutContent() {
     ...gatewayPaymentGroups,
   ], [gatewayPaymentGroups]);
 
+  const preferredGateways = useCallback(() => {
+    const byCode = (code: CheckoutGateway["code"]) =>
+      checkoutGatewayCandidates.find((gateway) => gateway.code === code);
+    return isIpaymuAmountSupported(subtotal)
+      ? [byCode("ipaymu"), byCode("midtrans")].filter(
+          (gateway): gateway is CheckoutGateway => Boolean(gateway),
+        )
+      : [byCode("midtrans")].filter(
+          (gateway): gateway is CheckoutGateway => Boolean(gateway),
+        );
+  }, [checkoutGatewayCandidates, subtotal]);
+
   const chooseMethod = useCallback((method: CheckoutPaymentMethod) => {
-    setPaymentMethod(method);
-    setPaymentChannel(
-      method === "wallet"
-        ? "lfamilia-balance"
-        : (availableChannels.find((item) => item.method === method)
-            ?.channel ?? ""),
-    );
     setPayment(null);
-  }, [availableChannels]);
+    if (method === "wallet") {
+      setPaymentMethod("wallet");
+      setPaymentChannel("lfamilia-balance");
+      return;
+    }
+
+    const gateway = preferredGateways().find((candidate) =>
+      candidate.channels.some((channel) => channel.method === method),
+    );
+    const channel = gateway?.channels.find((item) => item.method === method);
+
+    if (!gateway || !channel) {
+      setPaymentMethod(method);
+      setPaymentChannel("");
+      return;
+    }
+
+    setActiveCheckoutGateway(gateway.code);
+    setAvailableChannels(gateway.channels);
+    setPaymentMethod(method);
+    setPaymentChannel(channel.channel);
+  }, [preferredGateways]);
 
   const chooseGateway = useCallback((gateway: CheckoutGateway) => {
     setActiveCheckoutGateway(gateway.code);
@@ -262,6 +300,7 @@ function CheckoutContent() {
       );
       if (!currentChannelIsAvailable) {
         const replacement =
+          gateway.channels.find((item) => item.method === paymentMethod) ??
           gateway.channels.find((item) => item.method === "qris") ??
           gateway.channels[0];
         setPaymentMethod(replacement?.method ?? "wallet");
@@ -305,17 +344,21 @@ function CheckoutContent() {
   }, []);
 
   useEffect(() => {
-    if (!gatewayOptions.length) return;
+    if (!gatewayOptions.length || paymentMethod === "wallet") return;
 
-    const preferred =
-      (isIpaymuAmountSupported(subtotal)
-        ? eligibleGatewayOptions.find((gateway) => gateway.code === "ipaymu")
-        : null) ??
-      eligibleGatewayOptions.find((gateway) => gateway.code === "midtrans") ??
-      eligibleGatewayOptions[0] ??
-      null;
+    const preferred = preferredGateways().find((gateway) =>
+      gateway.channels.some((channel) => channel.method === paymentMethod),
+    ) ?? preferredGateways()[0] ?? null;
 
-    if (preferred?.code === activeCheckoutGateway) return;
+    const currentStillValid =
+      preferred?.code === activeCheckoutGateway &&
+      availableChannels.some(
+        (channel) =>
+          channel.method === paymentMethod &&
+          channel.channel === paymentChannel,
+      );
+
+    if (currentStillValid) return;
 
     const timer = window.setTimeout(() => {
       if (preferred) {
@@ -323,21 +366,19 @@ function CheckoutContent() {
       } else {
         setActiveCheckoutGateway(null);
         setAvailableChannels([]);
-        if (paymentMethod !== "wallet") {
-          setPaymentMethod("wallet");
-          setPaymentChannel("lfamilia-balance");
-        }
+        setPaymentChannel("");
       }
     }, 0);
 
     return () => window.clearTimeout(timer);
   }, [
     activeCheckoutGateway,
+    availableChannels,
     chooseGateway,
-    eligibleGatewayOptions,
     gatewayOptions.length,
+    paymentChannel,
     paymentMethod,
-    subtotal,
+    preferredGateways,
   ]);
 
   useEffect(() => {
@@ -774,6 +815,11 @@ function CheckoutContent() {
                     Metode pembayaran yang tersedia sudah disesuaikan otomatis dengan nominal transaksi.
                   </div>
                 )}
+                {gatewayPaymentGroups.length === 0 && (
+                  <div className="mt-3 rounded-md border border-amber-300/20 bg-amber-300/[0.05] px-3 py-2 text-[10px] leading-4 text-amber-100/75">
+                    Metode pembayaran otomatis belum tersedia. Periksa gateway dan channel aktif di panel admin.
+                  </div>
+                )}
                 <div className="mt-3 space-y-2">
                   {checkoutGroups.map((group) => {
                     const Icon = groupIcons[group.code];
@@ -811,7 +857,7 @@ function CheckoutContent() {
                             {group.code === "qris" ? (
                               <span className="truncate text-[9px] font-bold text-white/65">QRIS • DANA • GoPay • ShopeePay • OVO</span>
                             ) : (
-                              availableChannels
+                              displayChannels
                                 .filter((channel) => channel.method === group.code)
                                 .slice(0, 7)
                                 .map((channel) =>
