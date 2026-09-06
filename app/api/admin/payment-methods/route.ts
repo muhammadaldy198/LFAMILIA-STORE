@@ -25,6 +25,7 @@ async function activeGateways(): Promise<PaymentGatewayName[]> {
   const settings = await readWalletSettings();
   const gateways: PaymentGatewayName[] = [];
   if (settings.ipaymuCheckoutEnabled) gateways.push("ipaymu");
+  if (settings.midtransCheckoutEnabled) gateways.push("midtrans");
   return gateways;
 }
 
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
     if (raw?.action === "sync") {
       const gateways = await activeGateways();
       if (!gateways.length)
-        throw new Error("Aktifkan iPaymu untuk checkout terlebih dahulu.");
+        throw new Error("Aktifkan Midtrans atau iPaymu untuk checkout terlebih dahulu.");
       return Response.json({
         ok: true,
         ...(await syncPaymentChannelsForGateways(gateways)),
