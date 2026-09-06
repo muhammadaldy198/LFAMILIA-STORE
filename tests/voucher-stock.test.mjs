@@ -104,7 +104,7 @@ test("product notices cascade and flash sales can be scheduled repeatedly", () =
 test("customer experience migration creates accounts, wallet, reviews, banners, popups, and news", () => {
   const db = migratedDatabase();
   const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name));
-  for (const table of ["customer_users", "customer_sessions", "wallet_settings", "wallet_topups", "wallet_transactions", "product_reviews", "home_banners", "site_popups", "news_articles"]) {
+  for (const table of ["customer_users", "customer_sessions", "customer_game_accounts", "wallet_settings", "wallet_topups", "wallet_transactions", "product_reviews", "home_banners", "site_popups", "news_articles"]) {
     assert.ok(tables.has(table), `${table} should exist`);
   }
   const productColumns = new Set(db.prepare("PRAGMA table_info(products)").all().map((row) => row.name));
