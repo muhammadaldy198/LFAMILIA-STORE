@@ -1,5 +1,5 @@
 import { hashHex, hmacHex, safeEqual } from "@/lib/server/crypto";
-import { withProviderRelayHeaders } from "@/lib/server/provider-relay";
+import { providerRelayRequest } from "@/lib/server/provider-relay";
 import {
   getRuntimeEnv,
   requireRuntimeChoice,
@@ -169,19 +169,20 @@ export async function createIpaymuDirectPayment(input: {
     `POST:${va}:${bodyHash}:${apiKey}`,
   );
 
-  const response = await fetch(apiUrl, {
+  const relay = providerRelayRequest(
+    apiUrl,
+    {
+      "content-type": "application/json",
+      accept: "application/json",
+      va,
+      signature,
+      timestamp: timestamp(),
+    },
+    { provider: "ipaymu", environment },
+  );
+  const response = await fetch(relay.url, {
     method: "POST",
-    headers: withProviderRelayHeaders(
-      apiUrl,
-      {
-        "content-type": "application/json",
-        accept: "application/json",
-        va,
-        signature,
-        timestamp: timestamp(),
-      },
-      { provider: "ipaymu", environment },
-    ),
+    headers: relay.headers,
     body: rawBody,
     signal: AbortSignal.timeout(15_000),
   });
