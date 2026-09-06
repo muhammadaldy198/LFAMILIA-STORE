@@ -39,10 +39,7 @@ export function TurnstileWidget({
   }, []);
 
   useEffect(() => {
-    if (!siteKey || !containerRef.current) {
-      onToken("");
-      return;
-    }
+    if (!siteKey || !containerRef.current) return;
     let disposed = false;
     let widgetId: string | null = null;
 
@@ -73,7 +70,6 @@ export function TurnstileWidget({
 
     return () => {
       disposed = true;
-      onToken("");
       if (widgetId && window.turnstile) window.turnstile.remove(widgetId);
       if (containerRef.current) containerRef.current.replaceChildren();
     };
