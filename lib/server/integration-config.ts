@@ -1,9 +1,10 @@
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { readWalletSettings, saveWalletSettings } from "@/lib/server/wallet";
 
-export type IntegrationProvider = "midtrans" | "ipaymu" | "digiflazz" | "vippayment";
-export type IntegrationMode = "snap" | "bisnap" | "direct";
-export type IntegrationEnvironment = "sandbox" | "production" | "development";
+export type IntegrationProvider = "midtrans" | "ipaymu" | "digiflazz" | "vippayment" | "melostore" | "resend" | "relay" | "security";
+export type IntegrationMode = "snap" | "bisnap" | "direct" | "service";
+export type IntegrationEnvironment = "sandbox" | "production" | "development" | "global";
 
 type RuntimeLike = Record<string, unknown> & {
   DB?: D1Database;
@@ -14,6 +15,17 @@ type RuntimeLike = Record<string, unknown> & {
   IPAYMU_ENV?: string;
   DIGIFLAZZ_ENV?: string;
   VIPPAYMENT_ENV?: string;
+  MELOSTORE_API_KEY?: string;
+  MELOSTORE_SECRET_KEY?: string;
+  MELOSTORE_API_URL?: string;
+  NICKNAME_API_KEY?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
+  RESEND_API_URL?: string;
+  VOUCHER_DELIVERY_CHANNEL?: string;
+  PROVIDER_RELAY_TOKEN?: string;
+  PROVIDER_RELAY_HOSTS?: string;
+  VOUCHER_ENCRYPTION_KEY?: string;
 };
 
 type StoredProfile = {
@@ -48,8 +60,14 @@ export type IntegrationOverview = {
     digiflazzEnvironment: "development" | "production";
     vippaymentEnvironment: "sandbox" | "production";
   };
+  gatewayToggles: {
+    midtransCheckoutEnabled: boolean;
+    midtransTopupEnabled: boolean;
+    ipaymuCheckoutEnabled: boolean;
+    ipaymuTopupEnabled: boolean;
+  };
   profiles: IntegrationProfileSummary[];
-  callbacks: Array<{ id: string; label: string; description: string; url: string }>;
+  callbacks: Array<{ id: string; label: string; description: string; kind: "notification" | "callback" | "fallback"; url: string }>;
 };
 
 export const profileFields: Record<string, readonly string[]> = {
@@ -78,6 +96,10 @@ export const profileFields: Record<string, readonly string[]> = {
   "ipaymu:direct": ["virtualAccount", "apiKey", "apiUrl"],
   "digiflazz:direct": ["username", "apiKey", "transactionApiUrl", "priceListUrl", "webhookSecret"],
   "vippayment:direct": ["apiId", "apiKey", "apiUrl"],
+  "melostore:service": ["apiKey", "secretKey", "apiUrl", "nicknameApiKey"],
+  "resend:service": ["apiKey", "fromEmail", "apiUrl", "deliveryChannel"],
+  "relay:service": ["hosts", "token"],
+  "security:service": ["voucherEncryptionKey"],
 };
 
 let schemaPromise: Promise<void> | null = null;
@@ -92,7 +114,10 @@ function isProfileSupported(provider: IntegrationProvider, mode: IntegrationMode
   if (provider === "midtrans") return (mode === "snap" || mode === "bisnap") && (environment === "sandbox" || environment === "production");
   if (provider === "ipaymu") return mode === "direct" && (environment === "sandbox" || environment === "production");
   if (provider === "digiflazz") return mode === "direct" && (environment === "development" || environment === "production");
-  return provider === "vippayment" && mode === "direct" && (environment === "sandbox" || environment === "production");
+  if (provider === "vippayment") return mode === "direct" && (environment === "sandbox" || environment === "production");
+  return (provider === "melostore" || provider === "resend" || provider === "relay" || provider === "security")
+    && mode === "service"
+    && environment === "global";
 }
 
 function secretFrom(value: RuntimeLike) {
@@ -196,12 +221,14 @@ function publicBaseUrl(value: RuntimeLike) {
 function buildCallbacks(baseUrl: string) {
   const route = (path: string) => baseUrl ? `${baseUrl}${path}` : path;
   return [
-    { id: "midtrans-snap", label: "Midtrans Snap / Virtual Account", description: "Notification URL pada dashboard Midtrans.", url: route("/api/payments/midtrans/callback") },
-    { id: "midtrans-bisnap-debit", label: "Midtrans BI-SNAP Direct Debit", description: "Debit notification URL BI-SNAP.", url: route("/v1.0/debit/notify") },
-    { id: "midtrans-bisnap-qris", label: "Midtrans BI-SNAP QRIS", description: "QRIS MPM notification URL BI-SNAP.", url: route("/v1.0/qr/qr-mpm-notify") },
-    { id: "ipaymu", label: "iPaymu", description: "Notification / callback URL iPaymu.", url: route("/api/payments/ipaymu/callback") },
-    { id: "digiflazz", label: "DigiFlazz", description: "Webhook status fulfillment DigiFlazz.", url: route("/api/fulfillment/digiflazz/callback") },
-    { id: "vippayment", label: "VIPayment", description: "Webhook status fulfillment VIPayment.", url: route("/api/fulfillment/vippayment/callback") },
+    { id: "midtrans-snap", label: "Midtrans Snap Notification URL", description: "Notification URL pada dashboard Midtrans.", kind: "notification" as const, url: route("/api/payments/midtrans/callback") },
+    { id: "midtrans-bisnap-debit", label: "Midtrans BI-SNAP Direct Debit", description: "Debit notification URL BI-SNAP.", kind: "notification" as const, url: route("/v1.0/debit/notify") },
+    { id: "midtrans-bisnap-qris", label: "Midtrans BI-SNAP QRIS", description: "QRIS MPM notification URL BI-SNAP.", kind: "notification" as const, url: route("/v1.0/qr/qr-mpm-notify") },
+    { id: "midtrans-fallback", label: "Midtrans Fallback URL", description: "Landing page umum bila dashboard meminta return/fallback URL.", kind: "fallback" as const, url: route("/payment") },
+    { id: "ipaymu", label: "iPaymu Callback / Notification URL", description: "Callback pembayaran otomatis iPaymu.", kind: "callback" as const, url: route("/api/payments/ipaymu/callback") },
+    { id: "ipaymu-fallback", label: "iPaymu Fallback URL", description: "Landing page umum bila provider meminta return/fallback URL.", kind: "fallback" as const, url: route("/payment") },
+    { id: "digiflazz", label: "DigiFlazz Webhook", description: "Webhook status fulfillment DigiFlazz.", kind: "callback" as const, url: route("/api/fulfillment/digiflazz/callback") },
+    { id: "vippayment", label: "VIPayment Webhook", description: "Webhook status fulfillment VIPayment.", kind: "callback" as const, url: route("/api/fulfillment/vippayment/callback") },
   ];
 }
 
@@ -229,6 +256,7 @@ export async function getIntegrationOverview(): Promise<IntegrationOverview> {
     } satisfies IntegrationProfileSummary;
   }));
   const selected = await readStoredSettings(database);
+  const walletSettings = await readWalletSettings();
 
   return {
     encryptionReady: Boolean(secret),
@@ -241,6 +269,12 @@ export async function getIntegrationOverview(): Promise<IntegrationOverview> {
       ipaymuEnvironment: valueOr(selected.get("ipaymu_environment") || current.IPAYMU_ENV, ["sandbox", "production"] as const, "sandbox"),
       digiflazzEnvironment: valueOr(selected.get("digiflazz_environment") || current.DIGIFLAZZ_ENV, ["development", "production"] as const, "development"),
       vippaymentEnvironment: valueOr(selected.get("vippayment_environment") || current.VIPPAYMENT_ENV, ["sandbox", "production"] as const, "production"),
+    },
+    gatewayToggles: {
+      midtransCheckoutEnabled: walletSettings.midtransCheckoutEnabled,
+      midtransTopupEnabled: walletSettings.midtransTopupEnabled,
+      ipaymuCheckoutEnabled: walletSettings.ipaymuCheckoutEnabled,
+      ipaymuTopupEnabled: walletSettings.ipaymuTopupEnabled,
     },
     profiles: configuredProfiles,
     callbacks: buildCallbacks(publicBaseUrl(current)),
@@ -317,6 +351,17 @@ export async function saveIntegrationSelections(input: Partial<IntegrationOvervi
   if (statements.length) await database.batch(statements);
 }
 
+export async function saveGatewayToggles(input: IntegrationOverview["gatewayToggles"]) {
+  const current = await readWalletSettings();
+  await saveWalletSettings({
+    ...current,
+    midtransCheckoutEnabled: input.midtransCheckoutEnabled,
+    midtransTopupEnabled: input.midtransTopupEnabled,
+    ipaymuCheckoutEnabled: input.ipaymuCheckoutEnabled,
+    ipaymuTopupEnabled: input.ipaymuTopupEnabled,
+  });
+}
+
 function put(target: Record<string, unknown>, key: string, value: string | undefined) {
   if (value?.trim()) target[key] = value.trim();
 }
@@ -382,6 +427,27 @@ function applyVipPaymentConfig(target: Record<string, unknown>, config: Record<s
   put(target, "VIPPAYMENT_API_URL", config.apiUrl);
 }
 
+function applyMelostoreConfig(target: Record<string, unknown>, config: Record<string, string>) {
+  put(target, "MELOSTORE_API_KEY", config.apiKey);
+  put(target, "MELOSTORE_SECRET_KEY", config.secretKey);
+  put(target, "MELOSTORE_API_URL", config.apiUrl);
+  put(target, "NICKNAME_API_KEY", config.nicknameApiKey);
+}
+function applyResendConfig(target: Record<string, unknown>, config: Record<string, string>) {
+  put(target, "RESEND_API_KEY", config.apiKey);
+  put(target, "RESEND_FROM_EMAIL", config.fromEmail);
+  put(target, "RESEND_API_URL", config.apiUrl);
+  const channel = config.deliveryChannel?.trim().toLowerCase();
+  if (channel === "website" || channel === "email") target.VOUCHER_DELIVERY_CHANNEL = channel;
+}
+function applyRelayConfig(target: Record<string, unknown>, config: Record<string, string>) {
+  put(target, "PROVIDER_RELAY_HOSTS", config.hosts);
+  put(target, "PROVIDER_RELAY_TOKEN", config.token);
+}
+function applySecurityConfig(target: Record<string, unknown>, config: Record<string, string>) {
+  put(target, "VOUCHER_ENCRYPTION_KEY", config.voucherEncryptionKey);
+}
+
 /** Merges encrypted panel credentials into the Worker runtime without exposing them to clients. */
 export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Promise<T> {
   const source = env as RuntimeLike;
@@ -425,6 +491,10 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
       if (profile.provider === "vippayment" && profile.mode === "direct") {
         applyVipPaymentConfig(target, config, profile.environment === vippaymentEnvironment);
       }
+      if (profile.provider === "melostore" && profile.mode === "service" && profile.environment === "global") applyMelostoreConfig(target, config);
+      if (profile.provider === "resend" && profile.mode === "service" && profile.environment === "global") applyResendConfig(target, config);
+      if (profile.provider === "relay" && profile.mode === "service" && profile.environment === "global") applyRelayConfig(target, config);
+      if (profile.provider === "security" && profile.mode === "service" && profile.environment === "global") applySecurityConfig(target, config);
     }
     return target as T;
   } catch {
