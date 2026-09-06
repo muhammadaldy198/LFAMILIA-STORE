@@ -25,6 +25,20 @@ export async function GET() {
   const activeChannels = await listPaymentChannels(false);
   const gateways: CheckoutGateway[] = [];
 
+  // Primary gateway: iPaymu
+  if (settings.ipaymuCheckoutEnabled) {
+    gateways.push({
+      code: "ipaymu",
+      label: "iPaymu",
+      midtransMode: null,
+      environment: null,
+      channels: activeChannels.filter((item) =>
+        isIpaymuChannelSupported(item.method, item.channel),
+      ),
+    });
+  }
+
+  // Fallback gateway: Midtrans
   if (settings.midtransCheckoutEnabled) {
     try {
       const midtransMode = getMidtransMode();
@@ -43,31 +57,22 @@ export async function GET() {
         ),
       });
     } catch {
-      // Do not advertise a gateway that has no valid Midtrans runtime configuration.
+      // Do not advertise invalid Midtrans configuration.
     }
   }
 
-  if (settings.ipaymuCheckoutEnabled) {
-    gateways.push({
-      code: "ipaymu",
-      label: "iPaymu",
-      midtransMode: null,
-      environment: null,
-      channels: activeChannels.filter((item) =>
-        isIpaymuChannelSupported(item.method, item.channel),
-      ),
-    });
-  }
-
   const primary = gateways[0] ?? null;
+
   return Response.json(
     {
-      // Keep this shape for existing clients while newer checkout clients use gateways.
+      // Primary gateway is always returned first.
+      // Checkout clients can use the first gateway and fallback logic can use the rest.
       gateway: primary?.code ?? null,
       midtransMode: primary?.midtransMode ?? null,
       environment: primary?.environment ?? null,
       channels: primary?.channels ?? [],
       gateways,
+      fallbackGateway: gateways[1]?.code ?? null,
     },
     { headers: { "Cache-Control": "no-store" } },
   );
