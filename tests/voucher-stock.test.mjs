@@ -83,10 +83,8 @@ test("final storefront migration creates editable content, promotions, and admin
   for (const table of ["store_settings", "product_categories", "product_notices", "discount_vouchers", "flash_sales", "admin_users", "faq_entries", "media_assets"]) {
     assert.ok(tables.has(table), `${table} should exist`);
   }
-  const owner = db.prepare("SELECT email, role, is_active FROM admin_users LIMIT 1").get();
-  assert.equal(owner.email, "muhammadaldy198@gmail.com");
-  assert.equal(owner.role, "owner");
-  assert.equal(owner.is_active, 1);
+  const owners = db.prepare("SELECT email, role, is_active FROM admin_users WHERE role = 'owner'").all();
+  assert.equal(owners.length, 0, "fresh databases must create the owner through the protected setup flow");
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM product_categories").get().count, 4);
 });
 
