@@ -45,6 +45,7 @@ type Profile = {
   environment: Environment;
   configured: boolean;
   configuredFields: string[];
+  decryptionError: boolean;
   updatedAt: string;
 };
 
@@ -406,7 +407,7 @@ export function AdminIntegrationManager() {
                   <select value={environment} onChange={(event) => setSelectedEnvironment((current) => ({ ...current, [definition.id]: event.target.value as Environment }))} className="admin-select h-8 min-w-28 text-[10px]">
                     {definition.environments.map((item) => <option key={item} value={item}>{environmentLabel(item)}</option>)}
                   </select>
-                  <span className={saved?.configured ? "inline-flex items-center gap-1 text-[9px] font-bold text-[#d8ff8d]" : "text-[9px] text-white/30"}>{saved?.configured ? <><CheckCircle2 className="size-3" />Tersimpan</> : "Belum diisi"}</span>
+                  <span className={saved?.decryptionError ? "text-[9px] font-bold text-red-300" : saved?.configured ? "inline-flex items-center gap-1 text-[9px] font-bold text-[#d8ff8d]" : "text-[9px] text-white/30"}>{saved?.decryptionError ? "Kunci enkripsi tidak cocok" : saved?.configured ? <><CheckCircle2 className="size-3" />Tersimpan</> : "Belum diisi"}</span>
                 </div>
               </div>
               {isOpen && <div className="border-t border-white/[0.08] bg-white/[0.012] p-3">
