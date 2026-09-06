@@ -32,3 +32,11 @@ test("legacy DOM controller no longer hides or toggles payment groups", () => {
 test("checkout shows a diagnostic instead of a blank payment section", () => {
   assert.match(source, /Metode pembayaran otomatis belum tersedia/);
 });
+
+test("checkout does not switch to wallet before payment methods finish loading", () => {
+  assert.match(source, /paymentMethodsLoaded/);
+  assert.match(source, /if \(!paymentMethodsLoaded\) return/);
+  assert.match(source, /paymentMethod === "wallet"\s*\? Boolean\(account\)/);
+  assert.match(source, /if \(account\) \{\s*chooseMethod\("wallet"\)/);
+  assert.match(source, /Memuat metode pembayaran/);
+});
