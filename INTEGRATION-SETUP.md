@@ -141,3 +141,11 @@ Arsitektur checkout dan tabel order tidak perlu diubah hanya untuk menambah adap
 - Tidak ada secret atau konfigurasi environment operasional di GitHub.
 - Tidak pernah meminta password, PIN, atau OTP pelanggan.
 - Kode uji berhasil tersedia/dikirim sesuai kanal yang dipilih dan jumlah stok berkurang tepat satu.
+
+
+## 10. Catatan keamanan panel
+
+- Semua request langsung ke `/api/admin/*` diblokir di Worker bila identitas Cloudflare Access tidak tersedia.
+- UI Admin/Staff memakai endpoint bersama `/api/panel/*` dan tetap diverifikasi oleh session + role pada server.
+- Jika kredensial Integration Manager tidak dapat didekripsi, panel menampilkan **Kunci enkripsi tidak cocok**. Jangan mengganti `INTEGRATION_ENCRYPTION_KEY` setelah credential tersimpan.
+- GitHub Actions menjalankan build, lint, test, dan test guard Cloudflare Access setiap push ke `main`.
