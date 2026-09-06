@@ -138,6 +138,8 @@ export function AdminDashboard({
             onClick={() => setMenuOpen(true)}
             className="border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white lg:hidden"
             aria-label="Buka navigasi panel"
+            aria-controls="admin-mobile-navigation"
+            aria-expanded={menuOpen}
           >
             <Menu className="size-4" />
           </Button>
@@ -209,7 +211,7 @@ export function AdminDashboard({
               className="fixed inset-0 z-40 bg-black/75 lg:hidden"
               aria-label="Tutup navigasi panel"
             />
-            <aside className="fixed inset-y-0 left-0 z-50 flex w-[84vw] max-w-[300px] flex-col border-r border-white/[0.1] bg-[#0b0f18] shadow-2xl lg:hidden">
+            <aside id="admin-mobile-navigation" role="dialog" aria-modal="true" className="fixed inset-y-0 left-0 z-50 flex w-[86vw] max-w-[310px] flex-col border-r border-white/[0.1] bg-[#0b0f18] shadow-2xl lg:hidden">
               <div className="flex h-14 items-center justify-between border-b border-white/[0.08] px-3">
                 <div className="flex items-center gap-2">
                   <span className="grid size-8 place-items-center rounded-md bg-[#b9ff35] text-[11px] font-black tracking-[-0.08em] text-[#091006]">
@@ -232,7 +234,7 @@ export function AdminDashboard({
                 </Button>
               </div>
               <div className="flex-1 overflow-y-auto px-2 py-3">
-                <PanelNavigation navGroups={navGroups} onSelect={selectTab} />
+                <MobilePanelNavigation navGroups={navGroups} activeTab={activeTab} onSelect={selectTab} />
               </div>
               <div className="border-t border-white/[0.08] p-3">
                 <p className="truncate text-xs font-bold">{initialSession.name}</p>
@@ -345,7 +347,7 @@ export function AdminDashboard({
                     <SettingCard title="Cloudflare D1" status="Terhubung" text="Katalog, konten, akun, pesanan, wallet, dan stok tersimpan di database." />
                     <SettingCard title="Gateway pembayaran" status="Secret Cloudflare" text="QRIS, e-wallet, virtual account, dan callback pembayaran." />
                     <SettingCard title="DigiFlazz & VIPayment" status="Secret Cloudflare" text="SKU per nominal dan callback provider tervalidasi." />
-                    <SettingCard title="Pengiriman kode" status="Khusus Pemilik" text="Email serta WhatsApp mengirim voucher tanpa membuka stok ke Staff." />
+                    <SettingCard title="Pengiriman kode" status="Khusus Pemilik" text="Website dan email Resend mengirim voucher tanpa membuka stok ke Staff." />
                   </div>
                 </AdminSection>
                 <AdminSection title="Kredensial API & callback" description="Simpan API key terenkripsi, pilih Sandbox/Production, atur mode Snap atau BI-SNAP, dan salin URL callback provider.">
@@ -361,6 +363,47 @@ export function AdminDashboard({
         </Tabs>
       </main>
     </div>
+  );
+}
+
+function MobilePanelNavigation({
+  navGroups,
+  activeTab,
+  onSelect,
+}: {
+  navGroups: NavigationGroup[];
+  activeTab: string;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <nav className="space-y-3" aria-label="Navigasi panel mobile">
+      {navGroups.map((group) => (
+        <div key={group.label}>
+          <p className="px-2 pb-1 text-[8px] font-black uppercase tracking-[0.16em] text-white/28">{group.label}</p>
+          <div className="space-y-0.5">
+            {group.items.map(({ value, label, Icon }) => {
+              const active = value === activeTab;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onSelect(value)}
+                  className={
+                    "flex h-10 w-full items-center rounded-md px-2.5 text-left text-[11px] font-medium transition " +
+                    (active
+                      ? "bg-[#b9ff35] font-bold text-[#091006]"
+                      : "text-white/58 hover:bg-white/[0.06] hover:text-white")
+                  }
+                >
+                  <Icon className="mr-2.5 size-3.5 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </nav>
   );
 }
 
