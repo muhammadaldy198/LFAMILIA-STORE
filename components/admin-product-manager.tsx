@@ -88,6 +88,7 @@ export function AdminProductManager() {
       const data = await requestProducts();
       setItems(data.products ?? []);
       setRole(data.role ?? "staff");
+      setSellerMonitor(data.sellerMonitor ?? null);
       setDatabaseReady(data.databaseReady !== false);
     } catch (reason) {
       setDatabaseReady(false);
@@ -103,6 +104,7 @@ export function AdminProductManager() {
       if (!active) return;
       setItems(data.products ?? []);
       setRole(data.role ?? "staff");
+      setSellerMonitor(data.sellerMonitor ?? null);
       setDatabaseReady(data.databaseReady !== false);
     }).catch((reason) => {
       if (!active) return;
@@ -124,11 +126,6 @@ export function AdminProductManager() {
     if (!response.ok) throw new Error(data.error ?? "Monitor seller DigiFlazz gagal dimuat.");
     setSellerMonitor(data);
   }, []);
-
-  useEffect(() => {
-    if (role !== "owner") return;
-    void loadSellerMonitor().catch(() => undefined);
-  }, [role, loadSellerMonitor]);
 
   const sellerMonitorByPackage = useMemo(
     () => new Map((sellerMonitor?.items ?? []).map((item) => [item.packageId, item])),
@@ -744,7 +741,7 @@ function slugify(value: string) {
 
 async function requestProducts() {
   const response = await fetch("/api/panel/products", { cache: "no-store" });
-  const data = await response.json() as { products?: ManagedProduct[]; databaseReady?: boolean; role?: "owner" | "staff"; error?: string };
+  const data = await response.json() as { products?: ManagedProduct[]; databaseReady?: boolean; role?: "owner" | "staff"; sellerMonitor?: DigiflazzMonitorPayload | null; error?: string };
   if (!response.ok) throw new Error(data.error ?? "Produk gagal dimuat.");
   return data;
 }
