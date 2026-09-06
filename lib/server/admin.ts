@@ -14,9 +14,10 @@ function normalizeEmail(value: string | null | undefined) {
 }
 
 export function getAccessEmail(request: Request) {
-  const cloudflareEmail = normalizeEmail(request.headers.get("cf-access-authenticated-user-email"));
-  if (cloudflareEmail) return cloudflareEmail;
-  return null;
+  // Trust only the internal header injected by worker/index.ts after the
+  // Cloudflare Access gate succeeds. The Worker strips any client-supplied
+  // value before setting this header.
+  return normalizeEmail(request.headers.get("x-lfamilia-admin-email"));
 }
 
 export function getOwnerEmail() {
