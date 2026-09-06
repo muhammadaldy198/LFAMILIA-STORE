@@ -238,7 +238,6 @@ export function AdminIntegrationManager() {
       setOverview(next);
       setSelections(next.selections);
       setGatewayToggles(next.gatewayToggles);
-      setGatewayToggles(next.gatewayToggles);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Pengaturan integrasi gagal dimuat.");
     } finally {
