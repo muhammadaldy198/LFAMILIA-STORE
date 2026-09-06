@@ -1,6 +1,7 @@
 import * as categories from "@/app/api/admin/categories/route";
 import * as content from "@/app/api/admin/content/route";
 import * as digiflazzPricing from "@/app/api/admin/digiflazz-pricing/route";
+import * as digiflazzMonitor from "@/app/api/admin/digiflazz-monitor/route";
 import * as faqs from "@/app/api/admin/faqs/route";
 import * as media from "@/app/api/admin/media/route";
 import * as members from "@/app/api/admin/members/route";
@@ -33,6 +34,7 @@ const routes: Record<string, RouteHandlers> = {
   categories: { GET: categories.GET, POST: categories.POST, DELETE: categories.DELETE },
   content: { GET: content.GET, POST: content.POST, DELETE: content.DELETE },
   "digiflazz-pricing": { GET: digiflazzPricing.GET, POST: digiflazzPricing.POST },
+  "digiflazz-monitor": { GET: digiflazzMonitor.GET, POST: digiflazzMonitor.POST },
   faqs: { GET: faqs.GET, POST: faqs.POST, DELETE: faqs.DELETE },
   media: { POST: media.POST },
   members: { GET: members.GET, PUT: members.PUT, PATCH: members.PATCH },
