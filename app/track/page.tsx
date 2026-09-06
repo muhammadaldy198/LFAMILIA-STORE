@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Clock3,
   Copy,
-  Eye,
   History,
   Loader2,
   PackageCheck,
@@ -298,7 +297,7 @@ export default function TrackPage() {
         {phoneOrders.length > 0 && <section className="panel mt-4 overflow-hidden">
           <div className="border-b border-white/[0.08] px-4 py-3 sm:px-5">
             <h2 className="text-sm font-black">Pesanan dari nomor WhatsApp ini</h2>
-            <p className="mt-0.5 text-[9px] text-white/35">Pilih transaksi yang ingin kamu cek.</p>
+            <p className="mt-0.5 text-[9px] text-white/35">Nomor WhatsApp hanya menampilkan ringkasan. Gunakan invoice asli untuk membuka detail transaksi.</p>
           </div>
           <div className="divide-y divide-white/[0.06]">
             {phoneOrders.map((item) => <div key={item.referenceId ?? item.maskedReferenceId} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
@@ -310,9 +309,9 @@ export default function TrackPage() {
                 <p className="mt-1 truncate text-xs font-bold text-white/75">{item.productName} • {item.packageLabel}</p>
                 <p className="mt-1 text-[9px] text-white/35">{formatRupiah(item.total)} • {dateLabel(item.createdAt)}</p>
               </div>
-              {item.referenceId && <button type="button" onClick={() => void loadOrder(item.referenceId!)} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-[9px] font-bold text-white/70 hover:border-[#b9ff35]/30 hover:text-[#cfff72]">
-                <Eye className="size-3" /> Lihat
-              </button>}
+              <span className="shrink-0 rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2 text-[9px] font-bold text-white/35">
+                Invoice diperlukan
+              </span>
             </div>)}
           </div>
         </section>}
