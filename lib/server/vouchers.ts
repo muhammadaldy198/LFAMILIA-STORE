@@ -10,12 +10,6 @@ type VoucherRuntimeEnv = {
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   RESEND_API_URL?: string;
-  WHATSAPP_ACCESS_TOKEN?: string;
-  WHATSAPP_PHONE_NUMBER_ID?: string;
-  WHATSAPP_VOUCHER_TEMPLATE?: string;
-  WHATSAPP_TEMPLATE_LANGUAGE?: string;
-  WHATSAPP_GRAPH_VERSION?: string;
-  WHATSAPP_GRAPH_BASE_URL?: string;
 };
 
 type VoucherCodeRow = {
@@ -32,7 +26,7 @@ type VoucherCodeRow = {
   created_at: string;
 };
 
-type DeliveryChannel = "email" | "whatsapp";
+type DeliveryChannel = "email";
 
 type DeliveryOutcome = {
   channel: DeliveryChannel;
@@ -204,7 +198,6 @@ export async function listVoucherDashboard() {
     config: {
       encryptionReady: Boolean(config.VOUCHER_ENCRYPTION_KEY && config.VOUCHER_ENCRYPTION_KEY.trim().length >= 32),
       emailReady: Boolean(config.RESEND_API_KEY && config.RESEND_FROM_EMAIL && config.RESEND_API_URL),
-      whatsappReady: Boolean(config.WHATSAPP_ACCESS_TOKEN && config.WHATSAPP_PHONE_NUMBER_ID && config.WHATSAPP_VOUCHER_TEMPLATE && config.WHATSAPP_TEMPLATE_LANGUAGE && config.WHATSAPP_GRAPH_VERSION && config.WHATSAPP_GRAPH_BASE_URL),
       deliveryChannel: config.VOUCHER_DELIVERY_CHANNEL?.trim().toLowerCase() || null,
     },
   };
@@ -252,11 +245,9 @@ async function reserveCode(orderId: string, stockKeyInput: string) {
 
 function parseDeliveryChannels(value: string): DeliveryChannel[] {
   const normalized = value.trim().toLowerCase();
-  if (normalized === "website") return [];
-  if (normalized === "email") return ["email"];
-  if (normalized === "whatsapp") return ["whatsapp"];
-  if (normalized === "both" || normalized === "email+whatsapp" || normalized === "whatsapp+email") return ["email", "whatsapp"];
-  throw new Error("VOUCHER_DELIVERY_CHANNEL harus website, email, whatsapp, atau both.");
+  if (normalized === "website" || normalized === "whatsapp") return [];
+  if (normalized === "email" || normalized === "both" || normalized === "email+whatsapp" || normalized === "whatsapp+email") return ["email"];
+  throw new Error("VOUCHER_DELIVERY_CHANNEL harus website atau email.");
 }
 
 async function existingDeliveryStatus(orderId: string, channel: DeliveryChannel) {
@@ -281,7 +272,7 @@ async function deliverChannel(order: ProviderOrder, voucher: VoucherCodeRow, cod
 
   let outcome: DeliveryOutcome;
   try {
-    outcome = channel === "email" ? await sendEmail(order, code) : await sendWhatsApp(order, code);
+    outcome = await sendEmail(order, code);
   } catch (error) {
     outcome = {
       channel,
@@ -324,45 +315,6 @@ async function sendEmail(order: ProviderOrder, code: string): Promise<DeliveryOu
   return { channel: "email", status: "sent", providerId: payload.id || null, message: "Kode berhasil dikirim lewat email." };
 }
 
-async function sendWhatsApp(order: ProviderOrder, code: string): Promise<DeliveryOutcome> {
-  const config = runtime();
-  const token = requireRuntimeValue(config.WHATSAPP_ACCESS_TOKEN, "WHATSAPP_ACCESS_TOKEN");
-  const phoneId = requireRuntimeValue(config.WHATSAPP_PHONE_NUMBER_ID, "WHATSAPP_PHONE_NUMBER_ID");
-  const template = requireRuntimeValue(config.WHATSAPP_VOUCHER_TEMPLATE, "WHATSAPP_VOUCHER_TEMPLATE");
-  const language = requireRuntimeValue(config.WHATSAPP_TEMPLATE_LANGUAGE, "WHATSAPP_TEMPLATE_LANGUAGE");
-  const version = requireRuntimeValue(config.WHATSAPP_GRAPH_VERSION, "WHATSAPP_GRAPH_VERSION");
-  const graphBaseUrl = requireRuntimeValue(config.WHATSAPP_GRAPH_BASE_URL, "WHATSAPP_GRAPH_BASE_URL").replace(/\/$/, "");
-
-  const response = await fetch(`${graphBaseUrl}/${version}/${encodeURIComponent(phoneId)}/messages`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to: normalizeWhatsApp(order.buyerPhone),
-      type: "template",
-      template: {
-        name: template,
-        language: { code: language },
-        components: [{
-          type: "body",
-          parameters: [order.buyerName, order.productName, order.packageLabel, code, order.referenceId]
-            .map((text) => ({ type: "text", text })),
-        }],
-      },
-    }),
-    signal: AbortSignal.timeout(12_000),
-  });
-  const payload = await response.json().catch(() => ({})) as { messages?: Array<{ id?: string }>; error?: { message?: string } };
-  if (!response.ok) throw new Error(payload.error?.message || "WhatsApp menolak pengiriman pesan.");
-  return { channel: "whatsapp", status: "sent", providerId: payload.messages?.[0]?.id || null, message: "Kode berhasil dikirim lewat WhatsApp." };
-}
-
-function normalizeWhatsApp(value: string) {
-  const digits = value.replace(/\D/g, "");
-  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
-  if (digits.startsWith("8")) return `62${digits}`;
-  return digits;
-}
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character] || character);
