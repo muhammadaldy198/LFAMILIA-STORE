@@ -2,13 +2,6 @@
 
 import { useEffect } from "react";
 
-type PaymentChannelPreview = {
-  method?: string;
-  channel?: string;
-  name?: string;
-  imageUrl?: string;
-};
-
 type ExtraNicknameState = {
   status: "idle" | "loading" | "success" | "error";
   key?: string;
@@ -35,37 +28,9 @@ export function CheckoutUiEnhancer() {
     let nicknameTimer = 0;
     let nicknameController: AbortController | null = null;
     let extraNickname: ExtraNicknameState = { status: "idle" };
-    let channels: PaymentChannelPreview[] = [];
-    const wiredHeaders = new WeakSet<HTMLButtonElement>();
     const wiredNicknameInputs = new WeakSet<HTMLInputElement>();
     const wiredWhatsappInputs = new WeakSet<HTMLInputElement>();
-    const expandedMethods = new Set<string>();
-
     ensureStyles();
-
-    void fetch("/api/payment-methods", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return;
-        const data = (await response.json()) as {
-          channels?: PaymentChannelPreview[];
-          allChannels?: PaymentChannelPreview[];
-          gateways?: Array<{ channels?: PaymentChannelPreview[] }>;
-        };
-        const combined =
-          data.allChannels?.length
-            ? data.allChannels
-            : data.gateways?.flatMap((gateway) => gateway.channels ?? []) ?? data.channels ?? [];
-        channels = [
-          ...new Map(
-            combined.map((channel) => [
-              `${channel.method ?? ""}:${channel.channel ?? ""}`,
-              channel,
-            ]),
-          ).values(),
-        ];
-        schedule();
-      })
-      .catch(() => undefined);
 
     function schedule() {
       if (disposed || frame) return;
@@ -84,7 +49,6 @@ export function CheckoutUiEnhancer() {
       makeAccountFieldsParallel(form);
       enforceWhatsappDestination(form);
       enhanceAdditionalNickname(form);
-      enhancePaymentGroups(form);
     }
 
     function enhanceProductHero(main: HTMLElement) {
@@ -291,121 +255,6 @@ export function CheckoutUiEnhancer() {
 
       row.className = "mt-3 rounded-lg border border-white/[0.07] bg-white/[0.025] p-2.5 text-[10px] leading-4 text-white/40";
       row.textContent = "Nickname akan diperiksa otomatis melalui Melostore setelah ID diisi.";
-    }
-
-    function enhancePaymentGroups(form: HTMLFormElement) {
-      const sections = Array.from(form.querySelectorAll<HTMLElement>("section"));
-      const paymentSection = sections.find((section) =>
-        section.querySelector("h2")?.textContent?.toLowerCase().includes("pembayaran"),
-      );
-      if (!paymentSection) return;
-
-      const groupsContainer = Array.from(paymentSection.querySelectorAll<HTMLElement>("div")).find(
-        (element) => element.className.includes("space-y-2"),
-      );
-      if (!groupsContainer) return;
-
-      Array.from(groupsContainer.children).forEach((node) => {
-        if (!(node instanceof HTMLElement)) return;
-        const header = Array.from(node.children).find(
-          (child): child is HTMLButtonElement => child instanceof HTMLButtonElement,
-        );
-        if (!header) return;
-
-        const label = header.querySelector("strong")?.textContent?.trim().toLowerCase() ?? "";
-        if (label.includes("koin lfamilia")) return;
-
-        const method = resolveMethod(label);
-        if (!method) return;
-
-        const selected = node.className.includes("border-[#b9ff35]/60");
-        if (!selected) expandedMethods.delete(method);
-
-        const directBorderRows = Array.from(node.children).filter(
-          (child): child is HTMLDivElement =>
-            child instanceof HTMLDivElement && child.className.includes("border-t"),
-        );
-        const preview = directBorderRows[0];
-        const channelDropdown = directBorderRows.find((row) => row.className.includes("grid-cols"));
-
-        if (preview) renderLogoOnlyPreview(preview, method);
-
-        if (method === "qris") {
-          header.removeAttribute("aria-expanded");
-          header.querySelector("[data-lf-payment-chevron]")?.remove();
-          if (channelDropdown) channelDropdown.style.display = "none";
-          return;
-        }
-
-        const dropdownOpen = selected && expandedMethods.has(method);
-        header.setAttribute("aria-expanded", String(dropdownOpen));
-
-        let arrow = header.querySelector<HTMLElement>("[data-lf-payment-chevron]");
-        if (!arrow) {
-          arrow = document.createElement("span");
-          arrow.dataset.lfPaymentChevron = "true";
-          arrow.className = "ml-1 grid size-6 shrink-0 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-white/60 transition";
-          arrow.setAttribute("aria-hidden", "true");
-          header.appendChild(arrow);
-        }
-        arrow.innerHTML = dropdownOpen
-          ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>'
-          : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
-
-        if (channelDropdown) channelDropdown.style.display = dropdownOpen ? "grid" : "none";
-
-        if (!wiredHeaders.has(header)) {
-          wiredHeaders.add(header);
-          header.addEventListener("click", () => {
-            const currentLabel = header.querySelector("strong")?.textContent?.trim().toLowerCase() ?? "";
-            const currentMethod = resolveMethod(currentLabel);
-            if (!currentMethod || currentMethod === "qris") return;
-
-            if (expandedMethods.has(currentMethod)) expandedMethods.delete(currentMethod);
-            else expandedMethods.add(currentMethod);
-            window.setTimeout(schedule, 0);
-          });
-        }
-      });
-    }
-
-    function resolveMethod(label: string) {
-      if (label.includes("qris")) return "qris";
-      if (label.includes("e-wallet") || label.includes("ewallet")) return "ewallet";
-      if (label.includes("virtual account") || label === "va") return "va";
-      return "";
-    }
-
-    function renderLogoOnlyPreview(preview: HTMLDivElement, method: string) {
-      const withImages = channels
-        .filter((channel) => channel.method === method && Boolean(channel.imageUrl))
-        .slice(0, 8);
-
-      const signature = withImages.map((channel) => `${channel.channel}:${channel.imageUrl}`).join("|");
-      if (preview.dataset.lfLogoSignature === signature) return;
-
-      preview.replaceChildren();
-      preview.dataset.lfLogoSignature = signature;
-
-      if (!withImages.length) {
-        preview.style.display = "none";
-        return;
-      }
-
-      preview.style.display = "flex";
-      preview.style.alignItems = "center";
-      preview.style.gap = "0.65rem";
-      preview.style.minHeight = "2.25rem";
-
-      withImages.forEach((channel) => {
-        const img = document.createElement("img");
-        img.src = channel.imageUrl!;
-        img.alt = channel.name ?? "Metode pembayaran";
-        img.title = channel.name ?? "";
-        img.className = "h-5 max-w-14 object-contain";
-        img.loading = "lazy";
-        preview.appendChild(img);
-      });
     }
 
     function ensureStyles() {
