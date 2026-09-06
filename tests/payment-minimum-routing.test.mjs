@@ -19,12 +19,13 @@ test("checkout hides iPaymu-only channels below the minimum", () => {
   assert.match(checkout, /isIpaymuAmountSupported\(subtotal\)/);
 });
 
-test("server routing prefers ready iPaymu then uses Midtrans fallback", () => {
+test("server routing prefers operational iPaymu and safely falls back to Midtrans", () => {
   assert.match(autoRoute, /const canUseIpaymu/);
   assert.match(autoRoute, /isIpaymuAmountSupported\(promotion\.finalPrice\)/);
-  assert.match(autoRoute, /return createIpaymuCheckout\(request\)/);
-  assert.match(autoRoute, /settings\.midtransCheckoutEnabled && midtransReadiness\.ready/);
-  assert.match(autoRoute, /return createMidtransCheckout\(request\)/);
+  assert.match(autoRoute, /const canUseMidtrans/);
+  assert.match(autoRoute, /createIpaymuCheckout\(ipaymuRequest\)/);
+  assert.match(autoRoute, /fallbackAllowed/);
+  assert.match(autoRoute, /createMidtransCheckout\(midtransRequest\)/);
 });
 
 test("iPaymu route rejects below-minimum amount before provider request", () => {
