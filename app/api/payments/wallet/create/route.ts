@@ -17,6 +17,7 @@ import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
 import { spendWallet } from "@/lib/server/wallet";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,10 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
+  const rate = await allowRequest(request, "wallet-checkout", 12, 600);
+  if (!rate.allowed) return Response.json({ error: "Terlalu banyak percobaan checkout. Coba lagi beberapa menit." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   const customer = await requireCustomerSession(request);
   if (customer instanceof Response) return customer;
   let referenceId: string | null = null;
