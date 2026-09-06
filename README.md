@@ -26,7 +26,7 @@ npm run lint
 npm test
 ```
 
-Konfigurasi Worker berada di `wrangler.jsonc`. Binding database harus bernama `DB`. Terapkan seluruh migrasi di folder `drizzle` secara berurutan.
+Konfigurasi Worker berada di `wrangler.jsonc`. Binding database harus bernama `DB`. Terapkan seluruh migrasi di folder `drizzle` secara berurutan. Migration lama dipertahankan apa adanya karena dapat sudah tercatat di D1 production. Jangan menjalankan `drizzle-kit generate` sampai metadata Drizzle dibaseline ulang; perubahan schema berikutnya harus dibuat sebagai migration SQL baru yang idempotent.
 
 Panduan secret, callback, provider, relay, dan pengiriman kode tersedia di [INTEGRATION-SETUP.md](./INTEGRATION-SETUP.md).
 
