@@ -6,66 +6,11 @@ Konfigurasi provider LFAMILIA bersifat environment-explicit. Credential dan pili
 
 Atur dari **Admin Panel → Integrasi & harga → Kredensial API & callback**:
 
-- Mode Midtrans: Snap atau BI-SNAP
-- Environment Midtrans: Sandbox atau Production
 - Environment iPaymu: Sandbox atau Production
 - Environment DigiFlazz: Development atau Production
+- Environment VIPayment: Sandbox atau Production
 
-Runtime internal tetap memakai `MIDTRANS_ENV`, `MIDTRANS_MODE`, `IPAYMU_ENV`, dan `DIGIFLAZZ_ENV`, tetapi nilainya dihidrasi dari D1 oleh Integration Manager.
-
-## Midtrans Snap
-
-```text
-MIDTRANS_SNAP_SANDBOX_SERVER_KEY
-MIDTRANS_SNAP_PRODUCTION_SERVER_KEY
-MIDTRANS_SNAP_SANDBOX_CLIENT_KEY
-MIDTRANS_SNAP_PRODUCTION_CLIENT_KEY
-MIDTRANS_SNAP_SANDBOX_API_URL
-MIDTRANS_SNAP_PRODUCTION_API_URL
-MIDTRANS_SNAP_SANDBOX_SCRIPT_URL
-MIDTRANS_SNAP_PRODUCTION_SCRIPT_URL
-```
-
-## Midtrans BI-SNAP
-
-Common:
-
-```text
-MIDTRANS_BISNAP_TIMEZONE_OFFSET
-MIDTRANS_BISNAP_CURRENCY
-MIDTRANS_BISNAP_DEVICE_ID
-MIDTRANS_BISNAP_PAYMENT_EXPIRY_MINUTES
-MIDTRANS_BISNAP_TOKEN_EXPIRY_SAFETY_SECONDS
-```
-
-Gunakan prefix `MIDTRANS_BISNAP_SANDBOX_` dan `MIDTRANS_BISNAP_PRODUCTION_` untuk setiap slot berikut:
-
-```text
-CLIENT_ID
-PRIVATE_KEY
-CLIENT_SECRET
-PARTNER_ID
-CHANNEL_ID
-MERCHANT_ID
-VA_PARTNER_SERVICE_ID
-VA_RANDOMIZE
-QRIS_ACQUIRER
-ACCESS_TOKEN_URL
-DIRECT_DEBIT_URL
-QRIS_URL
-VA_URL
-PUBLIC_KEY
-```
-
-Callback BI-SNAP:
-
-```text
-<PUBLIC_BASE_URL>/v1.0/debit/notify
-<PUBLIC_BASE_URL>/v1.0/qr/qr-mpm-notify
-
-Virtual Account BI-SNAP tetap memakai notification legacy Midtrans:
-<PUBLIC_BASE_URL>/api/payments/midtrans/callback
-```
+Runtime internal memakai `IPAYMU_ENV`, `DIGIFLAZZ_ENV`, dan `VIPPAYMENT_ENV`; nilainya dihidrasi dari konfigurasi terenkripsi D1 oleh Integration Manager.
 
 ## iPaymu
 
@@ -77,6 +22,12 @@ IPAYMU_SANDBOX_API_URL
 IPAYMU_PRODUCTION_VA
 IPAYMU_PRODUCTION_API_KEY
 IPAYMU_PRODUCTION_API_URL
+```
+
+Checkout pelanggan memakai iPaymu sebagai payment gateway. Callback pembayaran masuk langsung ke Worker:
+
+```text
+<PUBLIC_BASE_URL>/api/payments/ipaymu/callback
 ```
 
 ## DigiFlazz
@@ -94,7 +45,7 @@ DIGIFLAZZ_WEBHOOK_SECRET
 
 ## Service Integration Manager
 
-Selain provider pembayaran, panel dapat menyimpan terenkripsi:
+Panel juga dapat menyimpan terenkripsi:
 
 ```text
 MELOSTORE_API_KEY
@@ -114,14 +65,13 @@ VOUCHER_ENCRYPTION_KEY
 
 ## VPS Relay
 
-Relay dikonfigurasi dari **Admin Panel → Integrasi & harga → VPS Relay** dan disimpan terenkripsi di D1.
+Relay Worker dikonfigurasi dari **Admin Panel → Integrasi & harga → VPS Relay** dan disimpan terenkripsi di D1.
 
 Field Admin Panel:
 
 ```text
 DigiFlazz Relay URL
 iPaymu Relay URL
-BI-SNAP Relay URL
 Relay Token
 ```
 
@@ -129,13 +79,11 @@ Tidak perlu membuat `PROVIDER_RELAY_*` manual di Cloudflare. Worker membentuk ru
 
 ## Switching to Production
 
-1. Buka **Admin Panel → Integrasi & harga → Kredensial API & callback**.
-2. Isi credential pada slot Production provider terkait.
-3. Ubah selector environment menjadi **Production** lalu simpan.
-4. Jangan mengubah repo, Caddy, atau service VPS hanya untuk berpindah environment.
+1. Isi credential Production provider terkait di Admin Panel.
+2. Ubah selector environment menjadi **Production** lalu simpan.
+3. Jangan mengubah repo, Caddy, atau service VPS hanya untuk berpindah environment.
 
-Tidak ada fallback otomatis ke Production hanya karena credential Production sudah tersedia. `INTEGRATION_ENCRYPTION_KEY` tetap satu-satunya root secret integrasi yang wajib berada di Cloudflare.
-
+Tidak ada fallback otomatis ke Production hanya karena credential Production sudah tersedia.
 
 ## Security root
 
