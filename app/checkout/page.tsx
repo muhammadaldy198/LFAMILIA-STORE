@@ -42,6 +42,7 @@ import {
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
 import { formatRupiah } from "@/lib/store-data";
+import { IPAYMU_MIN_CHECKOUT_AMOUNT, isIpaymuAmountSupported } from "@/lib/payment-limits";
 import type { CustomerSession } from "@/lib/server/customer-auth";
 import type { WalletSettings } from "@/lib/server/wallet";
 
@@ -197,6 +198,12 @@ function CheckoutContent() {
   const destination = productInputFields[0] ? (customerInputValues[productInputFields[0].id] ?? "") : "";
   const server = productInputFields[1] ? (customerInputValues[productInputFields[1].id] ?? "") : "";
   const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
+  const eligibleGatewayOptions = useMemo(
+    () => gatewayOptions.filter((gateway) =>
+      gateway.code !== "ipaymu" || subtotal <= 0 || isIpaymuAmountSupported(subtotal),
+    ),
+    [gatewayOptions, subtotal],
+  );
   const isManual = product.fulfillmentType === "manual";
   const isVoucherStock = selectedPackage?.providerCode === "voucher-stock";
   const providerReady =
@@ -254,7 +261,9 @@ function CheckoutContent() {
           item.method === paymentMethod && item.channel === paymentChannel,
       );
       if (!currentChannelIsAvailable) {
-        const replacement = gateway.channels[0];
+        const replacement =
+          gateway.channels.find((item) => item.method === "qris") ??
+          gateway.channels[0];
         setPaymentMethod(replacement?.method ?? "wallet");
         setPaymentChannel(
           replacement?.channel ?? "lfamilia-balance",
@@ -294,6 +303,41 @@ function CheckoutContent() {
       })
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!gatewayOptions.length) return;
+
+    const current = eligibleGatewayOptions.find(
+      (gateway) => gateway.code === activeCheckoutGateway,
+    );
+    if (current) return;
+
+    const next =
+      eligibleGatewayOptions.find((gateway) => gateway.code === "midtrans") ??
+      eligibleGatewayOptions[0] ??
+      null;
+
+    const timer = window.setTimeout(() => {
+      if (next) {
+        chooseGateway(next);
+      } else {
+        setActiveCheckoutGateway(null);
+        setAvailableChannels([]);
+        if (paymentMethod !== "wallet") {
+          setPaymentMethod("wallet");
+          setPaymentChannel("lfamilia-balance");
+        }
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    activeCheckoutGateway,
+    chooseGateway,
+    eligibleGatewayOptions,
+    gatewayOptions.length,
+    paymentMethod,
+  ]);
 
   useEffect(() => {
     void fetch("/api/wallet", { cache: "no-store" })
@@ -724,11 +768,11 @@ function CheckoutContent() {
                   title="Pilih Pembayaran"
                   description="Pilih gateway, metode, lalu channel jika tersedia."
                 />
-                {gatewayOptions.length > 1 && (
+                {eligibleGatewayOptions.length > 1 && (
                   <div className="mt-3 rounded-lg border border-white/[0.08] bg-black/10 p-2">
                     <p className="px-1 text-[9px] font-bold text-white/45">Pilih gateway pembayaran</p>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      {gatewayOptions.map((gateway) => {
+                      {eligibleGatewayOptions.map((gateway) => {
                         const selectedGateway = activeCheckoutGateway === gateway.code;
                         return (
                           <button
@@ -744,6 +788,11 @@ function CheckoutContent() {
                         );
                       })}
                     </div>
+                  </div>
+                )}
+                {subtotal > 0 && subtotal < IPAYMU_MIN_CHECKOUT_AMOUNT && gatewayOptions.some((gateway) => gateway.code === "ipaymu") && (
+                  <div className="mt-3 rounded-md border border-amber-300/15 bg-amber-300/[0.05] px-2.5 py-2 text-[9px] leading-4 text-amber-100/70">
+                    Nominal di bawah {formatRupiah(IPAYMU_MIN_CHECKOUT_AMOUNT)} otomatis dialihkan dari iPaymu ke Midtrans jika tersedia.
                   </div>
                 )}
                 <div className="mt-3 space-y-2">
