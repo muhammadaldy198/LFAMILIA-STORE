@@ -5,10 +5,9 @@ type ProviderRelayEnv = {
   PROVIDER_RELAY_HOSTS?: string;
   PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?: string;
   PROVIDER_RELAY_IPAYMU_ORIGIN?: string;
-  PROVIDER_RELAY_MIDTRANS_BISNAP_ORIGIN?: string;
 };
 
-export type RelayProvider = "digiflazz" | "ipaymu" | "midtrans-bisnap";
+export type RelayProvider = "digiflazz" | "ipaymu";
 
 function relayHosts(value?: string) {
   return (value ?? "")
@@ -23,7 +22,7 @@ function legacyOriginFor(provider: RelayProvider, hosts?: string) {
     const value = host.toLowerCase();
     if (provider === "digiflazz") return value.includes("digiflazz");
     if (provider === "ipaymu") return value.includes("ipaymu");
-    return value.includes("bisnap") || value.includes("midtrans");
+    return false;
   });
   if (!selected) return "";
   return selected.startsWith("https://") ? selected : `https://${selected}`;
@@ -33,9 +32,7 @@ function configuredOrigin(runtime: ProviderRelayEnv, provider: RelayProvider) {
   const explicit =
     provider === "digiflazz"
       ? runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN
-      : provider === "ipaymu"
-        ? runtime.PROVIDER_RELAY_IPAYMU_ORIGIN
-        : runtime.PROVIDER_RELAY_MIDTRANS_BISNAP_ORIGIN;
+      : runtime.PROVIDER_RELAY_IPAYMU_ORIGIN;
   return explicit?.trim() || legacyOriginFor(provider, runtime.PROVIDER_RELAY_HOSTS);
 }
 
@@ -209,7 +206,6 @@ export async function testProviderRelayConnections() {
   return Promise.all([
     testRelayConnection("digiflazz", "DigiFlazz"),
     testRelayConnection("ipaymu", "iPaymu"),
-    testRelayConnection("midtrans-bisnap", "Midtrans BI-SNAP"),
   ]);
 }
 
