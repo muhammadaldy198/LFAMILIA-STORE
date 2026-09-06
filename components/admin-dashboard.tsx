@@ -310,7 +310,7 @@ export function AdminDashboard({
               </TabsContent>
 
               <TabsContent value="payments" className="mt-0 space-y-4">
-                <AdminSection title="Payment gateway" description="Atur iPaymu untuk checkout serta top up wallet.">
+                <AdminSection title="Payment gateway" description="Atur Midtrans dan iPaymu untuk checkout serta top up wallet.">
                   <AdminWalletManager view="checkout" />
                 </AdminSection>
                 <AdminSection title="Metode pembayaran" description="Kelompokkan metode checkout, urutan, logo, dan status aktifnya.">
@@ -350,10 +350,10 @@ export function AdminDashboard({
                     <SettingCard title="Pengiriman kode" status="Khusus Pemilik" text="Website dan email Resend mengirim voucher tanpa membuka stok ke Staff." />
                   </div>
                 </AdminSection>
-                <AdminSection title="VPS Relay" description="Hubungkan Worker LFAMILIA ke relay DigiFlazz dan iPaymu ber-IP statis.">
+                <AdminSection title="VPS Relay" description="Hubungkan Worker LFAMILIA ke relay DigiFlazz, iPaymu, dan Midtrans BI-SNAP ber-IP statis.">
                   <AdminIntegrationManager view="relay" />
                 </AdminSection>
-                <AdminSection title="Kredensial API & callback" description="Simpan API key terenkripsi, pilih environment provider, dan salin URL callback.">
+                <AdminSection title="Kredensial API & callback" description="Simpan API key terenkripsi, pilih Sandbox/Production, atur mode Snap atau BI-SNAP, dan salin URL callback provider.">
                   <AdminIntegrationManager view="providers" />
                 </AdminSection>
                 <AdminSection title="Harga otomatis DigiFlazz" description="Sinkronkan daftar harga DigiFlazz dan atur margin penjualan per nominal.">
