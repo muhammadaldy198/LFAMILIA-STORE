@@ -20,8 +20,7 @@ type PaymentOrder = {
   paymentChannel: string;
   paymentStatus: string;
   fulfillmentStatus: string;
-  paymentGateway: "midtrans" | "ipaymu" | null;
-  midtransMode: "snap" | "bisnap" | null;
+  paymentGateway: "ipaymu" | null;
   paymentNo: string | null;
   paymentName: string | null;
   paymentUrl: string | null;
@@ -29,42 +28,6 @@ type PaymentOrder = {
   createdAt: string;
   updatedAt: string;
 };
-
-type MidtransClientConfig = {
-  enabled: boolean;
-  environment: "sandbox" | "production";
-  clientKey: string | null;
-  scriptUrl: string;
-};
-
-type SnapCallbacks = {
-  onSuccess?: () => void;
-  onPending?: () => void;
-  onError?: () => void;
-  onClose?: () => void;
-};
-
-declare global {
-  interface Window {
-    snap?: {
-      pay: (token: string, callbacks?: SnapCallbacks) => void;
-    };
-  }
-}
-
-function snapTokenFromUrl(value: string | null) {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    const parts = url.pathname.split("/").filter(Boolean);
-    const redirectionIndex = parts.lastIndexOf("redirection");
-    if (redirectionIndex >= 0 && parts[redirectionIndex + 1])
-      return decodeURIComponent(parts[redirectionIndex + 1]);
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 export default function PaymentPage() {
   return (
@@ -78,14 +41,10 @@ function PaymentContent() {
   const { settings } = useStorefront();
   const searchParams = useSearchParams();
   const invoice = (searchParams.get("invoice") ?? "").trim().toUpperCase();
-  const querySnapToken = (searchParams.get("token") ?? "").trim();
   const [order, setOrder] = useState<PaymentOrder | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [snapToken, setSnapToken] = useState(querySnapToken);
-  const [snapReady, setSnapReady] = useState(false);
-  const [openingPayment, setOpeningPayment] = useState(false);
 
   const load = useCallback(async (quiet = false) => {
     if (!invoice) {
@@ -118,79 +77,6 @@ function PaymentContent() {
   }, [load]);
 
   useEffect(() => {
-    if (!invoice || snapToken) return;
-    const timer = window.setTimeout(() => {
-      try {
-        const stored = window.sessionStorage.getItem(`lfamilia-snap-token:${invoice}`);
-        if (stored) setSnapToken(stored);
-      } catch {
-        // Token query dan payment URL tetap menjadi fallback.
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [invoice, snapToken]);
-
-  useEffect(() => {
-    if (
-      order?.paymentGateway !== "midtrans" ||
-      order.midtransMode !== "snap"
-    )
-      return;
-    if (snapToken || !order?.paymentUrl) return;
-    const token = snapTokenFromUrl(order.paymentUrl);
-    if (!token) return;
-    const timer = window.setTimeout(() => setSnapToken(token), 0);
-    return () => window.clearTimeout(timer);
-  }, [order?.paymentGateway, order?.midtransMode, order?.paymentUrl, snapToken]);
-
-  useEffect(() => {
-    if (!snapToken) return;
-    let cancelled = false;
-    let script: HTMLScriptElement | null = null;
-
-    void fetch("/api/payments/midtrans/client-config", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return await response.json() as MidtransClientConfig;
-      })
-      .then((config) => {
-        if (cancelled || !config?.enabled || !config.clientKey) return;
-        if (window.snap?.pay) {
-          setSnapReady(true);
-          return;
-        }
-
-        const existing = document.querySelector<HTMLScriptElement>("script[data-lfamilia-midtrans-snap='true']");
-        if (existing) {
-          existing.addEventListener("load", () => !cancelled && setSnapReady(Boolean(window.snap?.pay)), { once: true });
-          return;
-        }
-
-        script = document.createElement("script");
-        script.src = config.scriptUrl;
-        script.async = true;
-        script.setAttribute("data-client-key", config.clientKey);
-        script.setAttribute("data-lfamilia-midtrans-snap", "true");
-        script.onload = () => {
-          if (!cancelled) setSnapReady(Boolean(window.snap?.pay));
-        };
-        script.onerror = () => {
-          if (!cancelled) setSnapReady(false);
-        };
-        document.body.appendChild(script);
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-      if (script) {
-        script.onload = null;
-        script.onerror = null;
-      }
-    };
-  }, [snapToken]);
-
-  useEffect(() => {
     if (!order || ["paid", "failed", "expired"].includes(order.paymentStatus)) return;
     const timer = window.setInterval(() => void load(true), 3000);
     return () => window.clearInterval(timer);
@@ -205,22 +91,7 @@ function PaymentContent() {
 
   function payNow() {
     if (!order?.paymentUrl) return;
-    if (!snapReady || !snapToken || !window.snap?.pay) {
-      window.location.assign(order.paymentUrl);
-      return;
-    }
-
-    setOpeningPayment(true);
-    const refreshStatus = () => {
-      setOpeningPayment(false);
-      window.setTimeout(() => void load(true), 800);
-    };
-    window.snap.pay(snapToken, {
-      onSuccess: refreshStatus,
-      onPending: refreshStatus,
-      onError: refreshStatus,
-      onClose: () => setOpeningPayment(false),
-    });
+    window.location.assign(order.paymentUrl);
   }
 
   if (loading) {
@@ -233,10 +104,6 @@ function PaymentContent() {
 
   const paid = order.paymentStatus === "paid";
   const failed = ["failed", "expired"].includes(order.paymentStatus);
-  const isBisnapQris =
-    order.paymentGateway === "midtrans" &&
-    order.midtransMode === "bisnap" &&
-    order.paymentMethod === "qris";
 
   return (
     <StoreLayout>
@@ -270,7 +137,7 @@ function PaymentContent() {
                 {paid ? <CheckCircle2 className="size-5" /> : <ShieldCheck className="size-5" />}
               </span>
             </div>
-            <p className="mt-2 text-xs leading-5 text-white/45">Pembayaran diproses melalui {order.paymentGateway === "ipaymu" ? "iPaymu" : "Midtrans"}. Data transaksi tetap tercatat di LFAMILIA STORE.</p>
+            <p className="mt-2 text-xs leading-5 text-white/45">Pembayaran diproses melalui iPaymu. Data transaksi tetap tercatat di LFAMILIA STORE.</p>
           </div>
 
           <div className="p-5 sm:p-6">
@@ -314,16 +181,6 @@ function PaymentContent() {
               </div>
             )}
 
-            {!paid && !failed && isBisnapQris && order.paymentUrl && (
-              <div className="mt-5 rounded-xl bg-white p-3">
-                <img
-                  src={order.paymentUrl}
-                  alt="QRIS pembayaran Midtrans"
-                  className="mx-auto aspect-square w-full max-w-72 object-contain"
-                />
-              </div>
-            )}
-
             {!paid && !failed && order.expiredAt && (
               <p className="mt-3 text-center text-[9px] text-white/35">
                 Berlaku sampai {order.expiredAt}
@@ -335,19 +192,13 @@ function PaymentContent() {
               <span>{paid ? "Pembayaran sudah diterima. Status pesanan akan diperbarui otomatis." : failed ? "Transaksi ini tidak dapat dilanjutkan. Buat checkout baru bila diperlukan." : "Status diperiksa otomatis setiap 3 detik."}</span>
             </div>
 
-            {!paid && !failed && order.paymentUrl && !isBisnapQris && (
+            {!paid && !failed && order.paymentUrl && (
               <>
-                <Button type="button" onClick={payNow} disabled={openingPayment} className="mt-5 h-12 w-full rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">
-                  {openingPayment ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : null}
-                  {openingPayment ? "Membuka pembayaran..." : "Bayar Sekarang"}
-                  {!openingPayment && (snapReady ? <ShieldCheck className="ml-2 size-4" /> : <ExternalLink className="ml-2 size-4" />)}
-                </Button>
-                <p className="mt-2 text-center text-[9px] text-white/30">
-                  {order.paymentGateway === "ipaymu"
-                    ? "Pembayaran dibuka melalui halaman iPaymu."
-                    : snapReady
-                      ? "Pembayaran dibuka di atas halaman LFAMILIA."
-                      : "Jika popup belum aktif, pembayaran dibuka melalui halaman Midtrans."}
+                <Button type="button" onClick={payNow} className="mt-5 h-12 w-full rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">
+                  Bayar Sekarang
+                  <ExternalLink className="ml-2 size-4" />
+                </Button>                <p className="mt-2 text-center text-[9px] text-white/30">
+                  Pembayaran dibuka melalui halaman iPaymu.
                 </p>
               </>
             )}
