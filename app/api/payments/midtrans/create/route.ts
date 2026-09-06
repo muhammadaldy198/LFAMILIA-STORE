@@ -20,6 +20,7 @@ import {
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
 import { readWalletSettings } from "@/lib/server/wallet";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,10 @@ function publicInvoice(referenceId: string) {
 }
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
+  const rate = await allowRequest(request, "midtrans-checkout", 12, 600);
+  if (!rate.allowed) return Response.json({ error: "Terlalu banyak percobaan checkout. Coba lagi beberapa menit." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   let referenceId: string | null = null;
   try {
     const input = schema.parse(await request.json());
