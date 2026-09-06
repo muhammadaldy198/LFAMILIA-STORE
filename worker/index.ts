@@ -42,9 +42,8 @@ const worker = {
       url.pathname.startsWith("/admin/panel/") ||
       url.pathname === "/admin/setup" ||
       url.pathname.startsWith("/admin/setup/") ||
-      url.pathname === "/api/admin/auth/setup" ||
-      url.pathname === "/api/admin/panel" ||
-      url.pathname.startsWith("/api/admin/panel/");
+      url.pathname === "/api/admin" ||
+      url.pathname.startsWith("/api/admin/");
 
     if (isAccessProtectedRequest) {
       let adminEmail: string | null = null;
@@ -60,7 +59,7 @@ const worker = {
 
       if (!adminEmail) {
         if (url.pathname.startsWith("/api/")) {
-          return Response.json({ error: "Cloudflare Access belum melindungi setup Pemilik." }, { status: 401 });
+          return Response.json({ error: "Cloudflare Access belum memvalidasi area Admin." }, { status: 401 });
         }
 
         return new Response(
