@@ -19,7 +19,7 @@ type SavedAccount = {
 
 export function CustomerGameAccounts() {
   const { products } = useStoreProducts();
-  const gameProducts = useMemo(() => products.filter((item) => item.category.trim().toLowerCase() !== "voucher"), [products]);
+  const gameProducts = useMemo(() => products.filter((item) => item.category.trim().toLowerCase() === "game"), [products]);
   const [items, setItems] = useState<SavedAccount[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [productSlug, setProductSlug] = useState("");
