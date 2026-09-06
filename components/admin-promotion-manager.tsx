@@ -104,6 +104,7 @@ export function AdminPromotionManager({ role }: { role: "owner" | "staff" }) {
   const [saving, setSaving] = useState<"voucher" | "flash" | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [referenceTime, setReferenceTime] = useState(0);
 
   const selectedProduct = products.find((item) => item.slug === flash.productSlug);
   const selectablePackages = (selectedProduct?.packages ?? []).filter((item) => item.isActive);
@@ -124,6 +125,7 @@ export function AdminPromotionManager({ role }: { role: "owner" | "staff" }) {
       setVouchers(promotionData.vouchers ?? []);
       setFlashSales(promotionData.flashSales ?? []);
       setProducts((productData.products ?? []).filter((item) => item.isActive));
+      setReferenceTime(Date.now());
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Promo gagal dimuat.");
     } finally {
@@ -132,7 +134,8 @@ export function AdminPromotionManager({ role }: { role: "owner" | "staff" }) {
   }, []);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   function selectFlashProduct(productSlug: string) {
@@ -342,7 +345,7 @@ export function AdminPromotionManager({ role }: { role: "owner" | "staff" }) {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <strong className="font-mono text-xs text-[#d8ff8d]">{item.code}</strong>
-                    <StatePill active={item.isActive} startsAt={item.startsAt} endsAt={item.endsAt} />
+                    <StatePill active={item.isActive} startsAt={item.startsAt} endsAt={item.endsAt} now={referenceTime} />
                   </div>
                   <p className="mt-1 text-[10px] text-white/70">{item.name}</p>
                   <p className="mt-0.5 text-[9px] text-white/32">
@@ -440,7 +443,7 @@ export function AdminPromotionManager({ role }: { role: "owner" | "staff" }) {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <strong className="truncate text-xs text-white">{item.productName}</strong>
-                    <StatePill active={item.isActive} startsAt={item.startsAt} endsAt={item.endsAt} />
+                    <StatePill active={item.isActive} startsAt={item.startsAt} endsAt={item.endsAt} now={referenceTime} />
                   </div>
                   <p className="mt-1 truncate text-[10px] text-white/60">{item.packageLabel} · <span className="font-bold text-[#d8ff8d]">{formatRupiah(item.salePrice)}</span> <span className="text-white/30">dari {formatRupiah(item.basePrice)}</span></p>
                   <p className="mt-0.5 text-[9px] text-white/32">
@@ -582,15 +585,16 @@ function StatePill({
   active,
   startsAt,
   endsAt,
+  now,
 }: {
   active: boolean;
   startsAt: string;
   endsAt: string;
+  now: number;
 }) {
-  const now = Date.now();
   const starts = new Date(startsAt).getTime();
   const ends = new Date(endsAt).getTime();
-  const state = !active ? "Nonaktif" : now < starts ? "Akan datang" : now > ends ? "Berakhir" : "Berjalan";
+  const state = !active ? "Nonaktif" : now === 0 ? "Aktif" : now < starts ? "Akan datang" : now > ends ? "Berakhir" : "Berjalan";
   const tone = state === "Berjalan"
     ? "bg-emerald-300/10 text-emerald-200"
     : state === "Akan datang"

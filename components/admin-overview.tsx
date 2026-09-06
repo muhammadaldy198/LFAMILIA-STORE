@@ -122,7 +122,8 @@ export function AdminOverview() {
   }, [range]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const maxOrders = Math.max(1, ...(data?.chart.map((item) => item.orders) ?? [1]));
