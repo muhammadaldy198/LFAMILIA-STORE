@@ -345,8 +345,8 @@ export function AdminDashboard({
                     <SettingCard title="Login panel" status="Aktif" text="Pemilik dan Staff memakai sesi panel khusus yang terpisah dari akun pelanggan." />
                     <SettingCard title="Pemulihan Pemilik" status="Cloudflare Access" text="Halaman setup pemilik tetap dilindungi oleh Cloudflare Access." />
                     <SettingCard title="Cloudflare D1" status="Terhubung" text="Katalog, konten, akun, pesanan, wallet, dan stok tersimpan di database." />
-                    <SettingCard title="Gateway pembayaran" status="Secret Cloudflare" text="QRIS, e-wallet, virtual account, dan callback pembayaran." />
-                    <SettingCard title="DigiFlazz & VIPayment" status="Secret Cloudflare" text="SKU per nominal dan callback provider tervalidasi." />
+                    <SettingCard title="Gateway pembayaran" status="Integration Manager" text="QRIS, e-wallet, virtual account, dan callback memakai konfigurasi aktif yang terenkripsi." />
+                    <SettingCard title="DigiFlazz & VIPayment" status="Integration Manager" text="Credential provider dapat dikelola terenkripsi; SKU dan callback tetap tervalidasi." />
                     <SettingCard title="Pengiriman kode" status="Khusus Pemilik" text="Website dan email Resend mengirim voucher tanpa membuka stok ke Staff." />
                   </div>
                 </AdminSection>
