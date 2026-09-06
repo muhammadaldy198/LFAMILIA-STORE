@@ -103,7 +103,7 @@ Saat pembayaran terkonfirmasi lunas, satu baris stok direservasi secara atomik. 
 
 ## 7. Syarat IP provider dan VPS relay
 
-DigiFlazz, iPaymu, dan Midtrans BI-SNAP dapat menggunakan satu VPS relay ber-IP keluar statis. Host relay dan token Worker → VPS dapat disimpan terenkripsi dari **Integrasi & harga → VPS Relay**. Konfigurasi service VPS/Caddy tetap mengikuti `relay/README.md`.
+DigiFlazz, iPaymu, dan Midtrans BI-SNAP dapat menggunakan satu VPS relay ber-IP keluar statis. URL relay per provider dan token Worker → VPS disimpan terenkripsi dari **Integrasi & harga → VPS Relay**. Tidak perlu membuat `PROVIDER_RELAY_*` manual di Cloudflare. Konfigurasi service VPS/Caddy tetap mengikuti `relay/README.md`.
 
 VPS disiapkan untuk seluruh environment sejak awal. Worker mengirim environment eksplisit pada setiap request relay.
 
