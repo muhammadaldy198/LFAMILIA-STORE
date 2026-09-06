@@ -44,7 +44,6 @@ import {
 import { formatRupiah } from "@/lib/store-data";
 import { IPAYMU_MIN_CHECKOUT_AMOUNT, isIpaymuAmountSupported } from "@/lib/payment-limits";
 import type { CustomerSession } from "@/lib/server/customer-auth";
-import type { WalletSettings } from "@/lib/server/wallet";
 
 const nicknameSupported = new Set([
   "mobile-legends",
@@ -162,7 +161,7 @@ function CheckoutContent() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] =
     useState<CheckoutPaymentMethod>("qris");
-  const [paymentChannel, setPaymentChannel] = useState("qris");
+  const [paymentChannel, setPaymentChannel] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [payment, setPayment] = useState<PaymentResult | null>(null);
@@ -176,14 +175,7 @@ function CheckoutContent() {
   const [quote, setQuote] = useState<PromotionQuote | null>(null);
   const [applyingVoucher, setApplyingVoucher] = useState(false);
   const [account, setAccount] = useState<CustomerSession | null>(null);
-  const [availableChannels, setAvailableChannels] =
-    useState<DisplayPaymentChannel[]>([]);
   const [gatewayOptions, setGatewayOptions] = useState<CheckoutGateway[]>([]);
-  const [activeCheckoutGateway, setActiveCheckoutGateway] =
-    useState<CheckoutGateway["code"] | null>(null);
-  const [walletSettings, setWalletSettings] = useState<WalletSettings | null>(
-    null,
-  );
 
   const selectedPackage = product.packages.find(
     (item) => item.id === packageId,
@@ -253,64 +245,18 @@ function CheckoutContent() {
     ...gatewayPaymentGroups,
   ], [gatewayPaymentGroups]);
 
-  const preferredGateways = useCallback(() => {
-    const byCode = (code: CheckoutGateway["code"]) =>
-      checkoutGatewayCandidates.find((gateway) => gateway.code === code);
-    return isIpaymuAmountSupported(subtotal)
-      ? [byCode("ipaymu"), byCode("midtrans")].filter(
-          (gateway): gateway is CheckoutGateway => Boolean(gateway),
-        )
-      : [byCode("midtrans")].filter(
-          (gateway): gateway is CheckoutGateway => Boolean(gateway),
-        );
-  }, [checkoutGatewayCandidates, subtotal]);
-
   const chooseMethod = useCallback((method: CheckoutPaymentMethod) => {
     setPayment(null);
+    setPaymentMethod(method);
     if (method === "wallet") {
-      setPaymentMethod("wallet");
       setPaymentChannel("lfamilia-balance");
       return;
     }
-
-    const gateway = preferredGateways().find((candidate) =>
-      candidate.channels.some((channel) => channel.method === method),
+    setPaymentChannel(
+      displayChannels.find((channel) => channel.method === method)?.channel ?? "",
     );
-    const channel = gateway?.channels.find((item) => item.method === method);
+  }, [displayChannels]);
 
-    if (!gateway || !channel) {
-      setPaymentMethod(method);
-      setPaymentChannel("");
-      return;
-    }
-
-    setActiveCheckoutGateway(gateway.code);
-    setAvailableChannels(gateway.channels);
-    setPaymentMethod(method);
-    setPaymentChannel(channel.channel);
-  }, [preferredGateways]);
-
-  const chooseGateway = useCallback((gateway: CheckoutGateway) => {
-    setActiveCheckoutGateway(gateway.code);
-    setAvailableChannels(gateway.channels);
-    if (paymentMethod !== "wallet") {
-      const currentChannelIsAvailable = gateway.channels.some(
-        (item) =>
-          item.method === paymentMethod && item.channel === paymentChannel,
-      );
-      if (!currentChannelIsAvailable) {
-        const replacement =
-          gateway.channels.find((item) => item.method === paymentMethod) ??
-          gateway.channels.find((item) => item.method === "qris") ??
-          gateway.channels[0];
-        setPaymentMethod(replacement?.method ?? "wallet");
-        setPaymentChannel(
-          replacement?.channel ?? "lfamilia-balance",
-        );
-      }
-    }
-    setPayment(null);
-  }, [paymentChannel, paymentMethod]);
   const notices = (product.notices ?? []).filter(
     (item) => item.isActive !== false,
   );
@@ -335,58 +281,7 @@ function CheckoutContent() {
         const gateways = data.gateways?.length
           ? data.gateways
           : fallbackGateways;
-        const primaryGateway = gateways[0] ?? null;
         setGatewayOptions(gateways);
-        setActiveCheckoutGateway(primaryGateway?.code ?? null);
-        setAvailableChannels(primaryGateway?.channels ?? []);
-      })
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    if (!gatewayOptions.length || paymentMethod === "wallet") return;
-
-    const preferred = preferredGateways().find((gateway) =>
-      gateway.channels.some((channel) => channel.method === paymentMethod),
-    ) ?? preferredGateways()[0] ?? null;
-
-    const currentStillValid =
-      preferred?.code === activeCheckoutGateway &&
-      availableChannels.some(
-        (channel) =>
-          channel.method === paymentMethod &&
-          channel.channel === paymentChannel,
-      );
-
-    if (currentStillValid) return;
-
-    const timer = window.setTimeout(() => {
-      if (preferred) {
-        chooseGateway(preferred);
-      } else {
-        setActiveCheckoutGateway(null);
-        setAvailableChannels([]);
-        setPaymentChannel("");
-      }
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    activeCheckoutGateway,
-    availableChannels,
-    chooseGateway,
-    gatewayOptions.length,
-    paymentChannel,
-    paymentMethod,
-    preferredGateways,
-  ]);
-
-  useEffect(() => {
-    void fetch("/api/wallet", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return;
-        const data = (await response.json()) as { settings?: WalletSettings };
-        if (data.settings) setWalletSettings(data.settings);
       })
       .catch(() => undefined);
   }, []);
@@ -491,38 +386,37 @@ function CheckoutContent() {
   ]);
 
   useEffect(() => {
-    if (!walletSettings) return;
     const enabled = checkoutGroups.map((group) => group.code);
-    const needsChannelCorrection =
-      enabled.includes(paymentMethod) &&
-      isGatewayMethod &&
-      !availableChannels.some(
+    const currentChannelValid =
+      paymentMethod === "wallet" ||
+      displayChannels.some(
         (item) =>
           item.method === paymentMethod &&
           item.channel === paymentChannel,
       );
-    const needsMethodCorrection = !enabled.includes(paymentMethod);
-    if (!needsChannelCorrection && !needsMethodCorrection) return;
+    const methodValid = enabled.includes(paymentMethod);
+
+    if (methodValid && currentChannelValid) return;
 
     const timer = window.setTimeout(() => {
-      if (needsChannelCorrection) {
+      if (methodValid && paymentMethod !== "wallet") {
         chooseMethod(paymentMethod);
         return;
       }
-      if (activeCheckoutGateway && gatewayPaymentGroups.length)
+      if (gatewayPaymentGroups.length) {
         chooseMethod(gatewayPaymentGroups[0].code);
-      else chooseMethod("wallet");
+        return;
+      }
+      chooseMethod("wallet");
     }, 0);
+
     return () => window.clearTimeout(timer);
   }, [
-    walletSettings,
-    activeCheckoutGateway,
-    paymentMethod,
-    paymentChannel,
-    isGatewayMethod,
-    availableChannels,
-    gatewayPaymentGroups,
     checkoutGroups,
+    displayChannels,
+    gatewayPaymentGroups,
+    paymentChannel,
+    paymentMethod,
     chooseMethod,
   ]);
 
@@ -614,13 +508,9 @@ function CheckoutContent() {
       const endpoint =
         paymentMethod === "wallet"
           ? "/api/payments/wallet/create"
-          : activeCheckoutGateway === "ipaymu"
-            ? "/api/payments/ipaymu/create"
-            : activeCheckoutGateway === "midtrans"
-              ? "/api/payments/midtrans/create"
-              : null;
-      if (!endpoint)
-        throw new Error("Payment gateway checkout sedang tidak aktif.");
+          : "/api/payments/auto/create";
+      if (paymentMethod !== "wallet" && !paymentChannel)
+        throw new Error("Pilih metode pembayaran yang tersedia.");
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -873,7 +763,7 @@ function CheckoutContent() {
 
                         {selected && isGatewayMethod && group.code !== "qris" && (
                           <div className="grid grid-cols-2 gap-2 border-t border-white/[0.08] bg-black/10 p-2.5 sm:grid-cols-3">
-                            {availableChannels
+                            {displayChannels
                               .filter((channel) => channel.method === group.code)
                               .map((channel) => (
                                 <button
