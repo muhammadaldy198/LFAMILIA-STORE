@@ -81,3 +81,14 @@ export function rejectCrossOriginMutation(request: Request) {
 
   return null;
 }
+
+
+export async function cleanupSecurityRateLimits(retentionSeconds = 172800) {
+  try {
+    await ensureSecuritySchema();
+    const cutoff = Math.floor(Date.now() / 1000) - retentionSeconds;
+    await getD1().prepare("DELETE FROM security_rate_limits WHERE bucket_start < ?").bind(cutoff).run();
+  } catch {
+    // Cleanup is best-effort and must never affect storefront traffic.
+  }
+}
