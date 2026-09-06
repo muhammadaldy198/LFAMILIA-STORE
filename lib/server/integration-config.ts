@@ -1,6 +1,5 @@
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
-import { readWalletSettings, saveWalletSettings } from "@/lib/server/wallet";
 
 export type IntegrationProvider = "midtrans" | "ipaymu" | "digiflazz" | "vippayment" | "melostore" | "resend" | "relay" | "security";
 export type IntegrationMode = "snap" | "bisnap" | "direct" | "service";
@@ -60,12 +59,6 @@ export type IntegrationOverview = {
     ipaymuEnvironment: "sandbox" | "production";
     digiflazzEnvironment: "development" | "production";
     vippaymentEnvironment: "sandbox" | "production";
-  };
-  gatewayToggles: {
-    midtransCheckoutEnabled: boolean;
-    midtransTopupEnabled: boolean;
-    ipaymuCheckoutEnabled: boolean;
-    ipaymuTopupEnabled: boolean;
   };
   profiles: IntegrationProfileSummary[];
   callbacks: Array<{ id: string; label: string; description: string; kind: "notification" | "callback" | "fallback"; url: string }>;
@@ -259,7 +252,6 @@ export async function getIntegrationOverview(): Promise<IntegrationOverview> {
     } satisfies IntegrationProfileSummary;
   }));
   const selected = await readStoredSettings(database);
-  const walletSettings = await readWalletSettings();
 
   return {
     encryptionReady: Boolean(secret),
@@ -272,12 +264,6 @@ export async function getIntegrationOverview(): Promise<IntegrationOverview> {
       ipaymuEnvironment: valueOr(selected.get("ipaymu_environment") || current.IPAYMU_ENV, ["sandbox", "production"] as const, "sandbox"),
       digiflazzEnvironment: valueOr(selected.get("digiflazz_environment") || current.DIGIFLAZZ_ENV, ["development", "production"] as const, "development"),
       vippaymentEnvironment: valueOr(selected.get("vippayment_environment") || current.VIPPAYMENT_ENV, ["sandbox", "production"] as const, "production"),
-    },
-    gatewayToggles: {
-      midtransCheckoutEnabled: walletSettings.midtransCheckoutEnabled,
-      midtransTopupEnabled: walletSettings.midtransTopupEnabled,
-      ipaymuCheckoutEnabled: walletSettings.ipaymuCheckoutEnabled,
-      ipaymuTopupEnabled: walletSettings.ipaymuTopupEnabled,
     },
     profiles: configuredProfiles,
     callbacks: buildCallbacks(publicBaseUrl(current)),
@@ -352,17 +338,6 @@ export async function saveIntegrationSelections(input: Partial<IntegrationOvervi
     : [],
   );
   if (statements.length) await database.batch(statements);
-}
-
-export async function saveGatewayToggles(input: IntegrationOverview["gatewayToggles"]) {
-  const current = await readWalletSettings();
-  await saveWalletSettings({
-    ...current,
-    midtransCheckoutEnabled: input.midtransCheckoutEnabled,
-    midtransTopupEnabled: input.midtransTopupEnabled,
-    ipaymuCheckoutEnabled: input.ipaymuCheckoutEnabled,
-    ipaymuTopupEnabled: input.ipaymuTopupEnabled,
-  });
 }
 
 function put(target: Record<string, unknown>, key: string, value: string | undefined) {
