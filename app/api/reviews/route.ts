@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getCustomerSession, requireCustomerSession } from "@/lib/server/customer-auth";
 import { listProductReviews, saveProductReview } from "@/lib/server/reviews";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,10 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
+  const rate = await allowRequest(request, "customer-review", 10, 3600);
+  if (!rate.allowed) return Response.json({ error: "Terlalu banyak ulasan dikirim. Coba lagi nanti." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   const customer = await requireCustomerSession(request);
   if (customer instanceof Response) return customer;
   try {
