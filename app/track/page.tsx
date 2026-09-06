@@ -79,6 +79,7 @@ const eventLabels: Record<string, string> = {
 };
 const sourceLabels: Record<string, string> = {
   system: "LFAMILIA",
+  midtrans: "Midtrans",
   wallet: "Saldo",
   digiflazz: "DigiFlazz",
   vippayment: "VIP Payment",
