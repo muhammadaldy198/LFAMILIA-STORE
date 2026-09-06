@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ManagedPaymentChannel } from "@/lib/server/payment-channels";
 
-type Gateway = "midtrans" | "ipaymu";
+type Gateway = "ipaymu";
 
 export function AdminPaymentMethodManager() {
   const [items, setItems] = useState<ManagedPaymentChannel[]>([]);
@@ -31,13 +31,10 @@ export function AdminPaymentMethodManager() {
       const data = await readJson(response);
       if (!response.ok) throw new Error(String(data.error || "Metode pembayaran gagal dimuat."));
       setItems((data.channels as ManagedPaymentChannel[] | undefined) ?? []);
-      const nextGateways = Array.isArray(data.gateways)
-        ? data.gateways.filter(
-            (item): item is Gateway =>
-              item === "midtrans" || item === "ipaymu",
-          )
-        : data.gateway === "midtrans" || data.gateway === "ipaymu"
-          ? [data.gateway]
+      const nextGateways: Gateway[] = Array.isArray(data.gateways)
+        ? data.gateways.filter((item): item is Gateway => item === "ipaymu")
+        : data.gateway === "ipaymu"
+          ? ["ipaymu"]
           : [];
       setGateways(nextGateways);
     } catch (reason) {
@@ -85,10 +82,7 @@ export function AdminPaymentMethodManager() {
       });
       const data = await readJson(response);
       if (!response.ok) throw new Error(String(data.error || "Sinkron metode pembayaran gagal."));
-      const syncedGateways = gateways
-        .map((gateway) => gateway === "ipaymu" ? "iPaymu" : "Midtrans")
-        .join(" + ");
-      setMessage(`Metode pembayaran ${syncedGateways || "gateway"} berhasil disinkronkan.`);
+      setMessage("Metode pembayaran iPaymu berhasil disinkronkan.");
       await load();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sinkron metode pembayaran gagal.");
@@ -134,15 +128,11 @@ export function AdminPaymentMethodManager() {
   if (loading) return <div className="flex min-h-40 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat metode pembayaran…</div>;
 
   const item = editing == null ? null : items[editing];
-  const gatewayLabel = gateways.length
-    ? gateways
-        .map((gateway) => gateway === "ipaymu" ? "iPaymu" : "Midtrans")
-        .join(" + ")
-    : "gateway";
+  const gatewayLabel = gateways.length ? "iPaymu" : "gateway";
 
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-[10px] text-white/35">Metode checkout mengikuti gateway aktif. Pelanggan hanya memilih QRIS, E-Wallet, atau VA; sistem memilih iPaymu/Midtrans otomatis.</p>
+      <p className="text-[10px] text-white/35">Metode checkout mengikuti iPaymu. Pelanggan hanya memilih QRIS, E-Wallet, atau Virtual Account.</p>
       <div className="flex gap-2">
         <Button type="button" disabled={syncing || gateways.length === 0} onClick={() => void syncGateway()} variant="outline" size="sm" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-3 text-[9px] text-white">
           {syncing ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}
@@ -151,7 +141,7 @@ export function AdminPaymentMethodManager() {
         <Button type="button" onClick={add} size="sm" className="h-8 bg-[#b9ff35] px-3 text-[9px] font-black text-[#091006]"><Plus className="mr-1 size-3" />Tambah metode</Button>
       </div>
     </div>
-    {gateways.length === 0 && <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.05] p-3 text-[10px] text-amber-100/65">Aktifkan Midtrans atau iPaymu untuk checkout sebelum melakukan sync.</p>}
+    {gateways.length === 0 && <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.05] p-3 text-[10px] text-amber-100/65">Aktifkan iPaymu untuk checkout sebelum melakukan sync.</p>}
     {message && <p className="rounded-lg border border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] p-3 text-xs text-[#d8ff8d]">{message}</p>}
     {error && <p className="rounded-lg border border-red-400/20 bg-red-400/[0.05] p-3 text-xs text-red-200">{error}</p>}
 
