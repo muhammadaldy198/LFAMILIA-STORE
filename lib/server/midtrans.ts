@@ -184,10 +184,17 @@ export async function getMidtransOperationalReadiness() {
   const configured = getMidtransReadiness();
   if (!configured.ready) return configured;
 
-  if (
-    configured.mode === "bisnap" &&
-    isProviderRelayConfigured("midtrans-bisnap")
-  ) {
+  if (configured.mode === "bisnap") {
+    if (!isProviderRelayConfigured("midtrans-bisnap")) {
+      return {
+        ready: false as const,
+        mode: configured.mode,
+        environment: configured.environment,
+        reason:
+          "Midtrans BI-SNAP memerlukan relay ber-IP statis yang dikonfigurasi dari Admin Panel.",
+      };
+    }
+
     const relay = await probeProviderRelay(
       "midtrans-bisnap",
       "Midtrans BI-SNAP",
