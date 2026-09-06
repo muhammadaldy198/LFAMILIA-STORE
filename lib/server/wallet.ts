@@ -3,16 +3,12 @@ import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 
 export type WalletSettings = {
   minTopup: number;
-  midtransTopupEnabled: boolean;
-  midtransCheckoutEnabled: boolean;
   ipaymuTopupEnabled: boolean;
   ipaymuCheckoutEnabled: boolean;
 };
 
 const fallbackSettings: WalletSettings = {
   minTopup: 10_000,
-  midtransTopupEnabled: false,
-  midtransCheckoutEnabled: false,
   ipaymuTopupEnabled: false,
   ipaymuCheckoutEnabled: false,
 };
@@ -21,20 +17,16 @@ export async function readWalletSettings(): Promise<WalletSettings> {
   try {
     await ensureLegacyDatabaseColumns();
     const row = await getD1()
-      .prepare(`SELECT min_topup, midtrans_topup_enabled, midtrans_checkout_enabled,
-        ipaymu_topup_enabled, ipaymu_checkout_enabled FROM wallet_settings WHERE id = 1`)
+      .prepare(`SELECT min_topup, ipaymu_topup_enabled, ipaymu_checkout_enabled
+        FROM wallet_settings WHERE id = 1`)
       .first<{
         min_topup: number;
-        midtrans_topup_enabled: number;
-        midtrans_checkout_enabled: number;
         ipaymu_topup_enabled: number;
         ipaymu_checkout_enabled: number;
       }>();
     if (!row) return fallbackSettings;
     return {
       minTopup: row.min_topup,
-      midtransTopupEnabled: Boolean(row.midtrans_topup_enabled),
-      midtransCheckoutEnabled: Boolean(row.midtrans_checkout_enabled),
       ipaymuTopupEnabled: Boolean(row.ipaymu_topup_enabled),
       ipaymuCheckoutEnabled: Boolean(row.ipaymu_checkout_enabled),
     };
@@ -47,173 +39,21 @@ export async function saveWalletSettings(input: WalletSettings) {
   await ensureLegacyDatabaseColumns();
   await getD1()
     .prepare(
-      `INSERT INTO wallet_settings (id, min_topup, midtrans_topup_enabled, midtrans_checkout_enabled, ipaymu_topup_enabled, ipaymu_checkout_enabled, updated_at)
-       VALUES (1, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `INSERT INTO wallet_settings (id, min_topup, ipaymu_topup_enabled, ipaymu_checkout_enabled, updated_at)
+       VALUES (1, ?, ?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(id) DO UPDATE SET
          min_topup = excluded.min_topup,
-         midtrans_topup_enabled = excluded.midtrans_topup_enabled,
-         midtrans_checkout_enabled = excluded.midtrans_checkout_enabled,
          ipaymu_topup_enabled = excluded.ipaymu_topup_enabled,
          ipaymu_checkout_enabled = excluded.ipaymu_checkout_enabled,
          updated_at = CURRENT_TIMESTAMP`,
     )
     .bind(
       input.minTopup,
-      input.midtransTopupEnabled ? 1 : 0,
-      input.midtransCheckoutEnabled ? 1 : 0,
       input.ipaymuTopupEnabled ? 1 : 0,
       input.ipaymuCheckoutEnabled ? 1 : 0,
     )
     .run();
 }
-
-export async function createMidtransWalletTopup(input: {
-  customerId: string;
-  amount: number;
-  name: string;
-  paymentMethod: string;
-  paymentChannel: string;
-  referenceId: string;
-}) {
-  await ensureLegacyDatabaseColumns();
-  const id = crypto.randomUUID();
-  await getD1()
-    .prepare(
-      `INSERT INTO wallet_topups (id, customer_id, amount, sender_name, payment_method, proof_url, source, reference_id)
-     VALUES (?, ?, ?, ?, ?, '', 'midtrans', ?)`,
-    )
-    .bind(
-      id,
-      input.customerId,
-      input.amount,
-      input.name,
-      `${input.paymentMethod}:${input.paymentChannel}`,
-      input.referenceId,
-    )
-    .run();
-  return id;
-}
-
-export async function updateMidtransWalletTopup(input: {
-  referenceId: string;
-  mode: "snap" | "bisnap";
-  transactionId: string | null;
-  paymentNo: string | null;
-  paymentName: string | null;
-  paymentUrl: string | null;
-  expiredAt: string | null;
-  fee: number;
-  total: number;
-}) {
-  await ensureLegacyDatabaseColumns();
-  await getD1()
-    .prepare(
-      `UPDATE wallet_topups SET midtrans_transaction_id = ?, midtrans_payment_no = ?,
-       midtrans_payment_name = ?, midtrans_payment_url = ?, midtrans_expired_at = ?,
-       midtrans_mode = ?, payment_fee = ?, payment_total = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE reference_id = ? AND source = 'midtrans'`,
-    )
-    .bind(
-      input.transactionId,
-      input.paymentNo,
-      input.paymentName,
-      input.paymentUrl,
-      input.expiredAt,
-      input.mode,
-      input.fee,
-      input.total,
-      input.referenceId,
-    )
-    .run();
-}
-
-export async function getMidtransWalletTopup(referenceId: string) {
-  await ensureLegacyDatabaseColumns();
-  return getD1()
-    .prepare(
-      `SELECT id, customer_id, amount, status, midtrans_transaction_id FROM wallet_topups
-     WHERE reference_id = ? AND source = 'midtrans' LIMIT 1`,
-    )
-    .bind(referenceId)
-    .first<{
-      id: string;
-      customer_id: string;
-      amount: number;
-      status: string;
-      midtrans_transaction_id: string | null;
-    }>();
-}
-
-export async function applyMidtransWalletTopup(input: {
-  referenceId: string;
-  status: "paid" | "pending" | "expired" | "failed";
-  transactionId: string | null;
-  callbackAmount: number;
-}) {
-  const topup = await getMidtransWalletTopup(input.referenceId);
-  if (!topup) return { found: false, credited: false };
-  if (
-    topup.midtrans_transaction_id &&
-    input.transactionId &&
-    topup.midtrans_transaction_id !== input.transactionId
-  )
-    return { found: true, credited: false, ignored: "transaction_mismatch" };
-  if (
-    input.status === "paid" &&
-    (!Number.isFinite(input.callbackAmount) ||
-      input.callbackAmount <= 0 ||
-      input.callbackAmount !== topup.amount)
-  )
-    return { found: true, credited: false, ignored: "amount_mismatch" };
-  const db = getD1();
-  if (input.status === "paid") {
-    const reference = `topup:${topup.id}`;
-    await db.batch([
-      db
-        .prepare(
-          `INSERT INTO wallet_transactions (id, customer_id, direction, amount, balance_before, balance_after, reference, description)
-         SELECT ?, t.customer_id, 'credit', t.amount, ledger.balance, ledger.balance + t.amount, ?, ?
-         FROM wallet_topups t CROSS JOIN (
-           SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0) AS balance
-           FROM wallet_transactions WHERE customer_id = ?
-         ) ledger WHERE t.id = ? AND t.status = 'pending'`,
-        )
-        .bind(
-          crypto.randomUUID(),
-          reference,
-          `Top up otomatis Midtrans ${topup.id.slice(0, 8).toUpperCase()}`,
-          topup.customer_id,
-          topup.id,
-        ),
-      db
-        .prepare(
-          "UPDATE wallet_topups SET status = 'approved', reviewed_by = 'midtrans-callback', reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
-        )
-        .bind(topup.id),
-      db
-        .prepare(
-          "UPDATE customer_users SET balance = (SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0) FROM wallet_transactions WHERE customer_id = ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        )
-        .bind(topup.customer_id, topup.customer_id),
-    ]);
-    return { found: true, credited: topup.status === "pending" };
-  }
-  if (input.status === "expired" || input.status === "failed") {
-    await db
-      .prepare(
-        "UPDATE wallet_topups SET status = 'rejected', admin_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
-      )
-      .bind(
-        input.status === "expired"
-          ? "Pembayaran Midtrans kedaluwarsa."
-          : "Pembayaran Midtrans gagal.",
-        topup.id,
-      )
-      .run();
-  }
-  return { found: true, credited: false };
-}
-
 
 export async function createIpaymuWalletTopup(input: {
   customerId: string;
