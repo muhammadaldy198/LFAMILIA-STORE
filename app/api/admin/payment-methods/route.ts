@@ -25,7 +25,6 @@ async function activeGateways(): Promise<PaymentGatewayName[]> {
   const settings = await readWalletSettings();
   const gateways: PaymentGatewayName[] = [];
   if (settings.ipaymuCheckoutEnabled) gateways.push("ipaymu");
-  if (settings.midtransCheckoutEnabled) gateways.push("midtrans");
   return gateways;
 }
 
