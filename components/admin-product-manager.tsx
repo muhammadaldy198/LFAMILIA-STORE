@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Fragment, useCallback, useEffect, useState } from "react";
+import { FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { BellRing, ChevronDown, ChevronUp, Database, Edit3, LoaderCircle, PackagePlus, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,9 +15,21 @@ import type { ManagedProduct } from "@/lib/server/products";
 import { ProductArtwork } from "@/components/product-artwork";
 import type { ProductCategoryRecord } from "@/lib/server/storefront";
 import { AdminMediaUpload } from "@/components/admin-media-upload";
+import type { DigiflazzSellerMonitorItem } from "@/lib/server/digiflazz-monitor";
 
 type DraftPackage = ManagedProduct["packages"][number];
 type DraftNotice = ManagedProduct["notices"][number];
+
+type DigiflazzMonitorPayload = {
+  items: DigiflazzSellerMonitorItem[];
+  summary: {
+    total: number;
+    healthy: number;
+    warning: number;
+    critical: number;
+    unknown: number;
+  };
+};
 
 const emptyProduct: ManagedProduct = {
   dbId: null,
@@ -66,6 +78,8 @@ export function AdminProductManager() {
   const [catalogSaving, setCatalogSaving] = useState<string | null>(null);
   const [syncingPackage, setSyncingPackage] = useState<number | null>(null);
   const [packageStatusSaving, setPackageStatusSaving] = useState<number | null>(null);
+  const [sellerMonitor, setSellerMonitor] = useState<DigiflazzMonitorPayload | null>(null);
+  const [monitorRefreshing, setMonitorRefreshing] = useState(false);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -103,6 +117,44 @@ export function AdminProductManager() {
   useEffect(() => {
     void fetch("/api/panel/categories", { cache: "no-store" }).then((response) => response.json()).then((data: { categories?: ProductCategoryRecord[] }) => setCategories(data.categories ?? []));
   }, []);
+
+  const loadSellerMonitor = useCallback(async () => {
+    const response = await fetch("/api/panel/digiflazz-monitor", { cache: "no-store" });
+    const data = await response.json() as DigiflazzMonitorPayload & { error?: string };
+    if (!response.ok) throw new Error(data.error ?? "Monitor seller DigiFlazz gagal dimuat.");
+    setSellerMonitor(data);
+  }, []);
+
+  useEffect(() => {
+    if (role !== "owner") {
+      setSellerMonitor(null);
+      return;
+    }
+    void loadSellerMonitor().catch(() => undefined);
+  }, [role, loadSellerMonitor]);
+
+  const sellerMonitorByPackage = useMemo(
+    () => new Map((sellerMonitor?.items ?? []).map((item) => [item.packageId, item])),
+    [sellerMonitor],
+  );
+
+  async function refreshSellerMonitor() {
+    setMonitorRefreshing(true);
+    setError("");
+    try {
+      const response = await fetch("/api/panel/digiflazz-monitor", { method: "POST" });
+      const data = await response.json() as DigiflazzMonitorPayload & { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Monitor seller DigiFlazz gagal diperbarui.");
+      setSellerMonitor(data);
+      setMessage("Monitor seller DigiFlazz berhasil diperbarui.");
+      await loadProducts();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Monitor seller DigiFlazz gagal diperbarui.");
+    } finally {
+      setMonitorRefreshing(false);
+    }
+  }
+
 
   function openNew() {
     setDraft(structuredClone(emptyProduct));
@@ -345,6 +397,7 @@ export function AdminProductManager() {
       if (!response.ok) throw new Error(data.error ?? "Sync provider gagal.");
       setMessage(`DigiFlazz berhasil disinkronkan untuk ${entry.label}.`);
       await loadProducts();
+      if (role === "owner") await loadSellerMonitor();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sync provider gagal.");
     } finally {
@@ -468,6 +521,21 @@ export function AdminProductManager() {
       </div>
       {message && <div className="mb-4 rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.06] p-3 text-xs text-[#d8ff8d]">{message}</div>}
       {error && <div className="mb-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-xs text-red-200">{error}</div>}
+      {role === "owner" && sellerMonitor && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2.5">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-[10px]">
+            <strong className="text-white/70">Monitor seller DigiFlazz</strong>
+            <span className="rounded-md bg-[#b9ff35]/10 px-1.5 py-0.5 font-bold text-[#d8ff8d]">{sellerMonitor.summary.healthy} aman</span>
+            <span className="rounded-md bg-amber-300/10 px-1.5 py-0.5 font-bold text-amber-200">{sellerMonitor.summary.warning} perlu cek</span>
+            <span className="rounded-md bg-red-400/10 px-1.5 py-0.5 font-bold text-red-200">{sellerMonitor.summary.critical} kritis</span>
+            {sellerMonitor.summary.unknown > 0 && <span className="rounded-md bg-white/[0.05] px-1.5 py-0.5 font-bold text-white/35">{sellerMonitor.summary.unknown} belum dicek</span>}
+          </div>
+          <p className="mt-1 text-[9px] text-white/28">Diperiksa otomatis setiap 15 menit bersama sinkron harga. Tanda muncul jika seller nonaktif, stok habis/menipis, sedang cut-off, atau harga naik ≥3% dari baseline seller.</p>
+        </div>
+        <Button type="button" onClick={() => void refreshSellerMonitor()} disabled={monitorRefreshing} variant="outline" size="sm" className="h-8 shrink-0 rounded-lg border-white/10 bg-white/[0.03] px-2.5 text-[9px] text-white">
+          {monitorRefreshing ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}Cek sekarang
+        </Button>
+      </div>}
       <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
         <Table>
           <TableHeader><TableRow className="border-white/[0.08] hover:bg-transparent"><TableHead className="text-[10px] text-white/35">Produk</TableHead><TableHead className="text-[10px] text-white/35">Harga mulai</TableHead><TableHead className="text-[10px] text-white/35">Proses</TableHead><TableHead className="text-[10px] text-white/35">Status</TableHead><TableHead className="text-right text-[10px] text-white/35">Aksi</TableHead></TableRow></TableHeader>
@@ -539,6 +607,22 @@ export function AdminProductManager() {
                                   <option value="">Belum diatur</option>
                                   {providerOptions.map((provider) => <option key={provider.code} value={provider.code}>{provider.name}</option>)}
                                 </select> : <span className="text-white/40">{entry.providerCode === "voucher-stock" ? "Stok kode LFAMILIA" : entry.providerCode || "Belum diatur"}</span>}
+                                {role === "owner" && entry.providerCode === "digiflazz" && (() => {
+                                  const monitor = entry.dbId ? sellerMonitorByPackage.get(entry.dbId) : undefined;
+                                  if (!monitor) return <p className="mt-1 text-[8px] text-white/20">Belum dimonitor</p>;
+                                  const badge = monitor.health === "critical" ? "Kritis" : monitor.health === "warning" ? "Cek seller" : monitor.health === "healthy" ? "Aman" : "Belum dicek";
+                                  const badgeClass = monitor.health === "critical" ? "bg-red-400/10 text-red-200" : monitor.health === "warning" ? "bg-amber-300/10 text-amber-200" : monitor.health === "healthy" ? "bg-[#b9ff35]/10 text-[#d8ff8d]" : "bg-white/[0.05] text-white/30";
+                                  return <div className="mt-1.5 min-w-[150px]" title={monitor.alertReason ?? "Seller terpantau normal."}>
+                                    <div className="flex flex-wrap items-center gap-1">
+                                      <span className={`rounded px-1.5 py-0.5 text-[7px] font-black ${badgeClass}`}>{badge}</span>
+                                      <span className="max-w-[105px] truncate text-[8px] font-semibold text-white/48">{monitor.sellerName || "Seller belum terbaca"}</span>
+                                    </div>
+                                    <p className="mt-1 text-[8px] text-white/28">
+                                      {monitor.currentPrice ? formatRupiah(monitor.currentPrice) : "-"} • {monitor.unlimitedStock ? "Stok ∞" : `Stok ${monitor.stock}`}
+                                    </p>
+                                    {monitor.alertReason && <p className="mt-0.5 max-w-[190px] text-[7px] leading-3 text-amber-100/55">{monitor.alertReason}</p>}
+                                  </div>;
+                                })()}
                               </td>
                               <td className="px-3 py-2">
                                 {role === "owner" ? <Input
