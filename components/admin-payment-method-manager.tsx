@@ -142,7 +142,7 @@ export function AdminPaymentMethodManager() {
 
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-[10px] text-white/35">Metode checkout mengikuti gateway aktif. Bila keduanya aktif, pelanggan dapat memilih gateway.</p>
+      <p className="text-[10px] text-white/35">Metode checkout mengikuti gateway aktif. Pelanggan hanya memilih QRIS, E-Wallet, atau VA; sistem memilih iPaymu/Midtrans otomatis.</p>
       <div className="flex gap-2">
         <Button type="button" disabled={syncing || gateways.length === 0} onClick={() => void syncGateway()} variant="outline" size="sm" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-3 text-[9px] text-white">
           {syncing ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}
