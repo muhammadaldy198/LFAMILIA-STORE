@@ -3,6 +3,7 @@ import { getCustomerSession } from "@/lib/server/customer-auth";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
 import {
   createIpaymuDirectPayment,
+  IpaymuProviderError,
   isIpaymuChannelSupported,
 } from "@/lib/server/ipaymu";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
@@ -203,9 +204,21 @@ export async function POST(request: Request) {
           : "Pembayaran iPaymu gagal dibuat.";
     if (referenceId)
       await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
+    const safeFallback =
+      error instanceof IpaymuProviderError && error.safeToFallback;
     return Response.json(
-      { error: message },
-      { status: error instanceof z.ZodError ? 400 : 503 },
+      {
+        error: message,
+        fallbackAllowed: safeFallback,
+      },
+      {
+        status:
+          error instanceof z.ZodError
+            ? 400
+            : safeFallback
+              ? 502
+              : 503,
+      },
     );
   }
 }
