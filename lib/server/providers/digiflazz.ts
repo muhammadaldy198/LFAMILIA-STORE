@@ -1,6 +1,6 @@
 import { hashHex } from "@/lib/server/crypto";
 import type { ProviderAdapter, ProviderResult } from "@/lib/server/providers/types";
-import { withProviderRelayHeaders } from "@/lib/server/provider-relay";
+import { providerRelayRequest } from "@/lib/server/provider-relay";
 import {
   getRuntimeEnv,
   requireRuntimeChoice,
@@ -80,13 +80,14 @@ export const digiflazzAdapter: ProviderAdapter = {
       cb_url: `${publicBaseUrl}/api/fulfillment/digiflazz/callback`,
     };
 
-    const response = await fetch(apiUrl, {
+    const relay = providerRelayRequest(
+      apiUrl,
+      { "content-type": "application/json", accept: "application/json" },
+      { provider: "digiflazz", environment },
+    );
+    const response = await fetch(relay.url, {
       method: "POST",
-      headers: withProviderRelayHeaders(
-        apiUrl,
-        { "content-type": "application/json", accept: "application/json" },
-        { provider: "digiflazz", environment },
-      ),
+      headers: relay.headers,
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15_000),
     });
