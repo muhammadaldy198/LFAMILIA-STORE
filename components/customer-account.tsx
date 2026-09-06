@@ -761,12 +761,10 @@ function TopupForm({
   onError(value: string): void;
 }) {
   const [amount, setAmount] = useState("");
-  const [gateway, setGateway] = useState<"midtrans" | "ipaymu">(settings?.midtransTopupEnabled ? "midtrans" : "ipaymu");
   const [method, setMethod] = useState<"qris" | "va" | "ewallet">("qris");
   const [saving, setSaving] = useState(false);
   const [payment, setPayment] = useState<{
     referenceId?: string;
-    midtransMode?: "snap" | "bisnap";
     paymentMethod?: "qris" | "va" | "ewallet";
     paymentNo?: string | null;
     paymentName?: string | null;
@@ -774,30 +772,36 @@ function TopupForm({
     expiredAt?: string | null;
   } | null>(null);
 
-  const midtransReady = Boolean(settings?.midtransTopupEnabled);
-  const ipaymuReady = Boolean(settings?.ipaymuTopupEnabled);
-  const automaticReady = midtransReady || ipaymuReady;
-  const activeGateway = gateway === "midtrans" && midtransReady ? "midtrans" : gateway === "ipaymu" && ipaymuReady ? "ipaymu" : midtransReady ? "midtrans" : "ipaymu";
+  const automaticReady = Boolean(settings?.ipaymuTopupEnabled);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     onError("");
     setSaving(true);
     try {
-      const channel = method === "qris" ? "mpm" : method === "va" ? "bca" : "dana";
+      const channel =
+        method === "qris" ? "mpm" : method === "va" ? "bca" : "dana";
       const response = await fetch("/api/account/topups", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mode: activeGateway, amount: Number(amount), paymentMethod: method, paymentChannel: channel }),
+        body: JSON.stringify({
+          amount: Number(amount),
+          paymentMethod: method,
+          paymentChannel: channel,
+        }),
       });
       const data = await response.json() as {
-        error?: string; referenceId?: string; midtransMode?: "snap" | "bisnap";
-        paymentMethod?: "qris" | "va" | "ewallet"; paymentNo?: string | null;
-        paymentName?: string | null; paymentUrl?: string | null; expiredAt?: string | null;
+        error?: string;
+        referenceId?: string;
+        paymentMethod?: "qris" | "va" | "ewallet";
+        paymentNo?: string | null;
+        paymentName?: string | null;
+        paymentUrl?: string | null;
+        expiredAt?: string | null;
       };
-      if (!response.ok) throw new Error(data.error ?? "Pembayaran otomatis gagal dibuat.");
-      const isBisnapQris = data.midtransMode === "bisnap" && data.paymentMethod === "qris";
-      if (data.paymentUrl && !isBisnapQris) {
+      if (!response.ok)
+        throw new Error(data.error ?? "Pembayaran iPaymu gagal dibuat.");
+      if (data.paymentUrl) {
         window.location.assign(data.paymentUrl);
         return;
       }
@@ -806,21 +810,24 @@ function TopupForm({
       await onDone();
     } catch (reason) {
       onError(reason instanceof Error ? reason.message : "Top up gagal dibuat.");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }
 
-  if (!automaticReady) return <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.05] p-5"><h2 className="font-bold">Top up saldo belum tersedia</h2><p className="mt-2 text-xs leading-5 text-white/40">Pemilik belum mengaktifkan payment gateway untuk top up saldo.</p></div>;
+  if (!automaticReady)
+    return <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.05] p-5"><h2 className="font-bold">Top up saldo belum tersedia</h2><p className="mt-2 text-xs leading-5 text-white/40">Pemilik belum mengaktifkan iPaymu untuk top up saldo.</p></div>;
 
   return <form onSubmit={submit} className="rounded-xl border border-white/[0.08] bg-[#0d1019] p-5">
     <h2 className="font-bold">Top up saldo otomatis</h2>
-    <p className="mt-2 text-xs leading-5 text-white/40">Saldo masuk otomatis setelah pembayaran dikonfirmasi gateway.</p>
-    {midtransReady && ipaymuReady && <div className="mt-4 grid grid-cols-2 gap-2">{(["midtrans","ipaymu"] as const).map((item) => <button key={item} type="button" onClick={() => setGateway(item)} className={`rounded-lg border px-3 py-2 text-[10px] font-bold ${activeGateway === item ? "border-[#b9ff35] bg-[#b9ff35]/10 text-[#d8ff8d]" : "border-white/10 text-white/45"}`}>{item === "midtrans" ? "Midtrans" : "iPaymu"}</button>)}</div>}
+    <p className="mt-2 text-xs leading-5 text-white/40">Saldo masuk otomatis setelah pembayaran iPaymu dikonfirmasi.</p>
     <div className="mt-4 grid grid-cols-3 gap-2">{(["qris","va","ewallet"] as const).map((item) => <button key={item} type="button" onClick={() => setMethod(item)} className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase ${method === item ? "border-[#b9ff35] bg-[#b9ff35] text-[#091006]" : "border-white/10 text-white/50"}`}>{item === "va" ? "Bank VA" : item}</button>)}</div>
     <div className="mt-4"><Field label={`Nominal (min. ${formatRupiah(settings?.minTopup ?? 10_000)})`}><Input required type="number" min={settings?.minTopup ?? 10_000} value={amount} onChange={(event) => setAmount(event.target.value)} className="checkout-input" /></Field></div>
     <Button disabled={saving} className="mt-4 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006]">{saving ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <ArrowUpRight className="mr-2 size-4" />}Lanjut bayar</Button>
-    {payment && <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/20 p-4"><strong className="text-xs">Pembayaran top up dibuat</strong>{payment.referenceId && <p className="mt-1 break-all text-[9px] text-white/40">{payment.referenceId}</p>}{payment.paymentNo && <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-black/25 p-3"><div><span className="block text-[8px] uppercase tracking-wider text-white/35">{payment.paymentName || "Nomor pembayaran"}</span><strong className="mt-1 block break-all text-xs text-[#d8ff8d]">{payment.paymentNo}</strong></div><button type="button" onClick={() => void navigator.clipboard.writeText(payment.paymentNo!)} className="text-white/45"><Copy className="size-4" /></button></div>}{payment.midtransMode === "bisnap" && payment.paymentMethod === "qris" && payment.paymentUrl && <div className="mt-3 rounded-xl bg-white p-2"><img src={payment.paymentUrl} alt="QRIS top up" className="mx-auto aspect-square w-full max-w-56 object-contain" /></div>}{payment.expiredAt && <p className="mt-2 text-[9px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}</div>}
+    {payment && <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/20 p-4"><strong className="text-xs">Pembayaran top up dibuat</strong>{payment.referenceId && <p className="mt-1 break-all text-[9px] text-white/40">{payment.referenceId}</p>}{payment.paymentNo && <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-black/25 p-3"><div><span className="block text-[8px] uppercase tracking-wider text-white/35">{payment.paymentName || "Nomor pembayaran"}</span><strong className="mt-1 block break-all text-xs text-[#d8ff8d]">{payment.paymentNo}</strong></div><button type="button" onClick={() => void navigator.clipboard.writeText(payment.paymentNo!)} className="text-white/45"><Copy className="size-4" /></button></div>}{payment.expiredAt && <p className="mt-2 text-[9px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}</div>}
   </form>;
 }
+
 function ProfileForm({
   customer,
   onDone,
