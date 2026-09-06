@@ -2,7 +2,6 @@ import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import {
   getIntegrationOverview,
-  saveGatewayToggles,
   saveIntegrationProfile,
   saveIntegrationSelections,
 } from "@/lib/server/integration-config";
@@ -27,12 +26,6 @@ const selectionInput = z.object({
     digiflazzEnvironment: z.enum(["development", "production"]).optional(),
     vippaymentEnvironment: z.enum(["sandbox", "production"]).optional(),
   }),
-  gatewayToggles: z.object({
-    midtransCheckoutEnabled: z.boolean(),
-    midtransTopupEnabled: z.boolean(),
-    ipaymuCheckoutEnabled: z.boolean(),
-    ipaymuTopupEnabled: z.boolean(),
-  }).optional(),
 });
 
 const schema = z.discriminatedUnion("action", [profileInput, selectionInput]);
@@ -61,7 +54,6 @@ export async function PUT(request: Request) {
       await saveIntegrationProfile(input);
     } else {
       await saveIntegrationSelections(input.selections);
-      if (input.gatewayToggles) await saveGatewayToggles(input.gatewayToggles);
     }
     return Response.json({ ok: true, overview: await getIntegrationOverview() });
   } catch (error) {
