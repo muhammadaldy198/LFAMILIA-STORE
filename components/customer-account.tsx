@@ -28,6 +28,7 @@ import type { WalletSettings } from "@/lib/server/wallet";
 import { formatRupiah } from "@/lib/store-data";
 import { CustomerSupport } from "@/components/customer-support";
 import { CustomerGameAccounts } from "@/components/customer-game-accounts";
+import { TurnstileWidget } from "@/components/turnstile-widget";
 
 type AccountData = {
   customer: CustomerSession;
@@ -148,6 +149,8 @@ function AuthPanel({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileReset, setTurnstileReset] = useState(0);
   const [saving, setSaving] = useState(false);
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -163,8 +166,8 @@ function AuthPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
           mode === "register"
-            ? { name, phone: phone.replace(/[\s()-]/g, ""), email, password }
-            : { email, password },
+            ? { name, phone: phone.replace(/[\s()-]/g, ""), email, password, turnstileToken }
+            : { email, password, turnstileToken },
         ),
       });
       const data = (await response.json()) as { error?: string };
@@ -174,6 +177,8 @@ function AuthPanel({
       setError(
         reason instanceof Error ? reason.message : "Akun gagal diproses.",
       );
+      setTurnstileToken("");
+      setTurnstileReset((value) => value + 1);
     } finally {
       setSaving(false);
     }
@@ -278,6 +283,7 @@ function AuthPanel({
             {error}
           </p>
         )}
+        <TurnstileWidget key={turnstileReset} onToken={setTurnstileToken} />
         <Button
           disabled={saving}
           className="h-12 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006]"
