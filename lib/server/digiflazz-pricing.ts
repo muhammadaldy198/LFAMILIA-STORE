@@ -60,22 +60,51 @@ async function fetchPriceList() {
     body: JSON.stringify({ cmd: "prepaid", username, sign: hashHex("md5", `${username}${key}pricelist`) }),
     signal: AbortSignal.timeout(20_000),
   });
-  const payload = (await response.json()) as {
-    data?: Array<{
-      buyer_sku_code?: string;
-      price?: number;
-      seller_name?: string;
-      buyer_product_status?: boolean;
-      seller_product_status?: boolean;
-      unlimited_stock?: boolean;
-      stock?: number | string;
-      multi?: boolean;
-      start_cut_off?: string;
-      end_cut_off?: string;
-      desc?: string;
-    }>;
+  type PriceItem = {
+    buyer_sku_code?: string;
+    price?: number;
+    seller_name?: string;
+    buyer_product_status?: boolean;
+    seller_product_status?: boolean;
+    unlimited_stock?: boolean;
+    stock?: number | string;
+    multi?: boolean;
+    start_cut_off?: string;
+    end_cut_off?: string;
+    desc?: string;
   };
-  if (!response.ok || !payload.data) throw new Error("Daftar harga DigiFlazz tidak valid.");
+  type PriceListError = {
+    rc?: string;
+    message?: string;
+  };
+
+  const payload = (await response.json().catch(() => null)) as {
+    data?: PriceItem[] | PriceListError;
+    message?: string;
+  } | null;
+
+  if (!response.ok) {
+    const providerError = payload?.data && !Array.isArray(payload.data)
+      ? payload.data
+      : null;
+    const detail = providerError?.message || payload?.message;
+    const rc = providerError?.rc ? ` (RC ${providerError.rc})` : "";
+    throw new Error(detail ? `DigiFlazz menolak price list: ${detail}${rc}` : `DigiFlazz price list gagal dengan HTTP ${response.status}.`);
+  }
+
+  if (!payload || !Array.isArray(payload.data)) {
+    const providerError = payload?.data && !Array.isArray(payload.data)
+      ? payload.data
+      : null;
+    const detail = providerError?.message || payload?.message;
+    const rc = providerError?.rc ? ` (RC ${providerError.rc})` : "";
+    throw new Error(
+      detail
+        ? `DigiFlazz menolak price list: ${detail}${rc}`
+        : "Respons price list DigiFlazz tidak berisi daftar produk.",
+    );
+  }
+
   return new Map(
     payload.data
       .filter((item) => item.buyer_sku_code && Number.isFinite(item.price))
