@@ -1,5 +1,8 @@
 import { hashHex, hmacHex, safeEqual } from "@/lib/server/crypto";
-import { providerRelayRequest } from "@/lib/server/provider-relay";
+import {
+  isProviderRelayConfigured,
+  providerRelayRequest,
+} from "@/lib/server/provider-relay";
 import {
   getRuntimeEnv,
   requireRuntimeChoice,
@@ -84,10 +87,9 @@ function environmentConfig(environment: IpaymuEnvironment) {
         config.IPAYMU_SANDBOX_API_KEY,
         "IPAYMU_SANDBOX_API_KEY",
       ),
-      apiUrl: requireRuntimeValue(
-        config.IPAYMU_SANDBOX_API_URL,
-        "IPAYMU_SANDBOX_API_URL",
-      ),
+      apiUrl:
+        config.IPAYMU_SANDBOX_API_URL?.trim() ||
+        "https://sandbox.ipaymu.com/api/v2/payment/direct",
     };
   }
 
@@ -101,10 +103,9 @@ function environmentConfig(environment: IpaymuEnvironment) {
       config.IPAYMU_PRODUCTION_API_KEY,
       "IPAYMU_PRODUCTION_API_KEY",
     ),
-    apiUrl: requireRuntimeValue(
-      config.IPAYMU_PRODUCTION_API_URL,
-      "IPAYMU_PRODUCTION_API_URL",
-    ),
+    apiUrl:
+      config.IPAYMU_PRODUCTION_API_URL?.trim() ||
+      "https://my.ipaymu.com/api/v2/payment/direct",
   };
 }
 
@@ -134,6 +135,17 @@ function activeConfig() {
 export function getIpaymuReadiness() {
   try {
     const config = activeConfig();
+    if (
+      config.environment === "production" &&
+      !isProviderRelayConfigured("ipaymu")
+    ) {
+      return {
+        ready: false as const,
+        environment: config.environment,
+        reason:
+          "iPaymu Production memerlukan relay ber-IP statis yang dikonfigurasi dari Admin Panel.",
+      };
+    }
     return {
       ready: true as const,
       environment: config.environment,
