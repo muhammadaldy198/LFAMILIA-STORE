@@ -38,7 +38,6 @@ VIPPAYMENT_API_ID
 VIPPAYMENT_API_KEY
 VOUCHER_ENCRYPTION_KEY
 RESEND_API_KEY
-WHATSAPP_ACCESS_TOKEN
 ```
 
 Variable umum yang tetap digunakan:
@@ -52,11 +51,6 @@ VIPPAYMENT_API_URL
 VOUCHER_DELIVERY_CHANNEL
 RESEND_FROM_EMAIL
 RESEND_API_URL
-WHATSAPP_PHONE_NUMBER_ID
-WHATSAPP_VOUCHER_TEMPLATE
-WHATSAPP_TEMPLATE_LANGUAGE
-WHATSAPP_GRAPH_VERSION
-WHATSAPP_GRAPH_BASE_URL
 ```
 
 ## 3. Callback dan webhook
@@ -100,8 +94,8 @@ Panel operasional menggunakan ID admin + password dengan sesi terpisah dari akun
 
 1. Isi `VOUCHER_ENCRYPTION_KEY` terlebih dahulu. Setelah kode diimpor, nilai ini tidak boleh diganti atau kode lama tidak dapat dibuka.
 2. Untuk pengiriman hanya lewat website, gunakan `VOUCHER_DELIVERY_CHANNEL=website`.
-3. Untuk email, verifikasi domain di Resend lalu isi `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, dan `RESEND_API_URL`.
-4. Untuk WhatsApp, isi seluruh Variable/Secret WhatsApp dan gunakan template dengan lima parameter berurutan: nama pembeli, nama produk, paket, kode, dan invoice. Template harus disetujui Meta.
+3. Untuk email, verifikasi domain di Resend lalu simpan `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, dan `RESEND_API_URL` dari **Integrasi & harga → Resend Email**.
+4. Pengiriman otomatis WhatsApp tidak digunakan. Pilih `website` atau `email` untuk kanal voucher.
 5. Di panel → Produk, buat produk kategori voucher seperti REDFINGER. Pada setiap nominal pilih provider **Stok kode LFAMILIA** dan isi kunci stok seperti `redfinger-30-hari`.
 6. Di panel → Stok kode, pilih kunci stok yang sama dan tempel kode satu per baris.
 
@@ -109,7 +103,7 @@ Saat pembayaran terkonfirmasi lunas, satu baris stok direservasi secara atomik. 
 
 ## 7. Syarat IP provider dan VPS relay
 
-DigiFlazz, iPaymu, dan Midtrans BI-SNAP dapat menggunakan satu VPS relay ber-IP keluar statis. Konfigurasi final relay ada pada `relay/README.md`.
+DigiFlazz, iPaymu, dan Midtrans BI-SNAP dapat menggunakan satu VPS relay ber-IP keluar statis. Host relay dan token Worker → VPS dapat disimpan terenkripsi dari **Integrasi & harga → VPS Relay**. Konfigurasi service VPS/Caddy tetap mengikuti `relay/README.md`.
 
 VPS disiapkan untuk seluruh environment sejak awal. Worker mengirim environment eksplisit pada setiap request relay.
 
@@ -137,7 +131,7 @@ Arsitektur checkout dan tabel order tidak perlu diubah hanya untuk menambah adap
 
 ## 9. Pemeriksaan sebelum production
 
-- Semua Variable/Secret wajib di Cloudflare sudah terisi.
+- `INTEGRATION_ENCRYPTION_KEY` wajib tetap tersedia sebagai Cloudflare Secret root; kredensial provider/service lain dapat dikelola terenkripsi dari Integration Manager.
 - Migrasi D1 production berhasil.
 - Cloudflare Access aktif.
 - Harga, margin, dan SKU sudah diverifikasi.
