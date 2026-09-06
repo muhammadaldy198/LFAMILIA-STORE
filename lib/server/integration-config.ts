@@ -47,6 +47,7 @@ export type IntegrationProfileSummary = {
   environment: IntegrationEnvironment;
   configured: boolean;
   configuredFields: string[];
+  decryptionError: boolean;
   updatedAt: string;
 };
 
@@ -239,19 +240,21 @@ export async function getIntegrationOverview(): Promise<IntegrationOverview> {
   const profiles = await readStoredProfiles(database);
   const configuredProfiles = await Promise.all(profiles.map(async (profile) => {
     let configuredFields: string[] = [];
+    let decryptionError = false;
     if (secret) {
       try {
         configuredFields = Object.keys(await decryptConfig(secret, profile.encrypted_config));
       } catch {
-        configuredFields = [];
+        decryptionError = true;
       }
     }
     return {
       provider: profile.provider,
       mode: profile.mode,
       environment: profile.environment,
-      configured: configuredFields.length > 0 || Boolean(profile.encrypted_config),
+      configured: secret ? !decryptionError && configuredFields.length > 0 : Boolean(profile.encrypted_config),
       configuredFields,
+      decryptionError,
       updatedAt: profile.updated_at,
     } satisfies IntegrationProfileSummary;
   }));
