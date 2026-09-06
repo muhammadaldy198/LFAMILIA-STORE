@@ -1,12 +1,14 @@
 import { z } from "zod";
 import { customerSessionCookie, registerCustomer } from "@/lib/server/customer-auth";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
+import { verifyTurnstile } from "@/lib/server/turnstile";
 
 const schema = z.object({
   name: z.string().trim().min(2, "Nama minimal 2 karakter.").max(80),
   email: z.string().trim().email("Email tidak valid.").max(150),
   phone: z.string().trim().regex(/^\+?[0-9]{8,16}$/, "Nomor WhatsApp tidak valid."),
   password: z.string().min(8, "Password minimal 8 karakter.").max(72),
+  turnstileToken: z.string().max(2048).optional(),
 });
 
 export async function POST(request: Request) {
@@ -16,6 +18,9 @@ export async function POST(request: Request) {
   if (!rate.allowed) return Response.json({ error: "Terlalu banyak pendaftaran dari jaringan ini. Coba lagi nanti." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   try {
     const input = schema.parse(await request.json());
+    if (!await verifyTurnstile(request, input.turnstileToken)) {
+      return Response.json({ error: "Verifikasi keamanan gagal. Coba lagi." }, { status: 403 });
+    }
     const session = await registerCustomer(input);
     return Response.json({ customer: session.customer }, { status: 201, headers: { "Set-Cookie": customerSessionCookie(session.token, session.expiresAt) } });
   } catch (error) {
