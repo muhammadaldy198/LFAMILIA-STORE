@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +113,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
+  const rate = await allowRequest(request, "saved-game-account", 30, 3600);
+  if (!rate.allowed) return Response.json({ error: "Terlalu banyak perubahan akun game. Coba lagi nanti." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   const customer = await requireCustomerSession(request);
   if (customer instanceof Response) return customer;
   try {
@@ -131,6 +136,10 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
+  const rate = await allowRequest(request, "saved-game-account", 30, 3600);
+  if (!rate.allowed) return Response.json({ error: "Terlalu banyak perubahan akun game. Coba lagi nanti." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   const customer = await requireCustomerSession(request);
   if (customer instanceof Response) return customer;
   try {
@@ -151,6 +160,10 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
+  const rate = await allowRequest(request, "saved-game-account", 30, 3600);
+  if (!rate.allowed) return Response.json({ error: "Terlalu banyak perubahan akun game. Coba lagi nanti." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   const customer = await requireCustomerSession(request);
   if (customer instanceof Response) return customer;
   await ensureTable();
