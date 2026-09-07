@@ -2,6 +2,7 @@ import { getD1 } from "@/db";
 import type { ProductInputField } from "@/lib/store-data";
 import { getProviderAdapter } from "@/lib/server/providers";
 import type { ProviderResult } from "@/lib/server/providers/types";
+import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 import {
   consumeOrderPromotion,
   type PromotionQuote,
@@ -21,6 +22,8 @@ export type PurchasableItem = {
   providerCode: string | null;
   providerSku: string | null;
 };
+
+export class CheckoutValidationError extends Error {}
 
 export type OrderRecord = {
   id: string;
@@ -138,8 +141,8 @@ export function normalizeCustomerInputs(
   const values = item.inputFields.map((field, index) => {
     const fallback = index === 0 ? legacyDestination.trim() : index === 1 ? legacyServer?.trim() ?? "" : "";
     const value = (byId.get(field.id) ?? fallback).trim();
-    if (field.required !== false && !value) throw new Error(`${field.label} wajib diisi.`);
-    if (value.length > 300) throw new Error(`${field.label} terlalu panjang.`);
+    if (field.required !== false && !value) throw new CheckoutValidationError(`${field.label} wajib diisi.`);
+    if (value.length > 300) throw new CheckoutValidationError(`${field.label} terlalu panjang.`);
     return { id: field.id, label: field.label, value };
   });
   return {
@@ -196,7 +199,7 @@ export function renderCustomerNo(
     .replaceAll("{{server}}", server?.trim() ?? "")
     .trim();
   if (!value || value.includes("{{") || value.length > 120)
-    throw new Error("Format tujuan provider belum valid.");
+    throw new CheckoutValidationError("Format tujuan provider belum valid.");
   return value;
 }
 
@@ -231,11 +234,11 @@ export async function insertPendingOrder(input: {
   const db = getD1();
   if (input.item.fulfillmentType === "automatic") {
     if (!input.item.providerCode || !input.item.providerSku)
-      throw new Error(
+      throw new CheckoutValidationError(
         "Provider dan SKU produk otomatis belum diatur oleh admin.",
       );
     if (!getProviderAdapter(input.item.providerCode))
-      throw new Error(
+      throw new CheckoutValidationError(
         `Adapter provider ${input.item.providerCode} belum tersedia.`,
       );
   }
@@ -486,6 +489,11 @@ export async function fulfillAutomaticOrder(
            AND provider_code IN ('digiflazz', 'voucher-stock')
            AND updated_at <= datetime('now', '-2 minutes')
          )
+         OR (
+           provider_status = 'retryable_error'
+           AND provider_code IN ('digiflazz', 'voucher-stock')
+           AND updated_at <= datetime('now', '-2 minutes')
+         )
        )`,
   ).bind(order.id).run();
   if (Number(claim.meta.changes ?? 0) === 0) return;
@@ -520,10 +528,12 @@ export async function fulfillAutomaticOrder(
     );
     await applyProviderResult(order, result);
   } catch (error) {
-    await setFulfillmentError(
-      order.id,
-      error instanceof Error ? error.message : "Provider gagal dihubungi.",
-    );
+    const message = error instanceof Error ? error.message : "Provider gagal dihubungi.";
+    if (order.provider_code === "digiflazz" || order.provider_code === "voucher-stock") {
+      await setRetryableFulfillmentError(order.id, message);
+    } else {
+      await setFulfillmentError(order.id, message);
+    }
   }
 }
 
@@ -551,11 +561,19 @@ export async function recoverStaleAutomaticOrders(
            AND provider_code IN ('digiflazz', 'voucher-stock')
            AND updated_at <= datetime('now', '-2 minutes')
          )
+         OR (
+           provider_status = 'retryable_error'
+           AND provider_code IN ('digiflazz', 'voucher-stock')
+           AND updated_at <= datetime('now', '-2 minutes')
+         )
        )
      ORDER BY created_at ASC LIMIT ?`,
   ).bind(Math.min(Math.max(limit, 1), 100)).all<{ id: string }>();
   for (const row of result.results) {
     await fulfillAutomaticOrder(row.id, publicBaseUrl);
+    await notifyOrderFulfillmentSuccessById(row.id).catch((error) =>
+      console.error("Notifikasi order hasil recovery gagal:", error),
+    );
   }
 }
 
@@ -601,6 +619,16 @@ async function setFulfillmentError(orderId: string, message: string) {
     .prepare(
       `UPDATE orders SET fulfillment_status = 'needs_review', provider_status = 'error',
      provider_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    )
+    .bind(message, orderId)
+    .run();
+}
+
+async function setRetryableFulfillmentError(orderId: string, message: string) {
+  await getD1()
+    .prepare(
+      `UPDATE orders SET fulfillment_status = 'processing', provider_status = 'retryable_error',
+       provider_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     )
     .bind(message, orderId)
     .run();
