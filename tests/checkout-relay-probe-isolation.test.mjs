@@ -6,17 +6,12 @@ import test from "node:test";
 const root = process.cwd();
 const methods = fs.readFileSync(path.join(root, "app/api/payment-methods/route.ts"), "utf8");
 const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/route.ts"), "utf8");
-const router = fs.readFileSync(path.join(root, "lib/server/payment-gateway-router.ts"), "utf8");
+const doku = fs.readFileSync(path.join(root, "lib/server/doku.ts"), "utf8");
 
-test("storefront payment-method discovery does not depend on live relay probes", () => {
-  assert.doesNotMatch(methods, /OperationalReadiness/);
-  assert.match(methods, /getIpaymuReadiness\(\)/);
-  assert.match(methods, /getMidtransReadiness\(\)/);
-});
-
-test("automatic checkout routing uses saved readiness, not live relay probes", () => {
-  assert.doesNotMatch(autoRoute, /OperationalReadiness/);
-  assert.doesNotMatch(router, /OperationalReadiness/);
-  assert.match(router, /getIpaymuReadiness\(\)/);
-  assert.match(router, /getMidtransReadiness\(\)/);
+test("DOKU storefront discovery does not depend on VPS relay probes", () => {
+  assert.match(methods, /getDokuReadiness\(\)/);
+  assert.match(autoRoute, /getDokuReadiness\(\)/);
+  assert.doesNotMatch(methods, /providerRelay|probeProviderRelay/);
+  assert.doesNotMatch(autoRoute, /providerRelay|probeProviderRelay/);
+  assert.doesNotMatch(doku, /providerRelay|probeProviderRelay/);
 });
