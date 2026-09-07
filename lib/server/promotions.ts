@@ -128,6 +128,7 @@ export type PromotionQuote = {
   discountAmount: number;
   finalPrice: number;
   voucherCode: string | null;
+  voucherId: number | null;
   flashSaleId: number | null;
   flashSaleEndsAt: string | null;
   memberTier: MemberTier | null;
@@ -180,6 +181,7 @@ export async function quotePromotion(
   const discountAmount = useMemberDiscount ? memberDiscountAmount : voucherDiscountAmount;
   const discountSource = discountAmount > 0 ? (useMemberDiscount ? "member" : "voucher") : null;
   const appliedCode = discountSource === "voucher" ? voucher?.code ?? null : null;
+  const appliedVoucherId = discountSource === "voucher" ? voucher?.id ?? null : null;
 
   return {
     basePrice,
@@ -187,6 +189,7 @@ export async function quotePromotion(
     discountAmount,
     finalPrice: Math.max(1, sellingPrice - discountAmount),
     voucherCode: appliedCode,
+    voucherId: appliedVoucherId,
     flashSaleId: flash?.id ?? null,
     flashSaleEndsAt: flash?.ends_at ?? null,
     memberTier: member?.tier ?? null,
@@ -194,12 +197,4 @@ export async function quotePromotion(
     memberDiscountAmount,
     discountSource,
   };
-}
-
-export async function consumeOrderPromotion(voucherCode: string | null, flashSaleId: number | null) {
-  const statements = [];
-  const db = getD1();
-  if (voucherCode) statements.push(db.prepare("UPDATE discount_vouchers SET used_count = used_count + 1, updated_at = CURRENT_TIMESTAMP WHERE code = ?").bind(voucherCode));
-  if (flashSaleId) statements.push(db.prepare("UPDATE flash_sales SET sold_count = sold_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(flashSaleId));
-  if (statements.length) await db.batch(statements);
 }

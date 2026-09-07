@@ -510,7 +510,12 @@ export async function settleWalletOrder(input: {
     ).bind(input.flashSaleId, now, now, input.orderId, reference));
   }
   statements.push(db.prepare(
-    `UPDATE orders SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
+    `UPDATE orders SET payment_status = 'paid', fulfillment_status = ?,
+       promotion_reservation_status = CASE
+         WHEN voucher_code IS NOT NULL OR flash_sale_id IS NOT NULL THEN 'consumed'
+         ELSE 'none'
+       END,
+       updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND payment_status = 'pending'
        AND EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?)`,
   ).bind(

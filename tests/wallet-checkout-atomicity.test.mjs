@@ -67,6 +67,8 @@ function createDatabase() {
       payment_status TEXT NOT NULL DEFAULT 'pending', fulfillment_status TEXT NOT NULL DEFAULT 'waiting_payment',
       fulfillment_type TEXT NOT NULL DEFAULT 'automatic', provider_status TEXT, provider_code TEXT,
       provider_message TEXT, provider_ref_id TEXT, reference_id TEXT,
+      voucher_code TEXT, flash_sale_id INTEGER,
+      promotion_reservation_status TEXT NOT NULL DEFAULT 'legacy',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT
     );
     CREATE TABLE wallet_transactions (
@@ -96,7 +98,9 @@ test("wallet settlement commits one debit, payment state, promotion counters, an
   const now = Date.now();
   database.prepare("INSERT INTO customer_users (id, balance) VALUES ('customer-1', 10000)").run();
   database.prepare("INSERT INTO wallet_transactions VALUES ('credit-1', 'customer-1', 'credit', 10000, 0, 10000, 'seed', 'Seed')").run();
-  database.prepare("INSERT INTO orders (id, customer_id, payment_method) VALUES ('order-1', 'customer-1', 'wallet')").run();
+  database.prepare(
+    "INSERT INTO orders (id, customer_id, payment_method, voucher_code, flash_sale_id, promotion_reservation_status) VALUES ('order-1', 'customer-1', 'wallet', 'PROMO', 7, 'none')",
+  ).run();
   database.prepare("INSERT INTO discount_vouchers VALUES ('PROMO', 1, ?, ?, 1, 0, NULL)")
     .run(new Date(now - 60_000).toISOString(), new Date(now + 60_000).toISOString());
   database.prepare("INSERT INTO flash_sales VALUES (7, 1, ?, ?, 1, 0, NULL)")
@@ -115,6 +119,7 @@ test("wallet settlement commits one debit, payment state, promotion counters, an
   assert.equal(database.prepare("SELECT used_count FROM discount_vouchers WHERE code = 'PROMO'").get().used_count, 1);
   assert.equal(database.prepare("SELECT sold_count FROM flash_sales WHERE id = 7").get().sold_count, 1);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM order_events").get().count, 1);
+  assert.equal(database.prepare("SELECT promotion_reservation_status AS state FROM orders WHERE id = 'order-1'").get().state, "consumed");
 
   const retryBalance = await settleWalletOrder({
     customerId: "customer-1", orderId: "order-1", amount: 6000,
@@ -133,7 +138,9 @@ test("wallet settlement does not debit when a limited promotion is exhausted", a
   const now = Date.now();
   database.prepare("INSERT INTO customer_users (id, balance) VALUES ('customer-1', 10000)").run();
   database.prepare("INSERT INTO wallet_transactions VALUES ('credit-1', 'customer-1', 'credit', 10000, 0, 10000, 'seed', 'Seed')").run();
-  database.prepare("INSERT INTO orders (id, customer_id, payment_method) VALUES ('order-2', 'customer-1', 'wallet')").run();
+  database.prepare(
+    "INSERT INTO orders (id, customer_id, payment_method, voucher_code, promotion_reservation_status) VALUES ('order-2', 'customer-1', 'wallet', 'HABIS', 'none')",
+  ).run();
   database.prepare("INSERT INTO discount_vouchers VALUES ('HABIS', 1, ?, ?, 1, 1, NULL)")
     .run(new Date(now - 60_000).toISOString(), new Date(now + 60_000).toISOString());
   setRuntimeEnv({ DB: new TestD1(database) });
@@ -168,6 +175,7 @@ test("wallet retries resume pending settlement and automatic fulfillment", () =>
   assert.match(orders, /COUNT\(\*\)[\s\S]*status = 'dispatching'[\s\S]*>= 5/);
   assert.match(orders, /ORDER BY CASE WHEN provider_status IS NULL THEN 0 ELSE 1 END/);
   assert.match(worker, /recoverStaleAutomaticOrders\(getPublicBaseUrl\(\)\)/);
+  assert.match(worker, /recoverExpiredPromotionReservations\(\)/);
 });
 
 test("deterministic wallet checkout validation is not reported as a retryable outage", () => {
