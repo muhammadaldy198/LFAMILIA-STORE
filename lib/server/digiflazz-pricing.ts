@@ -153,14 +153,13 @@ async function syncRows(target?: { productId: number; packageSku: string }) {
     const stock = Number(sourceItem.stock ?? 0);
 
     return [
+      // Status seller tetap dipantau, tetapi tidak boleh mengubah tombol Aktif/Nonaktif katalog milik admin.
       getD1().prepare(`UPDATE product_packages
-        SET supplier_price = ?, price = ?, supplier_synced_at = CURRENT_TIMESTAMP,
-            is_active = CASE WHEN ? THEN is_active ELSE 0 END
+        SET supplier_price = ?, price = ?, supplier_synced_at = CURRENT_TIMESTAMP
         WHERE id = ?`)
         .bind(
           sourceItem.price,
           sale(sourceItem.price, item.margin_type, item.margin_value),
-          buyerProductStatus && sellerProductStatus && (unlimitedStock || stock > 0) ? 1 : 0,
           item.id,
         ),
       buildDigiflazzSellerMonitorStatement({
