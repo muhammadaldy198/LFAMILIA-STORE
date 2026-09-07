@@ -117,6 +117,10 @@ const groupIcons = {
   wallet: WalletCards,
 };
 
+function packageGroupName(value?: string) {
+  return value?.trim() || "Umum";
+}
+
 export default function CheckoutPage() {
   return (
     <Suspense
@@ -190,6 +194,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       ? requestedPackage
       : "",
   );
+  const [packageGroupChoice, setPackageGroupChoice] = useState("");
   const [customerInputValues, setCustomerInputValues] = useState<Record<string, string>>({});
   const [buyerName, setBuyerName] = useState("");
   const [buyerEmail, setBuyerEmail] = useState("");
@@ -219,6 +224,33 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const selectedPackage = product.packages.find(
     (item) => item.id === packageId,
   );
+  const packageGroups = useMemo(() => {
+    if (!product.packageTabsEnabled || !product.packages.length) return [];
+    const assigned = Array.from(
+      new Set(product.packages.map((item) => packageGroupName(item.group))),
+    );
+    const configured = (product.packageTabs ?? [])
+      .map((item) => item.trim())
+      .filter((item) => item && assigned.includes(item));
+    return [
+      ...configured,
+      ...assigned.filter((item) => !configured.includes(item)),
+    ];
+  }, [product.packageTabs, product.packageTabsEnabled, product.packages]);
+  const selectedPackageGroup = selectedPackage
+    ? packageGroupName(selectedPackage.group)
+    : "";
+  const activePackageGroup = packageGroups.includes(packageGroupChoice)
+    ? packageGroupChoice
+    : packageGroups.includes(selectedPackageGroup)
+      ? selectedPackageGroup
+      : packageGroups[0] ?? "";
+  const visiblePackages =
+    packageGroups.length > 1
+      ? product.packages.filter(
+          (item) => packageGroupName(item.group) === activePackageGroup,
+        )
+      : product.packages;
   const productInputFields = useMemo(
     () => product.inputFields ?? [
       { id: "account-id", label: product.inputLabel, placeholder: product.inputPlaceholder, required: true },
@@ -500,6 +532,20 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     setQuote(null);
   }
 
+  function choosePackageGroup(group: string) {
+    setPackageGroupChoice(group);
+    if (
+      selectedPackage &&
+      packageGroupName(selectedPackage.group) === group
+    ) {
+      return;
+    }
+    const firstPackage = product.packages.find(
+      (item) => packageGroupName(item.group) === group,
+    );
+    if (firstPackage) choosePackage(firstPackage.id);
+  }
+
   function closeNotice() {
     if (hideNotice)
       window.localStorage.setItem(
@@ -763,8 +809,26 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                         : "Pesanan diteruskan otomatis ke provider."
                   }
                 />
-                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {product.packages.map((item) => {
+                {packageGroups.length > 1 && (
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                    {packageGroups.map((group) => (
+                      <button
+                        key={group}
+                        type="button"
+                        onClick={() => choosePackageGroup(group)}
+                        className={
+                          group === activePackageGroup
+                            ? "shrink-0 rounded-lg border border-[#bca17d] bg-[#bca17d] px-3 py-2 text-[10px] font-black text-white"
+                            : "shrink-0 rounded-lg border border-white/[0.10] bg-white/[0.035] px-3 py-2 text-[10px] font-bold text-white/55 transition hover:border-white/20 hover:text-white"
+                        }
+                      >
+                        {group}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className={`${packageGroups.length > 1 ? "mt-2" : "mt-3"} grid grid-cols-2 gap-2 sm:grid-cols-3`}>
+                  {visiblePackages.map((item) => {
                     const ready = isManual || Boolean(item.providerCode && item.providerSku);
                     return (
                       <button
