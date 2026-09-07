@@ -195,11 +195,3 @@ export async function quotePromotion(
     discountSource,
   };
 }
-
-export async function consumeOrderPromotion(voucherCode: string | null, flashSaleId: number | null) {
-  const statements = [];
-  const db = getD1();
-  if (voucherCode) statements.push(db.prepare("UPDATE discount_vouchers SET used_count = used_count + 1, updated_at = CURRENT_TIMESTAMP WHERE code = ?").bind(voucherCode));
-  if (flashSaleId) statements.push(db.prepare("UPDATE flash_sales SET sold_count = sold_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(flashSaleId));
-  if (statements.length) await db.batch(statements);
-}
