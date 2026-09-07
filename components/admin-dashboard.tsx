@@ -310,7 +310,7 @@ export function AdminDashboard({
               </TabsContent>
 
               <TabsContent value="payments" className="mt-0 space-y-4">
-                <AdminSection title="Payment gateway" description="Atur Midtrans dan iPaymu untuk checkout serta top up wallet.">
+                <AdminSection title="Payment gateway" description="Atur DOKU untuk checkout serta top up wallet.">
                   <AdminWalletManager view="checkout" />
                 </AdminSection>
                 <AdminSection title="Metode pembayaran" description="Kelompokkan metode checkout, urutan, logo, dan status aktifnya.">
@@ -346,14 +346,14 @@ export function AdminDashboard({
                     <SettingCard title="Pemulihan Pemilik" status="Cloudflare Access" text="Halaman setup pemilik tetap dilindungi oleh Cloudflare Access." />
                     <SettingCard title="Cloudflare D1" status="Terhubung" text="Katalog, konten, akun, pesanan, wallet, dan stok tersimpan di database." />
                     <SettingCard title="Gateway pembayaran" status="Integration Manager" text="QRIS, e-wallet, virtual account, dan callback memakai konfigurasi aktif yang terenkripsi." />
-                    <SettingCard title="DigiFlazz & VIPayment" status="Integration Manager" text="Credential provider dapat dikelola terenkripsi; SKU dan callback tetap tervalidasi." />
+                    <SettingCard title="DigiFlazz" status="Integration Manager" text="Credential provider dapat dikelola terenkripsi; SKU dan callback tetap tervalidasi." />
                     <SettingCard title="Pengiriman kode" status="Khusus Pemilik" text="Website dan email Resend mengirim voucher tanpa membuka stok ke Staff." />
                   </div>
                 </AdminSection>
-                <AdminSection title="VPS Relay" description="Hubungkan Worker LFAMILIA ke relay DigiFlazz dan iPaymu ber-IP statis.">
+                <AdminSection title="VPS Relay" description="Hubungkan Worker LFAMILIA ke relay DigiFlazz ber-IP statis.">
                   <AdminIntegrationManager view="relay" />
                 </AdminSection>
-                <AdminSection title="Kredensial API & callback" description="Simpan API key terenkripsi, pilih environment aktif, dan salin URL callback provider. Midtrans memakai Snap sebagai gateway cadangan.">
+                <AdminSection title="Kredensial API & callback" description="Simpan credential DOKU dan DigiFlazz terenkripsi, pilih environment aktif, dan salin URL callback yang diperlukan.">
                   <AdminIntegrationManager view="providers" />
                 </AdminSection>
                 <AdminSection title="Harga otomatis DigiFlazz" description="Sinkronkan daftar harga DigiFlazz dan atur margin penjualan per nominal.">
