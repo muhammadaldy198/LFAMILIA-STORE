@@ -149,8 +149,8 @@ export async function readFaqs(includeInactive = false): Promise<FaqRecord[]> {
     ).all<{ id: number; question: string; answer: string; is_active: number; sort_order: number }>();
     if (result.results.length) return result.results.map((row) => ({
       id: row.id,
-      question: sanitizeLegacyProviderName(row.question),
-      answer: sanitizeLegacyProviderName(row.answer),
+      question: row.question,
+      answer: row.answer,
       isActive: Boolean(row.is_active),
       sortOrder: row.sort_order,
     }));
@@ -177,6 +177,3 @@ export async function deleteFaq(id: number) {
   await getD1().prepare("DELETE FROM faq_entries WHERE id = ?").bind(id).run();
 }
 
-function sanitizeLegacyProviderName(value: string) {
-  return value.replace(/iPaymu/gi, "gateway pembayaran");
-}
