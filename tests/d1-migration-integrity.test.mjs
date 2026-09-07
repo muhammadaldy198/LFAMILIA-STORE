@@ -79,6 +79,14 @@ test("unexpected D1 repair errors are not swallowed", () => {
   assert.match(source, /throw error/);
 });
 
+test("feature modules do not run ad-hoc ALTER TABLE repairs", () => {
+  const products = fs.readFileSync(path.join(root, "lib/server/products.ts"), "utf8");
+  assert.doesNotMatch(products, /ALTER TABLE/);
+  assert.match(products, /ensureLegacyDatabaseColumns\(\)/);
+  const repair = fs.readFileSync(path.join(root, "lib/server/database-repair.ts"), "utf8");
+  assert.match(repair, /\["products", "description", "description TEXT"\]/);
+});
+
 test("Drizzle product metadata reflects active runtime columns", () => {
   const schema = fs.readFileSync(path.join(root, "db/schema.ts"), "utf8");
   for (const field of [

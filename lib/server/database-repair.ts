@@ -5,6 +5,7 @@ let repairPromise: Promise<void> | null = null;
 const columns: Array<[table: string, column: string, definition: string]> = [
   ["products", "image_url", "image_url TEXT"],
   ["products", "banner_url", "banner_url TEXT"],
+  ["products", "description", "description TEXT"],
   ["products", "input_fields_json", "input_fields_json TEXT"],
   ["products", "manual_open_time", "manual_open_time TEXT"],
   ["products", "manual_close_time", "manual_close_time TEXT"],
