@@ -1,7 +1,6 @@
 import { getD1 } from "@/db";
 import { paymentChannels, type PaymentChannel, type PaymentMethodCode } from "@/lib/payment-methods";
-import { isIpaymuChannelSupported } from "@/lib/server/ipaymu";
-import { getMidtransMode, isMidtransChannelSupported } from "@/lib/server/midtrans";
+import { isDokuChannelSupported } from "@/lib/server/doku";
 
 export type ManagedPaymentChannel = PaymentChannel & {
   id: number | null;
@@ -10,7 +9,7 @@ export type ManagedPaymentChannel = PaymentChannel & {
   sortOrder: number;
 };
 
-export type PaymentGatewayName = "midtrans" | "ipaymu";
+export type PaymentGatewayName = "doku";
 
 const fallback: ManagedPaymentChannel[] = paymentChannels.map((item, index) => ({
   ...item,
@@ -86,6 +85,45 @@ export async function savePaymentChannel(input: Omit<ManagedPaymentChannel, "id"
 
 export async function deletePaymentChannel(id: number) {
   await getD1().prepare("DELETE FROM payment_channels WHERE id = ?").bind(id).run();
+}
+
+export async function syncPaymentChannelsForGateways(
+  gateways: PaymentGatewayName[],
+) {
+  const activeGateways = [...new Set(gateways)] as PaymentGatewayName[];
+  if (!activeGateways.includes("doku"))
+    throw new Error("Aktifkan DOKU untuk sinkronisasi metode pembayaran.");
+
+  const supported = paymentChannels.filter((item) =>
+    isDokuChannelSupported(item.method, item.channel),
+  );
+  const supportedKeys = new Set(
+    supported.map((item) => `${item.method}:${item.channel}`),
+  );
+  const db = getD1();
+  await db.batch(paymentChannels.map((item, index) =>
+    db.prepare(`INSERT INTO payment_channels (method, channel, name, description, image_url, is_active, sort_order)
+      VALUES (?, ?, ?, ?, NULL, ?, ?)
+      ON CONFLICT(method, channel) DO UPDATE SET
+        is_active = excluded.is_active,
+        sort_order = excluded.sort_order,
+        updated_at = CURRENT_TIMESTAMP`)
+      .bind(
+        item.method,
+        item.channel,
+        item.name,
+        item.description,
+        supportedKeys.has(`${item.method}:${item.channel}`) ? 1 : 0,
+        index,
+      ),
+  ));
+  return {
+    gateway: "doku" as const,
+    gateways: ["doku"] as PaymentGatewayName[],
+    mode: "checkout" as const,
+    synced: supported.length,
+    channels: await listPaymentChannels(true),
+  };
 }
 
 export async function syncPaymentChannelsForGateways(
