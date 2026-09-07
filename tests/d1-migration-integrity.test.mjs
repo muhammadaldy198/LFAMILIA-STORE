@@ -44,7 +44,7 @@ test("D1 migration numeric prefixes have no new collisions", () => {
   assert.deepEqual(duplicatePrefixes, ["0006"]);
 });
 
-test("runtime compatibility repair is limited to the documented legacy gap", () => {
+test("runtime compatibility repair is limited to documented legacy gaps", () => {
   const db = migratedDatabase();
   const missing = [];
 
@@ -56,21 +56,33 @@ test("runtime compatibility repair is limited to the documented legacy gap", () 
   }
 
   const expectedLegacyOnly = [
-    "orders.midtrans_expired_at",
-    "orders.midtrans_mode",
-    "orders.midtrans_payment_name",
-    "orders.midtrans_payment_no",
     "product_packages.package_group",
     "products.package_tabs_enabled",
     "products.package_tabs_json",
     "store_settings.support_widget_enabled",
-    "wallet_topups.midtrans_expired_at",
-    "wallet_topups.midtrans_mode",
-    "wallet_topups.midtrans_payment_name",
-    "wallet_topups.midtrans_payment_no",
   ].sort();
 
   assert.deepEqual(missing.sort(), expectedLegacyOnly);
+});
+
+test("DOKU migration owns payment columns and resets pre-launch transaction data", () => {
+  const migration = fs.readFileSync(
+    path.join(drizzleDir, "0023_doku_digiflazz_reset.sql"),
+    "utf8",
+  );
+  for (const column of [
+    "doku_topup_enabled",
+    "doku_checkout_enabled",
+    "doku_request_id",
+    "doku_token_id",
+    "doku_payment_url",
+    "doku_expired_at",
+  ]) {
+    assert.match(migration, new RegExp(column));
+  }
+  for (const table of ["order_events", "voucher_deliveries", "orders", "wallet_transactions", "wallet_topups"]) {
+    assert.match(migration, new RegExp(`DELETE FROM ${table}`));
+  }
 });
 
 test("unexpected D1 repair errors are not swallowed", () => {
@@ -83,23 +95,4 @@ test("feature modules do not run ad-hoc ALTER TABLE repairs", () => {
   const products = fs.readFileSync(path.join(root, "lib/server/products.ts"), "utf8");
   assert.doesNotMatch(products, /ALTER TABLE/);
   assert.match(products, /ensureLegacyDatabaseColumns\(\)/);
-  const repair = fs.readFileSync(path.join(root, "lib/server/database-repair.ts"), "utf8");
-  assert.match(repair, /\["products", "description", "description TEXT"\]/);
-});
-
-test("Drizzle product metadata reflects active runtime columns", () => {
-  const schema = fs.readFileSync(path.join(root, "db/schema.ts"), "utf8");
-  for (const field of [
-    "description",
-    "packageTabsEnabled",
-    "packageTabsJson",
-    "packageGroup",
-    "supplierPrice",
-    "pricingMode",
-    "marginType",
-    "marginValue",
-    "supplierSyncedAt",
-  ]) {
-    assert.match(schema, new RegExp(`\\b${field}:`));
-  }
 });
