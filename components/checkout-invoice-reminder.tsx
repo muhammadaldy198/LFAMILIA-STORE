@@ -7,7 +7,9 @@ import { Check, Copy, ReceiptText, X } from "lucide-react";
 const orderReference = /LF(?:-\d{8}-[A-F0-9]{8,12}|\d{6}(?:[A-F0-9]{12}|[A-F0-9]{32}))/g;
 
 function publicInvoice(referenceId: string) {
-  const token = referenceId.split("-").at(-1) ?? referenceId;
+  const clean = referenceId.trim().toUpperCase();
+  if (!clean.includes("-")) return clean;
+  const token = clean.split("-").at(-1) ?? clean.replace(/^LF/, "");
   return `LF${token}`;
 }
 
