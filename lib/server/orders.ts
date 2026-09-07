@@ -25,6 +25,7 @@ export type PurchasableItem = {
 export type OrderRecord = {
   id: string;
   customer_id: string | null;
+  wallet_checkout_key: string | null;
   reference_id: string;
   product_slug: string;
   product_name: string;
@@ -224,6 +225,7 @@ export async function insertPendingOrder(input: {
   paymentMethod: string;
   paymentChannel: string;
   customerId?: string | null;
+  walletCheckoutKey?: string | null;
   promotion: PromotionQuote;
 }) {
   const db = getD1();
@@ -245,16 +247,17 @@ export async function insertPendingOrder(input: {
   await db
     .prepare(
       `INSERT INTO orders (
-      id, customer_id, reference_id, product_slug, product_name, package_sku, package_label,
+      id, customer_id, wallet_checkout_key, reference_id, product_slug, product_name, package_sku, package_label,
       provider_code, provider_sku, fulfillment_type, target_template, destination, server,
       nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json,
       base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
       admin_fee, total, payment_method, payment_channel
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
     )
     .bind(
       input.id,
       input.customerId ?? null,
+      input.walletCheckoutKey ?? null,
       input.referenceId,
       input.item.productSlug,
       input.item.productName,
@@ -283,6 +286,20 @@ export async function insertPendingOrder(input: {
       input.paymentChannel,
     )
     .run();
+}
+
+export async function getWalletOrderByCheckoutKey(
+  customerId: string,
+  checkoutKey: string,
+) {
+  return getD1()
+    .prepare(
+      `SELECT * FROM orders
+       WHERE customer_id = ? AND wallet_checkout_key = ? AND payment_method = 'wallet'
+       LIMIT 1`,
+    )
+    .bind(customerId, checkoutKey)
+    .first<OrderRecord>();
 }
 
 export async function getOrderByReference(referenceId: string) {
