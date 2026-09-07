@@ -10,6 +10,7 @@ const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/
 const ipaymu = fs.readFileSync(path.join(root, "app/api/payments/ipaymu/create/route.ts"), "utf8");
 const midtrans = fs.readFileSync(path.join(root, "app/api/payments/midtrans/create/route.ts"), "utf8");
 const invoiceReminder = fs.readFileSync(path.join(root, "components/checkout-invoice-reminder.tsx"), "utf8");
+const accountRoute = fs.readFileSync(path.join(root, "app/api/account/route.ts"), "utf8");
 
 test("automatic checkout identifies the selected payment gateway", () => {
   assert.match(autoRoute, /paymentGateway: "ipaymu"/);
@@ -37,7 +38,7 @@ test("iPaymu Direct payment is rendered by LFAMILIA", () => {
 });
 
 test("compact invoice references keep a single LF prefix", () => {
-  for (const source of [autoRoute, invoiceReminder]) {
+  for (const source of [autoRoute, invoiceReminder, accountRoute]) {
     assert.match(source, /if \(!clean\.includes\("-"\)\) return clean/);
   }
 });

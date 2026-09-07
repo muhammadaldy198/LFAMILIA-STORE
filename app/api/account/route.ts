@@ -8,7 +8,9 @@ import { rejectCrossOriginMutation } from "@/lib/server/security";
 export const dynamic = "force-dynamic";
 
 function publicReferenceId(value: string) {
-  const token = value.split("-").at(-1) ?? value.replace(/^LF/, "");
+  const clean = value.trim().toUpperCase();
+  if (!clean.includes("-")) return clean;
+  const token = clean.split("-").at(-1) ?? clean.replace(/^LF/, "");
   return `LF${token}`;
 }
 
