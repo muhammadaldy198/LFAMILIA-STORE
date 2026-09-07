@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 type CheckoutGateway = {
   code: "midtrans" | "ipaymu";
   label: string;
-  midtransMode: "snap" | "bisnap" | null;
+  midtransMode: "snap" | null;
   environment: "sandbox" | "production" | null;
   channels: ManagedPaymentChannel[];
 };
@@ -52,7 +52,7 @@ export async function GET() {
     const environment = getMidtransEnvironment();
     gateways.push({
       code: "midtrans",
-      label: `Midtrans ${midtransMode === "bisnap" ? "BI-SNAP" : "Snap"} · ${environment === "production" ? "Production" : "Sandbox"}`,
+      label: `Midtrans Snap · ${environment === "production" ? "Production" : "Sandbox"}`,
       midtransMode,
       environment,
       channels: activeChannels.filter((item) =>
