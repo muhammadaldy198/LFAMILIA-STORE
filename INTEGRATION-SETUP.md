@@ -72,7 +72,7 @@ Panel operasional menggunakan ID admin + password dengan sesi terpisah dari akun
 
 ## 6. Stok kode REDFINGER atau lisensi
 
-1. Isi `VOUCHER_ENCRYPTION_KEY` terlebih dahulu. Setelah kode diimpor, nilai ini tidak boleh diganti atau kode lama tidak dapat dibuka.
+1. Simpan **Voucher Encryption Key** dari **Integrasi & harga → Kredensial API & callback → Security** terlebih dahulu. Runtime internal membentuk `VOUCHER_ENCRYPTION_KEY` dari konfigurasi terenkripsi tersebut. Setelah kode diimpor, nilainya tidak boleh diganti atau kode lama tidak dapat dibuka.
 2. Untuk pengiriman hanya lewat website, gunakan `VOUCHER_DELIVERY_CHANNEL=website`.
 3. Untuk email, verifikasi domain di Resend lalu simpan `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, dan `RESEND_API_URL` dari **Integrasi & harga → Resend Email**.
 4. Pengiriman otomatis WhatsApp tidak digunakan. Pilih `website` atau `email` untuk kanal voucher.
@@ -83,7 +83,7 @@ Saat pembayaran terkonfirmasi lunas, satu baris stok direservasi secara atomik. 
 
 ## 7. Syarat IP provider dan VPS relay
 
-DigiFlazz, iPaymu, dan Midtrans BI-SNAP dapat menggunakan satu VPS relay ber-IP keluar statis. URL relay per provider dan token Worker → VPS disimpan terenkripsi dari **Integrasi & harga → VPS Relay**. Tidak perlu membuat `PROVIDER_RELAY_*` manual di Cloudflare. Konfigurasi service VPS/Caddy tetap mengikuti `relay/README.md`.
+DigiFlazz dan iPaymu dapat menggunakan satu VPS relay ber-IP keluar statis. Midtrans Snap berjalan langsung dari Worker. URL relay per provider dan token Worker → VPS disimpan terenkripsi dari **Integrasi & harga → VPS Relay**. Tidak perlu membuat `PROVIDER_RELAY_*` manual di Cloudflare. Konfigurasi service VPS/Caddy tetap mengikuti `relay/README.md`.
 
 VPS disiapkan untuk seluruh environment sejak awal. Worker mengirim environment eksplisit pada setiap request relay.
 

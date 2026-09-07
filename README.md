@@ -36,4 +36,4 @@ Panduan secret, callback, provider, relay, dan pengiriman kode tersedia di [INTE
 - Jangan meminta PIN atau OTP pelanggan melalui formulir maupun catatan pesanan.
 - Lindungi halaman pemulihan Pemilik dan endpoint admin sensitif sesuai konfigurasi deployment.
 - Gunakan password admin yang kuat; password disimpan sebagai hash dan tidak dapat dibaca kembali dari panel.
-- `INTEGRATION_ENCRYPTION_KEY` tetap disimpan sebagai Cloudflare Secret root. Credential provider/service lain dapat dikelola terenkripsi melalui Integration Manager atau memakai Cloudflare Variables/Secrets sebagai fallback.
+- `INTEGRATION_ENCRYPTION_KEY` tetap disimpan sebagai Cloudflare Secret root. Credential provider/service, relay, dan environment provider wajib dikelola terenkripsi melalui Integration Manager dan tidak memakai fallback Cloudflare Variables/Secrets.
