@@ -28,12 +28,14 @@ test("shared router prefers iPaymu when eligible and keeps Midtrans fallback", (
   assert.match(router, /if \(midtransEligible\) candidates\.push\("midtrans"\)/);
 });
 
-test("checkout uses shared routing and safe provider fallback", () => {
+test("checkout uses shared routing and reuses one order across fallback", () => {
   assert.match(autoRoute, /routePaymentGateway\(/);
-  assert.match(autoRoute, /createIpaymuCheckout\(ipaymuRequest\)/);
-  assert.match(autoRoute, /fallbackAllowed/);
+  assert.match(autoRoute, /const identity = createOrderIdentity\(\)/);
+  assert.match(autoRoute, /await insertPendingOrder\(/);
+  assert.match(autoRoute, /createIpaymuDirectPayment\(/);
   assert.match(autoRoute, /fallback !== "midtrans"/);
-  assert.match(autoRoute, /createMidtransCheckout\(midtransRequest\)/);
+  assert.match(autoRoute, /createMidtransPayment\(/);
+  assert.doesNotMatch(autoRoute, /createIpaymuCheckout|createMidtransCheckout/);
 });
 
 test("below-minimum checkout explains the iPaymu limit without requiring Midtrans", () => {
