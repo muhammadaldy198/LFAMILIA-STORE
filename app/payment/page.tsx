@@ -241,6 +241,10 @@ function PaymentContent() {
     order.paymentGateway === "ipaymu" &&
     order.paymentMethod === "qris";
   const isEmbeddedQr = isBisnapQris || isIpaymuQris;
+  const canLaunchPayment =
+    order.paymentGateway === "midtrans"
+      ? Boolean(order.paymentUrl) && !isEmbeddedQr
+      : order.paymentMethod === "ewallet" && Boolean(order.paymentUrl);
 
   return (
     <StoreLayout>
@@ -339,7 +343,7 @@ function PaymentContent() {
               <span>{paid ? "Pembayaran sudah diterima. Status pesanan akan diperbarui otomatis." : failed ? "Transaksi ini tidak dapat dilanjutkan. Buat checkout baru bila diperlukan." : "Status diperiksa otomatis setiap 3 detik."}</span>
             </div>
 
-            {!paid && !failed && order.paymentUrl && !isEmbeddedQr && (
+            {!paid && !failed && canLaunchPayment && (
               <>
                 <Button type="button" onClick={payNow} disabled={openingPayment} className="mt-5 h-12 w-full rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">
                   {openingPayment ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : null}
