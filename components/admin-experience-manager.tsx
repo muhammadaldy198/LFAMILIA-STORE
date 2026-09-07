@@ -61,7 +61,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
     setSaving(key); setError(""); setMessage("");
     try {
       const response = await fetch("/api/panel/content", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, item }) });
-      const data = await readJson(response); if (!response.ok) throw new Error(data.error || "Konten gagal disimpan.");
+      const data = await readJson<{ error?: string }>(response); if (!response.ok) throw new Error(data.error || "Konten gagal disimpan.");
       setMessage(kind === "banner" ? "Banner Home berhasil disimpan." : kind === "popup" ? "Pop-up Home berhasil disimpan." : "Berita berhasil disimpan.");
       await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Konten gagal disimpan."); }
@@ -71,7 +71,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
   async function remove(kind: ManagedKind, id: number) {
     if (!window.confirm("Hapus konten ini secara permanen?")) return;
     const response = await fetch(`/api/panel/content?kind=${kind}&id=${id}`, { method: "DELETE" });
-    const data = await readJson(response); if (!response.ok) { setError(data.error || "Konten gagal dihapus."); return; }
+    const data = await readJson<{ error?: string }>(response); if (!response.ok) { setError(data.error || "Konten gagal dihapus."); return; }
     setMessage("Konten berhasil dihapus."); await load();
   }
 
@@ -79,7 +79,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
     setSaving(`review-${review.id}`);
     try {
       const response = await fetch("/api/panel/reviews", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: review.id, isVisible: !review.isVisible }) });
-      const data = await readJson(response); if (!response.ok) throw new Error(data.error || "Ulasan gagal diperbarui.");
+      const data = await readJson<{ error?: string }>(response); if (!response.ok) throw new Error(data.error || "Ulasan gagal diperbarui.");
       setReviews((current) => current.map((item) => item.id === review.id ? { ...item, isVisible: !item.isVisible } : item));
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Ulasan gagal diperbarui."); }
     finally { setSaving(""); }
@@ -121,7 +121,7 @@ function toLocalDate(value?: string) { if (!value) return ""; const date = new D
 function updateAt<T>(setter: React.Dispatch<React.SetStateAction<T[]>>, index: number, patch: Partial<T>) { setter((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item)); }
 async function readJson<T extends Record<string, unknown>>(response: Response): Promise<T> {
   const raw = await response.text();
-  if (!raw) return { error: "Server mengembalikan respons kosong. Coba muat ulang." } as T;
+  if (!raw) return { error: "Server mengembalikan respons kosong. Coba muat ulang." } as unknown as T;
   try { return JSON.parse(raw) as T; }
-  catch { return { error: "Server mengembalikan respons tidak valid." } as T; }
+  catch { return { error: "Server mengembalikan respons tidak valid." } as unknown as T; }
 }
