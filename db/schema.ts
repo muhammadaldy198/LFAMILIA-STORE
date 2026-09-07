@@ -168,6 +168,9 @@ export const orders = sqliteTable(
     discountAmount: integer("discount_amount").notNull().default(0),
     voucherCode: text("voucher_code"),
     flashSaleId: integer("flash_sale_id"),
+    promotionReservationStatus: text("promotion_reservation_status", {
+      enum: ["none", "legacy", "reserved", "consumed", "released"],
+    }).notNull().default("legacy"),
     adminFee: integer("admin_fee").notNull().default(0),
     total: integer("total").notNull(),
     paymentMethod: text("payment_method").notNull(),
