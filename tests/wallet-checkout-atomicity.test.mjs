@@ -154,7 +154,20 @@ test("wallet retries resume pending settlement and automatic fulfillment", () =>
   assert.match(orders, /provider_status = 'dispatching'[\s\S]*datetime\('now', '-2 minutes'\)/);
   assert.match(orders, /provider_code IN \('digiflazz', 'voucher-stock'\)/);
   assert.match(orders, /provider_code NOT IN \('digiflazz', 'voucher-stock'\)/);
+  assert.match(orders, /provider_status = 'retryable_error'/);
+  assert.match(orders, /notifyOrderFulfillmentSuccessById\(row\.id\)/);
   assert.match(worker, /recoverStaleAutomaticOrders\(getPublicBaseUrl\(\)\)/);
+});
+
+test("deterministic wallet checkout validation is not reported as a retryable outage", () => {
+  const root = process.cwd();
+  const route = fs.readFileSync(path.join(root, "app/api/payments/wallet/create/route.ts"), "utf8");
+  const orders = fs.readFileSync(path.join(root, "lib/server/orders.ts"), "utf8");
+  const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
+  assert.match(route, /error instanceof CheckoutValidationError/);
+  assert.match(route, /error instanceof PromotionQuoteError/);
+  assert.match(orders, /throw new CheckoutValidationError\(`/);
+  assert.match(promotions, /throw new PromotionQuoteError\(/);
 });
 
 test.after(async () => unregister());
