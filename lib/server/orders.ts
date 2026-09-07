@@ -479,38 +479,11 @@ export async function fulfillAutomaticOrder(
     return;
   }
 
-  const claim = await getD1().prepare(
-    `UPDATE orders SET fulfillment_status = 'dispatching', provider_status = 'dispatching', updated_at = CURRENT_TIMESTAMP
-     WHERE id = ? AND payment_status = 'paid' AND fulfillment_type = 'automatic'
-       AND (
-         provider_status IS NULL
-         OR (
-           provider_status = 'dispatching'
-           AND provider_code IN ('digiflazz', 'voucher-stock')
-           AND updated_at <= datetime('now', '-2 minutes')
-         )
-         OR (
-           provider_status = 'retryable_error'
-           AND provider_code IN ('digiflazz', 'voucher-stock')
-           AND updated_at <= datetime('now', '-2 minutes')
-         )
-       )`,
-  ).bind(order.id).run();
-  if (Number(claim.meta.changes ?? 0) === 0) return;
-  await recordOrderEvent({
-    orderId: order.id,
-    source: "admin",
-    eventId: `fulfillment-attempt-${order.id}-${crypto.randomUUID()}`,
-    status: "dispatching",
-    payload: { providerCode: order.provider_code },
-  });
-
-  if (order.provider_code === "digiflazz" && !order.provider_ref_id) {
-    await getD1()
-      .prepare("UPDATE orders SET provider_ref_id = ? WHERE id = ?")
-      .bind(order.reference_id, order.id)
-      .run();
-  }
+  const claimed = await claimAutomaticFulfillmentAttempt(
+    order.id,
+    order.provider_code,
+  );
+  if (!claimed) return;
 
   try {
     const result = await adapter.fulfill(
@@ -542,6 +515,59 @@ export async function fulfillAutomaticOrder(
       await setFulfillmentError(order.id, message);
     }
   }
+}
+
+export async function claimAutomaticFulfillmentAttempt(
+  orderId: string,
+  providerCode: string,
+) {
+  const db = getD1();
+  const eventId = `fulfillment-attempt-${orderId}-${crypto.randomUUID()}`;
+  const eligible = `payment_status = 'paid' AND fulfillment_type = 'automatic'
+    AND (
+      provider_status IS NULL
+      OR (
+        provider_status IN ('dispatching', 'retryable_error')
+        AND provider_code IN ('digiflazz', 'voucher-stock')
+        AND updated_at <= datetime('now', '-2 minutes')
+      )
+    )`;
+  const results = await db.batch([
+    db.prepare(
+      `INSERT INTO order_events (order_id, source, event_id, status, payload_json)
+       SELECT id, 'admin', ?, 'dispatching', ? FROM orders
+       WHERE id = ? AND ${eligible}
+         AND (
+           SELECT COUNT(*) FROM order_events
+           WHERE order_id = orders.id AND source = 'admin' AND status = 'dispatching'
+         ) < 5`,
+    ).bind(eventId, JSON.stringify({ providerCode }), orderId),
+    db.prepare(
+      `UPDATE orders SET fulfillment_status = 'dispatching', provider_status = 'dispatching',
+         provider_ref_id = CASE
+           WHEN provider_code = 'digiflazz' THEN COALESCE(provider_ref_id, reference_id)
+           ELSE provider_ref_id
+         END,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND EXISTS (
+         SELECT 1 FROM order_events WHERE source = 'admin' AND event_id = ?
+       )`,
+    ).bind(orderId, eventId),
+    db.prepare(
+      `UPDATE orders SET fulfillment_status = 'needs_review', provider_status = 'retry_exhausted',
+         provider_message = 'Pemenuhan otomatis gagal setelah 5 percobaan; periksa sebelum mencoba ulang.',
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND ${eligible}
+         AND NOT EXISTS (
+           SELECT 1 FROM order_events WHERE source = 'admin' AND event_id = ?
+         )
+         AND (
+           SELECT COUNT(*) FROM order_events
+           WHERE order_id = orders.id AND source = 'admin' AND status = 'dispatching'
+         ) >= 5`,
+    ).bind(orderId, eventId),
+  ]);
+  return Number(results[0]?.meta.changes ?? 0) > 0;
 }
 
 export async function recoverStaleAutomaticOrders(
