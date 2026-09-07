@@ -62,6 +62,18 @@ const providerDefinitions = [
       "IPAYMU_PRODUCTION_UPSTREAM_ORIGIN",
     ),
   },
+  {
+    name: "midtrans-bisnap",
+    host: optionalEnv("MIDTRANS_BISNAP_RELAY_HOST").toLowerCase(),
+    sandboxUpstream: normalizeOrigin(
+      optionalEnv("MIDTRANS_BISNAP_SANDBOX_UPSTREAM_ORIGIN"),
+      "MIDTRANS_BISNAP_SANDBOX_UPSTREAM_ORIGIN",
+    ),
+    productionUpstream: normalizeOrigin(
+      optionalEnv("MIDTRANS_BISNAP_PRODUCTION_UPSTREAM_ORIGIN"),
+      "MIDTRANS_BISNAP_PRODUCTION_UPSTREAM_ORIGIN",
+    ),
+  },
 ];
 
 const providers = new Map(
@@ -74,6 +86,7 @@ const internalHeaders = new Set([
   "x-lfamilia-relay-token",
   "x-lfamilia-digiflazz-environment",
   "x-lfamilia-ipaymu-environment",
+  "x-lfamilia-midtrans-bisnap-environment",
 ]);
 
 const hopByHopHeaders = new Set([
@@ -178,7 +191,10 @@ function responseHeaders(upstream) {
   return headers;
 }
 
-function isMethodAllowed(_provider, method) {
+function isMethodAllowed(provider, method) {
+  if (provider.name === "midtrans-bisnap") {
+    return method === "GET" || method === "POST";
+  }
   return method === "POST";
 }
 
@@ -203,7 +219,15 @@ function resolveProviderUpstream(provider, req) {
     return "";
   }
 
-  return "";
+  if (provider.name !== "midtrans-bisnap") return "";
+
+  const environment = String(
+    req.headers["x-lfamilia-midtrans-bisnap-environment"] || "",
+  ).toLowerCase();
+  if (environment !== "sandbox" && environment !== "production") return "";
+
+  if (environment === "sandbox") return provider.sandboxUpstream;
+  return provider.productionUpstream;
 }
 
 function providerConfigured(provider) {
@@ -223,7 +247,11 @@ function providerConfigured(provider) {
     );
   }
 
-  return false;
+  return Boolean(
+    provider.host &&
+      provider.sandboxUpstream &&
+      provider.productionUpstream,
+  );
 }
 
 const server = createServer(async (req, res) => {
