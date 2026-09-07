@@ -7,6 +7,7 @@ const root = process.cwd();
 const checkout = fs.readFileSync(path.join(root, "app/checkout/page.tsx"), "utf8");
 const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/route.ts"), "utf8");
 const ipaymuRoute = fs.readFileSync(path.join(root, "app/api/payments/ipaymu/create/route.ts"), "utf8");
+const router = fs.readFileSync(path.join(root, "lib/server/payment-gateway-router.ts"), "utf8");
 const limits = fs.readFileSync(path.join(root, "lib/payment-limits.ts"), "utf8");
 
 test("iPaymu checkout minimum is centralized", () => {
@@ -19,16 +20,23 @@ test("checkout hides iPaymu-only channels below the minimum", () => {
   assert.match(checkout, /isIpaymuAmountSupported\(subtotal\)/);
 });
 
-test("server routing prefers configured iPaymu and safely falls back to Midtrans", () => {
-  assert.match(autoRoute, /const canUseIpaymu/);
-  assert.match(autoRoute, /isIpaymuAmountSupported\(promotion\.finalPrice\)/);
-  assert.match(autoRoute, /const canUseMidtrans/);
+test("shared router prefers iPaymu when eligible and keeps Midtrans fallback", () => {
+  assert.match(router, /const ipaymuEligible/);
+  assert.match(router, /isIpaymuAmountSupported\(input\.amount\)/);
+  assert.match(router, /const midtransEligible/);
+  assert.match(router, /if \(ipaymuEligible\) candidates\.push\("ipaymu"\)/);
+  assert.match(router, /if \(midtransEligible\) candidates\.push\("midtrans"\)/);
+});
+
+test("checkout uses shared routing and safe provider fallback", () => {
+  assert.match(autoRoute, /routePaymentGateway\(/);
   assert.match(autoRoute, /createIpaymuCheckout\(ipaymuRequest\)/);
   assert.match(autoRoute, /fallbackAllowed/);
+  assert.match(autoRoute, /fallback !== "midtrans"/);
   assert.match(autoRoute, /createMidtransCheckout\(midtransRequest\)/);
 });
 
-test("iPaymu route rejects below-minimum amount before provider request", () => {
+test("iPaymu direct route rejects below-minimum amount before provider request", () => {
   assert.match(ipaymuRoute, /isIpaymuAmountSupported\(promotion\.finalPrice\)/);
   assert.match(ipaymuRoute, /Pilih Midtrans QRIS\/e-wallet/);
 });
