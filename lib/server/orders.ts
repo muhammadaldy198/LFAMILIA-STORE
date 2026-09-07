@@ -595,16 +595,12 @@ export async function applyPaymentStatus(
   return false;
 }
 
-const abandonedReservationCondition = `payment_status = 'pending'
+const expiredReservationCondition = `payment_status = 'pending'
   AND promotion_reservation_status = 'reserved'
   AND promotion_reserved_until IS NOT NULL
-  AND promotion_reserved_until <= ?
-  AND midtrans_transaction_id IS NULL
-  AND midtrans_payment_url IS NULL
-  AND ipaymu_transaction_id IS NULL
-  AND ipaymu_payment_url IS NULL`;
+  AND promotion_reserved_until <= ?`;
 
-export async function releaseAbandonedPromotionReservation(
+export async function releaseExpiredPromotionReservation(
   orderId: string,
   now = new Date().toISOString(),
 ) {
@@ -613,35 +609,40 @@ export async function releaseAbandonedPromotionReservation(
     db.prepare(
       `UPDATE discount_vouchers SET used_count = MAX(0, used_count - 1), updated_at = CURRENT_TIMESTAMP
        WHERE id = (
-         SELECT voucher_id FROM orders WHERE id = ? AND ${abandonedReservationCondition}
+         SELECT voucher_id FROM orders WHERE id = ? AND ${expiredReservationCondition}
        )`,
     ).bind(orderId, now),
     db.prepare(
       `UPDATE flash_sales SET sold_count = MAX(0, sold_count - 1), updated_at = CURRENT_TIMESTAMP
        WHERE id = (
-         SELECT flash_sale_id FROM orders WHERE id = ? AND ${abandonedReservationCondition}
+         SELECT flash_sale_id FROM orders WHERE id = ? AND ${expiredReservationCondition}
        )`,
     ).bind(orderId, now),
     db.prepare(
       `UPDATE orders SET payment_status = 'failed', promotion_reservation_status = 'released',
-         provider_message = 'Checkout terputus sebelum pembayaran berhasil dibuat.',
+         provider_message = CASE
+           WHEN midtrans_transaction_id IS NOT NULL OR midtrans_payment_url IS NOT NULL
+             OR ipaymu_transaction_id IS NOT NULL OR ipaymu_payment_url IS NOT NULL
+           THEN 'Masa pembayaran berakhir tanpa callback sukses.'
+           ELSE 'Checkout terputus sebelum pembayaran berhasil dibuat.'
+         END,
          updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND ${abandonedReservationCondition}`,
+       WHERE id = ? AND ${expiredReservationCondition}`,
     ).bind(orderId, now),
   ]);
   return Number(results[2]?.meta.changes ?? 0) > 0;
 }
 
-export async function recoverAbandonedPromotionReservations(limit = 100) {
+export async function recoverExpiredPromotionReservations(limit = 100) {
   await ensureLegacyDatabaseColumns();
   const now = new Date().toISOString();
   const result = await getD1().prepare(
-    `SELECT id FROM orders WHERE ${abandonedReservationCondition}
+    `SELECT id FROM orders WHERE ${expiredReservationCondition}
      ORDER BY promotion_reserved_until ASC LIMIT ?`,
   ).bind(now, Math.min(Math.max(limit, 1), 500)).all<{ id: string }>();
   let released = 0;
   for (const row of result.results) {
-    if (await releaseAbandonedPromotionReservation(row.id, now)) released += 1;
+    if (await releaseExpiredPromotionReservation(row.id, now)) released += 1;
   }
   return released;
 }
