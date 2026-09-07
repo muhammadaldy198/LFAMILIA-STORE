@@ -818,15 +818,11 @@ function TopupForm({
       payment.midtransMode !== "snap" ||
       !payment.paymentUrl
     ) {
-      setSnapReady(false);
       return;
     }
 
     const token = snapTokenFromUrl(payment.paymentUrl);
-    if (!token) {
-      setSnapReady(false);
-      return;
-    }
+    if (!token) return;
 
     let cancelled = false;
     let script: HTMLScriptElement | null = null;
@@ -939,6 +935,7 @@ function TopupForm({
       });
       const data = await response.json() as TopupPayment & { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Pembayaran otomatis gagal dibuat.");
+      setSnapReady(false);
       setPayment(data);
       setAmount("");
       await onDone();
