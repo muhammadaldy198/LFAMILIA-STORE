@@ -1,12 +1,22 @@
 import { z } from "zod";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
 import { createMidtransPayment } from "@/lib/server/midtrans";
-import { createIpaymuDirectPayment } from "@/lib/server/ipaymu";
+import {
+  createIpaymuDirectPayment,
+  IpaymuProviderError,
+} from "@/lib/server/ipaymu";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
 import { routePaymentGateway } from "@/lib/server/payment-gateway-router";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
-import { createIpaymuWalletTopup, createMidtransWalletTopup, readWalletSettings, updateIpaymuWalletTopup, updateMidtransWalletTopup } from "@/lib/server/wallet";
+import {
+  createAutomaticWalletTopup,
+  markAutomaticWalletTopupCreationFailed,
+  readWalletSettings,
+  switchAutomaticWalletTopupGateway,
+  updateIpaymuWalletTopup,
+  updateMidtransWalletTopup,
+} from "@/lib/server/wallet";
 
 const automaticSchema = z.object({
   amount: z.number().int().min(1000).max(100_000_000),
@@ -20,24 +30,39 @@ export async function POST(request: Request) {
   const customer = await requireCustomerSession(request);
   if (customer instanceof Response) return customer;
   const rate = await allowRequest(request, "wallet-topup", 8, 900);
-  if (!rate.allowed) return Response.json({ error: "Terlalu banyak permintaan top up. Coba lagi beberapa menit." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
+  if (!rate.allowed) {
+    return Response.json(
+      { error: "Terlalu banyak permintaan top up. Coba lagi beberapa menit." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rate.retryAfter) },
+      },
+    );
+  }
+
+  let referenceId: string | null = null;
 
   try {
     if (!request.headers.get("content-type")?.includes("application/json")) {
       throw new Error("Top up saldo hanya tersedia melalui payment gateway otomatis.");
     }
+
     const settings = await readWalletSettings();
     const input = automaticSchema.parse(await request.json());
-    if (input.amount < settings.minTopup)
-      throw new Error(`Minimum top up Rp${settings.minTopup.toLocaleString("id-ID")}.`);
+    if (input.amount < settings.minTopup) {
+      throw new Error(
+        `Minimum top up Rp${settings.minTopup.toLocaleString("id-ID")}.`,
+      );
+    }
 
     const paymentChannel =
       input.paymentMethod === "qris" && input.paymentChannel === "qris"
         ? "mpm"
         : input.paymentChannel;
 
-    if (!(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel)))
+    if (!(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel))) {
       throw new Error("Metode pembayaran otomatis tidak tersedia.");
+    }
 
     const routing = routePaymentGateway({
       amount: input.amount,
@@ -46,71 +71,83 @@ export async function POST(request: Request) {
       ipaymuEnabled: settings.ipaymuTopupEnabled,
       midtransEnabled: settings.midtransTopupEnabled,
     });
-    const gateway = routing.candidates[0];
-    if (!gateway)
+    const [primary, fallback] = routing.candidates;
+    if (!primary) {
       throw new Error(
         "Tidak ada payment gateway yang siap untuk top up ini. Periksa toggle, credential, nominal, dan channel pembayaran.",
       );
-
-    const referenceId = `WLT-${crypto.randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
-
-    if (gateway === "ipaymu") {
-      await createIpaymuWalletTopup({
-        customerId: customer.id,
-        amount: input.amount,
-        name: customer.name,
-        paymentMethod: input.paymentMethod,
-        paymentChannel,
-        referenceId,
-      });
-      const payment = await createIpaymuDirectPayment({
-        name: customer.name,
-        phone: customer.phone,
-        email: customer.email,
-        amount: input.amount,
-        notifyUrl: `${getPublicBaseUrl()}/api/payments/ipaymu/callback`,
-        referenceId,
-        paymentMethod: input.paymentMethod,
-        paymentChannel,
-        productName: "Top up Saldo LFAMILIA",
-        productPrice: input.amount,
-      });
-      await updateIpaymuWalletTopup({
-        referenceId,
-        transactionId: payment.transactionId,
-        paymentNo: payment.paymentNo,
-        paymentName: payment.paymentName,
-        paymentUrl: payment.paymentUrl,
-        expiredAt: payment.expiredAt,
-        fee: payment.fee,
-        total: payment.total,
-      });
-      return Response.json(
-        {
-          ok: true,
-          mode: "ipaymu",
-          referenceId,
-          paymentMethod: input.paymentMethod,
-          paymentChannel,
-          paymentNo: payment.paymentNo,
-          paymentName: payment.paymentName,
-          paymentUrl: payment.paymentUrl,
-          total: payment.total,
-          fee: payment.fee,
-          expiredAt: payment.expiredAt,
-        },
-        { status: 201 },
-      );
     }
 
-    await createMidtransWalletTopup({
+    referenceId = `WLT-${crypto.randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
+    await createAutomaticWalletTopup({
       customerId: customer.id,
       amount: input.amount,
       name: customer.name,
       paymentMethod: input.paymentMethod,
       paymentChannel,
       referenceId,
+      gateway: primary,
     });
+
+    const baseUrl = getPublicBaseUrl();
+
+    if (primary === "ipaymu") {
+      try {
+        const payment = await createIpaymuDirectPayment({
+          name: customer.name,
+          phone: customer.phone,
+          email: customer.email,
+          amount: input.amount,
+          notifyUrl: `${baseUrl}/api/payments/ipaymu/callback`,
+          referenceId,
+          paymentMethod: input.paymentMethod,
+          paymentChannel,
+          productName: "Top up Saldo LFAMILIA",
+          productPrice: input.amount,
+        });
+        await updateIpaymuWalletTopup({
+          referenceId,
+          transactionId: payment.transactionId,
+          paymentNo: payment.paymentNo,
+          paymentName: payment.paymentName,
+          paymentUrl: payment.paymentUrl,
+          expiredAt: payment.expiredAt,
+          fee: payment.fee,
+          total: payment.total,
+        });
+        return Response.json(
+          {
+            ok: true,
+            paymentGateway: "ipaymu",
+            referenceId,
+            paymentMethod: input.paymentMethod,
+            paymentChannel,
+            paymentNo: payment.paymentNo,
+            paymentName: payment.paymentName,
+            paymentUrl: payment.paymentUrl,
+            total: payment.total,
+            fee: payment.fee,
+            expiredAt: payment.expiredAt,
+          },
+          { status: 201 },
+        );
+      } catch (error) {
+        const safeFallback =
+          error instanceof IpaymuProviderError && error.safeToFallback;
+        if (!safeFallback || fallback !== "midtrans") throw error;
+
+        const switched = await switchAutomaticWalletTopupGateway(
+          referenceId,
+          "midtrans",
+        );
+        if (!switched) {
+          throw new Error(
+            "Top up tidak dapat dialihkan ke gateway cadangan karena status transaksi sudah berubah.",
+          );
+        }
+      }
+    }
+
     const payment = await createMidtransPayment({
       buyerName: customer.name,
       buyerPhone: customer.phone,
@@ -120,7 +157,7 @@ export async function POST(request: Request) {
       paymentMethod: input.paymentMethod,
       paymentChannel,
       productName: "Top up Saldo LFAMILIA",
-      finishUrl: `${getPublicBaseUrl()}/account`,
+      finishUrl: `${baseUrl}/account`,
     });
     await updateMidtransWalletTopup({
       referenceId,
@@ -133,10 +170,11 @@ export async function POST(request: Request) {
       fee: 0,
       total: input.amount,
     });
+
     return Response.json(
       {
         ok: true,
-        mode: "midtrans",
+        paymentGateway: "midtrans",
         midtransMode: payment.mode,
         referenceId,
         paymentMethod: input.paymentMethod,
@@ -151,6 +189,22 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Permintaan top up gagal." }, { status: 400 });
+    const message =
+      error instanceof z.ZodError
+        ? error.issues[0]?.message || "Data top up tidak valid."
+        : error instanceof Error
+          ? error.message
+          : "Permintaan top up gagal.";
+
+    if (referenceId) {
+      await markAutomaticWalletTopupCreationFailed(referenceId, message).catch(
+        () => undefined,
+      );
+    }
+
+    return Response.json(
+      { error: message },
+      { status: error instanceof z.ZodError ? 400 : 503 },
+    );
   }
 }
