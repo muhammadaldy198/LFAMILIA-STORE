@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   CheckCircle2,
+  ExternalLink,
   Copy,
   LoaderCircle,
   LogIn,
@@ -751,6 +752,46 @@ function CustomerNotifications({ data }: { data: AccountData }) {
   );
 }
 
+type TopupPayment = {
+  paymentGateway?: "ipaymu" | "midtrans";
+  referenceId?: string;
+  midtransMode?: "snap";
+  paymentMethod?: "qris" | "va" | "ewallet";
+  paymentNo?: string | null;
+  paymentName?: string | null;
+  paymentUrl?: string | null;
+  expiredAt?: string | null;
+};
+
+type SnapWindow = Window & {
+  snap?: {
+    pay(
+      token: string,
+      callbacks?: {
+        onSuccess?: () => void;
+        onPending?: () => void;
+        onError?: () => void;
+        onClose?: () => void;
+      },
+    ): void;
+  };
+};
+
+function snapTokenFromUrl(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const parts = url.pathname.split("/").filter(Boolean);
+    const redirectionIndex = parts.lastIndexOf("redirection");
+    if (redirectionIndex >= 0 && parts[redirectionIndex + 1]) {
+      return decodeURIComponent(parts[redirectionIndex + 1]);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function TopupForm({
   settings,
   onDone,
@@ -763,19 +804,127 @@ function TopupForm({
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"qris" | "va" | "ewallet">("qris");
   const [saving, setSaving] = useState(false);
-  const [payment, setPayment] = useState<{
-    referenceId?: string;
-    midtransMode?: "snap" | "bisnap";
-    paymentMethod?: "qris" | "va" | "ewallet";
-    paymentNo?: string | null;
-    paymentName?: string | null;
-    paymentUrl?: string | null;
-    expiredAt?: string | null;
-  } | null>(null);
+  const [payment, setPayment] = useState<TopupPayment | null>(null);
+  const [snapReady, setSnapReady] = useState(false);
+  const [openingPayment, setOpeningPayment] = useState(false);
 
   const midtransReady = Boolean(settings?.midtransTopupEnabled);
   const ipaymuReady = Boolean(settings?.ipaymuTopupEnabled);
   const automaticReady = midtransReady || ipaymuReady;
+
+  useEffect(() => {
+    if (
+      payment?.paymentGateway !== "midtrans" ||
+      payment.midtransMode !== "snap" ||
+      !payment.paymentUrl
+    ) {
+      setSnapReady(false);
+      return;
+    }
+
+    const token = snapTokenFromUrl(payment.paymentUrl);
+    if (!token) {
+      setSnapReady(false);
+      return;
+    }
+
+    let cancelled = false;
+    let script: HTMLScriptElement | null = null;
+
+    void fetch("/api/payments/midtrans/client-config", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return await response.json() as {
+          enabled?: boolean;
+          clientKey?: string | null;
+          scriptUrl?: string;
+        };
+      })
+      .then((config) => {
+        if (
+          cancelled ||
+          !config?.enabled ||
+          !config.clientKey ||
+          !config.scriptUrl
+        ) {
+          return;
+        }
+
+        const snapWindow = window as SnapWindow;
+        if (snapWindow.snap?.pay) {
+          setSnapReady(true);
+          return;
+        }
+
+        const existing = document.querySelector<HTMLScriptElement>(
+          "script[data-lfamilia-midtrans-snap='true']",
+        );
+        if (existing) {
+          existing.addEventListener(
+            "load",
+            () =>
+              !cancelled &&
+              setSnapReady(Boolean((window as SnapWindow).snap?.pay)),
+            { once: true },
+          );
+          return;
+        }
+
+        script = document.createElement("script");
+        script.src = config.scriptUrl;
+        script.async = true;
+        script.setAttribute("data-client-key", config.clientKey);
+        script.setAttribute("data-lfamilia-midtrans-snap", "true");
+        script.onload = () => {
+          if (!cancelled) {
+            setSnapReady(Boolean((window as SnapWindow).snap?.pay));
+          }
+        };
+        script.onerror = () => {
+          if (!cancelled) setSnapReady(false);
+        };
+        document.body.appendChild(script);
+      })
+      .catch(() => setSnapReady(false));
+
+    return () => {
+      cancelled = true;
+      if (script) {
+        script.onload = null;
+        script.onerror = null;
+      }
+    };
+  }, [payment]);
+
+  function openTopupPayment() {
+    if (!payment?.paymentUrl) return;
+
+    if (
+      payment.paymentGateway === "midtrans" &&
+      payment.midtransMode === "snap"
+    ) {
+      const token = snapTokenFromUrl(payment.paymentUrl);
+      const snap = (window as SnapWindow).snap;
+      if (!token || !snapReady || !snap?.pay) return;
+
+      setOpeningPayment(true);
+      const done = () => setOpeningPayment(false);
+      snap.pay(token, {
+        onSuccess: done,
+        onPending: done,
+        onError: done,
+        onClose: done,
+      });
+      return;
+    }
+
+    if (
+      payment.paymentGateway === "ipaymu" &&
+      payment.paymentMethod === "ewallet"
+    ) {
+      window.location.assign(payment.paymentUrl);
+    }
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -788,17 +937,8 @@ function TopupForm({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ amount: Number(amount), paymentMethod: method, paymentChannel: channel }),
       });
-      const data = await response.json() as {
-        error?: string; referenceId?: string; midtransMode?: "snap" | "bisnap";
-        paymentMethod?: "qris" | "va" | "ewallet"; paymentNo?: string | null;
-        paymentName?: string | null; paymentUrl?: string | null; expiredAt?: string | null;
-      };
+      const data = await response.json() as TopupPayment & { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Pembayaran otomatis gagal dibuat.");
-      const isBisnapQris = data.midtransMode === "bisnap" && data.paymentMethod === "qris";
-      if (data.paymentUrl && !isBisnapQris) {
-        window.location.assign(data.paymentUrl);
-        return;
-      }
       setPayment(data);
       setAmount("");
       await onDone();
@@ -818,7 +958,85 @@ function TopupForm({
     <div className="mt-4 grid grid-cols-3 gap-2">{(["qris","va","ewallet"] as const).map((item) => <button key={item} type="button" onClick={() => setMethod(item)} className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase ${method === item ? "border-[#b9ff35] bg-[#b9ff35] text-[#091006]" : "border-white/10 text-white/50"}`}>{item === "va" ? "Bank VA" : item}</button>)}</div>
     <div className="mt-4"><Field label={`Nominal (min. ${formatRupiah(settings?.minTopup ?? 10_000)})`}><Input required type="number" min={settings?.minTopup ?? 10_000} value={amount} onChange={(event) => setAmount(event.target.value)} className="checkout-input" /></Field></div>
     <Button disabled={saving} className="mt-4 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006]">{saving ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <ArrowUpRight className="mr-2 size-4" />}Lanjut bayar</Button>
-    {payment && <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/20 p-4"><strong className="text-xs">Pembayaran top up dibuat</strong>{payment.referenceId && <p className="mt-1 break-all text-[9px] text-white/40">{payment.referenceId}</p>}{payment.paymentNo && <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-black/25 p-3"><div><span className="block text-[8px] uppercase tracking-wider text-white/35">{payment.paymentName || "Nomor pembayaran"}</span><strong className="mt-1 block break-all text-xs text-[#d8ff8d]">{payment.paymentNo}</strong></div><button type="button" onClick={() => void navigator.clipboard.writeText(payment.paymentNo!)} className="text-white/45"><Copy className="size-4" /></button></div>}{payment.midtransMode === "bisnap" && payment.paymentMethod === "qris" && payment.paymentUrl && <div className="mt-3 rounded-xl bg-white p-2"><img src={payment.paymentUrl} alt="QRIS top up" className="mx-auto aspect-square w-full max-w-56 object-contain" /></div>}{payment.expiredAt && <p className="mt-2 text-[9px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}</div>}
+    {payment && (
+      <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/20 p-4">
+        <strong className="text-xs">Pembayaran top up dibuat</strong>
+        {payment.referenceId && (
+          <p className="mt-1 break-all text-[9px] text-white/40">
+            {payment.referenceId}
+          </p>
+        )}
+        {payment.paymentNo && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-black/25 p-3">
+            <div>
+              <span className="block text-[8px] uppercase tracking-wider text-white/35">
+                {payment.paymentName || "Nomor pembayaran"}
+              </span>
+              <strong className="mt-1 block break-all text-xs text-[#d8ff8d]">
+                {payment.paymentNo}
+              </strong>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                void navigator.clipboard.writeText(payment.paymentNo!)
+              }
+              className="text-white/45"
+            >
+              <Copy className="size-4" />
+            </button>
+          </div>
+        )}
+        {payment.paymentGateway === "ipaymu" &&
+          payment.paymentMethod === "qris" &&
+          payment.paymentUrl && (
+            <div className="mt-3 rounded-xl bg-white p-2">
+              <img
+                src={payment.paymentUrl}
+                alt="QRIS top up"
+                className="mx-auto aspect-square w-full max-w-56 object-contain"
+              />
+            </div>
+          )}
+        {payment.expiredAt && (
+          <p className="mt-2 text-[9px] text-white/35">
+            Berlaku sampai {payment.expiredAt}
+          </p>
+        )}
+        {payment.paymentGateway === "midtrans" &&
+          payment.paymentUrl && (
+            <Button
+              type="button"
+              onClick={openTopupPayment}
+              disabled={!snapReady || openingPayment}
+              className="mt-3 w-full rounded-lg bg-[#bca17d] font-black text-white"
+            >
+              {openingPayment ? (
+                <LoaderCircle className="mr-2 size-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="mr-2 size-4" />
+              )}
+              {snapReady ? "Bayar dengan Midtrans" : "Menyiapkan pembayaran…"}
+            </Button>
+          )}
+        {payment.paymentGateway === "ipaymu" &&
+          payment.paymentMethod === "ewallet" &&
+          payment.paymentUrl && (
+            <Button
+              type="button"
+              onClick={openTopupPayment}
+              className="mt-3 w-full rounded-lg bg-[#b9ff35] font-black text-[#091006]"
+            >
+              Buka aplikasi pembayaran
+              <ExternalLink className="ml-2 size-4" />
+            </Button>
+          )}
+        <p className="mt-3 text-[9px] leading-4 text-white/35">
+          QRIS dan Virtual Account tetap ditampilkan di LFAMILIA. E-wallet hanya
+          membuka aplikasi pembayaran ketika diperlukan.
+        </p>
+      </div>
+    )}
   </form>;
 }
 function ProfileForm({
