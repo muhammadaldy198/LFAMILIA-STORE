@@ -144,6 +144,7 @@ export async function POST(request: Request) {
     return Response.json({
       orderId: identity.id,
       referenceId: identity.referenceId,
+      paymentGateway: "midtrans",
       publicInvoice: invoice,
       paymentNo: payment.paymentNo,
       paymentName: payment.paymentName,
