@@ -259,35 +259,35 @@ export async function POST(request: Request) {
     }
 
     const payment = await createMidtransPayment({
-        referenceId: identity.referenceId,
-        amount: promotion.finalPrice,
-        productName: `${item.productName} - ${item.packageLabel}`,
-        buyerName: input.buyerName,
-        buyerEmail: input.buyerEmail,
-        buyerPhone: input.buyerPhone,
-        paymentMethod: input.paymentMethod,
-        paymentChannel,
-        finishUrl: `${baseUrl}/payment?invoice=${encodeURIComponent(invoice)}`,
-      });
+      referenceId: identity.referenceId,
+      amount: promotion.finalPrice,
+      productName: `${item.productName} - ${item.packageLabel}`,
+      buyerName: input.buyerName,
+      buyerEmail: input.buyerEmail,
+      buyerPhone: input.buyerPhone,
+      paymentMethod: input.paymentMethod,
+      paymentChannel,
+      finishUrl: `${baseUrl}/payment?invoice=${encodeURIComponent(invoice)}`,
+    });
 
-      await updateMidtransPayment({
-        referenceId: identity.referenceId,
-        mode: payment.mode,
-        transactionId: payment.transactionId,
-        paymentNo: payment.paymentNo,
-        paymentName: payment.paymentName,
-        paymentUrl: payment.paymentUrl,
-        expiredAt: payment.expiredAt,
-        fee: 0,
-        total: promotion.finalPrice,
-      });
-      await recordOrderEvent({
-        orderId: identity.id,
-        source: "midtrans",
-        eventId: `create-${identity.referenceId}`,
-        status: "pending",
-        payload: payment.raw,
-      });
+    await updateMidtransPayment({
+      referenceId: identity.referenceId,
+      mode: payment.mode,
+      transactionId: payment.transactionId,
+      paymentNo: payment.paymentNo,
+      paymentName: payment.paymentName,
+      paymentUrl: payment.paymentUrl,
+      expiredAt: payment.expiredAt,
+      fee: 0,
+      total: promotion.finalPrice,
+    });
+    await recordOrderEvent({
+      orderId: identity.id,
+      source: "midtrans",
+      eventId: `create-${identity.referenceId}`,
+      status: "pending",
+      payload: payment.raw,
+    });
 
     return Response.json(
       {
