@@ -7,32 +7,21 @@ const root = process.cwd();
 const route = fs.readFileSync(path.join(root, "app/api/account/topups/route.ts"), "utf8");
 const account = fs.readFileSync(path.join(root, "components/customer-account.tsx"), "utf8");
 
-test("wallet topup gateway is selected on the server", () => {
-  assert.match(route, /routePaymentGateway\(/);
-  assert.doesNotMatch(route, /mode: z\.enum\(\["midtrans", "ipaymu"\]\)/);
-  assert.match(route, /primary === "ipaymu"/);
-  assert.match(route, /createMidtransPayment\(/);
-});
-
-test("wallet topup reuses one record across safe gateway fallback", () => {
-  assert.equal((route.match(/createAutomaticWalletTopup\(/g) ?? []).length, 1);
-  assert.match(route, /IpaymuProviderError/);
-  assert.match(route, /error\.safeToFallback/);
-  assert.match(route, /switchAutomaticWalletTopupGateway\(/);
-  assert.match(route, /fallback !== "midtrans"/);
-  assert.doesNotMatch(route, /createIpaymuWalletTopup|createMidtransWalletTopup/);
+test("wallet topup uses DOKU only on the server", () => {
+  assert.match(route, /createDokuWalletTopup\(/);
+  assert.match(route, /createDokuCheckoutPayment\(/);
+  assert.match(route, /updateDokuWalletTopup\(/);
+  assert.match(route, /paymentGateway: "doku"/);
+  assert.doesNotMatch(route, /midtrans|ipaymu|fallback/i);
 });
 
 test("customer topup UI does not ask which gateway to use", () => {
-  assert.doesNotMatch(account, /setGateway\(/);
-  assert.doesNotMatch(account, /mode: activeGateway/);
-  assert.match(account, /Gateway dipilih otomatis berdasarkan nominal dan metode pembayaran/);
+  assert.doesNotMatch(account, /setGateway\(|activeGateway/);
+  assert.match(account, /DOKU adalah satu-satunya payment gateway/);
 });
 
-test("wallet topup stays on LFAMILIA payment UI", () => {
-  assert.doesNotMatch(account, /if \(data\.paymentUrl.*window\.location\.assign/s);
-  assert.match(account, /payment\.paymentGateway === "ipaymu"/);
-  assert.match(account, /payment\.paymentMethod === "qris"/);
-  assert.match(account, /snap\.pay\(token/);
-  assert.match(account, /QRIS dan Virtual Account tetap ditampilkan di LFAMILIA/);
+test("customer topup opens the DOKU hosted payment page", () => {
+  assert.match(account, /window\.location\.assign\(payment\.paymentUrl\)/);
+  assert.match(account, /Bayar melalui DOKU/);
+  assert.doesNotMatch(account, /snap\.pay|midtrans|ipaymu/i);
 });
