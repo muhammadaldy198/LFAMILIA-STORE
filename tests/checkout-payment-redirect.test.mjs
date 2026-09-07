@@ -9,7 +9,7 @@ const payment = fs.readFileSync(path.join(root, "app/payment/page.tsx"), "utf8")
 const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/route.ts"), "utf8");
 const ipaymu = fs.readFileSync(path.join(root, "app/api/payments/ipaymu/create/route.ts"), "utf8");
 const midtrans = fs.readFileSync(path.join(root, "app/api/payments/midtrans/create/route.ts"), "utf8");
-const invoiceReminder = fs.readFileSync(path.join(root, "components/checkout-invoice-reminder.tsx"), "utf8");
+const checkoutLayout = fs.readFileSync(path.join(root, "app/checkout/layout.tsx"), "utf8");
 const accountRoute = fs.readFileSync(path.join(root, "app/api/account/route.ts"), "utf8");
 
 test("automatic checkout identifies the selected payment gateway", () => {
@@ -38,7 +38,13 @@ test("iPaymu Direct payment is rendered by LFAMILIA", () => {
 });
 
 test("compact invoice references keep a single LF prefix", () => {
-  for (const source of [autoRoute, invoiceReminder, accountRoute]) {
+  for (const source of [autoRoute, accountRoute]) {
     assert.match(source, /if \(!clean\.includes\("-"\)\) return clean/);
   }
+});
+
+test("checkout no longer mounts legacy payment redirect observers", () => {
+  assert.doesNotMatch(checkoutLayout, /CheckoutMidtransRedirect|CheckoutInvoiceReminder/);
+  assert.equal(fs.existsSync(path.join(root, "components/checkout-midtrans-redirect.tsx")), false);
+  assert.equal(fs.existsSync(path.join(root, "components/checkout-invoice-reminder.tsx")), false);
 });
