@@ -15,3 +15,7 @@
 {$IPAYMU_RELAY_HOST} {
   import lfamilia_provider_relay
 }
+
+{$MIDTRANS_BISNAP_RELAY_HOST} {
+  import lfamilia_provider_relay
+}
