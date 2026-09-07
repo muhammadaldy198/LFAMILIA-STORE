@@ -1,8 +1,8 @@
 # LFAMILIA DigiFlazz Relay
 
-Relay VPS hanya digunakan untuk **DigiFlazz** ketika IP keluar statis diperlukan. DOKU tidak melewati relay ini.
+Relay VPS hanya digunakan untuk **DigiFlazz** ketika IP keluar statis diperlukan.
 
-Semua nilai operasional dibaca dari `/etc/lfamilia-relay.env`; API key DigiFlazz tetap dikelola terenkripsi dari Admin Panel dan tidak ditulis ke source relay.
+DOKU tidak menggunakan relay.
 
 ## Environment VPS
 
@@ -21,20 +21,18 @@ DIGIFLAZZ_DEVELOPMENT_UPSTREAM_ORIGIN=https://api.digiflazz.com
 DIGIFLAZZ_PRODUCTION_UPSTREAM_ORIGIN=https://api.digiflazz.com
 ```
 
-Worker mengirim `x-lfamilia-digiflazz-environment` (`development` atau `production`) serta relay token. Header internal tidak diteruskan ke DigiFlazz.
+Worker mengirim environment DigiFlazz dan relay token pada setiap request.
 
 ## Admin Panel
 
-Isi dari **Admin Panel → Integrasi & harga → VPS Relay**:
+Buka **Admin Panel → Integrasi & harga → VPS Relay** lalu isi:
 
 - DigiFlazz Relay URL
 - Relay Token
 
-Nilai disimpan terenkripsi di D1. Token harus sama persis dengan `RELAY_TOKEN` pada VPS.
+Nilai disimpan terenkripsi di D1. Relay Token harus sama dengan `RELAY_TOKEN` di VPS.
 
 ## Caddy
-
-Gunakan hanya host DigiFlazz:
 
 ```caddy
 {
@@ -52,4 +50,4 @@ Gunakan hanya host DigiFlazz:
 }
 ```
 
-Setelah source relay diperbarui di VPS, restart service relay dan reload Caddy. Domain relay iPaymu/BI-SNAP lama tidak lagi diperlukan.
+Setelah source relay diperbarui, restart service relay dan reload Caddy.
