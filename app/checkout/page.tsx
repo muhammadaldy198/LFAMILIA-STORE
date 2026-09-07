@@ -432,8 +432,6 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   }, []);
 
   useEffect(() => {
-    setSavedGameAccounts([]);
-    setSelectedSavedGameAccountId("");
     if (!account?.id || !isGameProduct || isVoucherProduct) return;
 
     const controller = new AbortController();
@@ -872,6 +870,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                             value={customerInputValues[field.id] ?? ""}
                             onChange={(event) => {
                               setCustomerInputValues((current) => ({ ...current, [field.id]: event.target.value }));
+                              setSelectedSavedGameAccountId("");
                               setPayment(null);
                               setError("");
                             }}
