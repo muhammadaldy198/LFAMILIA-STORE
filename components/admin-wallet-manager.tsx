@@ -118,6 +118,9 @@ export function AdminWalletManager({ view = "topups" }: { view?: "topups" | "che
   ];
 
   return <div className="space-y-3">
+    <div className="rounded-lg border border-sky-300/15 bg-sky-300/[0.04] px-3 py-2 text-[9px] leading-4 text-white/45">
+      Routing otomatis: iPaymu diprioritaskan saat nominal memenuhi minimum dan channel didukung; Midtrans menangani nominal lebih rendah, channel yang tidak didukung iPaymu, serta fallback yang aman. Pelanggan tidak memilih gateway.
+    </div>
     {message && <div className="rounded-lg border border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] p-3 text-xs text-[#d8ff8d]">{message}</div>}
     {error && <div className="rounded-lg border border-red-400/20 bg-red-400/[0.05] p-3 text-xs text-red-200">{error}</div>}
     <div className="overflow-x-auto rounded-lg border border-white/[0.08]">
