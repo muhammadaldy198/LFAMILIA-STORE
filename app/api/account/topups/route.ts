@@ -1,14 +1,14 @@
 import { z } from "zod";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
-import { createMidtransPayment, getMidtransMode, isMidtransChannelSupported } from "@/lib/server/midtrans";
-import { createIpaymuDirectPayment, isIpaymuChannelSupported } from "@/lib/server/ipaymu";
+import { createMidtransPayment } from "@/lib/server/midtrans";
+import { createIpaymuDirectPayment } from "@/lib/server/ipaymu";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
+import { routePaymentGateway } from "@/lib/server/payment-gateway-router";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 import { createIpaymuWalletTopup, createMidtransWalletTopup, readWalletSettings, updateIpaymuWalletTopup, updateMidtransWalletTopup } from "@/lib/server/wallet";
 
 const automaticSchema = z.object({
-  mode: z.enum(["midtrans", "ipaymu"]),
   amount: z.number().int().min(1000).max(100_000_000),
   paymentMethod: z.enum(["va", "ewallet", "qris"]),
   paymentChannel: z.string().trim().min(2).max(30),
@@ -28,38 +28,128 @@ export async function POST(request: Request) {
     }
     const settings = await readWalletSettings();
     const input = automaticSchema.parse(await request.json());
-    const gatewayEnabled = input.mode === "midtrans" ? settings.midtransTopupEnabled : settings.ipaymuTopupEnabled;
-    if (!gatewayEnabled) throw new Error(`Top up otomatis ${input.mode === "midtrans" ? "Midtrans" : "iPaymu"} belum diaktifkan oleh Pemilik.`);
-    if (input.amount < settings.minTopup) throw new Error(`Minimum top up Rp${settings.minTopup.toLocaleString("id-ID")}.`);
+    if (input.amount < settings.minTopup)
+      throw new Error(`Minimum top up Rp${settings.minTopup.toLocaleString("id-ID")}.`);
 
-    const midtransMode = input.mode === "midtrans" ? getMidtransMode() : null;
-    if (
-      !(await isPaymentChannelAvailable(input.paymentMethod, input.paymentChannel)) ||
-      (input.mode === "ipaymu" && !isIpaymuChannelSupported(input.paymentMethod, input.paymentChannel)) ||
-      (input.mode === "midtrans" && midtransMode && !isMidtransChannelSupported(input.paymentMethod, input.paymentChannel, midtransMode))
-    ) throw new Error("Metode pembayaran otomatis tidak tersedia.");
+    const paymentChannel =
+      input.paymentMethod === "qris" && input.paymentChannel === "qris"
+        ? "mpm"
+        : input.paymentChannel;
+
+    if (!(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel)))
+      throw new Error("Metode pembayaran otomatis tidak tersedia.");
+
+    const routing = routePaymentGateway({
+      amount: input.amount,
+      paymentMethod: input.paymentMethod,
+      paymentChannel,
+      ipaymuEnabled: settings.ipaymuTopupEnabled,
+      midtransEnabled: settings.midtransTopupEnabled,
+    });
+    const gateway = routing.candidates[0];
+    if (!gateway)
+      throw new Error(
+        "Tidak ada payment gateway yang siap untuk top up ini. Periksa toggle, credential, nominal, dan channel pembayaran.",
+      );
 
     const referenceId = `WLT-${crypto.randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
-    if (input.mode === "ipaymu") {
-      await createIpaymuWalletTopup({ customerId: customer.id, amount: input.amount, name: customer.name, paymentMethod: input.paymentMethod, paymentChannel: input.paymentChannel, referenceId });
-      const payment = await createIpaymuDirectPayment({
-        name: customer.name, phone: customer.phone, email: customer.email, amount: input.amount,
-        notifyUrl: `${getPublicBaseUrl()}/api/payments/ipaymu/callback`, referenceId,
-        paymentMethod: input.paymentMethod, paymentChannel: input.paymentChannel,
-        productName: "Top up Saldo LFAMILIA", productPrice: input.amount,
+
+    if (gateway === "ipaymu") {
+      await createIpaymuWalletTopup({
+        customerId: customer.id,
+        amount: input.amount,
+        name: customer.name,
+        paymentMethod: input.paymentMethod,
+        paymentChannel,
+        referenceId,
       });
-      await updateIpaymuWalletTopup({ referenceId, transactionId: payment.transactionId, paymentNo: payment.paymentNo, paymentName: payment.paymentName, paymentUrl: payment.paymentUrl, expiredAt: payment.expiredAt, fee: payment.fee, total: payment.total });
-      return Response.json({ ok: true, mode: "ipaymu", referenceId, paymentMethod: input.paymentMethod, paymentNo: payment.paymentNo, paymentName: payment.paymentName, paymentUrl: payment.paymentUrl, total: payment.total, fee: payment.fee, expiredAt: payment.expiredAt }, { status: 201 });
+      const payment = await createIpaymuDirectPayment({
+        name: customer.name,
+        phone: customer.phone,
+        email: customer.email,
+        amount: input.amount,
+        notifyUrl: `${getPublicBaseUrl()}/api/payments/ipaymu/callback`,
+        referenceId,
+        paymentMethod: input.paymentMethod,
+        paymentChannel,
+        productName: "Top up Saldo LFAMILIA",
+        productPrice: input.amount,
+      });
+      await updateIpaymuWalletTopup({
+        referenceId,
+        transactionId: payment.transactionId,
+        paymentNo: payment.paymentNo,
+        paymentName: payment.paymentName,
+        paymentUrl: payment.paymentUrl,
+        expiredAt: payment.expiredAt,
+        fee: payment.fee,
+        total: payment.total,
+      });
+      return Response.json(
+        {
+          ok: true,
+          mode: "ipaymu",
+          referenceId,
+          paymentMethod: input.paymentMethod,
+          paymentChannel,
+          paymentNo: payment.paymentNo,
+          paymentName: payment.paymentName,
+          paymentUrl: payment.paymentUrl,
+          total: payment.total,
+          fee: payment.fee,
+          expiredAt: payment.expiredAt,
+        },
+        { status: 201 },
+      );
     }
 
-    await createMidtransWalletTopup({ customerId: customer.id, amount: input.amount, name: customer.name, paymentMethod: input.paymentMethod, paymentChannel: input.paymentChannel, referenceId });
-    const payment = await createMidtransPayment({
-      buyerName: customer.name, buyerPhone: customer.phone, buyerEmail: customer.email, amount: input.amount,
-      referenceId, paymentMethod: input.paymentMethod, paymentChannel: input.paymentChannel,
-      productName: "Top up Saldo LFAMILIA", finishUrl: `${getPublicBaseUrl()}/account`,
+    await createMidtransWalletTopup({
+      customerId: customer.id,
+      amount: input.amount,
+      name: customer.name,
+      paymentMethod: input.paymentMethod,
+      paymentChannel,
+      referenceId,
     });
-    await updateMidtransWalletTopup({ referenceId, mode: payment.mode, transactionId: payment.transactionId, paymentNo: payment.paymentNo, paymentName: payment.paymentName, paymentUrl: payment.paymentUrl, expiredAt: payment.expiredAt, fee: 0, total: input.amount });
-    return Response.json({ ok: true, mode: "midtrans", midtransMode: payment.mode, referenceId, paymentMethod: input.paymentMethod, paymentChannel: input.paymentChannel, paymentNo: payment.paymentNo, paymentName: payment.paymentName, paymentUrl: payment.paymentUrl, total: input.amount, fee: 0, expiredAt: payment.expiredAt }, { status: 201 });
+    const payment = await createMidtransPayment({
+      buyerName: customer.name,
+      buyerPhone: customer.phone,
+      buyerEmail: customer.email,
+      amount: input.amount,
+      referenceId,
+      paymentMethod: input.paymentMethod,
+      paymentChannel,
+      productName: "Top up Saldo LFAMILIA",
+      finishUrl: `${getPublicBaseUrl()}/account`,
+    });
+    await updateMidtransWalletTopup({
+      referenceId,
+      mode: payment.mode,
+      transactionId: payment.transactionId,
+      paymentNo: payment.paymentNo,
+      paymentName: payment.paymentName,
+      paymentUrl: payment.paymentUrl,
+      expiredAt: payment.expiredAt,
+      fee: 0,
+      total: input.amount,
+    });
+    return Response.json(
+      {
+        ok: true,
+        mode: "midtrans",
+        midtransMode: payment.mode,
+        referenceId,
+        paymentMethod: input.paymentMethod,
+        paymentChannel,
+        paymentNo: payment.paymentNo,
+        paymentName: payment.paymentName,
+        paymentUrl: payment.paymentUrl,
+        total: input.amount,
+        fee: 0,
+        expiredAt: payment.expiredAt,
+      },
+      { status: 201 },
+    );
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Permintaan top up gagal." }, { status: 400 });
   }
