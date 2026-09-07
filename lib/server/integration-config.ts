@@ -336,7 +336,7 @@ function applySnapConfig(target: Record<string, unknown>, environment: "sandbox"
   put(target, `${prefix}SCRIPT_URL`, config.scriptUrl);
 }
 
- function applyIpaymuConfig(target: Record<string, unknown>, environment: "sandbox" | "production", config: Record<string, string>) {
+function applyIpaymuConfig(target: Record<string, unknown>, environment: "sandbox" | "production", config: Record<string, string>) {
   const prefix = `IPAYMU_${environment.toUpperCase()}_`;
   put(target, `${prefix}VA`, config.virtualAccount);
   put(target, `${prefix}API_KEY`, config.apiKey);
@@ -415,7 +415,7 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
       if (profile.provider === "midtrans" && profile.mode === "snap" && (profile.environment === "sandbox" || profile.environment === "production")) {
         applySnapConfig(target, profile.environment, config);
       }
-       if (profile.provider === "ipaymu" && profile.mode === "direct" && (profile.environment === "sandbox" || profile.environment === "production")) {
+      if (profile.provider === "ipaymu" && profile.mode === "direct" && (profile.environment === "sandbox" || profile.environment === "production")) {
         applyIpaymuConfig(target, profile.environment, config);
       }
       if (profile.provider === "digiflazz" && profile.mode === "direct" && (profile.environment === "development" || profile.environment === "production")) {
