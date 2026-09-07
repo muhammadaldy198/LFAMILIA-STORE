@@ -161,16 +161,16 @@ export async function POST(request: Request) {
       const priorResponse = await existingWalletResponse(customer.id, checkoutKey);
       if (priorResponse) return priorResponse;
     }
-    const rejected =
+    const clientInputRejected =
       error instanceof z.ZodError ||
       error instanceof CheckoutValidationError ||
-      error instanceof PromotionQuoteError ||
-      error instanceof WalletSettlementError;
+      error instanceof PromotionQuoteError;
+    const rejected = clientInputRejected || error instanceof WalletSettlementError;
     if (referenceId && rejected) await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
     if (!rejected) console.error("Checkout wallet belum dapat dipastikan:", error);
     return Response.json(
       { error: rejected ? message : "Pembayaran saldo belum dapat dipastikan. Coba lagi dengan data yang sama.", retryable: !rejected },
-      { status: error instanceof z.ZodError ? 400 : error instanceof WalletSettlementError ? 409 : 503 },
+      { status: clientInputRejected ? 400 : error instanceof WalletSettlementError ? 409 : 503 },
     );
   }
 }
