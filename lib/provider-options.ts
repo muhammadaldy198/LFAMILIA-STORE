@@ -1,5 +1,4 @@
 export const providerOptions = [
   { code: "digiflazz", name: "DigiFlazz" },
-  { code: "vippayment", name: "VIPayment" },
-  { code: "voucher-stock", name: "Stok kode LFAMILIA" },
+  { code: "voucher-stock", name: "Stok internal LFAMILIA" },
 ] as const;
