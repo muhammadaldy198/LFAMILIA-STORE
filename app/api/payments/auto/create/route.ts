@@ -1,12 +1,11 @@
 import { z } from "zod";
 import { getCustomerSession } from "@/lib/server/customer-auth";
-import { getMemberTierProfile } from "@/lib/server/member-tiers";
 import {
-  createIpaymuDirectPayment,
-  IpaymuProviderError,
-} from "@/lib/server/ipaymu";
-import { createMidtransPayment } from "@/lib/server/midtrans";
-import { routePaymentGateway } from "@/lib/server/payment-gateway-router";
+  createDokuCheckoutPayment,
+  getDokuReadiness,
+  isDokuChannelSupported,
+} from "@/lib/server/doku";
+import { getMemberTierProfile } from "@/lib/server/member-tiers";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
 import { quotePromotion } from "@/lib/server/promotions";
 import {
@@ -16,14 +15,12 @@ import {
   normalizeCustomerInputs,
   recordOrderEvent,
   resolvePurchasableItem,
-  updateIpaymuPayment,
-  updateMidtransPayment,
+  updateDokuPayment,
 } from "@/lib/server/orders";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
 import { readWalletSettings } from "@/lib/server/wallet";
-import { IPAYMU_MIN_CHECKOUT_AMOUNT } from "@/lib/payment-limits";
 
 export const dynamic = "force-dynamic";
 
@@ -60,15 +57,11 @@ export async function POST(request: Request) {
   if (!rate.allowed) {
     return Response.json(
       { error: "Terlalu banyak percobaan checkout. Coba lagi beberapa menit." },
-      {
-        status: 429,
-        headers: { "Retry-After": String(rate.retryAfter) },
-      },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfter) } },
     );
   }
 
   let referenceId: string | null = null;
-
   try {
     const input = routingSchema.parse(await request.json());
     const paymentChannel =
@@ -76,29 +69,39 @@ export async function POST(request: Request) {
         ? "mpm"
         : input.paymentChannel;
 
-    if (!(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel))) {
+    if (
+      !isDokuChannelSupported(input.paymentMethod, paymentChannel) ||
+      !(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel))
+    ) {
       return Response.json(
-        { error: "Metode pembayaran sedang tidak tersedia." },
+        { error: "Metode pembayaran belum didukung atau sedang dinonaktifkan di DOKU." },
         { status: 400 },
+      );
+    }
+
+    const settings = await readWalletSettings();
+    const readiness = getDokuReadiness();
+    if (!settings.dokuCheckoutEnabled || !readiness.ready) {
+      return Response.json(
+        {
+          error: readiness.ready
+            ? "DOKU sedang dinonaktifkan untuk checkout."
+            : readiness.reason || "Konfigurasi DOKU belum siap.",
+        },
+        { status: 503 },
       );
     }
 
     const item = await resolvePurchasableItem(input.productSlug, input.packageSku);
     if (!item) {
-      return Response.json(
-        { error: "Produk atau nominal tidak tersedia." },
-        { status: 404 },
-      );
+      return Response.json({ error: "Produk atau nominal tidak tersedia." }, { status: 404 });
     }
     if (
       item.providerCode === "voucher-stock" &&
       item.providerSku &&
       !(await hasAvailableVoucherStock(item.providerSku))
     ) {
-      return Response.json(
-        { error: "Stok kode untuk paket ini sedang habis." },
-        { status: 409 },
-      );
+      return Response.json({ error: "Stok kode untuk paket ini sedang habis." }, { status: 409 });
     }
 
     const customer = await getCustomerSession(request);
@@ -115,38 +118,6 @@ export async function POST(request: Request) {
           }
         : null,
     );
-
-    const settings = await readWalletSettings();
-    const routing = routePaymentGateway({
-      amount: promotion.finalPrice,
-      paymentMethod: input.paymentMethod,
-      paymentChannel,
-      ipaymuEnabled: settings.ipaymuCheckoutEnabled,
-      midtransEnabled: settings.midtransCheckoutEnabled,
-    });
-    const [primary, fallback] = routing.candidates;
-
-    if (!primary) {
-      if (
-        settings.ipaymuCheckoutEnabled &&
-        promotion.finalPrice < IPAYMU_MIN_CHECKOUT_AMOUNT &&
-        !routing.midtransEligible
-      ) {
-        return Response.json(
-          {
-            error: `iPaymu tersedia mulai Rp${IPAYMU_MIN_CHECKOUT_AMOUNT.toLocaleString("id-ID")}. Pilih nominal lain atau gunakan Koin LFAMILIA.`,
-          },
-          { status: 422 },
-        );
-      }
-      return Response.json(
-        {
-          error:
-            "Tidak ada payment gateway yang siap untuk metode ini. Periksa toggle gateway, credential environment aktif, dan channel pembayaran di panel admin.",
-        },
-        { status: 503 },
-      );
-    }
 
     const customerData = normalizeCustomerInputs(
       item,
@@ -176,89 +147,7 @@ export async function POST(request: Request) {
 
     const baseUrl = getPublicBaseUrl();
     const invoice = publicInvoice(identity.referenceId);
-
-    const shared = {
-      orderId: identity.id,
-      referenceId: identity.referenceId,
-      publicInvoice: invoice,
-      fulfillmentType: item.fulfillmentType,
-      providerCode: item.providerCode,
-      basePrice: promotion.basePrice,
-      sellingPrice: promotion.sellingPrice,
-      discountAmount: promotion.discountAmount,
-      voucherCode: promotion.voucherCode,
-      flashSaleId: promotion.flashSaleId,
-      memberTier: promotion.memberTier,
-      memberDiscountPercent: promotion.memberDiscountPercent,
-      discountSource: promotion.discountSource,
-      paymentMethod: input.paymentMethod,
-    };
-
-    if (primary === "ipaymu") {
-      try {
-        const payment = await createIpaymuDirectPayment({
-          name: input.buyerName,
-          phone: input.buyerPhone,
-          email: input.buyerEmail,
-          amount: promotion.finalPrice,
-          notifyUrl: `${baseUrl}/api/payments/ipaymu/callback`,
-          referenceId: identity.referenceId,
-          paymentMethod: input.paymentMethod,
-          paymentChannel,
-          productName: `${item.productName} - ${item.packageLabel}`,
-          productPrice: promotion.finalPrice,
-        });
-
-        await updateIpaymuPayment({
-          referenceId: identity.referenceId,
-          transactionId: payment.transactionId,
-          paymentNo: payment.paymentNo,
-          paymentName: payment.paymentName,
-          paymentUrl: payment.paymentUrl,
-          expiredAt: payment.expiredAt,
-          fee: payment.fee,
-          total: payment.total,
-        });
-        await recordOrderEvent({
-          orderId: identity.id,
-          source: "ipaymu",
-          eventId: `create-${identity.referenceId}`,
-          status: "pending",
-          payload: payment.raw,
-        });
-
-        return Response.json(
-          {
-            ...shared,
-            paymentGateway: "ipaymu",
-            paymentNo: payment.paymentNo,
-            paymentName: payment.paymentName,
-            paymentUrl: payment.paymentUrl,
-            fee: payment.fee,
-            total: payment.total,
-            expiredAt: payment.expiredAt,
-          },
-          { status: 201 },
-        );
-      } catch (error) {
-        const safeFallback =
-          error instanceof IpaymuProviderError && error.safeToFallback;
-        if (!safeFallback || fallback !== "midtrans") throw error;
-
-        await recordOrderEvent({
-          orderId: identity.id,
-          source: "ipaymu",
-          eventId: `create-failed-${identity.referenceId}`,
-          status: "failed",
-          payload: {
-            fallback: "midtrans",
-            message: error.message,
-          },
-        });
-      }
-    }
-
-    const payment = await createMidtransPayment({
+    const payment = await createDokuCheckoutPayment({
       referenceId: identity.referenceId,
       amount: promotion.finalPrice,
       productName: `${item.productName} - ${item.packageLabel}`,
@@ -270,36 +159,45 @@ export async function POST(request: Request) {
       finishUrl: `${baseUrl}/payment?invoice=${encodeURIComponent(invoice)}`,
     });
 
-    await updateMidtransPayment({
+    await updateDokuPayment({
       referenceId: identity.referenceId,
-      mode: payment.mode,
-      transactionId: payment.transactionId,
-      paymentNo: payment.paymentNo,
-      paymentName: payment.paymentName,
+      requestId: payment.requestId,
+      tokenId: payment.tokenId,
       paymentUrl: payment.paymentUrl,
       expiredAt: payment.expiredAt,
-      fee: 0,
       total: promotion.finalPrice,
     });
     await recordOrderEvent({
       orderId: identity.id,
-      source: "midtrans",
-      eventId: `create-${identity.referenceId}`,
+      source: "doku",
+      eventId: `create-${payment.requestId}`,
       status: "pending",
       payload: payment.raw,
     });
 
     return Response.json(
       {
-        ...shared,
-        paymentGateway: "midtrans",
-        paymentNo: payment.paymentNo,
-        paymentName: payment.paymentName,
+        orderId: identity.id,
+        referenceId: identity.referenceId,
+        publicInvoice: invoice,
+        fulfillmentType: item.fulfillmentType,
+        providerCode: item.providerCode,
+        basePrice: promotion.basePrice,
+        sellingPrice: promotion.sellingPrice,
+        discountAmount: promotion.discountAmount,
+        voucherCode: promotion.voucherCode,
+        flashSaleId: promotion.flashSaleId,
+        memberTier: promotion.memberTier,
+        memberDiscountPercent: promotion.memberDiscountPercent,
+        discountSource: promotion.discountSource,
+        paymentMethod: input.paymentMethod,
+        paymentGateway: "doku",
+        paymentNo: null,
+        paymentName: "DOKU Checkout",
         paymentUrl: payment.paymentUrl,
         fee: 0,
         total: promotion.finalPrice,
         expiredAt: payment.expiredAt,
-        midtransMode: payment.mode,
       },
       { status: 201 },
     );
@@ -314,7 +212,6 @@ export async function POST(request: Request) {
     if (referenceId) {
       await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
     }
-
     return Response.json(
       { error: message },
       { status: error instanceof z.ZodError ? 400 : 503 },
