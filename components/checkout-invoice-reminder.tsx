@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Copy, ReceiptText, X } from "lucide-react";
 
-const legacyReference = /LF-\d{8}-[A-F0-9]{8,12}/g;
+const orderReference = /LF(?:-\d{8}-[A-F0-9]{8,12}|\d{6}(?:[A-F0-9]{12}|[A-F0-9]{32}))/g;
 
 function publicInvoice(referenceId: string) {
   const token = referenceId.split("-").at(-1) ?? referenceId;
@@ -22,7 +22,7 @@ export function CheckoutInvoiceReminder() {
       if (frame) return;
       frame = window.requestAnimationFrame(() => {
         frame = 0;
-        const matches = document.body.textContent?.match(legacyReference) ?? [];
+        const matches = document.body.textContent?.match(orderReference) ?? [];
         const found = matches.at(-1);
         if (found) {
           setInvoice(publicInvoice(found));

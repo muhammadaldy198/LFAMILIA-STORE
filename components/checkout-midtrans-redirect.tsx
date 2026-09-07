@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-const orderReference = /LF(?:-\d{8}-[A-F0-9]{8,12}|\d{6}[A-F0-9]{12})/g;
+const orderReference = /LF(?:-\d{8}-[A-F0-9]{8,12}|\d{6}(?:[A-F0-9]{12}|[A-F0-9]{32}))/g;
 
 function snapTokenFromUrl(value: string) {
   try {
