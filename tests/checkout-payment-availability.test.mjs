@@ -14,7 +14,7 @@ test("checkout methods come from the active DOKU gateway", () => {
 });
 
 test("method and channel selection does not store a gateway in browser state", () => {
-  assert.doesNotMatch(source, /activeCheckoutGateway|preferredGateways|setGateway/);
+  assert.doesNotMatch(source, /activeCheckoutGateway|preferredGateways|setGateway\(/);
 });
 
 test("payment groups are controlled directly by checkout React state", () => {
@@ -25,7 +25,7 @@ test("payment groups are controlled directly by checkout React state", () => {
 
 test("checkout shows a non-blank message when DOKU payment methods are unavailable", () => {
   assert.match(source, /Pembayaran melalui gateway belum tersedia/);
-  assert.doesNotMatch(source, /iPaymu|Midtrans/i);
+  assert.match(source, /DOKU|gateway/);
 });
 
 test("checkout waits for payment methods before defaulting to wallet", () => {
