@@ -1,6 +1,5 @@
 import { CheckoutUiEnhancer } from "@/components/checkout-ui-enhancer";
 import { CheckoutSpacingTuning } from "@/components/checkout-spacing-tuning";
-import { CheckoutSavedGameAccounts } from "@/components/checkout-saved-game-accounts";
 
 export default function CheckoutLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -14,7 +13,6 @@ export default function CheckoutLayout({ children }: { children: React.ReactNode
       `}</style>
       <CheckoutUiEnhancer />
       <CheckoutSpacingTuning />
-      <CheckoutSavedGameAccounts />
       {children}
     </>
   );
