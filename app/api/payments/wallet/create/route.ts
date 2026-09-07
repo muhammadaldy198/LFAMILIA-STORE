@@ -15,7 +15,7 @@ import { quotePromotion } from "@/lib/server/promotions";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
-import { getWalletOrderBalance, settleWalletOrder } from "@/lib/server/wallet";
+import { getWalletOrderBalance, settleWalletOrder, WalletSettlementError } from "@/lib/server/wallet";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
@@ -64,18 +64,51 @@ function walletSuccessResponse(order: Awaited<ReturnType<typeof getOrderById>>, 
 async function existingWalletResponse(customerId: string, checkoutKey: string) {
   const existing = await getWalletOrderByCheckoutKey(customerId, checkoutKey);
   if (!existing) return null;
+  if (existing.payment_status === "pending") {
+    try {
+      await settleWalletOrder({
+        customerId,
+        orderId: existing.id,
+        amount: existing.total,
+        description: `${existing.product_name} • ${existing.package_label}`,
+        fulfillmentType: existing.fulfillment_type,
+        voucherCode: existing.voucher_code,
+        flashSaleId: existing.flash_sale_id,
+      });
+    } catch (error) {
+      if (error instanceof WalletSettlementError) {
+        await markPaymentCreationFailed(existing.reference_id, error.message).catch(() => undefined);
+      }
+      throw error;
+    }
+    const settled = await getOrderById(existing.id);
+    if (!settled) throw new Error("Pesanan wallet tidak ditemukan setelah dipulihkan.");
+    if (settled.fulfillment_type === "automatic") {
+      await fulfillAutomaticOrder(settled.id, getPublicBaseUrl()).catch((error) =>
+        console.error("Pemulihan fulfillment wallet gagal:", error),
+      );
+      await notifyOrderFulfillmentSuccessById(settled.id).catch((error) =>
+        console.error("Notifikasi pemulihan wallet gagal:", error),
+      );
+    }
+    const balanceAfter = await getWalletOrderBalance(settled.id);
+    if (balanceAfter === null) throw new Error("Debit wallet tidak ditemukan setelah pemulihan.");
+    return Response.json(walletSuccessResponse(settled, balanceAfter));
+  }
   if (existing.payment_status === "paid") {
+    if (existing.fulfillment_type === "automatic") {
+      await fulfillAutomaticOrder(existing.id, getPublicBaseUrl()).catch((error) =>
+        console.error("Pemulihan fulfillment wallet gagal:", error),
+      );
+      await notifyOrderFulfillmentSuccessById(existing.id).catch((error) =>
+        console.error("Notifikasi pemulihan wallet gagal:", error),
+      );
+    }
     const balanceAfter = await getWalletOrderBalance(existing.id);
     if (balanceAfter === null) {
       return Response.json({ error: "Pembayaran wallet perlu diperiksa admin." }, { status: 409 });
     }
     return Response.json(walletSuccessResponse(existing, balanceAfter));
-  }
-  if (existing.payment_status === "pending") {
-    return Response.json(
-      { error: "Pesanan wallet sedang diproses. Coba lagi.", retryable: true },
-      { status: 409, headers: { "Retry-After": "2" } },
-    );
   }
   return Response.json({ error: "Percobaan sebelumnya gagal. Silakan buat pesanan kembali." }, { status: 409 });
 }
@@ -84,7 +117,7 @@ export async function POST(request: Request) {
   const originBlock = rejectCrossOriginMutation(request);
   if (originBlock) return originBlock;
   const rate = await allowRequest(request, "wallet-checkout", 12, 600);
-  if (!rate.allowed) return Response.json({ error: "Terlalu banyak percobaan checkout. Coba lagi beberapa menit." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
+  if (!rate.allowed) return Response.json({ error: "Terlalu banyak percobaan checkout. Coba lagi beberapa menit.", retryable: true }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   const customer = await requireCustomerSession(request);
   if (customer instanceof Response) return customer;
   let referenceId: string | null = null;
@@ -123,11 +156,16 @@ export async function POST(request: Request) {
     return Response.json(walletSuccessResponse(order, balanceAfter), { status: 201 });
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message || "Data checkout tidak valid." : error instanceof Error ? error.message : "Pembayaran saldo gagal.";
-    if (referenceId) await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
     if (checkoutKey && error instanceof Error && /UNIQUE constraint failed.*wallet_checkout_key/i.test(error.message)) {
       const priorResponse = await existingWalletResponse(customer.id, checkoutKey);
       if (priorResponse) return priorResponse;
     }
-    return Response.json({ error: message }, { status: error instanceof z.ZodError ? 400 : 400 });
+    const rejected = error instanceof z.ZodError || error instanceof WalletSettlementError;
+    if (referenceId && rejected) await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
+    if (!rejected) console.error("Checkout wallet belum dapat dipastikan:", error);
+    return Response.json(
+      { error: rejected ? message : "Pembayaran saldo belum dapat dipastikan. Coba lagi dengan data yang sama.", retryable: !rejected },
+      { status: error instanceof z.ZodError ? 400 : error instanceof WalletSettlementError ? 409 : 503 },
+    );
   }
 }
