@@ -1,5 +1,5 @@
 import { getD1 } from "@/db";
- import type { ProductInputField } from "@/lib/store-data";
+import type { ProductInputField } from "@/lib/store-data";
 import { getProviderAdapter } from "@/lib/server/providers";
 import type { ProviderResult } from "@/lib/server/providers/types";
 import {
