@@ -215,7 +215,9 @@ export async function getIntegrationOverview(): Promise<IntegrationOverview> {
     let decryptionError = false;
     if (secret) {
       try {
-        configuredFields = Object.keys(await decryptConfig(secret, profile.encrypted_config));
+        const config = await decryptConfig(secret, profile.encrypted_config);
+        const allowed = profileFields[profileFieldKey(profile.provider, profile.mode)] ?? [];
+        configuredFields = Object.keys(config).filter((field) => allowed.includes(field));
       } catch {
         decryptionError = true;
       }
@@ -270,6 +272,9 @@ export async function saveIntegrationProfile(input: {
   if (existing?.encrypted_config) {
     try {
       merged = await decryptConfig(secret, existing.encrypted_config);
+      merged = Object.fromEntries(
+        Object.entries(merged).filter(([key]) => allowed.includes(key)),
+      );
     } catch {
       throw new Error("Kredensial lama tidak dapat dibuka. Pastikan INTEGRATION_ENCRYPTION_KEY tidak berubah.");
     }
