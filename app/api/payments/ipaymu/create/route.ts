@@ -175,6 +175,7 @@ export async function POST(request: Request) {
       {
         orderId: identity.id,
         referenceId: identity.referenceId,
+        paymentGateway: "ipaymu",
         publicInvoice: invoice,
         paymentNo: payment.paymentNo,
         paymentName: payment.paymentName,
