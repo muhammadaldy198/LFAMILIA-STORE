@@ -104,6 +104,35 @@ function runtime() {
   return getRuntimeEnv<RuntimeLike>();
 }
 
+function withoutDashboardManagedRuntime(source: RuntimeLike) {
+  const target: Record<string, unknown> = { ...source };
+  const managedPrefixes = [
+    "MIDTRANS_",
+    "IPAYMU_",
+    "DIGIFLAZZ_",
+    "VIPPAYMENT_",
+    "MELOSTORE_",
+    "RESEND_",
+    "PROVIDER_RELAY_",
+  ];
+  const managedKeys = new Set([
+    "NICKNAME_API_KEY",
+    "VOUCHER_DELIVERY_CHANNEL",
+    "VOUCHER_ENCRYPTION_KEY",
+  ]);
+
+  for (const key of Object.keys(target)) {
+    if (
+      managedKeys.has(key) ||
+      managedPrefixes.some((prefix) => key.startsWith(prefix))
+    ) {
+      delete target[key];
+    }
+  }
+
+  return target;
+}
+
 async function ensureIntegrationTables(database: D1Database) {
   if (!schemaPromise) {
     schemaPromise = (async () => {
@@ -389,16 +418,17 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
   const source = env as RuntimeLike;
   const database = source.DB;
   const secret = secretFrom(source);
-  if (!database || !secret) return env;
+  const systemOnly = withoutDashboardManagedRuntime(source);
+  if (!database || !secret) return systemOnly as T;
   try {
     await ensureIntegrationTables(database);
     const [profiles, settings] = await Promise.all([readStoredProfiles(database), readStoredSettings(database)]);
-    const target: Record<string, unknown> = { ...source };
+    const target: Record<string, unknown> = { ...systemOnly };
     const midtransMode = "snap" as const;
-    const midtransEnvironment = valueOr(settings.get("midtrans_environment"), ["sandbox", "production"] as const, valueOr(source.MIDTRANS_ENV, ["sandbox", "production"] as const, "sandbox"));
-    const ipaymuEnvironment = valueOr(settings.get("ipaymu_environment"), ["sandbox", "production"] as const, valueOr(source.IPAYMU_ENV, ["sandbox", "production"] as const, "sandbox"));
-    const digiflazzEnvironment = valueOr(settings.get("digiflazz_environment"), ["development", "production"] as const, valueOr(source.DIGIFLAZZ_ENV, ["development", "production"] as const, "development"));
-    const vippaymentEnvironment = valueOr(settings.get("vippayment_environment"), ["sandbox", "production"] as const, valueOr(source.VIPPAYMENT_ENV, ["sandbox", "production"] as const, "production"));
+    const midtransEnvironment = valueOr(settings.get("midtrans_environment"), ["sandbox", "production"] as const, "sandbox");
+    const ipaymuEnvironment = valueOr(settings.get("ipaymu_environment"), ["sandbox", "production"] as const, "sandbox");
+    const digiflazzEnvironment = valueOr(settings.get("digiflazz_environment"), ["development", "production"] as const, "development");
+    const vippaymentEnvironment = valueOr(settings.get("vippayment_environment"), ["sandbox", "production"] as const, "production");
     target.MIDTRANS_MODE = midtransMode;
     target.MIDTRANS_ENV = midtransEnvironment;
     target.IPAYMU_ENV = ipaymuEnvironment;
@@ -431,7 +461,8 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
     }
     return target as T;
   } catch {
-    // Existing Cloudflare Variables remain the safe fallback if the optional panel store is unavailable.
-    return env;
+    // Fail closed: provider credentials are dashboard-managed and must never
+    // fall back to stale Cloudflare Variables/Secrets.
+    return systemOnly as T;
   }
 }

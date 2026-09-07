@@ -33,3 +33,23 @@ test("integration credentials stay owner-only and encrypted", () => {
   assert.match(manager, /Tersimpan — isi untuk mengganti/);
   assert.match(manager, /type=\{field\.secret \? "password" : "text"\}/);
 });
+
+test("provider credentials never fall back to Cloudflare runtime values", () => {
+  assert.match(config, /withoutDashboardManagedRuntime/);
+  for (const prefix of [
+    "MIDTRANS_",
+    "IPAYMU_",
+    "DIGIFLAZZ_",
+    "VIPPAYMENT_",
+    "MELOSTORE_",
+    "RESEND_",
+    "PROVIDER_RELAY_",
+  ]) {
+    assert.match(config, new RegExp(`"${prefix}"`));
+  }
+  assert.match(config, /return systemOnly as T/);
+  assert.doesNotMatch(config, /valueOr\(source\.MIDTRANS_ENV/);
+  assert.doesNotMatch(config, /valueOr\(source\.IPAYMU_ENV/);
+  assert.doesNotMatch(config, /valueOr\(source\.DIGIFLAZZ_ENV/);
+  assert.doesNotMatch(config, /valueOr\(source\.VIPPAYMENT_ENV/);
+});

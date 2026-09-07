@@ -2,6 +2,8 @@
 
 Konfigurasi provider LFAMILIA bersifat environment-explicit. Credential dan pilihan environment operasional disimpan terenkripsi dari Admin Panel. Production credential boleh kosong sampai onboarding selesai. Nama variabel di bawah adalah nama runtime internal yang dibentuk dari konfigurasi panel, bukan daftar Variable/Secret yang harus dibuat manual di Cloudflare.
 
+**Provider credentials tidak memakai fallback Cloudflare Variables/Secrets.** Jika D1 atau root encryption key tidak tersedia, integrasi provider gagal tertutup (fail closed) sampai konfigurasi Admin Dashboard dapat dibaca kembali. Cloudflare hanya menyimpan root/system-level values seperti `INTEGRATION_ENCRYPTION_KEY`, `TEAM_DOMAIN`, dan `POLICY_AUD`, serta binding D1/R2.
+
 ## Selector Admin Panel
 
 Atur dari **Admin Panel → Integrasi & harga → Kredensial API & callback**:
