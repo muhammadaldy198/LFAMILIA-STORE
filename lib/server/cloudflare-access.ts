@@ -17,13 +17,17 @@ type AccessJwtClaims = {
   nbf?: unknown;
 };
 
+type AccessJwk = JsonWebKey & {
+  kid?: string;
+};
+
 type AccessJwks = {
-  keys?: JsonWebKey[];
+  keys?: AccessJwk[];
 };
 
 type JwksCacheEntry = {
   expiresAt: number;
-  keys: Map<string, JsonWebKey>;
+  keys: Map<string, AccessJwk>;
 };
 
 type AccessFetch = (
@@ -99,7 +103,7 @@ async function fetchJwks(
     throw new Error("Cloudflare Access JWKS tidak valid.");
   }
 
-  const keys = new Map<string, JsonWebKey>();
+  const keys = new Map<string, AccessJwk>();
   for (const key of payload.keys) {
     if (
       key &&
