@@ -175,7 +175,7 @@ test("wallet retries resume pending settlement and automatic fulfillment", () =>
   assert.match(orders, /COUNT\(\*\)[\s\S]*status = 'dispatching'[\s\S]*>= 5/);
   assert.match(orders, /ORDER BY CASE WHEN provider_status IS NULL THEN 0 ELSE 1 END/);
   assert.match(worker, /recoverStaleAutomaticOrders\(getPublicBaseUrl\(\)\)/);
-  assert.match(worker, /recoverAbandonedPromotionReservations\(\)/);
+  assert.match(worker, /recoverExpiredPromotionReservations\(\)/);
 });
 
 test("deterministic wallet checkout validation is not reported as a retryable outage", () => {
