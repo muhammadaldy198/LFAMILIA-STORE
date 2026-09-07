@@ -4,10 +4,9 @@ type ProviderRelayEnv = {
   PROVIDER_RELAY_TOKEN?: string;
   PROVIDER_RELAY_HOSTS?: string;
   PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?: string;
-  PROVIDER_RELAY_IPAYMU_ORIGIN?: string;
 };
 
-export type RelayProvider = "digiflazz" | "ipaymu";
+export type RelayProvider = "digiflazz";
 
 function relayHosts(value?: string) {
   return (value ?? "")
@@ -18,20 +17,13 @@ function relayHosts(value?: string) {
 
 function legacyOriginFor(provider: RelayProvider, hosts?: string) {
   const candidates = relayHosts(hosts);
-  const selected = candidates.find((host) => {
-    const value = host.toLowerCase();
-    if (provider === "digiflazz") return value.includes("digiflazz");
-    return value.includes("ipaymu");
-  });
+  const selected = candidates.find((host) => host.toLowerCase().includes("digiflazz"));
   if (!selected) return "";
   return selected.startsWith("https://") ? selected : `https://${selected}`;
 }
 
 function configuredOrigin(runtime: ProviderRelayEnv, provider: RelayProvider) {
-  const explicit =
-    provider === "digiflazz"
-      ? runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN
-      : runtime.PROVIDER_RELAY_IPAYMU_ORIGIN;
+  const explicit = runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN;
   return explicit?.trim() || legacyOriginFor(provider, runtime.PROVIDER_RELAY_HOSTS);
 }
 
@@ -204,7 +196,6 @@ export async function probeProviderRelay(
 export async function testProviderRelayConnections() {
   return Promise.all([
     testRelayConnection("digiflazz", "DigiFlazz"),
-    testRelayConnection("ipaymu", "iPaymu"),
   ]);
 }
 
