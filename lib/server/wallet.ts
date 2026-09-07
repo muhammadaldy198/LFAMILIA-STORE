@@ -3,40 +3,32 @@ import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 
 export type WalletSettings = {
   minTopup: number;
-  midtransTopupEnabled: boolean;
-  midtransCheckoutEnabled: boolean;
-  ipaymuTopupEnabled: boolean;
-  ipaymuCheckoutEnabled: boolean;
+  dokuTopupEnabled: boolean;
+  dokuCheckoutEnabled: boolean;
 };
 
 const fallbackSettings: WalletSettings = {
   minTopup: 10_000,
-  midtransTopupEnabled: false,
-  midtransCheckoutEnabled: false,
-  ipaymuTopupEnabled: false,
-  ipaymuCheckoutEnabled: false,
+  dokuTopupEnabled: false,
+  dokuCheckoutEnabled: false,
 };
 
 export async function readWalletSettings(): Promise<WalletSettings> {
   try {
     await ensureLegacyDatabaseColumns();
     const row = await getD1()
-      .prepare(`SELECT min_topup, midtrans_topup_enabled, midtrans_checkout_enabled,
-        ipaymu_topup_enabled, ipaymu_checkout_enabled FROM wallet_settings WHERE id = 1`)
+      .prepare(`SELECT min_topup, doku_topup_enabled, doku_checkout_enabled
+        FROM wallet_settings WHERE id = 1`)
       .first<{
         min_topup: number;
-        midtrans_topup_enabled: number;
-        midtrans_checkout_enabled: number;
-        ipaymu_topup_enabled: number;
-        ipaymu_checkout_enabled: number;
+        doku_topup_enabled: number;
+        doku_checkout_enabled: number;
       }>();
     if (!row) return fallbackSettings;
     return {
       minTopup: row.min_topup,
-      midtransTopupEnabled: Boolean(row.midtrans_topup_enabled),
-      midtransCheckoutEnabled: Boolean(row.midtrans_checkout_enabled),
-      ipaymuTopupEnabled: Boolean(row.ipaymu_topup_enabled),
-      ipaymuCheckoutEnabled: Boolean(row.ipaymu_checkout_enabled),
+      dokuTopupEnabled: Boolean(row.doku_topup_enabled),
+      dokuCheckoutEnabled: Boolean(row.doku_checkout_enabled),
     };
   } catch {
     return fallbackSettings;
@@ -47,22 +39,22 @@ export async function saveWalletSettings(input: WalletSettings) {
   await ensureLegacyDatabaseColumns();
   await getD1()
     .prepare(
-      `INSERT INTO wallet_settings (id, min_topup, midtrans_topup_enabled, midtrans_checkout_enabled, ipaymu_topup_enabled, ipaymu_checkout_enabled, updated_at)
-       VALUES (1, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `INSERT INTO wallet_settings (id, min_topup, doku_topup_enabled, doku_checkout_enabled, updated_at)
+       VALUES (1, ?, ?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(id) DO UPDATE SET
          min_topup = excluded.min_topup,
-         midtrans_topup_enabled = excluded.midtrans_topup_enabled,
-         midtrans_checkout_enabled = excluded.midtrans_checkout_enabled,
-         ipaymu_topup_enabled = excluded.ipaymu_topup_enabled,
-         ipaymu_checkout_enabled = excluded.ipaymu_checkout_enabled,
+         doku_topup_enabled = excluded.doku_topup_enabled,
+         doku_checkout_enabled = excluded.doku_checkout_enabled,
+         midtrans_topup_enabled = 0,
+         midtrans_checkout_enabled = 0,
+         ipaymu_topup_enabled = 0,
+         ipaymu_checkout_enabled = 0,
          updated_at = CURRENT_TIMESTAMP`,
     )
     .bind(
       input.minTopup,
-      input.midtransTopupEnabled ? 1 : 0,
-      input.midtransCheckoutEnabled ? 1 : 0,
-      input.ipaymuTopupEnabled ? 1 : 0,
-      input.ipaymuCheckoutEnabled ? 1 : 0,
+      input.dokuTopupEnabled ? 1 : 0,
+      input.dokuCheckoutEnabled ? 1 : 0,
     )
     .run();
 }
@@ -74,7 +66,7 @@ export async function createAutomaticWalletTopup(input: {
   paymentMethod: string;
   paymentChannel: string;
   referenceId: string;
-  gateway: "ipaymu" | "midtrans";
+  gateway: "doku" | "ipaymu" | "midtrans";
 }) {
   await ensureLegacyDatabaseColumns();
   const id = crypto.randomUUID();
@@ -401,6 +393,136 @@ export async function applyIpaymuWalletTopup(input: {
         input.status === "expired"
           ? "Pembayaran iPaymu kedaluwarsa."
           : "Pembayaran iPaymu gagal.",
+        topup.id,
+      )
+      .run();
+  }
+  return { found: true, credited: false };
+}
+
+export async function createDokuWalletTopup(input: {
+  customerId: string;
+  amount: number;
+  name: string;
+  paymentMethod: string;
+  paymentChannel: string;
+  referenceId: string;
+}) {
+  return createAutomaticWalletTopup({ ...input, gateway: "doku" });
+}
+
+export async function updateDokuWalletTopup(input: {
+  referenceId: string;
+  requestId: string;
+  tokenId: string | null;
+  paymentUrl: string;
+  expiredAt: string | null;
+  total: number;
+}) {
+  await ensureLegacyDatabaseColumns();
+  await getD1()
+    .prepare(
+      `UPDATE wallet_topups SET doku_request_id = ?, doku_token_id = ?,
+       doku_payment_url = ?, doku_expired_at = ?, payment_fee = 0, payment_total = ?,
+       updated_at = CURRENT_TIMESTAMP WHERE reference_id = ? AND source = 'doku'`,
+    )
+    .bind(
+      input.requestId,
+      input.tokenId,
+      input.paymentUrl,
+      input.expiredAt,
+      input.total,
+      input.referenceId,
+    )
+    .run();
+}
+
+export async function getDokuWalletTopup(referenceId: string) {
+  await ensureLegacyDatabaseColumns();
+  return getD1()
+    .prepare(
+      `SELECT id, customer_id, amount, status, doku_request_id FROM wallet_topups
+       WHERE reference_id = ? AND source = 'doku' LIMIT 1`,
+    )
+    .bind(referenceId)
+    .first<{
+      id: string;
+      customer_id: string;
+      amount: number;
+      status: string;
+      doku_request_id: string | null;
+    }>();
+}
+
+export async function applyDokuWalletTopup(input: {
+  referenceId: string;
+  status: "paid" | "pending" | "expired" | "failed";
+  originalRequestId: string | null;
+  callbackAmount: number;
+}) {
+  const topup = await getDokuWalletTopup(input.referenceId);
+  if (!topup) return { found: false, credited: false };
+  if (
+    topup.doku_request_id &&
+    input.originalRequestId &&
+    topup.doku_request_id !== input.originalRequestId
+  ) {
+    return { found: true, credited: false, ignored: "request_mismatch" };
+  }
+  if (
+    input.status === "paid" &&
+    (!Number.isFinite(input.callbackAmount) ||
+      input.callbackAmount <= 0 ||
+      input.callbackAmount !== topup.amount)
+  ) {
+    return { found: true, credited: false, ignored: "amount_mismatch" };
+  }
+
+  const db = getD1();
+  if (input.status === "paid") {
+    const reference = `topup:${topup.id}`;
+    const results = await db.batch([
+      db
+        .prepare(
+          `INSERT INTO wallet_transactions (id, customer_id, direction, amount, balance_before, balance_after, reference, description)
+           SELECT ?, t.customer_id, 'credit', t.amount, ledger.balance, ledger.balance + t.amount, ?, ?
+           FROM wallet_topups t CROSS JOIN (
+             SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0) AS balance
+             FROM wallet_transactions WHERE customer_id = ?
+           ) ledger WHERE t.id = ? AND t.status = 'pending'`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          reference,
+          `Top up otomatis DOKU ${topup.id.slice(0, 8).toUpperCase()}`,
+          topup.customer_id,
+          topup.id,
+        ),
+      db
+        .prepare(
+          "UPDATE wallet_topups SET status = 'approved', reviewed_by = 'doku-callback', reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
+        )
+        .bind(topup.id),
+      db
+        .prepare(
+          "UPDATE customer_users SET balance = (SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0) FROM wallet_transactions WHERE customer_id = ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        )
+        .bind(topup.customer_id, topup.customer_id),
+    ]);
+    const inserted = Number(results[0]?.meta.changes ?? 0) > 0;
+    const approved = Number(results[1]?.meta.changes ?? 0) > 0;
+    return { found: true, credited: inserted && approved };
+  }
+
+  if (input.status === "expired" || input.status === "failed") {
+    await db
+      .prepare(
+        "UPDATE wallet_topups SET status = 'rejected', admin_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
+      )
+      .bind(
+        input.status === "expired"
+          ? "Pembayaran DOKU kedaluwarsa."
+          : "Pembayaran DOKU gagal.",
         topup.id,
       )
       .run();
