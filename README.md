@@ -1,13 +1,13 @@
 # LFAMILIA STORE
 
-Toko top up digital berbasis Cloudflare Workers dan D1. Aplikasi mencakup katalog, checkout iPaymu, saldo pelanggan, pemenuhan otomatis melalui provider, antrean manual, voucher diskon, stok kode terenkripsi, pelacakan transaksi, membership, serta panel Pemilik/Staff.
+Toko top up digital berbasis Cloudflare Workers dan D1. Aplikasi mencakup katalog, checkout Midtrans/iPaymu, saldo pelanggan, pemenuhan otomatis melalui provider, antrean manual, voucher diskon, stok kode terenkripsi, pelacakan transaksi, membership, serta panel Pemilik/Staff.
 
 ## Fitur utama
 
 - Katalog dinamis dengan gambar, banner produk, kategori, urutan, status, tab pemisah nominal, dan harga yang dikelola dari panel.
 - Nominal produk memakai provider per nominal, SKU provider, margin Rupiah/Persen, harga modal supplier, dan sinkron harga DigiFlazz per nominal maupun otomatis.
 - Produk otomatis memakai DigiFlazz, VIPayment, atau Stok Kode LFAMILIA. Produk manual masuk antrean admin setelah pembayaran terverifikasi.
-- Checkout iPaymu dengan QRIS, Virtual Account, dan e-wallet sesuai channel yang aktif.
+- Checkout Midtrans atau iPaymu dengan QRIS, Virtual Account, dan e-wallet sesuai channel yang aktif.
 - Saldo pelanggan dapat di-top-up otomatis melalui gateway dan dipakai langsung saat checkout.
 - Account pelanggan, membership BASIC/GOLD/DIAMOND/PLATINUM, leaderboard, ulasan, bantuan/refund, berita, FAQ, banner Home, dan pop-up informasi produk.
 - Voucher diskon, promo terjadwal, minimum transaksi, kuota, dan batas potongan.
