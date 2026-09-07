@@ -44,7 +44,9 @@ const schema = z.object({
 });
 
 function publicInvoice(referenceId: string) {
-  const token = referenceId.split("-").at(-1) ?? referenceId.replace(/^LF/, "");
+  const clean = referenceId.trim().toUpperCase();
+  if (!clean.includes("-")) return clean;
+  const token = clean.split("-").at(-1) ?? clean.replace(/^LF/, "");
   return `LF${token}`;
 }
 
