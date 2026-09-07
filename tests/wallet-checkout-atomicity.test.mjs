@@ -56,6 +56,7 @@ class TestD1 {
 const unregister = register();
 const { setRuntimeEnv } = await import("../lib/server/runtime-env.ts");
 const { settleWalletOrder } = await import("../lib/server/wallet.ts");
+const { claimAutomaticFulfillmentAttempt } = await import("../lib/server/orders.ts");
 
 function createDatabase() {
   const database = new DatabaseSync(":memory:");
@@ -65,7 +66,8 @@ function createDatabase() {
       id TEXT PRIMARY KEY, customer_id TEXT, payment_method TEXT NOT NULL,
       payment_status TEXT NOT NULL DEFAULT 'pending', fulfillment_status TEXT NOT NULL DEFAULT 'waiting_payment',
       fulfillment_type TEXT NOT NULL DEFAULT 'automatic', provider_status TEXT, provider_code TEXT,
-      provider_message TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT
+      provider_message TEXT, provider_ref_id TEXT, reference_id TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT
     );
     CREATE TABLE wallet_transactions (
       id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, direction TEXT NOT NULL, amount INTEGER NOT NULL,
@@ -198,6 +200,56 @@ test("automatic recovery retires an order after five dispatch attempts", async (
     { ...database.prepare("SELECT fulfillment_status, provider_status FROM orders WHERE id = 'order-retry'").get() },
     { fulfillment_status: "needs_review", provider_status: "retry_exhausted" },
   );
+  database.close();
+});
+
+test("automatic fulfillment atomically claims only five dispatch attempts", async () => {
+  const database = createDatabase();
+  database.prepare(
+    `INSERT INTO orders (id, customer_id, payment_method, payment_status, fulfillment_status, provider_status, provider_code, reference_id, updated_at)
+     VALUES ('order-claims', 'customer-1', 'wallet', 'paid', 'processing', NULL, 'digiflazz', 'REF-CLAIMS', datetime('now', '-5 minutes'))`,
+  ).run();
+  setRuntimeEnv({ DB: new TestD1(database) });
+
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    const claimed = await claimAutomaticFulfillmentAttempt("order-claims", "digiflazz");
+    assert.equal(claimed, true);
+    database.prepare(
+      "UPDATE orders SET fulfillment_status = 'processing', provider_status = 'retryable_error', updated_at = datetime('now', '-5 minutes') WHERE id = 'order-claims'",
+    ).run();
+  }
+
+  assert.equal(await claimAutomaticFulfillmentAttempt("order-claims", "digiflazz"), false);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM order_events WHERE order_id = 'order-claims'").get().count, 5);
+  assert.deepEqual(
+    { ...database.prepare("SELECT fulfillment_status, provider_status, provider_ref_id FROM orders WHERE id = 'order-claims'").get() },
+    { fulfillment_status: "needs_review", provider_status: "retry_exhausted", provider_ref_id: "REF-CLAIMS" },
+  );
+  database.close();
+});
+
+test("failed attempt logging rolls back the dispatch claim", async () => {
+  const database = createDatabase();
+  database.prepare(
+    `INSERT INTO orders (id, customer_id, payment_method, payment_status, fulfillment_status, provider_status, provider_code, reference_id, updated_at)
+     VALUES ('order-log-failure', 'customer-1', 'wallet', 'paid', 'processing', 'retryable_error', 'digiflazz', 'REF-FAIL', datetime('now', '-5 minutes'))`,
+  ).run();
+  database.exec(`
+    CREATE TRIGGER reject_dispatch_attempt BEFORE INSERT ON order_events
+    WHEN NEW.order_id = 'order-log-failure'
+    BEGIN SELECT RAISE(ABORT, 'event write failed'); END;
+  `);
+  setRuntimeEnv({ DB: new TestD1(database) });
+
+  await assert.rejects(
+    claimAutomaticFulfillmentAttempt("order-log-failure", "digiflazz"),
+    /event write failed/,
+  );
+  assert.deepEqual(
+    { ...database.prepare("SELECT fulfillment_status, provider_status, provider_ref_id FROM orders WHERE id = 'order-log-failure'").get() },
+    { fulfillment_status: "processing", provider_status: "retryable_error", provider_ref_id: null },
+  );
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM order_events WHERE order_id = 'order-log-failure'").get().count, 0);
   database.close();
 });
 
