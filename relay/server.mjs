@@ -62,7 +62,7 @@ const providerDefinitions = [
       "IPAYMU_PRODUCTION_UPSTREAM_ORIGIN",
     ),
   },
- ];
+];
 
 const providers = new Map(
   providerDefinitions
