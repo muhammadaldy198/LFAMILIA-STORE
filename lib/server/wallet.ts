@@ -422,6 +422,8 @@ export async function listWalletTopups(limit = 200) {
   return result.results;
 }
 
+export class WalletSettlementError extends Error {}
+
 export async function settleWalletOrder(input: {
   customerId: string;
   orderId: string;
@@ -539,9 +541,9 @@ export async function settleWalletOrder(input: {
        FROM wallet_transactions WHERE customer_id = ?`,
     ).bind(input.customerId).first<{ balance: number }>();
     if (Number(balance?.balance ?? 0) < input.amount) {
-      throw new Error("Saldo tidak cukup. Silakan top up saldo terlebih dahulu.");
+      throw new WalletSettlementError("Saldo tidak cukup. Silakan top up saldo terlebih dahulu.");
     }
-    throw new Error("Promo baru saja habis atau pesanan sudah diproses. Muat ulang checkout.");
+    throw new WalletSettlementError("Promo baru saja habis atau pesanan sudah diproses. Muat ulang checkout.");
   }
   return transaction.balance_after;
 }
