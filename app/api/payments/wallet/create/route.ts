@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
 import {
+  CheckoutValidationError,
   createOrderIdentity,
   fulfillAutomaticOrder,
   getOrderById,
@@ -11,7 +12,7 @@ import {
   markPaymentCreationFailed,
   resolvePurchasableItem,
 } from "@/lib/server/orders";
-import { quotePromotion } from "@/lib/server/promotions";
+import { PromotionQuoteError, quotePromotion } from "@/lib/server/promotions";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
@@ -160,7 +161,11 @@ export async function POST(request: Request) {
       const priorResponse = await existingWalletResponse(customer.id, checkoutKey);
       if (priorResponse) return priorResponse;
     }
-    const rejected = error instanceof z.ZodError || error instanceof WalletSettlementError;
+    const rejected =
+      error instanceof z.ZodError ||
+      error instanceof CheckoutValidationError ||
+      error instanceof PromotionQuoteError ||
+      error instanceof WalletSettlementError;
     if (referenceId && rejected) await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
     if (!rejected) console.error("Checkout wallet belum dapat dipastikan:", error);
     return Response.json(
