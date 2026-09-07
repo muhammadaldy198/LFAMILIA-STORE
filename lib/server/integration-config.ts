@@ -1,14 +1,16 @@
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
-export type IntegrationProvider = "ipaymu" | "digiflazz" | "vippayment" | "melostore" | "resend" | "relay" | "security";
-export type IntegrationMode = "direct" | "service";
+export type IntegrationProvider = "midtrans" | "ipaymu" | "digiflazz" | "vippayment" | "melostore" | "resend" | "relay" | "security";
+export type IntegrationMode = "snap" | "bisnap" | "direct" | "service";
 export type IntegrationEnvironment = "sandbox" | "production" | "development" | "global";
 
 type RuntimeLike = Record<string, unknown> & {
   DB?: D1Database;
   INTEGRATION_ENCRYPTION_KEY?: string;
   PUBLIC_BASE_URL?: string;
+  MIDTRANS_MODE?: string;
+  MIDTRANS_ENV?: string;
   IPAYMU_ENV?: string;
   DIGIFLAZZ_ENV?: string;
   VIPPAYMENT_ENV?: string;
@@ -24,6 +26,7 @@ type RuntimeLike = Record<string, unknown> & {
   PROVIDER_RELAY_HOSTS?: string;
   PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?: string;
   PROVIDER_RELAY_IPAYMU_ORIGIN?: string;
+  PROVIDER_RELAY_MIDTRANS_BISNAP_ORIGIN?: string;
   VOUCHER_ENCRYPTION_KEY?: string;
 };
 
@@ -54,6 +57,8 @@ export type IntegrationOverview = {
   encryptionReady: boolean;
   encryptionHint: string;
   selections: {
+    midtransMode: "snap" | "bisnap";
+    midtransEnvironment: "sandbox" | "production";
     ipaymuEnvironment: "sandbox" | "production";
     digiflazzEnvironment: "development" | "production";
     vippaymentEnvironment: "sandbox" | "production";
@@ -63,12 +68,34 @@ export type IntegrationOverview = {
 };
 
 export const profileFields: Record<string, readonly string[]> = {
+  "midtrans:snap": ["serverKey", "clientKey", "apiUrl", "scriptUrl"],
+  "midtrans:bisnap": [
+    "clientId",
+    "privateKey",
+    "clientSecret",
+    "partnerId",
+    "channelId",
+    "merchantId",
+    "vaPartnerServiceId",
+    "vaRandomize",
+    "qrisAcquirer",
+    "accessTokenUrl",
+    "directDebitUrl",
+    "qrisUrl",
+    "vaUrl",
+    "publicKey",
+    "timezoneOffset",
+    "currency",
+    "deviceId",
+    "paymentExpiryMinutes",
+    "tokenExpirySafetySeconds",
+  ],
   "ipaymu:direct": ["virtualAccount", "apiKey", "apiUrl"],
   "digiflazz:direct": ["username", "apiKey", "transactionApiUrl", "priceListUrl", "webhookSecret"],
   "vippayment:direct": ["apiId", "apiKey", "apiUrl"],
   "melostore:service": ["apiKey", "secretKey", "apiUrl", "nicknameApiKey"],
   "resend:service": ["apiKey", "fromEmail", "apiUrl", "deliveryChannel"],
-  "relay:service": ["digiflazzOrigin", "ipaymuOrigin", "hosts", "token"],
+  "relay:service": ["digiflazzOrigin", "ipaymuOrigin", "bisnapOrigin", "hosts", "token"],
   "security:service": ["voucherEncryptionKey"],
 };
 
@@ -81,6 +108,7 @@ function profileFieldKey(provider: IntegrationProvider, mode: IntegrationMode) {
 }
 
 function isProfileSupported(provider: IntegrationProvider, mode: IntegrationMode, environment: IntegrationEnvironment) {
+  if (provider === "midtrans") return (mode === "snap" || mode === "bisnap") && (environment === "sandbox" || environment === "production");
   if (provider === "ipaymu") return mode === "direct" && (environment === "sandbox" || environment === "production");
   if (provider === "digiflazz") return mode === "direct" && (environment === "development" || environment === "production");
   if (provider === "vippayment") return mode === "direct" && (environment === "sandbox" || environment === "production");
@@ -189,7 +217,12 @@ function publicBaseUrl(value: RuntimeLike) {
 
 function buildCallbacks(baseUrl: string) {
   const route = (path: string) => baseUrl ? `${baseUrl}${path}` : path;
-  return [    { id: "ipaymu", label: "iPaymu Callback / Notification URL", description: "Callback pembayaran otomatis iPaymu.", kind: "callback" as const, url: route("/api/payments/ipaymu/callback") },
+  return [
+    { id: "midtrans-snap", label: "Midtrans Snap Notification URL", description: "Notification URL pada dashboard Midtrans.", kind: "notification" as const, url: route("/api/payments/midtrans/callback") },
+    { id: "midtrans-bisnap-debit", label: "Midtrans BI-SNAP Direct Debit", description: "Debit notification URL BI-SNAP.", kind: "notification" as const, url: route("/v1.0/debit/notify") },
+    { id: "midtrans-bisnap-qris", label: "Midtrans BI-SNAP QRIS", description: "QRIS MPM notification URL BI-SNAP.", kind: "notification" as const, url: route("/v1.0/qr/qr-mpm-notify") },
+    { id: "midtrans-fallback", label: "Midtrans Fallback URL", description: "Landing page umum bila dashboard meminta return/fallback URL.", kind: "fallback" as const, url: route("/track") },
+    { id: "ipaymu", label: "iPaymu Callback / Notification URL", description: "Callback pembayaran otomatis iPaymu.", kind: "callback" as const, url: route("/api/payments/ipaymu/callback") },
     { id: "ipaymu-fallback", label: "iPaymu Fallback URL", description: "Landing page umum bila provider meminta return/fallback URL.", kind: "fallback" as const, url: route("/track") },
     { id: "digiflazz", label: "DigiFlazz Webhook", description: "Webhook status fulfillment DigiFlazz.", kind: "callback" as const, url: route("/api/fulfillment/digiflazz/callback") },
     { id: "vippayment", label: "VIPayment Webhook", description: "Webhook status fulfillment VIPayment.", kind: "callback" as const, url: route("/api/fulfillment/vippayment/callback") },
@@ -229,6 +262,8 @@ export async function getIntegrationOverview(): Promise<IntegrationOverview> {
       ? "Kredensial disimpan terenkripsi dan tidak ditampilkan kembali setelah disimpan."
       : "Tambahkan Cloudflare Secret INTEGRATION_ENCRYPTION_KEY (minimal 32 karakter) satu kali untuk mengaktifkan penyimpanan terenkripsi.",
     selections: {
+      midtransMode: valueOr(selected.get("midtrans_mode") || current.MIDTRANS_MODE, ["snap", "bisnap"] as const, "snap"),
+      midtransEnvironment: valueOr(selected.get("midtrans_environment") || current.MIDTRANS_ENV, ["sandbox", "production"] as const, "sandbox"),
       ipaymuEnvironment: valueOr(selected.get("ipaymu_environment") || current.IPAYMU_ENV, ["sandbox", "production"] as const, "sandbox"),
       digiflazzEnvironment: valueOr(selected.get("digiflazz_environment") || current.DIGIFLAZZ_ENV, ["development", "production"] as const, "development"),
       vippaymentEnvironment: valueOr(selected.get("vippayment_environment") || current.VIPPAYMENT_ENV, ["sandbox", "production"] as const, "production"),
@@ -285,11 +320,16 @@ export async function saveIntegrationProfile(input: {
 
 export async function saveIntegrationSelections(input: Partial<IntegrationOverview["selections"]>) {
   const normalized = {
+    midtransMode: input.midtransMode && valueOr(input.midtransMode, ["snap", "bisnap"] as const, "snap"),
+    midtransEnvironment: input.midtransEnvironment && valueOr(input.midtransEnvironment, ["sandbox", "production"] as const, "sandbox"),
     ipaymuEnvironment: input.ipaymuEnvironment && valueOr(input.ipaymuEnvironment, ["sandbox", "production"] as const, "sandbox"),
     digiflazzEnvironment: input.digiflazzEnvironment && valueOr(input.digiflazzEnvironment, ["development", "production"] as const, "development"),
     vippaymentEnvironment: input.vippaymentEnvironment && valueOr(input.vippaymentEnvironment, ["sandbox", "production"] as const, "production"),
   };
-  const values: Array<[string, string | undefined]> = [    ["ipaymu_environment", normalized.ipaymuEnvironment],
+  const values: Array<[string, string | undefined]> = [
+    ["midtrans_mode", normalized.midtransMode],
+    ["midtrans_environment", normalized.midtransEnvironment],
+    ["ipaymu_environment", normalized.ipaymuEnvironment],
     ["digiflazz_environment", normalized.digiflazzEnvironment],
     ["vippayment_environment", normalized.vippaymentEnvironment],
   ];
@@ -305,6 +345,42 @@ export async function saveIntegrationSelections(input: Partial<IntegrationOvervi
 
 function put(target: Record<string, unknown>, key: string, value: string | undefined) {
   if (value?.trim()) target[key] = value.trim();
+}
+
+function applySnapConfig(target: Record<string, unknown>, environment: "sandbox" | "production", config: Record<string, string>) {
+  const prefix = `MIDTRANS_SNAP_${environment.toUpperCase()}_`;
+  put(target, `${prefix}SERVER_KEY`, config.serverKey);
+  put(target, `${prefix}CLIENT_KEY`, config.clientKey);
+  put(target, `${prefix}API_URL`, config.apiUrl);
+  put(target, `${prefix}SCRIPT_URL`, config.scriptUrl);
+}
+
+function applyBisnapConfig(target: Record<string, unknown>, environment: "sandbox" | "production", config: Record<string, string>, active: boolean) {
+  const prefix = `MIDTRANS_BISNAP_${environment.toUpperCase()}_`;
+  const fields: Record<string, string> = {
+    clientId: "CLIENT_ID",
+    privateKey: "PRIVATE_KEY",
+    clientSecret: "CLIENT_SECRET",
+    partnerId: "PARTNER_ID",
+    channelId: "CHANNEL_ID",
+    merchantId: "MERCHANT_ID",
+    vaPartnerServiceId: "VA_PARTNER_SERVICE_ID",
+    vaRandomize: "VA_RANDOMIZE",
+    qrisAcquirer: "QRIS_ACQUIRER",
+    accessTokenUrl: "ACCESS_TOKEN_URL",
+    directDebitUrl: "DIRECT_DEBIT_URL",
+    qrisUrl: "QRIS_URL",
+    vaUrl: "VA_URL",
+    publicKey: "PUBLIC_KEY",
+  };
+  for (const [field, name] of Object.entries(fields)) put(target, `${prefix}${name}`, config[field]);
+  if (active) {
+    put(target, "MIDTRANS_BISNAP_TIMEZONE_OFFSET", config.timezoneOffset);
+    put(target, "MIDTRANS_BISNAP_CURRENCY", config.currency);
+    put(target, "MIDTRANS_BISNAP_DEVICE_ID", config.deviceId);
+    put(target, "MIDTRANS_BISNAP_PAYMENT_EXPIRY_MINUTES", config.paymentExpiryMinutes);
+    put(target, "MIDTRANS_BISNAP_TOKEN_EXPIRY_SAFETY_SECONDS", config.tokenExpirySafetySeconds);
+  }
 }
 
 function applyIpaymuConfig(target: Record<string, unknown>, environment: "sandbox" | "production", config: Record<string, string>) {
@@ -348,6 +424,7 @@ function applyResendConfig(target: Record<string, unknown>, config: Record<strin
 function applyRelayConfig(target: Record<string, unknown>, config: Record<string, string>) {
   put(target, "PROVIDER_RELAY_DIGIFLAZZ_ORIGIN", config.digiflazzOrigin);
   put(target, "PROVIDER_RELAY_IPAYMU_ORIGIN", config.ipaymuOrigin);
+  put(target, "PROVIDER_RELAY_MIDTRANS_BISNAP_ORIGIN", config.bisnapOrigin);
   put(target, "PROVIDER_RELAY_HOSTS", config.hosts);
   put(target, "PROVIDER_RELAY_TOKEN", config.token);
 }
@@ -365,9 +442,13 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
     await ensureIntegrationTables(database);
     const [profiles, settings] = await Promise.all([readStoredProfiles(database), readStoredSettings(database)]);
     const target: Record<string, unknown> = { ...source };
+    const midtransMode = valueOr(settings.get("midtrans_mode"), ["snap", "bisnap"] as const, valueOr(source.MIDTRANS_MODE, ["snap", "bisnap"] as const, "snap"));
+    const midtransEnvironment = valueOr(settings.get("midtrans_environment"), ["sandbox", "production"] as const, valueOr(source.MIDTRANS_ENV, ["sandbox", "production"] as const, "sandbox"));
     const ipaymuEnvironment = valueOr(settings.get("ipaymu_environment"), ["sandbox", "production"] as const, valueOr(source.IPAYMU_ENV, ["sandbox", "production"] as const, "sandbox"));
     const digiflazzEnvironment = valueOr(settings.get("digiflazz_environment"), ["development", "production"] as const, valueOr(source.DIGIFLAZZ_ENV, ["development", "production"] as const, "development"));
     const vippaymentEnvironment = valueOr(settings.get("vippayment_environment"), ["sandbox", "production"] as const, valueOr(source.VIPPAYMENT_ENV, ["sandbox", "production"] as const, "production"));
+    target.MIDTRANS_MODE = midtransMode;
+    target.MIDTRANS_ENV = midtransEnvironment;
     target.IPAYMU_ENV = ipaymuEnvironment;
     target.DIGIFLAZZ_ENV = digiflazzEnvironment;
     target.VIPPAYMENT_ENV = vippaymentEnvironment;
@@ -378,6 +459,12 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
         config = await decryptConfig(secret, profile.encrypted_config);
       } catch {
         continue;
+      }
+      if (profile.provider === "midtrans" && profile.mode === "snap" && (profile.environment === "sandbox" || profile.environment === "production")) {
+        applySnapConfig(target, profile.environment, config);
+      }
+      if (profile.provider === "midtrans" && profile.mode === "bisnap" && (profile.environment === "sandbox" || profile.environment === "production")) {
+        applyBisnapConfig(target, profile.environment, config, profile.environment === midtransEnvironment);
       }
       if (profile.provider === "ipaymu" && profile.mode === "direct" && (profile.environment === "sandbox" || profile.environment === "production")) {
         applyIpaymuConfig(target, profile.environment, config);
