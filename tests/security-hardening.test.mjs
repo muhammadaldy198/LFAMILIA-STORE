@@ -70,10 +70,17 @@ test("customer login and registration support Cloudflare Turnstile", () => {
 });
 
 
-test("phone transaction search never exposes full invoice references", () => {
+test("public transaction summaries never expose or derive invoice references", () => {
   const source = read("app/api/orders/search/route.ts");
-  assert.match(source, /mapSummary\(row, false\)/);
+  assert.doesNotMatch(source, /reference_id|maskInvoice|publicReferenceId/);
+  assert.match(source, /maskedReferenceId: "Dirahasiakan"/);
   assert.match(source, /allowRequest\(request, "order-phone-search"/);
+});
+
+test("new invoices use an independent full-length random token", () => {
+  const source = read("lib/server/orders.ts");
+  assert.match(source, /const referenceToken = crypto\.randomUUID\(\)\.replaceAll\("-", ""\)\.toUpperCase\(\)/);
+  assert.match(source, /referenceId: `LF\$\{date\}\$\{referenceToken\}`/);
 });
 
 test("owner setup trusts only Worker-injected Access identity", () => {
