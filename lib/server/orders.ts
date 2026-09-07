@@ -4,7 +4,7 @@ import { getProviderAdapter } from "@/lib/server/providers";
 import type { ProviderResult } from "@/lib/server/providers/types";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 import {
-  consumeOrderPromotion,
+  PromotionQuoteError,
   type PromotionQuote,
 } from "@/lib/server/promotions";
 
@@ -52,6 +52,7 @@ export type OrderRecord = {
   discount_amount: number;
   voucher_code: string | null;
   flash_sale_id: number | null;
+  promotion_reservation_status: "none" | "legacy" | "reserved" | "consumed" | "released";
   admin_fee: number;
   total: number;
   payment_method: string;
@@ -247,15 +248,30 @@ export async function insertPendingOrder(input: {
     input.destination,
     input.server,
   );
-  await db
-    .prepare(
+  const now = new Date().toISOString();
+  const reservePromotion =
+    input.paymentMethod !== "wallet" &&
+    Boolean(input.promotion.voucherCode || input.promotion.flashSaleId);
+  const reservationStatus = reservePromotion ? "reserved" : "none";
+  const results = await db.batch([
+    db.prepare(
       `INSERT INTO orders (
       id, customer_id, wallet_checkout_key, reference_id, product_slug, product_name, package_sku, package_label,
       provider_code, provider_sku, fulfillment_type, target_template, destination, server,
       nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json,
-      base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
+      base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id, promotion_reservation_status,
       admin_fee, total, payment_method, payment_channel
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+    ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?
+      WHERE (? IS NULL OR EXISTS (
+        SELECT 1 FROM discount_vouchers
+        WHERE code = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
+          AND (usage_limit IS NULL OR used_count < usage_limit)
+      ))
+      AND (? IS NULL OR EXISTS (
+        SELECT 1 FROM flash_sales
+        WHERE id = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
+          AND (stock_limit IS NULL OR sold_count < stock_limit)
+      ))`,
     )
     .bind(
       input.id,
@@ -284,11 +300,53 @@ export async function insertPendingOrder(input: {
       input.promotion.discountAmount,
       input.promotion.voucherCode,
       input.promotion.flashSaleId,
+      reservationStatus,
       input.promotion.finalPrice,
       input.paymentMethod,
       input.paymentChannel,
-    )
-    .run();
+      reservePromotion ? input.promotion.voucherCode : null,
+      input.promotion.voucherCode,
+      now,
+      now,
+      reservePromotion ? input.promotion.flashSaleId : null,
+      input.promotion.flashSaleId,
+      now,
+      now,
+    ),
+    db.prepare(
+      `UPDATE discount_vouchers SET used_count = used_count + 1, updated_at = CURRENT_TIMESTAMP
+       WHERE code = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
+         AND (usage_limit IS NULL OR used_count < usage_limit)
+         AND EXISTS (
+           SELECT 1 FROM orders
+           WHERE id = ? AND promotion_reservation_status = 'reserved'
+         )`,
+    ).bind(
+      reservePromotion ? input.promotion.voucherCode : null,
+      now,
+      now,
+      input.id,
+    ),
+    db.prepare(
+      `UPDATE flash_sales SET sold_count = sold_count + 1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
+         AND (stock_limit IS NULL OR sold_count < stock_limit)
+         AND EXISTS (
+           SELECT 1 FROM orders
+           WHERE id = ? AND promotion_reservation_status = 'reserved'
+         )`,
+    ).bind(
+      reservePromotion ? input.promotion.flashSaleId : null,
+      now,
+      now,
+      input.id,
+    ),
+  ]);
+  if (Number(results[0]?.meta.changes ?? 0) === 0) {
+    throw new PromotionQuoteError(
+      "Voucher atau kuota flash sale baru saja habis. Muat ulang checkout.",
+    );
+  }
 }
 
 export async function getWalletOrderByCheckoutKey(
@@ -384,13 +442,34 @@ export async function markPaymentCreationFailed(
   referenceId: string,
   message: string,
 ) {
-  await getD1()
-    .prepare(
-      `UPDATE orders SET payment_status = 'failed', provider_message = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE reference_id = ? AND payment_status = 'pending'`,
-    )
-    .bind(message, referenceId)
-    .run();
+  const db = getD1();
+  await db.batch([
+    db.prepare(
+      `UPDATE discount_vouchers SET used_count = MAX(0, used_count - 1), updated_at = CURRENT_TIMESTAMP
+       WHERE code = (
+         SELECT voucher_code FROM orders
+         WHERE reference_id = ? AND payment_status = 'pending'
+           AND promotion_reservation_status = 'reserved'
+       )`,
+    ).bind(referenceId),
+    db.prepare(
+      `UPDATE flash_sales SET sold_count = MAX(0, sold_count - 1), updated_at = CURRENT_TIMESTAMP
+       WHERE id = (
+         SELECT flash_sale_id FROM orders
+         WHERE reference_id = ? AND payment_status = 'pending'
+           AND promotion_reservation_status = 'reserved'
+       )`,
+    ).bind(referenceId),
+    db.prepare(
+      `UPDATE orders SET payment_status = 'failed', provider_message = ?,
+         promotion_reservation_status = CASE
+           WHEN promotion_reservation_status = 'reserved' THEN 'released'
+           ELSE promotion_reservation_status
+         END,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE reference_id = ? AND payment_status = 'pending'`,
+    ).bind(message, referenceId),
+  ]);
 }
 
 export async function recordOrderEvent(input: {
@@ -430,25 +509,59 @@ export async function applyPaymentStatus(
   if (status === "paid") {
     const nextFulfillment =
       order.fulfillment_type === "manual" ? "manual_pending" : "processing";
-    const result = await db
-      .prepare(
-        `UPDATE orders SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND payment_status <> 'paid'`,
-      )
-      .bind(nextFulfillment, order.id)
-      .run();
-    const changed = Number(result.meta.changes ?? 0) > 0;
-    if (changed)
-      await consumeOrderPromotion(order.voucher_code, order.flash_sale_id);
-    return changed;
+    const results = await db.batch([
+      db.prepare(
+        `UPDATE discount_vouchers SET used_count = used_count + 1, updated_at = CURRENT_TIMESTAMP
+         WHERE code = ? AND EXISTS (
+           SELECT 1 FROM orders WHERE id = ? AND payment_status <> 'paid'
+             AND promotion_reservation_status IN ('legacy', 'released')
+         )`,
+      ).bind(order.voucher_code, order.id),
+      db.prepare(
+        `UPDATE flash_sales SET sold_count = sold_count + 1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND EXISTS (
+           SELECT 1 FROM orders WHERE id = ? AND payment_status <> 'paid'
+             AND promotion_reservation_status IN ('legacy', 'released')
+         )`,
+      ).bind(order.flash_sale_id, order.id),
+      db.prepare(
+        `UPDATE orders SET payment_status = 'paid', fulfillment_status = ?,
+           promotion_reservation_status = CASE
+             WHEN voucher_code IS NOT NULL OR flash_sale_id IS NOT NULL THEN 'consumed'
+             ELSE 'none'
+           END,
+           updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND payment_status <> 'paid'`,
+      ).bind(nextFulfillment, order.id),
+    ]);
+    return Number(results[2]?.meta.changes ?? 0) > 0;
   }
-  await db
-    .prepare(
-      `UPDATE orders SET payment_status = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE id = ? AND payment_status <> 'paid'`,
-    )
-    .bind(status, order.id)
-    .run();
+  if (status === "pending") return false;
+  await db.batch([
+    db.prepare(
+      `UPDATE discount_vouchers SET used_count = MAX(0, used_count - 1), updated_at = CURRENT_TIMESTAMP
+       WHERE code = ? AND EXISTS (
+         SELECT 1 FROM orders WHERE id = ? AND payment_status = 'pending'
+           AND promotion_reservation_status = 'reserved'
+       )`,
+    ).bind(order.voucher_code, order.id),
+    db.prepare(
+      `UPDATE flash_sales SET sold_count = MAX(0, sold_count - 1), updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND EXISTS (
+         SELECT 1 FROM orders WHERE id = ? AND payment_status = 'pending'
+           AND promotion_reservation_status = 'reserved'
+       )`,
+    ).bind(order.flash_sale_id, order.id),
+    db.prepare(
+      `UPDATE orders SET payment_status = ?,
+         promotion_reservation_status = CASE
+           WHEN promotion_reservation_status = 'reserved' THEN 'released'
+           ELSE promotion_reservation_status
+         END,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND payment_status = 'pending'`,
+    ).bind(status, order.id),
+  ]);
   return false;
 }
 
