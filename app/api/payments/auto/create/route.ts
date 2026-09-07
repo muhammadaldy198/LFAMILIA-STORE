@@ -1,23 +1,12 @@
 import { z } from "zod";
 import { getCustomerSession } from "@/lib/server/customer-auth";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
-import {
-  getIpaymuReadiness,
-  isIpaymuChannelSupported,
-} from "@/lib/server/ipaymu";
-import {
-  getMidtransMode,
-  getMidtransReadiness,
-  isMidtransChannelSupported,
-} from "@/lib/server/midtrans";
+import { routePaymentGateway } from "@/lib/server/payment-gateway-router";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
 import { quotePromotion } from "@/lib/server/promotions";
 import { resolvePurchasableItem } from "@/lib/server/orders";
 import { readWalletSettings } from "@/lib/server/wallet";
-import {
-  IPAYMU_MIN_CHECKOUT_AMOUNT,
-  isIpaymuAmountSupported,
-} from "@/lib/payment-limits";
+import { IPAYMU_MIN_CHECKOUT_AMOUNT } from "@/lib/payment-limits";
 import { POST as createIpaymuCheckout } from "@/app/api/payments/ipaymu/create/route";
 import { POST as createMidtransCheckout } from "@/app/api/payments/midtrans/create/route";
 
@@ -72,48 +61,41 @@ export async function POST(request: Request) {
     );
 
     const settings = await readWalletSettings();
-    const ipaymuReadiness = getIpaymuReadiness();
-    const midtransReadiness = getMidtransReadiness();
+    const routing = routePaymentGateway({
+      amount: promotion.finalPrice,
+      paymentMethod: input.paymentMethod,
+      paymentChannel,
+      ipaymuEnabled: settings.ipaymuCheckoutEnabled,
+      midtransEnabled: settings.midtransCheckoutEnabled,
+    });
 
-    const canUseIpaymu =
-      settings.ipaymuCheckoutEnabled &&
-      ipaymuReadiness.ready &&
-      isIpaymuAmountSupported(promotion.finalPrice) &&
-      isIpaymuChannelSupported(input.paymentMethod, paymentChannel);
+    const [primary, fallback] = routing.candidates;
 
-    const canUseMidtrans =
-      settings.midtransCheckoutEnabled &&
-      midtransReadiness.ready &&
-      isMidtransChannelSupported(
-        input.paymentMethod,
-        paymentChannel,
-        getMidtransMode(),
-      );
-
-    if (canUseIpaymu) {
+    if (primary === "ipaymu") {
       const ipaymuResponse = await createIpaymuCheckout(ipaymuRequest);
       if (ipaymuResponse.ok) return ipaymuResponse;
 
       const failed = (await ipaymuResponse.clone().json().catch(() => null)) as {
         fallbackAllowed?: boolean;
       } | null;
-      if (!failed?.fallbackAllowed || !canUseMidtrans) {
+      if (!failed?.fallbackAllowed || fallback !== "midtrans") {
         return ipaymuResponse;
       }
       return createMidtransCheckout(midtransRequest);
     }
 
-    if (canUseMidtrans) {
+    if (primary === "midtrans") {
       return createMidtransCheckout(midtransRequest);
     }
 
     if (
       settings.ipaymuCheckoutEnabled &&
-      !isIpaymuAmountSupported(promotion.finalPrice)
+      promotion.finalPrice < IPAYMU_MIN_CHECKOUT_AMOUNT &&
+      !routing.midtransEligible
     ) {
       return Response.json(
         {
-          error: `Nominal ini di bawah minimum iPaymu Rp${IPAYMU_MIN_CHECKOUT_AMOUNT.toLocaleString("id-ID")} dan gateway alternatif belum siap untuk metode yang dipilih.`,
+          error: `Nominal ini di bawah minimum iPaymu Rp${IPAYMU_MIN_CHECKOUT_AMOUNT.toLocaleString("id-ID")} dan Midtrans belum siap untuk metode yang dipilih.`,
         },
         { status: 422 },
       );
@@ -122,7 +104,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         error:
-          "Tidak ada payment gateway yang siap untuk metode ini. Periksa status gateway, credential environment aktif, dan channel pembayaran di panel admin.",
+          "Tidak ada payment gateway yang siap untuk metode ini. Periksa toggle gateway, credential environment aktif, dan channel pembayaran di panel admin.",
       },
       { status: 503 },
     );
