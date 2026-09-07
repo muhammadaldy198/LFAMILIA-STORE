@@ -14,8 +14,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type Provider = "midtrans" | "ipaymu" | "digiflazz" | "vippayment" | "melostore" | "resend" | "relay" | "security";
-type Mode = "snap" | "direct" | "service";
+type Provider = "doku" | "digiflazz" | "melostore" | "resend" | "relay" | "security";
+type Mode = "direct" | "service";
 type Environment = "sandbox" | "production" | "development" | "global";
 
 type Field = {
@@ -52,18 +52,15 @@ type Overview = {
   encryptionReady: boolean;
   encryptionHint: string;
   selections: {
-    midtransMode: "snap";
-    midtransEnvironment: "sandbox" | "production";
-    ipaymuEnvironment: "sandbox" | "production";
+    dokuEnvironment: "sandbox" | "production";
     digiflazzEnvironment: "development" | "production";
-    vippaymentEnvironment: "sandbox" | "production";
   };
   profiles: Profile[];
   callbacks: Array<{ id: string; label: string; description: string; kind: "notification" | "callback" | "fallback"; url: string }>;
 };
 
 type RelayConnectionResult = {
-  provider: "digiflazz" | "ipaymu";
+  provider: "digiflazz";
   label: string;
   connected: boolean;
   status: number | null;
@@ -72,30 +69,16 @@ type RelayConnectionResult = {
 
 const definitions: Definition[] = [
   {
-    id: "midtrans-snap",
-    provider: "midtrans",
-    mode: "snap",
-    title: "Midtrans Snap",
-    description: "Gateway cadangan otomatis untuk QRIS, e-wallet, dan virtual account ketika iPaymu tidak dapat digunakan.",
-    environments: ["sandbox", "production"],
-    fields: [
-      { key: "serverKey", label: "Server Key", secret: true, placeholder: "SB-Mid-server-… / Mid-server-…" },
-      { key: "clientKey", label: "Client Key", secret: true, placeholder: "SB-Mid-client-… / Mid-client-…" },
-      { key: "apiUrl", label: "Snap API URL", inputMode: "url", placeholder: "https://app.sandbox.midtrans.com/snap/v1/transactions" },
-      { key: "scriptUrl", label: "Snap Script URL", inputMode: "url", placeholder: "https://app.sandbox.midtrans.com/snap/snap.js" },
-    ],
-  },
-  {
-    id: "ipaymu",
-    provider: "ipaymu",
+    id: "doku",
+    provider: "doku",
     mode: "direct",
-    title: "iPaymu",
-    description: "Gateway utama LFAMILIA untuk QRIS, e-wallet, dan virtual account dengan callback pembayaran otomatis.",
+    title: "DOKU Checkout",
+    description: "Satu-satunya payment gateway LFAMILIA untuk QRIS, e-wallet, dan virtual account.",
     environments: ["sandbox", "production"],
     fields: [
-      { key: "virtualAccount", label: "Virtual Account (VA)", secret: true },
-      { key: "apiKey", label: "API Key", secret: true },
-      { key: "apiUrl", label: "API URL", inputMode: "url", placeholder: "https://sandbox.ipaymu.com/api/v2/payment/direct" },
+      { key: "clientId", label: "Client ID", secret: true },
+      { key: "secretKey", label: "Secret Key", secret: true },
+      { key: "apiUrl", label: "Checkout API URL", inputMode: "url", placeholder: "Kosongkan untuk endpoint resmi DOKU sesuai environment." },
     ],
   },
   {
@@ -103,7 +86,7 @@ const definitions: Definition[] = [
     provider: "digiflazz",
     mode: "direct",
     title: "DigiFlazz",
-    description: "Provider produk otomatis, sinkron harga, dan webhook status transaksi.",
+    description: "Satu-satunya provider eksternal untuk produk otomatis dan sinkron harga.",
     environments: ["development", "production"],
     fields: [
       { key: "username", label: "Username DigiFlazz", secret: true },
@@ -114,24 +97,11 @@ const definitions: Definition[] = [
     ],
   },
   {
-    id: "vippayment",
-    provider: "vippayment",
-    mode: "direct",
-    title: "VIPayment",
-    description: "Provider produk otomatis tambahan. Setiap nominal dapat memilih provider ini dari menu Produk.",
-    environments: ["sandbox", "production"],
-    fields: [
-      { key: "apiId", label: "API ID", secret: true },
-      { key: "apiKey", label: "API Key", secret: true },
-      { key: "apiUrl", label: "API URL", inputMode: "url" },
-    ],
-  },
-  {
     id: "melostore",
     provider: "melostore",
     mode: "service",
     title: "Melostore",
-    description: "Kredensial nickname checker dan endpoint Melostore.",
+    description: "Layanan nickname checker; bukan provider fulfillment produk.",
     environments: ["global"],
     fields: [
       { key: "apiKey", label: "API Key", secret: true },
@@ -145,7 +115,7 @@ const definitions: Definition[] = [
     provider: "resend",
     mode: "service",
     title: "Resend Email",
-    description: "Email transaksi dan pengiriman kode voucher. WhatsApp tidak digunakan lagi.",
+    description: "Email transaksi dan pengiriman kode voucher.",
     environments: ["global"],
     fields: [
       { key: "apiKey", label: "API Key", secret: true },
@@ -158,12 +128,11 @@ const definitions: Definition[] = [
     id: "relay",
     provider: "relay",
     mode: "service",
-    title: "VPS Relay",
-    description: "Daftar hostname relay ber-IP statis dan token autentikasi Worker → VPS.",
+    title: "VPS Relay DigiFlazz",
+    description: "Relay IP statis khusus koneksi DigiFlazz bila diperlukan.",
     environments: ["global"],
     fields: [
       { key: "digiflazzOrigin", label: "DigiFlazz Relay URL", inputMode: "url", placeholder: "https://digiflazz-relay.lfamiliastore.my.id" },
-      { key: "ipaymuOrigin", label: "iPaymu Relay URL", inputMode: "url", placeholder: "https://ipaymu-relay.lfamiliastore.my.id" },
       { key: "token", label: "Relay Token", secret: true, help: "Harus sama persis dengan RELAY_TOKEN pada VPS." },
     ],
   },
@@ -178,7 +147,7 @@ const definitions: Definition[] = [
       { key: "voucherEncryptionKey", label: "Voucher Encryption Key", secret: true, help: "Minimal 32 karakter. Jangan diganti setelah stok voucher terenkripsi tersimpan." },
     ],
   },
-];
+]
 
 function profileKey(definition: Definition, environment: Environment) {
   return `${definition.provider}:${definition.mode}:${environment}`;
@@ -304,7 +273,7 @@ export function AdminIntegrationManager({
       const next = data.overview as Overview;
       setOverview(next);
       setSelections(next.selections);
-      setMessage("Mode dan environment aktif berhasil disimpan.");
+      setMessage("Environment aktif berhasil disimpan.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Environment aktif gagal disimpan.");
     } finally {
@@ -368,24 +337,22 @@ export function AdminIntegrationManager({
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-bold">Mode yang dipakai toko</p>
-            <p className="mt-0.5 text-[10px] text-white/35">Pilih mode dan environment credential. Aktivasi checkout/top up hanya dikelola dari menu Pembayaran.</p>
+            <p className="mt-0.5 text-[10px] text-white/35">Pilih environment DOKU dan DigiFlazz. Aktivasi checkout/top up tetap dikelola dari menu Pembayaran.</p>
           </div>
           <Button type="button" size="sm" disabled={saving === "selections"} onClick={() => void saveSelections()} className="shrink-0 bg-[#b9ff35] text-[#091006] hover:bg-[#d8ff8d]">
             {saving === "selections" ? <LoaderCircle className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}Simpan pilihan
           </Button>
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          <SelectField label="Environment Midtrans" value={selections.midtransEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, midtransEnvironment: value as "sandbox" | "production" } : current)} options={[['sandbox', 'Sandbox'], ['production', 'Production']]} />
-          <SelectField label="Environment iPaymu" value={selections.ipaymuEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, ipaymuEnvironment: value as "sandbox" | "production" } : current)} options={[['sandbox', 'Sandbox'], ['production', 'Production']]} />
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <SelectField label="Environment DOKU" value={selections.dokuEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, dokuEnvironment: value as "sandbox" | "production" } : current)} options={[['sandbox', 'Sandbox'], ['production', 'Production']]} />
           <SelectField label="Environment DigiFlazz" value={selections.digiflazzEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, digiflazzEnvironment: value as "development" | "production" } : current)} options={[['development', 'Development'], ['production', 'Production']]} />
-          <SelectField label="Environment VIPayment" value={selections.vippaymentEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, vippaymentEnvironment: value as "sandbox" | "production" } : current)} options={[['sandbox', 'Sandbox'], ['production', 'Production']]} />
         </div>
       </section>}
 
       {view === "relay" && (
         <>
           <div className="rounded-lg border border-sky-300/20 bg-sky-300/[0.045] p-3 text-[10px] leading-4 text-white/52">
-            Relay menghubungkan Worker LFAMILIA ke VPS ber-IP statis. Isi URL DigiFlazz, iPaymu, dan Relay Token di sini. Semua disimpan terenkripsi di D1; tidak perlu membuat PROVIDER_RELAY_* di Cloudflare.
+            Relay menghubungkan Worker LFAMILIA ke VPS ber-IP statis khusus DigiFlazz. URL dan token disimpan terenkripsi di D1; tidak perlu membuat PROVIDER_RELAY_* di Cloudflare.
           </div>
           <section className="rounded-lg border border-white/[0.08] bg-[#0d1019] p-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -405,7 +372,7 @@ export function AdminIntegrationManager({
               </Button>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {(["DigiFlazz", "iPaymu"] as const).map((label) => {
+              {(["DigiFlazz"] as const).map((label) => {
                 const result = relayResults.find((item) => item.label === label);
                 return (
                   <div key={label} className="rounded-md border border-white/[0.07] bg-white/[0.018] p-2.5">
@@ -436,10 +403,8 @@ export function AdminIntegrationManager({
           const savedFields = saved?.configuredFields ?? [];
           const isOpen = openId === definition.id;
           const isActive =
-            (definition.provider === "midtrans" && selections.midtransMode === definition.mode && selections.midtransEnvironment === environment) ||
-            (definition.provider === "ipaymu" && selections.ipaymuEnvironment === environment) ||
+            (definition.provider === "doku" && selections.dokuEnvironment === environment) ||
             (definition.provider === "digiflazz" && selections.digiflazzEnvironment === environment) ||
-            (definition.provider === "vippayment" && selections.vippaymentEnvironment === environment) ||
             ((definition.provider === "melostore" || definition.provider === "resend" || definition.provider === "relay" || definition.provider === "security") && Boolean(saved?.configured));
           return (
             <section key={definition.id} className="overflow-hidden rounded-lg border border-white/[0.08] bg-[#0d1019]">
