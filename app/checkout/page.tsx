@@ -45,6 +45,8 @@ import { formatRupiah, type StoreProduct } from "@/lib/store-data";
 import { IPAYMU_MIN_CHECKOUT_AMOUNT, isIpaymuAmountSupported } from "@/lib/payment-limits";
 import type { CustomerSession } from "@/lib/server/customer-auth";
 
+const INTERNAL_VOUCHER_DESTINATION = "00000000";
+
 const nicknameSupported = new Set([
   "mobile-legends",
   "free-fire",
@@ -258,8 +260,17 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     ],
     [product.inputFields, product.inputLabel, product.inputPlaceholder, product.needsServer],
   );
-  const destination = productInputFields[0] ? (customerInputValues[productInputFields[0].id] ?? "") : "";
-  const server = productInputFields[1] ? (customerInputValues[productInputFields[1].id] ?? "") : "";
+  const isVoucherProduct = product.category.trim().toLowerCase() === "voucher";
+  const destination = isVoucherProduct
+    ? INTERNAL_VOUCHER_DESTINATION
+    : productInputFields[0]
+      ? (customerInputValues[productInputFields[0].id] ?? "")
+      : "";
+  const server = isVoucherProduct
+    ? ""
+    : productInputFields[1]
+      ? (customerInputValues[productInputFields[1].id] ?? "")
+      : "";
   const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
   const eligibleGatewayOptions = useMemo(
     () => gatewayOptions.filter((gateway) =>
@@ -272,7 +283,8 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const providerReady =
     isManual ||
     Boolean(selectedPackage?.providerCode && selectedPackage?.providerSku);
-  const canCheckNickname = nicknameSupported.has(product.slug);
+  const canCheckNickname =
+    !isVoucherProduct && nicknameSupported.has(product.slug);
   const lookupNeedsServer = product.slug === "mobile-legends";
   const lookupKey = `${product.slug}:${destination.trim()}:${server.trim()}`;
   const visibleNickname: NicknameState =
@@ -589,7 +601,14 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
 
   function requestConfirmation(event: FormEvent) {
     event.preventDefault();
-    if (productInputFields.some((field) => field.required !== false && !(customerInputValues[field.id] ?? "").trim()) || !buyerEmail.trim() || !contact.trim() || !packageId) {
+    const missingRequiredAccountData =
+      !isVoucherProduct &&
+      productInputFields.some(
+        (field) =>
+          field.required !== false &&
+          !(customerInputValues[field.id] ?? "").trim(),
+      );
+    if (missingRequiredAccountData || !buyerEmail.trim() || !contact.trim() || !packageId) {
       setError("Lengkapi data yang wajib, nominal, email, nomor WhatsApp, dan pembayaran.");
       return;
     }
@@ -610,7 +629,14 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
 
   async function submitOrder(event?: FormEvent) {
     event?.preventDefault();
-    if (productInputFields.some((field) => field.required !== false && !(customerInputValues[field.id] ?? "").trim()) || !buyerEmail.trim() || !contact.trim() || !packageId || !agreed) {
+    const missingRequiredAccountData =
+      !isVoucherProduct &&
+      productInputFields.some(
+        (field) =>
+          field.required !== false &&
+          !(customerInputValues[field.id] ?? "").trim(),
+      );
+    if (missingRequiredAccountData || !buyerEmail.trim() || !contact.trim() || !packageId || !agreed) {
       setError(
         "Lengkapi data yang wajib, nominal, identitas pembeli, pembayaran, dan persetujuan.",
       );
@@ -651,9 +677,11 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
           packageSku: packageId,
           destination: destination.trim(),
           server: server.trim() || undefined,
-          customerInputs: productInputFields.map((field) => ({
+          customerInputs: productInputFields.map((field, index) => ({
             id: field.id,
-            value: (customerInputValues[field.id] ?? "").trim(),
+            value: isVoucherProduct && index === 0
+              ? INTERNAL_VOUCHER_DESTINATION
+              : (customerInputValues[field.id] ?? "").trim(),
           })),
           nickname: visibleNickname.nickname,
           buyerName: buyerName.trim() || buyerEmail.trim().split("@")[0] || "Pelanggan",
@@ -731,6 +759,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
         {activeTab === "transaction" ? (
           <div className="mt-3 grid items-start gap-3 lg:grid-cols-[1fr_360px]">
             <form id="checkout-form" onSubmit={requestConfirmation} className="space-y-3">
+              {!isVoucherProduct && (
               <section className="overflow-hidden rounded-lg border border-white/[0.10] bg-[#2f3338]">
                 <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] bg-white/[0.025] px-3 py-2.5 sm:px-4">
                   <StepTitle
@@ -796,10 +825,11 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                   )}
                 </div>
               </section>
+              )}
 
               <section className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4">
                 <StepTitle
-                  number="2"
+                  number={isVoucherProduct ? "1" : "2"}
                   title="Pilih Nominal"
                   description={
                     isManual
@@ -853,7 +883,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
 
               <section className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4">
                 <StepTitle
-                  number="3"
+                  number={isVoucherProduct ? "2" : "3"}
                   title="Pilih Pembayaran"
                   description="Pilih metode pembayaran yang ingin digunakan."
                 />
@@ -962,7 +992,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
 
               <section className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4">
                 <StepTitle
-                  number="4"
+                  number={isVoucherProduct ? "3" : "4"}
                   title="Data Pembeli & Voucher"
                   description="Email dan WhatsApp digunakan untuk invoice serta status transaksi."
                 />
@@ -1121,8 +1151,8 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
 
       <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
         <DialogContent className="max-w-md border-white/10 bg-[#191b20] text-white" showCloseButton={false}>
-          <DialogHeader><div className="mx-auto grid size-14 place-items-center rounded-full bg-[#b9ff35]/15"><CheckCircle2 className="size-8 text-[#b9ff35]" /></div><DialogTitle className="pt-3 text-center text-lg font-black">Buat Pesanan</DialogTitle><DialogDescription className="text-center text-xs leading-5 text-white/55">Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai.</DialogDescription></DialogHeader>
-          <dl className="rounded-xl bg-black/15 p-4 text-xs">{visibleNickname.nickname && <SummaryRow label="Username" value={visibleNickname.nickname} />}{productInputFields.map((field) => <SummaryRow key={field.id} label={field.label} value={(customerInputValues[field.id] ?? "").trim() || "-"} />)}<SummaryRow label="Item" value={selectedPackage?.label ?? "-"} /><SummaryRow label="Produk" value={product.name} /><SummaryRow label="Payment" value={checkoutGroups.find((item) => item.code === paymentMethod)?.name ?? "-"} /></dl>
+          <DialogHeader><div className="mx-auto grid size-14 place-items-center rounded-full bg-[#b9ff35]/15"><CheckCircle2 className="size-8 text-[#b9ff35]" /></div><DialogTitle className="pt-3 text-center text-lg font-black">Buat Pesanan</DialogTitle><DialogDescription className="text-center text-xs leading-5 text-white/55">{isVoucherProduct ? "Pastikan produk, nominal, dan pembayaran yang kamu pilih sudah sesuai." : "Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai."}</DialogDescription></DialogHeader>
+          <dl className="rounded-xl bg-black/15 p-4 text-xs">{!isVoucherProduct && visibleNickname.nickname && <SummaryRow label="Username" value={visibleNickname.nickname} />}{!isVoucherProduct && productInputFields.map((field) => <SummaryRow key={field.id} label={field.label} value={(customerInputValues[field.id] ?? "").trim() || "-"} />)}<SummaryRow label="Item" value={selectedPackage?.label ?? "-"} /><SummaryRow label="Produk" value={product.name} /><SummaryRow label="Payment" value={checkoutGroups.find((item) => item.code === paymentMethod)?.name ?? "-"} /></dl>
           <label className="flex cursor-pointer items-start gap-3 text-xs leading-5 text-white/60"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-0.5 size-4 accent-[#b9ff35]" />Dengan melanjutkan, saya menyetujui syarat & ketentuan yang berlaku.</label>
           <div className="grid grid-cols-2 gap-3"><Button type="button" onClick={() => { setConfirmationOpen(false); void submitOrder(); }} disabled={!agreed || submitting} className="bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">{submitting ? "Memproses..." : "Pesan Sekarang"}</Button><Button type="button" variant="outline" onClick={() => setConfirmationOpen(false)} className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">Batalkan</Button></div>
         </DialogContent>
