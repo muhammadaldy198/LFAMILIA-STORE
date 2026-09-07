@@ -3,7 +3,10 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import handler from "vinext/server/app-router-entry";
 import { getPublicBaseUrl, setRuntimeEnv } from "../lib/server/runtime-env";
 import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
-import { recoverStaleAutomaticOrders } from "../lib/server/orders";
+import {
+  recoverAbandonedPromotionReservations,
+  recoverStaleAutomaticOrders,
+} from "../lib/server/orders";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 import { cleanupSecurityRateLimits } from "../lib/server/security";
 import { verifyCloudflareAccess } from "../lib/server/cloudflare-access";
@@ -132,6 +135,7 @@ const worker = {
       Promise.resolve()
         .then(() => recoverStaleAutomaticOrders(getPublicBaseUrl()))
         .catch(() => undefined),
+      recoverAbandonedPromotionReservations().catch(() => undefined),
     ]));
   },
 };
