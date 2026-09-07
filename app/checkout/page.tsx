@@ -41,7 +41,7 @@ import {
   type PaymentChannel,
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
-import { formatRupiah } from "@/lib/store-data";
+import { formatRupiah, type StoreProduct } from "@/lib/store-data";
 import { IPAYMU_MIN_CHECKOUT_AMOUNT, isIpaymuAmountSupported } from "@/lib/payment-limits";
 import type { CustomerSession } from "@/lib/server/customer-auth";
 
@@ -135,18 +135,54 @@ export default function CheckoutPage() {
 
 function CheckoutRoute() {
   const searchParams = useSearchParams();
-  return <CheckoutContent key={searchParams.get("product") ?? "default"} />;
-}
-
-function CheckoutContent() {
-  const { products } = useStoreProducts();
-  const searchParams = useSearchParams();
+  const { products, databaseReady, loading } = useStoreProducts();
   const requestedProduct = searchParams.get("product");
   const product = useMemo(
     () =>
       products.find((item) => item.slug === requestedProduct) ?? products[0],
     [products, requestedProduct],
   );
+
+  if (loading) {
+    return (
+      <StoreLayout>
+        <main className="mx-auto min-h-[70vh] max-w-7xl px-4 py-14 text-sm text-white/40 sm:px-6 lg:px-8">
+          Memuat katalog LFAMILIA…
+        </main>
+      </StoreLayout>
+    );
+  }
+
+  if (!product) {
+    return (
+      <StoreLayout>
+        <main className="mx-auto min-h-[70vh] max-w-3xl px-4 py-14 sm:px-6 lg:px-8">
+          <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.05] p-5">
+            <h1 className="text-lg font-black text-white">Katalog belum tersedia</h1>
+            <p className="mt-2 text-xs leading-5 text-white/45">
+              {databaseReady
+                ? "Belum ada produk aktif di database LFAMILIA."
+                : "Katalog tidak dapat dibaca dari database. Checkout dinonaktifkan agar harga lama tidak digunakan."}
+            </p>
+            <Button asChild variant="outline" className="mt-4 border-white/10 bg-white/[0.03] text-white">
+              <Link href="/catalog">Kembali ke katalog</Link>
+            </Button>
+          </div>
+        </main>
+      </StoreLayout>
+    );
+  }
+
+  return (
+    <CheckoutContent
+      key={`${product.slug}:${searchParams.get("package") ?? ""}`}
+      product={product}
+    />
+  );
+}
+
+function CheckoutContent({ product }: { product: StoreProduct }) {
+  const searchParams = useSearchParams();
   const requestedPackage = searchParams.get("package");
   const [packageId, setPackageId] = useState(() =>
     requestedPackage &&
