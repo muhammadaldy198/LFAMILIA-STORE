@@ -6,12 +6,11 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("relay configuration is managed from encrypted admin profile", () => {
+test("relay configuration is encrypted and DigiFlazz-only", () => {
   const integration = read("lib/server/integration-config.ts");
-  assert.match(integration, /"relay:service": \["digiflazzOrigin", "ipaymuOrigin", "hosts", "token"\]/);
+  assert.match(integration, /"relay:service": \["digiflazzOrigin", "hosts", "token"\]/);
   assert.match(integration, /PROVIDER_RELAY_DIGIFLAZZ_ORIGIN/);
-  assert.match(integration, /PROVIDER_RELAY_IPAYMU_ORIGIN/);
-  assert.doesNotMatch(integration, /PROVIDER_RELAY_MIDTRANS_BISNAP_ORIGIN/);
+  assert.doesNotMatch(integration, /IPAYMU|MIDTRANS|VIPPAYMENT/i);
 });
 
 test("provider relay rewrites destination URL and adds authenticated environment headers", () => {
@@ -19,48 +18,25 @@ test("provider relay rewrites destination URL and adds authenticated environment
   assert.match(relay, /relay\.pathname = source\.pathname/);
   assert.match(relay, /x-lfamilia-relay-token/);
   assert.match(relay, /x-lfamilia-\$\{route\.provider\}-environment/);
+  assert.match(relay, /RelayProvider = "digiflazz"/);
 });
 
-test("relay-enabled providers use providerRelayRequest", () => {
-  for (const file of [
-    "lib/server/providers/digiflazz.ts",
-    "lib/server/digiflazz-pricing.ts",
-    "lib/server/ipaymu.ts",
-  ]) {
+test("DigiFlazz integrations use providerRelayRequest", () => {
+  for (const file of ["lib/server/providers/digiflazz.ts", "lib/server/digiflazz-pricing.ts"]) {
     const source = read(file);
     assert.match(source, /providerRelayRequest\(/, file);
-    assert.doesNotMatch(source, /withProviderRelayHeaders\(/, file);
   }
 });
 
-test("admin exposes separate encrypted relay URLs and token", () => {
+test("admin exposes only DigiFlazz relay URL and token", () => {
   const source = read("components/admin-integration-manager.tsx");
-  for (const field of ["digiflazzOrigin", "ipaymuOrigin", "token"]) {
-    assert.ok(source.includes(`key: "${field}"`), field);
-  }
-  assert.match(source, /tidak perlu membuat PROVIDER_RELAY_\* di Cloudflare/);
+  assert.match(source, /key: "digiflazzOrigin"/);
+  assert.match(source, /key: "token"/);
+  assert.doesNotMatch(source, /ipaymuOrigin|iPaymu/i);
 });
 
-
-test("relay probe verifies health and token without provider transaction", () => {
-  const relay = read("lib/server/provider-relay.ts");
-  assert.match(relay, /new URL\("\/health"/);
-  assert.match(relay, /method: "HEAD"/);
-  assert.match(relay, /authResponse\.status === 405/);
-  assert.match(relay, /Relay Token tidak cocok dengan VPS/);
-});
-
-test("owner integration endpoint exposes relay test action", () => {
-  const route = read("app/api/admin/integrations/route.ts");
-  assert.match(route, /z\.literal\("test_relay"\)/);
-  assert.match(route, /testProviderRelayConnections\(\)/);
-});
-
-test("admin relay view renders connection test button and provider statuses", () => {
-  const source = read("components/admin-integration-manager.tsx");
-  assert.match(source, /Tes Koneksi Relay/);
-  assert.match(source, /DigiFlazz/);
-  assert.match(source, /iPaymu/);
-  assert.doesNotMatch(source, /Midtrans BI-SNAP/);
-  assert.match(source, /Connected/);
+test("relay service contains no legacy payment gateway upstream", () => {
+  const server = read("relay/server.mjs");
+  assert.match(server, /name: "digiflazz"/);
+  assert.doesNotMatch(server, /ipaymu|midtrans|bisnap/i);
 });
