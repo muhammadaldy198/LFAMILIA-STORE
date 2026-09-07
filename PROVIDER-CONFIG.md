@@ -1,44 +1,43 @@
-# Provider Environment Matrix
+# LFAMILIA Integration Configuration
 
-Konfigurasi provider LFAMILIA bersifat environment-explicit. Credential dan pilihan environment operasional disimpan terenkripsi dari Admin Panel. Production credential boleh kosong sampai onboarding selesai. Nama variabel di bawah adalah nama runtime internal yang dibentuk dari konfigurasi panel, bukan daftar Variable/Secret yang harus dibuat manual di Cloudflare.
+Arsitektur aktif:
 
-**Provider credentials tidak memakai fallback Cloudflare Variables/Secrets.** Jika D1 atau root encryption key tidak tersedia, integrasi provider gagal tertutup (fail closed) sampai konfigurasi Admin Dashboard dapat dibaca kembali. Cloudflare hanya menyimpan root/system-level values seperti `INTEGRATION_ENCRYPTION_KEY`, `TEAM_DOMAIN`, dan `POLICY_AUD`, serta binding D1/R2.
+- **Payment gateway:** DOKU Checkout
+- **Provider produk otomatis:** DigiFlazz
+- **Produk lain:** manual / stok internal LFAMILIA
 
-## Selector Admin Panel
+Credential operasional disimpan terenkripsi dari Admin Panel. Tidak ada DOKU Client ID, DOKU Secret Key, atau DigiFlazz API key yang perlu ditulis di repository.
 
-Atur dari **Admin Panel → Integrasi & harga → Kredensial API & callback**:
+## Cloudflare root secret
 
-- Midtrans memakai Snap.
-- Environment Midtrans: Sandbox atau Production
-- Environment iPaymu: Sandbox atau Production
-- Environment DigiFlazz: Development atau Production
-
-Runtime internal memakai `MIDTRANS_ENV`, `IPAYMU_ENV`, dan `DIGIFLAZZ_ENV`; Midtrans selalu menggunakan Snap. Nilainya dihidrasi dari D1 oleh Integration Manager.
-
-## Midtrans Snap
+Satu-satunya root secret Integration Manager yang tetap berada di Cloudflare adalah:
 
 ```text
-MIDTRANS_SNAP_SANDBOX_SERVER_KEY
-MIDTRANS_SNAP_PRODUCTION_SERVER_KEY
-MIDTRANS_SNAP_SANDBOX_CLIENT_KEY
-MIDTRANS_SNAP_PRODUCTION_CLIENT_KEY
-MIDTRANS_SNAP_SANDBOX_API_URL
-MIDTRANS_SNAP_PRODUCTION_API_URL
-MIDTRANS_SNAP_SANDBOX_SCRIPT_URL
-MIDTRANS_SNAP_PRODUCTION_SCRIPT_URL
+INTEGRATION_ENCRYPTION_KEY
 ```
 
-## iPaymu
+Minimal 32 karakter. Jangan menggantinya setelah credential tersimpan di D1.
+
+## DOKU
+
+Admin Panel menyimpan profil Sandbox dan Production secara terpisah:
 
 ```text
-IPAYMU_SANDBOX_VA
-IPAYMU_SANDBOX_API_KEY
-IPAYMU_SANDBOX_API_URL
+DOKU_SANDBOX_CLIENT_ID
+DOKU_SANDBOX_SECRET_KEY
+DOKU_SANDBOX_API_URL
 
-IPAYMU_PRODUCTION_VA
-IPAYMU_PRODUCTION_API_KEY
-IPAYMU_PRODUCTION_API_URL
+DOKU_PRODUCTION_CLIENT_ID
+DOKU_PRODUCTION_SECRET_KEY
+DOKU_PRODUCTION_API_URL
 ```
+
+Nama di atas adalah runtime internal hasil hidrasi D1, bukan Variable/Secret Cloudflare yang harus dibuat manual.
+
+Endpoint resmi default:
+
+- Sandbox: `https://api-sandbox.doku.com/checkout/v1/payment`
+- Production: `https://api.doku.com/checkout/v1/payment`
 
 ## DigiFlazz
 
@@ -53,50 +52,15 @@ DIGIFLAZZ_PRODUCTION_PRICE_LIST_URL
 DIGIFLAZZ_WEBHOOK_SECRET
 ```
 
-## Service Integration Manager
-
-Selain provider pembayaran, panel dapat menyimpan terenkripsi:
-
-```text
-MELOSTORE_API_KEY
-MELOSTORE_SECRET_KEY
-MELOSTORE_API_URL
-NICKNAME_API_KEY
-RESEND_API_KEY
-RESEND_FROM_EMAIL
-RESEND_API_URL
-VOUCHER_DELIVERY_CHANNEL=website|email
-PROVIDER_RELAY_TOKEN
-PROVIDER_RELAY_HOSTS
-VOUCHER_ENCRYPTION_KEY
-```
-
-`INTEGRATION_ENCRYPTION_KEY` tetap Cloudflare Secret root minimal 32 karakter dan tidak disimpan di D1.
+Semua credential diisi melalui Integration Manager.
 
 ## VPS Relay
 
-Relay dikonfigurasi dari **Admin Panel → Integrasi & harga → VPS Relay** dan disimpan terenkripsi di D1.
-
-Field Admin Panel:
+Relay hanya untuk DigiFlazz:
 
 ```text
 DigiFlazz Relay URL
-iPaymu Relay URL
 Relay Token
 ```
 
-Tidak perlu membuat `PROVIDER_RELAY_*` manual di Cloudflare. Worker membentuk runtime relay dari profile terenkripsi tersebut.
-
-## Switching to Production
-
-1. Buka **Admin Panel → Integrasi & harga → Kredensial API & callback**.
-2. Isi credential pada slot Production provider terkait.
-3. Ubah selector environment menjadi **Production** lalu simpan.
-4. Jangan mengubah repo, Caddy, atau service VPS hanya untuk berpindah environment.
-
-Tidak ada fallback otomatis ke Production hanya karena credential Production sudah tersedia. `INTEGRATION_ENCRYPTION_KEY` tetap satu-satunya root secret integrasi yang wajib berada di Cloudflare.
-
-
-## Security root
-
-Credential provider di Integration Manager dienkripsi sebelum masuk D1. Satu-satunya root secret yang wajib tetap berada di Cloudflare adalah `INTEGRATION_ENCRYPTION_KEY` (minimal 32 karakter). Jika root secret berubah, profile lama tidak dapat didekripsi dan panel akan menandainya sebagai **Kunci enkripsi tidak cocok**.
+DOKU tidak menggunakan VPS relay. Lihat `relay/README.md`.
