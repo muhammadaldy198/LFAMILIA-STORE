@@ -1,59 +1,75 @@
 # Konfigurasi Integrasi LFAMILIA STORE
 
-Arsitektur production LFAMILIA:
+Arsitektur aktif LFAMILIA:
 
-- **1 payment gateway:** DOKU Checkout
-- **1 provider otomatis:** DigiFlazz
-- **Produk manual/stok internal:** diproses LFAMILIA
+- **Payment gateway:** DOKU Checkout
+- **Provider otomatis:** DigiFlazz
+- **Produk manual / stok internal:** diproses oleh LFAMILIA
 
-## 1. Migrasi D1
+## 1. Persiapan database DOKU
 
-Binding: `DB`, database: `lfamilia-store-db`, folder migrasi: `drizzle`.
+Tidak perlu menjalankan Wrangler dari Cloudflare.
 
-Setelah branch ini masuk ke deployment, jalankan:
+Buka:
 
-```bash
-npx wrangler d1 migrations apply lfamilia-store-db --remote
-```
+**Admin Panel → Integrasi & harga → Persiapan database DOKU**
 
-Migration `0023_doku_digiflazz_reset.sql` menambahkan kolom DOKU, menonaktifkan toggle gateway lama, menghapus profile Midtrans/iPaymu/VIPPayment, dan membersihkan data transaksi lama. Produk dan akun tidak ikut dihapus.
+Tekan **Persiapkan Database DOKU** satu kali sebelum mengaktifkan pembayaran. Proses ini:
+
+- menambahkan kolom DOKU yang belum tersedia;
+- menonaktifkan checkout/top up DOKU selama persiapan;
+- membersihkan transaksi pra-rilis;
+- mempertahankan produk, akun pelanggan, staff, katalog, dan konfigurasi toko;
+- menyimpan marker satu-kali agar transaksi baru tidak ikut dibersihkan pada penggunaan berikutnya.
 
 ## 2. Root encryption Cloudflare
 
-Cloudflare tetap membutuhkan satu secret sistem:
+Cloudflare hanya perlu menyimpan root secret Integration Manager:
 
 ```text
 INTEGRATION_ENCRYPTION_KEY
 ```
 
-Minimal 32 karakter dan jangan diganti setelah credential Integration Manager tersimpan.
+Gunakan nilai acak minimal 32 karakter. Jangan menggantinya setelah credential terenkripsi tersimpan di D1.
 
-## 3. DOKU dari Admin Panel
+## 3. DOKU
 
-Buka **Admin Panel → Integrasi & harga → Kredensial API & callback → DOKU Checkout**.
+Buka:
 
-Isi Sandbox atau Production:
+**Admin Panel → Integrasi & harga → Kredensial API & callback → DOKU Checkout**
+
+Simpan credential Sandbox dan Production secara terpisah:
 
 - Client ID
 - Secret Key
-- Checkout API URL (boleh dikosongkan agar memakai endpoint resmi)
-- pilih Environment DOKU yang aktif
+- Checkout API URL opsional
 
-Kemudian buka **Pembayaran** dan aktifkan DOKU untuk checkout dan/atau top up saldo.
+Endpoint default:
 
-### Notification URL DOKU
+- Sandbox: `https://api-sandbox.doku.com/checkout/v1/payment`
+- Production: `https://api.doku.com/checkout/v1/payment`
 
-Pasang URL berikut di dashboard DOKU:
+Pilih environment aktif dari Admin Panel.
+
+Notification URL:
 
 ```text
 https://lfamiliastore.my.id/api/payments/doku/callback
 ```
 
-DOKU Checkout redirect pelanggan kembali ke halaman LFAMILIA, sedangkan status pembayaran hanya dianggap sah setelah notification bertanda tangan berhasil diverifikasi server.
+Setelah credential siap, buka menu **Pembayaran** untuk mengaktifkan DOKU pada checkout dan/atau top up wallet.
 
 ## 4. DigiFlazz
 
-Buka **Integration Manager → DigiFlazz** lalu isi Username, API Key, Transaction API URL, Price List URL, dan Webhook Secret untuk environment yang dipakai.
+Buka **Integrasi & harga → Kredensial API & callback → DigiFlazz**.
+
+Isi:
+
+- Username
+- API Key
+- Transaction API URL
+- Price List URL
+- Webhook Secret
 
 Webhook:
 
@@ -61,42 +77,43 @@ Webhook:
 https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback
 ```
 
-Untuk nominal otomatis pilih **DigiFlazz** dan isi SKU provider. Produk manual tidak membutuhkan provider.
+Produk otomatis eksternal hanya memakai DigiFlazz. Produk manual tidak membutuhkan provider eksternal.
 
 ## 5. VPS Relay
 
-VPS relay sekarang hanya untuk DigiFlazz. DOKU berjalan langsung dari Worker.
+VPS relay hanya digunakan untuk DigiFlazz jika membutuhkan IP keluar statis.
 
 Di Admin Panel → VPS Relay isi:
 
 - DigiFlazz Relay URL
 - Relay Token
 
-Di VPS hapus konfigurasi host/upstream iPaymu/BI-SNAP lama, gunakan file `relay/server.mjs` dan `relay/Caddyfile.example` terbaru, lalu restart service relay dan reload Caddy.
+Gunakan source `relay/server.mjs` dan `relay/Caddyfile.example` terbaru di VPS.
+
+DOKU berjalan langsung dari Worker dan tidak melewati VPS relay.
 
 ## 6. Cloudflare Access
 
-Area Owner tetap dilindungi Cloudflare Access:
+Area Owner tetap dilindungi Cloudflare Access.
 
-- `/admin*`
-- `/api/admin*`
-
-Variable sistem yang tetap diperlukan sesuai konfigurasi Access:
+Worker membutuhkan:
 
 ```text
-TEAM_DOMAIN
-POLICY_AUD
+TEAM_DOMAIN=https://lfamilia.cloudflareaccess.com
+POLICY_AUD=<Application Audience aplikasi Access LFAMILIA>
 ```
 
-Credential DOKU/DigiFlazz tidak ditempatkan di Cloudflare Variables/Secrets.
+Credential DOKU dan DigiFlazz tidak ditempatkan di Cloudflare Variables/Secrets.
 
-## 7. Checklist sebelum buka toko
+## 7. Sebelum membuka toko
 
-- migrasi D1 `0023` sudah sukses
-- DOKU Sandbox diuji end-to-end
-- Notification URL DOKU menerima callback valid
-- DOKU Production credential diisi sebelum go-live
-- DigiFlazz SKU/harga/margin sudah sinkron dan diverifikasi
-- relay DigiFlazz sehat jika IP statis memang diperlukan
-- produk manual masuk ke antrean admin setelah pembayaran paid
-- tidak ada credential provider di GitHub
+Pastikan:
+
+- Persiapan database DOKU sudah berstatus siap.
+- DOKU Sandbox berhasil diuji end-to-end.
+- Notification DOKU tervalidasi.
+- Credential Production DOKU sudah diisi sebelum go-live.
+- DigiFlazz SKU, harga, dan margin sudah diverifikasi.
+- Relay DigiFlazz sehat bila memang digunakan.
+- Produk manual masuk antrean Admin setelah pembayaran lunas.
+- Tidak ada credential provider di GitHub.
