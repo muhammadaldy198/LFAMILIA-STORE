@@ -67,6 +67,64 @@ export async function saveWalletSettings(input: WalletSettings) {
     .run();
 }
 
+export async function createAutomaticWalletTopup(input: {
+  customerId: string;
+  amount: number;
+  name: string;
+  paymentMethod: string;
+  paymentChannel: string;
+  referenceId: string;
+  gateway: "ipaymu" | "midtrans";
+}) {
+  await ensureLegacyDatabaseColumns();
+  const id = crypto.randomUUID();
+  await getD1()
+    .prepare(
+      `INSERT INTO wallet_topups (id, customer_id, amount, sender_name, payment_method, proof_url, source, reference_id)
+       VALUES (?, ?, ?, ?, ?, '', ?, ?)`,
+    )
+    .bind(
+      id,
+      input.customerId,
+      input.amount,
+      input.name,
+      `${input.paymentMethod}:${input.paymentChannel}`,
+      input.gateway,
+      input.referenceId,
+    )
+    .run();
+  return id;
+}
+
+export async function switchAutomaticWalletTopupGateway(
+  referenceId: string,
+  gateway: "ipaymu" | "midtrans",
+) {
+  await ensureLegacyDatabaseColumns();
+  const result = await getD1()
+    .prepare(
+      `UPDATE wallet_topups
+       SET source = ?,
+           midtrans_transaction_id = NULL,
+           midtrans_payment_no = NULL,
+           midtrans_payment_name = NULL,
+           midtrans_payment_url = NULL,
+           midtrans_expired_at = NULL,
+           ipaymu_transaction_id = NULL,
+           ipaymu_payment_no = NULL,
+           ipaymu_payment_name = NULL,
+           ipaymu_payment_url = NULL,
+           ipaymu_expired_at = NULL,
+           payment_fee = 0,
+           payment_total = 0,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE reference_id = ? AND status = 'pending'`,
+    )
+    .bind(gateway, referenceId)
+    .run();
+  return Number(result.meta.changes ?? 0) > 0;
+}
+
 export async function createMidtransWalletTopup(input: {
   customerId: string;
   amount: number;
@@ -75,28 +133,12 @@ export async function createMidtransWalletTopup(input: {
   paymentChannel: string;
   referenceId: string;
 }) {
-  await ensureLegacyDatabaseColumns();
-  const id = crypto.randomUUID();
-  await getD1()
-    .prepare(
-      `INSERT INTO wallet_topups (id, customer_id, amount, sender_name, payment_method, proof_url, source, reference_id)
-     VALUES (?, ?, ?, ?, ?, '', 'midtrans', ?)`,
-    )
-    .bind(
-      id,
-      input.customerId,
-      input.amount,
-      input.name,
-      `${input.paymentMethod}:${input.paymentChannel}`,
-      input.referenceId,
-    )
-    .run();
-  return id;
+  return createAutomaticWalletTopup({ ...input, gateway: "midtrans" });
 }
 
 export async function updateMidtransWalletTopup(input: {
   referenceId: string;
-  mode: "snap" | "bisnap";
+  mode: "snap";
   transactionId: string | null;
   paymentNo: string | null;
   paymentName: string | null;
@@ -168,7 +210,7 @@ export async function applyMidtransWalletTopup(input: {
   const db = getD1();
   if (input.status === "paid") {
     const reference = `topup:${topup.id}`;
-    await db.batch([
+    const results = await db.batch([
       db
         .prepare(
           `INSERT INTO wallet_transactions (id, customer_id, direction, amount, balance_before, balance_after, reference, description)
@@ -196,7 +238,9 @@ export async function applyMidtransWalletTopup(input: {
         )
         .bind(topup.customer_id, topup.customer_id),
     ]);
-    return { found: true, credited: topup.status === "pending" };
+    const inserted = Number(results[0]?.meta.changes ?? 0) > 0;
+    const approved = Number(results[1]?.meta.changes ?? 0) > 0;
+    return { found: true, credited: inserted && approved };
   }
   if (input.status === "expired" || input.status === "failed") {
     await db
@@ -223,23 +267,7 @@ export async function createIpaymuWalletTopup(input: {
   paymentChannel: string;
   referenceId: string;
 }) {
-  await ensureLegacyDatabaseColumns();
-  const id = crypto.randomUUID();
-  await getD1()
-    .prepare(
-      `INSERT INTO wallet_topups (id, customer_id, amount, sender_name, payment_method, proof_url, source, reference_id)
-       VALUES (?, ?, ?, ?, ?, '', 'ipaymu', ?)`,
-    )
-    .bind(
-      id,
-      input.customerId,
-      input.amount,
-      input.name,
-      `${input.paymentMethod}:${input.paymentChannel}`,
-      input.referenceId,
-    )
-    .run();
-  return id;
+  return createAutomaticWalletTopup({ ...input, gateway: "ipaymu" });
 }
 
 export async function updateIpaymuWalletTopup(input: {
