@@ -1,19 +1,16 @@
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
-export type IntegrationProvider = "midtrans" | "ipaymu" | "digiflazz" | "vippayment" | "melostore" | "resend" | "relay" | "security";
-export type IntegrationMode = "snap" | "direct" | "service";
+export type IntegrationProvider = "doku" | "digiflazz" | "melostore" | "resend" | "relay" | "security";
+export type IntegrationMode = "direct" | "service";
 export type IntegrationEnvironment = "sandbox" | "production" | "development" | "global";
 
 type RuntimeLike = Record<string, unknown> & {
   DB?: D1Database;
   INTEGRATION_ENCRYPTION_KEY?: string;
   PUBLIC_BASE_URL?: string;
-  MIDTRANS_MODE?: string;
-  MIDTRANS_ENV?: string;
-  IPAYMU_ENV?: string;
+  DOKU_ENV?: string;
   DIGIFLAZZ_ENV?: string;
-  VIPPAYMENT_ENV?: string;
   MELOSTORE_API_KEY?: string;
   MELOSTORE_SECRET_KEY?: string;
   MELOSTORE_API_URL?: string;
@@ -25,7 +22,6 @@ type RuntimeLike = Record<string, unknown> & {
   PROVIDER_RELAY_TOKEN?: string;
   PROVIDER_RELAY_HOSTS?: string;
   PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?: string;
-  PROVIDER_RELAY_IPAYMU_ORIGIN?: string;
   VOUCHER_ENCRYPTION_KEY?: string;
 };
 
@@ -56,24 +52,19 @@ export type IntegrationOverview = {
   encryptionReady: boolean;
   encryptionHint: string;
   selections: {
-    midtransMode: "snap";
-    midtransEnvironment: "sandbox" | "production";
-    ipaymuEnvironment: "sandbox" | "production";
+    dokuEnvironment: "sandbox" | "production";
     digiflazzEnvironment: "development" | "production";
-    vippaymentEnvironment: "sandbox" | "production";
   };
   profiles: IntegrationProfileSummary[];
   callbacks: Array<{ id: string; label: string; description: string; kind: "notification" | "callback" | "fallback"; url: string }>;
 };
 
 export const profileFields: Record<string, readonly string[]> = {
-  "midtrans:snap": ["serverKey", "clientKey", "apiUrl", "scriptUrl"],
-  "ipaymu:direct": ["virtualAccount", "apiKey", "apiUrl"],
+  "doku:direct": ["clientId", "secretKey", "apiUrl"],
   "digiflazz:direct": ["username", "apiKey", "transactionApiUrl", "priceListUrl", "webhookSecret"],
-  "vippayment:direct": ["apiId", "apiKey", "apiUrl"],
   "melostore:service": ["apiKey", "secretKey", "apiUrl", "nicknameApiKey"],
   "resend:service": ["apiKey", "fromEmail", "apiUrl", "deliveryChannel"],
-  "relay:service": ["digiflazzOrigin", "ipaymuOrigin", "hosts", "token"],
+  "relay:service": ["digiflazzOrigin", "hosts", "token"],
   "security:service": ["voucherEncryptionKey"],
 };
 
@@ -86,10 +77,8 @@ function profileFieldKey(provider: IntegrationProvider, mode: IntegrationMode) {
 }
 
 function isProfileSupported(provider: IntegrationProvider, mode: IntegrationMode, environment: IntegrationEnvironment) {
-  if (provider === "midtrans") return mode === "snap" && (environment === "sandbox" || environment === "production");
-  if (provider === "ipaymu") return mode === "direct" && (environment === "sandbox" || environment === "production");
+  if (provider === "doku") return mode === "direct" && (environment === "sandbox" || environment === "production");
   if (provider === "digiflazz") return mode === "direct" && (environment === "development" || environment === "production");
-  if (provider === "vippayment") return mode === "direct" && (environment === "sandbox" || environment === "production");
   return (provider === "melostore" || provider === "resend" || provider === "relay" || provider === "security")
     && mode === "service"
     && environment === "global";
@@ -107,10 +96,8 @@ function runtime() {
 function withoutDashboardManagedRuntime(source: RuntimeLike) {
   const target: Record<string, unknown> = { ...source };
   const managedPrefixes = [
-    "MIDTRANS_",
-    "IPAYMU_",
+    "DOKU_",
     "DIGIFLAZZ_",
-    "VIPPAYMENT_",
     "MELOSTORE_",
     "RESEND_",
     "PROVIDER_RELAY_",
@@ -225,12 +212,9 @@ function publicBaseUrl(value: RuntimeLike) {
 function buildCallbacks(baseUrl: string) {
   const route = (path: string) => baseUrl ? `${baseUrl}${path}` : path;
   return [
-    { id: "midtrans-snap", label: "Midtrans Snap Notification URL", description: "Notification URL pada dashboard Midtrans.", kind: "notification" as const, url: route("/api/payments/midtrans/callback") },
-    { id: "midtrans-fallback", label: "Midtrans Fallback URL", description: "Landing page umum bila dashboard meminta return/fallback URL.", kind: "fallback" as const, url: route("/track") },
-    { id: "ipaymu", label: "iPaymu Callback / Notification URL", description: "Callback pembayaran otomatis iPaymu.", kind: "callback" as const, url: route("/api/payments/ipaymu/callback") },
-    { id: "ipaymu-fallback", label: "iPaymu Fallback URL", description: "Landing page umum bila provider meminta return/fallback URL.", kind: "fallback" as const, url: route("/track") },
+    { id: "doku", label: "DOKU Notification URL", description: "Pasang sebagai Payment Notification URL di dashboard DOKU.", kind: "notification" as const, url: route("/api/payments/doku/callback") },
+    { id: "doku-fallback", label: "DOKU Result / Fallback URL", description: "Halaman LFAMILIA setelah pelanggan kembali dari DOKU.", kind: "fallback" as const, url: route("/track") },
     { id: "digiflazz", label: "DigiFlazz Webhook", description: "Webhook status fulfillment DigiFlazz.", kind: "callback" as const, url: route("/api/fulfillment/digiflazz/callback") },
-    { id: "vippayment", label: "VIPayment Webhook", description: "Webhook status fulfillment VIPayment.", kind: "callback" as const, url: route("/api/fulfillment/vippayment/callback") },
   ];
 }
 
@@ -269,11 +253,8 @@ export async function getIntegrationOverview(): Promise<IntegrationOverview> {
       ? "Kredensial disimpan terenkripsi dan tidak ditampilkan kembali setelah disimpan."
       : "Tambahkan Cloudflare Secret INTEGRATION_ENCRYPTION_KEY (minimal 32 karakter) satu kali untuk mengaktifkan penyimpanan terenkripsi.",
     selections: {
-      midtransMode: "snap",
-      midtransEnvironment: valueOr(selected.get("midtrans_environment") || current.MIDTRANS_ENV, ["sandbox", "production"] as const, "sandbox"),
-      ipaymuEnvironment: valueOr(selected.get("ipaymu_environment") || current.IPAYMU_ENV, ["sandbox", "production"] as const, "sandbox"),
+      dokuEnvironment: valueOr(selected.get("doku_environment") || current.DOKU_ENV, ["sandbox", "production"] as const, "sandbox"),
       digiflazzEnvironment: valueOr(selected.get("digiflazz_environment") || current.DIGIFLAZZ_ENV, ["development", "production"] as const, "development"),
-      vippaymentEnvironment: valueOr(selected.get("vippayment_environment") || current.VIPPAYMENT_ENV, ["sandbox", "production"] as const, "production"),
     },
     profiles: configuredProfiles,
     callbacks: buildCallbacks(publicBaseUrl(current)),
@@ -330,18 +311,12 @@ export async function saveIntegrationProfile(input: {
 
 export async function saveIntegrationSelections(input: Partial<IntegrationOverview["selections"]>) {
   const normalized = {
-    midtransMode: input.midtransMode ? "snap" as const : undefined,
-    midtransEnvironment: input.midtransEnvironment && valueOr(input.midtransEnvironment, ["sandbox", "production"] as const, "sandbox"),
-    ipaymuEnvironment: input.ipaymuEnvironment && valueOr(input.ipaymuEnvironment, ["sandbox", "production"] as const, "sandbox"),
+    dokuEnvironment: input.dokuEnvironment && valueOr(input.dokuEnvironment, ["sandbox", "production"] as const, "sandbox"),
     digiflazzEnvironment: input.digiflazzEnvironment && valueOr(input.digiflazzEnvironment, ["development", "production"] as const, "development"),
-    vippaymentEnvironment: input.vippaymentEnvironment && valueOr(input.vippaymentEnvironment, ["sandbox", "production"] as const, "production"),
   };
   const values: Array<[string, string | undefined]> = [
-    ["midtrans_mode", normalized.midtransMode],
-    ["midtrans_environment", normalized.midtransEnvironment],
-    ["ipaymu_environment", normalized.ipaymuEnvironment],
+    ["doku_environment", normalized.dokuEnvironment],
     ["digiflazz_environment", normalized.digiflazzEnvironment],
-    ["vippayment_environment", normalized.vippaymentEnvironment],
   ];
   const database = getD1();
   await ensureIntegrationTables(database);
@@ -357,18 +332,10 @@ function put(target: Record<string, unknown>, key: string, value: string | undef
   if (value?.trim()) target[key] = value.trim();
 }
 
-function applySnapConfig(target: Record<string, unknown>, environment: "sandbox" | "production", config: Record<string, string>) {
-  const prefix = `MIDTRANS_SNAP_${environment.toUpperCase()}_`;
-  put(target, `${prefix}SERVER_KEY`, config.serverKey);
-  put(target, `${prefix}CLIENT_KEY`, config.clientKey);
-  put(target, `${prefix}API_URL`, config.apiUrl);
-  put(target, `${prefix}SCRIPT_URL`, config.scriptUrl);
-}
-
-function applyIpaymuConfig(target: Record<string, unknown>, environment: "sandbox" | "production", config: Record<string, string>) {
-  const prefix = `IPAYMU_${environment.toUpperCase()}_`;
-  put(target, `${prefix}VA`, config.virtualAccount);
-  put(target, `${prefix}API_KEY`, config.apiKey);
+function applyDokuConfig(target: Record<string, unknown>, environment: "sandbox" | "production", config: Record<string, string>) {
+  const prefix = `DOKU_${environment.toUpperCase()}_`;
+  put(target, `${prefix}CLIENT_ID`, config.clientId);
+  put(target, `${prefix}SECRET_KEY`, config.secretKey);
   put(target, `${prefix}API_URL`, config.apiUrl);
 }
 
@@ -381,13 +348,6 @@ function applyDigiflazzConfig(target: Record<string, unknown>, environment: "dev
     put(target, "DIGIFLAZZ_USERNAME", config.username);
     put(target, "DIGIFLAZZ_WEBHOOK_SECRET", config.webhookSecret);
   }
-}
-
-function applyVipPaymentConfig(target: Record<string, unknown>, config: Record<string, string>, active: boolean) {
-  if (!active) return;
-  put(target, "VIPPAYMENT_API_ID", config.apiId);
-  put(target, "VIPPAYMENT_API_KEY", config.apiKey);
-  put(target, "VIPPAYMENT_API_URL", config.apiUrl);
 }
 
 function applyMelostoreConfig(target: Record<string, unknown>, config: Record<string, string>) {
@@ -405,7 +365,6 @@ function applyResendConfig(target: Record<string, unknown>, config: Record<strin
 }
 function applyRelayConfig(target: Record<string, unknown>, config: Record<string, string>) {
   put(target, "PROVIDER_RELAY_DIGIFLAZZ_ORIGIN", config.digiflazzOrigin);
-  put(target, "PROVIDER_RELAY_IPAYMU_ORIGIN", config.ipaymuOrigin);
   put(target, "PROVIDER_RELAY_HOSTS", config.hosts);
   put(target, "PROVIDER_RELAY_TOKEN", config.token);
 }
@@ -424,16 +383,10 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
     await ensureIntegrationTables(database);
     const [profiles, settings] = await Promise.all([readStoredProfiles(database), readStoredSettings(database)]);
     const target: Record<string, unknown> = { ...systemOnly };
-    const midtransMode = "snap" as const;
-    const midtransEnvironment = valueOr(settings.get("midtrans_environment"), ["sandbox", "production"] as const, "sandbox");
-    const ipaymuEnvironment = valueOr(settings.get("ipaymu_environment"), ["sandbox", "production"] as const, "sandbox");
+    const dokuEnvironment = valueOr(settings.get("doku_environment"), ["sandbox", "production"] as const, "sandbox");
     const digiflazzEnvironment = valueOr(settings.get("digiflazz_environment"), ["development", "production"] as const, "development");
-    const vippaymentEnvironment = valueOr(settings.get("vippayment_environment"), ["sandbox", "production"] as const, "production");
-    target.MIDTRANS_MODE = midtransMode;
-    target.MIDTRANS_ENV = midtransEnvironment;
-    target.IPAYMU_ENV = ipaymuEnvironment;
+    target.DOKU_ENV = dokuEnvironment;
     target.DIGIFLAZZ_ENV = digiflazzEnvironment;
-    target.VIPPAYMENT_ENV = vippaymentEnvironment;
 
     for (const profile of profiles) {
       let config: Record<string, string>;
@@ -442,17 +395,11 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
       } catch {
         continue;
       }
-      if (profile.provider === "midtrans" && profile.mode === "snap" && (profile.environment === "sandbox" || profile.environment === "production")) {
-        applySnapConfig(target, profile.environment, config);
-      }
-      if (profile.provider === "ipaymu" && profile.mode === "direct" && (profile.environment === "sandbox" || profile.environment === "production")) {
-        applyIpaymuConfig(target, profile.environment, config);
+      if (profile.provider === "doku" && profile.mode === "direct" && (profile.environment === "sandbox" || profile.environment === "production")) {
+        applyDokuConfig(target, profile.environment, config);
       }
       if (profile.provider === "digiflazz" && profile.mode === "direct" && (profile.environment === "development" || profile.environment === "production")) {
         applyDigiflazzConfig(target, profile.environment, config, profile.environment === digiflazzEnvironment);
-      }
-      if (profile.provider === "vippayment" && profile.mode === "direct") {
-        applyVipPaymentConfig(target, config, profile.environment === vippaymentEnvironment);
       }
       if (profile.provider === "melostore" && profile.mode === "service" && profile.environment === "global") applyMelostoreConfig(target, config);
       if (profile.provider === "resend" && profile.mode === "service" && profile.environment === "global") applyResendConfig(target, config);
