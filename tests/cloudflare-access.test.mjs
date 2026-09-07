@@ -72,6 +72,28 @@ function requestWith(token) {
   });
 }
 
+test("accepts the Access JWT from CF_Authorization cookie when origin header is absent", async () => {
+  const token = await signToken(keyPair.privateKey, {
+    iss: teamDomain,
+    aud: [audience],
+    email: "CookieOwner@Example.com",
+    iat: now,
+    nbf: now - 1,
+    exp: now + 300,
+  });
+
+  const request = new Request("https://lfamiliastore.my.id/admin/panel", {
+    headers: {
+      cookie: `foo=bar; CF_Authorization=${token}; theme=dark`,
+    },
+  });
+
+  assert.deepEqual(
+    await verifyCloudflareAccess(request, env, fetchJwks),
+    { email: "cookieowner@example.com" },
+  );
+});
+
 test("accepts a correctly signed Access JWT and trusts its email claim", async () => {
   const token = await signToken(keyPair.privateKey, {
     iss: teamDomain,
