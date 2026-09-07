@@ -128,6 +128,7 @@ export type PromotionQuote = {
   discountAmount: number;
   finalPrice: number;
   voucherCode: string | null;
+  voucherId: number | null;
   flashSaleId: number | null;
   flashSaleEndsAt: string | null;
   memberTier: MemberTier | null;
@@ -180,6 +181,7 @@ export async function quotePromotion(
   const discountAmount = useMemberDiscount ? memberDiscountAmount : voucherDiscountAmount;
   const discountSource = discountAmount > 0 ? (useMemberDiscount ? "member" : "voucher") : null;
   const appliedCode = discountSource === "voucher" ? voucher?.code ?? null : null;
+  const appliedVoucherId = discountSource === "voucher" ? voucher?.id ?? null : null;
 
   return {
     basePrice,
@@ -187,6 +189,7 @@ export async function quotePromotion(
     discountAmount,
     finalPrice: Math.max(1, sellingPrice - discountAmount),
     voucherCode: appliedCode,
+    voucherId: appliedVoucherId,
     flashSaleId: flash?.id ?? null,
     flashSaleEndsAt: flash?.ends_at ?? null,
     memberTier: member?.tier ?? null,
