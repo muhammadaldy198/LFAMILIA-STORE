@@ -761,7 +761,6 @@ function TopupForm({
   onError(value: string): void;
 }) {
   const [amount, setAmount] = useState("");
-  const [gateway, setGateway] = useState<"midtrans" | "ipaymu">(settings?.midtransTopupEnabled ? "midtrans" : "ipaymu");
   const [method, setMethod] = useState<"qris" | "va" | "ewallet">("qris");
   const [saving, setSaving] = useState(false);
   const [payment, setPayment] = useState<{
@@ -777,7 +776,6 @@ function TopupForm({
   const midtransReady = Boolean(settings?.midtransTopupEnabled);
   const ipaymuReady = Boolean(settings?.ipaymuTopupEnabled);
   const automaticReady = midtransReady || ipaymuReady;
-  const activeGateway = gateway === "midtrans" && midtransReady ? "midtrans" : gateway === "ipaymu" && ipaymuReady ? "ipaymu" : midtransReady ? "midtrans" : "ipaymu";
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -788,7 +786,7 @@ function TopupForm({
       const response = await fetch("/api/account/topups", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mode: activeGateway, amount: Number(amount), paymentMethod: method, paymentChannel: channel }),
+        body: JSON.stringify({ amount: Number(amount), paymentMethod: method, paymentChannel: channel }),
       });
       const data = await response.json() as {
         error?: string; referenceId?: string; midtransMode?: "snap" | "bisnap";
@@ -814,7 +812,9 @@ function TopupForm({
   return <form onSubmit={submit} className="rounded-xl border border-white/[0.08] bg-[#0d1019] p-5">
     <h2 className="font-bold">Top up saldo otomatis</h2>
     <p className="mt-2 text-xs leading-5 text-white/40">Saldo masuk otomatis setelah pembayaran dikonfirmasi gateway.</p>
-    {midtransReady && ipaymuReady && <div className="mt-4 grid grid-cols-2 gap-2">{(["midtrans","ipaymu"] as const).map((item) => <button key={item} type="button" onClick={() => setGateway(item)} className={`rounded-lg border px-3 py-2 text-[10px] font-bold ${activeGateway === item ? "border-[#b9ff35] bg-[#b9ff35]/10 text-[#d8ff8d]" : "border-white/10 text-white/45"}`}>{item === "midtrans" ? "Midtrans" : "iPaymu"}</button>)}</div>}
+    <div className="mt-4 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-[10px] leading-4 text-white/42">
+      Gateway dipilih otomatis berdasarkan nominal dan metode pembayaran.
+    </div>
     <div className="mt-4 grid grid-cols-3 gap-2">{(["qris","va","ewallet"] as const).map((item) => <button key={item} type="button" onClick={() => setMethod(item)} className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase ${method === item ? "border-[#b9ff35] bg-[#b9ff35] text-[#091006]" : "border-white/10 text-white/50"}`}>{item === "va" ? "Bank VA" : item}</button>)}</div>
     <div className="mt-4"><Field label={`Nominal (min. ${formatRupiah(settings?.minTopup ?? 10_000)})`}><Input required type="number" min={settings?.minTopup ?? 10_000} value={amount} onChange={(event) => setAmount(event.target.value)} className="checkout-input" /></Field></div>
     <Button disabled={saving} className="mt-4 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006]">{saving ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <ArrowUpRight className="mr-2 size-4" />}Lanjut bayar</Button>
