@@ -62,6 +62,19 @@ type NicknameState = {
   message?: string;
 };
 
+type SavedGameValue = {
+  id: string;
+  label: string;
+  value: string;
+};
+
+type SavedGameAccount = {
+  id: string;
+  label: string;
+  nickname: string | null;
+  values: SavedGameValue[];
+};
+
 type PaymentResult = {
   referenceId: string;
   paymentNo: string | null;
@@ -220,6 +233,8 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const [quote, setQuote] = useState<PromotionQuote | null>(null);
   const [applyingVoucher, setApplyingVoucher] = useState(false);
   const [account, setAccount] = useState<CustomerSession | null>(null);
+  const [savedGameAccounts, setSavedGameAccounts] = useState<SavedGameAccount[]>([]);
+  const [selectedSavedGameAccountId, setSelectedSavedGameAccountId] = useState("");
   const [gatewayOptions, setGatewayOptions] = useState<CheckoutGateway[]>([]);
   const [paymentMethodsLoaded, setPaymentMethodsLoaded] = useState(false);
 
@@ -261,6 +276,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     [product.inputFields, product.inputLabel, product.inputPlaceholder, product.needsServer],
   );
   const isVoucherProduct = product.category.trim().toLowerCase() === "voucher";
+  const isGameProduct = product.category.trim().toLowerCase() === "game";
   const destination = isVoucherProduct
     ? INTERNAL_VOUCHER_DESTINATION
     : productInputFields[0]
@@ -416,6 +432,28 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   }, []);
 
   useEffect(() => {
+    setSavedGameAccounts([]);
+    setSelectedSavedGameAccountId("");
+    if (!account?.id || !isGameProduct || isVoucherProduct) return;
+
+    const controller = new AbortController();
+    void fetch(
+      `/api/account/game-accounts?product=${encodeURIComponent(product.slug)}`,
+      { cache: "no-store", signal: controller.signal },
+    )
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          accounts?: SavedGameAccount[];
+        };
+        setSavedGameAccounts(data.accounts ?? []);
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [account?.id, isGameProduct, isVoucherProduct, product.slug]);
+
+  useEffect(() => {
     if (!selectedPackage) return;
     const controller = new AbortController();
     void requestQuote(product.slug, selectedPackage.id, "", controller.signal)
@@ -542,6 +580,26 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     setVoucherCode("");
     setVoucherMessage("");
     setQuote(null);
+  }
+
+  function chooseSavedGameAccount(id: string) {
+    setSelectedSavedGameAccountId(id);
+    const saved = savedGameAccounts.find((item) => item.id === id);
+    if (!saved) return;
+
+    const savedById = new Map(
+      saved.values.map((item) => [item.id, item.value]),
+    );
+    setCustomerInputValues(
+      Object.fromEntries(
+        productInputFields.map((field) => [
+          field.id,
+          savedById.get(field.id) ?? "",
+        ]),
+      ),
+    );
+    setPayment(null);
+    setError("");
   }
 
   function choosePackageGroup(group: string) {
@@ -785,6 +843,26 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                       <Link href="/catalog" className="mt-0.5 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link>
                     </div>
                   </div>
+
+                  {savedGameAccounts.length > 0 && (
+                    <label className="mb-3 block rounded-lg border border-[#b9ff35]/18 bg-[#b9ff35]/[0.045] p-2.5">
+                      <span className="block text-[10px] font-bold text-[#d8ff8d]">
+                        Akun game tersimpan
+                      </span>
+                      <select
+                        value={selectedSavedGameAccountId}
+                        onChange={(event) => chooseSavedGameAccount(event.target.value)}
+                        className="mt-1.5 h-9 w-full rounded-lg border border-white/10 bg-[#171c27] px-2.5 text-[11px] text-white outline-none"
+                      >
+                        <option value="">Isi manual</option>
+                        {savedGameAccounts.map((saved) => (
+                          <option key={saved.id} value={saved.id}>
+                            {saved.label}{saved.nickname ? ` · ${saved.nickname}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
 
                   {productInputFields.length ? (
                     <div className={productInputFields.length > 1 ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
