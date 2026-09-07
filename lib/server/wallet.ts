@@ -125,6 +125,23 @@ export async function switchAutomaticWalletTopupGateway(
   return Number(result.meta.changes ?? 0) > 0;
 }
 
+export async function markAutomaticWalletTopupCreationFailed(
+  referenceId: string,
+  message: string,
+) {
+  await ensureLegacyDatabaseColumns();
+  await getD1()
+    .prepare(
+      `UPDATE wallet_topups
+       SET status = 'rejected',
+           admin_notes = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE reference_id = ? AND status = 'pending'`,
+    )
+    .bind(message.slice(0, 500), referenceId)
+    .run();
+}
+
 export async function createMidtransWalletTopup(input: {
   customerId: string;
   amount: number;
