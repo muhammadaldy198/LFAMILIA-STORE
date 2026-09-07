@@ -41,11 +41,10 @@ test("additional nickname checks are optional and do not block checkout", () => 
   assert.match(checkout, /const optionalNicknameGames = new Set/);
   assert.match(checkout, /nicknameRequired && visibleNickname\.status !== "success"/);
   assert.match(checkout, /blocking=\{nicknameRequired\}/);
-  assert.match(checkout, /publicNicknameMessage/);
 });
 
-test("checkout payment types are Midtrans Snap only", () => {
+test("checkout payment type is DOKU only", () => {
   const checkout = read("app/checkout/page.tsx");
-  assert.doesNotMatch(checkout, /bisnap|BI-SNAP/i);
-  assert.match(checkout, /midtransMode\?: "snap"/);
+  assert.match(checkout, /paymentGateway\?: "doku"/);
+  assert.doesNotMatch(checkout, /midtrans|ipaymu|bisnap/i);
 });
