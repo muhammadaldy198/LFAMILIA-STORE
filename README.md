@@ -26,7 +26,7 @@ npm run lint
 npm test
 ```
 
-Konfigurasi Worker berada di `wrangler.jsonc`. Binding database harus bernama `DB`. Terapkan seluruh migrasi di folder `drizzle` secara berurutan. Migration lama dipertahankan apa adanya karena dapat sudah tercatat di D1 production; dua file berawalan `0006_` adalah riwayat legacy dan tidak boleh di-rename. Cloudflare D1 melacak nama file SQL melalui `d1_migrations`; `drizzle/meta/_journal.json` hanya metadata Drizzle lama yang berhenti di 0002. Jangan menjalankan `drizzle-kit generate` sampai metadata Drizzle dibaseline ulang. Kolom legacy tertentu masih dipulihkan idempotently oleh `lib/server/database-repair.ts`, dan perubahan schema baru tidak boleh menambah ketergantungan baru pada repair runtime.
+Konfigurasi Worker berada di `wrangler.jsonc`. Binding database harus bernama `DB`. Untuk deployment aktif, persiapan schema DOKU dilakukan dari Admin Panel melalui kontrol Persiapan database DOKU. Migration SQL tetap tersedia sebagai baseline untuk instalasi baru, sedangkan metadata Drizzle lama yang sudah tidak sinkron telah dihapus.
 
 Panduan secret, callback, provider, relay, dan pengiriman kode tersedia di [INTEGRATION-SETUP.md](./INTEGRATION-SETUP.md).
 
