@@ -236,9 +236,9 @@ test("scheduled recovery releases an abandoned reservation atomically and idempo
   database.prepare(
     "UPDATE orders SET promotion_reserved_until = datetime('now', '-1 minute') WHERE id = 'order-abandoned'",
   ).run();
-  const { releaseAbandonedPromotionReservation } = await import("../lib/server/orders.ts");
-  assert.equal(await releaseAbandonedPromotionReservation("order-abandoned"), true);
-  assert.equal(await releaseAbandonedPromotionReservation("order-abandoned"), false);
+  const { releaseExpiredPromotionReservation } = await import("../lib/server/orders.ts");
+  assert.equal(await releaseExpiredPromotionReservation("order-abandoned"), true);
+  assert.equal(await releaseExpiredPromotionReservation("order-abandoned"), false);
   assert.deepEqual(
     {
       payment: database.prepare("SELECT payment_status AS value FROM orders WHERE id = 'order-abandoned'").get().value,
@@ -251,24 +251,42 @@ test("scheduled recovery releases an abandoned reservation atomically and idempo
   database.close();
 });
 
-test("abandoned recovery cannot release an attached or paid payment", async () => {
+test("expired attached payment releases quota and a late success consumes it once", async () => {
   const database = createDatabase();
   seedPromotions(database);
   setRuntimeEnv({ DB: new TestD1(database) });
-  const { releaseAbandonedPromotionReservation } = await import("../lib/server/orders.ts");
+  const { releaseExpiredPromotionReservation } = await import("../lib/server/orders.ts");
 
   await insertPendingOrder(orderInput("order-attached", "REF-ATTACHED"));
   database.prepare(
     "UPDATE orders SET promotion_reserved_until = datetime('now', '-1 minute'), midtrans_payment_url = 'https://pay.example.test' WHERE id = 'order-attached'",
   ).run();
-  assert.equal(await releaseAbandonedPromotionReservation("order-attached"), false);
+  assert.equal(await releaseExpiredPromotionReservation("order-attached"), true);
+  assert.equal(database.prepare("SELECT used_count AS count FROM discount_vouchers WHERE id = 1").get().count, 0);
+  assert.equal(database.prepare("SELECT sold_count AS count FROM flash_sales WHERE id = 7").get().count, 0);
 
+  const released = await getOrderById("order-attached");
+  assert.equal(await applyPaymentStatus(released, "paid"), true);
+  assert.equal(await applyPaymentStatus(released, "paid"), false);
+  assert.equal(await releaseExpiredPromotionReservation("order-attached"), false);
+  assert.equal(database.prepare("SELECT used_count AS count FROM discount_vouchers WHERE id = 1").get().count, 1);
+  assert.equal(database.prepare("SELECT sold_count AS count FROM flash_sales WHERE id = 7").get().count, 1);
+  database.close();
+});
+
+test("paid callback wins safely when it races expiration cleanup", async () => {
+  const database = createDatabase();
+  seedPromotions(database);
+  setRuntimeEnv({ DB: new TestD1(database) });
+  const { releaseExpiredPromotionReservation } = await import("../lib/server/orders.ts");
+
+  await insertPendingOrder(orderInput("order-paid-first", "REF-PAID-FIRST"));
   database.prepare(
-    "UPDATE orders SET midtrans_payment_url = NULL WHERE id = 'order-attached'",
+    "UPDATE orders SET promotion_reserved_until = datetime('now', '-1 minute') WHERE id = 'order-paid-first'",
   ).run();
-  const attached = await getOrderById("order-attached");
-  assert.equal(await applyPaymentStatus(attached, "paid"), true);
-  assert.equal(await releaseAbandonedPromotionReservation("order-attached"), false);
+  const pending = await getOrderById("order-paid-first");
+  assert.equal(await applyPaymentStatus(pending, "paid"), true);
+  assert.equal(await releaseExpiredPromotionReservation("order-paid-first"), false);
   assert.equal(database.prepare("SELECT used_count AS count FROM discount_vouchers WHERE id = 1").get().count, 1);
   assert.equal(database.prepare("SELECT sold_count AS count FROM flash_sales WHERE id = 7").get().count, 1);
   database.close();
