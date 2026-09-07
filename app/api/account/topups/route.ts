@@ -1,21 +1,18 @@
 import { z } from "zod";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
-import { createMidtransPayment } from "@/lib/server/midtrans";
 import {
-  createIpaymuDirectPayment,
-  IpaymuProviderError,
-} from "@/lib/server/ipaymu";
+  createDokuCheckoutPayment,
+  getDokuReadiness,
+  isDokuChannelSupported,
+} from "@/lib/server/doku";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
-import { routePaymentGateway } from "@/lib/server/payment-gateway-router";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 import {
-  createAutomaticWalletTopup,
+  createDokuWalletTopup,
   markAutomaticWalletTopupCreationFailed,
   readWalletSettings,
-  switchAutomaticWalletTopupGateway,
-  updateIpaymuWalletTopup,
-  updateMidtransWalletTopup,
+  updateDokuWalletTopup,
 } from "@/lib/server/wallet";
 
 const automaticSchema = z.object({
@@ -33,122 +30,54 @@ export async function POST(request: Request) {
   if (!rate.allowed) {
     return Response.json(
       { error: "Terlalu banyak permintaan top up. Coba lagi beberapa menit." },
-      {
-        status: 429,
-        headers: { "Retry-After": String(rate.retryAfter) },
-      },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfter) } },
     );
   }
 
   let referenceId: string | null = null;
-
   try {
     if (!request.headers.get("content-type")?.includes("application/json")) {
-      throw new Error("Top up saldo hanya tersedia melalui payment gateway otomatis.");
+      throw new Error("Top up saldo hanya tersedia melalui DOKU.");
     }
 
     const settings = await readWalletSettings();
+    const readiness = getDokuReadiness();
+    if (!settings.dokuTopupEnabled || !readiness.ready) {
+      throw new Error(
+        readiness.ready
+          ? "DOKU sedang dinonaktifkan untuk top up saldo."
+          : readiness.reason || "Konfigurasi DOKU belum siap.",
+      );
+    }
+
     const input = automaticSchema.parse(await request.json());
     if (input.amount < settings.minTopup) {
-      throw new Error(
-        `Minimum top up Rp${settings.minTopup.toLocaleString("id-ID")}.`,
-      );
+      throw new Error(`Minimum top up Rp${settings.minTopup.toLocaleString("id-ID")}.`);
     }
 
     const paymentChannel =
       input.paymentMethod === "qris" && input.paymentChannel === "qris"
         ? "mpm"
         : input.paymentChannel;
-
-    if (!(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel))) {
-      throw new Error("Metode pembayaran otomatis tidak tersedia.");
-    }
-
-    const routing = routePaymentGateway({
-      amount: input.amount,
-      paymentMethod: input.paymentMethod,
-      paymentChannel,
-      ipaymuEnabled: settings.ipaymuTopupEnabled,
-      midtransEnabled: settings.midtransTopupEnabled,
-    });
-    const [primary, fallback] = routing.candidates;
-    if (!primary) {
-      throw new Error(
-        "Tidak ada payment gateway yang siap untuk top up ini. Periksa toggle, credential, nominal, dan channel pembayaran.",
-      );
+    if (
+      !isDokuChannelSupported(input.paymentMethod, paymentChannel) ||
+      !(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel))
+    ) {
+      throw new Error("Metode pembayaran ini belum didukung atau sedang dinonaktifkan di DOKU.");
     }
 
     referenceId = `WLT-${crypto.randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
-    await createAutomaticWalletTopup({
+    await createDokuWalletTopup({
       customerId: customer.id,
       amount: input.amount,
       name: customer.name,
       paymentMethod: input.paymentMethod,
       paymentChannel,
       referenceId,
-      gateway: primary,
     });
 
     const baseUrl = getPublicBaseUrl();
-
-    if (primary === "ipaymu") {
-      try {
-        const payment = await createIpaymuDirectPayment({
-          name: customer.name,
-          phone: customer.phone,
-          email: customer.email,
-          amount: input.amount,
-          notifyUrl: `${baseUrl}/api/payments/ipaymu/callback`,
-          referenceId,
-          paymentMethod: input.paymentMethod,
-          paymentChannel,
-          productName: "Top up Saldo LFAMILIA",
-          productPrice: input.amount,
-        });
-        await updateIpaymuWalletTopup({
-          referenceId,
-          transactionId: payment.transactionId,
-          paymentNo: payment.paymentNo,
-          paymentName: payment.paymentName,
-          paymentUrl: payment.paymentUrl,
-          expiredAt: payment.expiredAt,
-          fee: payment.fee,
-          total: payment.total,
-        });
-        return Response.json(
-          {
-            ok: true,
-            paymentGateway: "ipaymu",
-            referenceId,
-            paymentMethod: input.paymentMethod,
-            paymentChannel,
-            paymentNo: payment.paymentNo,
-            paymentName: payment.paymentName,
-            paymentUrl: payment.paymentUrl,
-            total: payment.total,
-            fee: payment.fee,
-            expiredAt: payment.expiredAt,
-          },
-          { status: 201 },
-        );
-      } catch (error) {
-        const safeFallback =
-          error instanceof IpaymuProviderError && error.safeToFallback;
-        if (!safeFallback || fallback !== "midtrans") throw error;
-
-        const switched = await switchAutomaticWalletTopupGateway(
-          referenceId,
-          "midtrans",
-        );
-        if (!switched) {
-          throw new Error(
-            "Top up tidak dapat dialihkan ke gateway cadangan karena status transaksi sudah berubah.",
-          );
-        }
-      }
-    }
-
-    const payment = await createMidtransPayment({
+    const payment = await createDokuCheckoutPayment({
       buyerName: customer.name,
       buyerPhone: customer.phone,
       buyerEmail: customer.email,
@@ -159,28 +88,25 @@ export async function POST(request: Request) {
       productName: "Top up Saldo LFAMILIA",
       finishUrl: `${baseUrl}/account`,
     });
-    await updateMidtransWalletTopup({
+
+    await updateDokuWalletTopup({
       referenceId,
-      mode: payment.mode,
-      transactionId: payment.transactionId,
-      paymentNo: payment.paymentNo,
-      paymentName: payment.paymentName,
+      requestId: payment.requestId,
+      tokenId: payment.tokenId,
       paymentUrl: payment.paymentUrl,
       expiredAt: payment.expiredAt,
-      fee: 0,
       total: input.amount,
     });
 
     return Response.json(
       {
         ok: true,
-        paymentGateway: "midtrans",
-        midtransMode: payment.mode,
+        paymentGateway: "doku",
         referenceId,
         paymentMethod: input.paymentMethod,
         paymentChannel,
-        paymentNo: payment.paymentNo,
-        paymentName: payment.paymentName,
+        paymentNo: null,
+        paymentName: "DOKU Checkout",
         paymentUrl: payment.paymentUrl,
         total: input.amount,
         fee: 0,
@@ -201,7 +127,6 @@ export async function POST(request: Request) {
         () => undefined,
       );
     }
-
     return Response.json(
       { error: message },
       { status: error instanceof z.ZodError ? 400 : 503 },
