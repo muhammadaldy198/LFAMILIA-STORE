@@ -60,22 +60,9 @@ export async function getDokuDatabasePreparationStatus() {
   };
 }
 
-async function disableLegacyPaymentToggles() {
-  const columns = await tableColumns("wallet_settings");
-  const assignments = [
-    "doku_topup_enabled = 0",
-    "doku_checkout_enabled = 0",
-  ];
-  for (const legacy of [
-    "midtrans_topup_enabled",
-    "midtrans_checkout_enabled",
-    "ipaymu_topup_enabled",
-    "ipaymu_checkout_enabled",
-  ]) {
-    if (columns.has(legacy)) assignments.push(`${legacy} = 0`);
-  }
+async function initializeDokuPaymentToggles() {
   await getD1()
-    .prepare(`UPDATE wallet_settings SET ${assignments.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = 1`)
+    .prepare("UPDATE wallet_settings SET doku_topup_enabled = 0, doku_checkout_enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE id = 1")
     .run();
 }
 
@@ -97,7 +84,7 @@ export async function prepareDokuDatabase() {
     }
   }
 
-  await disableLegacyPaymentToggles();
+  await initializeDokuPaymentToggles();
 
   await db.batch([
     db.prepare("DELETE FROM order_events"),
@@ -105,11 +92,11 @@ export async function prepareDokuDatabase() {
     db.prepare("DELETE FROM orders"),
     db.prepare("DELETE FROM wallet_transactions"),
     db.prepare("DELETE FROM wallet_topups"),
-    db.prepare("DELETE FROM integration_profiles WHERE provider IN ('midtrans', 'ipaymu', 'vippayment')"),
-    db.prepare("DELETE FROM integration_settings WHERE setting_key IN ('midtrans_mode', 'midtrans_environment', 'ipaymu_environment', 'vippayment_environment')"),
+    db.prepare("DELETE FROM integration_profiles WHERE provider NOT IN ('doku', 'digiflazz', 'melostore', 'resend', 'relay', 'security')"),
+    db.prepare("DELETE FROM integration_settings WHERE setting_key NOT IN ('doku_environment', 'digiflazz_environment', 'doku_migration_completed')"),
     db.prepare(`UPDATE faq_entries
-      SET question = replace(replace(question, 'iPaymu', 'DOKU'), 'Midtrans', 'DOKU'),
-          answer = replace(replace(answer, 'iPaymu', 'DOKU'), 'Midtrans', 'DOKU')`),
+      SET answer = 'Virtual Account bank, dompet digital, dan QRIS tersedia melalui DOKU sesuai channel yang sedang aktif.'
+      WHERE question = 'Metode pembayaran apa yang tersedia?'`),
     db.prepare(`INSERT INTO integration_settings (setting_key, value, updated_at)
       VALUES (?, '1', CURRENT_TIMESTAMP)
       ON CONFLICT(setting_key) DO UPDATE SET value = '1', updated_at = CURRENT_TIMESTAMP`)
