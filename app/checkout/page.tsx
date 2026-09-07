@@ -247,6 +247,15 @@ function CheckoutContent() {
     },
     ...gatewayPaymentGroups,
   ], [gatewayPaymentGroups]);
+  const hasExternalPaymentOption = gatewayPaymentGroups.length > 0;
+  const isIpaymuMinimumBlocked =
+    subtotal > 0 &&
+    subtotal < IPAYMU_MIN_CHECKOUT_AMOUNT &&
+    gatewayOptions.some((gateway) => gateway.code === "ipaymu") &&
+    !hasExternalPaymentOption;
+  const unavailablePaymentMessage = isIpaymuMinimumBlocked
+    ? `iPaymu tersedia mulai ${formatRupiah(IPAYMU_MIN_CHECKOUT_AMOUNT)}. Pilih nominal lain atau gunakan Koin LFAMILIA.`
+    : "Pilih metode pembayaran yang tersedia.";
 
   const chooseMethod = useCallback((method: CheckoutPaymentMethod) => {
     setPayment(null);
@@ -506,6 +515,13 @@ function CheckoutContent() {
       setError("Tunggu sampai nickname akun berhasil diverifikasi.");
       return;
     }
+    if (
+      (paymentMethod === "wallet" && !account) ||
+      (paymentMethod !== "wallet" && !paymentChannel)
+    ) {
+      setError(unavailablePaymentMessage);
+      return;
+    }
     setError("");
     setConfirmationOpen(true);
   }
@@ -520,6 +536,13 @@ function CheckoutContent() {
     }
     if (canCheckNickname && visibleNickname.status !== "success") {
       setError("Tunggu sampai nickname akun berhasil diverifikasi.");
+      return;
+    }
+    if (
+      (paymentMethod === "wallet" && !account) ||
+      (paymentMethod !== "wallet" && !paymentChannel)
+    ) {
+      setError(unavailablePaymentMessage);
       return;
     }
     if (!providerReady) {
@@ -746,9 +769,9 @@ function CheckoutContent() {
                   title="Pilih Pembayaran"
                   description="Pilih metode pembayaran yang ingin digunakan."
                 />
-                {subtotal > 0 && subtotal < IPAYMU_MIN_CHECKOUT_AMOUNT && gatewayOptions.some((gateway) => gateway.code === "ipaymu") && (
+                {isIpaymuMinimumBlocked && (
                   <div className="mt-3 rounded-md border border-amber-300/15 bg-amber-300/[0.05] px-2.5 py-2 text-[9px] leading-4 text-amber-100/70">
-                    Metode pembayaran yang tersedia sudah disesuaikan otomatis dengan nominal transaksi.
+                    {unavailablePaymentMessage}
                   </div>
                 )}
                 {!paymentMethodsLoaded && (
@@ -757,9 +780,9 @@ function CheckoutContent() {
                     Memuat metode pembayaran…
                   </div>
                 )}
-                {paymentMethodsLoaded && gatewayPaymentGroups.length === 0 && (
+                {paymentMethodsLoaded && !hasExternalPaymentOption && !isIpaymuMinimumBlocked && (
                   <div className="mt-3 rounded-md border border-amber-300/20 bg-amber-300/[0.05] px-3 py-2 text-[10px] leading-4 text-amber-100/75">
-                    Metode pembayaran otomatis belum tersedia. Periksa gateway dan channel aktif di panel admin.
+                    Pembayaran melalui gateway belum tersedia. Kamu masih bisa memakai Koin LFAMILIA bila saldo mencukupi.
                   </div>
                 )}
                 <div className="mt-3 space-y-2">
