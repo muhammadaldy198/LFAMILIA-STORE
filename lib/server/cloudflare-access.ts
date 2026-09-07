@@ -112,6 +112,81 @@ export function getCloudflareAccessConfigStatus(env: AccessEnvironment) {
   };
 }
 
+export function diagnoseCloudflareAccessRequest(
+  request: Request,
+  env: AccessEnvironment,
+) {
+  const assertion = getCloudflareAccessAssertion(request);
+  const teamDomain = normalizeTeamDomain(env.TEAM_DOMAIN);
+  const audience = env.POLICY_AUD?.trim();
+
+  if (!teamDomain) return { reason: "TEAM_DOMAIN_INVALID" as const };
+  if (!audience) return { reason: "POLICY_AUD_MISSING" as const };
+  if (!assertion) return { reason: "ACCESS_TOKEN_MISSING" as const };
+
+  try {
+    const segments = assertion.split(".");
+    if (segments.length !== 3 || segments.some((segment) => !segment)) {
+      return { reason: "ACCESS_TOKEN_MALFORMED" as const };
+    }
+
+    const claims = parseJwtSegment<AccessJwtClaims>(segments[1]);
+    const issuer =
+      typeof claims.iss === "string"
+        ? claims.iss.replace(/\/$/, "")
+        : "";
+    if (issuer !== teamDomain) {
+      return {
+        reason: "ACCESS_ISSUER_MISMATCH" as const,
+        receivedIssuer: issuer || "(missing)",
+        expectedIssuer: teamDomain,
+      };
+    }
+
+    if (!hasAudience(claims.aud, audience)) {
+      const receivedAudience =
+        typeof claims.aud === "string"
+          ? claims.aud
+          : Array.isArray(claims.aud)
+            ? claims.aud.filter((item): item is string => typeof item === "string").join(", ")
+            : "(missing)";
+      return {
+        reason: "ACCESS_AUDIENCE_MISMATCH" as const,
+        receivedAudience,
+        expectedAudience: audience,
+      };
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (
+      typeof claims.exp !== "number" ||
+      claims.exp <= now - CLOCK_SKEW_SECONDS
+    ) {
+      return { reason: "ACCESS_TOKEN_EXPIRED" as const };
+    }
+    if (
+      (typeof claims.nbf === "number" &&
+        claims.nbf > now + CLOCK_SKEW_SECONDS) ||
+      (typeof claims.iat === "number" &&
+        claims.iat > now + CLOCK_SKEW_SECONDS)
+    ) {
+      return { reason: "ACCESS_TOKEN_TIME_INVALID" as const };
+    }
+
+    if (
+      typeof claims.email !== "string" ||
+      !claims.email.includes("@") ||
+      claims.email.length > 320
+    ) {
+      return { reason: "ACCESS_EMAIL_MISSING" as const };
+    }
+
+    return { reason: "ACCESS_SIGNATURE_OR_JWKS_INVALID" as const };
+  } catch {
+    return { reason: "ACCESS_TOKEN_MALFORMED" as const };
+  }
+}
+
 async function fetchJwks(
   teamDomain: string,
   fetchAccess: AccessFetch,
