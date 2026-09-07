@@ -1,4 +1,4 @@
- import { hashHex, safeEqual } from "@/lib/server/crypto";
+import { hashHex, safeEqual } from "@/lib/server/crypto";
 import {
   getRuntimeEnv,
   requireRuntimeChoice,
@@ -9,7 +9,7 @@ export type MidtransEnvironment = "sandbox" | "production";
 export type MidtransMode = "snap";
 
 type MidtransRuntime = {
-   MIDTRANS_ENV?: string;
+  MIDTRANS_ENV?: string;
   MIDTRANS_SNAP_SANDBOX_SERVER_KEY?: string;
   MIDTRANS_SNAP_PRODUCTION_SERVER_KEY?: string;
   MIDTRANS_SNAP_SANDBOX_API_URL?: string;
