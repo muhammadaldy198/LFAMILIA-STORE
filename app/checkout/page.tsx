@@ -47,11 +47,22 @@ import type { CustomerSession } from "@/lib/server/customer-auth";
 
 const INTERNAL_VOUCHER_DESTINATION = "00000000";
 
-const nicknameSupported = new Set([
+const requiredNicknameGames = new Set([
   "mobile-legends",
   "free-fire",
   "genshin-impact",
   "valorant",
+]);
+
+const optionalNicknameGames = new Set([
+  "pubg-mobile",
+  "honor-of-kings",
+  "call-of-duty-mobile",
+  "wild-rift",
+  "arena-of-valor",
+  "fc-mobile",
+  "efootball",
+  "point-blank",
 ]);
 
 type NicknameState = {
@@ -134,6 +145,18 @@ const groupIcons = {
 
 function packageGroupName(value?: string) {
   return value?.trim() || "Umum";
+}
+
+function normalizeWhatsapp(value: string) {
+  const hasPlus = value.trim().startsWith("+");
+  const digits = value.replace(/\D/g, "").slice(0, 16);
+  return `${hasPlus ? "+" : ""}${digits}`;
+}
+
+function publicNicknameMessage(value: string) {
+  return value
+    .replace(/Melostore/gi, "layanan verifikasi")
+    .replace(/API Key atau Secret Key/gi, "Konfigurasi layanan");
 }
 
 export default function CheckoutPage() {
@@ -299,8 +322,11 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const providerReady =
     isManual ||
     Boolean(selectedPackage?.providerCode && selectedPackage?.providerSku);
+  const nicknameRequired =
+    !isVoucherProduct && requiredNicknameGames.has(product.slug);
   const canCheckNickname =
-    !isVoucherProduct && nicknameSupported.has(product.slug);
+    !isVoucherProduct &&
+    (nicknameRequired || optionalNicknameGames.has(product.slug));
   const lookupNeedsServer = product.slug === "mobile-legends";
   const lookupKey = `${product.slug}:${destination.trim()}:${server.trim()}`;
   const visibleNickname: NicknameState =
@@ -465,7 +491,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     const cleanServer = server.trim();
     if (
       !canCheckNickname ||
-      cleanId.length < 4 ||
+      cleanId.length < (nicknameRequired ? 4 : 2) ||
       (lookupNeedsServer && cleanServer.length < 1)
     )
       return;
@@ -503,7 +529,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
           key: lookupKey,
           message:
             reason instanceof Error
-              ? reason.message
+              ? publicNicknameMessage(reason.message)
               : "Nickname gagal diperiksa.",
         });
       }
@@ -515,6 +541,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   }, [
     canCheckNickname,
     destination,
+    nicknameRequired,
     lookupKey,
     lookupNeedsServer,
     product.slug,
@@ -668,7 +695,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       setError("Lengkapi data yang wajib, nominal, email, nomor WhatsApp, dan pembayaran.");
       return;
     }
-    if (canCheckNickname && visibleNickname.status !== "success") {
+    if (nicknameRequired && visibleNickname.status !== "success") {
       setError("Tunggu sampai nickname akun berhasil diverifikasi.");
       return;
     }
@@ -698,7 +725,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       );
       return;
     }
-    if (canCheckNickname && visibleNickname.status !== "success") {
+    if (nicknameRequired && visibleNickname.status !== "success") {
       setError("Tunggu sampai nickname akun berhasil diverifikasi.");
       return;
     }
