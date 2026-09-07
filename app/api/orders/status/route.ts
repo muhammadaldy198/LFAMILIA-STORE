@@ -7,8 +7,8 @@ import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 export const dynamic = "force-dynamic";
 
 const legacyReference = /^LF-\d{8}-[A-F0-9]{8,12}$/;
-const compactReference = /^LF\d{6}[A-F0-9]{12}$/;
-const publicReference = /^LF[A-F0-9]{8,12}$/;
+const compactReference = /^LF\d{6}(?:[A-F0-9]{12}|[A-F0-9]{32})$/;
+const publicReference = /^LF(?:[A-F0-9]{8}|[A-F0-9]{12})$/;
 
 const schema = z.object({
   referenceId: z.string().trim().toUpperCase().refine(
