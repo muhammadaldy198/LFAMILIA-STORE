@@ -25,20 +25,6 @@ function normalizePhoneVariants(value: string) {
   ]));
 }
 
-function maskInvoice(value: string) {
-  const clean = value.trim().toUpperCase();
-  if (clean.length <= 10) return `${clean.slice(0, 3)}••••${clean.slice(-3)}`;
-  const prefix = clean.slice(0, 6);
-  const suffix = clean.slice(-4);
-  return `${prefix}${"•".repeat(Math.min(Math.max(clean.length - 10, 4), 10))}${suffix}`;
-}
-
-function publicReferenceId(value: string) {
-  if (!value.includes("-")) return value;
-  const token = value.split("-").at(-1) ?? value;
-  return `LF${token}`;
-}
-
 function publicStatus(paymentStatus: string, fulfillmentStatus: string) {
   if (["failed", "expired"].includes(paymentStatus)) return paymentStatus;
   if (fulfillmentStatus === "success") return "success";
@@ -48,7 +34,6 @@ function publicStatus(paymentStatus: string, fulfillmentStatus: string) {
 }
 
 type OrderSummaryRow = {
-  reference_id: string;
   product_name: string;
   package_label: string;
   total: number;
@@ -57,11 +42,10 @@ type OrderSummaryRow = {
   created_at: string;
 };
 
-function mapSummary(row: OrderSummaryRow, exposeReference: boolean) {
-  const referenceId = publicReferenceId(row.reference_id);
+function mapSummary(row: OrderSummaryRow) {
   return {
-    referenceId: exposeReference ? referenceId : null,
-    maskedReferenceId: maskInvoice(referenceId),
+    referenceId: null,
+    maskedReferenceId: "Dirahasiakan",
     productName: row.product_name,
     packageLabel: row.package_label,
     total: row.total,
@@ -74,7 +58,7 @@ export async function GET() {
   try {
     const result = await getD1()
       .prepare(
-        `SELECT reference_id, product_name, package_label, total,
+        `SELECT product_name, package_label, total,
          payment_status, fulfillment_status, created_at
          FROM orders
          ORDER BY created_at DESC
@@ -83,7 +67,7 @@ export async function GET() {
       .all<OrderSummaryRow>();
 
     return Response.json(
-      { transactions: result.results.map((row) => mapSummary(row, false)) },
+      { transactions: result.results.map((row) => mapSummary(row)) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch {
@@ -112,7 +96,7 @@ export async function POST(request: Request) {
     const placeholders = variants.map(() => "?").join(", ");
     const result = await getD1()
       .prepare(
-        `SELECT reference_id, product_name, package_label, total,
+        `SELECT product_name, package_label, total,
          payment_status, fulfillment_status, created_at
          FROM orders
          WHERE buyer_phone IN (${placeholders})
@@ -123,7 +107,7 @@ export async function POST(request: Request) {
       .all<OrderSummaryRow>();
 
     return Response.json(
-      { orders: result.results.map((row) => mapSummary(row, false)) },
+      { orders: result.results.map((row) => mapSummary(row)) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
