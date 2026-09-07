@@ -42,7 +42,6 @@ import {
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
 import { formatRupiah, type StoreProduct } from "@/lib/store-data";
-import { IPAYMU_MIN_CHECKOUT_AMOUNT, isIpaymuAmountSupported } from "@/lib/payment-limits";
 import type { CustomerSession } from "@/lib/server/customer-auth";
 
 const INTERNAL_VOUCHER_DESTINATION = "00000000";
@@ -102,9 +101,8 @@ type PaymentResult = {
   voucherCode: string | null;
   flashSaleId: number | null;
   paymentMethod?: string;
-  paymentGateway?: "ipaymu" | "midtrans";
+  paymentGateway?: "doku";
   publicInvoice?: string;
-  midtransMode?: "snap";
   paymentStatus?: "paid" | "pending";
   balanceAfter?: number;
 };
@@ -122,16 +120,14 @@ type PromotionQuote = {
 type CheckoutPaymentMethod = PaymentMethodCode | "wallet";
 type DisplayPaymentChannel = PaymentChannel & { imageUrl?: string };
 type CheckoutGateway = {
-  code: "midtrans" | "ipaymu";
+  code: "doku";
   label: string;
-  midtransMode: "snap" | null;
   environment: "sandbox" | "production" | null;
   channels: DisplayPaymentChannel[];
 };
 
 type CheckoutGatewayConfig = {
-  gateway: "midtrans" | "ipaymu" | null;
-  midtransMode: "snap" | null;
+  gateway: "doku" | null;
   environment: "sandbox" | "production" | null;
   channels?: DisplayPaymentChannel[];
   gateways?: CheckoutGateway[];
@@ -312,12 +308,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       ? (customerInputValues[productInputFields[1].id] ?? "")
       : "";
   const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
-  const eligibleGatewayOptions = useMemo(
-    () => gatewayOptions.filter((gateway) =>
-      gateway.code !== "ipaymu" || subtotal <= 0 || isIpaymuAmountSupported(subtotal),
-    ),
-    [gatewayOptions, subtotal],
-  );
+  const eligibleGatewayOptions = gatewayOptions;
   const isManual = product.fulfillmentType === "manual";
   const isVoucherStock = selectedPackage?.providerCode === "voucher-stock";
   const providerReady =
@@ -371,14 +362,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     ...gatewayPaymentGroups,
   ], [gatewayPaymentGroups]);
   const hasExternalPaymentOption = gatewayPaymentGroups.length > 0;
-  const isIpaymuMinimumBlocked =
-    subtotal > 0 &&
-    subtotal < IPAYMU_MIN_CHECKOUT_AMOUNT &&
-    gatewayOptions.some((gateway) => gateway.code === "ipaymu") &&
-    !hasExternalPaymentOption;
-  const unavailablePaymentMessage = isIpaymuMinimumBlocked
-    ? `iPaymu tersedia mulai ${formatRupiah(IPAYMU_MIN_CHECKOUT_AMOUNT)}. Pilih nominal lain atau gunakan Koin LFAMILIA.`
-    : "Pilih metode pembayaran yang tersedia.";
+  const unavailablePaymentMessage = "Pilih metode pembayaran yang tersedia.";
 
   const chooseMethod = useCallback((method: CheckoutPaymentMethod) => {
     setPayment(null);
@@ -408,8 +392,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
         const fallbackGateways: CheckoutGateway[] = data.gateway
           ? [{
               code: data.gateway,
-              label: data.gateway === "midtrans" ? "Midtrans Snap" : "iPaymu",
-              midtransMode: data.midtransMode ?? null,
+              label: "DOKU Checkout",
               environment: data.environment ?? null,
               channels: data.channels ?? [],
             }]
@@ -1006,18 +989,13 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                   title="Pilih Pembayaran"
                   description="Pilih metode pembayaran yang ingin digunakan."
                 />
-                {isIpaymuMinimumBlocked && (
-                  <div className="mt-3 rounded-md border border-amber-300/15 bg-amber-300/[0.05] px-2.5 py-2 text-[9px] leading-4 text-amber-100/70">
-                    {unavailablePaymentMessage}
-                  </div>
-                )}
                 {!paymentMethodsLoaded && (
                   <div className="mt-3 flex items-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-[10px] text-white/45">
                     <LoaderCircle className="size-3.5 animate-spin" />
                     Memuat metode pembayaran…
                   </div>
                 )}
-                {paymentMethodsLoaded && !hasExternalPaymentOption && !isIpaymuMinimumBlocked && (
+                {paymentMethodsLoaded && !hasExternalPaymentOption && (
                   <div className="mt-3 rounded-md border border-amber-300/20 bg-amber-300/[0.05] px-3 py-2 text-[10px] leading-4 text-amber-100/75">
                     Pembayaran melalui gateway belum tersedia. Kamu masih bisa memakai Koin LFAMILIA bila saldo mencukupi.
                   </div>
