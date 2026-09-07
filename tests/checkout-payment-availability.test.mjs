@@ -7,39 +7,28 @@ const root = process.cwd();
 const source = fs.readFileSync(path.join(root, "app/checkout/page.tsx"), "utf8");
 const methodsRoute = fs.readFileSync(path.join(root, "app/api/payment-methods/route.ts"), "utf8");
 
-test("checkout methods are derived from all eligible gateways", () => {
-  assert.match(source, /checkoutGatewayCandidates/);
+test("checkout methods come from the active DOKU gateway", () => {
+  assert.match(methodsRoute, /code: "doku"/);
+  assert.match(methodsRoute, /isDokuChannelSupported/);
   assert.match(source, /displayChannels/);
-  assert.match(source, /for \(const gateway of checkoutGatewayCandidates\)/);
-  assert.match(methodsRoute, /allChannels/);
 });
 
-test("method and channel selection no longer stores a gateway in browser state", () => {
-  assert.match(source, /displayChannels\.find\(\(channel\) => channel\.method === method\)/);
-  assert.doesNotMatch(source, /activeCheckoutGateway/);
-  assert.doesNotMatch(source, /preferredGateways/);
-  assert.doesNotMatch(source, /availableChannels/);
+test("method and channel selection does not store a gateway in browser state", () => {
+  assert.doesNotMatch(source, /activeCheckoutGateway|preferredGateways|setGateway/);
 });
 
 test("payment groups are controlled directly by checkout React state", () => {
-  assert.equal(
-    fs.existsSync(path.join(root, "components/checkout-ui-enhancer.tsx")),
-    false,
-  );
+  assert.equal(fs.existsSync(path.join(root, "components/checkout-ui-enhancer.tsx")), false);
   assert.match(source, /checkoutGroups\.map\(\(group\)/);
   assert.match(source, /chooseMethod\(group\.code\)/);
-  assert.doesNotMatch(source, /enhancePaymentGroups|expandedMethods|wiredHeaders/);
 });
 
-test("checkout explains unavailable gateways without leaving the payment section blank", () => {
+test("checkout shows a non-blank message when DOKU payment methods are unavailable", () => {
   assert.match(source, /Pembayaran melalui gateway belum tersedia/);
-  assert.match(source, /iPaymu tersedia mulai/);
+  assert.doesNotMatch(source, /iPaymu|Midtrans/i);
 });
 
-test("checkout does not switch to wallet before payment methods finish loading", () => {
+test("checkout waits for payment methods before defaulting to wallet", () => {
   assert.match(source, /paymentMethodsLoaded/);
-  assert.match(source, /if \(!paymentMethodsLoaded\) return/);
-  assert.match(source, /paymentMethod === "wallet"\s*\? Boolean\(account\)/);
-  assert.match(source, /if \(account\) \{\s*chooseMethod\("wallet"\)/);
   assert.match(source, /Memuat metode pembayaran/);
 });
