@@ -95,12 +95,13 @@ test("Worker cryptographically validates Cloudflare Access assertions", () => {
 
   const verifier = read("lib/server/cloudflare-access.ts");
   for (const requirement of [
-    "RSASSA-PKCS1-v1_5",
-    "SHA-256",
+    "createRemoteJWKSet",
+    "jwtVerify",
+    'algorithms: ["RS256"]',
     "POLICY_AUD",
     "TEAM_DOMAIN",
-    "claims.exp",
-    "claims.iss",
+    "issuer: teamDomain",
+    "audience",
   ]) {
     assert.ok(verifier.includes(requirement), requirement);
   }
