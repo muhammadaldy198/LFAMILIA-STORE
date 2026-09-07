@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type Provider = "midtrans" | "ipaymu" | "digiflazz" | "vippayment" | "melostore" | "resend" | "relay" | "security";
-type Mode = "snap" | "bisnap" | "direct" | "service";
+type Mode = "snap" | "direct" | "service";
 type Environment = "sandbox" | "production" | "development" | "global";
 
 type Field = {
@@ -52,7 +52,7 @@ type Overview = {
   encryptionReady: boolean;
   encryptionHint: string;
   selections: {
-    midtransMode: "snap" | "bisnap";
+    midtransMode: "snap";
     midtransEnvironment: "sandbox" | "production";
     ipaymuEnvironment: "sandbox" | "production";
     digiflazzEnvironment: "development" | "production";
@@ -63,7 +63,7 @@ type Overview = {
 };
 
 type RelayConnectionResult = {
-  provider: "digiflazz" | "ipaymu" | "midtrans-bisnap";
+  provider: "digiflazz" | "ipaymu";
   label: string;
   connected: boolean;
   status: number | null;
@@ -76,7 +76,7 @@ const definitions: Definition[] = [
     provider: "midtrans",
     mode: "snap",
     title: "Midtrans Snap",
-    description: "Pilihan paling sederhana untuk QRIS, e-wallet, dan virtual account dalam satu halaman pembayaran.",
+    description: "Gateway cadangan otomatis untuk QRIS, e-wallet, dan virtual account ketika iPaymu tidak dapat digunakan.",
     environments: ["sandbox", "production"],
     fields: [
       { key: "serverKey", label: "Server Key", secret: true, placeholder: "SB-Mid-server-… / Mid-server-…" },
@@ -86,40 +86,11 @@ const definitions: Definition[] = [
     ],
   },
   {
-    id: "midtrans-bisnap",
-    provider: "midtrans",
-    mode: "bisnap",
-    title: "Midtrans BI-SNAP",
-    description: "Untuk integrasi API BI-SNAP langsung. Isi data merchant dan endpoint resmi yang diberikan Midtrans untuk environment tersebut.",
-    environments: ["sandbox", "production"],
-    fields: [
-      { key: "clientId", label: "Client ID", secret: true },
-      { key: "privateKey", label: "Private Key (PEM)", secret: true, multiline: true, placeholder: "-----BEGIN PRIVATE KEY-----" },
-      { key: "clientSecret", label: "Client Secret", secret: true },
-      { key: "partnerId", label: "Partner ID", secret: true },
-      { key: "channelId", label: "Channel ID" },
-      { key: "merchantId", label: "Merchant ID" },
-      { key: "vaPartnerServiceId", label: "VA Partner Service ID" },
-      { key: "vaRandomize", label: "Randomize VA", placeholder: "true atau false" },
-      { key: "qrisAcquirer", label: "QRIS Acquirer" },
-      { key: "accessTokenUrl", label: "Access Token URL", inputMode: "url" },
-      { key: "directDebitUrl", label: "Direct Debit URL", inputMode: "url" },
-      { key: "qrisUrl", label: "QRIS API URL", inputMode: "url" },
-      { key: "vaUrl", label: "Virtual Account URL", inputMode: "url" },
-      { key: "publicKey", label: "Public Key Callback (PEM)", multiline: true, placeholder: "-----BEGIN PUBLIC KEY-----" },
-      { key: "timezoneOffset", label: "Timezone Offset", placeholder: "+07:00" },
-      { key: "currency", label: "Currency", placeholder: "IDR" },
-      { key: "deviceId", label: "Device ID" },
-      { key: "paymentExpiryMinutes", label: "Masa berlaku pembayaran (menit)", placeholder: "30" },
-      { key: "tokenExpirySafetySeconds", label: "Buffer masa token (detik)", placeholder: "60" },
-    ],
-  },
-  {
     id: "ipaymu",
     provider: "ipaymu",
     mode: "direct",
     title: "iPaymu",
-    description: "Gateway alternatif untuk QRIS, e-wallet, dan virtual account dengan callback pembayaran otomatis.",
+    description: "Gateway utama LFAMILIA untuk QRIS, e-wallet, dan virtual account dengan callback pembayaran otomatis.",
     environments: ["sandbox", "production"],
     fields: [
       { key: "virtualAccount", label: "Virtual Account (VA)", secret: true },
@@ -193,7 +164,6 @@ const definitions: Definition[] = [
     fields: [
       { key: "digiflazzOrigin", label: "DigiFlazz Relay URL", inputMode: "url", placeholder: "https://digiflazz-relay.lfamiliastore.my.id" },
       { key: "ipaymuOrigin", label: "iPaymu Relay URL", inputMode: "url", placeholder: "https://ipaymu-relay.lfamiliastore.my.id" },
-      { key: "bisnapOrigin", label: "BI-SNAP Relay URL", inputMode: "url", placeholder: "https://bisnap-relay.lfamiliastore.my.id" },
       { key: "token", label: "Relay Token", secret: true, help: "Harus sama persis dengan RELAY_TOKEN pada VPS." },
     ],
   },
@@ -404,8 +374,7 @@ export function AdminIntegrationManager({
             {saving === "selections" ? <LoaderCircle className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}Simpan pilihan
           </Button>
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          <SelectField label="Mode Midtrans" value={selections.midtransMode} onChange={(value) => setSelections((current) => current ? { ...current, midtransMode: value as "snap" | "bisnap" } : current)} options={[['snap', 'Snap'], ['bisnap', 'BI-SNAP']]} />
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           <SelectField label="Environment Midtrans" value={selections.midtransEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, midtransEnvironment: value as "sandbox" | "production" } : current)} options={[['sandbox', 'Sandbox'], ['production', 'Production']]} />
           <SelectField label="Environment iPaymu" value={selections.ipaymuEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, ipaymuEnvironment: value as "sandbox" | "production" } : current)} options={[['sandbox', 'Sandbox'], ['production', 'Production']]} />
           <SelectField label="Environment DigiFlazz" value={selections.digiflazzEnvironment} onChange={(value) => setSelections((current) => current ? { ...current, digiflazzEnvironment: value as "development" | "production" } : current)} options={[['development', 'Development'], ['production', 'Production']]} />
@@ -416,7 +385,7 @@ export function AdminIntegrationManager({
       {view === "relay" && (
         <>
           <div className="rounded-lg border border-sky-300/20 bg-sky-300/[0.045] p-3 text-[10px] leading-4 text-white/52">
-            Relay menghubungkan Worker LFAMILIA ke VPS ber-IP statis. Isi URL DigiFlazz, iPaymu, BI-SNAP, dan Relay Token di sini. Semua disimpan terenkripsi di D1; tidak perlu membuat PROVIDER_RELAY_* di Cloudflare.
+            Relay menghubungkan Worker LFAMILIA ke VPS ber-IP statis. Isi URL DigiFlazz, iPaymu, dan Relay Token di sini. Semua disimpan terenkripsi di D1; tidak perlu membuat PROVIDER_RELAY_* di Cloudflare.
           </div>
           <section className="rounded-lg border border-white/[0.08] bg-[#0d1019] p-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -435,8 +404,8 @@ export function AdminIntegrationManager({
                 {relayTesting ? "Menguji..." : "Tes Koneksi Relay"}
               </Button>
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              {(["DigiFlazz", "iPaymu", "Midtrans BI-SNAP"] as const).map((label) => {
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {(["DigiFlazz", "iPaymu"] as const).map((label) => {
                 const result = relayResults.find((item) => item.label === label);
                 return (
                   <div key={label} className="rounded-md border border-white/[0.07] bg-white/[0.018] p-2.5">
@@ -496,7 +465,7 @@ export function AdminIntegrationManager({
                   {definition.fields.map((field) => <CredentialField key={field.key} field={field} value={formValues[key]?.[field.key] ?? ""} onChange={(value) => updateField(definition, environment, field.key, value)} />)}
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/[0.07] pt-3">
-                  <p className="text-[9px] leading-4 text-white/34">{definition.id === "midtrans-bisnap" ? "BI-SNAP memakai field sesuai API yang diaktifkan; notification URL tersedia di bawah." : definition.id === "security" ? "Root INTEGRATION_ENCRYPTION_KEY tetap Cloudflare Secret; kunci voucher di sini disimpan terenkripsi." : "Nilai kosong tidak menimpa kredensial yang sudah tersimpan."}</p>
+                  <p className="text-[9px] leading-4 text-white/34">{definition.id === "security" ? "Root INTEGRATION_ENCRYPTION_KEY tetap Cloudflare Secret; kunci voucher di sini disimpan terenkripsi." : "Nilai kosong tidak menimpa kredensial yang sudah tersimpan."}</p>
                   <Button type="button" size="sm" disabled={!overview.encryptionReady || saving === key} onClick={() => void saveProfile(definition)} className="shrink-0 bg-[#b9ff35] text-[#091006] hover:bg-[#d8ff8d]">
                     {saving === key ? <LoaderCircle className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}Simpan
                   </Button>

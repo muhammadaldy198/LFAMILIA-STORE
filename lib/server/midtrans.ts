@@ -1,8 +1,3 @@
-import { isProviderRelayConfigured, probeProviderRelay } from "@/lib/server/provider-relay";
-import {
-  createMidtransBisnapPayment,
-  getMidtransBisnapReadiness,
-} from "@/lib/server/midtrans-bisnap";
 import { hashHex, safeEqual } from "@/lib/server/crypto";
 import {
   getRuntimeEnv,
@@ -11,10 +6,9 @@ import {
 } from "@/lib/server/runtime-env";
 
 export type MidtransEnvironment = "sandbox" | "production";
-export type MidtransMode = "snap" | "bisnap";
+export type MidtransMode = "snap";
 
 type MidtransRuntime = {
-  MIDTRANS_MODE?: string;
   MIDTRANS_ENV?: string;
   MIDTRANS_SNAP_SANDBOX_SERVER_KEY?: string;
   MIDTRANS_SNAP_PRODUCTION_SERVER_KEY?: string;
@@ -42,11 +36,8 @@ function runtime() {
   return getRuntimeEnv<MidtransRuntime>();
 }
 
-export function getMidtransMode() {
-  return requireRuntimeChoice(runtime().MIDTRANS_MODE, "MIDTRANS_MODE", [
-    "snap",
-    "bisnap",
-  ] as const);
+export function getMidtransMode(): MidtransMode {
+  return "snap";
 }
 
 export function getMidtransEnvironment() {
@@ -138,47 +129,11 @@ export function isMidtransSnapChannelSupported(
   }
 }
 
-function isMidtransBisnapChannelSupported(method: string, channel: string) {
-  if (method === "qris") return channel === "mpm";
-  if (method === "ewallet")
-    return channel === "gopay" || channel === "shopeepay" || channel === "dana";
-  if (method === "va")
-    return new Set([
-      "bca",
-      "bni",
-      "bri",
-      "permata",
-      "mandiri",
-      "cimb",
-      "danamon",
-    ]).has(channel);
-  return false;
-}
-
-export function getMidtransReadiness() {
+ export function getMidtransReadiness() {
   try {
     const mode = getMidtransMode();
     const environment = getMidtransEnvironment();
-    if (mode === "snap") {
-      snapConfig(environment);
-      return { ready: true as const, mode, environment, reason: null };
-    }
-    const bisnap = getMidtransBisnapReadiness();
-    if (!bisnap.ready)
-      return {
-        ready: false as const,
-        mode,
-        environment,
-        reason: bisnap.reason,
-      };
-    if (!isProviderRelayConfigured("midtrans-bisnap"))
-      return {
-        ready: false as const,
-        mode,
-        environment,
-        reason:
-          "Midtrans BI-SNAP memerlukan relay ber-IP statis yang dikonfigurasi dari Admin Panel.",
-      };
+    snapConfig(environment);
     return { ready: true as const, mode, environment, reason: null };
   } catch (error) {
     return {
@@ -194,45 +149,15 @@ export function getMidtransReadiness() {
 }
 
 export async function getMidtransOperationalReadiness() {
-  const configured = getMidtransReadiness();
-  if (!configured.ready) return configured;
-
-  if (configured.mode === "bisnap") {
-    if (!isProviderRelayConfigured("midtrans-bisnap")) {
-      return {
-        ready: false as const,
-        mode: configured.mode,
-        environment: configured.environment,
-        reason:
-          "Midtrans BI-SNAP memerlukan relay ber-IP statis yang dikonfigurasi dari Admin Panel.",
-      };
-    }
-
-    const relay = await probeProviderRelay(
-      "midtrans-bisnap",
-      "Midtrans BI-SNAP",
-    );
-    if (!relay.connected) {
-      return {
-        ready: false as const,
-        mode: configured.mode,
-        environment: configured.environment,
-        reason: relay.message,
-      };
-    }
-  }
-
-  return configured;
+  return getMidtransReadiness();
 }
 
 export function isMidtransChannelSupported(
   method: string,
   channel: string,
-  mode: MidtransMode = getMidtransMode(),
+  _mode: MidtransMode = getMidtransMode(),
 ) {
-  return mode === "bisnap"
-    ? isMidtransBisnapChannelSupported(method, channel)
-    : isMidtransSnapChannelSupported(method, channel);
+  return isMidtransSnapChannelSupported(method, channel);
 }
 
 export async function createMidtransSnapPayment(input: {
@@ -315,14 +240,7 @@ export async function createMidtransPayment(input: {
   paymentChannel: string;
   finishUrl: string;
 }) {
-  const mode = getMidtransMode();
-  if (mode === "snap") return createMidtransSnapPayment(input);
-
-  const payment = await createMidtransBisnapPayment(input);
-  return {
-    mode,
-    ...payment,
-  } satisfies MidtransPaymentResult;
+  return createMidtransSnapPayment(input);
 }
 
 export function validateMidtransNotification(

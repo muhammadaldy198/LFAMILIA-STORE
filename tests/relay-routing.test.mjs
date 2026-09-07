@@ -8,10 +8,10 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 test("relay configuration is managed from encrypted admin profile", () => {
   const integration = read("lib/server/integration-config.ts");
-  assert.match(integration, /"relay:service": \["digiflazzOrigin", "ipaymuOrigin", "bisnapOrigin", "hosts", "token"\]/);
+  assert.match(integration, /"relay:service": \["digiflazzOrigin", "ipaymuOrigin", "hosts", "token"\]/);
   assert.match(integration, /PROVIDER_RELAY_DIGIFLAZZ_ORIGIN/);
   assert.match(integration, /PROVIDER_RELAY_IPAYMU_ORIGIN/);
-  assert.match(integration, /PROVIDER_RELAY_MIDTRANS_BISNAP_ORIGIN/);
+  assert.doesNotMatch(integration, /PROVIDER_RELAY_MIDTRANS_BISNAP_ORIGIN/);
 });
 
 test("provider relay rewrites destination URL and adds authenticated environment headers", () => {
@@ -26,7 +26,6 @@ test("relay-enabled providers use providerRelayRequest", () => {
     "lib/server/providers/digiflazz.ts",
     "lib/server/digiflazz-pricing.ts",
     "lib/server/ipaymu.ts",
-    "lib/server/midtrans-bisnap.ts",
   ]) {
     const source = read(file);
     assert.match(source, /providerRelayRequest\(/, file);
@@ -36,7 +35,7 @@ test("relay-enabled providers use providerRelayRequest", () => {
 
 test("admin exposes separate encrypted relay URLs and token", () => {
   const source = read("components/admin-integration-manager.tsx");
-  for (const field of ["digiflazzOrigin", "ipaymuOrigin", "bisnapOrigin", "token"]) {
+  for (const field of ["digiflazzOrigin", "ipaymuOrigin", "token"]) {
     assert.ok(source.includes(`key: "${field}"`), field);
   }
   assert.match(source, /tidak perlu membuat PROVIDER_RELAY_\* di Cloudflare/);
@@ -62,6 +61,6 @@ test("admin relay view renders connection test button and provider statuses", ()
   assert.match(source, /Tes Koneksi Relay/);
   assert.match(source, /DigiFlazz/);
   assert.match(source, /iPaymu/);
-  assert.match(source, /Midtrans BI-SNAP/);
+  assert.doesNotMatch(source, /Midtrans BI-SNAP/);
   assert.match(source, /Connected/);
 });

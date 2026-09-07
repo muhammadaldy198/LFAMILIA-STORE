@@ -6,12 +6,12 @@ Konfigurasi provider LFAMILIA bersifat environment-explicit. Credential dan pili
 
 Atur dari **Admin Panel → Integrasi & harga → Kredensial API & callback**:
 
-- Mode Midtrans: Snap atau BI-SNAP
+- Midtrans memakai Snap.
 - Environment Midtrans: Sandbox atau Production
 - Environment iPaymu: Sandbox atau Production
 - Environment DigiFlazz: Development atau Production
 
-Runtime internal tetap memakai `MIDTRANS_ENV`, `MIDTRANS_MODE`, `IPAYMU_ENV`, dan `DIGIFLAZZ_ENV`, tetapi nilainya dihidrasi dari D1 oleh Integration Manager.
+Runtime internal memakai `MIDTRANS_ENV`, `IPAYMU_ENV`, dan `DIGIFLAZZ_ENV`; Midtrans selalu menggunakan Snap. Nilainya dihidrasi dari D1 oleh Integration Manager.
 
 ## Midtrans Snap
 
@@ -24,47 +24,6 @@ MIDTRANS_SNAP_SANDBOX_API_URL
 MIDTRANS_SNAP_PRODUCTION_API_URL
 MIDTRANS_SNAP_SANDBOX_SCRIPT_URL
 MIDTRANS_SNAP_PRODUCTION_SCRIPT_URL
-```
-
-## Midtrans BI-SNAP
-
-Common:
-
-```text
-MIDTRANS_BISNAP_TIMEZONE_OFFSET
-MIDTRANS_BISNAP_CURRENCY
-MIDTRANS_BISNAP_DEVICE_ID
-MIDTRANS_BISNAP_PAYMENT_EXPIRY_MINUTES
-MIDTRANS_BISNAP_TOKEN_EXPIRY_SAFETY_SECONDS
-```
-
-Gunakan prefix `MIDTRANS_BISNAP_SANDBOX_` dan `MIDTRANS_BISNAP_PRODUCTION_` untuk setiap slot berikut:
-
-```text
-CLIENT_ID
-PRIVATE_KEY
-CLIENT_SECRET
-PARTNER_ID
-CHANNEL_ID
-MERCHANT_ID
-VA_PARTNER_SERVICE_ID
-VA_RANDOMIZE
-QRIS_ACQUIRER
-ACCESS_TOKEN_URL
-DIRECT_DEBIT_URL
-QRIS_URL
-VA_URL
-PUBLIC_KEY
-```
-
-Callback BI-SNAP:
-
-```text
-<PUBLIC_BASE_URL>/v1.0/debit/notify
-<PUBLIC_BASE_URL>/v1.0/qr/qr-mpm-notify
-
-Virtual Account BI-SNAP tetap memakai notification legacy Midtrans:
-<PUBLIC_BASE_URL>/api/payments/midtrans/callback
 ```
 
 ## iPaymu
@@ -121,7 +80,6 @@ Field Admin Panel:
 ```text
 DigiFlazz Relay URL
 iPaymu Relay URL
-BI-SNAP Relay URL
 Relay Token
 ```
 

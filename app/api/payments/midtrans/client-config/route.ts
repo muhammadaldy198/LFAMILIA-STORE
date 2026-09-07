@@ -7,7 +7,6 @@ import {
 export const dynamic = "force-dynamic";
 
 type RuntimeEnv = {
-  MIDTRANS_MODE?: string;
   MIDTRANS_ENV?: string;
   MIDTRANS_SNAP_SANDBOX_CLIENT_KEY?: string;
   MIDTRANS_SNAP_PRODUCTION_CLIENT_KEY?: string;
@@ -18,23 +17,12 @@ type RuntimeEnv = {
 export async function GET() {
   try {
     const runtime = getRuntimeEnv<RuntimeEnv>();
-    const mode = requireRuntimeChoice(
-      runtime.MIDTRANS_MODE,
-      "MIDTRANS_MODE",
-      ["snap", "bisnap"] as const,
-    );
+    const mode = "snap" as const;
     const environment = requireRuntimeChoice(
       runtime.MIDTRANS_ENV,
       "MIDTRANS_ENV",
       ["sandbox", "production"] as const,
     );
-
-    if (mode !== "snap") {
-      return Response.json(
-        { enabled: false, mode, environment },
-        { headers: { "Cache-Control": "no-store" } },
-      );
-    }
 
     const clientKey = requireRuntimeValue(
       environment === "sandbox"
