@@ -45,10 +45,6 @@ export async function saveWalletSettings(input: WalletSettings) {
          min_topup = excluded.min_topup,
          doku_topup_enabled = excluded.doku_topup_enabled,
          doku_checkout_enabled = excluded.doku_checkout_enabled,
-         midtrans_topup_enabled = 0,
-         midtrans_checkout_enabled = 0,
-         ipaymu_topup_enabled = 0,
-         ipaymu_checkout_enabled = 0,
          updated_at = CURRENT_TIMESTAMP`,
     )
     .bind(
