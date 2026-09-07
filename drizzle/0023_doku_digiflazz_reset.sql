@@ -33,6 +33,11 @@ WHERE setting_key IN (
   'vippayment_environment'
 );
 
+-- Normalize any pre-launch customer-facing copy that named retired gateways.
+UPDATE faq_entries
+SET question = replace(replace(question, 'iPaymu', 'DOKU'), 'Midtrans', 'DOKU'),
+    answer = replace(replace(answer, 'iPaymu', 'DOKU'), 'Midtrans', 'DOKU');
+
 -- Store has not launched yet: remove legacy transactional state before DOKU go-live.
 DELETE FROM order_events;
 DELETE FROM voucher_deliveries;
