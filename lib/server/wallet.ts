@@ -305,15 +305,16 @@ export async function applyIpaymuWalletTopup(input: {
     return { found: true, credited: false, ignored: "transaction_mismatch" };
   if (
     input.status === "paid" &&
-    input.callbackAmount > 0 &&
-    input.callbackAmount < topup.amount
+    (!Number.isFinite(input.callbackAmount) ||
+      input.callbackAmount <= 0 ||
+      input.callbackAmount !== topup.amount)
   )
     return { found: true, credited: false, ignored: "amount_mismatch" };
 
   const db = getD1();
   if (input.status === "paid") {
     const reference = `topup:${topup.id}`;
-    await db.batch([
+    const results = await db.batch([
       db
         .prepare(
           `INSERT INTO wallet_transactions (id, customer_id, direction, amount, balance_before, balance_after, reference, description)
@@ -341,7 +342,9 @@ export async function applyIpaymuWalletTopup(input: {
         )
         .bind(topup.customer_id, topup.customer_id),
     ]);
-    return { found: true, credited: topup.status === "pending" };
+    const inserted = Number(results[0]?.meta.changes ?? 0) > 0;
+    const approved = Number(results[1]?.meta.changes ?? 0) > 0;
+    return { found: true, credited: inserted && approved };
   }
 
   if (input.status === "expired" || input.status === "failed") {
