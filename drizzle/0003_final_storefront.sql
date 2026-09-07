@@ -149,5 +149,5 @@ CREATE INDEX `faq_entries_active_sort_idx` ON `faq_entries` (`is_active`, `sort_
 INSERT INTO `faq_entries` (`question`, `answer`, `sort_order`) VALUES
   ('Bagaimana cara melakukan top up?', 'Pilih produk, isi data akun, pilih nominal, lalu selesaikan pembayaran. Status pesanan dapat dipantau menggunakan nomor invoice.', 0),
   ('Berapa lama pesanan diproses?', 'Pesanan otomatis diproses setelah pembayaran terverifikasi. Waktu penyelesaian dapat berbeda ketika publisher atau pemasok sedang mengalami gangguan.', 1),
-  ('Metode pembayaran apa yang tersedia?', 'Virtual Account bank, dompet digital, dan QRIS tersedia melalui iPaymu sesuai channel yang sedang aktif.', 2),
+  ('Metode pembayaran apa yang tersedia?', 'Virtual Account bank, dompet digital, dan QRIS tersedia melalui DOKU sesuai channel yang sedang aktif.', 2),
   ('Bagaimana jika saya salah memasukkan User ID?', 'Periksa kembali data tujuan sebelum membayar. Produk digital yang sudah berhasil dikirim umumnya tidak dapat dibatalkan.', 3);
