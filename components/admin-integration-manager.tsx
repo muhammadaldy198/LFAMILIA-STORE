@@ -85,7 +85,7 @@ const definitions: Definition[] = [
       { key: "scriptUrl", label: "Snap Script URL", inputMode: "url", placeholder: "https://app.sandbox.midtrans.com/snap/snap.js" },
     ],
   },
-   {
+  {
     id: "ipaymu",
     provider: "ipaymu",
     mode: "direct",
