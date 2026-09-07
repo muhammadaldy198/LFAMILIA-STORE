@@ -55,6 +55,12 @@ export type OrderRecord = {
   payment_channel: string;
   payment_status: string;
   fulfillment_status: string;
+  midtrans_transaction_id: string | null;
+  midtrans_payment_no: string | null;
+  midtrans_payment_name: string | null;
+  midtrans_payment_url: string | null;
+  midtrans_expired_at: string | null;
+  midtrans_mode: string | null;
   ipaymu_transaction_id: string | null;
   ipaymu_payment_no: string | null;
   ipaymu_payment_name: string | null;
@@ -311,6 +317,38 @@ export async function getOrderById(id: string) {
     .first<OrderRecord>();
 }
 
+export async function updateMidtransPayment(input: {
+  referenceId: string;
+  mode: "snap" | "bisnap";
+  transactionId: string | null;
+  paymentNo: string | null;
+  paymentName: string | null;
+  paymentUrl: string | null;
+  expiredAt: string | null;
+  fee: number;
+  total: number;
+}) {
+  await getD1()
+    .prepare(
+      `UPDATE orders SET midtrans_transaction_id = ?, midtrans_payment_no = ?,
+       midtrans_payment_name = ?, midtrans_payment_url = ?, midtrans_expired_at = ?,
+       midtrans_mode = ?, admin_fee = ?, total = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE reference_id = ?`,
+    )
+    .bind(
+      input.transactionId,
+      input.paymentNo,
+      input.paymentName,
+      input.paymentUrl,
+      input.expiredAt,
+      input.mode,
+      input.fee,
+      input.total,
+      input.referenceId,
+    )
+    .run();
+}
+
 export async function updateIpaymuPayment(input: {
   referenceId: string;
   transactionId: string | null;
@@ -356,6 +394,7 @@ export async function markPaymentCreationFailed(
 export async function recordOrderEvent(input: {
   orderId: string;
   source:
+    | "midtrans"
     | "ipaymu"
     | "wallet"
     | "digiflazz"
