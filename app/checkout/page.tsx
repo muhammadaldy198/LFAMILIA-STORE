@@ -76,6 +76,8 @@ type PaymentResult = {
   voucherCode: string | null;
   flashSaleId: number | null;
   paymentMethod?: string;
+  paymentGateway?: "ipaymu" | "midtrans";
+  publicInvoice?: string;
   midtransMode?: "snap" | "bisnap";
   paymentStatus?: "paid" | "pending";
   balanceAfter?: number;
@@ -564,10 +566,29 @@ function CheckoutContent() {
       if (!response.ok)
         throw new Error(data.error ?? "Pembayaran gagal dibuat.");
       setPayment(data);
-      if (data.balanceAfter != null)
+      if (data.balanceAfter != null) {
         setAccount((current) =>
           current ? { ...current, balance: data.balanceAfter! } : current,
         );
+        return;
+      }
+
+      const invoice = data.publicInvoice || data.referenceId;
+      if (data.paymentGateway === "ipaymu" && data.paymentUrl) {
+        try {
+          const redirectUrl = new URL(data.paymentUrl);
+          if (redirectUrl.protocol === "https:") {
+            window.location.assign(redirectUrl.toString());
+            return;
+          }
+        } catch {
+          // Use the internal payment page when the provider URL is unavailable.
+        }
+      }
+
+      window.location.assign(
+        `/payment?invoice=${encodeURIComponent(invoice)}`,
+      );
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "Pembayaran gagal dibuat.",
