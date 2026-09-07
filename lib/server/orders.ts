@@ -476,6 +476,20 @@ export async function fulfillAutomaticOrder(
     return;
   }
 
+  const claim = await getD1().prepare(
+    `UPDATE orders SET fulfillment_status = 'dispatching', provider_status = 'dispatching', updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND payment_status = 'paid' AND fulfillment_type = 'automatic'
+       AND (
+         provider_status IS NULL
+         OR (
+           provider_status = 'dispatching'
+           AND provider_code IN ('digiflazz', 'voucher-stock')
+           AND updated_at <= datetime('now', '-2 minutes')
+         )
+       )`,
+  ).bind(order.id).run();
+  if (Number(claim.meta.changes ?? 0) === 0) return;
+
   if (order.provider_code === "digiflazz" && !order.provider_ref_id) {
     await getD1()
       .prepare("UPDATE orders SET provider_ref_id = ? WHERE id = ?")
@@ -510,6 +524,38 @@ export async function fulfillAutomaticOrder(
       order.id,
       error instanceof Error ? error.message : "Provider gagal dihubungi.",
     );
+  }
+}
+
+export async function recoverStaleAutomaticOrders(
+  publicBaseUrl: string,
+  limit = 20,
+) {
+  const db = getD1();
+  await db.prepare(
+    `UPDATE orders SET fulfillment_status = 'needs_review', provider_status = 'unknown',
+       provider_message = 'Hasil pengiriman provider belum dapat dipastikan; periksa sebelum mencoba ulang.',
+       updated_at = CURRENT_TIMESTAMP
+     WHERE payment_status = 'paid' AND fulfillment_type = 'automatic'
+       AND provider_status = 'dispatching'
+       AND provider_code NOT IN ('digiflazz', 'voucher-stock')
+       AND updated_at <= datetime('now', '-2 minutes')`,
+  ).run();
+  const result = await db.prepare(
+    `SELECT id FROM orders
+     WHERE payment_status = 'paid' AND fulfillment_type = 'automatic'
+       AND (
+         provider_status IS NULL
+         OR (
+           provider_status = 'dispatching'
+           AND provider_code IN ('digiflazz', 'voucher-stock')
+           AND updated_at <= datetime('now', '-2 minutes')
+         )
+       )
+     ORDER BY created_at ASC LIMIT ?`,
+  ).bind(Math.min(Math.max(limit, 1), 100)).all<{ id: string }>();
+  for (const row of result.results) {
+    await fulfillAutomaticOrder(row.id, publicBaseUrl);
   }
 }
 
