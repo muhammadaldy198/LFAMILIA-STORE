@@ -2,6 +2,7 @@ import { getD1 } from "@/db";
 import type { ProductInputField } from "@/lib/store-data";
 import { getProviderAdapter } from "@/lib/server/providers";
 import type { ProviderResult } from "@/lib/server/providers/types";
+import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 import {
   consumeOrderPromotion,
   type PromotionQuote,
@@ -22,9 +23,12 @@ export type PurchasableItem = {
   providerSku: string | null;
 };
 
+export class CheckoutValidationError extends Error {}
+
 export type OrderRecord = {
   id: string;
   customer_id: string | null;
+  wallet_checkout_key: string | null;
   reference_id: string;
   product_slug: string;
   product_name: string;
@@ -137,8 +141,8 @@ export function normalizeCustomerInputs(
   const values = item.inputFields.map((field, index) => {
     const fallback = index === 0 ? legacyDestination.trim() : index === 1 ? legacyServer?.trim() ?? "" : "";
     const value = (byId.get(field.id) ?? fallback).trim();
-    if (field.required !== false && !value) throw new Error(`${field.label} wajib diisi.`);
-    if (value.length > 300) throw new Error(`${field.label} terlalu panjang.`);
+    if (field.required !== false && !value) throw new CheckoutValidationError(`${field.label} wajib diisi.`);
+    if (value.length > 300) throw new CheckoutValidationError(`${field.label} terlalu panjang.`);
     return { id: field.id, label: field.label, value };
   });
   return {
@@ -195,7 +199,7 @@ export function renderCustomerNo(
     .replaceAll("{{server}}", server?.trim() ?? "")
     .trim();
   if (!value || value.includes("{{") || value.length > 120)
-    throw new Error("Format tujuan provider belum valid.");
+    throw new CheckoutValidationError("Format tujuan provider belum valid.");
   return value;
 }
 
@@ -224,16 +228,17 @@ export async function insertPendingOrder(input: {
   paymentMethod: string;
   paymentChannel: string;
   customerId?: string | null;
+  walletCheckoutKey?: string | null;
   promotion: PromotionQuote;
 }) {
   const db = getD1();
   if (input.item.fulfillmentType === "automatic") {
     if (!input.item.providerCode || !input.item.providerSku)
-      throw new Error(
+      throw new CheckoutValidationError(
         "Provider dan SKU produk otomatis belum diatur oleh admin.",
       );
     if (!getProviderAdapter(input.item.providerCode))
-      throw new Error(
+      throw new CheckoutValidationError(
         `Adapter provider ${input.item.providerCode} belum tersedia.`,
       );
   }
@@ -245,16 +250,17 @@ export async function insertPendingOrder(input: {
   await db
     .prepare(
       `INSERT INTO orders (
-      id, customer_id, reference_id, product_slug, product_name, package_sku, package_label,
+      id, customer_id, wallet_checkout_key, reference_id, product_slug, product_name, package_sku, package_label,
       provider_code, provider_sku, fulfillment_type, target_template, destination, server,
       nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json,
       base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
       admin_fee, total, payment_method, payment_channel
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
     )
     .bind(
       input.id,
       input.customerId ?? null,
+      input.walletCheckoutKey ?? null,
       input.referenceId,
       input.item.productSlug,
       input.item.productName,
@@ -283,6 +289,20 @@ export async function insertPendingOrder(input: {
       input.paymentChannel,
     )
     .run();
+}
+
+export async function getWalletOrderByCheckoutKey(
+  customerId: string,
+  checkoutKey: string,
+) {
+  return getD1()
+    .prepare(
+      `SELECT * FROM orders
+       WHERE customer_id = ? AND wallet_checkout_key = ? AND payment_method = 'wallet'
+       LIMIT 1`,
+    )
+    .bind(customerId, checkoutKey)
+    .first<OrderRecord>();
 }
 
 export async function getOrderByReference(referenceId: string) {
@@ -459,12 +479,11 @@ export async function fulfillAutomaticOrder(
     return;
   }
 
-  if (order.provider_code === "digiflazz" && !order.provider_ref_id) {
-    await getD1()
-      .prepare("UPDATE orders SET provider_ref_id = ? WHERE id = ?")
-      .bind(order.reference_id, order.id)
-      .run();
-  }
+  const claimed = await claimAutomaticFulfillmentAttempt(
+    order.id,
+    order.provider_code,
+  );
+  if (!claimed) return;
 
   try {
     const result = await adapter.fulfill(
@@ -489,9 +508,119 @@ export async function fulfillAutomaticOrder(
     );
     await applyProviderResult(order, result);
   } catch (error) {
-    await setFulfillmentError(
-      order.id,
-      error instanceof Error ? error.message : "Provider gagal dihubungi.",
+    const message = error instanceof Error ? error.message : "Provider gagal dihubungi.";
+    if (order.provider_code === "digiflazz" || order.provider_code === "voucher-stock") {
+      await setRetryableFulfillmentError(order.id, message);
+    } else {
+      await setFulfillmentError(order.id, message);
+    }
+  }
+}
+
+export async function claimAutomaticFulfillmentAttempt(
+  orderId: string,
+  providerCode: string,
+) {
+  const db = getD1();
+  const eventId = `fulfillment-attempt-${orderId}-${crypto.randomUUID()}`;
+  const eligible = `payment_status = 'paid' AND fulfillment_type = 'automatic'
+    AND (
+      provider_status IS NULL
+      OR (
+        provider_status IN ('dispatching', 'retryable_error')
+        AND provider_code IN ('digiflazz', 'voucher-stock')
+        AND updated_at <= datetime('now', '-2 minutes')
+      )
+    )`;
+  const results = await db.batch([
+    db.prepare(
+      `INSERT INTO order_events (order_id, source, event_id, status, payload_json)
+       SELECT id, 'admin', ?, 'dispatching', ? FROM orders
+       WHERE id = ? AND ${eligible}
+         AND (
+           SELECT COUNT(*) FROM order_events
+           WHERE order_id = orders.id AND source = 'admin' AND status = 'dispatching'
+         ) < 5`,
+    ).bind(eventId, JSON.stringify({ providerCode }), orderId),
+    db.prepare(
+      `UPDATE orders SET fulfillment_status = 'dispatching', provider_status = 'dispatching',
+         provider_ref_id = CASE
+           WHEN provider_code = 'digiflazz' THEN COALESCE(provider_ref_id, reference_id)
+           ELSE provider_ref_id
+         END,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND EXISTS (
+         SELECT 1 FROM order_events WHERE source = 'admin' AND event_id = ?
+       )`,
+    ).bind(orderId, eventId),
+    db.prepare(
+      `UPDATE orders SET fulfillment_status = 'needs_review', provider_status = 'retry_exhausted',
+         provider_message = 'Pemenuhan otomatis gagal setelah 5 percobaan; periksa sebelum mencoba ulang.',
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND ${eligible}
+         AND NOT EXISTS (
+           SELECT 1 FROM order_events WHERE source = 'admin' AND event_id = ?
+         )
+         AND (
+           SELECT COUNT(*) FROM order_events
+           WHERE order_id = orders.id AND source = 'admin' AND status = 'dispatching'
+         ) >= 5`,
+    ).bind(orderId, eventId),
+  ]);
+  return Number(results[0]?.meta.changes ?? 0) > 0;
+}
+
+export async function recoverStaleAutomaticOrders(
+  publicBaseUrl: string,
+  limit = 20,
+) {
+  const db = getD1();
+  await db.prepare(
+    `UPDATE orders SET fulfillment_status = 'needs_review', provider_status = 'retry_exhausted',
+       provider_message = 'Pemenuhan otomatis gagal setelah 5 percobaan; periksa sebelum mencoba ulang.',
+       updated_at = CURRENT_TIMESTAMP
+     WHERE payment_status = 'paid' AND fulfillment_type = 'automatic'
+       AND provider_status IN ('dispatching', 'retryable_error')
+       AND (
+         SELECT COUNT(*) FROM order_events
+         WHERE order_id = orders.id AND source = 'admin' AND status = 'dispatching'
+       ) >= 5`,
+  ).run();
+  await db.prepare(
+    `UPDATE orders SET fulfillment_status = 'needs_review', provider_status = 'unknown',
+       provider_message = 'Hasil pengiriman provider belum dapat dipastikan; periksa sebelum mencoba ulang.',
+       updated_at = CURRENT_TIMESTAMP
+     WHERE payment_status = 'paid' AND fulfillment_type = 'automatic'
+       AND provider_status = 'dispatching'
+       AND provider_code NOT IN ('digiflazz', 'voucher-stock')
+       AND updated_at <= datetime('now', '-2 minutes')`,
+  ).run();
+  const result = await db.prepare(
+    `SELECT id FROM orders
+     WHERE payment_status = 'paid' AND fulfillment_type = 'automatic'
+       AND (
+         provider_status IS NULL
+         OR (
+           provider_status = 'dispatching'
+           AND provider_code IN ('digiflazz', 'voucher-stock')
+           AND updated_at <= datetime('now', '-2 minutes')
+         )
+         OR (
+           provider_status = 'retryable_error'
+           AND provider_code IN ('digiflazz', 'voucher-stock')
+           AND updated_at <= datetime('now', '-2 minutes')
+         )
+       )
+       AND (
+         SELECT COUNT(*) FROM order_events
+         WHERE order_id = orders.id AND source = 'admin' AND status = 'dispatching'
+       ) < 5
+     ORDER BY CASE WHEN provider_status IS NULL THEN 0 ELSE 1 END, updated_at ASC LIMIT ?`,
+  ).bind(Math.min(Math.max(limit, 1), 100)).all<{ id: string }>();
+  for (const row of result.results) {
+    await fulfillAutomaticOrder(row.id, publicBaseUrl);
+    await notifyOrderFulfillmentSuccessById(row.id).catch((error) =>
+      console.error("Notifikasi order hasil recovery gagal:", error),
     );
   }
 }
@@ -538,6 +667,16 @@ async function setFulfillmentError(orderId: string, message: string) {
     .prepare(
       `UPDATE orders SET fulfillment_status = 'needs_review', provider_status = 'error',
      provider_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    )
+    .bind(message, orderId)
+    .run();
+}
+
+async function setRetryableFulfillmentError(orderId: string, message: string) {
+  await getD1()
+    .prepare(
+      `UPDATE orders SET fulfillment_status = 'processing', provider_status = 'retryable_error',
+       provider_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     )
     .bind(message, orderId)
     .run();

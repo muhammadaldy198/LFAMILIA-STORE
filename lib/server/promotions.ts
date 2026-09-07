@@ -136,6 +136,8 @@ export type PromotionQuote = {
   discountSource: "voucher" | "member" | null;
 };
 
+export class PromotionQuoteError extends Error {}
+
 export async function quotePromotion(
   productSlug: string,
   packageSku: string,
@@ -160,8 +162,8 @@ export async function quotePromotion(
       `SELECT * FROM discount_vouchers WHERE code = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
        AND (usage_limit IS NULL OR used_count < usage_limit) LIMIT 1`,
     ).bind(code, now, now).first<VoucherRow>();
-    if (!voucher) throw new Error("Kode voucher tidak aktif, sudah habis, atau tidak ditemukan.");
-    if (sellingPrice < voucher.min_purchase) throw new Error(`Minimum transaksi voucher ini Rp${voucher.min_purchase.toLocaleString("id-ID")}.`);
+    if (!voucher) throw new PromotionQuoteError("Kode voucher tidak aktif, sudah habis, atau tidak ditemukan.");
+    if (sellingPrice < voucher.min_purchase) throw new PromotionQuoteError(`Minimum transaksi voucher ini Rp${voucher.min_purchase.toLocaleString("id-ID")}.`);
     voucherDiscountAmount = voucher.discount_type === "fixed"
       ? voucher.discount_value
       : Math.floor(sellingPrice * voucher.discount_value / 100);

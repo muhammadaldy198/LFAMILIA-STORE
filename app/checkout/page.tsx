@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -224,6 +224,7 @@ function CheckoutRoute() {
 }
 
 function CheckoutContent({ product }: { product: StoreProduct }) {
+  const walletAttemptRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const searchParams = useSearchParams();
   const requestedPackage = searchParams.get("package");
   const [packageId, setPackageId] = useState(() =>
@@ -750,10 +751,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
           : "/api/payments/auto/create";
       if (paymentMethod !== "wallet" && !paymentChannel)
         throw new Error("Pilih metode pembayaran yang tersedia.");
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
+      const requestPayload = {
           productSlug: product.slug,
           packageSku: packageId,
           destination: destination.trim(),
@@ -772,13 +770,28 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
           paymentMethod,
           paymentChannel,
           voucherCode: voucherCode.trim() || undefined,
+      };
+      const fingerprint = JSON.stringify(requestPayload);
+      if (paymentMethod === "wallet" && walletAttemptRef.current?.fingerprint !== fingerprint) {
+        walletAttemptRef.current = { fingerprint, key: crypto.randomUUID() };
+      }
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...requestPayload,
+          idempotencyKey: paymentMethod === "wallet" ? walletAttemptRef.current?.key : undefined,
         }),
       });
       const data = (await response.json()) as PaymentResult & {
         error?: string;
+        retryable?: boolean;
       };
-      if (!response.ok)
+      if (!response.ok) {
+        if (!data.retryable) walletAttemptRef.current = null;
         throw new Error(data.error ?? "Pembayaran gagal dibuat.");
+      }
+      walletAttemptRef.current = null;
       setPayment(data);
       if (data.balanceAfter != null) {
         setAccount((current) =>
