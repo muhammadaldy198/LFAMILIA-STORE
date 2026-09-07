@@ -67,24 +67,7 @@ const columns: Array<[table: string, column: string, definition: string]> = [
     "margin_value INTEGER DEFAULT 0 NOT NULL",
   ],
   ["product_packages", "supplier_synced_at", "supplier_synced_at TEXT"],
-  [
-    "wallet_settings",
-    "doku_topup_enabled",
-    "doku_topup_enabled INTEGER DEFAULT 0 NOT NULL",
-  ],
-  [
-    "wallet_settings",
-    "doku_checkout_enabled",
-    "doku_checkout_enabled INTEGER DEFAULT 0 NOT NULL",
-  ],
-  ["wallet_topups", "doku_request_id", "doku_request_id TEXT"],
-  ["wallet_topups", "doku_token_id", "doku_token_id TEXT"],
-  ["wallet_topups", "doku_payment_url", "doku_payment_url TEXT"],
-  ["wallet_topups", "doku_expired_at", "doku_expired_at TEXT"],
-  ["orders", "doku_request_id", "doku_request_id TEXT"],
-  ["orders", "doku_token_id", "doku_token_id TEXT"],
-  ["orders", "doku_payment_url", "doku_payment_url TEXT"],
-  ["orders", "doku_expired_at", "doku_expired_at TEXT"],
+
   ["wallet_topups", "payment_fee", "payment_fee INTEGER DEFAULT 0 NOT NULL"],
   [
     "wallet_topups",
