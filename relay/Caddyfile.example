@@ -11,8 +11,3 @@
 {$DIGIFLAZZ_RELAY_HOST} {
   import lfamilia_provider_relay
 }
-
-{$IPAYMU_RELAY_HOST} {
-  import lfamilia_provider_relay
-}
-
