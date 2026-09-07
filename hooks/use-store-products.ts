@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { products as fallbackProducts, type StoreProduct } from "@/lib/store-data";
+import type { StoreProduct } from "@/lib/store-data";
 
 function normalizeProviderReadiness(product: StoreProduct): StoreProduct {
   if (product.fulfillmentType !== "automatic") return product;
@@ -10,10 +10,8 @@ function normalizeProviderReadiness(product: StoreProduct): StoreProduct {
   return { ...product, fulfillmentType: "manual", instant: false };
 }
 
-const normalizedFallbackProducts = fallbackProducts.map(normalizeProviderReadiness);
-
 export function useStoreProducts() {
-  const [products, setProducts] = useState<StoreProduct[]>(normalizedFallbackProducts);
+  const [products, setProducts] = useState<StoreProduct[]>([]);
   const [databaseReady, setDatabaseReady] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -22,11 +20,17 @@ export function useStoreProducts() {
     async function load() {
       try {
         const response = await fetch("/api/products", { cache: "no-store" });
-        const data = await response.json() as { products?: StoreProduct[]; databaseReady?: boolean };
-        if (active && data.products?.length) {
-          setProducts(data.products.map(normalizeProviderReadiness));
-          setDatabaseReady(Boolean(data.databaseReady));
-        }
+        const data = await response.json() as {
+          products?: StoreProduct[];
+          databaseReady?: boolean;
+        };
+        if (!active) return;
+        setProducts((data.products ?? []).map(normalizeProviderReadiness));
+        setDatabaseReady(Boolean(response.ok && data.databaseReady));
+      } catch {
+        if (!active) return;
+        setProducts([]);
+        setDatabaseReady(false);
       } finally {
         if (active) setLoading(false);
       }
