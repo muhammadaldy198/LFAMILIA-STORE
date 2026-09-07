@@ -176,7 +176,6 @@ function CheckoutContent() {
   const [applyingVoucher, setApplyingVoucher] = useState(false);
   const [account, setAccount] = useState<CustomerSession | null>(null);
   const [gatewayOptions, setGatewayOptions] = useState<CheckoutGateway[]>([]);
-  const [paymentMethodsLoaded, setPaymentMethodsLoaded] = useState(false);
 
   const selectedPackage = product.packages.find(
     (item) => item.id === packageId,
@@ -266,10 +265,7 @@ function CheckoutContent() {
   useEffect(() => {
     void fetch("/api/payment-methods", { cache: "no-store" })
       .then(async (response) => {
-        if (!response.ok) {
-          setGatewayOptions([]);
-          return;
-        }
+        if (!response.ok) return;
         const data = (await response.json()) as CheckoutGatewayConfig;
         const fallbackGateways: CheckoutGateway[] = data.gateway
           ? [{
@@ -287,12 +283,7 @@ function CheckoutContent() {
           : fallbackGateways;
         setGatewayOptions(gateways);
       })
-      .catch(() => {
-        setGatewayOptions([]);
-      })
-      .finally(() => {
-        setPaymentMethodsLoaded(true);
-      });
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -395,29 +386,20 @@ function CheckoutContent() {
   ]);
 
   useEffect(() => {
-    if (!paymentMethodsLoaded) return;
-
     const enabled = checkoutGroups.map((group) => group.code);
     const currentChannelValid =
-      paymentMethod === "wallet"
-        ? Boolean(account)
-        : displayChannels.some(
-            (item) =>
-              item.method === paymentMethod &&
-              item.channel === paymentChannel,
-          );
-    const methodValid =
-      enabled.includes(paymentMethod) &&
-      (paymentMethod !== "wallet" || Boolean(account));
+      paymentMethod === "wallet" ||
+      displayChannels.some(
+        (item) =>
+          item.method === paymentMethod &&
+          item.channel === paymentChannel,
+      );
+    const methodValid = enabled.includes(paymentMethod);
 
     if (methodValid && currentChannelValid) return;
 
     const timer = window.setTimeout(() => {
-      if (
-        paymentMethod !== "wallet" &&
-        enabled.includes(paymentMethod) &&
-        displayChannels.some((item) => item.method === paymentMethod)
-      ) {
+      if (methodValid && paymentMethod !== "wallet") {
         chooseMethod(paymentMethod);
         return;
       }
@@ -425,23 +407,16 @@ function CheckoutContent() {
         chooseMethod(gatewayPaymentGroups[0].code);
         return;
       }
-      if (account) {
-        chooseMethod("wallet");
-        return;
-      }
-      setPaymentMethod("qris");
-      setPaymentChannel("");
+      chooseMethod("wallet");
     }, 0);
 
     return () => window.clearTimeout(timer);
   }, [
-    account,
     checkoutGroups,
     displayChannels,
     gatewayPaymentGroups,
     paymentChannel,
     paymentMethod,
-    paymentMethodsLoaded,
     chooseMethod,
   ]);
 
@@ -730,13 +705,7 @@ function CheckoutContent() {
                     Metode pembayaran yang tersedia sudah disesuaikan otomatis dengan nominal transaksi.
                   </div>
                 )}
-                {!paymentMethodsLoaded && (
-                  <div className="mt-3 flex items-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-[10px] text-white/45">
-                    <LoaderCircle className="size-3.5 animate-spin" />
-                    Memuat metode pembayaran…
-                  </div>
-                )}
-                {paymentMethodsLoaded && gatewayPaymentGroups.length === 0 && (
+                {gatewayPaymentGroups.length === 0 && (
                   <div className="mt-3 rounded-md border border-amber-300/20 bg-amber-300/[0.05] px-3 py-2 text-[10px] leading-4 text-amber-100/75">
                     Metode pembayaran otomatis belum tersedia. Periksa gateway dan channel aktif di panel admin.
                   </div>
