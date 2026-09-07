@@ -145,7 +145,7 @@ export function CheckoutUiEnhancer() {
       if (!resultRow) {
         resultRow = Array.from(firstSection.querySelectorAll<HTMLParagraphElement>("p")).find((paragraph) =>
           paragraph.textContent?.toLowerCase().includes("verifikasi nickname otomatis belum tersedia"),
-        );
+        ) ?? null;
         if (!resultRow) return;
         resultRow.dataset.lfExtraNickname = "true";
       }
