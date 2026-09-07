@@ -19,6 +19,7 @@ test("critical public mutation routes reject cross-site requests", () => {
     "app/api/account/game-accounts/route.ts",
     "app/api/account/topups/route.ts",
     "app/api/payments/wallet/create/route.ts",
+    "app/api/payments/midtrans/create/route.ts",
     "app/api/payments/ipaymu/create/route.ts",
     "app/api/reviews/route.ts",
   ];
@@ -36,6 +37,7 @@ test("abuse-prone public endpoints are rate limited", () => {
     ["app/api/account/game-accounts/route.ts", "saved-game-account"],
     ["app/api/account/topups/route.ts", "wallet-topup"],
     ["app/api/payments/wallet/create/route.ts", "wallet-checkout"],
+    ["app/api/payments/midtrans/create/route.ts", "midtrans-checkout"],
     ["app/api/payments/ipaymu/create/route.ts", "ipaymu-checkout"],
     ["app/api/reviews/route.ts", "customer-review"],
   ]);
@@ -58,6 +60,7 @@ test("customer sessions are bounded and stale rate-limit buckets are cleaned", (
   assert.match(read("worker/index.ts"), /cleanupSecurityRateLimits/);
 });
 
+
 test("customer login and registration support Cloudflare Turnstile", () => {
   for (const file of ["app/api/auth/login/route.ts", "app/api/auth/register/route.ts"]) {
     const source = read(file);
@@ -65,6 +68,7 @@ test("customer login and registration support Cloudflare Turnstile", () => {
   }
   assert.match(read("lib/server/turnstile.ts"), /turnstile\/v0\/siteverify/);
 });
+
 
 test("phone transaction search never exposes full invoice references", () => {
   const source = read("app/api/orders/search/route.ts");
