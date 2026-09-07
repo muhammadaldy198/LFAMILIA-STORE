@@ -70,13 +70,16 @@ function createDatabase() {
       destination TEXT, server TEXT, nickname TEXT, customer_no TEXT, buyer_name TEXT,
       buyer_email TEXT, buyer_phone TEXT, customer_notes TEXT, customer_inputs_json TEXT,
       base_subtotal INTEGER, subtotal INTEGER, discount_amount INTEGER, voucher_code TEXT,
-      flash_sale_id INTEGER, promotion_reservation_status TEXT NOT NULL DEFAULT 'legacy',
+      voucher_id INTEGER, flash_sale_id INTEGER, promotion_reservation_status TEXT NOT NULL DEFAULT 'legacy',
+      promotion_reserved_until TEXT,
       admin_fee INTEGER, total INTEGER, payment_method TEXT, payment_channel TEXT,
       payment_status TEXT NOT NULL DEFAULT 'pending', fulfillment_status TEXT NOT NULL DEFAULT 'waiting_payment',
+      midtrans_transaction_id TEXT, midtrans_payment_url TEXT,
+      ipaymu_transaction_id TEXT, ipaymu_payment_url TEXT,
       provider_message TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE discount_vouchers (
-      code TEXT PRIMARY KEY, is_active INTEGER NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL,
+      id INTEGER PRIMARY KEY, code TEXT UNIQUE, is_active INTEGER NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL,
       usage_limit INTEGER, used_count INTEGER NOT NULL DEFAULT 0, updated_at TEXT
     );
     CREATE TABLE flash_sales (
@@ -89,7 +92,7 @@ function createDatabase() {
 
 function seedPromotions(database) {
   const now = Date.now();
-  database.prepare("INSERT INTO discount_vouchers VALUES ('PROMO', 1, ?, ?, 1, 0, NULL)")
+  database.prepare("INSERT INTO discount_vouchers VALUES (1, 'PROMO', 1, ?, ?, 1, 0, NULL)")
     .run(new Date(now - 60_000).toISOString(), new Date(now + 60_000).toISOString());
   database.prepare("INSERT INTO flash_sales VALUES (7, 1, ?, ?, 1, 0, NULL)")
     .run(new Date(now - 60_000).toISOString(), new Date(now + 60_000).toISOString());
@@ -130,6 +133,7 @@ function orderInput(id, referenceId) {
       discountAmount: 1_000,
       finalPrice: 7_000,
       voucherCode: "PROMO",
+      voucherId: 1,
       flashSaleId: 7,
       flashSaleEndsAt: null,
       memberTier: null,
@@ -209,6 +213,67 @@ test("gateway creation failure releases a reservation", async () => {
   database.close();
 });
 
+test("voucher rename cannot orphan a reservation", async () => {
+  const database = createDatabase();
+  seedPromotions(database);
+  setRuntimeEnv({ DB: new TestD1(database) });
+
+  await insertPendingOrder(orderInput("order-rename", "REF-RENAME"));
+  database.prepare("UPDATE discount_vouchers SET code = 'RENAMED' WHERE id = 1").run();
+  await markPaymentCreationFailed("REF-RENAME", "Gateway unavailable");
+
+  assert.equal(database.prepare("SELECT used_count AS count FROM discount_vouchers WHERE id = 1").get().count, 0);
+  assert.equal(database.prepare("SELECT promotion_reservation_status AS state FROM orders WHERE id = 'order-rename'").get().state, "released");
+  database.close();
+});
+
+test("scheduled recovery releases an abandoned reservation atomically and idempotently", async () => {
+  const database = createDatabase();
+  seedPromotions(database);
+  setRuntimeEnv({ DB: new TestD1(database) });
+
+  await insertPendingOrder(orderInput("order-abandoned", "REF-ABANDONED"));
+  database.prepare(
+    "UPDATE orders SET promotion_reserved_until = datetime('now', '-1 minute') WHERE id = 'order-abandoned'",
+  ).run();
+  const { releaseAbandonedPromotionReservation } = await import("../lib/server/orders.ts");
+  assert.equal(await releaseAbandonedPromotionReservation("order-abandoned"), true);
+  assert.equal(await releaseAbandonedPromotionReservation("order-abandoned"), false);
+  assert.deepEqual(
+    {
+      payment: database.prepare("SELECT payment_status AS value FROM orders WHERE id = 'order-abandoned'").get().value,
+      state: database.prepare("SELECT promotion_reservation_status AS value FROM orders WHERE id = 'order-abandoned'").get().value,
+      voucher: database.prepare("SELECT used_count AS value FROM discount_vouchers WHERE id = 1").get().value,
+      flash: database.prepare("SELECT sold_count AS value FROM flash_sales WHERE id = 7").get().value,
+    },
+    { payment: "failed", state: "released", voucher: 0, flash: 0 },
+  );
+  database.close();
+});
+
+test("abandoned recovery cannot release an attached or paid payment", async () => {
+  const database = createDatabase();
+  seedPromotions(database);
+  setRuntimeEnv({ DB: new TestD1(database) });
+  const { releaseAbandonedPromotionReservation } = await import("../lib/server/orders.ts");
+
+  await insertPendingOrder(orderInput("order-attached", "REF-ATTACHED"));
+  database.prepare(
+    "UPDATE orders SET promotion_reserved_until = datetime('now', '-1 minute'), midtrans_payment_url = 'https://pay.example.test' WHERE id = 'order-attached'",
+  ).run();
+  assert.equal(await releaseAbandonedPromotionReservation("order-attached"), false);
+
+  database.prepare(
+    "UPDATE orders SET midtrans_payment_url = NULL WHERE id = 'order-attached'",
+  ).run();
+  const attached = await getOrderById("order-attached");
+  assert.equal(await applyPaymentStatus(attached, "paid"), true);
+  assert.equal(await releaseAbandonedPromotionReservation("order-attached"), false);
+  assert.equal(database.prepare("SELECT used_count AS count FROM discount_vouchers WHERE id = 1").get().count, 1);
+  assert.equal(database.prepare("SELECT sold_count AS count FROM flash_sales WHERE id = 7").get().count, 1);
+  database.close();
+});
+
 test("reservation batch rolls back the order and all counters on a write failure", async () => {
   const database = createDatabase();
   seedPromotions(database);
@@ -233,9 +298,9 @@ test("legacy pending orders consume promotions once when paid", async () => {
   seedPromotions(database);
   database.prepare(
     `INSERT INTO orders (
-      id, reference_id, fulfillment_type, voucher_code, flash_sale_id,
+      id, reference_id, fulfillment_type, voucher_code, voucher_id, flash_sale_id,
       promotion_reservation_status, payment_method, payment_channel
-    ) VALUES ('legacy-order', 'LEGACY-REF', 'manual', 'PROMO', 7, 'legacy', 'qris', 'mpm')`,
+    ) VALUES ('legacy-order', 'LEGACY-REF', 'manual', 'PROMO', NULL, 7, 'legacy', 'qris', 'mpm')`,
   ).run();
   setRuntimeEnv({ DB: new TestD1(database) });
 
