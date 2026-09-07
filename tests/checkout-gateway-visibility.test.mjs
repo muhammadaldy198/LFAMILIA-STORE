@@ -19,6 +19,8 @@ test("gateway routing is handled server-side", () => {
   assert.match(source, /\/api\/payments\/auto\/create/);
   assert.match(autoRoute, /routePaymentGateway\(/);
   assert.match(router, /candidates: RoutedPaymentGateway\[\]/);
-  assert.match(autoRoute, /createIpaymuCheckout\(ipaymuRequest\)/);
-  assert.match(autoRoute, /createMidtransCheckout\(midtransRequest\)/);
+  assert.match(autoRoute, /createIpaymuDirectPayment\(/);
+  assert.match(autoRoute, /createMidtransPayment\(/);
+  assert.match(autoRoute, /const identity = createOrderIdentity\(\)/);
+  assert.doesNotMatch(autoRoute, /createIpaymuCheckout|createMidtransCheckout/);
 });
