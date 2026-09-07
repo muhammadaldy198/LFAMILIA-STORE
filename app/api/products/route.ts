@@ -1,4 +1,4 @@
-import { getFallbackProducts, readProducts } from "@/lib/server/products";
+import { readProducts } from "@/lib/server/products";
 import { readReviewSummaries } from "@/lib/server/reviews";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +8,15 @@ export async function GET() {
     const stored = await readProducts(false);
     const summaries = await readReviewSummaries().catch(() => new Map<string, { ratingAverage: number; ratingCount: number }>());
     const products = stored.filter((item) => item.packages.length > 0).map((item) => ({ ...item, ...(summaries.get(item.slug) ?? { ratingAverage: 0, ratingCount: 0 }) }));
-    return Response.json({ products: products.length ? products : getFallbackProducts(), databaseReady: true, seeded: products.length > 0 });
+    return Response.json({
+      products,
+      databaseReady: true,
+      seeded: products.length > 0,
+    });
   } catch {
-    return Response.json({ products: getFallbackProducts(), databaseReady: false, seeded: false });
+    return Response.json(
+      { products: [], databaseReady: false, seeded: false },
+      { status: 503 },
+    );
   }
 }

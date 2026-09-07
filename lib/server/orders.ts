@@ -1,5 +1,4 @@
 import { getD1 } from "@/db";
-import { getFallbackProducts } from "@/lib/server/products";
 import type { ProductInputField } from "@/lib/store-data";
 import { getProviderAdapter } from "@/lib/server/providers";
 import type { ProviderResult } from "@/lib/server/providers/types";
@@ -183,25 +182,7 @@ export async function resolvePurchasableItem(
     };
   }
 
-  const fallback = getFallbackProducts().find(
-    (item) => item.slug === productSlug,
-  );
-  const packageItem = fallback?.packages.find((item) => item.id === packageSku);
-  if (!fallback || !packageItem) return null;
-  return {
-    productSlug: fallback.slug,
-    productName: fallback.name,
-    needsServer: Boolean(fallback.needsServer),
-    fulfillmentType: fallback.fulfillmentType,
-    targetTemplate: fallback.targetTemplate,
-    inputFields: fallback.inputFields ?? [],
-    manualInstructions: fallback.manualInstructions ?? null,
-    packageSku: packageItem.id,
-    packageLabel: packageItem.label,
-    price: packageItem.price,
-    providerCode: packageItem.providerCode ?? null,
-    providerSku: packageItem.providerSku ?? null,
-  };
+  return null;
 }
 
 export function renderCustomerNo(
