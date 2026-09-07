@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { getIpaymuOperationalReadiness } from "@/lib/server/ipaymu";
-import { getMidtransOperationalReadiness } from "@/lib/server/midtrans";
 import { requireAdminSession } from "@/lib/server/admin";
+import { getDokuReadiness } from "@/lib/server/doku";
 import {
   listWalletTopups,
   readWalletSettings,
@@ -10,25 +9,21 @@ import {
 
 const settingsSchema = z.object({
   minTopup: z.number().int().min(1000).max(100_000_000),
-  midtransTopupEnabled: z.boolean(),
-  midtransCheckoutEnabled: z.boolean(),
-  ipaymuTopupEnabled: z.boolean(),
-  ipaymuCheckoutEnabled: z.boolean(),
+  dokuTopupEnabled: z.boolean(),
+  dokuCheckoutEnabled: z.boolean(),
 });
 
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
-  const [settings, topups, ipaymu, midtrans] = await Promise.all([
+  const [settings, topups] = await Promise.all([
     readWalletSettings(),
     listWalletTopups(),
-    getIpaymuOperationalReadiness(),
-    getMidtransOperationalReadiness(),
   ]);
   return Response.json({
     settings,
     topups,
-    gatewayReadiness: { ipaymu, midtrans },
+    gatewayReadiness: { doku: getDokuReadiness() },
   });
 }
 
