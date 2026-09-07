@@ -132,8 +132,13 @@ export async function ensureLegacyDatabaseColumns() {
               .prepare(`ALTER TABLE ${table} ADD COLUMN ${definition}`)
               .run();
           }
-        } catch {
-          // A missing table is handled by its existing feature migration; never drop or recreate data here.
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (/no such table/i.test(message)) {
+            // A missing table is handled by its existing feature migration; never drop or recreate data here.
+            continue;
+          }
+          throw error;
         }
       }
     })().catch((error) => {
