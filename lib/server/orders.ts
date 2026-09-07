@@ -58,6 +58,10 @@ export type OrderRecord = {
   payment_channel: string;
   payment_status: string;
   fulfillment_status: string;
+  doku_request_id: string | null;
+  doku_token_id: string | null;
+  doku_payment_url: string | null;
+  doku_expired_at: string | null;
   midtrans_transaction_id: string | null;
   midtrans_payment_no: string | null;
   midtrans_payment_name: string | null;
@@ -319,6 +323,31 @@ export async function getOrderById(id: string) {
     .first<OrderRecord>();
 }
 
+export async function updateDokuPayment(input: {
+  referenceId: string;
+  requestId: string;
+  tokenId: string | null;
+  paymentUrl: string;
+  expiredAt: string | null;
+  total: number;
+}) {
+  await getD1()
+    .prepare(
+      `UPDATE orders SET doku_request_id = ?, doku_token_id = ?, doku_payment_url = ?,
+       doku_expired_at = ?, admin_fee = 0, total = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE reference_id = ?`,
+    )
+    .bind(
+      input.requestId,
+      input.tokenId,
+      input.paymentUrl,
+      input.expiredAt,
+      input.total,
+      input.referenceId,
+    )
+    .run();
+}
+
 export async function updateMidtransPayment(input: {
   referenceId: string;
   mode: "snap" | "bisnap";
@@ -396,6 +425,7 @@ export async function markPaymentCreationFailed(
 export async function recordOrderEvent(input: {
   orderId: string;
   source:
+    | "doku"
     | "midtrans"
     | "ipaymu"
     | "wallet"
