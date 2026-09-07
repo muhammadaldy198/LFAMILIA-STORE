@@ -497,6 +497,13 @@ export async function fulfillAutomaticOrder(
        )`,
   ).bind(order.id).run();
   if (Number(claim.meta.changes ?? 0) === 0) return;
+  await recordOrderEvent({
+    orderId: order.id,
+    source: "admin",
+    eventId: `fulfillment-attempt-${order.id}-${crypto.randomUUID()}`,
+    status: "dispatching",
+    payload: { providerCode: order.provider_code },
+  });
 
   if (order.provider_code === "digiflazz" && !order.provider_ref_id) {
     await getD1()
@@ -543,6 +550,17 @@ export async function recoverStaleAutomaticOrders(
 ) {
   const db = getD1();
   await db.prepare(
+    `UPDATE orders SET fulfillment_status = 'needs_review', provider_status = 'retry_exhausted',
+       provider_message = 'Pemenuhan otomatis gagal setelah 5 percobaan; periksa sebelum mencoba ulang.',
+       updated_at = CURRENT_TIMESTAMP
+     WHERE payment_status = 'paid' AND fulfillment_type = 'automatic'
+       AND provider_status IN ('dispatching', 'retryable_error')
+       AND (
+         SELECT COUNT(*) FROM order_events
+         WHERE order_id = orders.id AND source = 'admin' AND status = 'dispatching'
+       ) >= 5`,
+  ).run();
+  await db.prepare(
     `UPDATE orders SET fulfillment_status = 'needs_review', provider_status = 'unknown',
        provider_message = 'Hasil pengiriman provider belum dapat dipastikan; periksa sebelum mencoba ulang.',
        updated_at = CURRENT_TIMESTAMP
@@ -567,7 +585,11 @@ export async function recoverStaleAutomaticOrders(
            AND updated_at <= datetime('now', '-2 minutes')
          )
        )
-     ORDER BY created_at ASC LIMIT ?`,
+       AND (
+         SELECT COUNT(*) FROM order_events
+         WHERE order_id = orders.id AND source = 'admin' AND status = 'dispatching'
+       ) < 5
+     ORDER BY CASE WHEN provider_status IS NULL THEN 0 ELSE 1 END, updated_at ASC LIMIT ?`,
   ).bind(Math.min(Math.max(limit, 1), 100)).all<{ id: string }>();
   for (const row of result.results) {
     await fulfillAutomaticOrder(row.id, publicBaseUrl);
