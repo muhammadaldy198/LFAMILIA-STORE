@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { register } from "tsx/esm/api";
+import fs from "node:fs";
+import path from "node:path";
 
 class D1Statement {
   constructor(database, sql) {
@@ -139,6 +141,20 @@ test("wallet settlement does not debit when a limited promotion is exhausted", a
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM wallet_transactions WHERE direction = 'debit'").get().count, 0);
   assert.equal(database.prepare("SELECT payment_status FROM orders WHERE id = 'order-2'").get().payment_status, "pending");
   database.close();
+});
+
+test("wallet retries resume pending settlement and automatic fulfillment", () => {
+  const root = process.cwd();
+  const route = fs.readFileSync(path.join(root, "app/api/payments/wallet/create/route.ts"), "utf8");
+  const orders = fs.readFileSync(path.join(root, "lib/server/orders.ts"), "utf8");
+  const worker = fs.readFileSync(path.join(root, "worker/index.ts"), "utf8");
+  assert.match(route, /existing\.payment_status === "pending"[\s\S]*settleWalletOrder/);
+  assert.match(route, /existing\.payment_status === "paid"[\s\S]*fulfillAutomaticOrder/);
+  assert.match(route, /retryable: true[^\n]*status: 429/);
+  assert.match(orders, /provider_status = 'dispatching'[\s\S]*datetime\('now', '-2 minutes'\)/);
+  assert.match(orders, /provider_code IN \('digiflazz', 'voucher-stock'\)/);
+  assert.match(orders, /provider_code NOT IN \('digiflazz', 'voucher-stock'\)/);
+  assert.match(worker, /recoverStaleAutomaticOrders\(getPublicBaseUrl\(\)\)/);
 });
 
 test.after(async () => unregister());
