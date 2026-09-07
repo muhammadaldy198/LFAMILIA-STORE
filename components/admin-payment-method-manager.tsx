@@ -31,14 +31,13 @@ export function AdminPaymentMethodManager() {
       const data = await readJson(response);
       if (!response.ok) throw new Error(String(data.error || "Metode pembayaran gagal dimuat."));
       setItems((data.channels as ManagedPaymentChannel[] | undefined) ?? []);
-      const nextGateways = Array.isArray(data.gateways)
-        ? data.gateways.filter(
-            (item): item is Gateway =>
-              item === "midtrans" || item === "ipaymu",
-          )
-        : data.gateway === "midtrans" || data.gateway === "ipaymu"
-          ? [data.gateway]
-          : [];
+      const rawGateways = Array.isArray(data.gateways)
+        ? data.gateways
+        : [data.gateway];
+      const nextGateways = rawGateways.reduce<Gateway[]>((result, item) => {
+        if (item === "midtrans" || item === "ipaymu") result.push(item);
+        return result;
+      }, []);
       setGateways(nextGateways);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Metode pembayaran gagal dimuat.");

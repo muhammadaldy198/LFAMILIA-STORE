@@ -113,7 +113,6 @@ export async function POST(request: Request) {
     const invoice = publicInvoice(identity.referenceId);
     const payment = await createMidtransPayment({
       referenceId: identity.referenceId,
-      paymentGateway: "midtrans",
       amount: promotion.finalPrice,
       productName: `${item.productName} - ${item.packageLabel}`,
       buyerName: input.buyerName,
@@ -145,6 +144,7 @@ export async function POST(request: Request) {
     return Response.json({
       orderId: identity.id,
       referenceId: identity.referenceId,
+      paymentGateway: "midtrans",
       publicInvoice: invoice,
       paymentNo: payment.paymentNo,
       paymentName: payment.paymentName,
