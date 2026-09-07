@@ -7,15 +7,15 @@ const root = process.cwd();
 const route = fs.readFileSync(path.join(root, "app/api/admin/wallet/route.ts"), "utf8");
 const manager = fs.readFileSync(path.join(root, "components/admin-wallet-manager.tsx"), "utf8");
 
-test("owner payment API exposes operational gateway readiness without credentials", () => {
-  assert.match(route, /gatewayReadiness/);
-  assert.match(route, /getIpaymuOperationalReadiness\(\)/);
-  assert.match(route, /getMidtransOperationalReadiness\(\)/);
+test("owner payment API exposes DOKU readiness without exposing credentials", () => {
+  assert.match(route, /gatewayReadiness: \{ doku: getDokuReadiness\(\) \}/);
+  assert.doesNotMatch(route, /secretKey|clientId/);
 });
 
-test("payment admin shows ready and not-ready gateway states", () => {
-  assert.match(manager, /GatewayReadiness/);
+test("payment admin shows one DOKU gateway with ready and not-ready states", () => {
+  assert.match(manager, /DOKU Checkout/);
   assert.match(manager, /"Siap"/);
   assert.match(manager, /"Belum siap"/);
-  assert.match(manager, /row\.readiness\.reason/);
+  assert.match(manager, /readiness\.reason/);
+  assert.doesNotMatch(manager, /midtrans|ipaymu/i);
 });
