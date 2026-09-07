@@ -1,8 +1,9 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import { setRuntimeEnv } from "../lib/server/runtime-env";
+import { getPublicBaseUrl, setRuntimeEnv } from "../lib/server/runtime-env";
 import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
+import { recoverStaleAutomaticOrders } from "../lib/server/orders";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 import { cleanupSecurityRateLimits } from "../lib/server/security";
 import { verifyCloudflareAccess } from "../lib/server/cloudflare-access";
@@ -128,6 +129,9 @@ const worker = {
     ctx.waitUntil(Promise.all([
       syncDigiflazzPrices().catch(() => undefined),
       cleanupSecurityRateLimits().catch(() => undefined),
+      Promise.resolve()
+        .then(() => recoverStaleAutomaticOrders(getPublicBaseUrl()))
+        .catch(() => undefined),
     ]));
   },
 };
