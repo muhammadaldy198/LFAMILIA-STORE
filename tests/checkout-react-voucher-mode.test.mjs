@@ -29,9 +29,10 @@ test("voucher checkout does not require hidden account fields", () => {
     checkout.indexOf("function requestConfirmation"),
     checkout.indexOf("async function submitOrder"),
   );
+  const submitStart = checkout.indexOf("async function submitOrder");
   const submit = checkout.slice(
-    checkout.indexOf("async function submitOrder"),
-    checkout.indexOf("return ("),
+    submitStart,
+    checkout.indexOf("\n  return (\n    <StoreLayout>", submitStart),
   );
 
   assert.match(confirmation, /!isVoucherProduct/);
