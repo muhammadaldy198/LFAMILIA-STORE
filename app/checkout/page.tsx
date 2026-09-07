@@ -41,7 +41,7 @@ import {
   type PaymentChannel,
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
-import { formatRupiah } from "@/lib/store-data";
+import { formatRupiah, type StoreProduct } from "@/lib/store-data";
 import { IPAYMU_MIN_CHECKOUT_AMOUNT, isIpaymuAmountSupported } from "@/lib/payment-limits";
 import type { CustomerSession } from "@/lib/server/customer-auth";
 
@@ -117,6 +117,10 @@ const groupIcons = {
   wallet: WalletCards,
 };
 
+function packageGroupName(value?: string) {
+  return value?.trim() || "Umum";
+}
+
 export default function CheckoutPage() {
   return (
     <Suspense
@@ -135,18 +139,54 @@ export default function CheckoutPage() {
 
 function CheckoutRoute() {
   const searchParams = useSearchParams();
-  return <CheckoutContent key={searchParams.get("product") ?? "default"} />;
-}
-
-function CheckoutContent() {
-  const { products } = useStoreProducts();
-  const searchParams = useSearchParams();
+  const { products, databaseReady, loading } = useStoreProducts();
   const requestedProduct = searchParams.get("product");
   const product = useMemo(
     () =>
       products.find((item) => item.slug === requestedProduct) ?? products[0],
     [products, requestedProduct],
   );
+
+  if (loading) {
+    return (
+      <StoreLayout>
+        <main className="mx-auto min-h-[70vh] max-w-7xl px-4 py-14 text-sm text-white/40 sm:px-6 lg:px-8">
+          Memuat katalog LFAMILIA…
+        </main>
+      </StoreLayout>
+    );
+  }
+
+  if (!product) {
+    return (
+      <StoreLayout>
+        <main className="mx-auto min-h-[70vh] max-w-3xl px-4 py-14 sm:px-6 lg:px-8">
+          <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.05] p-5">
+            <h1 className="text-lg font-black text-white">Katalog belum tersedia</h1>
+            <p className="mt-2 text-xs leading-5 text-white/45">
+              {databaseReady
+                ? "Belum ada produk aktif di database LFAMILIA."
+                : "Katalog tidak dapat dibaca dari database. Checkout dinonaktifkan agar harga lama tidak digunakan."}
+            </p>
+            <Button asChild variant="outline" className="mt-4 border-white/10 bg-white/[0.03] text-white">
+              <Link href="/catalog">Kembali ke katalog</Link>
+            </Button>
+          </div>
+        </main>
+      </StoreLayout>
+    );
+  }
+
+  return (
+    <CheckoutContent
+      key={`${product.slug}:${searchParams.get("package") ?? ""}`}
+      product={product}
+    />
+  );
+}
+
+function CheckoutContent({ product }: { product: StoreProduct }) {
+  const searchParams = useSearchParams();
   const requestedPackage = searchParams.get("package");
   const [packageId, setPackageId] = useState(() =>
     requestedPackage &&
@@ -154,6 +194,7 @@ function CheckoutContent() {
       ? requestedPackage
       : "",
   );
+  const [packageGroupChoice, setPackageGroupChoice] = useState("");
   const [customerInputValues, setCustomerInputValues] = useState<Record<string, string>>({});
   const [buyerName, setBuyerName] = useState("");
   const [buyerEmail, setBuyerEmail] = useState("");
@@ -183,6 +224,33 @@ function CheckoutContent() {
   const selectedPackage = product.packages.find(
     (item) => item.id === packageId,
   );
+  const packageGroups = useMemo(() => {
+    if (!product.packageTabsEnabled || !product.packages.length) return [];
+    const assigned = Array.from(
+      new Set(product.packages.map((item) => packageGroupName(item.group))),
+    );
+    const configured = (product.packageTabs ?? [])
+      .map((item) => item.trim())
+      .filter((item) => item && assigned.includes(item));
+    return [
+      ...configured,
+      ...assigned.filter((item) => !configured.includes(item)),
+    ];
+  }, [product.packageTabs, product.packageTabsEnabled, product.packages]);
+  const selectedPackageGroup = selectedPackage
+    ? packageGroupName(selectedPackage.group)
+    : "";
+  const activePackageGroup = packageGroups.includes(packageGroupChoice)
+    ? packageGroupChoice
+    : packageGroups.includes(selectedPackageGroup)
+      ? selectedPackageGroup
+      : packageGroups[0] ?? "";
+  const visiblePackages =
+    packageGroups.length > 1
+      ? product.packages.filter(
+          (item) => packageGroupName(item.group) === activePackageGroup,
+        )
+      : product.packages;
   const productInputFields = useMemo(
     () => product.inputFields ?? [
       { id: "account-id", label: product.inputLabel, placeholder: product.inputPlaceholder, required: true },
@@ -464,6 +532,20 @@ function CheckoutContent() {
     setQuote(null);
   }
 
+  function choosePackageGroup(group: string) {
+    setPackageGroupChoice(group);
+    if (
+      selectedPackage &&
+      packageGroupName(selectedPackage.group) === group
+    ) {
+      return;
+    }
+    const firstPackage = product.packages.find(
+      (item) => packageGroupName(item.group) === group,
+    );
+    if (firstPackage) choosePackage(firstPackage.id);
+  }
+
   function closeNotice() {
     if (hideNotice)
       window.localStorage.setItem(
@@ -727,8 +809,26 @@ function CheckoutContent() {
                         : "Pesanan diteruskan otomatis ke provider."
                   }
                 />
-                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {product.packages.map((item) => {
+                {packageGroups.length > 1 && (
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                    {packageGroups.map((group) => (
+                      <button
+                        key={group}
+                        type="button"
+                        onClick={() => choosePackageGroup(group)}
+                        className={
+                          group === activePackageGroup
+                            ? "shrink-0 rounded-lg border border-[#bca17d] bg-[#bca17d] px-3 py-2 text-[10px] font-black text-white"
+                            : "shrink-0 rounded-lg border border-white/[0.10] bg-white/[0.035] px-3 py-2 text-[10px] font-bold text-white/55 transition hover:border-white/20 hover:text-white"
+                        }
+                      >
+                        {group}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className={`${packageGroups.length > 1 ? "mt-2" : "mt-3"} grid grid-cols-2 gap-2 sm:grid-cols-3`}>
+                  {visiblePackages.map((item) => {
                     const ready = isManual || Boolean(item.providerCode && item.providerSku);
                     return (
                       <button

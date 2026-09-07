@@ -7,6 +7,7 @@ export type ProductPackage = {
   label: string;
   price: number;
   note?: string;
+  group?: string;
   providerCode?: string;
   providerSku?: string;
 };
@@ -45,6 +46,8 @@ export type StoreProduct = {
   manualOpenTime?: string;
   manualCloseTime?: string;
   manualTimezone?: string;
+  packageTabsEnabled?: boolean;
+  packageTabs?: string[];
   inputFields?: ProductInputField[];
   needsServer?: boolean;
   inputLabel: string;
