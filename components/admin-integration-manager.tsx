@@ -76,7 +76,7 @@ const definitions: Definition[] = [
     provider: "midtrans",
     mode: "snap",
     title: "Midtrans Snap",
-    description: "Pilihan paling sederhana untuk QRIS, e-wallet, dan virtual account dalam satu halaman pembayaran.",
+    description: "Gateway cadangan otomatis untuk QRIS, e-wallet, dan virtual account ketika iPaymu tidak dapat digunakan.",
     environments: ["sandbox", "production"],
     fields: [
       { key: "serverKey", label: "Server Key", secret: true, placeholder: "SB-Mid-server-… / Mid-server-…" },
@@ -90,7 +90,7 @@ const definitions: Definition[] = [
     provider: "ipaymu",
     mode: "direct",
     title: "iPaymu",
-    description: "Gateway alternatif untuk QRIS, e-wallet, dan virtual account dengan callback pembayaran otomatis.",
+    description: "Gateway utama LFAMILIA untuk QRIS, e-wallet, dan virtual account dengan callback pembayaran otomatis.",
     environments: ["sandbox", "production"],
     fields: [
       { key: "virtualAccount", label: "Virtual Account (VA)", secret: true },
@@ -404,7 +404,7 @@ export function AdminIntegrationManager({
                 {relayTesting ? "Menguji..." : "Tes Koneksi Relay"}
               </Button>
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {(["DigiFlazz", "iPaymu"] as const).map((label) => {
                 const result = relayResults.find((item) => item.label === label);
                 return (
