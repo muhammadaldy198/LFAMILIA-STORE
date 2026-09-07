@@ -1,6 +1,7 @@
 import { getD1 } from "@/db";
 import { paymentChannels, type PaymentChannel, type PaymentMethodCode } from "@/lib/payment-methods";
 import { isIpaymuChannelSupported } from "@/lib/server/ipaymu";
+import { getMidtransMode, isMidtransChannelSupported } from "@/lib/server/midtrans";
 
 export type ManagedPaymentChannel = PaymentChannel & {
   id: number | null;
@@ -9,13 +10,13 @@ export type ManagedPaymentChannel = PaymentChannel & {
   sortOrder: number;
 };
 
-export type PaymentGatewayName = "ipaymu";
+export type PaymentGatewayName = "midtrans" | "ipaymu";
 
 const fallback: ManagedPaymentChannel[] = paymentChannels.map((item, index) => ({
   ...item,
   id: null,
   imageUrl: undefined,
-  isActive: isIpaymuChannelSupported(item.method, item.channel),
+  isActive: true,
   sortOrder: index,
 }));
 
@@ -90,11 +91,24 @@ export async function deletePaymentChannel(id: number) {
 export async function syncPaymentChannelsForGateways(
   gateways: PaymentGatewayName[],
 ) {
-  if (!gateways.includes("ipaymu"))
-    throw new Error("Aktifkan iPaymu untuk sinkronisasi metode pembayaran.");
+  const activeGateways = [...new Set(gateways)] as PaymentGatewayName[];
+  const primaryGateway = activeGateways[0];
+  if (!primaryGateway)
+    throw new Error("Aktifkan minimal satu payment gateway untuk sinkronisasi.");
 
+  const midtransMode = activeGateways.includes("midtrans")
+    ? getMidtransMode()
+    : null;
   const supported = paymentChannels.filter((item) =>
-    isIpaymuChannelSupported(item.method, item.channel),
+    activeGateways.some((gateway) =>
+      gateway === "midtrans"
+        ? isMidtransChannelSupported(
+            item.method,
+            item.channel,
+            midtransMode!,
+          )
+        : isIpaymuChannelSupported(item.method, item.channel),
+    ),
   );
   const supportedKeys = new Set(
     supported.map((item) => `${item.method}:${item.channel}`),
@@ -117,8 +131,9 @@ export async function syncPaymentChannelsForGateways(
       ),
   ));
   return {
-    gateway: "ipaymu" as const,
-    gateways: ["ipaymu"] as const,
+    gateway: primaryGateway,
+    gateways: activeGateways,
+    mode: midtransMode,
     synced: supported.length,
     channels: await listPaymentChannels(true),
   };
