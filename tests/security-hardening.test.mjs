@@ -88,3 +88,22 @@ test("owner setup trusts only Worker-injected Access identity", () => {
   assert.match(source, /x-lfamilia-admin-email/);
   assert.doesNotMatch(source, /cf-access-authenticated-user-email/);
 });
+
+test("Worker cryptographically validates Cloudflare Access assertions", () => {
+  const source = read("worker/index.ts");
+  assert.match(source, /verifyCloudflareAccess\(request, env\)/);
+  assert.doesNotMatch(source, /ctx\.access|getIdentity\(\)/);
+  assert.doesNotMatch(source, /cf-access-authenticated-user-email/);
+
+  const verifier = read("lib/server/cloudflare-access.ts");
+  for (const requirement of [
+    "RSASSA-PKCS1-v1_5",
+    "SHA-256",
+    "POLICY_AUD",
+    "TEAM_DOMAIN",
+    "claims.exp",
+    "claims.iss",
+  ]) {
+    assert.ok(verifier.includes(requirement), requirement);
+  }
+});

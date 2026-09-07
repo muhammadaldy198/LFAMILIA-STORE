@@ -5,10 +5,13 @@ import { setRuntimeEnv } from "../lib/server/runtime-env";
 import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 import { cleanupSecurityRateLimits } from "../lib/server/security";
+import { verifyCloudflareAccess } from "../lib/server/cloudflare-access";
 
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
+  TEAM_DOMAIN?: string;
+  POLICY_AUD?: string;
   IMAGES?: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -21,9 +24,6 @@ interface Env {
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
   passThroughOnException(): void;
-  access?: {
-    getIdentity(): Promise<{ email?: string | null }>;
-  };
 }
 
 interface ScheduledEvent { cron: string; }
@@ -54,7 +54,6 @@ function withSecurityHeaders(response: Response, url: URL) {
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
     const url = new URL(request.url);
     const isAccessProtectedRequest =
       url.pathname === "/admin/panel" ||
@@ -65,16 +64,8 @@ const worker = {
       url.pathname.startsWith("/api/admin/");
 
     if (isAccessProtectedRequest) {
-      let adminEmail: string | null = null;
-
-      if (ctx.access) {
-        const identity = await ctx.access.getIdentity();
-        adminEmail = identity?.email ?? null;
-      } else {
-        const accessEmail = request.headers.get("cf-access-authenticated-user-email");
-        const accessAssertion = request.headers.get("cf-access-jwt-assertion");
-        if (accessEmail && accessAssertion) adminEmail = accessEmail;
-      }
+      const accessIdentity = await verifyCloudflareAccess(request, env);
+      const adminEmail = accessIdentity?.email ?? null;
 
       if (!adminEmail) {
         if (url.pathname.startsWith("/api/")) {
@@ -92,6 +83,8 @@ const worker = {
       headers.set("x-lfamilia-admin-email", adminEmail);
       request = new Request(request, { headers });
     }
+
+    setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
 
     if (url.pathname === "/_vinext/image") {
       if (!env.IMAGES) return withSecurityHeaders(new Response("Image optimization is unavailable.", { status: 404 }), url);

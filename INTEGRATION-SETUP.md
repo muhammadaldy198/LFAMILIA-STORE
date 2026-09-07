@@ -64,6 +64,9 @@ Panel operasional menggunakan ID admin + password dengan sesi terpisah dari akun
 - Password disimpan sebagai hash dan tidak pernah ditampilkan kembali.
 - Endpoint perubahan admin memeriksa sesi dan origin request.
 - Area Admin `/admin/panel*` dan halaman pemulihan Pemilik `/admin/setup*` harus dilindungi Cloudflare Access.
+- Tambahkan Cloudflare Worker Variable `TEAM_DOMAIN=https://<nama-team>.cloudflareaccess.com`.
+- Tambahkan Cloudflare Worker Variable `POLICY_AUD=<Application Audience AUD>` dari aplikasi Access yang melindungi Admin.
+- Worker memvalidasi signature RS256, issuer, audience, masa berlaku, dan email pada JWT Access. Request Admin ditolak jika salah satu variable tersebut kosong atau token tidak valid.
 - `OWNER_EMAIL` digunakan untuk jalur pemulihan Pemilik, bukan sebagai password/login operasional.
 - Jangan mengekspos secret provider atau gateway ke browser.
 

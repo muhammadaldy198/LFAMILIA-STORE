@@ -43,3 +43,25 @@ test("admin panel requires Cloudflare Access identity before app routing", async
   assert.equal(response.status, 401);
   assert.match(await response.text(), /Admin belum dilindungi/i);
 });
+
+test("forged Access email and unsigned assertion are rejected", async () => {
+  const worker = await loadWorker();
+  const response = await worker.fetch(
+    new Request("http://localhost/api/admin/integrations", {
+      headers: {
+        "cf-access-authenticated-user-email": "attacker@example.com",
+        "cf-access-jwt-assertion": "forged.jwt.assertion",
+      },
+    }),
+    {
+      ...env,
+      TEAM_DOMAIN: "https://lfamilia-test.cloudflareaccess.com",
+      POLICY_AUD: "lfamilia-admin-audience",
+    },
+    ctx,
+  );
+
+  assert.equal(response.status, 401);
+  const payload = await response.json();
+  assert.equal(payload.error, "Cloudflare Access belum memvalidasi area Admin.");
+});
