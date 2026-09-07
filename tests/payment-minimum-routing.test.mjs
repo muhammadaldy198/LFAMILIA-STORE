@@ -36,7 +36,9 @@ test("checkout uses shared routing and safe provider fallback", () => {
   assert.match(autoRoute, /createMidtransCheckout\(midtransRequest\)/);
 });
 
-test("iPaymu direct route rejects below-minimum amount before provider request", () => {
+test("below-minimum checkout explains the iPaymu limit without requiring Midtrans", () => {
+  assert.match(autoRoute, /Pilih nominal lain atau gunakan Koin LFAMILIA/);
   assert.match(ipaymuRoute, /isIpaymuAmountSupported\(promotion\.finalPrice\)/);
-  assert.match(ipaymuRoute, /Pilih Midtrans QRIS\/e-wallet/);
+  assert.match(ipaymuRoute, /Pilih nominal lain atau gunakan Koin LFAMILIA/);
+  assert.match(checkout, /iPaymu tersedia mulai/);
 });
