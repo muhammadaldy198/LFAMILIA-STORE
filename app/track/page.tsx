@@ -78,11 +78,10 @@ const eventLabels: Record<string, string> = {
   error: "Terjadi kendala pemrosesan",
 };
 const sourceLabels: Record<string, string> = {
+  doku: "DOKU",
   system: "LFAMILIA",
-  midtrans: "Midtrans",
   wallet: "Saldo",
   digiflazz: "DigiFlazz",
-  vippayment: "VIP Payment",
   voucher_stock: "Voucher",
   admin: "Admin",
 };
