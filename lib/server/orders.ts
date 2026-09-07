@@ -1,5 +1,6 @@
 import { getD1 } from "@/db";
 import type { ProductInputField } from "@/lib/store-data";
+import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { getProviderAdapter } from "@/lib/server/providers";
 import type { ProviderResult } from "@/lib/server/providers/types";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
@@ -51,8 +52,10 @@ export type OrderRecord = {
   subtotal: number;
   discount_amount: number;
   voucher_code: string | null;
+  voucher_id: number | null;
   flash_sale_id: number | null;
   promotion_reservation_status: "none" | "legacy" | "reserved" | "consumed" | "released";
+  promotion_reserved_until: string | null;
   admin_fee: number;
   total: number;
   payment_method: string;
@@ -253,18 +256,22 @@ export async function insertPendingOrder(input: {
     input.paymentMethod !== "wallet" &&
     Boolean(input.promotion.voucherCode || input.promotion.flashSaleId);
   const reservationStatus = reservePromotion ? "reserved" : "none";
+  const reservationLease = reservePromotion
+    ? new Date(Date.now() + 10 * 60_000).toISOString()
+    : null;
   const results = await db.batch([
     db.prepare(
       `INSERT INTO orders (
       id, customer_id, wallet_checkout_key, reference_id, product_slug, product_name, package_sku, package_label,
       provider_code, provider_sku, fulfillment_type, target_template, destination, server,
       nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json,
-      base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id, promotion_reservation_status,
+      base_subtotal, subtotal, discount_amount, voucher_code, voucher_id, flash_sale_id,
+      promotion_reservation_status, promotion_reserved_until,
       admin_fee, total, payment_method, payment_channel
-    ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?
+    ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?
       WHERE (? IS NULL OR EXISTS (
         SELECT 1 FROM discount_vouchers
-        WHERE code = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
+        WHERE id = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
           AND (usage_limit IS NULL OR used_count < usage_limit)
       ))
       AND (? IS NULL OR EXISTS (
@@ -299,13 +306,15 @@ export async function insertPendingOrder(input: {
       input.promotion.sellingPrice,
       input.promotion.discountAmount,
       input.promotion.voucherCode,
+      input.promotion.voucherId,
       input.promotion.flashSaleId,
       reservationStatus,
+      reservationLease,
       input.promotion.finalPrice,
       input.paymentMethod,
       input.paymentChannel,
-      reservePromotion ? input.promotion.voucherCode : null,
-      input.promotion.voucherCode,
+      reservePromotion ? input.promotion.voucherId : null,
+      input.promotion.voucherId,
       now,
       now,
       reservePromotion ? input.promotion.flashSaleId : null,
@@ -315,14 +324,14 @@ export async function insertPendingOrder(input: {
     ),
     db.prepare(
       `UPDATE discount_vouchers SET used_count = used_count + 1, updated_at = CURRENT_TIMESTAMP
-       WHERE code = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
+       WHERE id = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
          AND (usage_limit IS NULL OR used_count < usage_limit)
          AND EXISTS (
            SELECT 1 FROM orders
            WHERE id = ? AND promotion_reservation_status = 'reserved'
          )`,
     ).bind(
-      reservePromotion ? input.promotion.voucherCode : null,
+      reservePromotion ? input.promotion.voucherId : null,
       now,
       now,
       input.id,
@@ -388,11 +397,17 @@ export async function updateMidtransPayment(input: {
   fee: number;
   total: number;
 }) {
+  const reservationExpiry = paymentReservationExpiry(input.expiredAt);
   await getD1()
     .prepare(
       `UPDATE orders SET midtrans_transaction_id = ?, midtrans_payment_no = ?,
        midtrans_payment_name = ?, midtrans_payment_url = ?, midtrans_expired_at = ?,
-       midtrans_mode = ?, admin_fee = ?, total = ?, updated_at = CURRENT_TIMESTAMP
+       midtrans_mode = ?, admin_fee = ?, total = ?,
+       promotion_reserved_until = CASE
+         WHEN promotion_reservation_status = 'reserved' THEN ?
+         ELSE promotion_reserved_until
+       END,
+       updated_at = CURRENT_TIMESTAMP
        WHERE reference_id = ?`,
     )
     .bind(
@@ -404,6 +419,7 @@ export async function updateMidtransPayment(input: {
       input.mode,
       input.fee,
       input.total,
+      reservationExpiry,
       input.referenceId,
     )
     .run();
@@ -419,10 +435,16 @@ export async function updateIpaymuPayment(input: {
   fee: number;
   total: number;
 }) {
+  const reservationExpiry = paymentReservationExpiry(input.expiredAt);
   await getD1()
     .prepare(
       `UPDATE orders SET ipaymu_transaction_id = ?, ipaymu_payment_no = ?, ipaymu_payment_name = ?,
-       ipaymu_payment_url = ?, ipaymu_expired_at = ?, admin_fee = ?, total = ?, updated_at = CURRENT_TIMESTAMP
+       ipaymu_payment_url = ?, ipaymu_expired_at = ?, admin_fee = ?, total = ?,
+       promotion_reserved_until = CASE
+         WHEN promotion_reservation_status = 'reserved' THEN ?
+         ELSE promotion_reserved_until
+       END,
+       updated_at = CURRENT_TIMESTAMP
        WHERE reference_id = ?`,
     )
     .bind(
@@ -433,9 +455,17 @@ export async function updateIpaymuPayment(input: {
       input.expiredAt,
       input.fee,
       input.total,
+      reservationExpiry,
       input.referenceId,
     )
     .run();
+}
+
+function paymentReservationExpiry(expiredAt: string | null) {
+  const parsed = expiredAt ? Date.parse(expiredAt) : Number.NaN;
+  return Number.isFinite(parsed)
+    ? new Date(parsed).toISOString()
+    : new Date(Date.now() + 24 * 60 * 60_000).toISOString();
 }
 
 export async function markPaymentCreationFailed(
@@ -446,8 +476,8 @@ export async function markPaymentCreationFailed(
   await db.batch([
     db.prepare(
       `UPDATE discount_vouchers SET used_count = MAX(0, used_count - 1), updated_at = CURRENT_TIMESTAMP
-       WHERE code = (
-         SELECT voucher_code FROM orders
+       WHERE id = (
+         SELECT voucher_id FROM orders
          WHERE reference_id = ? AND payment_status = 'pending'
            AND promotion_reservation_status = 'reserved'
        )`,
@@ -512,11 +542,11 @@ export async function applyPaymentStatus(
     const results = await db.batch([
       db.prepare(
         `UPDATE discount_vouchers SET used_count = used_count + 1, updated_at = CURRENT_TIMESTAMP
-         WHERE code = ? AND EXISTS (
+         WHERE id = COALESCE(?, (SELECT id FROM discount_vouchers WHERE code = ?)) AND EXISTS (
            SELECT 1 FROM orders WHERE id = ? AND payment_status <> 'paid'
              AND promotion_reservation_status IN ('legacy', 'released')
          )`,
-      ).bind(order.voucher_code, order.id),
+      ).bind(order.voucher_id, order.voucher_code, order.id),
       db.prepare(
         `UPDATE flash_sales SET sold_count = sold_count + 1, updated_at = CURRENT_TIMESTAMP
          WHERE id = ? AND EXISTS (
@@ -540,11 +570,11 @@ export async function applyPaymentStatus(
   await db.batch([
     db.prepare(
       `UPDATE discount_vouchers SET used_count = MAX(0, used_count - 1), updated_at = CURRENT_TIMESTAMP
-       WHERE code = ? AND EXISTS (
+       WHERE id = COALESCE(?, (SELECT id FROM discount_vouchers WHERE code = ?)) AND EXISTS (
          SELECT 1 FROM orders WHERE id = ? AND payment_status = 'pending'
            AND promotion_reservation_status = 'reserved'
        )`,
-    ).bind(order.voucher_code, order.id),
+    ).bind(order.voucher_id, order.voucher_code, order.id),
     db.prepare(
       `UPDATE flash_sales SET sold_count = MAX(0, sold_count - 1), updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND EXISTS (
@@ -563,6 +593,57 @@ export async function applyPaymentStatus(
     ).bind(status, order.id),
   ]);
   return false;
+}
+
+const abandonedReservationCondition = `payment_status = 'pending'
+  AND promotion_reservation_status = 'reserved'
+  AND promotion_reserved_until IS NOT NULL
+  AND promotion_reserved_until <= ?
+  AND midtrans_transaction_id IS NULL
+  AND midtrans_payment_url IS NULL
+  AND ipaymu_transaction_id IS NULL
+  AND ipaymu_payment_url IS NULL`;
+
+export async function releaseAbandonedPromotionReservation(
+  orderId: string,
+  now = new Date().toISOString(),
+) {
+  const db = getD1();
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE discount_vouchers SET used_count = MAX(0, used_count - 1), updated_at = CURRENT_TIMESTAMP
+       WHERE id = (
+         SELECT voucher_id FROM orders WHERE id = ? AND ${abandonedReservationCondition}
+       )`,
+    ).bind(orderId, now),
+    db.prepare(
+      `UPDATE flash_sales SET sold_count = MAX(0, sold_count - 1), updated_at = CURRENT_TIMESTAMP
+       WHERE id = (
+         SELECT flash_sale_id FROM orders WHERE id = ? AND ${abandonedReservationCondition}
+       )`,
+    ).bind(orderId, now),
+    db.prepare(
+      `UPDATE orders SET payment_status = 'failed', promotion_reservation_status = 'released',
+         provider_message = 'Checkout terputus sebelum pembayaran berhasil dibuat.',
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND ${abandonedReservationCondition}`,
+    ).bind(orderId, now),
+  ]);
+  return Number(results[2]?.meta.changes ?? 0) > 0;
+}
+
+export async function recoverAbandonedPromotionReservations(limit = 100) {
+  await ensureLegacyDatabaseColumns();
+  const now = new Date().toISOString();
+  const result = await getD1().prepare(
+    `SELECT id FROM orders WHERE ${abandonedReservationCondition}
+     ORDER BY promotion_reserved_until ASC LIMIT ?`,
+  ).bind(now, Math.min(Math.max(limit, 1), 500)).all<{ id: string }>();
+  let released = 0;
+  for (const row of result.results) {
+    if (await releaseAbandonedPromotionReservation(row.id, now)) released += 1;
+  }
+  return released;
 }
 
 export async function fulfillAutomaticOrder(
