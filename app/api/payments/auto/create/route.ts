@@ -33,6 +33,8 @@ const routingSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const ipaymuRequest = request.clone();
+    const midtransRequest = request.clone();
     const input = routingSchema.parse(await request.clone().json());
     const paymentChannel =
       input.paymentMethod === "qris" && input.paymentChannel === "qris"
@@ -79,21 +81,30 @@ export async function POST(request: Request) {
       isIpaymuAmountSupported(promotion.finalPrice) &&
       isIpaymuChannelSupported(input.paymentMethod, paymentChannel);
 
+    const canUseMidtrans =
+      settings.midtransCheckoutEnabled &&
+      midtransReadiness.ready &&
+      isMidtransChannelSupported(
+        input.paymentMethod,
+        paymentChannel,
+        getMidtransMode(),
+      );
+
     if (canUseIpaymu) {
-      return createIpaymuCheckout(request);
+      const ipaymuResponse = await createIpaymuCheckout(ipaymuRequest);
+      if (ipaymuResponse.ok) return ipaymuResponse;
+
+      const failed = (await ipaymuResponse.clone().json().catch(() => null)) as {
+        fallbackAllowed?: boolean;
+      } | null;
+      if (!failed?.fallbackAllowed || !canUseMidtrans) {
+        return ipaymuResponse;
+      }
+      return createMidtransCheckout(midtransRequest);
     }
 
-    if (settings.midtransCheckoutEnabled && midtransReadiness.ready) {
-      const midtransMode = getMidtransMode();
-      if (
-        isMidtransChannelSupported(
-          input.paymentMethod,
-          paymentChannel,
-          midtransMode,
-        )
-      ) {
-        return createMidtransCheckout(request);
-      }
+    if (canUseMidtrans) {
+      return createMidtransCheckout(midtransRequest);
     }
 
     if (
