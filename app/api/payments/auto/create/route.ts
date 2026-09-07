@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     ) {
       return Response.json(
         {
-          error: `Nominal ini di bawah minimum iPaymu Rp${IPAYMU_MIN_CHECKOUT_AMOUNT.toLocaleString("id-ID")} dan Midtrans belum siap untuk metode yang dipilih.`,
+          error: `iPaymu tersedia mulai Rp${IPAYMU_MIN_CHECKOUT_AMOUNT.toLocaleString("id-ID")}. Pilih nominal lain atau gunakan Koin LFAMILIA.`,
         },
         { status: 422 },
       );
