@@ -49,19 +49,7 @@ const providerDefinitions = [
       optionalEnv("DIGIFLAZZ_PRODUCTION_UPSTREAM_ORIGIN"),
       "DIGIFLAZZ_PRODUCTION_UPSTREAM_ORIGIN",
     ),
-  },
-  {
-    name: "ipaymu",
-    host: optionalEnv("IPAYMU_RELAY_HOST").toLowerCase(),
-    sandboxUpstream: normalizeOrigin(
-      optionalEnv("IPAYMU_SANDBOX_UPSTREAM_ORIGIN"),
-      "IPAYMU_SANDBOX_UPSTREAM_ORIGIN",
-    ),
-    productionUpstream: normalizeOrigin(
-      optionalEnv("IPAYMU_PRODUCTION_UPSTREAM_ORIGIN"),
-      "IPAYMU_PRODUCTION_UPSTREAM_ORIGIN",
-    ),
-  },
+  }
 ];
 
 const providers = new Map(
@@ -73,7 +61,6 @@ const providers = new Map(
 const internalHeaders = new Set([
   "x-lfamilia-relay-token",
   "x-lfamilia-digiflazz-environment",
-  "x-lfamilia-ipaymu-environment",
 ]);
 
 const hopByHopHeaders = new Set([
@@ -193,16 +180,6 @@ function resolveProviderUpstream(provider, req) {
     return "";
   }
 
-  if (provider.name === "ipaymu") {
-    const environment = String(
-      req.headers["x-lfamilia-ipaymu-environment"] || "",
-    ).toLowerCase();
-
-    if (environment === "sandbox") return provider.sandboxUpstream;
-    if (environment === "production") return provider.productionUpstream;
-    return "";
-  }
-
   return "";
 }
 
@@ -215,19 +192,7 @@ function providerConfigured(provider) {
     );
   }
 
-  if (provider.name === "ipaymu") {
-    return Boolean(
-      provider.host &&
-        provider.sandboxUpstream &&
-        provider.productionUpstream,
-    );
-  }
-
-  return Boolean(
-    provider.host &&
-      provider.sandboxUpstream &&
-      provider.productionUpstream,
-  );
+  return false;
 }
 
 const server = createServer(async (req, res) => {
