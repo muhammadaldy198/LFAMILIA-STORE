@@ -8,7 +8,7 @@ import {
 import { createMidtransPayment } from "@/lib/server/midtrans";
 import { routePaymentGateway } from "@/lib/server/payment-gateway-router";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
-import { quotePromotion } from "@/lib/server/promotions";
+import { PromotionQuoteError, quotePromotion } from "@/lib/server/promotions";
 import {
   createOrderIdentity,
   insertPendingOrder,
@@ -317,7 +317,14 @@ export async function POST(request: Request) {
 
     return Response.json(
       { error: message },
-      { status: error instanceof z.ZodError ? 400 : 503 },
+      {
+        status:
+          error instanceof z.ZodError
+            ? 400
+            : error instanceof PromotionQuoteError
+              ? 409
+              : 503,
+      },
     );
   }
 }
