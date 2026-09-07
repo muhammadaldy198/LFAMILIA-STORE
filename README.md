@@ -1,19 +1,19 @@
 # LFAMILIA STORE
 
-Toko top up digital berbasis Cloudflare Workers dan D1. Aplikasi mencakup katalog, checkout Midtrans/iPaymu, saldo pelanggan, pemenuhan otomatis melalui provider, antrean manual, voucher diskon, stok kode terenkripsi, pelacakan transaksi, membership, serta panel Pemilik/Staff.
+Toko top up digital berbasis Cloudflare Workers dan D1. Aplikasi mencakup katalog, checkout DOKU, saldo pelanggan, pemenuhan otomatis melalui provider, antrean manual, voucher diskon, stok kode terenkripsi, pelacakan transaksi, membership, serta panel Pemilik/Staff.
 
 ## Fitur utama
 
 - Katalog dinamis dengan gambar, banner produk, kategori, urutan, status, tab pemisah nominal, dan harga yang dikelola dari panel.
 - Nominal produk memakai provider per nominal, SKU provider, margin Rupiah/Persen, harga modal supplier, dan sinkron harga DigiFlazz per nominal maupun otomatis.
-- Produk otomatis memakai DigiFlazz, VIPayment, atau Stok Kode LFAMILIA. Produk manual masuk antrean admin setelah pembayaran terverifikasi.
-- Checkout Midtrans atau iPaymu dengan QRIS, Virtual Account, dan e-wallet sesuai channel yang aktif.
+- Produk otomatis eksternal memakai DigiFlazz. Stok Kode LFAMILIA diproses internal; produk manual masuk antrean admin setelah pembayaran terverifikasi.
+- Checkout memakai satu gateway DOKU untuk QRIS, Virtual Account, dan e-wallet sesuai channel DOKU yang aktif.
 - Saldo pelanggan dapat di-top-up otomatis melalui gateway dan dipakai langsung saat checkout.
 - Account pelanggan, membership BASIC/GOLD/DIAMOND/PLATINUM, leaderboard, ulasan, bantuan/refund, berita, FAQ, banner Home, dan pop-up informasi produk.
 - Voucher diskon, promo terjadwal, minimum transaksi, kuota, dan batas potongan.
 - Stok kode digital disimpan terenkripsi dan dapat ditampilkan di website serta dikirim melalui kanal notifikasi yang dikonfigurasi.
 - Panel memakai sesi Pemilik/Staff berbasis ID admin + password. Akses pemulihan Pemilik tetap dapat dilindungi dengan Cloudflare Access.
-- Secret payment/provider tidak disimpan di repository. Credential operasional dapat disimpan terenkripsi melalui Integration Manager.
+- Secret DOKU/DigiFlazz tidak disimpan di repository. Credential operasional disimpan terenkripsi melalui Integration Manager.
 
 ## Menjalankan proyek
 
