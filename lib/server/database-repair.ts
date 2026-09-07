@@ -39,6 +39,11 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["orders", "discount_amount", "discount_amount INTEGER DEFAULT 0 NOT NULL"],
   ["orders", "voucher_code", "voucher_code TEXT"],
   ["orders", "flash_sale_id", "flash_sale_id INTEGER"],
+  [
+    "orders",
+    "promotion_reservation_status",
+    "promotion_reservation_status TEXT DEFAULT 'legacy' NOT NULL",
+  ],
   ["orders", "customer_id", "customer_id TEXT"],
   ["orders", "wallet_checkout_key", "wallet_checkout_key TEXT"],
   ["orders", "customer_inputs_json", "customer_inputs_json TEXT DEFAULT '[]' NOT NULL"],
