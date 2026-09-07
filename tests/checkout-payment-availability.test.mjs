@@ -5,7 +5,6 @@ import test from "node:test";
 
 const root = process.cwd();
 const source = fs.readFileSync(path.join(root, "app/checkout/page.tsx"), "utf8");
-const enhancer = fs.readFileSync(path.join(root, "components/checkout-ui-enhancer.tsx"), "utf8");
 const methodsRoute = fs.readFileSync(path.join(root, "app/api/payment-methods/route.ts"), "utf8");
 
 test("checkout methods are derived from all eligible gateways", () => {
@@ -22,11 +21,14 @@ test("method and channel selection no longer stores a gateway in browser state",
   assert.doesNotMatch(source, /availableChannels/);
 });
 
-test("legacy DOM controller no longer hides or toggles payment groups", () => {
-  assert.doesNotMatch(enhancer, /enhancePaymentGroups/);
-  assert.doesNotMatch(enhancer, /expandedMethods/);
-  assert.doesNotMatch(enhancer, /wiredHeaders/);
-  assert.doesNotMatch(enhancer, /fetch\("\/api\/payment-methods"/);
+test("payment groups are controlled directly by checkout React state", () => {
+  assert.equal(
+    fs.existsSync(path.join(root, "components/checkout-ui-enhancer.tsx")),
+    false,
+  );
+  assert.match(source, /checkoutGroups\.map\(\(group\)/);
+  assert.match(source, /chooseMethod\(group\.code\)/);
+  assert.doesNotMatch(source, /enhancePaymentGroups|expandedMethods|wiredHeaders/);
 });
 
 test("checkout explains unavailable gateways without leaving the payment section blank", () => {
