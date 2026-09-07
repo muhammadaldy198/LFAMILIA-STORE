@@ -19,8 +19,7 @@ test("critical public mutation routes reject cross-site requests", () => {
     "app/api/account/game-accounts/route.ts",
     "app/api/account/topups/route.ts",
     "app/api/payments/wallet/create/route.ts",
-    "app/api/payments/midtrans/create/route.ts",
-    "app/api/payments/ipaymu/create/route.ts",
+    "app/api/payments/auto/create/route.ts",
     "app/api/reviews/route.ts",
   ];
   for (const file of routes) assert.match(read(file), /rejectCrossOriginMutation\(request\)/, file);
@@ -37,8 +36,7 @@ test("abuse-prone public endpoints are rate limited", () => {
     ["app/api/account/game-accounts/route.ts", "saved-game-account"],
     ["app/api/account/topups/route.ts", "wallet-topup"],
     ["app/api/payments/wallet/create/route.ts", "wallet-checkout"],
-    ["app/api/payments/midtrans/create/route.ts", "midtrans-checkout"],
-    ["app/api/payments/ipaymu/create/route.ts", "ipaymu-checkout"],
+    ["app/api/payments/auto/create/route.ts", "automatic-checkout"],
     ["app/api/reviews/route.ts", "customer-review"],
   ]);
   for (const [file, scope] of expected) assert.ok(read(file).includes(`allowRequest(request, "${scope}"`), `${file} missing ${scope}`);

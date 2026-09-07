@@ -6,7 +6,6 @@ import test from "node:test";
 const root = process.cwd();
 const checkout = fs.readFileSync(path.join(root, "app/checkout/page.tsx"), "utf8");
 const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/route.ts"), "utf8");
-const ipaymuRoute = fs.readFileSync(path.join(root, "app/api/payments/ipaymu/create/route.ts"), "utf8");
 const router = fs.readFileSync(path.join(root, "lib/server/payment-gateway-router.ts"), "utf8");
 const limits = fs.readFileSync(path.join(root, "lib/payment-limits.ts"), "utf8");
 
@@ -28,17 +27,23 @@ test("shared router prefers iPaymu when eligible and keeps Midtrans fallback", (
   assert.match(router, /if \(midtransEligible\) candidates\.push\("midtrans"\)/);
 });
 
-test("checkout uses shared routing and safe provider fallback", () => {
+test("checkout uses shared routing and reuses one order across fallback", () => {
   assert.match(autoRoute, /routePaymentGateway\(/);
-  assert.match(autoRoute, /createIpaymuCheckout\(ipaymuRequest\)/);
-  assert.match(autoRoute, /fallbackAllowed/);
+  assert.match(autoRoute, /const identity = createOrderIdentity\(\)/);
+  assert.match(autoRoute, /await insertPendingOrder\(/);
+  assert.match(autoRoute, /createIpaymuDirectPayment\(/);
   assert.match(autoRoute, /fallback !== "midtrans"/);
-  assert.match(autoRoute, /createMidtransCheckout\(midtransRequest\)/);
+  assert.match(autoRoute, /createMidtransPayment\(/);
+  assert.doesNotMatch(autoRoute, /createIpaymuCheckout|createMidtransCheckout/);
 });
 
 test("below-minimum checkout explains the iPaymu limit without requiring Midtrans", () => {
   assert.match(autoRoute, /Pilih nominal lain atau gunakan Koin LFAMILIA/);
-  assert.match(ipaymuRoute, /isIpaymuAmountSupported\(promotion\.finalPrice\)/);
-  assert.match(ipaymuRoute, /Pilih nominal lain atau gunakan Koin LFAMILIA/);
+  assert.match(router, /isIpaymuAmountSupported\(input\.amount\)/);
   assert.match(checkout, /iPaymu tersedia mulai/);
+});
+
+test("automatic checkout creates exactly one order identity", () => {
+  assert.equal((autoRoute.match(/createOrderIdentity\(\)/g) ?? []).length, 1);
+  assert.equal((autoRoute.match(/await insertPendingOrder\(/g) ?? []).length, 1);
 });
