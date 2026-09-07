@@ -300,7 +300,7 @@ export default function TrackPage() {
             <p className="mt-0.5 text-[9px] text-white/35">Nomor WhatsApp hanya menampilkan ringkasan. Gunakan invoice asli untuk membuka detail transaksi.</p>
           </div>
           <div className="divide-y divide-white/[0.06]">
-            {phoneOrders.map((item) => <div key={item.referenceId ?? item.maskedReferenceId} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+            {phoneOrders.map((item, index) => <div key={`${item.createdAt}-${item.productName}-${index}`} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-[10px] font-bold text-[#cfff72]">{item.maskedReferenceId}</span>
@@ -363,14 +363,14 @@ export default function TrackPage() {
           <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] px-4 py-3 sm:px-5">
             <div>
               <div className="flex items-center gap-2"><History className="size-4 text-[#b9ff35]" /><h2 className="text-sm font-black">Transaksi Terbaru</h2></div>
-              <p className="mt-0.5 text-[9px] text-white/35">Aktivitas top up LFAMILIA terbaru. Invoice disamarkan untuk privasi pelanggan.</p>
+              <p className="mt-0.5 text-[9px] text-white/35">Aktivitas top up LFAMILIA terbaru. Nomor invoice tidak ditampilkan.</p>
             </div>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#b9ff35]/[0.08] px-2 py-1 text-[8px] font-bold text-[#cfff72]"><Radio className="size-3 animate-pulse" /> Live</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-[10px]">
               <thead className="bg-black/15 text-[8px] uppercase tracking-wider text-white/30">
-                <tr><th className="px-4 py-2.5 font-bold sm:px-5">Waktu</th><th className="px-3 py-2.5 font-bold">Invoice</th><th className="px-3 py-2.5 font-bold">Produk</th><th className="px-3 py-2.5 font-bold">Nominal</th><th className="px-3 py-2.5 font-bold">Status</th></tr>
+                <tr><th className="px-4 py-2.5 font-bold sm:px-5">Waktu</th><th className="px-3 py-2.5 font-bold">Privasi</th><th className="px-3 py-2.5 font-bold">Produk</th><th className="px-3 py-2.5 font-bold">Nominal</th><th className="px-3 py-2.5 font-bold">Status</th></tr>
               </thead>
               <tbody className="divide-y divide-white/[0.06]">
                 {transactions.map((item, index) => <tr key={`${item.maskedReferenceId}-${item.createdAt}-${index}`} className="text-white/55">
@@ -384,7 +384,7 @@ export default function TrackPage() {
               </tbody>
             </table>
           </div>
-          <p className="border-t border-white/[0.06] px-4 py-2.5 text-[9px] text-white/28 sm:px-5">Tidak menampilkan nama, email, nomor WhatsApp, tujuan akun, atau kode voucher pelanggan.</p>
+          <p className="border-t border-white/[0.06] px-4 py-2.5 text-[9px] text-white/28 sm:px-5">Tidak menampilkan invoice, nama, email, nomor WhatsApp, tujuan akun, atau kode voucher pelanggan.</p>
         </section>
       </main>
     </StoreLayout>
