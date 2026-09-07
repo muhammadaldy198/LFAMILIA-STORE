@@ -24,6 +24,10 @@ class D1Statement {
   async first() {
     return this.statement.get(...this.values) ?? null;
   }
+
+  async all() {
+    return { results: this.statement.all(...this.values) };
+  }
 }
 
 class TestD1 {
@@ -60,7 +64,8 @@ function createDatabase() {
     CREATE TABLE orders (
       id TEXT PRIMARY KEY, customer_id TEXT, payment_method TEXT NOT NULL,
       payment_status TEXT NOT NULL DEFAULT 'pending', fulfillment_status TEXT NOT NULL DEFAULT 'waiting_payment',
-      updated_at TEXT
+      fulfillment_type TEXT NOT NULL DEFAULT 'automatic', provider_status TEXT, provider_code TEXT,
+      provider_message TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT
     );
     CREATE TABLE wallet_transactions (
       id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, direction TEXT NOT NULL, amount INTEGER NOT NULL,
@@ -156,6 +161,10 @@ test("wallet retries resume pending settlement and automatic fulfillment", () =>
   assert.match(orders, /provider_code NOT IN \('digiflazz', 'voucher-stock'\)/);
   assert.match(orders, /provider_status = 'retryable_error'/);
   assert.match(orders, /notifyOrderFulfillmentSuccessById\(row\.id\)/);
+  assert.match(orders, /fulfillment-attempt-/);
+  assert.match(orders, /provider_status = 'retry_exhausted'/);
+  assert.match(orders, /COUNT\(\*\)[\s\S]*status = 'dispatching'[\s\S]*>= 5/);
+  assert.match(orders, /ORDER BY CASE WHEN provider_status IS NULL THEN 0 ELSE 1 END/);
   assert.match(worker, /recoverStaleAutomaticOrders\(getPublicBaseUrl\(\)\)/);
 });
 
@@ -166,8 +175,30 @@ test("deterministic wallet checkout validation is not reported as a retryable ou
   const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
   assert.match(route, /error instanceof CheckoutValidationError/);
   assert.match(route, /error instanceof PromotionQuoteError/);
+  assert.match(route, /status: clientInputRejected \? 400/);
   assert.match(orders, /throw new CheckoutValidationError\(`/);
   assert.match(promotions, /throw new PromotionQuoteError\(/);
+});
+
+test("automatic recovery retires an order after five dispatch attempts", async () => {
+  const database = createDatabase();
+  database.prepare(
+    `INSERT INTO orders (id, customer_id, payment_method, payment_status, fulfillment_status, provider_status, provider_code, updated_at)
+     VALUES ('order-retry', 'customer-1', 'wallet', 'paid', 'processing', 'retryable_error', 'digiflazz', datetime('now', '-5 minutes'))`,
+  ).run();
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    database.prepare(
+      "INSERT INTO order_events (order_id, source, event_id, status, payload_json) VALUES ('order-retry', 'admin', ?, 'dispatching', '{}')",
+    ).run(`attempt-${attempt}`);
+  }
+  setRuntimeEnv({ DB: new TestD1(database) });
+  const { recoverStaleAutomaticOrders } = await import("../lib/server/orders.ts");
+  await recoverStaleAutomaticOrders("https://lfamiliastore.my.id");
+  assert.deepEqual(
+    { ...database.prepare("SELECT fulfillment_status, provider_status FROM orders WHERE id = 'order-retry'").get() },
+    { fulfillment_status: "needs_review", provider_status: "retry_exhausted" },
+  );
+  database.close();
 });
 
 test.after(async () => unregister());
