@@ -112,7 +112,7 @@ export async function POST(request: Request) {
     if (!isIpaymuAmountSupported(promotion.finalPrice)) {
       return Response.json(
         {
-          error: `iPaymu hanya tersedia mulai Rp${IPAYMU_MIN_CHECKOUT_AMOUNT.toLocaleString("id-ID")}. Pilih Midtrans QRIS/e-wallet untuk nominal ini.`,
+          error: `iPaymu hanya tersedia mulai Rp${IPAYMU_MIN_CHECKOUT_AMOUNT.toLocaleString("id-ID")}. Pilih nominal lain atau gunakan Koin LFAMILIA.`,
         },
         { status: 422 },
       );
