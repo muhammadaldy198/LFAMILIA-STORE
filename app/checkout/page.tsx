@@ -805,21 +805,22 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   return (
     <StoreLayout>
       <main className="mx-auto max-w-7xl px-4 pb-[9rem] pt-3 sm:px-6 sm:py-7 lg:px-8">
-        <section className="relative mt-2 -mx-4 h-48 overflow-hidden bg-[#10131b] sm:-mx-6 sm:h-64 lg:-mx-8 lg:h-72">
+        <section data-lf-checkout-banner="true" className="relative mt-2 -mx-4 h-48 overflow-hidden bg-[#10131b] sm:-mx-6 sm:h-64 lg:-mx-8 lg:h-72">
           {(product.bannerUrl || product.imageUrl) && (
             <img
               src={product.bannerUrl || product.imageUrl}
               alt={`Banner ${product.name}`}
+              data-lf-checkout-banner-image="true"
               className="absolute inset-0 size-full object-cover object-center"
             />
           )}
         </section>
 
-        <section className="relative z-10 -mx-4 min-h-[118px] overflow-visible border-y border-white/[0.10] bg-[#202224] px-4 py-3 shadow-xl sm:-mx-6 sm:px-6 lg:-mx-8">
-          <span className="absolute -top-12 left-4 block aspect-square size-24 overflow-hidden rounded-[14px] border-[3px] border-[#202224] shadow-xl sm:-top-14 sm:left-6 sm:size-28">
+        <section data-lf-product-hero="true" className="relative z-10 -mx-4 min-h-[118px] overflow-visible border-y border-white/[0.10] bg-[#202224] px-4 py-3 shadow-xl sm:-mx-6 sm:px-6 lg:-mx-8">
+          <span data-lf-product-art="true" className="absolute -top-12 left-4 block aspect-square size-24 overflow-hidden rounded-[14px] border-[3px] border-[#202224] shadow-xl sm:-top-14 sm:left-6 sm:size-28">
             <ProductArtwork product={product} compact />
           </span>
-          <div className="pl-28 pt-1 sm:pl-32">
+          <div data-lf-product-info="true" className="pl-28 pt-1 sm:pl-32">
             <h1 className="text-sm font-black uppercase tracking-[0.06em] text-white sm:text-base">
               {product.name}
             </h1>
@@ -827,7 +828,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
               {product.publisher}
             </p>
           </div>
-          <div className="absolute inset-x-4 bottom-3 grid grid-cols-3 gap-2 text-center text-[8px] text-white/50 sm:inset-x-6 sm:text-[9px]">
+          <div data-lf-product-features="true" className="absolute inset-x-4 bottom-3 grid grid-cols-3 gap-2 text-center text-[8px] text-white/50 sm:inset-x-6 sm:text-[9px]">
             <span><Zap className="mx-auto mb-0.5 size-3.5 text-[#cfff72]" />Proses cepat</span>
             <span><ShieldCheck className="mx-auto mb-0.5 size-3.5 text-[#cfff72]" />Chat 24/7</span>
             <span><BadgeCheck className="mx-auto mb-0.5 size-3.5 text-[#cfff72]" />Pembayaran aman</span>
@@ -890,7 +891,10 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                   )}
 
                   {productInputFields.length ? (
-                    <div className={productInputFields.length > 1 ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
+                    <div
+                      data-lf-account-grid={productInputFields.length > 1 ? "true" : undefined}
+                      className={productInputFields.length > 1 ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}
+                    >
                       {productInputFields.map((field) => (
                         <Field key={field.id} label={`${field.label}${field.required === false ? " (opsional)" : ""}`}>
                           <Input
@@ -913,7 +917,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                   )}
 
                   {canCheckNickname ? (
-                    <NicknameResult state={visibleNickname} />
+                    <NicknameResult state={visibleNickname} blocking={nicknameRequired} />
                   ) : (
                     <p className="mt-3 flex items-start gap-2 rounded-lg border border-white/[0.07] bg-white/[0.025] p-2.5 text-[10px] leading-4 text-white/40">
                       <Info className="mt-0.5 size-3.5 shrink-0 text-[#b9ff35]" />
@@ -1105,7 +1109,16 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                     <Input type="email" value={buyerEmail} onChange={(event) => setBuyerEmail(event.target.value)} placeholder="nama@email.com" className="checkout-input" />
                   </Field>
                   <Field label="Nomor WhatsApp">
-                    <Input inputMode="tel" value={contact} onChange={(event) => setContact(event.target.value)} placeholder="081234567890" className="checkout-input" />
+                    <Input
+                      inputMode="tel"
+                      autoComplete="tel"
+                      maxLength={17}
+                      pattern="\+?[0-9]{8,16}"
+                      value={contact}
+                      onChange={(event) => setContact(normalizeWhatsapp(event.target.value))}
+                      placeholder="081234567890"
+                      className="checkout-input"
+                    />
                   </Field>
                 </div>
                 <div className="mt-3 border-t border-white/[0.08] pt-3">
@@ -1437,7 +1450,13 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
   );
 }
 
-function NicknameResult({ state }: { state: NicknameState }) {
+function NicknameResult({
+  state,
+  blocking,
+}: {
+  state: NicknameState;
+  blocking: boolean;
+}) {
   if (state.status === "loading")
     return (
       <div className="mt-3 flex items-center gap-2.5 rounded-lg border border-[#b9ff35]/15 bg-[#b9ff35]/[0.05] p-2.5 text-[10px] text-white/55">
@@ -1458,18 +1477,24 @@ function NicknameResult({ state }: { state: NicknameState }) {
     );
   if (state.status === "error")
     return (
-      <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-red-400/30 bg-red-400/[0.08] p-2.5">
-        <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-300" />
+      <div className={`mt-3 flex items-start gap-2.5 rounded-lg border p-2.5 ${blocking ? "border-red-400/30 bg-red-400/[0.08]" : "border-amber-300/20 bg-amber-300/[0.05]"}`}>
+        <AlertCircle className={`mt-0.5 size-4 shrink-0 ${blocking ? "text-red-300" : "text-amber-300"}`} />
         <div>
-          <p className="text-[10px] font-bold text-red-200">Akun belum terverifikasi</p>
-          <p className="mt-0.5 text-[9px] leading-4 text-red-100/60">{state.message}</p>
+          <p className={`text-[10px] font-bold ${blocking ? "text-red-200" : "text-amber-200"}`}>
+            {blocking ? "Akun belum terverifikasi" : "Nickname belum terverifikasi"}
+          </p>
+          <p className={`mt-0.5 text-[9px] leading-4 ${blocking ? "text-red-100/60" : "text-amber-100/60"}`}>
+            {state.message}
+          </p>
         </div>
       </div>
     );
   return (
     <div className="mt-3 flex items-start gap-2 rounded-lg border border-white/[0.07] bg-white/[0.025] p-2.5 text-[9px] leading-4 text-white/40">
       <Info className="mt-0.5 size-3.5 shrink-0 text-[#b9ff35]" />
-      Nickname akan tampil otomatis setelah User ID dan Server yang diperlukan terisi.
+      {blocking
+        ? "Nickname akan tampil otomatis setelah User ID dan Server yang diperlukan terisi."
+        : "Nickname akan diperiksa otomatis jika layanan verifikasi tersedia."}
     </div>
   );
 }
