@@ -1,4 +1,4 @@
- import { CheckoutUiEnhancer } from "@/components/checkout-ui-enhancer";
+import { CheckoutUiEnhancer } from "@/components/checkout-ui-enhancer";
 import { CheckoutSpacingTuning } from "@/components/checkout-spacing-tuning";
 import { CheckoutPackageTabs } from "@/components/checkout-package-tabs";
 import { CheckoutVoucherMode } from "@/components/checkout-voucher-mode";
