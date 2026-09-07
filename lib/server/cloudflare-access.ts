@@ -1,11 +1,13 @@
+import {
+  createLocalJWKSet,
+  createRemoteJWKSet,
+  jwtVerify,
+  type JSONWebKeySet,
+} from "jose";
+
 type AccessEnvironment = {
   TEAM_DOMAIN?: string;
   POLICY_AUD?: string;
-};
-
-type AccessJwtHeader = {
-  alg?: unknown;
-  kid?: unknown;
 };
 
 type AccessJwtClaims = {
@@ -17,29 +19,16 @@ type AccessJwtClaims = {
   nbf?: unknown;
 };
 
-type AccessJwk = JsonWebKey & {
-  kid?: string;
-};
-
-type AccessJwks = {
-  keys?: AccessJwk[];
-};
-
-type JwksCacheEntry = {
-  expiresAt: number;
-  keys: Map<string, AccessJwk>;
-};
-
 type AccessFetch = (
   input: URL,
   init?: RequestInit,
 ) => Promise<Response>;
 
 const CLOCK_SKEW_SECONDS = 30;
-const JWKS_CACHE_MS = 5 * 60 * 1000;
-const JWKS_FORCED_REFRESH_MS = 60 * 1000;
-const jwksCache = new Map<string, JwksCacheEntry>();
-const jwksForcedRefresh = new Map<string, number>();
+const remoteJwks = new Map<
+  string,
+  ReturnType<typeof createRemoteJWKSet>
+>();
 
 function decodeBase64Url(value: string) {
   if (!/^[A-Za-z0-9_-]+$/.test(value)) {
@@ -82,145 +71,97 @@ function hasAudience(value: unknown, expected: string) {
   return Array.isArray(value) && value.some((item) => item === expected);
 }
 
-async function fetchJwks(
-  teamDomain: string,
-  fetchAccess: AccessFetch,
-): Promise<JwksCacheEntry> {
-  const response = await fetchAccess(
-    new URL("/cdn-cgi/access/certs", teamDomain),
-    {
-      headers: { accept: "application/json" },
-      redirect: "error",
-      signal: AbortSignal.timeout(5_000),
-    },
+function readCookie(request: Request, name: string) {
+  const cookieHeader = request.headers.get("cookie");
+  if (!cookieHeader) return null;
+
+  for (const pair of cookieHeader.split(";")) {
+    const separator = pair.indexOf("=");
+    if (separator < 0) continue;
+    const key = pair.slice(0, separator).trim();
+    if (key !== name) continue;
+    const value = pair.slice(separator + 1).trim();
+    return value || null;
+  }
+  return null;
+}
+
+export function getCloudflareAccessAssertion(request: Request) {
+  return (
+    request.headers.get("cf-access-jwt-assertion")?.trim() ||
+    readCookie(request, "CF_Authorization")?.trim() ||
+    null
   );
-  if (!response.ok) {
-    throw new Error("Cloudflare Access JWKS tidak tersedia.");
-  }
+}
 
-  const payload = (await response.json()) as AccessJwks;
-  if (!Array.isArray(payload.keys)) {
-    throw new Error("Cloudflare Access JWKS tidak valid.");
-  }
-
-  const keys = new Map<string, AccessJwk>();
-  for (const key of payload.keys) {
-    if (
-      key &&
-      typeof key === "object" &&
-      typeof key.kid === "string" &&
-      key.kid
-    ) {
-      keys.set(key.kid, key);
-    }
-  }
-  if (!keys.size) {
-    throw new Error("Cloudflare Access JWKS tidak memiliki signing key.");
-  }
-
-  const entry = {
-    expiresAt: Date.now() + JWKS_CACHE_MS,
-    keys,
+export function getCloudflareAccessConfigStatus(env: AccessEnvironment) {
+  return {
+    teamDomainConfigured: Boolean(normalizeTeamDomain(env.TEAM_DOMAIN)),
+    audienceConfigured: Boolean(env.POLICY_AUD?.trim()),
   };
-  jwksCache.set(teamDomain, entry);
-  return entry;
 }
 
-async function getSigningKey(
-  teamDomain: string,
-  kid: string,
-  fetchAccess: AccessFetch,
-) {
-  const now = Date.now();
-  let entry = jwksCache.get(teamDomain);
-  let refreshed = false;
-  if (!entry || entry.expiresAt <= now) {
-    entry = await fetchJwks(teamDomain, fetchAccess);
-    refreshed = true;
-  }
-
-  let key = entry.keys.get(kid);
-  const lastForcedRefresh = jwksForcedRefresh.get(teamDomain) ?? 0;
-  if (
-    !key &&
-    !refreshed &&
-    now - lastForcedRefresh >= JWKS_FORCED_REFRESH_MS
-  ) {
-    jwksForcedRefresh.set(teamDomain, now);
-    entry = await fetchJwks(teamDomain, fetchAccess);
-    key = entry.keys.get(kid);
-  }
-  return key ?? null;
-}
-
-export async function verifyCloudflareAccess(
+export function diagnoseCloudflareAccessRequest(
   request: Request,
   env: AccessEnvironment,
-  fetchAccess: AccessFetch = (input, init) => fetch(input, init),
-): Promise<{ email: string } | null> {
-  try {
-    const assertion = request.headers.get("cf-access-jwt-assertion")?.trim();
-    const teamDomain = normalizeTeamDomain(env.TEAM_DOMAIN);
-    const audience = env.POLICY_AUD?.trim();
-    if (!assertion || !teamDomain || !audience) return null;
+) {
+  const assertion = getCloudflareAccessAssertion(request);
+  const teamDomain = normalizeTeamDomain(env.TEAM_DOMAIN);
+  const audience = env.POLICY_AUD?.trim();
 
+  if (!teamDomain) return { reason: "TEAM_DOMAIN_INVALID" as const };
+  if (!audience) return { reason: "POLICY_AUD_MISSING" as const };
+  if (!assertion) return { reason: "ACCESS_TOKEN_MISSING" as const };
+
+  try {
     const segments = assertion.split(".");
     if (segments.length !== 3 || segments.some((segment) => !segment)) {
-      return null;
+      return { reason: "ACCESS_TOKEN_MALFORMED" as const };
     }
 
-    const [encodedHeader, encodedClaims, encodedSignature] = segments;
-    const header = parseJwtSegment<AccessJwtHeader>(encodedHeader);
-    const claims = parseJwtSegment<AccessJwtClaims>(encodedClaims);
-    if (
-      header.alg !== "RS256" ||
-      typeof header.kid !== "string" ||
-      !header.kid
-    ) {
-      return null;
-    }
-
-    const signingKey = await getSigningKey(
-      teamDomain,
-      header.kid,
-      fetchAccess,
-    );
-    if (!signingKey) return null;
-
-    const publicKey = await crypto.subtle.importKey(
-      "jwk",
-      signingKey,
-      {
-        name: "RSASSA-PKCS1-v1_5",
-        hash: "SHA-256",
-      },
-      false,
-      ["verify"],
-    );
-    const signatureValid = await crypto.subtle.verify(
-      "RSASSA-PKCS1-v1_5",
-      publicKey,
-      decodeBase64Url(encodedSignature),
-      new TextEncoder().encode(`${encodedHeader}.${encodedClaims}`),
-    );
-    if (!signatureValid) return null;
-
-    const now = Math.floor(Date.now() / 1000);
+    const claims = parseJwtSegment<AccessJwtClaims>(segments[1]);
     const issuer =
       typeof claims.iss === "string"
         ? claims.iss.replace(/\/$/, "")
         : "";
+    if (issuer !== teamDomain) {
+      return {
+        reason: "ACCESS_ISSUER_MISMATCH" as const,
+        receivedIssuer: issuer || "(missing)",
+        expectedIssuer: teamDomain,
+      };
+    }
+
+    if (!hasAudience(claims.aud, audience)) {
+      const receivedAudience =
+        typeof claims.aud === "string"
+          ? claims.aud
+          : Array.isArray(claims.aud)
+            ? claims.aud
+                .filter((item): item is string => typeof item === "string")
+                .join(", ")
+            : "(missing)";
+      return {
+        reason: "ACCESS_AUDIENCE_MISMATCH" as const,
+        receivedAudience,
+        expectedAudience: audience,
+      };
+    }
+
+    const now = Math.floor(Date.now() / 1000);
     if (
-      issuer !== teamDomain ||
-      !hasAudience(claims.aud, audience) ||
       typeof claims.exp !== "number" ||
-      claims.exp <= now - CLOCK_SKEW_SECONDS ||
+      claims.exp <= now - CLOCK_SKEW_SECONDS
+    ) {
+      return { reason: "ACCESS_TOKEN_EXPIRED" as const };
+    }
+    if (
       (typeof claims.nbf === "number" &&
         claims.nbf > now + CLOCK_SKEW_SECONDS) ||
       (typeof claims.iat === "number" &&
         claims.iat > now + CLOCK_SKEW_SECONDS)
     ) {
-      return null;
+      return { reason: "ACCESS_TOKEN_TIME_INVALID" as const };
     }
 
     if (
@@ -228,10 +169,78 @@ export async function verifyCloudflareAccess(
       !claims.email.includes("@") ||
       claims.email.length > 320
     ) {
+      return { reason: "ACCESS_EMAIL_MISSING" as const };
+    }
+
+    return { reason: "ACCESS_SIGNATURE_OR_JWKS_INVALID" as const };
+  } catch {
+    return { reason: "ACCESS_TOKEN_MALFORMED" as const };
+  }
+}
+
+async function getJwks(
+  teamDomain: string,
+  fetchAccess?: AccessFetch,
+) {
+  const certsUrl = new URL("/cdn-cgi/access/certs", teamDomain);
+
+  if (fetchAccess) {
+    const response = await fetchAccess(certsUrl, {
+      headers: { accept: "application/json" },
+      redirect: "error",
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) {
+      throw new Error("Cloudflare Access JWKS tidak tersedia.");
+    }
+    const payload = (await response.json()) as JSONWebKeySet;
+    if (!Array.isArray(payload.keys) || payload.keys.length === 0) {
+      throw new Error("Cloudflare Access JWKS tidak valid.");
+    }
+    return createLocalJWKSet(payload);
+  }
+
+  let jwks = remoteJwks.get(teamDomain);
+  if (!jwks) {
+    jwks = createRemoteJWKSet(certsUrl, {
+      timeoutDuration: 5_000,
+      cooldownDuration: 30_000,
+      cacheMaxAge: 5 * 60 * 1000,
+      headers: { accept: "application/json" },
+    });
+    remoteJwks.set(teamDomain, jwks);
+  }
+  return jwks;
+}
+
+export async function verifyCloudflareAccess(
+  request: Request,
+  env: AccessEnvironment,
+  fetchAccess?: AccessFetch,
+): Promise<{ email: string } | null> {
+  try {
+    const assertion = getCloudflareAccessAssertion(request);
+    const teamDomain = normalizeTeamDomain(env.TEAM_DOMAIN);
+    const audience = env.POLICY_AUD?.trim();
+    if (!assertion || !teamDomain || !audience) return null;
+
+    const jwks = await getJwks(teamDomain, fetchAccess);
+    const { payload } = await jwtVerify(assertion, jwks, {
+      algorithms: ["RS256"],
+      issuer: teamDomain,
+      audience,
+      clockTolerance: CLOCK_SKEW_SECONDS,
+    });
+
+    if (
+      typeof payload.email !== "string" ||
+      !payload.email.includes("@") ||
+      payload.email.length > 320
+    ) {
       return null;
     }
 
-    return { email: claims.email.trim().toLowerCase() };
+    return { email: payload.email.trim().toLowerCase() };
   } catch {
     return null;
   }
