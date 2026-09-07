@@ -258,8 +258,7 @@ export async function POST(request: Request) {
       }
     }
 
-    try {
-      const payment = await createMidtransPayment({
+    const payment = await createMidtransPayment({
         referenceId: identity.referenceId,
         amount: promotion.finalPrice,
         productName: `${item.productName} - ${item.packageLabel}`,
@@ -290,23 +289,20 @@ export async function POST(request: Request) {
         payload: payment.raw,
       });
 
-      return Response.json(
-        {
-          ...shared,
-          paymentGateway: "midtrans",
-          paymentNo: payment.paymentNo,
-          paymentName: payment.paymentName,
-          paymentUrl: payment.paymentUrl,
-          fee: 0,
-          total: promotion.finalPrice,
-          expiredAt: payment.expiredAt,
-          midtransMode: payment.mode,
-        },
-        { status: 201 },
-      );
-    } catch (error) {
-      throw error;
-    }
+    return Response.json(
+      {
+        ...shared,
+        paymentGateway: "midtrans",
+        paymentNo: payment.paymentNo,
+        paymentName: payment.paymentName,
+        paymentUrl: payment.paymentUrl,
+        fee: 0,
+        total: promotion.finalPrice,
+        expiredAt: payment.expiredAt,
+        midtransMode: payment.mode,
+      },
+      { status: 201 },
+    );
   } catch (error) {
     const message =
       error instanceof z.ZodError
