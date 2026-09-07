@@ -29,8 +29,9 @@ test("legacy DOM controller no longer hides or toggles payment groups", () => {
   assert.doesNotMatch(enhancer, /fetch\("\/api\/payment-methods"/);
 });
 
-test("checkout shows a diagnostic instead of a blank payment section", () => {
-  assert.match(source, /Metode pembayaran otomatis belum tersedia/);
+test("checkout explains unavailable gateways without leaving the payment section blank", () => {
+  assert.match(source, /Pembayaran melalui gateway belum tersedia/);
+  assert.match(source, /iPaymu tersedia mulai/);
 });
 
 test("checkout does not switch to wallet before payment methods finish loading", () => {
