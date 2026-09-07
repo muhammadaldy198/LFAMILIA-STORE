@@ -597,18 +597,6 @@ function CheckoutContent() {
       }
 
       const invoice = data.publicInvoice || data.referenceId;
-      if (data.paymentGateway === "ipaymu" && data.paymentUrl) {
-        try {
-          const redirectUrl = new URL(data.paymentUrl);
-          if (redirectUrl.protocol === "https:") {
-            window.location.assign(redirectUrl.toString());
-            return;
-          }
-        } catch {
-          // Use the internal payment page when the provider URL is unavailable.
-        }
-      }
-
       window.location.assign(
         `/payment?invoice=${encodeURIComponent(invoice)}`,
       );
