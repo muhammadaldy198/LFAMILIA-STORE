@@ -164,9 +164,22 @@ export function getMidtransReadiness() {
       return { ready: true as const, mode, environment, reason: null };
     }
     const bisnap = getMidtransBisnapReadiness();
-    return bisnap.ready
-      ? { ready: true as const, mode, environment, reason: null }
-      : { ready: false as const, mode, environment, reason: bisnap.reason };
+    if (!bisnap.ready)
+      return {
+        ready: false as const,
+        mode,
+        environment,
+        reason: bisnap.reason,
+      };
+    if (!isProviderRelayConfigured("midtrans-bisnap"))
+      return {
+        ready: false as const,
+        mode,
+        environment,
+        reason:
+          "Midtrans BI-SNAP memerlukan relay ber-IP statis yang dikonfigurasi dari Admin Panel.",
+      };
+    return { ready: true as const, mode, environment, reason: null };
   } catch (error) {
     return {
       ready: false as const,
