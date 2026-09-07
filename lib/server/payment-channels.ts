@@ -126,57 +126,6 @@ export async function syncPaymentChannelsForGateways(
   };
 }
 
-export async function syncPaymentChannelsForGateways(
-  gateways: PaymentGatewayName[],
-) {
-  const activeGateways = [...new Set(gateways)] as PaymentGatewayName[];
-  const primaryGateway = activeGateways[0];
-  if (!primaryGateway)
-    throw new Error("Aktifkan minimal satu payment gateway untuk sinkronisasi.");
-
-  const midtransMode = activeGateways.includes("midtrans")
-    ? getMidtransMode()
-    : null;
-  const supported = paymentChannels.filter((item) =>
-    activeGateways.some((gateway) =>
-      gateway === "midtrans"
-        ? isMidtransChannelSupported(
-            item.method,
-            item.channel,
-            midtransMode!,
-          )
-        : isIpaymuChannelSupported(item.method, item.channel),
-    ),
-  );
-  const supportedKeys = new Set(
-    supported.map((item) => `${item.method}:${item.channel}`),
-  );
-  const db = getD1();
-  await db.batch(paymentChannels.map((item, index) =>
-    db.prepare(`INSERT INTO payment_channels (method, channel, name, description, image_url, is_active, sort_order)
-      VALUES (?, ?, ?, ?, NULL, ?, ?)
-      ON CONFLICT(method, channel) DO UPDATE SET
-        is_active = excluded.is_active,
-        sort_order = excluded.sort_order,
-        updated_at = CURRENT_TIMESTAMP`)
-      .bind(
-        item.method,
-        item.channel,
-        item.name,
-        item.description,
-        supportedKeys.has(`${item.method}:${item.channel}`) ? 1 : 0,
-        index,
-      ),
-  ));
-  return {
-    gateway: primaryGateway,
-    gateways: activeGateways,
-    mode: midtransMode,
-    synced: supported.length,
-    channels: await listPaymentChannels(true),
-  };
-}
-
 export async function syncPaymentChannelsForGateway(gateway: PaymentGatewayName) {
   return syncPaymentChannelsForGateways([gateway]);
 }
