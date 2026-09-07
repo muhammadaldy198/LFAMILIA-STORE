@@ -82,6 +82,36 @@ function hasAudience(value: unknown, expected: string) {
   return Array.isArray(value) && value.some((item) => item === expected);
 }
 
+function readCookie(request: Request, name: string) {
+  const cookieHeader = request.headers.get("cookie");
+  if (!cookieHeader) return null;
+
+  for (const pair of cookieHeader.split(";")) {
+    const separator = pair.indexOf("=");
+    if (separator < 0) continue;
+    const key = pair.slice(0, separator).trim();
+    if (key !== name) continue;
+    const value = pair.slice(separator + 1).trim();
+    return value || null;
+  }
+  return null;
+}
+
+export function getCloudflareAccessAssertion(request: Request) {
+  return (
+    request.headers.get("cf-access-jwt-assertion")?.trim() ||
+    readCookie(request, "CF_Authorization")?.trim() ||
+    null
+  );
+}
+
+export function getCloudflareAccessConfigStatus(env: AccessEnvironment) {
+  return {
+    teamDomainConfigured: Boolean(normalizeTeamDomain(env.TEAM_DOMAIN)),
+    audienceConfigured: Boolean(env.POLICY_AUD?.trim()),
+  };
+}
+
 async function fetchJwks(
   teamDomain: string,
   fetchAccess: AccessFetch,
@@ -159,7 +189,7 @@ export async function verifyCloudflareAccess(
   fetchAccess: AccessFetch = (input, init) => fetch(input, init),
 ): Promise<{ email: string } | null> {
   try {
-    const assertion = request.headers.get("cf-access-jwt-assertion")?.trim();
+    const assertion = getCloudflareAccessAssertion(request);
     const teamDomain = normalizeTeamDomain(env.TEAM_DOMAIN);
     const audience = env.POLICY_AUD?.trim();
     if (!assertion || !teamDomain || !audience) return null;
