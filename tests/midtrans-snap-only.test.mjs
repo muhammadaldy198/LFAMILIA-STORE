@@ -40,3 +40,10 @@ test("historical Midtrans mode columns remain available for old orders", () => {
   assert.match(schema, /midtransMode: text\("midtrans_mode"/);
   assert.match(status, /order\.midtrans_mode/);
 });
+
+test("D1 migration removes obsolete BI-SNAP integration selection", () => {
+  const migration = read("drizzle/0022_remove_active_midtrans_bisnap.sql");
+  assert.match(migration, /DELETE FROM integration_profiles/);
+  assert.match(migration, /mode = 'bisnap'/);
+  assert.match(migration, /VALUES \('midtrans_mode', 'snap'/);
+});
