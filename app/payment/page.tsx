@@ -237,6 +237,14 @@ function PaymentContent() {
     order.paymentGateway === "midtrans" &&
     order.midtransMode === "bisnap" &&
     order.paymentMethod === "qris";
+  const isIpaymuQris =
+    order.paymentGateway === "ipaymu" &&
+    order.paymentMethod === "qris";
+  const isEmbeddedQr = isBisnapQris || isIpaymuQris;
+  const canLaunchPayment =
+    order.paymentGateway === "midtrans"
+      ? Boolean(order.paymentUrl) && !isEmbeddedQr
+      : order.paymentMethod === "ewallet" && Boolean(order.paymentUrl);
 
   return (
     <StoreLayout>
@@ -314,11 +322,11 @@ function PaymentContent() {
               </div>
             )}
 
-            {!paid && !failed && isBisnapQris && order.paymentUrl && (
+            {!paid && !failed && isEmbeddedQr && order.paymentUrl && (
               <div className="mt-5 rounded-xl bg-white p-3">
                 <img
                   src={order.paymentUrl}
-                  alt="QRIS pembayaran Midtrans"
+                  alt={isIpaymuQris ? "QRIS pembayaran iPaymu" : "QRIS pembayaran Midtrans"}
                   className="mx-auto aspect-square w-full max-w-72 object-contain"
                 />
               </div>
@@ -335,7 +343,7 @@ function PaymentContent() {
               <span>{paid ? "Pembayaran sudah diterima. Status pesanan akan diperbarui otomatis." : failed ? "Transaksi ini tidak dapat dilanjutkan. Buat checkout baru bila diperlukan." : "Status diperiksa otomatis setiap 3 detik."}</span>
             </div>
 
-            {!paid && !failed && order.paymentUrl && !isBisnapQris && (
+            {!paid && !failed && canLaunchPayment && (
               <>
                 <Button type="button" onClick={payNow} disabled={openingPayment} className="mt-5 h-12 w-full rounded-xl bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">
                   {openingPayment ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : null}
@@ -344,7 +352,7 @@ function PaymentContent() {
                 </Button>
                 <p className="mt-2 text-center text-[9px] text-white/30">
                   {order.paymentGateway === "ipaymu"
-                    ? "Pembayaran dibuka melalui halaman iPaymu."
+                    ? "Detail pembayaran tetap ditampilkan di LFAMILIA. Untuk e-wallet, tombol di atas membuka aplikasi atau tautan pembayaran yang diperlukan."
                     : snapReady
                       ? "Pembayaran dibuka di atas halaman LFAMILIA."
                       : "Jika popup belum aktif, pembayaran dibuka melalui halaman Midtrans."}
