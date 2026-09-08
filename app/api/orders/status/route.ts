@@ -2,10 +2,10 @@ import { z } from "zod";
 import { getD1 } from "@/db";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { queryDokuQrisStatus } from "@/lib/server/doku";
-import { fulfillAutomaticOrder } from "@/lib/server/fulfillment";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
 import {
   applyPaymentStatus,
+  fulfillAutomaticOrder,
   getOrderById,
   markDokuStatusChecked,
   recordOrderEvent,
