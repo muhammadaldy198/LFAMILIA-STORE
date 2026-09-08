@@ -623,6 +623,27 @@ function equalSignature(left: string | null, right: string) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+function nonSnapNotificationSignature(input: {
+  secretKey: string;
+  clientId: string;
+  requestId: string;
+  requestTimestamp: string;
+  requestTarget: string;
+  rawBody: string;
+}) {
+  const digest = createHash("sha256")
+    .update(input.rawBody, "utf8")
+    .digest("base64");
+  const components = [
+    `Client-Id:${input.clientId}`,
+    `Request-Id:${input.requestId}`,
+    `Request-Timestamp:${input.requestTimestamp}`,
+    `Request-Target:${input.requestTarget}`,
+    `Digest:${digest}`,
+  ].join("\n");
+  return `HMACSHA256=${hmacBase64("sha256", input.secretKey, components)}`;
+}
+
 export function validateDokuNotification(input: {
   rawBody: string;
   requestTarget: string;
@@ -630,13 +651,15 @@ export function validateDokuNotification(input: {
   requestTimestamp: string | null;
   receivedSignature: string | null;
   authorization: string | null;
+  clientId: string | null;
+  requestId: string | null;
+  legacyTimestamp: string | null;
+  legacySignature: string | null;
 }) {
-  if (!input.partnerId || !input.requestTimestamp || !input.receivedSignature) {
-    return { valid: false as const, environment: null };
-  }
   const accessToken = (input.authorization || "")
     .replace(/^Bearer\s+/i, "")
     .trim();
+
   for (const environment of ["sandbox", "production"] as const) {
     let config: DirectConfig;
     try {
@@ -644,19 +667,59 @@ export function validateDokuNotification(input: {
     } catch {
       continue;
     }
-    if (config.clientId !== input.partnerId) continue;
-    const expected = symmetricSignature(config.secretKey, {
-      method: "POST",
-      endpointPath: input.requestTarget,
-      accessToken,
-      rawBody: input.rawBody,
-      requestTimestamp: input.requestTimestamp,
-    });
-    if (equalSignature(input.receivedSignature, expected)) {
-      return { valid: true as const, environment };
+
+    if (
+      input.partnerId &&
+      input.requestTimestamp &&
+      input.receivedSignature &&
+      config.clientId === input.partnerId
+    ) {
+      const expected = symmetricSignature(config.secretKey, {
+        method: "POST",
+        endpointPath: input.requestTarget,
+        accessToken,
+        rawBody: input.rawBody,
+        requestTimestamp: input.requestTimestamp,
+      });
+      if (equalSignature(input.receivedSignature, expected)) {
+        return {
+          valid: true as const,
+          environment,
+          scheme: "snap" as const,
+        };
+      }
+    }
+
+    if (
+      input.clientId &&
+      input.requestId &&
+      input.legacyTimestamp &&
+      input.legacySignature &&
+      config.clientId === input.clientId
+    ) {
+      const expected = nonSnapNotificationSignature({
+        secretKey: config.secretKey,
+        clientId: input.clientId,
+        requestId: input.requestId,
+        requestTimestamp: input.legacyTimestamp,
+        requestTarget: input.requestTarget,
+        rawBody: input.rawBody,
+      });
+      if (equalSignature(input.legacySignature, expected)) {
+        return {
+          valid: true as const,
+          environment,
+          scheme: "non-snap" as const,
+        };
+      }
     }
   }
-  return { valid: false as const, environment: null };
+
+  return {
+    valid: false as const,
+    environment: null,
+    scheme: null,
+  };
 }
 
 function object(value: unknown) {
@@ -680,6 +743,31 @@ export function mapDokuStatus(payload: Record<string, unknown>) {
 }
 
 export function parseDokuNotification(payload: Record<string, unknown>) {
+  const orderData = object(payload.order);
+  const transactionData = object(payload.transaction);
+  const legacyReference = String(orderData.invoice_number ?? "").trim();
+  if (legacyReference) {
+    const legacyStatus = String(transactionData.status ?? "")
+      .trim()
+      .toUpperCase();
+    const status =
+      legacyStatus === "SUCCESS"
+        ? ("paid" as const)
+        : legacyStatus === "FAILED"
+          ? ("failed" as const)
+          : ("pending" as const);
+    const vaInfo = object(payload.virtual_account_info);
+    return {
+      referenceId: legacyReference,
+      originalRequestId:
+        String(transactionData.original_request_id ?? "").trim() || null,
+      status,
+      amount: numericAmount(orderData.amount),
+      referenceNo:
+        String(vaInfo.virtual_account_number ?? "").trim() || null,
+    };
+  }
+
   const vaData = object(payload.virtualAccountData);
   if (Object.keys(vaData).length) {
     return {
@@ -690,6 +778,7 @@ export function parseDokuNotification(payload: Record<string, unknown>) {
       referenceNo: String(vaData.virtualAccountNo ?? "").trim() || null,
     };
   }
+
   return {
     referenceId: String(payload.originalPartnerReferenceNo ?? "").trim(),
     originalRequestId:
