@@ -49,6 +49,16 @@ function notificationAck(payload: Record<string, unknown>, eventId: string) {
   };
 }
 
+function notificationResponse(
+  scheme: "snap" | "non-snap",
+  payload: Record<string, unknown>,
+  eventId: string,
+) {
+  return scheme === "snap"
+    ? Response.json(notificationAck(payload, eventId))
+    : Response.json({ ok: true });
+}
+
 export async function GET() {
   return Response.json(
     { ok: true, service: "doku-notification", method: "POST" },
@@ -74,6 +84,10 @@ export async function POST(request: Request) {
       requestTimestamp: request.headers.get("x-timestamp"),
       receivedSignature: request.headers.get("x-signature"),
       authorization: request.headers.get("authorization"),
+      clientId: request.headers.get("client-id"),
+      requestId: request.headers.get("request-id"),
+      legacyTimestamp: request.headers.get("request-timestamp"),
+      legacySignature: request.headers.get("signature"),
     });
     if (!validation.valid) {
       return Response.json({ error: "Signature callback DOKU tidak valid." }, { status: 401 });
@@ -88,7 +102,7 @@ export async function POST(request: Request) {
     const status = notification.status;
     const callbackAmount = notification.amount;
     const originalRequestId = notification.originalRequestId;
-    const eventId = request.headers.get("x-external-id") || crypto.randomUUID();
+    const eventId = request.headers.get("x-external-id") || request.headers.get("request-id") || crypto.randomUUID();
 
     const walletTopup = await getDokuWalletTopup(referenceId);
     if (walletTopup) {
@@ -103,7 +117,7 @@ export async function POST(request: Request) {
           (error) => console.error("Notifikasi top up DOKU gagal:", error),
         );
       }
-      return Response.json(notificationAck(payload, eventId));
+      return notificationResponse(validation.scheme, payload, eventId);
     }
 
     const order = await getOrderByReference(referenceId);
@@ -140,7 +154,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return Response.json(notificationAck(payload, eventId));
+    return notificationResponse(validation.scheme, payload, eventId);
   } catch (error) {
     return Response.json(
       {
