@@ -352,7 +352,7 @@ async function getB2BToken(config: DirectConfig) {
   return accessToken;
 }
 
-async function directRequest<T extends Record<string, unknown>>(input: {
+async function directRequest<T>(input: {
   config: DirectConfig;
   endpointPath: string;
   body: Record<string, unknown>;
