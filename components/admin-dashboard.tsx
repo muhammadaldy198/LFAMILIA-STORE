@@ -29,6 +29,7 @@ import { AdminMemberManager } from "@/components/admin-member-manager";
 import { AdminOrderManager } from "@/components/admin-order-manager";
 import { AdminOverview } from "@/components/admin-overview";
 import { AdminPaymentMethodManager } from "@/components/admin-payment-method-manager";
+import { AdminPaymentPageManager } from "@/components/admin-payment-page-manager";
 import { AdminProductManager } from "@/components/admin-product-manager";
 import { AdminPromotionManager } from "@/components/admin-promotion-manager";
 import { AdminStorefrontManager } from "@/components/admin-storefront-manager";
@@ -315,6 +316,9 @@ export function AdminDashboard({
                 </AdminSection>
                 <AdminSection title="Metode pembayaran" description="Kelompokkan metode checkout, urutan, logo, dan status aktifnya.">
                   <AdminPaymentMethodManager />
+                </AdminSection>
+                <AdminSection title="Halaman pembayaran" description="Edit branding, teks, tombol, bantuan, dan elemen yang tampil pada halaman pembayaran pelanggan.">
+                  <AdminPaymentPageManager />
                 </AdminSection>
               </TabsContent>
 
