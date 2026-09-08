@@ -21,8 +21,6 @@ export const paymentChannels: PaymentChannel[] = [
   { method: "va", channel: "bag", name: "Bank Artha Graha", description: "Virtual Account Bank Artha Graha" },
   { method: "va", channel: "bpd_bali", name: "BPD Bali", description: "Virtual Account BPD Bali" },
   { method: "ewallet", channel: "dana", name: "DANA", description: "Bayar melalui aplikasi DANA" },
-  { method: "ewallet", channel: "gopay", name: "GoPay", description: "Bayar melalui aplikasi GoPay" },
-  { method: "ewallet", channel: "ovo", name: "OVO", description: "Bayar melalui aplikasi OVO" },
   { method: "ewallet", channel: "shopeepay", name: "ShopeePay", description: "Bayar melalui aplikasi ShopeePay" },
   { method: "qris", channel: "mpm", name: "QRIS", description: "Scan dari aplikasi bank atau e-wallet" },
 ];
@@ -33,6 +31,6 @@ export function findPaymentChannel(method: string, channel: string) {
 
 export const paymentGroups = [
   { code: "va" as const, name: "Virtual Account", description: "Transfer bank dengan nomor VA unik" },
-  { code: "ewallet" as const, name: "E-Wallet", description: "DANA, GoPay, OVO, atau ShopeePay" },
+  { code: "ewallet" as const, name: "E-Wallet", description: "DANA atau ShopeePay melalui DOKU Direct API" },
   { code: "qris" as const, name: "QRIS", description: "Scan dari semua aplikasi yang mendukung QRIS" },
 ];
