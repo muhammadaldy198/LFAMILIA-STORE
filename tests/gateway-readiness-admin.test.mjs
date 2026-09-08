@@ -13,7 +13,7 @@ test("owner payment API exposes DOKU readiness without exposing credentials", ()
 });
 
 test("payment admin shows one DOKU gateway with ready and not-ready states", () => {
-  assert.match(manager, /DOKU Checkout/);
+  assert.match(manager, /DOKU Direct API/);
   assert.match(manager, /"Siap"/);
   assert.match(manager, /"Belum siap"/);
   assert.match(manager, /readiness\.reason/);
