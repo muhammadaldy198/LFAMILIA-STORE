@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     });
 
     const baseUrl = getPublicBaseUrl();
-    const payment = await createDokuCheckoutPayment({
+    const payment = await createDokuDirectPayment({
       buyerName: customer.name,
       buyerPhone: customer.phone,
       buyerEmail: customer.email,
