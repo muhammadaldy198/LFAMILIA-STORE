@@ -18,10 +18,11 @@ test("external checkout first enters the LFAMILIA payment page", () => {
   assert.match(checkout, /encodeURIComponent\(invoice\)/);
 });
 
-test("LFAMILIA payment page launches the hosted DOKU payment URL", () => {
-  assert.match(payment, /DOKU Checkout/);
+test("LFAMILIA payment page owns QRIS and VA rendering while e-wallet can redirect", () => {
+  assert.match(payment, /QRCodeSVG/);
+  assert.match(payment, /order\.paymentNo/);
   assert.match(payment, /window\.location\.assign\(order\.paymentUrl\)/);
-  assert.doesNotMatch(payment, /snap\.pay|midtrans|ipaymu/i);
+  assert.doesNotMatch(payment, /DOKU Checkout|snap\.pay|midtrans|ipaymu/i);
 });
 
 test("legacy payment endpoints stay deleted", () => {
