@@ -192,13 +192,27 @@ export function renderCustomerNo(
   template: string,
   destination: string,
   server: string | null,
+  customerInputs: CustomerInputValue[] = [],
 ) {
+  const tokens = new Map<string, string>([
+    ["destination", destination.trim()],
+    ["server", server?.trim() ?? ""],
+  ]);
+  for (const input of customerInputs) {
+    tokens.set(input.id.trim().toLowerCase(), input.value.trim());
+  }
+
   const value = template
-    .replaceAll("{{destination}}", destination.trim())
-    .replaceAll("{{server}}", server?.trim() ?? "")
+    .replace(/\{\{([a-z0-9-]+)\}\}/gi, (match, token: string) => {
+      const replacement = tokens.get(token.toLowerCase());
+      return replacement === undefined ? match : replacement;
+    })
     .trim();
+
   if (!value || value.includes("{{") || value.length > 120)
-    throw new CheckoutValidationError("Format tujuan provider belum valid.");
+    throw new CheckoutValidationError(
+      "Format tujuan provider belum valid atau masih memiliki token yang belum terisi.",
+    );
   return value;
 }
 
@@ -245,6 +259,7 @@ export async function insertPendingOrder(input: {
     input.item.targetTemplate,
     input.destination,
     input.server,
+    input.customerInputs,
   );
   await db
     .prepare(
