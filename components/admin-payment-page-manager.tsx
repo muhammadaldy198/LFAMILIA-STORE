@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useState } from "react";
 import { Eye, LoaderCircle, Save } from "lucide-react";
@@ -9,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   defaultPaymentPageSettings,
   type PaymentPageSettings,
-} from "@/lib/server/payment-page-settings";
+} from "@/lib/payment-page-settings";
 
 export function AdminPaymentPageManager() {
   const [settings, setSettings] = useState<PaymentPageSettings>(defaultPaymentPageSettings);
