@@ -3,6 +3,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { QRCodeSVG } from "qrcode.react";
 import { useSearchParams } from "next/navigation";
 import {
   BadgeCheck,
@@ -35,6 +36,7 @@ type PaymentOrder = {
   fulfillmentStatus: string;
   paymentGateway: "doku" | null;
   paymentNo: string | null;
+  qrContent: string | null;
   paymentName: string | null;
   paymentUrl: string | null;
   expiredAt: string | null;
@@ -69,6 +71,7 @@ function PaymentContent() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [paymentCopied, setPaymentCopied] = useState(false);
   const [openingPayment, setOpeningPayment] = useState(false);
 
   const load = useCallback(
@@ -139,6 +142,12 @@ function PaymentContent() {
     void navigator.clipboard.writeText(order.referenceId);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  function copyPaymentValue(value: string) {
+    void navigator.clipboard.writeText(value);
+    setPaymentCopied(true);
+    window.setTimeout(() => setPaymentCopied(false), 1600);
   }
 
   function payNow() {
@@ -321,6 +330,46 @@ function PaymentContent() {
                   accentColor={pageSettings.accentColor}
                 />
               </dl>
+            ) : null}
+
+            {!paid && !failed && order.qrContent ? (
+              <div className="mt-5 rounded-xl border border-white/[0.08] bg-white p-4 text-center">
+                <QRCodeSVG
+                  value={order.qrContent}
+                  size={220}
+                  level="M"
+                  marginSize={2}
+                  className="mx-auto h-auto w-full max-w-[220px]"
+                />
+                <p className="mt-3 text-[10px] font-black text-[#091006]">
+                  Scan QRIS untuk membayar
+                </p>
+                <p className="mt-1 text-[8px] text-black/55">
+                  Gunakan aplikasi bank atau e-wallet yang mendukung QRIS.
+                </p>
+              </div>
+            ) : null}
+
+            {!paid && !failed && order.paymentNo ? (
+              <div className="mt-5 rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
+                <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/35">
+                  {order.paymentName || "Nomor pembayaran"}
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-black/25 px-3 py-3">
+                  <code className="break-all text-base font-black tracking-wider text-white">
+                    {order.paymentNo}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => copyPaymentValue(order.paymentNo!)}
+                    className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold"
+                    style={{ color: pageSettings.accentColor }}
+                  >
+                    <Copy className="size-3.5" />
+                    {paymentCopied ? "Tersalin" : "Salin"}
+                  </button>
+                </div>
+              </div>
             ) : null}
 
             {!paid && !failed && order.expiredAt ? (
