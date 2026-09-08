@@ -3,6 +3,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowUpRight,
   CheckCircle2,
@@ -757,6 +758,7 @@ type TopupPayment = {
   referenceId?: string;
   paymentMethod?: "qris" | "va" | "ewallet";
   paymentNo?: string | null;
+  qrContent?: string | null;
   paymentName?: string | null;
   paymentUrl?: string | null;
   expiredAt?: string | null;
@@ -824,6 +826,21 @@ function TopupForm({
         <strong className="text-xs">Pembayaran top up dibuat</strong>
         {payment.referenceId && <p className="mt-1 break-all text-[9px] text-white/40">{payment.referenceId}</p>}
         {payment.expiredAt && <p className="mt-2 text-[9px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}
+        {payment.qrContent && (
+          <div className="mt-3 rounded-xl bg-white p-4 text-center">
+            <QRCodeSVG value={payment.qrContent} size={210} level="M" className="mx-auto h-auto w-full max-w-[210px]" />
+            <p className="mt-2 text-[9px] font-black text-[#091006]">Scan QRIS untuk top up</p>
+          </div>
+        )}
+        {payment.paymentNo && (
+          <div className="mt-3 rounded-lg border border-white/[0.08] bg-white/[0.025] p-3">
+            <p className="text-[9px] text-white/35">{payment.paymentName || "Nomor pembayaran"}</p>
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <code className="break-all text-sm font-black text-white">{payment.paymentNo}</code>
+              <button type="button" onClick={() => void navigator.clipboard.writeText(payment.paymentNo!)} className="inline-flex items-center gap-1 text-[9px] font-bold text-[#d8ff8d]"><Copy className="size-3" />Salin</button>
+            </div>
+          </div>
+        )}
         {payment.paymentUrl && (
           <Button
             type="button"
@@ -832,11 +849,11 @@ function TopupForm({
             className="mt-3 w-full rounded-lg bg-[#b9ff35] font-black text-[#091006]"
           >
             {openingPayment ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <ExternalLink className="mr-2 size-4" />}
-            {openingPayment ? "Membuka DOKU…" : "Bayar melalui DOKU"}
+            {openingPayment ? "Membuka pembayaran…" : `Lanjut ke ${payment.paymentName || "e-wallet"}`}
           </Button>
         )}
         <p className="mt-3 text-[9px] leading-4 text-white/35">
-          Setelah pembayaran berhasil, saldo akan masuk otomatis melalui notification DOKU.
+          Setelah pembayaran berhasil, saldo akan masuk otomatis melalui notifikasi DOKU.
         </p>
       </div>
     )}
