@@ -19,5 +19,6 @@ test("automatic checkout uses DOKU as the only external gateway", () => {
   assert.match(autoRoute, /paymentGateway: "doku"/);
   assert.match(autoRoute, /const identity = createOrderIdentity\(\)/);
   assert.doesNotMatch(autoRoute, /routePaymentGateway|Midtrans|iPaymu/i);
-  assert.match(doku, /authorization\/v1\/access-token\/b2b/);\n  assert.match(doku, /qr-mpm-generate/);
+  assert.match(doku, /authorization\/v1\/access-token\/b2b/);
+  assert.match(doku, /qr-mpm-generate/);
 });
