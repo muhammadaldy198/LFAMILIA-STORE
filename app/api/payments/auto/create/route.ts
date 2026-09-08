@@ -147,7 +147,7 @@ export async function POST(request: Request) {
 
     const baseUrl = getPublicBaseUrl();
     const invoice = publicInvoice(identity.referenceId);
-    const payment = await createDokuCheckoutPayment({
+    const payment = await createDokuDirectPayment({
       referenceId: identity.referenceId,
       amount: promotion.finalPrice,
       productName: `${item.productName} - ${item.packageLabel}`,
