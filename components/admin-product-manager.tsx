@@ -819,7 +819,7 @@ export function AdminProductManager() {
                       })}
                     </div>
                     <p className="mt-2 text-[9px] leading-4 text-white/32">
-                      Secara default semua kolom pelanggan dikirim berurutan ke DigiFlazz. Ubah format ini hanya jika SKU membutuhkan pemisah atau urutan khusus.
+                      DigiFlazz Buyer menerima satu customer_no. LFAMILIA menyusun customer_no dari token kolom di atas sesuai urutan/pemisah yang dibutuhkan SKU. Jika format memakai titik, allow_dot dikirim otomatis.
                     </p>
                   </div>
                 )}
