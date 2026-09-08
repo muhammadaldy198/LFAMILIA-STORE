@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { getCustomerSession } from "@/lib/server/customer-auth";
 import {
-  createDokuCheckoutPayment,
+  createDokuDirectPayment,
   getDokuReadiness,
   isDokuChannelSupported,
 } from "@/lib/server/doku";
@@ -162,7 +162,10 @@ export async function POST(request: Request) {
     await updateDokuPayment({
       referenceId: identity.referenceId,
       requestId: payment.requestId,
-      tokenId: payment.tokenId,
+      referenceNo: payment.referenceNo,
+      paymentNo: payment.paymentNo,
+      qrContent: payment.qrContent,
+      paymentName: payment.paymentName,
       paymentUrl: payment.paymentUrl,
       expiredAt: payment.expiredAt,
       total: promotion.finalPrice,
@@ -192,8 +195,9 @@ export async function POST(request: Request) {
         discountSource: promotion.discountSource,
         paymentMethod: input.paymentMethod,
         paymentGateway: "doku",
-        paymentNo: null,
-        paymentName: "DOKU Checkout",
+        paymentNo: payment.paymentNo,
+        qrContent: payment.qrContent,
+        paymentName: payment.paymentName,
         paymentUrl: payment.paymentUrl,
         fee: 0,
         total: promotion.finalPrice,
