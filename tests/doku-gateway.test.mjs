@@ -10,13 +10,15 @@ const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/
 const providers = fs.readFileSync(path.join(root, "lib/server/providers/index.ts"), "utf8");
 const providerOptions = fs.readFileSync(path.join(root, "lib/provider-options.ts"), "utf8");
 
-test("DOKU Checkout uses explicit sandbox and production endpoints with signed requests", () => {
-  assert.match(doku, /https:\/\/api-sandbox\.doku\.com\/checkout\/v1\/payment/);
-  assert.match(doku, /https:\/\/api\.doku\.com\/checkout\/v1\/payment/);
-  assert.match(doku, /HMACSHA256=/);
-  assert.match(doku, /Digest:/);
-  assert.match(doku, /Client-Id:/);
-  assert.match(doku, /Request-Target:/);
+test("DOKU Direct API uses SNAP token and payment endpoints with asymmetric and symmetric signatures", () => {
+  assert.match(doku, /authorization\/v1\/access-token\/b2b/);
+  assert.match(doku, /snap-adapter\/b2b\/v1\.0\/qr\/qr-mpm-generate/);
+  assert.match(doku, /direct-debit\/core\/v1\/debit\/payment-host-to-host/);
+  assert.match(doku, /virtual-accounts\/bi-snap-va\/v1\.1\/transfer-va\/create-va/);
+  assert.match(doku, /RSA-SHA256/);
+  assert.match(doku, /hmacBase64\("sha512"/);
+  assert.match(doku, /x-signature/);
+  assert.match(doku, /x-partner-id/);
 });
 
 test("DOKU callback validates signature, amount, and request identity before fulfillment", () => {
@@ -28,7 +30,7 @@ test("DOKU callback validates signature, amount, and request identity before ful
 });
 
 test("checkout creates one DOKU payment without legacy gateway fallback", () => {
-  assert.match(autoRoute, /createDokuCheckoutPayment\(/);
+  assert.match(autoRoute, /createDokuDirectPayment\(/);
   assert.match(autoRoute, /paymentGateway: "doku"/);
   assert.doesNotMatch(autoRoute, /midtrans|ipaymu|fallback/i);
 });
