@@ -23,7 +23,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminDigiflazzPricing } from "@/components/admin-digiflazz-pricing";
-import { AdminDokuDatabasePreparation } from "@/components/admin-doku-database-preparation";
 import { AdminIntegrationManager } from "@/components/admin-integration-manager";
 import { AdminExperienceManager } from "@/components/admin-experience-manager";
 import { AdminMemberManager } from "@/components/admin-member-manager";
@@ -350,9 +349,6 @@ export function AdminDashboard({
                     <SettingCard title="DigiFlazz" status="Integration Manager" text="Credential provider dapat dikelola terenkripsi; SKU dan callback tetap tervalidasi." />
                     <SettingCard title="Pengiriman kode" status="Khusus Pemilik" text="Website dan email Resend mengirim voucher tanpa membuka stok ke Staff." />
                   </div>
-                </AdminSection>
-                <AdminSection title="Persiapan database DOKU" description="Siapkan kolom DOKU dan bersihkan transaksi pra-rilis satu kali tanpa Wrangler.">
-                  <AdminDokuDatabasePreparation />
                 </AdminSection>
                 <AdminSection title="VPS Relay" description="Hubungkan Worker LFAMILIA ke relay DigiFlazz ber-IP statis.">
                   <AdminIntegrationManager view="relay" />
