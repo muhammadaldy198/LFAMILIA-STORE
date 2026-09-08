@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import type { ProductInputField } from "@/lib/store-data";
 import { getProviderAdapter } from "@/lib/server/providers";
 import type { ProviderResult } from "@/lib/server/providers/types";
@@ -328,6 +329,7 @@ export async function updateDokuPayment(input: {
   expiredAt: string | null;
   total: number;
 }) {
+  await ensureLegacyDatabaseColumns();
   await getD1()
     .prepare(
       `UPDATE orders SET
@@ -360,6 +362,7 @@ export async function updateDokuPayment(input: {
 }
 
 export async function markDokuStatusChecked(referenceId: string) {
+  await ensureLegacyDatabaseColumns();
   await getD1()
     .prepare(
       `UPDATE orders SET doku_status_checked_at = CURRENT_TIMESTAMP,
