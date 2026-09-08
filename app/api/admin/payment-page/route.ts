@@ -6,9 +6,10 @@ import {
 } from "@/lib/server/payment-page-settings";
 import { isAllowedMediaUrl } from "@/lib/media-url";
 
-const mediaUrl = z.string().trim().max(500)
-  .refine(isAllowedMediaUrl, "URL gambar tidak valid.")
-  .optional().or(z.literal(""));
+const mediaUrl = z.union([
+  z.literal(""),
+  z.string().trim().max(500).refine(isAllowedMediaUrl, "URL gambar tidak valid."),
+]);
 
 const supportUrl = z.string().trim().max(500).refine((value) => {
   if (!value) return true;
