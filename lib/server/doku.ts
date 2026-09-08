@@ -684,9 +684,7 @@ export function parseDokuNotification(payload: Record<string, unknown>) {
   if (Object.keys(vaData).length) {
     return {
       referenceId: String(vaData.trxId ?? "").trim(),
-      originalRequestId: String(
-        vaData.paymentRequestId ?? payload.originalExternalId ?? "",
-      ).trim() || null,
+      originalRequestId: null,
       status: "paid" as const,
       amount: numericAmount(vaData.paidAmount),
       referenceNo: String(vaData.virtualAccountNo ?? "").trim() || null,
