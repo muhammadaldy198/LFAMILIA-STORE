@@ -392,7 +392,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
         const fallbackGateways: CheckoutGateway[] = data.gateway
           ? [{
               code: data.gateway,
-              label: "DOKU Checkout",
+              label: "DOKU Direct API",
               environment: data.environment ?? null,
               channels: data.channels ?? [],
             }]
