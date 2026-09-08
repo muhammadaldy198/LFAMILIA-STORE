@@ -2,11 +2,11 @@
 
 Arsitektur aktif:
 
-- **Payment gateway:** DOKU Checkout
+- **Payment gateway:** DOKU Direct API / SNAP
 - **Provider produk otomatis:** DigiFlazz
 - **Produk lain:** manual / stok internal LFAMILIA
 
-Credential operasional disimpan terenkripsi dari Admin Panel. Tidak ada DOKU Client ID, DOKU Secret Key, atau DigiFlazz API key yang perlu ditulis di repository.
+Credential operasional disimpan terenkripsi dari Admin Panel. DOKU Client ID, Secret Key, RSA private key, dan DigiFlazz API key tidak ditulis di repository.
 
 ## Cloudflare root secret
 
@@ -18,26 +18,40 @@ INTEGRATION_ENCRYPTION_KEY
 
 Minimal 32 karakter. Jangan menggantinya setelah credential tersimpan di D1.
 
-## DOKU
+## DOKU Direct API
 
-Admin Panel menyimpan profil Sandbox dan Production secara terpisah:
+Admin Panel menyimpan profil Sandbox dan Production secara terpisah. Runtime internal hasil hidrasi D1 menggunakan field berikut:
 
 ```text
 DOKU_SANDBOX_CLIENT_ID
 DOKU_SANDBOX_SECRET_KEY
+DOKU_SANDBOX_PRIVATE_KEY
+DOKU_SANDBOX_PRIVATE_KEY_PASSPHRASE
 DOKU_SANDBOX_API_URL
+DOKU_SANDBOX_QRIS_MERCHANT_ID
+DOKU_SANDBOX_QRIS_TERMINAL_ID
+DOKU_SANDBOX_QRIS_POSTAL_CODE
+DOKU_SANDBOX_VA_CONFIG_JSON
 
 DOKU_PRODUCTION_CLIENT_ID
 DOKU_PRODUCTION_SECRET_KEY
+DOKU_PRODUCTION_PRIVATE_KEY
+DOKU_PRODUCTION_PRIVATE_KEY_PASSPHRASE
 DOKU_PRODUCTION_API_URL
+DOKU_PRODUCTION_QRIS_MERCHANT_ID
+DOKU_PRODUCTION_QRIS_TERMINAL_ID
+DOKU_PRODUCTION_QRIS_POSTAL_CODE
+DOKU_PRODUCTION_VA_CONFIG_JSON
 ```
 
-Nama di atas adalah runtime internal hasil hidrasi D1, bukan Variable/Secret Cloudflare yang harus dibuat manual.
+Nama tersebut adalah runtime internal, bukan Variable/Secret Cloudflare yang harus dibuat manual.
 
-Endpoint resmi default:
+Base URL default:
 
-- Sandbox: `https://api-sandbox.doku.com/checkout/v1/payment`
-- Production: `https://api.doku.com/checkout/v1/payment`
+- Sandbox: `https://api-sandbox.doku.com`
+- Production: `https://api.doku.com`
+
+Payment initiation memakai B2B token SNAP, RSA SHA256 untuk token signature, dan HMAC-SHA512 untuk transactional request. Notification handler juga memverifikasi signature non-SNAP HMAC-SHA256 yang masih digunakan DOKU pada beberapa notification flow.
 
 ## DigiFlazz
 
