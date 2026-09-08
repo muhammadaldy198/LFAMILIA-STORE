@@ -68,6 +68,17 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ],
   ["product_packages", "supplier_synced_at", "supplier_synced_at TEXT"],
 
+  ["orders", "doku_reference_no", "doku_reference_no TEXT"],
+  ["orders", "doku_payment_no", "doku_payment_no TEXT"],
+  ["orders", "doku_qr_content", "doku_qr_content TEXT"],
+  ["orders", "doku_payment_name", "doku_payment_name TEXT"],
+  ["orders", "doku_status_checked_at", "doku_status_checked_at TEXT"],
+  ["wallet_topups", "doku_reference_no", "doku_reference_no TEXT"],
+  ["wallet_topups", "doku_payment_no", "doku_payment_no TEXT"],
+  ["wallet_topups", "doku_qr_content", "doku_qr_content TEXT"],
+  ["wallet_topups", "doku_payment_name", "doku_payment_name TEXT"],
+  ["wallet_topups", "doku_status_checked_at", "doku_status_checked_at TEXT"],
+
   ["wallet_topups", "payment_fee", "payment_fee INTEGER DEFAULT 0 NOT NULL"],
   [
     "wallet_topups",
