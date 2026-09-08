@@ -78,6 +78,7 @@ export const digiflazzAdapter: ProviderAdapter = {
       testing: environment === "development",
       max_price: order.subtotal,
       cb_url: `${publicBaseUrl}/api/fulfillment/digiflazz/callback`,
+      ...(order.customerNo.includes(".") ? { allow_dot: true } : {}),
     };
 
     const relay = providerRelayRequest(
