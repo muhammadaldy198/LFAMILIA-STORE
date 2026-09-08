@@ -1,5 +1,5 @@
 import {
-  mapDokuStatus,
+  parseDokuNotification,
   validateDokuNotification,
 } from "@/lib/server/doku";
 import {
@@ -26,6 +26,29 @@ function object(value: unknown) {
     : {};
 }
 
+function notificationAck(payload: Record<string, unknown>, eventId: string) {
+  const vaData = object(payload.virtualAccountData);
+  if (Object.keys(vaData).length) {
+    return {
+      responseCode: "2002500",
+      responseMessage: "Success",
+      virtualAccountData: {
+        partnerServiceId: vaData.partnerServiceId,
+        customerNo: vaData.customerNo,
+        virtualAccountNo: vaData.virtualAccountNo,
+        virtualAccountName: vaData.virtualAccountName,
+        trxId: vaData.trxId,
+        paymentRequestId: vaData.paymentRequestId,
+      },
+    };
+  }
+  return {
+    responseCode: "2005600",
+    approvalCode: eventId.slice(0, 32),
+    responseMessage: "Request has been processed successfully",
+  };
+}
+
 export async function GET() {
   return Response.json(
     { ok: true, service: "doku-notification", method: "POST" },
@@ -47,28 +70,25 @@ export async function POST(request: Request) {
     const validation = validateDokuNotification({
       rawBody,
       requestTarget: target,
-      clientId: request.headers.get("client-id"),
-      requestId: request.headers.get("request-id"),
-      requestTimestamp: request.headers.get("request-timestamp"),
-      receivedSignature: request.headers.get("signature"),
+      partnerId: request.headers.get("x-partner-id"),
+      requestTimestamp: request.headers.get("x-timestamp"),
+      receivedSignature: request.headers.get("x-signature"),
+      authorization: request.headers.get("authorization"),
     });
     if (!validation.valid) {
       return Response.json({ error: "Signature callback DOKU tidak valid." }, { status: 401 });
     }
 
-    const orderPayload = object(payload.order);
-    const transaction = object(payload.transaction);
-    const referenceId = String(orderPayload.invoice_number ?? "").trim();
+    const notification = parseDokuNotification(payload);
+    const referenceId = notification.referenceId;
     if (!referenceId) {
-      return Response.json({ error: "Invoice number DOKU tidak ada." }, { status: 400 });
+      return Response.json({ error: "Referensi transaksi DOKU tidak ada." }, { status: 400 });
     }
 
-    const status = mapDokuStatus(payload);
-    const callbackAmount = Number(orderPayload.amount ?? 0);
-    const originalRequestId = transaction.original_request_id == null
-      ? null
-      : String(transaction.original_request_id);
-    const eventId = request.headers.get("request-id") || crypto.randomUUID();
+    const status = notification.status;
+    const callbackAmount = notification.amount;
+    const originalRequestId = notification.originalRequestId;
+    const eventId = request.headers.get("x-external-id") || crypto.randomUUID();
 
     const walletTopup = await getDokuWalletTopup(referenceId);
     if (walletTopup) {
@@ -83,7 +103,7 @@ export async function POST(request: Request) {
           (error) => console.error("Notifikasi top up DOKU gagal:", error),
         );
       }
-      return Response.json({ ok: true, walletTopup: result });
+      return Response.json(notificationAck(payload, eventId));
     }
 
     const order = await getOrderByReference(referenceId);
@@ -120,7 +140,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return Response.json({ ok: true });
+    return Response.json(notificationAck(payload, eventId));
   } catch (error) {
     return Response.json(
       {
