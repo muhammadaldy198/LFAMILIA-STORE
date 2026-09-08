@@ -60,7 +60,7 @@ export type IntegrationOverview = {
 };
 
 export const profileFields: Record<string, readonly string[]> = {
-  "doku:direct": ["clientId", "secretKey", "apiUrl"],
+  "doku:direct": ["clientId", "secretKey", "privateKey", "privateKeyPassphrase", "apiUrl", "qrisMerchantId", "qrisTerminalId", "qrisPostalCode", "vaConfigJson"],
   "digiflazz:direct": ["username", "apiKey", "transactionApiUrl", "priceListUrl", "webhookSecret"],
   "melostore:service": ["apiKey", "secretKey", "apiUrl", "nicknameApiKey"],
   "resend:service": ["apiKey", "fromEmail", "apiUrl", "deliveryChannel"],
@@ -213,7 +213,7 @@ function buildCallbacks(baseUrl: string) {
   const route = (path: string) => baseUrl ? `${baseUrl}${path}` : path;
   return [
     { id: "doku", label: "DOKU Notification URL", description: "Pasang sebagai Payment Notification URL di dashboard DOKU.", kind: "notification" as const, url: route("/api/payments/doku/callback") },
-    { id: "doku-fallback", label: "DOKU Result / Fallback URL", description: "Halaman LFAMILIA setelah pelanggan kembali dari DOKU.", kind: "fallback" as const, url: route("/track") },
+    { id: "doku-fallback", label: "DOKU Return URL", description: "Dipakai DANA/ShopeePay untuk mengembalikan pelanggan ke halaman pembayaran LFAMILIA.", kind: "fallback" as const, url: route("/payment") },
     { id: "digiflazz", label: "DigiFlazz Webhook", description: "Webhook status fulfillment DigiFlazz.", kind: "callback" as const, url: route("/api/fulfillment/digiflazz/callback") },
   ];
 }
@@ -336,7 +336,13 @@ function applyDokuConfig(target: Record<string, unknown>, environment: "sandbox"
   const prefix = `DOKU_${environment.toUpperCase()}_`;
   put(target, `${prefix}CLIENT_ID`, config.clientId);
   put(target, `${prefix}SECRET_KEY`, config.secretKey);
+  put(target, `${prefix}PRIVATE_KEY`, config.privateKey);
+  put(target, `${prefix}PRIVATE_KEY_PASSPHRASE`, config.privateKeyPassphrase);
   put(target, `${prefix}API_URL`, config.apiUrl);
+  put(target, `${prefix}QRIS_MERCHANT_ID`, config.qrisMerchantId);
+  put(target, `${prefix}QRIS_TERMINAL_ID`, config.qrisTerminalId);
+  put(target, `${prefix}QRIS_POSTAL_CODE`, config.qrisPostalCode);
+  put(target, `${prefix}VA_CONFIG_JSON`, config.vaConfigJson);
 }
 
 function applyDigiflazzConfig(target: Record<string, unknown>, environment: "development" | "production", config: Record<string, string>, active: boolean) {
