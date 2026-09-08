@@ -85,6 +85,22 @@ test("DOKU migration owns payment columns and resets pre-launch transaction data
   }
 });
 
+test("DOKU Direct API migration adds customer-facing payment artifacts", () => {
+  const migration = fs.readFileSync(
+    path.join(drizzleDir, "0025_doku_direct_api.sql"),
+    "utf8",
+  );
+  for (const column of [
+    "doku_reference_no",
+    "doku_payment_no",
+    "doku_qr_content",
+    "doku_payment_name",
+    "doku_status_checked_at",
+  ]) {
+    assert.match(migration, new RegExp(column));
+  }
+});
+
 test("unexpected D1 repair errors are not swallowed", () => {
   const source = fs.readFileSync(path.join(root, "lib/server/database-repair.ts"), "utf8");
   assert.match(source, /if \(\/no such table\/i\.test\(message\)\)/);
