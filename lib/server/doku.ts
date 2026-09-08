@@ -600,7 +600,7 @@ export async function createDokuDirectPayment(input: {
       referenceNo: data?.trxId?.trim() || null,
       paymentNo,
       qrContent: null,
-      paymentUrl: data?.additionalInfo?.howToPayPage?.trim() || null,
+      paymentUrl: null,
       paymentName: `Virtual Account ${input.paymentChannel.toUpperCase()}`,
       expiredAt: data?.expiredDate || expiresAt,
       raw: payload,
