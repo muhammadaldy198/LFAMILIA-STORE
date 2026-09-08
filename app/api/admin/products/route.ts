@@ -53,7 +53,7 @@ const productSchema = z.object({
   popular: z.boolean().default(false),
   instant: z.boolean().default(false),
   fulfillmentType: z.enum(["automatic", "manual"]),
-  targetTemplate: z.string().trim().min(3).max(120),
+  targetTemplate: z.string().trim().min(3).max(500),
   manualInstructions: z.string().trim().max(500).optional(),
   manualOpenTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   manualCloseTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
@@ -73,6 +73,15 @@ function validateProduct(input: z.infer<typeof productSchema>) {
   const fieldIds = input.inputFields.map((item) => item.id);
   if (new Set(fieldIds).size !== fieldIds.length) {
     throw new Error("Nama kolom data pelanggan tidak boleh duplikat.");
+  }
+  if (input.fulfillmentType === "automatic") {
+    const tokens = [...input.targetTemplate.matchAll(/\{\{([a-z0-9-]+)\}\}/gi)]
+      .map((match) => match[1].toLowerCase());
+    const allowedTokens = new Set(["destination", "server", ...fieldIds]);
+    const unknownToken = tokens.find((token) => !allowedTokens.has(token));
+    if (unknownToken) {
+      throw new Error(`Token tujuan provider {{${unknownToken}}} tidak cocok dengan kolom pelanggan.`);
+    }
   }
   const tabs = input.packageTabs.map((item) => item.trim());
   if (new Set(tabs.map((item) => item.toLowerCase())).size !== tabs.length) {
