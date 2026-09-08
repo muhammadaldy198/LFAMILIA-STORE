@@ -7,6 +7,7 @@ import * as faqs from "@/app/api/admin/faqs/route";
 import * as media from "@/app/api/admin/media/route";
 import * as members from "@/app/api/admin/members/route";
 import * as paymentMethods from "@/app/api/admin/payment-methods/route";
+import * as paymentPage from "@/app/api/admin/payment-page/route";
 import * as orders from "@/app/api/admin/orders/route";
 import * as integrations from "@/app/api/admin/integrations/route";
 import * as productContent from "@/app/api/admin/product-content/route";
@@ -44,6 +45,7 @@ const routes: Record<string, RouteHandlers> = {
   media: { POST: media.POST },
   members: { GET: members.GET, PUT: members.PUT, PATCH: members.PATCH },
   "payment-methods": { GET: paymentMethods.GET, POST: paymentMethods.POST, DELETE: paymentMethods.DELETE },
+  "payment-page": { GET: paymentPage.GET, PUT: paymentPage.PUT },
   orders: { GET: orders.GET, PATCH: orders.PATCH },
   "product-content": { PUT: productContent.PUT },
   "product-package-provider": { PATCH: productPackageProvider.PATCH },
