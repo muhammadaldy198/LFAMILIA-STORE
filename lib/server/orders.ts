@@ -60,8 +60,13 @@ export type OrderRecord = {
   fulfillment_status: string;
   doku_request_id: string | null;
   doku_token_id: string | null;
+  doku_reference_no: string | null;
+  doku_payment_no: string | null;
+  doku_qr_content: string | null;
+  doku_payment_name: string | null;
   doku_payment_url: string | null;
   doku_expired_at: string | null;
+  doku_status_checked_at: string | null;
   provider_ref_id: string | null;
   provider_status: string | null;
   provider_message: string | null;
@@ -315,20 +320,37 @@ export async function getOrderById(id: string) {
 export async function updateDokuPayment(input: {
   referenceId: string;
   requestId: string;
-  tokenId: string | null;
-  paymentUrl: string;
+  referenceNo: string | null;
+  paymentNo: string | null;
+  qrContent: string | null;
+  paymentName: string;
+  paymentUrl: string | null;
   expiredAt: string | null;
   total: number;
 }) {
   await getD1()
     .prepare(
-      `UPDATE orders SET doku_request_id = ?, doku_token_id = ?, doku_payment_url = ?,
-       doku_expired_at = ?, admin_fee = 0, total = ?, updated_at = CURRENT_TIMESTAMP
+      `UPDATE orders SET
+       doku_request_id = ?,
+       doku_token_id = NULL,
+       doku_reference_no = ?,
+       doku_payment_no = ?,
+       doku_qr_content = ?,
+       doku_payment_name = ?,
+       doku_payment_url = ?,
+       doku_expired_at = ?,
+       doku_status_checked_at = NULL,
+       admin_fee = 0,
+       total = ?,
+       updated_at = CURRENT_TIMESTAMP
        WHERE reference_id = ?`,
     )
     .bind(
       input.requestId,
-      input.tokenId,
+      input.referenceNo,
+      input.paymentNo,
+      input.qrContent,
+      input.paymentName,
       input.paymentUrl,
       input.expiredAt,
       input.total,
@@ -337,6 +359,15 @@ export async function updateDokuPayment(input: {
     .run();
 }
 
+export async function markDokuStatusChecked(referenceId: string) {
+  await getD1()
+    .prepare(
+      `UPDATE orders SET doku_status_checked_at = CURRENT_TIMESTAMP,
+       updated_at = updated_at WHERE reference_id = ?`,
+    )
+    .bind(referenceId)
+    .run();
+}
 export async function markPaymentCreationFailed(
   referenceId: string,
   message: string,
