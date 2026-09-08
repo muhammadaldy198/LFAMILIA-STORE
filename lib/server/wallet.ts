@@ -115,21 +115,38 @@ export async function createDokuWalletTopup(input: {
 export async function updateDokuWalletTopup(input: {
   referenceId: string;
   requestId: string;
-  tokenId: string | null;
-  paymentUrl: string;
+  referenceNo: string | null;
+  paymentNo: string | null;
+  qrContent: string | null;
+  paymentName: string;
+  paymentUrl: string | null;
   expiredAt: string | null;
   total: number;
 }) {
   await ensureLegacyDatabaseColumns();
   await getD1()
     .prepare(
-      `UPDATE wallet_topups SET doku_request_id = ?, doku_token_id = ?,
-       doku_payment_url = ?, doku_expired_at = ?, payment_fee = 0, payment_total = ?,
-       updated_at = CURRENT_TIMESTAMP WHERE reference_id = ? AND source = 'doku'`,
+      `UPDATE wallet_topups SET
+       doku_request_id = ?,
+       doku_token_id = NULL,
+       doku_reference_no = ?,
+       doku_payment_no = ?,
+       doku_qr_content = ?,
+       doku_payment_name = ?,
+       doku_payment_url = ?,
+       doku_expired_at = ?,
+       doku_status_checked_at = NULL,
+       payment_fee = 0,
+       payment_total = ?,
+       updated_at = CURRENT_TIMESTAMP
+       WHERE reference_id = ? AND source = 'doku'`,
     )
     .bind(
       input.requestId,
-      input.tokenId,
+      input.referenceNo,
+      input.paymentNo,
+      input.qrContent,
+      input.paymentName,
       input.paymentUrl,
       input.expiredAt,
       input.total,
@@ -137,7 +154,6 @@ export async function updateDokuWalletTopup(input: {
     )
     .run();
 }
-
 export async function getDokuWalletTopup(referenceId: string) {
   await ensureLegacyDatabaseColumns();
   return getD1()
