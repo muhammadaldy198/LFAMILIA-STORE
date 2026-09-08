@@ -1,7 +1,17 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
+import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
+import { queryDokuQrisStatus } from "@/lib/server/doku";
+import { fulfillAutomaticOrder } from "@/lib/server/fulfillment";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
-import type { OrderRecord } from "@/lib/server/orders";
+import {
+  applyPaymentStatus,
+  getOrderById,
+  markDokuStatusChecked,
+  recordOrderEvent,
+  type OrderRecord,
+} from "@/lib/server/orders";
+import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +37,7 @@ function publicReferenceId(value: string) {
 }
 
 async function resolveOrder(referenceId: string) {
+  await ensureLegacyDatabaseColumns();
   const db = getD1();
   const exact = await db.prepare("SELECT * FROM orders WHERE reference_id = ? LIMIT 1")
     .bind(referenceId)
@@ -51,6 +62,53 @@ function maskDestination(value: string, server: string | null) {
   return server ? `${visible} (${server})` : visible;
 }
 
+function shouldQueryQris(order: OrderRecord) {
+  if (
+    order.payment_status !== "pending" ||
+    order.payment_method !== "qris" ||
+    !order.doku_reference_no
+  ) return false;
+  const created = Date.parse(order.created_at);
+  if (Number.isFinite(created) && Date.now() - created < 60_000) return false;
+  const last = order.doku_status_checked_at
+    ? Date.parse(order.doku_status_checked_at)
+    : 0;
+  return !Number.isFinite(last) || Date.now() - last >= 60_000;
+}
+
+async function refreshQrisStatus(order: OrderRecord) {
+  if (!shouldQueryQris(order) || !order.doku_reference_no) return order;
+  try {
+    await markDokuStatusChecked(order.reference_id);
+    const query = await queryDokuQrisStatus({
+      referenceId: order.reference_id,
+      referenceNo: order.doku_reference_no,
+    });
+    await recordOrderEvent({
+      orderId: order.id,
+      source: "doku",
+      eventId: `qris-status-${query.requestId}`,
+      status: query.status,
+      payload: query.raw,
+    });
+    if (
+      query.status === "paid" &&
+      Number.isFinite(query.amount) &&
+      query.amount === order.total
+    ) {
+      const firstPaid = await applyPaymentStatus(order, "paid");
+      if (firstPaid && order.fulfillment_type === "automatic") {
+        await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
+      }
+    } else if (query.status === "failed") {
+      await applyPaymentStatus(order, "failed");
+    }
+    return (await getOrderById(order.id)) ?? order;
+  } catch {
+    return (await getOrderById(order.id)) ?? order;
+  }
+}
+
 export async function POST(request: Request) {
   const originBlock = rejectCrossOriginMutation(request);
   if (originBlock) return originBlock;
@@ -58,10 +116,12 @@ export async function POST(request: Request) {
   if (!rate.allowed) return Response.json({ error: "Terlalu banyak pengecekan transaksi. Coba lagi beberapa menit." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   try {
     const { referenceId } = schema.parse(await request.json());
-    const order = await resolveOrder(referenceId);
+    let order = await resolveOrder(referenceId);
     if (!order) {
       return Response.json({ error: "Invoice tidak ditemukan." }, { status: 404 });
     }
+
+    order = await refreshQrisStatus(order);
 
     const voucherCode = order.payment_status === "paid"
       ? await getWebsiteVoucherCodeByReference(order.reference_id).catch(() => null)
@@ -93,9 +153,10 @@ export async function POST(request: Request) {
         paymentStatus: order.payment_status,
         fulfillmentStatus: order.fulfillment_status,
         fulfillmentType: order.fulfillment_type,
-        paymentGateway: order.doku_payment_url || order.doku_token_id ? "doku" : null,
-        paymentNo: null,
-        paymentName: order.payment_status === "pending" ? "DOKU Checkout" : null,
+        paymentGateway: order.doku_request_id ? "doku" : null,
+        paymentNo: order.payment_status === "pending" ? order.doku_payment_no : null,
+        qrContent: order.payment_status === "pending" ? order.doku_qr_content : null,
+        paymentName: order.doku_payment_name,
         paymentUrl: order.payment_status === "pending" ? order.doku_payment_url : null,
         expiredAt: order.payment_status === "pending" ? order.doku_expired_at : null,
         voucherCode,
