@@ -277,23 +277,36 @@ export function AdminProductManager() {
 
   function buildProductPayload(product: ManagedProduct) {
     const packageTabs = product.packageTabs.map((item) => item.trim()).filter(Boolean);
+    const inputFields = (product.inputFields ?? []).map((item, index) => ({
+      ...item,
+      id: slugify(item.id || item.label || `kolom-${index + 1}`),
+      label: item.label.trim(),
+      placeholder: item.placeholder?.trim() || "",
+      required: item.required !== false,
+    })).filter((item) => item.label);
+    const automaticTemplate = inputFields.length
+      ? inputFields.map((item) => `{{${item.id}}}`).join("")
+      : "{{destination}}";
+    const configuredTemplate = product.targetTemplate?.trim() || "";
+    const usesLegacyAutomaticTemplate =
+      configuredTemplate === "{{destination}}" ||
+      configuredTemplate === "{{destination}}{{server}}";
+    const targetTemplate =
+      !configuredTemplate || usesLegacyAutomaticTemplate
+        ? automaticTemplate
+        : configuredTemplate;
+
     return {
       ...product,
       instant: product.fulfillmentType === "automatic",
       slug: slugify(product.slug || product.name),
       initials: product.initials.toUpperCase(),
       packageTabs,
-      inputFields: (product.inputFields ?? []).map((item, index) => ({
-        ...item,
-        id: slugify(item.id || item.label || `kolom-${index + 1}`),
-        label: item.label.trim(),
-        placeholder: item.placeholder?.trim() || "",
-        required: item.required !== false,
-      })).filter((item) => item.label),
-      inputLabel: product.inputFields?.[0]?.label?.trim() || "Data pelanggan",
-      inputPlaceholder: product.inputFields?.[0]?.placeholder?.trim() || "Tidak diperlukan",
-      needsServer: Boolean(product.inputFields?.[1]),
-      targetTemplate: product.inputFields && product.inputFields.length > 1 ? "{{destination}}{{server}}" : "{{destination}}",
+      inputFields,
+      inputLabel: inputFields[0]?.label || "Data pelanggan",
+      inputPlaceholder: inputFields[0]?.placeholder || "Tidak diperlukan",
+      needsServer: Boolean(inputFields[1]),
+      targetTemplate,
       packages: product.packages.map((item, index) => {
         const id = slugify(item.id || `${product.slug || product.name}-${item.label || index + 1}`);
         const providerCode = item.providerCode || (product.category === "voucher" ? "voucher-stock" : undefined);
@@ -779,7 +792,38 @@ export function AdminProductManager() {
             </div>
             {role === "owner" && <>
               <div className="grid grid-cols-2 gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">{[["Aktif", "isActive"], ["Populer", "popular"]].map(([label, key]) => <label key={key} className="flex items-center justify-between gap-2 text-[11px] text-white/55"><span>{label}</span><Switch checked={Boolean(draft[key as keyof ManagedProduct])} onCheckedChange={(checked) => updateDraft(key as keyof ManagedProduct, checked as never)} /></label>)}</div>
-              <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.08]"><div className="flex items-center justify-between gap-3 border-b border-white/[0.08] px-3 py-2.5"><div><h3 className="text-xs font-bold">Data yang diisi pelanggan</h3><p className="mt-0.5 text-[9px] text-white/30">Buat kolom sendiri sesuai kebutuhan produk.</p></div><Button type="button" onClick={addInputField} size="sm" variant="outline" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-2.5 text-[9px] text-white"><Plus className="mr-1 size-3" />Tambah kolom</Button></div><div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-[10px]"><thead className="bg-white/[0.025] text-white/30"><tr><th className="px-3 py-2">Nama kolom</th><th className="px-3 py-2">Contoh isi</th><th className="px-3 py-2 text-center">Wajib</th><th className="px-3 py-2 text-right">Aksi</th></tr></thead><tbody>{(draft.inputFields ?? []).map((field, index) => <tr key={field.id} className="border-t border-white/[0.06]"><td className="p-2"><Input required value={field.label} onChange={(event) => updateInputField(index, { label: event.target.value, id: slugify(event.target.value) || field.id })} className="admin-input" placeholder="User ID / Username / Email" /></td><td className="p-2"><Input value={field.placeholder ?? ""} onChange={(event) => updateInputField(index, { placeholder: event.target.value })} className="admin-input" placeholder="Contoh: 123456789" /></td><td className="p-2 text-center"><Switch checked={field.required !== false} onCheckedChange={(checked) => updateInputField(index, { required: checked })} /></td><td className="p-2 text-right"><Button type="button" onClick={() => removeInputField(index)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></td></tr>)}{!(draft.inputFields ?? []).length && <tr><td colSpan={4} className="px-3 py-5 text-center text-[10px] text-white/28">Produk ini tidak meminta data tambahan dari pelanggan.</td></tr>}</tbody></table></div></div>
+              <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.08]"><div className="flex items-center justify-between gap-3 border-b border-white/[0.08] px-3 py-2.5"><div><h3 className="text-xs font-bold">Data yang diisi pelanggan</h3><p className="mt-0.5 text-[9px] text-white/30">Buat kolom sendiri sesuai kebutuhan produk.</p></div><Button type="button" onClick={addInputField} size="sm" variant="outline" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-2.5 text-[9px] text-white"><Plus className="mr-1 size-3" />Tambah kolom</Button></div><div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-[10px]"><thead className="bg-white/[0.025] text-white/30"><tr><th className="px-3 py-2">Nama kolom</th><th className="px-3 py-2">Contoh isi</th><th className="px-3 py-2 text-center">Wajib</th><th className="px-3 py-2 text-right">Aksi</th></tr></thead><tbody>{(draft.inputFields ?? []).map((field, index) => <tr key={field.id} className="border-t border-white/[0.06]"><td className="p-2"><Input required value={field.label} onChange={(event) => updateInputField(index, { label: event.target.value, id: slugify(event.target.value) || field.id })} className="admin-input" placeholder="User ID / Username / Email" /></td><td className="p-2"><Input value={field.placeholder ?? ""} onChange={(event) => updateInputField(index, { placeholder: event.target.value })} className="admin-input" placeholder="Contoh: 123456789" /></td><td className="p-2 text-center"><Switch checked={field.required !== false} onCheckedChange={(checked) => updateInputField(index, { required: checked })} /></td><td className="p-2 text-right"><Button type="button" onClick={() => removeInputField(index)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></td></tr>)}{!(draft.inputFields ?? []).length && <tr><td colSpan={4} className="px-3 py-5 text-center text-[10px] text-white/28">Produk ini tidak meminta data tambahan dari pelanggan.</td></tr>}</tbody></table></div>
+                {draft.fulfillmentType === "automatic" && (
+                  <div className="border-t border-white/[0.07] p-3">
+                    <Field label="Format tujuan DigiFlazz" wide>
+                      <Input
+                        value={draft.targetTemplate}
+                        onChange={(event) => updateDraft("targetTemplate", event.target.value)}
+                        className="admin-input font-mono text-[10px]"
+                        placeholder="{{user-id}}{{zone-id}}"
+                      />
+                    </Field>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {(draft.inputFields ?? []).map((field, index) => {
+                        const token = `{{${slugify(field.id || field.label || `kolom-${index + 1}`)}}}`;
+                        return (
+                          <button
+                            type="button"
+                            key={`${field.id}-token-${index}`}
+                            onClick={() => updateDraft("targetTemplate", `${draft.targetTemplate || ""}${token}`)}
+                            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-mono text-[8px] text-[#d8ff8d]"
+                          >
+                            {token}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-[9px] leading-4 text-white/32">
+                      Secara default semua kolom pelanggan dikirim berurutan ke DigiFlazz. Ubah format ini hanya jika SKU membutuhkan pemisah atau urutan khusus.
+                    </p>
+                  </div>
+                )}
+              </div>
             </>}
             <div className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="flex items-center gap-2 text-sm font-bold"><BellRing className="size-4 text-[#b9ff35]" />Pop-up informasi produk</h3><p className="mt-1 text-[10px] text-white/30">Muncul sebelum pelanggan memilih nominal. Tambahkan slide sebanyak kebutuhan dan atur urutannya.</p><p className="mt-1 text-[9px] text-[#cfff72]/55">Token jam: {"{{jam_buka}}"}, {"{{jam_tutup}}"}, dan {"{{zona_waktu}}"}.</p></div><Button type="button" onClick={addNotice} size="sm" variant="outline" className="shrink-0 rounded-lg border-white/10 bg-white/[0.03] text-[10px] text-white hover:bg-white/[0.08] hover:text-white"><Plus className="mr-1 size-3.5" />Tambah slide</Button></div><div className="mt-3 space-y-3">{draft.notices.length ? draft.notices.map((notice, index) => <div key={`${notice.id}-${index}`} className="rounded-xl border border-white/[0.08] bg-[#111620] p-3"><div className="flex items-center gap-2"><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/[0.05] text-[9px] font-bold text-white/40">{index + 1}</span><div className="flex shrink-0 flex-col"><button type="button" disabled={index === 0} onClick={() => moveNotice(index, -1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser slide ke atas"><ChevronUp className="size-3.5" /></button><button type="button" disabled={index === draft.notices.length - 1} onClick={() => moveNotice(index, 1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser slide ke bawah"><ChevronDown className="size-3.5" /></button></div><Input required value={notice.title} onChange={(event) => updateNotice(index, "title", event.target.value)} className="admin-input" placeholder="JAM OPERASIONAL 09.00 – 23.00 WIB" /><Switch checked={notice.isActive} onCheckedChange={(checked) => updateNotice(index, "isActive", checked)} /><Button type="button" onClick={() => removeNotice(index)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></div><Textarea required value={notice.body} onChange={(event) => updateNotice(index, "body", event.target.value)} className="mt-2 min-h-28 rounded-xl border-white/10 bg-white/[0.025] text-xs text-white" placeholder={"Estimasi proses 30 menit sampai 2 jam.\n\nAdmin akan menghubungi melalui WhatsApp setelah pembayaran."} /></div>) : <div className="rounded-xl border border-dashed border-white/10 py-6 text-center text-[10px] text-white/28">Tidak ada pop-up untuk produk ini.</div>}</div></div>
                         {error && <p className="mt-4 rounded-xl bg-red-400/[0.07] p-3 text-xs text-red-200">{error}</p>}
