@@ -338,7 +338,6 @@ function PaymentContent() {
                   value={order.qrContent}
                   size={220}
                   level="M"
-                  marginSize={2}
                   className="mx-auto h-auto w-full max-w-[220px]"
                 />
                 <p className="mt-3 text-[10px] font-black text-[#091006]">
