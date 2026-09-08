@@ -72,13 +72,19 @@ const definitions: Definition[] = [
     id: "doku",
     provider: "doku",
     mode: "direct",
-    title: "DOKU Checkout",
-    description: "Satu-satunya payment gateway LFAMILIA untuk QRIS, e-wallet, dan virtual account.",
+    title: "DOKU Direct API",
+    description: "Payment gateway Direct API/SNAP. Halaman pembayaran, QRIS, VA, dan alur checkout tetap dikendalikan LFAMILIA.",
     environments: ["sandbox", "production"],
     fields: [
       { key: "clientId", label: "Client ID", secret: true },
       { key: "secretKey", label: "Secret Key", secret: true },
-      { key: "apiUrl", label: "Checkout API URL", inputMode: "url", placeholder: "Kosongkan untuk endpoint resmi DOKU sesuai environment." },
+      { key: "privateKey", label: "RSA Private Key (PKCS#8)", secret: true, multiline: true, help: "Private key merchant untuk Get Token B2B. Public key pasang di dashboard DOKU; jangan unggah private key ke DOKU." },
+      { key: "privateKeyPassphrase", label: "Private Key Passphrase", secret: true, help: "Opsional. Isi hanya bila private key PKCS#8 memakai passphrase." },
+      { key: "apiUrl", label: "Direct API Base URL", inputMode: "url", placeholder: "Kosongkan untuk https://api-sandbox.doku.com atau https://api.doku.com." },
+      { key: "qrisMerchantId", label: "QRIS Merchant ID / Mall ID", secret: true, help: "Credential QRIS yang diberikan DOKU setelah aktivasi QRIS." },
+      { key: "qrisTerminalId", label: "QRIS Terminal ID", help: "3–16 karakter alfanumerik sesuai konfigurasi QRIS merchant." },
+      { key: "qrisPostalCode", label: "QRIS Postal Code", help: "Kode pos merchant maksimal 5 digit." },
+      { key: "vaConfigJson", label: "Konfigurasi Virtual Account (JSON)", secret: true, multiline: true, placeholder: "{\n  \"bca\": { \"partnerServiceId\": \"...\", \"customerNo\": \"...\", \"virtualAccountNo\": \"...\" }\n}", help: "Isi hanya bank VA yang sudah aktif di DOKU. Nilai partnerServiceId/customerNo/virtualAccountNo harus mengikuti credential bank yang diberikan DOKU." },
     ],
   },
   {
@@ -337,7 +343,7 @@ export function AdminIntegrationManager({
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-bold">Mode yang dipakai toko</p>
-            <p className="mt-0.5 text-[10px] text-white/35">Pilih environment DOKU dan DigiFlazz. Aktivasi checkout/top up tetap dikelola dari menu Pembayaran.</p>
+            <p className="mt-0.5 text-[10px] text-white/35">Environment DOKU Direct API dan DigiFlazz disimpan terpisah. Aktivasi checkout/top up tetap dikelola dari menu Pembayaran.</p>
           </div>
           <Button type="button" size="sm" disabled={saving === "selections"} onClick={() => void saveSelections()} className="shrink-0 bg-[#b9ff35] text-[#091006] hover:bg-[#d8ff8d]">
             {saving === "selections" ? <LoaderCircle className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}Simpan pilihan
