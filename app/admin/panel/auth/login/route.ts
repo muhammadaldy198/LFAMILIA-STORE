@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isValidAdminId, loginAdmin, panelSessionCookie } from "@/lib/server/admin-auth";
-import { allowRequest } from "@/lib/server/security";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 const schema = z.object({
   username: z.string().trim().min(3).max(32).refine(isValidAdminId),
@@ -47,6 +47,8 @@ function loginCompleteResponse(token: string, expiresAt: string) {
 }
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
   const rate = await allowRequest(request, "owner-login", 5, 900);
   if (!rate.allowed) return backToLogin(request, "Terlalu banyak percobaan masuk. Coba lagi 15 menit.");
 
