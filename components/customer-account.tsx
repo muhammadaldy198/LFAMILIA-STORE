@@ -1,6 +1,4 @@
 "use client";
-/* eslint-disable @next/next/no-img-element */
-
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
@@ -483,7 +481,7 @@ function Dashboard({
                 settings={settings}
                 onDone={async () => {
                   setMessage(
-                    "Permintaan top up terkirim dan menunggu verifikasi Pemilik.",
+                    "Pembayaran top up berhasil dibuat. Selesaikan pembayaran agar saldo masuk otomatis.",
                   );
                   await reload();
                 }}
