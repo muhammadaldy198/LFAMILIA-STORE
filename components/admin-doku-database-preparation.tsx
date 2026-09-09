@@ -45,14 +45,6 @@ export function AdminDokuDatabasePreparation() {
   }, [load]);
 
   async function runPreparation() {
-    if (
-      !window.confirm(
-        "Jalankan persiapan DOKU? Ini akan menghapus transaksi lama sekali saja. Produk dan akun tidak dihapus.",
-      )
-    ) {
-      return;
-    }
-
     setRunning(true);
     setError("");
     setMessage("");
@@ -69,7 +61,7 @@ export function AdminDokuDatabasePreparation() {
       setMessage(
         data.alreadyCompleted
           ? "Database DOKU sebelumnya sudah dipersiapkan."
-          : "Database DOKU berhasil dipersiapkan. Proses ini tidak akan menghapus transaksi lagi.",
+          : "Database DOKU berhasil dipersiapkan tanpa menghapus transaksi, produk, atau akun.",
       );
       await load();
     } catch (reason) {
@@ -113,8 +105,8 @@ export function AdminDokuDatabasePreparation() {
             </strong>
             <p className="mt-1 text-[10px] leading-4 text-white/42">
               {completed
-                ? "Marker satu-kali sudah tersimpan. Persiapan tidak akan membersihkan transaksi lagi."
-                : "Jalankan sekali sebelum mengaktifkan DOKU. Produk dan akun tidak ikut dihapus."}
+                ? "Marker persiapan sudah tersimpan dan skema DOKU siap digunakan."
+                : "Jalankan sekali sebelum mengaktifkan DOKU. Proses ini hanya menyiapkan skema dan tidak menghapus data."}
             </p>
           </div>
         </div>
@@ -132,9 +124,9 @@ export function AdminDokuDatabasePreparation() {
       ) : null}
 
       {!completed && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-300/15 bg-red-300/[0.04] p-3 text-[9px] leading-4 text-red-100/70">
-          <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
-          Tombol ini memang membersihkan transaksi lama karena toko belum go-live. Setelah berhasil, marker mencegah pembersihan kedua kali.
+        <div className="flex items-start gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] p-3 text-[9px] leading-4 text-white/50">
+          <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-[#b9ff35]" />
+          Aman dijalankan: persiapan DOKU tidak menghapus transaksi, saldo, produk, akun, atau stok voucher.
         </div>
       )}
 
