@@ -131,29 +131,6 @@ function parsePackageTabs(value: string | null) {
   }
 }
 
-export function getFallbackProducts(): ManagedProduct[] {
-  return fallbackProducts.map((product, productIndex) => ({
-    ...product,
-    dbId: null,
-    packageTabsEnabled: false,
-    packageTabs: [],
-    isActive: true,
-    sortOrder: productIndex,
-    notices: (product.notices ?? []).map((item, noticeIndex) => ({
-      ...item,
-      id: item.id ?? null,
-      isActive: item.isActive ?? true,
-      sortOrder: item.sortOrder ?? noticeIndex,
-    })),
-    packages: product.packages.map((item, packageIndex) => ({
-      ...item,
-      dbId: null,
-      isActive: true,
-      sortOrder: packageIndex,
-    })),
-  }));
-}
-
 export async function readProducts(includeInactive = false): Promise<ManagedProduct[]> {
   await ensureLegacyDatabaseColumns();
   const db = getD1();
@@ -391,45 +368,4 @@ export async function updateProductPackageStatus(packageId: number, isActive: bo
 export async function deleteProduct(id: number) {
   const db = getD1();
   await db.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
-}
-
-export async function seedFallbackProducts() {
-  const db = getD1();
-  const source = getFallbackProducts();
-  const productStatements = source.map((item) => db.prepare(
-    `INSERT INTO products (slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label,
-     input_placeholder, needs_server, popular, instant, fulfillment_type, target_template,
-     manual_instructions, manual_open_time, manual_close_time, manual_timezone, package_tabs_enabled, package_tabs_json, is_active, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(slug) DO NOTHING`,
-  ).bind(
-    item.slug, item.name, item.publisher, item.category, item.imageUrl ?? null, item.bannerUrl ?? null, item.description ?? null, item.initials, item.accent,
-    item.inputLabel, item.inputPlaceholder, item.needsServer ? 1 : 0, item.popular ? 1 : 0,
-    item.instant ? 1 : 0, item.fulfillmentType, item.targetTemplate, item.manualInstructions ?? null,
-    item.manualOpenTime ?? null, item.manualCloseTime ?? null, item.manualTimezone ?? "Asia/Jakarta", 0, "[]", 1, item.sortOrder,
-  ));
-  await db.batch(productStatements);
-
-  const idRows = await db.prepare("SELECT id, slug FROM products").all<{ id: number; slug: string }>();
-  const idBySlug = new Map(idRows.results.map((row) => [row.slug, row.id]));
-  await db.batch(source.flatMap((item) => {
-    const productId = idBySlug.get(item.slug);
-    return productId
-      ? [db.prepare("UPDATE products SET input_fields_json = COALESCE(input_fields_json, ?) WHERE id = ?").bind(JSON.stringify(item.inputFields ?? []), productId)]
-      : [];
-  }));
-
-  const packageStatements = source.flatMap((product) => product.packages.map((item, index) => db.prepare(
-    `INSERT INTO product_packages (product_id, sku, label, price, note, package_group, provider_code, provider_sku, is_active, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(sku) DO NOTHING`,
-  ).bind(idBySlug.get(product.slug), item.id, item.label, item.price, item.note ?? null, null, item.providerCode ?? null, item.providerSku ?? null, 1, index)));
-  await db.batch(packageStatements);
-  const noticeCounts = await db.prepare("SELECT product_id, COUNT(*) AS count FROM product_notices GROUP BY product_id").all<{ product_id: number; count: number }>();
-  const productsWithNotices = new Set(noticeCounts.results.filter((row) => row.count > 0).map((row) => row.product_id));
-  const noticeStatements = source.filter((product) => !productsWithNotices.has(idBySlug.get(product.slug)!)).flatMap((product) => product.notices.map((item, index) => db.prepare(
-    `INSERT INTO product_notices (product_id, title, body, is_active, sort_order) VALUES (?, ?, ?, ?, ?)`,
-  ).bind(idBySlug.get(product.slug), item.title, item.body, item.isActive ? 1 : 0, index)));
-  if (noticeStatements.length) await db.batch(noticeStatements);
-  return source.length;
 }
