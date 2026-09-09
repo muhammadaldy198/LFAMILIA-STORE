@@ -99,6 +99,16 @@ test("requested catalog repopulation is permanently gated after its first succes
   assert.doesNotMatch(products, /DELETE FROM one_time_operations/);
 });
 
+test("Staff content edits preserve the existing product description", () => {
+  const products = read("lib/server/products.ts");
+  const section = products.slice(
+    products.indexOf("export async function saveProductContent"),
+    products.indexOf("export async function updateProductPackageProvider"),
+  );
+  assert.doesNotMatch(section, /description = \?/);
+  assert.doesNotMatch(section, /input\.description/);
+});
+
 test("panel credential rows never appear as real customers or members", () => {
   const members = read("lib/server/member-tiers.ts");
   const summary = read("app/api/admin/summary/route.ts");
