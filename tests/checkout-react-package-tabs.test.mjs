@@ -14,7 +14,7 @@ test("checkout waits for D1 catalog before mounting a product form", () => {
   assert.match(checkout, /Checkout dinonaktifkan agar harga lama tidak digunakan/);
 });
 
-test("package tabs are rendered from React state instead of DOM mutation", () => {
+test("package sections are rendered from React state instead of DOM mutation", () => {
   const checkout = read("app/checkout/page.tsx");
   const layout = read("app/checkout/layout.tsx");
   const types = read("lib/store-data.ts");
@@ -23,9 +23,10 @@ test("package tabs are rendered from React state instead of DOM mutation", () =>
   assert.match(types, /packageTabsEnabled\?: boolean/);
   assert.match(types, /packageTabs\?: string\[\]/);
   assert.match(checkout, /const packageGroups = useMemo/);
-  assert.match(checkout, /const visiblePackages =/);
-  assert.match(checkout, /packageGroups\.map\(\(group\)/);
-  assert.match(checkout, /visiblePackages\.map\(\(item\)/);
+  assert.match(checkout, /const packageSections =/);
+  assert.match(checkout, /packageSections\.map\(\(section\)/);
+  assert.match(checkout, /section\.packages\.map\(\(item\)/);
+  assert.match(types, /imageUrl\?: string/);
   assert.doesNotMatch(layout, /CheckoutPackageTabs/);
   assert.equal(
     fs.existsSync(path.join(root, "components/checkout-package-tabs.tsx")),
