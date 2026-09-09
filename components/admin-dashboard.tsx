@@ -1,8 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
@@ -19,7 +18,6 @@ import {
   PackageSearch,
   Search,
   Settings,
-  ShoppingBag,
   Sparkles,
   Users,
   X,
@@ -106,7 +104,7 @@ export function AdminDashboard({
     setMenuOpen(false);
   }
 
-  function submitGlobalSearch(event: React.FormEvent) {
+  function submitGlobalSearch(event: FormEvent) {
     event.preventDefault();
     const query = globalSearch.trim().toLowerCase();
     if (!query) return;
