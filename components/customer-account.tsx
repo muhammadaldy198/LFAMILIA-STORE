@@ -84,18 +84,28 @@ export function CustomerAccount({
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    const [accountResponse, walletResponse] = await Promise.all([
-      fetch("/api/account", { cache: "no-store" }),
-      fetch("/api/wallet", { cache: "no-store" }),
-    ]);
-    const walletData = (await walletResponse.json()) as {
-      settings?: WalletSettings;
-    };
-    setSettings(walletData.settings ?? null);
-    if (accountResponse.ok)
-      setAccount((await accountResponse.json()) as AccountData);
-    else setAccount(null);
-    setLoading(false);
+    setLoading(true);
+    try {
+      const [accountResponse, walletResponse] = await Promise.all([
+        fetch("/api/account", { cache: "no-store" }),
+        fetch("/api/wallet", { cache: "no-store" }),
+      ]);
+      const walletData = await walletResponse.json().catch(() => ({})) as {
+        settings?: WalletSettings;
+      };
+      setSettings(walletData.settings ?? null);
+      if (accountResponse.ok) {
+        const accountData = await accountResponse.json().catch(() => null) as AccountData | null;
+        setAccount(accountData);
+      } else {
+        setAccount(null);
+      }
+    } catch {
+      setAccount(null);
+      setSettings(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
