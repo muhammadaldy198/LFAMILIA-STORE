@@ -1,6 +1,7 @@
 import { getD1 } from "@/db";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { defaultStorefrontSettings, faqs as fallbackFaqs, type StorefrontSettings } from "@/lib/store-data";
+import { safeNavigationUrl } from "@/lib/navigation-url";
 
 type SettingsRow = {
   store_name: string;
@@ -59,7 +60,7 @@ export async function readStorefrontSettings(): Promise<StorefrontSettings> {
       bannerDescription: row.banner_description,
       bannerImageUrl: row.banner_image_url ?? defaultStorefrontSettings.bannerImageUrl,
       bannerCtaLabel: row.banner_cta_label,
-      bannerCtaHref: row.banner_cta_href,
+      bannerCtaHref: safeNavigationUrl(row.banner_cta_href, "/catalog"),
       supportWhatsapp: row.support_whatsapp ?? undefined,
       supportEmail: row.support_email ?? undefined,
       instagramUrl: row.instagram_url ?? undefined,
