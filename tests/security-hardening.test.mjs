@@ -120,4 +120,6 @@ test("managed storefront links reject javascript and protocol-relative URLs", ()
   assert.match(storefrontRoute, /isAllowedNavigationUrl/);
   assert.match(contentServer, /safeNavigationUrl/);
   assert.match(storefrontServer, /safeNavigationUrl/);
+  assert.match(storefrontRoute, /isAllowedHttpUrl/);
+  assert.match(storefrontServer, /safeHttpUrl/);
 });
