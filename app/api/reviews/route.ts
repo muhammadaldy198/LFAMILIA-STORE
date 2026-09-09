@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(productSlug)) return Response.json({ error: "Produk tidak valid." }, { status: 400 });
   const customer = await getCustomerSession(request);
   const reviews = await listProductReviews(productSlug);
-  return Response.json({ reviews, customer });
+  return Response.json({ reviews, customer }, { headers: { "Cache-Control": "no-store" } });
 }
 
 const schema = z.object({
