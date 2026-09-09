@@ -29,15 +29,16 @@ test("checkout only accepts products and packages that exist in D1", () => {
   assert.match(resolveSection, /return null;/);
 });
 
-test("hardcoded products remain available only for explicit admin seed", () => {
+test("catalog data can only be managed through normal product CRUD", () => {
   const products = read("lib/server/products.ts");
-  const seedRoute = read("app/api/admin/products/seed/route.ts");
+  const panelRoute = read("app/api/panel/[...path]/route.ts");
+  const manager = read("components/admin-product-manager.tsx");
 
-  assert.match(products, /export function getFallbackProducts/);
-  assert.match(products, /export async function seedFallbackProducts/);
-  assert.match(seedRoute, /seedFallbackProducts\(/);
+  assert.doesNotMatch(products, /seedFallbackProducts|getFallbackProducts/);
+  assert.doesNotMatch(panelRoute, /products\/seed|productSeed/);
+  assert.doesNotMatch(manager, /products\/seed|Lengkapi katalog utama|seedProducts/);
+  assert.equal(fs.existsSync(path.join(root, "app/api/admin/products/seed/route.ts")), false);
 });
-
 
 test("unconfigured automatic products stay automatic and checkout blocks them instead of pretending they are manual", () => {
   const hook = read("hooks/use-store-products.ts");
