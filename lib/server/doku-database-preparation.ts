@@ -9,10 +9,22 @@ const requiredColumns: Array<[table: string, column: string, definition: string]
   ["wallet_topups", "doku_token_id", "doku_token_id TEXT"],
   ["wallet_topups", "doku_payment_url", "doku_payment_url TEXT"],
   ["wallet_topups", "doku_expired_at", "doku_expired_at TEXT"],
+  ["wallet_topups", "doku_reference_no", "doku_reference_no TEXT"],
+  ["wallet_topups", "doku_payment_no", "doku_payment_no TEXT"],
+  ["wallet_topups", "doku_qr_content", "doku_qr_content TEXT"],
+  ["wallet_topups", "doku_payment_name", "doku_payment_name TEXT"],
+  ["wallet_topups", "doku_status_checked_at", "doku_status_checked_at TEXT"],
+  ["wallet_topups", "payment_fee", "payment_fee INTEGER DEFAULT 0 NOT NULL"],
+  ["wallet_topups", "payment_total", "payment_total INTEGER DEFAULT 0 NOT NULL"],
   ["orders", "doku_request_id", "doku_request_id TEXT"],
   ["orders", "doku_token_id", "doku_token_id TEXT"],
   ["orders", "doku_payment_url", "doku_payment_url TEXT"],
   ["orders", "doku_expired_at", "doku_expired_at TEXT"],
+  ["orders", "doku_reference_no", "doku_reference_no TEXT"],
+  ["orders", "doku_payment_no", "doku_payment_no TEXT"],
+  ["orders", "doku_qr_content", "doku_qr_content TEXT"],
+  ["orders", "doku_payment_name", "doku_payment_name TEXT"],
+  ["orders", "doku_status_checked_at", "doku_status_checked_at TEXT"],
 ];
 
 async function ensureMarkerTable() {
