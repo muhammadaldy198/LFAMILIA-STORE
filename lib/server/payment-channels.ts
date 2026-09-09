@@ -15,7 +15,7 @@ const fallback: ManagedPaymentChannel[] = paymentChannels.map((item, index) => (
   ...item,
   id: null,
   imageUrl: undefined,
-  isActive: true,
+  isActive: false,
   sortOrder: index,
 }));
 
@@ -105,7 +105,8 @@ export async function syncPaymentChannelsForGateways(
     db.prepare(`INSERT INTO payment_channels (method, channel, name, description, image_url, is_active, sort_order)
       VALUES (?, ?, ?, ?, NULL, ?, ?)
       ON CONFLICT(method, channel) DO UPDATE SET
-        is_active = excluded.is_active,
+        name = excluded.name,
+        description = excluded.description,
         sort_order = excluded.sort_order,
         updated_at = CURRENT_TIMESTAMP`)
       .bind(
@@ -113,7 +114,7 @@ export async function syncPaymentChannelsForGateways(
         item.channel,
         item.name,
         item.description,
-        supportedKeys.has(`${item.method}:${item.channel}`) ? 1 : 0,
+        0,
         index,
       ),
   ));
@@ -122,6 +123,7 @@ export async function syncPaymentChannelsForGateways(
     gateways: ["doku"] as PaymentGatewayName[],
     mode: "checkout" as const,
     synced: supported.length,
+    activationPolicy: "manual" as const,
     channels: await listPaymentChannels(true),
   };
 }
