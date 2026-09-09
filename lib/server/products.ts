@@ -69,6 +69,7 @@ type PackageRow = {
   price: number;
   note: string | null;
   package_group: string | null;
+  image_url: string | null;
   provider_code: string | null;
   provider_sku: string | null;
   supplier_price: number | null;
@@ -187,10 +188,10 @@ async function applyOneTimeCatalogRepopulation() {
       statements.push(
         db.prepare(
           `INSERT OR IGNORE INTO product_packages (
-            product_id, sku, label, price, note, package_group, provider_code, provider_sku,
+            product_id, sku, label, price, note, package_group, image_url, provider_code, provider_sku,
             supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
           )
-          SELECT id, ?, ?, ?, ?, ?, ?, ?, NULL, 'manual', 'fixed', 0, 1, ?
+          SELECT id, ?, ?, ?, ?, ?, NULL, ?, ?, NULL, 'manual', 'fixed', 0, 1, ?
           FROM products WHERE slug = ?`,
         ).bind(
           item.id,
@@ -255,9 +256,9 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
         manual_open_time, manual_close_time, manual_timezone, package_tabs_enabled, package_tabs_json, is_active, sort_order
        FROM products WHERE is_active = 1 ORDER BY sort_order ASC, name ASC`;
   const packageSql = includeInactive
-    ? `SELECT id, product_id, sku, label, price, note, package_group, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
+    ? `SELECT id, product_id, sku, label, price, note, package_group, image_url, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
        FROM product_packages ORDER BY sort_order ASC, id ASC`
-    : `SELECT id, product_id, sku, label, price, note, package_group, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
+    : `SELECT id, product_id, sku, label, price, note, package_group, image_url, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
        FROM product_packages WHERE is_active = 1 ORDER BY sort_order ASC, id ASC`;
   const noticeSql = includeInactive
     ? `SELECT id, product_id, title, body, is_active, sort_order FROM product_notices ORDER BY sort_order ASC, id ASC`
@@ -314,6 +315,7 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
       price: item.price,
       note: item.note ?? undefined,
       group: item.package_group ?? undefined,
+      imageUrl: item.image_url ?? undefined,
       providerCode: item.provider_code ?? undefined,
       providerSku: item.provider_sku ?? undefined,
       supplierPrice: item.supplier_price,
@@ -388,9 +390,9 @@ export async function saveProduct(input: ProductWrite, id?: number) {
   const packageStatements = [
     db.prepare("DELETE FROM product_packages WHERE product_id = ?").bind(productRow.id),
     ...input.packages.map((item, index) => db.prepare(
-      `INSERT INTO product_packages (product_id, sku, label, price, note, package_group, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(productRow.id, item.id, item.label, item.price, item.note ?? null, item.group?.trim() || null, item.providerCode ?? null, item.providerSku ?? null, item.supplierPrice ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index)),
+      `INSERT INTO product_packages (product_id, sku, label, price, note, package_group, image_url, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(productRow.id, item.id, item.label, item.price, item.note ?? null, item.group?.trim() || null, item.imageUrl ?? null, item.providerCode ?? null, item.providerSku ?? null, item.supplierPrice ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index)),
   ];
   await db.batch(packageStatements);
   const noticeStatements = [
