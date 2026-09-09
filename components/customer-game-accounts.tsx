@@ -38,7 +38,7 @@ export function CustomerGameAccounts() {
     setLoading(true);
     try {
       const response = await fetch("/api/account/game-accounts", { cache: "no-store" });
-      const data = await response.json() as { accounts?: SavedAccount[]; error?: string };
+      const data = await readJson(response) as { accounts?: SavedAccount[]; error?: string };
       if (!response.ok) throw new Error(data.error || "Akun game gagal dimuat.");
       setItems(data.accounts ?? []);
     } catch (reason) {
@@ -82,7 +82,7 @@ export function CustomerGameAccounts() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await response.json() as { error?: string };
+      const data = await readJson(response) as { error?: string };
       if (!response.ok) throw new Error(data.error || "Akun game gagal disimpan.");
       setMessage(editingId ? "Akun game diperbarui." : "Akun game tersimpan.");
       reset();
@@ -134,4 +134,12 @@ export function CustomerGameAccounts() {
       </div>)}</div>}
     </section>
   </div>;
+}
+
+
+async function readJson(response: Response): Promise<Record<string, unknown>> {
+  const raw = await response.text();
+  if (!raw) return { error: "Respons server kosong." };
+  try { return JSON.parse(raw) as Record<string, unknown>; }
+  catch { return { error: "Respons server tidak valid." }; }
 }
