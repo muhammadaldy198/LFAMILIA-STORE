@@ -131,8 +131,119 @@ function parsePackageTabs(value: string | null) {
   }
 }
 
+const oneTimeCatalogRepopulationKey = "catalog_repopulation_2026_09_09";
+
+async function applyOneTimeCatalogRepopulation() {
+  const db = getD1();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS one_time_operations (
+    operation_key TEXT PRIMARY KEY NOT NULL,
+    completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`).run();
+
+  const completed = await db.prepare(
+    "SELECT completed_at FROM one_time_operations WHERE operation_key = ? LIMIT 1",
+  ).bind(oneTimeCatalogRepopulationKey).first<{ completed_at: string }>();
+  if (completed?.completed_at) return;
+
+  const statements: D1PreparedStatement[] = [];
+  for (const [productIndex, product] of bundledProducts.entries()) {
+    statements.push(
+      db.prepare(
+        `INSERT OR IGNORE INTO products (
+          slug, name, publisher, category, image_url, banner_url, description, initials, accent,
+          input_label, input_placeholder, input_fields_json, needs_server, popular, instant,
+          fulfillment_type, target_template, manual_instructions, manual_open_time, manual_close_time,
+          manual_timezone, package_tabs_enabled, package_tabs_json, is_active, sort_order
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+      ).bind(
+        product.slug,
+        product.name,
+        product.publisher,
+        product.category,
+        product.imageUrl ?? null,
+        product.bannerUrl ?? null,
+        null,
+        product.initials,
+        product.accent,
+        product.inputLabel,
+        product.inputPlaceholder,
+        JSON.stringify(product.inputFields ?? []),
+        product.needsServer ? 1 : 0,
+        product.popular ? 1 : 0,
+        product.instant ? 1 : 0,
+        product.fulfillmentType,
+        product.targetTemplate,
+        product.manualInstructions ?? null,
+        product.manualOpenTime ?? null,
+        product.manualCloseTime ?? null,
+        product.manualTimezone ?? "Asia/Jakarta",
+        product.packageTabsEnabled ? 1 : 0,
+        JSON.stringify(product.packageTabs ?? []),
+        productIndex,
+      ),
+    );
+
+    for (const [packageIndex, item] of product.packages.entries()) {
+      statements.push(
+        db.prepare(
+          `INSERT OR IGNORE INTO product_packages (
+            product_id, sku, label, price, note, package_group, provider_code, provider_sku,
+            supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
+          )
+          SELECT id, ?, ?, ?, ?, ?, ?, ?, NULL, 'manual', 'fixed', 0, 1, ?
+          FROM products WHERE slug = ?`,
+        ).bind(
+          item.id,
+          item.label,
+          item.price,
+          item.note ?? null,
+          item.group?.trim() || null,
+          item.providerCode ?? null,
+          item.providerSku ?? null,
+          packageIndex,
+          product.slug,
+        ),
+      );
+    }
+
+    for (const [noticeIndex, notice] of (product.notices ?? []).entries()) {
+      statements.push(
+        db.prepare(
+          `INSERT INTO product_notices (product_id, title, body, is_active, sort_order)
+           SELECT p.id, ?, ?, ?, ?
+           FROM products p
+           WHERE p.slug = ?
+             AND NOT EXISTS (
+               SELECT 1 FROM product_notices n
+               WHERE n.product_id = p.id AND n.title = ? AND n.body = ?
+             )`,
+        ).bind(
+          notice.title,
+          notice.body,
+          notice.isActive === false ? 0 : 1,
+          notice.sortOrder ?? noticeIndex,
+          product.slug,
+          notice.title,
+          notice.body,
+        ),
+      );
+    }
+  }
+
+  for (let index = 0; index < statements.length; index += 40) {
+    await db.batch(statements.slice(index, index + 40));
+  }
+
+  await db.prepare(
+    `INSERT INTO one_time_operations (operation_key, completed_at)
+     VALUES (?, CURRENT_TIMESTAMP)
+     ON CONFLICT(operation_key) DO UPDATE SET completed_at = excluded.completed_at`,
+  ).bind(oneTimeCatalogRepopulationKey).run();
+}
+
 export async function readProducts(includeInactive = false): Promise<ManagedProduct[]> {
   await ensureLegacyDatabaseColumns();
+  await applyOneTimeCatalogRepopulation();
   const db = getD1();
   const productSql = includeInactive
     ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json,
