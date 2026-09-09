@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 const root = process.cwd();
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const pricing = fs.readFileSync(path.join(root, "lib/server/digiflazz-pricing.ts"), "utf8");
 const manager = fs.readFileSync(path.join(root, "components/admin-product-manager.tsx"), "utf8");
 
