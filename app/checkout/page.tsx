@@ -231,7 +231,6 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       ? requestedPackage
       : "",
   );
-  const [packageGroupChoice, setPackageGroupChoice] = useState("");
   const [customerInputValues, setCustomerInputValues] = useState<Record<string, string>>({});
   const [buyerName, setBuyerName] = useState("");
   const [buyerEmail, setBuyerEmail] = useState("");
@@ -276,20 +275,12 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       ...assigned.filter((item) => !configured.includes(item)),
     ];
   }, [product.packageTabs, product.packageTabsEnabled, product.packages]);
-  const selectedPackageGroup = selectedPackage
-    ? packageGroupName(selectedPackage.group)
-    : "";
-  const activePackageGroup = packageGroups.includes(packageGroupChoice)
-    ? packageGroupChoice
-    : packageGroups.includes(selectedPackageGroup)
-      ? selectedPackageGroup
-      : packageGroups[0] ?? "";
-  const visiblePackages =
-    packageGroups.length > 1
-      ? product.packages.filter(
-          (item) => packageGroupName(item.group) === activePackageGroup,
-        )
-      : product.packages;
+  const packageSections = packageGroups.length
+    ? packageGroups.map((group) => ({
+        name: group,
+        packages: product.packages.filter((item) => packageGroupName(item.group) === group),
+      }))
+    : [{ name: "", packages: product.packages }];
   const productInputFields = useMemo(
     () => product.inputFields ?? [
       { id: "account-id", label: product.inputLabel, placeholder: product.inputPlaceholder, required: true },
@@ -609,20 +600,6 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     );
     setPayment(null);
     setError("");
-  }
-
-  function choosePackageGroup(group: string) {
-    setPackageGroupChoice(group);
-    if (
-      selectedPackage &&
-      packageGroupName(selectedPackage.group) === group
-    ) {
-      return;
-    }
-    const firstPackage = product.packages.find(
-      (item) => packageGroupName(item.group) === group,
-    );
-    if (firstPackage) choosePackage(firstPackage.id);
   }
 
   function closeNotice() {
@@ -947,45 +924,43 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                         : "Pesanan diteruskan otomatis ke provider."
                   }
                 />
-                {packageGroups.length > 1 && (
-                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                    {packageGroups.map((group) => (
-                      <button
-                        key={group}
-                        type="button"
-                        onClick={() => choosePackageGroup(group)}
-                        className={
-                          group === activePackageGroup
-                            ? "shrink-0 rounded-lg border border-[#bca17d] bg-[#bca17d] px-3 py-2 text-[10px] font-black text-white"
-                            : "shrink-0 rounded-lg border border-white/[0.10] bg-white/[0.035] px-3 py-2 text-[10px] font-bold text-white/55 transition hover:border-white/20 hover:text-white"
-                        }
-                      >
-                        {group}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className={`${packageGroups.length > 1 ? "mt-2" : "mt-3"} grid grid-cols-2 gap-2 sm:grid-cols-3`}>
-                  {visiblePackages.map((item) => {
-                    const ready = isManual || Boolean(item.providerCode && item.providerSku);
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => choosePackage(item.id)}
-                        className={`relative min-h-[72px] rounded-lg border px-3 py-2.5 text-left transition ${packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.18)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <strong className="min-w-0 flex-1 text-[11px] leading-4 sm:text-xs">{item.label}</strong>
-                          {item.note && (
-                            <span className="shrink-0 rounded bg-[#b9ff35] px-1.5 py-0.5 text-[7px] font-black uppercase text-[#091006]">{item.note}</span>
-                          )}
+                <div className="mt-3 space-y-5">
+                  {packageSections.map((section) => (
+                    <div key={section.name || "all"}>
+                      {section.name && (
+                        <div className="mb-2 flex items-center gap-2">
+                          <h3 className="text-sm font-black text-white">{section.name}</h3>
+                          <span className="h-px min-w-0 flex-1 bg-white/[0.08]" />
                         </div>
-                        <span className="mt-1.5 block text-[10px] font-black text-[#cfff72] sm:text-[11px]">{formatRupiah(item.price)}</span>
-                        {!ready && <span className="mt-1 block text-[8px] font-semibold text-amber-300/70">SKU belum diatur</span>}
-                      </button>
-                    );
-                  })}
+                      )}
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {section.packages.map((item) => {
+                          const ready = isManual || Boolean(item.providerCode && item.providerSku);
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => choosePackage(item.id)}
+                              className={`relative min-h-[86px] overflow-hidden rounded-lg border px-3 py-2.5 text-left transition ${packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.18)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <strong className="block text-[11px] leading-4 sm:text-xs">{item.label}</strong>
+                                  {item.note && <span className="mt-1 inline-flex rounded bg-[#b9ff35] px-1.5 py-0.5 text-[7px] font-black uppercase text-[#091006]">{item.note}</span>}
+                                </div>
+                                {item.imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={item.imageUrl} alt="" className="size-10 shrink-0 object-contain sm:size-12" />
+                                ) : null}
+                              </div>
+                              <span className="mt-2 block text-[10px] font-black text-[#cfff72] sm:text-[11px]">{formatRupiah(item.price)}</span>
+                              {!ready && <span className="mt-1 block text-[8px] font-semibold text-amber-300/70">SKU belum diatur</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </section>
 
