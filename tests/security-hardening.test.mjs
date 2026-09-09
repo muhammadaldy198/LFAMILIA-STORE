@@ -77,6 +77,7 @@ test("authenticated customer data is explicitly non-cacheable", () => {
     "app/api/account/membership/route.ts",
     "app/api/account/support/route.ts",
     "app/api/account/game-accounts/route.ts",
+    "app/api/reviews/route.ts",
   ]) {
     assert.match(read(file), /"Cache-Control": "no-store"/, file);
   }
