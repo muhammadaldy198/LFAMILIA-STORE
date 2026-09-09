@@ -1,5 +1,8 @@
 import { getD1 } from "@/db";
 import { requireAdminSession } from "@/lib/server/admin";
+import { getDokuReadiness } from "@/lib/server/doku";
+import { getDigiflazzReadiness } from "@/lib/server/providers/digiflazz";
+import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +140,64 @@ export async function GET(request: Request) {
       });
     }
 
+    const doku = getDokuReadiness();
+    const digiflazz = getDigiflazzReadiness();
+    let publicBaseUrl = "";
+    try {
+      publicBaseUrl = getPublicBaseUrl();
+    } catch {
+      publicBaseUrl = "";
+    }
+
+    let digiflazzIssues = 0;
+    let lastDigiflazzSync: string | null = null;
+    let recentActivities: Array<{
+      id: string;
+      adminName: string;
+      adminRole: string;
+      action: string;
+      target: string;
+      createdAt: string;
+    }> = [];
+    try {
+      const monitor = await db.prepare(
+        "SELECT COUNT(*) AS count FROM digiflazz_seller_monitor WHERE health IN ('warning', 'critical')",
+      ).first<{ count?: number }>();
+      digiflazzIssues = Number(monitor?.count || 0);
+    } catch {
+      digiflazzIssues = 0;
+    }
+    try {
+      const synced = await db.prepare(
+        "SELECT MAX(supplier_synced_at) AS synced_at FROM product_packages WHERE provider_code = 'digiflazz'",
+      ).first<{ synced_at?: string | null }>();
+      lastDigiflazzSync = synced?.synced_at || null;
+    } catch {
+      lastDigiflazzSync = null;
+    }
+    try {
+      const activities = await db.prepare(
+        "SELECT id, admin_name, admin_role, action, target, created_at FROM admin_activity_logs ORDER BY created_at DESC LIMIT 8",
+      ).all<{
+        id: string;
+        admin_name: string;
+        admin_role: string;
+        action: string;
+        target: string;
+        created_at: string;
+      }>();
+      recentActivities = activities.results.map((item) => ({
+        id: item.id,
+        adminName: item.admin_name,
+        adminRole: item.admin_role,
+        action: item.action,
+        target: item.target,
+        createdAt: item.created_at,
+      }));
+    } catch {
+      recentActivities = [];
+    }
+
     return Response.json(
       {
         range,
@@ -193,6 +254,25 @@ export async function GET(request: Request) {
           };
         }),
         topCustomers: canViewFinance ? topCustomers : [],
+        integrations: {
+          doku: {
+            ready: doku.ready,
+            environment: doku.environment,
+            reason: doku.reason,
+          },
+          digiflazz: {
+            ready: digiflazz.ready,
+            environment: digiflazz.environment,
+            reason: digiflazz.reason,
+            issues: digiflazzIssues,
+            lastSyncAt: lastDigiflazzSync,
+          },
+          webhook: {
+            ready: Boolean(publicBaseUrl),
+            baseUrl: publicBaseUrl || null,
+          },
+        },
+        recentActivities,
         recentOrders: common[8].results.map((row) => {
           const item = row as {
             id?: string;
