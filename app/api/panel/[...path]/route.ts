@@ -76,7 +76,15 @@ async function dispatch(request: Request, context: RouteContext, method: Method)
     const admin = await getAdminSession(request);
     if (admin) await recordAdminActivity(admin, method, path.join("/"));
   }
-  return response;
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  headers.set("CDN-Cache-Control", "no-store");
+  headers.set("Cloudflare-CDN-Cache-Control", "no-store");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 export function GET(request: Request, context: RouteContext) { return dispatch(request, context, "GET"); }
