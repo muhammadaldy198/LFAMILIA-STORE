@@ -10,12 +10,14 @@ import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
 import { quotePromotion } from "@/lib/server/promotions";
 import {
   createOrderIdentity,
+  getExternalOrderByCheckoutKey,
   insertPendingOrder,
   markPaymentCreationFailed,
   normalizeCustomerInputs,
   recordOrderEvent,
   resolvePurchasableItem,
   updateDokuPayment,
+  type OrderRecord,
 } from "@/lib/server/orders";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
@@ -41,6 +43,7 @@ const routingSchema = z.object({
   paymentMethod: z.enum(["va", "ewallet", "qris"]),
   paymentChannel: z.string().trim().min(2).max(30),
   voucherCode: z.string().trim().max(40).optional(),
+  idempotencyKey: z.string().uuid(),
 });
 
 function publicInvoice(referenceId: string) {
@@ -48,6 +51,44 @@ function publicInvoice(referenceId: string) {
   if (!clean.includes("-")) return clean;
   const token = clean.split("-").at(-1) ?? clean.replace(/^LF/, "");
   return `LF${token}`;
+}
+
+
+function existingExternalResponse(order: OrderRecord) {
+  if (["failed", "expired"].includes(order.payment_status)) {
+    return Response.json(
+      { error: "Percobaan pembayaran sebelumnya sudah gagal atau kedaluwarsa. Buat pembayaran baru.", retryable: false },
+      { status: 409 },
+    );
+  }
+  if (!order.doku_request_id) {
+    return Response.json(
+      { error: "Invoice sedang dibuat. Coba lagi dengan data yang sama.", retryable: true },
+      { status: 409 },
+    );
+  }
+  return Response.json({
+    orderId: order.id,
+    referenceId: order.reference_id,
+    publicInvoice: publicInvoice(order.reference_id),
+    fulfillmentType: order.fulfillment_type,
+    providerCode: order.provider_code,
+    basePrice: order.base_subtotal,
+    sellingPrice: order.subtotal,
+    discountAmount: order.discount_amount,
+    voucherCode: order.voucher_code,
+    flashSaleId: order.flash_sale_id,
+    paymentMethod: order.payment_method,
+    paymentGateway: "doku",
+    paymentNo: order.doku_payment_no,
+    qrContent: order.doku_qr_content,
+    paymentName: order.doku_payment_name,
+    paymentUrl: order.doku_payment_url,
+    fee: order.admin_fee,
+    total: order.total,
+    expiredAt: order.doku_expired_at,
+    paymentStatus: order.payment_status,
+  });
 }
 
 export async function POST(request: Request) {
@@ -62,8 +103,12 @@ export async function POST(request: Request) {
   }
 
   let referenceId: string | null = null;
+  let checkoutKey: string | null = null;
   try {
     const input = routingSchema.parse(await request.json());
+    checkoutKey = input.idempotencyKey;
+    const priorOrder = await getExternalOrderByCheckoutKey(input.idempotencyKey);
+    if (priorOrder) return existingExternalResponse(priorOrder);
     const paymentChannel =
       input.paymentMethod === "qris" && input.paymentChannel === "qris"
         ? "mpm"
@@ -142,6 +187,7 @@ export async function POST(request: Request) {
       paymentMethod: input.paymentMethod,
       paymentChannel,
       customerId: customer?.id ?? null,
+      externalCheckoutKey: input.idempotencyKey,
       promotion,
     });
 
@@ -212,6 +258,15 @@ export async function POST(request: Request) {
         : error instanceof Error
           ? error.message
           : "Pembayaran gagal dibuat.";
+
+    if (
+      checkoutKey &&
+      error instanceof Error &&
+      /UNIQUE constraint failed.*external_checkout_key/i.test(error.message)
+    ) {
+      const priorOrder = await getExternalOrderByCheckoutKey(checkoutKey);
+      if (priorOrder) return existingExternalResponse(priorOrder);
+    }
 
     if (referenceId) {
       await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
