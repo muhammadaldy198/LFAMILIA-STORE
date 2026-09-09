@@ -41,7 +41,8 @@ export function AdminDigiflazzMonitor() {
   const [error, setError] = useState("");
 
   const load = useCallback(async (refresh = false) => {
-    refresh ? setRefreshing(true) : setLoading(true);
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
     setError("");
     try {
       const response = await fetch("/api/panel/digiflazz-monitor", { method: refresh ? "POST" : "GET", cache: "no-store" });
@@ -56,7 +57,10 @@ export function AdminDigiflazzMonitor() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
