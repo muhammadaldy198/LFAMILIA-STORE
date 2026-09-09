@@ -56,6 +56,23 @@ function runtimeConfig() {
   return { environment, username, apiKey, apiUrl };
 }
 
+export function getDigiflazzReadiness() {
+  try {
+    const config = runtimeConfig();
+    return {
+      ready: true as const,
+      environment: config.environment,
+      reason: null,
+    };
+  } catch (error) {
+    return {
+      ready: false as const,
+      environment: null,
+      reason: error instanceof Error ? error.message : "Konfigurasi DigiFlazz belum lengkap.",
+    };
+  }
+}
+
 function mapStatus(value?: string): ProviderResult["status"] {
   const status = value?.toLowerCase();
   if (status === "sukses") return "success";
