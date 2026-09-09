@@ -39,13 +39,14 @@ export function TurnstileWidget({
   }, []);
 
   useEffect(() => {
-    if (!siteKey || !containerRef.current) return;
+    const container = containerRef.current;
+    if (!siteKey || !container) return;
     let disposed = false;
     let widgetId: string | null = null;
 
     const render = () => {
-      if (disposed || widgetId || !window.turnstile || !containerRef.current) return;
-      widgetId = window.turnstile.render(containerRef.current, {
+      if (disposed || widgetId || !window.turnstile) return;
+      widgetId = window.turnstile.render(container, {
         sitekey: siteKey,
         theme: "dark",
         size: "normal",
@@ -71,7 +72,7 @@ export function TurnstileWidget({
     return () => {
       disposed = true;
       if (widgetId && window.turnstile) window.turnstile.remove(widgetId);
-      if (containerRef.current) containerRef.current.replaceChildren();
+      container.replaceChildren();
     };
   }, [siteKey, onToken]);
 
