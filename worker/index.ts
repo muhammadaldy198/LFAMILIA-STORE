@@ -182,7 +182,9 @@ const worker = {
       url.pathname === "/admin" ||
       url.pathname.startsWith("/admin/");
 
-    if (request.method === "GET" && isPanelPage) {
+    const isSensitiveAdminApi =
+      url.pathname === "/api/admin" || url.pathname.startsWith("/api/admin/");
+    if ((request.method === "GET" && isPanelPage) || isSensitiveAdminApi) {
       const headers = new Headers(response.headers);
       headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
       headers.set("CDN-Cache-Control", "no-store");
