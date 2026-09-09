@@ -34,6 +34,15 @@ interface ExecutionContext {
 
 interface ScheduledEvent { cron: string; }
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function withSecurityHeaders(response: Response, url: URL) {
   const headers = new Headers(response.headers);
   headers.set("X-Content-Type-Options", "nosniff");
@@ -130,9 +139,9 @@ const worker = {
           "receivedIssuer" in diagnostic ? diagnostic.receivedIssuer : "";
 
         const details = expectedAudience
-          ? `<p style="font-size:11px;color:#ffffff66;word-break:break-all">AUD Worker: ${expectedAudience}<br>AUD Token: ${receivedAudience}</p>`
+          ? `<p style="font-size:11px;color:#ffffff66;word-break:break-all">AUD Worker: ${escapeHtml(expectedAudience)}<br>AUD Token: ${escapeHtml(receivedAudience)}</p>`
           : expectedIssuer
-            ? `<p style="font-size:11px;color:#ffffff66;word-break:break-all">TEAM_DOMAIN: ${expectedIssuer}<br>Issuer Token: ${receivedIssuer}</p>`
+            ? `<p style="font-size:11px;color:#ffffff66;word-break:break-all">TEAM_DOMAIN: ${escapeHtml(expectedIssuer)}<br>Issuer Token: ${escapeHtml(receivedIssuer)}</p>`
             : "";
 
         return withSecurityHeaders(new Response(
