@@ -16,6 +16,7 @@ export type ManagedPackage = ProductPackage & {
 };
 
 export type ManagedProduct = Omit<StoreProduct, "packages" | "notices"> & {
+  description?: string;
   dbId: number | null;
   packageTabsEnabled: boolean;
   packageTabs: string[];
@@ -406,7 +407,6 @@ export async function saveProductContent(input: {
   id: number;
   imageUrl?: string;
   bannerUrl?: string;
-  description?: string;
   manualInstructions?: string;
   manualOpenTime?: string;
   manualCloseTime?: string;
