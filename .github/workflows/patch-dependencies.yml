@@ -1,0 +1,41 @@
+name: Patch dependencies once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/patch-dependencies.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Node 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Patch framework and dependency lock
+        run: |
+          npm install next@16.3.4 eslint-config-next@16.3.4 --save-exact
+          npm audit fix --omit=dev
+          npm audit --omit=dev --audit-level=high
+
+      - name: Commit patched dependency files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "No dependency changes to commit."
+            exit 0
+          fi
+          git commit -m "Patch production dependencies"
+          git push origin HEAD:main
