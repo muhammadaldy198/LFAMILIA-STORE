@@ -90,6 +90,7 @@ test("final storefront migration creates editable content, promotions, and admin
 
 test("product notices cascade and flash sales can be scheduled repeatedly", () => {
   const db = migratedDatabase();
+  const baselineNotices = Number(db.prepare("SELECT COUNT(*) AS count FROM product_notices").get().count);
   const productId = Number(db.prepare(`INSERT INTO products (
     slug, name, publisher, category, initials, accent, input_label, input_placeholder
   ) VALUES ('test-game', 'Test Game', 'Studio', 'game', 'TG', 'from-black to-white', 'User ID', 'Masukkan ID') RETURNING id`).get().id);
@@ -98,7 +99,14 @@ test("product notices cascade and flash sales can be scheduled repeatedly", () =
   db.prepare("INSERT INTO flash_sales (product_slug, package_sku, sale_price, starts_at, ends_at) VALUES ('test-game', 'sku-1', 8000, '2026-09-01T00:00:00.000Z', '2026-09-02T00:00:00.000Z')").run();
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM flash_sales").get().count, 2);
   db.prepare("DELETE FROM products WHERE id = ?").run(productId);
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM product_notices").get().count, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM product_notices").get().count, baselineNotices);
+});
+
+test("one-time catalog repopulation restores the bundled catalog as normal rows", () => {
+  const db = migratedDatabase();
+  assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM products").get().count), 24);
+  assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM product_packages").get().count), 83);
+  assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM product_notices").get().count), 3);
 });
 
 test("customer experience migration creates accounts, wallet, reviews, banners, popups, and news", () => {
