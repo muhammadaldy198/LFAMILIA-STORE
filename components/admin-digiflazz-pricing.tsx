@@ -15,7 +15,7 @@ export function AdminDigiflazzPricing() {
   useEffect(() => {
     void fetch("/api/panel/digiflazz-pricing", { cache: "no-store" })
       .then(async (response) => {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error);
         setSettings(data.settings);
       })
@@ -34,7 +34,7 @@ export function AdminDigiflazzPricing() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...settings, syncNow }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error);
       setMessage(
         syncNow
@@ -60,8 +60,8 @@ export function AdminDigiflazzPricing() {
         <span>
           <strong className="block">Sinkron otomatis</strong>
           <span className="mt-1 block text-[10px] text-white/35">
-            Perbarui harga modal supplier dan hitung ulang harga jual memakai
-            margin masing-masing nominal.
+            Perbarui harga modal supplier sekali sehari sekitar 09:15 WIB dan
+            hitung ulang harga jual memakai margin masing-masing nominal.
           </span>
         </span>
         <Switch
