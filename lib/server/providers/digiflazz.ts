@@ -16,6 +16,12 @@ type DigiFlazzEnv = {
   DIGIFLAZZ_PRODUCTION_API_URL?: string;
 };
 
+type DigiFlazzBalanceResponse = {
+  data?: {
+    deposit?: number;
+  };
+};
+
 type DigiFlazzResponse = {
   data?: {
     ref_id?: string;
@@ -71,6 +77,39 @@ export function getDigiflazzReadiness() {
       reason: error instanceof Error ? error.message : "Konfigurasi DigiFlazz belum lengkap.",
     };
   }
+}
+
+let balanceCache: { value: number; checkedAt: number } | null = null;
+
+export async function getDigiflazzBalance() {
+  const { username, apiKey, apiUrl } = runtimeConfig();
+  if (balanceCache && Date.now() - balanceCache.checkedAt < 60_000) {
+    return { balance: balanceCache.value, cached: true as const };
+  }
+  const origin = new URL(apiUrl).origin;
+  const balanceUrl = new URL("/v1/cek-saldo", origin).toString();
+  const relay = providerRelayRequest(
+    balanceUrl,
+    { "content-type": "application/json", accept: "application/json" },
+    { provider: "digiflazz", environment: runtimeConfig().environment },
+  );
+  const response = await fetch(relay.url, {
+    method: "POST",
+    headers: relay.headers,
+    body: JSON.stringify({
+      cmd: "deposit",
+      username,
+      sign: hashHex("md5", `${username}${apiKey}depo`),
+    }),
+    signal: AbortSignal.timeout(12_000),
+  });
+  const payload = (await response.json().catch(() => ({}))) as DigiFlazzBalanceResponse;
+  const deposit = Number(payload.data?.deposit);
+  if (!response.ok || !Number.isFinite(deposit)) {
+    throw new Error("Saldo DigiFlazz tidak dapat dibaca.");
+  }
+  balanceCache = { value: deposit, checkedAt: Date.now() };
+  return { balance: deposit, cached: false as const };
 }
 
 function mapStatus(value?: string): ProviderResult["status"] {
