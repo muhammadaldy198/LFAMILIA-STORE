@@ -25,9 +25,17 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
       const [settingsResponse, categoryResponse, faqResponse] = await Promise.all([
         fetch("/api/panel/storefront", { cache: "no-store" }), fetch("/api/panel/categories", { cache: "no-store" }), fetch("/api/panel/faqs", { cache: "no-store" }),
       ]);
-      const [settingsData, categoryData, faqData] = await Promise.all([settingsResponse.json(), categoryResponse.json(), faqResponse.json()]);
-      if (!settingsResponse.ok) throw new Error(settingsData.error);
-      setSettings(settingsData.settings); setCategories(categoryData.categories ?? []); setFaqs(faqData.faqs ?? []);
+      const [settingsData, categoryData, faqData] = await Promise.all([
+        readJson(settingsResponse),
+        readJson(categoryResponse),
+        readJson(faqResponse),
+      ]);
+      if (!settingsResponse.ok) throw new Error(String(settingsData.error || "Pengaturan toko gagal dimuat."));
+      if (!categoryResponse.ok) throw new Error(String(categoryData.error || "Kategori gagal dimuat."));
+      if (!faqResponse.ok) throw new Error(String(faqData.error || "FAQ gagal dimuat."));
+      setSettings((settingsData.settings as StorefrontSettings | undefined) ?? defaultStorefrontSettings);
+      setCategories((categoryData.categories as ProductCategoryRecord[] | undefined) ?? []);
+      setFaqs((faqData.faqs as FaqRecord[] | undefined) ?? []);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Konten toko gagal dimuat."); }
     finally { setLoading(false); }
   }, []);
@@ -39,7 +47,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
     setSaving("settings"); setError("");
     try {
       const response = await fetch("/api/panel/storefront", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(settings) });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error);
+      const data = await readJson(response); if (!response.ok) throw new Error(String(data.error || "Pengaturan gagal disimpan."));
       setMessage("Identitas, banner, kanal bantuan, dan Live Support berhasil disimpan.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengaturan gagal disimpan."); }
     finally { setSaving(""); }
@@ -49,7 +57,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
     setSaving(`category-${item.id ?? "new"}`); setError("");
     try {
       const response = await fetch("/api/panel/categories", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(item) });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error);
+      const data = await readJson(response); if (!response.ok) throw new Error(String(data.error || "Kategori gagal disimpan."));
       setMessage("Kategori berhasil disimpan."); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Kategori gagal disimpan."); }
     finally { setSaving(""); }
@@ -57,7 +65,7 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
 
   async function removeCategory(id: number) {
     const response = await fetch(`/api/panel/categories?id=${id}`, { method: "DELETE" });
-    const data = await response.json(); if (!response.ok) { setError(data.error); return; }
+    const data = await readJson(response); if (!response.ok) { setError(String(data.error || "Kategori gagal dihapus.")); return; }
     setMessage("Kategori berhasil dihapus."); await load();
   }
 
@@ -65,13 +73,13 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
     setSaving(`faq-${item.id ?? "new"}`); setError("");
     try {
       const response = await fetch("/api/panel/faqs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(item) });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error);
+      const data = await readJson(response); if (!response.ok) throw new Error(String(data.error || "FAQ gagal disimpan."));
       setMessage("FAQ berhasil disimpan."); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "FAQ gagal disimpan."); }
     finally { setSaving(""); }
   }
 
-  async function removeFaq(id: number) { const response = await fetch(`/api/panel/faqs?id=${id}`, { method: "DELETE" }); const data = await response.json(); if (!response.ok) { setError(data.error); return; } setMessage("FAQ berhasil dihapus."); await load(); }
+  async function removeFaq(id: number) { const response = await fetch(`/api/panel/faqs?id=${id}`, { method: "DELETE" }); const data = await readJson(response); if (!response.ok) { setError(String(data.error || "FAQ gagal dihapus.")); return; } setMessage("FAQ berhasil dihapus."); await load(); }
 
   if (loading) return <div className="flex min-h-56 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat konten…</div>;
   return <div className="space-y-6">
@@ -108,3 +116,11 @@ export function AdminStorefrontManager({ role }: { role: "owner" | "staff" }) {
 
 function Field({ label, wide = false, children }: { label: string; wide?: boolean; children: React.ReactNode }) { return <label className={wide ? "sm:col-span-2" : ""}><span className="field-label">{label}</span>{children}</label>; }
 function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
+
+
+async function readJson(response: Response): Promise<Record<string, unknown>> {
+  const raw = await response.text();
+  if (!raw) return { error: "Respons server kosong." };
+  try { return JSON.parse(raw) as Record<string, unknown>; }
+  catch { return { error: "Respons server tidak valid." }; }
+}
