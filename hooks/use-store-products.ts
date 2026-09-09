@@ -3,13 +3,6 @@
 import { useEffect, useState } from "react";
 import type { StoreProduct } from "@/lib/store-data";
 
-function normalizeProviderReadiness(product: StoreProduct): StoreProduct {
-  if (product.fulfillmentType !== "automatic") return product;
-  const providerReady = product.packages.length > 0 && product.packages.every((item) => Boolean(item.providerCode && item.providerSku));
-  if (providerReady) return product;
-  return { ...product, fulfillmentType: "manual", instant: false };
-}
-
 export function useStoreProducts() {
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [databaseReady, setDatabaseReady] = useState(false);
@@ -20,12 +13,12 @@ export function useStoreProducts() {
     async function load() {
       try {
         const response = await fetch("/api/products", { cache: "no-store" });
-        const data = await response.json() as {
+        const data = await response.json().catch(() => ({})) as {
           products?: StoreProduct[];
           databaseReady?: boolean;
         };
         if (!active) return;
-        setProducts((data.products ?? []).map(normalizeProviderReadiness));
+        setProducts(data.products ?? []);
         setDatabaseReady(Boolean(response.ok && data.databaseReady));
       } catch {
         if (!active) return;
