@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import { readStorefrontSettings, saveStorefrontSettings } from "@/lib/server/storefront";
 import { isAllowedMediaUrl } from "@/lib/media-url";
+import { isAllowedNavigationUrl } from "@/lib/navigation-url";
 
 const optionalUrl = z.string().trim().url().max(500).optional().or(z.literal(""));
 const optionalMediaUrl = z.string().trim().max(500).refine(isAllowedMediaUrl, "URL gambar tidak valid.").optional().or(z.literal(""));
@@ -18,7 +19,7 @@ const schema = z.object({
   bannerDescription: z.string().trim().min(3).max(300),
   bannerImageUrl: optionalMediaUrl,
   bannerCtaLabel: z.string().trim().min(2).max(40),
-  bannerCtaHref: z.string().trim().min(1).max(200),
+  bannerCtaHref: z.string().trim().min(1).max(200).refine(isAllowedNavigationUrl, "Tujuan tombol banner tidak valid."),
   supportWhatsapp: z.string().trim().regex(/^\+?[0-9]{8,16}$/).optional().or(z.literal("")),
   supportEmail: z.string().trim().email().max(150).optional().or(z.literal("")),
   instagramUrl: optionalUrl,
