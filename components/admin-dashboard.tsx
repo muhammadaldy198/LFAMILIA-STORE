@@ -5,13 +5,11 @@ import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
   Box,
-  ChevronDown,
   CreditCard,
   FileText,
   Headphones,
   LayoutDashboard,
   LifeBuoy,
-  LogOut,
   Menu,
   PackageSearch,
   Search,
@@ -24,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminBrandLogo } from "@/components/admin-brand-logo";
+import { AdminAccountMenu } from "@/components/admin-account-menu";
 import { AdminNotifications } from "@/components/admin-notifications";
 import { AdminDigiflazzMonitor } from "@/components/admin-digiflazz-monitor";
 import { AdminDokuDatabasePreparation } from "@/components/admin-doku-database-preparation";
@@ -192,22 +191,11 @@ export function AdminDashboard({
                 onNavigate={selectTab}
               />
 
-              <div className="hidden items-center gap-2 sm:flex">
-                <span className="grid size-8 place-items-center rounded-full bg-[#155eef] text-[10px] font-black text-white">
-                  {initialSession.name.trim().charAt(0).toUpperCase() || "A"}
-                </span>
-                <div className="min-w-0 leading-tight">
-                  <p className="max-w-28 truncate text-[10px] font-bold text-[#1e293b]">{initialSession.name}</p>
-                  <p className="text-[8px] text-[#94a3b8]">{isOwner ? "Super Admin" : "Staff"}</p>
-                </div>
-                <ChevronDown className="size-3.5 text-[#94a3b8]" />
-              </div>
-
-              <form action={logoutPath} method="post">
-                <Button type="submit" variant="ghost" size="icon-sm" className="text-[#94a3b8] hover:bg-red-50 hover:text-red-600" aria-label="Keluar">
-                  <LogOut className="size-3.5" />
-                </Button>
-              </form>
+              <AdminAccountMenu
+                session={initialSession}
+                logoutPath={logoutPath}
+                onNavigate={selectTab}
+              />
             </div>
           </div>
         </header>
@@ -217,9 +205,7 @@ export function AdminDashboard({
             <TabsContent value="overview" className="mt-0"><AdminOverview onNavigate={selectTab} /></TabsContent>
 
             <TabsContent value="orders" className="mt-0">
-              <AdminSection title="Pesanan" description="Semua status pesanan, pembayaran, fulfillment, refund, dan order manual dalam satu tempat.">
-                <AdminOrderManager />
-              </AdminSection>
+              <AdminOrderManager />
             </TabsContent>
 
             <TabsContent value="products" className="mt-0">

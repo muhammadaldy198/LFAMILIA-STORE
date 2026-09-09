@@ -1,17 +1,19 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
-import { requireAdminSession } from "@/lib/server/admin";
+import { requireAdminSession, type AdminRole } from "@/lib/server/admin";
 import {
   completeManualOrder,
   getOrderById,
   listOrders,
   recordOrderEvent,
+  type OrderRecord,
 } from "@/lib/server/orders";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 
 export const dynamic = "force-dynamic";
 
 type DeliveryMode = "direct" | "voucher" | "manual";
+type OrderWithMode = OrderRecord & { delivery_mode: DeliveryMode };
 
 async function readDeliveryModes() {
   const result = await getD1()
@@ -28,52 +30,93 @@ async function readDeliveryModes() {
   return new Map(result.results.map((row) => [row.slug, row.mode]));
 }
 
+function withDeliveryMode(order: OrderRecord, deliveryModes: Map<string, DeliveryMode>): OrderWithMode {
+  return {
+    ...order,
+    delivery_mode:
+      deliveryModes.get(order.product_slug) ??
+      (order.fulfillment_type === "manual" ? "manual" : "direct"),
+  };
+}
+
+function visibleOrder(order: OrderWithMode, role: AdminRole) {
+  if (role === "owner") return order;
+  return {
+    id: order.id,
+    reference_id: order.reference_id,
+    product_slug: order.product_slug,
+    product_name: order.product_name,
+    package_sku: order.package_sku,
+    package_label: order.package_label,
+    destination: order.destination,
+    server: order.server,
+    nickname: order.nickname,
+    buyer_name: order.buyer_name,
+    buyer_phone: order.buyer_phone,
+    customer_inputs_json: order.customer_inputs_json,
+    total: null,
+    payment_method: order.payment_method,
+    payment_channel: order.payment_channel,
+    payment_status: order.payment_status,
+    fulfillment_type: order.fulfillment_type,
+    fulfillment_status: order.fulfillment_status,
+    provider_code: order.provider_code,
+    provider_status: order.provider_status,
+    provider_message: order.provider_message,
+    provider_serial_number: order.provider_serial_number,
+    delivery_mode: order.delivery_mode,
+    created_at: order.created_at,
+    updated_at: order.updated_at,
+  };
+}
+
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "staff");
   if (access instanceof Response) return access;
   try {
-    const [orders, deliveryModes] = await Promise.all([
-      listOrders(),
-      readDeliveryModes(),
-    ]);
-    const rows = orders.map((order) => ({
-      ...order,
-      delivery_mode:
-        deliveryModes.get(order.product_slug) ??
-        (order.fulfillment_type === "manual" ? "manual" : "direct"),
-    }));
-    return Response.json({
-      orders:
-        access.role === "owner"
-          ? rows
-          : rows.map((order) => ({
-              id: order.id,
-              reference_id: order.reference_id,
-              product_name: order.product_name,
-              package_label: order.package_label,
-              destination: order.destination,
-              server: order.server,
-              buyer_name: order.buyer_name,
-              buyer_phone: order.buyer_phone,
-              customer_inputs_json: order.customer_inputs_json,
-              total: null,
-              payment_method: order.payment_method,
-              payment_status: order.payment_status,
-              fulfillment_type: order.fulfillment_type,
-              fulfillment_status: order.fulfillment_status,
-              provider_code: order.provider_code,
-              provider_message: order.provider_message,
-              provider_serial_number: order.provider_serial_number,
-              delivery_mode: order.delivery_mode,
-              created_at: order.created_at,
-            })),
-      role: access.role,
-    });
-  } catch (error) {
+    const requestedId = new URL(request.url).searchParams.get("id");
+    const deliveryModes = await readDeliveryModes();
+
+    if (requestedId) {
+      const parsedId = z.string().uuid().safeParse(requestedId);
+      if (!parsedId.success) return Response.json({ error: "ID pesanan tidak valid." }, { status: 400 });
+      const order = await getOrderById(parsedId.data);
+      if (!order) return Response.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
+      const eventRows = await getD1()
+        .prepare(
+          `SELECT id, source, event_id, status, payload_json, created_at
+           FROM order_events WHERE order_id = ? ORDER BY created_at ASC LIMIT 100`,
+        )
+        .bind(order.id)
+        .all<{
+          id: number;
+          source: string;
+          event_id: string;
+          status: string;
+          payload_json: string;
+          created_at: string;
+        }>();
+      return Response.json(
+        {
+          order: visibleOrder(withDeliveryMode(order, deliveryModes), access.role),
+          events: eventRows.results,
+          role: access.role,
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    const orders = await listOrders(500);
     return Response.json(
       {
-        error: error instanceof Error ? error.message : "Pesanan gagal dimuat.",
+        orders: orders.map((order) => visibleOrder(withDeliveryMode(order, deliveryModes), access.role)),
+        role: access.role,
       },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Pesanan gagal dimuat." },
       { status: 503 },
     );
   }
@@ -85,11 +128,7 @@ const actionSchema = z.object({
   serialNumber: z.string().trim().min(1).max(500).optional(),
 });
 
-async function completeManualVoucher(
-  id: string,
-  serialNumber: string | undefined,
-  adminEmail: string,
-) {
+async function completeManualVoucher(id: string, serialNumber: string | undefined, adminEmail: string) {
   const order = await getOrderById(id);
   if (
     !order ||
