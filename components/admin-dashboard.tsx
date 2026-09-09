@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminDigiflazzMonitor } from "@/components/admin-digiflazz-monitor";
+import { AdminDokuDatabasePreparation } from "@/components/admin-doku-database-preparation";
 import { AdminDigiflazzPricing } from "@/components/admin-digiflazz-pricing";
 import { AdminExperienceManager } from "@/components/admin-experience-manager";
 import { AdminIntegrationManager } from "@/components/admin-integration-manager";
@@ -162,7 +163,7 @@ export function AdminDashboard({
         </aside>
 
         <main className="admin-v3-content min-w-0 p-3 sm:p-5">
-          <TabsContent value="overview" className="mt-0"><AdminOverview /></TabsContent>
+          <TabsContent value="overview" className="mt-0"><AdminOverview onNavigate={selectTab} /></TabsContent>
 
           <TabsContent value="orders" className="mt-0">
             <AdminSection title="Pesanan" description="Semua status pesanan, pembayaran, fulfillment, refund, dan order manual dalam satu tempat.">
@@ -192,6 +193,9 @@ export function AdminDashboard({
 
           {isOwner && (
             <TabsContent value="payments" className="mt-0 space-y-4">
+              <AdminSection title="Persiapan Database DOKU" description="Periksa dan siapkan kolom DOKU satu kali sebelum gateway diaktifkan. Proses ini tidak menghapus data toko.">
+                <AdminDokuDatabasePreparation />
+              </AdminSection>
               <AdminSection title="DOKU Direct API" description="DOKU adalah satu-satunya gateway checkout eksternal. Kelola Sandbox/Production dan credential terenkripsi di sini.">
                 <AdminIntegrationManager view="providers" providerFilter={["doku"]} />
               </AdminSection>
