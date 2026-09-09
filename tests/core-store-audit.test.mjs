@@ -80,11 +80,18 @@ test("essential storefront and operational pages remain present", () => {
   }
 });
 
-test("an accidentally emptied catalog self-restores without overwriting existing products", () => {
+test("an empty catalog stays empty until the owner explicitly restores it", () => {
   const source = read("lib/server/products.ts");
-  assert.match(source, /SELECT COUNT\(\*\) AS count FROM products/);
-  assert.match(source, /if \(Number\(catalogCount\?\.count \?\? 0\) === 0\)/);
-  assert.match(source, /await seedFallbackProducts\(\)/);
+  const seedRoute = read("app/api/admin/products/seed/route.ts");
+  const readSection = source.slice(
+    source.indexOf("export async function readProducts"),
+    source.indexOf("type ProductWrite"),
+  );
+
+  assert.doesNotMatch(readSection, /seedFallbackProducts/);
+  assert.doesNotMatch(readSection, /SELECT COUNT\(\*\) AS count FROM products/);
+  assert.match(seedRoute, /requireAdminSession\(request, "owner"\)/);
+  assert.match(seedRoute, /seedFallbackProducts\(\)/);
   assert.match(source, /ON CONFLICT\(slug\) DO NOTHING/);
   assert.match(source, /ON CONFLICT\(sku\) DO NOTHING/);
 });
