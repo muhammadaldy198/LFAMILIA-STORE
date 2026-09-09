@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { BellRing, ChevronDown, ChevronUp, Database, Edit3, ImageIcon, LoaderCircle, PackagePlus, Plus, RefreshCw, Search, Trash2, Upload } from "lucide-react";
@@ -868,6 +869,73 @@ export function AdminProductManager() {
         </Table>
       </div>
 
+      <Dialog open={digiflazzImportOpen} onOpenChange={setDigiflazzImportOpen}>
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-5xl overflow-hidden rounded-xl border-white/10 bg-[#10141d] p-0 text-white">
+          <DialogHeader className="border-b border-white/[0.08] px-4 py-3 text-left">
+            <DialogTitle>Tambah nominal dari Digiflazz</DialogTitle>
+            <DialogDescription className="text-[10px] text-white/40">
+              Pilih SKU langsung dari price list Digiflazz. Price list hanya dimuat ketika dialog dibuka agar penggunaan endpoint tetap efisien.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid max-h-[72dvh] min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]">
+            <div className="grid gap-2 border-b border-white/[0.08] p-3 sm:grid-cols-[minmax(0,1fr)_180px_110px_110px]">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-white/30" />
+                <Input value={digiflazzCatalogQuery} onChange={(event) => setDigiflazzCatalogQuery(event.target.value)} className="admin-input pl-8" placeholder="Cari nama, brand, SKU, seller…" />
+              </div>
+              <select value={digiflazzGroup} onChange={(event) => setDigiflazzGroup(event.target.value)} className="admin-select">
+                <option value="">Tanpa section</option>
+                {digiflazzImportTarget?.packageTabs.map((tab) => <option key={tab} value={tab}>{tab}</option>)}
+              </select>
+              <select value={digiflazzMarginType} onChange={(event) => setDigiflazzMarginType(event.target.value as "fixed" | "percent")} className="admin-select">
+                <option value="fixed">Margin Rp</option>
+                <option value="percent">Margin %</option>
+              </select>
+              <Input type="number" min={0} value={digiflazzMarginValue} onChange={(event) => setDigiflazzMarginValue(Number(event.target.value))} className="admin-input" placeholder="Margin" />
+            </div>
+            <div className="min-h-0 overflow-auto">
+              {digiflazzCatalogLoading ? (
+                <div className="flex min-h-48 items-center justify-center text-xs text-white/40"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat price list Digiflazz…</div>
+              ) : (
+                <table className="w-full min-w-[900px] text-left text-[10px]">
+                  <thead className="sticky top-0 bg-[#10141d] text-white/35">
+                    <tr><th className="px-3 py-2">Pilih</th><th className="px-3 py-2">Produk</th><th className="px-3 py-2">Brand / Kategori</th><th className="px-3 py-2">SKU</th><th className="px-3 py-2">Seller</th><th className="px-3 py-2">Modal</th><th className="px-3 py-2">Stok</th><th className="px-3 py-2">Status</th></tr>
+                  </thead>
+                  <tbody>
+                    {digiflazzCatalog.filter((entry) => {
+                      const q = digiflazzCatalogQuery.trim().toLowerCase();
+                      return !q || [entry.productName, entry.brand, entry.category, entry.buyerSkuCode, entry.sellerName].some((value) => value.toLowerCase().includes(q));
+                    }).map((entry) => {
+                      const selected = digiflazzSelected.includes(entry.buyerSkuCode);
+                      const available = entry.buyerProductStatus && entry.sellerProductStatus && (entry.unlimitedStock || entry.stock > 0);
+                      return (
+                        <tr key={entry.buyerSkuCode} className="border-t border-white/[0.06]">
+                          <td className="px-3 py-2"><input type="checkbox" checked={selected} onChange={(event) => setDigiflazzSelected((current) => event.target.checked ? [...current, entry.buyerSkuCode] : current.filter((sku) => sku !== entry.buyerSkuCode))} /></td>
+                          <td className="px-3 py-2"><strong>{entry.productName}</strong><p className="text-[8px] text-white/30">{entry.type || entry.description}</p></td>
+                          <td className="px-3 py-2">{entry.brand}<p className="text-[8px] text-white/30">{entry.category}</p></td>
+                          <td className="px-3 py-2 font-mono">{entry.buyerSkuCode}</td>
+                          <td className="px-3 py-2">{entry.sellerName || "-"}</td>
+                          <td className="px-3 py-2 font-bold">{formatRupiah(entry.price)}</td>
+                          <td className="px-3 py-2">{entry.unlimitedStock ? "∞" : entry.stock}</td>
+                          <td className="px-3 py-2"><span className={available ? "rounded bg-emerald-400/10 px-2 py-1 font-bold text-emerald-300" : "rounded bg-red-400/10 px-2 py-1 font-bold text-red-300"}>{available ? "Tersedia" : "Tidak tersedia"}</span></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-white/[0.08] p-3">
+              <p className="text-[10px] text-white/40">{digiflazzSelected.length} SKU dipilih</p>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => setDigiflazzImportOpen(false)} className="border-white/10 bg-white/[0.03] text-white">Batal</Button>
+                <Button type="button" disabled={!digiflazzSelected.length || Boolean(catalogSaving)} onClick={() => void addSelectedDigiflazzPackages()} className="bg-[#155eef] font-bold text-white hover:bg-[#0b4dd8]">Tambahkan ke Produk</Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-[340px] gap-0 overflow-hidden rounded-xl border-white/10 bg-[#10141d] p-0 text-white sm:max-w-2xl">
           <form onSubmit={save} className="grid max-h-[68dvh] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-h-[86vh]">
@@ -943,6 +1011,45 @@ function Field({ label, wide = false, children }: { label: string; wide?: boolea
 
 function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function PackageImagePicker({ value, onChange, disabled = false }: { value: string; onChange(value: string): void; disabled?: boolean }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function upload(file?: File) {
+    if (!file || disabled) return;
+    setUploading(true);
+    setError("");
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const response = await fetch("/api/panel/media", { method: "POST", body: form });
+      const data = await response.json().catch(() => ({})) as { url?: string; error?: string };
+      if (!response.ok || !data.url) throw new Error(data.error || "Gambar nominal gagal diunggah.");
+      onChange(data.url);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Gambar nominal gagal diunggah.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="min-w-[150px]">
+      <div className="flex items-center gap-2">
+        {value ? <img src={value} alt="" className="size-9 rounded-md border border-white/10 object-contain" /> : <span className="grid size-9 place-items-center rounded-md border border-white/10 bg-white/[0.03] text-white/25"><ImageIcon className="size-4" /></span>}
+        {!disabled && (
+          <label className="inline-flex cursor-pointer items-center rounded-md border border-white/10 px-2 py-1.5 text-[8px] font-bold text-white/55 hover:bg-white/[0.05]">
+            {uploading ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <Upload className="mr-1 size-3" />}
+            Unggah
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(event) => void upload(event.target.files?.[0])} />
+          </label>
+        )}
+      </div>
+      {error && <p className="mt-1 max-w-[150px] text-[7px] text-red-300">{error}</p>}
+    </div>
+  );
 }
 
 async function requestProducts() {
