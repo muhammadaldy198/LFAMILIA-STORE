@@ -123,7 +123,7 @@ export function AdminProductManager() {
 
   const loadSellerMonitor = useCallback(async () => {
     const response = await fetch("/api/panel/digiflazz-monitor", { cache: "no-store" });
-    const data = await response.json() as DigiflazzMonitorPayload & { error?: string };
+    const data = await response.json().catch(() => ({})) as DigiflazzMonitorPayload & { error?: string };
     if (!response.ok) throw new Error(data.error ?? "Monitor seller DigiFlazz gagal dimuat.");
     setSellerMonitor(data);
   }, []);
@@ -139,7 +139,7 @@ export function AdminProductManager() {
     setMessage("");
     try {
       const response = await fetch("/api/panel/digiflazz-monitor", { method: "POST" });
-      const data = await response.json() as DigiflazzMonitorPayload & { error?: string };
+      const data = await response.json().catch(() => ({})) as DigiflazzMonitorPayload & { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Monitor seller DigiFlazz gagal diperbarui.");
       setSellerMonitor(data);
       setMessage("Monitor seller DigiFlazz berhasil diperbarui.");
@@ -339,7 +339,7 @@ export function AdminProductManager() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(buildProductPayload(item)),
       });
-      const data = await response.json() as { error?: string };
+      const data = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Pengaturan katalog gagal disimpan.");
       setMessage(successMessage);
       await loadProducts();
@@ -371,7 +371,7 @@ export function AdminProductManager() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ packageId: entry.dbId, isActive }),
       });
-      const data = await response.json() as { error?: string };
+      const data = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Status nominal gagal diperbarui.");
       setMessage(`${entry.label} sekarang ${isActive ? "aktif" : "nonaktif"}.`);
     } catch (reason) {
@@ -412,7 +412,7 @@ export function AdminProductManager() {
           marginValue: Number(entry.marginValue ?? 0),
         }),
       });
-      const data = await response.json() as { error?: string };
+      const data = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Provider/SKU nominal gagal disimpan.");
       if (!options.quiet) {
         setMessage(`SKU/provider ${entry.label} berhasil disimpan tanpa sync DigiFlazz.`);
@@ -453,7 +453,7 @@ export function AdminProductManager() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ productId: item.dbId, packageSku: entry.id }),
       });
-      const data = await response.json() as { error?: string; result?: { updated?: number } };
+      const data = await response.json().catch(() => ({})) as { error?: string; result?: { updated?: number } };
       if (!response.ok) throw new Error(data.error ?? "Sync provider gagal.");
       setMessage(`DigiFlazz berhasil disinkronkan untuk ${entry.label}.`);
       await loadProducts();
@@ -524,7 +524,7 @@ export function AdminProductManager() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await response.json() as { error?: string };
+      const data = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Produk gagal disimpan.");
       setDialogOpen(false);
       setMessage(staffContentOnly ? "Informasi produk berhasil diperbarui." : draft.dbId ? "Produk berhasil diperbarui." : "Produk berhasil ditambahkan.");
@@ -541,7 +541,7 @@ export function AdminProductManager() {
     setError("");
     try {
       const response = await fetch("/api/panel/products/seed", { method: "POST" });
-      const data = await response.json() as { error?: string };
+      const data = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Katalog utama gagal diimpor.");
       setMessage("Katalog utama berhasil dilengkapi tanpa menimpa perubahan yang sudah ada.");
       await loadProducts();
@@ -555,7 +555,7 @@ export function AdminProductManager() {
   async function removeProduct(id: number) {
     setError("");
     const response = await fetch(`/api/panel/products?id=${id}`, { method: "DELETE" });
-    const data = await response.json() as { error?: string };
+    const data = await response.json().catch(() => ({})) as { error?: string };
     if (!response.ok) {
       setError(data.error ?? "Produk gagal dihapus.");
       return;
@@ -849,7 +849,7 @@ function slugify(value: string) {
 
 async function requestProducts() {
   const response = await fetch("/api/panel/products", { cache: "no-store" });
-  const data = await response.json() as { products?: ManagedProduct[]; databaseReady?: boolean; role?: "owner" | "staff"; sellerMonitor?: DigiflazzMonitorPayload | null; error?: string };
+  const data = await response.json().catch(() => ({})) as { products?: ManagedProduct[]; databaseReady?: boolean; role?: "owner" | "staff"; sellerMonitor?: DigiflazzMonitorPayload | null; error?: string };
   if (!response.ok) throw new Error(data.error ?? "Produk gagal dimuat.");
   return data;
 }
