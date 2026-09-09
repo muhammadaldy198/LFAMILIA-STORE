@@ -34,8 +34,8 @@ interface ExecutionContext {
 
 interface ScheduledEvent { cron: string; }
 
-function escapeHtml(value: string) {
-  return value
+function escapeHtml(value: string | undefined | null) {
+  return (value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
