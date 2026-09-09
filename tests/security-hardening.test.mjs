@@ -25,6 +25,8 @@ test("critical public mutation routes reject cross-site requests", () => {
     "app/staff/panel/auth/login/route.ts",
     "app/api/admin/auth/setup/route.ts",
     "app/api/admin/media/route.ts",
+    "app/admin/panel/auth/logout/route.ts",
+    "app/staff/panel/auth/logout/route.ts",
   ];
   for (const file of routes) assert.match(read(file), /rejectCrossOriginMutation\(request\)/, file);
 });
@@ -125,6 +127,12 @@ test("new invoices use an independent full-length random token", () => {
   const source = read("lib/server/orders.ts");
   assert.match(source, /const referenceToken = crypto\.randomUUID\(\)\.replaceAll\("-", ""\)\.toUpperCase\(\)/);
   assert.match(source, /referenceId: `LF\$\{date\}\$\{referenceToken\}`/);
+});
+
+test("admin authorization uses the shared cross-origin mutation guard", () => {
+  const source = read("lib/server/admin.ts");
+  assert.match(source, /rejectCrossOriginMutation\(request\)/);
+  assert.doesNotMatch(source, /origin !== new URL\(request\.url\)\.origin/);
 });
 
 test("owner setup trusts only Worker-injected Access identity", () => {
