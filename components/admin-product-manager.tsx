@@ -67,7 +67,6 @@ export function AdminProductManager() {
   const [databaseReady, setDatabaseReady] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [seeding, setSeeding] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [draft, setDraft] = useState<ManagedProduct>(emptyProduct);
   const [message, setMessage] = useState("");
@@ -536,22 +535,6 @@ export function AdminProductManager() {
     }
   }
 
-  async function seedProducts() {
-    setSeeding(true);
-    setError("");
-    try {
-      const response = await fetch("/api/panel/products/seed", { method: "POST" });
-      const data = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Katalog utama gagal diimpor.");
-      setMessage("Katalog utama berhasil dilengkapi tanpa menimpa perubahan yang sudah ada.");
-      await loadProducts();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Katalog utama gagal diimpor.");
-    } finally {
-      setSeeding(false);
-    }
-  }
-
   async function removeProduct(id: number) {
     setError("");
     const response = await fetch(`/api/panel/products?id=${id}`, { method: "DELETE" });
@@ -575,7 +558,6 @@ export function AdminProductManager() {
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div><p className="text-xs font-semibold">{items.length} produk tersimpan</p><p className="mt-1 text-[10px] text-white/30">Perubahan aktif langsung dipakai katalog publik.</p></div>
         <div className="flex gap-2">
-          {role === "owner" && <Button onClick={() => void seedProducts()} disabled={seeding} variant="outline" className="rounded-xl border-white/10 bg-white/[0.03] text-xs text-white hover:bg-white/[0.08] hover:text-white">{seeding ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Database className="mr-2 size-4" />}Lengkapi katalog utama</Button>}
           {role === "owner" && <Button onClick={openNew} className="rounded-xl bg-[#b9ff35] text-xs font-black text-[#091006] hover:bg-[#d0ff75]"><Plus className="mr-2 size-4" />Tambah produk</Button>}
         </div>
       </div>
