@@ -20,11 +20,25 @@ test("all literal Admin Panel API calls have a unified panel route", () => {
     }
   }
   for (const endpoint of endpoints) {
+    if (endpoint.includes("/")) {
+      assert.ok(
+        panelRoute.includes(`"${endpoint}"`) || panelRoute.includes(`'${endpoint}'`),
+        "Missing panel route: " + endpoint,
+      );
+    } else {
+      const escaped = endpoint.replace(/[.*+?^$()|[\]\\]/g, "\\  for (const endpoint of endpoints) {
     const escaped = endpoint.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
     const routePattern = new RegExp(
       '(?:["\\']' + escaped + '["\\']|\\\\b' + escaped + '\\\\b)\\\\s*:',
     );
     assert.match(panelRoute, routePattern, "Missing panel route: " + endpoint);
+  }");
+      assert.match(
+        panelRoute,
+        new RegExp("\\b" + escaped + "\\s*:"),
+        "Missing panel route: " + endpoint,
+      );
+    }
   }
 });
 
