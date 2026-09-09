@@ -1408,7 +1408,7 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
     payment.fulfillmentType === "manual"
       ? "Setelah lunas, pesanan masuk antrean admin."
       : payment.providerCode === "voucher-stock"
-        ? "Setelah lunas, satu kode stok dikirim otomatis ke email/WhatsApp pembeli."
+        ? "Setelah lunas, kode stok tersedia otomatis di akun dan halaman status pesanan. Email hanya dikirim jika diaktifkan."
         : "Setelah lunas, pesanan diteruskan otomatis ke provider.";
   return (
     <div className="mt-4 rounded-lg border border-[#b9ff35]/30 bg-[#b9ff35]/[0.08] p-3">
