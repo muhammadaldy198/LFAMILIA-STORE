@@ -57,7 +57,7 @@ export function AdminOrderManager() {
     setError("");
     try {
       const response = await fetch("/api/panel/orders", { cache: "no-store" });
-      const data = (await response.json()) as {
+      const data = (await response.json().catch(() => ({}))) as {
         orders?: Order[];
         role?: "owner" | "staff";
         error?: string;
@@ -78,7 +78,7 @@ export function AdminOrderManager() {
     let active = true;
     void fetch("/api/panel/orders", { cache: "no-store" })
       .then(async (response) => {
-        const data = (await response.json()) as {
+        const data = (await response.json().catch(() => ({}))) as {
           orders?: Order[];
           role?: "owner" | "staff";
           error?: string;
@@ -138,7 +138,7 @@ export function AdminOrderManager() {
           ...(voucherManual ? { serialNumber } : {}),
         }),
       });
-      const data = (await response.json()) as { error?: string };
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok)
         throw new Error(data.error ?? "Pesanan gagal diperbarui.");
       if (voucherManual) {
@@ -167,7 +167,7 @@ export function AdminOrderManager() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "retry", orderId: id }),
       });
-      const data = (await response.json()) as {
+      const data = (await response.json().catch(() => ({}))) as {
         ok?: boolean;
         message?: string;
         error?: string;
