@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import {
   getPricingSettings,
+  listDigiflazzPriceList,
   savePricingSettings,
   syncDigiflazzPackage,
   syncDigiflazzPrices,
@@ -20,6 +21,13 @@ export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
   try {
+    const url = new URL(request.url);
+    if (url.searchParams.get("catalog") === "1") {
+      return Response.json({
+        settings: await getPricingSettings(),
+        catalog: await listDigiflazzPriceList(),
+      });
+    }
     return Response.json({ settings: await getPricingSettings() });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Pengaturan harga belum siap." }, { status: 503 });
