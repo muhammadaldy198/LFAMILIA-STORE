@@ -166,8 +166,10 @@ function environmentLabel(environment: Environment) {
 
 export function AdminIntegrationManager({
   view = "providers",
+  providerFilter,
 }: {
   view?: "providers" | "relay";
+  providerFilter?: Provider[];
 }) {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [selections, setSelections] = useState<Overview["selections"] | null>(null);
@@ -208,10 +210,12 @@ export function AdminIntegrationManager({
   ), [overview]);
 
   const visibleDefinitions = useMemo(
-    () => definitions.filter((definition) =>
-      view === "relay" ? definition.provider === "relay" : definition.provider !== "relay",
-    ),
-    [view],
+    () => definitions.filter((definition) => {
+      const matchesView = view === "relay" ? definition.provider === "relay" : definition.provider !== "relay";
+      const matchesProvider = !providerFilter?.length || providerFilter.includes(definition.provider);
+      return matchesView && matchesProvider;
+    }),
+    [view, providerFilter],
   );
 
   function currentEnvironment(definition: Definition) {

@@ -375,3 +375,72 @@ body main [data-slot="tabs-trigger"] {
   padding: 0 0.625rem;
   color: rgba(255, 255, 255, 0.52);
 }
+
+
+/* LFAMILIA Admin v3 — light operational workspace with a dark navigation rail. */
+.admin-v3-content {
+  color: #0f172a;
+}
+.admin-v3-content [class*="bg-[#0d1019]"],
+.admin-v3-content [class*="bg-[#10141d]"],
+.admin-v3-content [class*="bg-[#111620]"],
+.admin-v3-content [class*="bg-[#171c27]"],
+.admin-v3-content [class*="bg-[#0b0f17]"],
+.admin-v3-content [class*="bg-[#090c13]"] {
+  background-color: #ffffff !important;
+}
+.admin-v3-content [class*="bg-black/"],
+.admin-v3-content [class*="bg-white/[0.0"] {
+  background-color: #f8fafc !important;
+}
+.admin-v3-content .text-white,
+.admin-v3-content [class*="text-white/"] {
+  color: #475569 !important;
+}
+.admin-v3-content strong.text-white,
+.admin-v3-content h1,
+.admin-v3-content h2,
+.admin-v3-content h3,
+.admin-v3-content h4 {
+  color: #0f172a !important;
+}
+.admin-v3-content [class*="border-white/"] {
+  border-color: #e2e8f0 !important;
+}
+.admin-v3-content [class*="text-[#d8ff8d]"],
+.admin-v3-content [class*="text-[#cfff72]"] {
+  color: #155eef !important;
+}
+.admin-v3-content [class*="bg-[#b9ff35]"] {
+  background-color: #155eef !important;
+  color: #ffffff !important;
+}
+.admin-v3-content [class*="border-[#b9ff35]"] {
+  border-color: #155eef !important;
+}
+.admin-v3-content .admin-input,
+.admin-v3-content .admin-select,
+.admin-v3-content [data-slot="input"],
+.admin-v3-content [data-slot="textarea"] {
+  border-color: #dbe3ee !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+.admin-v3-content .admin-select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+.admin-v3-content .admin-readonly {
+  border-color: #dbe3ee;
+  background: #f8fafc;
+  color: #64748b;
+}
+.admin-v3-content [data-slot="table-row"] {
+  border-color: #e8edf4 !important;
+}
+.admin-v3-content [data-slot="dialog-content"],
+.admin-v3-content [data-slot="alert-dialog-content"] {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #dbe3ee !important;
+}

@@ -14,7 +14,7 @@ export function getRuntimeEnv<T extends object>() {
 
 export function requireRuntimeValue(value: string | null | undefined, name: string) {
   const normalized = value?.trim();
-  if (!normalized) throw new Error(`${name} belum dikonfigurasi di Cloudflare.`);
+  if (!normalized) throw new Error(`${name} belum dikonfigurasi.`);
   return normalized;
 }
 
