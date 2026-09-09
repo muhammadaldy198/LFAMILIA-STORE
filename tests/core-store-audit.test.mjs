@@ -80,7 +80,7 @@ test("essential storefront and operational pages remain present", () => {
   }
 });
 
-test("catalog has no automatic or manual restore mechanism", () => {
+test("catalog exposes no reusable restore endpoint or admin control", () => {
   const products = read("lib/server/products.ts");
   const panelRoute = read("app/api/panel/[...path]/route.ts");
   const manager = read("components/admin-product-manager.tsx");
@@ -89,6 +89,14 @@ test("catalog has no automatic or manual restore mechanism", () => {
   assert.doesNotMatch(panelRoute, /products\/seed|productSeed/);
   assert.doesNotMatch(manager, /products\/seed|Lengkapi katalog utama|seedProducts|setSeeding/);
   assert.equal(fs.existsSync(path.join(root, "app/api/admin/products/seed/route.ts")), false);
+});
+
+test("requested catalog repopulation is permanently gated after its first successful run", () => {
+  const products = read("lib/server/products.ts");
+  assert.match(products, /catalog_repopulation_2026_09_09/);
+  assert.match(products, /if \(completed\?\.completed_at\) return;/);
+  assert.doesNotMatch(products, /SELECT COUNT\(\*\) AS count FROM products/);
+  assert.doesNotMatch(products, /DELETE FROM one_time_operations/);
 });
 
 test("panel credential rows never appear as real customers or members", () => {
