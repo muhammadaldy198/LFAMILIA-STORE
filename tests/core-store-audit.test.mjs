@@ -109,6 +109,13 @@ test("Staff content edits preserve the existing product description", () => {
   assert.doesNotMatch(section, /input\.description/);
 });
 
+test("product APIs accept only DigiFlazz and internal voucher stock providers", () => {
+  const productsRoute = read("app/api/admin/products/route.ts");
+  const packageRoute = read("app/api/admin/product-package-provider/route.ts");
+  assert.match(productsRoute, /z\.enum\(\["digiflazz", "voucher-stock"\]\)\.optional\(\)/);
+  assert.match(packageRoute, /z\.enum\(\["digiflazz", "voucher-stock"\]\)\.nullable\(\)/);
+});
+
 test("panel credential rows never appear as real customers or members", () => {
   const members = read("lib/server/member-tiers.ts");
   const summary = read("app/api/admin/summary/route.ts");
