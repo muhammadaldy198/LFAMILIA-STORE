@@ -20,10 +20,15 @@ export function ProductReviews({ productSlug }: { productSlug: string }) {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    const response = await fetch(`/api/reviews?product=${encodeURIComponent(productSlug)}`, { cache: "no-store" });
-    const data = await response.json() as { reviews?: ProductReview[]; customer?: CustomerSession | null };
-    setReviews(data.reviews ?? []);
-    setCustomer(data.customer ?? null);
+    try {
+      const response = await fetch(`/api/reviews?product=${encodeURIComponent(productSlug)}`, { cache: "no-store" });
+      const data = await response.json().catch(() => ({})) as { reviews?: ProductReview[]; customer?: CustomerSession | null };
+      setReviews(response.ok ? data.reviews ?? [] : []);
+      setCustomer(response.ok ? data.customer ?? null : null);
+    } catch {
+      setReviews([]);
+      setCustomer(null);
+    }
   }, [productSlug]);
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
