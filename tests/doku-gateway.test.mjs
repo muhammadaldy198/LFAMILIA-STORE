@@ -35,6 +35,12 @@ test("checkout creates one DOKU payment without legacy gateway fallback", () => 
   assert.doesNotMatch(autoRoute, /midtrans|ipaymu|fallback/i);
 });
 
+test("DOKU database preparation is schema-only and non-destructive", () => {
+  const preparation = fs.readFileSync(path.join(root, "lib/server/doku-database-preparation.ts"), "utf8");
+  assert.match(preparation, /ALTER TABLE/);
+  assert.doesNotMatch(preparation, /DELETE FROM (orders|wallet_transactions|wallet_topups|order_events|voucher_deliveries)/);
+});
+
 test("DigiFlazz is the only external fulfillment provider", () => {
   assert.match(providers, /digiflazzAdapter/);
   assert.doesNotMatch(providers, /vippayment|VIPPayment/i);
