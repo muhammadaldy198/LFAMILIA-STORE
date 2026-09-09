@@ -37,3 +37,13 @@ test("hardcoded products remain available only for explicit admin seed", () => {
   assert.match(products, /export async function seedFallbackProducts/);
   assert.match(seedRoute, /seedFallbackProducts\(/);
 });
+
+
+test("unconfigured automatic products stay automatic and checkout blocks them instead of pretending they are manual", () => {
+  const hook = read("hooks/use-store-products.ts");
+  const checkout = read("app/checkout/page.tsx");
+  assert.doesNotMatch(hook, /normalizeProviderReadiness/);
+  assert.doesNotMatch(hook, /fulfillmentType:\s*"manual"/);
+  assert.match(checkout, /if \(!providerReady\)/);
+  assert.match(checkout, /belum siap dijual karena provider\/SKU belum diatur/);
+});
