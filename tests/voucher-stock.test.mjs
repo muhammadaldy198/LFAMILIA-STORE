@@ -124,3 +124,10 @@ test("customer experience migration creates accounts, wallet, reviews, banners, 
     (id, customer_id, direction, amount, balance_before, balance_after, reference, description)
     VALUES ('wallet-b', 'customer-a', 'credit', 10000, 10000, 20000, 'topup:one', 'Duplikat')`).run(), /UNIQUE/i);
 });
+
+
+test("voucher stock defaults to website delivery when no optional email channel is configured", () => {
+  const source = fs.readFileSync(path.join(projectRoot, "lib/server/vouchers.ts"), "utf8");
+  assert.match(source, /VOUCHER_DELIVERY_CHANNEL\?\.trim\(\) \|\| "website"/);
+  assert.doesNotMatch(source, /requireRuntimeValue\(runtime\(\)\.VOUCHER_DELIVERY_CHANNEL/);
+});
