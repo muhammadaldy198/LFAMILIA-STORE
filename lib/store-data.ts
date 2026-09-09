@@ -8,6 +8,7 @@ export type ProductPackage = {
   price: number;
   note?: string;
   group?: string;
+  imageUrl?: string;
   providerCode?: string;
   providerSku?: string;
   providerConfigured?: boolean;
