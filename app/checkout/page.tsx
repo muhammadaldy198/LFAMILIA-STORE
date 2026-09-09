@@ -949,7 +949,6 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                                   {item.note && <span className="mt-1 inline-flex rounded bg-[#b9ff35] px-1.5 py-0.5 text-[7px] font-black uppercase text-[#091006]">{item.note}</span>}
                                 </div>
                                 {item.imageUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
                                   <img src={item.imageUrl} alt="" className="size-10 shrink-0 object-contain sm:size-12" />
                                 ) : null}
                               </div>
