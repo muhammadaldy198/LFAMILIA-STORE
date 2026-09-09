@@ -46,6 +46,12 @@ test("abuse-prone public endpoints are rate limited", () => {
   for (const [file, scope] of expected) assert.ok(read(file).includes(`allowRequest(request, "${scope}"`), `${file} missing ${scope}`);
 });
 
+test("all unified panel mutations reject cross-site requests centrally", () => {
+  const source = read("app/api/panel/[...path]/route.ts");
+  assert.match(source, /rejectCrossOriginMutation\(request\)/);
+  assert.match(source, /if \(originBlock\) return originBlock/);
+});
+
 test("saved game accounts enforce ownership on writes", () => {
   const source = read("app/api/account/game-accounts/route.ts");
   assert.match(source, /WHERE id = \? AND customer_id = \?/);
