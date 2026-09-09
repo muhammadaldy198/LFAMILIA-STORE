@@ -145,6 +145,7 @@ export const orders = sqliteTable(
     id: text("id").primaryKey(),
     customerId: text("customer_id").references(() => customerUsers.id, { onDelete: "set null" }),
     walletCheckoutKey: text("wallet_checkout_key"),
+    externalCheckoutKey: text("external_checkout_key"),
     referenceId: text("reference_id").notNull(),
     productSlug: text("product_slug").notNull(),
     productName: text("product_name").notNull(),
@@ -193,6 +194,7 @@ export const orders = sqliteTable(
   (table) => [
     uniqueIndex("orders_reference_id_unique").on(table.referenceId),
     uniqueIndex("orders_wallet_checkout_key_unique").on(table.customerId, table.walletCheckoutKey),
+    uniqueIndex("orders_external_checkout_key_unique").on(table.externalCheckoutKey),
     uniqueIndex("orders_provider_ref_id_unique").on(table.providerCode, table.providerRefId),
     index("orders_payment_fulfillment_idx").on(table.paymentStatus, table.fulfillmentStatus),
     index("orders_created_at_idx").on(table.createdAt),
