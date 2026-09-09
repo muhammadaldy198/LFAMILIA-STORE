@@ -11,11 +11,10 @@ export async function GET() {
     return Response.json({
       products,
       databaseReady: true,
-      seeded: products.length > 0,
     });
   } catch {
     return Response.json(
-      { products: [], databaseReady: false, seeded: false },
+      { products: [], databaseReady: false },
       { status: 503 },
     );
   }
