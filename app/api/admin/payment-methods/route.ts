@@ -8,6 +8,8 @@ import {
   type PaymentGatewayName,
 } from "@/lib/server/payment-channels";
 import { isAllowedMediaUrl } from "@/lib/media-url";
+import { findPaymentChannel } from "@/lib/payment-methods";
+import { isDokuChannelSupported } from "@/lib/server/doku";
 import { readWalletSettings } from "@/lib/server/wallet";
 
 const channelSchema = z.object({
@@ -54,6 +56,9 @@ export async function POST(request: Request) {
       });
     }
     const input = channelSchema.parse(raw);
+    if (!findPaymentChannel(input.method, input.channel) || !isDokuChannelSupported(input.method, input.channel)) {
+      throw new Error("Channel pembayaran tidak dikenali sebagai channel DOKU Direct API.");
+    }
     const id = await savePaymentChannel(input);
     return Response.json({ ok: true, id });
   } catch (error) {
