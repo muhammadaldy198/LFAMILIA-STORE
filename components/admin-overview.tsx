@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
-  ArrowDownRight,
   ArrowUpRight,
-  BadgeDollarSign,
   Box,
   CalendarDays,
   CheckCircle2,
