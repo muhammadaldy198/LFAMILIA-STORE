@@ -95,6 +95,15 @@ test("accepts managed and HTTPS image URLs while rejecting unsafe schemes", asyn
   assert.equal(isAllowedMediaUrl("/brand/../private.png"), false);
 });
 
+test("customer and pricing actions tolerate empty or non-JSON server responses", async () => {
+  const accounts = await readFile(path.join(root, "components/customer-game-accounts.tsx"), "utf8");
+  const pricing = await readFile(path.join(root, "components/admin-digiflazz-pricing.tsx"), "utf8");
+  assert.match(accounts, /const data = await readJson\(response\)/);
+  assert.match(accounts, /Akun game gagal dihapus/);
+  assert.match(pricing, /response\.json\(\)\.catch\(\(\) => \(\{\}\)\)/);
+  assert.match(pricing, /09:15 WIB/);
+});
+
 test("Contact Us uses brand marks for WhatsApp, Instagram, and Discord", async () => {
   const source = await readFile(path.join(root, "components/contact-panel.tsx"), "utf8");
   for (const name of ["WhatsAppLogo", "InstagramLogo", "DiscordLogo"]) assert.ok(source.includes(name), name);
