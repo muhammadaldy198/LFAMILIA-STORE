@@ -101,6 +101,16 @@ test("DOKU Direct API migration adds customer-facing payment artifacts", () => {
   }
 });
 
+test("external checkout migration adds a unique retry key", () => {
+  const migration = fs.readFileSync(
+    path.join(drizzleDir, "0026_external_checkout_idempotency.sql"),
+    "utf8",
+  );
+  assert.match(migration, /external_checkout_key/);
+  assert.match(migration, /orders_external_checkout_key_unique/);
+  assert.match(migration, /WHERE `external_checkout_key` IS NOT NULL/);
+});
+
 test("unexpected D1 repair errors are not swallowed", () => {
   const source = fs.readFileSync(path.join(root, "lib/server/database-repair.ts"), "utf8");
   assert.match(source, /if \(\/no such table\/i\.test\(message\)\)/);
