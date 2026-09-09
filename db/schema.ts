@@ -106,6 +106,7 @@ export const productPackages = sqliteTable(
     price: integer("price").notNull(),
     note: text("note"),
     packageGroup: text("package_group"),
+    imageUrl: text("image_url"),
     providerCode: text("provider_code"),
     providerSku: text("provider_sku"),
     supplierPrice: integer("supplier_price"),
