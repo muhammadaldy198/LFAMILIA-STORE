@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  Activity,
+  AlertTriangle,
   BarChart3,
   Box,
   CircleDollarSign,
   Clock3,
   LoaderCircle,
   PackageCheck,
+  PlugZap,
   ReceiptText,
   RefreshCw,
   TicketPercent,
@@ -53,6 +56,15 @@ type RankedCustomer = {
   total: number | null;
 };
 
+type RecentActivity = {
+  id: string;
+  adminName: string;
+  adminRole: string;
+  action: string;
+  target: string;
+  createdAt: string;
+};
+
 type RecentOrder = {
   id: string;
   referenceId: string;
@@ -84,6 +96,12 @@ type Summary = {
   topProducts: RankedProduct[];
   topCategories: RankedCategory[];
   topCustomers: RankedCustomer[];
+  integrations: {
+    doku: { ready: boolean; environment: string | null; reason: string | null };
+    digiflazz: { ready: boolean; environment: string | null; reason: string | null; issues: number; lastSyncAt: string | null };
+    webhook: { ready: boolean; baseUrl: string | null };
+  };
+  recentActivities: RecentActivity[];
   recentOrders: RecentOrder[];
 };
 
@@ -95,7 +113,7 @@ const ranges: Array<{ value: DashboardRange; label: string }> = [
   { value: "all", label: "Semua" },
 ];
 
-export function AdminOverview() {
+export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => void }) {
   const [range, setRange] = useState<DashboardRange>("7d");
   const [data, setData] = useState<Summary | null>(null);
   const [error, setError] = useState("");
@@ -199,6 +217,40 @@ export function AdminOverview() {
       </section>
 
       {error && <div className="rounded-md border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2 text-[10px] text-amber-100">{error}</div>}
+
+      <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="grid gap-2 sm:grid-cols-3">
+          <IntegrationCard
+            label="DOKU Direct API"
+            ready={data.integrations.doku.ready}
+            detail={data.integrations.doku.ready ? `Siap · ${data.integrations.doku.environment ?? "-"}` : data.integrations.doku.reason || "Belum dikonfigurasi"}
+          />
+          <IntegrationCard
+            label="Digiflazz"
+            ready={data.integrations.digiflazz.ready && data.integrations.digiflazz.issues === 0}
+            warning={data.integrations.digiflazz.ready && data.integrations.digiflazz.issues > 0}
+            detail={data.integrations.digiflazz.ready
+              ? data.integrations.digiflazz.issues > 0
+                ? `${data.integrations.digiflazz.issues} SKU perlu perhatian`
+                : `Siap · ${data.integrations.digiflazz.environment ?? "-"}`
+              : data.integrations.digiflazz.reason || "Belum dikonfigurasi"}
+            meta={data.integrations.digiflazz.lastSyncAt ? `Sync: ${formatDateTime(data.integrations.digiflazz.lastSyncAt)}` : "Belum ada sync harga"}
+          />
+          <IntegrationCard
+            label="Webhook / Callback"
+            ready={data.integrations.webhook.ready}
+            detail={data.integrations.webhook.ready ? "URL publik siap" : "PUBLIC_BASE_URL belum siap"}
+            meta={data.integrations.webhook.baseUrl || undefined}
+          />
+        </div>
+
+        <div className="flex flex-wrap content-start gap-1.5 lg:max-w-[270px]">
+          <Button type="button" size="sm" onClick={() => onNavigate?.("orders")} className="h-8 bg-[#155eef] px-2.5 text-[9px] font-bold text-white hover:bg-[#0b4dd8]">Pesanan</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => onNavigate?.("products")} className="h-8 border-white/10 bg-white/[0.03] px-2.5 text-[9px]">Produk</Button>
+          {data.canViewFinance && <Button type="button" size="sm" variant="outline" onClick={() => onNavigate?.("digiflazz")} className="h-8 border-white/10 bg-white/[0.03] px-2.5 text-[9px]">Sync Digiflazz</Button>}
+          {data.canViewFinance && <Button type="button" size="sm" variant="outline" onClick={() => onNavigate?.("payments")} className="h-8 border-white/10 bg-white/[0.03] px-2.5 text-[9px]">Pembayaran</Button>}
+        </div>
+      </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map(({ label, value, Icon, tone }) => (
@@ -325,6 +377,29 @@ export function AdminOverview() {
         </section>
       )}
 
+      {data.recentActivities.length > 0 && (
+        <section className="rounded-lg border border-white/[0.08] bg-[#0d1019] p-4">
+          <div className="flex items-center gap-2">
+            <Activity className="size-3.5 text-[#d8ff8d]" />
+            <div>
+              <p className="text-xs font-bold">Aktivitas admin terbaru</p>
+              <p className="text-[10px] text-white/35">Perubahan terakhir dari Pemilik dan Staff.</p>
+            </div>
+          </div>
+          <div className="mt-3 divide-y divide-white/[0.07] rounded-md border border-white/[0.08]">
+            {data.recentActivities.slice(0, 6).map((item) => (
+              <div key={item.id} className="flex items-start justify-between gap-3 px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-[10px] font-semibold">{item.adminName} <span className="font-normal text-white/35">· {item.action}</span></p>
+                  <p className="mt-0.5 truncate text-[9px] text-white/32">{item.target}</p>
+                </div>
+                <span className="shrink-0 text-[8px] text-white/28">{formatDateTime(item.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="overflow-hidden rounded-lg border border-white/[0.08] bg-[#0d1019]">
         <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] px-4 py-3">
           <div>
@@ -374,6 +449,37 @@ export function AdminOverview() {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function IntegrationCard({
+  label,
+  ready,
+  warning = false,
+  detail,
+  meta,
+}: {
+  label: string;
+  ready: boolean;
+  warning?: boolean;
+  detail: string;
+  meta?: string;
+}) {
+  const tone = warning
+    ? "border-amber-300/20 bg-amber-300/[0.05]"
+    : ready
+      ? "border-emerald-300/20 bg-emerald-300/[0.04]"
+      : "border-red-300/20 bg-red-300/[0.04]";
+  const Icon = warning ? AlertTriangle : PlugZap;
+  return (
+    <div className={"rounded-lg border p-3 " + tone}>
+      <div className="flex items-center gap-2">
+        <Icon className={"size-3.5 " + (warning ? "text-amber-300" : ready ? "text-emerald-300" : "text-red-300")} />
+        <strong className="text-[10px]">{label}</strong>
+      </div>
+      <p className="mt-1.5 line-clamp-2 text-[9px] leading-4 text-white/48">{detail}</p>
+      {meta && <p className="mt-1 truncate text-[8px] text-white/28">{meta}</p>}
     </div>
   );
 }
