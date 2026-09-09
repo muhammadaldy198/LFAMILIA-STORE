@@ -65,7 +65,7 @@ test("runtime compatibility repair is limited to documented legacy gaps", () => 
   assert.deepEqual(missing.sort(), expectedLegacyOnly);
 });
 
-test("DOKU migration owns payment columns and resets pre-launch transaction data", () => {
+test("DOKU migration owns payment columns without destructive transaction cleanup", () => {
   const migration = fs.readFileSync(
     path.join(drizzleDir, "0023_doku_digiflazz_reset.sql"),
     "utf8",
@@ -81,7 +81,17 @@ test("DOKU migration owns payment columns and resets pre-launch transaction data
     assert.match(migration, new RegExp(column));
   }
   for (const table of ["order_events", "voucher_deliveries", "orders", "wallet_transactions", "wallet_topups"]) {
-    assert.match(migration, new RegExp(`DELETE FROM ${table}`));
+    assert.doesNotMatch(migration, new RegExp(`DELETE FROM ${table}`));
+  }
+});
+
+test("runtime DOKU preparation never deletes transactional data", () => {
+  const source = fs.readFileSync(
+    path.join(root, "lib/server/doku-database-preparation.ts"),
+    "utf8",
+  );
+  for (const table of ["order_events", "voucher_deliveries", "orders", "wallet_transactions", "wallet_topups"]) {
+    assert.doesNotMatch(source, new RegExp(`DELETE FROM ${table}`));
   }
 });
 
