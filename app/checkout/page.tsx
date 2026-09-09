@@ -690,6 +690,10 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       setError(unavailablePaymentMessage);
       return;
     }
+    if (!providerReady) {
+      setError("Produk otomatis ini belum siap dijual karena provider/SKU belum diatur.");
+      return;
+    }
     setError("");
     setConfirmationOpen(true);
   }
