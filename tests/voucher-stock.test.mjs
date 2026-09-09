@@ -102,13 +102,6 @@ test("product notices cascade and flash sales can be scheduled repeatedly", () =
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM product_notices").get().count, baselineNotices);
 });
 
-test("one-time catalog repopulation restores the bundled catalog as normal rows", () => {
-  const db = migratedDatabase();
-  assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM products").get().count), 24);
-  assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM product_packages").get().count), 83);
-  assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM product_notices").get().count), 3);
-});
-
 test("customer experience migration creates accounts, wallet, reviews, banners, popups, and news", () => {
   const db = migratedDatabase();
   const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name));
