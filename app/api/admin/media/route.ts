@@ -1,7 +1,10 @@
 import { requireAdminSession } from "@/lib/server/admin";
 import { uploadStoreMedia } from "@/lib/server/media";
+import { rejectCrossOriginMutation } from "@/lib/server/security";
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
   const access = await requireAdminSession(request, "staff");
   if (access instanceof Response) return access;
 
