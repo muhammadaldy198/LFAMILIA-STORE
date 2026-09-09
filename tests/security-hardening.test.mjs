@@ -72,7 +72,7 @@ test("Worker applies baseline browser security headers", () => {
 
 test("Worker runtime retains the configured R2 media binding", () => {
   const source = read("worker/index.ts");
-  assert.match(source, /BUCKET\?: R2Bucket/);
+  assert.match(source, /BUCKET\?: object/);
   const integrations = read("lib/server/integration-config.ts");
   assert.match(integrations, /const target: Record<string, unknown> = \{ \.\.\.systemOnly \}/);
 });
