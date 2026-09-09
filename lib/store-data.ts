@@ -10,6 +10,7 @@ export type ProductPackage = {
   group?: string;
   providerCode?: string;
   providerSku?: string;
+  providerConfigured?: boolean;
 };
 
 export type FulfillmentType = "automatic" | "manual";
