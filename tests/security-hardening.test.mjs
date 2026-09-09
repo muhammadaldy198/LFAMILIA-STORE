@@ -63,6 +63,18 @@ test("Worker applies baseline browser security headers", () => {
   for (const header of ["X-Content-Type-Options","X-Frame-Options","Referrer-Policy","Permissions-Policy","Content-Security-Policy","Strict-Transport-Security"]) assert.ok(source.includes(header), header);
 });
 
+test("authenticated customer data is explicitly non-cacheable", () => {
+  for (const file of [
+    "app/api/account/route.ts",
+    "app/api/account/membership/route.ts",
+    "app/api/account/support/route.ts",
+    "app/api/account/game-accounts/route.ts",
+  ]) {
+    assert.match(read(file), /"Cache-Control": "no-store"/, file);
+  }
+  assert.match(read("lib/server/customer-auth.ts"), /status: 401, headers: \{ "Cache-Control": "no-store" \}/);
+});
+
 test("customer sessions are bounded and stale rate-limit buckets are cleaned", () => {
   assert.match(read("lib/server/customer-auth.ts"), /oldSessions\.results\.slice\(4\)/);
   assert.match(read("worker/index.ts"), /cleanupSecurityRateLimits/);
