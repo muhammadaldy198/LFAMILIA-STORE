@@ -35,6 +35,19 @@ test("checkout creates one DOKU payment without legacy gateway fallback", () => 
   assert.doesNotMatch(autoRoute, /midtrans|ipaymu|fallback/i);
 });
 
+test("DOKU database readiness includes current Direct API artifacts", () => {
+  const preparation = fs.readFileSync(path.join(root, "lib/server/doku-database-preparation.ts"), "utf8");
+  for (const column of [
+    "doku_reference_no",
+    "doku_payment_no",
+    "doku_qr_content",
+    "doku_payment_name",
+    "doku_status_checked_at",
+  ]) {
+    assert.match(preparation, new RegExp(column));
+  }
+});
+
 test("DOKU database preparation is schema-only and non-destructive", () => {
   const preparation = fs.readFileSync(path.join(root, "lib/server/doku-database-preparation.ts"), "utf8");
   assert.match(preparation, /ALTER TABLE/);
