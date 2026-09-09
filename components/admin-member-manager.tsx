@@ -37,7 +37,7 @@ export function AdminMemberManager({
     setLoading(true); setError("");
     try {
       const response = await fetch("/api/panel/members", { cache: "no-store" });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Data member gagal dimuat.");
       setSettings(data.settings ?? []); setMembers(data.members ?? []);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Data member gagal dimuat."); }
@@ -59,7 +59,7 @@ export function AdminMemberManager({
         method: "PUT", headers: { "content-type": "application/json" },
         body: JSON.stringify({ settings: settings.map((item) => ({ tier: item.tier, discountPercent: Number(item.discountPercent) || 0, benefits: item.benefits })) }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Privilege member gagal disimpan.");
       setSettings(data.settings ?? settings); setTierEdit(null); setMessage("Privilege member berhasil disimpan.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Privilege member gagal disimpan."); }
@@ -80,7 +80,7 @@ export function AdminMemberManager({
         method: "PATCH", headers: { "content-type": "application/json" },
         body: JSON.stringify({ customerId: memberEdit.id, role, addBalance: Number(addBalance) || 0, reason: reason.trim() || undefined }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Member gagal diperbarui.");
       setMembers(data.members ?? members); setMemberEdit(null); setMessage("Role dan saldo member berhasil diperbarui.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Member gagal diperbarui."); }
