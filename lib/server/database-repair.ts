@@ -49,6 +49,7 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["store_settings", "discord_url", "discord_url TEXT"],
   ["store_settings", "support_widget_enabled", "support_widget_enabled INTEGER DEFAULT 1 NOT NULL"],
   ["product_packages", "package_group", "package_group TEXT"],
+  ["product_packages", "image_url", "image_url TEXT"],
   ["product_packages", "provider_code", "provider_code TEXT"],
   ["product_packages", "provider_sku", "provider_sku TEXT"],
   ["product_packages", "supplier_price", "supplier_price INTEGER"],
