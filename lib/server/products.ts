@@ -157,6 +157,10 @@ export function getFallbackProducts(): ManagedProduct[] {
 export async function readProducts(includeInactive = false): Promise<ManagedProduct[]> {
   await ensureLegacyDatabaseColumns();
   const db = getD1();
+  const catalogCount = await db.prepare("SELECT COUNT(*) AS count FROM products").first<{ count: number }>();
+  if (Number(catalogCount?.count ?? 0) === 0) {
+    await seedFallbackProducts();
+  }
   const productSql = includeInactive
     ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json,
         needs_server, popular, instant, fulfillment_type, target_template, manual_instructions,
