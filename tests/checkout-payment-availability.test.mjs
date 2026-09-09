@@ -32,3 +32,11 @@ test("checkout waits for payment methods before defaulting to wallet", () => {
   assert.match(source, /paymentMethodsLoaded/);
   assert.match(source, /Memuat metode pembayaran/);
 });
+
+
+test("DOKU channel sync never enables merchant channels automatically", () => {
+  const channels = fs.readFileSync(path.join(root, "lib/server/payment-channels.ts"), "utf8");
+  assert.match(channels, /isActive: false/);
+  assert.match(channels, /activationPolicy: "manual"/);
+  assert.doesNotMatch(channels, /is_active = excluded\.is_active/);
+});
