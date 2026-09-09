@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { BellRing, ChevronDown, ChevronUp, Database, Edit3, LoaderCircle, PackagePlus, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { BellRing, ChevronDown, ChevronUp, Database, Edit3, ImageIcon, LoaderCircle, PackagePlus, Plus, RefreshCw, Search, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +19,24 @@ import type { DigiflazzSellerMonitorItem } from "@/lib/server/digiflazz-monitor"
 
 type DraftPackage = ManagedProduct["packages"][number];
 type DraftNotice = ManagedProduct["notices"][number];
+
+type DigiflazzCatalogItem = {
+  buyerSkuCode: string;
+  productName: string;
+  category: string;
+  brand: string;
+  type: string;
+  sellerName: string;
+  price: number;
+  buyerProductStatus: boolean;
+  sellerProductStatus: boolean;
+  unlimitedStock: boolean;
+  stock: number;
+  multi: boolean;
+  startCutOff: string;
+  endCutOff: string;
+  description: string;
+};
 
 type DigiflazzMonitorPayload = {
   items: DigiflazzSellerMonitorItem[];
@@ -80,6 +98,15 @@ export function AdminProductManager() {
   const [packageStatusSaving, setPackageStatusSaving] = useState<number | null>(null);
   const [sellerMonitor, setSellerMonitor] = useState<DigiflazzMonitorPayload | null>(null);
   const [monitorRefreshing, setMonitorRefreshing] = useState(false);
+  const [digiflazzImportOpen, setDigiflazzImportOpen] = useState(false);
+  const [digiflazzImportTarget, setDigiflazzImportTarget] = useState<ManagedProduct | null>(null);
+  const [digiflazzCatalog, setDigiflazzCatalog] = useState<DigiflazzCatalogItem[]>([]);
+  const [digiflazzCatalogLoading, setDigiflazzCatalogLoading] = useState(false);
+  const [digiflazzCatalogQuery, setDigiflazzCatalogQuery] = useState("");
+  const [digiflazzSelected, setDigiflazzSelected] = useState<string[]>([]);
+  const [digiflazzGroup, setDigiflazzGroup] = useState("");
+  const [digiflazzMarginType, setDigiflazzMarginType] = useState<"fixed" | "percent">("fixed");
+  const [digiflazzMarginValue, setDigiflazzMarginValue] = useState(0);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -203,6 +230,7 @@ export function AdminProductManager() {
           price: 0,
           note: "",
           group: current.packageTabsEnabled ? current.packageTabs[0] ?? "" : "",
+          imageUrl: "",
           providerCode: current.category === "voucher" ? "voucher-stock" : undefined,
           providerSku: undefined,
           supplierPrice: null,
@@ -214,6 +242,79 @@ export function AdminProductManager() {
         },
       ],
     }));
+  }
+
+  function moveCatalogPackage(item: ManagedProduct, index: number, direction: -1 | 1) {
+    const key = itemKey(item);
+    updateCatalogProduct(key, (current) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.packages.length) return current;
+      const packages = [...current.packages];
+      [packages[index], packages[nextIndex]] = [packages[nextIndex], packages[index]];
+      return { ...current, packages };
+    });
+  }
+
+  async function openDigiflazzImport(item: ManagedProduct) {
+    setDigiflazzImportTarget(item);
+    setDigiflazzGroup(item.packageTabs[0] ?? "");
+    setDigiflazzSelected([]);
+    setDigiflazzCatalogQuery("");
+    setDigiflazzImportOpen(true);
+    if (digiflazzCatalog.length) return;
+    setDigiflazzCatalogLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/panel/digiflazz-pricing?catalog=1", { cache: "no-store" });
+      const data = await response.json().catch(() => ({})) as { catalog?: DigiflazzCatalogItem[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Price list DigiFlazz gagal dimuat.");
+      setDigiflazzCatalog(data.catalog ?? []);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Price list DigiFlazz gagal dimuat.");
+    } finally {
+      setDigiflazzCatalogLoading(false);
+    }
+  }
+
+  async function addSelectedDigiflazzPackages() {
+    const target = digiflazzImportTarget;
+    if (!target?.dbId || !digiflazzSelected.length) return;
+    const selected = digiflazzCatalog.filter((item) => digiflazzSelected.includes(item.buyerSkuCode));
+    const existing = new Set(target.packages.map((item) => item.providerSku).filter(Boolean));
+    const additions = selected
+      .filter((item) => !existing.has(item.buyerSkuCode))
+      .map((item, offset) => {
+        const price = digiflazzMarginType === "percent"
+          ? Math.ceil((item.price * (100 + digiflazzMarginValue)) / 100)
+          : item.price + digiflazzMarginValue;
+        return {
+          dbId: null,
+          id: slugify(`${target.slug}-${item.buyerSkuCode}`),
+          label: item.productName,
+          price,
+          note: "",
+          group: target.packageTabsEnabled ? digiflazzGroup || target.packageTabs[0] || "" : "",
+          imageUrl: "",
+          providerCode: "digiflazz" as const,
+          providerSku: item.buyerSkuCode,
+          supplierPrice: item.price,
+          pricingMode: "auto" as const,
+          marginType: digiflazzMarginType,
+          marginValue: digiflazzMarginValue,
+          isActive: item.buyerProductStatus && item.sellerProductStatus,
+          sortOrder: target.packages.length + offset,
+        };
+      });
+    if (!additions.length) {
+      setError("SKU yang dipilih sudah ada pada produk ini.");
+      return;
+    }
+    const next = { ...target, packages: [...target.packages, ...additions] };
+    const ok = await saveCatalogProduct(next, `${additions.length} nominal DigiFlazz berhasil ditambahkan.`);
+    if (ok) {
+      setDigiflazzImportOpen(false);
+      setDigiflazzSelected([]);
+    }
   }
 
   function addCatalogTab(item: ManagedProduct) {
@@ -602,13 +703,14 @@ export function AdminProductManager() {
                   {role === "owner" && <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.07] pb-3">
                     <div><strong className="text-[10px] text-white/65">Pengaturan nominal</strong><p className="mt-0.5 text-[8px] text-white/28">Tambah tab pemisah, pindahkan nominal, atur provider, lalu simpan.</p></div>
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" onClick={() => addCatalogTab(item)} variant="outline" size="sm" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-2.5 text-[9px] text-white"><Plus className="mr-1 size-3" />Tambah Tab Pemisah</Button>
-                      <Button type="button" onClick={() => addCatalogPackage(item)} variant="outline" size="sm" className="h-8 rounded-lg border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] px-2.5 text-[9px] text-[#d8ff8d]"><PackagePlus className="mr-1 size-3" />Tambah nominal</Button>
+                      <Button type="button" onClick={() => addCatalogTab(item)} variant="outline" size="sm" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-2.5 text-[9px] text-white"><Plus className="mr-1 size-3" />Tambah Section Pemisah</Button>
+                      <Button type="button" onClick={() => void openDigiflazzImport(item)} variant="outline" size="sm" className="h-8 rounded-lg border-blue-400/20 bg-blue-400/[0.05] px-2.5 text-[9px] text-blue-300"><PackagePlus className="mr-1 size-3" />Tambah dari Digiflazz</Button>
+                      <Button type="button" onClick={() => addCatalogPackage(item)} variant="outline" size="sm" className="h-8 rounded-lg border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] px-2.5 text-[9px] text-[#d8ff8d]"><PackagePlus className="mr-1 size-3" />Tambah manual</Button>
                     </div>
                   </div>}
 
                   {role === "owner" && item.packageTabs.length > 0 && <div className="border-b border-white/[0.07] py-3">
-                    <p className="mb-2 text-[9px] font-bold text-white/40">Tab pemisah</p>
+                    <p className="mb-2 text-[9px] font-bold text-white/40">Section pemisah nominal · urutan section menentukan posisi di halaman customer</p>
                     <div className="space-y-2">{item.packageTabs.map((tab, tabIndex) => <div key={`${tabIndex}-${tab}`} className="flex items-center gap-2">
                       <div className="flex shrink-0 flex-col"><button type="button" disabled={tabIndex === 0} onClick={() => moveCatalogTab(item, tabIndex, -1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20"><ChevronUp className="size-3.5" /></button><button type="button" disabled={tabIndex === item.packageTabs.length - 1} onClick={() => moveCatalogTab(item, tabIndex, 1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20"><ChevronDown className="size-3.5" /></button></div>
                       <Input value={tab} onChange={(event) => updateCatalogTab(item, tabIndex, event.target.value)} className="admin-input h-9 min-w-0 flex-1" placeholder="Nama tab pemisah" />
