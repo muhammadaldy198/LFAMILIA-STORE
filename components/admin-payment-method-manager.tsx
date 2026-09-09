@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useState } from "react";
-import { CreditCard, Edit3, LoaderCircle, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { CreditCard, Edit3, LoaderCircle, RefreshCw, Save } from "lucide-react";
 import { AdminMediaUpload } from "@/components/admin-media-upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,23 +55,6 @@ export function AdminPaymentMethodManager() {
     setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
   }
 
-  function add() {
-    setItems((current) => {
-      const next = [...current, {
-        id: null,
-        method: "va" as const,
-        channel: "",
-        name: "",
-        description: "",
-        imageUrl: "",
-        isActive: false,
-        sortOrder: current.length,
-      }];
-      window.setTimeout(() => setEditing(next.length - 1), 0);
-      return next;
-    });
-  }
-
   async function syncGateway() {
     setSyncing(true);
     setError("");
@@ -115,18 +98,6 @@ export function AdminPaymentMethodManager() {
     }
   }
 
-  async function remove(index: number) {
-    const item = items[index];
-    if (!item.id || !window.confirm(`Hapus ${item.name}?`)) return;
-    const response = await fetch(`/api/panel/payment-methods?id=${item.id}`, { method: "DELETE" });
-    if (!response.ok) {
-      setError("Metode pembayaran gagal dihapus.");
-      return;
-    }
-    setEditing(null);
-    await load();
-  }
-
   if (loading) return <div className="flex min-h-40 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat metode pembayaran…</div>;
 
   const item = editing == null ? null : items[editing];
@@ -134,14 +105,14 @@ export function AdminPaymentMethodManager() {
 
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-[10px] text-white/35">Metode checkout mengikuti channel yang didukung DOKU. Pelanggan hanya memilih QRIS, E-Wallet, atau Virtual Account.</p>
-      <div className="flex gap-2">
-        <Button type="button" disabled={syncing || gateways.length === 0} onClick={() => void syncGateway()} variant="outline" size="sm" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-3 text-[9px] text-white">
-          {syncing ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}
-          Sync {gatewayLabel}
-        </Button>
-        <Button type="button" onClick={add} size="sm" className="h-8 bg-[#b9ff35] px-3 text-[9px] font-black text-[#091006]"><Plus className="mr-1 size-3" />Tambah metode</Button>
+      <div>
+        <p className="text-[10px] text-white/45">Daftar channel mengikuti DOKU Direct API. Aktifkan hanya metode yang benar-benar sudah diaktifkan pada akun merchant DOKU.</p>
+        <p className="mt-1 text-[9px] text-amber-300/70">Sync tidak akan mengaktifkan QRIS, E-Wallet, atau VA secara otomatis.</p>
       </div>
+      <Button type="button" disabled={syncing || gateways.length === 0} onClick={() => void syncGateway()} variant="outline" size="sm" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-3 text-[9px] text-white">
+        {syncing ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}
+        Sync daftar {gatewayLabel}
+      </Button>
     </div>
     {gateways.length === 0 && <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.05] p-3 text-[10px] text-amber-100/65">Aktifkan DOKU untuk checkout sebelum melakukan sync.</p>}
     {message && <p className="rounded-lg border border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] p-3 text-xs text-[#d8ff8d]">{message}</p>}
@@ -165,13 +136,13 @@ export function AdminPaymentMethodManager() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2"><AdminMediaUpload label="Logo pembayaran" value={item.imageUrl ?? ""} onChange={(imageUrl) => update(editing, { imageUrl })} help="Logo yang tampil di checkout." previewClassName="h-20" /></div>
           <Field label="Nama"><Input value={item.name} onChange={(e) => update(editing, { name: e.target.value })} className="admin-input" /></Field>
-          <Field label="Jenis"><select value={item.method} onChange={(e) => update(editing, { method: e.target.value as ManagedPaymentChannel["method"] })} className="admin-input"><option value="va">Virtual Account</option><option value="ewallet">E-Wallet</option><option value="qris">QRIS</option></select></Field>
-          <Field label="Kode channel"><Input value={item.channel} onChange={(e) => update(editing, { channel: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "") })} className="admin-input" /></Field>
+          <Field label="Jenis"><div className="admin-readonly">{item.method === "va" ? "Virtual Account" : item.method === "ewallet" ? "E-Wallet" : "QRIS"}</div></Field>
+          <Field label="Kode DOKU"><div className="admin-readonly font-mono">{item.channel}</div></Field>
           <Field label="Urutan"><Input type="number" min={0} value={item.sortOrder} onChange={(e) => update(editing, { sortOrder: Number(e.target.value) })} className="admin-input" /></Field>
           <Field label="Keterangan" wide><Input value={item.description} onChange={(e) => update(editing, { description: e.target.value })} className="admin-input" /></Field>
           <label className="flex items-center justify-between border-t border-white/[0.08] py-3 text-xs text-white/60 sm:col-span-2"><span>Aktif di checkout</span><Switch checked={item.isActive} onCheckedChange={(isActive) => update(editing, { isActive })} /></label>
         </div>
-        <DialogFooter>{item.id && <Button type="button" variant="ghost" onClick={() => void remove(editing)} className="mr-auto text-red-300"><Trash2 className="mr-1 size-4" />Hapus</Button>}<Button type="button" variant="outline" onClick={() => setEditing(null)} className="border-white/10 bg-white/[0.03] text-white">Batal</Button><Button type="button" disabled={saving === `save-${editing}`} onClick={() => void save(editing)} className="bg-[#b9ff35] font-black text-[#091006]">{saving === `save-${editing}` ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}Simpan</Button></DialogFooter>
+        <DialogFooter><Button type="button" variant="outline" onClick={() => setEditing(null)} className="border-white/10 bg-white/[0.03] text-white">Batal</Button><Button type="button" disabled={saving === `save-${editing}`} onClick={() => void save(editing)} className="bg-[#b9ff35] font-black text-[#091006]">{saving === `save-${editing}` ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}Simpan</Button></DialogFooter>
       </DialogContent>}
     </Dialog>
   </div>;
