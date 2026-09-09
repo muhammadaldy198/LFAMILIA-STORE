@@ -153,7 +153,7 @@ export async function getCustomerSession(request: Request): Promise<CustomerSess
 
 export async function requireCustomerSession(request: Request) {
   const customer = await getCustomerSession(request);
-  if (!customer) return Response.json({ error: "Silakan masuk ke akun terlebih dahulu." }, { status: 401 });
+  if (!customer) return Response.json({ error: "Silakan masuk ke akun terlebih dahulu." }, { status: 401, headers: { "Cache-Control": "no-store" } });
   return customer;
 }
 
