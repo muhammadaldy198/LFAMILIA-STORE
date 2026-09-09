@@ -25,7 +25,7 @@ import * as vouchers from "@/app/api/admin/vouchers/route";
 import * as wallet from "@/app/api/admin/wallet/route";
 import * as walletProof from "@/app/api/admin/wallet/proof/route";
 import { getAdminSession } from "@/lib/server/admin";
-import { recordAdminActivity } from "@/lib/server/security";
+import { recordAdminActivity, rejectCrossOriginMutation } from "@/lib/server/security";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -63,6 +63,8 @@ const routes: Record<string, RouteHandlers> = {
 };
 
 async function dispatch(request: Request, context: RouteContext, method: Method) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
   await ensureLegacyDatabaseColumns();
   const { path } = await context.params;
   const handlers = routes[path.join("/")];
