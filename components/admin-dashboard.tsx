@@ -1,11 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
-  Bell,
   Box,
   ChevronDown,
   CreditCard,
@@ -25,6 +23,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AdminBrandLogo } from "@/components/admin-brand-logo";
+import { AdminNotifications } from "@/components/admin-notifications";
 import { AdminDigiflazzMonitor } from "@/components/admin-digiflazz-monitor";
 import { AdminDokuDatabasePreparation } from "@/components/admin-doku-database-preparation";
 import { AdminDigiflazzPricing } from "@/components/admin-digiflazz-pricing";
@@ -186,10 +186,11 @@ export function AdminDashboard({
             </form>
 
             <div className="ml-auto flex items-center gap-2">
-              <button type="button" className="relative grid size-8 place-items-center rounded-full text-[#64748b] hover:bg-[#f1f5f9]" aria-label="Notifikasi">
-                <Bell className="size-4" />
-                <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-red-500 ring-2 ring-white" />
-              </button>
+              <AdminNotifications
+                sessionId={initialSession.id}
+                isOwner={isOwner}
+                onNavigate={selectTab}
+              />
 
               <div className="hidden items-center gap-2 sm:flex">
                 <span className="grid size-8 place-items-center rounded-full bg-[#155eef] text-[10px] font-black text-white">
@@ -334,7 +335,7 @@ export function AdminDashboard({
 function Brand({ onClick }: { onClick(): void }) {
   return (
     <button type="button" onClick={onClick} className="flex h-[54px] w-full items-center gap-2.5 border-b border-[#edf0f5] px-4 text-left">
-      <Image src="/lfamilia-admin-logo.webp" alt="LFAMILIA" width={34} height={34} priority className="size-8 rounded-full object-cover shadow-sm" />
+      <AdminBrandLogo primarySrc="/lfamilia-admin-logo.webp" />
       <span className="min-w-0">
         <strong className="block truncate text-[13px] font-black tracking-[-0.03em] text-[#172033]">LFAMILIA</strong>
         <span className="block truncate text-[6px] font-bold uppercase tracking-[0.1em] text-[#94a3b8]">Top Up & Digital Service</span>
