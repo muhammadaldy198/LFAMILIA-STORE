@@ -2,10 +2,14 @@ import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import { deleteManagedContent, listHomeBanners, listNews, listSitePopups, saveHomeBanner, saveNews, saveSitePopup } from "@/lib/server/content";
 import { isAllowedMediaUrl } from "@/lib/media-url";
+import { isAllowedNavigationUrl } from "@/lib/navigation-url";
 
 const mediaUrl = z.string().trim().max(500).refine(isAllowedMediaUrl, "URL gambar tidak valid.");
-const optionalUrl = z.string().trim().max(500).optional().or(z.literal(""));
-const bannerSchema = z.object({ id: z.number().int().positive().nullable().optional(), title: z.string().trim().min(2).max(120), subtitle: z.string().trim().max(300), imageUrl: mediaUrl, mobileImageUrl: mediaUrl.optional().or(z.literal("")), ctaLabel: z.string().trim().min(2).max(50), ctaHref: z.string().trim().min(1).max(300), isActive: z.boolean(), sortOrder: z.number().int().min(0).max(10000) });
+const optionalUrl = z.union([
+  z.literal(""),
+  z.string().trim().max(500).refine(isAllowedNavigationUrl, "URL tujuan tidak valid."),
+]);
+const bannerSchema = z.object({ id: z.number().int().positive().nullable().optional(), title: z.string().trim().min(2).max(120), subtitle: z.string().trim().max(300), imageUrl: mediaUrl, mobileImageUrl: mediaUrl.optional().or(z.literal("")), ctaLabel: z.string().trim().min(2).max(50), ctaHref: z.string().trim().min(1).max(300).refine(isAllowedNavigationUrl, "Tujuan banner tidak valid."), isActive: z.boolean(), sortOrder: z.number().int().min(0).max(10000) });
 const popupSchema = z.object({ id: z.number().int().positive().nullable().optional(), title: z.string().trim().min(2).max(140), body: z.string().trim().min(2).max(3000), primaryLabel: z.string().trim().max(80).optional(), primaryHref: optionalUrl, secondaryLabel: z.string().trim().max(80).optional(), secondaryHref: optionalUrl, dismissDays: z.number().int().min(0).max(365), isActive: z.boolean(), sortOrder: z.number().int().min(0).max(10000) });
 const newsSchema = z.object({ id: z.number().int().positive().nullable().optional(), slug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100), title: z.string().trim().min(2).max(180), summary: z.string().trim().max(500), body: z.string().trim().min(2).max(12000), coverUrl: mediaUrl.optional().or(z.literal("")), isPublished: z.boolean(), publishedAt: z.string().trim().max(40).optional().or(z.literal("")), sortOrder: z.number().int().min(0).max(10000) });
 
