@@ -38,7 +38,7 @@ export function ProductReviews({ productSlug }: { productSlug: string }) {
     event.preventDefault(); setSaving(true); setError(""); setMessage("");
     try {
       const response = await fetch("/api/reviews", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ productSlug, rating, title, body }) });
-      const data = await response.json() as { error?: string };
+      const data = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Ulasan gagal disimpan.");
       setBody(""); setTitle(""); setMessage("Ulasanmu berhasil ditampilkan."); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Ulasan gagal disimpan."); }
