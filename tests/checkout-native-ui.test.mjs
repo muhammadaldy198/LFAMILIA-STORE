@@ -35,11 +35,11 @@ test("WhatsApp input is normalized in React", () => {
   assert.match(checkout, /autoComplete="tel"/);
 });
 
-test("additional nickname checks are optional and do not block checkout", () => {
+test("nickname verification is optional and never becomes another checkout dependency", () => {
   const checkout = read("app/checkout/page.tsx");
-  assert.match(checkout, /const requiredNicknameGames = new Set/);
+  assert.match(checkout, /const requiredNicknameGames = new Set<string>\(\)/);
   assert.match(checkout, /const optionalNicknameGames = new Set/);
-  assert.match(checkout, /nicknameRequired && visibleNickname\.status !== "success"/);
+  assert.match(checkout, /"mobile-legends"/);
   assert.match(checkout, /blocking=\{nicknameRequired\}/);
 });
 
