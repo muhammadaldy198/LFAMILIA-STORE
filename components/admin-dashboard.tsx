@@ -209,9 +209,7 @@ export function AdminDashboard({
             </TabsContent>
 
             <TabsContent value="products" className="mt-0">
-              <AdminSection title="Produk" description="Kelola katalog, nominal, gambar nominal, section pemisah, posisi nominal, harga, dan fulfillment.">
-                <AdminProductManager />
-              </AdminSection>
+              <AdminProductManager />
             </TabsContent>
 
             {isOwner && (
