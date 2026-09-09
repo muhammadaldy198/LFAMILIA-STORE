@@ -1,8 +1,8 @@
 import { getD1 } from "@/db";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
-import { products as fallbackProducts, type ProductInputField, type ProductNotice, type ProductPackage, type StoreProduct } from "@/lib/store-data";
+import { products as bundledProducts, type ProductInputField, type ProductNotice, type ProductPackage, type StoreProduct } from "@/lib/store-data";
 
-const fallbackProductBySlug = new Map(fallbackProducts.map((product) => [product.slug, product]));
+const bundledProductBySlug = new Map(bundledProducts.map((product) => [product.slug, product]));
 
 export type ManagedPackage = ProductPackage & {
   dbId: number | null;
@@ -161,7 +161,7 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
   const noticeRows = noticeResult.results as NoticeRow[];
 
   return (productResult.results as ProductRow[]).map((row) => {
-    const bundled = fallbackProductBySlug.get(row.slug);
+    const bundled = bundledProductBySlug.get(row.slug);
     return {
     dbId: row.id,
     slug: row.slug,
