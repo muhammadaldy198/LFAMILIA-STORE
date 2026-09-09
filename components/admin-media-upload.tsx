@@ -31,7 +31,7 @@ export function AdminMediaUpload({
       const form = new FormData();
       form.set("file", preparedFile);
       const response = await fetch("/api/panel/media", { method: "POST", body: form });
-      const data = await response.json() as { url?: string; error?: string };
+      const data = await response.json().catch(() => ({})) as { url?: string; error?: string };
       if (!response.ok || !data.url) throw new Error(data.error || "Gambar gagal diunggah.");
       onChange(data.url);
     } catch (reason) {
