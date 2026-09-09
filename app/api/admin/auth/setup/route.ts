@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { adminSessionCookie, configurePrimaryOwner, getOwnerCredentialState, isValidAdminId } from "@/lib/server/admin-auth";
 import { getAccessEmail, getOwnerEmail } from "@/lib/server/admin";
-import { allowRequest } from "@/lib/server/security";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 const schema = z.object({
   username: z.string().trim().min(3, "ID admin minimal 3 karakter.").max(32).refine(isValidAdminId, "ID hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda minus."),
@@ -21,6 +21,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
   const accessEmail = authorizeOwner(request);
   if (!accessEmail) return Response.json({ error: "Setup hanya dapat dilakukan oleh email Pemilik." }, { status: 403 });
   const rate = await allowRequest(request, "owner-setup", 3, 900);
