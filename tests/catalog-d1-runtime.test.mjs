@@ -29,7 +29,7 @@ test("checkout only accepts products and packages that exist in D1", () => {
   assert.match(resolveSection, /return null;/);
 });
 
-test("catalog data can only be managed through normal product CRUD", () => {
+test("catalog has no reusable seed endpoint and returns to normal CRUD after the one-time repopulation", () => {
   const products = read("lib/server/products.ts");
   const panelRoute = read("app/api/panel/[...path]/route.ts");
   const manager = read("components/admin-product-manager.tsx");
@@ -38,6 +38,8 @@ test("catalog data can only be managed through normal product CRUD", () => {
   assert.doesNotMatch(panelRoute, /products\/seed|productSeed/);
   assert.doesNotMatch(manager, /products\/seed|Lengkapi katalog utama|seedProducts/);
   assert.equal(fs.existsSync(path.join(root, "app/api/admin/products/seed/route.ts")), false);
+  assert.match(products, /if \(completed\?\.completed_at\) return;/);
+  assert.doesNotMatch(products, /SELECT COUNT\(\*\) AS count FROM products/);
 });
 
 test("unconfigured automatic products stay automatic and checkout blocks them instead of pretending they are manual", () => {
