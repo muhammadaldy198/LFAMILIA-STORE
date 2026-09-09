@@ -17,3 +17,16 @@ test("admin labels product images as optional", () => {
   assert.match(manager, /Boleh dikosongkan dan ditambahkan nanti/);
   assert.match(manager, /Banner halaman produk \(opsional\)/);
 });
+
+
+test("restored fallback catalog keeps complete local artwork for every bundled product", () => {
+  const source = fs.readFileSync(path.join(root, "lib/store-data.ts"), "utf8");
+  const slugs = [...source.matchAll(/slug:\s*"([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(slugs.length, 24);
+  for (const slug of slugs) {
+    for (const suffix of ["card", "banner", "cover"]) {
+      const asset = path.join(root, "public", "products", `${slug}-${suffix}.webp`);
+      assert.equal(fs.existsSync(asset), true, asset);
+    }
+  }
+});
