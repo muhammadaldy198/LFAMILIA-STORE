@@ -80,22 +80,16 @@ test("essential storefront and operational pages remain present", () => {
   }
 });
 
-test("an empty catalog stays empty until the owner explicitly restores it", () => {
-  const source = read("lib/server/products.ts");
-  const seedRoute = read("app/api/admin/products/seed/route.ts");
-  const readSection = source.slice(
-    source.indexOf("export async function readProducts"),
-    source.indexOf("type ProductWrite"),
-  );
+test("catalog has no automatic or manual restore mechanism", () => {
+  const products = read("lib/server/products.ts");
+  const panelRoute = read("app/api/panel/[...path]/route.ts");
+  const manager = read("components/admin-product-manager.tsx");
 
-  assert.doesNotMatch(readSection, /seedFallbackProducts/);
-  assert.doesNotMatch(readSection, /SELECT COUNT\(\*\) AS count FROM products/);
-  assert.match(seedRoute, /requireAdminSession\(request, "owner"\)/);
-  assert.match(seedRoute, /seedFallbackProducts\(\)/);
-  assert.match(source, /ON CONFLICT\(slug\) DO NOTHING/);
-  assert.match(source, /ON CONFLICT\(sku\) DO NOTHING/);
+  assert.doesNotMatch(products, /seedFallbackProducts|getFallbackProducts/);
+  assert.doesNotMatch(panelRoute, /products\/seed|productSeed/);
+  assert.doesNotMatch(manager, /products\/seed|Lengkapi katalog utama|seedProducts|setSeeding/);
+  assert.equal(fs.existsSync(path.join(root, "app/api/admin/products/seed/route.ts")), false);
 });
-
 
 test("panel credential rows never appear as real customers or members", () => {
   const members = read("lib/server/member-tiers.ts");
