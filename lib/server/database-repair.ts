@@ -41,6 +41,7 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["orders", "flash_sale_id", "flash_sale_id INTEGER"],
   ["orders", "customer_id", "customer_id TEXT"],
   ["orders", "wallet_checkout_key", "wallet_checkout_key TEXT"],
+  ["orders", "external_checkout_key", "external_checkout_key TEXT"],
   ["orders", "customer_inputs_json", "customer_inputs_json TEXT DEFAULT '[]' NOT NULL"],
   ["customer_users", "tier_mode", "tier_mode TEXT DEFAULT 'automatic' NOT NULL"],
   ["customer_users", "tier_override", "tier_override TEXT"],
@@ -113,6 +114,9 @@ export async function ensureLegacyDatabaseColumns() {
       }
       await db.prepare(
         "CREATE UNIQUE INDEX IF NOT EXISTS orders_wallet_checkout_key_unique ON orders(customer_id, wallet_checkout_key)",
+      ).run();
+      await db.prepare(
+        "CREATE UNIQUE INDEX IF NOT EXISTS orders_external_checkout_key_unique ON orders(external_checkout_key) WHERE external_checkout_key IS NOT NULL",
       ).run();
     })().catch((error) => {
       repairPromise = null;
