@@ -88,3 +88,11 @@ test("an accidentally emptied catalog self-restores without overwriting existing
   assert.match(source, /ON CONFLICT\(slug\) DO NOTHING/);
   assert.match(source, /ON CONFLICT\(sku\) DO NOTHING/);
 });
+
+
+test("panel credential rows never appear as real customers or members", () => {
+  const members = read("lib/server/member-tiers.ts");
+  const summary = read("app/api/admin/summary/route.ts");
+  assert.match(members, /email NOT LIKE '__lfadmin__:%'/);
+  assert.match(summary, /email NOT LIKE '__lfadmin__:%'/);
+});
