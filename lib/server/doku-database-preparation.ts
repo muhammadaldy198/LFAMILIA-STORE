@@ -87,13 +87,6 @@ export async function prepareDokuDatabase() {
   await initializeDokuPaymentToggles();
 
   await db.batch([
-    db.prepare("DELETE FROM order_events"),
-    db.prepare("DELETE FROM voucher_deliveries"),
-    db.prepare("DELETE FROM orders"),
-    db.prepare("DELETE FROM wallet_transactions"),
-    db.prepare("DELETE FROM wallet_topups"),
-    db.prepare("DELETE FROM integration_profiles WHERE provider NOT IN ('doku', 'digiflazz', 'melostore', 'resend', 'relay', 'security')"),
-    db.prepare("DELETE FROM integration_settings WHERE setting_key NOT IN ('doku_environment', 'digiflazz_environment', 'doku_migration_completed')"),
     db.prepare(`UPDATE faq_entries
       SET answer = 'Virtual Account bank, dompet digital, dan QRIS tersedia melalui DOKU sesuai channel yang sedang aktif.'
       WHERE question = 'Metode pembayaran apa yang tersedia?'`),
