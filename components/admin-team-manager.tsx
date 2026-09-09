@@ -33,7 +33,7 @@ export function AdminTeamManager() {
     setLoading(true);
     try {
       const response = await fetch("/api/panel/team", { cache: "no-store" });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error);
       setUsers(data.users ?? []);
     } catch (reason) {
@@ -57,7 +57,7 @@ export function AdminTeamManager() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...draft, id: draft.id || undefined }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error);
       setOpen(false);
       setMessage(draft.id ? "Akun panel berhasil diperbarui." : "Akun panel baru berhasil dibuat.");
@@ -71,7 +71,7 @@ export function AdminTeamManager() {
 
   async function remove(id: number) {
     const response = await fetch(`/api/panel/team?id=${id}`, { method: "DELETE" });
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) { setError(data.error); return; }
     setMessage("Akun panel berhasil dihapus.");
     await load();
