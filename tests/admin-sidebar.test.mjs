@@ -7,7 +7,7 @@ const source = fs.readFileSync(path.join(process.cwd(), "components/admin-dashbo
 const overview = fs.readFileSync(path.join(process.cwd(), "components/admin-overview.tsx"), "utf8");
 
 test("admin reference keeps a persistent light desktop sidebar and responsive mobile drawer", () => {
-  assert.match(source, /border-r border-[#e7ebf2] bg-white/);
+  assert.ok(source.includes("border-r border-[#e7ebf2] bg-white"));
   assert.match(source, /fixed inset-y-0 left-0/);
   assert.match(source, /lg:hidden/);
   assert.match(source, /lfamilia-admin-logo\.webp/);
