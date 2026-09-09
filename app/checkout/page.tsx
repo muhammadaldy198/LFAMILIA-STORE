@@ -222,7 +222,7 @@ function CheckoutRoute() {
 }
 
 function CheckoutContent({ product }: { product: StoreProduct }) {
-  const walletAttemptRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const checkoutAttemptRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const searchParams = useSearchParams();
   const requestedPackage = searchParams.get("package");
   const [packageId, setPackageId] = useState(() =>
@@ -761,26 +761,26 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
           voucherCode: voucherCode.trim() || undefined,
       };
       const fingerprint = JSON.stringify(requestPayload);
-      if (paymentMethod === "wallet" && walletAttemptRef.current?.fingerprint !== fingerprint) {
-        walletAttemptRef.current = { fingerprint, key: crypto.randomUUID() };
+      if (checkoutAttemptRef.current?.fingerprint !== fingerprint) {
+        checkoutAttemptRef.current = { fingerprint, key: crypto.randomUUID() };
       }
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           ...requestPayload,
-          idempotencyKey: paymentMethod === "wallet" ? walletAttemptRef.current?.key : undefined,
+          idempotencyKey: checkoutAttemptRef.current?.key,
         }),
       });
-      const data = (await response.json()) as PaymentResult & {
+      const data = (await response.json().catch(() => ({}))) as PaymentResult & {
         error?: string;
         retryable?: boolean;
       };
       if (!response.ok) {
-        if (!data.retryable) walletAttemptRef.current = null;
+        if (!data.retryable) checkoutAttemptRef.current = null;
         throw new Error(data.error ?? "Pembayaran gagal dibuat.");
       }
-      walletAttemptRef.current = null;
+      checkoutAttemptRef.current = null;
       setPayment(data);
       if (data.balanceAfter != null) {
         setAccount((current) =>
