@@ -31,7 +31,7 @@ export function AdminVoucherManager() {
     setLoading(true); setError("");
     try {
       const response = await fetch("/api/panel/vouchers", { cache: "no-store" });
-      const data = await response.json() as DashboardResponse;
+      const data = await response.json().catch(() => ({})) as DashboardResponse;
       if (!response.ok) throw new Error(data.error || "Stok kode gagal dimuat.");
       const next = data.stocks ?? [];
       setStocks(next); setDeliveries(data.deliveries ?? []); setConfig(data.config ?? emptyConfig);
@@ -55,15 +55,15 @@ export function AdminVoucherManager() {
     setImporting(true);setError("");setMessage("");
     try{
       const response=await fetch("/api/panel/vouchers",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"import",stockKey,codes:values})});
-      const data=await response.json() as {imported?:number;duplicates?:number;error?:string};
+      const data=await response.json().catch(() => ({})) as {imported?:number;duplicates?:number;error?:string};
       if(!response.ok) throw new Error(data.error||"Impor kode gagal.");
       setMessage(`${data.imported??0} kode berhasil ditambahkan${data.duplicates?`, ${data.duplicates} duplikat dilewati`:""}.`);
       setImportOpen(false);setCodes("");await load();
     }catch(reason){setError(reason instanceof Error?reason.message:"Impor kode gagal.");}
     finally{setImporting(false);}
   }
-  async function reveal(orderId:string){setWorkingOrder(orderId);setError("");try{const response=await fetch("/api/panel/vouchers",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"reveal",orderId})});const data=await response.json() as {code?:string;stockKey?:string;error?:string};if(!response.ok||!data.code||!data.stockKey)throw new Error(data.error||"Kode tidak dapat dibuka.");setRevealed({orderId,code:data.code,stockKey:data.stockKey});}catch(reason){setError(reason instanceof Error?reason.message:"Kode tidak dapat dibuka.");}finally{setWorkingOrder(null);}}
-  async function retry(orderId:string){setWorkingOrder(orderId);setError("");try{const response=await fetch("/api/panel/vouchers",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({action:"retry",orderId})});const data=await response.json() as {ok?:boolean;message?:string;error?:string};if(!response.ok||!data.ok)throw new Error(data.error||data.message||"Pengiriman ulang belum berhasil.");setMessage(data.message||"Kode berhasil dikirim ulang.");await load();}catch(reason){setError(reason instanceof Error?reason.message:"Pengiriman ulang gagal.");}finally{setWorkingOrder(null);}}
+  async function reveal(orderId:string){setWorkingOrder(orderId);setError("");try{const response=await fetch("/api/panel/vouchers",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"reveal",orderId})});const data=await response.json().catch(() => ({})) as {code?:string;stockKey?:string;error?:string};if(!response.ok||!data.code||!data.stockKey)throw new Error(data.error||"Kode tidak dapat dibuka.");setRevealed({orderId,code:data.code,stockKey:data.stockKey});}catch(reason){setError(reason instanceof Error?reason.message:"Kode tidak dapat dibuka.");}finally{setWorkingOrder(null);}}
+  async function retry(orderId:string){setWorkingOrder(orderId);setError("");try{const response=await fetch("/api/panel/vouchers",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({action:"retry",orderId})});const data=await response.json().catch(() => ({})) as {ok?:boolean;message?:string;error?:string};if(!response.ok||!data.ok)throw new Error(data.error||data.message||"Pengiriman ulang belum berhasil.");setMessage(data.message||"Kode berhasil dikirim ulang.");await load();}catch(reason){setError(reason instanceof Error?reason.message:"Pengiriman ulang gagal.");}finally{setWorkingOrder(null);}}
 
   if(loading)return <div className="flex min-h-40 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin"/>Memuat stok kode…</div>;
   return <div className="space-y-4">
