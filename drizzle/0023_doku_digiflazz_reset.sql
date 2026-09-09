@@ -28,9 +28,5 @@ UPDATE faq_entries
 SET answer = 'Virtual Account bank, dompet digital, dan QRIS tersedia melalui DOKU sesuai channel yang sedang aktif.'
 WHERE question = 'Metode pembayaran apa yang tersedia?';
 
--- Store has not launched yet: remove pre-launch transactional state before DOKU go-live.
-DELETE FROM order_events;
-DELETE FROM voucher_deliveries;
-DELETE FROM orders;
-DELETE FROM wallet_transactions;
-DELETE FROM wallet_topups;
+-- Transactional data is intentionally preserved. Historical pre-launch cleanup,
+-- when needed, must not remain as a deploy-time destructive operation.
