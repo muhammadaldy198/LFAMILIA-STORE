@@ -15,3 +15,19 @@ export function safeNavigationUrl(value: string | null | undefined, fallback = "
   const normalized = value?.trim() || "";
   return isAllowedNavigationUrl(normalized) ? normalized : fallback;
 }
+
+export function isAllowedHttpUrl(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return false;
+  try {
+    const url = new URL(normalized);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+export function safeHttpUrl(value: string | null | undefined) {
+  const normalized = value?.trim() || "";
+  return isAllowedHttpUrl(normalized) ? normalized : "";
+}
