@@ -4,7 +4,7 @@ import { updateProductPackageProvider } from "@/lib/server/products";
 
 const schema = z.object({
   packageId: z.number().int().positive(),
-  providerCode: z.string().trim().regex(/^[a-z0-9-]+$/).max(40).nullable(),
+  providerCode: z.enum(["digiflazz", "voucher-stock"]).nullable(),
   providerSku: z.string().trim().max(100).nullable(),
   pricingMode: z.enum(["manual", "auto"]).default("auto"),
   marginType: z.enum(["fixed", "percent"]).default("fixed"),
