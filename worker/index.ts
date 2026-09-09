@@ -16,7 +16,7 @@ import {
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
-  BUCKET?: R2Bucket;
+  BUCKET?: object;
   TEAM_DOMAIN?: string;
   POLICY_AUD?: string;
   IMAGES?: {
