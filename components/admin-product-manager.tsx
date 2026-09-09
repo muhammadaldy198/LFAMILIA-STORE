@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { BellRing, ChevronDown, ChevronUp, Database, Edit3, ImageIcon, LoaderCircle, PackagePlus, Plus, RefreshCw, Search, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, BellRing, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Database, Edit3, ExternalLink, ImageIcon, LoaderCircle, Monitor, PackagePlus, Plus, RefreshCw, Save, Search, Smartphone, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -108,6 +108,14 @@ export function AdminProductManager() {
   const [digiflazzGroup, setDigiflazzGroup] = useState("");
   const [digiflazzMarginType, setDigiflazzMarginType] = useState<"fixed" | "percent">("fixed");
   const [digiflazzMarginValue, setDigiflazzMarginValue] = useState(0);
+  const [productQuery, setProductQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [providerFilter, setProviderFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortMode, setSortMode] = useState("newest");
+  const [page, setPage] = useState(1);
+  const [editorTab, setEditorTab] = useState<"information" | "nominal" | "sections" | "display" | "input" | "fulfillment" | "checkout">("nominal");
+  const [previewMode, setPreviewMode] = useState<"mobile" | "desktop">("mobile");
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -186,6 +194,12 @@ export function AdminProductManager() {
   }
 
   function openEdit(item: ManagedProduct) {
+    if (role === "owner") {
+      setExpandedProduct(itemKey(item));
+      setEditorTab("nominal");
+      setError("");
+      return;
+    }
     setDraft(structuredClone(item));
     setError("");
     setDialogOpen(true);
@@ -257,6 +271,7 @@ export function AdminProductManager() {
   }
 
   async function openDigiflazzImport(item: ManagedProduct) {
+    setExpandedProduct(null);
     setDigiflazzImportTarget(item);
     setDigiflazzGroup(item.packageTabs[0] ?? "");
     setDigiflazzSelected([]);
@@ -649,49 +664,152 @@ export function AdminProductManager() {
     await loadProducts();
   }
 
+  const providers = useMemo(() => Array.from(new Set(items.flatMap((item) => item.packages.map((entry) => entry.providerCode || "manual")))), [items]);
+  const editingProduct = useMemo(() => expandedProduct ? items.find((item) => itemKey(item) === expandedProduct) ?? null : null, [expandedProduct, items]);
+  const filteredProducts = useMemo(() => {
+    const query = productQuery.trim().toLowerCase();
+    const next = items.filter((item) => {
+      const providerMatch = providerFilter === "all" || item.packages.some((entry) => (entry.providerCode || "manual") === providerFilter);
+      return (!query || `${item.name} ${item.publisher} ${item.slug} ${item.category}`.toLowerCase().includes(query))
+        && (categoryFilter === "all" || item.category === categoryFilter)
+        && providerMatch
+        && (statusFilter === "all" || (statusFilter === "active" ? item.isActive : !item.isActive));
+    });
+    return next.sort((a, b) => sortMode === "name" ? a.name.localeCompare(b.name) : sortMode === "price"
+      ? Math.min(...a.packages.map((entry) => entry.price), Number.MAX_SAFE_INTEGER) - Math.min(...b.packages.map((entry) => entry.price), Number.MAX_SAFE_INTEGER)
+      : b.sortOrder - a.sortOrder);
+  }, [items, productQuery, categoryFilter, providerFilter, statusFilter, sortMode]);
+  const pageSize = 8;
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const visiblePage = Math.min(page, totalPages);
+  const visibleProducts = filteredProducts.slice((visiblePage - 1) * pageSize, visiblePage * pageSize);
+  const pageSize = 10;
+  const pageCount = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const visibleProducts = filteredProducts.slice((Math.min(page, pageCount) - 1) * pageSize, Math.min(page, pageCount) * pageSize);
+  const editingProduct = expandedProduct ? items.find((item) => itemKey(item) === expandedProduct) ?? null : null;
+
   if (loading) return <div className="flex min-h-48 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" /> Memuat produk…</div>;
 
   if (!databaseReady) {
     return <div className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] p-6 text-center"><Database className="mx-auto size-7 text-amber-300" /><h3 className="mt-4 font-bold">Database belum siap</h3><p className="mx-auto mt-2 max-w-md text-xs leading-6 text-white/42">Buat database D1 dan jalankan file migrasi terlebih dahulu. Setelah itu tekan Muat ulang.</p>{error && <p className="mt-2 text-[10px] text-red-200/70">{error}</p>}<Button onClick={() => void loadProducts()} variant="outline" className="mt-5 rounded-xl border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white"><RefreshCw className="mr-2 size-4" />Muat ulang</Button></div>;
   }
 
+  if (editingProduct && role === "owner") {
+    const item = editingProduct;
+    const key = itemKey(item);
+    const updateItem = <K extends keyof ManagedProduct,>(field: K, value: ManagedProduct[K]) =>
+      updateCatalogProduct(key, (current) => ({ ...current, [field]: value }));
+    const tabs = [
+      ["information", "Informasi Produk"], ["nominal", "Nominal & Harga"],
+      ["sections", "Tabel Pemisah"], ["display", "Tampilan Produk"],
+      ["input", "Input Customer"], ["fulfillment", "Fulfillment"], ["checkout", "Checkout"],
+    ] as const;
+    const groups = item.packageTabsEnabled && item.packageTabs.length
+      ? item.packageTabs.map((name) => ({ name, packages: item.packages.filter((entry) => entry.group === name && entry.isActive) }))
+      : [{ name: "Pilih Nominal", packages: item.packages.filter((entry) => entry.isActive) }];
+
+    return <div className="product-workspace min-h-[70vh] text-[#344054]">
+      <style jsx global>{`.product-input{height:2.25rem;width:100%;border:1px solid #d0d5dd;border-radius:.375rem;background:#fff;padding:0 .625rem;font-size:10px;color:#344054;outline:none}.product-input:focus{border-color:#155eef;box-shadow:0 0 0 2px rgba(21,94,239,.1)}`}</style>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <button type="button" onClick={() => setExpandedProduct(null)} className="mb-2 inline-flex items-center gap-1 text-[10px] font-semibold text-[#667085] hover:text-[#155eef]"><ArrowLeft className="size-3.5" />Produk / Daftar Produk</button>
+          <div className="flex items-center gap-3"><span className="block size-14 overflow-hidden rounded-xl border border-[#e4e7ec] bg-white shadow-sm"><ProductArtwork product={item} compact /></span><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-black text-[#101828]">Edit Produk - {item.name}</h2><span className="rounded-md bg-blue-50 px-2 py-1 text-[9px] font-bold text-[#155eef]">{categories.find((entry) => entry.slug === item.category)?.name || item.category}</span></div><p className="mt-1 text-[11px] text-[#667085]">Kelola nominal, tabel pemisah, gambar, harga, input pelanggan, dan fulfillment.</p></div></div>
+        </div>
+        <div className="flex gap-2"><Button type="button" variant="outline" className="border-[#dfe5ed] bg-white text-[#344054]" onClick={() => window.open("/products/" + item.slug, "_blank")}><ExternalLink className="mr-2 size-4" />Lihat di Toko</Button><Button type="button" variant="outline" className="border-[#dfe5ed] bg-white text-[#344054]" onClick={() => setExpandedProduct(null)}><ArrowLeft className="mr-2 size-4" />Kembali</Button></div>
+      </div>
+      {message && <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700">{message}</div>}
+      {error && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">{error}</div>}
+      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-[#dfe5ed]">{tabs.map(([value, label]) => <button key={value} type="button" onClick={() => setEditorTab(value)} className={`whitespace-nowrap border-b-2 px-4 py-3 text-[10px] font-bold ${editorTab === value ? "border-[#155eef] text-[#155eef]" : "border-transparent text-[#667085]"}`}>{label}</button>)}</div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_310px]">
+        <section className="rounded-xl border border-[#dfe5ed] bg-white p-4 shadow-sm">
+          {editorTab === "information" && <><EditorTitle title="Informasi Produk" description="Identitas utama produk yang tampil di katalog." /><div className="grid gap-3 sm:grid-cols-2">
+            <LightField label="Nama Produk"><Input value={item.name} onChange={(event) => updateItem("name", event.target.value)} className="product-input" /></LightField>
+            <LightField label="Slug"><Input value={item.slug} onChange={(event) => updateItem("slug", slugify(event.target.value))} className="product-input" /></LightField>
+            <LightField label="Publisher"><Input value={item.publisher} onChange={(event) => updateItem("publisher", event.target.value)} className="product-input" /></LightField>
+            <LightField label="Kategori"><select value={item.category} onChange={(event) => updateItem("category", event.target.value)} className="product-input">{categories.map((entry) => <option key={entry.slug} value={entry.slug}>{entry.name}</option>)}</select></LightField>
+            <LightField label="Deskripsi" wide><Textarea value={item.description || ""} onChange={(event) => updateItem("description", event.target.value)} className="min-h-28 border-[#dfe5ed] bg-white text-[#344054]" /></LightField>
+            <LightField label="Urutan"><Input type="number" min={0} value={item.sortOrder} onChange={(event) => updateItem("sortOrder", Number(event.target.value))} className="product-input" /></LightField>
+            <div className="flex items-center gap-5 pt-5"><label className="flex items-center gap-2 text-[10px] font-semibold"><Switch checked={item.isActive} onCheckedChange={(checked) => updateItem("isActive", checked)} />Produk aktif</label><label className="flex items-center gap-2 text-[10px] font-semibold"><Switch checked={item.popular} onCheckedChange={(checked) => updateItem("popular", checked)} />Produk populer</label></div>
+          </div></>}
+
+          {editorTab === "nominal" && <><div className="flex flex-wrap items-start justify-between gap-3"><EditorTitle title="Daftar Nominal" description="Kelola harga, gambar, SKU, section, dan urutan nominal." /><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" className="border-[#dfe5ed] text-[#155eef]" onClick={() => void openDigiflazzImport(item)}><Plus className="mr-1 size-3.5" />Tambah dari Digiflazz</Button><Button type="button" size="sm" variant="outline" className="border-[#dfe5ed] text-[#155eef]" onClick={() => addCatalogPackage(item)}><Plus className="mr-1 size-3.5" />Tambah Manual</Button><Button type="button" size="sm" disabled={catalogSaving === key} onClick={() => void saveCatalogProduct(item)} className="bg-[#155eef] text-white hover:bg-[#004eeb]">{catalogSaving === key ? <LoaderCircle className="mr-1 size-3.5 animate-spin" /> : <Save className="mr-1 size-3.5" />}Simpan Perubahan</Button></div></div>
+            <div className="mt-3 overflow-x-auto rounded-lg border border-[#e4e7ec]"><table className="w-full min-w-[1040px] text-left text-[9px]"><thead className="bg-[#f8fafc] text-[#667085]"><tr><th className="p-2">#</th><th className="p-2">Nama Nominal</th><th className="p-2">Gambar</th><th className="p-2">Provider / SKU</th><th className="p-2">Grup</th><th className="p-2">Modal</th><th className="p-2">Margin</th><th className="p-2">Harga Jual</th><th className="p-2">Status</th><th className="p-2 text-right">Aksi</th></tr></thead><tbody>
+              {item.packages.map((entry, index) => <tr key={(entry.dbId || "new") + "-" + index} className="border-t border-[#e4e7ec]"><td className="p-2"><div className="flex items-center gap-1"><button type="button" disabled={index === 0} onClick={() => moveCatalogPackage(item, index, -1)}><ChevronUp className="size-3" /></button><span>{index + 1}</span><button type="button" disabled={index === item.packages.length - 1} onClick={() => moveCatalogPackage(item, index, 1)}><ChevronDown className="size-3" /></button></div></td>
+                <td className="p-2"><Input value={entry.label} onChange={(event) => updateCatalogPackage(key, index, "label", event.target.value)} className="product-input min-w-[140px]" /></td>
+                <td className="p-2"><PackageImagePicker value={entry.imageUrl || ""} onChange={(value) => updateCatalogPackage(key, index, "imageUrl", value)} /></td>
+                <td className="p-2"><div className="space-y-1"><select value={entry.providerCode || ""} onChange={(event) => updateCatalogPackage(key, index, "providerCode", event.target.value || undefined)} className="product-input min-w-[125px]"><option value="">Manual</option>{providerOptions.map((provider) => <option key={provider.code} value={provider.code}>{provider.name}</option>)}</select><Input value={entry.providerSku || ""} onChange={(event) => updateCatalogPackage(key, index, "providerSku", event.target.value)} className="product-input min-w-[125px]" placeholder="SKU" /></div></td>
+                <td className="p-2"><select value={entry.group || ""} onChange={(event) => updateCatalogPackage(key, index, "group", event.target.value)} className="product-input min-w-[115px]"><option value="">Tanpa section</option>{item.packageTabs.map((tab) => <option key={tab}>{tab}</option>)}</select></td>
+                <td className="p-2 font-semibold">{entry.supplierPrice ? formatRupiah(entry.supplierPrice) : "-"}</td>
+                <td className="p-2"><div className="flex gap-1"><select value={entry.marginType || "fixed"} onChange={(event) => updateCatalogPackage(key, index, "marginType", event.target.value as "fixed" | "percent")} className="product-input w-14"><option value="fixed">Rp</option><option value="percent">%</option></select><Input type="number" min={0} value={entry.marginValue || 0} onChange={(event) => updateCatalogPackage(key, index, "marginValue", Number(event.target.value))} className="product-input w-20" /></div></td>
+                <td className="p-2"><Input type="number" min={0} value={entry.price} onChange={(event) => updateCatalogPackage(key, index, "price", Number(event.target.value))} className="product-input w-24 font-bold" /></td>
+                <td className="p-2"><div className="flex items-center gap-2"><Switch checked={entry.isActive} onCheckedChange={(checked) => entry.dbId ? void toggleCatalogPackageStatus(item, index, checked) : updateCatalogPackage(key, index, "isActive", checked)} /><span className={entry.isActive ? "text-emerald-600" : "text-[#98a2b3]"}>{entry.isActive ? "Aktif" : "Nonaktif"}</span></div></td>
+                <td className="p-2"><div className="flex justify-end gap-1">{entry.providerCode === "digiflazz" && <Button type="button" variant="ghost" size="icon-sm" onClick={() => void syncCatalogPackage(item, index)}><RefreshCw className="size-3.5" /></Button>}<Button type="button" variant="ghost" size="icon-sm" className="text-red-500" onClick={() => void removeCatalogPackage(item, index)}><Trash2 className="size-3.5" /></Button></div></td></tr>)}
+              {!item.packages.length && <tr><td colSpan={10} className="p-8 text-center text-[#98a2b3]">Belum ada nominal. Tambahkan manual atau ambil dari Digiflazz.</td></tr>}
+            </tbody></table></div>
+          </>}
+
+          {editorTab === "sections" && <><div className="flex items-start justify-between gap-3"><EditorTitle title="Tabel Pemisah Nominal" description="Kelompokkan nominal dan tentukan urutan section di toko." /><Button type="button" onClick={() => addCatalogTab(item)} className="bg-[#155eef] text-white"><Plus className="mr-2 size-4" />Tambah Tabel Pemisah</Button></div><div className="mt-3 overflow-hidden rounded-lg border border-[#e4e7ec]"><table className="w-full text-left text-[10px]"><thead className="bg-[#f8fafc] text-[#667085]"><tr><th className="p-3">#</th><th className="p-3">Nama Section</th><th className="p-3">Urutan</th><th className="p-3">Status</th><th className="p-3 text-right">Aksi</th></tr></thead><tbody>{item.packageTabs.map((tab, index) => <tr key={tab + "-" + index} className="border-t border-[#e4e7ec]"><td className="p-3">{index + 1}</td><td className="p-3"><Input value={tab} onChange={(event) => updateCatalogTab(item, index, event.target.value)} className="product-input max-w-sm" /></td><td className="p-3"><Button type="button" size="icon-sm" variant="ghost" disabled={index === 0} onClick={() => moveCatalogTab(item, index, -1)}><ChevronUp className="size-3.5" /></Button><Button type="button" size="icon-sm" variant="ghost" disabled={index === item.packageTabs.length - 1} onClick={() => moveCatalogTab(item, index, 1)}><ChevronDown className="size-3.5" /></Button></td><td className="p-3"><span className="rounded bg-emerald-50 px-2 py-1 font-bold text-emerald-600">Aktif</span></td><td className="p-3 text-right"><Button type="button" variant="ghost" size="icon-sm" className="text-red-500" onClick={() => void removeCatalogTab(item, index)}><Trash2 className="size-3.5" /></Button></td></tr>)}</tbody></table></div><div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-[10px] text-blue-700">Urutan tabel menentukan urutan section di halaman produk. Pilih section setiap nominal di tab Nominal & Harga.</div></>}
+
+          {editorTab === "display" && <><EditorTitle title="Tampilan Produk" description="Atur gambar utama dan banner untuk katalog." /><div className="space-y-4"><AdminMediaUpload label="Gambar produk (1:1)" value={item.imageUrl || ""} onChange={(value) => updateItem("imageUrl", value)} previewClassName="h-32" /><AdminMediaUpload label="Banner halaman produk" value={item.bannerUrl || ""} onChange={(value) => updateItem("bannerUrl", value)} previewClassName="h-36" /></div></>}
+          {editorTab === "input" && <><div className="flex justify-between gap-3"><EditorTitle title="Input Customer" description="Data yang wajib diisi pelanggan." /><Button type="button" variant="outline" onClick={() => updateItem("inputFields", [...item.inputFields, { id: "kolom-" + (item.inputFields.length + 1), label: "Kolom baru", placeholder: "", required: true }])}><Plus className="mr-2 size-4" />Tambah Kolom</Button></div><div className="mt-3 space-y-2">{item.inputFields.map((field, index) => <div key={field.id + "-" + index} className="grid gap-2 rounded-lg border border-[#e4e7ec] p-3 sm:grid-cols-[1fr_1fr_auto_auto]"><Input value={field.label} onChange={(event) => updateItem("inputFields", item.inputFields.map((entry, i) => i === index ? { ...entry, label: event.target.value, id: slugify(event.target.value) } : entry))} className="product-input" /><Input value={field.placeholder || ""} onChange={(event) => updateItem("inputFields", item.inputFields.map((entry, i) => i === index ? { ...entry, placeholder: event.target.value } : entry))} className="product-input" /><label className="flex items-center gap-2 text-[10px]"><Switch checked={field.required !== false} onCheckedChange={(checked) => updateItem("inputFields", item.inputFields.map((entry, i) => i === index ? { ...entry, required: checked } : entry))} />Wajib</label><Button type="button" size="icon-sm" variant="ghost" className="text-red-500" onClick={() => updateItem("inputFields", item.inputFields.filter((_, i) => i !== index))}><Trash2 className="size-3.5" /></Button></div>)}</div><LightField label="Format tujuan Digiflazz"><Input value={item.targetTemplate} onChange={(event) => updateItem("targetTemplate", event.target.value)} className="product-input mt-3 font-mono" /></LightField></>}
+          {editorTab === "fulfillment" && <><EditorTitle title="Fulfillment" description="Proses otomatis melalui provider atau manual oleh admin." /><div className="grid gap-3 sm:grid-cols-2"><LightField label="Jenis Proses"><select value={item.fulfillmentType} onChange={(event) => updateItem("fulfillmentType", event.target.value as "automatic" | "manual")} className="product-input"><option value="automatic">Otomatis via provider</option><option value="manual">Manual oleh admin</option></select></LightField><LightField label="Zona Waktu"><select value={item.manualTimezone || "Asia/Jakarta"} onChange={(event) => updateItem("manualTimezone", event.target.value)} className="product-input"><option value="Asia/Jakarta">WIB — Asia/Jakarta</option><option value="Asia/Makassar">WITA — Asia/Makassar</option><option value="Asia/Jayapura">WIT — Asia/Jayapura</option></select></LightField>{item.fulfillmentType === "manual" && <><LightField label="Jam Buka"><Input type="time" value={item.manualOpenTime || "09:00"} onChange={(event) => updateItem("manualOpenTime", event.target.value)} className="product-input" /></LightField><LightField label="Jam Tutup"><Input type="time" value={item.manualCloseTime || "21:00"} onChange={(event) => updateItem("manualCloseTime", event.target.value)} className="product-input" /></LightField><LightField label="Instruksi Manual" wide><Textarea value={item.manualInstructions || ""} onChange={(event) => updateItem("manualInstructions", event.target.value)} className="min-h-28 border-[#dfe5ed]" /></LightField></>}</div></>}
+          {editorTab === "checkout" && <><div className="flex justify-between gap-3"><EditorTitle title="Informasi Checkout" description="Pop-up sebelum pelanggan memilih nominal." /><Button type="button" variant="outline" onClick={() => updateItem("notices", [...item.notices, { id: null, title: "Informasi", body: "", isActive: true, sortOrder: item.notices.length }])}><Plus className="mr-2 size-4" />Tambah Slide</Button></div><div className="mt-3 space-y-3">{item.notices.map((notice, index) => <div key={String(notice.id) + "-" + index} className="rounded-lg border border-[#e4e7ec] p-3"><div className="flex gap-2"><Input value={notice.title} onChange={(event) => updateItem("notices", item.notices.map((entry, i) => i === index ? { ...entry, title: event.target.value } : entry))} className="product-input" /><Switch checked={notice.isActive} onCheckedChange={(checked) => updateItem("notices", item.notices.map((entry, i) => i === index ? { ...entry, isActive: checked } : entry))} /><Button type="button" variant="ghost" size="icon-sm" className="text-red-500" onClick={() => updateItem("notices", item.notices.filter((_, i) => i !== index))}><Trash2 className="size-3.5" /></Button></div><Textarea value={notice.body} onChange={(event) => updateItem("notices", item.notices.map((entry, i) => i === index ? { ...entry, body: event.target.value } : entry))} className="mt-2 min-h-24 border-[#dfe5ed]" /></div>)}</div></>}
+
+          {editorTab !== "nominal" && <div className="mt-5 flex justify-end border-t border-[#e4e7ec] pt-4"><Button type="button" disabled={catalogSaving === key} onClick={() => void saveCatalogProduct(item, "Perubahan produk berhasil disimpan.")} className="bg-[#155eef] text-white hover:bg-[#004eeb]">{catalogSaving === key ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}Simpan Perubahan</Button></div>}
+        </section>
+
+        <aside className="rounded-xl border border-[#dfe5ed] bg-white p-4 shadow-sm xl:sticky xl:top-4"><div className="flex items-center justify-between"><EditorTitle title="Preview Tampilan di Toko" description="Preview data saat ini." /><div className="flex rounded-md bg-[#f2f4f7] p-0.5"><button type="button" onClick={() => setPreviewMode("mobile")} className={previewMode === "mobile" ? "rounded bg-[#155eef] p-1.5 text-white" : "p-1.5 text-[#667085]"}><Smartphone className="size-3.5" /></button><button type="button" onClick={() => setPreviewMode("desktop")} className={previewMode === "desktop" ? "rounded bg-[#155eef] p-1.5 text-white" : "p-1.5 text-[#667085]"}><Monitor className="size-3.5" /></button></div></div><div className="mx-auto mt-2 overflow-hidden rounded-[26px] border-[5px] border-[#101828] bg-[#f8fafc]"><div className="flex items-center gap-2 bg-white p-3"><span className="block size-9 overflow-hidden rounded-lg"><ProductArtwork product={item} compact /></span><strong className="text-[10px] text-[#101828]">{item.name}</strong></div><div className="max-h-[520px] overflow-y-auto p-3">{groups.map((group) => <div key={group.name} className="mb-4"><h4 className="mb-2 text-[11px] font-black text-[#101828]">{group.name}</h4><div className="grid grid-cols-2 gap-2">{group.packages.map((entry) => <div key={entry.id} className="rounded-lg border border-[#e4e7ec] bg-white p-2"><p className="text-[9px] font-bold">{entry.label}</p>{entry.imageUrl && <img src={entry.imageUrl} alt="" className="mx-auto my-2 size-12 object-contain" />}<p className="mt-2 font-black text-red-500">{formatRupiah(entry.price)}</p></div>)}</div></div>)}</div></div></aside>
+      </div>
+    </div>;
+  }
+
   return (
-    <>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div><p className="text-xs font-semibold">{items.length} produk tersimpan</p><p className="mt-1 text-[10px] text-white/30">Perubahan aktif langsung dipakai katalog publik.</p></div>
-        <div className="flex gap-2">
-          {role === "owner" && <Button onClick={openNew} className="rounded-xl bg-[#b9ff35] text-xs font-black text-[#091006] hover:bg-[#d0ff75]"><Plus className="mr-2 size-4" />Tambah produk</Button>}
+    <div className="product-workspace text-[#344054]">
+      <style jsx global>{`.product-workspace .admin-input{border-color:#d0d5dd!important;background:#fff!important;color:#344054!important}.product-workspace .field-label{color:#344054!important}`}</style>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="text-2xl font-black text-[#101828]">Produk</h2><p className="mt-1 text-[11px] text-[#667085]">Kelola semua produk top up, voucher, nominal, harga, dan layanan digital.</p></div>
+        <div className="flex flex-wrap gap-2">
+          {role === "owner" && <Button onClick={openNew} className="bg-[#155eef] text-white hover:bg-[#004eeb]"><Plus className="mr-2 size-4" />Tambah Produk Manual</Button>}
         </div>
       </div>
-      {message && <div className="mb-4 rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.06] p-3 text-xs text-[#d8ff8d]">{message}</div>}
-      {error && <div className="mb-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-xs text-red-200">{error}</div>}
-      {role === "owner" && sellerMonitor && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2.5">
+      {message && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">{message}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}</div>}
+      <div className="mb-3 grid gap-2 lg:grid-cols-[minmax(240px,1fr)_170px_170px_170px_170px_auto]">
+        <label className="relative"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#98a2b3]" /><Input value={productQuery} onChange={(event) => { setProductQuery(event.target.value); setPage(1); }} placeholder="Cari nama produk, kategori, atau slug..." className="h-10 border-[#d0d5dd] bg-white pl-9 text-[11px] text-[#344054]" /></label>
+        <select value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(1); }} className="h-10 rounded-md border border-[#d0d5dd] bg-white px-3 text-[10px]"><option value="all">Semua Kategori</option>{categories.map((entry) => <option key={entry.slug} value={entry.slug}>{entry.name}</option>)}</select>
+        <select value={providerFilter} onChange={(event) => { setProviderFilter(event.target.value); setPage(1); }} className="h-10 rounded-md border border-[#d0d5dd] bg-white px-3 text-[10px]"><option value="all">Semua Provider</option>{providers.map((provider) => <option key={provider} value={provider}>{provider === "manual" ? "Manual" : provider}</option>)}</select>
+        <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }} className="h-10 rounded-md border border-[#d0d5dd] bg-white px-3 text-[10px]"><option value="all">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
+        <select value={sortMode} onChange={(event) => setSortMode(event.target.value)} className="h-10 rounded-md border border-[#d0d5dd] bg-white px-3 text-[10px]"><option value="newest">Urutkan: Terbaru</option><option value="name">Nama A-Z</option><option value="price">Harga Terendah</option></select>
+        <Button type="button" variant="outline" className="h-10 border-[#d0d5dd] bg-white text-[#344054]" onClick={() => { setProductQuery(""); setCategoryFilter("all"); setProviderFilter("all"); setStatusFilter("all"); setSortMode("newest"); setPage(1); }}><RefreshCw className="mr-1 size-3.5" />Reset</Button>
+      </div>
+      {role === "owner" && sellerMonitor && <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#dfe5ed] bg-white px-3 py-2.5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-[10px]">
-            <strong className="text-white/70">Monitor seller DigiFlazz</strong>
+            <strong className="text-[#344054]">Monitor seller DigiFlazz</strong>
             <span className="rounded-md bg-[#b9ff35]/10 px-1.5 py-0.5 font-bold text-[#d8ff8d]">{sellerMonitor.summary.healthy} aman</span>
             <span className="rounded-md bg-amber-300/10 px-1.5 py-0.5 font-bold text-amber-200">{sellerMonitor.summary.warning} perlu cek</span>
             <span className="rounded-md bg-red-400/10 px-1.5 py-0.5 font-bold text-red-200">{sellerMonitor.summary.critical} kritis</span>
             {sellerMonitor.summary.unknown > 0 && <span className="rounded-md bg-white/[0.05] px-1.5 py-0.5 font-bold text-white/35">{sellerMonitor.summary.unknown} belum dicek</span>}
           </div>
-          <p className="mt-1 text-[9px] text-white/28">Diperiksa otomatis setiap 15 menit bersama sinkron harga. Tanda muncul jika seller nonaktif, stok habis/menipis, sedang cut-off, atau harga naik ≥3% dari baseline seller.</p>
+          <p className="mt-1 text-[9px] text-[#667085]">Diperiksa otomatis setiap 15 menit. Tanda muncul jika seller nonaktif, stok menipis, cut-off, atau harga berubah.</p>
         </div>
-        <Button type="button" onClick={() => void refreshSellerMonitor()} disabled={monitorRefreshing} variant="outline" size="sm" className="h-8 shrink-0 rounded-lg border-white/10 bg-white/[0.03] px-2.5 text-[9px] text-white">
+        <Button type="button" onClick={() => void refreshSellerMonitor()} disabled={monitorRefreshing} variant="outline" size="sm" className="h-8 shrink-0 rounded-lg border-[#dfe5ed] bg-white px-2.5 text-[9px] text-[#344054]">
           {monitorRefreshing ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}Cek sekarang
         </Button>
       </div>}
-      <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
+      <div className="overflow-x-auto rounded-xl border border-[#e4e7ec] bg-white">
         <Table>
-          <TableHeader><TableRow className="border-white/[0.08] hover:bg-transparent"><TableHead className="text-[10px] text-white/35">Produk</TableHead><TableHead className="text-[10px] text-white/35">Harga mulai</TableHead><TableHead className="text-[10px] text-white/35">Proses</TableHead><TableHead className="text-[10px] text-white/35">Status</TableHead><TableHead className="text-right text-[10px] text-white/35">Aksi</TableHead></TableRow></TableHeader>
-          <TableBody>{items.map((item) => {
+          <TableHeader><TableRow className="border-[#e4e7ec] bg-[#f8fafc] hover:bg-[#f8fafc]"><TableHead className="w-12 text-[9px] text-[#667085]">#</TableHead><TableHead className="text-[9px] text-[#667085]">Produk</TableHead><TableHead className="text-[9px] text-[#667085]">Kategori</TableHead><TableHead className="text-[9px] text-[#667085]">Provider</TableHead><TableHead className="text-[9px] text-[#667085]">Total Nominal</TableHead><TableHead className="text-[9px] text-[#667085]">Harga Mulai</TableHead><TableHead className="text-[9px] text-[#667085]">Status</TableHead><TableHead className="text-[9px] text-[#667085]">Ditampilkan</TableHead><TableHead className="text-right text-[9px] text-[#667085]">Aksi</TableHead></TableRow></TableHeader>
+          <TableBody>{visibleProducts.map((item) => {
             const key = itemKey(item);
             const expanded = expandedProduct === key;
             return <Fragment key={key}>
-              <TableRow className="border-white/[0.07] hover:bg-white/[0.025]">
-                <TableCell><div className="flex items-center gap-3"><span className="block size-9 overflow-hidden rounded-lg"><ProductArtwork product={item} compact /></span><div><strong className="text-xs">{item.name}</strong><p className="mt-1 text-[9px] text-white/28">{item.category} • {item.publisher}</p></div></div></TableCell>
-                <TableCell className="text-xs text-[#d8ff8d]">{item.packages.length ? formatRupiah(Math.min(...item.packages.map((entry) => entry.price))) : <span className="text-white/30">Belum ada nominal</span>}</TableCell>
-                <TableCell className="text-xs text-white/42">{item.fulfillmentType === "manual" ? "Manual" : `${item.packages.filter((entry) => entry.providerSku).length}/${item.packages.length} SKU`}</TableCell>
-                <TableCell><span className={`rounded-full px-2 py-1 text-[9px] font-bold ${item.isActive ? "bg-[#b9ff35]/10 text-[#d8ff8d]" : "bg-white/[0.06] text-white/35"}`}>{item.isActive ? "Aktif" : "Nonaktif"}</span></TableCell>
+              <TableRow className="border-[#e4e7ec] hover:bg-[#f8fafc]">
+                <TableCell className="text-[10px] text-[#667085]">{(visiblePage - 1) * pageSize + visibleProducts.indexOf(item) + 1}</TableCell><TableCell><div className="flex items-center gap-3"><span className="block size-10 overflow-hidden rounded-lg border border-[#e4e7ec]"><ProductArtwork product={item} compact /></span><div><strong className="text-[11px] text-[#101828]">{item.name}</strong><p className="mt-1 text-[9px] text-[#98a2b3]">{item.publisher || item.slug}</p></div></div></TableCell>
+                <TableCell><span className="rounded-md bg-blue-50 px-2 py-1 text-[9px] font-semibold text-[#155eef]">{categories.find((entry) => entry.slug === item.category)?.name || item.category}</span></TableCell><TableCell className="text-[10px] text-[#475467]">{item.fulfillmentType === "manual" ? "Manual" : item.packages.some((entry) => entry.providerCode === "digiflazz") ? "Digiflazz" : "Belum diatur"}</TableCell><TableCell className="text-[10px] font-semibold text-[#344054]">{item.packages.length}</TableCell><TableCell className="text-[10px] font-bold text-[#101828]">{item.packages.length ? formatRupiah(Math.min(...item.packages.map((entry) => entry.price))) : "-"}</TableCell>
+                <TableCell><span className={item.isActive ? "rounded-md bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-600" : "rounded-md bg-slate-100 px-2 py-1 text-[9px] font-bold text-slate-500"}>{item.isActive ? "Aktif" : "Nonaktif"}</span></TableCell>
+                <TableCell><Switch checked={item.isActive} onCheckedChange={(checked) => void saveCatalogProduct({ ...item, isActive: checked }, checked ? "Produk ditampilkan di katalog." : "Produk disembunyikan dari katalog.")} aria-label={"Tampilkan " + item.name} /></TableCell>
                 <TableCell><div className="flex justify-end gap-1">
                   {role === "owner" && <Button type="button" onClick={() => addCatalogPackage(item)} variant="ghost" size="icon-sm" className="text-[#d8ff8d]/70 hover:bg-[#b9ff35]/10 hover:text-[#d8ff8d]" aria-label={`Tambah nominal ${item.name}`}><Plus className="size-3.5" /></Button>}
                   <Button type="button" onClick={() => setExpandedProduct(expanded ? null : key)} variant="ghost" size="icon-sm" className="text-white/45 hover:bg-white/[0.08] hover:text-white" aria-label={expanded ? "Tutup daftar harga" : "Buka daftar harga"}>{expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}</Button>
@@ -868,6 +986,10 @@ export function AdminProductManager() {
           })}</TableBody>
         </Table>
       </div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-b-xl border border-t-0 border-[#e4e7ec] bg-white px-3 py-2">
+        <p className="text-[9px] text-[#667085]">Menampilkan {visibleProducts.length ? (visiblePage - 1) * pageSize + 1 : 0}–{Math.min(visiblePage * pageSize, filteredProducts.length)} dari {filteredProducts.length} produk</p>
+        <div className="flex items-center gap-1"><Button type="button" size="icon-sm" variant="outline" disabled={visiblePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="border-[#dfe5ed]"><ChevronLeft className="size-3.5" /></Button>{Array.from({ length: Math.min(totalPages, 5) }, (_, index) => index + 1).map((value) => <button key={value} type="button" onClick={() => setPage(value)} className={`size-8 rounded-md text-[10px] font-bold ${visiblePage === value ? "bg-[#155eef] text-white" : "text-[#475467] hover:bg-[#f2f4f7]"}`}>{value}</button>)}<Button type="button" size="icon-sm" variant="outline" disabled={visiblePage >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="border-[#dfe5ed]"><ChevronRight className="size-3.5" /></Button></div>
+      </div>
 
       <Dialog open={digiflazzImportOpen} onOpenChange={setDigiflazzImportOpen}>
         <DialogContent className="w-[calc(100vw-1rem)] max-w-5xl overflow-hidden rounded-xl border-white/10 bg-[#10141d] p-0 text-white">
@@ -1001,8 +1123,16 @@ export function AdminProductManager() {
           </form>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
+}
+
+function EditorTitle({ title, description }: { title: string; description: string }) {
+  return <div className="mb-4"><h3 className="text-sm font-black text-[#101828]">{title}</h3><p className="mt-1 text-[10px] text-[#667085]">{description}</p></div>;
+}
+
+function LightField({ label, wide = false, children }: { label: string; wide?: boolean; children: React.ReactNode }) {
+  return <label className={wide ? "sm:col-span-2" : ""}><span className="mb-1.5 block text-[10px] font-bold text-[#344054]">{label}</span>{children}</label>;
 }
 
 function Field({ label, wide = false, children }: { label: string; wide?: boolean; children: React.ReactNode }) {
