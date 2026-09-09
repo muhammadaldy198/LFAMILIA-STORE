@@ -12,6 +12,7 @@ const packageSchema = z.object({
   price: z.number().int().min(1).max(100_000_000),
   note: z.string().trim().max(40).optional(),
   group: z.string().trim().max(60).optional(),
+  imageUrl: z.string().trim().max(500).refine(isAllowedMediaUrl, "URL gambar nominal tidak valid.").optional().or(z.literal("")),
   providerCode: z.enum(["digiflazz", "voucher-stock"]).optional(),
   providerSku: z.string().trim().max(100).optional(),
   pricingMode: z.enum(["manual", "auto"]).default("auto"),
