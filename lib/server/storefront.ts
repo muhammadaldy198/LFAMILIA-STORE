@@ -1,7 +1,7 @@
 import { getD1 } from "@/db";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { defaultStorefrontSettings, faqs as fallbackFaqs, type StorefrontSettings } from "@/lib/store-data";
-import { safeNavigationUrl } from "@/lib/navigation-url";
+import { safeHttpUrl, safeNavigationUrl } from "@/lib/navigation-url";
 
 type SettingsRow = {
   store_name: string;
@@ -63,8 +63,8 @@ export async function readStorefrontSettings(): Promise<StorefrontSettings> {
       bannerCtaHref: safeNavigationUrl(row.banner_cta_href, "/catalog"),
       supportWhatsapp: row.support_whatsapp ?? undefined,
       supportEmail: row.support_email ?? undefined,
-      instagramUrl: row.instagram_url ?? undefined,
-      discordUrl: row.discord_url ?? undefined,
+      instagramUrl: safeHttpUrl(row.instagram_url) || undefined,
+      discordUrl: safeHttpUrl(row.discord_url) || undefined,
       supportHours: row.support_hours,
       supportWidgetEnabled: Boolean(row.support_widget_enabled),
     };
