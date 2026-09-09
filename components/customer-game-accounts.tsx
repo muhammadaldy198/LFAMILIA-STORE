@@ -96,12 +96,16 @@ export function CustomerGameAccounts() {
 
   async function remove(id: string) {
     setError(""); setMessage("");
-    const response = await fetch(`/api/account/game-accounts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    const data = await response.json() as { error?: string };
-    if (!response.ok) { setError(data.error || "Akun game gagal dihapus."); return; }
-    if (editingId === id) reset();
-    setMessage("Akun game dihapus.");
-    await load();
+    try {
+      const response = await fetch(`/api/account/game-accounts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const data = await readJson(response) as { error?: string };
+      if (!response.ok) throw new Error(data.error || "Akun game gagal dihapus.");
+      if (editingId === id) reset();
+      setMessage("Akun game dihapus.");
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Akun game gagal dihapus.");
+    }
   }
 
   return <div className="space-y-4">
