@@ -16,7 +16,6 @@ export type ManagedPackage = ProductPackage & {
 };
 
 export type ManagedProduct = Omit<StoreProduct, "packages" | "notices"> & {
-  description?: string;
   dbId: number | null;
   packageTabsEnabled: boolean;
   packageTabs: string[];
@@ -418,12 +417,11 @@ export async function saveProductContent(input: {
   const exists = await db.prepare("SELECT id FROM products WHERE id = ? LIMIT 1").bind(input.id).first<{ id: number }>();
   if (!exists) throw new Error("Produk tidak ditemukan.");
   await db.prepare(
-    `UPDATE products SET image_url = ?, banner_url = ?, description = ?, manual_instructions = ?, manual_open_time = ?,
+    `UPDATE products SET image_url = ?, banner_url = ?, manual_instructions = ?, manual_open_time = ?,
      manual_close_time = ?, manual_timezone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
   ).bind(
     input.imageUrl || null,
     input.bannerUrl || null,
-    input.description?.trim() || null,
     input.manualInstructions || null,
     input.manualOpenTime || null,
     input.manualCloseTime || null,
