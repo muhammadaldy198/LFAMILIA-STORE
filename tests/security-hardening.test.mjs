@@ -24,6 +24,7 @@ test("critical public mutation routes reject cross-site requests", () => {
     "app/admin/panel/auth/login/route.ts",
     "app/staff/panel/auth/login/route.ts",
     "app/api/admin/auth/setup/route.ts",
+    "app/api/admin/media/route.ts",
   ];
   for (const file of routes) assert.match(read(file), /rejectCrossOriginMutation\(request\)/, file);
 });
@@ -61,6 +62,13 @@ test("Cloudflare Access diagnostics escape unverified JWT claim text", () => {
 test("Worker applies baseline browser security headers", () => {
   const source = read("worker/index.ts");
   for (const header of ["X-Content-Type-Options","X-Frame-Options","Referrer-Policy","Permissions-Policy","Content-Security-Policy","Strict-Transport-Security"]) assert.ok(source.includes(header), header);
+});
+
+test("Worker runtime retains the configured R2 media binding", () => {
+  const source = read("worker/index.ts");
+  assert.match(source, /BUCKET\?: R2Bucket/);
+  const integrations = read("lib/server/integration-config.ts");
+  assert.match(integrations, /const target: Record<string, unknown> = \{ \.\.\.systemOnly \}/);
 });
 
 test("authenticated customer data is explicitly non-cacheable", () => {
