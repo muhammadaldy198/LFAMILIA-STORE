@@ -106,3 +106,18 @@ test("Worker cryptographically validates Cloudflare Access assertions", () => {
     assert.ok(verifier.includes(requirement), requirement);
   }
 });
+
+
+test("managed storefront links reject javascript and protocol-relative URLs", () => {
+  const helper = read("lib/navigation-url.ts");
+  const contentRoute = read("app/api/admin/content/route.ts");
+  const storefrontRoute = read("app/api/admin/storefront/route.ts");
+  const contentServer = read("lib/server/content.ts");
+  const storefrontServer = read("lib/server/storefront.ts");
+  assert.match(helper, /url\.protocol === "https:" \|\| url\.protocol === "http:"/);
+  assert.match(helper, /!normalized\.startsWith\("\/\/"\)/);
+  assert.match(contentRoute, /isAllowedNavigationUrl/);
+  assert.match(storefrontRoute, /isAllowedNavigationUrl/);
+  assert.match(contentServer, /safeNavigationUrl/);
+  assert.match(storefrontServer, /safeNavigationUrl/);
+});
