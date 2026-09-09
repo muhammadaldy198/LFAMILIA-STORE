@@ -37,7 +37,43 @@ function sale(cost: number, type: "fixed" | "percent", value: number) {
   return type === "percent" ? Math.ceil((cost * (100 + value)) / 100) : cost + value;
 }
 
-async function fetchPriceList() {
+export type DigiflazzPriceListItem = {
+  buyerSkuCode: string;
+  productName: string;
+  category: string;
+  brand: string;
+  type: string;
+  sellerName: string;
+  price: number;
+  buyerProductStatus: boolean;
+  sellerProductStatus: boolean;
+  unlimitedStock: boolean;
+  stock: number;
+  multi: boolean;
+  startCutOff: string;
+  endCutOff: string;
+  description: string;
+};
+
+type RawPriceItem = {
+  buyer_sku_code?: string;
+  product_name?: string;
+  category?: string;
+  brand?: string;
+  type?: string;
+  seller_name?: string;
+  price?: number;
+  buyer_product_status?: boolean;
+  seller_product_status?: boolean;
+  unlimited_stock?: boolean;
+  stock?: number | string;
+  multi?: boolean;
+  start_cut_off?: string;
+  end_cut_off?: string;
+  desc?: string;
+};
+
+async function fetchPriceListItems(): Promise<DigiflazzPriceListItem[]> {
   const env = getRuntimeEnv<Env>();
   const environment = requireRuntimeChoice(env.DIGIFLAZZ_ENV, "DIGIFLAZZ_ENV", ["development", "production"] as const);
   const username = requireRuntimeValue(env.DIGIFLAZZ_USERNAME, "DIGIFLAZZ_USERNAME");
@@ -60,56 +96,65 @@ async function fetchPriceList() {
     body: JSON.stringify({ cmd: "prepaid", username, sign: hashHex("md5", `${username}${key}pricelist`) }),
     signal: AbortSignal.timeout(20_000),
   });
-  type PriceItem = {
-    buyer_sku_code?: string;
-    price?: number;
-    seller_name?: string;
-    buyer_product_status?: boolean;
-    seller_product_status?: boolean;
-    unlimited_stock?: boolean;
-    stock?: number | string;
-    multi?: boolean;
-    start_cut_off?: string;
-    end_cut_off?: string;
-    desc?: string;
-  };
-  type PriceListError = {
-    rc?: string;
-    message?: string;
-  };
-
+  type PriceListError = { rc?: string; message?: string };
   const payload = (await response.json().catch(() => null)) as {
-    data?: PriceItem[] | PriceListError;
+    data?: RawPriceItem[] | PriceListError;
     message?: string;
   } | null;
 
-  if (!response.ok) {
-    const providerError = payload?.data && !Array.isArray(payload.data)
-      ? payload.data
-      : null;
+  if (!response.ok || !payload || !Array.isArray(payload.data)) {
+    const providerError = payload?.data && !Array.isArray(payload.data) ? payload.data : null;
     const detail = providerError?.message || payload?.message;
     const rc = providerError?.rc ? ` (RC ${providerError.rc})` : "";
     throw new Error(detail ? `DigiFlazz menolak price list: ${detail}${rc}` : `DigiFlazz price list gagal dengan HTTP ${response.status}.`);
   }
 
-  if (!payload || !Array.isArray(payload.data)) {
-    const providerError = payload?.data && !Array.isArray(payload.data)
-      ? payload.data
-      : null;
-    const detail = providerError?.message || payload?.message;
-    const rc = providerError?.rc ? ` (RC ${providerError.rc})` : "";
-    throw new Error(
-      detail
-        ? `DigiFlazz menolak price list: ${detail}${rc}`
-        : "Respons price list DigiFlazz tidak berisi daftar produk.",
-    );
-  }
+  return payload.data
+    .filter((item) => item.buyer_sku_code && Number.isFinite(Number(item.price)))
+    .map((item) => ({
+      buyerSkuCode: item.buyer_sku_code!.trim(),
+      productName: item.product_name?.trim() || item.buyer_sku_code!.trim(),
+      category: item.category?.trim() || "",
+      brand: item.brand?.trim() || "",
+      type: item.type?.trim() || "",
+      sellerName: item.seller_name?.trim() || "",
+      price: Number(item.price),
+      buyerProductStatus: item.buyer_product_status !== false,
+      sellerProductStatus: item.seller_product_status !== false,
+      unlimitedStock: item.unlimited_stock === true,
+      stock: Number(item.stock ?? 0),
+      multi: item.multi === true,
+      startCutOff: item.start_cut_off || "00:00",
+      endCutOff: item.end_cut_off || "00:00",
+      description: item.desc?.trim() || "",
+    }));
+}
 
-  return new Map(
-    payload.data
-      .filter((item) => item.buyer_sku_code && Number.isFinite(item.price))
-      .map((item) => [item.buyer_sku_code!, item]),
+export async function listDigiflazzPriceList() {
+  return (await fetchPriceListItems()).sort((a, b) =>
+    a.brand.localeCompare(b.brand) || a.productName.localeCompare(b.productName) || a.price - b.price,
   );
+}
+
+async function fetchPriceList() {
+  const items = await fetchPriceListItems();
+  return new Map(items.map((item) => [item.buyerSkuCode, {
+    buyer_sku_code: item.buyerSkuCode,
+    product_name: item.productName,
+    category: item.category,
+    brand: item.brand,
+    type: item.type,
+    seller_name: item.sellerName,
+    price: item.price,
+    buyer_product_status: item.buyerProductStatus,
+    seller_product_status: item.sellerProductStatus,
+    unlimited_stock: item.unlimitedStock,
+    stock: item.stock,
+    multi: item.multi,
+    start_cut_off: item.startCutOff,
+    end_cut_off: item.endCutOff,
+    desc: item.description,
+  } satisfies RawPriceItem]));
 }
 
 async function syncRows(target?: { productId: number; packageSku: string }) {
