@@ -99,7 +99,7 @@ export async function getMemberLifetimeSpend(customerId: string) {
 
 async function getRoleState(customerId: string) {
   await ensureMemberTierSettings();
-  const row = await getD1().prepare(`SELECT tier_mode, tier_override, tier_progress_bonus FROM customer_users WHERE id = ? LIMIT 1`)
+  const row = await getD1().prepare(`SELECT tier_mode, tier_override, tier_progress_bonus FROM customer_users WHERE id = ? AND email NOT LIKE '__lfadmin__:%' LIMIT 1`)
     .bind(customerId).first<{ tier_mode: string; tier_override: string | null; tier_progress_bonus: number }>();
   if (!row) throw new Error("Pelanggan tidak ditemukan.");
   return {
@@ -150,7 +150,7 @@ export async function addMemberBalance(input: { customerId: string; amount: numb
   const amount = Math.trunc(Number(input.amount));
   if (!Number.isFinite(amount) || amount <= 0 || amount > 100_000_000) throw new Error("Nominal saldo tidak valid.");
   const db = getD1();
-  const customer = await db.prepare("SELECT id FROM customer_users WHERE id = ? LIMIT 1").bind(input.customerId).first<{ id: string }>();
+  const customer = await db.prepare("SELECT id FROM customer_users WHERE id = ? AND email NOT LIKE '__lfadmin__:%' LIMIT 1").bind(input.customerId).first<{ id: string }>();
   if (!customer) throw new Error("Pelanggan tidak ditemukan.");
   const reference = `admin-credit:${crypto.randomUUID()}`;
   const description = input.reason?.trim() ? `Penambahan saldo admin: ${input.reason.trim()}` : `Penambahan saldo oleh ${input.adminEmail}`;
@@ -171,6 +171,7 @@ export async function listMembersWithTiers(limit = 300) {
       COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN o.total ELSE 0 END), 0) AS lifetime_spend,
       COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN 1 ELSE 0 END), 0) AS paid_orders
     FROM customer_users u LEFT JOIN orders o ON o.customer_id = u.id
+    WHERE u.email NOT LIKE '__lfadmin__:%'
     GROUP BY u.id, u.name, u.email, u.phone, u.balance, u.is_active, u.created_at, u.tier_mode, u.tier_override, u.tier_progress_bonus
     ORDER BY lifetime_spend DESC, u.created_at DESC LIMIT ?`)
     .bind(Math.min(Math.max(limit, 1), 500))
