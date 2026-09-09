@@ -16,6 +16,21 @@ test("public catalog never falls back to hardcoded products", () => {
   assert.match(hook, /useState<StoreProduct\[\]>\(\[\]\)/);
 });
 
+test("public catalog strips supplier pricing and provider SKU metadata", () => {
+  const route = read("app/api/products/route.ts");
+  const checkout = read("app/checkout/page.tsx");
+
+  assert.match(route, /providerConfigured: Boolean\(pkg\.providerCode && pkg\.providerSku\)/);
+  assert.doesNotMatch(route, /supplierPrice: pkg\./);
+  assert.doesNotMatch(route, /marginValue: pkg\./);
+  assert.doesNotMatch(route, /marginType: pkg\./);
+  assert.doesNotMatch(route, /pricingMode: pkg\./);
+  assert.doesNotMatch(route, /providerSku: pkg\./);
+  assert.doesNotMatch(route, /\.\.\.item/);
+  assert.match(checkout, /selectedPackage\?\.providerConfigured/);
+  assert.doesNotMatch(checkout, /selectedPackage\?\.providerSku/);
+});
+
 test("checkout only accepts products and packages that exist in D1", () => {
   const orders = read("lib/server/orders.ts");
   const resolveSection = orders.slice(
