@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import { safeNavigationUrl } from "@/lib/navigation-url";
 
 export type HomeBannerRecord = {
   id: number | null;
@@ -43,7 +44,7 @@ export async function listHomeBanners(includeInactive = false): Promise<HomeBann
      FROM home_banners ${includeInactive ? "" : "WHERE is_active = 1"}
      ORDER BY sort_order ASC, id ASC`,
   ).all<{ id: number; title: string; subtitle: string; image_url: string; cta_label: string; cta_href: string; is_active: number; sort_order: number }>();
-  return result.results.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, ...decodeBannerImages(row.image_url), ctaLabel: row.cta_label, ctaHref: row.cta_href, isActive: Boolean(row.is_active), sortOrder: row.sort_order }));
+  return result.results.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, ...decodeBannerImages(row.image_url), ctaLabel: row.cta_label, ctaHref: safeNavigationUrl(row.cta_href, "/catalog"), isActive: Boolean(row.is_active), sortOrder: row.sort_order }));
 }
 
 export async function saveHomeBanner(input: Omit<HomeBannerRecord, "id">, id?: number) {
@@ -83,7 +84,7 @@ export async function listSitePopups(includeInactive = false): Promise<SitePopup
      FROM site_popups ${includeInactive ? "" : "WHERE is_active = 1"}
      ORDER BY sort_order ASC, id ASC`,
   ).all<{ id: number; title: string; body: string; primary_label: string | null; primary_href: string | null; secondary_label: string | null; secondary_href: string | null; dismiss_days: number; is_active: number; sort_order: number }>();
-  return result.results.map((row) => ({ id: row.id, title: row.title, body: row.body, primaryLabel: row.primary_label ?? undefined, primaryHref: row.primary_href ?? undefined, secondaryLabel: row.secondary_label ?? undefined, secondaryHref: row.secondary_href ?? undefined, dismissDays: row.dismiss_days, isActive: Boolean(row.is_active), sortOrder: row.sort_order }));
+  return result.results.map((row) => ({ id: row.id, title: row.title, body: row.body, primaryLabel: row.primary_label ?? undefined, primaryHref: safeNavigationUrl(row.primary_href) || undefined, secondaryLabel: row.secondary_label ?? undefined, secondaryHref: safeNavigationUrl(row.secondary_href) || undefined, dismissDays: row.dismiss_days, isActive: Boolean(row.is_active), sortOrder: row.sort_order }));
 }
 
 export async function saveSitePopup(input: Omit<SitePopupRecord, "id">, id?: number) {
