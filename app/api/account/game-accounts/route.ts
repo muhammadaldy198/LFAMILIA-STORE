@@ -109,7 +109,7 @@ export async function GET(request: Request) {
       values: JSON.parse(row.values_json || "[]"),
       updatedAt: row.updated_at,
     })),
-  });
+  }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
