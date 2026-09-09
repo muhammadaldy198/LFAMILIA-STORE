@@ -99,7 +99,7 @@ export function AdminOrderManager() {
   const [detailTab, setDetailTab] = useState<DetailTab>("detail");
   const [detailLoading, setDetailLoading] = useState(false);
   const [workingId, setWorkingId] = useState<string | null>(null);
-  const [serialInput, setDeliveryInput] = useState("");
+  const [deliveryInput, setDeliveryInput] = useState("");
 
   const refreshOrders = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
