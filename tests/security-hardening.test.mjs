@@ -53,7 +53,7 @@ test("saved game accounts enforce ownership on writes", () => {
 
 test("Cloudflare Access diagnostics escape unverified JWT claim text", () => {
   const source = read("worker/index.ts");
-  assert.match(source, /function escapeHtml\\(value: string \\| undefined \\| null\\)/);
+  assert.match(source, /function escapeHtml\(value: string \| undefined \| null\)/);
   assert.match(source, /escapeHtml\(receivedAudience\)/);
   assert.match(source, /escapeHtml\(receivedIssuer\)/);
 });
