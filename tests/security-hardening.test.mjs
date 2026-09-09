@@ -77,6 +77,15 @@ test("Worker runtime retains the configured R2 media binding", () => {
   assert.match(integrations, /const target: Record<string, unknown> = \{ \.\.\.systemOnly \}/);
 });
 
+test("Admin and Staff API responses are centrally non-cacheable", () => {
+  const panel = read("app/api/panel/[...path]/route.ts");
+  const worker = read("worker/index.ts");
+  assert.match(panel, /Cloudflare-CDN-Cache-Control", "no-store"/);
+  assert.match(panel, /Cache-Control", "no-store, no-cache, must-revalidate"/);
+  assert.match(worker, /isSensitiveAdminApi/);
+  assert.match(worker, /url\.pathname\.startsWith\("\/api\/admin\/"\)/);
+});
+
 test("authenticated customer data is explicitly non-cacheable", () => {
   for (const file of [
     "app/api/account/route.ts",
