@@ -196,15 +196,18 @@ const worker = {
 
     return withSecurityHeaders(response, url);
   },
-  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
-    ctx.waitUntil(Promise.all([
-      syncDigiflazzPrices().catch(() => undefined),
+    const tasks: Promise<unknown>[] = [
       cleanupSecurityRateLimits().catch(() => undefined),
       Promise.resolve()
         .then(() => recoverStaleAutomaticOrders(getPublicBaseUrl()))
         .catch(() => undefined),
-    ]));
+    ];
+    if (event.cron === "15 2 * * *") {
+      tasks.push(syncDigiflazzPrices().catch(() => undefined));
+    }
+    ctx.waitUntil(Promise.all(tasks));
   },
 };
 
