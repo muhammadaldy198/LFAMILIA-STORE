@@ -18,6 +18,19 @@ test("external checkout first enters the LFAMILIA payment page", () => {
   assert.match(checkout, /encodeURIComponent\(invoice\)/);
 });
 
+test("external checkout retries reuse one idempotency key and one DOKU invoice", () => {
+  const orders = fs.readFileSync(path.join(root, "lib/server/orders.ts"), "utf8");
+  const migration = fs.readFileSync(path.join(root, "drizzle/0026_external_checkout_idempotency.sql"), "utf8");
+  assert.match(checkout, /checkoutAttemptRef/);
+  assert.match(checkout, /idempotencyKey: checkoutAttemptRef\.current\?\.key/);
+  assert.match(autoRoute, /idempotencyKey: z\.string\(\)\.uuid\(\)/);
+  assert.match(autoRoute, /getExternalOrderByCheckoutKey/);
+  assert.match(autoRoute, /externalCheckoutKey: input\.idempotencyKey/);
+  assert.match(autoRoute, /UNIQUE constraint failed\.\*external_checkout_key/);
+  assert.match(orders, /external_checkout_key/);
+  assert.match(migration, /orders_external_checkout_key_unique/);
+});
+
 test("LFAMILIA payment page owns QRIS and VA rendering while e-wallet can redirect", () => {
   assert.match(payment, /QRCodeSVG/);
   assert.match(payment, /order\.paymentNo/);
