@@ -329,7 +329,7 @@ export async function fulfillVoucherStockOrder(order: ProviderOrder): Promise<Pr
      WHERE id = ? AND order_id = ?`,
   ).bind(voucher.id, order.id).run();
 
-  const deliveryChannel = requireRuntimeValue(runtime().VOUCHER_DELIVERY_CHANNEL, "VOUCHER_DELIVERY_CHANNEL");
+  const deliveryChannel = runtime().VOUCHER_DELIVERY_CHANNEL?.trim() || "website";
   const channels = parseDeliveryChannels(deliveryChannel);
   const outcomes = channels.length
     ? await Promise.all(channels.map((channel) => deliverChannel(order, voucher, code, channel)))
