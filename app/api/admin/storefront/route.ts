@@ -2,9 +2,12 @@ import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import { readStorefrontSettings, saveStorefrontSettings } from "@/lib/server/storefront";
 import { isAllowedMediaUrl } from "@/lib/media-url";
-import { isAllowedNavigationUrl } from "@/lib/navigation-url";
+import { isAllowedHttpUrl, isAllowedNavigationUrl } from "@/lib/navigation-url";
 
-const optionalUrl = z.string().trim().url().max(500).optional().or(z.literal(""));
+const optionalUrl = z.union([
+  z.literal(""),
+  z.string().trim().max(500).refine(isAllowedHttpUrl, "URL harus menggunakan HTTP atau HTTPS."),
+]);
 const optionalMediaUrl = z.string().trim().max(500).refine(isAllowedMediaUrl, "URL gambar tidak valid.").optional().or(z.literal(""));
 const schema = z.object({
   storeName: z.string().trim().min(2).max(80),
