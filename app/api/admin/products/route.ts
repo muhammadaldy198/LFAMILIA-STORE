@@ -103,7 +103,7 @@ export async function GET(request: Request) {
   try {
     const products = await readProducts(true);
     const sellerMonitor = access.role === "owner" ? await readDigiflazzSellerMonitor() : null;
-    return Response.json({ products, databaseReady: true, seeded: products.length > 0, adminEmail: access.email, role: access.role, sellerMonitor });
+    return Response.json({ products, databaseReady: true, adminEmail: access.email, role: access.role, sellerMonitor });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Database belum siap.", databaseReady: false }, { status: 503 });
   }
