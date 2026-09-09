@@ -19,7 +19,7 @@ test("admin labels product images as optional", () => {
 });
 
 
-test("restored fallback catalog keeps complete local artwork for every bundled product", () => {
+test("bundled product artwork remains complete for known product slugs", () => {
   const source = fs.readFileSync(path.join(root, "lib/store-data.ts"), "utf8");
   const slugs = [...source.matchAll(/slug:\s*"([^"]+)"/g)].map((match) => match[1]);
   assert.equal(slugs.length, 24);
