@@ -46,14 +46,16 @@ import type { CustomerSession } from "@/lib/server/customer-auth";
 
 const INTERNAL_VOUCHER_DESTINATION = "00000000";
 
-const requiredNicknameGames = new Set([
+// Nickname verification is a convenience only. Checkout must not depend on
+// Melostore or another nickname service; DOKU + the selected fulfillment
+// provider remain the only external dependencies required to complete an order.
+const requiredNicknameGames = new Set<string>();
+
+const optionalNicknameGames = new Set([
   "mobile-legends",
   "free-fire",
   "genshin-impact",
   "valorant",
-]);
-
-const optionalNicknameGames = new Set([
   "pubg-mobile",
   "honor-of-kings",
   "call-of-duty-mobile",
