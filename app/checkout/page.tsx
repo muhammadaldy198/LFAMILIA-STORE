@@ -315,7 +315,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const isVoucherStock = selectedPackage?.providerCode === "voucher-stock";
   const providerReady =
     isManual ||
-    Boolean(selectedPackage?.providerCode && selectedPackage?.providerSku);
+    Boolean(selectedPackage?.providerCode && selectedPackage?.providerConfigured);
   const nicknameRequired =
     !isVoucherProduct && requiredNicknameGames.has(product.slug);
   const canCheckNickname =
