@@ -234,10 +234,13 @@ export async function getPasswordAdminSession(request: Request): Promise<Passwor
 }
 
 export async function deleteRolePanelSession(_request: Request, _role: "owner" | "staff") {
+  void _request;
+  void _role;
   // Stateless session: logout invalidates it by clearing PANEL_COOKIE_NAME.
 }
 
 export async function deleteAdminSession(_request: Request) {
+  void _request;
   // Stateless session: logout invalidates it by clearing PANEL_COOKIE_NAME.
 }
 
