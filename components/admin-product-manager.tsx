@@ -721,11 +721,13 @@ export function AdminProductManager() {
 
                   <div className="pt-3">
                     <div className="overflow-x-auto rounded-lg border border-white/[0.07]">
-                      <table className="w-full min-w-[1040px] text-left text-[10px]">
+                      <table className="w-full min-w-[1280px] text-left text-[10px]">
                         <thead className="bg-white/[0.02] text-white/30">
                           <tr>
+                            <th className="px-3 py-2">Urutan</th>
                             <th className="px-3 py-2">Nominal</th>
-                            <th className="px-3 py-2">Tab</th>
+                            <th className="px-3 py-2">Gambar</th>
+                            <th className="px-3 py-2">Section</th>
                             <th className="px-3 py-2">Provider</th>
                             <th className="px-3 py-2">SKU</th>
                             <th className="px-3 py-2">Margin</th>
@@ -740,8 +742,20 @@ export function AdminProductManager() {
                             const canSync = entry.providerCode === "digiflazz" && Boolean(entry.providerSku?.trim());
                             const syncKey = entry.dbId ?? index + 1;
                             return <tr key={`${entry.dbId ?? "new"}-${index}`} className="border-t border-white/[0.06]">
-                              <td className="px-3 py-2 font-semibold text-white/75">{entry.label || <span className="text-amber-200/60">Nominal baru</span>}</td>
-                              <td className="px-3 py-2 text-white/40">{entry.group || "Tanpa tab"}</td>
+                              <td className="px-3 py-2">
+                                <div className="flex items-center gap-1">
+                                  <button type="button" disabled={index === 0} onClick={() => moveCatalogPackage(item, index, -1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser nominal ke atas"><ChevronUp className="size-3.5" /></button>
+                                  <button type="button" disabled={index === item.packages.length - 1} onClick={() => moveCatalogPackage(item, index, 1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser nominal ke bawah"><ChevronDown className="size-3.5" /></button>
+                                  <span className="ml-1 text-[9px] text-white/35">{index + 1}</span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-2">
+                                {role === "owner" ? <Input value={entry.label} onChange={(event) => updateCatalogPackage(key, index, "label", event.target.value)} className="admin-input h-8 min-w-[170px]" placeholder="Nama nominal" /> : <span className="font-semibold text-white/75">{entry.label}</span>}
+                              </td>
+                              <td className="px-3 py-2"><PackageImagePicker value={entry.imageUrl ?? ""} onChange={(value) => updateCatalogPackage(key, index, "imageUrl", value)} disabled={role !== "owner"} /></td>
+                              <td className="px-3 py-2">
+                                {role === "owner" && item.packageTabs.length ? <select value={entry.group ?? ""} onChange={(event) => updateCatalogPackage(key, index, "group", event.target.value)} className="admin-input h-8 min-w-[150px] px-2 text-[9px]"><option value="">Tanpa section</option>{item.packageTabs.map((tab) => <option key={tab} value={tab}>{tab}</option>)}</select> : <span className="text-white/40">{entry.group || "Tanpa section"}</span>}
+                              </td>
                               <td className="px-3 py-2">
                                 {role === "owner" ? <select
                                   value={entry.providerCode ?? ""}
@@ -842,7 +856,7 @@ export function AdminProductManager() {
                               </td>
                             </tr>;
                           })}
-                          {!item.packages.length && <tr><td colSpan={9} className="px-3 py-6 text-center text-[10px] text-white/30">Belum ada nominal. Tekan + pada produk atau tombol Tambah nominal.</td></tr>}
+                          {!item.packages.length && <tr><td colSpan={11} className="px-3 py-6 text-center text-[10px] text-white/30">Belum ada nominal. Tambahkan langsung dari Digiflazz atau buat nominal manual.</td></tr>}
                         </tbody>
                       </table>
                     </div>
