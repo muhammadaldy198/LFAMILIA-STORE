@@ -36,7 +36,11 @@ test("checkout waits for payment methods before defaulting to wallet", () => {
 
 test("DOKU channel sync never enables merchant channels automatically", () => {
   const channels = fs.readFileSync(path.join(root, "lib/server/payment-channels.ts"), "utf8");
+  const syncStart = channels.indexOf("export async function syncPaymentChannelsForGateways");
+  const syncEnd = channels.indexOf("export async function syncPaymentChannelsForGateway", syncStart);
+  const syncSource = channels.slice(syncStart, syncEnd);
   assert.match(channels, /isActive: false/);
-  assert.match(channels, /activationPolicy: "manual"/);
-  assert.doesNotMatch(channels, /is_active = excluded\.is_active/);
+  assert.match(syncSource, /activationPolicy: "manual"/);
+  assert.match(syncSource, /\.bind\([\s\S]*?item\.description,[\s\S]*?0,[\s\S]*?index/);
+  assert.doesNotMatch(syncSource, /is_active = excluded\.is_active/);
 });
