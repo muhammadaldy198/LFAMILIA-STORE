@@ -46,7 +46,10 @@ export function AdminReportsCenter() {
     } finally { setLoading(false); }
   }, [range]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
