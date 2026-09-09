@@ -1,5 +1,6 @@
 import { getPasswordAdminSession, type PasswordAdminSession } from "@/lib/server/admin-auth";
 import { getRuntimeEnv, requireRuntimeValue } from "@/lib/server/runtime-env";
+import { rejectCrossOriginMutation } from "@/lib/server/security";
 
 export type AdminRole = "owner" | "staff";
 
@@ -31,10 +32,8 @@ export async function getAdminSession(request: Request): Promise<AdminSession | 
 export async function requireAdminSession(request: Request, minimumRole: AdminRole = "staff") {
   const session = await getAdminSession(request);
   if (!session) return Response.json({ error: "Akses admin tidak ditemukan atau sudah dinonaktifkan." }, { status: 401 });
-  if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
-    const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin) return Response.json({ error: "Permintaan admin ditolak." }, { status: 403 });
-  }
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
   if (minimumRole === "owner" && session.role !== "owner") {
     return Response.json({ error: "Tindakan ini hanya dapat dilakukan oleh Pemilik." }, { status: 403 });
   }
