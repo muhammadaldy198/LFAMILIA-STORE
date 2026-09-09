@@ -8,5 +8,5 @@ export async function GET(request: Request) {
   if (customer instanceof Response) return customer;
 
   const membership = await getMemberTierProfile(customer.id);
-  return Response.json({ membership });
+  return Response.json({ membership }, { headers: { "Cache-Control": "no-store" } });
 }
