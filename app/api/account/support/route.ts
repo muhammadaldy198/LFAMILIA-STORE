@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   if (customer instanceof Response) return customer;
   try {
     const rows = await getD1().prepare("SELECT id, kind, order_reference, subject, message, status, staff_reply, created_at, updated_at FROM customer_support_requests WHERE customer_id = ? ORDER BY updated_at DESC LIMIT 50").bind(customer.id).all();
-    return Response.json({ requests: rows.results });
+    return Response.json({ requests: rows.results }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Bantuan gagal dimuat." }, { status: 503 }); }
 }
 
