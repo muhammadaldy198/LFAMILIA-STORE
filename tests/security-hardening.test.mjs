@@ -21,6 +21,9 @@ test("critical public mutation routes reject cross-site requests", () => {
     "app/api/payments/wallet/create/route.ts",
     "app/api/payments/auto/create/route.ts",
     "app/api/reviews/route.ts",
+    "app/admin/panel/auth/login/route.ts",
+    "app/staff/panel/auth/login/route.ts",
+    "app/api/admin/auth/setup/route.ts",
   ];
   for (const file of routes) assert.match(read(file), /rejectCrossOriginMutation\(request\)/, file);
 });
@@ -46,6 +49,13 @@ test("saved game accounts enforce ownership on writes", () => {
   const source = read("app/api/account/game-accounts/route.ts");
   assert.match(source, /WHERE id = \? AND customer_id = \?/);
   assert.match(source, /DELETE FROM customer_game_accounts WHERE id = \? AND customer_id = \?/);
+});
+
+test("Cloudflare Access diagnostics escape unverified JWT claim text", () => {
+  const source = read("worker/index.ts");
+  assert.match(source, /function escapeHtml\(value: string\)/);
+  assert.match(source, /escapeHtml\(receivedAudience\)/);
+  assert.match(source, /escapeHtml\(receivedIssuer\)/);
 });
 
 test("Worker applies baseline browser security headers", () => {
