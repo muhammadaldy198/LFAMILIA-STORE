@@ -59,7 +59,7 @@ export async function GET(request: Request) {
           "FROM orders WHERE " + orderPeriod,
       ),
       db.prepare("SELECT COUNT(*) AS count FROM products WHERE is_active = 1"),
-      db.prepare("SELECT COUNT(*) AS count FROM customer_users WHERE is_active = 1"),
+      db.prepare("SELECT COUNT(*) AS count FROM customer_users WHERE is_active = 1 AND email NOT LIKE '__lfadmin__:%'"),
       db.prepare("SELECT payment_status AS status, COUNT(*) AS count FROM orders WHERE " + orderPeriod + " GROUP BY payment_status ORDER BY count DESC"),
       db.prepare("SELECT fulfillment_status AS status, COUNT(*) AS count FROM orders WHERE " + orderPeriod + " GROUP BY fulfillment_status ORDER BY count DESC"),
       db.prepare(
