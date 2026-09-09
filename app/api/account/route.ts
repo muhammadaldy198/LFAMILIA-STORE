@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     transactions: transactions.results,
     orders: orders.results.map((order) => ({ ...order, reference_id: publicReferenceId(order.reference_id) })),
     vouchers: vouchers.map((voucher) => ({ ...voucher, referenceId: publicReferenceId(voucher.referenceId) })),
-  });
+  }, { headers: { "Cache-Control": "no-store" } });
 }
 
 const profileSchema = z.object({
