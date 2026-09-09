@@ -95,6 +95,12 @@ test("accepts managed and HTTPS image URLs while rejecting unsafe schemes", asyn
   assert.equal(isAllowedMediaUrl("/brand/../private.png"), false);
 });
 
+test("Contact Us uses brand marks for WhatsApp, Instagram, and Discord", async () => {
+  const source = await readFile(path.join(root, "components/contact-panel.tsx"), "utf8");
+  for (const name of ["WhatsAppLogo", "InstagramLogo", "DiscordLogo"]) assert.ok(source.includes(name), name);
+  assert.doesNotMatch(source, /icon: MessageCircle|icon: Camera|icon: MessagesSquare/);
+});
+
 test("media uploader exposes accessible URL and upload controls", async () => {
   const { AdminMediaUpload } = await vite.ssrLoadModule("/components/admin-media-upload.tsx");
   const html = renderToStaticMarkup(React.createElement(AdminMediaUpload, {
