@@ -87,18 +87,24 @@ export function AdminNotifications({
   }, []);
 
   useEffect(() => {
-    try {
-      const stored = JSON.parse(window.localStorage.getItem(storageKey) || "[]");
-      if (Array.isArray(stored)) setReadIds(stored.filter((id): id is string => typeof id === "string"));
-    } catch {
-      setReadIds([]);
-    }
+    const storageTimer = window.setTimeout(() => {
+      try {
+        const stored = JSON.parse(window.localStorage.getItem(storageKey) || "[]");
+        if (Array.isArray(stored)) setReadIds(stored.filter((id): id is string => typeof id === "string"));
+      } catch {
+        setReadIds([]);
+      }
+    }, 0);
+    return () => window.clearTimeout(storageTimer);
   }, [storageKey]);
 
   useEffect(() => {
-    void load();
+    const initialTimer = window.setTimeout(() => void load(), 0);
     const timer = window.setInterval(() => void load(), 60_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
   }, [load]);
 
   useEffect(() => {
