@@ -24,12 +24,13 @@ test("admin reference exposes the approved desktop information architecture", ()
     "Pembayaran",
     "Pelanggan",
     "Promo",
-    "Konten",
     "Layanan Pelanggan",
     "Laporan",
     "Staff & Admin Akses",
     "Pengaturan",
   ]) assert.ok(source.includes(`label: "${label}"`), label);
+  assert.doesNotMatch(source, /value: "site-content"/);
+  assert.equal([...source.matchAll(/\{ value: "[^"]+", label: "[^"]+"/g)].length, 12);
 });
 
 test("dashboard is a backend-independent visual reference", () => {
