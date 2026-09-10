@@ -38,11 +38,13 @@ test("promo, support, reports, team, and settings are fully represented", () => 
   for (const label of ["Tambah Promo", "Daftar Tiket", "Grafik Penjualan", "Hak Akses Role", "Audit Aktivitas Admin", "Logo & Ikon", "Aturan Wallet Pelanggan", "Keamanan Transaksi", "Riwayat Backup"]) assert.ok(operations.includes(label), `missing remaining UI: ${label}`);
 });
 
-test("payment and integration workspaces use real panel APIs while pending workspaces remain frontend-only", () => {
+test("payment, integration, and customer balance workspaces use real panel APIs", () => {
   assert.match(integration, /fetch\("\/api\/panel\/integrations"/);
   assert.match(integration, /fetch\("\/api\/nickname"/);
   assert.doesNotMatch(integration, /Simulasi tes|UI sementara/);
   for (const endpoint of ["payment-methods", "payment-page", "wallet", "media"]) assert.ok(payment.includes(`/api/panel/${endpoint}`), `payment does not use ${endpoint}`);
   assert.doesNotMatch(payment, /Simulasi UI|backend dikerjakan/);
-  for (const [name, source] of [["customer", customer], ["operations", operations]]) assert.doesNotMatch(source, /fetch\s*\(/, `${name} unexpectedly calls backend`);
+  assert.match(customer, /fetch\("\/api\/panel\/balances"/);
+  assert.doesNotMatch(customer, /dicatat pada UI/);
+  assert.doesNotMatch(operations, /fetch\s*\(/);
 });

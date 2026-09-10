@@ -1,4 +1,5 @@
 import * as categories from "@/app/api/admin/categories/route";
+import * as balances from "@/app/api/admin/balances/route";
 import * as content from "@/app/api/admin/content/route";
 import * as digiflazzPricing from "@/app/api/admin/digiflazz-pricing/route";
 import * as digiflazzMonitor from "@/app/api/admin/digiflazz-monitor/route";
@@ -35,6 +36,7 @@ type RouteHandlers = Partial<Record<Method, Handler>>;
 type RouteContext = { params: Promise<{ path: string[] }> };
 
 const routes: Record<string, RouteHandlers> = {
+  balances: { GET: balances.GET, PUT: balances.PUT },
   categories: { GET: categories.GET, POST: categories.POST, DELETE: categories.DELETE },
   content: { GET: content.GET, POST: content.POST, DELETE: content.DELETE },
   "digiflazz-pricing": { GET: digiflazzPricing.GET, POST: digiflazzPricing.POST },
