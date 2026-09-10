@@ -25,6 +25,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { announceAdminAction } from "@/components/admin-workspace-ui";
 
 type ProductProvider = "Digiflazz" | "Manual";
 type EditorTab = "Informasi Produk" | "Nominal & Harga" | "Tabel Pemisah" | "Tampilan Produk" | "Input Customer" | "Fulfillment";
@@ -115,14 +116,15 @@ type NominalSection = {
   active: boolean;
 };
 
-const digiflazzCatalog = [
-  { sku: "ML5", name: "Mobile Legends 5 Diamonds", cost: 1050, status: "Normal" },
-  { sku: "ML12", name: "Mobile Legends 12 Diamonds", cost: 2200, status: "Normal" },
-  { sku: "ML28", name: "Mobile Legends 28 Diamonds", cost: 4900, status: "Normal" },
-  { sku: "ML56", name: "Mobile Legends 56 Diamonds", cost: 9650, status: "Normal" },
-  { sku: "ML86", name: "Mobile Legends 86 Diamonds", cost: 14800, status: "Normal" },
-  { sku: "ML112", name: "Mobile Legends 112 Diamonds", cost: 18900, status: "Normal" },
-];
+type DigiflazzCatalogItem = {
+  buyerSkuCode: string;
+  productName: string;
+  category: string;
+  brand: string;
+  price: number;
+  buyerProductStatus: boolean;
+  sellerProductStatus: boolean;
+};
 
 function displayCategory(value: string): Product["category"] {
   if (value === "voucher" || value.includes("voucher")) return "Game Voucher";
@@ -296,7 +298,7 @@ export function AdminProductManager() {
 
       <section className="mt-[10px] overflow-hidden rounded-[8px] border border-[#dfe6ef] bg-white shadow-[0_1px_4px_rgba(20,33,58,.04)]">
         {loading ? <div className="grid h-[190px] place-items-center text-[9px] text-[#64758c]">Memuat produk dari database...</div> : <ProductTable products={visibleProducts} onEdit={setEditorProduct} onToggle={(id) => void toggleProduct(id)} />}
-        <div className="flex h-[48px] items-center justify-between border-t border-[#e4e9ef] px-[12px] text-[8px] text-[#586980]"><span>Menampilkan 1–{visibleProducts.length} dari {products.length} produk</span><div className="flex items-center gap-[5px]"><PageButton active>1</PageButton></div><CompactSelect value="50 per halaman" onChange={() => {}} options={["50 per halaman"]} /></div>
+        <div className="flex h-[48px] items-center justify-between border-t border-[#e4e9ef] px-[12px] text-[8px] text-[#586980]"><span>Menampilkan 1–{visibleProducts.length} dari {products.length} produk</span><div className="flex items-center gap-[5px]"><PageButton active>1</PageButton></div><span className="rounded-[5px] border border-[#dce3eb] bg-white px-[10px] py-[7px]">50 per halaman</span></div>
       </section>
 
       {manualProductOpen && <ManualProductModal saving={saving} onClose={() => setManualProductOpen(false)} onSubmit={addProduct} />}
@@ -308,7 +310,7 @@ function ProductTable({ products, onEdit, onToggle }: { products: Product[]; onE
   return (
     <div className="overflow-x-auto"><table className="w-full min-w-[960px] table-fixed text-left">
       <thead className="bg-[#f3f6fa] text-[7px] font-bold text-[#52637b]"><tr><th className="w-[35px] px-[12px] py-[10px]"><Box /></th><th className="w-[28px] py-[10px]">#</th><th className="w-[62px] py-[10px]">Gambar</th><th className="w-[170px] py-[10px]">Nama Produk</th><th className="w-[108px] py-[10px]">Kategori</th><th className="w-[86px] py-[10px]">Provider</th><th className="w-[90px] py-[10px]">Total Nominal</th><th className="w-[88px] py-[10px]">Harga Mulai</th><th className="w-[73px] py-[10px]">Status</th><th className="w-[78px] py-[10px]">Ditampilkan</th><th className="w-[112px] py-[10px]">Terakhir Update</th><th className="w-[112px] py-[10px]">Aksi</th></tr></thead>
-      <tbody>{products.map((product, index) => <tr key={product.id} className="border-t border-[#e4e9ef] text-[7.5px] text-[#34465e] hover:bg-[#fafbfd]"><td className="px-[12px] py-[7px]"><Box /></td><td>{index + 1}</td><td className="py-[5px]"><ProductImage product={product} /></td><td className="pr-[8px]"><strong className="block truncate text-[8px] text-[#21344e]">{product.name}</strong><span className="block truncate text-[6.5px] text-[#718198]">{product.description}</span></td><td><CategoryBadge category={product.category} /></td><td>{product.provider}</td><td>{product.nominalCount}</td><td>{formatRupiah(product.startPrice)}</td><td><span className={`rounded-[4px] px-[7px] py-[4px] font-bold ${product.active ? "bg-[#dff8e9] text-[#15965b]" : "bg-[#eef1f5] text-[#6f7f92]"}`}>{product.active ? "Aktif" : "Nonaktif"}</span></td><td><Switch enabled={product.visible} onToggle={() => onToggle(product.id)} /></td><td>{product.updated}</td><td><div className="flex items-center gap-[7px]"><button type="button" onClick={() => onEdit(product)} className="inline-flex h-[29px] items-center gap-[5px] rounded-[4px] border border-[#dbe2eb] bg-white px-[12px] font-bold text-[#40516a] hover:bg-[#f5f8fb]"><Pencil className="size-[10px]" />Edit</button><button type="button" aria-label={`Menu ${product.name}`}><MoreVertical className="size-[13px]" /></button></div></td></tr>)}</tbody>
+      <tbody>{products.map((product, index) => <tr key={product.id} className="border-t border-[#e4e9ef] text-[7.5px] text-[#34465e] hover:bg-[#fafbfd]"><td className="px-[12px] py-[7px]"><Box /></td><td>{index + 1}</td><td className="py-[5px]"><ProductImage product={product} /></td><td className="pr-[8px]"><strong className="block truncate text-[8px] text-[#21344e]">{product.name}</strong><span className="block truncate text-[6.5px] text-[#718198]">{product.description}</span></td><td><CategoryBadge category={product.category} /></td><td>{product.provider}</td><td>{product.nominalCount}</td><td>{formatRupiah(product.startPrice)}</td><td><span className={`rounded-[4px] px-[7px] py-[4px] font-bold ${product.active ? "bg-[#dff8e9] text-[#15965b]" : "bg-[#eef1f5] text-[#6f7f92]"}`}>{product.active ? "Aktif" : "Nonaktif"}</span></td><td><Switch enabled={product.visible} onToggle={() => onToggle(product.id)} /></td><td>{product.updated}</td><td><div className="flex items-center gap-[7px]"><button type="button" onClick={() => onEdit(product)} className="inline-flex h-[29px] items-center gap-[5px] rounded-[4px] border border-[#dbe2eb] bg-white px-[12px] font-bold text-[#40516a] hover:bg-[#f5f8fb]"><Pencil className="size-[10px]" />Edit</button><button type="button" onClick={() => onEdit(product)} aria-label={`Menu ${product.name}`}><MoreVertical className="size-[13px]" /></button></div></td></tr>)}</tbody>
     </table></div>
   );
 }
@@ -485,6 +487,22 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
     setManualOpen(false); setMessage("Nominal manual berhasil ditambahkan.");
   }
 
+  function copyNominal(id: string) {
+    setNominals((current) => {
+      const source = current.find((item) => item.id === id);
+      if (!source) return current;
+      const copyNumber = current.filter((item) => item.name.startsWith(`${source.name} (Salinan`)).length + 1;
+      return [...current, {
+        ...source,
+        id: crypto.randomUUID(),
+        name: `${source.name} (Salinan ${copyNumber})`,
+        sku: `${source.sku}-COPY-${copyNumber}`,
+        provider: "Manual",
+      }];
+    });
+    setMessage("Salinan nominal ditambahkan sebagai nominal manual. Simpan perubahan untuk menerapkannya.");
+  }
+
   function addSection(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget);
     setSections((current) => [...current, { id: crypto.randomUUID(), name: String(form.get("name")), description: String(form.get("description") || ""), position: "Di atas", active: true }]);
@@ -510,7 +528,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
             <section className={`overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white ${tab === "Tabel Pemisah" ? "opacity-60" : ""}`}>
               <div className="flex items-center justify-between px-[14px] py-[12px]"><div><h2 className="text-[13px] font-extrabold">Daftar Nominal</h2><p className="mt-[2px] text-[8px] text-[#6b7c92]">Kelola semua nominal, set gambar, harga dan tentukan posisi di tabel pemisah.</p></div></div>
               <div className="flex flex-wrap gap-[7px] border-t border-[#eef1f5] px-[14px] py-[9px]"><ActionButton onClick={() => setImportOpen(true)}><Plus className="size-[12px]" />Tambah dari Digiflazz</ActionButton><ActionButton onClick={() => setManualOpen(true)}><Plus className="size-[12px]" />Tambah Manual</ActionButton><ActionButton onClick={() => setMessage("Gunakan URL gambar pada penyuntingan nominal berikutnya.")}><Upload className="size-[12px]" />Upload Gambar Nominal</ActionButton><ActionButton onClick={() => setMessage("Seret baris atau gunakan tombol naik/turun untuk mengatur urutan.")}><Settings2 className="size-[12px]" />Atur Urutan</ActionButton><ActionButton onClick={() => void refreshSellerMonitor()}><RefreshCw className={`size-[12px] ${monitorRefreshing ? "animate-spin" : ""}`} />{monitorRefreshing ? "Menyinkron..." : "Sync Harga"}</ActionButton><ActionButton onClick={() => setMessage("Ubah margin nominal pada tabel, lalu simpan perubahan.")}><SlidersHorizontal className="size-[12px]" />Atur Margin Massal</ActionButton><button type="button" disabled={inputSaving} onClick={() => void saveProductChanges("Nominal dan tabel pemisah berhasil disimpan ke database.")} className="ml-auto inline-flex h-[31px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[13px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{inputSaving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>
-              <NominalTable nominals={nominals} sections={sections} onChange={setNominals} onMove={moveNominal} onDragStart={(id) => setDragging({ kind: "nominal", id })} onDrop={dropNominal} />
+              <NominalTable nominals={nominals} sections={sections} onChange={setNominals} onMove={moveNominal} onCopy={copyNominal} onDragStart={(id) => setDragging({ kind: "nominal", id })} onDrop={dropNominal} />
             </section>
 
             <section className="overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white">
@@ -532,12 +550,12 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
   );
 }
 
-function NominalTable({ nominals, sections, onChange, onMove, onDragStart, onDrop }: { nominals: Nominal[]; sections: NominalSection[]; onChange(value: Nominal[]): void; onMove(id: string, direction: -1 | 1): void; onDragStart(id: string): void; onDrop(id: string): void }) {
-  return <div className="overflow-x-auto"><table className="w-full min-w-[820px] table-fixed text-left"><thead className="bg-[#f2f6fa] text-[6.5px] font-bold text-[#52647c]"><tr><th className="w-[24px]"></th><th className="w-[25px] py-[8px]">#</th><th className="w-[120px]">Nama Nominal</th><th className="w-[52px]">Gambar</th><th className="w-[72px]">SKU Digiflazz</th><th className="w-[98px]">Grup / Tabel</th><th className="w-[45px]">Urutan</th><th className="w-[65px]">Modal</th><th className="w-[52px]">Margin</th><th className="w-[70px]">Harga Jual</th><th className="w-[53px]">Status</th><th className="w-[95px]">Aksi</th></tr></thead><tbody>{nominals.map((nominal, index) => <tr key={nominal.id} draggable onDragStart={() => onDragStart(nominal.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => onDrop(nominal.id)} className="border-t border-[#e5eaf0] text-[6.8px] text-[#34465e] hover:bg-[#fafbfd]"><td><GripVertical className="mx-auto size-[12px] cursor-grab text-[#7b8ba0]" /></td><td className="py-[6px]">{index + 1}</td><td className="truncate pr-[5px] font-semibold">{nominal.name}</td><td><NominalArtwork kind={nominal.imageKind} /></td><td>{nominal.provider === "Digiflazz" ? nominal.sku : "Manual"}</td><td><select value={nominal.group} onChange={(event) => onChange(nominals.map((item) => item.id === nominal.id ? { ...item, group: event.target.value } : item))} className="h-[27px] w-[92px] rounded-[4px] border border-[#dce3eb] bg-white px-[5px] text-[6.5px]">{sections.map((section) => <option key={section.id}>{section.name}</option>)}</select></td><td><input value={index + 1} readOnly className="h-[27px] w-[34px] rounded-[4px] border border-[#dce3eb] text-center" /></td><td>{formatRupiah(nominal.cost)}</td><td><span className="inline-flex h-[27px] items-center rounded-[4px] border border-[#dce3eb] bg-white px-[6px]">{nominal.margin} %</span></td><td className="font-semibold">{formatRupiah(nominal.sell)}</td><td><Switch enabled={nominal.active} onToggle={() => onChange(nominals.map((item) => item.id === nominal.id ? { ...item, active: !item.active } : item))} /></td><td><div className="flex gap-[3px]"><IconButton label="Naik" onClick={() => onMove(nominal.id, -1)}><ArrowUp /></IconButton><IconButton label="Turun" onClick={() => onMove(nominal.id, 1)}><ArrowDown /></IconButton><IconButton label="Salin"><Copy /></IconButton><IconButton label="Hapus" danger onClick={() => onChange(nominals.filter((item) => item.id !== nominal.id))}><Trash2 /></IconButton></div></td></tr>)}</tbody></table></div>;
+function NominalTable({ nominals, sections, onChange, onMove, onCopy, onDragStart, onDrop }: { nominals: Nominal[]; sections: NominalSection[]; onChange(value: Nominal[]): void; onMove(id: string, direction: -1 | 1): void; onCopy(id: string): void; onDragStart(id: string): void; onDrop(id: string): void }) {
+  return <div className="overflow-x-auto"><table className="w-full min-w-[820px] table-fixed text-left"><thead className="bg-[#f2f6fa] text-[6.5px] font-bold text-[#52647c]"><tr><th className="w-[24px]"></th><th className="w-[25px] py-[8px]">#</th><th className="w-[120px]">Nama Nominal</th><th className="w-[52px]">Gambar</th><th className="w-[72px]">SKU Digiflazz</th><th className="w-[98px]">Grup / Tabel</th><th className="w-[45px]">Urutan</th><th className="w-[65px]">Modal</th><th className="w-[52px]">Margin</th><th className="w-[70px]">Harga Jual</th><th className="w-[53px]">Status</th><th className="w-[95px]">Aksi</th></tr></thead><tbody>{nominals.map((nominal, index) => <tr key={nominal.id} draggable onDragStart={() => onDragStart(nominal.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => onDrop(nominal.id)} className="border-t border-[#e5eaf0] text-[6.8px] text-[#34465e] hover:bg-[#fafbfd]"><td><GripVertical className="mx-auto size-[12px] cursor-grab text-[#7b8ba0]" /></td><td className="py-[6px]">{index + 1}</td><td className="truncate pr-[5px] font-semibold">{nominal.name}</td><td><NominalArtwork kind={nominal.imageKind} /></td><td>{nominal.provider === "Digiflazz" ? nominal.sku : "Manual"}</td><td><select value={nominal.group} onChange={(event) => onChange(nominals.map((item) => item.id === nominal.id ? { ...item, group: event.target.value } : item))} className="h-[27px] w-[92px] rounded-[4px] border border-[#dce3eb] bg-white px-[5px] text-[6.5px]">{sections.map((section) => <option key={section.id}>{section.name}</option>)}</select></td><td><input value={index + 1} readOnly className="h-[27px] w-[34px] rounded-[4px] border border-[#dce3eb] text-center" /></td><td>{formatRupiah(nominal.cost)}</td><td><span className="inline-flex h-[27px] items-center rounded-[4px] border border-[#dce3eb] bg-white px-[6px]">{nominal.margin} %</span></td><td className="font-semibold">{formatRupiah(nominal.sell)}</td><td><Switch enabled={nominal.active} onToggle={() => onChange(nominals.map((item) => item.id === nominal.id ? { ...item, active: !item.active } : item))} /></td><td><div className="flex gap-[3px]"><IconButton label="Naik" onClick={() => onMove(nominal.id, -1)}><ArrowUp /></IconButton><IconButton label="Turun" onClick={() => onMove(nominal.id, 1)}><ArrowDown /></IconButton><IconButton label="Salin" onClick={() => onCopy(nominal.id)}><Copy /></IconButton><IconButton label="Hapus" danger onClick={() => onChange(nominals.filter((item) => item.id !== nominal.id))}><Trash2 /></IconButton></div></td></tr>)}</tbody></table></div>;
 }
 
 function SectionTable({ sections, onChange, onMove, onDragStart, onDrop }: { sections: NominalSection[]; onChange(value: NominalSection[]): void; onMove(id: string, direction: -1 | 1): void; onDragStart(id: string): void; onDrop(id: string): void }) {
-  return <div className="overflow-x-auto border-t border-[#e7ebf0]"><table className="w-full min-w-[720px] table-fixed text-left"><thead className="bg-[#f2f6fa] text-[6.5px] font-bold text-[#52647c]"><tr><th className="w-[27px]"></th><th className="w-[25px] py-[8px]">#</th><th className="w-[130px]">Nama Tabel / Section</th><th>Deskripsi (Opsional)</th><th className="w-[105px]">Posisi di Halaman</th><th className="w-[50px]">Urutan</th><th className="w-[60px]">Status</th><th className="w-[90px]">Aksi</th></tr></thead><tbody>{sections.map((section, index) => <tr key={section.id} draggable onDragStart={() => onDragStart(section.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => onDrop(section.id)} className="border-t border-[#e6eaf0] text-[7px] text-[#35475f]"><td><GripVertical className="mx-auto size-[12px] cursor-grab text-[#75869c]" /></td><td className="py-[7px]">{index + 1}</td><td className="font-semibold">{section.name}</td><td className="truncate pr-[8px]">{section.description}</td><td><select value={section.position} onChange={(event) => onChange(sections.map((item) => item.id === section.id ? { ...item, position: event.target.value as NominalSection["position"] } : item))} className="h-[27px] w-[90px] rounded-[4px] border border-[#dce3eb] bg-white px-[6px] text-[6.5px]"><option>Di atas</option><option>Di bawah</option></select></td><td><span className="grid size-[27px] place-items-center rounded-[4px] border border-[#dce3eb] bg-white">{index + 1}</span></td><td><span className="rounded-[4px] bg-[#dff8e9] px-[7px] py-[4px] font-bold text-[#15965b]">Aktif</span></td><td><div className="flex gap-[3px]"><IconButton label="Naik" onClick={() => onMove(section.id, -1)}><ArrowUp /></IconButton><IconButton label="Turun" onClick={() => onMove(section.id, 1)}><ArrowDown /></IconButton><IconButton label="Hapus" danger onClick={() => onChange(sections.filter((item) => item.id !== section.id))}><Trash2 /></IconButton></div></td></tr>)}</tbody></table></div>;
+  return <div className="overflow-x-auto border-t border-[#e7ebf0]"><table className="w-full min-w-[720px] table-fixed text-left"><thead className="bg-[#f2f6fa] text-[6.5px] font-bold text-[#52647c]"><tr><th className="w-[27px]"></th><th className="w-[25px] py-[8px]">#</th><th className="w-[130px]">Nama Tabel / Section</th><th>Deskripsi (Opsional)</th><th className="w-[105px]">Posisi di Halaman</th><th className="w-[50px]">Urutan</th><th className="w-[60px]">Status</th><th className="w-[90px]">Aksi</th></tr></thead><tbody>{sections.map((section, index) => <tr key={section.id} draggable onDragStart={() => onDragStart(section.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => onDrop(section.id)} className="border-t border-[#e6eaf0] text-[7px] text-[#35475f]"><td><GripVertical className="mx-auto size-[12px] cursor-grab text-[#75869c]" /></td><td className="py-[7px]">{index + 1}</td><td className="font-semibold">{section.name}</td><td className="truncate pr-[8px]">{section.description}</td><td><select value={section.position} onChange={(event) => onChange(sections.map((item) => item.id === section.id ? { ...item, position: event.target.value as NominalSection["position"] } : item))} className="h-[27px] w-[90px] rounded-[4px] border border-[#dce3eb] bg-white px-[6px] text-[6.5px]"><option>Di atas</option><option>Di bawah</option></select></td><td><span className="grid size-[27px] place-items-center rounded-[4px] border border-[#dce3eb] bg-white">{index + 1}</span></td><td><Switch enabled={section.active} onToggle={() => onChange(sections.map((item) => item.id === section.id ? { ...item, active: !item.active } : item))} /></td><td><div className="flex gap-[3px]"><IconButton label="Naik" onClick={() => onMove(section.id, -1)}><ArrowUp /></IconButton><IconButton label="Turun" onClick={() => onMove(section.id, 1)}><ArrowDown /></IconButton><IconButton label="Hapus" danger onClick={() => onChange(sections.filter((item) => item.id !== section.id))}><Trash2 /></IconButton></div></td></tr>)}</tbody></table></div>;
 }
 
 function StorePreview({ product, nominals, sections, mode, onMode }: { product: Product; nominals: Nominal[]; sections: NominalSection[]; mode: "Mobile" | "Desktop"; onMode(value: "Mobile" | "Desktop"): void }) {
@@ -577,18 +595,122 @@ function SettingSwitch({ label, value, onChange }: { label: string; value: boole
 }
 
 function EditorTabPanel({ tab, product, targetTemplate, checkoutType, labelId, labelServer, onCheckoutType, onLabelId, onLabelServer, inputLoading, saving, onSave }: { tab: EditorTab; product: Product; targetTemplate: string; checkoutType: "id" | "id-server"; labelId: string; labelServer: string; onCheckoutType(value: "id" | "id-server"): void; onLabelId(value: string): void; onLabelServer(value: string): void; inputLoading: boolean; saving: boolean; onSave(): void }) {
-  return <section className="mt-[12px] rounded-[7px] border border-[#dfe6ef] bg-white p-[16px]"><div className="flex items-center justify-between border-b border-[#e8ecf1] pb-[11px]"><div><h2 className="text-[13px] font-extrabold">{tab}</h2><p className="mt-[2px] text-[8px] text-[#6c7d92]">Pengaturan {tab.toLowerCase()} untuk {product.name}.</p></div><button type="button" disabled={saving || (tab === "Input Customer" && inputLoading)} onClick={onSave} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>{tab === "Informasi Produk" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><Field label="Nama produk" name="name" placeholder={product.name} /><Field label="Slug" name="slug" placeholder={product.slug} /><Field label="Gambar produk (opsional, rasio 1:1)" name="image" placeholder="Boleh dikosongkan dan ditambahkan nanti" /><Field label="Banner halaman produk (opsional)" name="banner" placeholder="Boleh dikosongkan dan ditambahkan nanti" /></div>}{tab === "Input Customer" && <div className="mt-[14px] grid max-w-[900px] grid-cols-[minmax(0,1fr)_300px] gap-[14px]"><div className="grid grid-cols-2 gap-[12px]"><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Checkout Type<span className="mt-[3px] block font-normal text-[#718197]">Pilih data akun yang harus diisi pelanggan.</span><select disabled={inputLoading} value={checkoutType} onChange={(event) => onCheckoutType(event.target.value as "id" | "id-server")} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] bg-white px-[10px] text-[9px]"><option value="id">ID</option><option value="id-server">ID + Server</option></select></label><label className="text-[8px] font-bold text-[#3d4f68]">Label ID<span className="mt-[3px] block font-normal text-[#718197]">Nama field yang tampil di checkout customer.</span><input disabled={inputLoading} value={labelId} onChange={(event) => onLabelId(event.target.value)} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="Contoh: User ID" /></label>{checkoutType === "id-server" && <label className="text-[8px] font-bold text-[#3d4f68]">Label Server<span className="mt-[3px] block font-normal text-[#718197]">Nama field server/zone di checkout customer.</span><input disabled={inputLoading} value={labelServer} onChange={(event) => onLabelServer(event.target.value)} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="Contoh: Zone ID" /></label>}</div><aside className="rounded-[7px] border border-[#dce6f2] bg-[#f8fbff] p-[13px]"><p className="text-[9px] font-extrabold text-[#263b58]">Preview Input Checkout</p>{inputLoading ? <p className="mt-[10px] text-[8px] text-[#718197]">Memuat pengaturan dari backend...</p> : <><label className="mt-[10px] block text-[8px] font-bold text-[#4c6078]">{labelId || "ID"}<input disabled placeholder={`Masukkan ${labelId || "ID"}`} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]" /></label>{checkoutType === "id-server" && <label className="mt-[9px] block text-[8px] font-bold text-[#4c6078]">{labelServer || "Server"}<input disabled placeholder={`Masukkan ${labelServer || "Server"}`} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]" /></label>}</>}<p className="mt-[12px] text-[8px] font-bold text-[#2f4968]">Format customer_no</p><code className="mt-[5px] block rounded-[4px] bg-white px-[9px] py-[8px] text-[8px] text-[#0875ed]">{targetTemplate}</code><p className="mt-[6px] text-[7.5px] leading-4 text-[#718197]">Backend menggabungkan data ini saat mengirim pesanan otomatis, lalu mengunci aturan verifikasi nickname. Staff hanya mengatur jenis dan label input pelanggan.</p></aside></div>}{tab !== "Informasi Produk" && tab !== "Input Customer" && <div className="mt-[14px] grid grid-cols-3 gap-[10px]">{["Aktif", "Ditampilkan di katalog", "Gunakan pengaturan default"].map((label) => <label key={label} className="flex items-center justify-between rounded-[6px] border border-[#e1e7ee] px-[11px] py-[10px] text-[8px] font-semibold">{label}<Switch enabled onToggle={() => {}} /></label>)}</div>}</section>;
+  return <section className="mt-[12px] rounded-[7px] border border-[#dfe6ef] bg-white p-[16px]"><div className="flex items-center justify-between border-b border-[#e8ecf1] pb-[11px]"><div><h2 className="text-[13px] font-extrabold">{tab}</h2><p className="mt-[2px] text-[8px] text-[#6c7d92]">Pengaturan {tab.toLowerCase()} untuk {product.name}.</p></div><button type="button" disabled={saving || (tab === "Input Customer" && inputLoading)} onClick={onSave} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>{tab === "Input Customer" && <div className="mt-[14px] grid max-w-[900px] grid-cols-[minmax(0,1fr)_300px] gap-[14px]"><div className="grid grid-cols-2 gap-[12px]"><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Checkout Type<span className="mt-[3px] block font-normal text-[#718197]">Pilih data akun yang harus diisi pelanggan.</span><select disabled={inputLoading} value={checkoutType} onChange={(event) => onCheckoutType(event.target.value as "id" | "id-server")} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] bg-white px-[10px] text-[9px]"><option value="id">ID</option><option value="id-server">ID + Server</option></select></label><label className="text-[8px] font-bold text-[#3d4f68]">Label ID<span className="mt-[3px] block font-normal text-[#718197]">Nama field yang tampil di checkout customer.</span><input disabled={inputLoading} value={labelId} onChange={(event) => onLabelId(event.target.value)} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="Contoh: User ID" /></label>{checkoutType === "id-server" && <label className="text-[8px] font-bold text-[#3d4f68]">Label Server<span className="mt-[3px] block font-normal text-[#718197]">Nama field server/zone di checkout customer.</span><input disabled={inputLoading} value={labelServer} onChange={(event) => onLabelServer(event.target.value)} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="Contoh: Zone ID" /></label>}</div><aside className="rounded-[7px] border border-[#dce6f2] bg-[#f8fbff] p-[13px]"><p className="text-[9px] font-extrabold text-[#263b58]">Preview Input Checkout</p>{inputLoading ? <p className="mt-[10px] text-[8px] text-[#718197]">Memuat pengaturan dari backend...</p> : <><label className="mt-[10px] block text-[8px] font-bold text-[#4c6078]">{labelId || "ID"}<input disabled placeholder={`Masukkan ${labelId || "ID"}`} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]" /></label>{checkoutType === "id-server" && <label className="mt-[9px] block text-[8px] font-bold text-[#4c6078]">{labelServer || "Server"}<input disabled placeholder={`Masukkan ${labelServer || "Server"}`} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]" /></label>}</>}<p className="mt-[12px] text-[8px] font-bold text-[#2f4968]">Format customer_no</p><code className="mt-[5px] block rounded-[4px] bg-white px-[9px] py-[8px] text-[8px] text-[#0875ed]">{targetTemplate}</code><p className="mt-[6px] text-[7.5px] leading-4 text-[#718197]">Backend menggabungkan data ini saat mengirim pesanan otomatis, lalu mengunci aturan verifikasi nickname. Staff hanya mengatur jenis dan label input pelanggan.</p></aside></div>}</section>;
 }
 
 function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal[]; onClose(): void; onImport(items: Nominal[]): void }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [step, setStep] = useState(1);
   const [margin, setMargin] = useState(10);
-  const available = digiflazzCatalog.filter((item) => !existing.some((nominal) => nominal.sku === item.sku));
-  function finish() { onImport(available.filter((item) => selected.includes(item.sku)).map((item) => ({ id: crypto.randomUUID(), name: item.name.replace("Mobile Legends ", ""), sku: item.sku, group: "Diamonds", cost: item.cost, margin, sell: Math.ceil(item.cost + item.cost * margin / 100), active: true, imageKind: "diamond" as const, provider: "Digiflazz" as const }))); }
-  return <SimpleModal title="Import Nominal dari Digiflazz" description="Produk tetap dibuat manual. Hanya nominal terpilih yang diambil dari Digiflazz." onClose={onClose} wide><div className="mb-[13px] grid grid-cols-4 gap-[8px]">{["Pilih Kategori", "Pilih Nominal", "Atur Margin", "Konfirmasi"].map((label, index) => <div key={label} className={`flex items-center gap-[6px] text-[7px] font-semibold ${step === index + 1 ? "text-[#0875ed]" : "text-[#74849a]"}`}><span className={`grid size-[21px] place-items-center rounded-full ${step === index + 1 ? "bg-[#0875ed] text-white" : "bg-[#eef2f6]"}`}>{index + 1}</span>{label}</div>)}</div>{step === 1 && <div className="grid grid-cols-2 gap-[10px]"><label className="text-[8px] font-bold">Kategori Digiflazz<CompactSelect value="Mobile Games" onChange={() => {}} options={["Mobile Games"]} /></label><label className="text-[8px] font-bold">Pilih Game / Brand<CompactSelect value="Mobile Legends" onChange={() => {}} options={["Mobile Legends"]} /></label></div>}{step === 2 && <div><label className="relative block"><Search className="absolute left-[9px] top-1/2 size-[12px] -translate-y-1/2 text-[#7b899b]" /><input placeholder="Cari nama atau SKU di Digiflazz..." className="h-[32px] w-full rounded-[4px] border border-[#dce3eb] pl-[28px] text-[8px]" /></label><div className="mt-[8px] overflow-hidden rounded-[5px] border border-[#e0e6ed]">{available.map((item) => <label key={item.sku} className="grid grid-cols-[22px_1fr_60px_75px_55px] items-center border-t border-[#e8ecf1] px-[8px] py-[6px] text-[7px] first:border-0"><input type="checkbox" checked={selected.includes(item.sku)} onChange={() => setSelected((current) => current.includes(item.sku) ? current.filter((sku) => sku !== item.sku) : [...current, item.sku])} /><span>{item.name}</span><span>{item.sku}</span><span>{formatRupiah(item.cost)}</span><span className="rounded bg-[#ddf8e8] px-[6px] py-[3px] text-center font-bold text-[#15955a]">{item.status}</span></label>)}</div></div>}{step === 3 && <label className="block text-[8px] font-bold">Margin global untuk nominal Digiflazz (%)<input type="number" value={margin} onChange={(event) => setMargin(Number(event.target.value))} className="mt-[5px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label>}{step === 4 && <div className="rounded-[5px] border border-[#cfe4fa] bg-[#f0f7ff] p-[12px] text-[8px] text-[#415b75]"><strong>{selected.length} nominal dipilih</strong><p className="mt-[4px]">Provider: Digiflazz · Margin: {margin}% · Produk tidak dibuat otomatis.</p></div>}<div className="mt-[15px] flex justify-between"><button type="button" onClick={step === 1 ? onClose : () => setStep((value) => value - 1)} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[13px] text-[8px] font-bold">{step === 1 ? "Batal" : "Kembali"}</button><button type="button" disabled={step === 2 && !selected.length} onClick={step === 4 ? finish : () => setStep((value) => value + 1)} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50">{step === 4 ? "Import Nominal" : "Lanjut"}</button></div></SimpleModal>;
-}
+  const [catalog, setCatalog] = useState<DigiflazzCatalogItem[]>([]);
+  const [category, setCategory] = useState("");
+  const [brand, setBrand] = useState("");
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const payload = await readJson<{ catalog: DigiflazzCatalogItem[] }>(
+          await fetch("/api/panel/digiflazz-pricing?catalog=1", { cache: "no-store", signal: controller.signal }),
+        );
+        setCatalog(payload.catalog);
+        const first = payload.catalog[0];
+        if (first) {
+          setCategory(first.category);
+          setBrand(first.brand);
+        }
+      } catch (reason) {
+        if (reason instanceof DOMException && reason.name === "AbortError") return;
+        setError(reason instanceof Error ? reason.message : "Pricelist Digiflazz gagal dimuat.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, []);
+
+  const categories = useMemo(
+    () => Array.from(new Set(catalog.map((item) => item.category).filter(Boolean))).sort(),
+    [catalog],
+  );
+  const brands = useMemo(
+    () => Array.from(new Set(catalog.filter((item) => !category || item.category === category).map((item) => item.brand).filter(Boolean))).sort(),
+    [catalog, category],
+  );
+  const available = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    return catalog.filter((item) =>
+      (!category || item.category === category) &&
+      (!brand || item.brand === brand) &&
+      item.buyerProductStatus &&
+      item.sellerProductStatus &&
+      !existing.some((nominal) => nominal.sku === item.buyerSkuCode) &&
+      (!term || `${item.productName} ${item.buyerSkuCode}`.toLowerCase().includes(term)),
+    );
+  }, [brand, catalog, category, existing, query]);
+
+  function chooseCategory(value: string) {
+    setCategory(value);
+    setBrand(catalog.find((item) => item.category === value)?.brand || "");
+    setSelected([]);
+  }
+
+  function finish() {
+    const defaultGroup = existing[0]?.group || "Lainnya";
+    onImport(available
+      .filter((item) => selected.includes(item.buyerSkuCode))
+      .map((item) => ({
+        id: crypto.randomUUID(),
+        name: item.productName,
+        sku: item.buyerSkuCode,
+        group: defaultGroup,
+        cost: item.price,
+        margin,
+        sell: Math.ceil(item.price + item.price * margin / 100),
+        active: true,
+        imageKind: item.productName.toLowerCase().includes("pass") ? "weekly" as const : "diamond" as const,
+        provider: "Digiflazz" as const,
+      })));
+  }
+
+  return (
+    <SimpleModal title="Import Nominal dari Digiflazz" description="Produk tetap dibuat manual. Hanya nominal terpilih yang diambil dari Digiflazz. Pricelist selalu dimuat langsung dari data aktif." onClose={onClose} wide>
+      <div className="mb-[13px] grid grid-cols-4 gap-[8px]">
+        {["Pilih Kategori", "Pilih Nominal", "Atur Margin", "Konfirmasi"].map((label, index) => (
+          <div key={label} className={`flex items-center gap-[6px] text-[7px] font-semibold ${step === index + 1 ? "text-[#0875ed]" : "text-[#74849a]"}`}>
+            <span className={`grid size-[21px] place-items-center rounded-full ${step === index + 1 ? "bg-[#0875ed] text-white" : "bg-[#eef2f6]"}`}>{index + 1}</span>{label}
+          </div>
+        ))}
+      </div>
+      {loading && <p className="rounded-[5px] border border-[#dce6f2] bg-[#f8fbff] p-[12px] text-[8px] text-[#52647c]">Mengambil pricelist Digiflazz terbaru...</p>}
+      {error && <p className="rounded-[5px] border border-red-200 bg-red-50 p-[12px] text-[8px] text-red-700">{error}</p>}
+      {!loading && !error && step === 1 && (
+        <div className="grid grid-cols-2 gap-[10px]">
+          <label className="text-[8px] font-bold">Kategori Digiflazz<CompactSelect value={category} onChange={chooseCategory} options={categories} /></label>
+          <label className="text-[8px] font-bold">Pilih Game / Brand<CompactSelect value={brand} onChange={(value) => { setBrand(value); setSelected([]); }} options={brands} /></label>
+        </div>
+      )}
+      {!loading && !error && step === 2 && (
+        <div>
+          <label className="relative block"><Search className="absolute left-[9px] top-1/2 size-[12px] -translate-y-1/2 text-[#7b899b]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama atau SKU di Digiflazz..." className="h-[32px] w-full rounded-[4px] border border-[#dce3eb] pl-[28px] text-[8px]" /></label>
+          <div className="mt-[8px] max-h-[310px] overflow-auto rounded-[5px] border border-[#e0e6ed]">
+            {available.map((item) => <label key={item.buyerSkuCode} className="grid grid-cols-[22px_1fr_75px_80px_55px] items-center border-t border-[#e8ecf1] px-[8px] py-[6px] text-[7px] first:border-0"><input type="checkbox" checked={selected.includes(item.buyerSkuCode)} onChange={() => setSelected((current) => current.includes(item.buyerSkuCode) ? current.filter((sku) => sku !== item.buyerSkuCode) : [...current, item.buyerSkuCode])} /><span>{item.productName}</span><span>{item.buyerSkuCode}</span><span>{formatRupiah(item.price)}</span><span className="rounded bg-[#ddf8e8] px-[6px] py-[3px] text-center font-bold text-[#15955a]">Normal</span></label>)}
+            {!available.length && <p className="p-[18px] text-center text-[8px] text-[#718198]">Tidak ada nominal aktif yang cocok atau seluruh SKU sudah diimpor.</p>}
+          </div>
+        </div>
+      )}
+      {!loading && !error && step === 3 && <label className="block text-[8px] font-bold">Margin global untuk nominal Digiflazz (%)<input type="number" min={0} value={margin} onChange={(event) => setMargin(Number(event.target.value))} className="mt-[5px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label>}
+      {!loading && !error && step === 4 && <div className="rounded-[5px] border border-[#cfe4fa] bg-[#f0f7ff] p-[12px] text-[8px] text-[#415b75]"><strong>{selected.length} nominal dipilih</strong><p className="mt-[4px]">Brand: {brand} · Margin: {margin}% · Produk utama tidak dibuat otomatis.</p></div>}
+      <div className="mt-[15px] flex justify-between">
+        <button type="button" onClick={step === 1 ? onClose : () => setStep((value) => value - 1)} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[13px] text-[8px] font-bold">{step === 1 ? "Batal" : "Kembali"}</button>
+        <button type="button" disabled={loading || Boolean(error) || (step === 2 && !selected.length)} onClick={step === 4 ? finish : () => setStep((value) => value + 1)} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50">{step === 4 ? "Import Nominal" : "Lanjut"}</button>
+      </div>
+    </SimpleModal>
+  );
+}
 function ManualProductModal({ saving, onClose, onSubmit }: { saving: boolean; onClose(): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
   return <SimpleModal title="Tambah Produk Manual" description="Semua produk dibuat sendiri. Nominal dapat ditambahkan setelah produk tersimpan." onClose={onClose} wide><form onSubmit={onSubmit}><div className="mb-[12px] flex border-b border-[#e2e7ed]"><span className="border-b-2 border-[#0875ed] px-[10px] pb-[8px] text-[8px] font-bold text-[#0875ed]">Informasi Produk</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Nominal & Harga</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Input Customer</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Fulfillment</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Tampilan</span></div><div className="grid grid-cols-[120px_1fr_1fr] gap-[12px]"><label className="row-span-3 text-[8px] font-bold text-[#3d4f68]">Gambar produk (opsional, rasio 1:1)<span className="mt-[5px] grid h-[110px] place-items-center rounded-[5px] border border-dashed border-[#cfd9e5] bg-[#fafbfd] text-center text-[#0875ed]"><span><ImageIcon className="mx-auto size-[24px]" /><small className="mt-[5px] block">Pilih gambar</small></span></span><small className="mt-[5px] block font-normal text-[#7a899c]">Boleh dikosongkan dan ditambahkan nanti</small></label><Field label="Nama Produk *" name="name" placeholder="Contoh: Roblox Robux" required /><Field label="Slug *" name="slug" placeholder="contoh: roblox-robux" /><label className="text-[8px] font-bold">Kategori *<select name="category" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Mobile Games</option><option>PC Games</option><option>Game Voucher</option></select></label><label className="text-[8px] font-bold">Provider nominal *<select name="provider" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Digiflazz</option><option>Manual</option></select></label><label className="col-span-2 text-[8px] font-bold">Deskripsi singkat<textarea name="description" placeholder="Deskripsi singkat produk..." className="mt-[4px] h-[72px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label><label className="col-span-2 text-[8px] font-bold">Banner halaman produk (opsional)<input name="banner" placeholder="Boleh dikosongkan dan ditambahkan nanti" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label></div><div className="mt-[12px] flex justify-end gap-[8px] border-t border-[#e5e9ef] pt-[12px]"><button type="button" onClick={onClose} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[14px] text-[8px] font-bold">Batal</button><button type="submit" disabled={saving} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[15px] text-[8px] font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Lanjut ke Nominal"}</button></div></form></SimpleModal>;
 }
@@ -597,8 +719,8 @@ function SimpleModal({ title, description, children, onClose, wide }: { title: s
 
 function ModalActions({ onCancel, submit }: { onCancel(): void; submit: string }) { return <div className="col-span-full mt-[5px] flex justify-end gap-[8px] border-t border-[#e5e9ef] pt-[12px]"><button type="button" onClick={onCancel} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[14px] text-[8px] font-bold">Batal</button><button type="submit" className="h-[32px] rounded-[4px] bg-[#0875ed] px-[15px] text-[8px] font-bold text-white">{submit}</button></div>; }
 function Field({ label, ...props }: { label: string; name: string; placeholder: string; type?: string; required?: boolean }) { return <label className="text-[8px] font-bold text-[#3d4f68]">{label}<input {...props} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] outline-none placeholder:text-[#929eae] focus:border-[#2580eb]" /></label>; }
-function ActionButton({ children, onClick }: { children: ReactNode; onClick?: () => void }) { return <button type="button" onClick={onClick} className="inline-flex h-[31px] items-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white px-[11px] text-[7.5px] font-bold text-[#34506d] hover:bg-[#f6f9fc]">{children}</button>; }
-function IconButton({ children, label, danger, onClick }: { children: ReactNode; label: string; danger?: boolean; onClick?: () => void }) { return <button type="button" aria-label={label} onClick={onClick} className={`grid size-[25px] place-items-center rounded-[4px] border ${danger ? "border-red-100 bg-red-50 text-red-500" : "border-[#dce3eb] bg-white text-[#52657d]"}`}>{children}</button>; }
+function ActionButton({ children, onClick }: { children: ReactNode; onClick?: () => void }) { return <button type="button" onClick={onClick ?? (() => announceAdminAction("Aksi produk dijalankan."))} className="inline-flex h-[31px] items-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white px-[11px] text-[7.5px] font-bold text-[#34506d] hover:bg-[#f6f9fc]">{children}</button>; }
+function IconButton({ children, label, danger, onClick }: { children: ReactNode; label: string; danger?: boolean; onClick?: () => void }) { return <button type="button" aria-label={label} onClick={onClick ?? (() => announceAdminAction(`${label} dijalankan.`))} className={`grid size-[25px] place-items-center rounded-[4px] border ${danger ? "border-red-100 bg-red-50 text-red-500" : "border-[#dce3eb] bg-white text-[#52657d]"}`}>{children}</button>; }
 function CompactSelect({ value, onChange, options }: { value: string; onChange(value: string): void; options: string[] }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className="h-[34px] min-w-0 rounded-[5px] border border-[#dce3eb] bg-white px-[9px] text-[8px] font-medium text-[#40516a] outline-none">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
 function PageButton({ children, active }: { children: ReactNode; active?: boolean }) { return <span className={`grid size-[27px] place-items-center rounded-[4px] border text-[8px] font-bold ${active ? "border-[#0875ed] bg-[#0875ed] text-white" : "border-[#dde4ec] bg-white text-[#4c5e76]"}`}>{children}</span>; }
 function Box() { return <span className="block size-[13px] rounded-[3px] border border-[#cdd7e2] bg-white" />; }
