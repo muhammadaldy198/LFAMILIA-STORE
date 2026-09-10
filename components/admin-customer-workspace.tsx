@@ -43,11 +43,6 @@ export function AdminCustomerWorkspace() {
 
   useEffect(() => { load().catch((reason) => setError(reason instanceof Error ? reason.message : "Data pelanggan gagal dimuat.")); }, [load]);
 
-  useEffect(() => {
-    const options = accountType === "Pelanggan" ? customers : admins;
-    if (!options.some((item) => item.id === targetId)) setTargetId(options[0]?.id || "");
-  }, [accountType, admins, customers, targetId]);
-
   async function adjustBalance() {
     const value = Math.max(0, Number(amount) || 0);
     setNotice(""); setError("");
@@ -75,7 +70,7 @@ export function AdminCustomerWorkspace() {
     </Panel>
 
     <Modal open={balanceOpen} title="Atur Saldo" description="Super Admin dapat menambah atau mengurangi saldo pelanggan maupun akun admin sendiri." onClose={() => setBalanceOpen(false)} footer={<><button type="button" onClick={() => setBalanceOpen(false)} className={buttonClass}>Batal</button><button type="button" disabled={busy} onClick={adjustBalance} className={primaryButtonClass}>{busy ? "Menyimpan..." : "Simpan Perubahan Saldo"}</button></>}><div className="grid grid-cols-2 gap-4">
-      <Field label="Jenis akun"><div className="grid grid-cols-2 gap-2">{(["Pelanggan", "Admin"] as const).map((type) => <button type="button" key={type} onClick={() => setAccountType(type)} className={`h-9 rounded-md border text-[9px] font-bold ${accountType === type ? "border-[#0769e9] bg-blue-50 text-[#0769e9]" : "border-[#dfe5ed] text-[#52627a]"}`}>{type}</button>)}</div></Field>
+      <Field label="Jenis akun"><div className="grid grid-cols-2 gap-2">{(["Pelanggan", "Admin"] as const).map((type) => <button type="button" key={type} onClick={() => { setAccountType(type); setTargetId(type === "Pelanggan" ? customers[0]?.id || "" : admins[0]?.id || ""); }} className={`h-9 rounded-md border text-[9px] font-bold ${accountType === type ? "border-[#0769e9] bg-blue-50 text-[#0769e9]" : "border-[#dfe5ed] text-[#52627a]"}`}>{type}</button>)}</div></Field>
       <Field label="Akun tujuan"><select className={inputClass} value={targetId} onChange={(e) => setTargetId(e.target.value)}>{accountType === "Pelanggan" ? customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name} — Rp {customer.balance.toLocaleString("id-ID")}</option>) : admins.map((admin) => <option key={admin.id} value={admin.id}>{admin.name} ({admin.role}) — Rp {admin.balance.toLocaleString("id-ID")}</option>)}</select></Field>
       <Field label="Tindakan"><select className={inputClass} value={operation} onChange={(e) => setOperation(e.target.value as "Tambah" | "Kurangi")}><option>Tambah</option><option>Kurangi</option></select></Field>
       <Field label="Nominal"><input className={inputClass} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} /></Field>
