@@ -38,7 +38,7 @@ test("promo, support, reports, team, and settings are fully represented", () => 
   for (const label of ["Tambah Promo", "Daftar Tiket", "Grafik Penjualan", "Hak Akses Role", "Audit Aktivitas Admin", "Logo & Ikon", "Aturan Wallet Pelanggan", "Keamanan Transaksi", "Riwayat Backup"]) assert.ok(operations.includes(label), `missing remaining UI: ${label}`);
 });
 
-test("payment, integration, and customer balance workspaces use real panel APIs", () => {
+test("all remaining workspaces use real panel APIs", () => {
   assert.match(integration, /fetch\("\/api\/panel\/integrations"/);
   assert.match(integration, /fetch\("\/api\/nickname"/);
   assert.doesNotMatch(integration, /Simulasi tes|UI sementara/);
@@ -46,5 +46,9 @@ test("payment, integration, and customer balance workspaces use real panel APIs"
   assert.doesNotMatch(payment, /Simulasi UI|backend dikerjakan/);
   assert.match(customer, /fetch\("\/api\/panel\/balances"/);
   assert.doesNotMatch(customer, /dicatat pada UI/);
-  assert.doesNotMatch(operations, /fetch\s*\(/);
+  for (const endpoint of ["promotions", "support", "summary", "team", "storefront", "wallet", "media"]) {
+    assert.ok(operations.includes(`/api/panel/${endpoint}`), `operations does not use ${endpoint}`);
+  }
+  for (const method of ["POST", "PATCH", "PUT", "DELETE"]) assert.ok(operations.includes(`method: "${method}"`), `operations does not issue ${method}`);
+  assert.doesNotMatch(operations, /backend dikerjakan|tahap UI|simulasi/i);
 });
