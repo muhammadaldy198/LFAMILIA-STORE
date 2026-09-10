@@ -9,6 +9,7 @@ test("DOKU workspace loads and saves live channel and checkout configuration", (
   assert.match(source, /fetch\("\/api\/panel\/payment-methods"/);
   assert.match(source, /fetch\("\/api\/panel\/payment-page"/);
   assert.match(source, /fetch\("\/api\/panel\/wallet"/);
+  assert.match(source, /fetch\("\/api\/panel\/orders"/);
   assert.match(source, /method: "POST"/);
   assert.match(source, /method: "PUT"/);
   assert.match(source, /DOKU sebagai satu-satunya jalur eksternal/);
@@ -19,5 +20,6 @@ test("payment and channel images are uploaded before their URLs are persisted", 
   assert.match(source, /form\.set\("file", channelFile\)/);
   assert.match(source, /\/api\/panel\/media/);
   assert.match(source, /headerImageUrl/);
-  assert.doesNotMatch(source, /Simulasi UI/);
+  assert.match(source, /setSelectedTransaction/);
+  assert.doesNotMatch(source, /Simulasi UI|backend dihubungkan|saat backend aktif/);
 });
