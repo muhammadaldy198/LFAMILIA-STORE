@@ -39,8 +39,11 @@ test("Digiflazz operational controls and tables are present", () => {
   assert.match(source, /function OperationDialog/);
 });
 
-test("Digiflazz workspace remains frontend-only and credentials stay in Integrasi", () => {
-  assert.doesNotMatch(source, /fetch\s*\(/);
+test("Digiflazz workspace uses backend operations while credentials stay in Integrasi", () => {
+  assert.match(source, /fetch\("\/api\/panel\/digiflazz-monitor"/);
+  assert.match(source, /fetch\("\/api\/panel\/orders"/);
+  assert.match(source, /method: "POST"/);
+  assert.doesNotMatch(source, /Simulasi sync|Backend Digiflazz belum dihubungkan|rancangan frontend/);
   assert.doesNotMatch(source, /api key|username|secret/i);
   assert.match(dashboard, /label: "Integrasi"/);
   assert.match(dashboard, /value="integrations"/);
