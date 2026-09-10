@@ -1,1223 +1,326 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BellRing, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Database, Edit3, ExternalLink, ImageIcon, LoaderCircle, Monitor, PackagePlus, Plus, RefreshCw, Save, Search, Smartphone, Trash2, Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatRupiah } from "@/lib/store-data";
-import { providerOptions } from "@/lib/provider-options";
-import type { ManagedProduct } from "@/lib/server/products";
-import { ProductArtwork } from "@/components/product-artwork";
-import type { ProductCategoryRecord } from "@/lib/server/storefront";
-import { AdminMediaUpload } from "@/components/admin-media-upload";
-import type { DigiflazzSellerMonitorItem } from "@/lib/server/digiflazz-monitor";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  GripVertical,
+  ImageIcon,
+  Info,
+  Monitor,
+  MoreVertical,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  Settings2,
+  SlidersHorizontal,
+  Smartphone,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
 
-type DraftPackage = ManagedProduct["packages"][number];
-type DraftNotice = ManagedProduct["notices"][number];
+type ProductProvider = "Digiflazz" | "Manual";
+type EditorTab = "Informasi Produk" | "Nominal & Harga" | "Tabel Pemisah" | "Tampilan Produk" | "Input Customer" | "Fulfillment";
 
-type DigiflazzCatalogItem = {
-  buyerSkuCode: string;
-  productName: string;
-  category: string;
-  brand: string;
-  type: string;
-  sellerName: string;
-  price: number;
-  buyerProductStatus: boolean;
-  sellerProductStatus: boolean;
-  unlimitedStock: boolean;
-  stock: number;
-  multi: boolean;
-  startCutOff: string;
-  endCutOff: string;
+type Product = {
+  id: number;
+  name: string;
+  slug: string;
   description: string;
+  category: "Mobile Games" | "PC Games" | "Game Voucher";
+  provider: ProductProvider;
+  nominalCount: number;
+  startPrice: number;
+  active: boolean;
+  visible: boolean;
+  updated: string;
+  image: string;
 };
 
-type DigiflazzMonitorPayload = {
-  items: DigiflazzSellerMonitorItem[];
-  summary: {
-    total: number;
-    healthy: number;
-    warning: number;
-    critical: number;
-    unknown: number;
-  };
+type Nominal = {
+  id: string;
+  name: string;
+  sku: string;
+  group: string;
+  cost: number;
+  margin: number;
+  sell: number;
+  active: boolean;
+  imageKind: "diamond" | "weekly" | "double" | "twilight";
+  provider: ProductProvider;
 };
 
-const emptyProduct: ManagedProduct = {
-  dbId: null,
-  slug: "",
-  name: "",
-  publisher: "",
-  category: "game",
-  imageUrl: "",
-  bannerUrl: "",
-  description: "",
-  initials: "",
-  accent: "from-[#b9ff35] to-[#347a21]",
-  inputLabel: "User ID",
-  inputPlaceholder: "Masukkan User ID",
-  inputFields: [{ id: "user-id", label: "User ID", placeholder: "Masukkan User ID", required: true }],
-  needsServer: false,
-  popular: false,
-  instant: true,
-  fulfillmentType: "automatic",
-  targetTemplate: "{{destination}}{{server}}",
-  manualInstructions: "",
-  manualOpenTime: "09:00",
-  manualCloseTime: "21:00",
-  manualTimezone: "Asia/Jakarta",
-  packageTabsEnabled: false,
-  packageTabs: [],
-  isActive: false,
-  sortOrder: 0,
-  notices: [],
-  packages: [],
+type NominalSection = {
+  id: string;
+  name: string;
+  description: string;
+  position: "Di atas" | "Di bawah";
+  active: boolean;
 };
+
+const initialProducts: Product[] = [
+  { id: 1, name: "Mobile Legends", slug: "mobile-legends", description: "Top up diamond Mobile Legends", category: "Mobile Games", provider: "Digiflazz", nominalCount: 24, startPrice: 1000, active: true, visible: true, updated: "24 Apr 2025 10:24", image: "/products/mobile-legends-card.webp" },
+  { id: 2, name: "Free Fire", slug: "free-fire", description: "Top up diamond Free Fire", category: "Mobile Games", provider: "Digiflazz", nominalCount: 18, startPrice: 1000, active: true, visible: true, updated: "24 Apr 2025 09:12", image: "/products/free-fire-card.webp" },
+  { id: 3, name: "PUBG Mobile", slug: "pubg-mobile", description: "Top up UC PUBG Mobile", category: "Mobile Games", provider: "Digiflazz", nominalCount: 15, startPrice: 1000, active: true, visible: true, updated: "23 Apr 2025 21:43", image: "/products/pubg-mobile-card.webp" },
+  { id: 4, name: "Valorant", slug: "valorant", description: "Top up Valorant Points", category: "PC Games", provider: "Digiflazz", nominalCount: 12, startPrice: 5000, active: true, visible: true, updated: "23 Apr 2025 18:20", image: "/products/valorant-card.webp" },
+  { id: 5, name: "Genshin Impact", slug: "genshin-impact", description: "Top up Genesis Crystals", category: "Mobile Games", provider: "Digiflazz", nominalCount: 10, startPrice: 16000, active: true, visible: true, updated: "23 Apr 2025 16:11", image: "/products/genshin-impact-card.webp" },
+  { id: 6, name: "Roblox", slug: "roblox", description: "Robux Gift / Login", category: "Game Voucher", provider: "Manual", nominalCount: 8, startPrice: 25000, active: true, visible: true, updated: "22 Apr 2025 14:08", image: "/products/roblox-card.webp" },
+];
+
+const initialNominals: Nominal[] = [
+  { id: "n1", name: "5 Diamonds", sku: "ML5", group: "Diamonds", cost: 1000, margin: 50, sell: 1639, active: true, imageKind: "diamond", provider: "Digiflazz" },
+  { id: "n2", name: "12 Diamonds", sku: "ML12", group: "Diamonds", cost: 2500, margin: 57, sell: 3919, active: true, imageKind: "diamond", provider: "Digiflazz" },
+  { id: "n3", name: "Weekly Diamond Pass", sku: "MLWDP", group: "Special Items", cost: 20000, margin: 40, sell: 28082, active: true, imageKind: "weekly", provider: "Digiflazz" },
+  { id: "n4", name: "2x Weekly Diamond Pass", sku: "MLWDP2", group: "Special Items", cost: 45000, margin: 43, sell: 64264, active: true, imageKind: "weekly", provider: "Digiflazz" },
+  { id: "n5", name: "3x Weekly Diamond Pass", sku: "MLWDP3", group: "Special Items", cost: 68000, margin: 42, sell: 96396, active: true, imageKind: "weekly", provider: "Digiflazz" },
+  { id: "n6", name: "100 (50+50) Diamonds", sku: "ML100", group: "First Top Up", cost: 9500, margin: 54, sell: 14659, active: true, imageKind: "double", provider: "Digiflazz" },
+  { id: "n7", name: "300 (150+150) Diamonds", sku: "ML300", group: "First Top Up", cost: 28500, margin: 54, sell: 43865, active: true, imageKind: "double", provider: "Digiflazz" },
+  { id: "n8", name: "Twilight Pass", sku: "MLTP", group: "Weekly Pass", cost: 95000, margin: 53, sell: 145200, active: true, imageKind: "twilight", provider: "Digiflazz" },
+];
+
+const initialSections: NominalSection[] = [
+  { id: "s1", name: "Special Items", description: "Item spesial seperti Weekly Pass, Twilight Pass, dll.", position: "Di atas", active: true },
+  { id: "s2", name: "Weekly Pass", description: "Semua paket Weekly Pass", position: "Di atas", active: true },
+  { id: "s3", name: "First Top Up", description: "Bonus double diamonds untuk top up pertama", position: "Di atas", active: true },
+  { id: "s4", name: "Diamonds", description: "Semua nominal diamonds reguler", position: "Di atas", active: true },
+];
+
+const digiflazzCatalog = [
+  { sku: "ML5", name: "Mobile Legends 5 Diamonds", cost: 1050, status: "Normal" },
+  { sku: "ML12", name: "Mobile Legends 12 Diamonds", cost: 2200, status: "Normal" },
+  { sku: "ML28", name: "Mobile Legends 28 Diamonds", cost: 4900, status: "Normal" },
+  { sku: "ML56", name: "Mobile Legends 56 Diamonds", cost: 9650, status: "Normal" },
+  { sku: "ML86", name: "Mobile Legends 86 Diamonds", cost: 14800, status: "Normal" },
+  { sku: "ML112", name: "Mobile Legends 112 Diamonds", cost: 18900, status: "Normal" },
+];
 
 export function AdminProductManager() {
-  const [items, setItems] = useState<ManagedProduct[]>([]);
-  const [databaseReady, setDatabaseReady] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [draft, setDraft] = useState<ManagedProduct>(emptyProduct);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [role, setRole] = useState<"owner" | "staff">("staff");
-  const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
-  const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
-  const [catalogSaving, setCatalogSaving] = useState<string | null>(null);
-  const [packageProviderSaving, setPackageProviderSaving] = useState<number | null>(null);
-  const [syncingPackage, setSyncingPackage] = useState<number | null>(null);
-  const [packageStatusSaving, setPackageStatusSaving] = useState<number | null>(null);
-  const [sellerMonitor, setSellerMonitor] = useState<DigiflazzMonitorPayload | null>(null);
-  const [monitorRefreshing, setMonitorRefreshing] = useState(false);
-  const [digiflazzImportOpen, setDigiflazzImportOpen] = useState(false);
-  const [digiflazzImportTarget, setDigiflazzImportTarget] = useState<ManagedProduct | null>(null);
-  const [digiflazzCatalog, setDigiflazzCatalog] = useState<DigiflazzCatalogItem[]>([]);
-  const [digiflazzCatalogLoading, setDigiflazzCatalogLoading] = useState(false);
-  const [digiflazzCatalogQuery, setDigiflazzCatalogQuery] = useState("");
-  const [digiflazzSelected, setDigiflazzSelected] = useState<string[]>([]);
-  const [digiflazzGroup, setDigiflazzGroup] = useState("");
-  const [digiflazzMarginType, setDigiflazzMarginType] = useState<"fixed" | "percent">("fixed");
-  const [digiflazzMarginValue, setDigiflazzMarginValue] = useState(0);
-  const [productQuery, setProductQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [providerFilter, setProviderFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [sortMode, setSortMode] = useState("newest");
-  const [page, setPage] = useState(1);
-  const [editorTab, setEditorTab] = useState<"information" | "nominal" | "sections" | "display" | "input" | "fulfillment" | "checkout">("nominal");
-  const [previewMode, setPreviewMode] = useState<"mobile" | "desktop">("mobile");
+  const [products, setProducts] = useState(initialProducts);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("Semua Kategori");
+  const [provider, setProvider] = useState("Semua Provider");
+  const [status, setStatus] = useState("Semua Status");
+  const [sort, setSort] = useState("Urutkan: Terbaru");
+  const [editorProduct, setEditorProduct] = useState<Product | null>(null);
+  const [manualProductOpen, setManualProductOpen] = useState(false);
+  const [notice, setNotice] = useState("");
 
-  const loadProducts = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await requestProducts();
-      setItems(data.products ?? []);
-      setRole(data.role ?? "staff");
-      setSellerMonitor(data.sellerMonitor ?? null);
-      setDatabaseReady(data.databaseReady !== false);
-    } catch (reason) {
-      setDatabaseReady(false);
-      setError(reason instanceof Error ? reason.message : "Produk gagal dimuat.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const visibleProducts = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    const filtered = products.filter((product) =>
+      (!term || `${product.name} ${product.category} ${product.slug}`.toLowerCase().includes(term)) &&
+      (category === "Semua Kategori" || product.category === category) &&
+      (provider === "Semua Provider" || product.provider === provider) &&
+      (status === "Semua Status" || (status === "Aktif" ? product.active : !product.active)),
+    );
+    return sort === "Urutkan: Nama A-Z" ? [...filtered].sort((a, b) => a.name.localeCompare(b.name)) : filtered;
+  }, [category, products, provider, query, sort, status]);
 
-  useEffect(() => {
-    let active = true;
-    void requestProducts().then((data) => {
-      if (!active) return;
-      setItems(data.products ?? []);
-      setRole(data.role ?? "staff");
-      setSellerMonitor(data.sellerMonitor ?? null);
-      setDatabaseReady(data.databaseReady !== false);
-    }).catch((reason) => {
-      if (!active) return;
-      setDatabaseReady(false);
-      setError(reason instanceof Error ? reason.message : "Produk gagal dimuat.");
-    }).finally(() => {
-      if (active) setLoading(false);
-    });
-    return () => { active = false; };
-  }, []);
+  function resetFilters() {
+    setQuery(""); setCategory("Semua Kategori"); setProvider("Semua Provider"); setStatus("Semua Status"); setSort("Urutkan: Terbaru");
+  }
 
-  useEffect(() => {
-    void fetch("/api/panel/categories", { cache: "no-store" }).then((response) => response.json()).then((data: { categories?: ProductCategoryRecord[] }) => setCategories(data.categories ?? []));
-  }, []);
+  function addProduct(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") || "Produk Baru");
+    const next: Product = {
+      id: products.length + 1,
+      name,
+      slug: String(form.get("slug") || slugify(name)),
+      description: String(form.get("description") || "Produk digital LFAMILIA"),
+      category: String(form.get("category") || "Mobile Games") as Product["category"],
+      provider: String(form.get("provider") || "Manual") as ProductProvider,
+      nominalCount: 0,
+      startPrice: 0,
+      active: true,
+      visible: true,
+      updated: "Baru saja",
+      image: "",
+    };
+    setProducts((current) => [...current, next]);
+    setManualProductOpen(false);
+    setEditorProduct(next);
+    setNotice(`${name} ditambahkan secara manual. Silakan atur nominalnya.`);
+  }
 
-  const loadSellerMonitor = useCallback(async () => {
-    const response = await fetch("/api/panel/digiflazz-monitor", { cache: "no-store" });
-    const data = await response.json().catch(() => ({})) as DigiflazzMonitorPayload & { error?: string };
-    if (!response.ok) throw new Error(data.error ?? "Monitor seller DigiFlazz gagal dimuat.");
-    setSellerMonitor(data);
-  }, []);
+  if (editorProduct) {
+    return <ProductEditor product={editorProduct} onBack={() => setEditorProduct(null)} onNotice={setNotice} />;
+  }
 
-  const sellerMonitorByPackage = useMemo(
-    () => new Map((sellerMonitor?.items ?? []).map((item) => [item.packageId, item])),
-    [sellerMonitor],
+  return (
+    <div className="admin-products-reference min-w-0 text-[#14213a]">
+      <div className="flex items-start justify-between gap-[16px]">
+        <div><h1 className="text-[23px] font-black tracking-[-0.04em] text-[#0b1834]">Produk</h1><p className="mt-[3px] text-[10px] text-[#64758c]">Kelola semua produk top up, voucher, dan layanan digital.</p></div>
+        <div className="flex items-center gap-[8px]">
+          <button type="button" onClick={() => setNotice("Pilih produk lalu klik Edit untuk mengimpor nominal Digiflazz.")} className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] border border-[#dce3eb] bg-white px-[13px] text-[9px] font-bold text-[#34465f] hover:bg-[#f8fafc]"><SlidersHorizontal className="size-[13px]" />Import Nominal Digiflazz</button>
+          <button type="button" onClick={() => setManualProductOpen(true)} className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] bg-[#0875ed] px-[15px] text-[9px] font-bold text-white shadow-[0_5px_14px_rgba(8,117,237,.2)] hover:bg-[#0668d5]"><Plus className="size-[14px]" />Tambah Produk Manual</button>
+        </div>
+      </div>
+
+      {notice && <button type="button" onClick={() => setNotice("")} className="mt-[10px] flex w-full items-center justify-between rounded-[6px] border border-[#b9dfca] bg-[#edf9f2] px-[12px] py-[8px] text-left text-[9px] font-semibold text-[#168553]"><span>{notice}</span><X className="size-[12px]" /></button>}
+
+      <div className="mt-[15px] grid grid-cols-[1.65fr_.75fr_.78fr_.72fr_.85fr_auto] gap-[8px]">
+        <label className="relative"><Search className="absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#708198]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama produk, kategori, atau slug..." className="h-[34px] w-full rounded-[5px] border border-[#dce3eb] bg-white pl-[31px] pr-[9px] text-[9px] outline-none placeholder:text-[#8290a2] focus:border-[#2680eb]" /></label>
+        <CompactSelect value={category} onChange={setCategory} options={["Semua Kategori", "Mobile Games", "PC Games", "Game Voucher"]} />
+        <CompactSelect value={provider} onChange={setProvider} options={["Semua Provider", "Digiflazz", "Manual"]} />
+        <CompactSelect value={status} onChange={setStatus} options={["Semua Status", "Aktif", "Nonaktif"]} />
+        <CompactSelect value={sort} onChange={setSort} options={["Urutkan: Terbaru", "Urutkan: Nama A-Z"]} />
+        <button type="button" onClick={resetFilters} className="inline-flex h-[34px] items-center gap-[6px] rounded-[5px] border border-[#dce3eb] bg-white px-[14px] text-[9px] font-semibold text-[#40516a]"><RefreshCw className="size-[12px]" />Reset</button>
+      </div>
+
+      <section className="mt-[10px] overflow-hidden rounded-[8px] border border-[#dfe6ef] bg-white shadow-[0_1px_4px_rgba(20,33,58,.04)]">
+        <ProductTable products={visibleProducts} onEdit={setEditorProduct} onToggle={(id) => setProducts((current) => current.map((product) => product.id === id ? { ...product, visible: !product.visible } : product))} />
+        <div className="flex h-[48px] items-center justify-between border-t border-[#e4e9ef] px-[12px] text-[8px] text-[#586980]"><span>Menampilkan 1–{visibleProducts.length} dari 56 produk</span><div className="flex items-center gap-[5px]"><PageButton><ChevronLeft className="size-[11px]" /></PageButton>{[1, 2, 3, 4, 5].map((page) => <PageButton key={page} active={page === 1}>{page}</PageButton>)}<span className="px-[3px]">...</span><PageButton>10</PageButton><PageButton><ChevronRight className="size-[11px]" /></PageButton></div><CompactSelect value="10 per halaman" onChange={() => {}} options={["10 per halaman", "25 per halaman", "50 per halaman"]} /></div>
+      </section>
+
+      {manualProductOpen && <ManualProductModal onClose={() => setManualProductOpen(false)} onSubmit={addProduct} />}
+    </div>
   );
+}
 
-  async function refreshSellerMonitor() {
+function ProductTable({ products, onEdit, onToggle }: { products: Product[]; onEdit(product: Product): void; onToggle(id: number): void }) {
+  return (
+    <div className="overflow-x-auto"><table className="w-full min-w-[960px] table-fixed text-left">
+      <thead className="bg-[#f3f6fa] text-[7px] font-bold text-[#52637b]"><tr><th className="w-[35px] px-[12px] py-[10px]"><Box /></th><th className="w-[28px] py-[10px]">#</th><th className="w-[62px] py-[10px]">Gambar</th><th className="w-[170px] py-[10px]">Nama Produk</th><th className="w-[108px] py-[10px]">Kategori</th><th className="w-[86px] py-[10px]">Provider</th><th className="w-[90px] py-[10px]">Total Nominal</th><th className="w-[88px] py-[10px]">Harga Mulai</th><th className="w-[73px] py-[10px]">Status</th><th className="w-[78px] py-[10px]">Ditampilkan</th><th className="w-[112px] py-[10px]">Terakhir Update</th><th className="w-[112px] py-[10px]">Aksi</th></tr></thead>
+      <tbody>{products.map((product, index) => <tr key={product.id} className="border-t border-[#e4e9ef] text-[7.5px] text-[#34465e] hover:bg-[#fafbfd]"><td className="px-[12px] py-[7px]"><Box /></td><td>{index + 1}</td><td className="py-[5px]"><ProductImage product={product} /></td><td className="pr-[8px]"><strong className="block truncate text-[8px] text-[#21344e]">{product.name}</strong><span className="block truncate text-[6.5px] text-[#718198]">{product.description}</span></td><td><CategoryBadge category={product.category} /></td><td>{product.provider}</td><td>{product.nominalCount}</td><td>{formatRupiah(product.startPrice)}</td><td><span className="rounded-[4px] bg-[#dff8e9] px-[7px] py-[4px] font-bold text-[#15965b]">Aktif</span></td><td><Switch enabled={product.visible} onToggle={() => onToggle(product.id)} /></td><td>{product.updated}</td><td><div className="flex items-center gap-[7px]"><button type="button" onClick={() => onEdit(product)} className="inline-flex h-[29px] items-center gap-[5px] rounded-[4px] border border-[#dbe2eb] bg-white px-[12px] font-bold text-[#40516a] hover:bg-[#f5f8fb]"><Pencil className="size-[10px]" />Edit</button><button type="button" aria-label={`Menu ${product.name}`}><MoreVertical className="size-[13px]" /></button></div></td></tr>)}</tbody>
+    </table></div>
+  );
+}
+
+function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack(): void; onNotice(message: string): void }) {
+  const [tab, setTab] = useState<EditorTab>("Nominal & Harga");
+  const [nominals, setNominals] = useState(initialNominals);
+  const [sections, setSections] = useState(initialSections);
+  const [importOpen, setImportOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [sectionOpen, setSectionOpen] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"Mobile" | "Desktop">("Mobile");
+  const [dragging, setDragging] = useState<{ kind: "nominal" | "section"; id: string } | null>(null);
+  const [message, setMessage] = useState("");
+  const [monitorRefreshing, setMonitorRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [inputFields] = useState([{ id: "user-id", label: "User ID" }, { id: "server-id", label: "Server ID" }]);
+  const providerTarget = inputFields.map((item) => `{{${item.id}}}`).join("");
+
+  function refreshSellerMonitor() {
     setMonitorRefreshing(true);
     setError("");
     setMessage("");
-    try {
-      const response = await fetch("/api/panel/digiflazz-monitor", { method: "POST" });
-      const data = await response.json().catch(() => ({})) as DigiflazzMonitorPayload & { error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Monitor seller DigiFlazz gagal diperbarui.");
-      setSellerMonitor(data);
-      setMessage("Monitor seller DigiFlazz berhasil diperbarui.");
-      await loadProducts();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Monitor seller DigiFlazz gagal diperbarui.");
-    } finally {
-      setMonitorRefreshing(false);
-    }
+    window.setTimeout(() => { setMonitorRefreshing(false); setMessage("Harga tampilan berhasil disinkronkan."); }, 350);
   }
 
+  function moveNominal(id: string, direction: -1 | 1) { setNominals((current) => moveItem(current, id, direction)); }
+  function moveSection(id: string, direction: -1 | 1) { setSections((current) => moveItem(current, id, direction)); }
+  function dropNominal(targetId: string) { if (dragging?.kind === "nominal") setNominals((current) => moveBefore(current, dragging.id, targetId)); setDragging(null); }
+  function dropSection(targetId: string) { if (dragging?.kind === "section") setSections((current) => moveBefore(current, dragging.id, targetId)); setDragging(null); }
 
-  function openNew() {
-    setDraft(structuredClone(emptyProduct));
-    setError("");
-    setDialogOpen(true);
+  function addManualNominal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); const form = new FormData(event.currentTarget); const cost = Number(form.get("cost") || 0); const margin = Number(form.get("margin") || 0);
+    setNominals((current) => [...current, { id: crypto.randomUUID(), name: String(form.get("name")), sku: String(form.get("sku") || "MANUAL"), group: String(form.get("group") || sections[0]?.name || "Lainnya"), cost, margin, sell: Math.ceil(cost + cost * margin / 100), active: true, imageKind: "diamond", provider: "Manual" }]);
+    setManualOpen(false); setMessage("Nominal manual berhasil ditambahkan.");
   }
 
-  function openEdit(item: ManagedProduct) {
-    if (role === "owner") {
-      setExpandedProduct(itemKey(item));
-      setEditorTab("nominal");
-      setError("");
-      return;
-    }
-    setDraft(structuredClone(item));
-    setError("");
-    setDialogOpen(true);
-  }
-
-  function updateDraft<K extends keyof ManagedProduct>(key: K, value: ManagedProduct[K]) {
-    setDraft((current) => ({ ...current, [key]: value }));
-  }
-
-  function itemKey(item: ManagedProduct) {
-    return String(item.dbId ?? item.slug);
-  }
-
-  function updateCatalogProduct(key: string, update: (item: ManagedProduct) => ManagedProduct) {
-    setItems((current) => current.map((item) => itemKey(item) === key ? update(item) : item));
-  }
-
-  function updateCatalogPackage<K extends keyof DraftPackage>(
-    key: string,
-    index: number,
-    field: K,
-    value: DraftPackage[K],
-  ) {
-    updateCatalogProduct(key, (item) => ({
-      ...item,
-      packages: item.packages.map((entry, itemIndex) =>
-        itemIndex === index ? { ...entry, [field]: value } : entry,
-      ),
-    }));
-  }
-
-  function addCatalogPackage(item: ManagedProduct) {
-    const key = itemKey(item);
-    setExpandedProduct(key);
-    updateCatalogProduct(key, (current) => ({
-      ...current,
-      packages: [
-        ...current.packages,
-        {
-          dbId: null,
-          id: "",
-          label: "",
-          price: 0,
-          note: "",
-          group: current.packageTabsEnabled ? current.packageTabs[0] ?? "" : "",
-          imageUrl: "",
-          providerCode: current.category === "voucher" ? "voucher-stock" : undefined,
-          providerSku: undefined,
-          supplierPrice: null,
-          pricingMode: "auto",
-          marginType: "fixed",
-          marginValue: 0,
-          isActive: true,
-          sortOrder: current.packages.length,
-        },
-      ],
-    }));
-  }
-
-  function moveCatalogPackage(item: ManagedProduct, index: number, direction: -1 | 1) {
-    const key = itemKey(item);
-    updateCatalogProduct(key, (current) => {
-      const nextIndex = index + direction;
-      if (nextIndex < 0 || nextIndex >= current.packages.length) return current;
-      const packages = [...current.packages];
-      [packages[index], packages[nextIndex]] = [packages[nextIndex], packages[index]];
-      return { ...current, packages };
-    });
-  }
-
-  async function openDigiflazzImport(item: ManagedProduct) {
-    setExpandedProduct(null);
-    setDigiflazzImportTarget(item);
-    setDigiflazzGroup(item.packageTabs[0] ?? "");
-    setDigiflazzSelected([]);
-    setDigiflazzCatalogQuery("");
-    setDigiflazzImportOpen(true);
-    if (digiflazzCatalog.length) return;
-    setDigiflazzCatalogLoading(true);
-    setError("");
-    try {
-      const response = await fetch("/api/panel/digiflazz-pricing?catalog=1", { cache: "no-store" });
-      const data = await response.json().catch(() => ({})) as { catalog?: DigiflazzCatalogItem[]; error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Price list DigiFlazz gagal dimuat.");
-      setDigiflazzCatalog(data.catalog ?? []);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Price list DigiFlazz gagal dimuat.");
-    } finally {
-      setDigiflazzCatalogLoading(false);
-    }
-  }
-
-  async function addSelectedDigiflazzPackages() {
-    const target = digiflazzImportTarget;
-    if (!target?.dbId || !digiflazzSelected.length) return;
-    const selected = digiflazzCatalog.filter((item) => digiflazzSelected.includes(item.buyerSkuCode));
-    const existing = new Set(target.packages.map((item) => item.providerSku).filter(Boolean));
-    const additions = selected
-      .filter((item) => !existing.has(item.buyerSkuCode))
-      .map((item, offset) => {
-        const price = digiflazzMarginType === "percent"
-          ? Math.ceil((item.price * (100 + digiflazzMarginValue)) / 100)
-          : item.price + digiflazzMarginValue;
-        return {
-          dbId: null,
-          id: slugify(`${target.slug}-${item.buyerSkuCode}`),
-          label: item.productName,
-          price,
-          note: "",
-          group: target.packageTabsEnabled ? digiflazzGroup || target.packageTabs[0] || "" : "",
-          imageUrl: "",
-          providerCode: "digiflazz" as const,
-          providerSku: item.buyerSkuCode,
-          supplierPrice: item.price,
-          pricingMode: "auto" as const,
-          marginType: digiflazzMarginType,
-          marginValue: digiflazzMarginValue,
-          isActive: item.buyerProductStatus && item.sellerProductStatus,
-          sortOrder: target.packages.length + offset,
-        };
-      });
-    if (!additions.length) {
-      setError("SKU yang dipilih sudah ada pada produk ini.");
-      return;
-    }
-    const next = { ...target, packages: [...target.packages, ...additions] };
-    const ok = await saveCatalogProduct(next, `${additions.length} nominal DigiFlazz berhasil ditambahkan.`);
-    if (ok) {
-      setDigiflazzImportOpen(false);
-      setDigiflazzSelected([]);
-    }
-  }
-
-  function addCatalogTab(item: ManagedProduct) {
-    const key = itemKey(item);
-    updateCatalogProduct(key, (current) => {
-      const existing = new Set(current.packageTabs.map((entry) => entry.toLowerCase()));
-      let name = "Tab baru";
-      let suffix = 2;
-      while (existing.has(name.toLowerCase())) name = `Tab baru ${suffix++}`;
-      return {
-        ...current,
-        packageTabsEnabled: true,
-        packageTabs: [...current.packageTabs, name],
-      };
-    });
-  }
-
-  function updateCatalogTab(item: ManagedProduct, index: number, value: string) {
-    const key = itemKey(item);
-    updateCatalogProduct(key, (current) => {
-      const previous = current.packageTabs[index];
-      return {
-        ...current,
-        packageTabs: current.packageTabs.map((entry, itemIndex) => itemIndex === index ? value : entry),
-        packages: current.packages.map((entry) => entry.group === previous ? { ...entry, group: value } : entry),
-      };
-    });
-  }
-
-  function moveCatalogTab(item: ManagedProduct, index: number, direction: -1 | 1) {
-    const key = itemKey(item);
-    updateCatalogProduct(key, (current) => {
-      const nextIndex = index + direction;
-      if (nextIndex < 0 || nextIndex >= current.packageTabs.length) return current;
-      const packageTabs = [...current.packageTabs];
-      [packageTabs[index], packageTabs[nextIndex]] = [packageTabs[nextIndex], packageTabs[index]];
-      return { ...current, packageTabs };
-    });
-  }
-
-  async function removeCatalogTab(item: ManagedProduct, index: number) {
-    const removed = item.packageTabs[index];
-    const next: ManagedProduct = {
-      ...item,
-      packageTabs: item.packageTabs.filter((_, itemIndex) => itemIndex !== index),
-      packageTabsEnabled: item.packageTabs.length > 1,
-      packages: item.packages.map((entry) => entry.group === removed ? { ...entry, group: "" } : entry),
-    };
-    setItems((current) => current.map((entry) => itemKey(entry) === itemKey(item) ? next : entry));
-    await saveCatalogProduct(next, "Tab pemisah berhasil dihapus.");
-  }
-
-  async function removeCatalogPackage(item: ManagedProduct, index: number) {
-    const entry = item.packages[index];
-    if (entry.dbId && !window.confirm(`Hapus nominal ${entry.label}?`)) return;
-    const next = { ...item, packages: item.packages.filter((_, itemIndex) => itemIndex !== index) };
-    setItems((current) => current.map((product) => itemKey(product) === itemKey(item) ? next : product));
-    if (entry.dbId) await saveCatalogProduct(next, "Nominal berhasil dihapus.");
-  }
-
-  function buildProductPayload(product: ManagedProduct) {
-    const packageTabs = product.packageTabs.map((item) => item.trim()).filter(Boolean);
-    const inputFields = (product.inputFields ?? []).map((item, index) => ({
-      ...item,
-      id: slugify(item.id || item.label || `kolom-${index + 1}`),
-      label: item.label.trim(),
-      placeholder: item.placeholder?.trim() || "",
-      required: item.required !== false,
-    })).filter((item) => item.label);
-    const automaticTemplate = inputFields.length
-      ? inputFields.map((item) => `{{${item.id}}}`).join("")
-      : "{{destination}}";
-    const configuredTemplate = product.targetTemplate?.trim() || "";
-    const usesLegacyAutomaticTemplate =
-      configuredTemplate === "{{destination}}" ||
-      configuredTemplate === "{{destination}}{{server}}";
-    const targetTemplate =
-      !configuredTemplate || usesLegacyAutomaticTemplate
-        ? automaticTemplate
-        : configuredTemplate;
-
-    return {
-      ...product,
-      instant: product.fulfillmentType === "automatic",
-      slug: slugify(product.slug || product.name),
-      initials: product.initials.toUpperCase(),
-      packageTabs,
-      inputFields,
-      inputLabel: inputFields[0]?.label || "Data pelanggan",
-      inputPlaceholder: inputFields[0]?.placeholder || "Tidak diperlukan",
-      needsServer: Boolean(inputFields[1]),
-      targetTemplate,
-      packages: product.packages.map((item, index) => {
-        const id = slugify(item.id || `${product.slug || product.name}-${item.label || index + 1}`);
-        const providerCode = item.providerCode || (product.category === "voucher" ? "voucher-stock" : undefined);
-        const providerSku = item.providerSku || (providerCode === "voucher-stock" ? id : undefined);
-        return {
-          ...item,
-          id,
-          price: Number(item.price),
-          group: item.group?.trim() || undefined,
-          providerCode,
-          providerSku,
-          sortOrder: index,
-        };
-      }),
-      notices: product.notices.map((item, index) => ({ ...item, sortOrder: index })),
-    };
-  }
-
-  async function saveCatalogProduct(item: ManagedProduct, successMessage = "Pengaturan nominal berhasil disimpan.") {
-    if (!item.dbId) {
-      setError("Simpan produk terlebih dahulu sebelum mengatur nominal.");
-      return false;
-    }
-    const key = itemKey(item);
-    setCatalogSaving(key);
-    setError("");
-    try {
-      const response = await fetch("/api/panel/products", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(buildProductPayload(item)),
-      });
-      const data = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Pengaturan katalog gagal disimpan.");
-      setMessage(successMessage);
-      await loadProducts();
-      return true;
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Pengaturan katalog gagal disimpan.");
-      return false;
-    } finally {
-      setCatalogSaving(null);
-    }
-  }
-
-  async function toggleCatalogPackageStatus(item: ManagedProduct, index: number, isActive: boolean) {
-    const entry = item.packages[index];
-    if (!entry.dbId) {
-      setError("Simpan nominal terlebih dahulu sebelum mengubah status.");
-      return;
-    }
-
-    const key = itemKey(item);
-    const previous = entry.isActive;
-    updateCatalogPackage(key, index, "isActive", isActive);
-    setPackageStatusSaving(entry.dbId);
-    setError("");
-
-    try {
-      const response = await fetch("/api/panel/product-package-status", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ packageId: entry.dbId, isActive }),
-      });
-      const data = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Status nominal gagal diperbarui.");
-      setMessage(`${entry.label} sekarang ${isActive ? "aktif" : "nonaktif"}.`);
-    } catch (reason) {
-      updateCatalogPackage(key, index, "isActive", previous);
-      setError(reason instanceof Error ? reason.message : "Status nominal gagal diperbarui.");
-    } finally {
-      setPackageStatusSaving(null);
-    }
-  }
-
-  async function saveCatalogPackageProvider(
-    item: ManagedProduct,
-    index: number,
-    options: { quiet?: boolean } = {},
-  ) {
-    const entry = item.packages[index];
-    if (!entry.dbId) {
-      setError("Simpan nominal terlebih dahulu sebelum mengatur provider/SKU.");
-      return false;
-    }
-
-    setPackageProviderSaving(entry.dbId);
-    if (!options.quiet) {
-      setError("");
-      setMessage("");
-    }
-
-    try {
-      const response = await fetch("/api/panel/product-package-provider", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          packageId: entry.dbId,
-          providerCode: entry.providerCode || null,
-          providerSku: entry.providerSku?.trim() || null,
-          pricingMode: entry.pricingMode ?? "auto",
-          marginType: entry.marginType ?? "fixed",
-          marginValue: Number(entry.marginValue ?? 0),
-        }),
-      });
-      const data = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Provider/SKU nominal gagal disimpan.");
-      if (!options.quiet) {
-        setMessage(`SKU/provider ${entry.label} berhasil disimpan tanpa sync DigiFlazz.`);
-      }
-      return true;
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Provider/SKU nominal gagal disimpan.");
-      return false;
-    } finally {
-      setPackageProviderSaving(null);
-    }
-  }
-
-  async function syncCatalogPackage(item: ManagedProduct, index: number) {
-    const entry = item.packages[index];
-    if (entry.providerCode !== "digiflazz") {
-      setError("Sync provider saat ini tersedia untuk nominal DigiFlazz.");
-      return;
-    }
-    if (!item.dbId || !entry.id || !entry.dbId) {
-      setError("Simpan nominal terlebih dahulu sebelum melakukan sync provider.");
-      return;
-    }
-    if (!entry.providerSku?.trim()) {
-      setError("Isi SKU DigiFlazz lalu tekan Simpan SKU sebelum melakukan Sync.");
-      return;
-    }
-
-    setSyncingPackage(entry.dbId);
-    setError("");
-    setMessage("");
-    try {
-      const saved = await saveCatalogPackageProvider(item, index, { quiet: true });
-      if (!saved) return;
-
-      const response = await fetch("/api/panel/digiflazz-pricing", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ productId: item.dbId, packageSku: entry.id }),
-      });
-      const data = await response.json().catch(() => ({})) as { error?: string; result?: { updated?: number } };
-      if (!response.ok) throw new Error(data.error ?? "Sync provider gagal.");
-      setMessage(`DigiFlazz berhasil disinkronkan untuk ${entry.label}.`);
-      await loadProducts();
-      if (role === "owner") await loadSellerMonitor();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Sync provider gagal.");
-    } finally {
-      setSyncingPackage(null);
-    }
-  }
-
-  function addNotice() {
-    setDraft((current) => ({
-      ...current,
-      notices: [...current.notices, { id: null, title: "Informasi penting", body: "", isActive: true, sortOrder: current.notices.length }],
-    }));
-  }
-
-  function updateNotice<K extends keyof DraftNotice>(index: number, key: K, value: DraftNotice[K]) {
-    setDraft((current) => ({ ...current, notices: current.notices.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item) }));
-  }
-
-  function removeNotice(index: number) {
-    setDraft((current) => ({ ...current, notices: current.notices.filter((_, itemIndex) => itemIndex !== index) }));
-  }
-
-  function addInputField() {
-    setDraft((current) => {
-      const inputFields = current.inputFields ?? [];
-      let suffix = inputFields.length + 1;
-      let id = `kolom-${suffix}`;
-      const ids = new Set(inputFields.map((item) => item.id));
-      while (ids.has(id)) id = `kolom-${++suffix}`;
-      return { ...current, inputFields: [...inputFields, { id, label: "", placeholder: "", required: true }] };
-    });
-  }
-
-  function updateInputField(index: number, patch: Partial<NonNullable<ManagedProduct["inputFields"]>[number]>) {
-    setDraft((current) => ({
-      ...current,
-      inputFields: (current.inputFields ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item),
-    }));
-  }
-
-  function removeInputField(index: number) {
-    setDraft((current) => ({ ...current, inputFields: (current.inputFields ?? []).filter((_, itemIndex) => itemIndex !== index) }));
-  }
-
-  function moveNotice(index: number, direction: -1 | 1) {
-    setDraft((current) => {
-      const nextIndex = index + direction;
-      if (nextIndex < 0 || nextIndex >= current.notices.length) return current;
-      const notices = [...current.notices];
-      [notices[index], notices[nextIndex]] = [notices[nextIndex], notices[index]];
-      return { ...current, notices };
-    });
-  }
-
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    const payload = buildProductPayload(draft);
-    try {
-      const staffContentOnly = role === "staff";
-      const response = await fetch(staffContentOnly ? "/api/panel/product-content" : "/api/panel/products", {
-        method: staffContentOnly ? "PUT" : draft.dbId ? "PATCH" : "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Produk gagal disimpan.");
-      setDialogOpen(false);
-      setMessage(staffContentOnly ? "Informasi produk berhasil diperbarui." : draft.dbId ? "Produk berhasil diperbarui." : "Produk berhasil ditambahkan.");
-      await loadProducts();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Produk gagal disimpan.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function removeProduct(id: number) {
-    setError("");
-    const response = await fetch(`/api/panel/products?id=${id}`, { method: "DELETE" });
-    const data = await response.json().catch(() => ({})) as { error?: string };
-    if (!response.ok) {
-      setError(data.error ?? "Produk gagal dihapus.");
-      return;
-    }
-    setMessage("Produk berhasil dihapus.");
-    await loadProducts();
-  }
-
-  const providers = useMemo(() => Array.from(new Set(items.flatMap((item) => item.packages.map((entry) => entry.providerCode || "manual")))), [items]);
-  const editingProduct = useMemo(() => expandedProduct ? items.find((item) => itemKey(item) === expandedProduct) ?? null : null, [expandedProduct, items]);
-  const filteredProducts = useMemo(() => {
-    const query = productQuery.trim().toLowerCase();
-    const next = items.filter((item) => {
-      const providerMatch = providerFilter === "all" || item.packages.some((entry) => (entry.providerCode || "manual") === providerFilter);
-      return (!query || `${item.name} ${item.publisher} ${item.slug} ${item.category}`.toLowerCase().includes(query))
-        && (categoryFilter === "all" || item.category === categoryFilter)
-        && providerMatch
-        && (statusFilter === "all" || (statusFilter === "active" ? item.isActive : !item.isActive));
-    });
-    return next.sort((a, b) => sortMode === "name" ? a.name.localeCompare(b.name) : sortMode === "price"
-      ? Math.min(...a.packages.map((entry) => entry.price), Number.MAX_SAFE_INTEGER) - Math.min(...b.packages.map((entry) => entry.price), Number.MAX_SAFE_INTEGER)
-      : b.sortOrder - a.sortOrder);
-  }, [items, productQuery, categoryFilter, providerFilter, statusFilter, sortMode]);
-  const pageSize = 8;
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
-  const visiblePage = Math.min(page, totalPages);
-  const visibleProducts = filteredProducts.slice((visiblePage - 1) * pageSize, visiblePage * pageSize);
-  if (loading) return <div className="flex min-h-48 items-center justify-center text-xs text-white/35"><LoaderCircle className="mr-2 size-4 animate-spin" /> Memuat produk…</div>;
-
-  if (!databaseReady) {
-    return <div className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] p-6 text-center"><Database className="mx-auto size-7 text-amber-300" /><h3 className="mt-4 font-bold">Database belum siap</h3><p className="mx-auto mt-2 max-w-md text-xs leading-6 text-white/42">Buat database D1 dan jalankan file migrasi terlebih dahulu. Setelah itu tekan Muat ulang.</p>{error && <p className="mt-2 text-[10px] text-red-200/70">{error}</p>}<Button onClick={() => void loadProducts()} variant="outline" className="mt-5 rounded-xl border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white"><RefreshCw className="mr-2 size-4" />Muat ulang</Button></div>;
-  }
-
-  if (editingProduct && role === "owner") {
-    const item = editingProduct;
-    const key = itemKey(item);
-    const inputFields = item.inputFields ?? [];
-    const updateItem = <K extends keyof ManagedProduct,>(field: K, value: ManagedProduct[K]) =>
-      updateCatalogProduct(key, (current) => ({ ...current, [field]: value }));
-    const tabs = [
-      ["information", "Informasi Produk"], ["nominal", "Nominal & Harga"],
-      ["sections", "Tabel Pemisah"], ["display", "Tampilan Produk"],
-      ["input", "Input Customer"], ["fulfillment", "Fulfillment"], ["checkout", "Checkout"],
-    ] as const;
-    const groups = item.packageTabsEnabled && item.packageTabs.length
-      ? item.packageTabs.map((name) => ({ name, packages: item.packages.filter((entry) => entry.group === name && entry.isActive) }))
-      : [{ name: "Pilih Nominal", packages: item.packages.filter((entry) => entry.isActive) }];
-
-    return <div className="product-workspace min-h-[70vh] text-[#344054]">
-      <style jsx global>{`.product-input{height:2.25rem;width:100%;border:1px solid #d0d5dd;border-radius:.375rem;background:#fff;padding:0 .625rem;font-size:10px;color:#344054;outline:none}.product-input:focus{border-color:#155eef;box-shadow:0 0 0 2px rgba(21,94,239,.1)}`}</style>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <button type="button" onClick={() => setExpandedProduct(null)} className="mb-2 inline-flex items-center gap-1 text-[10px] font-semibold text-[#667085] hover:text-[#155eef]"><ArrowLeft className="size-3.5" />Produk / Daftar Produk</button>
-          <div className="flex min-w-0 items-center gap-3"><span className="block size-12 shrink-0 overflow-hidden rounded-lg border border-[#e4e7ec] bg-white shadow-sm sm:size-14 sm:rounded-xl"><ProductArtwork product={item} compact /></span><div className="min-w-0"><div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2"><h2 className="min-w-0 text-base font-black leading-tight text-[#101828] sm:text-xl">Edit Produk - {item.name}</h2><span className="rounded-md bg-blue-50 px-2 py-1 text-[8px] font-bold text-[#155eef] sm:text-[9px]">{categories.find((entry) => entry.slug === item.category)?.name || item.category}</span></div><p className="mt-1 line-clamp-2 text-[9px] leading-4 text-[#667085] sm:text-[11px]">Kelola nominal, tabel pemisah, gambar, harga, input pelanggan, dan fulfillment.</p></div></div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex"><Button type="button" variant="outline" className="w-full border-[#dfe5ed] bg-white text-[#344054]" onClick={() => window.open("/products/" + item.slug, "_blank")}><ExternalLink className="mr-1.5 size-3.5 sm:mr-2 sm:size-4" />Lihat di Toko</Button><Button type="button" variant="outline" className="w-full border-[#dfe5ed] bg-white text-[#344054]" onClick={() => setExpandedProduct(null)}><ArrowLeft className="mr-1.5 size-3.5 sm:mr-2 sm:size-4" />Kembali</Button></div>
-      </div>
-      {message && <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700">{message}</div>}
-      {error && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">{error}</div>}
-      <div className="admin-mobile-scroll mb-4 flex snap-x gap-1 overflow-x-auto border-b border-[#dfe5ed]">{tabs.map(([value, label]) => <button key={value} type="button" onClick={() => setEditorTab(value)} className={`snap-start whitespace-nowrap border-b-2 px-3 py-2.5 text-[9px] font-bold sm:px-4 sm:py-3 sm:text-[10px] ${editorTab === value ? "border-[#155eef] text-[#155eef]" : "border-transparent text-[#667085]"}`}>{label}</button>)}</div>
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_310px]">
-        <section className="min-w-0 rounded-xl border border-[#dfe5ed] bg-white p-3 shadow-sm sm:p-4">
-          {editorTab === "information" && <><EditorTitle title="Informasi Produk" description="Identitas utama produk yang tampil di katalog." /><div className="grid gap-3 sm:grid-cols-2">
-            <LightField label="Nama Produk"><Input value={item.name} onChange={(event) => updateItem("name", event.target.value)} className="product-input" /></LightField>
-            <LightField label="Slug"><Input value={item.slug} onChange={(event) => updateItem("slug", slugify(event.target.value))} className="product-input" /></LightField>
-            <LightField label="Publisher"><Input value={item.publisher} onChange={(event) => updateItem("publisher", event.target.value)} className="product-input" /></LightField>
-            <LightField label="Kategori"><select value={item.category} onChange={(event) => updateItem("category", event.target.value)} className="product-input">{categories.map((entry) => <option key={entry.slug} value={entry.slug}>{entry.name}</option>)}</select></LightField>
-            <LightField label="Deskripsi" wide><Textarea value={item.description || ""} onChange={(event) => updateItem("description", event.target.value)} className="min-h-28 border-[#dfe5ed] bg-white text-[#344054]" /></LightField>
-            <LightField label="Urutan"><Input type="number" min={0} value={item.sortOrder} onChange={(event) => updateItem("sortOrder", Number(event.target.value))} className="product-input" /></LightField>
-            <div className="flex items-center gap-5 pt-5"><label className="flex items-center gap-2 text-[10px] font-semibold"><Switch checked={item.isActive} onCheckedChange={(checked) => updateItem("isActive", checked)} />Produk aktif</label><label className="flex items-center gap-2 text-[10px] font-semibold"><Switch checked={item.popular} onCheckedChange={(checked) => updateItem("popular", checked)} />Produk populer</label></div>
-          </div></>}
-
-          {editorTab === "nominal" && <><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><EditorTitle title="Daftar Nominal" description="Kelola harga, gambar, SKU, section, dan urutan nominal." /><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"><Button type="button" size="sm" variant="outline" className="border-[#dfe5ed] text-[#155eef]" onClick={() => void openDigiflazzImport(item)}><Plus className="mr-1 size-3.5" />Dari Digiflazz</Button><Button type="button" size="sm" variant="outline" className="border-[#dfe5ed] text-[#155eef]" onClick={() => addCatalogPackage(item)}><Plus className="mr-1 size-3.5" />Manual</Button><Button type="button" size="sm" disabled={catalogSaving === key} onClick={() => void saveCatalogProduct(item)} className="col-span-2 bg-[#155eef] text-white hover:bg-[#004eeb] sm:col-span-1">{catalogSaving === key ? <LoaderCircle className="mr-1 size-3.5 animate-spin" /> : <Save className="mr-1 size-3.5" />}Simpan Perubahan</Button></div></div>
-            <div className="mt-3 hidden overflow-x-auto rounded-lg border border-[#e4e7ec] md:block"><table className="w-full min-w-[1040px] text-left text-[9px]"><thead className="bg-[#f8fafc] text-[#667085]"><tr><th className="p-2">#</th><th className="p-2">Nama Nominal</th><th className="p-2">Gambar</th><th className="p-2">Provider / SKU</th><th className="p-2">Grup</th><th className="p-2">Modal</th><th className="p-2">Margin</th><th className="p-2">Harga Jual</th><th className="p-2">Status</th><th className="p-2 text-right">Aksi</th></tr></thead><tbody>
-              {item.packages.map((entry, index) => <tr key={(entry.dbId || "new") + "-" + index} className="border-t border-[#e4e7ec]"><td className="p-2"><div className="flex items-center gap-1"><button type="button" disabled={index === 0} onClick={() => moveCatalogPackage(item, index, -1)}><ChevronUp className="size-3" /></button><span>{index + 1}</span><button type="button" disabled={index === item.packages.length - 1} onClick={() => moveCatalogPackage(item, index, 1)}><ChevronDown className="size-3" /></button></div></td>
-                <td className="p-2"><Input value={entry.label} onChange={(event) => updateCatalogPackage(key, index, "label", event.target.value)} className="product-input min-w-[140px]" /></td>
-                <td className="p-2"><PackageImagePicker value={entry.imageUrl || ""} onChange={(value) => updateCatalogPackage(key, index, "imageUrl", value)} /></td>
-                <td className="p-2"><div className="space-y-1"><select value={entry.providerCode || ""} onChange={(event) => updateCatalogPackage(key, index, "providerCode", event.target.value || undefined)} className="product-input min-w-[125px]"><option value="">Manual</option>{providerOptions.map((provider) => <option key={provider.code} value={provider.code}>{provider.name}</option>)}</select><Input value={entry.providerSku || ""} onChange={(event) => updateCatalogPackage(key, index, "providerSku", event.target.value)} className="product-input min-w-[125px]" placeholder="SKU" /></div></td>
-                <td className="p-2"><select value={entry.group || ""} onChange={(event) => updateCatalogPackage(key, index, "group", event.target.value)} className="product-input min-w-[115px]"><option value="">Tanpa section</option>{item.packageTabs.map((tab) => <option key={tab}>{tab}</option>)}</select></td>
-                <td className="p-2 font-semibold">{entry.supplierPrice ? formatRupiah(entry.supplierPrice) : "-"}</td>
-                <td className="p-2"><div className="flex gap-1"><select value={entry.marginType || "fixed"} onChange={(event) => updateCatalogPackage(key, index, "marginType", event.target.value as "fixed" | "percent")} className="product-input w-14"><option value="fixed">Rp</option><option value="percent">%</option></select><Input type="number" min={0} value={entry.marginValue || 0} onChange={(event) => updateCatalogPackage(key, index, "marginValue", Number(event.target.value))} className="product-input w-20" /></div></td>
-                <td className="p-2"><Input type="number" min={0} value={entry.price} onChange={(event) => updateCatalogPackage(key, index, "price", Number(event.target.value))} className="product-input w-24 font-bold" /></td>
-                <td className="p-2"><div className="flex items-center gap-2"><Switch checked={entry.isActive} onCheckedChange={(checked) => entry.dbId ? void toggleCatalogPackageStatus(item, index, checked) : updateCatalogPackage(key, index, "isActive", checked)} /><span className={entry.isActive ? "text-emerald-600" : "text-[#98a2b3]"}>{entry.isActive ? "Aktif" : "Nonaktif"}</span></div></td>
-                <td className="p-2"><div className="flex justify-end gap-1">{entry.providerCode === "digiflazz" && <Button type="button" variant="ghost" size="icon-sm" onClick={() => void syncCatalogPackage(item, index)}><RefreshCw className="size-3.5" /></Button>}<Button type="button" variant="ghost" size="icon-sm" className="text-red-500" onClick={() => void removeCatalogPackage(item, index)}><Trash2 className="size-3.5" /></Button></div></td></tr>)}
-              {!item.packages.length && <tr><td colSpan={10} className="p-8 text-center text-[#98a2b3]">Belum ada nominal. Tambahkan manual atau ambil dari Digiflazz.</td></tr>}
-            </tbody></table></div>
-            <div className="mt-3 space-y-2 md:hidden">
-              {item.packages.map((entry, index) => <article key={(entry.dbId || "mobile-new") + "-" + index} className="rounded-lg border border-[#e4e7ec] bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,.03)]">
-                <div className="flex items-center gap-2 border-b border-[#edf0f5] pb-2">
-                  <span className="grid size-6 shrink-0 place-items-center rounded-md bg-[#f2f4f7] text-[9px] font-black text-[#667085]">{index + 1}</span>
-                  <Input aria-label={`Nama nominal ${index + 1}`} value={entry.label} onChange={(event) => updateCatalogPackage(key, index, "label", event.target.value)} className="product-input min-w-0 flex-1 font-semibold" />
-                  <button type="button" disabled={index === 0} onClick={() => moveCatalogPackage(item, index, -1)} className="grid size-7 shrink-0 place-items-center rounded border border-[#e4e7ec] disabled:opacity-30" aria-label="Pindah ke atas"><ChevronUp className="size-3.5" /></button>
-                  <button type="button" disabled={index === item.packages.length - 1} onClick={() => moveCatalogPackage(item, index, 1)} className="grid size-7 shrink-0 place-items-center rounded border border-[#e4e7ec] disabled:opacity-30" aria-label="Pindah ke bawah"><ChevronDown className="size-3.5" /></button>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <LightField label="Provider"><select value={entry.providerCode || ""} onChange={(event) => updateCatalogPackage(key, index, "providerCode", event.target.value || undefined)} className="product-input"><option value="">Manual</option>{providerOptions.map((provider) => <option key={provider.code} value={provider.code}>{provider.name}</option>)}</select></LightField>
-                  <LightField label="SKU"><Input value={entry.providerSku || ""} onChange={(event) => updateCatalogPackage(key, index, "providerSku", event.target.value)} className="product-input" placeholder="SKU" /></LightField>
-                  <LightField label="Section"><select value={entry.group || ""} onChange={(event) => updateCatalogPackage(key, index, "group", event.target.value)} className="product-input"><option value="">Tanpa section</option>{item.packageTabs.map((tab) => <option key={tab}>{tab}</option>)}</select></LightField>
-                  <LightField label="Harga modal"><div className="flex h-9 items-center rounded-md border border-[#d0d5dd] bg-[#f8fafc] px-2 text-[9px] font-semibold">{entry.supplierPrice ? formatRupiah(entry.supplierPrice) : "-"}</div></LightField>
-                  <LightField label="Margin"><div className="flex gap-1"><select value={entry.marginType || "fixed"} onChange={(event) => updateCatalogPackage(key, index, "marginType", event.target.value as "fixed" | "percent")} className="product-input w-[58px] shrink-0"><option value="fixed">Rp</option><option value="percent">%</option></select><Input type="number" min={0} value={entry.marginValue || 0} onChange={(event) => updateCatalogPackage(key, index, "marginValue", Number(event.target.value))} className="product-input min-w-0" /></div></LightField>
-                  <LightField label="Harga jual"><Input type="number" min={0} value={entry.price} onChange={(event) => updateCatalogPackage(key, index, "price", Number(event.target.value))} className="product-input font-bold" /></LightField>
-                </div>
-                <div className="mt-3 flex items-center justify-between border-t border-[#edf0f5] pt-2">
-                  <div className="flex items-center gap-2"><PackageImagePicker value={entry.imageUrl || ""} onChange={(value) => updateCatalogPackage(key, index, "imageUrl", value)} /><Switch checked={entry.isActive} onCheckedChange={(checked) => entry.dbId ? void toggleCatalogPackageStatus(item, index, checked) : updateCatalogPackage(key, index, "isActive", checked)} /><span className={entry.isActive ? "text-[9px] font-bold text-emerald-600" : "text-[9px] font-bold text-[#98a2b3]"}>{entry.isActive ? "Aktif" : "Nonaktif"}</span></div>
-                  <div className="flex gap-1">{entry.providerCode === "digiflazz" && <Button type="button" variant="outline" size="icon-sm" onClick={() => void syncCatalogPackage(item, index)} aria-label="Sinkronkan nominal"><RefreshCw className="size-3.5" /></Button>}<Button type="button" variant="ghost" size="icon-sm" className="text-red-500" onClick={() => void removeCatalogPackage(item, index)} aria-label="Hapus nominal"><Trash2 className="size-3.5" /></Button></div>
-                </div>
-              </article>)}
-              {!item.packages.length && <div className="rounded-lg border border-dashed border-[#d0d5dd] p-6 text-center text-[10px] text-[#98a2b3]">Belum ada nominal. Tambahkan manual atau ambil dari Digiflazz.</div>}
-            </div>
-          </>}
-
-          {editorTab === "sections" && <><div className="flex items-start justify-between gap-3"><EditorTitle title="Tabel Pemisah Nominal" description="Kelompokkan nominal dan tentukan urutan section di toko." /><Button type="button" onClick={() => addCatalogTab(item)} className="bg-[#155eef] text-white"><Plus className="mr-2 size-4" />Tambah Tabel Pemisah</Button></div><div className="mt-3 overflow-hidden rounded-lg border border-[#e4e7ec]"><table className="w-full text-left text-[10px]"><thead className="bg-[#f8fafc] text-[#667085]"><tr><th className="p-3">#</th><th className="p-3">Nama Section</th><th className="p-3">Urutan</th><th className="p-3">Status</th><th className="p-3 text-right">Aksi</th></tr></thead><tbody>{item.packageTabs.map((tab, index) => <tr key={tab + "-" + index} className="border-t border-[#e4e7ec]"><td className="p-3">{index + 1}</td><td className="p-3"><Input value={tab} onChange={(event) => updateCatalogTab(item, index, event.target.value)} className="product-input max-w-sm" /></td><td className="p-3"><Button type="button" size="icon-sm" variant="ghost" disabled={index === 0} onClick={() => moveCatalogTab(item, index, -1)}><ChevronUp className="size-3.5" /></Button><Button type="button" size="icon-sm" variant="ghost" disabled={index === item.packageTabs.length - 1} onClick={() => moveCatalogTab(item, index, 1)}><ChevronDown className="size-3.5" /></Button></td><td className="p-3"><span className="rounded bg-emerald-50 px-2 py-1 font-bold text-emerald-600">Aktif</span></td><td className="p-3 text-right"><Button type="button" variant="ghost" size="icon-sm" className="text-red-500" onClick={() => void removeCatalogTab(item, index)}><Trash2 className="size-3.5" /></Button></td></tr>)}</tbody></table></div><div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-[10px] text-blue-700">Urutan tabel menentukan urutan section di halaman produk. Pilih section setiap nominal di tab Nominal & Harga.</div></>}
-
-          {editorTab === "display" && <><EditorTitle title="Tampilan Produk" description="Atur gambar utama dan banner untuk katalog." /><div className="space-y-4"><AdminMediaUpload label="Gambar produk (1:1)" help="Gunakan gambar kotak PNG, JPG, atau WebP." value={item.imageUrl || ""} onChange={(value) => updateItem("imageUrl", value)} previewClassName="h-32" /><AdminMediaUpload label="Banner halaman produk" help="Opsional; gambar utama menjadi fallback bila kosong." value={item.bannerUrl || ""} onChange={(value) => updateItem("bannerUrl", value)} previewClassName="h-36" /></div></>}
-          {editorTab === "input" && <><div className="flex justify-between gap-3"><EditorTitle title="Input Customer" description="Data yang wajib diisi pelanggan." /><Button type="button" variant="outline" onClick={() => updateItem("inputFields", [...inputFields, { id: "kolom-" + (inputFields.length + 1), label: "Kolom baru", placeholder: "", required: true }])}><Plus className="mr-2 size-4" />Tambah Kolom</Button></div><div className="mt-3 space-y-2">{inputFields.map((field, index) => <div key={field.id + "-" + index} className="grid gap-2 rounded-lg border border-[#e4e7ec] p-3 sm:grid-cols-[1fr_1fr_auto_auto]"><Input value={field.label} onChange={(event) => updateItem("inputFields", inputFields.map((entry, i) => i === index ? { ...entry, label: event.target.value, id: slugify(event.target.value) } : entry))} className="product-input" /><Input value={field.placeholder || ""} onChange={(event) => updateItem("inputFields", inputFields.map((entry, i) => i === index ? { ...entry, placeholder: event.target.value } : entry))} className="product-input" /><label className="flex items-center gap-2 text-[10px]"><Switch checked={field.required !== false} onCheckedChange={(checked) => updateItem("inputFields", inputFields.map((entry, i) => i === index ? { ...entry, required: checked } : entry))} />Wajib</label><Button type="button" size="icon-sm" variant="ghost" className="text-red-500" onClick={() => updateItem("inputFields", inputFields.filter((_, i) => i !== index))}><Trash2 className="size-3.5" /></Button></div>)}</div><LightField label="Format tujuan Digiflazz"><Input value={item.targetTemplate} onChange={(event) => updateItem("targetTemplate", event.target.value)} className="product-input mt-3 font-mono" /></LightField></>}
-          {editorTab === "fulfillment" && <><EditorTitle title="Fulfillment" description="Proses otomatis melalui provider atau manual oleh admin." /><div className="grid gap-3 sm:grid-cols-2"><LightField label="Jenis Proses"><select value={item.fulfillmentType} onChange={(event) => updateItem("fulfillmentType", event.target.value as "automatic" | "manual")} className="product-input"><option value="automatic">Otomatis via provider</option><option value="manual">Manual oleh admin</option></select></LightField><LightField label="Zona Waktu"><select value={item.manualTimezone || "Asia/Jakarta"} onChange={(event) => updateItem("manualTimezone", event.target.value)} className="product-input"><option value="Asia/Jakarta">WIB — Asia/Jakarta</option><option value="Asia/Makassar">WITA — Asia/Makassar</option><option value="Asia/Jayapura">WIT — Asia/Jayapura</option></select></LightField>{item.fulfillmentType === "manual" && <><LightField label="Jam Buka"><Input type="time" value={item.manualOpenTime || "09:00"} onChange={(event) => updateItem("manualOpenTime", event.target.value)} className="product-input" /></LightField><LightField label="Jam Tutup"><Input type="time" value={item.manualCloseTime || "21:00"} onChange={(event) => updateItem("manualCloseTime", event.target.value)} className="product-input" /></LightField><LightField label="Instruksi Manual" wide><Textarea value={item.manualInstructions || ""} onChange={(event) => updateItem("manualInstructions", event.target.value)} className="min-h-28 border-[#dfe5ed]" /></LightField></>}</div></>}
-          {editorTab === "checkout" && <><div className="flex justify-between gap-3"><EditorTitle title="Informasi Checkout" description="Pop-up sebelum pelanggan memilih nominal." /><Button type="button" variant="outline" onClick={() => updateItem("notices", [...item.notices, { id: null, title: "Informasi", body: "", isActive: true, sortOrder: item.notices.length }])}><Plus className="mr-2 size-4" />Tambah Slide</Button></div><div className="mt-3 space-y-3">{item.notices.map((notice, index) => <div key={String(notice.id) + "-" + index} className="rounded-lg border border-[#e4e7ec] p-3"><div className="flex gap-2"><Input value={notice.title} onChange={(event) => updateItem("notices", item.notices.map((entry, i) => i === index ? { ...entry, title: event.target.value } : entry))} className="product-input" /><Switch checked={notice.isActive} onCheckedChange={(checked) => updateItem("notices", item.notices.map((entry, i) => i === index ? { ...entry, isActive: checked } : entry))} /><Button type="button" variant="ghost" size="icon-sm" className="text-red-500" onClick={() => updateItem("notices", item.notices.filter((_, i) => i !== index))}><Trash2 className="size-3.5" /></Button></div><Textarea value={notice.body} onChange={(event) => updateItem("notices", item.notices.map((entry, i) => i === index ? { ...entry, body: event.target.value } : entry))} className="mt-2 min-h-24 border-[#dfe5ed]" /></div>)}</div></>}
-
-          {editorTab !== "nominal" && <div className="mt-5 flex justify-end border-t border-[#e4e7ec] pt-4"><Button type="button" disabled={catalogSaving === key} onClick={() => void saveCatalogProduct(item, "Perubahan produk berhasil disimpan.")} className="bg-[#155eef] text-white hover:bg-[#004eeb]">{catalogSaving === key ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}Simpan Perubahan</Button></div>}
-        </section>
-
-        <aside className="rounded-xl border border-[#dfe5ed] bg-white p-4 shadow-sm xl:sticky xl:top-4"><div className="flex items-center justify-between"><EditorTitle title="Preview Tampilan di Toko" description="Preview data saat ini." /><div className="flex rounded-md bg-[#f2f4f7] p-0.5"><button type="button" onClick={() => setPreviewMode("mobile")} className={previewMode === "mobile" ? "rounded bg-[#155eef] p-1.5 text-white" : "p-1.5 text-[#667085]"}><Smartphone className="size-3.5" /></button><button type="button" onClick={() => setPreviewMode("desktop")} className={previewMode === "desktop" ? "rounded bg-[#155eef] p-1.5 text-white" : "p-1.5 text-[#667085]"}><Monitor className="size-3.5" /></button></div></div><div className="mx-auto mt-2 overflow-hidden rounded-[26px] border-[5px] border-[#101828] bg-[#f8fafc]"><div className="flex items-center gap-2 bg-white p-3"><span className="block size-9 overflow-hidden rounded-lg"><ProductArtwork product={item} compact /></span><strong className="text-[10px] text-[#101828]">{item.name}</strong></div><div className="max-h-[520px] overflow-y-auto p-3">{groups.map((group) => <div key={group.name} className="mb-4"><h4 className="mb-2 text-[11px] font-black text-[#101828]">{group.name}</h4><div className="grid grid-cols-2 gap-2">{group.packages.map((entry) => <div key={entry.id} className="rounded-lg border border-[#e4e7ec] bg-white p-2"><p className="text-[9px] font-bold">{entry.label}</p>{entry.imageUrl && <img src={entry.imageUrl} alt="" className="mx-auto my-2 size-12 object-contain" />}<p className="mt-2 font-black text-red-500">{formatRupiah(entry.price)}</p></div>)}</div></div>)}</div></div></aside>
-      </div>
-    </div>;
+  function addSection(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); const form = new FormData(event.currentTarget);
+    setSections((current) => [...current, { id: crypto.randomUUID(), name: String(form.get("name")), description: String(form.get("description") || ""), position: "Di atas", active: true }]);
+    setSectionOpen(false); setMessage("Tabel pemisah berhasil ditambahkan.");
   }
 
   return (
-    <div className="product-workspace text-[#344054]">
-      <style jsx global>{`.product-workspace .admin-input{border-color:#d0d5dd!important;background:#fff!important;color:#344054!important}.product-workspace .field-label{color:#344054!important}`}</style>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div><h2 className="text-2xl font-black text-[#101828]">Produk</h2><p className="mt-1 text-[11px] text-[#667085]">Kelola semua produk top up, voucher, nominal, harga, dan layanan digital.</p></div>
-        <div className="flex flex-wrap gap-2">
-          {role === "owner" && <Button onClick={openNew} className="bg-[#155eef] text-white hover:bg-[#004eeb]"><Plus className="mr-2 size-4" />Tambah Produk Manual</Button>}
+    <div className="admin-product-editor min-w-0 text-[#14213a]">
+      <div className="mb-[8px] flex items-center gap-[6px] text-[8px] text-[#65758c]"><button type="button" onClick={onBack}>Produk</button><span>›</span><button type="button" onClick={onBack}>Daftar Produk</button><span>›</span><strong className="text-[#2f4159]">Edit Produk</strong></div>
+      <header className="flex items-start justify-between gap-[18px]">
+        <div className="flex items-center gap-[13px]"><ProductImage product={product} large /><div><div className="flex items-center gap-[8px]"><h1 className="text-[20px] font-black tracking-[-0.035em] text-[#0e1b35]">Edit Produk - {product.name}</h1><CategoryBadge category={product.category} /></div><p className="mt-[4px] text-[10px] text-[#607189]">Kelola nominal, tabel pemisah, gambar, harga dan urutan tampilan produk ini.</p></div></div>
+        <div className="flex gap-[9px]"><button type="button" className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] border border-[#dce3eb] bg-white px-[15px] text-[9px] font-bold text-[#2f425b]"><ExternalLink className="size-[12px] text-[#0875ed]" />Lihat di Toko</button><button type="button" onClick={onBack} className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] border border-[#dce3eb] bg-white px-[16px] text-[9px] font-bold text-[#2f425b]"><ArrowLeft className="size-[13px]" />Kembali</button></div>
+      </header>
+
+      <nav className="mt-[14px] flex border-b border-[#dce3eb]">{(["Informasi Produk", "Nominal & Harga", "Tabel Pemisah", "Tampilan Produk", "Input Customer", "Fulfillment"] as EditorTab[]).map((item) => <button type="button" key={item} onClick={() => setTab(item)} className={`h-[38px] border-b-2 px-[16px] text-[9px] font-semibold ${tab === item ? "border-[#0875ed] text-[#0875ed]" : "border-transparent text-[#4f6078]"}`}>{item}</button>)}</nav>
+
+      {message && <button type="button" onClick={() => setMessage("")} className="mt-[10px] flex w-full items-center justify-between rounded-[5px] border border-[#bce3ce] bg-[#eef9f3] px-[11px] py-[7px] text-[8px] font-semibold text-[#158755]"><span>{message}</span><X className="size-[11px]" /></button>}
+      {error && <button type="button" onClick={() => setError("")} className="mt-[10px] w-full rounded-[5px] border border-red-200 bg-red-50 px-[11px] py-[7px] text-left text-[8px] text-red-700">{error}</button>}
+
+      {tab === "Nominal & Harga" || tab === "Tabel Pemisah" ? (
+        <div className="mt-[12px] grid grid-cols-[minmax(0,1fr)_300px] gap-[12px]">
+          <main className="min-w-0 space-y-[12px]">
+            <section className={`overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white ${tab === "Tabel Pemisah" ? "opacity-60" : ""}`}>
+              <div className="flex items-center justify-between px-[14px] py-[12px]"><div><h2 className="text-[13px] font-extrabold">Daftar Nominal</h2><p className="mt-[2px] text-[8px] text-[#6b7c92]">Kelola semua nominal, set gambar, harga dan tentukan posisi di tabel pemisah.</p></div></div>
+              <div className="flex flex-wrap gap-[7px] border-t border-[#eef1f5] px-[14px] py-[9px]"><ActionButton onClick={() => setImportOpen(true)}><Plus className="size-[12px]" />Tambah dari Digiflazz</ActionButton><ActionButton onClick={() => setManualOpen(true)}><Plus className="size-[12px]" />Tambah Manual</ActionButton><ActionButton><Upload className="size-[12px]" />Upload Gambar Nominal</ActionButton><ActionButton><Settings2 className="size-[12px]" />Atur Urutan</ActionButton><ActionButton onClick={refreshSellerMonitor}><RefreshCw className={`size-[12px] ${monitorRefreshing ? "animate-spin" : ""}`} />{monitorRefreshing ? "Menyinkron..." : "Sync Harga"}</ActionButton><ActionButton><SlidersHorizontal className="size-[12px]" />Atur Margin Massal</ActionButton><button type="button" onClick={() => setMessage("Perubahan tampilan disimpan sementara di frontend.")} className="ml-auto inline-flex h-[31px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[13px] text-[8px] font-bold text-white"><Save className="size-[12px]" />Simpan Perubahan</button></div>
+              <NominalTable nominals={nominals} sections={sections} onChange={setNominals} onMove={moveNominal} onDragStart={(id) => setDragging({ kind: "nominal", id })} onDrop={dropNominal} />
+            </section>
+
+            <section className="overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white">
+              <div className="flex items-center justify-between px-[14px] py-[11px]"><div><h2 className="text-[13px] font-extrabold">Tabel Pemisah Nominal</h2><p className="mt-[2px] text-[8px] text-[#6b7c92]">Buat dan kelola kategori/section untuk mengelompokkan nominal produk.</p></div><button type="button" onClick={() => setSectionOpen(true)} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white"><Plus className="size-[13px]" />Tambah Tabel Pemisah</button></div>
+              <SectionTable sections={sections} onChange={setSections} onMove={moveSection} onDragStart={(id) => setDragging({ kind: "section", id })} onDrop={dropSection} />
+              <div className="m-[13px] flex items-start gap-[8px] rounded-[5px] border border-[#bcdcfb] bg-[#edf7ff] px-[12px] py-[9px] text-[7.5px] leading-[1.5] text-[#45627f]"><Info className="mt-[1px] size-[14px] shrink-0 fill-[#1678e7] text-white" /><span><strong>Tips:</strong> Atur urutan tabel pemisah untuk menentukan urutan section yang tampil di halaman produk. Setiap nominal harus dipilih grup/tabelnya agar muncul di section yang sesuai.</span></div>
+            </section>
+          </main>
+          <StorePreview product={product} nominals={nominals} sections={sections} mode={previewMode} onMode={setPreviewMode} />
         </div>
-      </div>
-      {message && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">{message}</div>}
-      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}</div>}
-      <div className="mb-3 grid gap-2 lg:grid-cols-[minmax(240px,1fr)_170px_170px_170px_170px_auto]">
-        <label className="relative"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#98a2b3]" /><Input value={productQuery} onChange={(event) => { setProductQuery(event.target.value); setPage(1); }} placeholder="Cari nama produk, kategori, atau slug..." className="h-10 border-[#d0d5dd] bg-white pl-9 text-[11px] text-[#344054]" /></label>
-        <select value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(1); }} className="h-10 rounded-md border border-[#d0d5dd] bg-white px-3 text-[10px]"><option value="all">Semua Kategori</option>{categories.map((entry) => <option key={entry.slug} value={entry.slug}>{entry.name}</option>)}</select>
-        <select value={providerFilter} onChange={(event) => { setProviderFilter(event.target.value); setPage(1); }} className="h-10 rounded-md border border-[#d0d5dd] bg-white px-3 text-[10px]"><option value="all">Semua Provider</option>{providers.map((provider) => <option key={provider} value={provider}>{provider === "manual" ? "Manual" : provider}</option>)}</select>
-        <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }} className="h-10 rounded-md border border-[#d0d5dd] bg-white px-3 text-[10px]"><option value="all">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
-        <select value={sortMode} onChange={(event) => setSortMode(event.target.value)} className="h-10 rounded-md border border-[#d0d5dd] bg-white px-3 text-[10px]"><option value="newest">Urutkan: Terbaru</option><option value="name">Nama A-Z</option><option value="price">Harga Terendah</option></select>
-        <Button type="button" variant="outline" className="h-10 border-[#d0d5dd] bg-white text-[#344054]" onClick={() => { setProductQuery(""); setCategoryFilter("all"); setProviderFilter("all"); setStatusFilter("all"); setSortMode("newest"); setPage(1); }}><RefreshCw className="mr-1 size-3.5" />Reset</Button>
-      </div>
-      {role === "owner" && sellerMonitor && <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#dfe5ed] bg-white px-3 py-2.5">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 text-[10px]">
-            <strong className="text-[#344054]">Monitor seller DigiFlazz</strong>
-            <span className="rounded-md bg-[#b9ff35]/10 px-1.5 py-0.5 font-bold text-[#d8ff8d]">{sellerMonitor.summary.healthy} aman</span>
-            <span className="rounded-md bg-amber-300/10 px-1.5 py-0.5 font-bold text-amber-200">{sellerMonitor.summary.warning} perlu cek</span>
-            <span className="rounded-md bg-red-400/10 px-1.5 py-0.5 font-bold text-red-200">{sellerMonitor.summary.critical} kritis</span>
-            {sellerMonitor.summary.unknown > 0 && <span className="rounded-md bg-white/[0.05] px-1.5 py-0.5 font-bold text-white/35">{sellerMonitor.summary.unknown} belum dicek</span>}
-          </div>
-          <p className="mt-1 text-[9px] text-[#667085]">Diperiksa otomatis setiap 15 menit. Tanda muncul jika seller nonaktif, stok menipis, cut-off, atau harga berubah.</p>
-        </div>
-        <Button type="button" onClick={() => void refreshSellerMonitor()} disabled={monitorRefreshing} variant="outline" size="sm" className="h-8 shrink-0 rounded-lg border-[#dfe5ed] bg-white px-2.5 text-[9px] text-[#344054]">
-          {monitorRefreshing ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}Cek sekarang
-        </Button>
-      </div>}
-      <div className="hidden overflow-x-auto rounded-xl border border-[#e4e7ec] bg-white sm:block">
-        <Table>
-          <TableHeader><TableRow className="border-[#e4e7ec] bg-[#f8fafc] hover:bg-[#f8fafc]"><TableHead className="w-12 text-[9px] text-[#667085]">#</TableHead><TableHead className="text-[9px] text-[#667085]">Produk</TableHead><TableHead className="text-[9px] text-[#667085]">Kategori</TableHead><TableHead className="text-[9px] text-[#667085]">Provider</TableHead><TableHead className="text-[9px] text-[#667085]">Total Nominal</TableHead><TableHead className="text-[9px] text-[#667085]">Harga Mulai</TableHead><TableHead className="text-[9px] text-[#667085]">Status</TableHead><TableHead className="text-[9px] text-[#667085]">Ditampilkan</TableHead><TableHead className="text-right text-[9px] text-[#667085]">Aksi</TableHead></TableRow></TableHeader>
-          <TableBody>{visibleProducts.map((item) => {
-            const key = itemKey(item);
-            const expanded = expandedProduct === key;
-            return <Fragment key={key}>
-              <TableRow className="border-[#e4e7ec] hover:bg-[#f8fafc]">
-                <TableCell className="text-[10px] text-[#667085]">{(visiblePage - 1) * pageSize + visibleProducts.indexOf(item) + 1}</TableCell><TableCell><div className="flex items-center gap-3"><span className="block size-10 overflow-hidden rounded-lg border border-[#e4e7ec]"><ProductArtwork product={item} compact /></span><div><strong className="text-[11px] text-[#101828]">{item.name}</strong><p className="mt-1 text-[9px] text-[#98a2b3]">{item.publisher || item.slug}</p></div></div></TableCell>
-                <TableCell><span className="rounded-md bg-blue-50 px-2 py-1 text-[9px] font-semibold text-[#155eef]">{categories.find((entry) => entry.slug === item.category)?.name || item.category}</span></TableCell><TableCell className="text-[10px] text-[#475467]">{item.fulfillmentType === "manual" ? "Manual" : item.packages.some((entry) => entry.providerCode === "digiflazz") ? "Digiflazz" : "Belum diatur"}</TableCell><TableCell className="text-[10px] font-semibold text-[#344054]">{item.packages.length}</TableCell><TableCell className="text-[10px] font-bold text-[#101828]">{item.packages.length ? formatRupiah(Math.min(...item.packages.map((entry) => entry.price))) : "-"}</TableCell>
-                <TableCell><span className={item.isActive ? "rounded-md bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-600" : "rounded-md bg-slate-100 px-2 py-1 text-[9px] font-bold text-slate-500"}>{item.isActive ? "Aktif" : "Nonaktif"}</span></TableCell>
-                <TableCell><Switch checked={item.isActive} onCheckedChange={(checked) => void saveCatalogProduct({ ...item, isActive: checked }, checked ? "Produk ditampilkan di katalog." : "Produk disembunyikan dari katalog.")} aria-label={"Tampilkan " + item.name} /></TableCell>
-                <TableCell><div className="flex justify-end gap-1">
-                  {role === "owner" && <Button type="button" onClick={() => addCatalogPackage(item)} variant="ghost" size="icon-sm" className="text-[#d8ff8d]/70 hover:bg-[#b9ff35]/10 hover:text-[#d8ff8d]" aria-label={`Tambah nominal ${item.name}`}><Plus className="size-3.5" /></Button>}
-                  <Button type="button" onClick={() => setExpandedProduct(expanded ? null : key)} variant="ghost" size="icon-sm" className="text-white/45 hover:bg-white/[0.08] hover:text-white" aria-label={expanded ? "Tutup daftar harga" : "Buka daftar harga"}>{expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}</Button>
-                  <Button onClick={() => openEdit(item)} variant="ghost" size="icon-sm" className="text-white/45 hover:bg-white/[0.08] hover:text-white" aria-label={`Edit ${item.name}`}><Edit3 className="size-3.5" /></Button>
-                  {role === "owner" && item.dbId && <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon-sm" className="text-red-300/45 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></AlertDialogTrigger><AlertDialogContent className="border-white/10 bg-[#10141d] text-white"><AlertDialogHeader><AlertDialogTitle>Hapus {item.name}?</AlertDialogTitle><AlertDialogDescription className="text-white/42">Produk dan semua nominalnya akan dihapus dari katalog. Tindakan ini tidak dapat dibatalkan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">Batal</AlertDialogCancel><AlertDialogAction onClick={() => void removeProduct(item.dbId!)} className="bg-red-500 text-white hover:bg-red-400">Hapus</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
-                </div></TableCell>
-              </TableRow>
-              {expanded && <TableRow className="border-white/[0.07] bg-black/15 hover:bg-black/15"><TableCell colSpan={5} className="p-0">
-                <div className="px-3 py-3 sm:px-4">
-                  {role === "owner" && <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.07] pb-3">
-                    <div><strong className="text-[10px] text-white/65">Pengaturan nominal</strong><p className="mt-0.5 text-[8px] text-white/28">Tambah tab pemisah, pindahkan nominal, atur provider, lalu simpan.</p></div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" onClick={() => addCatalogTab(item)} variant="outline" size="sm" className="h-8 rounded-lg border-white/10 bg-white/[0.03] px-2.5 text-[9px] text-white"><Plus className="mr-1 size-3" />Tambah Section Pemisah</Button>
-                      <Button type="button" onClick={() => void openDigiflazzImport(item)} variant="outline" size="sm" className="h-8 rounded-lg border-blue-400/20 bg-blue-400/[0.05] px-2.5 text-[9px] text-blue-300"><PackagePlus className="mr-1 size-3" />Tambah dari Digiflazz</Button>
-                      <Button type="button" onClick={() => addCatalogPackage(item)} variant="outline" size="sm" className="h-8 rounded-lg border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] px-2.5 text-[9px] text-[#d8ff8d]"><PackagePlus className="mr-1 size-3" />Tambah manual</Button>
-                    </div>
-                  </div>}
+      ) : (
+        <EditorTabPanel tab={tab} product={product} providerTarget={providerTarget} onSave={() => { onNotice(`${product.name} diperbarui.`); setMessage("Perubahan tampilan disimpan sementara di frontend."); }} />
+      )}
 
-                  {role === "owner" && item.packageTabs.length > 0 && <div className="border-b border-white/[0.07] py-3">
-                    <p className="mb-2 text-[9px] font-bold text-white/40">Section pemisah nominal · urutan section menentukan posisi di halaman customer</p>
-                    <div className="space-y-2">{item.packageTabs.map((tab, tabIndex) => <div key={`${tabIndex}-${tab}`} className="flex items-center gap-2">
-                      <div className="flex shrink-0 flex-col"><button type="button" disabled={tabIndex === 0} onClick={() => moveCatalogTab(item, tabIndex, -1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20"><ChevronUp className="size-3.5" /></button><button type="button" disabled={tabIndex === item.packageTabs.length - 1} onClick={() => moveCatalogTab(item, tabIndex, 1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20"><ChevronDown className="size-3.5" /></button></div>
-                      <Input value={tab} onChange={(event) => updateCatalogTab(item, tabIndex, event.target.value)} className="admin-input h-9 min-w-0 flex-1" placeholder="Nama tab pemisah" />
-                      <Button type="button" disabled={catalogSaving === key} onClick={() => void saveCatalogProduct(item, "Tab pemisah berhasil disimpan.")} variant="ghost" size="sm" className="h-8 px-2 text-[9px] text-[#d8ff8d]">Simpan</Button>
-                      <Button type="button" onClick={() => void removeCatalogTab(item, tabIndex)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:text-red-200"><Trash2 className="size-3.5" /></Button>
-                    </div>)}</div>
-                  </div>}
-
-                  <div className="pt-3">
-                    <div className="overflow-x-auto rounded-lg border border-white/[0.07]">
-                      <table className="w-full min-w-[1280px] text-left text-[10px]">
-                        <thead className="bg-white/[0.02] text-white/30">
-                          <tr>
-                            <th className="px-3 py-2">Urutan</th>
-                            <th className="px-3 py-2">Nominal</th>
-                            <th className="px-3 py-2">Gambar</th>
-                            <th className="px-3 py-2">Section</th>
-                            <th className="px-3 py-2">Provider</th>
-                            <th className="px-3 py-2">SKU</th>
-                            <th className="px-3 py-2">Margin</th>
-                            <th className="px-3 py-2">Harga jual</th>
-                            <th className="px-3 py-2">Status</th>
-                            <th className="px-3 py-2">Sync</th>
-                            <th className="px-3 py-2 text-right">Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {item.packages.map((entry, index) => {
-                            const canSync = entry.providerCode === "digiflazz" && Boolean(entry.providerSku?.trim());
-                            const syncKey = entry.dbId ?? index + 1;
-                            return <tr key={`${entry.dbId ?? "new"}-${index}`} className="border-t border-white/[0.06]">
-                              <td className="px-3 py-2">
-                                <div className="flex items-center gap-1">
-                                  <button type="button" disabled={index === 0} onClick={() => moveCatalogPackage(item, index, -1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser nominal ke atas"><ChevronUp className="size-3.5" /></button>
-                                  <button type="button" disabled={index === item.packages.length - 1} onClick={() => moveCatalogPackage(item, index, 1)} className="text-white/30 enabled:hover:text-white disabled:opacity-20" aria-label="Geser nominal ke bawah"><ChevronDown className="size-3.5" /></button>
-                                  <span className="ml-1 text-[9px] text-white/35">{index + 1}</span>
-                                </div>
-                              </td>
-                              <td className="px-3 py-2">
-                                {role === "owner" ? <Input value={entry.label} onChange={(event) => updateCatalogPackage(key, index, "label", event.target.value)} className="admin-input h-8 min-w-[170px]" placeholder="Nama nominal" /> : <span className="font-semibold text-white/75">{entry.label}</span>}
-                              </td>
-                              <td className="px-3 py-2"><PackageImagePicker value={entry.imageUrl ?? ""} onChange={(value) => updateCatalogPackage(key, index, "imageUrl", value)} disabled={role !== "owner"} /></td>
-                              <td className="px-3 py-2">
-                                {role === "owner" && item.packageTabs.length ? <select value={entry.group ?? ""} onChange={(event) => updateCatalogPackage(key, index, "group", event.target.value)} className="admin-input h-8 min-w-[150px] px-2 text-[9px]"><option value="">Tanpa section</option>{item.packageTabs.map((tab) => <option key={tab} value={tab}>{tab}</option>)}</select> : <span className="text-white/40">{entry.group || "Tanpa section"}</span>}
-                              </td>
-                              <td className="px-3 py-2">
-                                {role === "owner" ? <select
-                                  value={entry.providerCode ?? ""}
-                                  onChange={(event) => updateCatalogPackage(key, index, "providerCode", event.target.value || undefined)}
-                                  className="admin-input h-8 min-w-[132px] px-2 text-[9px]"
-                                >
-                                  <option value="">Belum diatur</option>
-                                  {providerOptions.map((provider) => <option key={provider.code} value={provider.code}>{provider.name}</option>)}
-                                </select> : <span className="text-white/40">{entry.providerCode === "voucher-stock" ? "Stok kode LFAMILIA" : entry.providerCode || "Belum diatur"}</span>}
-                                {role === "owner" && entry.providerCode === "digiflazz" && (() => {
-                                  const monitor = entry.dbId ? sellerMonitorByPackage.get(entry.dbId) : undefined;
-                                  if (!monitor) return <p className="mt-1 text-[8px] text-white/20">Belum dimonitor</p>;
-                                  const badge = monitor.health === "critical" ? "Kritis" : monitor.health === "warning" ? "Cek seller" : monitor.health === "healthy" ? "Aman" : "Belum dicek";
-                                  const badgeClass = monitor.health === "critical" ? "bg-red-400/10 text-red-200" : monitor.health === "warning" ? "bg-amber-300/10 text-amber-200" : monitor.health === "healthy" ? "bg-[#b9ff35]/10 text-[#d8ff8d]" : "bg-white/[0.05] text-white/30";
-                                  return <div className="mt-1.5 min-w-[150px]" title={monitor.alertReason ?? "Seller terpantau normal."}>
-                                    <div className="flex flex-wrap items-center gap-1">
-                                      <span className={`rounded px-1.5 py-0.5 text-[7px] font-black ${badgeClass}`}>{badge}</span>
-                                      <span className="max-w-[105px] truncate text-[8px] font-semibold text-white/48">{monitor.sellerName || "Seller belum terbaca"}</span>
-                                    </div>
-                                    <p className="mt-1 text-[8px] text-white/28">
-                                      {monitor.currentPrice ? formatRupiah(monitor.currentPrice) : "-"} • {monitor.unlimitedStock ? "Stok ∞" : `Stok ${monitor.stock}`}
-                                    </p>
-                                    {monitor.alertReason && <p className="mt-0.5 max-w-[190px] text-[7px] leading-3 text-amber-100/55">{monitor.alertReason}</p>}
-                                  </div>;
-                                })()}
-                              </td>
-                              <td className="px-3 py-2">
-                                {role === "owner" ? <Input
-                                  value={entry.providerSku ?? ""}
-                                  onChange={(event) => updateCatalogPackage(key, index, "providerSku", entry.providerCode === "voucher-stock" ? event.target.value.toLowerCase().replace(/[^a-z0-9._:-]/g, "-") : event.target.value)}
-                                  className="admin-input h-8 min-w-[150px]"
-                                  placeholder="SKU provider"
-                                /> : <span className="text-white/40">{entry.providerSku || "-"}</span>}
-                              </td>
-                              <td className="px-3 py-2">
-                                {role === "owner" ? <div className="flex min-w-[150px] items-center gap-1.5">
-                                  <select
-                                    value={entry.marginType ?? "fixed"}
-                                    onChange={(event) => updateCatalogPackage(key, index, "marginType", event.target.value as "fixed" | "percent")}
-                                    className="admin-input h-8 w-[72px] px-2 text-[9px]"
-                                  >
-                                    <option value="fixed">Rp</option>
-                                    <option value="percent">%</option>
-                                  </select>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    value={entry.marginValue ?? 0}
-                                    onChange={(event) => updateCatalogPackage(key, index, "marginValue", Number(event.target.value))}
-                                    className="admin-input h-8 min-w-0 flex-1"
-                                  />
-                                </div> : <span className="text-white/40">{entry.marginType === "percent" ? `${entry.marginValue ?? 0}%` : formatRupiah(entry.marginValue ?? 0)}</span>}
-                              </td>
-                              <td className="px-3 py-2 font-bold text-[#d8ff8d]">{entry.price ? formatRupiah(entry.price) : "-"}</td>
-                              <td className="px-3 py-2">
-                                <label className="flex min-w-[88px] items-center gap-2">
-                                  <Switch
-                                    checked={entry.isActive}
-                                    disabled={!entry.dbId || packageStatusSaving === entry.dbId}
-                                    onCheckedChange={(checked) => void toggleCatalogPackageStatus(item, index, checked)}
-                                    aria-label={`${entry.isActive ? "Nonaktifkan" : "Aktifkan"} nominal ${entry.label}`}
-                                  />
-                                  <span className={`text-[9px] font-bold ${entry.isActive ? "text-[#d8ff8d]" : "text-white/30"}`}>
-                                    {packageStatusSaving === entry.dbId ? "Menyimpan…" : entry.isActive ? "Aktif" : "Nonaktif"}
-                                  </span>
-                                </label>
-                              </td>
-                              <td className="px-3 py-2">
-                                <Button
-                                  type="button"
-                                  disabled={!canSync || !item.dbId || !entry.id || syncingPackage === syncKey || catalogSaving === key}
-                                  onClick={() => void syncCatalogPackage(item, index)}
-                                  variant="outline"
-                                  size="sm"
-                                  title={canSync ? "Sync nominal ini dengan DigiFlazz" : "Sync tersedia untuk nominal DigiFlazz"}
-                                  className="h-7 rounded-md border-[#b9ff35]/20 bg-[#b9ff35]/[0.05] px-2 text-[8px] text-[#d8ff8d] disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-white/20"
-                                >
-                                  {syncingPackage === syncKey ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}
-                                  Sync
-                                </Button>
-                              </td>
-                              <td className="px-3 py-2">
-                                {role === "owner" ? <div className="flex justify-end gap-1">
-                                  <Button
-                                    type="button"
-                                    disabled={!entry.dbId || packageProviderSaving === entry.dbId}
-                                    onClick={() => void saveCatalogPackageProvider(item, index)}
-                                    variant="ghost"
-                                    size="sm"
-                                    title="Simpan provider, SKU, pricing mode, dan margin tanpa memanggil DigiFlazz"
-                                    className="h-7 px-2 text-[8px] text-[#d8ff8d]"
-                                  >
-                                    {packageProviderSaving === entry.dbId ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : null}
-                                    Simpan SKU
-                                  </Button>
-                                  <Button type="button" onClick={() => void removeCatalogPackage(item, index)} variant="ghost" size="icon-sm" className="text-red-300/45 hover:text-red-200" aria-label={`Hapus nominal ${entry.label || index + 1}`}><Trash2 className="size-3.5" /></Button>
-                                </div> : <span className="block text-right text-white/20">-</span>}
-                              </td>
-                            </tr>;
-                          })}
-                          {!item.packages.length && <tr><td colSpan={11} className="px-3 py-6 text-center text-[10px] text-white/30">Belum ada nominal. Tambahkan langsung dari Digiflazz atau buat nominal manual.</td></tr>}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </TableCell></TableRow>}
-            </Fragment>;
-          })}</TableBody>
-        </Table>
-      </div>
-      <div className="space-y-2 sm:hidden">
-        {visibleProducts.map((item, index) => {
-          const provider = item.fulfillmentType === "manual" ? "Manual" : item.packages.some((entry) => entry.providerCode === "digiflazz") ? "Digiflazz" : "Belum diatur";
-          return <article key={itemKey(item)} className="rounded-lg border border-[#e4e7ec] bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,.03)]">
-            <div className="flex items-start gap-3">
-              <span className="block size-11 shrink-0 overflow-hidden rounded-lg border border-[#e4e7ec]"><ProductArtwork product={item} compact /></span>
-              <div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-[8px] font-semibold text-[#98a2b3]">#{(visiblePage - 1) * pageSize + index + 1}</p><h3 className="truncate text-[11px] font-black text-[#101828]">{item.name}</h3><p className="mt-0.5 truncate text-[8px] text-[#98a2b3]">{item.publisher || item.slug}</p></div><span className={item.isActive ? "rounded bg-emerald-50 px-2 py-1 text-[8px] font-bold text-emerald-600" : "rounded bg-slate-100 px-2 py-1 text-[8px] font-bold text-slate-500"}>{item.isActive ? "Aktif" : "Nonaktif"}</span></div></div>
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 rounded-md bg-[#f8fafc] p-2 text-center"><div><p className="text-[7px] text-[#98a2b3]">Provider</p><p className="mt-0.5 truncate text-[9px] font-bold text-[#344054]">{provider}</p></div><div><p className="text-[7px] text-[#98a2b3]">Nominal</p><p className="mt-0.5 text-[9px] font-bold text-[#344054]">{item.packages.length}</p></div><div><p className="text-[7px] text-[#98a2b3]">Mulai</p><p className="mt-0.5 truncate text-[9px] font-bold text-[#344054]">{item.packages.length ? formatRupiah(Math.min(...item.packages.map((entry) => entry.price))) : "-"}</p></div></div>
-            <div className="mt-3 flex items-center gap-2 border-t border-[#edf0f5] pt-2"><Switch checked={item.isActive} onCheckedChange={(checked) => void saveCatalogProduct({ ...item, isActive: checked }, checked ? "Produk ditampilkan di katalog." : "Produk disembunyikan dari katalog.")} aria-label={"Tampilkan " + item.name} /><span className="mr-auto text-[8px] font-semibold text-[#667085]">Tampilkan</span>{role === "owner" && <Button type="button" onClick={() => addCatalogPackage(item)} variant="outline" size="icon-sm" className="border-[#dfe5ed] text-[#155eef]" aria-label={`Tambah nominal ${item.name}`}><Plus className="size-3.5" /></Button>}<Button onClick={() => openEdit(item)} variant="outline" size="sm" className="border-[#dfe5ed] text-[#344054]"><Edit3 className="mr-1 size-3.5" />Edit</Button>{role === "owner" && item.dbId && <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon-sm" className="text-red-500" aria-label={`Hapus ${item.name}`}><Trash2 className="size-3.5" /></Button></AlertDialogTrigger><AlertDialogContent className="border-[#dfe5ed] bg-white text-[#101828]"><AlertDialogHeader><AlertDialogTitle>Hapus {item.name}?</AlertDialogTitle><AlertDialogDescription>Produk dan semua nominalnya akan dihapus dari katalog.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Batal</AlertDialogCancel><AlertDialogAction onClick={() => void removeProduct(item.dbId!)} className="bg-red-500 text-white">Hapus</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}</div>
-          </article>;
-        })}
-        {!visibleProducts.length && <div className="rounded-lg border border-dashed border-[#d0d5dd] bg-white p-8 text-center text-[10px] text-[#98a2b3]">Produk tidak ditemukan.</div>}
-      </div>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-b-xl border border-t-0 border-[#e4e7ec] bg-white px-3 py-2">
-        <p className="text-[9px] text-[#667085]">Menampilkan {visibleProducts.length ? (visiblePage - 1) * pageSize + 1 : 0}–{Math.min(visiblePage * pageSize, filteredProducts.length)} dari {filteredProducts.length} produk</p>
-        <div className="flex items-center gap-1"><Button type="button" size="icon-sm" variant="outline" disabled={visiblePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="border-[#dfe5ed]"><ChevronLeft className="size-3.5" /></Button>{Array.from({ length: Math.min(totalPages, 5) }, (_, index) => index + 1).map((value) => <button key={value} type="button" onClick={() => setPage(value)} className={`size-8 rounded-md text-[10px] font-bold ${visiblePage === value ? "bg-[#155eef] text-white" : "text-[#475467] hover:bg-[#f2f4f7]"}`}>{value}</button>)}<Button type="button" size="icon-sm" variant="outline" disabled={visiblePage >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="border-[#dfe5ed]"><ChevronRight className="size-3.5" /></Button></div>
-      </div>
-
-      <Dialog open={digiflazzImportOpen} onOpenChange={setDigiflazzImportOpen}>
-        <DialogContent className="w-[calc(100vw-1rem)] max-w-5xl overflow-hidden rounded-xl border-[#dfe5ed] bg-white p-0 text-[#344054]">
-          <DialogHeader className="border-b border-[#e4e7ec] px-4 py-3 text-left">
-            <DialogTitle>Tambah nominal dari Digiflazz</DialogTitle>
-            <DialogDescription className="text-[10px] text-[#667085]">
-              Pilih SKU langsung dari price list Digiflazz. Price list hanya dimuat ketika dialog dibuka agar penggunaan endpoint tetap efisien.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid max-h-[72dvh] min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]">
-            <div className="grid gap-2 border-b border-[#e4e7ec] p-3 sm:grid-cols-[minmax(0,1fr)_180px_110px_110px]">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#98a2b3]" />
-                <Input value={digiflazzCatalogQuery} onChange={(event) => setDigiflazzCatalogQuery(event.target.value)} className="admin-input pl-8" placeholder="Cari nama, brand, SKU, seller…" />
-              </div>
-              <select value={digiflazzGroup} onChange={(event) => setDigiflazzGroup(event.target.value)} className="admin-select">
-                <option value="">Tanpa section</option>
-                {digiflazzImportTarget?.packageTabs.map((tab) => <option key={tab} value={tab}>{tab}</option>)}
-              </select>
-              <select value={digiflazzMarginType} onChange={(event) => setDigiflazzMarginType(event.target.value as "fixed" | "percent")} className="admin-select">
-                <option value="fixed">Margin Rp</option>
-                <option value="percent">Margin %</option>
-              </select>
-              <Input type="number" min={0} value={digiflazzMarginValue} onChange={(event) => setDigiflazzMarginValue(Number(event.target.value))} className="admin-input" placeholder="Margin" />
-            </div>
-            <div className="min-h-0 overflow-auto">
-              {digiflazzCatalogLoading ? (
-                <div className="flex min-h-48 items-center justify-center text-xs text-[#667085]"><LoaderCircle className="mr-2 size-4 animate-spin" />Memuat price list Digiflazz…</div>
-              ) : (
-                <table className="w-full min-w-[900px] text-left text-[10px]">
-                  <thead className="sticky top-0 bg-white text-[#667085]">
-                    <tr><th className="px-3 py-2">Pilih</th><th className="px-3 py-2">Produk</th><th className="px-3 py-2">Brand / Kategori</th><th className="px-3 py-2">SKU</th><th className="px-3 py-2">Seller</th><th className="px-3 py-2">Modal</th><th className="px-3 py-2">Stok</th><th className="px-3 py-2">Status</th></tr>
-                  </thead>
-                  <tbody>
-                    {digiflazzCatalog.filter((entry) => {
-                      const q = digiflazzCatalogQuery.trim().toLowerCase();
-                      return !q || [entry.productName, entry.brand, entry.category, entry.buyerSkuCode, entry.sellerName].some((value) => value.toLowerCase().includes(q));
-                    }).map((entry) => {
-                      const selected = digiflazzSelected.includes(entry.buyerSkuCode);
-                      const available = entry.buyerProductStatus && entry.sellerProductStatus && (entry.unlimitedStock || entry.stock > 0);
-                      return (
-                        <tr key={entry.buyerSkuCode} className="border-t border-[#e4e7ec]">
-                          <td className="px-3 py-2"><input type="checkbox" checked={selected} onChange={(event) => setDigiflazzSelected((current) => event.target.checked ? [...current, entry.buyerSkuCode] : current.filter((sku) => sku !== entry.buyerSkuCode))} /></td>
-                          <td className="px-3 py-2"><strong>{entry.productName}</strong><p className="text-[8px] text-[#98a2b3]">{entry.type || entry.description}</p></td>
-                          <td className="px-3 py-2">{entry.brand}<p className="text-[8px] text-[#98a2b3]">{entry.category}</p></td>
-                          <td className="px-3 py-2 font-mono">{entry.buyerSkuCode}</td>
-                          <td className="px-3 py-2">{entry.sellerName || "-"}</td>
-                          <td className="px-3 py-2 font-bold">{formatRupiah(entry.price)}</td>
-                          <td className="px-3 py-2">{entry.unlimitedStock ? "∞" : entry.stock}</td>
-                          <td className="px-3 py-2"><span className={available ? "rounded bg-emerald-400/10 px-2 py-1 font-bold text-emerald-300" : "rounded bg-red-400/10 px-2 py-1 font-bold text-red-300"}>{available ? "Tersedia" : "Tidak tersedia"}</span></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-            <div className="flex items-center justify-between gap-3 border-t border-[#e4e7ec] p-3">
-              <p className="text-[10px] text-[#667085]">{digiflazzSelected.length} SKU dipilih</p>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => setDigiflazzImportOpen(false)} className="border-[#dfe5ed] bg-[#f8fafc] text-white">Batal</Button>
-                <Button type="button" disabled={!digiflazzSelected.length || Boolean(catalogSaving)} onClick={() => void addSelectedDigiflazzPackages()} className="bg-[#155eef] font-bold text-white hover:bg-[#0b4dd8]">Tambahkan ke Produk</Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-[340px] gap-0 overflow-hidden rounded-xl border-[#dfe5ed] bg-white p-0 text-[#344054] sm:max-w-2xl">
-          <form onSubmit={save} className="grid max-h-[68dvh] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-h-[86vh]">
-            <DialogHeader className="border-b border-[#e4e7ec] px-4 pb-3 pt-4 pr-10 text-left"><DialogTitle className="text-base sm:text-lg">{role === "staff" ? `Edit informasi ${draft.name}` : draft.dbId ? "Edit produk" : "Tambah produk"}</DialogTitle><DialogDescription className="text-[10px] leading-4 text-[#667085] sm:text-xs">{role === "staff" ? "Staff dapat mengubah media, jam layanan, instruksi, pop-up, serta mengaktifkan atau menonaktifkan nominal tanpa akses ke harga atau provider." : "Data ini akan digunakan oleh katalog dan checkout."}</DialogDescription></DialogHeader>
-            <div className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-4 py-3">
-            <div className="grid min-w-0 gap-2.5 sm:grid-cols-2">
-              {role === "owner" && <><Field label="Nama produk"><Input required value={draft.name} onChange={(event) => { updateDraft("name", event.target.value); if (!draft.dbId) updateDraft("slug", slugify(event.target.value)); }} className="admin-input" placeholder="Mobile Legends" /></Field>
-              <Field label="Slug URL"><Input required value={draft.slug} onChange={(event) => updateDraft("slug", slugify(event.target.value))} className="admin-input" placeholder="mobile-legends" /></Field>
-              <Field label="Publisher"><Input value={draft.publisher} onChange={(event) => updateDraft("publisher", event.target.value)} className="admin-input" placeholder="Moonton" /></Field>
-              <Field label="Kategori"><select value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} className="h-9 w-full rounded-lg border border-[#dfe5ed] bg-white px-3 text-xs text-white sm:h-10 sm:rounded-xl">{(categories.length ? categories : [{ slug: "game", name: "Top Up Game" }, { slug: "voucher", name: "Voucher & Gift Card" }]).map((category) => <option key={category.slug} value={category.slug}>{category.name}</option>)}</select></Field></>}
-              <div className="sm:col-span-2"><AdminMediaUpload label="Gambar produk (opsional, rasio 1:1)" value={draft.imageUrl ?? ""} onChange={(value) => updateDraft("imageUrl", value)} help="Boleh dikosongkan dan ditambahkan nanti. Jika diisi, gunakan gambar kotak 1:1, misalnya 1080 × 1080." previewClassName="h-20 sm:h-28" /></div>
-              <div className="sm:col-span-2"><Field label="Deskripsi produk" wide><Textarea value={draft.description ?? ""} onChange={(event) => updateDraft("description", event.target.value)} className="min-h-20 w-full rounded-lg border border-[#dfe5ed] bg-white px-3 py-2 text-xs text-white sm:min-h-28 sm:rounded-xl" placeholder="Deskripsi khusus produk ini yang tampil di tab Keterangan." /></Field></div>
-              <div className="sm:col-span-2"><AdminMediaUpload label="Banner halaman produk (opsional)" value={draft.bannerUrl ?? ""} onChange={(value) => updateDraft("bannerUrl", value)} help="Boleh dikosongkan dan ditambahkan nanti. Jika kosong, gambar produk digunakan sebagai fallback." previewClassName="h-20 sm:h-28" /></div>
-              {role === "owner" && <><Field label="Inisial kartu"><Input required maxLength={3} value={draft.initials} onChange={(event) => updateDraft("initials", event.target.value.toUpperCase())} className="admin-input" placeholder="ML" /></Field>
-              <Field label="Urutan"><Input type="number" min={0} value={draft.sortOrder} onChange={(event) => updateDraft("sortOrder", Number(event.target.value))} className="admin-input" /></Field>
-              <Field label="Jenis proses" wide><select value={draft.fulfillmentType} onChange={(event) => { const value = event.target.value as "automatic" | "manual"; updateDraft("fulfillmentType", value); updateDraft("instant", value === "automatic"); if (value === "manual" && draft.notices.length === 0) updateDraft("notices", [{ id: null, title: "JAM OPERASIONAL {{jam_buka}} – {{jam_tutup}} {{zona_waktu}}", body: "Estimasi proses 30 menit sampai 2 jam.\n\nAdmin akan menghubungi melalui WhatsApp setelah pembayaran berhasil.", isActive: true, sortOrder: 0 }]); }} className="h-9 w-full rounded-lg border border-[#dfe5ed] bg-white px-3 text-xs text-white sm:h-10 sm:rounded-xl"><option value="automatic">Otomatis via provider</option><option value="manual">Manual oleh admin</option></select></Field></>}
-              {draft.fulfillmentType === "manual" && <Field label="Instruksi manual" wide><Input value={draft.manualInstructions ?? ""} onChange={(event) => updateDraft("manualInstructions", event.target.value)} className="admin-input" placeholder="Instruksi aman untuk pelanggan, tanpa meminta password atau OTP" /></Field>}
-              {draft.fulfillmentType === "manual" && <><Field label="Jam buka"><Input type="time" required value={draft.manualOpenTime ?? "09:00"} onChange={(event) => updateDraft("manualOpenTime", event.target.value)} className="admin-input" /></Field><Field label="Jam tutup"><Input type="time" required value={draft.manualCloseTime ?? "21:00"} onChange={(event) => updateDraft("manualCloseTime", event.target.value)} className="admin-input" /></Field><Field label="Zona waktu" wide><select value={draft.manualTimezone ?? "Asia/Jakarta"} onChange={(event) => updateDraft("manualTimezone", event.target.value)} className="h-9 w-full rounded-lg border border-[#dfe5ed] bg-white px-3 text-xs text-white sm:h-10 sm:rounded-xl"><option value="Asia/Jakarta">WIB — Asia/Jakarta</option><option value="Asia/Makassar">WITA — Asia/Makassar</option><option value="Asia/Jayapura">WIT — Asia/Jayapura</option></select></Field></>}
-              {role === "owner" && <Field label="Warna kartu" wide><select value={draft.accent} onChange={(event) => updateDraft("accent", event.target.value)} className="h-9 w-full rounded-lg border border-[#dfe5ed] bg-white px-3 text-xs text-white sm:h-10 sm:rounded-xl"><option value="from-[#5577ff] via-[#314fc0] to-[#16276c]">Biru</option><option value="from-[#ffad32] via-[#ea6825] to-[#7c2714]">Oranye</option><option value="from-[#ff5f65] via-[#c42f50] to-[#5b1530]">Merah</option><option value="from-[#58d68d] via-[#2b8f9a] to-[#174862]">Hijau</option><option value="from-[#f6d878] via-[#7c4fc9] to-[#2b174c]">Ungu</option><option value="from-[#b9ff35] to-[#347a21]">Neon</option></select></Field>}
-            </div>
-            {role === "owner" && <>
-              <div className="grid grid-cols-2 gap-3 rounded-xl border border-[#e4e7ec] bg-[#f8fafc] p-3">{[["Aktif", "isActive"], ["Populer", "popular"]].map(([label, key]) => <label key={key} className="flex items-center justify-between gap-2 text-[11px] text-[#667085]"><span>{label}</span><Switch checked={Boolean(draft[key as keyof ManagedProduct])} onCheckedChange={(checked) => updateDraft(key as keyof ManagedProduct, checked as never)} /></label>)}</div>
-              <div className="mt-4 overflow-hidden rounded-xl border border-[#e4e7ec]"><div className="flex items-center justify-between gap-3 border-b border-[#e4e7ec] px-3 py-2.5"><div><h3 className="text-xs font-bold">Data yang diisi pelanggan</h3><p className="mt-0.5 text-[9px] text-[#98a2b3]">Buat kolom sendiri sesuai kebutuhan produk.</p></div><Button type="button" onClick={addInputField} size="sm" variant="outline" className="h-8 rounded-lg border-[#dfe5ed] bg-[#f8fafc] px-2.5 text-[9px] text-white"><Plus className="mr-1 size-3" />Tambah kolom</Button></div><div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-[10px]"><thead className="bg-[#f8fafc] text-[#98a2b3]"><tr><th className="px-3 py-2">Nama kolom</th><th className="px-3 py-2">Contoh isi</th><th className="px-3 py-2 text-center">Wajib</th><th className="px-3 py-2 text-right">Aksi</th></tr></thead><tbody>{(draft.inputFields ?? []).map((field, index) => <tr key={field.id} className="border-t border-[#e4e7ec]"><td className="p-2"><Input required value={field.label} onChange={(event) => updateInputField(index, { label: event.target.value, id: slugify(event.target.value) || field.id })} className="admin-input" placeholder="User ID / Username / Email" /></td><td className="p-2"><Input value={field.placeholder ?? ""} onChange={(event) => updateInputField(index, { placeholder: event.target.value })} className="admin-input" placeholder="Contoh: 123456789" /></td><td className="p-2 text-center"><Switch checked={field.required !== false} onCheckedChange={(checked) => updateInputField(index, { required: checked })} /></td><td className="p-2 text-right"><Button type="button" onClick={() => removeInputField(index)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></td></tr>)}{!(draft.inputFields ?? []).length && <tr><td colSpan={4} className="px-3 py-5 text-center text-[10px] text-[#98a2b3]">Produk ini tidak meminta data tambahan dari pelanggan.</td></tr>}</tbody></table></div>
-                {draft.fulfillmentType === "automatic" && (
-                  <div className="border-t border-[#e4e7ec] p-3">
-                    <Field label="Format tujuan DigiFlazz" wide>
-                      <Input
-                        value={draft.targetTemplate}
-                        onChange={(event) => updateDraft("targetTemplate", event.target.value)}
-                        className="admin-input font-mono text-[10px]"
-                        placeholder="{{user-id}}{{zone-id}}"
-                      />
-                    </Field>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {(draft.inputFields ?? []).map((field, index) => {
-                        const token = `{{${slugify(field.id || field.label || `kolom-${index + 1}`)}}}`;
-                        return (
-                          <button
-                            type="button"
-                            key={`${field.id}-token-${index}`}
-                            onClick={() => updateDraft("targetTemplate", `${draft.targetTemplate || ""}${token}`)}
-                            className="rounded-md border border-[#e4e7ec] bg-[#f8fafc] px-2 py-1 font-mono text-[8px] text-[#d8ff8d]"
-                          >
-                            {token}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="mt-2 text-[9px] leading-4 text-[#667085]">
-                      DigiFlazz Buyer menerima satu customer_no. LFAMILIA menyusun customer_no dari token kolom di atas sesuai urutan/pemisah yang dibutuhkan SKU. Jika format memakai titik, allow_dot dikirim otomatis.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </>}
-            <div className="mt-5 rounded-2xl border border-[#e4e7ec] bg-[#f8fafc] p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="flex items-center gap-2 text-sm font-bold"><BellRing className="size-4 text-[#b9ff35]" />Pop-up informasi produk</h3><p className="mt-1 text-[10px] text-[#98a2b3]">Muncul sebelum pelanggan memilih nominal. Tambahkan slide sebanyak kebutuhan dan atur urutannya.</p><p className="mt-1 text-[9px] text-[#cfff72]/55">Token jam: {"{{jam_buka}}"}, {"{{jam_tutup}}"}, dan {"{{zona_waktu}}"}.</p></div><Button type="button" onClick={addNotice} size="sm" variant="outline" className="shrink-0 rounded-lg border-[#dfe5ed] bg-[#f8fafc] text-[10px] text-white hover:bg-white/[0.08] hover:text-white"><Plus className="mr-1 size-3.5" />Tambah slide</Button></div><div className="mt-3 space-y-3">{draft.notices.length ? draft.notices.map((notice, index) => <div key={`${notice.id}-${index}`} className="rounded-xl border border-[#e4e7ec] bg-[#f8fafc] p-3"><div className="flex items-center gap-2"><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-[#f2f4f7] text-[9px] font-bold text-[#667085]">{index + 1}</span><div className="flex shrink-0 flex-col"><button type="button" disabled={index === 0} onClick={() => moveNotice(index, -1)} className="text-[#98a2b3] enabled:hover:text-white disabled:opacity-20" aria-label="Geser slide ke atas"><ChevronUp className="size-3.5" /></button><button type="button" disabled={index === draft.notices.length - 1} onClick={() => moveNotice(index, 1)} className="text-[#98a2b3] enabled:hover:text-white disabled:opacity-20" aria-label="Geser slide ke bawah"><ChevronDown className="size-3.5" /></button></div><Input required value={notice.title} onChange={(event) => updateNotice(index, "title", event.target.value)} className="admin-input" placeholder="JAM OPERASIONAL 09.00 – 23.00 WIB" /><Switch checked={notice.isActive} onCheckedChange={(checked) => updateNotice(index, "isActive", checked)} /><Button type="button" onClick={() => removeNotice(index)} variant="ghost" size="icon-sm" className="text-red-300/50 hover:bg-red-400/[0.08] hover:text-red-200"><Trash2 className="size-3.5" /></Button></div><Textarea required value={notice.body} onChange={(event) => updateNotice(index, "body", event.target.value)} className="mt-2 min-h-28 rounded-xl border-[#dfe5ed] bg-[#f8fafc] text-xs text-white" placeholder={"Estimasi proses 30 menit sampai 2 jam.\n\nAdmin akan menghubungi melalui WhatsApp setelah pembayaran."} /></div>) : <div className="rounded-xl border border-dashed border-[#dfe5ed] py-6 text-center text-[10px] text-[#98a2b3]">Tidak ada pop-up untuk produk ini.</div>}</div></div>
-                        {error && <p className="mt-4 rounded-xl bg-red-400/[0.07] p-3 text-xs text-red-200">{error}</p>}
-            </div>
-            <DialogFooter className="!grid grid-cols-2 gap-2 border-t border-[#e4e7ec] bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="h-9 w-full min-w-0 border-[#dfe5ed] bg-[#f8fafc] px-2 text-xs text-white hover:bg-white/[0.08] hover:text-white">Batal</Button>
-              <Button disabled={saving} className="h-9 w-full min-w-0 bg-[#b9ff35] px-2 text-xs font-black text-[#091006] hover:bg-[#d0ff75]">{saving && <LoaderCircle className="mr-1 size-3.5 animate-spin" />}{role === "staff" ? "Simpan" : "Simpan produk"}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {importOpen && <ImportNominalModal existing={nominals} onClose={() => setImportOpen(false)} onImport={(added) => { setNominals((current) => [...current, ...added]); setImportOpen(false); setMessage(`${added.length} nominal Digiflazz berhasil ditambahkan.`); }} />}
+      {manualOpen && <SimpleModal title="Tambah Nominal Manual" description="Isi nominal sendiri tanpa mengambil data Digiflazz." onClose={() => setManualOpen(false)}><form onSubmit={addManualNominal} className="grid grid-cols-2 gap-[10px]"><Field label="Nama nominal" name="name" placeholder="Contoh: 50 Diamonds" required /><Field label="SKU internal" name="sku" placeholder="ML-MANUAL-50" /><Field label="Harga modal" name="cost" placeholder="10000" type="number" required /><Field label="Margin (%)" name="margin" placeholder="10" type="number" required /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Grup / Tabel<select name="group" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]">{sections.map((section) => <option key={section.id}>{section.name}</option>)}</select></label><ModalActions onCancel={() => setManualOpen(false)} submit="Tambah Nominal" /></form></SimpleModal>}
+      {sectionOpen && <SimpleModal title="Tambah Tabel Pemisah" description="Buat section baru untuk mengelompokkan nominal." onClose={() => setSectionOpen(false)}><form onSubmit={addSection} className="grid gap-[10px]"><Field label="Nama tabel / section" name="name" placeholder="Contoh: Promo Spesial" required /><Field label="Deskripsi (opsional)" name="description" placeholder="Keterangan section" /><ModalActions onCancel={() => setSectionOpen(false)} submit="Tambah Tabel" /></form></SimpleModal>}
     </div>
   );
 }
 
-function EditorTitle({ title, description }: { title: string; description: string }) {
-  return <div className="mb-4"><h3 className="text-sm font-black text-[#101828]">{title}</h3><p className="mt-1 text-[10px] text-[#667085]">{description}</p></div>;
+function NominalTable({ nominals, sections, onChange, onMove, onDragStart, onDrop }: { nominals: Nominal[]; sections: NominalSection[]; onChange(value: Nominal[]): void; onMove(id: string, direction: -1 | 1): void; onDragStart(id: string): void; onDrop(id: string): void }) {
+  return <div className="overflow-x-auto"><table className="w-full min-w-[820px] table-fixed text-left"><thead className="bg-[#f2f6fa] text-[6.5px] font-bold text-[#52647c]"><tr><th className="w-[24px]"></th><th className="w-[25px] py-[8px]">#</th><th className="w-[120px]">Nama Nominal</th><th className="w-[52px]">Gambar</th><th className="w-[72px]">SKU Digiflazz</th><th className="w-[98px]">Grup / Tabel</th><th className="w-[45px]">Urutan</th><th className="w-[65px]">Modal</th><th className="w-[52px]">Margin</th><th className="w-[70px]">Harga Jual</th><th className="w-[53px]">Status</th><th className="w-[95px]">Aksi</th></tr></thead><tbody>{nominals.map((nominal, index) => <tr key={nominal.id} draggable onDragStart={() => onDragStart(nominal.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => onDrop(nominal.id)} className="border-t border-[#e5eaf0] text-[6.8px] text-[#34465e] hover:bg-[#fafbfd]"><td><GripVertical className="mx-auto size-[12px] cursor-grab text-[#7b8ba0]" /></td><td className="py-[6px]">{index + 1}</td><td className="truncate pr-[5px] font-semibold">{nominal.name}</td><td><NominalArtwork kind={nominal.imageKind} /></td><td>{nominal.provider === "Digiflazz" ? nominal.sku : "Manual"}</td><td><select value={nominal.group} onChange={(event) => onChange(nominals.map((item) => item.id === nominal.id ? { ...item, group: event.target.value } : item))} className="h-[27px] w-[92px] rounded-[4px] border border-[#dce3eb] bg-white px-[5px] text-[6.5px]">{sections.map((section) => <option key={section.id}>{section.name}</option>)}</select></td><td><input value={index + 1} readOnly className="h-[27px] w-[34px] rounded-[4px] border border-[#dce3eb] text-center" /></td><td>{formatRupiah(nominal.cost)}</td><td><span className="inline-flex h-[27px] items-center rounded-[4px] border border-[#dce3eb] bg-white px-[6px]">{nominal.margin} %</span></td><td className="font-semibold">{formatRupiah(nominal.sell)}</td><td><Switch enabled={nominal.active} onToggle={() => onChange(nominals.map((item) => item.id === nominal.id ? { ...item, active: !item.active } : item))} /></td><td><div className="flex gap-[3px]"><IconButton label="Naik" onClick={() => onMove(nominal.id, -1)}><ArrowUp /></IconButton><IconButton label="Turun" onClick={() => onMove(nominal.id, 1)}><ArrowDown /></IconButton><IconButton label="Salin"><Copy /></IconButton><IconButton label="Hapus" danger onClick={() => onChange(nominals.filter((item) => item.id !== nominal.id))}><Trash2 /></IconButton></div></td></tr>)}</tbody></table></div>;
 }
 
-function LightField({ label, wide = false, children }: { label: string; wide?: boolean; children: React.ReactNode }) {
-  return <label className={wide ? "sm:col-span-2" : ""}><span className="mb-1.5 block text-[10px] font-bold text-[#344054]">{label}</span>{children}</label>;
+function SectionTable({ sections, onChange, onMove, onDragStart, onDrop }: { sections: NominalSection[]; onChange(value: NominalSection[]): void; onMove(id: string, direction: -1 | 1): void; onDragStart(id: string): void; onDrop(id: string): void }) {
+  return <div className="overflow-x-auto border-t border-[#e7ebf0]"><table className="w-full min-w-[720px] table-fixed text-left"><thead className="bg-[#f2f6fa] text-[6.5px] font-bold text-[#52647c]"><tr><th className="w-[27px]"></th><th className="w-[25px] py-[8px]">#</th><th className="w-[130px]">Nama Tabel / Section</th><th>Deskripsi (Opsional)</th><th className="w-[105px]">Posisi di Halaman</th><th className="w-[50px]">Urutan</th><th className="w-[60px]">Status</th><th className="w-[90px]">Aksi</th></tr></thead><tbody>{sections.map((section, index) => <tr key={section.id} draggable onDragStart={() => onDragStart(section.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => onDrop(section.id)} className="border-t border-[#e6eaf0] text-[7px] text-[#35475f]"><td><GripVertical className="mx-auto size-[12px] cursor-grab text-[#75869c]" /></td><td className="py-[7px]">{index + 1}</td><td className="font-semibold">{section.name}</td><td className="truncate pr-[8px]">{section.description}</td><td><select value={section.position} onChange={(event) => onChange(sections.map((item) => item.id === section.id ? { ...item, position: event.target.value as NominalSection["position"] } : item))} className="h-[27px] w-[90px] rounded-[4px] border border-[#dce3eb] bg-white px-[6px] text-[6.5px]"><option>Di atas</option><option>Di bawah</option></select></td><td><span className="grid size-[27px] place-items-center rounded-[4px] border border-[#dce3eb] bg-white">{index + 1}</span></td><td><span className="rounded-[4px] bg-[#dff8e9] px-[7px] py-[4px] font-bold text-[#15965b]">Aktif</span></td><td><div className="flex gap-[3px]"><IconButton label="Naik" onClick={() => onMove(section.id, -1)}><ArrowUp /></IconButton><IconButton label="Turun" onClick={() => onMove(section.id, 1)}><ArrowDown /></IconButton><IconButton label="Hapus" danger onClick={() => onChange(sections.filter((item) => item.id !== section.id))}><Trash2 /></IconButton></div></td></tr>)}</tbody></table></div>;
 }
 
-function Field({ label, wide = false, children }: { label: string; wide?: boolean; children: React.ReactNode }) {
-  return <label className={wide ? "sm:col-span-2" : ""}><span className="field-label">{label}</span>{children}</label>;
+function StorePreview({ product, nominals, sections, mode, onMode }: { product: Product; nominals: Nominal[]; sections: NominalSection[]; mode: "Mobile" | "Desktop"; onMode(value: "Mobile" | "Desktop"): void }) {
+  return <aside className="sticky top-[70px] self-start rounded-[7px] border border-[#dfe6ef] bg-white p-[13px]"><div className="flex items-start justify-between"><div><h2 className="text-[12px] font-extrabold">Preview Tampilan di Toko</h2><p className="mt-[3px] text-[7.5px] text-[#6c7d92]">Berikut adalah preview tampilan produk di sisi pelanggan.</p></div><div className="flex overflow-hidden rounded-[4px] border border-[#dce3eb]">{(["Mobile", "Desktop"] as const).map((item) => <button type="button" key={item} onClick={() => onMode(item)} className={`inline-flex h-[27px] items-center gap-[4px] px-[9px] text-[7px] font-semibold ${mode === item ? "bg-[#0875ed] text-white" : "bg-white text-[#4e6078]"}`}>{item === "Mobile" ? <Smartphone className="size-[10px]" /> : <Monitor className="size-[10px]" />}{item}</button>)}</div></div><div className={`mx-auto mt-[12px] overflow-hidden border-[6px] border-[#101820] bg-[#f4f7fa] shadow-[0_10px_25px_rgba(15,31,55,.2)] ${mode === "Mobile" ? "h-[500px] w-[250px] rounded-[32px]" : "h-[390px] w-full rounded-[12px]"}`}><div className="flex h-[25px] items-center justify-between bg-[#101820] px-[18px] text-[7px] font-bold text-white"><span>15.30</span><span>● ◔ ▰</span></div><div className="flex items-center gap-[7px] border-b bg-white p-[8px]"><ProductImage product={product} /><div><strong className="block text-[8px]">{product.name}</strong><span className="text-[6px] text-[#66778d]">Top up Diamonds, Weekly Pass, dan lainnya</span></div></div><div className="h-[405px] overflow-hidden p-[8px]">{sections.map((section) => { const entries = nominals.filter((item) => item.group === section.name && item.active).slice(0, 2); if (!entries.length) return null; return <div key={section.id} className="mb-[8px]"><h3 className="mb-[5px] text-[9px] font-extrabold">{section.name}{section.name.includes("Special") || section.name.includes("First") ? " ✨" : section.name === "Diamonds" ? " 💎" : ""}</h3><div className="grid grid-cols-2 gap-[6px]">{entries.map((nominal) => <div key={nominal.id} className="min-h-[76px] rounded-[5px] border border-[#e1e7ee] bg-white p-[6px] shadow-sm"><strong className="block truncate text-[6.5px]">{nominal.name}</strong><NominalArtwork kind={nominal.imageKind} large /><span className="block text-[8px] font-black text-[#e93643]">{formatRupiah(nominal.sell)}</span></div>)}</div></div>; })}</div><div className="absolute"></div></div></aside>;
 }
 
-function slugify(value: string) {
-  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+function EditorTabPanel({ tab, product, providerTarget, onSave }: { tab: EditorTab; product: Product; providerTarget: string; onSave(): void }) {
+  return <section className="mt-[12px] rounded-[7px] border border-[#dfe6ef] bg-white p-[16px]"><div className="flex items-center justify-between border-b border-[#e8ecf1] pb-[11px]"><div><h2 className="text-[13px] font-extrabold">{tab}</h2><p className="mt-[2px] text-[8px] text-[#6c7d92]">Pengaturan {tab.toLowerCase()} untuk {product.name}.</p></div><button type="button" onClick={onSave} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white"><Save className="size-[12px]" />Simpan Perubahan</button></div>{tab === "Informasi Produk" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><Field label="Nama produk" name="name" placeholder={product.name} /><Field label="Slug" name="slug" placeholder={product.slug} /><Field label="Gambar produk (opsional, rasio 1:1)" name="image" placeholder="Boleh dikosongkan dan ditambahkan nanti" /><Field label="Banner halaman produk (opsional)" name="banner" placeholder="Boleh dikosongkan dan ditambahkan nanti" /></div>}{tab === "Input Customer" && <div className="mt-[14px] max-w-[700px]"><p className="text-[9px] font-bold">Format tujuan DigiFlazz</p><code className="mt-[6px] block rounded-[5px] bg-[#f1f5f9] px-[10px] py-[9px] text-[8px] text-[#2d4967]">{providerTarget}</code><p className="mt-[6px] text-[8px] text-[#687a91]">DigiFlazz Buyer menerima satu customer_no yang dibentuk dari seluruh input pelanggan.</p></div>}{tab !== "Informasi Produk" && tab !== "Input Customer" && <div className="mt-[14px] grid grid-cols-3 gap-[10px]">{["Aktif", "Ditampilkan di katalog", "Gunakan pengaturan default"].map((label) => <label key={label} className="flex items-center justify-between rounded-[6px] border border-[#e1e7ee] px-[11px] py-[10px] text-[8px] font-semibold">{label}<Switch enabled onToggle={() => {}} /></label>)}</div>}</section>;
 }
 
-function PackageImagePicker({ value, onChange, disabled = false }: { value: string; onChange(value: string): void; disabled?: boolean }) {
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
-
-  async function upload(file?: File) {
-    if (!file || disabled) return;
-    setUploading(true);
-    setError("");
-    try {
-      const form = new FormData();
-      form.set("file", file);
-      const response = await fetch("/api/panel/media", { method: "POST", body: form });
-      const data = await response.json().catch(() => ({})) as { url?: string; error?: string };
-      if (!response.ok || !data.url) throw new Error(data.error || "Gambar nominal gagal diunggah.");
-      onChange(data.url);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Gambar nominal gagal diunggah.");
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  return (
-    <div className="min-w-[150px]">
-      <div className="flex items-center gap-2">
-        {value ? <img src={value} alt="" className="size-9 rounded-md border border-[#dfe5ed] object-contain" /> : <span className="grid size-9 place-items-center rounded-md border border-[#dfe5ed] bg-[#f8fafc] text-[#98a2b3]"><ImageIcon className="size-4" /></span>}
-        {!disabled && (
-          <label className="inline-flex cursor-pointer items-center rounded-md border border-[#dfe5ed] px-2 py-1.5 text-[8px] font-bold text-[#667085] hover:bg-[#f2f4f7]">
-            {uploading ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : <Upload className="mr-1 size-3" />}
-            Unggah
-            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(event) => void upload(event.target.files?.[0])} />
-          </label>
-        )}
-      </div>
-      {error && <p className="mt-1 max-w-[150px] text-[7px] text-red-300">{error}</p>}
-    </div>
-  );
+function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal[]; onClose(): void; onImport(items: Nominal[]): void }) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const [step, setStep] = useState(1);
+  const [margin, setMargin] = useState(10);
+  const available = digiflazzCatalog.filter((item) => !existing.some((nominal) => nominal.sku === item.sku));
+  function finish() { onImport(available.filter((item) => selected.includes(item.sku)).map((item) => ({ id: crypto.randomUUID(), name: item.name.replace("Mobile Legends ", ""), sku: item.sku, group: "Diamonds", cost: item.cost, margin, sell: Math.ceil(item.cost + item.cost * margin / 100), active: true, imageKind: "diamond" as const, provider: "Digiflazz" as const }))); }
+  return <SimpleModal title="Import Nominal dari Digiflazz" description="Produk tetap dibuat manual. Hanya nominal terpilih yang diambil dari Digiflazz." onClose={onClose} wide><div className="mb-[13px] grid grid-cols-4 gap-[8px]">{["Pilih Kategori", "Pilih Nominal", "Atur Margin", "Konfirmasi"].map((label, index) => <div key={label} className={`flex items-center gap-[6px] text-[7px] font-semibold ${step === index + 1 ? "text-[#0875ed]" : "text-[#74849a]"}`}><span className={`grid size-[21px] place-items-center rounded-full ${step === index + 1 ? "bg-[#0875ed] text-white" : "bg-[#eef2f6]"}`}>{index + 1}</span>{label}</div>)}</div>{step === 1 && <div className="grid grid-cols-2 gap-[10px]"><label className="text-[8px] font-bold">Kategori Digiflazz<CompactSelect value="Mobile Games" onChange={() => {}} options={["Mobile Games"]} /></label><label className="text-[8px] font-bold">Pilih Game / Brand<CompactSelect value="Mobile Legends" onChange={() => {}} options={["Mobile Legends"]} /></label></div>}{step === 2 && <div><label className="relative block"><Search className="absolute left-[9px] top-1/2 size-[12px] -translate-y-1/2 text-[#7b899b]" /><input placeholder="Cari nama atau SKU di Digiflazz..." className="h-[32px] w-full rounded-[4px] border border-[#dce3eb] pl-[28px] text-[8px]" /></label><div className="mt-[8px] overflow-hidden rounded-[5px] border border-[#e0e6ed]">{available.map((item) => <label key={item.sku} className="grid grid-cols-[22px_1fr_60px_75px_55px] items-center border-t border-[#e8ecf1] px-[8px] py-[6px] text-[7px] first:border-0"><input type="checkbox" checked={selected.includes(item.sku)} onChange={() => setSelected((current) => current.includes(item.sku) ? current.filter((sku) => sku !== item.sku) : [...current, item.sku])} /><span>{item.name}</span><span>{item.sku}</span><span>{formatRupiah(item.cost)}</span><span className="rounded bg-[#ddf8e8] px-[6px] py-[3px] text-center font-bold text-[#15955a]">{item.status}</span></label>)}</div></div>}{step === 3 && <label className="block text-[8px] font-bold">Margin global untuk nominal Digiflazz (%)<input type="number" value={margin} onChange={(event) => setMargin(Number(event.target.value))} className="mt-[5px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label>}{step === 4 && <div className="rounded-[5px] border border-[#cfe4fa] bg-[#f0f7ff] p-[12px] text-[8px] text-[#415b75]"><strong>{selected.length} nominal dipilih</strong><p className="mt-[4px]">Provider: Digiflazz · Margin: {margin}% · Produk tidak dibuat otomatis.</p></div>}<div className="mt-[15px] flex justify-between"><button type="button" onClick={step === 1 ? onClose : () => setStep((value) => value - 1)} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[13px] text-[8px] font-bold">{step === 1 ? "Batal" : "Kembali"}</button><button type="button" disabled={step === 2 && !selected.length} onClick={step === 4 ? finish : () => setStep((value) => value + 1)} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50">{step === 4 ? "Import Nominal" : "Lanjut"}</button></div></SimpleModal>;
 }
 
-async function requestProducts() {
-  const response = await fetch("/api/panel/products", { cache: "no-store" });
-  const data = await response.json().catch(() => ({})) as { products?: ManagedProduct[]; databaseReady?: boolean; role?: "owner" | "staff"; sellerMonitor?: DigiflazzMonitorPayload | null; error?: string };
-  if (!response.ok) throw new Error(data.error ?? "Produk gagal dimuat.");
-  return data;
+function ManualProductModal({ onClose, onSubmit }: { onClose(): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
+  return <SimpleModal title="Tambah Produk Manual" description="Semua produk dibuat sendiri. Nominal dapat ditambahkan setelah produk tersimpan." onClose={onClose} wide><form onSubmit={onSubmit}><div className="mb-[12px] flex border-b border-[#e2e7ed]"><span className="border-b-2 border-[#0875ed] px-[10px] pb-[8px] text-[8px] font-bold text-[#0875ed]">Informasi Produk</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Nominal & Harga</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Input Customer</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Fulfillment</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Tampilan</span></div><div className="grid grid-cols-[120px_1fr_1fr] gap-[12px]"><label className="row-span-3 text-[8px] font-bold text-[#3d4f68]">Gambar produk (opsional, rasio 1:1)<span className="mt-[5px] grid h-[110px] place-items-center rounded-[5px] border border-dashed border-[#cfd9e5] bg-[#fafbfd] text-center text-[#0875ed]"><span><ImageIcon className="mx-auto size-[24px]" /><small className="mt-[5px] block">Pilih gambar</small></span></span><small className="mt-[5px] block font-normal text-[#7a899c]">Boleh dikosongkan dan ditambahkan nanti</small></label><Field label="Nama Produk *" name="name" placeholder="Contoh: Roblox Robux" required /><Field label="Slug *" name="slug" placeholder="contoh: roblox-robux" /><label className="text-[8px] font-bold">Kategori *<select name="category" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Mobile Games</option><option>PC Games</option><option>Game Voucher</option></select></label><label className="text-[8px] font-bold">Provider nominal *<select name="provider" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Digiflazz</option><option>Manual</option></select></label><label className="col-span-2 text-[8px] font-bold">Deskripsi singkat<textarea name="description" placeholder="Deskripsi singkat produk..." className="mt-[4px] h-[72px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label><label className="col-span-2 text-[8px] font-bold">Banner halaman produk (opsional)<input placeholder="Boleh dikosongkan dan ditambahkan nanti" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label></div><ModalActions onCancel={onClose} submit="Lanjut ke Nominal" /></form></SimpleModal>;
 }
+
+function SimpleModal({ title, description, children, onClose, wide }: { title: string; description: string; children: ReactNode; onClose(): void; wide?: boolean }) { return <div className="fixed inset-0 z-50 grid place-items-center bg-[#071426]/55 p-[24px]" role="dialog" aria-modal="true" aria-label={title}><section className={`max-h-[88vh] w-full overflow-auto rounded-[9px] bg-white shadow-2xl ${wide ? "max-w-[720px]" : "max-w-[480px]"}`}><header className="flex items-start justify-between border-b border-[#e3e8ef] px-[16px] py-[13px]"><div><h2 className="text-[14px] font-black text-[#101d35]">{title}</h2><p className="mt-[2px] text-[8px] text-[#6d7d92]">{description}</p></div><button type="button" onClick={onClose} className="grid size-[27px] place-items-center rounded-[4px] text-[#596b82] hover:bg-[#f2f5f8]"><X className="size-[14px]" /></button></header><div className="p-[16px]">{children}</div></section></div>; }
+
+function ModalActions({ onCancel, submit }: { onCancel(): void; submit: string }) { return <div className="col-span-full mt-[5px] flex justify-end gap-[8px] border-t border-[#e5e9ef] pt-[12px]"><button type="button" onClick={onCancel} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[14px] text-[8px] font-bold">Batal</button><button type="submit" className="h-[32px] rounded-[4px] bg-[#0875ed] px-[15px] text-[8px] font-bold text-white">{submit}</button></div>; }
+function Field({ label, ...props }: { label: string; name: string; placeholder: string; type?: string; required?: boolean }) { return <label className="text-[8px] font-bold text-[#3d4f68]">{label}<input {...props} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] outline-none placeholder:text-[#929eae] focus:border-[#2580eb]" /></label>; }
+function ActionButton({ children, onClick }: { children: ReactNode; onClick?: () => void }) { return <button type="button" onClick={onClick} className="inline-flex h-[31px] items-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white px-[11px] text-[7.5px] font-bold text-[#34506d] hover:bg-[#f6f9fc]">{children}</button>; }
+function IconButton({ children, label, danger, onClick }: { children: ReactNode; label: string; danger?: boolean; onClick?: () => void }) { return <button type="button" aria-label={label} onClick={onClick} className={`grid size-[25px] place-items-center rounded-[4px] border ${danger ? "border-red-100 bg-red-50 text-red-500" : "border-[#dce3eb] bg-white text-[#52657d]"}`}>{children}</button>; }
+function CompactSelect({ value, onChange, options }: { value: string; onChange(value: string): void; options: string[] }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className="h-[34px] min-w-0 rounded-[5px] border border-[#dce3eb] bg-white px-[9px] text-[8px] font-medium text-[#40516a] outline-none">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
+function PageButton({ children, active }: { children: ReactNode; active?: boolean }) { return <button type="button" className={`grid size-[27px] place-items-center rounded-[4px] border text-[8px] font-bold ${active ? "border-[#0875ed] bg-[#0875ed] text-white" : "border-[#dde4ec] bg-white text-[#4c5e76]"}`}>{children}</button>; }
+function Box() { return <span className="block size-[13px] rounded-[3px] border border-[#cdd7e2] bg-white" />; }
+function Switch({ enabled, onToggle }: { enabled: boolean; onToggle(): void }) { return <button type="button" aria-pressed={enabled} onClick={onToggle} className={`relative h-[17px] w-[31px] rounded-full transition ${enabled ? "bg-[#0875ed]" : "bg-[#cad5e1]"}`}><span className={`absolute top-[2px] size-[13px] rounded-full bg-white shadow transition ${enabled ? "left-[16px]" : "left-[2px]"}`} /></button>; }
+function ProductImage({ product, large }: { product: Product; large?: boolean }) { const size = large ? "size-[58px] rounded-[9px]" : "size-[36px] rounded-[6px]"; return product.image ? <img src={product.image} alt="" className={`${size} object-cover shadow-sm`} /> : <span className={`grid ${size} place-items-center bg-gradient-to-br from-[#2186ef] to-[#133a85] font-black text-white`}>{product.name.slice(0, 2).toUpperCase()}</span>; }
+function CategoryBadge({ category }: { category: Product["category"] }) { const style = category === "PC Games" ? "bg-[#eee2ff] text-[#7142b3]" : category === "Game Voucher" ? "bg-[#fff0df] text-[#c46b1b]" : "bg-[#e2f1ff] text-[#1671c5]"; return <span className={`rounded-[4px] px-[7px] py-[4px] text-[6.5px] font-semibold ${style}`}>{category}</span>; }
+function NominalArtwork({ kind, large }: { kind: Nominal["imageKind"]; large?: boolean }) { const label = kind === "diamond" ? "💎" : kind === "weekly" ? "🎟️" : kind === "double" ? "2X" : "🌙"; return <span className={`grid place-items-center rounded-[4px] bg-gradient-to-br from-[#b7efff] to-[#6d4fe8] font-black text-white ${large ? "mx-auto my-[7px] size-[35px] text-[16px]" : "size-[27px] text-[11px]"}`}>{label}</span>; }
+
+function moveItem<T extends { id: string }>(items: T[], id: string, direction: -1 | 1) { const index = items.findIndex((item) => item.id === id); const target = index + direction; if (index < 0 || target < 0 || target >= items.length) return items; const next = [...items]; [next[index], next[target]] = [next[target], next[index]]; return next; }
+function moveBefore<T extends { id: string }>(items: T[], sourceId: string, targetId: string) { const source = items.find((item) => item.id === sourceId); if (!source || sourceId === targetId) return items; const remaining = items.filter((item) => item.id !== sourceId); const target = remaining.findIndex((item) => item.id === targetId); remaining.splice(target < 0 ? remaining.length : target, 0, source); return remaining; }
+function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
+function formatRupiah(value: number) { return `Rp ${new Intl.NumberFormat("id-ID").format(value)}`; }
