@@ -35,8 +35,10 @@ test("admin reference exposes the approved desktop information architecture", ()
   assert.ok(source.indexOf('label: "Integrasi"') < source.indexOf('label: "Pengaturan"'));
 });
 
-test("dashboard is a backend-independent visual reference", () => {
-  assert.doesNotMatch(overview, /fetch\(/);
+test("dashboard keeps the approved reference while using live summary data", () => {
+  assert.match(overview, /fetch\(`\/api\/panel\/summary\?range=\$\{range\}`/);
+  assert.match(overview, /summary\?\.recentOrders/);
+  assert.match(overview, /summary\?\.topProducts/);
   for (const label of [
     "Omzet Hari Ini",
     "Pesanan Hari Ini",

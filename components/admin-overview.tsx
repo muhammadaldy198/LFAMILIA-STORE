@@ -25,23 +25,15 @@ import {
   WalletCards,
 } from "lucide-react";
 
-const sales = [
-  { day: "17 Apr", revenue: 1000000, orders: 42 },
-  { day: "18 Apr", revenue: 1230000, orders: 61 },
-  { day: "19 Apr", revenue: 820000, orders: 102 },
-  { day: "20 Apr", revenue: 920000, orders: 111 },
-  { day: "21 Apr", revenue: 1130000, orders: 71 },
-  { day: "22 Apr", revenue: 1410000, orders: 88 },
-  { day: "23 Apr", revenue: 1060000, orders: 168 },
-];
-
-const activities = [
-  { tone: "blue", title: "Pesanan baru", detail: "INV/20250423/0012 - Mobile Legends", time: "2 menit lalu", Icon: ShoppingCart },
-  { tone: "green", title: "Pembayaran berhasil", detail: "INV/20250423/0011 - DANA", time: "8 menit lalu", Icon: CheckCircle2 },
-  { tone: "blue", title: "Pelanggan baru", detail: "rinaldi123@gmail.com", time: "15 menit lalu", Icon: Users },
-  { tone: "purple", title: "Produk diperbarui", detail: "Harga Mobile Legends (Digiflazz)", time: "28 menit lalu", Icon: Boxes },
-  { tone: "orange", title: "Tiket pelanggan", detail: "#TK-00045 - Kendala top up", time: "1 jam lalu", Icon: Headphones },
-];
+type Summary = {
+  todayMetrics: { paidRevenue: number | null; totalOrders: number; pendingPayments: number; failedOrders: number; activeProducts: number };
+  metrics: { customers: number; fulfilledOrders: number };
+  chart: Array<{ day: string; orders: number; revenue: number | null }>;
+  recentActivities: Array<{ id: string; action: string; target: string; createdAt: string }>;
+  recentOrders: Array<{ id: string; referenceId: string; buyerName: string; productName: string; packageLabel: string; paymentChannel: string; paymentStatus: string; fulfillmentStatus: string; total: number | null; createdAt: string }>;
+  topProducts: Array<{ slug: string; name: string; fulfilledOrders: number }>;
+  integrations: { doku: { ready: boolean }; digiflazz: { ready: boolean; balance: number | null; lastSyncAt: string | null }; webhook: { ready: boolean } };
+};
 
 const featureCards = [
   { title: "Pesanan", Icon: FileText, target: "orders", items: ["Kelola pesanan & invoice", "Update status pesanan", "Callback log & notifikasi", "Proses manual / refund"] },
@@ -57,23 +49,11 @@ const featureCards = [
   { title: "Pengaturan", Icon: Settings, target: "settings", items: ["Profil toko & kontak", "Logo & favicon", "Integrasi layanan", "Pengaturan keamanan", "Notifikasi sistem"] },
 ];
 
-const orders = [
-  { invoice: "INV/20250423/0012", customer: "Rizky Pratama", product: "Mobile Legends 86 Diamonds", payment: "DANA", total: "Rp 20.000", status: "Berhasil" },
-  { invoice: "INV/20250423/0011", customer: "Siti Aulia", product: "Free Fire 140 Diamonds", payment: "QRIS", total: "Rp 33.000", status: "Berhasil" },
-  { invoice: "INV/20250423/0010", customer: "Budi Santoso", product: "PUBG Mobile 325 UC", payment: "Virtual Account", total: "Rp 75.000", status: "Diproses" },
-  { invoice: "INV/20250423/0009", customer: "Andi Saputra", product: "Valorant 100 VP", payment: "GoPay", total: "Rp 16.000", status: "Berhasil" },
-];
-
-const products = [
-  ["Mobile Legends", "1.284"],
-  ["Free Fire", "982"],
-  ["PUBG Mobile", "756"],
-  ["Valorant", "521"],
-  ["Steam Wallet", "418"],
-];
-
 export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => void }) {
   const [now, setNow] = useState<Date | null>(null);
+  const [range, setRange] = useState("7d");
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const initial = window.setTimeout(() => setNow(new Date()), 0);
@@ -83,6 +63,19 @@ export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => 
       window.clearInterval(timer);
     };
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/panel/summary?range=${range}`, { cache: "no-store", signal: controller.signal })
+      .then(async (response) => { const payload = await response.json() as Summary & { error?: string }; if (!response.ok) throw new Error(payload.error || "Dashboard gagal dimuat."); setSummary(payload); setError(""); })
+      .catch((reason) => { if (!(reason instanceof DOMException && reason.name === "AbortError")) setError(reason instanceof Error ? reason.message : "Dashboard gagal dimuat."); });
+    return () => controller.abort();
+  }, [range]);
+
+  const sales = summary?.chart.map((point) => ({ day: new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short" }).format(new Date(point.day)), revenue: Number(point.revenue || 0), orders: point.orders })) || [];
+  const activities = (summary?.recentActivities.length ? summary.recentActivities.map((item) => ({ tone: "purple", title: item.action, detail: item.target, time: relativeTime(item.createdAt), Icon: UserCog })) : summary?.recentOrders.map((item) => ({ tone: item.paymentStatus === "paid" ? "green" : "blue", title: item.paymentStatus === "paid" ? "Pembayaran berhasil" : "Pesanan diperbarui", detail: `${item.referenceId} - ${item.productName}`, time: relativeTime(item.createdAt), Icon: item.paymentStatus === "paid" ? CheckCircle2 : ShoppingCart })) || []).slice(0, 5);
+  const orders = summary?.recentOrders.slice(0, 4).map((item) => ({ invoice: item.referenceId, customer: item.buyerName, product: `${item.productName} ${item.packageLabel}`, payment: item.paymentChannel, total: money(item.total), status: item.fulfillmentStatus === "success" ? "Berhasil" : item.paymentStatus === "failed" || item.fulfillmentStatus === "failed" ? "Gagal" : item.paymentStatus === "paid" ? "Diproses" : "Pending" })) || [];
+  const products = summary?.topProducts.map((item) => [item.name, String(item.fulfilledOrders)] as const) || [];
 
   return (
     <div className="admin-dashboard-reference space-y-3.5">
@@ -101,17 +94,19 @@ export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => 
       </section>
 
       <section className="grid grid-cols-5 gap-3">
-        <MetricCard Icon={WalletCards} label="Omzet Hari Ini" value="Rp 2.480.980" delta="+12,5%" note="dari kemarin" />
-        <MetricCard Icon={ShoppingCart} label="Pesanan Hari Ini" value="164" delta="+8,1%" note="dari kemarin" />
-        <MetricCard Icon={Boxes} label="Produk Aktif" value="256" delta="0%" note="tidak ada perubahan" neutral />
-        <MetricCard Icon={CircleDollarSign} label="Saldo Digiflazz" value="Rp 4.570.800" delta="+5,2%" note="dari kemarin" />
-        <MetricCard Icon={CheckCircle2} label="Pembayaran Berhasil" value="158" delta="+11,3%" note="dari kemarin" success />
+        <MetricCard Icon={WalletCards} label="Omzet Hari Ini" value={money(summary?.todayMetrics.paidRevenue)} delta="Live" note="dari transaksi dibayar" />
+        <MetricCard Icon={ShoppingCart} label="Pesanan Hari Ini" value={String(summary?.todayMetrics.totalOrders || 0)} delta="Live" note="pesanan tercatat" />
+        <MetricCard Icon={Boxes} label="Produk Aktif" value={String(summary?.todayMetrics.activeProducts || 0)} delta="Live" note="tersedia di toko" neutral />
+        <MetricCard Icon={CircleDollarSign} label="Saldo Digiflazz" value={money(summary?.integrations.digiflazz.balance)} delta={summary?.integrations.digiflazz.ready ? "Online" : "Periksa"} note="status provider" />
+        <MetricCard Icon={CheckCircle2} label="Pembayaran Berhasil" value={String(summary?.metrics.fulfilledOrders || 0)} delta="Live" note="periode dipilih" success />
       </section>
+
+      {error && <button type="button" onClick={() => setError("")} className="w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-[9px] text-red-700">{error}</button>}
 
       <section className="grid grid-cols-[1.25fr_1fr_0.94fr] gap-3">
         <Panel className="min-h-[282px]">
           <PanelHeader title="Grafik Penjualan">
-            <button type="button" className="flex h-7 items-center gap-2 rounded-md border border-[#e0e5ec] bg-white px-2.5 text-[8px] font-semibold text-[#607089]">7 Hari Terakhir <ChevronDown className="size-3" /></button>
+            <label className="relative"><select value={range} onChange={(event) => setRange(event.target.value)} className="h-7 appearance-none rounded-md border border-[#e0e5ec] bg-white pl-2.5 pr-7 text-[8px] font-semibold text-[#607089]"><option value="today">Hari Ini</option><option value="7d">7 Hari Terakhir</option><option value="30d">30 Hari Terakhir</option><option value="90d">90 Hari Terakhir</option></select><ChevronDown className="pointer-events-none absolute right-2 top-2 size-3" /></label>
           </PanelHeader>
           <div className="px-4 pt-3">
             <div className="flex gap-5 text-[8px] text-[#607089]">
@@ -119,11 +114,11 @@ export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => 
               <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-[#8cc7ff]" />Jumlah Pesanan</span>
             </div>
           </div>
-          <SalesBars />
+          <SalesBars sales={sales} />
         </Panel>
 
         <Panel className="min-h-[282px]">
-          <PanelHeader title="Aktivitas Terbaru"><button type="button" className="text-[8px] font-bold text-[#1769e8]">Lihat Semua</button></PanelHeader>
+          <PanelHeader title="Aktivitas Terbaru"><button type="button" onClick={() => onNavigate?.("team")} className="text-[8px] font-bold text-[#1769e8]">Lihat Semua</button></PanelHeader>
           <div className="relative px-4 py-2">
             <span className="absolute bottom-5 left-[27px] top-6 w-px bg-[#dbe3ed]" />
             {activities.map((activity) => <ActivityRow key={activity.title} {...activity} />)}
@@ -131,15 +126,15 @@ export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => 
         </Panel>
 
         <Panel className="min-h-[282px]">
-          <PanelHeader title="Status Integrasi"><span className="flex items-center gap-1.5 text-[8px] font-semibold text-emerald-600"><CheckCircle2 className="size-3" />Semua Sistem Normal</span></PanelHeader>
+          <PanelHeader title="Status Integrasi"><button type="button" onClick={() => onNavigate?.("integrations")} className="flex items-center gap-1.5 text-[8px] font-semibold text-[#1769e8]"><CheckCircle2 className="size-3" />Lihat Integrasi</button></PanelHeader>
           <div className="space-y-2 px-4 py-3">
-            <IntegrationRow letter="D" name="Digiflazz API" />
-            <IntegrationRow letter="DO" name="DOKU Direct API" red />
+            <IntegrationRow letter="D" name="Digiflazz API" ready={Boolean(summary?.integrations.digiflazz.ready)} />
+            <IntegrationRow letter="DO" name="DOKU Direct API" ready={Boolean(summary?.integrations.doku.ready)} red />
             <dl className="space-y-2 border-t border-[#edf0f4] pt-2 text-[8px]">
-              <StatusLine label="Terakhir Sinkronisasi" value="23 Apr 2025 14:28 WIB" />
-              <StatusLine label="Status Webhook" value="Aktif" dot />
-              <StatusLine label="Respon API" value="Normal" dot />
-              <StatusLine label="Uptime" value="99,9%" dot />
+              <StatusLine label="Terakhir Sinkronisasi" value={summary?.integrations.digiflazz.lastSyncAt ? relativeTime(summary.integrations.digiflazz.lastSyncAt) : "Belum ada"} />
+              <StatusLine label="Status Webhook" value={summary?.integrations.webhook.ready ? "Aktif" : "Belum siap"} dot={Boolean(summary?.integrations.webhook.ready)} />
+              <StatusLine label="Respon API" value={summary?.integrations.doku.ready && summary?.integrations.digiflazz.ready ? "Normal" : "Perlu konfigurasi"} dot={Boolean(summary?.integrations.doku.ready && summary?.integrations.digiflazz.ready)} />
+              <StatusLine label="Data" value="Live" dot />
             </dl>
           </div>
         </Panel>
@@ -219,9 +214,9 @@ function PanelHeader({ title, children }: { title: string; children?: React.Reac
   return <header className="flex h-10 items-center justify-between border-b border-[#edf0f4] px-4"><h2 className="text-[11px] font-extrabold text-[#1a2942]">{title}</h2>{children}</header>;
 }
 
-function SalesBars() {
-  const maxRevenue = 2_000_000;
-  const maxOrders = 200;
+function SalesBars({ sales }: { sales: Array<{ day: string; revenue: number; orders: number }> }) {
+  const maxRevenue = Math.max(1, ...sales.map((point) => point.revenue));
+  const maxOrders = Math.max(1, ...sales.map((point) => point.orders));
   return (
     <div className="grid h-[216px] grid-cols-[34px_1fr] gap-2 px-4 pb-3 pt-2">
       <div className="flex flex-col justify-between pb-6 text-right text-[7px] text-[#7b899d]"><span>2M</span><span>1,5M</span><span>1M</span><span>500K</span><span>0</span></div>
@@ -252,12 +247,12 @@ function ActivityRow({ tone, title, detail, time, Icon }: { tone: string; title:
   );
 }
 
-function IntegrationRow({ letter, name, red = false }: { letter: string; name: string; red?: boolean }) {
+function IntegrationRow({ letter, name, ready, red = false }: { letter: string; name: string; ready: boolean; red?: boolean }) {
   return (
     <div className="flex items-center gap-3 rounded-md border border-[#e7ebf0] bg-[#fbfcfe] px-3 py-2">
       <span className={"grid size-8 place-items-center rounded-md text-[15px] font-black text-white " + (red ? "bg-[#e5232d]" : "bg-[#1769e8]")}>{letter}</span>
-      <div className="min-w-0 flex-1"><p className="truncate text-[9px] font-bold text-[#26354e]">{name}</p><p className="mt-0.5 text-[7px] font-semibold text-emerald-600">Terhubung</p></div>
-      <span className="flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-1 text-[7px] font-semibold text-emerald-600"><i className="size-1.5 rounded-full bg-emerald-500" />Online</span>
+      <div className="min-w-0 flex-1"><p className="truncate text-[9px] font-bold text-[#26354e]">{name}</p><p className={`mt-0.5 text-[7px] font-semibold ${ready ? "text-emerald-600" : "text-amber-600"}`}>{ready ? "Terhubung" : "Perlu konfigurasi"}</p></div>
+      <span className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[7px] font-semibold ${ready ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}><i className={`size-1.5 rounded-full ${ready ? "bg-emerald-500" : "bg-amber-500"}`} />{ready ? "Online" : "Periksa"}</span>
     </div>
   );
 }
@@ -279,8 +274,12 @@ function FeatureCard({ title, Icon, target, items, onNavigate }: { title: string
 
 function StatusBadge({ value }: { value: string }) {
   const success = value === "Berhasil";
-  return <span className={"rounded-md px-2 py-1 text-[7px] font-semibold " + (success ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600")}>{value}</span>;
+  const failed = value === "Gagal";
+  return <span className={"rounded-md px-2 py-1 text-[7px] font-semibold " + (success ? "bg-emerald-50 text-emerald-600" : failed ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600")}>{value}</span>;
 }
+
+function money(value: number | null | undefined) { return value == null ? "-" : new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value); }
+function relativeTime(value: string) { const time = new Date(value).getTime(); if (!Number.isFinite(time)) return value || "-"; const minutes = Math.max(0, Math.floor((Date.now() - time) / 60_000)); return minutes < 1 ? "baru saja" : minutes < 60 ? `${minutes} menit lalu` : minutes < 1_440 ? `${Math.floor(minutes / 60)} jam lalu` : `${Math.floor(minutes / 1_440)} hari lalu`; }
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(date);
