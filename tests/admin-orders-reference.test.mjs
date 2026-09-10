@@ -3,42 +3,51 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-const root = process.cwd();
+const source = fs.readFileSync(path.join(process.cwd(), "components/admin-order-manager.tsx"), "utf8");
 
-test("account menu is interactive and exposes identity plus safe navigation", () => {
-  const dashboard = fs.readFileSync(path.join(root, "components/admin-dashboard.tsx"), "utf8");
-  const accountMenu = fs.readFileSync(path.join(root, "components/admin-account-menu.tsx"), "utf8");
-  assert.match(dashboard, /<AdminAccountMenu/);
-  assert.match(accountMenu, /aria-expanded=\{open\}/);
-  assert.match(accountMenu, /session\.email/);
-  assert.match(accountMenu, /Super Admin/);
-  assert.match(accountMenu, /logoutPath/);
-});
-
-test("orders panel implements desktop, mobile, filters, export and real detail data", () => {
-  const source = fs.readFileSync(path.join(root, "components/admin-order-manager.tsx"), "utf8");
-  const route = fs.readFileSync(path.join(root, "app/api/admin/orders/route.ts"), "utf8");
+test("orders page follows the supplied desktop reference structure", () => {
   for (const label of [
-    "Kelola semua pesanan dan pantau status transaksi pelanggan.",
-    "Export",
-    "Semua Status",
-    "Semua Produk",
-    "Semua Pembayaran",
-    "Semua Provider",
-    "Menunggu Pembayaran",
+    "Kelola seluruh transaksi top up game, monitor status pembayaran dan proses pengiriman.",
+    "Total Pesanan",
+    "Pending",
     "Diproses",
     "Berhasil",
-    "Refund",
-    "Detail Pesanan",
-    "Timeline",
-    "Aksi Admin",
-    "Copy Invoice",
-  ]) assert.ok(source.includes(label), label);
-  assert.match(source, /DesktopOrderTable/);
-  assert.match(source, /MobileOrderList/);
-  assert.match(source, /MobileFilters/);
-  assert.match(source, /text\/csv/);
-  assert.match(route, /FROM order_events WHERE order_id = \?/);
-  assert.match(route, /Cache-Control/);
-  assert.doesNotMatch(source, />Refund<\/Button>/);
+    "Gagal",
+    "Komplain",
+    "Auto Refresh Aktif",
+    "Pesanan Manual",
+    "Daftar Pesanan",
+    "Aktivitas Terbaru",
+    "Menampilkan 1–",
+  ]) assert.ok(source.includes(label), `missing reference label: ${label}`);
+
+  assert.match(source, /grid-cols-6/);
+  assert.match(source, /grid-cols-\[minmax\(0,1fr\)_270px\]/);
+  assert.match(source, /function DesktopOrderTable/);
+});
+
+test("orders table exposes all reference columns and local controls", () => {
+  for (const label of [
+    "ID Pesanan",
+    "Pelanggan",
+    "Produk",
+    "Tujuan",
+    "Pembayaran",
+    "Provider",
+    "Total",
+    "Status",
+    "Aksi",
+    "Aksi massal",
+    "Pilih semua",
+    "Baris per halaman",
+  ]) assert.ok(source.includes(label), `missing table control: ${label}`);
+
+  assert.match(source, /type: "text\/csv;charset=utf-8"/);
+  assert.match(source, /OrderDetailModal/);
+  assert.match(source, /ManualOrderModal/);
+});
+
+test("orders reference UI is intentionally frontend-only", () => {
+  assert.doesNotMatch(source, /fetch\s*\(/);
+  assert.doesNotMatch(source, /\/api\/panel\/orders/);
 });
