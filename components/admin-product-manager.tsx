@@ -6,8 +6,6 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
-  ChevronLeft,
-  ChevronRight,
   Copy,
   ExternalLink,
   GripVertical,
@@ -27,10 +25,58 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { announceAdminAction } from "@/components/admin-workspace-ui";
 
 type ProductProvider = "Digiflazz" | "Manual";
 type EditorTab = "Informasi Produk" | "Nominal & Harga" | "Tabel Pemisah" | "Tampilan Produk" | "Input Customer" | "Fulfillment";
+
+type ManagedPackagePayload = {
+  dbId?: number | null;
+  id: string;
+  label: string;
+  price: number;
+  note?: string;
+  group?: string;
+  imageUrl?: string;
+  providerCode?: "digiflazz" | "voucher-stock";
+  providerSku?: string;
+  supplierPrice?: number | null;
+  pricingMode?: "manual" | "auto";
+  marginType?: "fixed" | "percent";
+  marginValue?: number;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+type ManagedProductPayload = {
+  dbId: number | null;
+  slug: string;
+  name: string;
+  publisher: string;
+  category: string;
+  imageUrl?: string;
+  bannerUrl?: string;
+  description?: string;
+  initials: string;
+  accent: string;
+  inputLabel: string;
+  inputPlaceholder: string;
+  inputFields: Array<{ id: string; label: string; placeholder?: string; required?: boolean }>;
+  needsServer: boolean;
+  popular: boolean;
+  instant: boolean;
+  fulfillmentType: "automatic" | "manual";
+  targetTemplate: string;
+  manualInstructions?: string;
+  manualOpenTime?: string;
+  manualCloseTime?: string;
+  manualTimezone: string;
+  packageTabsEnabled: boolean;
+  packageTabs: string[];
+  isActive: boolean;
+  sortOrder: number;
+  packages: ManagedPackagePayload[];
+  notices: Array<{ id?: number | null; title: string; body: string; isActive: boolean; sortOrder: number }>;
+};
 
 type Product = {
   id: number;
@@ -45,6 +91,7 @@ type Product = {
   visible: boolean;
   updated: string;
   image: string;
+  raw: ManagedProductPayload;
 };
 
 type Nominal = {
@@ -68,33 +115,6 @@ type NominalSection = {
   active: boolean;
 };
 
-const initialProducts: Product[] = [
-  { id: 1, name: "Mobile Legends", slug: "mobile-legends", description: "Top up diamond Mobile Legends", category: "Mobile Games", provider: "Digiflazz", nominalCount: 24, startPrice: 1000, active: true, visible: true, updated: "24 Apr 2025 10:24", image: "/products/mobile-legends-card.webp" },
-  { id: 2, name: "Free Fire", slug: "free-fire", description: "Top up diamond Free Fire", category: "Mobile Games", provider: "Digiflazz", nominalCount: 18, startPrice: 1000, active: true, visible: true, updated: "24 Apr 2025 09:12", image: "/products/free-fire-card.webp" },
-  { id: 3, name: "PUBG Mobile", slug: "pubg-mobile", description: "Top up UC PUBG Mobile", category: "Mobile Games", provider: "Digiflazz", nominalCount: 15, startPrice: 1000, active: true, visible: true, updated: "23 Apr 2025 21:43", image: "/products/pubg-mobile-card.webp" },
-  { id: 4, name: "Valorant", slug: "valorant", description: "Top up Valorant Points", category: "PC Games", provider: "Digiflazz", nominalCount: 12, startPrice: 5000, active: true, visible: true, updated: "23 Apr 2025 18:20", image: "/products/valorant-card.webp" },
-  { id: 5, name: "Genshin Impact", slug: "genshin-impact", description: "Top up Genesis Crystals", category: "Mobile Games", provider: "Digiflazz", nominalCount: 10, startPrice: 16000, active: true, visible: true, updated: "23 Apr 2025 16:11", image: "/products/genshin-impact-card.webp" },
-  { id: 6, name: "Roblox", slug: "roblox", description: "Robux Gift / Login", category: "Game Voucher", provider: "Manual", nominalCount: 8, startPrice: 25000, active: true, visible: true, updated: "22 Apr 2025 14:08", image: "/products/roblox-card.webp" },
-];
-
-const initialNominals: Nominal[] = [
-  { id: "n1", name: "5 Diamonds", sku: "ML5", group: "Diamonds", cost: 1000, margin: 50, sell: 1639, active: true, imageKind: "diamond", provider: "Digiflazz" },
-  { id: "n2", name: "12 Diamonds", sku: "ML12", group: "Diamonds", cost: 2500, margin: 57, sell: 3919, active: true, imageKind: "diamond", provider: "Digiflazz" },
-  { id: "n3", name: "Weekly Diamond Pass", sku: "MLWDP", group: "Special Items", cost: 20000, margin: 40, sell: 28082, active: true, imageKind: "weekly", provider: "Digiflazz" },
-  { id: "n4", name: "2x Weekly Diamond Pass", sku: "MLWDP2", group: "Special Items", cost: 45000, margin: 43, sell: 64264, active: true, imageKind: "weekly", provider: "Digiflazz" },
-  { id: "n5", name: "3x Weekly Diamond Pass", sku: "MLWDP3", group: "Special Items", cost: 68000, margin: 42, sell: 96396, active: true, imageKind: "weekly", provider: "Digiflazz" },
-  { id: "n6", name: "100 (50+50) Diamonds", sku: "ML100", group: "First Top Up", cost: 9500, margin: 54, sell: 14659, active: true, imageKind: "double", provider: "Digiflazz" },
-  { id: "n7", name: "300 (150+150) Diamonds", sku: "ML300", group: "First Top Up", cost: 28500, margin: 54, sell: 43865, active: true, imageKind: "double", provider: "Digiflazz" },
-  { id: "n8", name: "Twilight Pass", sku: "MLTP", group: "Weekly Pass", cost: 95000, margin: 53, sell: 145200, active: true, imageKind: "twilight", provider: "Digiflazz" },
-];
-
-const initialSections: NominalSection[] = [
-  { id: "s1", name: "Special Items", description: "Item spesial seperti Weekly Pass, Twilight Pass, dll.", position: "Di atas", active: true },
-  { id: "s2", name: "Weekly Pass", description: "Semua paket Weekly Pass", position: "Di atas", active: true },
-  { id: "s3", name: "First Top Up", description: "Bonus double diamonds untuk top up pertama", position: "Di atas", active: true },
-  { id: "s4", name: "Diamonds", description: "Semua nominal diamonds reguler", position: "Di atas", active: true },
-];
-
 const digiflazzCatalog = [
   { sku: "ML5", name: "Mobile Legends 5 Diamonds", cost: 1050, status: "Normal" },
   { sku: "ML12", name: "Mobile Legends 12 Diamonds", cost: 2200, status: "Normal" },
@@ -104,8 +124,43 @@ const digiflazzCatalog = [
   { sku: "ML112", name: "Mobile Legends 112 Diamonds", cost: 18900, status: "Normal" },
 ];
 
+function displayCategory(value: string): Product["category"] {
+  if (value === "voucher" || value.includes("voucher")) return "Game Voucher";
+  if (value === "pc-game" || value.includes("pc")) return "PC Games";
+  return "Mobile Games";
+}
+
+function apiCategory(value: Product["category"]) {
+  return value === "Game Voucher" ? "voucher" : value === "PC Games" ? "pc-game" : "game";
+}
+
+function mapProduct(raw: ManagedProductPayload): Product {
+  const activePackages = raw.packages.filter((item) => item.isActive);
+  return {
+    id: raw.dbId ?? raw.sortOrder + 1,
+    name: raw.name,
+    slug: raw.slug,
+    description: raw.description || raw.publisher || "Produk digital LFAMILIA",
+    category: displayCategory(raw.category),
+    provider: raw.packages.some((item) => item.providerCode === "digiflazz") || raw.fulfillmentType === "automatic" ? "Digiflazz" : "Manual",
+    nominalCount: raw.packages.length,
+    startPrice: activePackages.length ? Math.min(...activePackages.map((item) => item.price)) : 0,
+    active: raw.isActive,
+    visible: raw.isActive,
+    updated: "Tersimpan",
+    image: raw.imageUrl || "",
+    raw,
+  };
+}
+
+async function readJson<T>(response: Response): Promise<T> {
+  const payload = await response.json().catch(() => ({})) as T & { error?: string };
+  if (!response.ok) throw new Error(payload.error || "Permintaan panel gagal diproses.");
+  return payload;
+}
+
 export function AdminProductManager() {
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Semua Kategori");
   const [provider, setProvider] = useState("Semua Provider");
@@ -114,6 +169,29 @@ export function AdminProductManager() {
   const [editorProduct, setEditorProduct] = useState<Product | null>(null);
   const [manualProductOpen, setManualProductOpen] = useState(false);
   const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  async function loadProducts(signal?: AbortSignal) {
+    setLoading(true);
+    setError("");
+    try {
+      const payload = await readJson<{ products: ManagedProductPayload[] }>(await fetch("/api/panel/products", { cache: "no-store", signal }));
+      setProducts(payload.products.map(mapProduct));
+    } catch (reason) {
+      if (reason instanceof DOMException && reason.name === "AbortError") return;
+      setError(reason instanceof Error ? reason.message : "Daftar produk gagal dimuat.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadProducts(controller.signal);
+    return () => controller.abort();
+  }, []);
 
   const visibleProducts = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -130,32 +208,68 @@ export function AdminProductManager() {
     setQuery(""); setCategory("Semua Kategori"); setProvider("Semua Provider"); setStatus("Semua Status"); setSort("Urutkan: Terbaru");
   }
 
-  function addProduct(event: FormEvent<HTMLFormElement>) {
+  async function addProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name") || "Produk Baru");
-    const next: Product = {
-      id: products.length + 1,
+    const slug = String(form.get("slug") || slugify(name));
+    const selectedProvider = String(form.get("provider") || "Manual") as ProductProvider;
+    const category = String(form.get("category") || "Mobile Games") as Product["category"];
+    const raw: ManagedProductPayload = {
+      dbId: null,
       name,
-      slug: String(form.get("slug") || slugify(name)),
+      slug,
+      publisher: "",
+      category: apiCategory(category),
+      imageUrl: "",
+      bannerUrl: String(form.get("banner") || ""),
       description: String(form.get("description") || "Produk digital LFAMILIA"),
-      category: String(form.get("category") || "Mobile Games") as Product["category"],
-      provider: String(form.get("provider") || "Manual") as ProductProvider,
-      nominalCount: 0,
-      startPrice: 0,
-      active: true,
-      visible: true,
-      updated: "Baru saja",
-      image: "",
+      initials: name.split(/\s+/).map((item) => item[0]).join("").slice(0, 3).toUpperCase() || "LF",
+      accent: "linear-gradient(135deg,#2186ef,#133a85)",
+      inputLabel: "User ID",
+      inputPlaceholder: "Masukkan User ID",
+      inputFields: [{ id: "destination", label: "User ID", placeholder: "Masukkan User ID", required: true }],
+      needsServer: false,
+      popular: false,
+      instant: selectedProvider === "Digiflazz",
+      fulfillmentType: selectedProvider === "Digiflazz" ? "automatic" : "manual",
+      targetTemplate: "{{destination}}",
+      manualInstructions: "",
+      manualTimezone: "Asia/Jakarta",
+      packageTabsEnabled: false,
+      packageTabs: [],
+      isActive: false,
+      sortOrder: products.length,
+      packages: [],
+      notices: [],
     };
-    setProducts((current) => [...current, next]);
-    setManualProductOpen(false);
-    setEditorProduct(next);
-    setNotice(`${name} ditambahkan secara manual. Silakan atur nominalnya.`);
+    setSaving(true); setError("");
+    try {
+      const result = await readJson<{ id: number }>(await fetch("/api/panel/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(raw) }));
+      const next = mapProduct({ ...raw, dbId: result.id });
+      setProducts((current) => [...current, next]);
+      setManualProductOpen(false);
+      setEditorProduct(next);
+      setNotice(`${name} ditambahkan. Tambahkan nominal sebelum mengaktifkannya.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Produk gagal ditambahkan.");
+    } finally { setSaving(false); }
+  }
+
+  async function toggleProduct(id: number) {
+    const product = products.find((item) => item.id === id);
+    if (!product?.raw.dbId) return;
+    const nextRaw = { ...product.raw, isActive: !product.raw.isActive };
+    setError("");
+    try {
+      await readJson(await fetch("/api/panel/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nextRaw) }));
+      setProducts((current) => current.map((item) => item.id === id ? mapProduct(nextRaw) : item));
+      setNotice(`${product.name} ${nextRaw.isActive ? "ditampilkan" : "disembunyikan"} dari katalog.`);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Status produk gagal diperbarui."); }
   }
 
   if (editorProduct) {
-    return <ProductEditor product={editorProduct} onBack={() => setEditorProduct(null)} onNotice={setNotice} />;
+    return <ProductEditor product={editorProduct} onBack={() => { setEditorProduct(null); void loadProducts(); }} onNotice={setNotice} />;
   }
 
   return (
@@ -169,6 +283,7 @@ export function AdminProductManager() {
       </div>
 
       {notice && <button type="button" onClick={() => setNotice("")} className="mt-[10px] flex w-full items-center justify-between rounded-[6px] border border-[#b9dfca] bg-[#edf9f2] px-[12px] py-[8px] text-left text-[9px] font-semibold text-[#168553]"><span>{notice}</span><X className="size-[12px]" /></button>}
+      {error && <button type="button" onClick={() => setError("")} className="mt-[10px] w-full rounded-[6px] border border-red-200 bg-red-50 px-[12px] py-[8px] text-left text-[9px] text-red-700">{error}</button>}
 
       <div className="mt-[15px] grid grid-cols-[1.65fr_.75fr_.78fr_.72fr_.85fr_auto] gap-[8px]">
         <label className="relative"><Search className="absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#708198]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama produk, kategori, atau slug..." className="h-[34px] w-full rounded-[5px] border border-[#dce3eb] bg-white pl-[31px] pr-[9px] text-[9px] outline-none placeholder:text-[#8290a2] focus:border-[#2680eb]" /></label>
@@ -180,11 +295,11 @@ export function AdminProductManager() {
       </div>
 
       <section className="mt-[10px] overflow-hidden rounded-[8px] border border-[#dfe6ef] bg-white shadow-[0_1px_4px_rgba(20,33,58,.04)]">
-        <ProductTable products={visibleProducts} onEdit={setEditorProduct} onToggle={(id) => setProducts((current) => current.map((product) => product.id === id ? { ...product, visible: !product.visible } : product))} />
-        <div className="flex h-[48px] items-center justify-between border-t border-[#e4e9ef] px-[12px] text-[8px] text-[#586980]"><span>Menampilkan 1–{visibleProducts.length} dari 56 produk</span><div className="flex items-center gap-[5px]"><PageButton><ChevronLeft className="size-[11px]" /></PageButton>{[1, 2, 3, 4, 5].map((page) => <PageButton key={page} active={page === 1}>{page}</PageButton>)}<span className="px-[3px]">...</span><PageButton>10</PageButton><PageButton><ChevronRight className="size-[11px]" /></PageButton></div><CompactSelect value="10 per halaman" onChange={() => {}} options={["10 per halaman", "25 per halaman", "50 per halaman"]} /></div>
+        {loading ? <div className="grid h-[190px] place-items-center text-[9px] text-[#64758c]">Memuat produk dari database...</div> : <ProductTable products={visibleProducts} onEdit={setEditorProduct} onToggle={(id) => void toggleProduct(id)} />}
+        <div className="flex h-[48px] items-center justify-between border-t border-[#e4e9ef] px-[12px] text-[8px] text-[#586980]"><span>Menampilkan 1–{visibleProducts.length} dari {products.length} produk</span><div className="flex items-center gap-[5px]"><PageButton active>1</PageButton></div><CompactSelect value="50 per halaman" onChange={() => {}} options={["50 per halaman"]} /></div>
       </section>
 
-      {manualProductOpen && <ManualProductModal onClose={() => setManualProductOpen(false)} onSubmit={addProduct} />}
+      {manualProductOpen && <ManualProductModal saving={saving} onClose={() => setManualProductOpen(false)} onSubmit={addProduct} />}
     </div>
   );
 }
@@ -193,15 +308,29 @@ function ProductTable({ products, onEdit, onToggle }: { products: Product[]; onE
   return (
     <div className="overflow-x-auto"><table className="w-full min-w-[960px] table-fixed text-left">
       <thead className="bg-[#f3f6fa] text-[7px] font-bold text-[#52637b]"><tr><th className="w-[35px] px-[12px] py-[10px]"><Box /></th><th className="w-[28px] py-[10px]">#</th><th className="w-[62px] py-[10px]">Gambar</th><th className="w-[170px] py-[10px]">Nama Produk</th><th className="w-[108px] py-[10px]">Kategori</th><th className="w-[86px] py-[10px]">Provider</th><th className="w-[90px] py-[10px]">Total Nominal</th><th className="w-[88px] py-[10px]">Harga Mulai</th><th className="w-[73px] py-[10px]">Status</th><th className="w-[78px] py-[10px]">Ditampilkan</th><th className="w-[112px] py-[10px]">Terakhir Update</th><th className="w-[112px] py-[10px]">Aksi</th></tr></thead>
-      <tbody>{products.map((product, index) => <tr key={product.id} className="border-t border-[#e4e9ef] text-[7.5px] text-[#34465e] hover:bg-[#fafbfd]"><td className="px-[12px] py-[7px]"><Box /></td><td>{index + 1}</td><td className="py-[5px]"><ProductImage product={product} /></td><td className="pr-[8px]"><strong className="block truncate text-[8px] text-[#21344e]">{product.name}</strong><span className="block truncate text-[6.5px] text-[#718198]">{product.description}</span></td><td><CategoryBadge category={product.category} /></td><td>{product.provider}</td><td>{product.nominalCount}</td><td>{formatRupiah(product.startPrice)}</td><td><span className="rounded-[4px] bg-[#dff8e9] px-[7px] py-[4px] font-bold text-[#15965b]">Aktif</span></td><td><Switch enabled={product.visible} onToggle={() => onToggle(product.id)} /></td><td>{product.updated}</td><td><div className="flex items-center gap-[7px]"><button type="button" onClick={() => onEdit(product)} className="inline-flex h-[29px] items-center gap-[5px] rounded-[4px] border border-[#dbe2eb] bg-white px-[12px] font-bold text-[#40516a] hover:bg-[#f5f8fb]"><Pencil className="size-[10px]" />Edit</button><button type="button" aria-label={`Menu ${product.name}`}><MoreVertical className="size-[13px]" /></button></div></td></tr>)}</tbody>
+      <tbody>{products.map((product, index) => <tr key={product.id} className="border-t border-[#e4e9ef] text-[7.5px] text-[#34465e] hover:bg-[#fafbfd]"><td className="px-[12px] py-[7px]"><Box /></td><td>{index + 1}</td><td className="py-[5px]"><ProductImage product={product} /></td><td className="pr-[8px]"><strong className="block truncate text-[8px] text-[#21344e]">{product.name}</strong><span className="block truncate text-[6.5px] text-[#718198]">{product.description}</span></td><td><CategoryBadge category={product.category} /></td><td>{product.provider}</td><td>{product.nominalCount}</td><td>{formatRupiah(product.startPrice)}</td><td><span className={`rounded-[4px] px-[7px] py-[4px] font-bold ${product.active ? "bg-[#dff8e9] text-[#15965b]" : "bg-[#eef1f5] text-[#6f7f92]"}`}>{product.active ? "Aktif" : "Nonaktif"}</span></td><td><Switch enabled={product.visible} onToggle={() => onToggle(product.id)} /></td><td>{product.updated}</td><td><div className="flex items-center gap-[7px]"><button type="button" onClick={() => onEdit(product)} className="inline-flex h-[29px] items-center gap-[5px] rounded-[4px] border border-[#dbe2eb] bg-white px-[12px] font-bold text-[#40516a] hover:bg-[#f5f8fb]"><Pencil className="size-[10px]" />Edit</button><button type="button" aria-label={`Menu ${product.name}`}><MoreVertical className="size-[13px]" /></button></div></td></tr>)}</tbody>
     </table></div>
   );
 }
 
 function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack(): void; onNotice(message: string): void }) {
   const [tab, setTab] = useState<EditorTab>("Nominal & Harga");
-  const [nominals, setNominals] = useState(initialNominals);
-  const [sections, setSections] = useState(initialSections);
+  const [nominals, setNominals] = useState<Nominal[]>(() => product.raw.packages.map((item) => ({
+    id: item.id,
+    name: item.label,
+    sku: item.providerSku || item.id,
+    group: item.group || "Lainnya",
+    cost: item.supplierPrice ?? item.price,
+    margin: item.marginType === "percent" ? (item.marginValue ?? 0) : item.supplierPrice ? Math.max(0, Math.round((item.price - item.supplierPrice) / item.supplierPrice * 100)) : 0,
+    sell: item.price,
+    active: item.isActive,
+    imageKind: item.label.toLowerCase().includes("weekly") ? "weekly" : item.label.toLowerCase().includes("twilight") ? "twilight" : item.label.includes("+") ? "double" : "diamond",
+    provider: item.providerCode === "digiflazz" ? "Digiflazz" : "Manual",
+  })));
+  const [sections, setSections] = useState<NominalSection[]>(() => {
+    const names = product.raw.packageTabs.length ? product.raw.packageTabs : Array.from(new Set(product.raw.packages.map((item) => item.group).filter((item): item is string => Boolean(item))));
+    return names.map((name, index) => ({ id: `section-${index}-${slugify(name)}`, name, description: "", position: "Di atas", active: true }));
+  });
   const [importOpen, setImportOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [sectionOpen, setSectionOpen] = useState(false);
@@ -215,6 +344,18 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
   const [labelServer, setLabelServer] = useState("Server ID");
   const [inputLoading, setInputLoading] = useState(true);
   const [inputSaving, setInputSaving] = useState(false);
+  const [name, setName] = useState(product.raw.name);
+  const [slug, setSlug] = useState(product.raw.slug);
+  const [publisher, setPublisher] = useState(product.raw.publisher);
+  const [description, setDescription] = useState(product.raw.description || "");
+  const [imageUrl, setImageUrl] = useState(product.raw.imageUrl || "");
+  const [bannerUrl, setBannerUrl] = useState(product.raw.bannerUrl || "");
+  const [category, setCategory] = useState(product.raw.category);
+  const [isActive, setIsActive] = useState(product.raw.isActive);
+  const [popular, setPopular] = useState(product.raw.popular);
+  const [instant, setInstant] = useState(product.raw.instant);
+  const [fulfillmentType, setFulfillmentType] = useState(product.raw.fulfillmentType);
+  const [manualInstructions, setManualInstructions] = useState(product.raw.manualInstructions || "");
   const inputFields = checkoutType === "id-server"
     ? [{ id: "destination", label: labelId }, { id: "server", label: labelServer }]
     : [{ id: "destination", label: labelId }];
@@ -261,11 +402,76 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
     } finally { setInputSaving(false); }
   }
 
-  function refreshSellerMonitor() {
+  function buildPayload(): ManagedProductPayload {
+    const activeSections = sections.filter((item) => item.active).map((item) => item.name.trim()).filter(Boolean);
+    return {
+      ...product.raw,
+      dbId: product.raw.dbId,
+      name: name.trim(),
+      slug: slugify(slug),
+      publisher: publisher.trim(),
+      description: description.trim(),
+      category,
+      imageUrl: imageUrl.trim(),
+      bannerUrl: bannerUrl.trim(),
+      initials: name.trim().split(/\s+/).map((item) => item[0]).join("").slice(0, 3).toUpperCase() || product.raw.initials,
+      inputLabel: labelId.trim(),
+      inputPlaceholder: `Masukkan ${labelId.trim()}`,
+      inputFields: checkoutType === "id-server"
+        ? [{ id: "destination", label: labelId.trim(), placeholder: `Masukkan ${labelId.trim()}`, required: true }, { id: "server", label: labelServer.trim(), placeholder: `Masukkan ${labelServer.trim()}`, required: true }]
+        : [{ id: "destination", label: labelId.trim(), placeholder: `Masukkan ${labelId.trim()}`, required: true }],
+      needsServer: checkoutType === "id-server",
+      targetTemplate,
+      popular,
+      instant,
+      fulfillmentType,
+      manualInstructions: manualInstructions.trim(),
+      packageTabsEnabled: activeSections.length > 0,
+      packageTabs: activeSections,
+      isActive,
+      packages: nominals.map((item, index) => {
+        const previous = product.raw.packages.find((stored) => stored.id === item.id || stored.providerSku === item.sku);
+        return {
+          id: item.id,
+          label: item.name,
+          price: Math.max(1, Math.round(item.sell)),
+          note: previous?.note || "",
+          group: item.group || undefined,
+          imageUrl: previous?.imageUrl || "",
+          providerCode: item.provider === "Digiflazz" ? "digiflazz" : previous?.providerCode === "voucher-stock" ? "voucher-stock" : undefined,
+          providerSku: item.provider === "Digiflazz" ? item.sku : previous?.providerSku,
+          supplierPrice: Math.max(0, Math.round(item.cost)),
+          pricingMode: item.provider === "Digiflazz" ? "auto" : "manual",
+          marginType: "percent",
+          marginValue: Math.max(0, Math.round(item.margin)),
+          isActive: item.active,
+          sortOrder: index,
+        };
+      }),
+    };
+  }
+
+  async function saveProductChanges(success = "Perubahan produk berhasil disimpan.") {
+    if (!product.raw.dbId) { setError("ID produk tidak ditemukan."); return; }
+    if (!name.trim() || !slugify(slug)) { setError("Nama dan slug produk wajib diisi."); return; }
+    setInputSaving(true); setError(""); setMessage("");
+    try {
+      await readJson(await fetch("/api/panel/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildPayload()) }));
+      setMessage(success);
+      onNotice(`${name.trim()} diperbarui.`);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Produk gagal disimpan."); }
+    finally { setInputSaving(false); }
+  }
+
+  async function refreshSellerMonitor() {
     setMonitorRefreshing(true);
     setError("");
     setMessage("");
-    window.setTimeout(() => { setMonitorRefreshing(false); setMessage("Harga tampilan berhasil disinkronkan."); }, 350);
+    try {
+      await readJson(await fetch("/api/panel/digiflazz-pricing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ syncProductId: product.raw.dbId, syncNow: true }) }));
+      setMessage("Harga modal dan harga jual berhasil disinkronkan dari katalog.");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Sinkron harga gagal."); }
+    finally { setMonitorRefreshing(false); }
   }
 
   function moveNominal(id: string, direction: -1 | 1) { setNominals((current) => moveItem(current, id, direction)); }
@@ -303,7 +509,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
           <main className="min-w-0 space-y-[12px]">
             <section className={`overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white ${tab === "Tabel Pemisah" ? "opacity-60" : ""}`}>
               <div className="flex items-center justify-between px-[14px] py-[12px]"><div><h2 className="text-[13px] font-extrabold">Daftar Nominal</h2><p className="mt-[2px] text-[8px] text-[#6b7c92]">Kelola semua nominal, set gambar, harga dan tentukan posisi di tabel pemisah.</p></div></div>
-              <div className="flex flex-wrap gap-[7px] border-t border-[#eef1f5] px-[14px] py-[9px]"><ActionButton onClick={() => setImportOpen(true)}><Plus className="size-[12px]" />Tambah dari Digiflazz</ActionButton><ActionButton onClick={() => setManualOpen(true)}><Plus className="size-[12px]" />Tambah Manual</ActionButton><ActionButton><Upload className="size-[12px]" />Upload Gambar Nominal</ActionButton><ActionButton><Settings2 className="size-[12px]" />Atur Urutan</ActionButton><ActionButton onClick={refreshSellerMonitor}><RefreshCw className={`size-[12px] ${monitorRefreshing ? "animate-spin" : ""}`} />{monitorRefreshing ? "Menyinkron..." : "Sync Harga"}</ActionButton><ActionButton><SlidersHorizontal className="size-[12px]" />Atur Margin Massal</ActionButton><button type="button" onClick={() => setMessage("Perubahan tampilan disimpan sementara di frontend.")} className="ml-auto inline-flex h-[31px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[13px] text-[8px] font-bold text-white"><Save className="size-[12px]" />Simpan Perubahan</button></div>
+              <div className="flex flex-wrap gap-[7px] border-t border-[#eef1f5] px-[14px] py-[9px]"><ActionButton onClick={() => setImportOpen(true)}><Plus className="size-[12px]" />Tambah dari Digiflazz</ActionButton><ActionButton onClick={() => setManualOpen(true)}><Plus className="size-[12px]" />Tambah Manual</ActionButton><ActionButton onClick={() => setMessage("Gunakan URL gambar pada penyuntingan nominal berikutnya.")}><Upload className="size-[12px]" />Upload Gambar Nominal</ActionButton><ActionButton onClick={() => setMessage("Seret baris atau gunakan tombol naik/turun untuk mengatur urutan.")}><Settings2 className="size-[12px]" />Atur Urutan</ActionButton><ActionButton onClick={() => void refreshSellerMonitor()}><RefreshCw className={`size-[12px] ${monitorRefreshing ? "animate-spin" : ""}`} />{monitorRefreshing ? "Menyinkron..." : "Sync Harga"}</ActionButton><ActionButton onClick={() => setMessage("Ubah margin nominal pada tabel, lalu simpan perubahan.")}><SlidersHorizontal className="size-[12px]" />Atur Margin Massal</ActionButton><button type="button" disabled={inputSaving} onClick={() => void saveProductChanges("Nominal dan tabel pemisah berhasil disimpan ke database.")} className="ml-auto inline-flex h-[31px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[13px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{inputSaving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>
               <NominalTable nominals={nominals} sections={sections} onChange={setNominals} onMove={moveNominal} onDragStart={(id) => setDragging({ kind: "nominal", id })} onDrop={dropNominal} />
             </section>
 
@@ -316,7 +522,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
           <StorePreview product={product} nominals={nominals} sections={sections} mode={previewMode} onMode={setPreviewMode} />
         </div>
       ) : (
-        <EditorTabPanel tab={tab} product={product} targetTemplate={targetTemplate} checkoutType={checkoutType} labelId={labelId} labelServer={labelServer} onCheckoutType={setCheckoutType} onLabelId={setLabelId} onLabelServer={setLabelServer} inputLoading={inputLoading} saving={inputSaving} onSave={tab === "Input Customer" ? saveInputSettings : () => announceAdminAction(`Penyimpanan ${tab} akan memakai endpoint khusus berikutnya.`)} />
+        tab === "Input Customer" ? <EditorTabPanel tab={tab} product={product} targetTemplate={targetTemplate} checkoutType={checkoutType} labelId={labelId} labelServer={labelServer} onCheckoutType={setCheckoutType} onLabelId={setLabelId} onLabelServer={setLabelServer} inputLoading={inputLoading} saving={inputSaving} onSave={saveInputSettings} /> : <ProductSettingsPanel tab={tab} product={product} values={{ name, slug, publisher, description, imageUrl, bannerUrl, category, isActive, popular, instant, fulfillmentType, manualInstructions }} onChange={(key, value) => { if (key === "name") setName(String(value)); else if (key === "slug") setSlug(String(value)); else if (key === "publisher") setPublisher(String(value)); else if (key === "description") setDescription(String(value)); else if (key === "imageUrl") setImageUrl(String(value)); else if (key === "bannerUrl") setBannerUrl(String(value)); else if (key === "category") setCategory(String(value)); else if (key === "isActive") setIsActive(Boolean(value)); else if (key === "popular") setPopular(Boolean(value)); else if (key === "instant") setInstant(Boolean(value)); else if (key === "fulfillmentType") setFulfillmentType(value as "automatic" | "manual"); else if (key === "manualInstructions") setManualInstructions(String(value)); }} saving={inputSaving} onSave={() => void saveProductChanges()} />
       )}
 
       {importOpen && <ImportNominalModal existing={nominals} onClose={() => setImportOpen(false)} onImport={(added) => { setNominals((current) => [...current, ...added]); setImportOpen(false); setMessage(`${added.length} nominal Digiflazz berhasil ditambahkan.`); }} />}
@@ -338,6 +544,38 @@ function StorePreview({ product, nominals, sections, mode, onMode }: { product: 
   return <aside className="sticky top-[70px] self-start rounded-[7px] border border-[#dfe6ef] bg-white p-[13px]"><div className="flex items-start justify-between"><div><h2 className="text-[12px] font-extrabold">Preview Tampilan di Toko</h2><p className="mt-[3px] text-[7.5px] text-[#6c7d92]">Berikut adalah preview tampilan produk di sisi pelanggan.</p></div><div className="flex overflow-hidden rounded-[4px] border border-[#dce3eb]">{(["Mobile", "Desktop"] as const).map((item) => <button type="button" key={item} onClick={() => onMode(item)} className={`inline-flex h-[27px] items-center gap-[4px] px-[9px] text-[7px] font-semibold ${mode === item ? "bg-[#0875ed] text-white" : "bg-white text-[#4e6078]"}`}>{item === "Mobile" ? <Smartphone className="size-[10px]" /> : <Monitor className="size-[10px]" />}{item}</button>)}</div></div><div className={`mx-auto mt-[12px] overflow-hidden border-[6px] border-[#101820] bg-[#f4f7fa] shadow-[0_10px_25px_rgba(15,31,55,.2)] ${mode === "Mobile" ? "h-[500px] w-[250px] rounded-[32px]" : "h-[390px] w-full rounded-[12px]"}`}><div className="flex h-[25px] items-center justify-between bg-[#101820] px-[18px] text-[7px] font-bold text-white"><span>15.30</span><span>● ◔ ▰</span></div><div className="flex items-center gap-[7px] border-b bg-white p-[8px]"><ProductImage product={product} /><div><strong className="block text-[8px]">{product.name}</strong><span className="text-[6px] text-[#66778d]">Top up Diamonds, Weekly Pass, dan lainnya</span></div></div><div className="h-[405px] overflow-hidden p-[8px]">{sections.map((section) => { const entries = nominals.filter((item) => item.group === section.name && item.active).slice(0, 2); if (!entries.length) return null; return <div key={section.id} className="mb-[8px]"><h3 className="mb-[5px] text-[9px] font-extrabold">{section.name}{section.name.includes("Special") || section.name.includes("First") ? " ✨" : section.name === "Diamonds" ? " 💎" : ""}</h3><div className="grid grid-cols-2 gap-[6px]">{entries.map((nominal) => <div key={nominal.id} className="min-h-[76px] rounded-[5px] border border-[#e1e7ee] bg-white p-[6px] shadow-sm"><strong className="block truncate text-[6.5px]">{nominal.name}</strong><NominalArtwork kind={nominal.imageKind} large /><span className="block text-[8px] font-black text-[#e93643]">{formatRupiah(nominal.sell)}</span></div>)}</div></div>; })}</div><div className="absolute"></div></div></aside>;
 }
 
+type ProductSettingsValues = {
+  name: string;
+  slug: string;
+  publisher: string;
+  description: string;
+  imageUrl: string;
+  bannerUrl: string;
+  category: string;
+  isActive: boolean;
+  popular: boolean;
+  instant: boolean;
+  fulfillmentType: "automatic" | "manual";
+  manualInstructions: string;
+};
+
+function ProductSettingsPanel({ tab, product, values, onChange, saving, onSave }: { tab: Exclude<EditorTab, "Nominal & Harga" | "Tabel Pemisah" | "Input Customer">; product: Product; values: ProductSettingsValues; onChange(key: keyof ProductSettingsValues, value: string | boolean): void; saving: boolean; onSave(): void }) {
+  return <section className="mt-[12px] rounded-[7px] border border-[#dfe6ef] bg-white p-[16px]">
+    <div className="flex items-center justify-between border-b border-[#e8ecf1] pb-[11px]"><div><h2 className="text-[13px] font-extrabold">{tab}</h2><p className="mt-[2px] text-[8px] text-[#6c7d92]">Pengaturan {tab.toLowerCase()} untuk {product.name}.</p></div><button type="button" disabled={saving} onClick={onSave} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>
+    {tab === "Informasi Produk" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><ControlledField label="Nama produk" value={values.name} onChange={(value) => onChange("name", value)} /><ControlledField label="Slug" value={values.slug} onChange={(value) => onChange("slug", value)} /><ControlledField label="Publisher" value={values.publisher} onChange={(value) => onChange("publisher", value)} /><label className="text-[8px] font-bold text-[#3d4f68]">Kategori<select value={values.category} onChange={(event) => onChange("category", event.target.value)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="game">Mobile Games</option><option value="pc-game">PC Games</option><option value="voucher">Game Voucher</option></select></label><ControlledField label="Gambar produk (opsional, rasio 1:1)" value={values.imageUrl} onChange={(value) => onChange("imageUrl", value)} placeholder="URL gambar dari Media" /><ControlledField label="Banner halaman produk (opsional)" value={values.bannerUrl} onChange={(value) => onChange("bannerUrl", value)} placeholder="URL banner dari Media" /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Deskripsi singkat<textarea value={values.description} onChange={(event) => onChange("description", event.target.value)} className="mt-[4px] h-[74px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label></div>}
+    {tab === "Tampilan Produk" && <div className="mt-[14px] grid grid-cols-3 gap-[10px]"><SettingSwitch label="Aktif" value={values.isActive} onChange={(value) => onChange("isActive", value)} /><SettingSwitch label="Ditampilkan di katalog" value={values.isActive} onChange={(value) => onChange("isActive", value)} /><SettingSwitch label="Produk populer" value={values.popular} onChange={(value) => onChange("popular", value)} /></div>}
+    {tab === "Fulfillment" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><label className="text-[8px] font-bold text-[#3d4f68]">Jenis pemenuhan<select value={values.fulfillmentType} onChange={(event) => onChange("fulfillmentType", event.target.value)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="automatic">Otomatis</option><option value="manual">Manual</option></select></label><SettingSwitch label="Proses instan" value={values.instant} onChange={(value) => onChange("instant", value)} /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Instruksi pemenuhan manual<textarea value={values.manualInstructions} onChange={(event) => onChange("manualInstructions", event.target.value)} disabled={values.fulfillmentType !== "manual"} className="mt-[4px] h-[84px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px] disabled:bg-[#f3f5f8]" placeholder="Instruksi internal/admin untuk memproses pesanan" /></label></div>}
+  </section>;
+}
+
+function ControlledField({ label, value, onChange, placeholder }: { label: string; value: string; onChange(value: string): void; placeholder?: string }) {
+  return <label className="text-[8px] font-bold text-[#3d4f68]">{label}<input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] outline-none placeholder:text-[#929eae] focus:border-[#2580eb]" /></label>;
+}
+
+function SettingSwitch({ label, value, onChange }: { label: string; value: boolean; onChange(value: boolean): void }) {
+  return <label className="flex items-center justify-between rounded-[6px] border border-[#e1e7ee] px-[11px] py-[10px] text-[8px] font-semibold">{label}<Switch enabled={value} onToggle={() => onChange(!value)} /></label>;
+}
+
 function EditorTabPanel({ tab, product, targetTemplate, checkoutType, labelId, labelServer, onCheckoutType, onLabelId, onLabelServer, inputLoading, saving, onSave }: { tab: EditorTab; product: Product; targetTemplate: string; checkoutType: "id" | "id-server"; labelId: string; labelServer: string; onCheckoutType(value: "id" | "id-server"): void; onLabelId(value: string): void; onLabelServer(value: string): void; inputLoading: boolean; saving: boolean; onSave(): void }) {
   return <section className="mt-[12px] rounded-[7px] border border-[#dfe6ef] bg-white p-[16px]"><div className="flex items-center justify-between border-b border-[#e8ecf1] pb-[11px]"><div><h2 className="text-[13px] font-extrabold">{tab}</h2><p className="mt-[2px] text-[8px] text-[#6c7d92]">Pengaturan {tab.toLowerCase()} untuk {product.name}.</p></div><button type="button" disabled={saving || (tab === "Input Customer" && inputLoading)} onClick={onSave} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>{tab === "Informasi Produk" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><Field label="Nama produk" name="name" placeholder={product.name} /><Field label="Slug" name="slug" placeholder={product.slug} /><Field label="Gambar produk (opsional, rasio 1:1)" name="image" placeholder="Boleh dikosongkan dan ditambahkan nanti" /><Field label="Banner halaman produk (opsional)" name="banner" placeholder="Boleh dikosongkan dan ditambahkan nanti" /></div>}{tab === "Input Customer" && <div className="mt-[14px] grid max-w-[900px] grid-cols-[minmax(0,1fr)_300px] gap-[14px]"><div className="grid grid-cols-2 gap-[12px]"><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Checkout Type<span className="mt-[3px] block font-normal text-[#718197]">Pilih data akun yang harus diisi pelanggan.</span><select disabled={inputLoading} value={checkoutType} onChange={(event) => onCheckoutType(event.target.value as "id" | "id-server")} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] bg-white px-[10px] text-[9px]"><option value="id">ID</option><option value="id-server">ID + Server</option></select></label><label className="text-[8px] font-bold text-[#3d4f68]">Label ID<span className="mt-[3px] block font-normal text-[#718197]">Nama field yang tampil di checkout customer.</span><input disabled={inputLoading} value={labelId} onChange={(event) => onLabelId(event.target.value)} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="Contoh: User ID" /></label>{checkoutType === "id-server" && <label className="text-[8px] font-bold text-[#3d4f68]">Label Server<span className="mt-[3px] block font-normal text-[#718197]">Nama field server/zone di checkout customer.</span><input disabled={inputLoading} value={labelServer} onChange={(event) => onLabelServer(event.target.value)} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="Contoh: Zone ID" /></label>}</div><aside className="rounded-[7px] border border-[#dce6f2] bg-[#f8fbff] p-[13px]"><p className="text-[9px] font-extrabold text-[#263b58]">Preview Input Checkout</p>{inputLoading ? <p className="mt-[10px] text-[8px] text-[#718197]">Memuat pengaturan dari backend...</p> : <><label className="mt-[10px] block text-[8px] font-bold text-[#4c6078]">{labelId || "ID"}<input disabled placeholder={`Masukkan ${labelId || "ID"}`} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]" /></label>{checkoutType === "id-server" && <label className="mt-[9px] block text-[8px] font-bold text-[#4c6078]">{labelServer || "Server"}<input disabled placeholder={`Masukkan ${labelServer || "Server"}`} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]" /></label>}</>}<p className="mt-[12px] text-[8px] font-bold text-[#2f4968]">Format customer_no</p><code className="mt-[5px] block rounded-[4px] bg-white px-[9px] py-[8px] text-[8px] text-[#0875ed]">{targetTemplate}</code><p className="mt-[6px] text-[7.5px] leading-4 text-[#718197]">Backend membentuk format tujuan ini dan mengunci aturan verifikasi nickname. Staff hanya mengatur jenis dan label input pelanggan.</p></aside></div>}{tab !== "Informasi Produk" && tab !== "Input Customer" && <div className="mt-[14px] grid grid-cols-3 gap-[10px]">{["Aktif", "Ditampilkan di katalog", "Gunakan pengaturan default"].map((label) => <label key={label} className="flex items-center justify-between rounded-[6px] border border-[#e1e7ee] px-[11px] py-[10px] text-[8px] font-semibold">{label}<Switch enabled onToggle={() => {}} /></label>)}</div>}</section>;
 }
@@ -351,18 +589,18 @@ function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal
   return <SimpleModal title="Import Nominal dari Digiflazz" description="Produk tetap dibuat manual. Hanya nominal terpilih yang diambil dari Digiflazz." onClose={onClose} wide><div className="mb-[13px] grid grid-cols-4 gap-[8px]">{["Pilih Kategori", "Pilih Nominal", "Atur Margin", "Konfirmasi"].map((label, index) => <div key={label} className={`flex items-center gap-[6px] text-[7px] font-semibold ${step === index + 1 ? "text-[#0875ed]" : "text-[#74849a]"}`}><span className={`grid size-[21px] place-items-center rounded-full ${step === index + 1 ? "bg-[#0875ed] text-white" : "bg-[#eef2f6]"}`}>{index + 1}</span>{label}</div>)}</div>{step === 1 && <div className="grid grid-cols-2 gap-[10px]"><label className="text-[8px] font-bold">Kategori Digiflazz<CompactSelect value="Mobile Games" onChange={() => {}} options={["Mobile Games"]} /></label><label className="text-[8px] font-bold">Pilih Game / Brand<CompactSelect value="Mobile Legends" onChange={() => {}} options={["Mobile Legends"]} /></label></div>}{step === 2 && <div><label className="relative block"><Search className="absolute left-[9px] top-1/2 size-[12px] -translate-y-1/2 text-[#7b899b]" /><input placeholder="Cari nama atau SKU di Digiflazz..." className="h-[32px] w-full rounded-[4px] border border-[#dce3eb] pl-[28px] text-[8px]" /></label><div className="mt-[8px] overflow-hidden rounded-[5px] border border-[#e0e6ed]">{available.map((item) => <label key={item.sku} className="grid grid-cols-[22px_1fr_60px_75px_55px] items-center border-t border-[#e8ecf1] px-[8px] py-[6px] text-[7px] first:border-0"><input type="checkbox" checked={selected.includes(item.sku)} onChange={() => setSelected((current) => current.includes(item.sku) ? current.filter((sku) => sku !== item.sku) : [...current, item.sku])} /><span>{item.name}</span><span>{item.sku}</span><span>{formatRupiah(item.cost)}</span><span className="rounded bg-[#ddf8e8] px-[6px] py-[3px] text-center font-bold text-[#15955a]">{item.status}</span></label>)}</div></div>}{step === 3 && <label className="block text-[8px] font-bold">Margin global untuk nominal Digiflazz (%)<input type="number" value={margin} onChange={(event) => setMargin(Number(event.target.value))} className="mt-[5px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label>}{step === 4 && <div className="rounded-[5px] border border-[#cfe4fa] bg-[#f0f7ff] p-[12px] text-[8px] text-[#415b75]"><strong>{selected.length} nominal dipilih</strong><p className="mt-[4px]">Provider: Digiflazz · Margin: {margin}% · Produk tidak dibuat otomatis.</p></div>}<div className="mt-[15px] flex justify-between"><button type="button" onClick={step === 1 ? onClose : () => setStep((value) => value - 1)} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[13px] text-[8px] font-bold">{step === 1 ? "Batal" : "Kembali"}</button><button type="button" disabled={step === 2 && !selected.length} onClick={step === 4 ? finish : () => setStep((value) => value + 1)} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50">{step === 4 ? "Import Nominal" : "Lanjut"}</button></div></SimpleModal>;
 }
 
-function ManualProductModal({ onClose, onSubmit }: { onClose(): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
-  return <SimpleModal title="Tambah Produk Manual" description="Semua produk dibuat sendiri. Nominal dapat ditambahkan setelah produk tersimpan." onClose={onClose} wide><form onSubmit={onSubmit}><div className="mb-[12px] flex border-b border-[#e2e7ed]"><span className="border-b-2 border-[#0875ed] px-[10px] pb-[8px] text-[8px] font-bold text-[#0875ed]">Informasi Produk</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Nominal & Harga</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Input Customer</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Fulfillment</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Tampilan</span></div><div className="grid grid-cols-[120px_1fr_1fr] gap-[12px]"><label className="row-span-3 text-[8px] font-bold text-[#3d4f68]">Gambar produk (opsional, rasio 1:1)<span className="mt-[5px] grid h-[110px] place-items-center rounded-[5px] border border-dashed border-[#cfd9e5] bg-[#fafbfd] text-center text-[#0875ed]"><span><ImageIcon className="mx-auto size-[24px]" /><small className="mt-[5px] block">Pilih gambar</small></span></span><small className="mt-[5px] block font-normal text-[#7a899c]">Boleh dikosongkan dan ditambahkan nanti</small></label><Field label="Nama Produk *" name="name" placeholder="Contoh: Roblox Robux" required /><Field label="Slug *" name="slug" placeholder="contoh: roblox-robux" /><label className="text-[8px] font-bold">Kategori *<select name="category" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Mobile Games</option><option>PC Games</option><option>Game Voucher</option></select></label><label className="text-[8px] font-bold">Provider nominal *<select name="provider" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Digiflazz</option><option>Manual</option></select></label><label className="col-span-2 text-[8px] font-bold">Deskripsi singkat<textarea name="description" placeholder="Deskripsi singkat produk..." className="mt-[4px] h-[72px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label><label className="col-span-2 text-[8px] font-bold">Banner halaman produk (opsional)<input placeholder="Boleh dikosongkan dan ditambahkan nanti" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label></div><ModalActions onCancel={onClose} submit="Lanjut ke Nominal" /></form></SimpleModal>;
+function ManualProductModal({ saving, onClose, onSubmit }: { saving: boolean; onClose(): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
+  return <SimpleModal title="Tambah Produk Manual" description="Semua produk dibuat sendiri. Nominal dapat ditambahkan setelah produk tersimpan." onClose={onClose} wide><form onSubmit={onSubmit}><div className="mb-[12px] flex border-b border-[#e2e7ed]"><span className="border-b-2 border-[#0875ed] px-[10px] pb-[8px] text-[8px] font-bold text-[#0875ed]">Informasi Produk</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Nominal & Harga</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Input Customer</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Fulfillment</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Tampilan</span></div><div className="grid grid-cols-[120px_1fr_1fr] gap-[12px]"><label className="row-span-3 text-[8px] font-bold text-[#3d4f68]">Gambar produk (opsional, rasio 1:1)<span className="mt-[5px] grid h-[110px] place-items-center rounded-[5px] border border-dashed border-[#cfd9e5] bg-[#fafbfd] text-center text-[#0875ed]"><span><ImageIcon className="mx-auto size-[24px]" /><small className="mt-[5px] block">Pilih gambar</small></span></span><small className="mt-[5px] block font-normal text-[#7a899c]">Boleh dikosongkan dan ditambahkan nanti</small></label><Field label="Nama Produk *" name="name" placeholder="Contoh: Roblox Robux" required /><Field label="Slug *" name="slug" placeholder="contoh: roblox-robux" /><label className="text-[8px] font-bold">Kategori *<select name="category" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Mobile Games</option><option>PC Games</option><option>Game Voucher</option></select></label><label className="text-[8px] font-bold">Provider nominal *<select name="provider" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Digiflazz</option><option>Manual</option></select></label><label className="col-span-2 text-[8px] font-bold">Deskripsi singkat<textarea name="description" placeholder="Deskripsi singkat produk..." className="mt-[4px] h-[72px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label><label className="col-span-2 text-[8px] font-bold">Banner halaman produk (opsional)<input name="banner" placeholder="Boleh dikosongkan dan ditambahkan nanti" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label></div><div className="mt-[12px] flex justify-end gap-[8px] border-t border-[#e5e9ef] pt-[12px]"><button type="button" onClick={onClose} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[14px] text-[8px] font-bold">Batal</button><button type="submit" disabled={saving} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[15px] text-[8px] font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Lanjut ke Nominal"}</button></div></form></SimpleModal>;
 }
 
 function SimpleModal({ title, description, children, onClose, wide }: { title: string; description: string; children: ReactNode; onClose(): void; wide?: boolean }) { return <div className="fixed inset-0 z-50 grid place-items-center bg-[#071426]/55 p-[24px]" role="dialog" aria-modal="true" aria-label={title}><section className={`max-h-[88vh] w-full overflow-auto rounded-[9px] bg-white shadow-2xl ${wide ? "max-w-[720px]" : "max-w-[480px]"}`}><header className="flex items-start justify-between border-b border-[#e3e8ef] px-[16px] py-[13px]"><div><h2 className="text-[14px] font-black text-[#101d35]">{title}</h2><p className="mt-[2px] text-[8px] text-[#6d7d92]">{description}</p></div><button type="button" onClick={onClose} className="grid size-[27px] place-items-center rounded-[4px] text-[#596b82] hover:bg-[#f2f5f8]"><X className="size-[14px]" /></button></header><div className="p-[16px]">{children}</div></section></div>; }
 
 function ModalActions({ onCancel, submit }: { onCancel(): void; submit: string }) { return <div className="col-span-full mt-[5px] flex justify-end gap-[8px] border-t border-[#e5e9ef] pt-[12px]"><button type="button" onClick={onCancel} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[14px] text-[8px] font-bold">Batal</button><button type="submit" className="h-[32px] rounded-[4px] bg-[#0875ed] px-[15px] text-[8px] font-bold text-white">{submit}</button></div>; }
 function Field({ label, ...props }: { label: string; name: string; placeholder: string; type?: string; required?: boolean }) { return <label className="text-[8px] font-bold text-[#3d4f68]">{label}<input {...props} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] outline-none placeholder:text-[#929eae] focus:border-[#2580eb]" /></label>; }
-function ActionButton({ children, onClick }: { children: ReactNode; onClick?: () => void }) { return <button type="button" onClick={onClick ?? (() => announceAdminAction("Aksi produk dijalankan di frontend."))} className="inline-flex h-[31px] items-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white px-[11px] text-[7.5px] font-bold text-[#34506d] hover:bg-[#f6f9fc]">{children}</button>; }
+function ActionButton({ children, onClick }: { children: ReactNode; onClick?: () => void }) { return <button type="button" onClick={onClick} className="inline-flex h-[31px] items-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white px-[11px] text-[7.5px] font-bold text-[#34506d] hover:bg-[#f6f9fc]">{children}</button>; }
 function IconButton({ children, label, danger, onClick }: { children: ReactNode; label: string; danger?: boolean; onClick?: () => void }) { return <button type="button" aria-label={label} onClick={onClick} className={`grid size-[25px] place-items-center rounded-[4px] border ${danger ? "border-red-100 bg-red-50 text-red-500" : "border-[#dce3eb] bg-white text-[#52657d]"}`}>{children}</button>; }
 function CompactSelect({ value, onChange, options }: { value: string; onChange(value: string): void; options: string[] }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className="h-[34px] min-w-0 rounded-[5px] border border-[#dce3eb] bg-white px-[9px] text-[8px] font-medium text-[#40516a] outline-none">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
-function PageButton({ children, active }: { children: ReactNode; active?: boolean }) { return <button type="button" onClick={() => announceAdminAction("Halaman produk diperbarui.")} className={`grid size-[27px] place-items-center rounded-[4px] border text-[8px] font-bold ${active ? "border-[#0875ed] bg-[#0875ed] text-white" : "border-[#dde4ec] bg-white text-[#4c5e76]"}`}>{children}</button>; }
+function PageButton({ children, active }: { children: ReactNode; active?: boolean }) { return <span className={`grid size-[27px] place-items-center rounded-[4px] border text-[8px] font-bold ${active ? "border-[#0875ed] bg-[#0875ed] text-white" : "border-[#dde4ec] bg-white text-[#4c5e76]"}`}>{children}</span>; }
 function Box() { return <span className="block size-[13px] rounded-[3px] border border-[#cdd7e2] bg-white" />; }
 function Switch({ enabled, onToggle }: { enabled: boolean; onToggle(): void }) { return <button type="button" aria-pressed={enabled} onClick={onToggle} className={`relative h-[17px] w-[31px] rounded-full transition ${enabled ? "bg-[#0875ed]" : "bg-[#cad5e1]"}`}><span className={`absolute top-[2px] size-[13px] rounded-full bg-white shadow transition ${enabled ? "left-[16px]" : "left-[2px]"}`} /></button>; }
 function ProductImage({ product, large }: { product: Product; large?: boolean }) { const size = large ? "size-[58px] rounded-[9px]" : "size-[36px] rounded-[6px]"; return product.image ? <img src={product.image} alt="" className={`${size} object-cover shadow-sm`} /> : <span className={`grid ${size} place-items-center bg-gradient-to-br from-[#2186ef] to-[#133a85] font-black text-white`}>{product.name.slice(0, 2).toUpperCase()}</span>; }

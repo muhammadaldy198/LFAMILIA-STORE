@@ -25,7 +25,9 @@ test("product creation is manual and DigiFlazz imports nominal only", () => {
   assert.match(source, /Produk tetap dibuat manual\. Hanya nominal terpilih yang diambil dari Digiflazz/);
   assert.match(source, /provider: "Digiflazz" as const/);
   assert.doesNotMatch(source, /Import Produk dari Digiflazz/);
-  assert.doesNotMatch(source, /fetch\s*\(/);
+  assert.match(source, /fetch\("\/api\/panel\/products"/);
+  assert.match(source, /method: "POST"/);
+  assert.match(source, /method: "PATCH"/);
 });
 
 test("editor includes nominal, separators, reordering and store preview", () => {
@@ -63,4 +65,12 @@ test("product input editor controls checkout ID labels and customer_no mapping",
   assert.match(source, /\{ id: "destination", label: labelId \}/);
   assert.match(source, /\{ id: "server", label: labelServer \}/);
   assert.doesNotMatch(source, /nicknameRequired|nicknameOptional/);
+});
+
+test("product controls persist instead of showing frontend-only simulations", () => {
+  assert.match(source, /loadProducts/);
+  assert.match(source, /saveProductChanges/);
+  assert.match(source, /toggleProduct/);
+  assert.match(source, /Nominal dan tabel pemisah berhasil disimpan ke database/);
+  assert.doesNotMatch(source, /disimpan sementara di frontend|endpoint khusus berikutnya/);
 });

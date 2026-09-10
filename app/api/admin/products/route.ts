@@ -15,6 +15,7 @@ const packageSchema = z.object({
   imageUrl: z.string().trim().max(500).refine(isAllowedMediaUrl, "URL gambar nominal tidak valid.").optional().or(z.literal("")),
   providerCode: z.enum(["digiflazz", "voucher-stock"]).optional(),
   providerSku: z.string().trim().max(100).optional(),
+  supplierPrice: z.number().int().min(0).max(100_000_000).nullable().optional(),
   pricingMode: z.enum(["manual", "auto"]).default("auto"),
   marginType: z.enum(["fixed", "percent"]).default("fixed"),
   marginValue: z.number().int().min(0).max(1_000_000).default(0),
