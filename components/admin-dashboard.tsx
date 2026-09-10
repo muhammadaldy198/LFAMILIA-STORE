@@ -11,6 +11,7 @@ import {
   Headphones,
   ImageIcon,
   LayoutDashboard,
+  Layers3,
   LifeBuoy,
   PackageSearch,
   Search,
@@ -23,9 +24,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminAccountMenu } from "@/components/admin-account-menu";
 import { AdminNotifications } from "@/components/admin-notifications";
-import { AdminDigiflazzMonitor } from "@/components/admin-digiflazz-monitor";
 import { AdminDokuDatabasePreparation } from "@/components/admin-doku-database-preparation";
-import { AdminDigiflazzPricing } from "@/components/admin-digiflazz-pricing";
+import { AdminDigiflazzWorkspace } from "@/components/admin-digiflazz-workspace";
 import { AdminExperienceManager } from "@/components/admin-experience-manager";
 import { AdminIntegrationManager } from "@/components/admin-integration-manager";
 import { AdminMemberManager } from "@/components/admin-member-manager";
@@ -68,6 +68,7 @@ const navigation: NavigationItem[] = [
   { value: "support", label: "Layanan Pelanggan", Icon: Headphones },
   { value: "reports", label: "Laporan", Icon: BarChart3, ownerOnly: true },
   { value: "team", label: "Staff & Admin Akses", Icon: UserCog, ownerOnly: true },
+  { value: "integrations", label: "Integrasi", Icon: Layers3, ownerOnly: true },
   { value: "settings", label: "Pengaturan", Icon: Settings, ownerOnly: true },
 ];
 
@@ -169,19 +170,7 @@ export function AdminDashboard({
             <TabsContent value="products" className="mt-0"><AdminProductManager /></TabsContent>
             <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} /></TabsContent>
 
-            {isOwner && (
-              <TabsContent value="digiflazz" className="mt-0 space-y-4">
-                <AdminSection title="Digiflazz" description="Credential, sinkronisasi, SKU, saldo, dan status layanan.">
-                  <AdminIntegrationManager view="providers" providerFilter={["digiflazz"]} />
-                </AdminSection>
-                <AdminSection title="Sinkronisasi Harga" description="Sinkronkan harga modal dan margin produk.">
-                  <AdminDigiflazzPricing />
-                </AdminSection>
-                <AdminSection title="Monitoring SKU" description="Pantau status seller, stok, dan perubahan harga.">
-                  <AdminDigiflazzMonitor />
-                </AdminSection>
-              </TabsContent>
-            )}
+            {isOwner && <TabsContent value="digiflazz" className="mt-0"><AdminDigiflazzWorkspace /></TabsContent>}
 
             {isOwner && (
               <TabsContent value="payments" className="mt-0 space-y-4">
@@ -210,6 +199,8 @@ export function AdminDashboard({
             <TabsContent value="support" className="mt-0"><AdminSection title="Layanan Pelanggan" description="Tiket bantuan, komplain, refund, dan tindak lanjut."><AdminSupportManager /></AdminSection></TabsContent>
             {isOwner && <TabsContent value="reports" className="mt-0"><AdminSection title="Laporan" description="Penjualan, omzet, performa produk, dan transaksi."><AdminReportsCenter /></AdminSection></TabsContent>}
             {isOwner && <TabsContent value="team" className="mt-0"><AdminSection title="Staff & Admin Akses" description="Kelola akun, role, permission, dan aktivitas tim."><AdminTeamManager /></AdminSection></TabsContent>}
+
+            {isOwner && <TabsContent value="integrations" className="mt-0"><AdminSection title="Integrasi" description="Pusat konfigurasi Digiflazz, DOKU Direct API, callback, dan koneksi layanan."><div className="rounded-md border border-dashed border-[#ccd6e3] bg-[#f8fafc] px-4 py-10 text-center text-[10px] text-[#718198]">Rancangan menu Integrasi akan dibuat setelah menu operasional selesai.</div></AdminSection></TabsContent>}
 
             {isOwner && (
               <TabsContent value="settings" className="mt-0 space-y-4">
