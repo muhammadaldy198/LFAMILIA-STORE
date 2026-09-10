@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
@@ -24,23 +24,15 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminAccountMenu } from "@/components/admin-account-menu";
 import { AdminNotifications } from "@/components/admin-notifications";
-import { AdminDokuDatabasePreparation } from "@/components/admin-doku-database-preparation";
 import { AdminDigiflazzWorkspace } from "@/components/admin-digiflazz-workspace";
 import { AdminExperienceManager } from "@/components/admin-experience-manager";
-import { AdminIntegrationManager } from "@/components/admin-integration-manager";
-import { AdminMemberManager } from "@/components/admin-member-manager";
+import { AdminIntegrationWorkspace } from "@/components/admin-integration-workspace";
 import { AdminOrderManager } from "@/components/admin-order-manager";
 import { AdminOverview } from "@/components/admin-overview";
-import { AdminPaymentMethodManager } from "@/components/admin-payment-method-manager";
-import { AdminPaymentPageManager } from "@/components/admin-payment-page-manager";
+import { AdminPaymentWorkspace } from "@/components/admin-payment-workspace";
 import { AdminProductManager } from "@/components/admin-product-manager";
-import { AdminPromotionManager } from "@/components/admin-promotion-manager";
-import { AdminReportsCenter } from "@/components/admin-reports-center";
-import { AdminStorefrontManager } from "@/components/admin-storefront-manager";
-import { AdminSupportManager } from "@/components/admin-support-manager";
-import { AdminTeamManager } from "@/components/admin-team-manager";
-import { AdminVoucherManager } from "@/components/admin-voucher-manager";
-import { AdminWalletManager } from "@/components/admin-wallet-manager";
+import { AdminCustomerWorkspace } from "@/components/admin-customer-workspace";
+import { AdminPromoWorkspace, AdminReportsWorkspace, AdminSettingsWorkspace, AdminSupportWorkspace, AdminTeamWorkspace } from "@/components/admin-operations-workspaces";
 
 type Session = {
   id: number;
@@ -172,43 +164,14 @@ export function AdminDashboard({
 
             {isOwner && <TabsContent value="digiflazz" className="mt-0"><AdminDigiflazzWorkspace /></TabsContent>}
 
-            {isOwner && (
-              <TabsContent value="payments" className="mt-0 space-y-4">
-                <AdminSection title="Persiapan Database DOKU" description="Persiapan integrasi pembayaran."><AdminDokuDatabasePreparation /></AdminSection>
-                <AdminSection title="DOKU Direct API" description="Pengaturan gateway pembayaran."><AdminIntegrationManager view="providers" providerFilter={["doku"]} /></AdminSection>
-                <AdminSection title="Aktivasi Pembayaran" description="Atur checkout dan top up pelanggan."><AdminWalletManager view="checkout" /></AdminSection>
-                <AdminSection title="Metode Pembayaran" description="Kelola QRIS, e-wallet, dan Virtual Account."><AdminPaymentMethodManager /></AdminSection>
-                <AdminSection title="Halaman Pembayaran" description="Atur tampilan pembayaran LFAMILIA."><AdminPaymentPageManager /></AdminSection>
-              </TabsContent>
-            )}
-
-            {isOwner && (
-              <TabsContent value="customers" className="mt-0 space-y-4">
-                <AdminSection title="Pelanggan" description="Kelola akun, tier, transaksi, dan aktivitas pelanggan."><AdminMemberManager view="customers" /></AdminSection>
-                <AdminSection title="Saldo & Top Up" description="Pantau top up dan perubahan saldo."><AdminWalletManager view="topups" /></AdminSection>
-              </TabsContent>
-            )}
-
-            {isOwner && (
-              <TabsContent value="promotions" className="mt-0 space-y-4">
-                <AdminSection title="Promo" description="Kelola voucher diskon dan promo terjadwal."><AdminPromotionManager role="owner" /></AdminSection>
-                <AdminSection title="Stok Kode Digital" description="Kelola stok voucher internal."><AdminVoucherManager /></AdminSection>
-              </TabsContent>
-            )}
-
-            <TabsContent value="support" className="mt-0"><AdminSection title="Layanan Pelanggan" description="Tiket bantuan, komplain, refund, dan tindak lanjut."><AdminSupportManager /></AdminSection></TabsContent>
-            {isOwner && <TabsContent value="reports" className="mt-0"><AdminSection title="Laporan" description="Penjualan, omzet, performa produk, dan transaksi."><AdminReportsCenter /></AdminSection></TabsContent>}
-            {isOwner && <TabsContent value="team" className="mt-0"><AdminSection title="Staff & Admin Akses" description="Kelola akun, role, permission, dan aktivitas tim."><AdminTeamManager /></AdminSection></TabsContent>}
-
-            {isOwner && <TabsContent value="integrations" className="mt-0"><AdminSection title="Integrasi" description="Pusat konfigurasi Digiflazz, DOKU Direct API, callback, dan koneksi layanan."><div className="rounded-md border border-dashed border-[#ccd6e3] bg-[#f8fafc] px-4 py-10 text-center text-[10px] text-[#718198]">Rancangan menu Integrasi akan dibuat setelah menu operasional selesai.</div></AdminSection></TabsContent>}
-
-            {isOwner && (
-              <TabsContent value="settings" className="mt-0 space-y-4">
-                <AdminSection title="Identitas & Struktur Toko" description="Profil toko, kontak, logo, kategori, dan kanal publik."><AdminStorefrontManager role={initialSession.role} /></AdminSection>
-                <AdminSection title="Pengaturan Sistem" description="Integrasi pendukung dan keamanan sistem."><AdminIntegrationManager view="providers" providerFilter={["melostore", "resend", "security"]} /></AdminSection>
-                <AdminSection title="VPS Relay Digiflazz" description="Konfigurasi relay untuk Digiflazz."><AdminIntegrationManager view="relay" /></AdminSection>
-              </TabsContent>
-            )}
+            {isOwner && <TabsContent value="payments" className="mt-0"><AdminPaymentWorkspace /></TabsContent>}
+            {isOwner && <TabsContent value="customers" className="mt-0"><AdminCustomerWorkspace /></TabsContent>}
+            {isOwner && <TabsContent value="promotions" className="mt-0"><AdminPromoWorkspace /></TabsContent>}
+            <TabsContent value="support" className="mt-0"><AdminSupportWorkspace /></TabsContent>
+            {isOwner && <TabsContent value="reports" className="mt-0"><AdminReportsWorkspace /></TabsContent>}
+            {isOwner && <TabsContent value="team" className="mt-0"><AdminTeamWorkspace /></TabsContent>}
+            {isOwner && <TabsContent value="integrations" className="mt-0"><AdminIntegrationWorkspace /></TabsContent>}
+            {isOwner && <TabsContent value="settings" className="mt-0"><AdminSettingsWorkspace /></TabsContent>}
           </div>
         </main>
       </div>
@@ -244,17 +207,5 @@ function SidebarHelp() {
         <button type="button" className="mt-3 h-8 w-full rounded-md bg-white/[0.08] text-[9px] font-semibold text-white transition hover:bg-white/[0.13]">Pusat Bantuan</button>
       </div>
     </div>
-  );
-}
-
-function AdminSection({ title, description, children }: { title: string; description: string; children: ReactNode }) {
-  return (
-    <section className="overflow-hidden rounded-lg border border-[#e1e6ed] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-      <div className="border-b border-[#edf0f4] px-4 py-3">
-        <h2 className="text-sm font-bold text-[#14213a]">{title}</h2>
-        <p className="mt-0.5 text-[9px] leading-4 text-[#8190a5]">{description}</p>
-      </div>
-      <div className="p-4">{children}</div>
-    </section>
   );
 }
