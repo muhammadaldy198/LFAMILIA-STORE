@@ -212,7 +212,7 @@ export function renderCustomerNo(
 
   if (!value || value.includes("{{") || value.length > 120)
     throw new CheckoutValidationError(
-      "Format tujuan provider belum valid atau masih memiliki token yang belum terisi.",
+      "Format tujuan produk belum valid atau masih memiliki data yang belum terisi.",
     );
   return value;
 }
@@ -250,11 +250,11 @@ export async function insertPendingOrder(input: {
   if (input.item.fulfillmentType === "automatic") {
     if (!input.item.providerCode || !input.item.providerSku)
       throw new CheckoutValidationError(
-        "Provider dan SKU produk otomatis belum diatur oleh admin.",
+        "Konfigurasi pemrosesan otomatis belum lengkap.",
       );
     if (!getProviderAdapter(input.item.providerCode))
       throw new CheckoutValidationError(
-        `Adapter provider ${input.item.providerCode} belum tersedia.`,
+        "Sistem pemrosesan otomatis belum tersedia.",
       );
   }
   const customerNo = renderCustomerNo(

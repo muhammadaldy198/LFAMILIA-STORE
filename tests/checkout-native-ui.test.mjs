@@ -35,16 +35,16 @@ test("WhatsApp input is normalized in React", () => {
   assert.match(checkout, /autoComplete="tel"/);
 });
 
-test("nickname verification is optional and never becomes another checkout dependency", () => {
+test("nickname verification blocks supported games in UI and is enforced again by backend", () => {
   const checkout = read("app/checkout/page.tsx");
-  assert.match(checkout, /const requiredNicknameGames = new Set<string>\(\)/);
-  assert.match(checkout, /const optionalNicknameGames = new Set/);
-  assert.match(checkout, /"mobile-legends"/);
+  assert.match(checkout, /supportsNicknameLookup\(product\.slug\)/);
+  assert.match(checkout, /visibleNickname\.status !== "success"/);
   assert.match(checkout, /blocking=\{nicknameRequired\}/);
 });
 
 test("checkout payment type is DOKU only", () => {
   const checkout = read("app/checkout/page.tsx");
-  assert.match(checkout, /paymentGateway\?: "doku"/);
+  assert.match(checkout, /code: "doku"/);
+  assert.doesNotMatch(checkout, /"DOKU Direct API"|Pesanan diteruskan otomatis ke provider|Pembayaran melalui gateway/);
   assert.doesNotMatch(checkout, /midtrans|ipaymu|bisnap/i);
 });

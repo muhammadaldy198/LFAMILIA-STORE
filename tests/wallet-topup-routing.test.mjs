@@ -11,13 +11,14 @@ test("wallet topup uses DOKU only on the server", () => {
   assert.match(route, /createDokuWalletTopup\(/);
   assert.match(route, /createDokuDirectPayment\(/);
   assert.match(route, /updateDokuWalletTopup\(/);
-  assert.match(route, /paymentGateway: "doku"/);
+  assert.doesNotMatch(route, /paymentGateway: "doku"/);
   assert.doesNotMatch(route, /midtrans|ipaymu|fallback/i);
 });
 
 test("customer topup UI does not ask which gateway to use", () => {
   assert.doesNotMatch(account, /setGateway\(|activeGateway/);
-  assert.match(account, /DOKU adalah satu-satunya payment gateway/);
+  assert.match(account, /Pilih metode pembayaran yang ingin digunakan/);
+  assert.doesNotMatch(account, /DOKU|DigiFlazz|Melostore|payment gateway|provider/);
 });
 
 test("customer topup renders Direct API payment artifacts in LFAMILIA", () => {

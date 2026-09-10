@@ -27,10 +27,11 @@ test("Super Admin can design balance changes for customer or admin accounts", ()
 });
 
 test("integration UI contains credentials, copyable provider URLs, and relay", () => {
-  for (const label of ["DOKU Notification URL", "Digiflazz Webhook URL", "Relay Token", "Webhook Secret", "digiflazz-relay@lfamilia.my.id", "https://digiflazz-relay.lfamiliastore.my.id"]) assert.ok(integration.includes(label), `missing integration UI: ${label}`);
+  for (const label of ["DOKU Notification URL", "Digiflazz Webhook URL", "Melostore Nickname", "API Keys Check Nickname", "API Key", "Secret Key", "Relay Token", "Webhook Secret", "digiflazz-relay@lfamilia.my.id", "https://digiflazz-relay.lfamiliastore.my.id"]) assert.ok(integration.includes(label), `missing integration UI: ${label}`);
   assert.ok(integration.includes("https://lfamiliastore.my.id/api/payments/doku/callback"));
   assert.ok(integration.includes("https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback"));
   assert.ok(ui.includes("navigator.clipboard.writeText"));
+  assert.doesNotMatch(integration, /SwitchLine label="(?:Wajib|Tidak Wajib).*nickname/i);
 });
 
 test("promo, support, reports, team, and settings are fully represented", () => {

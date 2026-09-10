@@ -41,30 +41,11 @@ import {
   type PaymentChannel,
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
+import { supportsNicknameLookup } from "@/lib/nickname-policy";
 import { formatRupiah, type StoreProduct } from "@/lib/store-data";
 import type { CustomerSession } from "@/lib/server/customer-auth";
 
 const INTERNAL_VOUCHER_DESTINATION = "00000000";
-
-// Nickname verification is a convenience only. Checkout must not depend on
-// Melostore or another nickname service; DOKU + the selected fulfillment
-// provider remain the only external dependencies required to complete an order.
-const requiredNicknameGames = new Set<string>();
-
-const optionalNicknameGames = new Set([
-  "mobile-legends",
-  "free-fire",
-  "genshin-impact",
-  "valorant",
-  "pubg-mobile",
-  "honor-of-kings",
-  "call-of-duty-mobile",
-  "wild-rift",
-  "arena-of-valor",
-  "fc-mobile",
-  "efootball",
-  "point-blank",
-]);
 
 type NicknameState = {
   status: "idle" | "loading" | "success" | "error";
@@ -96,14 +77,12 @@ type PaymentResult = {
   total: number;
   expiredAt: string | null;
   fulfillmentType: "automatic" | "manual";
-  providerCode: string | null;
   basePrice: number;
   sellingPrice: number;
   discountAmount: number;
   voucherCode: string | null;
   flashSaleId: number | null;
   paymentMethod?: string;
-  paymentGateway?: "doku";
   publicInvoice?: string;
   paymentStatus?: "paid" | "pending";
   balanceAfter?: number;
@@ -152,9 +131,7 @@ function normalizeWhatsapp(value: string) {
 }
 
 function publicNicknameMessage(value: string) {
-  return value
-    .replace(/Melostore/gi, "layanan verifikasi")
-    .replace(/API Key atau Secret Key/gi, "Konfigurasi layanan");
+  return value.replace(/API Key atau Secret Key/gi, "Konfigurasi layanan");
 }
 
 export default function CheckoutPage() {
@@ -308,10 +285,8 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     isManual ||
     Boolean(selectedPackage?.providerCode && selectedPackage?.providerConfigured);
   const nicknameRequired =
-    !isVoucherProduct && requiredNicknameGames.has(product.slug);
-  const canCheckNickname =
-    !isVoucherProduct &&
-    (nicknameRequired || optionalNicknameGames.has(product.slug));
+    !isVoucherProduct && supportsNicknameLookup(product.slug);
+  const canCheckNickname = nicknameRequired;
   const lookupNeedsServer = product.slug === "mobile-legends";
   const lookupKey = `${product.slug}:${destination.trim()}:${server.trim()}`;
   const visibleNickname: NicknameState =
@@ -385,7 +360,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
         const fallbackGateways: CheckoutGateway[] = data.gateway
           ? [{
               code: data.gateway,
-              label: "DOKU Direct API",
+              label: "Pembayaran Otomatis",
               environment: data.environment ?? null,
               channels: data.channels ?? [],
             }]
@@ -668,7 +643,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       return;
     }
     if (!providerReady) {
-      setError("Produk otomatis ini belum siap dijual karena provider/SKU belum diatur.");
+      setError("Produk otomatis ini belum siap dijual. Hubungi admin.");
       return;
     }
     setError("");
@@ -702,9 +677,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       return;
     }
     if (!providerReady) {
-      setError(
-        "Produk otomatis ini belum memiliki provider dan SKU. Atur dahulu dari panel admin.",
-      );
+      setError("Produk otomatis ini belum siap dijual. Hubungi admin.");
       return;
     }
     setSubmitting(true);
@@ -728,7 +701,6 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
               ? INTERNAL_VOUCHER_DESTINATION
               : (customerInputValues[field.id] ?? "").trim(),
           })),
-          nickname: visibleNickname.nickname,
           buyerName: buyerName.trim() || buyerEmail.trim().split("@")[0] || "Pelanggan",
           buyerEmail: buyerEmail.trim(),
           buyerPhone: contact.replace(/[\s()-]/g, ""),
@@ -921,7 +893,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                       ? "Pesanan diproses admin setelah pembayaran."
                       : isVoucherStock
                         ? "Satu kode stok dikirim otomatis setelah pembayaran."
-                        : "Pesanan diteruskan otomatis ke provider."
+                        : "Pesanan diproses otomatis setelah pembayaran."
                   }
                 />
                 <div className="mt-3 space-y-5">
@@ -977,7 +949,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                 )}
                 {paymentMethodsLoaded && !hasExternalPaymentOption && (
                   <div className="mt-3 rounded-md border border-amber-300/20 bg-amber-300/[0.05] px-3 py-2 text-[10px] leading-4 text-amber-100/75">
-                    Pembayaran melalui gateway belum tersedia. Kamu masih bisa memakai Koin LFAMILIA bila saldo mencukupi.
+                    Pembayaran otomatis belum tersedia. Kamu masih bisa memakai Koin LFAMILIA bila saldo mencukupi.
                   </div>
                 )}
                 <div className="mt-3 space-y-2">
@@ -1154,7 +1126,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                 />
                 <SummaryRow
                   label="Proses"
-                  value={isManual ? "Antrean admin" : isVoucherStock ? "Kirim kode otomatis" : selectedPackage?.providerCode || "Provider belum diatur"}
+                  value={isManual ? "Antrean admin" : isVoucherStock ? "Kirim kode otomatis" : "Diproses otomatis"}
                 />
               </dl>
               <div className="my-3 h-px bg-white/[0.08]" />
@@ -1385,9 +1357,7 @@ function PaymentBox({ payment }: { payment: PaymentResult }) {
   const fulfillmentMessage =
     payment.fulfillmentType === "manual"
       ? "Setelah lunas, pesanan masuk antrean admin."
-      : payment.providerCode === "voucher-stock"
-        ? "Setelah lunas, kode stok tersedia otomatis di akun dan halaman status pesanan. Email hanya dikirim jika diaktifkan."
-        : "Setelah lunas, pesanan diteruskan otomatis ke provider.";
+      : "Setelah lunas, pesanan diproses otomatis.";
   return (
     <div className="mt-4 rounded-lg border border-[#b9ff35]/30 bg-[#b9ff35]/[0.08] p-3">
       <BadgeCheck className="size-5 text-[#b9ff35]" />

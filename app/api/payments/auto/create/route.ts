@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { publicPaymentLabel } from "@/lib/public-payment";
 import { getCustomerSession } from "@/lib/server/customer-auth";
 import {
   createDokuDirectPayment,
@@ -6,6 +7,11 @@ import {
   isDokuChannelSupported,
 } from "@/lib/server/doku";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
+import {
+  NicknameServiceError,
+  NicknameValidationError,
+  verifyNicknameForCheckout,
+} from "@/lib/server/nickname-check";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
 import { quotePromotion } from "@/lib/server/promotions";
 import {
@@ -35,7 +41,6 @@ const routingSchema = z.object({
     id: z.string().trim().min(1).max(60),
     value: z.string().trim().max(300),
   })).max(12).default([]),
-  nickname: z.string().trim().max(100).optional(),
   buyerName: z.string().trim().min(2).max(100),
   buyerEmail: z.string().trim().email().max(150),
   buyerPhone: z.string().trim().regex(/^\+?[0-9]{8,16}$/),
@@ -72,17 +77,15 @@ function existingExternalResponse(order: OrderRecord) {
     referenceId: order.reference_id,
     publicInvoice: publicInvoice(order.reference_id),
     fulfillmentType: order.fulfillment_type,
-    providerCode: order.provider_code,
     basePrice: order.base_subtotal,
     sellingPrice: order.subtotal,
     discountAmount: order.discount_amount,
     voucherCode: order.voucher_code,
     flashSaleId: order.flash_sale_id,
     paymentMethod: order.payment_method,
-    paymentGateway: "doku",
     paymentNo: order.doku_payment_no,
     qrContent: order.doku_qr_content,
-    paymentName: order.doku_payment_name,
+    paymentName: publicPaymentLabel(order.payment_method, order.payment_channel),
     paymentUrl: order.doku_payment_url,
     fee: order.admin_fee,
     total: order.total,
@@ -119,7 +122,7 @@ export async function POST(request: Request) {
       !(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel))
     ) {
       return Response.json(
-        { error: "Metode pembayaran belum didukung atau sedang dinonaktifkan di DOKU." },
+        { error: "Metode pembayaran belum didukung atau sedang dinonaktifkan." },
         { status: 400 },
       );
     }
@@ -130,8 +133,8 @@ export async function POST(request: Request) {
       return Response.json(
         {
           error: readiness.ready
-            ? "DOKU sedang dinonaktifkan untuk checkout."
-            : readiness.reason || "Konfigurasi DOKU belum siap.",
+            ? "Pembayaran otomatis sedang dinonaktifkan."
+            : "Pembayaran otomatis belum siap.",
         },
         { status: 503 },
       );
@@ -170,6 +173,11 @@ export async function POST(request: Request) {
       input.destination,
       input.server || null,
     );
+    const verifiedAccount = await verifyNicknameForCheckout({
+      productSlug: item.productSlug,
+      userId: customerData.destination,
+      server: customerData.server,
+    });
     const identity = createOrderIdentity();
     referenceId = identity.referenceId;
 
@@ -178,7 +186,7 @@ export async function POST(request: Request) {
       item,
       destination: customerData.destination,
       server: customerData.server,
-      nickname: input.nickname || null,
+      nickname: verifiedAccount.nickname,
       buyerName: input.buyerName,
       buyerEmail: input.buyerEmail,
       buyerPhone: input.buyerPhone,
@@ -230,7 +238,6 @@ export async function POST(request: Request) {
         referenceId: identity.referenceId,
         publicInvoice: invoice,
         fulfillmentType: item.fulfillmentType,
-        providerCode: item.providerCode,
         basePrice: promotion.basePrice,
         sellingPrice: promotion.sellingPrice,
         discountAmount: promotion.discountAmount,
@@ -240,10 +247,9 @@ export async function POST(request: Request) {
         memberDiscountPercent: promotion.memberDiscountPercent,
         discountSource: promotion.discountSource,
         paymentMethod: input.paymentMethod,
-        paymentGateway: "doku",
         paymentNo: payment.paymentNo,
         qrContent: payment.qrContent,
-        paymentName: payment.paymentName,
+        paymentName: publicPaymentLabel(input.paymentMethod, paymentChannel),
         paymentUrl: payment.paymentUrl,
         fee: 0,
         total: promotion.finalPrice,
@@ -271,9 +277,13 @@ export async function POST(request: Request) {
     if (referenceId) {
       await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
     }
+    const invalidInput =
+      error instanceof z.ZodError ||
+      error instanceof NicknameValidationError;
+    const serviceUnavailable = error instanceof NicknameServiceError;
     return Response.json(
       { error: message },
-      { status: error instanceof z.ZodError ? 400 : 503 },
+      { status: invalidInput ? 400 : serviceUnavailable ? 503 : 503 },
     );
   }
 }

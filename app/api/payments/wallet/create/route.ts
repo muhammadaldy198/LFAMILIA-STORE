@@ -2,6 +2,11 @@ import { z } from "zod";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
 import {
+  NicknameServiceError,
+  NicknameValidationError,
+  verifyNicknameForCheckout,
+} from "@/lib/server/nickname-check";
+import {
   CheckoutValidationError,
   createOrderIdentity,
   fulfillAutomaticOrder,
@@ -30,7 +35,6 @@ const schema = z.object({
     id: z.string().trim().min(1).max(60),
     value: z.string().trim().max(300),
   })).max(12).default([]),
-  nickname: z.string().trim().max(100).optional(),
   buyerName: z.string().trim().min(2).max(100),
   buyerEmail: z.string().trim().email().max(150),
   buyerPhone: z.string().trim().regex(/^\+?[0-9]{8,16}$/),
@@ -53,7 +57,6 @@ function walletSuccessResponse(order: Awaited<ReturnType<typeof getOrderById>>, 
     paymentStatus: "paid" as const,
     balanceAfter,
     fulfillmentType: order.fulfillment_type,
-    providerCode: order.provider_code,
     basePrice: order.base_subtotal,
     sellingPrice: order.subtotal,
     discountAmount: order.discount_amount,
@@ -140,9 +143,14 @@ export async function POST(request: Request) {
       { tier: membership.tier, discountPercent: membership.setting.discountPercent },
     );
     const customerData = normalizeCustomerInputs(item, input.customerInputs, input.destination, input.server || null);
+    const verifiedAccount = await verifyNicknameForCheckout({
+      productSlug: item.productSlug,
+      userId: customerData.destination,
+      server: customerData.server,
+    });
     const identity = createOrderIdentity();
     referenceId = identity.referenceId;
-    await insertPendingOrder({ ...identity, item, destination: customerData.destination, server: customerData.server, nickname: input.nickname || null, buyerName: input.buyerName, buyerEmail: input.buyerEmail, buyerPhone: input.buyerPhone, customerNotes: input.customerNotes || null, customerInputs: customerData.values, paymentMethod: "wallet", paymentChannel: "lfamilia-balance", customerId: customer.id, walletCheckoutKey: input.idempotencyKey, promotion });
+    await insertPendingOrder({ ...identity, item, destination: customerData.destination, server: customerData.server, nickname: verifiedAccount.nickname, buyerName: input.buyerName, buyerEmail: input.buyerEmail, buyerPhone: input.buyerPhone, customerNotes: input.customerNotes || null, customerInputs: customerData.values, paymentMethod: "wallet", paymentChannel: "lfamilia-balance", customerId: customer.id, walletCheckoutKey: input.idempotencyKey, promotion });
     const balanceAfter = await settleWalletOrder({ customerId: customer.id, orderId: identity.id, amount: promotion.finalPrice, description: `${item.productName} • ${item.packageLabel}`, fulfillmentType: item.fulfillmentType, voucherCode: promotion.voucherCode, flashSaleId: promotion.flashSaleId });
     const order = await getOrderById(identity.id);
     if (!order) throw new Error("Pesanan tidak ditemukan setelah dibuat.");
@@ -164,12 +172,13 @@ export async function POST(request: Request) {
     const clientInputRejected =
       error instanceof z.ZodError ||
       error instanceof CheckoutValidationError ||
+      error instanceof NicknameValidationError ||
       error instanceof PromotionQuoteError;
     const rejected = clientInputRejected || error instanceof WalletSettlementError;
     if (referenceId && rejected) await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
     if (!rejected) console.error("Checkout wallet belum dapat dipastikan:", error);
     return Response.json(
-      { error: rejected ? message : "Pembayaran saldo belum dapat dipastikan. Coba lagi dengan data yang sama.", retryable: !rejected },
+      { error: rejected || error instanceof NicknameServiceError ? message : "Pembayaran saldo belum dapat dipastikan. Coba lagi dengan data yang sama.", retryable: !rejected },
       { status: clientInputRejected ? 400 : error instanceof WalletSettlementError ? 409 : 503 },
     );
   }

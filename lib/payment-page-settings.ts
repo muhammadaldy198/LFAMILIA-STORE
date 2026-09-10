@@ -30,7 +30,7 @@ export const defaultPaymentPageSettings: PaymentPageSettings = {
   pendingTitle: "Selesaikan pembayaran",
   paidTitle: "Pembayaran berhasil",
   failedTitle: "Pembayaran tidak aktif",
-  subtitle: "Pembayaran diproses aman oleh LFAMILIA STORE melalui DOKU.",
+  subtitle: "Pembayaran diproses aman oleh LFAMILIA STORE.",
   invoiceNoticeTitle: "Simpan invoice sebelum membayar",
   invoiceNoticeText: "Invoice diperlukan untuk mengecek transaksi jika halaman pembayaran tertutup atau terjadi kendala.",
   pendingStatusText: "Status diperiksa otomatis setiap 3 detik.",

@@ -31,6 +31,6 @@ export function findPaymentChannel(method: string, channel: string) {
 
 export const paymentGroups = [
   { code: "va" as const, name: "Virtual Account", description: "Transfer bank dengan nomor VA unik" },
-  { code: "ewallet" as const, name: "E-Wallet", description: "DANA atau ShopeePay melalui DOKU Direct API" },
+  { code: "ewallet" as const, name: "E-Wallet", description: "DANA atau ShopeePay dengan proses pembayaran otomatis" },
   { code: "qris" as const, name: "QRIS", description: "Scan dari semua aplikasi yang mendukung QRIS" },
 ];

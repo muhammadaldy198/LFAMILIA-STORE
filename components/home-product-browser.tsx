@@ -48,7 +48,7 @@ export function HomeProductBrowser() {
             Pilih game favoritmu
           </h2>
           <p className="mt-[7px] max-w-2xl text-[11px] leading-[1.5] text-white/42 sm:text-xs">
-            Produk otomatis diproses provider 24 jam; produk khusus masuk antrean admin.
+            Produk otomatis diproses sistem 24 jam; produk khusus masuk antrean admin.
           </p>
         </div>
 

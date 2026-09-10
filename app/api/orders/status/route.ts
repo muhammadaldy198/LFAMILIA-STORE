@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
+import { publicPaymentLabel } from "@/lib/public-payment";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { queryDokuQrisStatus } from "@/lib/server/doku";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
@@ -76,6 +77,14 @@ function shouldQueryQris(order: OrderRecord) {
   return !Number.isFinite(last) || Date.now() - last >= 60_000;
 }
 
+function publicEventSource(source: string) {
+  if (source === "doku") return "payment";
+  if (source === "digiflazz") return "processing";
+  if (source === "wallet") return "balance";
+  if (source === "voucher_stock") return "delivery";
+  return source === "admin" ? "admin" : "system";
+}
+
 async function refreshQrisStatus(order: OrderRecord) {
   if (!shouldQueryQris(order) || !order.doku_reference_no) return order;
   try {
@@ -135,7 +144,7 @@ export async function POST(request: Request) {
     const events = [
       { source: "system", status: "created", createdAt: order.created_at },
       ...eventsResult.results.map((event) => ({
-        source: event.source,
+        source: publicEventSource(event.source),
         status: event.status,
         createdAt: event.created_at,
       })),
@@ -153,10 +162,9 @@ export async function POST(request: Request) {
         paymentStatus: order.payment_status,
         fulfillmentStatus: order.fulfillment_status,
         fulfillmentType: order.fulfillment_type,
-        paymentGateway: order.doku_request_id ? "doku" : null,
         paymentNo: order.payment_status === "pending" ? order.doku_payment_no : null,
         qrContent: order.payment_status === "pending" ? order.doku_qr_content : null,
-        paymentName: order.doku_payment_name,
+        paymentName: publicPaymentLabel(order.payment_method, order.payment_channel),
         paymentUrl: order.payment_status === "pending" ? order.doku_payment_url : null,
         expiredAt: order.payment_status === "pending" ? order.doku_expired_at : null,
         voucherCode,

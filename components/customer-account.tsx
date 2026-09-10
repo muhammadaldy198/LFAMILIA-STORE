@@ -762,7 +762,6 @@ function CustomerNotifications({ data }: { data: AccountData }) {
 }
 
 type TopupPayment = {
-  paymentGateway?: "doku";
   referenceId?: string;
   paymentMethod?: "qris" | "va" | "ewallet";
   paymentNo?: string | null;
@@ -807,7 +806,7 @@ function TopupForm({
         body: JSON.stringify({ amount: Number(amount), paymentMethod: method, paymentChannel: channel }),
       });
       const data = await response.json() as TopupPayment & { error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Pembayaran DOKU gagal dibuat.");
+      if (!response.ok) throw new Error(data.error ?? "Pembayaran gagal dibuat.");
       setPayment(data);
       setAmount("");
       await onDone();
@@ -818,13 +817,13 @@ function TopupForm({
     }
   }
 
-  if (!automaticReady) return <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.05] p-5"><h2 className="font-bold">Top up saldo belum tersedia</h2><p className="mt-2 text-xs leading-5 text-white/40">Pemilik belum mengaktifkan DOKU untuk top up saldo.</p></div>;
+  if (!automaticReady) return <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.05] p-5"><h2 className="font-bold">Top up saldo belum tersedia</h2><p className="mt-2 text-xs leading-5 text-white/40">Pemilik belum mengaktifkan top up saldo otomatis.</p></div>;
 
   return <form onSubmit={submit} className="rounded-xl border border-white/[0.08] bg-[#0d1019] p-5">
     <h2 className="font-bold">Top up saldo otomatis</h2>
-    <p className="mt-2 text-xs leading-5 text-white/40">Saldo masuk otomatis setelah pembayaran DOKU dikonfirmasi.</p>
+    <p className="mt-2 text-xs leading-5 text-white/40">Saldo masuk otomatis setelah pembayaran dikonfirmasi.</p>
     <div className="mt-4 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-[10px] leading-4 text-white/42">
-      DOKU adalah satu-satunya payment gateway. Pilih metode pembayaran yang ingin digunakan.
+      Pilih metode pembayaran yang ingin digunakan.
     </div>
     <div className="mt-4 grid grid-cols-3 gap-2">{(["qris","va","ewallet"] as const).map((item) => <button key={item} type="button" onClick={() => setMethod(item)} className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase ${method === item ? "border-[#b9ff35] bg-[#b9ff35] text-[#091006]" : "border-white/10 text-white/50"}`}>{item === "va" ? "Bank VA" : item}</button>)}</div>
     <div className="mt-4"><Field label={`Nominal (min. ${formatRupiah(settings?.minTopup ?? 10_000)})`}><Input required type="number" min={settings?.minTopup ?? 10_000} value={amount} onChange={(event) => setAmount(event.target.value)} className="checkout-input" /></Field></div>
@@ -861,7 +860,7 @@ function TopupForm({
           </Button>
         )}
         <p className="mt-3 text-[9px] leading-4 text-white/35">
-          Setelah pembayaran berhasil, saldo akan masuk otomatis melalui notifikasi DOKU.
+          Setelah pembayaran berhasil, saldo akan masuk otomatis.
         </p>
       </div>
     )}

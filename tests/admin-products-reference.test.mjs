@@ -50,3 +50,17 @@ test("editor includes nominal, separators, reordering and store preview", () => 
   assert.match(source, /aria-label="Naik"|label="Naik"/);
   assert.match(source, /aria-label="Turun"|label="Turun"/);
 });
+
+test("product input editor controls checkout ID labels and customer_no mapping", () => {
+  for (const label of [
+    "Checkout Type",
+    "ID + Server",
+    "Label ID",
+    "Label Server",
+    "Preview Input Checkout",
+    "Format customer_no",
+  ]) assert.ok(source.includes(label), `missing customer input UI: ${label}`);
+  assert.match(source, /\{ id: "destination", label: labelId \}/);
+  assert.match(source, /\{ id: "server", label: labelServer \}/);
+  assert.doesNotMatch(source, /nicknameRequired|nicknameOptional/);
+});

@@ -34,7 +34,6 @@ type PaymentOrder = {
   paymentChannel: string;
   paymentStatus: string;
   fulfillmentStatus: string;
-  paymentGateway: "doku" | null;
   paymentNo: string | null;
   qrContent: string | null;
   paymentName: string | null;

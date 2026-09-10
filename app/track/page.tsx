@@ -53,8 +53,8 @@ const paymentLabels: Record<string, string> = {
 };
 const fulfillmentLabels: Record<string, string> = {
   waiting_payment: "Menunggu pembayaran",
-  processing: "Sedang diproses provider",
-  pending: "Sedang diproses provider",
+  processing: "Sedang diproses sistem",
+  pending: "Sedang diproses sistem",
   manual_pending: "Menunggu diproses admin",
   needs_review: "Perlu diperiksa admin",
   success: "Pesanan selesai",
@@ -78,11 +78,11 @@ const eventLabels: Record<string, string> = {
   error: "Terjadi kendala pemrosesan",
 };
 const sourceLabels: Record<string, string> = {
-  doku: "DOKU",
+  payment: "Pembayaran",
   system: "LFAMILIA",
-  wallet: "Saldo",
-  digiflazz: "DigiFlazz",
-  voucher_stock: "Voucher",
+  balance: "Saldo",
+  processing: "Pemrosesan",
+  delivery: "Pengiriman",
   admin: "Admin",
 };
 const publicStatusLabels: Record<string, string> = {
@@ -350,7 +350,7 @@ export default function TrackPage() {
               <table className="w-full min-w-[540px] text-left text-[10px]">
                 <thead className="bg-black/15 text-[8px] uppercase tracking-wider text-white/30"><tr><th className="px-4 py-2.5 font-bold sm:px-5">Waktu</th><th className="px-3 py-2.5 font-bold">Sumber</th><th className="px-3 py-2.5 font-bold">Status</th></tr></thead>
                 <tbody className="divide-y divide-white/[0.06]">
-                  {order.events.map((event, index) => <tr key={`${event.source}-${event.status}-${event.createdAt}-${index}`} className="text-white/55"><td className="whitespace-nowrap px-4 py-3 font-mono text-[9px] sm:px-5">{dateLabel(event.createdAt)}</td><td className="px-3 py-3 font-bold text-white/70">{sourceLabels[event.source] || event.source}</td><td className="px-3 py-3"><span className="inline-flex rounded-md bg-white/[0.05] px-2 py-1 font-semibold text-white/65">{eventLabels[event.status.toLowerCase()] || event.status.replaceAll("_", " ")}</span></td></tr>)}
+                  {order.events.map((event, index) => <tr key={`${event.source}-${event.status}-${event.createdAt}-${index}`} className="text-white/55"><td className="whitespace-nowrap px-4 py-3 font-mono text-[9px] sm:px-5">{dateLabel(event.createdAt)}</td><td className="px-3 py-3 font-bold text-white/70">{sourceLabels[event.source] || "Sistem"}</td><td className="px-3 py-3"><span className="inline-flex rounded-md bg-white/[0.05] px-2 py-1 font-semibold text-white/65">{eventLabels[event.status.toLowerCase()] || event.status.replaceAll("_", " ")}</span></td></tr>)}
                 </tbody>
               </table>
             </div>

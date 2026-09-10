@@ -9,7 +9,8 @@ const payment = fs.readFileSync(path.join(root, "app/payment/page.tsx"), "utf8")
 const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/route.ts"), "utf8");
 
 test("automatic checkout identifies DOKU only", () => {
-  assert.match(autoRoute, /paymentGateway: "doku"/);
+  assert.match(autoRoute, /createDokuDirectPayment\(/);
+  assert.doesNotMatch(autoRoute, /paymentGateway: "doku"/);
   assert.doesNotMatch(autoRoute, /midtrans|ipaymu/i);
 });
 

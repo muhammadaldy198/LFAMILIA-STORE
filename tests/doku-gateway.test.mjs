@@ -31,7 +31,7 @@ test("DOKU callback validates signature, amount, and request identity before ful
 
 test("checkout creates one DOKU payment without legacy gateway fallback", () => {
   assert.match(autoRoute, /createDokuDirectPayment\(/);
-  assert.match(autoRoute, /paymentGateway: "doku"/);
+  assert.doesNotMatch(autoRoute, /paymentGateway: "doku"/);
   assert.doesNotMatch(autoRoute, /midtrans|ipaymu|fallback/i);
 });
 

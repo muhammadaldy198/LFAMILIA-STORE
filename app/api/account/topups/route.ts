@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { publicPaymentLabel } from "@/lib/public-payment";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
 import {
   createDokuDirectPayment,
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
   let referenceId: string | null = null;
   try {
     if (!request.headers.get("content-type")?.includes("application/json")) {
-      throw new Error("Top up saldo hanya tersedia melalui DOKU.");
+      throw new Error("Top up saldo hanya tersedia melalui pembayaran otomatis.");
     }
 
     const settings = await readWalletSettings();
@@ -45,8 +46,8 @@ export async function POST(request: Request) {
     if (!settings.dokuTopupEnabled || !readiness.ready) {
       throw new Error(
         readiness.ready
-          ? "DOKU sedang dinonaktifkan untuk top up saldo."
-          : readiness.reason || "Konfigurasi DOKU belum siap.",
+          ? "Top up saldo otomatis sedang dinonaktifkan."
+          : "Pembayaran otomatis belum siap.",
       );
     }
 
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
       !isDokuChannelSupported(input.paymentMethod, paymentChannel) ||
       !(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel))
     ) {
-      throw new Error("Metode pembayaran ini belum didukung atau sedang dinonaktifkan di DOKU.");
+      throw new Error("Metode pembayaran ini belum didukung atau sedang dinonaktifkan.");
     }
 
     referenceId = `WLT-${crypto.randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
@@ -104,13 +105,12 @@ export async function POST(request: Request) {
     return Response.json(
       {
         ok: true,
-        paymentGateway: "doku",
         referenceId,
         paymentMethod: input.paymentMethod,
         paymentChannel,
         paymentNo: payment.paymentNo,
         qrContent: payment.qrContent,
-        paymentName: payment.paymentName,
+        paymentName: publicPaymentLabel(input.paymentMethod, paymentChannel),
         paymentUrl: payment.paymentUrl,
         total: input.amount,
         fee: 0,

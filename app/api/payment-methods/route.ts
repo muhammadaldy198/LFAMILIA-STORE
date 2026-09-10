@@ -27,7 +27,7 @@ export async function GET() {
   if (settings.dokuCheckoutEnabled && readiness.ready) {
     gateways.push({
       code: "doku",
-      label: `DOKU Direct API · ${getDokuEnvironment() === "production" ? "Production" : "Sandbox"}`,
+      label: `Pembayaran Otomatis · ${getDokuEnvironment() === "production" ? "Aktif" : "Uji Coba"}`,
       environment: readiness.environment,
       channels: activeChannels.filter((item) =>
         isDokuChannelSupported(item.method, item.channel),
