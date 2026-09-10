@@ -7,6 +7,8 @@ export type HomeBannerRecord = {
   subtitle: string;
   imageUrl: string;
   mobileImageUrl?: string;
+  showDesktop?: boolean;
+  showMobile?: boolean;
   ctaLabel: string;
   ctaHref: string;
   isActive: boolean;
@@ -49,7 +51,7 @@ export async function listHomeBanners(includeInactive = false): Promise<HomeBann
 
 export async function saveHomeBanner(input: Omit<HomeBannerRecord, "id">, id?: number) {
   const db = getD1();
-  const storedImages = encodeBannerImages(input.imageUrl, input.mobileImageUrl);
+  const storedImages = encodeBannerImages(input.imageUrl, input.mobileImageUrl, input.showDesktop, input.showMobile);
   if (id) {
     await db.prepare("UPDATE home_banners SET title = ?, subtitle = ?, image_url = ?, cta_label = ?, cta_href = ?, is_active = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
       .bind(input.title, input.subtitle, storedImages, input.ctaLabel, input.ctaHref, input.isActive ? 1 : 0, input.sortOrder, id).run();
@@ -61,20 +63,25 @@ export async function saveHomeBanner(input: Omit<HomeBannerRecord, "id">, id?: n
   return row.id;
 }
 
-function encodeBannerImages(imageUrl: string, mobileImageUrl?: string) {
+function encodeBannerImages(imageUrl: string, mobileImageUrl?: string, showDesktop = true, showMobile = true) {
   const mobile = mobileImageUrl?.trim();
-  if (!mobile || mobile === imageUrl) return imageUrl;
-  return JSON.stringify({ desktop: imageUrl, mobile });
+  if ((!mobile || mobile === imageUrl) && showDesktop && showMobile) return imageUrl;
+  return JSON.stringify({ desktop: imageUrl, mobile: mobile || undefined, showDesktop, showMobile });
 }
 
-function decodeBannerImages(value: string): Pick<HomeBannerRecord, "imageUrl" | "mobileImageUrl"> {
-  if (!value.trim().startsWith("{")) return { imageUrl: value };
+function decodeBannerImages(value: string): Pick<HomeBannerRecord, "imageUrl" | "mobileImageUrl" | "showDesktop" | "showMobile"> {
+  if (!value.trim().startsWith("{")) return { imageUrl: value, showDesktop: true, showMobile: true };
   try {
-    const parsed = JSON.parse(value) as { desktop?: unknown; mobile?: unknown };
-    if (typeof parsed.desktop !== "string" || !parsed.desktop) return { imageUrl: value };
-    return { imageUrl: parsed.desktop, mobileImageUrl: typeof parsed.mobile === "string" && parsed.mobile ? parsed.mobile : undefined };
+    const parsed = JSON.parse(value) as { desktop?: unknown; mobile?: unknown; showDesktop?: unknown; showMobile?: unknown };
+    if (typeof parsed.desktop !== "string" || !parsed.desktop) return { imageUrl: value, showDesktop: true, showMobile: true };
+    return {
+      imageUrl: parsed.desktop,
+      mobileImageUrl: typeof parsed.mobile === "string" && parsed.mobile ? parsed.mobile : undefined,
+      showDesktop: parsed.showDesktop !== false,
+      showMobile: parsed.showMobile !== false,
+    };
   } catch {
-    return { imageUrl: value };
+    return { imageUrl: value, showDesktop: true, showMobile: true };
   }
 }
 

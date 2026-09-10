@@ -8,6 +8,7 @@ import type { HomeBannerRecord } from "@/lib/server/content";
 export function HomeBannerCarousel() {
   const [banners, setBanners] = useState<HomeBannerRecord[]>([]);
   const [active, setActive] = useState(0);
+  const [mobile, setMobile] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -23,26 +24,36 @@ export function HomeBannerCarousel() {
   }, []);
 
   useEffect(() => {
-    if (banners.length < 2) return;
+    const media = window.matchMedia("(max-width: 639px)");
+    const update = () => setMobile(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  const visibleBanners = banners.filter((item) => mobile ? item.showMobile !== false : item.showDesktop !== false);
+
+  useEffect(() => {
+    if (visibleBanners.length < 2) return;
     const timer = window.setInterval(
-      () => setActive((value) => (value + 1) % banners.length),
+      () => setActive((value) => (value + 1) % visibleBanners.length),
       6500,
     );
     return () => window.clearInterval(timer);
-  }, [banners.length]);
+  }, [visibleBanners.length]);
 
-  if (!banners.length) return null;
+  if (!visibleBanners.length) return null;
 
-  const banner = banners[Math.min(active, banners.length - 1)];
+  const banner = visibleBanners[Math.min(active, visibleBanners.length - 1)];
   const mobileImageUrl = banner.mobileImageUrl || mobileFallback(banner.imageUrl);
-  const showControls = banners.length > 1;
+  const showControls = visibleBanners.length > 1;
 
   function previousSlide() {
-    setActive((value) => (value - 1 + banners.length) % banners.length);
+    setActive((value) => (value - 1 + visibleBanners.length) % visibleBanners.length);
   }
 
   function nextSlide() {
-    setActive((value) => (value + 1) % banners.length);
+    setActive((value) => (value + 1) % visibleBanners.length);
   }
 
   return (

@@ -61,11 +61,11 @@ const navigation: NavigationItem[] = [
   { value: "overview", label: "Dashboard", Icon: LayoutDashboard },
   { value: "orders", label: "Pesanan", Icon: FileText },
   { value: "products", label: "Produk", Icon: Box },
+  { value: "content", label: "Banner & Konten", Icon: FileText },
   { value: "digiflazz", label: "Digiflazz", Icon: PackageSearch, ownerOnly: true },
   { value: "payments", label: "Pembayaran", Icon: CreditCard, ownerOnly: true },
   { value: "customers", label: "Pelanggan", Icon: Users, ownerOnly: true },
   { value: "promotions", label: "Promo", Icon: Sparkles, ownerOnly: true },
-  { value: "content", label: "Konten", Icon: FileText },
   { value: "support", label: "Layanan Pelanggan", Icon: Headphones },
   { value: "reports", label: "Laporan", Icon: BarChart3, ownerOnly: true },
   { value: "team", label: "Staff & Akses", Icon: Users, ownerOnly: true },
@@ -108,6 +108,7 @@ export function AdminDashboard({
     const query = globalSearch.trim().toLowerCase();
     if (!query) return;
     if (query.includes("produk") || query.includes("sku")) selectTab("products");
+    else if (["banner", "konten", "pop-up", "popup", "berita", "ulasan", "faq"].some((term) => query.includes(term))) selectTab("content");
     else if (query.includes("pelanggan") || query.includes("customer") || query.includes("member")) selectTab("customers");
     else selectTab("orders");
   }
@@ -268,13 +269,8 @@ export function AdminDashboard({
               </TabsContent>
             )}
 
-            <TabsContent value="content" className="mt-0 space-y-4">
-              <AdminSection title="Identitas & struktur toko" description="Logo, kontak, kategori, FAQ, dan informasi dasar storefront.">
-                <AdminStorefrontManager role={initialSession.role} />
-              </AdminSection>
-              <AdminSection title="Konten website" description="Banner, pop-up, berita, ulasan, dan konten pelanggan.">
-                <AdminExperienceManager role={initialSession.role} />
-              </AdminSection>
+            <TabsContent value="content" className="mt-0">
+              <AdminExperienceManager role={initialSession.role} />
             </TabsContent>
 
             <TabsContent value="support" className="mt-0">
@@ -301,6 +297,9 @@ export function AdminDashboard({
 
             {isOwner && (
               <TabsContent value="settings" className="mt-0 space-y-4">
+                <AdminSection title="Identitas & Struktur Toko" description="Logo, kontak, kategori katalog, banner cadangan, dan kanal bantuan publik.">
+                  <AdminStorefrontManager role={initialSession.role} />
+                </AdminSection>
                 <AdminSection title="Pengaturan Sistem" description="Integrasi pendukung yang bukan provider transaksi atau payment gateway.">
                   <AdminIntegrationManager view="providers" providerFilter={["melostore", "resend", "security"]} />
                 </AdminSection>
