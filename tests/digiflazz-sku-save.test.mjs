@@ -6,7 +6,7 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("provider SKU can be saved directly without DigiFlazz sync", () => {
+test("provider SKU can still be saved by the existing backend contract", () => {
   const route = read("app/api/admin/product-package-provider/route.ts");
   const products = read("lib/server/products.ts");
   assert.match(route, /updateProductPackageProvider/);
@@ -14,15 +14,11 @@ test("provider SKU can be saved directly without DigiFlazz sync", () => {
   assert.match(products, /provider_sku = \?/);
 });
 
-test("admin panel exposes direct Simpan SKU action", () => {
+test("admin creates products manually and imports DigiFlazz nominal SKUs", () => {
   const source = read("components/admin-product-manager.tsx");
-  assert.match(source, /\/api\/panel\/product-package-provider/);
-  assert.match(source, /Simpan SKU/);
-  assert.match(source, /berhasil disimpan tanpa sync DigiFlazz/);
-});
-
-test("DigiFlazz sync requires an already-entered provider SKU", () => {
-  const source = read("components/admin-product-manager.tsx");
-  assert.match(source, /Boolean\(entry\.providerSku\?\.trim\(\)\)/);
-  assert.match(source, /Isi SKU DigiFlazz lalu tekan Simpan SKU/);
+  assert.match(source, /Tambah Produk Manual/);
+  assert.match(source, /Import Nominal dari Digiflazz/);
+  assert.match(source, /sku: item\.sku/);
+  assert.match(source, /Produk tidak dibuat otomatis/);
+  assert.doesNotMatch(source, /Import Produk dari Digiflazz/);
 });
