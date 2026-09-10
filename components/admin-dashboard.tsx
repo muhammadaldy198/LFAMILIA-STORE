@@ -149,7 +149,7 @@ export function AdminDashboard({
           </TabsList>
         </div>
 
-        <SidebarHelp />
+        <SidebarHelp onClick={() => setActiveTab("support")} />
         <div className="px-5 pb-5 pt-2 text-[9px] leading-4 text-slate-400">
           <p>© {new Date().getFullYear()} LFAMILIA</p>
           <p>Top Up Game Solution</p>
@@ -219,7 +219,7 @@ function Brand({ onClick }: { onClick(): void }) {
   );
 }
 
-function SidebarHelp() {
+function SidebarHelp({ onClick }: { onClick(): void }) {
   return (
     <div className="px-4 pb-3">
       <div className="rounded-lg bg-white/[0.055] p-3">
@@ -230,7 +230,7 @@ function SidebarHelp() {
             <p className="mt-0.5 text-[8px] leading-3.5 text-slate-400">Tim kami siap membantu Anda 24/7.</p>
           </div>
         </div>
-        <button type="button" className="mt-3 h-8 w-full rounded-md bg-white/[0.08] text-[9px] font-semibold text-white transition hover:bg-white/[0.13]">Pusat Bantuan</button>
+        <button type="button" onClick={onClick} className="mt-3 h-8 w-full rounded-md bg-white/[0.08] text-[9px] font-semibold text-white transition hover:bg-white/[0.13]">Pusat Bantuan</button>
       </div>
     </div>
   );
