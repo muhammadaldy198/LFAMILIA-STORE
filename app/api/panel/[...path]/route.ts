@@ -11,6 +11,7 @@ import * as paymentPage from "@/app/api/admin/payment-page/route";
 import * as orders from "@/app/api/admin/orders/route";
 import * as integrations from "@/app/api/admin/integrations/route";
 import * as productContent from "@/app/api/admin/product-content/route";
+import * as productInput from "@/app/api/admin/product-input/route";
 import * as productPackageProvider from "@/app/api/admin/product-package-provider/route";
 import * as productPackageStatus from "@/app/api/admin/product-package-status/route";
 import * as products from "@/app/api/admin/products/route";
@@ -47,6 +48,7 @@ const routes: Record<string, RouteHandlers> = {
   "payment-page": { GET: paymentPage.GET, PUT: paymentPage.PUT },
   orders: { GET: orders.GET, PATCH: orders.PATCH },
   "product-content": { PUT: productContent.PUT },
+  "product-input": { GET: productInput.GET, PATCH: productInput.PATCH },
   "product-package-provider": { PATCH: productPackageProvider.PATCH },
   "product-package-status": { PATCH: productPackageStatus.PATCH },
   products: { GET: products.GET, POST: products.POST, PATCH: products.PATCH, DELETE: products.DELETE },
@@ -80,11 +82,7 @@ async function dispatch(request: Request, context: RouteContext, method: Method)
   headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
   headers.set("CDN-Cache-Control", "no-store");
   headers.set("Cloudflare-CDN-Cache-Control", "no-store");
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
 export function GET(request: Request, context: RouteContext) { return dispatch(request, context, "GET"); }

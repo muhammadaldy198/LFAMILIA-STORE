@@ -19,8 +19,10 @@ test("integration credentials stay owner-only and encrypted", () => {
   assert.match(config, /INTEGRATION_ENCRYPTION_KEY/);
   assert.match(config, /encryptConfig\(/);
   assert.match(config, /decryptConfig\(/);
-  assert.match(manager, /Kredensial nantinya disimpan terenkripsi/);
+  assert.match(manager, /berhasil disimpan terenkripsi di backend/);
   assert.match(manager, /type=\{show \? "text" : "password"\}/);
+  assert.match(manager, /action: "save_profile"/);
+  assert.match(manager, /action: "save_selections"/);
 });
 
 test("dashboard-managed credentials fail closed instead of using stale Cloudflare provider secrets", () => {

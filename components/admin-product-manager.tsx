@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowLeft,
@@ -213,10 +213,53 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
   const [checkoutType, setCheckoutType] = useState<"id" | "id-server">("id-server");
   const [labelId, setLabelId] = useState("User ID");
   const [labelServer, setLabelServer] = useState("Server ID");
+  const [inputLoading, setInputLoading] = useState(true);
+  const [inputSaving, setInputSaving] = useState(false);
   const inputFields = checkoutType === "id-server"
     ? [{ id: "destination", label: labelId }, { id: "server", label: labelServer }]
     : [{ id: "destination", label: labelId }];
   const targetTemplate = inputFields.map((item) => `{{${item.id}}}`).join("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setInputLoading(true);
+    fetch(`/api/panel/product-input?slug=${encodeURIComponent(product.slug)}`, { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as { error?: string; input?: { checkoutType: "id" | "id-server"; labelId: string; labelServer: string } };
+        if (!response.ok || !payload.input) throw new Error(payload.error || "Pengaturan input pelanggan gagal dimuat.");
+        setCheckoutType(payload.input.checkoutType);
+        setLabelId(payload.input.labelId);
+        setLabelServer(payload.input.labelServer);
+      })
+      .catch((reason) => {
+        if (reason instanceof DOMException && reason.name === "AbortError") return;
+        setError(reason instanceof Error ? reason.message : "Pengaturan input pelanggan gagal dimuat.");
+      })
+      .finally(() => setInputLoading(false));
+    return () => controller.abort();
+  }, [product.slug]);
+
+  async function saveInputSettings() {
+    setError(""); setMessage("");
+    if (!labelId.trim() || (checkoutType === "id-server" && !labelServer.trim())) {
+      setError("Label ID dan Label Server tidak boleh kosong.");
+      return;
+    }
+    setInputSaving(true);
+    try {
+      const response = await fetch("/api/panel/product-input", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: product.slug, checkoutType, labelId, labelServer }),
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Pengaturan input pelanggan gagal disimpan.");
+      setMessage("Checkout Type dan label input berhasil disimpan ke backend.");
+      onNotice(`${product.name} diperbarui.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Pengaturan input pelanggan gagal disimpan.");
+    } finally { setInputSaving(false); }
+  }
 
   function refreshSellerMonitor() {
     setMonitorRefreshing(true);
@@ -273,7 +316,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
           <StorePreview product={product} nominals={nominals} sections={sections} mode={previewMode} onMode={setPreviewMode} />
         </div>
       ) : (
-        <EditorTabPanel tab={tab} product={product} targetTemplate={targetTemplate} checkoutType={checkoutType} labelId={labelId} labelServer={labelServer} onCheckoutType={setCheckoutType} onLabelId={setLabelId} onLabelServer={setLabelServer} onSave={() => { onNotice(`${product.name} diperbarui.`); setMessage("Pengaturan input pelanggan berhasil disimpan."); }} />
+        <EditorTabPanel tab={tab} product={product} targetTemplate={targetTemplate} checkoutType={checkoutType} labelId={labelId} labelServer={labelServer} onCheckoutType={setCheckoutType} onLabelId={setLabelId} onLabelServer={setLabelServer} inputLoading={inputLoading} saving={inputSaving} onSave={tab === "Input Customer" ? saveInputSettings : () => announceAdminAction(`Penyimpanan ${tab} akan memakai endpoint khusus berikutnya.`)} />
       )}
 
       {importOpen && <ImportNominalModal existing={nominals} onClose={() => setImportOpen(false)} onImport={(added) => { setNominals((current) => [...current, ...added]); setImportOpen(false); setMessage(`${added.length} nominal Digiflazz berhasil ditambahkan.`); }} />}
@@ -295,8 +338,8 @@ function StorePreview({ product, nominals, sections, mode, onMode }: { product: 
   return <aside className="sticky top-[70px] self-start rounded-[7px] border border-[#dfe6ef] bg-white p-[13px]"><div className="flex items-start justify-between"><div><h2 className="text-[12px] font-extrabold">Preview Tampilan di Toko</h2><p className="mt-[3px] text-[7.5px] text-[#6c7d92]">Berikut adalah preview tampilan produk di sisi pelanggan.</p></div><div className="flex overflow-hidden rounded-[4px] border border-[#dce3eb]">{(["Mobile", "Desktop"] as const).map((item) => <button type="button" key={item} onClick={() => onMode(item)} className={`inline-flex h-[27px] items-center gap-[4px] px-[9px] text-[7px] font-semibold ${mode === item ? "bg-[#0875ed] text-white" : "bg-white text-[#4e6078]"}`}>{item === "Mobile" ? <Smartphone className="size-[10px]" /> : <Monitor className="size-[10px]" />}{item}</button>)}</div></div><div className={`mx-auto mt-[12px] overflow-hidden border-[6px] border-[#101820] bg-[#f4f7fa] shadow-[0_10px_25px_rgba(15,31,55,.2)] ${mode === "Mobile" ? "h-[500px] w-[250px] rounded-[32px]" : "h-[390px] w-full rounded-[12px]"}`}><div className="flex h-[25px] items-center justify-between bg-[#101820] px-[18px] text-[7px] font-bold text-white"><span>15.30</span><span>● ◔ ▰</span></div><div className="flex items-center gap-[7px] border-b bg-white p-[8px]"><ProductImage product={product} /><div><strong className="block text-[8px]">{product.name}</strong><span className="text-[6px] text-[#66778d]">Top up Diamonds, Weekly Pass, dan lainnya</span></div></div><div className="h-[405px] overflow-hidden p-[8px]">{sections.map((section) => { const entries = nominals.filter((item) => item.group === section.name && item.active).slice(0, 2); if (!entries.length) return null; return <div key={section.id} className="mb-[8px]"><h3 className="mb-[5px] text-[9px] font-extrabold">{section.name}{section.name.includes("Special") || section.name.includes("First") ? " ✨" : section.name === "Diamonds" ? " 💎" : ""}</h3><div className="grid grid-cols-2 gap-[6px]">{entries.map((nominal) => <div key={nominal.id} className="min-h-[76px] rounded-[5px] border border-[#e1e7ee] bg-white p-[6px] shadow-sm"><strong className="block truncate text-[6.5px]">{nominal.name}</strong><NominalArtwork kind={nominal.imageKind} large /><span className="block text-[8px] font-black text-[#e93643]">{formatRupiah(nominal.sell)}</span></div>)}</div></div>; })}</div><div className="absolute"></div></div></aside>;
 }
 
-function EditorTabPanel({ tab, product, targetTemplate, checkoutType, labelId, labelServer, onCheckoutType, onLabelId, onLabelServer, onSave }: { tab: EditorTab; product: Product; targetTemplate: string; checkoutType: "id" | "id-server"; labelId: string; labelServer: string; onCheckoutType(value: "id" | "id-server"): void; onLabelId(value: string): void; onLabelServer(value: string): void; onSave(): void }) {
-  return <section className="mt-[12px] rounded-[7px] border border-[#dfe6ef] bg-white p-[16px]"><div className="flex items-center justify-between border-b border-[#e8ecf1] pb-[11px]"><div><h2 className="text-[13px] font-extrabold">{tab}</h2><p className="mt-[2px] text-[8px] text-[#6c7d92]">Pengaturan {tab.toLowerCase()} untuk {product.name}.</p></div><button type="button" onClick={onSave} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white"><Save className="size-[12px]" />Simpan Perubahan</button></div>{tab === "Informasi Produk" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><Field label="Nama produk" name="name" placeholder={product.name} /><Field label="Slug" name="slug" placeholder={product.slug} /><Field label="Gambar produk (opsional, rasio 1:1)" name="image" placeholder="Boleh dikosongkan dan ditambahkan nanti" /><Field label="Banner halaman produk (opsional)" name="banner" placeholder="Boleh dikosongkan dan ditambahkan nanti" /></div>}{tab === "Input Customer" && <div className="mt-[14px] grid max-w-[900px] grid-cols-[minmax(0,1fr)_300px] gap-[14px]"><div className="grid grid-cols-2 gap-[12px]"><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Checkout Type<span className="mt-[3px] block font-normal text-[#718197]">Pilih data akun yang harus diisi pelanggan.</span><select value={checkoutType} onChange={(event) => onCheckoutType(event.target.value as "id" | "id-server")} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] bg-white px-[10px] text-[9px]"><option value="id">ID</option><option value="id-server">ID + Server</option></select></label><label className="text-[8px] font-bold text-[#3d4f68]">Label ID<span className="mt-[3px] block font-normal text-[#718197]">Nama field yang tampil di checkout customer.</span><input value={labelId} onChange={(event) => onLabelId(event.target.value)} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="Contoh: User ID" /></label>{checkoutType === "id-server" && <label className="text-[8px] font-bold text-[#3d4f68]">Label Server<span className="mt-[3px] block font-normal text-[#718197]">Nama field server/zone di checkout customer.</span><input value={labelServer} onChange={(event) => onLabelServer(event.target.value)} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="Contoh: Zone ID" /></label>}</div><aside className="rounded-[7px] border border-[#dce6f2] bg-[#f8fbff] p-[13px]"><p className="text-[9px] font-extrabold text-[#263b58]">Preview Input Checkout</p><label className="mt-[10px] block text-[8px] font-bold text-[#4c6078]">{labelId || "ID"}<input disabled placeholder={`Masukkan ${labelId || "ID"}`} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]" /></label>{checkoutType === "id-server" && <label className="mt-[9px] block text-[8px] font-bold text-[#4c6078]">{labelServer || "Server"}<input disabled placeholder={`Masukkan ${labelServer || "Server"}`} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]" /></label>}<p className="mt-[12px] text-[8px] font-bold text-[#2f4968]">Format customer_no</p><code className="mt-[5px] block rounded-[4px] bg-white px-[9px] py-[8px] text-[8px] text-[#0875ed]">{targetTemplate}</code><p className="mt-[6px] text-[7.5px] leading-4 text-[#718197]">Backend menggabungkan data ini saat mengirim pesanan otomatis. Aturan verifikasi nickname ditentukan server dan tidak dapat dimatikan dari panel.</p></aside></div>}{tab !== "Informasi Produk" && tab !== "Input Customer" && <div className="mt-[14px] grid grid-cols-3 gap-[10px]">{["Aktif", "Ditampilkan di katalog", "Gunakan pengaturan default"].map((label) => <label key={label} className="flex items-center justify-between rounded-[6px] border border-[#e1e7ee] px-[11px] py-[10px] text-[8px] font-semibold">{label}<Switch enabled onToggle={() => {}} /></label>)}</div>}</section>;
+function EditorTabPanel({ tab, product, targetTemplate, checkoutType, labelId, labelServer, onCheckoutType, onLabelId, onLabelServer, inputLoading, saving, onSave }: { tab: EditorTab; product: Product; targetTemplate: string; checkoutType: "id" | "id-server"; labelId: string; labelServer: string; onCheckoutType(value: "id" | "id-server"): void; onLabelId(value: string): void; onLabelServer(value: string): void; inputLoading: boolean; saving: boolean; onSave(): void }) {
+  return <section className="mt-[12px] rounded-[7px] border border-[#dfe6ef] bg-white p-[16px]"><div className="flex items-center justify-between border-b border-[#e8ecf1] pb-[11px]"><div><h2 className="text-[13px] font-extrabold">{tab}</h2><p className="mt-[2px] text-[8px] text-[#6c7d92]">Pengaturan {tab.toLowerCase()} untuk {product.name}.</p></div><button type="button" disabled={saving || (tab === "Input Customer" && inputLoading)} onClick={onSave} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>{tab === "Informasi Produk" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><Field label="Nama produk" name="name" placeholder={product.name} /><Field label="Slug" name="slug" placeholder={product.slug} /><Field label="Gambar produk (opsional, rasio 1:1)" name="image" placeholder="Boleh dikosongkan dan ditambahkan nanti" /><Field label="Banner halaman produk (opsional)" name="banner" placeholder="Boleh dikosongkan dan ditambahkan nanti" /></div>}{tab === "Input Customer" && <div className="mt-[14px] grid max-w-[900px] grid-cols-[minmax(0,1fr)_300px] gap-[14px]"><div className="grid grid-cols-2 gap-[12px]"><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Checkout Type<span className="mt-[3px] block font-normal text-[#718197]">Pilih data akun yang harus diisi pelanggan.</span><select disabled={inputLoading} value={checkoutType} onChange={(event) => onCheckoutType(event.target.value as "id" | "id-server")} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] bg-white px-[10px] text-[9px]"><option value="id">ID</option><option value="id-server">ID + Server</option></select></label><label className="text-[8px] font-bold text-[#3d4f68]">Label ID<span className="mt-[3px] block font-normal text-[#718197]">Nama field yang tampil di checkout customer.</span><input disabled={inputLoading} value={labelId} onChange={(event) => onLabelId(event.target.value)} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="Contoh: User ID" /></label>{checkoutType === "id-server" && <label className="text-[8px] font-bold text-[#3d4f68]">Label Server<span className="mt-[3px] block font-normal text-[#718197]">Nama field server/zone di checkout customer.</span><input disabled={inputLoading} value={labelServer} onChange={(event) => onLabelServer(event.target.value)} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="Contoh: Zone ID" /></label>}</div><aside className="rounded-[7px] border border-[#dce6f2] bg-[#f8fbff] p-[13px]"><p className="text-[9px] font-extrabold text-[#263b58]">Preview Input Checkout</p>{inputLoading ? <p className="mt-[10px] text-[8px] text-[#718197]">Memuat pengaturan dari backend...</p> : <><label className="mt-[10px] block text-[8px] font-bold text-[#4c6078]">{labelId || "ID"}<input disabled placeholder={`Masukkan ${labelId || "ID"}`} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]" /></label>{checkoutType === "id-server" && <label className="mt-[9px] block text-[8px] font-bold text-[#4c6078]">{labelServer || "Server"}<input disabled placeholder={`Masukkan ${labelServer || "Server"}`} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]" /></label>}</>}<p className="mt-[12px] text-[8px] font-bold text-[#2f4968]">Format customer_no</p><code className="mt-[5px] block rounded-[4px] bg-white px-[9px] py-[8px] text-[8px] text-[#0875ed]">{targetTemplate}</code><p className="mt-[6px] text-[7.5px] leading-4 text-[#718197]">Backend membentuk format tujuan ini dan mengunci aturan verifikasi nickname. Staff hanya mengatur jenis dan label input pelanggan.</p></aside></div>}{tab !== "Informasi Produk" && tab !== "Input Customer" && <div className="mt-[14px] grid grid-cols-3 gap-[10px]">{["Aktif", "Ditampilkan di katalog", "Gunakan pengaturan default"].map((label) => <label key={label} className="flex items-center justify-between rounded-[6px] border border-[#e1e7ee] px-[11px] py-[10px] text-[8px] font-semibold">{label}<Switch enabled onToggle={() => {}} /></label>)}</div>}</section>;
 }
 
 function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal[]; onClose(): void; onImport(items: Nominal[]): void }) {

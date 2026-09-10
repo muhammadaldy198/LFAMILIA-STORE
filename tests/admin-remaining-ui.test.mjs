@@ -38,6 +38,9 @@ test("promo, support, reports, team, and settings are fully represented", () => 
   for (const label of ["Tambah Promo", "Daftar Tiket", "Grafik Penjualan", "Hak Akses Role", "Audit Aktivitas Admin", "Logo & Ikon", "Aturan Wallet Pelanggan", "Keamanan Transaksi", "Riwayat Backup"]) assert.ok(operations.includes(label), `missing remaining UI: ${label}`);
 });
 
-test("new admin workspaces are frontend-only", () => {
-  for (const [name, source] of [["payment", payment], ["customer", customer], ["integration", integration], ["operations", operations]]) assert.doesNotMatch(source, /fetch\s*\(/, `${name} unexpectedly calls backend`);
+test("integration workspace uses real panel APIs while pending workspaces remain frontend-only", () => {
+  assert.match(integration, /fetch\("\/api\/panel\/integrations"/);
+  assert.match(integration, /fetch\("\/api\/nickname"/);
+  assert.doesNotMatch(integration, /Simulasi tes|UI sementara/);
+  for (const [name, source] of [["payment", payment], ["customer", customer], ["operations", operations]]) assert.doesNotMatch(source, /fetch\s*\(/, `${name} unexpectedly calls backend`);
 });
