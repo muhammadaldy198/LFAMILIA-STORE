@@ -27,10 +27,12 @@ test("admin reference exposes the approved desktop information architecture", ()
     "Layanan Pelanggan",
     "Laporan",
     "Staff & Admin Akses",
+    "Integrasi",
     "Pengaturan",
   ]) assert.ok(source.includes(`label: "${label}"`), label);
   assert.doesNotMatch(source, /value: "site-content"/);
-  assert.equal([...source.matchAll(/\{ value: "[^"]+", label: "[^"]+"/g)].length, 12);
+  assert.equal([...source.matchAll(/\{ value: "[^"]+", label: "[^"]+"/g)].length, 13);
+  assert.ok(source.indexOf('label: "Integrasi"') < source.indexOf('label: "Pengaturan"'));
 });
 
 test("dashboard is a backend-independent visual reference", () => {
