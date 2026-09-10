@@ -4,24 +4,24 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
-  Box,
+  Boxes,
   CreditCard,
   FileText,
+  Gamepad2,
   Headphones,
+  ImageIcon,
   LayoutDashboard,
   LifeBuoy,
-  Menu,
+  Newspaper,
   PackageSearch,
   Search,
   Settings,
   Sparkles,
+  UserCog,
   Users,
-  X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AdminBrandLogo } from "@/components/admin-brand-logo";
 import { AdminAccountMenu } from "@/components/admin-account-menu";
 import { AdminNotifications } from "@/components/admin-notifications";
 import { AdminDigiflazzMonitor } from "@/components/admin-digiflazz-monitor";
@@ -60,15 +60,16 @@ type NavigationItem = {
 const navigation: NavigationItem[] = [
   { value: "overview", label: "Dashboard", Icon: LayoutDashboard },
   { value: "orders", label: "Pesanan", Icon: FileText },
-  { value: "products", label: "Produk", Icon: Box },
-  { value: "content", label: "Banner & Konten", Icon: FileText },
+  { value: "products", label: "Produk", Icon: Boxes },
+  { value: "content", label: "Banner & Konten", Icon: ImageIcon },
   { value: "digiflazz", label: "Digiflazz", Icon: PackageSearch, ownerOnly: true },
   { value: "payments", label: "Pembayaran", Icon: CreditCard, ownerOnly: true },
   { value: "customers", label: "Pelanggan", Icon: Users, ownerOnly: true },
   { value: "promotions", label: "Promo", Icon: Sparkles, ownerOnly: true },
+  { value: "site-content", label: "Konten", Icon: Newspaper },
   { value: "support", label: "Layanan Pelanggan", Icon: Headphones },
   { value: "reports", label: "Laporan", Icon: BarChart3, ownerOnly: true },
-  { value: "team", label: "Staff & Akses", Icon: Users, ownerOnly: true },
+  { value: "team", label: "Staff & Admin Akses", Icon: UserCog, ownerOnly: true },
   { value: "settings", label: "Pengaturan", Icon: Settings, ownerOnly: true },
 ];
 
@@ -79,7 +80,6 @@ export function AdminDashboard({
   expectedRole: "owner" | "staff";
   initialSession: Session;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [globalSearch, setGlobalSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -98,162 +98,89 @@ export function AdminDashboard({
     return () => window.removeEventListener("keydown", handleShortcut);
   }, []);
 
-  function selectTab(value: string) {
-    setActiveTab(value);
-    setMenuOpen(false);
-  }
-
   function submitGlobalSearch(event: FormEvent) {
     event.preventDefault();
     const query = globalSearch.trim().toLowerCase();
     if (!query) return;
-    if (query.includes("produk") || query.includes("sku")) selectTab("products");
-    else if (["banner", "konten", "pop-up", "popup", "berita", "ulasan", "faq"].some((term) => query.includes(term))) selectTab("content");
-    else if (query.includes("pelanggan") || query.includes("customer") || query.includes("member")) selectTab("customers");
-    else selectTab("orders");
+    const target = visibleNavigation.find((item) => item.label.toLowerCase().includes(query));
+    if (target) setActiveTab(target.value);
+    else if (query.includes("sku") || query.includes("produk")) setActiveTab("products");
+    else if (query.includes("pelanggan")) setActiveTab("customers");
+    else setActiveTab("orders");
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={selectTab} className="admin-reference min-h-screen w-full max-w-full overflow-x-clip bg-[#f6f8fc] text-[#172033] lg:grid lg:grid-cols-[190px_minmax(0,1fr)]">
-      {menuOpen && (
-        <>
-          <button
-            type="button"
-            onClick={() => setMenuOpen(false)}
-            className="fixed inset-0 z-40 bg-slate-950/35 lg:hidden"
-            aria-label="Tutup navigasi panel"
-          />
-          <aside className="fixed inset-y-0 left-0 z-50 flex w-[82vw] max-w-[250px] flex-col border-r border-[#e7ebf2] bg-white shadow-2xl lg:hidden">
-            <Brand onClick={() => selectTab("overview")} />
-            <div className="flex-1 overflow-y-auto px-3 py-3">
-              <PanelNavigation items={visibleNavigation} activeTab={activeTab} mobile onSelect={selectTab} />
-            </div>
-            <SidebarHelp />
-            <div className="border-t border-[#edf0f5] p-3">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#155eef] text-[10px] font-black text-white">
-                  {initialSession.name.trim().charAt(0).toUpperCase() || "A"}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-[11px] font-bold text-[#1e293b]">{initialSession.name}</p>
-                  <p className="truncate text-[9px] text-[#94a3b8]">{isOwner ? "Super Admin" : "Staff"}</p>
-                </div>
-                <Button type="button" variant="ghost" size="icon-sm" onClick={() => setMenuOpen(false)} className="ml-auto text-[#64748b]">
-                  <X className="size-4" />
-                </Button>
-              </div>
-            </div>
-          </aside>
-        </>
-      )}
+    <Tabs
+      value={activeTab}
+      onValueChange={setActiveTab}
+      className="admin-reference grid min-h-screen min-w-[1180px] grid-cols-[230px_minmax(0,1fr)] bg-[#f4f7fb] text-[#0f1f3d]"
+    >
+      <aside className="sticky top-0 flex h-screen flex-col overflow-hidden bg-[#112842] text-white shadow-[6px_0_24px_rgba(15,37,64,0.12)]">
+        <Brand onClick={() => setActiveTab("overview")} />
 
-      <aside className="hidden min-h-screen border-r border-[#e7ebf2] bg-white lg:flex lg:flex-col">
-        <Brand onClick={() => selectTab("overview")} />
-        <div className="flex-1 px-3 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3 scrollbar-none">
           <TabsList className="h-auto w-full flex-col items-stretch gap-1 bg-transparent p-0">
-            <PanelNavigation items={visibleNavigation} activeTab={activeTab} onSelect={selectTab} />
+            {visibleNavigation.map(({ value, label, Icon }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="flex h-10 w-full justify-start rounded-md px-3 text-left text-[12px] font-medium text-slate-200/90 transition hover:bg-white/[0.08] hover:text-white data-[state=active]:bg-[#1769e8] data-[state=active]:text-white data-[state=active]:shadow-[0_5px_16px_rgba(23,105,232,0.28)]"
+              >
+                <Icon className="mr-3 size-[17px] shrink-0" strokeWidth={1.9} />
+                <span className="truncate">{label}</span>
+              </TabsTrigger>
+            ))}
           </TabsList>
         </div>
+
         <SidebarHelp />
+        <div className="px-5 pb-5 pt-2 text-[9px] leading-4 text-slate-400">
+          <p>© {new Date().getFullYear()} LFAMILIA</p>
+          <p>Top Up Game Solution</p>
+          <p>v1.0.0</p>
+        </div>
       </aside>
 
-      <div className="min-w-0 max-w-full overflow-x-clip">
-        <header className="sticky top-0 z-30 border-b border-[#e8ecf3] bg-white/95 backdrop-blur">
-          <div className="hidden h-[54px] items-center gap-3 px-5 md:flex">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => setMenuOpen(true)}
-              className="size-9 border-[#e2e8f0] bg-white text-[#475569] lg:hidden"
-              aria-label="Buka navigasi"
-            >
-              <Menu className="size-4" />
-            </Button>
+      <div className="min-w-0">
+        <header className="sticky top-0 z-30 flex h-[58px] items-center border-b border-[#e5eaf1] bg-white px-5 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
+          <form onSubmit={submitGlobalSearch} className="relative w-full max-w-[550px]">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#7d8ba3]" />
+            <Input
+              ref={searchRef}
+              value={globalSearch}
+              onChange={(event) => setGlobalSearch(event.target.value)}
+              placeholder="Cari menu, produk, pesanan, atau pelanggan..."
+              className="h-9 rounded-md border-[#dfe5ed] bg-[#f8fafc] pl-9 pr-14 text-[11px] text-[#26364f] shadow-none placeholder:text-[#98a5b8] focus-visible:ring-[#1769e8]/30"
+            />
+            <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-[#dfe5ed] bg-white px-1.5 py-0.5 text-[9px] font-semibold text-[#8b98aa]">
+              Ctrl K
+            </kbd>
+          </form>
 
-            <form onSubmit={submitGlobalSearch} className="relative w-full max-w-[420px]">
-              <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[#94a3b8]" />
-              <Input
-                ref={searchRef}
-                value={globalSearch}
-                onChange={(event) => setGlobalSearch(event.target.value)}
-                placeholder="Cari pesanan, produk, atau pelanggan..."
-                className="h-8 rounded-md border-[#e2e8f0] bg-[#f8fafc] pl-8 pr-12 text-[10px] text-[#334155] shadow-none placeholder:text-[#94a3b8]"
-              />
-              <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-[#dbe2eb] bg-white px-1.5 py-0.5 text-[8px] font-semibold text-[#94a3b8]">
-                Ctrl K
-              </kbd>
-            </form>
-
-            <div className="ml-auto flex items-center gap-2">
-              <AdminNotifications
-                sessionId={initialSession.id}
-                isOwner={isOwner}
-                onNavigate={selectTab}
-              />
-
-              <AdminAccountMenu
-                session={initialSession}
-                logoutPath={logoutPath}
-                onNavigate={selectTab}
-              />
-            </div>
-          </div>
-
-          <div className="md:hidden">
-            <div className="flex h-12 items-center gap-2 px-2.5">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => setMenuOpen(true)}
-                className="size-8 shrink-0 border-[#e2e8f0] bg-white text-[#475569]"
-                aria-label="Buka navigasi"
-              >
-                <Menu className="size-4" />
-              </Button>
-              <button type="button" onClick={() => selectTab("overview")} className="flex min-w-0 items-center gap-2 text-left">
-                <AdminBrandLogo primarySrc="/lfamilia-admin-logo.webp" />
-                <span className="truncate text-[11px] font-black tracking-[-0.02em] text-[#172033]">LFAMILIA</span>
-              </button>
-              <div className="ml-auto flex shrink-0 items-center gap-1">
-                <AdminNotifications sessionId={initialSession.id} isOwner={isOwner} onNavigate={selectTab} />
-                <AdminAccountMenu session={initialSession} logoutPath={logoutPath} onNavigate={selectTab} />
-              </div>
-            </div>
-            <form onSubmit={submitGlobalSearch} className="relative border-t border-[#f1f3f7] px-2.5 py-2">
-              <Search className="absolute left-5 top-1/2 size-3.5 -translate-y-1/2 text-[#94a3b8]" />
-              <Input
-                value={globalSearch}
-                onChange={(event) => setGlobalSearch(event.target.value)}
-                placeholder="Cari menu, pesanan, atau produk..."
-                className="h-8 w-full rounded-md border-[#e2e8f0] bg-[#f8fafc] pl-8 text-[10px] text-[#334155] shadow-none placeholder:text-[#94a3b8]"
-              />
-            </form>
+          <div className="ml-auto flex items-center gap-3">
+            <AdminNotifications sessionId={initialSession.id} isOwner={isOwner} onNavigate={setActiveTab} />
+            <span className="h-7 w-px bg-[#e7ebf1]" />
+            <AdminAccountMenu session={initialSession} logoutPath={logoutPath} onNavigate={setActiveTab} />
           </div>
         </header>
 
-        <main className="admin-v3-content min-w-0 max-w-full overflow-x-clip p-3 sm:p-5 lg:p-5">
-          <div className="mx-auto min-w-0 max-w-[1450px]">
-            <TabsContent value="overview" className="mt-0"><AdminOverview onNavigate={selectTab} /></TabsContent>
-
-            <TabsContent value="orders" className="mt-0">
-              <AdminOrderManager />
-            </TabsContent>
-
-            <TabsContent value="products" className="mt-0">
-              <AdminProductManager />
-            </TabsContent>
+        <main className="admin-v3-content min-w-0 p-5">
+          <div className="mx-auto min-w-0 max-w-[1540px]">
+            <TabsContent value="overview" className="mt-0"><AdminOverview onNavigate={setActiveTab} /></TabsContent>
+            <TabsContent value="orders" className="mt-0"><AdminOrderManager /></TabsContent>
+            <TabsContent value="products" className="mt-0"><AdminProductManager /></TabsContent>
+            <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} /></TabsContent>
+            <TabsContent value="site-content" className="mt-0"><AdminExperienceManager role={initialSession.role} /></TabsContent>
 
             {isOwner && (
               <TabsContent value="digiflazz" className="mt-0 space-y-4">
-                <AdminSection title="Digiflazz" description="Credential, price list, sinkronisasi harga, status seller, SKU, webhook, dan monitoring.">
+                <AdminSection title="Digiflazz" description="Credential, sinkronisasi, SKU, saldo, dan status layanan.">
                   <AdminIntegrationManager view="providers" providerFilter={["digiflazz"]} />
                 </AdminSection>
-                <AdminSection title="Sinkronisasi harga" description="Sinkronkan harga modal Digiflazz dan hitung harga jual berdasarkan margin nominal.">
+                <AdminSection title="Sinkronisasi Harga" description="Sinkronkan harga modal dan margin produk.">
                   <AdminDigiflazzPricing />
                 </AdminSection>
-                <AdminSection title="Monitoring SKU" description="Pantau seller OFF, stok, cut-off, kenaikan harga, dan SKU yang perlu perhatian.">
+                <AdminSection title="Monitoring SKU" description="Pantau status seller, stok, dan perubahan harga.">
                   <AdminDigiflazzMonitor />
                 </AdminSection>
               </TabsContent>
@@ -261,83 +188,37 @@ export function AdminDashboard({
 
             {isOwner && (
               <TabsContent value="payments" className="mt-0 space-y-4">
-                <AdminSection title="Persiapan Database DOKU" description="Periksa dan siapkan kolom DOKU satu kali sebelum gateway diaktifkan.">
-                  <AdminDokuDatabasePreparation />
-                </AdminSection>
-                <AdminSection title="DOKU Direct API" description="DOKU adalah gateway checkout eksternal LFAMILIA.">
-                  <AdminIntegrationManager view="providers" providerFilter={["doku"]} />
-                </AdminSection>
-                <AdminSection title="Aktivasi pembayaran" description="Aktifkan DOKU untuk checkout dan top up wallet pelanggan.">
-                  <AdminWalletManager view="checkout" />
-                </AdminSection>
-                <AdminSection title="Metode pembayaran" description="Kelola QRIS, e-wallet, dan Virtual Account yang aktif pada akun DOKU.">
-                  <AdminPaymentMethodManager />
-                </AdminSection>
-                <AdminSection title="Halaman pembayaran" description="Atur tampilan halaman pembayaran LFAMILIA.">
-                  <AdminPaymentPageManager />
-                </AdminSection>
+                <AdminSection title="Persiapan Database DOKU" description="Persiapan integrasi pembayaran."><AdminDokuDatabasePreparation /></AdminSection>
+                <AdminSection title="DOKU Direct API" description="Pengaturan gateway pembayaran."><AdminIntegrationManager view="providers" providerFilter={["doku"]} /></AdminSection>
+                <AdminSection title="Aktivasi Pembayaran" description="Atur checkout dan top up pelanggan."><AdminWalletManager view="checkout" /></AdminSection>
+                <AdminSection title="Metode Pembayaran" description="Kelola QRIS, e-wallet, dan Virtual Account."><AdminPaymentMethodManager /></AdminSection>
+                <AdminSection title="Halaman Pembayaran" description="Atur tampilan pembayaran LFAMILIA."><AdminPaymentPageManager /></AdminSection>
               </TabsContent>
             )}
 
             {isOwner && (
               <TabsContent value="customers" className="mt-0 space-y-4">
-                <AdminSection title="Pelanggan" description="Akun pelanggan, tier, transaksi, saldo, dan aktivitas.">
-                  <AdminMemberManager view="customers" />
-                </AdminSection>
-                <AdminSection title="Saldo & top up" description="Pantau top up DOKU/manual dan perubahan saldo pelanggan.">
-                  <AdminWalletManager view="topups" />
-                </AdminSection>
+                <AdminSection title="Pelanggan" description="Kelola akun, tier, transaksi, dan aktivitas pelanggan."><AdminMemberManager view="customers" /></AdminSection>
+                <AdminSection title="Saldo & Top Up" description="Pantau top up dan perubahan saldo."><AdminWalletManager view="topups" /></AdminSection>
               </TabsContent>
             )}
 
             {isOwner && (
               <TabsContent value="promotions" className="mt-0 space-y-4">
-                <AdminSection title="Promo" description="Voucher diskon dan promo harga terjadwal.">
-                  <AdminPromotionManager role="owner" />
-                </AdminSection>
-                <AdminSection title="Stok kode digital" description="Kelola stok voucher internal.">
-                  <AdminVoucherManager />
-                </AdminSection>
+                <AdminSection title="Promo" description="Kelola voucher diskon dan promo terjadwal."><AdminPromotionManager role="owner" /></AdminSection>
+                <AdminSection title="Stok Kode Digital" description="Kelola stok voucher internal."><AdminVoucherManager /></AdminSection>
               </TabsContent>
             )}
 
-            <TabsContent value="content" className="mt-0">
-              <AdminExperienceManager role={initialSession.role} />
-            </TabsContent>
-
-            <TabsContent value="support" className="mt-0">
-              <AdminSection title="Layanan Pelanggan" description="Tiket bantuan, komplain, refund, dan tindak lanjut pelanggan.">
-                <AdminSupportManager />
-              </AdminSection>
-            </TabsContent>
-
-            {isOwner && (
-              <TabsContent value="reports" className="mt-0">
-                <AdminSection title="Laporan" description="Penjualan, omzet, performa produk, pelanggan, dan transaksi.">
-                  <AdminReportsCenter />
-                </AdminSection>
-              </TabsContent>
-            )}
-
-            {isOwner && (
-              <TabsContent value="team" className="mt-0">
-                <AdminSection title="Staff & Akses" description="Kelola akun staff, role, dan akses panel.">
-                  <AdminTeamManager />
-                </AdminSection>
-              </TabsContent>
-            )}
+            <TabsContent value="support" className="mt-0"><AdminSection title="Layanan Pelanggan" description="Tiket bantuan, komplain, refund, dan tindak lanjut."><AdminSupportManager /></AdminSection></TabsContent>
+            {isOwner && <TabsContent value="reports" className="mt-0"><AdminSection title="Laporan" description="Penjualan, omzet, performa produk, dan transaksi."><AdminReportsCenter /></AdminSection></TabsContent>}
+            {isOwner && <TabsContent value="team" className="mt-0"><AdminSection title="Staff & Admin Akses" description="Kelola akun, role, permission, dan aktivitas tim."><AdminTeamManager /></AdminSection></TabsContent>}
 
             {isOwner && (
               <TabsContent value="settings" className="mt-0 space-y-4">
-                <AdminSection title="Identitas & Struktur Toko" description="Logo, kontak, kategori katalog, banner cadangan, dan kanal bantuan publik.">
-                  <AdminStorefrontManager role={initialSession.role} />
-                </AdminSection>
-                <AdminSection title="Pengaturan Sistem" description="Integrasi pendukung yang bukan provider transaksi atau payment gateway.">
-                  <AdminIntegrationManager view="providers" providerFilter={["melostore", "resend", "security"]} />
-                </AdminSection>
-                <AdminSection title="VPS Relay Digiflazz" description="Opsional: relay IP statis hanya untuk Digiflazz.">
-                  <AdminIntegrationManager view="relay" />
-                </AdminSection>
+                <AdminSection title="Identitas & Struktur Toko" description="Profil toko, kontak, logo, kategori, dan kanal publik."><AdminStorefrontManager role={initialSession.role} /></AdminSection>
+                <AdminSection title="Pengaturan Sistem" description="Integrasi pendukung dan keamanan sistem."><AdminIntegrationManager view="providers" providerFilter={["melostore", "resend", "security"]} /></AdminSection>
+                <AdminSection title="VPS Relay Digiflazz" description="Konfigurasi relay untuk Digiflazz."><AdminIntegrationManager view="relay" /></AdminSection>
               </TabsContent>
             )}
           </div>
@@ -349,94 +230,43 @@ export function AdminDashboard({
 
 function Brand({ onClick }: { onClick(): void }) {
   return (
-    <button type="button" onClick={onClick} className="flex h-[54px] w-full items-center gap-2.5 border-b border-[#edf0f5] px-4 text-left">
-      <AdminBrandLogo primarySrc="/lfamilia-admin-logo.webp" />
+    <button type="button" onClick={onClick} className="flex h-[70px] w-full items-center gap-3 border-b border-white/[0.07] px-4 text-left">
+      <span className="grid size-[42px] place-items-center rounded-full bg-gradient-to-br from-[#2483ff] to-[#0b56c8] shadow-[0_8px_22px_rgba(17,99,224,0.35)]">
+        <Gamepad2 className="size-6 text-white" strokeWidth={2.2} />
+      </span>
       <span className="min-w-0">
-        <strong className="block truncate text-[13px] font-black tracking-[-0.03em] text-[#172033]">LFAMILIA</strong>
-        <span className="block truncate text-[6px] font-bold uppercase tracking-[0.1em] text-[#94a3b8]">Top Up & Digital Service</span>
+        <strong className="block truncate text-[14px] font-extrabold tracking-[-0.02em] text-white">LFAMILIA ADMIN</strong>
+        <span className="mt-0.5 block truncate text-[8px] font-medium text-slate-400">Top Up Game Solution</span>
       </span>
     </button>
   );
 }
 
-function PanelNavigation({
-  items,
-  activeTab,
-  onSelect,
-  mobile = false,
-}: {
-  items: NavigationItem[];
-  activeTab: string;
-  onSelect: (value: string) => void;
-  mobile?: boolean;
-}) {
-  if (mobile) {
-    return (
-      <nav className="space-y-1" aria-label="Navigasi panel mobile">
-        {items.map(({ value, label, Icon }) => {
-          const active = value === activeTab;
-          return (
-            <button
-              key={value}
-              type="button"
-              onClick={() => onSelect(value)}
-              className={
-                "flex h-9 w-full items-center rounded-md px-2.5 text-left text-[10px] font-semibold transition " +
-                (active
-                  ? "bg-[#edf4ff] text-[#155eef]"
-                  : "text-[#526072] hover:bg-[#f7f9fc] hover:text-[#172033]")
-              }
-            >
-              <Icon className="mr-2.5 size-3.5" />
-              <span className="truncate">{label}</span>
-            </button>
-          );
-        })}
-      </nav>
-    );
-  }
-
-  return (
-    <>
-      {items.map(({ value, label, Icon }) => (
-        <TabsTrigger
-          key={value}
-          value={value}
-          onClick={() => onSelect(value)}
-          className="flex h-9 w-full justify-start rounded-md px-2.5 text-left text-[10px] font-semibold text-[#526072] hover:bg-[#f7f9fc] hover:text-[#172033] data-[state=active]:bg-[#edf4ff] data-[state=active]:text-[#155eef] data-[state=active]:shadow-none"
-        >
-          <Icon className="mr-2.5 size-3.5" />
-          <span className="truncate">{label}</span>
-        </TabsTrigger>
-      ))}
-    </>
-  );
-}
-
 function SidebarHelp() {
   return (
-    <div className="p-3">
-      <button type="button" className="w-full rounded-lg border border-[#edf0f5] bg-[#fbfcfe] p-3 text-left transition hover:border-[#dfe5ee] hover:bg-white">
-        <p className="text-[9px] font-semibold text-[#64748b]">Butuh bantuan?</p>
-        <p className="mt-2 flex items-center gap-2 text-[9px] font-bold text-[#334155]">
-          <span className="grid size-6 place-items-center rounded-md bg-white text-[#64748b] shadow-sm">
-            <LifeBuoy className="size-3.5" />
-          </span>
-          Pusat Bantuan
-        </p>
-      </button>
+    <div className="px-4 pb-3">
+      <div className="rounded-lg bg-white/[0.055] p-3">
+        <div className="flex items-start gap-2.5">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full border border-white/20 text-white"><LifeBuoy className="size-4" /></span>
+          <div>
+            <p className="text-[10px] font-semibold text-white">Butuh bantuan?</p>
+            <p className="mt-0.5 text-[8px] leading-3.5 text-slate-400">Tim kami siap membantu Anda 24/7.</p>
+          </div>
+        </div>
+        <button type="button" className="mt-3 h-8 w-full rounded-md bg-white/[0.08] text-[9px] font-semibold text-white transition hover:bg-white/[0.13]">Pusat Bantuan</button>
+      </div>
     </div>
   );
 }
 
 function AdminSection({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-[#e4e9f1] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.03)]">
-      <div className="border-b border-[#edf0f5] px-4 py-3">
-        <h2 className="text-sm font-bold text-[#172033]">{title}</h2>
-        <p className="mt-0.5 text-[9px] leading-4 text-[#94a3b8]">{description}</p>
+    <section className="overflow-hidden rounded-lg border border-[#e1e6ed] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      <div className="border-b border-[#edf0f4] px-4 py-3">
+        <h2 className="text-sm font-bold text-[#14213a]">{title}</h2>
+        <p className="mt-0.5 text-[9px] leading-4 text-[#8190a5]">{description}</p>
       </div>
-      <div className="p-3 sm:p-4">{children}</div>
+      <div className="p-4">{children}</div>
     </section>
   );
 }
