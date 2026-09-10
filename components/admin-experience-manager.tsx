@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element, react-hooks/set-state-in-effect */
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {

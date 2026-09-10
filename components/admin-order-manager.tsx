@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";

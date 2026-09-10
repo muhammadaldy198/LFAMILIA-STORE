@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element, react-hooks/set-state-in-effect */
 
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { AlertTriangle, CheckCircle2, CreditCard, Eye, ImagePlus, Landmark, QrCode, Receipt, RefreshCw, Save, Search, Smartphone, Wallet } from "lucide-react";

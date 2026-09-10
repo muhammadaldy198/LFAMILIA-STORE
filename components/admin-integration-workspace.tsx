@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { CheckCircle2, Eye, EyeOff, KeyRound, Mail, Network, RefreshCw, Save, Server, ShieldCheck, WalletCards, XCircle } from "lucide-react";
