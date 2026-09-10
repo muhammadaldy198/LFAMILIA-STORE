@@ -59,21 +59,23 @@ export async function PUT(request: Request) {
     if (!target) throw new Error(input.accountType === "customer" ? "Pelanggan tidak ditemukan." : "Akun admin tidak ditemukan.");
     const before = Math.max(0, Number(target.balance || 0));
     if (input.operation === "debit" && before < input.amount) throw new Error("Saldo tidak mencukupi untuk dikurangi.");
-    const after = input.operation === "credit" ? before + input.amount : before - input.amount;
     const direction = input.operation === "credit" ? "credit" : "debit";
+    const delta = direction === "credit" ? input.amount : -input.amount;
     const reference = `admin-adjustment:${crypto.randomUUID()}`;
     const description = `${input.accountType === "admin" ? "Saldo admin" : "Saldo pelanggan"} oleh ${access.email}: ${input.reason}`;
     const results = await db.batch([
       db.prepare(`INSERT INTO wallet_transactions (id, customer_id, direction, amount, balance_before, balance_after, reference, description)
-        SELECT ?, id, ?, ?, balance, ?, ?, ? FROM customer_users
+        SELECT ?, id, ?, ?, balance, balance + ?, ?, ? FROM customer_users
         WHERE id = ? AND (? = 'credit' OR balance >= ?)`)
-        .bind(crypto.randomUUID(), direction, input.amount, after, reference, description, target.ledger_id, direction, input.amount),
-      db.prepare(`UPDATE customer_users SET balance = ?, updated_at = CURRENT_TIMESTAMP
+        .bind(crypto.randomUUID(), direction, input.amount, delta, reference, description, target.ledger_id, direction, input.amount),
+      db.prepare(`UPDATE customer_users SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND (? = 'credit' OR balance >= ?)`)
-        .bind(after, target.ledger_id, direction, input.amount),
+        .bind(delta, target.ledger_id, direction, input.amount),
     ]);
     if (!results[1]?.meta.changes) throw new Error("Saldo berubah sebelum transaksi selesai. Muat ulang lalu coba lagi.");
-    return Response.json({ ok: true, balanceBefore: before, balanceAfter: after, target: { id: input.targetId, name: target.target_name, email: target.target_email }, ...(await readOverview()) });
+    const updated = await db.prepare("SELECT balance FROM customer_users WHERE id = ? LIMIT 1").bind(target.ledger_id).first<{ balance: number }>();
+    const balanceAfter = Number(updated?.balance ?? before + delta);
+    return Response.json({ ok: true, balanceBefore: balanceAfter - delta, balanceAfter, target: { id: input.targetId, name: target.target_name, email: target.target_email }, ...(await readOverview()) });
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message || "Perubahan saldo tidak valid." : error instanceof Error ? error.message : "Saldo gagal diperbarui.";
     return Response.json({ error: message }, { status: 400 });
