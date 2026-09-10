@@ -114,7 +114,7 @@ export function AdminDashboard({
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={selectTab} className="admin-reference min-h-screen bg-[#f6f8fc] text-[#172033] lg:grid lg:grid-cols-[190px_minmax(0,1fr)]">
+    <Tabs value={activeTab} onValueChange={selectTab} className="admin-reference min-h-screen w-full max-w-full overflow-x-clip bg-[#f6f8fc] text-[#172033] lg:grid lg:grid-cols-[190px_minmax(0,1fr)]">
       {menuOpen && (
         <>
           <button
@@ -157,9 +157,9 @@ export function AdminDashboard({
         <SidebarHelp />
       </aside>
 
-      <div className="min-w-0">
+      <div className="min-w-0 max-w-full overflow-x-clip">
         <header className="sticky top-0 z-30 border-b border-[#e8ecf3] bg-white/95 backdrop-blur">
-          <div className="flex h-[54px] items-center gap-3 px-3 sm:px-5">
+          <div className="hidden h-[54px] items-center gap-3 px-5 md:flex">
             <Button
               type="button"
               variant="outline"
@@ -199,10 +199,42 @@ export function AdminDashboard({
               />
             </div>
           </div>
+
+          <div className="md:hidden">
+            <div className="flex h-12 items-center gap-2 px-2.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setMenuOpen(true)}
+                className="size-8 shrink-0 border-[#e2e8f0] bg-white text-[#475569]"
+                aria-label="Buka navigasi"
+              >
+                <Menu className="size-4" />
+              </Button>
+              <button type="button" onClick={() => selectTab("overview")} className="flex min-w-0 items-center gap-2 text-left">
+                <AdminBrandLogo primarySrc="/lfamilia-admin-logo.webp" />
+                <span className="truncate text-[11px] font-black tracking-[-0.02em] text-[#172033]">LFAMILIA</span>
+              </button>
+              <div className="ml-auto flex shrink-0 items-center gap-1">
+                <AdminNotifications sessionId={initialSession.id} isOwner={isOwner} onNavigate={selectTab} />
+                <AdminAccountMenu session={initialSession} logoutPath={logoutPath} onNavigate={selectTab} />
+              </div>
+            </div>
+            <form onSubmit={submitGlobalSearch} className="relative border-t border-[#f1f3f7] px-2.5 py-2">
+              <Search className="absolute left-5 top-1/2 size-3.5 -translate-y-1/2 text-[#94a3b8]" />
+              <Input
+                value={globalSearch}
+                onChange={(event) => setGlobalSearch(event.target.value)}
+                placeholder="Cari menu, pesanan, atau produk..."
+                className="h-8 w-full rounded-md border-[#e2e8f0] bg-[#f8fafc] pl-8 text-[10px] text-[#334155] shadow-none placeholder:text-[#94a3b8]"
+              />
+            </form>
+          </div>
         </header>
 
-        <main className="admin-v3-content min-w-0 p-3 sm:p-5 lg:p-5">
-          <div className="mx-auto max-w-[1450px]">
+        <main className="admin-v3-content min-w-0 max-w-full overflow-x-clip p-3 sm:p-5 lg:p-5">
+          <div className="mx-auto min-w-0 max-w-[1450px]">
             <TabsContent value="overview" className="mt-0"><AdminOverview onNavigate={selectTab} /></TabsContent>
 
             <TabsContent value="orders" className="mt-0">
