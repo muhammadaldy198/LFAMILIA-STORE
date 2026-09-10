@@ -1,14 +1,12 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   BadgeCheck,
   CalendarDays,
   Check,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   CircleX,
   Clock3,
   Cog,
@@ -32,6 +30,7 @@ import {
 type OrderStatus = "Berhasil" | "Diproses" | "Pending" | "Gagal" | "Komplain";
 
 type Order = {
+  dbId?: string;
   id: string;
   customer: string;
   phone: string;
@@ -44,6 +43,29 @@ type Order = {
   provider: string;
   total: number;
   status: OrderStatus;
+  createdAt?: string;
+  fulfillmentStatus?: string;
+  deliveryMode?: "direct" | "voucher" | "manual";
+};
+
+type ApiOrder = {
+  id: string;
+  reference_id: string;
+  product_name: string;
+  package_sku: string;
+  package_label: string;
+  destination: string;
+  server: string | null;
+  nickname: string | null;
+  buyer_name: string;
+  buyer_phone: string;
+  total: number | null;
+  payment_channel: string;
+  payment_status: string;
+  provider_code: string | null;
+  fulfillment_status: string;
+  delivery_mode: "direct" | "voucher" | "manual";
+  created_at: string;
 };
 
 type Activity = {
@@ -55,43 +77,72 @@ type Activity = {
   Icon: LucideIcon;
 };
 
-const initialOrders: Order[] = [
-  { id: "INV/20250423/0012", customer: "Rizky Pratama", phone: "0857****1123", product: "Mobile Legends", packageName: "86 Diamond", productCode: "ML", destination: "123456789", destinationNote: "ID Server: 9876", payment: "QRIS DOKU", provider: "Digiflazz", total: 20000, status: "Berhasil" },
-  { id: "INV/20250423/0011", customer: "Siti Aulia", phone: "0812****7789", product: "Free Fire", packageName: "Membership Mingguan", productCode: "FF", destination: "556677889", destinationNote: "ID Server: 1122", payment: "DOKU VA BCA", provider: "Digiflazz", total: 33000, status: "Diproses" },
-  { id: "INV/20250423/0010", customer: "Budi Santoso", phone: "0813****4455", product: "PUBG Mobile", packageName: "325 UC", productCode: "PUBG", destination: "8899001122", destinationNote: "ID: 3344", payment: "DOKU GoPay", provider: "Digiflazz", total: 75000, status: "Berhasil" },
-  { id: "INV/20250423/0009", customer: "Andi Saputra", phone: "0821****6677", product: "Valorant", packageName: "100 Valorant Points", productCode: "VAL", destination: "Riot ID: AndiS#INA", destinationNote: "Tag: #1234", payment: "QRIS DOKU", provider: "Digiflazz", total: 16000, status: "Pending" },
-  { id: "INV/20250423/0008", customer: "Maya Sari", phone: "0819****3344", product: "Genshin Impact", packageName: "Blessing of the Welkin Moon", productCode: "GI", destination: "UID 812345678", destinationNote: "Server: Asia", payment: "DOKU GoPay", provider: "Digiflazz", total: 79000, status: "Berhasil" },
-  { id: "INV/20250423/0007", customer: "Dimas Kurniawan", phone: "0856****9988", product: "Steam Wallet", packageName: "Rp 120.000", productCode: "STEAM", destination: "Steam ID: dimas123", destinationNote: "", payment: "DOKU VA BCA", provider: "Digiflazz", total: 120000, status: "Berhasil" },
-  { id: "INV/20250423/0006", customer: "Putri Ananda", phone: "0822****7766", product: "Mobile Legends", packageName: "172 Diamond", productCode: "ML", destination: "987654321", destinationNote: "ID Server: 4321", payment: "QRIS DOKU", provider: "Digiflazz", total: 40000, status: "Gagal" },
-  { id: "INV/20250423/0005", customer: "Fahri Maulana", phone: "0811****2233", product: "Free Fire", packageName: "510 Diamond", productCode: "FF", destination: "778899001", destinationNote: "ID Server: 6677", payment: "DOKU GoPay", provider: "Digiflazz", total: 149000, status: "Berhasil" },
-  { id: "INV/20250423/0004", customer: "Nabila Putri", phone: "0838****4455", product: "PUBG Mobile", packageName: "660 UC", productCode: "PUBG", destination: "1122334455", destinationNote: "ID: 8899", payment: "QRIS DOKU", provider: "Digiflazz", total: 149000, status: "Komplain" },
-  { id: "INV/20250423/0003", customer: "Kevin Wijaya", phone: "0877****9900", product: "Valorant", packageName: "2050 Valorant Points", productCode: "VAL", destination: "Riot ID: KevinW#INA", destinationNote: "Tag: #5678", payment: "DOKU VA BCA", provider: "Digiflazz", total: 299000, status: "Berhasil" },
-];
+type OrderMetric = { label: string; value: string; change: string; note: string; trend: "up" | "down"; trendTone: "green" | "red"; tone: string; Icon: LucideIcon };
 
-const activities: Activity[] = [
-  { title: "Pembayaran diterima", invoice: "INV/20250423/0012", detail: "DOKU - QRIS", time: "2 menit lalu", tone: "green", Icon: CheckCircle2 },
-  { title: "Pesanan dikirim Digiflazz", invoice: "INV/20250423/0011", detail: "Mobile Legends 86 Diamond", time: "5 menit lalu", tone: "blue", Icon: Send },
-  { title: "Menunggu pembayaran", invoice: "INV/20250423/0009", detail: "DOKU VA BCA", time: "8 menit lalu", tone: "yellow", Icon: Clock3 },
-  { title: "Pesanan berhasil", invoice: "INV/20250423/0008", detail: "Genshin Impact", time: "12 menit lalu", tone: "green", Icon: CheckCircle2 },
-  { title: "Pembayaran gagal", invoice: "INV/20250423/0006", detail: "Saldo tidak mencukupi", time: "18 menit lalu", tone: "red", Icon: CircleX },
-  { title: "Pesanan dikirim Digiflazz", invoice: "INV/20250423/0005", detail: "Free Fire 510 Diamond", time: "25 menit lalu", tone: "blue", Icon: Send },
-  { title: "Komplain masuk", invoice: "INV/20250423/0004", detail: "Produk belum diterima", time: "32 menit lalu", tone: "pink", Icon: TriangleAlert },
-  { title: "Pesanan berhasil", invoice: "INV/20250423/0003", detail: "Valorant 2050 Points", time: "45 menit lalu", tone: "green", Icon: CheckCircle2 },
-  { title: "Menunggu pembayaran", invoice: "INV/20250423/0002", detail: "DOKU GoPay", time: "1 jam lalu", tone: "yellow", Icon: Clock3 },
-  { title: "Pembayaran diterima", invoice: "INV/20250423/0001", detail: "DOKU - QRIS", time: "2 jam lalu", tone: "green", Icon: CheckCircle2 },
-];
+function mapOrderStatus(order: ApiOrder): OrderStatus {
+  if (order.fulfillment_status === "success") return "Berhasil";
+  if (order.payment_status === "failed" || order.fulfillment_status === "failed") return "Gagal";
+  if (["needs_review", "retry_exhausted"].includes(order.fulfillment_status)) return "Komplain";
+  if (["paid", "processing", "dispatching", "manual_pending"].includes(order.fulfillment_status) || order.payment_status === "paid") return "Diproses";
+  return "Pending";
+}
 
-const metrics: Array<{ label: string; value: string; change: string; note: string; trend: "up" | "down"; trendTone: "green" | "red"; tone: string; Icon: LucideIcon }> = [
-  { label: "Total Pesanan", value: "12.450", change: "+12.5%", note: "dari bulan lalu", trend: "up", trendTone: "green", tone: "blue", Icon: ShoppingCart },
-  { label: "Pending", value: "125", change: "+8.1%", note: "dari bulan lalu", trend: "up", trendTone: "red", tone: "yellow", Icon: Clock3 },
-  { label: "Diproses", value: "86", change: "-15.3%", note: "dari bulan lalu", trend: "down", trendTone: "green", tone: "blue", Icon: Cog },
-  { label: "Berhasil", value: "11.980", change: "+10.2%", note: "dari bulan lalu", trend: "up", trendTone: "green", tone: "green", Icon: BadgeCheck },
-  { label: "Gagal", value: "42", change: "+2.4%", note: "dari bulan lalu", trend: "up", trendTone: "red", tone: "red", Icon: CircleX },
-  { label: "Komplain", value: "18", change: "+20.0%", note: "dari bulan lalu", trend: "up", trendTone: "red", tone: "red", Icon: TriangleAlert },
-];
+function mapApiOrder(order: ApiOrder): Order {
+  return {
+    dbId: order.id,
+    id: order.reference_id,
+    customer: order.buyer_name || "Pelanggan",
+    phone: order.buyer_phone || "-",
+    product: order.product_name,
+    packageName: order.package_label,
+    productCode: order.product_name.split(/\s+/).map((part) => part[0]).join("").slice(0, 5).toUpperCase(),
+    destination: order.destination,
+    destinationNote: [order.server ? `Server: ${order.server}` : "", order.nickname ? `Nickname: ${order.nickname}` : ""].filter(Boolean).join(" · "),
+    payment: friendlyPayment(order.payment_channel),
+    provider: order.provider_code === "digiflazz" ? "Digiflazz" : "Manual",
+    total: Number(order.total || 0),
+    status: mapOrderStatus(order),
+    createdAt: order.created_at,
+    fulfillmentStatus: order.fulfillment_status,
+    deliveryMode: order.delivery_mode,
+  };
+}
+
+function orderActivity(order: Order): Activity {
+  if (order.status === "Berhasil") return { title: "Pesanan berhasil", invoice: order.id, detail: order.product, time: shortDate(order.createdAt), tone: "green", Icon: CheckCircle2 };
+  if (order.status === "Gagal") return { title: "Pesanan gagal", invoice: order.id, detail: order.product, time: shortDate(order.createdAt), tone: "red", Icon: CircleX };
+  if (order.status === "Komplain") return { title: "Pesanan perlu diperiksa", invoice: order.id, detail: order.product, time: shortDate(order.createdAt), tone: "pink", Icon: TriangleAlert };
+  if (order.status === "Diproses") return { title: "Pesanan sedang diproses", invoice: order.id, detail: order.product, time: shortDate(order.createdAt), tone: "blue", Icon: Send };
+  return { title: "Menunggu pembayaran", invoice: order.id, detail: order.payment, time: shortDate(order.createdAt), tone: "yellow", Icon: Clock3 };
+}
+
+function friendlyPayment(value: string) {
+  const normalized = value.replaceAll("_", " ").trim();
+  if (normalized === "wallet") return "Saldo LFAMILIA";
+  if (normalized === "admin manual") return "Admin Manual";
+  return normalized.toUpperCase() || "DOKU";
+}
+
+function shortDate(value?: string) {
+  if (!value) return "-";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("id-ID", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(date);
+}
+
+function exportRows(rows: Order[], filename: string) {
+  const headings = ["ID Pesanan", "Pelanggan", "Produk", "Tujuan", "Pembayaran", "Provider", "Total", "Status"];
+  const lines = rows.map((order) => [order.id, order.customer, `${order.product} ${order.packageName}`, order.destination, order.payment, order.provider, order.total, order.status]);
+  const csv = [headings, ...lines].map((line) => line.map(csvCell).join(",")).join("\n");
+  const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 export function AdminOrderManager() {
-  const [orders, setOrders] = useState(initialOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Semua Status");
   const [provider, setProvider] = useState("Semua Provider");
@@ -102,8 +153,37 @@ export function AdminOrderManager() {
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [notice, setNotice] = useState("");
-  const [lastUpdated, setLastUpdated] = useState("10:24 WIB");
+  const [lastUpdated, setLastUpdated] = useState("Belum dimuat");
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function loadOrders(signal?: AbortSignal) {
+    setLoading(true); setError("");
+    try {
+      const response = await fetch("/api/panel/orders", { cache: "no-store", signal });
+      const payload = await response.json().catch(() => ({})) as { orders?: ApiOrder[]; error?: string };
+      if (!response.ok || !payload.orders) throw new Error(payload.error || "Pesanan gagal dimuat.");
+      setOrders(payload.orders.map(mapApiOrder));
+      setLastUpdated(`${new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date())} WIB`);
+    } catch (reason) {
+      if (reason instanceof DOMException && reason.name === "AbortError") return;
+      setError(reason instanceof Error ? reason.message : "Pesanan gagal dimuat.");
+    } finally { setLoading(false); }
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadOrders(controller.signal);
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const timer = window.setInterval(() => { void loadOrders(); }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [autoRefresh]);
 
   const visibleOrders = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -113,9 +193,21 @@ export function AdminOrderManager() {
       return (!term || searchable.includes(term)) &&
         (status === "Semua Status" || order.status === status) &&
         (provider === "Semua Provider" || order.provider === provider) &&
-        (payment === "Semua Pembayaran" || paymentGroup === payment);
+        (payment === "Semua Pembayaran" || paymentGroup === payment) &&
+        (!date || order.createdAt?.slice(0, 10) === date);
     });
-  }, [orders, payment, provider, query, status]);
+  }, [date, orders, payment, provider, query, status]);
+
+  const liveMetrics = useMemo(() => [
+    { label: "Total Pesanan", value: String(orders.length), change: "Aktual", note: "data tersimpan", trend: "up" as const, trendTone: "green" as const, tone: "blue", Icon: ShoppingCart },
+    { label: "Pending", value: String(orders.filter((item) => item.status === "Pending").length), change: "Aktual", note: "menunggu bayar", trend: "up" as const, trendTone: "red" as const, tone: "yellow", Icon: Clock3 },
+    { label: "Diproses", value: String(orders.filter((item) => item.status === "Diproses").length), change: "Aktual", note: "sedang diproses", trend: "up" as const, trendTone: "green" as const, tone: "blue", Icon: Cog },
+    { label: "Berhasil", value: String(orders.filter((item) => item.status === "Berhasil").length), change: "Aktual", note: "selesai", trend: "up" as const, trendTone: "green" as const, tone: "green", Icon: BadgeCheck },
+    { label: "Gagal", value: String(orders.filter((item) => item.status === "Gagal").length), change: "Aktual", note: "perlu diperiksa", trend: "up" as const, trendTone: "red" as const, tone: "red", Icon: CircleX },
+    { label: "Komplain", value: String(orders.filter((item) => item.status === "Komplain").length), change: "Aktual", note: "butuh tindakan", trend: "up" as const, trendTone: "red" as const, tone: "red", Icon: TriangleAlert },
+  ], [orders]);
+
+  const liveActivities = useMemo(() => orders.slice(0, 10).map(orderActivity), [orders]);
 
   const allSelected = visibleOrders.length > 0 && visibleOrders.every((order) => selected.includes(order.id));
 
@@ -127,22 +219,13 @@ export function AdminOrderManager() {
     setDate("");
   }
 
-  function refresh() {
-    const now = new Date();
-    setLastUpdated(`${now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ":")} WIB`);
-    setNotice("Data tampilan berhasil diperbarui.");
+  async function refresh() {
+    await loadOrders();
+    setNotice("Pesanan terbaru berhasil dimuat.");
   }
 
   function exportCsv() {
-    const headings = ["ID Pesanan", "Pelanggan", "Produk", "Tujuan", "Pembayaran", "Provider", "Total", "Status"];
-    const lines = visibleOrders.map((order) => [order.id, order.customer, `${order.product} ${order.packageName}`, order.destination, order.payment, order.provider, order.total, order.status]);
-    const csv = [headings, ...lines].map((line) => line.map(csvCell).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "pesanan-lfamilia.csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
+    exportRows(visibleOrders, "pesanan-lfamilia.csv");
   }
 
   function toggleAll() {
@@ -155,36 +238,25 @@ export function AdminOrderManager() {
       setNotice("Pilih pesanan dan aksi massal terlebih dahulu.");
       return;
     }
-    if (bulkAction === "Tandai diproses") {
-      setOrders((current) => current.map((order) => selected.includes(order.id) ? { ...order, status: "Diproses" as OrderStatus } : order));
-    }
-    setNotice(`${bulkAction} diterapkan ke ${selected.length} pesanan.`);
+    const chosen = orders.filter((order) => selected.includes(order.id));
+    exportRows(chosen, "pesanan-terpilih-lfamilia.csv");
+    setNotice(`${chosen.length} pesanan terpilih berhasil diekspor.`);
     setSelected([]);
   }
 
-  function addManualOrder(event: FormEvent<HTMLFormElement>) {
+  async function addManualOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    const customer = String(data.get("customer") || "Pelanggan Manual");
-    const product = String(data.get("product") || "Mobile Legends");
-    const destination = String(data.get("destination") || "-");
-    const newOrder: Order = {
-      id: `INV/MANUAL/${String(orders.length + 1).padStart(4, "0")}`,
-      customer,
-      phone: String(data.get("phone") || "-"),
-      product,
-      packageName: String(data.get("packageName") || "Pesanan manual"),
-      productCode: product.slice(0, 3).toUpperCase(),
-      destination,
-      destinationNote: "Dibuat oleh Admin",
-      payment: String(data.get("payment") || "QRIS DOKU"),
-      provider: "Manual",
-      total: Number(data.get("total") || 0),
-      status: "Pending",
-    };
-    setOrders((current) => [newOrder, ...current]);
-    setManualOpen(false);
-    setNotice(`Pesanan manual ${newOrder.id} berhasil ditambahkan.`);
+    setSaving(true); setError("");
+    try {
+      const response = await fetch("/api/panel/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(data.entries())) });
+      const payload = await response.json().catch(() => ({})) as { referenceId?: string; error?: string };
+      if (!response.ok) throw new Error(payload.error || "Pesanan manual gagal disimpan.");
+      setManualOpen(false);
+      setNotice(`Pesanan manual ${payload.referenceId || "baru"} berhasil disimpan.`);
+      await loadOrders();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Pesanan manual gagal disimpan."); }
+    finally { setSaving(false); }
   }
 
   return (
@@ -214,9 +286,10 @@ export function AdminOrderManager() {
           <span>{notice}</span><X className="size-[12px]" />
         </button>
       )}
+      {error && <button type="button" onClick={() => setError("")} className="mt-[10px] w-full rounded-[6px] border border-red-200 bg-red-50 px-[12px] py-[8px] text-left text-[9px] text-red-700">{error}</button>}
 
       <section className="mt-[12px] grid grid-cols-6 gap-[10px]">
-        {metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}
+        {liveMetrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}
       </section>
 
       <div className="mt-[12px] grid grid-cols-[minmax(0,1fr)_270px] gap-[12px]">
@@ -233,14 +306,14 @@ export function AdminOrderManager() {
             <label className="relative">
               <span className="sr-only">Pilih tanggal</span>
               <CalendarDays className="absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#58708d]" />
-              <input value={date} onChange={(event) => setDate(event.target.value)} placeholder="Pilih Tanggal" className="h-[32px] w-full rounded-[5px] border border-[#dfe5ed] bg-white pl-[30px] pr-[7px] text-[8px] text-[#33445d] outline-none placeholder:text-[#7b899c]" />
+              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="h-[32px] w-full rounded-[5px] border border-[#dfe5ed] bg-white pl-[30px] pr-[7px] text-[8px] text-[#33445d] outline-none" />
             </label>
             <button type="button" onClick={resetFilters} className="h-[32px] rounded-[5px] border border-[#dfe5ed] bg-white text-[9px] font-semibold text-[#43536b] hover:bg-[#f6f8fb]">Reset</button>
           </div>
 
           <div className="flex h-[43px] items-center justify-between px-[12px]">
             <h2 className="text-[12px] font-extrabold text-[#101c34]">Daftar Pesanan</h2>
-            <span className="text-[8px] text-[#657690]">Menampilkan 1–{visibleOrders.length} dari 12.450 pesanan</span>
+            <span className="text-[8px] text-[#657690]">{loading ? "Memuat pesanan..." : `Menampilkan 1–${visibleOrders.length} dari ${orders.length} pesanan`}</span>
           </div>
 
           <DesktopOrderTable orders={visibleOrders} selected={selected} onSelect={setSelected} onOpen={setDetailOrder} />
@@ -249,23 +322,23 @@ export function AdminOrderManager() {
             <div className="flex items-center gap-[8px]">
               <label className="flex items-center gap-[7px] text-[8px] text-[#4f6078]"><Checkbox checked={allSelected} onChange={toggleAll} />Pilih semua</label>
               <select value={bulkAction} onChange={(event) => setBulkAction(event.target.value)} className="h-[30px] w-[142px] rounded-[5px] border border-[#dce3eb] bg-white px-[9px] text-[8px] text-[#42536a] outline-none">
-                <option>Aksi massal</option><option>Tandai diproses</option><option>Cetak invoice</option><option>Export terpilih</option>
+                <option>Aksi massal</option><option>Export terpilih</option>
               </select>
               <button type="button" onClick={applyBulkAction} className="h-[30px] rounded-[5px] bg-[#e8eef6] px-[13px] text-[8px] font-semibold text-[#61718a] hover:bg-[#dce6f1]">Terapkan</button>
             </div>
             <div className="flex items-center gap-[8px] text-[8px] text-[#52627a]">
               <span>Baris per halaman</span>
-              <select className="h-[29px] rounded-[5px] border border-[#dce3eb] bg-white px-[8px] outline-none"><option>10</option><option>25</option><option>50</option></select>
+              <select className="h-[29px] rounded-[5px] border border-[#dce3eb] bg-white px-[8px] outline-none"><option>500</option></select>
               <Pagination />
             </div>
           </footer>
         </section>
 
-        <ActivityPanel />
+        <ActivityPanel activities={liveActivities} />
       </div>
 
-      {detailOrder && <OrderDetailModal order={detailOrder} onClose={() => setDetailOrder(null)} onNotice={setNotice} />}
-      {manualOpen && <ManualOrderModal onClose={() => setManualOpen(false)} onSubmit={addManualOrder} />}
+      {detailOrder && <OrderDetailModal order={detailOrder} onClose={() => setDetailOrder(null)} onNotice={setNotice} onCompleted={() => void loadOrders()} />}
+      {manualOpen && <ManualOrderModal saving={saving} onClose={() => setManualOpen(false)} onSubmit={addManualOrder} />}
     </div>
   );
 }
@@ -274,7 +347,7 @@ function ToolbarButton({ children, onClick }: { children: ReactNode; onClick(): 
   return <button type="button" onClick={onClick} className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] border border-[#dbe3ed] bg-white px-[13px] text-[9px] font-bold text-[#34445d] shadow-[0_1px_2px_rgba(15,23,42,0.02)] hover:bg-[#f8fafc]">{children}</button>;
 }
 
-function MetricCard({ label, value, change, note, trend, trendTone, tone, Icon }: (typeof metrics)[number]) {
+function MetricCard({ label, value, change, note, trend, trendTone, tone, Icon }: OrderMetric) {
   const iconTone = tone === "green" ? "bg-[#dcf8ea] text-[#08ad65]" : tone === "yellow" ? "bg-[#fff5d9] text-[#f4a700]" : tone === "red" ? "bg-[#ffe8e9] text-[#ed2639]" : "bg-[#e8f2ff] text-[#1675ee]";
   const trendColor = trendTone === "green" ? "text-[#0ba75b]" : "text-[#e9273d]";
   return (
@@ -320,7 +393,7 @@ function DesktopOrderTable({ orders, selected, onSelect, onOpen }: { orders: Ord
               <td className="truncate py-[6px] pr-[7px]">{order.provider}</td>
               <td className="whitespace-nowrap py-[6px] pr-[7px] font-semibold">{formatRupiah(order.total)}</td>
               <td className="py-[6px] pr-[7px]"><StatusBadge status={order.status} /></td>
-              <td className="py-[6px]"><div className="flex items-center justify-center gap-[6px]"><button type="button" onClick={() => onOpen(order)} className="h-[26px] rounded-[4px] bg-[#e8f2ff] px-[12px] font-bold text-[#0873dd] hover:bg-[#d9eaff]">Detail</button><button type="button" aria-label={`Menu ${order.id}`} className="grid size-[26px] place-items-center rounded-[4px] border border-[#dce3eb] text-[#475b74] hover:bg-[#f4f7fa]"><MoreVertical className="size-[12px]" /></button></div></td>
+              <td className="py-[6px]"><div className="flex items-center justify-center gap-[6px]"><button type="button" onClick={() => onOpen(order)} className="h-[26px] rounded-[4px] bg-[#e8f2ff] px-[12px] font-bold text-[#0873dd] hover:bg-[#d9eaff]">Detail</button><button type="button" onClick={() => onOpen(order)} aria-label={`Menu ${order.id}`} className="grid size-[26px] place-items-center rounded-[4px] border border-[#dce3eb] text-[#475b74] hover:bg-[#f4f7fa]"><MoreVertical className="size-[12px]" /></button></div></td>
             </tr>
           )) : (
             <tr><td colSpan={10} className="py-[42px] text-center text-[9px] text-[#7a899c]">Tidak ada pesanan yang cocok dengan filter.</td></tr>
@@ -358,22 +431,17 @@ function StatusBadge({ status }: { status: OrderStatus }) {
 }
 
 function Pagination() {
-  return (
-    <nav aria-label="Pagination" className="flex items-center gap-[4px]">
-      <button type="button" className="grid size-[26px] place-items-center rounded-[4px] border border-[#e0e6ee] bg-[#f7f9fb] text-[#9aa7b7]"><ChevronLeft className="size-[12px]" /></button>
-      {[1, 2, 3, 4, 5].map((page) => <button type="button" key={page} className={`grid size-[26px] place-items-center rounded-[4px] border text-[8px] font-bold ${page === 1 ? "border-[#0875ed] bg-[#0875ed] text-white" : "border-[#dfe5ed] bg-white text-[#52637b]"}`}>{page}</button>)}
-      <span className="px-[3px]">...</span><button type="button" className="h-[26px] rounded-[4px] border border-[#dfe5ed] bg-white px-[9px] font-semibold">1.245</button><button type="button" className="grid size-[26px] place-items-center rounded-[4px] border border-[#dfe5ed] bg-white"><ChevronRight className="size-[12px]" /></button>
-    </nav>
-  );
+  return <nav aria-label="Pagination" className="flex items-center gap-[4px]"><span className="grid size-[26px] place-items-center rounded-[4px] border border-[#0875ed] bg-[#0875ed] text-[8px] font-bold text-white">1</span></nav>;
 }
 
-function ActivityPanel() {
+function ActivityPanel({ activities }: { activities: Activity[] }) {
   return (
     <aside className="overflow-hidden rounded-[8px] border border-[#dfe6ef] bg-white shadow-[0_1px_4px_rgba(20,33,58,0.04)]">
-      <div className="flex h-[45px] items-center justify-between px-[12px]"><h2 className="text-[12px] font-extrabold text-[#101c34]">Aktivitas Terbaru</h2><button type="button" className="text-[8px] font-semibold text-[#0875e3] hover:underline">Lihat Semua</button></div>
+      <div className="flex h-[45px] items-center justify-between px-[12px]"><h2 className="text-[12px] font-extrabold text-[#101c34]">Aktivitas Terbaru</h2><span className="text-[8px] font-semibold text-[#0875e3]">{activities.length} aktivitas</span></div>
       <div className="relative px-[12px] pb-[8px]">
         <span className="absolute bottom-[22px] left-[18px] top-[15px] w-px bg-[#dbe4ee]" />
         {activities.map((activity, index) => <ActivityItem key={`${activity.invoice}-${index}`} activity={activity} />)}
+        {!activities.length && <p className="py-[32px] text-center text-[8px] text-[#718198]">Belum ada aktivitas pesanan.</p>}
       </div>
     </aside>
   );
@@ -393,10 +461,26 @@ function ActivityItem({ activity }: { activity: Activity }) {
   );
 }
 
-function OrderDetailModal({ order, onClose, onNotice }: { order: Order; onClose(): void; onNotice(message: string): void }) {
+function OrderDetailModal({ order, onClose, onNotice, onCompleted }: { order: Order; onClose(): void; onNotice(message: string): void; onCompleted(): void }) {
+  const [serialNumber, setSerialNumber] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   async function copyInvoice() {
     try { await navigator.clipboard.writeText(order.id); onNotice("Nomor invoice berhasil disalin."); } catch { onNotice(`Invoice: ${order.id}`); }
     onClose();
+  }
+  async function completeManual() {
+    if (!order.dbId) return;
+    if (order.deliveryMode === "voucher" && !serialNumber.trim()) { setError("Kode voucher / serial wajib diisi."); return; }
+    setSaving(true); setError("");
+    try {
+      const response = await fetch("/api/panel/orders", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: order.dbId, action: "complete_manual", serialNumber: serialNumber.trim() || undefined }) });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Pesanan gagal diselesaikan.");
+      onNotice(`${order.id} berhasil diselesaikan.`);
+      onCompleted(); onClose();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Pesanan gagal diselesaikan."); }
+    finally { setSaving(false); }
   }
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#071426]/55 p-[24px]" role="dialog" aria-modal="true" aria-label="Detail Pesanan">
@@ -408,7 +492,9 @@ function OrderDetailModal({ order, onClose, onNotice }: { order: Order; onClose(
           <DetailSection title="Pembayaran"><DetailLine label="Metode" value={order.payment} /><DetailLine label="Total" value={formatRupiah(order.total)} /><div className="mt-[8px]"><StatusBadge status={order.status} /></div></DetailSection>
           <DetailSection title="Timeline"><p className="flex items-center gap-[7px] text-[#52647b]"><CheckCircle2 className="size-[13px] text-[#12a45f]" />Pesanan dibuat oleh sistem</p><p className="mt-[8px] flex items-center gap-[7px] text-[#52647b]"><Clock3 className="size-[13px] text-[#f0a400]" />Menunggu pembaruan berikutnya</p></DetailSection>
         </div>
-        <div className="flex items-center justify-between border-t border-[#e4e9ef] bg-[#fafbfd] px-[20px] py-[12px]"><span className="text-[9px] font-bold text-[#2e4058]">Aksi Admin</span><div className="flex gap-[8px]"><button type="button" onClick={copyInvoice} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] border border-[#dce3eb] bg-white px-[12px] text-[8px] font-bold text-[#40516a]"><Copy className="size-[12px]" />Copy Invoice</button><button type="button" onClick={onClose} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] bg-[#0875ed] px-[13px] text-[8px] font-bold text-white"><Eye className="size-[12px]" />Selesai</button></div></div>
+        {error && <p className="mx-[20px] mb-[10px] rounded-[5px] bg-red-50 px-[10px] py-[7px] text-[8px] text-red-700">{error}</p>}
+        {order.fulfillmentStatus === "manual_pending" && order.deliveryMode === "voucher" && <label className="mx-[20px] mb-[12px] block text-[8px] font-bold text-[#42536b]">Kode voucher / serial<input value={serialNumber} onChange={(event) => setSerialNumber(event.target.value)} className="mt-[5px] h-[34px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" /></label>}
+        <div className="flex items-center justify-between border-t border-[#e4e9ef] bg-[#fafbfd] px-[20px] py-[12px]"><span className="text-[9px] font-bold text-[#2e4058]">Aksi Admin</span><div className="flex gap-[8px]"><button type="button" onClick={copyInvoice} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] border border-[#dce3eb] bg-white px-[12px] text-[8px] font-bold text-[#40516a]"><Copy className="size-[12px]" />Copy Invoice</button>{order.fulfillmentStatus === "manual_pending" && <button type="button" disabled={saving} onClick={() => void completeManual()} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] bg-emerald-600 px-[13px] text-[8px] font-bold text-white disabled:opacity-50"><CheckCircle2 className="size-[12px]" />{saving ? "Menyimpan..." : "Selesaikan Pesanan"}</button>}<button type="button" onClick={onClose} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] bg-[#0875ed] px-[13px] text-[8px] font-bold text-white"><Eye className="size-[12px]" />Tutup</button></div></div>
       </div>
     </div>
   );
@@ -422,7 +508,7 @@ function DetailLine({ label, value }: { label: string; value: string }) {
   return <div className="mt-[6px] flex justify-between gap-[12px]"><span className="text-[#718198]">{label}</span><strong className="text-right text-[#304158]">{value}</strong></div>;
 }
 
-function ManualOrderModal({ onClose, onSubmit }: { onClose(): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
+function ManualOrderModal({ saving, onClose, onSubmit }: { saving: boolean; onClose(): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#071426]/55 p-[24px]" role="dialog" aria-modal="true" aria-label="Pesanan Manual">
       <form onSubmit={onSubmit} className="w-full max-w-[560px] overflow-hidden rounded-[10px] bg-white shadow-2xl">
@@ -434,9 +520,9 @@ function ManualOrderModal({ onClose, onSubmit }: { onClose(): void; onSubmit(eve
           <FormField label="Paket / nominal" name="packageName" placeholder="86 Diamond" required />
           <FormField label="Tujuan / User ID" name="destination" placeholder="123456789" required />
           <FormField label="Total pembayaran" name="total" placeholder="20000" type="number" required />
-          <label className="col-span-2 text-[8px] font-bold text-[#42536b]">Metode pembayaran<select name="payment" className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] bg-white px-[10px] text-[9px] font-medium outline-none focus:border-[#2380ec]"><option>QRIS DOKU</option><option>DOKU VA BCA</option><option>DOKU GoPay</option></select></label>
+          <label className="col-span-2 text-[8px] font-bold text-[#42536b]">Pencatatan pembayaran<select name="payment" className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] bg-white px-[10px] text-[9px] font-medium outline-none focus:border-[#2380ec]"><option value="admin_manual">Dicatat lunas oleh Admin</option></select></label>
         </div>
-        <div className="flex justify-end gap-[8px] border-t border-[#e4e9ef] bg-[#fafbfd] px-[20px] py-[12px]"><button type="button" onClick={onClose} className="h-[34px] rounded-[5px] border border-[#dce3eb] bg-white px-[14px] text-[9px] font-bold text-[#40516a]">Batal</button><button type="submit" className="h-[34px] rounded-[5px] bg-[#0875ed] px-[16px] text-[9px] font-bold text-white">Simpan Pesanan</button></div>
+        <div className="flex justify-end gap-[8px] border-t border-[#e4e9ef] bg-[#fafbfd] px-[20px] py-[12px]"><button type="button" onClick={onClose} className="h-[34px] rounded-[5px] border border-[#dce3eb] bg-white px-[14px] text-[9px] font-bold text-[#40516a]">Batal</button><button type="submit" disabled={saving} className="h-[34px] rounded-[5px] bg-[#0875ed] px-[16px] text-[9px] font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Simpan Pesanan"}</button></div>
       </form>
     </div>
   );

@@ -48,7 +48,7 @@ const routes: Record<string, RouteHandlers> = {
   members: { GET: members.GET, PUT: members.PUT, PATCH: members.PATCH },
   "payment-methods": { GET: paymentMethods.GET, POST: paymentMethods.POST, DELETE: paymentMethods.DELETE },
   "payment-page": { GET: paymentPage.GET, PUT: paymentPage.PUT },
-  orders: { GET: orders.GET, PATCH: orders.PATCH },
+  orders: { GET: orders.GET, POST: orders.POST, PATCH: orders.PATCH },
   "product-content": { PUT: productContent.PUT },
   "product-input": { GET: productInput.GET, PATCH: productInput.PATCH },
   "product-package-provider": { PATCH: productPackageProvider.PATCH },

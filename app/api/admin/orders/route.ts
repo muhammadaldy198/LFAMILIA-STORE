@@ -3,6 +3,7 @@ import { getD1 } from "@/db";
 import { requireAdminSession, type AdminRole } from "@/lib/server/admin";
 import {
   completeManualOrder,
+  createOrderIdentity,
   getOrderById,
   listOrders,
   recordOrderEvent,
@@ -119,6 +120,63 @@ export async function GET(request: Request) {
       { error: error instanceof Error ? error.message : "Pesanan gagal dimuat." },
       { status: 503 },
     );
+  }
+}
+
+const manualOrderSchema = z.object({
+  customer: z.string().trim().min(2).max(120),
+  phone: z.string().trim().min(5).max(30),
+  product: z.string().trim().min(2).max(120),
+  packageName: z.string().trim().min(2).max(120),
+  destination: z.string().trim().min(1).max(300),
+  total: z.coerce.number().int().min(1).max(100_000_000),
+  payment: z.literal("admin_manual"),
+});
+
+export async function POST(request: Request) {
+  const access = await requireAdminSession(request, "owner");
+  if (access instanceof Response) return access;
+  try {
+    const input = manualOrderSchema.parse(await request.json());
+    const identity = createOrderIdentity();
+    const slug = `manual-${input.product.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "order"}`;
+    await getD1().prepare(
+      `INSERT INTO orders (
+        id, reference_id, product_slug, product_name, package_sku, package_label,
+        provider_code, provider_sku, fulfillment_type, target_template, destination,
+        server, nickname, customer_no, buyer_name, buyer_email, buyer_phone,
+        customer_notes, customer_inputs_json, base_subtotal, subtotal, discount_amount,
+        admin_fee, total, payment_method, payment_channel, payment_status, fulfillment_status
+      ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 'manual', '{{destination}}', ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 'admin_manual', 'admin_manual', 'paid', 'manual_pending')`
+    ).bind(
+      identity.id,
+      identity.referenceId,
+      slug,
+      input.product,
+      `MANUAL-${identity.id.slice(0, 8).toUpperCase()}`,
+      input.packageName,
+      input.destination,
+      input.destination,
+      input.customer,
+      access.email,
+      input.phone,
+      `Dibuat manual oleh ${access.email}`,
+      JSON.stringify([{ id: "destination", label: "Tujuan", value: input.destination }]),
+      input.total,
+      input.total,
+      input.total,
+    ).run();
+    await recordOrderEvent({
+      orderId: identity.id,
+      source: "admin",
+      eventId: `manual-created-${identity.id}`,
+      status: "manual_pending",
+      payload: { adminEmail: access.email },
+    });
+    return Response.json({ ok: true, id: identity.id, referenceId: identity.referenceId }, { status: 201 });
+  } catch (error) {
+    const message = error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Pesanan manual gagal dibuat.";
+    return Response.json({ error: message }, { status: 400 });
   }
 }
 

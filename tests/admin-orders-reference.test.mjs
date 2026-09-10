@@ -47,7 +47,11 @@ test("orders table exposes all reference columns and local controls", () => {
   assert.match(source, /ManualOrderModal/);
 });
 
-test("orders reference UI is intentionally frontend-only", () => {
-  assert.doesNotMatch(source, /fetch\s*\(/);
-  assert.doesNotMatch(source, /\/api\/panel\/orders/);
+test("orders UI loads and mutates backend data", () => {
+  assert.match(source, /fetch\("\/api\/panel\/orders"/);
+  assert.match(source, /method: "POST"/);
+  assert.match(source, /method: "PATCH"/);
+  assert.match(source, /complete_manual/);
+  assert.match(source, /setInterval/);
+  assert.doesNotMatch(source, /const initialOrders|12\.450 pesanan|Data tampilan berhasil diperbarui/);
 });
