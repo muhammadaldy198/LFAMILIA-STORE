@@ -82,7 +82,7 @@ export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => 
   }, []);
 
   return (
-    <div className="space-y-3.5">
+    <div className="admin-dashboard-reference space-y-3.5">
       <section className="flex items-start justify-between">
         <div>
           <h1 className="text-[25px] font-black tracking-[-0.04em] text-[#0c1c3b]">Panel Admin LFAMILIA STORE</h1>
