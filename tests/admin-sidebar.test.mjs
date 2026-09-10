@@ -6,15 +6,15 @@ import test from "node:test";
 const source = fs.readFileSync(path.join(process.cwd(), "components/admin-dashboard.tsx"), "utf8");
 const overview = fs.readFileSync(path.join(process.cwd(), "components/admin-overview.tsx"), "utf8");
 
-test("admin reference keeps a persistent light desktop sidebar and responsive mobile drawer", () => {
-  assert.ok(source.includes("border-r border-[#e7ebf2] bg-white"));
-  assert.match(source, /fixed inset-y-0 left-0/);
-  assert.match(source, /lg:hidden/);
-  assert.match(source, /lfamilia-admin-logo\.webp/);
-  assert.match(source, /Cari pesanan, produk, atau pelanggan/);
+test("admin reference uses the approved dark desktop shell", () => {
+  assert.match(source, /grid-cols-\[230px_minmax\(0,1fr\)\]/);
+  assert.match(source, /bg-\[#112842\]/);
+  assert.match(source, /LFAMILIA ADMIN/);
+  assert.match(source, /Top Up Game Solution/);
+  assert.match(source, /Cari menu, produk, pesanan, atau pelanggan/);
 });
 
-test("admin reference exposes the simplified operational information architecture", () => {
+test("admin reference exposes the approved desktop information architecture", () => {
   for (const label of [
     "Dashboard",
     "Pesanan",
@@ -24,35 +24,26 @@ test("admin reference exposes the simplified operational information architectur
     "Pembayaran",
     "Pelanggan",
     "Promo",
+    "Konten",
     "Layanan Pelanggan",
     "Laporan",
-    "Staff & Akses",
+    "Staff & Admin Akses",
     "Pengaturan",
-  ]) {
-    assert.ok(source.includes(`label: "${label}"`), label);
-  }
-  assert.doesNotMatch(source, /label: "Pesanan realtime"|label: "Produk & nominal"|label: "Integrasi & harga"/);
+  ]) assert.ok(source.includes(`label: "${label}"`), label);
 });
 
-test("dashboard reference contains the approved sections and quick actions", () => {
+test("dashboard is a backend-independent visual reference", () => {
+  assert.doesNotMatch(overview, /fetch\(/);
   for (const label of [
-    "Tambah Produk",
-    "Import Digiflazz",
-    "Sync Harga",
-    "Lihat Pesanan",
     "Omzet Hari Ini",
-    "Profit Hari Ini",
     "Pesanan Hari Ini",
-    "Pesanan Pending",
-    "Pesanan Gagal",
     "Produk Aktif",
     "Saldo Digiflazz",
+    "Pembayaran Berhasil",
     "Grafik Penjualan",
-    "Perlu Perhatian",
-    "Pesanan Terbaru",
-    "Produk Terlaris",
     "Aktivitas Terbaru",
-  ]) {
-    assert.ok(overview.includes(label), label);
-  }
+    "Status Integrasi",
+    "Pesanan Terbaru",
+    "Produk Populer",
+  ]) assert.ok(overview.includes(label), label);
 });
