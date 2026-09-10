@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   ImageIcon,
   MoreVertical,
@@ -16,8 +16,13 @@ import {
 
 type ContentKind = "banner" | "popup" | "news" | "review" | "faq";
 type Editor = { kind: ContentKind; id: number };
-type Banner = { id: number; title: string; href: string; devices: string; order: number; active: boolean; tone: string };
-type MiniItem = { id: number; title: string; detail: string; active: boolean };
+type BannerPayload = { id?: number | null; title: string; subtitle: string; imageUrl: string; mobileImageUrl?: string; ctaLabel: string; ctaHref: string; showDesktop: boolean; showMobile: boolean; isActive: boolean; sortOrder: number };
+type PopupPayload = { id?: number | null; title: string; body: string; primaryLabel?: string; primaryHref: string; secondaryLabel?: string; secondaryHref: string; dismissDays: number; isActive: boolean; sortOrder: number };
+type NewsPayload = { id?: number | null; slug: string; title: string; summary: string; body: string; coverUrl?: string; isPublished: boolean; publishedAt?: string; sortOrder: number };
+type FaqPayload = { id?: number | null; question: string; answer: string; isActive: boolean; sortOrder: number };
+type ReviewPayload = { id: number; customerName: string; body: string; rating: number; isVisible: boolean; createdAt: string; productSlug: string };
+type Banner = { id: number; title: string; href: string; devices: string; order: number; active: boolean; tone: string; raw?: BannerPayload };
+type MiniItem = { id: number; title: string; detail: string; active: boolean; raw?: PopupPayload | NewsPayload | FaqPayload | ReviewPayload };
 
 const tabs: Array<{ value: ContentKind; label: string }> = [
   { value: "banner", label: "Banner" },
@@ -27,44 +32,83 @@ const tabs: Array<{ value: ContentKind; label: string }> = [
   { value: "faq", label: "FAQ" },
 ];
 
-const initialBanners: Banner[] = [
-  { id: 1, title: "Top Up Game Termurah", href: "/produk/mobile-legends", devices: "Desktop & Mobile", order: 1, active: true, tone: "from-[#07152f] via-[#123a78] to-[#d33f68]" },
-  { id: 2, title: "Weekly Diamond Pass", href: "/produk/mobile-legends", devices: "Desktop & Mobile", order: 2, active: true, tone: "from-[#111d5c] via-[#4238b8] to-[#20a4ef]" },
-  { id: 3, title: "Promo Spesial Bulan Ini", href: "/promo", devices: "Desktop", order: 3, active: true, tone: "from-[#160d25] via-[#97132a] to-[#f39222]" },
-  { id: 4, title: "Jadi Member Sekarang", href: "/membership", devices: "Mobile", order: 4, active: false, tone: "from-[#321062] via-[#801285] to-[#1378c9]" },
-];
+function mapBanner(item: BannerPayload): Banner {
+  return { id: Number(item.id), title: item.title, href: item.ctaHref, devices: item.showDesktop && item.showMobile ? "Desktop & Mobile" : item.showDesktop ? "Desktop" : "Mobile", order: item.sortOrder + 1, active: item.isActive, tone: "from-[#07152f] via-[#123a78] to-[#d33f68]", raw: item };
+}
+function mapPopup(item: PopupPayload): MiniItem { return { id: Number(item.id), title: item.title, detail: item.body, active: item.isActive, raw: item }; }
+function mapNews(item: NewsPayload): MiniItem { return { id: Number(item.id), title: item.title, detail: item.publishedAt || "Belum diterbitkan", active: item.isPublished, raw: item }; }
+function mapFaq(item: FaqPayload): MiniItem { return { id: Number(item.id), title: item.question, detail: item.answer, active: item.isActive, raw: item }; }
+function mapReview(item: ReviewPayload): MiniItem { return { id: item.id, title: item.customerName, detail: item.body, active: item.isVisible, raw: item }; }
 
-const initialPopups: MiniItem[] = [
-  { id: 1, title: "Promo Ramadhan", detail: "Semua Halaman", active: true },
-  { id: 2, title: "Pengumuman Maintenance", detail: "Halaman Utama", active: true },
-  { id: 3, title: "Event Spesial", detail: "Semua Halaman", active: false },
-];
-const initialNews: MiniItem[] = [
-  { id: 1, title: "Event Top Up Spesial", detail: "24 Apr 2025", active: true },
-  { id: 2, title: "Update Layanan", detail: "22 Apr 2025", active: true },
-  { id: 3, title: "Maintenance Sistem", detail: "20 Apr 2025", active: false },
-];
-const initialReviews: MiniItem[] = [
-  { id: 1, title: "R*****", detail: "Proses cepat dan aman!", active: true },
-  { id: 2, title: "D*****", detail: "Harga paling murah!", active: true },
-  { id: 3, title: "A*****", detail: "Pelayanan sangat baik!", active: false },
-];
-const initialFaqs: MiniItem[] = [
-  { id: 1, title: "Berapa lama proses top up?", detail: "1", active: true },
-  { id: 2, title: "Metode pembayaran apa saja?", detail: "2", active: true },
-  { id: 3, title: "Apakah transaksi aman?", detail: "3", active: true },
-];
+async function panelJson(response: Response) {
+  const payload = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok) throw new Error(payload.error || "Permintaan konten gagal diproses.");
+  return payload;
+}
+
+async function saveContentItem(kind: Exclude<ContentKind, "review" | "faq"> | "faq", item: BannerPayload | PopupPayload | NewsPayload | FaqPayload) {
+  if (kind === "faq") return panelJson(await fetch("/api/panel/faqs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item) }));
+  return panelJson(await fetch("/api/panel/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, item }) }));
+}
+
+async function saveReview(item: ReviewPayload) {
+  return panelJson(await fetch("/api/panel/reviews", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: item.id, isVisible: item.isVisible }) }));
+}
+
+function togglePayload(kind: ContentKind, raw: NonNullable<Banner["raw"]> | NonNullable<MiniItem["raw"]>) {
+  if (kind === "banner") return { ...(raw as BannerPayload), isActive: !(raw as BannerPayload).isActive };
+  if (kind === "popup") return { ...(raw as PopupPayload), isActive: !(raw as PopupPayload).isActive };
+  if (kind === "news") return { ...(raw as NewsPayload), isPublished: !(raw as NewsPayload).isPublished };
+  return { ...(raw as FaqPayload), isActive: !(raw as FaqPayload).isActive };
+}
+
+function editPayload(kind: Exclude<ContentKind, "review">, raw: NonNullable<Banner["raw"]> | NonNullable<MiniItem["raw"]>, data: FormData, title: string) {
+  const active = data.get("active") === "on";
+  if (kind === "banner") return { ...(raw as BannerPayload), title, ctaHref: String(data.get("href") || "/"), showDesktop: data.get("showDesktop") === "on", showMobile: data.get("showMobile") === "on", sortOrder: Math.max(0, Number(data.get("order") || 1) - 1), isActive: active };
+  if (kind === "popup") return { ...(raw as PopupPayload), title, body: String(data.get("detail") || "Isi pop-up"), isActive: active };
+  if (kind === "news") return { ...(raw as NewsPayload), title, summary: String(data.get("detail") || "Ringkasan berita"), body: String(data.get("detail") || "Isi berita"), isPublished: active };
+  return { ...(raw as FaqPayload), question: title, answer: String(data.get("detail") || "Jawaban FAQ"), isActive: active };
+}
 
 export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
   const [activeTab, setActiveTab] = useState<ContentKind>("banner");
-  const [banners, setBanners] = useState(initialBanners);
-  const [popups, setPopups] = useState(initialPopups);
-  const [news, setNews] = useState(initialNews);
-  const [reviews, setReviews] = useState(initialReviews);
-  const [faqs, setFaqs] = useState(initialFaqs);
-  const [editor, setEditor] = useState<Editor>({ kind: "banner", id: 1 });
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [popups, setPopups] = useState<MiniItem[]>([]);
+  const [news, setNews] = useState<MiniItem[]>([]);
+  const [reviews, setReviews] = useState<MiniItem[]>([]);
+  const [faqs, setFaqs] = useState<MiniItem[]>([]);
+  const [editor, setEditor] = useState<Editor>({ kind: "banner", id: 0 });
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("mobile");
   const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function loadContent() {
+    setError("");
+    try {
+      const [contentResponse, faqResponse, reviewResponse] = await Promise.all([
+        fetch("/api/panel/content", { cache: "no-store" }),
+        fetch("/api/panel/faqs", { cache: "no-store" }),
+        fetch("/api/panel/reviews", { cache: "no-store" }),
+      ]);
+      const content = await contentResponse.json().catch(() => ({})) as { banners?: BannerPayload[]; popups?: PopupPayload[]; news?: NewsPayload[]; error?: string };
+      const faqData = await faqResponse.json().catch(() => ({})) as { faqs?: FaqPayload[]; error?: string };
+      const reviewData = await reviewResponse.json().catch(() => ({})) as { reviews?: ReviewPayload[]; error?: string };
+      if (!contentResponse.ok) throw new Error(content.error || "Konten gagal dimuat.");
+      if (!faqResponse.ok) throw new Error(faqData.error || "FAQ gagal dimuat.");
+      if (!reviewResponse.ok) throw new Error(reviewData.error || "Ulasan gagal dimuat.");
+      const mappedBanners = (content.banners || []).map(mapBanner);
+      const mappedPopups = (content.popups || []).map(mapPopup);
+      const mappedNews = (content.news || []).map(mapNews);
+      const mappedFaqs = (faqData.faqs || []).map(mapFaq);
+      const mappedReviews = (reviewData.reviews || []).map(mapReview);
+      setBanners(mappedBanners); setPopups(mappedPopups); setNews(mappedNews); setFaqs(mappedFaqs); setReviews(mappedReviews);
+      const first = mappedBanners[0] || mappedPopups[0] || mappedNews[0] || mappedReviews[0] || mappedFaqs[0];
+      if (first) setEditor({ kind: mappedBanners[0] ? "banner" : mappedPopups[0] ? "popup" : mappedNews[0] ? "news" : mappedReviews[0] ? "review" : "faq", id: first.id });
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Konten gagal dimuat."); }
+  }
+
+  useEffect(() => { void loadContent(); }, []);
 
   function focus(kind: ContentKind, id: number) {
     setActiveTab(kind);
@@ -74,31 +118,65 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
   function add(kind: ContentKind) {
     const setters = { popup: setPopups, news: setNews, review: setReviews, faq: setFaqs };
     if (kind === "banner") {
-      const item: Banner = { id: Date.now(), title: "Banner Baru", href: "/", devices: "Desktop & Mobile", order: banners.length + 1, active: true, tone: "from-[#123776] via-[#1857ad] to-[#713bd4]" };
+      const item: Banner = { id: -Date.now(), title: "Banner Baru", href: "/", devices: "Desktop & Mobile", order: banners.length + 1, active: true, tone: "from-[#123776] via-[#1857ad] to-[#713bd4]", raw: { id: null, title: "Banner Baru", subtitle: "", imageUrl: "/logo-lfamilia.png", mobileImageUrl: "", ctaLabel: "Lihat Sekarang", ctaHref: "/", showDesktop: true, showMobile: true, isActive: true, sortOrder: banners.length } };
       setBanners((current) => [...current, item]); focus("banner", item.id); return;
     }
-    const item: MiniItem = { id: Date.now(), title: kind === "popup" ? "Pop-up Baru" : kind === "news" ? "Berita Baru" : kind === "review" ? "Ulasan Baru" : "Pertanyaan Baru", detail: kind === "review" ? "Pesan pelanggan" : kind === "faq" ? String(faqs.length + 1) : "Belum dijadwalkan", active: true };
+    if (kind === "review") { setNotice("Ulasan hanya dibuat oleh pelanggan yang sudah bertransaksi; admin dapat mengatur visibilitasnya."); return; }
+    const id = -Date.now();
+    const item: MiniItem = kind === "popup"
+      ? { id, title: "Pop-up Baru", detail: "Isi pengumuman", active: true, raw: { id: null, title: "Pop-up Baru", body: "Isi pengumuman", primaryLabel: "Lihat", primaryHref: "/", secondaryLabel: "", secondaryHref: "", dismissDays: 1, isActive: true, sortOrder: popups.length } }
+      : kind === "news"
+        ? { id, title: "Berita Baru", detail: "Belum diterbitkan", active: false, raw: { id: null, slug: `berita-${Date.now()}`, title: "Berita Baru", summary: "Ringkasan berita", body: "Isi berita", coverUrl: "", isPublished: false, publishedAt: "", sortOrder: news.length } }
+        : { id, title: "Pertanyaan Baru", detail: "Jawaban FAQ", active: true, raw: { id: null, question: "Pertanyaan baru?", answer: "Jawaban FAQ", isActive: true, sortOrder: faqs.length } };
     setters[kind]((current) => [...current, item]); focus(kind, item.id);
   }
 
-  function toggle(kind: ContentKind, id: number) {
+  async function toggle(kind: ContentKind, id: number) {
     if (kind === "banner") setBanners((current) => current.map((item) => item.id === id ? { ...item, active: !item.active } : item));
     else if (kind === "popup") setPopups((current) => flip(current, id));
     else if (kind === "news") setNews((current) => flip(current, id));
     else if (kind === "review") setReviews((current) => flip(current, id));
     else setFaqs((current) => flip(current, id));
+    const current = kind === "banner" ? banners.find((item) => item.id === id) : kind === "popup" ? popups.find((item) => item.id === id) : kind === "news" ? news.find((item) => item.id === id) : kind === "review" ? reviews.find((item) => item.id === id) : faqs.find((item) => item.id === id);
+    if (!current?.raw || id < 1) return;
+    try {
+      if (kind === "review") await saveReview({ ...(current.raw as ReviewPayload), isVisible: !current.active });
+      else await saveContentItem(kind, togglePayload(kind, current.raw));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Status konten gagal disimpan."); await loadContent(); }
   }
 
-  function saveEditor(event: FormEvent<HTMLFormElement>) {
+  async function saveEditor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const title = String(data.get("title") || "Tanpa judul");
-    if (editor.kind === "banner") setBanners((current) => current.map((item) => item.id === editor.id ? { ...item, title, href: String(data.get("href") || "/"), order: Number(data.get("order") || 1), active: data.get("active") === "on" } : item));
-    else {
-      const patch = (items: MiniItem[]) => items.map((item) => item.id === editor.id ? { ...item, title, detail: String(data.get("detail") || item.detail), active: data.get("active") === "on" } : item);
-      if (editor.kind === "popup") setPopups(patch); else if (editor.kind === "news") setNews(patch); else if (editor.kind === "review") setReviews(patch); else setFaqs(patch);
-    }
-    setNotice("Perubahan tampilan berhasil disimpan sementara di frontend.");
+    const current = editor.kind === "banner" ? banners.find((item) => item.id === editor.id) : editor.kind === "popup" ? popups.find((item) => item.id === editor.id) : editor.kind === "news" ? news.find((item) => item.id === editor.id) : editor.kind === "review" ? reviews.find((item) => item.id === editor.id) : faqs.find((item) => item.id === editor.id);
+    if (!current?.raw) { setError("Pilih konten yang ingin diedit."); return; }
+    setSaving(true); setError("");
+    try {
+      if (editor.kind === "review") await saveReview({ ...(current.raw as ReviewPayload), isVisible: data.get("active") === "on" });
+      else await saveContentItem(editor.kind, editPayload(editor.kind, current.raw, data, title));
+      setNotice("Perubahan konten berhasil disimpan ke database.");
+      await loadContent();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Konten gagal disimpan."); }
+    finally { setSaving(false); }
+  }
+
+  async function deleteEditor() {
+    if (editor.id < 1 || editor.kind === "review") { setError(editor.kind === "review" ? "Ulasan tidak dihapus; nonaktifkan agar riwayat pelanggan tetap tersimpan." : "Konten baru belum tersimpan."); return; }
+    setSaving(true); setError("");
+    try {
+      const endpoint = editor.kind === "faq" ? `/api/panel/faqs?id=${editor.id}` : `/api/panel/content?kind=${editor.kind}&id=${editor.id}`;
+      await panelJson(await fetch(endpoint, { method: "DELETE" }));
+      setNotice(`${labelKind(editor.kind)} berhasil dihapus.`);
+      await loadContent();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Konten gagal dihapus."); }
+    finally { setSaving(false); }
+  }
+
+  function updateImage(kind: ContentKind, id: number, url: string) {
+    if (kind === "banner") setBanners((current) => current.map((item) => item.id === id && item.raw ? { ...item, raw: { ...item.raw, imageUrl: url } } : item));
+    else if (kind === "news") setNews((current) => current.map((item) => item.id === id && item.raw ? { ...item, raw: { ...(item.raw as NewsPayload), coverUrl: url } } : item));
+    setNotice("Gambar berhasil diunggah. Klik Simpan Perubahan untuk menerapkannya.");
   }
 
   return (
@@ -109,6 +187,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
       </header>
 
       {notice && <button type="button" onClick={() => setNotice("")} className="mt-[9px] flex w-full items-center justify-between rounded-[5px] border border-[#bce4cf] bg-[#edf9f3] px-[11px] py-[7px] text-left text-[8px] font-semibold text-[#168653]"><span>{notice}</span><X className="size-[11px]" /></button>}
+      {error && <button type="button" onClick={() => setError("")} className="mt-[9px] w-full rounded-[5px] border border-red-200 bg-red-50 px-[11px] py-[7px] text-left text-[8px] text-red-700">{error}</button>}
 
       <nav className="mt-[10px] flex border-b border-[#dfe5ec]">{tabs.map((tab) => <button type="button" key={tab.value} onClick={() => setActiveTab(tab.value)} className={`h-[38px] border-b-2 px-[15px] text-[9px] font-bold ${activeTab === tab.value ? "border-[#0875ed] text-[#0875ed]" : "border-transparent text-[#53647c]"}`}>{tab.label}</button>)}</nav>
 
@@ -128,7 +207,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
           </div>
         </main>
 
-        <EditorPanel editor={editor} banners={banners} popups={popups} news={news} reviews={reviews} faqs={faqs} canDelete={role === "owner"} onAdd={() => add(editor.kind)} onSubmit={saveEditor} />
+        <EditorPanel editor={editor} banners={banners} popups={popups} news={news} reviews={reviews} faqs={faqs} canDelete={role === "owner"} saving={saving} onAdd={() => add(editor.kind)} onDelete={() => void deleteEditor()} onImage={updateImage} onError={setError} onSubmit={saveEditor} />
       </div>
 
       <PreviewPanel banners={banners} popups={popups} news={news} reviews={reviews} mode={previewMode} onMode={setPreviewMode} />
@@ -146,11 +225,54 @@ function MiniPanel({ title, description, action, items, kind, onAdd, onEdit, onT
 
 function ContentPanel({ title, description, action, onAdd, children }: { title: string; description: string; action: string; onAdd(): void; children: ReactNode }) { return <section className="overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white shadow-[0_1px_4px_rgba(20,33,58,.04)]"><header className="flex items-start justify-between px-[13px] py-[11px]"><div><h2 className="text-[12px] font-extrabold text-[#101d35]">{title}</h2><p className="mt-[2px] text-[7.5px] text-[#6b7c92]">{description}</p></div><button type="button" onClick={onAdd} className="inline-flex h-[30px] items-center gap-[5px] rounded-[4px] bg-[#0875ed] px-[11px] text-[7.5px] font-bold text-white"><Plus className="size-[11px]" />{action}</button></header>{children}</section>; }
 
-function EditorPanel({ editor, banners, popups, news, reviews, faqs, canDelete, onAdd, onSubmit }: { editor: Editor; banners: Banner[]; popups: MiniItem[]; news: MiniItem[]; reviews: MiniItem[]; faqs: MiniItem[]; canDelete: boolean; onAdd(): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
+function EditorPanel({ editor, banners, popups, news, reviews, faqs, canDelete, saving, onAdd, onDelete, onImage, onError, onSubmit }: { editor: Editor; banners: Banner[]; popups: MiniItem[]; news: MiniItem[]; reviews: MiniItem[]; faqs: MiniItem[]; canDelete: boolean; saving: boolean; onAdd(): void; onDelete(): void; onImage(kind: ContentKind, id: number, url: string): void; onError(message: string): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
   const banner = editor.kind === "banner" ? banners.find((item) => item.id === editor.id) : undefined;
   const item = editor.kind === "popup" ? popups.find((entry) => entry.id === editor.id) : editor.kind === "news" ? news.find((entry) => entry.id === editor.id) : editor.kind === "review" ? reviews.find((entry) => entry.id === editor.id) : editor.kind === "faq" ? faqs.find((entry) => entry.id === editor.id) : undefined;
   const title = editor.kind === "banner" ? "Edit Banner" : editor.kind === "popup" ? "Edit Pop-up" : editor.kind === "news" ? "Edit Berita" : editor.kind === "review" ? "Edit Ulasan" : "Edit FAQ";
-  return <aside className="sticky top-[70px] self-start overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white shadow-[0_8px_24px_rgba(18,35,60,.08)]"><header className="flex h-[47px] items-center justify-between border-b border-[#e5eaf0] px-[13px]"><h2 className="text-[12px] font-extrabold">{title}</h2><button type="button" onClick={onAdd} className="inline-flex h-[29px] items-center gap-[5px] rounded-[4px] bg-[#0875ed] px-[10px] text-[7.5px] font-bold text-white"><Plus className="size-[11px]" />Tambah {labelKind(editor.kind)}</button></header><form onSubmit={onSubmit} className="p-[13px]"><label className="text-[8px] font-bold">Gambar {labelKind(editor.kind)}<div className={`mt-[5px] grid place-items-center overflow-hidden rounded-[5px] border border-[#dce3eb] ${editor.kind === "banner" ? "h-[98px]" : "h-[75px]"}`}>{banner ? <BannerArtwork banner={banner} large /> : <span className="text-center text-[#718198]"><ImageIcon className="mx-auto size-[22px]" /><small className="mt-[4px] block">Preview gambar</small></span>}</div></label><button type="button" className="mt-[6px] inline-flex h-[30px] w-full items-center justify-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white text-[8px] font-bold"><Upload className="size-[11px]" />Ganti Gambar</button><p className="mt-[6px] text-[6.5px] leading-[1.5] text-[#718198]">Rekomendasi ukuran: 1920 × 600 (Desktop)<br />1080 × 1080 (Mobile) | Maks. 2MB</p><EditorField label={editor.kind === "faq" ? "Pertanyaan" : editor.kind === "review" ? "Pelanggan" : "Judul"} name="title" defaultValue={banner?.title ?? item?.title ?? ""} /><EditorField label={editor.kind === "banner" ? "Link Tujuan" : editor.kind === "review" ? "Pesan" : editor.kind === "faq" ? "Jawaban" : "Tampilan / Tanggal"} name={editor.kind === "banner" ? "href" : "detail"} defaultValue={banner?.href ?? item?.detail ?? ""} />{editor.kind === "banner" && <><p className="mt-[11px] text-[8px] font-bold">Tampilkan di</p><div className="mt-[7px] flex justify-between text-[8px] font-semibold"><label className="flex items-center gap-[5px]"><input type="checkbox" defaultChecked />Desktop</label><label className="flex items-center gap-[5px]"><input type="checkbox" defaultChecked />Mobile</label></div><EditorField label="Urutan" name="order" type="number" defaultValue={String(banner?.order ?? 1)} /></>}<label className="mt-[12px] flex items-center gap-[8px] text-[8px] font-bold"><input type="checkbox" name="active" defaultChecked={banner?.active ?? item?.active ?? true} className="sr-only peer" /><span className="relative h-[19px] w-[34px] rounded-full bg-[#ccd6e2] peer-checked:bg-[#0875ed] after:absolute after:left-[2px] after:top-[2px] after:size-[15px] after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-[15px]" />Aktif</label><div className="mt-[30px] flex justify-end gap-[7px]"><button type="button" className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[13px] text-[8px] font-bold">Batal</button>{canDelete && <button type="button" className="h-[32px] rounded-[4px] border border-red-100 bg-red-50 px-[10px] text-[8px] font-bold text-red-500">Hapus</button>}<button type="submit" className="inline-flex h-[32px] items-center gap-[5px] rounded-[4px] bg-[#0875ed] px-[13px] text-[8px] font-bold text-white"><Save className="size-[11px]" />Simpan Perubahan</button></div></form></aside>;
+  const currentImage = banner?.raw?.imageUrl || (editor.kind === "news" ? (item?.raw as NewsPayload | undefined)?.coverUrl : "");
+  async function uploadImage(file?: File) {
+    if (!file || !["banner", "news"].includes(editor.kind)) return;
+    const form = new FormData(); form.set("file", file);
+    try {
+      const response = await fetch("/api/panel/media", { method: "POST", body: form });
+      const payload = await response.json().catch(() => ({})) as { url?: string; error?: string };
+      if (!response.ok || !payload.url) throw new Error(payload.error || "Gambar gagal diunggah.");
+      onImage(editor.kind, editor.id, payload.url);
+    } catch (reason) { onError(reason instanceof Error ? reason.message : "Gambar gagal diunggah."); }
+  }
+  return (
+    <aside className="sticky top-[70px] self-start overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white shadow-[0_8px_24px_rgba(18,35,60,.08)]">
+      <header className="flex h-[47px] items-center justify-between border-b border-[#e5eaf0] px-[13px]">
+        <h2 className="text-[12px] font-extrabold">{title}</h2>
+        <button type="button" onClick={onAdd} className="inline-flex h-[29px] items-center gap-[5px] rounded-[4px] bg-[#0875ed] px-[10px] text-[7.5px] font-bold text-white"><Plus className="size-[11px]" />Tambah {labelKind(editor.kind)}</button>
+      </header>
+      <form key={`${editor.kind}-${editor.id}`} onSubmit={onSubmit} className="p-[13px]">
+        <label className="text-[8px] font-bold">Gambar {labelKind(editor.kind)}
+          <div className={`mt-[5px] grid place-items-center overflow-hidden rounded-[5px] border border-[#dce3eb] ${editor.kind === "banner" ? "h-[98px]" : "h-[75px]"}`}>
+            {currentImage ? <img src={currentImage} alt="" className="size-full object-cover" /> : <span className="text-center text-[#718198]"><ImageIcon className="mx-auto size-[22px]" /><small className="mt-[4px] block">Preview gambar</small></span>}
+          </div>
+        </label>
+        {["banner", "news"].includes(editor.kind) && <label className="mt-[6px] inline-flex h-[30px] w-full cursor-pointer items-center justify-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white text-[8px] font-bold"><Upload className="size-[11px]" />Ganti Gambar<input type="file" accept="image/*" className="sr-only" onChange={(event) => void uploadImage(event.target.files?.[0])} /></label>}
+        <p className="mt-[6px] text-[6.5px] leading-[1.5] text-[#718198]">Rekomendasi ukuran: 1920 × 600 (Desktop)<br />1080 × 1080 (Mobile) | Maks. 2MB</p>
+        <EditorField label={editor.kind === "faq" ? "Pertanyaan" : editor.kind === "review" ? "Pelanggan" : "Judul"} name="title" defaultValue={banner?.title ?? item?.title ?? ""} />
+        <EditorField label={editor.kind === "banner" ? "Link Tujuan" : editor.kind === "review" ? "Pesan" : editor.kind === "faq" ? "Jawaban" : "Isi / Ringkasan"} name={editor.kind === "banner" ? "href" : "detail"} defaultValue={banner?.href ?? item?.detail ?? ""} />
+        {editor.kind === "banner" && <>
+          <p className="mt-[11px] text-[8px] font-bold">Tampilkan di</p>
+          <div className="mt-[7px] flex justify-between text-[8px] font-semibold">
+            <label className="flex items-center gap-[5px]"><input type="checkbox" name="showDesktop" defaultChecked={banner?.raw?.showDesktop ?? true} />Desktop</label>
+            <label className="flex items-center gap-[5px]"><input type="checkbox" name="showMobile" defaultChecked={banner?.raw?.showMobile ?? true} />Mobile</label>
+          </div>
+          <EditorField label="Urutan" name="order" type="number" defaultValue={String(banner?.order ?? 1)} />
+        </>}
+        <label className="mt-[12px] flex items-center gap-[8px] text-[8px] font-bold"><input type="checkbox" name="active" defaultChecked={banner?.active ?? item?.active ?? true} className="sr-only peer" /><span className="relative h-[19px] w-[34px] rounded-full bg-[#ccd6e2] peer-checked:bg-[#0875ed] after:absolute after:left-[2px] after:top-[2px] after:size-[15px] after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-[15px]" />Aktif</label>
+        <div className="mt-[30px] flex justify-end gap-[7px]">
+          <button type="reset" className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[13px] text-[8px] font-bold">Batal</button>
+          {canDelete && <button type="button" disabled={saving} onClick={onDelete} className="h-[32px] rounded-[4px] border border-red-100 bg-red-50 px-[10px] text-[8px] font-bold text-red-500 disabled:opacity-50">Hapus</button>}
+          <button type="submit" disabled={saving} className="inline-flex h-[32px] items-center gap-[5px] rounded-[4px] bg-[#0875ed] px-[13px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[11px]" />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button>
+        </div>
+      </form>
+    </aside>
+  );
 }
 
 function EditorField({ label, name, defaultValue, type = "text" }: { label: string; name: string; defaultValue: string; type?: string }) { return <label className="mt-[11px] block text-[8px] font-bold">{label}<input key={defaultValue} name={name} type={type} defaultValue={defaultValue} className="mt-[5px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] font-medium outline-none focus:border-[#2781ed]" /></label>; }

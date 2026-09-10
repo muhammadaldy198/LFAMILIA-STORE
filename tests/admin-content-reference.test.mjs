@@ -38,7 +38,15 @@ test("content reference exposes add, edit, ordering, visibility and preview cont
   assert.match(source, /function Switch/);
 });
 
-test("content design is frontend-only during the UI phase", () => {
-  assert.doesNotMatch(source, /fetch\s*\(/);
-  assert.doesNotMatch(source, /\/api\/panel\//);
+test("content controls persist through the admin APIs", () => {
+  for (const endpoint of [
+    "/api/panel/content",
+    "/api/panel/faqs",
+    "/api/panel/reviews",
+    "/api/panel/media",
+  ]) assert.ok(source.includes(endpoint), `missing content endpoint: ${endpoint}`);
+  assert.match(source, /method: "POST"/);
+  assert.match(source, /method: "PATCH"/);
+  assert.match(source, /method: "DELETE"/);
+  assert.doesNotMatch(source, /frontend-only|backend nanti|simulasi/i);
 });
