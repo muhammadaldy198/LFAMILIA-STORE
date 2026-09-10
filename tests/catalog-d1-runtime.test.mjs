@@ -63,5 +63,5 @@ test("unconfigured automatic products stay automatic and checkout blocks them in
   assert.doesNotMatch(hook, /normalizeProviderReadiness/);
   assert.doesNotMatch(hook, /fulfillmentType:\s*"manual"/);
   assert.match(checkout, /if \(!providerReady\)/);
-  assert.match(checkout, /belum siap dijual karena provider\/SKU belum diatur/);
+  assert.match(checkout, /Produk otomatis ini belum siap dijual\. Hubungi admin\./);
 });

@@ -16,8 +16,8 @@ test("all custom customer fields can be mapped into provider customer_no", () =>
 
 test("admin automatically builds a provider target from every custom field", () => {
   assert.match(manager, /inputFields\.map\(\(item\) => `\{\{\$\{item\.id\}\}\}`\)\.join\(" "\)|inputFields\.map\(\(item\) => `\{\{\$\{item\.id\}\}\}`\)\.join\(""/);
-  assert.match(manager, /Format tujuan DigiFlazz/);
-  assert.match(manager, /DigiFlazz Buyer menerima satu customer_no/);
+  assert.match(manager, /Format customer_no/);
+  assert.match(manager, /Backend menggabungkan data ini saat mengirim pesanan otomatis/);
 });
 
 test("unknown provider target tokens are rejected by admin API", () => {

@@ -7,6 +7,11 @@ import { useState, type ReactNode } from "react";
 export const inputClass = "h-9 w-full rounded-md border border-[#dfe5ed] bg-white px-3 text-[10px] text-[#243653] outline-none transition placeholder:text-[#9aa7ba] focus:border-[#1769e8] focus:ring-2 focus:ring-[#1769e8]/10";
 export const buttonClass = "inline-flex h-9 items-center justify-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 text-[10px] font-bold text-[#26364f] transition hover:border-[#b9c8db] hover:bg-[#f8fafc]";
 export const primaryButtonClass = "inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[#0769e9] px-3 text-[10px] font-bold text-white shadow-[0_5px_14px_rgba(7,105,233,0.2)] transition hover:bg-[#075dcc]";
+export const adminActionEvent = "lfamilia:admin-action";
+
+export function announceAdminAction(message: string) {
+  window.dispatchEvent(new CustomEvent(adminActionEvent, { detail: message }));
+}
 
 export function WorkspaceHeader({ title, description, actions }: { title: string; description: string; actions?: ReactNode }) {
   return <div className="mb-4 flex items-start justify-between gap-5">
@@ -37,8 +42,17 @@ export function TabBar({ tabs, active, onChange }: { tabs: string[]; active: str
 }
 
 export function Toggle({ checked, onChange, label }: { checked: boolean; onChange?(value: boolean): void; label?: string }) {
-  return <button type="button" role="switch" aria-checked={checked} onClick={() => onChange?.(!checked)} className="inline-flex items-center gap-2">
-    <span className={`relative h-[20px] w-[36px] rounded-full transition ${checked ? "bg-[#0769e9]" : "bg-[#cbd5e1]"}`}><span className={`absolute top-[3px] size-[14px] rounded-full bg-white shadow transition ${checked ? "left-[19px]" : "left-[3px]"}`} /></span>
+  const [localValue, setLocalValue] = useState(checked);
+  const value = onChange ? checked : localValue;
+  function toggle() {
+    if (onChange) onChange(!checked);
+    else {
+      setLocalValue((current) => !current);
+      announceAdminAction(`${label || "Pengaturan"} diperbarui di tampilan.`);
+    }
+  }
+  return <button type="button" role="switch" aria-checked={value} onClick={toggle} className="inline-flex items-center gap-2">
+    <span className={`relative h-[20px] w-[36px] rounded-full transition ${value ? "bg-[#0769e9]" : "bg-[#cbd5e1]"}`}><span className={`absolute top-[3px] size-[14px] rounded-full bg-white shadow transition ${value ? "left-[19px]" : "left-[3px]"}`} /></span>
     {label && <span className="text-[9px] font-semibold text-[#52627a]">{label}</span>}
   </button>;
 }
@@ -70,5 +84,5 @@ export function Modal({ open, title, description, children, footer, onClose, wid
 }
 
 export function EmptyButton({ children, onClick, className = "" }: { children: ReactNode; onClick?(): void; className?: string }) {
-  return <button type="button" onClick={onClick} className={`${buttonClass} ${className}`}>{children}</button>;
+  return <button type="button" onClick={onClick ?? (() => announceAdminAction("Aksi frontend dijalankan."))} className={`${buttonClass} ${className}`}>{children}</button>;
 }

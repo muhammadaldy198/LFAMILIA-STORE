@@ -42,7 +42,7 @@ test("custom customer fields are rendered into one DigiFlazz customer_no", () =>
 });
 
 test("admin can configure DigiFlazz customer_no using dynamic input tokens", () => {
-  assert.match(admin, /Format tujuan DigiFlazz/);
-  assert.match(admin, /DigiFlazz Buyer menerima satu customer_no/);
+  assert.match(admin, /Format customer_no/);
+  assert.match(admin, /Backend menggabungkan data ini saat mengirim pesanan otomatis/);
   assert.match(admin, /targetTemplate/);
 });

@@ -4,13 +4,13 @@ import path from "node:path";
 import test from "node:test";
 
 const root = process.cwd();
-const manager = fs.readFileSync(path.join(root, "components/admin-integration-manager.tsx"), "utf8");
+const manager = fs.readFileSync(path.join(root, "components/admin-integration-workspace.tsx"), "utf8");
 const route = fs.readFileSync(path.join(root, "app/api/admin/integrations/route.ts"), "utf8");
 const config = fs.readFileSync(path.join(root, "lib/server/integration-config.ts"), "utf8");
 
 test("DOKU and DigiFlazz environments are selected from Admin Dashboard", () => {
-  assert.match(manager, /Environment DOKU/);
-  assert.match(manager, /Environment DigiFlazz/);
+  assert.match(manager, /DOKU Direct API/);
+  assert.match(manager, /Kredensial Digiflazz/);
   assert.doesNotMatch(manager, /Midtrans|iPaymu|VIPayment/i);
 });
 
@@ -19,8 +19,8 @@ test("integration credentials stay owner-only and encrypted", () => {
   assert.match(config, /INTEGRATION_ENCRYPTION_KEY/);
   assert.match(config, /encryptConfig\(/);
   assert.match(config, /decryptConfig\(/);
-  assert.match(manager, /Tersimpan — isi untuk mengganti/);
-  assert.match(manager, /type=\{field\.secret \? "password" : "text"\}/);
+  assert.match(manager, /Kredensial nantinya disimpan terenkripsi/);
+  assert.match(manager, /type=\{show \? "text" : "password"\}/);
 });
 
 test("dashboard-managed credentials fail closed instead of using stale Cloudflare provider secrets", () => {

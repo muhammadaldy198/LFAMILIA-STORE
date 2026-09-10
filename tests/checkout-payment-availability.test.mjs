@@ -23,9 +23,9 @@ test("payment groups are controlled directly by checkout React state", () => {
   assert.match(source, /chooseMethod\(group\.code\)/);
 });
 
-test("checkout shows a non-blank message when DOKU payment methods are unavailable", () => {
-  assert.match(source, /Pembayaran melalui gateway belum tersedia/);
-  assert.match(source, /DOKU|gateway/);
+test("checkout shows a non-blank generic message when payment methods are unavailable", () => {
+  assert.match(source, /Pembayaran otomatis belum tersedia/);
+  assert.doesNotMatch(source, /Pembayaran melalui gateway belum tersedia/);
 });
 
 test("checkout waits for payment methods before defaulting to wallet", () => {

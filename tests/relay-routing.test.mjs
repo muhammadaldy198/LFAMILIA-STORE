@@ -29,9 +29,9 @@ test("DigiFlazz integrations use providerRelayRequest", () => {
 });
 
 test("admin exposes only DigiFlazz relay URL and token", () => {
-  const source = read("components/admin-integration-manager.tsx");
-  assert.match(source, /key: "digiflazzOrigin"/);
-  assert.match(source, /key: "token"/);
+  const source = read("components/admin-integration-workspace.tsx");
+  assert.match(source, /Relay URL/);
+  assert.match(source, /Relay Token/);
   assert.doesNotMatch(source, /ipaymuOrigin|iPaymu/i);
 });
 
