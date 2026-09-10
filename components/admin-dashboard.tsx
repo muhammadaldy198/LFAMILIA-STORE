@@ -12,7 +12,6 @@ import {
   ImageIcon,
   LayoutDashboard,
   LifeBuoy,
-  Newspaper,
   PackageSearch,
   Search,
   Settings,
@@ -66,7 +65,6 @@ const navigation: NavigationItem[] = [
   { value: "payments", label: "Pembayaran", Icon: CreditCard, ownerOnly: true },
   { value: "customers", label: "Pelanggan", Icon: Users, ownerOnly: true },
   { value: "promotions", label: "Promo", Icon: Sparkles, ownerOnly: true },
-  { value: "site-content", label: "Konten", Icon: Newspaper },
   { value: "support", label: "Layanan Pelanggan", Icon: Headphones },
   { value: "reports", label: "Laporan", Icon: BarChart3, ownerOnly: true },
   { value: "team", label: "Staff & Admin Akses", Icon: UserCog, ownerOnly: true },
@@ -170,7 +168,6 @@ export function AdminDashboard({
             <TabsContent value="orders" className="mt-0"><AdminOrderManager /></TabsContent>
             <TabsContent value="products" className="mt-0"><AdminProductManager /></TabsContent>
             <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} /></TabsContent>
-            <TabsContent value="site-content" className="mt-0"><AdminExperienceManager role={initialSession.role} /></TabsContent>
 
             {isOwner && (
               <TabsContent value="digiflazz" className="mt-0 space-y-4">
