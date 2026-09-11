@@ -5,6 +5,7 @@ import {
   listDigiflazzPriceList,
   savePricingSettings,
   syncDigiflazzPackage,
+  syncDigiflazzProduct,
   syncDigiflazzPrices,
 } from "@/lib/server/digiflazz-pricing";
 
@@ -42,9 +43,11 @@ export async function POST(request: Request) {
     if (typeof input.isAutoSync === "boolean") await savePricingSettings({ isAutoSync: input.isAutoSync });
     const result = input.productId && input.packageSku
       ? await syncDigiflazzPackage(input.productId, input.packageSku)
-      : input.syncNow
-        ? await syncDigiflazzPrices({ force: true })
-        : null;
+      : input.productId
+        ? await syncDigiflazzProduct(input.productId)
+        : input.syncNow
+          ? await syncDigiflazzPrices({ force: true })
+          : null;
     return Response.json({ ok: true, result });
   } catch (error) {
     return Response.json({

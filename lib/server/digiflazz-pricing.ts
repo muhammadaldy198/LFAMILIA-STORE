@@ -157,7 +157,7 @@ async function fetchPriceList() {
   } satisfies RawPriceItem]));
 }
 
-async function syncRows(target?: { productId: number; packageSku: string }) {
+async function syncRows(target?: { productId: number; packageSku?: string }) {
   await ensureDigiflazzSellerMonitorTable();
   const source = await fetchPriceList();
   const query = target
@@ -165,7 +165,7 @@ async function syncRows(target?: { productId: number; packageSku: string }) {
         m.seller_name AS previous_seller_name, m.baseline_price AS previous_baseline_price
        FROM product_packages p
        LEFT JOIN digiflazz_seller_monitor m ON m.package_id = p.id
-       WHERE p.product_id = ? AND p.sku = ? AND p.provider_code = 'digiflazz' AND p.provider_sku IS NOT NULL`
+       WHERE p.product_id = ?${target.packageSku ? " AND p.sku = ?" : ""} AND p.provider_code = 'digiflazz' AND p.provider_sku IS NOT NULL`
     : `SELECT p.id, p.provider_sku, p.margin_type, p.margin_value,
         m.seller_name AS previous_seller_name, m.baseline_price AS previous_baseline_price
        FROM product_packages p
@@ -181,10 +181,12 @@ async function syncRows(target?: { productId: number; packageSku: string }) {
     previous_baseline_price: number | null;
   };
   const rows = target
-    ? await prepared.bind(target.productId, target.packageSku).all<SyncRow>()
+    ? target.packageSku
+      ? await prepared.bind(target.productId, target.packageSku).all<SyncRow>()
+      : await prepared.bind(target.productId).all<SyncRow>()
     : await prepared.all<SyncRow>();
   if (target && !rows.results.length)
-    throw new Error("Nominal DigiFlazz belum memiliki SKU provider yang valid.");
+    throw new Error(target.packageSku ? "Nominal DigiFlazz belum memiliki SKU provider yang valid." : "Produk ini belum memiliki nominal DigiFlazz yang dapat disinkronkan.");
 
   let updated = 0;
   const statements = rows.results.flatMap((item) => {
@@ -226,7 +228,7 @@ async function syncRows(target?: { productId: number; packageSku: string }) {
   });
   if (statements.length) await getD1().batch(statements);
   if (target && updated === 0)
-    throw new Error("SKU nominal tidak ditemukan pada price list DigiFlazz.");
+    throw new Error(target.packageSku ? "SKU nominal tidak ditemukan pada price list DigiFlazz." : "Tidak ada SKU nominal produk ini pada price list DigiFlazz.");
   return { updated, skipped: false };
 }
 
@@ -234,6 +236,10 @@ export async function syncDigiflazzPrices(options: { force?: boolean } = {}) {
   const settings = await getPricingSettings();
   if (!settings.isAutoSync && !options.force) return { updated: 0, skipped: true };
   return syncRows();
+}
+
+export async function syncDigiflazzProduct(productId: number) {
+  return syncRows({ productId });
 }
 
 export async function syncDigiflazzPackage(productId: number, packageSku: string) {

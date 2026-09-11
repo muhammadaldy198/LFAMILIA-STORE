@@ -477,7 +477,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
     setError("");
     setMessage("");
     try {
-      await readJson(await fetch("/api/panel/digiflazz-pricing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ syncProductId: product.raw.dbId, syncNow: true }) }));
+      await readJson(await fetch("/api/panel/digiflazz-pricing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productId: product.raw.dbId }) }));
       setMessage("Harga modal dan harga jual berhasil disinkronkan dari katalog.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Sinkron harga gagal."); }
     finally { setMonitorRefreshing(false); }
