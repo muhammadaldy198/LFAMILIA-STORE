@@ -25,7 +25,6 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { announceAdminAction } from "@/components/admin-workspace-ui";
 
 type ProductProvider = "Digiflazz" | "Manual";
 type EditorTab = "Informasi Produk" | "Nominal & Harga" | "Tabel Pemisah" | "Tampilan Produk" | "Input Customer" | "Fulfillment";
@@ -817,8 +816,8 @@ function SimpleModal({ title, description, children, onClose, wide }: { title: s
 
 function ModalActions({ onCancel, submit }: { onCancel(): void; submit: string }) { return <div className="col-span-full mt-[5px] flex justify-end gap-[8px] border-t border-[#e5e9ef] pt-[12px]"><button type="button" onClick={onCancel} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[14px] text-[8px] font-bold">Batal</button><button type="submit" className="h-[32px] rounded-[4px] bg-[#0875ed] px-[15px] text-[8px] font-bold text-white">{submit}</button></div>; }
 function Field({ label, ...props }: { label: string; name: string; placeholder: string; type?: string; required?: boolean }) { return <label className="text-[8px] font-bold text-[#3d4f68]">{label}<input {...props} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] outline-none placeholder:text-[#929eae] focus:border-[#2580eb]" /></label>; }
-function ActionButton({ children, onClick }: { children: ReactNode; onClick?: () => void }) { return <button type="button" onClick={onClick ?? (() => announceAdminAction("Aksi produk dijalankan."))} className="inline-flex h-[31px] items-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white px-[11px] text-[7.5px] font-bold text-[#34506d] hover:bg-[#f6f9fc]">{children}</button>; }
-function IconButton({ children, label, danger, onClick }: { children: ReactNode; label: string; danger?: boolean; onClick?: () => void }) { return <button type="button" aria-label={label} onClick={onClick ?? (() => announceAdminAction(`${label} dijalankan.`))} className={`grid size-[25px] place-items-center rounded-[4px] border ${danger ? "border-red-100 bg-red-50 text-red-500" : "border-[#dce3eb] bg-white text-[#52657d]"}`}>{children}</button>; }
+function ActionButton({ children, onClick }: { children: ReactNode; onClick: () => void }) { return <button type="button" onClick={onClick} className="inline-flex h-[31px] items-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white px-[11px] text-[7.5px] font-bold text-[#34506d] hover:bg-[#f6f9fc]">{children}</button>; }
+function IconButton({ children, label, danger, onClick }: { children: ReactNode; label: string; danger?: boolean; onClick: () => void }) { return <button type="button" aria-label={label} onClick={onClick} className={`grid size-[25px] place-items-center rounded-[4px] border ${danger ? "border-red-100 bg-red-50 text-red-500" : "border-[#dce3eb] bg-white text-[#52657d]"}`}>{children}</button>; }
 function CompactSelect({ value, onChange, options }: { value: string; onChange(value: string): void; options: string[] }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className="h-[34px] min-w-0 rounded-[5px] border border-[#dce3eb] bg-white px-[9px] text-[8px] font-medium text-[#40516a] outline-none">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
 function PageButton({ children, active }: { children: ReactNode; active?: boolean }) { return <span className={`grid size-[27px] place-items-center rounded-[4px] border text-[8px] font-bold ${active ? "border-[#0875ed] bg-[#0875ed] text-white" : "border-[#dde4ec] bg-white text-[#4c5e76]"}`}>{children}</span>; }
 function Box() { return <span className="block size-[13px] rounded-[3px] border border-[#cdd7e2] bg-white" />; }

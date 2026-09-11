@@ -50,3 +50,22 @@ test("content controls persist through the admin APIs", () => {
   assert.match(source, /method: "DELETE"/);
   assert.doesNotMatch(source, /frontend-only|backend nanti|simulasi/i);
 });
+
+test("each content type exposes its own saved customer-facing settings", () => {
+  for (const label of [
+    "URL gambar desktop",
+    "URL gambar mobile (opsional)",
+    "Teks tombol utama",
+    "Sembunyikan lagi setelah (hari)",
+    "Slug URL",
+    "Isi berita",
+    "Tanggal terbit (ISO, opsional)",
+    "Jawaban",
+    "Preview memakai data yang sedang dikelola",
+  ]) assert.ok(source.includes(label), `missing useful content setting: ${label}`);
+  assert.match(source, /primaryLabel/);
+  assert.match(source, /secondaryHref/);
+  assert.match(source, /publishedAt/);
+  assert.match(source, /mobileImageUrl/);
+  assert.match(source, /<img src=\{imageUrl\}/);
+});

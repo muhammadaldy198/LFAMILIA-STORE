@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
@@ -34,7 +34,6 @@ import { AdminOverview } from "@/components/admin-overview";
 import { AdminPaymentWorkspace } from "@/components/admin-payment-workspace";
 import { AdminProductManager } from "@/components/admin-product-manager";
 import { AdminCustomerWorkspace } from "@/components/admin-customer-workspace";
-import { adminActionEvent } from "@/components/admin-workspace-ui";
 import { AdminPromoWorkspace, AdminReportsWorkspace, AdminSettingsWorkspace, AdminSupportWorkspace, AdminTeamWorkspace } from "@/components/admin-operations-workspaces";
 
 type Session = {
@@ -76,7 +75,6 @@ export function AdminDashboard({
 }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [globalSearch, setGlobalSearch] = useState("");
-  const [uiNotice, setUiNotice] = useState("");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const isOwner = initialSession.role === "owner";
@@ -94,16 +92,6 @@ export function AdminDashboard({
     return () => window.removeEventListener("keydown", handleShortcut);
   }, []);
 
-  useEffect(() => {
-    function showAction(event: Event) {
-      const message = (event as CustomEvent<string>).detail || "Aksi frontend dijalankan.";
-      setUiNotice(message);
-      window.setTimeout(() => setUiNotice(""), 1800);
-    }
-    window.addEventListener(adminActionEvent, showAction);
-    return () => window.removeEventListener(adminActionEvent, showAction);
-  }, []);
-
   function submitGlobalSearch(event: FormEvent) {
     event.preventDefault();
     const query = globalSearch.trim().toLowerCase();
@@ -116,23 +104,10 @@ export function AdminDashboard({
     setMobileNavigationOpen(false);
   }
 
-  function confirmUiAction(event: ReactMouseEvent<HTMLDivElement>) {
-    const button = (event.target as HTMLElement).closest("button");
-    if (!button || button.disabled) return;
-    const label =
-      button.getAttribute("aria-label") ||
-      button.getAttribute("title") ||
-      button.textContent?.trim();
-    if (!label || label === "Tersimpan") return;
-    setUiNotice(`${label.replace(/\s+/g, " ").slice(0, 70)} aktif.`);
-    window.setTimeout(() => setUiNotice(""), 1800);
-  }
-
   return (
     <Tabs
       value={activeTab}
       onValueChange={setActiveTab}
-      onClick={confirmUiAction}
       className="admin-reference min-h-screen bg-[#f4f7fb] text-[#0f1f3d] lg:grid lg:grid-cols-[230px_minmax(0,1fr)]"
     >
       {mobileNavigationOpen && <button type="button" aria-label="Tutup menu" onClick={() => setMobileNavigationOpen(false)} className="fixed inset-0 z-40 bg-[#071426]/55 lg:hidden" />}
@@ -164,7 +139,6 @@ export function AdminDashboard({
       </aside>
 
       <div className="min-w-0 lg:col-start-2">
-        {uiNotice && <div className="fixed right-3 top-[64px] z-[100] max-w-[calc(100vw-24px)] rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-bold text-emerald-700 shadow-lg lg:right-5 lg:top-[70px] lg:px-4">{uiNotice}</div>}
         <header className="sticky top-0 z-30 flex h-[56px] items-center gap-2 border-b border-[#e5eaf1] bg-white px-3 shadow-[0_1px_2px_rgba(15,23,42,0.02)] lg:h-[58px] lg:px-5">
           <button type="button" onClick={() => setMobileNavigationOpen(true)} aria-label="Buka menu admin" className="grid size-10 shrink-0 place-items-center rounded-md border border-[#dfe5ed] bg-[#f8fafc] text-[#183451] lg:hidden"><Menu className="size-5" /></button>
           <form onSubmit={submitGlobalSearch} className="relative w-full max-w-[550px]">
