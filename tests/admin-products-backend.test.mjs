@@ -19,3 +19,11 @@ test("nominals and separators are serialized into the backend product contract",
   assert.match(source, /pricingMode: item\.provider === "Digiflazz" \? "auto" : "manual"/);
   assert.match(source, /targetTemplate/);
 });
+
+test("manual product creation uploads the selected product image before persisting the product", () => {
+  assert.match(source, /name="image" type="file" accept="image\/png,image\/jpeg,image\/webp"/);
+  assert.match(source, /form\.get\("image"\)/);
+  assert.match(source, /Ukuran gambar produk maksimal 2MB/);
+  assert.match(source, /upload\.set\("file", image\)/);
+  assert.match(source, /raw\.imageUrl = uploaded\.url/);
+});

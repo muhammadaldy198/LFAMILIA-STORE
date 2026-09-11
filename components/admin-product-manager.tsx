@@ -220,6 +220,7 @@ export function AdminProductManager() {
     const slug = String(form.get("slug") || slugify(name));
     const selectedProvider = String(form.get("provider") || "Manual") as ProductProvider;
     const category = String(form.get("category") || "Mobile Games") as Product["category"];
+    const image = form.get("image");
     const raw: ManagedProductPayload = {
       dbId: null,
       name,
@@ -250,6 +251,13 @@ export function AdminProductManager() {
     };
     setSaving(true); setError("");
     try {
+      if (image instanceof File && image.size > 0) {
+        if (image.size > 2 * 1024 * 1024) throw new Error("Ukuran gambar produk maksimal 2MB.");
+        const upload = new FormData();
+        upload.set("file", image);
+        const uploaded = await readJson<{ url: string }>(await fetch("/api/panel/media", { method: "POST", body: upload }));
+        raw.imageUrl = uploaded.url;
+      }
       const result = await readJson<{ id: number }>(await fetch("/api/panel/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(raw) }));
       const next = mapProduct({ ...raw, dbId: result.id });
       setProducts((current) => [...current, next]);
@@ -808,8 +816,37 @@ function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal
     </SimpleModal>
   );
 }
+
 function ManualProductModal({ saving, onClose, onSubmit }: { saving: boolean; onClose(): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
-  return <SimpleModal title="Tambah Produk Manual" description="Semua produk dibuat sendiri. Nominal dapat ditambahkan setelah produk tersimpan." onClose={onClose} wide><form onSubmit={onSubmit}><div className="mb-[12px] flex border-b border-[#e2e7ed]"><span className="border-b-2 border-[#0875ed] px-[10px] pb-[8px] text-[8px] font-bold text-[#0875ed]">Informasi Produk</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Nominal & Harga</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Input Customer</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Fulfillment</span><span className="px-[10px] pb-[8px] text-[8px] text-[#718197]">Tampilan</span></div><div className="grid grid-cols-[120px_1fr_1fr] gap-[12px]"><label className="row-span-3 text-[8px] font-bold text-[#3d4f68]">Gambar produk (opsional, rasio 1:1)<span className="mt-[5px] grid h-[110px] place-items-center rounded-[5px] border border-dashed border-[#cfd9e5] bg-[#fafbfd] text-center text-[#0875ed]"><span><ImageIcon className="mx-auto size-[24px]" /><small className="mt-[5px] block">Pilih gambar</small></span></span><small className="mt-[5px] block font-normal text-[#7a899c]">Boleh dikosongkan dan ditambahkan nanti</small></label><Field label="Nama Produk *" name="name" placeholder="Contoh: Roblox Robux" required /><Field label="Slug *" name="slug" placeholder="contoh: roblox-robux" /><label className="text-[8px] font-bold">Kategori *<select name="category" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Mobile Games</option><option>PC Games</option><option>Game Voucher</option></select></label><label className="text-[8px] font-bold">Provider nominal *<select name="provider" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Digiflazz</option><option>Manual</option></select></label><label className="col-span-2 text-[8px] font-bold">Deskripsi singkat<textarea name="description" placeholder="Deskripsi singkat produk..." className="mt-[4px] h-[72px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label><label className="col-span-2 text-[8px] font-bold">Banner halaman produk (opsional)<input name="banner" placeholder="Boleh dikosongkan dan ditambahkan nanti" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label></div><div className="mt-[12px] flex justify-end gap-[8px] border-t border-[#e5e9ef] pt-[12px]"><button type="button" onClick={onClose} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[14px] text-[8px] font-bold">Batal</button><button type="submit" disabled={saving} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[15px] text-[8px] font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Lanjut ke Nominal"}</button></div></form></SimpleModal>;
+  return (
+    <SimpleModal title="Tambah Produk Manual" description="Semua produk dibuat sendiri. Nominal dapat ditambahkan setelah produk tersimpan." onClose={onClose} wide>
+      <form onSubmit={onSubmit}>
+        <div className="mb-[12px] flex border-b border-[#e2e7ed]">
+          {["Informasi Produk", "Nominal & Harga", "Input Customer", "Fulfillment", "Tampilan"].map((label, index) => <span key={label} className={index === 0 ? "border-b-2 border-[#0875ed] px-[10px] pb-[8px] text-[8px] font-bold text-[#0875ed]" : "px-[10px] pb-[8px] text-[8px] text-[#718197]"}>{label}</span>)}
+        </div>
+        <div className="grid grid-cols-[120px_1fr_1fr] gap-[12px]">
+          <label htmlFor="manual-product-image" className="row-span-3 cursor-pointer text-[8px] font-bold text-[#3d4f68]">
+            Gambar produk (opsional, rasio 1:1)
+            <span className="mt-[5px] grid h-[110px] place-items-center rounded-[5px] border border-dashed border-[#cfd9e5] bg-[#fafbfd] text-center text-[#0875ed]">
+              <span><ImageIcon className="mx-auto size-[24px]" /><small className="mt-[5px] block">Pilih gambar</small></span>
+            </span>
+            <input id="manual-product-image" name="image" type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" />
+            <small className="mt-[5px] block font-normal text-[#7a899c]">PNG, JPG, WEBP · Maks. 2MB</small>
+          </label>
+          <Field label="Nama Produk *" name="name" placeholder="Contoh: Roblox Robux" required />
+          <Field label="Slug *" name="slug" placeholder="contoh: roblox-robux" />
+          <label className="text-[8px] font-bold">Kategori *<select name="category" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Mobile Games</option><option>PC Games</option><option>Game Voucher</option></select></label>
+          <label className="text-[8px] font-bold">Provider nominal *<select name="provider" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Digiflazz</option><option>Manual</option></select></label>
+          <label className="col-span-2 text-[8px] font-bold">Deskripsi singkat<textarea name="description" placeholder="Deskripsi singkat produk..." className="mt-[4px] h-[72px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label>
+          <label className="col-span-2 text-[8px] font-bold">Banner halaman produk (opsional)<input name="banner" placeholder="Boleh dikosongkan dan ditambahkan nanti" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label>
+        </div>
+        <div className="mt-[12px] flex justify-end gap-[8px] border-t border-[#e5e9ef] pt-[12px]">
+          <button type="button" onClick={onClose} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[14px] text-[8px] font-bold">Batal</button>
+          <button type="submit" disabled={saving} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[15px] text-[8px] font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Lanjut ke Nominal"}</button>
+        </div>
+      </form>
+    </SimpleModal>
+  );
 }
 
 function SimpleModal({ title, description, children, onClose, wide }: { title: string; description: string; children: ReactNode; onClose(): void; wide?: boolean }) { return <div className="fixed inset-0 z-50 grid place-items-center bg-[#071426]/55 p-[24px]" role="dialog" aria-modal="true" aria-label={title}><section className={`max-h-[88vh] w-full overflow-auto rounded-[9px] bg-white shadow-2xl ${wide ? "max-w-[720px]" : "max-w-[480px]"}`}><header className="flex items-start justify-between border-b border-[#e3e8ef] px-[16px] py-[13px]"><div><h2 className="text-[14px] font-black text-[#101d35]">{title}</h2><p className="mt-[2px] text-[8px] text-[#6d7d92]">{description}</p></div><button type="button" onClick={onClose} className="grid size-[27px] place-items-center rounded-[4px] text-[#596b82] hover:bg-[#f2f5f8]"><X className="size-[14px]" /></button></header><div className="p-[16px]">{children}</div></section></div>; }

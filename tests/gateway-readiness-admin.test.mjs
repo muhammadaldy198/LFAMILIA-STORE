@@ -14,7 +14,8 @@ test("owner payment API exposes DOKU readiness without exposing credentials", ()
 
 test("payment admin shows the single DOKU Direct API workspace", () => {
   assert.match(manager, /DOKU Direct API/);
-  assert.match(manager, /Tes Koneksi/);
+  assert.match(manager, /Periksa Konfigurasi/);
+  assert.match(manager, /Uji koneksi dan transaksi live dilakukan pada tahap pra-peluncuran/);
   assert.match(manager, /Channel Pembayaran/);
   assert.match(manager, /Editor Halaman Pembayaran/);
   assert.doesNotMatch(manager, /midtrans|ipaymu/i);
