@@ -126,6 +126,8 @@ type DigiflazzCatalogItem = {
   sellerProductStatus: boolean;
 };
 
+type DigiflazzImportItem = DigiflazzCatalogItem & { sku: string };
+
 function displayCategory(value: string): Product["category"] {
   if (value === "voucher" || value.includes("voucher")) return "Game Voucher";
   if (value === "pc-game" || value.includes("pc")) return "PC Games";
@@ -640,16 +642,18 @@ function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal
     () => Array.from(new Set(catalog.filter((item) => !category || item.category === category).map((item) => item.brand).filter(Boolean))).sort(),
     [catalog, category],
   );
-  const available = useMemo(() => {
+  const available = useMemo<DigiflazzImportItem[]>(() => {
     const term = query.trim().toLowerCase();
-    return catalog.filter((item) =>
-      (!category || item.category === category) &&
-      (!brand || item.brand === brand) &&
-      item.buyerProductStatus &&
-      item.sellerProductStatus &&
-      !existing.some((nominal) => nominal.sku === item.buyerSkuCode) &&
-      (!term || `${item.productName} ${item.buyerSkuCode}`.toLowerCase().includes(term)),
-    );
+    return catalog
+      .filter((item) =>
+        (!category || item.category === category) &&
+        (!brand || item.brand === brand) &&
+        item.buyerProductStatus &&
+        item.sellerProductStatus &&
+        !existing.some((nominal) => nominal.sku === item.buyerSkuCode) &&
+        (!term || `${item.productName} ${item.buyerSkuCode}`.toLowerCase().includes(term)),
+      )
+      .map((item) => ({ ...item, sku: item.buyerSkuCode }));
   }, [brand, catalog, category, existing, query]);
 
   function chooseCategory(value: string) {
@@ -665,7 +669,7 @@ function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal
       .map((item) => ({
         id: crypto.randomUUID(),
         name: item.productName,
-        sku: item.buyerSkuCode,
+        sku: item.sku,
         group: defaultGroup,
         cost: item.price,
         margin,
