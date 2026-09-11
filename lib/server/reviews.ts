@@ -62,6 +62,18 @@ export async function listAllReviews() {
   return result.results.map(reviewFromRow);
 }
 
+export async function listFeaturedReviews(limit = 6) {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 12);
+  const result = await getD1().prepare(
+    `SELECT r.id, r.product_slug, r.rating, r.title, r.body, u.name AS customer_name,
+      r.is_verified_purchase, r.is_visible, r.created_at, r.updated_at
+     FROM product_reviews r JOIN customer_users u ON u.id = r.customer_id
+     WHERE r.is_visible = 1
+     ORDER BY r.created_at DESC LIMIT ?`,
+  ).bind(safeLimit).all<ReviewRow>();
+  return result.results.map(reviewFromRow);
+}
+
 export async function readReviewSummaries() {
   const result = await getD1().prepare(
     `SELECT product_slug, ROUND(AVG(rating), 1) AS rating_average, COUNT(*) AS rating_count

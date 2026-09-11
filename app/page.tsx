@@ -15,6 +15,7 @@ import { GlobalHomePopup } from "@/components/global-home-popup";
 import { HomeBannerCarousel } from "@/components/home-banner-carousel";
 import { PopularNow } from "@/components/popular-now";
 import { HomeNewsPreview } from "@/components/home-news-preview";
+import { HomeReviewsPreview } from "@/components/home-reviews-preview";
 
 const steps = [
   {
@@ -63,6 +64,7 @@ export default function Home() {
 
         <HomeProductBrowser />
         <HomeNewsPreview />
+        <HomeReviewsPreview />
 
         <section className="border-y border-white/[0.07] bg-white/[0.018]">
           <div className="mx-auto max-w-7xl px-4 py-[32px] sm:px-6 sm:py-[40px] lg:px-8">

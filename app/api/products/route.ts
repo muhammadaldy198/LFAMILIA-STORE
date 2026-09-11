@@ -40,6 +40,7 @@ export async function GET() {
           price: pkg.price,
           note: pkg.note,
           group: pkg.group,
+          imageUrl: pkg.imageUrl,
           providerCode: pkg.providerCode,
           providerConfigured: Boolean(pkg.providerCode && pkg.providerSku),
         })),

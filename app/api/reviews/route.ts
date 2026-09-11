@@ -1,12 +1,16 @@
 import { z } from "zod";
 import { getCustomerSession, requireCustomerSession } from "@/lib/server/customer-auth";
-import { listProductReviews, saveProductReview } from "@/lib/server/reviews";
+import { listFeaturedReviews, listProductReviews, saveProductReview } from "@/lib/server/reviews";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const productSlug = new URL(request.url).searchParams.get("product")?.trim() ?? "";
+  const params = new URL(request.url).searchParams;
+  if (params.get("featured") === "1") {
+    return Response.json({ reviews: await listFeaturedReviews(6) }, { headers: { "Cache-Control": "public, max-age=60" } });
+  }
+  const productSlug = params.get("product")?.trim() ?? "";
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(productSlug)) return Response.json({ error: "Produk tidak valid." }, { status: 400 });
   const customer = await getCustomerSession(request);
   const reviews = await listProductReviews(productSlug);
