@@ -13,12 +13,14 @@ import {
   LayoutDashboard,
   Layers3,
   LifeBuoy,
+  Menu,
   PackageSearch,
   Search,
   Settings,
   Sparkles,
   UserCog,
   Users,
+  X,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -75,6 +77,7 @@ export function AdminDashboard({
   const [activeTab, setActiveTab] = useState("overview");
   const [globalSearch, setGlobalSearch] = useState("");
   const [uiNotice, setUiNotice] = useState("");
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const isOwner = initialSession.role === "owner";
   const visibleNavigation = navigation.filter((item) => isOwner || !item.ownerOnly);
@@ -110,6 +113,7 @@ export function AdminDashboard({
     else if (query.includes("sku") || query.includes("produk")) setActiveTab("products");
     else if (query.includes("pelanggan")) setActiveTab("customers");
     else setActiveTab("orders");
+    setMobileNavigationOpen(false);
   }
 
   function confirmUiAction(event: ReactMouseEvent<HTMLDivElement>) {
@@ -129,10 +133,11 @@ export function AdminDashboard({
       value={activeTab}
       onValueChange={setActiveTab}
       onClick={confirmUiAction}
-      className="admin-reference grid min-h-screen min-w-[1180px] grid-cols-[230px_minmax(0,1fr)] bg-[#f4f7fb] text-[#0f1f3d]"
+      className="admin-reference min-h-screen bg-[#f4f7fb] text-[#0f1f3d] lg:grid lg:grid-cols-[230px_minmax(0,1fr)]"
     >
-      <aside className="sticky top-0 flex h-screen flex-col overflow-hidden bg-[#112842] text-white shadow-[6px_0_24px_rgba(15,37,64,0.12)]">
-        <Brand onClick={() => setActiveTab("overview")} />
+      {mobileNavigationOpen && <button type="button" aria-label="Tutup menu" onClick={() => setMobileNavigationOpen(false)} className="fixed inset-0 z-40 bg-[#071426]/55 lg:hidden" />}
+      <aside className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[280px] flex-col overflow-hidden bg-[#112842] text-white shadow-[6px_0_24px_rgba(15,37,64,0.22)] transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:w-auto lg:translate-x-0 lg:shadow-[6px_0_24px_rgba(15,37,64,0.12)] ${mobileNavigationOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <Brand onClick={() => { setActiveTab("overview"); setMobileNavigationOpen(false); }} onClose={() => setMobileNavigationOpen(false)} />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3 scrollbar-none">
           <TabsList className="h-auto w-full flex-col items-stretch gap-1 bg-transparent p-0">
@@ -140,7 +145,8 @@ export function AdminDashboard({
               <TabsTrigger
                 key={value}
                 value={value}
-                className="flex h-10 w-full justify-start rounded-md px-3 text-left text-[12px] font-medium text-slate-200/90 transition hover:bg-white/[0.08] hover:text-white data-[state=active]:bg-[#1769e8] data-[state=active]:text-white data-[state=active]:shadow-[0_5px_16px_rgba(23,105,232,0.28)]"
+                onClick={() => setMobileNavigationOpen(false)}
+                className="flex h-11 w-full justify-start rounded-md px-3 text-left text-[13px] font-medium text-slate-200/90 transition hover:bg-white/[0.08] hover:text-white data-[state=active]:bg-[#1769e8] data-[state=active]:text-white data-[state=active]:shadow-[0_5px_16px_rgba(23,105,232,0.28)] lg:h-10 lg:text-[12px]"
               >
                 <Icon className="mr-3 size-[17px] shrink-0" strokeWidth={1.9} />
                 <span className="truncate">{label}</span>
@@ -157,9 +163,10 @@ export function AdminDashboard({
         </div>
       </aside>
 
-      <div className="min-w-0">
-        {uiNotice && <div className="fixed right-5 top-[70px] z-[100] rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-[10px] font-bold text-emerald-700 shadow-lg">{uiNotice}</div>}
-        <header className="sticky top-0 z-30 flex h-[58px] items-center border-b border-[#e5eaf1] bg-white px-5 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
+      <div className="min-w-0 lg:col-start-2">
+        {uiNotice && <div className="fixed right-3 top-[64px] z-[100] max-w-[calc(100vw-24px)] rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-bold text-emerald-700 shadow-lg lg:right-5 lg:top-[70px] lg:px-4">{uiNotice}</div>}
+        <header className="sticky top-0 z-30 flex h-[56px] items-center gap-2 border-b border-[#e5eaf1] bg-white px-3 shadow-[0_1px_2px_rgba(15,23,42,0.02)] lg:h-[58px] lg:px-5">
+          <button type="button" onClick={() => setMobileNavigationOpen(true)} aria-label="Buka menu admin" className="grid size-10 shrink-0 place-items-center rounded-md border border-[#dfe5ed] bg-[#f8fafc] text-[#183451] lg:hidden"><Menu className="size-5" /></button>
           <form onSubmit={submitGlobalSearch} className="relative w-full max-w-[550px]">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#7d8ba3]" />
             <Input
@@ -169,19 +176,19 @@ export function AdminDashboard({
               placeholder="Cari menu, produk, pesanan, atau pelanggan..."
               className="h-9 rounded-md border-[#dfe5ed] bg-[#f8fafc] pl-9 pr-14 text-[11px] text-[#26364f] shadow-none placeholder:text-[#98a5b8] focus-visible:ring-[#1769e8]/30"
             />
-            <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-[#dfe5ed] bg-white px-1.5 py-0.5 text-[9px] font-semibold text-[#8b98aa]">
+            <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-[#dfe5ed] bg-white px-1.5 py-0.5 text-[9px] font-semibold text-[#8b98aa] sm:block">
               Ctrl K
             </kbd>
           </form>
 
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-2 lg:gap-3">
             <AdminNotifications sessionId={initialSession.id} isOwner={isOwner} onNavigate={setActiveTab} />
-            <span className="h-7 w-px bg-[#e7ebf1]" />
+            <span className="hidden h-7 w-px bg-[#e7ebf1] sm:block" />
             <AdminAccountMenu session={initialSession} logoutPath={logoutPath} onNavigate={setActiveTab} />
           </div>
         </header>
 
-        <main className="admin-v3-content min-w-0 p-5">
+        <main className="admin-v3-content min-w-0 overflow-x-hidden p-3 sm:p-4 lg:p-5">
           <div className="mx-auto min-w-0 max-w-[1540px]">
             <TabsContent value="overview" className="mt-0"><AdminOverview onNavigate={setActiveTab} /></TabsContent>
             <TabsContent value="orders" className="mt-0"><AdminOrderManager /></TabsContent>
@@ -201,21 +208,32 @@ export function AdminDashboard({
           </div>
         </main>
       </div>
+      <style>{`@media (max-width: 1023px) {
+        .admin-v3-content .grid { grid-template-columns: minmax(0, 1fr) !important; }
+        .admin-v3-content .col-span-2 { grid-column: span 1 / span 1 !important; }
+        .admin-v3-content .grid > .col-span-2 { grid-column: span 1 / span 1 !important; }
+        .admin-v3-content .flex.items-start.justify-between,
+        .admin-v3-content .flex.items-center.justify-between { flex-wrap: wrap; }
+        .admin-v3-content .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+        .admin-v3-content [role="dialog"] { padding: 12px !important; }
+        .admin-v3-content .text-\\[6px\\], .admin-v3-content .text-\\[6\.5px\\] { font-size: 10px !important; }
+        .admin-v3-content .text-\\[7px\\], .admin-v3-content .text-\\[7\.5px\\], .admin-v3-content .text-\\[8px\\] { font-size: 11px !important; }
+        .admin-v3-content .text-\\[8\.5px\\], .admin-v3-content .text-\\[9px\\] { font-size: 12px !important; }
+        .admin-v3-content .text-\\[10px\\] { font-size: 13px !important; }
+      }`}</style>
     </Tabs>
   );
 }
 
-function Brand({ onClick }: { onClick(): void }) {
+function Brand({ onClick, onClose }: { onClick(): void; onClose(): void }) {
   return (
-    <button type="button" onClick={onClick} className="flex h-[70px] w-full items-center gap-3 border-b border-white/[0.07] px-4 text-left">
-      <span className="grid size-[42px] place-items-center rounded-full bg-gradient-to-br from-[#2483ff] to-[#0b56c8] shadow-[0_8px_22px_rgba(17,99,224,0.35)]">
-        <Gamepad2 className="size-6 text-white" strokeWidth={2.2} />
-      </span>
-      <span className="min-w-0">
-        <strong className="block truncate text-[14px] font-extrabold tracking-[-0.02em] text-white">LFAMILIA ADMIN</strong>
-        <span className="mt-0.5 block truncate text-[8px] font-medium text-slate-400">Top Up Game Solution</span>
-      </span>
-    </button>
+    <div className="flex h-[70px] items-center gap-2 border-b border-white/[0.07] px-4">
+      <button type="button" onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <span className="grid size-[42px] place-items-center rounded-full bg-gradient-to-br from-[#2483ff] to-[#0b56c8] shadow-[0_8px_22px_rgba(17,99,224,0.35)]"><Gamepad2 className="size-6 text-white" strokeWidth={2.2} /></span>
+        <span className="min-w-0"><strong className="block truncate text-[14px] font-extrabold tracking-[-0.02em] text-white">LFAMILIA ADMIN</strong><span className="mt-0.5 block truncate text-[8px] font-medium text-slate-400">Top Up Game Solution</span></span>
+      </button>
+      <button type="button" onClick={onClose} aria-label="Tutup menu" className="grid size-9 place-items-center rounded-md text-slate-300 hover:bg-white/[0.08] lg:hidden"><X className="size-5" /></button>
+    </div>
   );
 }
 

@@ -14,15 +14,15 @@ export function announceAdminAction(message: string) {
 }
 
 export function WorkspaceHeader({ title, description, actions }: { title: string; description: string; actions?: ReactNode }) {
-  return <div className="mb-4 flex items-start justify-between gap-5">
-    <div><h1 className="text-[24px] font-extrabold tracking-[-0.035em] text-[#10203d]">{title}</h1><p className="mt-0.5 text-[10px] text-[#718198]">{description}</p></div>
-    {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+  return <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:gap-5">
+    <div><h1 className="text-[21px] font-extrabold tracking-[-0.035em] text-[#10203d] sm:text-[24px]">{title}</h1><p className="mt-0.5 max-w-[680px] text-[11px] leading-4 text-[#718198] sm:text-[10px]">{description}</p></div>
+    {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{actions}</div>}
   </div>;
 }
 
 export function Panel({ title, description, action, children, className = "" }: { title?: string; description?: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return <section className={`overflow-hidden rounded-lg border border-[#e1e6ed] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)] ${className}`}>
-    {(title || action) && <div className="flex min-h-[54px] items-center justify-between gap-3 border-b border-[#edf0f4] px-4 py-2.5"><div>{title && <h2 className="text-[13px] font-extrabold text-[#14213a]">{title}</h2>}{description && <p className="mt-0.5 text-[9px] text-[#8190a5]">{description}</p>}</div>{action}</div>}
+    {(title || action) && <div className="flex min-h-[54px] flex-col items-start justify-between gap-2 border-b border-[#edf0f4] px-3 py-3 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-2.5"><div>{title && <h2 className="text-[14px] font-extrabold text-[#14213a] sm:text-[13px]">{title}</h2>}{description && <p className="mt-0.5 text-[10px] leading-4 text-[#8190a5] sm:text-[9px]">{description}</p>}</div>{action}</div>}
     {children}
   </section>;
 }
@@ -36,8 +36,10 @@ export function MetricCard({ icon: Icon, label, value, detail, tone = "blue" }: 
 }
 
 export function TabBar({ tabs, active, onChange }: { tabs: string[]; active: string; onChange(value: string): void }) {
-  return <div className="mb-4 flex items-center gap-1 border-b border-[#dfe5ed]">
-    {tabs.map((tab) => <button key={tab} type="button" onClick={() => onChange(tab)} className={`border-b-2 px-3 py-2.5 text-[10px] font-bold transition ${active === tab ? "border-[#0769e9] text-[#0769e9]" : "border-transparent text-[#718198] hover:text-[#243653]"}`}>{tab}</button>)}
+  return <div className="mb-4 overflow-x-auto border-b border-[#dfe5ed] [-webkit-overflow-scrolling:touch]">
+    <div className="flex min-w-max items-center gap-1">
+      {tabs.map((tab) => <button key={tab} type="button" onClick={() => onChange(tab)} className={`border-b-2 px-3 py-2.5 text-[11px] font-bold transition sm:text-[10px] ${active === tab ? "border-[#0769e9] text-[#0769e9]" : "border-transparent text-[#718198] hover:text-[#243653]"}`}>{tab}</button>)}
+    </div>
   </div>;
 }
 
@@ -74,8 +76,8 @@ export function CopyUrl({ label, value, note }: { label: string; value: string; 
 
 export function Modal({ open, title, description, children, footer, onClose, width = "max-w-[620px]" }: { open: boolean; title: string; description?: string; children: ReactNode; footer?: ReactNode; onClose(): void; width?: string }) {
   if (!open) return null;
-  return <div className="fixed inset-0 z-[80] grid place-items-center bg-[#0b1729]/45 p-5" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <div className={`max-h-[88vh] w-full ${width} overflow-hidden rounded-lg border border-[#dfe5ed] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)]`}>
+  return <div className="fixed inset-0 z-[80] grid place-items-end bg-[#0b1729]/45 p-0 sm:place-items-center sm:p-5" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className={`max-h-[92vh] w-full ${width} overflow-hidden rounded-t-xl border border-[#dfe5ed] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:max-h-[88vh] sm:rounded-lg`}>
       <div className="flex items-start justify-between border-b border-[#edf0f4] px-4 py-3"><div><h2 className="text-sm font-extrabold text-[#14213a]">{title}</h2>{description && <p className="mt-0.5 text-[9px] text-[#8190a5]">{description}</p>}</div><button type="button" onClick={onClose} className="grid size-7 place-items-center rounded text-[#718198] hover:bg-slate-100"><X className="size-4" /></button></div>
       <div className="max-h-[66vh] overflow-y-auto p-4">{children}</div>
       {footer && <div className="flex items-center justify-end gap-2 border-t border-[#edf0f4] px-4 py-3">{footer}</div>}
