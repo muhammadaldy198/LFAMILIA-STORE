@@ -15,7 +15,6 @@ import {
   Download,
   Eye,
   Landmark,
-  MoreVertical,
   Plus,
   QrCode,
   RefreshCw,
@@ -149,6 +148,8 @@ export function AdminOrderManager() {
   const [provider, setProvider] = useState("Semua Provider");
   const [payment, setPayment] = useState("Semua Pembayaran");
   const [date, setDate] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkAction, setBulkAction] = useState("Aksi massal");
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
@@ -198,6 +199,9 @@ export function AdminOrderManager() {
         (!date || order.createdAt?.slice(0, 10) === date);
     });
   }, [date, orders, payment, provider, query, status]);
+  const pageCount = Math.max(1, Math.ceil(visibleOrders.length / pageSize));
+  const activePage = Math.min(page, pageCount);
+  const pagedOrders = visibleOrders.slice((activePage - 1) * pageSize, activePage * pageSize);
 
   const liveMetrics = useMemo(() => [
     { label: "Total Pesanan", value: String(orders.length), change: "Aktual", note: "data tersimpan", trend: "up" as const, trendTone: "green" as const, tone: "blue", Icon: ShoppingCart },
@@ -218,6 +222,7 @@ export function AdminOrderManager() {
     setProvider("Semua Provider");
     setPayment("Semua Pembayaran");
     setDate("");
+    setPage(1);
   }
 
   async function refresh() {
@@ -299,25 +304,25 @@ export function AdminOrderManager() {
             <label className="relative">
               <span className="sr-only">Cari pesanan</span>
               <Search className="absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#71829a]" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari ID / Customer / UID" className="h-[32px] w-full rounded-[5px] border border-[#dfe5ed] bg-white pl-[30px] pr-[9px] text-[9px] outline-none placeholder:text-[#7b899c] focus:border-[#2b82ef]" />
+              <input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Cari ID / Customer / UID" className="h-[32px] w-full rounded-[5px] border border-[#dfe5ed] bg-white pl-[30px] pr-[9px] text-[9px] outline-none placeholder:text-[#7b899c] focus:border-[#2b82ef]" />
             </label>
-            <FilterSelect value={status} onChange={setStatus} options={["Semua Status", "Pending", "Diproses", "Berhasil", "Gagal", "Komplain"]} />
-            <FilterSelect value={provider} onChange={setProvider} options={["Semua Provider", "Digiflazz", "Manual"]} />
-            <FilterSelect value={payment} onChange={setPayment} options={["Semua Pembayaran", "QRIS", "Virtual Account", "E-Wallet"]} />
+            <FilterSelect value={status} onChange={(value) => { setStatus(value); setPage(1); }} options={["Semua Status", "Pending", "Diproses", "Berhasil", "Gagal", "Komplain"]} />
+            <FilterSelect value={provider} onChange={(value) => { setProvider(value); setPage(1); }} options={["Semua Provider", "Digiflazz", "Manual"]} />
+            <FilterSelect value={payment} onChange={(value) => { setPayment(value); setPage(1); }} options={["Semua Pembayaran", "QRIS", "Virtual Account", "E-Wallet"]} />
             <label className="relative">
               <span className="sr-only">Pilih tanggal</span>
               <CalendarDays className="absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#58708d]" />
-              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="h-[32px] w-full rounded-[5px] border border-[#dfe5ed] bg-white pl-[30px] pr-[7px] text-[8px] text-[#33445d] outline-none" />
+              <input type="date" value={date} onChange={(event) => { setDate(event.target.value); setPage(1); }} className="h-[32px] w-full rounded-[5px] border border-[#dfe5ed] bg-white pl-[30px] pr-[7px] text-[8px] text-[#33445d] outline-none" />
             </label>
             <button type="button" onClick={resetFilters} className="h-[32px] rounded-[5px] border border-[#dfe5ed] bg-white text-[9px] font-semibold text-[#43536b] hover:bg-[#f6f8fb]">Reset</button>
           </div>
 
           <div className="flex h-[43px] items-center justify-between px-[12px]">
             <h2 className="text-[12px] font-extrabold text-[#101c34]">Daftar Pesanan</h2>
-            <span className="text-[8px] text-[#657690]">{loading ? "Memuat pesanan..." : `Menampilkan 1–${visibleOrders.length} dari ${orders.length} pesanan`}</span>
+            <span title={activePage === 1 ? `Menampilkan 1–${Math.min(pageSize, visibleOrders.length)} dari ${visibleOrders.length} pesanan` : undefined} className="text-[8px] text-[#657690]">{loading ? "Memuat pesanan..." : `Menampilkan ${visibleOrders.length ? (activePage - 1) * pageSize + 1 : 0}–${Math.min(activePage * pageSize, visibleOrders.length)} dari ${visibleOrders.length} pesanan`}</span>
           </div>
 
-          <DesktopOrderTable orders={visibleOrders} selected={selected} onSelect={setSelected} onOpen={setDetailOrder} />
+          <DesktopOrderTable orders={pagedOrders} selected={selected} onSelect={setSelected} onOpen={setDetailOrder} />
 
           <footer className="flex min-h-[46px] items-center justify-between border-t border-[#e5eaf0] px-[11px] py-[7px]">
             <div className="flex items-center gap-[8px]">
@@ -329,8 +334,8 @@ export function AdminOrderManager() {
             </div>
             <div className="flex items-center gap-[8px] text-[8px] text-[#52627a]">
               <span>Baris per halaman</span>
-              <select className="h-[29px] rounded-[5px] border border-[#dce3eb] bg-white px-[8px] outline-none"><option>500</option></select>
-              <Pagination />
+              <select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} className="h-[29px] rounded-[5px] border border-[#dce3eb] bg-white px-[8px] outline-none"><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
+              <Pagination page={activePage} pages={pageCount} onChange={setPage} />
             </div>
           </footer>
         </section>
@@ -394,7 +399,7 @@ function DesktopOrderTable({ orders, selected, onSelect, onOpen }: { orders: Ord
               <td className="truncate py-[6px] pr-[7px]">{order.provider}</td>
               <td className="whitespace-nowrap py-[6px] pr-[7px] font-semibold">{formatRupiah(order.total)}</td>
               <td className="py-[6px] pr-[7px]"><StatusBadge status={order.status} /></td>
-              <td className="py-[6px]"><div className="flex items-center justify-center gap-[6px]"><button type="button" onClick={() => onOpen(order)} className="h-[26px] rounded-[4px] bg-[#e8f2ff] px-[12px] font-bold text-[#0873dd] hover:bg-[#d9eaff]">Detail</button><button type="button" onClick={() => onOpen(order)} aria-label={`Menu ${order.id}`} className="grid size-[26px] place-items-center rounded-[4px] border border-[#dce3eb] text-[#475b74] hover:bg-[#f4f7fa]"><MoreVertical className="size-[12px]" /></button></div></td>
+              <td className="py-[6px]"><div className="flex items-center justify-center"><button type="button" onClick={() => onOpen(order)} className="h-[26px] rounded-[4px] bg-[#e8f2ff] px-[12px] font-bold text-[#0873dd] hover:bg-[#d9eaff]">Detail</button></div></td>
             </tr>
           )) : (
             <tr><td colSpan={10} className="py-[42px] text-center text-[9px] text-[#7a899c]">Tidak ada pesanan yang cocok dengan filter.</td></tr>
@@ -431,8 +436,11 @@ function StatusBadge({ status }: { status: OrderStatus }) {
   return <span className={`inline-flex rounded-[4px] px-[7px] py-[4px] text-[6.5px] font-bold ${styles[status]}`}>{status}</span>;
 }
 
-function Pagination() {
-  return <nav aria-label="Pagination" className="flex items-center gap-[4px]"><span className="grid size-[26px] place-items-center rounded-[4px] border border-[#0875ed] bg-[#0875ed] text-[8px] font-bold text-white">1</span></nav>;
+function Pagination({ page, pages, onChange }: { page: number; pages: number; onChange(value: number): void }) {
+  const start = pages <= 5 ? 1 : Math.min(Math.max(1, page - 2), pages - 4);
+  const numbers = Array.from({ length: Math.min(5, pages) }, (_, index) => start + index);
+  const base = "grid size-[26px] place-items-center rounded-[4px] border border-[#dce3eb] bg-white text-[8px] font-bold text-[#52627a] disabled:cursor-not-allowed disabled:opacity-40";
+  return <nav aria-label="Pagination" className="flex items-center gap-[4px]"><button type="button" disabled={page <= 1} onClick={() => onChange(page - 1)} className={base} aria-label="Halaman sebelumnya">‹</button>{numbers.map((number) => <button key={number} type="button" onClick={() => onChange(number)} aria-current={number === page ? "page" : undefined} className={`grid size-[26px] place-items-center rounded-[4px] border text-[8px] font-bold ${number === page ? "border-[#0875ed] bg-[#0875ed] text-white" : "border-[#dce3eb] bg-white text-[#52627a]"}`}>{number}</button>)}<button type="button" disabled={page >= pages} onClick={() => onChange(page + 1)} className={base} aria-label="Halaman berikutnya">›</button></nav>;
 }
 
 function ActivityPanel({ activities }: { activities: Activity[] }) {
