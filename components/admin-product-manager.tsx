@@ -102,8 +102,10 @@ type Nominal = {
   group: string;
   cost: number;
   margin: number;
+  marginType: "fixed" | "percent";
   sell: number;
   active: boolean;
+  imageUrl: string;
   imageKind: "diamond" | "weekly" | "double" | "twilight";
   provider: ProductProvider;
 };
@@ -326,8 +328,10 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
     group: item.group || "Lainnya",
     cost: item.supplierPrice ?? item.price,
     margin: item.marginType === "percent" ? (item.marginValue ?? 0) : item.supplierPrice ? Math.max(0, Math.round((item.price - item.supplierPrice) / item.supplierPrice * 100)) : 0,
+    marginType: item.marginType || "percent",
     sell: item.price,
     active: item.isActive,
+    imageUrl: item.imageUrl || "",
     imageKind: item.label.toLowerCase().includes("weekly") ? "weekly" : item.label.toLowerCase().includes("twilight") ? "twilight" : item.label.includes("+") ? "double" : "diamond",
     provider: item.providerCode === "digiflazz" ? "Digiflazz" : "Manual",
   })));
@@ -338,6 +342,8 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
   const [importOpen, setImportOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [sectionOpen, setSectionOpen] = useState(false);
+  const [nominalEditor, setNominalEditor] = useState<Nominal | null>(null);
+  const [marginOpen, setMarginOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState<"Mobile" | "Desktop">("Mobile");
   const [dragging, setDragging] = useState<{ kind: "nominal" | "section"; id: string } | null>(null);
   const [message, setMessage] = useState("");
@@ -441,12 +447,12 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
           price: Math.max(1, Math.round(item.sell)),
           note: previous?.note || "",
           group: item.group || undefined,
-          imageUrl: previous?.imageUrl || "",
+          imageUrl: item.imageUrl.trim(),
           providerCode: item.provider === "Digiflazz" ? "digiflazz" : previous?.providerCode === "voucher-stock" ? "voucher-stock" : undefined,
           providerSku: item.provider === "Digiflazz" ? item.sku : previous?.providerSku,
           supplierPrice: Math.max(0, Math.round(item.cost)),
           pricingMode: item.provider === "Digiflazz" ? "auto" : "manual",
-          marginType: "percent",
+          marginType: item.marginType,
           marginValue: Math.max(0, Math.round(item.margin)),
           isActive: item.active,
           sortOrder: index,
@@ -485,7 +491,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
 
   function addManualNominal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget); const cost = Number(form.get("cost") || 0); const margin = Number(form.get("margin") || 0);
-    setNominals((current) => [...current, { id: crypto.randomUUID(), name: String(form.get("name")), sku: String(form.get("sku") || "MANUAL"), group: String(form.get("group") || sections[0]?.name || "Lainnya"), cost, margin, sell: Math.ceil(cost + cost * margin / 100), active: true, imageKind: "diamond", provider: "Manual" }]);
+    setNominals((current) => [...current, { id: crypto.randomUUID(), name: String(form.get("name")), sku: String(form.get("sku") || "MANUAL"), group: String(form.get("group") || sections[0]?.name || "Lainnya"), cost, margin, marginType: "fixed", sell: Math.ceil(cost + cost * margin / 100), active: true, imageUrl: "", imageKind: "diamond", provider: "Manual" }]);
     setManualOpen(false); setMessage("Nominal manual berhasil ditambahkan.");
   }
 
@@ -503,6 +509,42 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
       }];
     });
     setMessage("Salinan nominal ditambahkan sebagai nominal manual. Simpan perubahan untuk menerapkannya.");
+  }
+
+  function updateNominal(next: Nominal) {
+    setNominals((current) => current.map((item) => item.id === next.id ? next : item));
+    setNominalEditor(null);
+    setMessage("Nominal diperbarui. Klik Simpan Perubahan untuk menerapkannya ke toko.");
+  }
+
+  function applyGlobalMargin(input: { type: "fixed" | "percent"; value: number; target: "digiflazz" | "all" }) {
+    setNominals((current) => current.map((item) => {
+      if (input.target === "digiflazz" && item.provider !== "Digiflazz") return item;
+      const sell = input.type === "percent"
+        ? Math.ceil(item.cost * (100 + input.value) / 100)
+        : Math.ceil(item.cost + input.value);
+      return { ...item, marginType: input.type, margin: input.value, sell: Math.max(1, sell) };
+    }));
+    setMarginOpen(false);
+    setMessage("Margin massal diterapkan. Klik Simpan Perubahan untuk menerapkannya ke toko.");
+  }
+
+  async function syncNominal(id: string) {
+    const nominal = nominals.find((item) => item.id === id);
+    if (!nominal || nominal.provider !== "Digiflazz" || !product.raw.dbId) {
+      setError("Sinkron hanya tersedia untuk nominal Digiflazz yang sudah tersimpan.");
+      return;
+    }
+    setMonitorRefreshing(true);
+    setError("");
+    try {
+      await readJson(await fetch("/api/panel/digiflazz-pricing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productId: product.raw.dbId, packageSku: nominal.sku }) }));
+      setMessage(`${nominal.name} berhasil disinkronkan. Muat ulang produk setelah perubahan tersimpan.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Sinkron nominal gagal.");
+    } finally {
+      setMonitorRefreshing(false);
+    }
   }
 
   function addSection(event: FormEvent<HTMLFormElement>) {
@@ -529,8 +571,8 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
           <main className="min-w-0 space-y-[12px]">
             <section className={`overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white ${tab === "Tabel Pemisah" ? "opacity-60" : ""}`}>
               <div className="flex items-center justify-between px-[14px] py-[12px]"><div><h2 className="text-[13px] font-extrabold">Daftar Nominal</h2><p className="mt-[2px] text-[8px] text-[#6b7c92]">Kelola semua nominal, set gambar, harga dan tentukan posisi di tabel pemisah.</p></div></div>
-              <div className="flex flex-wrap gap-[7px] border-t border-[#eef1f5] px-[14px] py-[9px]"><ActionButton onClick={() => setImportOpen(true)}><Plus className="size-[12px]" />Tambah dari Digiflazz</ActionButton><ActionButton onClick={() => setManualOpen(true)}><Plus className="size-[12px]" />Tambah Manual</ActionButton><ActionButton onClick={() => setMessage("Gunakan URL gambar pada penyuntingan nominal berikutnya.")}><Upload className="size-[12px]" />Upload Gambar Nominal</ActionButton><ActionButton onClick={() => setMessage("Seret baris atau gunakan tombol naik/turun untuk mengatur urutan.")}><Settings2 className="size-[12px]" />Atur Urutan</ActionButton><ActionButton onClick={() => void refreshSellerMonitor()}><RefreshCw className={`size-[12px] ${monitorRefreshing ? "animate-spin" : ""}`} />{monitorRefreshing ? "Menyinkron..." : "Sync Harga"}</ActionButton><ActionButton onClick={() => setMessage("Ubah margin nominal pada tabel, lalu simpan perubahan.")}><SlidersHorizontal className="size-[12px]" />Atur Margin Massal</ActionButton><button type="button" disabled={inputSaving} onClick={() => void saveProductChanges("Nominal dan tabel pemisah berhasil disimpan ke database.")} className="ml-auto inline-flex h-[31px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[13px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{inputSaving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>
-              <NominalTable nominals={nominals} sections={sections} onChange={setNominals} onMove={moveNominal} onCopy={copyNominal} onDragStart={(id) => setDragging({ kind: "nominal", id })} onDrop={dropNominal} />
+              <div className="flex flex-wrap gap-[7px] border-t border-[#eef1f5] px-[14px] py-[9px]"><ActionButton onClick={() => setImportOpen(true)}><Plus className="size-[12px]" />Tambah dari Digiflazz</ActionButton><ActionButton onClick={() => setManualOpen(true)}><Plus className="size-[12px]" />Tambah Manual</ActionButton><ActionButton onClick={() => nominals[0] ? setNominalEditor(nominals[0]) : setError("Tambahkan nominal terlebih dahulu.")}><Upload className="size-[12px]" />Upload Gambar Nominal</ActionButton><ActionButton onClick={() => setMessage("Seret baris atau gunakan tombol naik/turun untuk mengatur urutan.")}><Settings2 className="size-[12px]" />Atur Urutan</ActionButton><ActionButton onClick={() => void refreshSellerMonitor()}><RefreshCw className={`size-[12px] ${monitorRefreshing ? "animate-spin" : ""}`} />{monitorRefreshing ? "Menyinkron..." : "Sync Harga"}</ActionButton><ActionButton onClick={() => setMarginOpen(true)}><SlidersHorizontal className="size-[12px]" />Atur Margin Massal</ActionButton><button type="button" disabled={inputSaving} onClick={() => void saveProductChanges("Nominal dan tabel pemisah berhasil disimpan ke database.")} className="ml-auto inline-flex h-[31px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[13px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{inputSaving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>
+              <NominalTable nominals={nominals} sections={sections} onChange={setNominals} onMove={moveNominal} onCopy={copyNominal} onEdit={setNominalEditor} onSync={syncNominal} onDragStart={(id) => setDragging({ kind: "nominal", id })} onDrop={dropNominal} />
             </section>
 
             <section className="overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white">
@@ -548,20 +590,70 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
       {importOpen && <ImportNominalModal existing={nominals} onClose={() => setImportOpen(false)} onImport={(added) => { setNominals((current) => [...current, ...added]); setImportOpen(false); setMessage(`${added.length} nominal Digiflazz berhasil ditambahkan.`); }} />}
       {manualOpen && <SimpleModal title="Tambah Nominal Manual" description="Isi nominal sendiri tanpa mengambil data Digiflazz." onClose={() => setManualOpen(false)}><form onSubmit={addManualNominal} className="grid grid-cols-2 gap-[10px]"><Field label="Nama nominal" name="name" placeholder="Contoh: 50 Diamonds" required /><Field label="SKU internal" name="sku" placeholder="ML-MANUAL-50" /><Field label="Harga modal" name="cost" placeholder="10000" type="number" required /><Field label="Margin (%)" name="margin" placeholder="10" type="number" required /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Grup / Tabel<select name="group" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]">{sections.map((section) => <option key={section.id}>{section.name}</option>)}</select></label><ModalActions onCancel={() => setManualOpen(false)} submit="Tambah Nominal" /></form></SimpleModal>}
       {sectionOpen && <SimpleModal title="Tambah Tabel Pemisah" description="Buat section baru untuk mengelompokkan nominal." onClose={() => setSectionOpen(false)}><form onSubmit={addSection} className="grid gap-[10px]"><Field label="Nama tabel / section" name="name" placeholder="Contoh: Promo Spesial" required /><Field label="Deskripsi (opsional)" name="description" placeholder="Keterangan section" /><ModalActions onCancel={() => setSectionOpen(false)} submit="Tambah Tabel" /></form></SimpleModal>}
+      {nominalEditor && <NominalEditorModal nominal={nominalEditor} sections={sections} onClose={() => setNominalEditor(null)} onSave={updateNominal} />}
+      {marginOpen && <GlobalMarginModal onClose={() => setMarginOpen(false)} onApply={applyGlobalMargin} />}
     </div>
   );
 }
 
-function NominalTable({ nominals, sections, onChange, onMove, onCopy, onDragStart, onDrop }: { nominals: Nominal[]; sections: NominalSection[]; onChange(value: Nominal[]): void; onMove(id: string, direction: -1 | 1): void; onCopy(id: string): void; onDragStart(id: string): void; onDrop(id: string): void }) {
-  return <div className="overflow-x-auto"><table className="w-full min-w-[820px] table-fixed text-left"><thead className="bg-[#f2f6fa] text-[6.5px] font-bold text-[#52647c]"><tr><th className="w-[24px]"></th><th className="w-[25px] py-[8px]">#</th><th className="w-[120px]">Nama Nominal</th><th className="w-[52px]">Gambar</th><th className="w-[72px]">SKU Digiflazz</th><th className="w-[98px]">Grup / Tabel</th><th className="w-[45px]">Urutan</th><th className="w-[65px]">Modal</th><th className="w-[52px]">Margin</th><th className="w-[70px]">Harga Jual</th><th className="w-[53px]">Status</th><th className="w-[95px]">Aksi</th></tr></thead><tbody>{nominals.map((nominal, index) => <tr key={nominal.id} draggable onDragStart={() => onDragStart(nominal.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => onDrop(nominal.id)} className="border-t border-[#e5eaf0] text-[6.8px] text-[#34465e] hover:bg-[#fafbfd]"><td><GripVertical className="mx-auto size-[12px] cursor-grab text-[#7b8ba0]" /></td><td className="py-[6px]">{index + 1}</td><td className="truncate pr-[5px] font-semibold">{nominal.name}</td><td><NominalArtwork kind={nominal.imageKind} /></td><td>{nominal.provider === "Digiflazz" ? nominal.sku : "Manual"}</td><td><select value={nominal.group} onChange={(event) => onChange(nominals.map((item) => item.id === nominal.id ? { ...item, group: event.target.value } : item))} className="h-[27px] w-[92px] rounded-[4px] border border-[#dce3eb] bg-white px-[5px] text-[6.5px]">{sections.map((section) => <option key={section.id}>{section.name}</option>)}</select></td><td><input value={index + 1} readOnly className="h-[27px] w-[34px] rounded-[4px] border border-[#dce3eb] text-center" /></td><td>{formatRupiah(nominal.cost)}</td><td><span className="inline-flex h-[27px] items-center rounded-[4px] border border-[#dce3eb] bg-white px-[6px]">{nominal.margin} %</span></td><td className="font-semibold">{formatRupiah(nominal.sell)}</td><td><Switch enabled={nominal.active} onToggle={() => onChange(nominals.map((item) => item.id === nominal.id ? { ...item, active: !item.active } : item))} /></td><td><div className="flex gap-[3px]"><IconButton label="Naik" onClick={() => onMove(nominal.id, -1)}><ArrowUp /></IconButton><IconButton label="Turun" onClick={() => onMove(nominal.id, 1)}><ArrowDown /></IconButton><IconButton label="Salin" onClick={() => onCopy(nominal.id)}><Copy /></IconButton><IconButton label="Hapus" danger onClick={() => onChange(nominals.filter((item) => item.id !== nominal.id))}><Trash2 /></IconButton></div></td></tr>)}</tbody></table></div>;
+function NominalTable({ nominals, sections, onChange, onMove, onCopy, onEdit, onSync, onDragStart, onDrop }: { nominals: Nominal[]; sections: NominalSection[]; onChange(value: Nominal[]): void; onMove(id: string, direction: -1 | 1): void; onCopy(id: string): void; onEdit(value: Nominal): void; onSync(id: string): void; onDragStart(id: string): void; onDrop(id: string): void }) {
+  return <div className="overflow-x-auto"><table className="w-full min-w-[820px] table-fixed text-left"><thead className="bg-[#f2f6fa] text-[6.5px] font-bold text-[#52647c]"><tr><th className="w-[24px]"></th><th className="w-[25px] py-[8px]">#</th><th className="w-[120px]">Nama Nominal</th><th className="w-[52px]">Gambar</th><th className="w-[72px]">SKU Digiflazz</th><th className="w-[98px]">Grup / Tabel</th><th className="w-[45px]">Urutan</th><th className="w-[65px]">Modal</th><th className="w-[52px]">Margin</th><th className="w-[70px]">Harga Jual</th><th className="w-[53px]">Status</th><th className="w-[132px]">Aksi</th></tr></thead><tbody>{nominals.map((nominal, index) => <tr key={nominal.id} draggable onDragStart={() => onDragStart(nominal.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => onDrop(nominal.id)} className="border-t border-[#e5eaf0] text-[6.8px] text-[#34465e] hover:bg-[#fafbfd]"><td><GripVertical className="mx-auto size-[12px] cursor-grab text-[#7b8ba0]" /></td><td className="py-[6px]">{index + 1}</td><td className="truncate pr-[5px] font-semibold">{nominal.name}</td><td><NominalArtwork kind={nominal.imageKind} imageUrl={nominal.imageUrl} /></td><td>{nominal.provider === "Digiflazz" ? nominal.sku : "Manual"}</td><td><select value={nominal.group} onChange={(event) => onChange(nominals.map((item) => item.id === nominal.id ? { ...item, group: event.target.value } : item))} className="h-[27px] w-[92px] rounded-[4px] border border-[#dce3eb] bg-white px-[5px] text-[6.5px]">{sections.map((section) => <option key={section.id}>{section.name}</option>)}</select></td><td><input value={index + 1} readOnly className="h-[27px] w-[34px] rounded-[4px] border border-[#dce3eb] text-center" /></td><td>{formatRupiah(nominal.cost)}</td><td><span className="inline-flex h-[27px] items-center rounded-[4px] border border-[#dce3eb] bg-white px-[6px]">{nominal.marginType === "percent" ? `${nominal.margin} %` : formatRupiah(nominal.margin)}</span></td><td className="font-semibold">{formatRupiah(nominal.sell)}</td><td><Switch enabled={nominal.active} onToggle={() => onChange(nominals.map((item) => item.id === nominal.id ? { ...item, active: !item.active } : item))} /></td><td><div className="flex gap-[3px]"><IconButton label="Edit nominal" onClick={() => onEdit(nominal)}><Pencil /></IconButton>{nominal.provider === "Digiflazz" && <IconButton label="Sync nominal" onClick={() => void onSync(nominal.id)}><RefreshCw /></IconButton>}<IconButton label="Naik" onClick={() => onMove(nominal.id, -1)}><ArrowUp /></IconButton><IconButton label="Turun" onClick={() => onMove(nominal.id, 1)}><ArrowDown /></IconButton><IconButton label="Salin" onClick={() => onCopy(nominal.id)}><Copy /></IconButton><IconButton label="Hapus" danger onClick={() => onChange(nominals.filter((item) => item.id !== nominal.id))}><Trash2 /></IconButton></div></td></tr>)}</tbody></table></div>;
 }
 
 function SectionTable({ sections, onChange, onMove, onDragStart, onDrop }: { sections: NominalSection[]; onChange(value: NominalSection[]): void; onMove(id: string, direction: -1 | 1): void; onDragStart(id: string): void; onDrop(id: string): void }) {
   return <div className="overflow-x-auto border-t border-[#e7ebf0]"><table className="w-full min-w-[720px] table-fixed text-left"><thead className="bg-[#f2f6fa] text-[6.5px] font-bold text-[#52647c]"><tr><th className="w-[27px]"></th><th className="w-[25px] py-[8px]">#</th><th className="w-[130px]">Nama Tabel / Section</th><th>Deskripsi (Opsional)</th><th className="w-[105px]">Posisi di Halaman</th><th className="w-[50px]">Urutan</th><th className="w-[60px]">Status</th><th className="w-[90px]">Aksi</th></tr></thead><tbody>{sections.map((section, index) => <tr key={section.id} draggable onDragStart={() => onDragStart(section.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => onDrop(section.id)} className="border-t border-[#e6eaf0] text-[7px] text-[#35475f]"><td><GripVertical className="mx-auto size-[12px] cursor-grab text-[#75869c]" /></td><td className="py-[7px]">{index + 1}</td><td className="font-semibold">{section.name}</td><td className="truncate pr-[8px]">{section.description}</td><td><select value={section.position} onChange={(event) => onChange(sections.map((item) => item.id === section.id ? { ...item, position: event.target.value as NominalSection["position"] } : item))} className="h-[27px] w-[90px] rounded-[4px] border border-[#dce3eb] bg-white px-[6px] text-[6.5px]"><option>Di atas</option><option>Di bawah</option></select></td><td><span className="grid size-[27px] place-items-center rounded-[4px] border border-[#dce3eb] bg-white">{index + 1}</span></td><td><Switch enabled={section.active} onToggle={() => onChange(sections.map((item) => item.id === section.id ? { ...item, active: !item.active } : item))} /></td><td><div className="flex gap-[3px]"><IconButton label="Naik" onClick={() => onMove(section.id, -1)}><ArrowUp /></IconButton><IconButton label="Turun" onClick={() => onMove(section.id, 1)}><ArrowDown /></IconButton><IconButton label="Hapus" danger onClick={() => onChange(sections.filter((item) => item.id !== section.id))}><Trash2 /></IconButton></div></td></tr>)}</tbody></table></div>;
 }
 
+function NominalEditorModal({ nominal, sections, onClose, onSave }: { nominal: Nominal; sections: NominalSection[]; onClose(): void; onSave(value: Nominal): void }) {
+  const [draft, setDraft] = useState(nominal);
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!draft.name.trim() || !draft.sku.trim()) { setError("Nama dan SKU tidak boleh kosong."); return; }
+    setBusy(true); setError("");
+    try {
+      let imageUrl = draft.imageUrl;
+      if (file) {
+        const form = new FormData();
+        form.set("file", file);
+        const uploaded = await readJson<{ url: string }>(await fetch("/api/panel/media", { method: "POST", body: form }));
+        imageUrl = uploaded.url;
+      }
+      const cost = Math.max(0, Math.round(draft.cost));
+      const margin = Math.max(0, Math.round(draft.margin));
+      const sell = draft.marginType === "percent" ? Math.ceil(cost * (100 + margin) / 100) : Math.ceil(cost + margin);
+      onSave({ ...draft, name: draft.name.trim(), sku: draft.sku.trim(), cost, margin, sell: Math.max(1, sell), imageUrl });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Nominal gagal diperbarui.");
+    } finally { setBusy(false); }
+  }
+
+  return <SimpleModal title="Edit Nominal" description="Atur SKU, harga, margin, gambar, dan tabel pemisah." onClose={onClose} wide><form onSubmit={submit} className="grid grid-cols-2 gap-[10px]">
+    {error && <p className="col-span-2 rounded-[5px] border border-red-200 bg-red-50 p-[9px] text-[8px] text-red-700">{error}</p>}
+    <label className="text-[8px] font-bold text-[#3d4f68]">Nama nominal<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label>
+    <label className="text-[8px] font-bold text-[#3d4f68]">SKU {draft.provider === "Digiflazz" ? "Digiflazz" : "internal"}<input value={draft.sku} disabled={draft.provider === "Digiflazz"} onChange={(event) => setDraft({ ...draft, sku: event.target.value })} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] disabled:bg-[#f3f5f8]" /></label>
+    <label className="text-[8px] font-bold text-[#3d4f68]">Harga modal<input type="number" min={0} value={draft.cost} onChange={(event) => setDraft({ ...draft, cost: Number(event.target.value) })} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label>
+    <label className="text-[8px] font-bold text-[#3d4f68]">Jenis margin<select value={draft.marginType} onChange={(event) => setDraft({ ...draft, marginType: event.target.value as Nominal["marginType"] })} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="percent">Persentase (%)</option><option value="fixed">Nominal (Rp)</option></select></label>
+    <label className="text-[8px] font-bold text-[#3d4f68]">Nilai margin<input type="number" min={0} value={draft.margin} onChange={(event) => setDraft({ ...draft, margin: Number(event.target.value) })} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label>
+    <label className="text-[8px] font-bold text-[#3d4f68]">Tabel pemisah<select value={draft.group} onChange={(event) => setDraft({ ...draft, group: event.target.value })} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]">{sections.map((section) => <option key={section.id}>{section.name}</option>)}</select></label>
+    <label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">URL gambar nominal<input value={draft.imageUrl} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value })} placeholder="/api/media/..." className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label>
+    <label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Unggah gambar baru<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setFile(event.target.files?.[0] || null)} className="mt-[4px] block w-full text-[8px]" /></label>
+    <div className="col-span-2 flex justify-between border-t border-[#e4e9ef] pt-[12px]"><span className="text-[8px] text-[#61728b]">Harga jual baru: <strong>{formatRupiah(draft.marginType === "percent" ? Math.ceil(draft.cost * (100 + draft.margin) / 100) : Math.ceil(draft.cost + draft.margin))}</strong></span><div className="flex gap-[8px]"><button type="button" onClick={onClose} className="h-[32px] rounded-[4px] border border-[#dce3eb] px-[13px] text-[8px] font-bold">Batal</button><button type="submit" disabled={busy} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50">{busy ? "Mengunggah..." : "Terapkan"}</button></div></div>
+  </form></SimpleModal>;
+}
+
+function GlobalMarginModal({ onClose, onApply }: { onClose(): void; onApply(value: { type: "fixed" | "percent"; value: number; target: "digiflazz" | "all" }): void }) {
+  const [type, setType] = useState<"fixed" | "percent">("percent");
+  const [value, setValue] = useState("10");
+  const [target, setTarget] = useState<"digiflazz" | "all">("digiflazz");
+  return <SimpleModal title="Atur Margin Massal" description="Terapkan margin ke nominal Digiflazz atau seluruh nominal." onClose={onClose}><div className="grid gap-[11px]"><label className="text-[8px] font-bold text-[#3d4f68]">Target<select value={target} onChange={(event) => setTarget(event.target.value as "digiflazz" | "all")} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="digiflazz">Semua nominal Digiflazz</option><option value="all">Semua nominal</option></select></label><label className="text-[8px] font-bold text-[#3d4f68]">Jenis margin<select value={type} onChange={(event) => setType(event.target.value as "fixed" | "percent")} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="percent">Persentase (%)</option><option value="fixed">Nominal (Rp)</option></select></label><label className="text-[8px] font-bold text-[#3d4f68]">Nilai margin<input type="number" min={0} value={value} onChange={(event) => setValue(event.target.value)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label><div className="flex justify-end gap-[8px] border-t border-[#e4e9ef] pt-[12px]"><button type="button" onClick={onClose} className="h-[32px] rounded-[4px] border border-[#dce3eb] px-[13px] text-[8px] font-bold">Batal</button><button type="button" onClick={() => onApply({ type, value: Math.max(0, Number(value) || 0), target })} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white">Terapkan</button></div></div></SimpleModal>;
+}
+
 function StorePreview({ product, nominals, sections, mode, onMode }: { product: Product; nominals: Nominal[]; sections: NominalSection[]; mode: "Mobile" | "Desktop"; onMode(value: "Mobile" | "Desktop"): void }) {
-  return <aside className="sticky top-[70px] self-start rounded-[7px] border border-[#dfe6ef] bg-white p-[13px]"><div className="flex items-start justify-between"><div><h2 className="text-[12px] font-extrabold">Preview Tampilan di Toko</h2><p className="mt-[3px] text-[7.5px] text-[#6c7d92]">Berikut adalah preview tampilan produk di sisi pelanggan.</p></div><div className="flex overflow-hidden rounded-[4px] border border-[#dce3eb]">{(["Mobile", "Desktop"] as const).map((item) => <button type="button" key={item} onClick={() => onMode(item)} className={`inline-flex h-[27px] items-center gap-[4px] px-[9px] text-[7px] font-semibold ${mode === item ? "bg-[#0875ed] text-white" : "bg-white text-[#4e6078]"}`}>{item === "Mobile" ? <Smartphone className="size-[10px]" /> : <Monitor className="size-[10px]" />}{item}</button>)}</div></div><div className={`mx-auto mt-[12px] overflow-hidden border-[6px] border-[#101820] bg-[#f4f7fa] shadow-[0_10px_25px_rgba(15,31,55,.2)] ${mode === "Mobile" ? "h-[500px] w-[250px] rounded-[32px]" : "h-[390px] w-full rounded-[12px]"}`}><div className="flex h-[25px] items-center justify-between bg-[#101820] px-[18px] text-[7px] font-bold text-white"><span>15.30</span><span>● ◔ ▰</span></div><div className="flex items-center gap-[7px] border-b bg-white p-[8px]"><ProductImage product={product} /><div><strong className="block text-[8px]">{product.name}</strong><span className="text-[6px] text-[#66778d]">Top up Diamonds, Weekly Pass, dan lainnya</span></div></div><div className="h-[405px] overflow-hidden p-[8px]">{sections.map((section) => { const entries = nominals.filter((item) => item.group === section.name && item.active).slice(0, 2); if (!entries.length) return null; return <div key={section.id} className="mb-[8px]"><h3 className="mb-[5px] text-[9px] font-extrabold">{section.name}{section.name.includes("Special") || section.name.includes("First") ? " ✨" : section.name === "Diamonds" ? " 💎" : ""}</h3><div className="grid grid-cols-2 gap-[6px]">{entries.map((nominal) => <div key={nominal.id} className="min-h-[76px] rounded-[5px] border border-[#e1e7ee] bg-white p-[6px] shadow-sm"><strong className="block truncate text-[6.5px]">{nominal.name}</strong><NominalArtwork kind={nominal.imageKind} large /><span className="block text-[8px] font-black text-[#e93643]">{formatRupiah(nominal.sell)}</span></div>)}</div></div>; })}</div><div className="absolute"></div></div></aside>;
+  return <aside className="sticky top-[70px] self-start rounded-[7px] border border-[#dfe6ef] bg-white p-[13px]"><div className="flex items-start justify-between"><div><h2 className="text-[12px] font-extrabold">Preview Tampilan di Toko</h2><p className="mt-[3px] text-[7.5px] text-[#6c7d92]">Berikut adalah preview tampilan produk di sisi pelanggan.</p></div><div className="flex overflow-hidden rounded-[4px] border border-[#dce3eb]">{(["Mobile", "Desktop"] as const).map((item) => <button type="button" key={item} onClick={() => onMode(item)} className={`inline-flex h-[27px] items-center gap-[4px] px-[9px] text-[7px] font-semibold ${mode === item ? "bg-[#0875ed] text-white" : "bg-white text-[#4e6078]"}`}>{item === "Mobile" ? <Smartphone className="size-[10px]" /> : <Monitor className="size-[10px]" />}{item}</button>)}</div></div><div className={`mx-auto mt-[12px] overflow-hidden border-[6px] border-[#101820] bg-[#f4f7fa] shadow-[0_10px_25px_rgba(15,31,55,.2)] ${mode === "Mobile" ? "h-[500px] w-[250px] rounded-[32px]" : "h-[390px] w-full rounded-[12px]"}`}><div className="flex h-[25px] items-center justify-between bg-[#101820] px-[18px] text-[7px] font-bold text-white"><span>15.30</span><span>● ◔ ▰</span></div><div className="flex items-center gap-[7px] border-b bg-white p-[8px]"><ProductImage product={product} /><div><strong className="block text-[8px]">{product.name}</strong><span className="text-[6px] text-[#66778d]">Top up Diamonds, Weekly Pass, dan lainnya</span></div></div><div className="h-[405px] overflow-hidden p-[8px]">{sections.map((section) => { const entries = nominals.filter((item) => item.group === section.name && item.active).slice(0, 2); if (!entries.length) return null; return <div key={section.id} className="mb-[8px]"><h3 className="mb-[5px] text-[9px] font-extrabold">{section.name}{section.name.includes("Special") || section.name.includes("First") ? " ✨" : section.name === "Diamonds" ? " 💎" : ""}</h3><div className="grid grid-cols-2 gap-[6px]">{entries.map((nominal) => <div key={nominal.id} className="min-h-[76px] rounded-[5px] border border-[#e1e7ee] bg-white p-[6px] shadow-sm"><strong className="block truncate text-[6.5px]">{nominal.name}</strong><NominalArtwork kind={nominal.imageKind} imageUrl={nominal.imageUrl} large /><span className="block text-[8px] font-black text-[#e93643]">{formatRupiah(nominal.sell)}</span></div>)}</div></div>; })}</div><div className="absolute"></div></div></aside>;
 }
 
 type ProductSettingsValues = {
@@ -673,8 +765,10 @@ function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal
         group: defaultGroup,
         cost: item.price,
         margin,
+        marginType: "percent" as const,
         sell: Math.ceil(item.price + item.price * margin / 100),
         active: true,
+        imageUrl: "",
         imageKind: item.productName.toLowerCase().includes("pass") ? "weekly" as const : "diamond" as const,
         provider: "Digiflazz" as const,
       })));
@@ -731,7 +825,7 @@ function Box() { return <span className="block size-[13px] rounded-[3px] border 
 function Switch({ enabled, onToggle }: { enabled: boolean; onToggle(): void }) { return <button type="button" aria-pressed={enabled} onClick={onToggle} className={`relative h-[17px] w-[31px] rounded-full transition ${enabled ? "bg-[#0875ed]" : "bg-[#cad5e1]"}`}><span className={`absolute top-[2px] size-[13px] rounded-full bg-white shadow transition ${enabled ? "left-[16px]" : "left-[2px]"}`} /></button>; }
 function ProductImage({ product, large }: { product: Product; large?: boolean }) { const size = large ? "size-[58px] rounded-[9px]" : "size-[36px] rounded-[6px]"; return product.image ? <img src={product.image} alt="" className={`${size} object-cover shadow-sm`} /> : <span className={`grid ${size} place-items-center bg-gradient-to-br from-[#2186ef] to-[#133a85] font-black text-white`}>{product.name.slice(0, 2).toUpperCase()}</span>; }
 function CategoryBadge({ category }: { category: Product["category"] }) { const style = category === "PC Games" ? "bg-[#eee2ff] text-[#7142b3]" : category === "Game Voucher" ? "bg-[#fff0df] text-[#c46b1b]" : "bg-[#e2f1ff] text-[#1671c5]"; return <span className={`rounded-[4px] px-[7px] py-[4px] text-[6.5px] font-semibold ${style}`}>{category}</span>; }
-function NominalArtwork({ kind, large }: { kind: Nominal["imageKind"]; large?: boolean }) { const label = kind === "diamond" ? "💎" : kind === "weekly" ? "🎟️" : kind === "double" ? "2X" : "🌙"; return <span className={`grid place-items-center rounded-[4px] bg-gradient-to-br from-[#b7efff] to-[#6d4fe8] font-black text-white ${large ? "mx-auto my-[7px] size-[35px] text-[16px]" : "size-[27px] text-[11px]"}`}>{label}</span>; }
+function NominalArtwork({ kind, imageUrl, large }: { kind: Nominal["imageKind"]; imageUrl?: string; large?: boolean }) { const size = large ? "mx-auto my-[7px] size-[35px] text-[16px]" : "size-[27px] text-[11px]"; if (imageUrl) return <img src={imageUrl} alt="" className={`${size} rounded-[4px] object-cover`} />; const label = kind === "diamond" ? "💎" : kind === "weekly" ? "🎟️" : kind === "double" ? "2X" : "🌙"; return <span className={`grid place-items-center rounded-[4px] bg-gradient-to-br from-[#b7efff] to-[#6d4fe8] font-black text-white ${size}`}>{label}</span>; }
 
 function moveItem<T extends { id: string }>(items: T[], id: string, direction: -1 | 1) { const index = items.findIndex((item) => item.id === id); const target = index + direction; if (index < 0 || target < 0 || target >= items.length) return items; const next = [...items]; [next[index], next[target]] = [next[target], next[index]]; return next; }
 function moveBefore<T extends { id: string }>(items: T[], sourceId: string, targetId: string) { const source = items.find((item) => item.id === sourceId); if (!source || sourceId === targetId) return items; const remaining = items.filter((item) => item.id !== sourceId); const target = remaining.findIndex((item) => item.id === targetId); remaining.splice(target < 0 ? remaining.length : target, 0, source); return remaining; }
