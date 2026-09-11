@@ -707,7 +707,7 @@ function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal
         </div>
       )}
       {!loading && !error && step === 3 && <label className="block text-[8px] font-bold">Margin global untuk nominal Digiflazz (%)<input type="number" min={0} value={margin} onChange={(event) => setMargin(Number(event.target.value))} className="mt-[5px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label>}
-      {!loading && !error && step === 4 && <div className="rounded-[5px] border border-[#cfe4fa] bg-[#f0f7ff] p-[12px] text-[8px] text-[#415b75]"><strong>{selected.length} nominal dipilih</strong><p className="mt-[4px]">Brand: {brand} · Margin: {margin}% · Produk utama tidak dibuat otomatis.</p></div>}
+      {!loading && !error && step === 4 && <div className="rounded-[5px] border border-[#cfe4fa] bg-[#f0f7ff] p-[12px] text-[8px] text-[#415b75]"><strong>{selected.length} nominal dipilih</strong><p className="mt-[4px]">Brand: {brand} · Margin: {margin}% · Produk tidak dibuat otomatis.</p></div>}
       <div className="mt-[15px] flex justify-between">
         <button type="button" onClick={step === 1 ? onClose : () => setStep((value) => value - 1)} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[13px] text-[8px] font-bold">{step === 1 ? "Batal" : "Kembali"}</button>
         <button type="button" disabled={loading || Boolean(error) || (step === 2 && !selected.length)} onClick={step === 4 ? finish : () => setStep((value) => value + 1)} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50">{step === 4 ? "Import Nominal" : "Lanjut"}</button>
