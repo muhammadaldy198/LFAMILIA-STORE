@@ -32,6 +32,8 @@ test("integration UI contains credentials, copyable provider URLs, and relay", (
   assert.ok(integration.includes("https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback"));
   assert.ok(ui.includes("navigator.clipboard.writeText"));
   assert.doesNotMatch(integration, /SwitchLine label="(?:Wajib|Tidak Wajib).*nickname/i);
+  assert.match(integration, /Periksa Konfigurasi Relay/);
+  assert.doesNotMatch(integration, /Tes Relay Sekarang/);
 });
 
 test("promo, support, reports, team, and settings are fully represented", () => {

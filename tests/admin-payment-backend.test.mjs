@@ -23,3 +23,19 @@ test("payment and channel images are uploaded before their URLs are persisted", 
   assert.match(source, /setSelectedTransaction/);
   assert.doesNotMatch(source, /Simulasi UI|backend dihubungkan|saat backend aktif/);
 });
+
+test("payment page editor exposes every persisted customer-facing setting", () => {
+  for (const field of [
+    "eyebrow", "pendingTitle", "paidTitle", "failedTitle", "invoiceNoticeTitle",
+    "invoiceNoticeText", "pendingStatusText", "paidStatusText", "failedStatusText",
+    "payButtonText", "checkStatusButtonText", "checkInvoiceButtonText", "supportText",
+    "supportUrl", "showStoreBrand", "showInvoiceNotice", "showOrderSummary",
+    "showStatusBox", "showSupport",
+  ]) assert.ok(source.includes(`pageSettings.${field}`), `payment page setting is not editable: ${field}`);
+});
+
+test("configuration checks do not pretend to be live DOKU tests", () => {
+  assert.match(source, /Periksa Konfigurasi/);
+  assert.match(source, /Uji koneksi dan transaksi live dilakukan pada tahap pra-peluncuran/);
+  assert.doesNotMatch(source, /kunci tanda tangan valid/);
+});
