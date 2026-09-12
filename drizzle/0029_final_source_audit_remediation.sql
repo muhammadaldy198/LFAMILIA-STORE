@@ -2,8 +2,13 @@
 ALTER TABLE orders ADD COLUMN delivery_mode TEXT;
 ALTER TABLE orders ADD COLUMN supplier_cost_snapshot INTEGER;
 ALTER TABLE orders ADD COLUMN doku_environment TEXT;
+ALTER TABLE wallet_topups ADD COLUMN doku_environment TEXT;
+ALTER TABLE wallet_topups ADD COLUMN external_checkout_key TEXT;
 ALTER TABLE discount_vouchers ADD COLUMN reserved_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE flash_sales ADD COLUMN reserved_count INTEGER NOT NULL DEFAULT 0;
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_topups_external_checkout_key_unique
+ON wallet_topups(customer_id, external_checkout_key)
+WHERE external_checkout_key IS NOT NULL;
 CREATE TABLE IF NOT EXISTS promotion_reservations (
   order_id TEXT PRIMARY KEY, voucher_code TEXT, flash_sale_id INTEGER,
   status TEXT NOT NULL CHECK(status IN ('reserved','consumed','released')),

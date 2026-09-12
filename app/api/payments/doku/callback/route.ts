@@ -1,7 +1,9 @@
+import { getD1 } from "@/db";
 import { hashHex } from "@/lib/server/crypto";
 import {
   parseDokuNotification,
   validateDokuNotification,
+  type DokuEnvironment,
 } from "@/lib/server/doku";
 import {
   applyPaymentStatus,
@@ -84,6 +86,19 @@ export async function POST(request: Request) {
     }
 
     const expectedOrder = await getOrderByReference(referenceId);
+    const expectedWallet = expectedOrder
+      ? null
+      : await getD1()
+          .prepare(
+            `SELECT doku_environment
+             FROM wallet_topups
+             WHERE reference_id = ? AND source = 'doku'
+             LIMIT 1`,
+          )
+          .bind(referenceId)
+          .first<{ doku_environment: DokuEnvironment | null }>();
+    const expectedEnvironment = expectedOrder?.doku_environment ?? expectedWallet?.doku_environment ?? null;
+
     const target = new URL(request.url).pathname;
     const validation = validateDokuNotification({
       rawBody,
@@ -96,7 +111,7 @@ export async function POST(request: Request) {
       requestId: request.headers.get("request-id"),
       legacyTimestamp: request.headers.get("request-timestamp"),
       legacySignature: request.headers.get("signature"),
-      expectedEnvironment: expectedOrder?.doku_environment ?? null,
+      expectedEnvironment,
     });
     if (!validation.valid) {
       return Response.json({ error: "Signature callback DOKU tidak valid." }, { status: 401 });
