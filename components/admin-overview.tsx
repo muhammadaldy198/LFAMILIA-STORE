@@ -35,21 +35,25 @@ type Summary = {
   integrations: { doku: { ready: boolean }; digiflazz: { ready: boolean; balance: number | null; lastSyncAt: string | null }; webhook: { ready: boolean } };
 };
 
+type AdminRole = "super_admin" | "admin" | "staff";
+const roleRank = { staff: 0, admin: 1, super_admin: 2 } as const;
 const featureCards = [
-  { title: "Pesanan", Icon: FileText, target: "orders", items: ["Kelola pesanan & invoice", "Update status pesanan", "Callback log & notifikasi", "Proses manual / refund"] },
-  { title: "Produk", Icon: Boxes, target: "products", items: ["Kategori game & layanan", "SKU provider (Digiflazz)", "Atur harga & margin", "Jenis pengiriman", "Kelola produk voucher"] },
-  { title: "Banner & Konten", Icon: ImageIcon, target: "content", items: ["Kelola banner utama", "Pop-up informasi", "Berita & pengumuman", "Ulasan pelanggan", "Halaman FAQ"] },
-  { title: "Digiflazz", Icon: Link2, target: "digiflazz", items: ["Sinkronisasi pricelist", "Mapping SKU produk", "Cek & kelola saldo", "Monitor gangguan layanan", "Log API & history"] },
-  { title: "Pembayaran (DOKU)", Icon: CreditCard, target: "payments", items: ["Terima pembayaran QRIS", "Virtual Account (VA)", "E-Wallet (DANA, OVO, GoPay)", "Callback otomatis", "Settlement & log transaksi"] },
-  { title: "Pelanggan", Icon: Users, target: "customers", items: ["Data pelanggan", "Wallet & saldo", "Riwayat transaksi", "Blacklist pelanggan"] },
-  { title: "Promo", Icon: Sparkles, target: "promotions", items: ["Kode voucher", "Cashback & diskon", "Promo member", "Event promo khusus"] },
-  { title: "Layanan Pelanggan", Icon: Headphones, target: "support", items: ["Sistem tiket", "Live chat pelanggan", "SLA & prioritas", "Lampiran bukti transaksi"] },
-  { title: "Laporan", Icon: BarChart3, target: "reports", items: ["Laporan penjualan", "Laporan profit", "Produk terlaris", "Export CSV / PDF", "Filter periode lengkap"] },
-  { title: "Staff & Admin Akses", Icon: UserCog, target: "team", items: ["Role Super Admin", "Role Admin & Staff", "Permission matrix", "Log aktivitas admin"] },
-  { title: "Pengaturan", Icon: Settings, target: "settings", items: ["Profil toko & kontak", "Logo & favicon", "Integrasi layanan", "Pengaturan keamanan", "Notifikasi sistem"] },
+  { title: "Pesanan", Icon: FileText, target: "orders", minimumRole: "staff", items: ["Kelola pesanan & invoice", "Update status pesanan", "Callback log & notifikasi", "Proses manual / refund"] },
+  { title: "Produk", Icon: Boxes, target: "products", minimumRole: "admin", items: ["Kategori game & layanan", "SKU provider (Digiflazz)", "Atur harga & margin", "Jenis pengiriman", "Kelola produk voucher"] },
+  { title: "Banner & Konten", Icon: ImageIcon, target: "content", minimumRole: "staff", items: ["Kelola banner utama", "Pop-up informasi", "Berita & pengumuman", "Ulasan pelanggan", "Halaman FAQ"] },
+  { title: "Digiflazz", Icon: Link2, target: "digiflazz", minimumRole: "admin", items: ["Sinkronisasi pricelist", "Mapping SKU produk", "Cek & kelola saldo", "Monitor gangguan layanan", "Log API & history"] },
+  { title: "Pembayaran (DOKU)", Icon: CreditCard, target: "payments", minimumRole: "admin", items: ["Terima pembayaran QRIS", "Virtual Account (VA)", "E-Wallet (DANA, ShopeePay)", "Callback otomatis", "Settlement & log transaksi"] },
+  { title: "Pelanggan", Icon: Users, target: "customers", minimumRole: "admin", items: ["Data pelanggan", "Wallet & saldo", "Riwayat transaksi", "Status akun pelanggan"] },
+  { title: "Promo", Icon: Sparkles, target: "promotions", minimumRole: "admin", items: ["Kode voucher", "Diskon checkout", "Promo member", "Event promo khusus"] },
+  { title: "Layanan Pelanggan", Icon: Headphones, target: "support", minimumRole: "staff", items: ["Sistem tiket", "Status tiket pelanggan", "Prioritas penanganan", "Lampiran bukti transaksi"] },
+  { title: "Laporan", Icon: BarChart3, target: "reports", minimumRole: "admin", items: ["Laporan penjualan", "Laporan profit", "Produk terlaris", "Riwayat transaksi", "Filter periode lengkap"] },
+  { title: "Staff & Admin Akses", Icon: UserCog, target: "team", minimumRole: "super_admin", items: ["Role Super Admin", "Role Admin & Staff", "Akses sesuai role", "Log aktivitas admin"] },
+  { title: "Pengaturan", Icon: Settings, target: "settings", minimumRole: "super_admin", items: ["Profil toko & kontak", "Logo & favicon", "Integrasi layanan", "Pengaturan keamanan", "Notifikasi sistem"] },
 ];
 
-export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => void }) {
+export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigate?: (value: string) => void }) {
+  const isStaff = role === "staff";
+  const visibleFeatureCards = featureCards.filter((item) => roleRank[role] >= roleRank[item.minimumRole as AdminRole]);
   const [now, setNow] = useState<Date | null>(null);
   const [range, setRange] = useState("7d");
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -81,8 +85,8 @@ export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => 
     <div className="admin-dashboard-reference space-y-3.5">
       <section className="flex items-start justify-between">
         <div>
-          <h1 className="text-[25px] font-black tracking-[-0.04em] text-[#0c1c3b]">Panel Admin LFAMILIA STORE</h1>
-          <p className="mt-0.5 text-[10px] text-[#61708a]">Kelola pesanan, produk, integrasi provider, pembayaran, pelanggan, laporan, dan konten dalam satu panel.</p>
+          <h1 className="text-[25px] font-black tracking-[-0.04em] text-[#0c1c3b]">{isStaff ? "Panel Staff LFAMILIA STORE" : "Panel Admin LFAMILIA STORE"}</h1>
+          <p className="mt-0.5 text-[10px] text-[#61708a]">{isStaff ? "Tangani pesanan, tiket, dan konten pelanggan sesuai akses Staff." : "Kelola operasional toko sesuai akses akun."}</p>
         </div>
         <div className="flex min-w-[176px] items-center gap-3 rounded-lg border border-[#e2e7ee] bg-white px-4 py-2.5 shadow-[0_2px_10px_rgba(15,23,42,0.035)]">
           <CalendarDays className="size-[18px] text-[#275fae]" />
@@ -93,18 +97,18 @@ export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => 
         </div>
       </section>
 
-      <section className="grid grid-cols-5 gap-3">
-        <MetricCard Icon={WalletCards} label="Omzet Hari Ini" value={money(summary?.todayMetrics.paidRevenue)} delta="Live" note="dari transaksi dibayar" />
+      <section className={`grid gap-3 ${isStaff ? "grid-cols-2" : "grid-cols-5"}`}>
+        {!isStaff && <MetricCard Icon={WalletCards} label="Omzet Hari Ini" value={money(summary?.todayMetrics.paidRevenue)} delta="Live" note="dari transaksi dibayar" />}
         <MetricCard Icon={ShoppingCart} label="Pesanan Hari Ini" value={String(summary?.todayMetrics.totalOrders || 0)} delta="Live" note="pesanan tercatat" />
-        <MetricCard Icon={Boxes} label="Produk Aktif" value={String(summary?.todayMetrics.activeProducts || 0)} delta="Live" note="tersedia di toko" neutral />
-        <MetricCard Icon={CircleDollarSign} label="Saldo Digiflazz" value={money(summary?.integrations.digiflazz.balance)} delta={summary?.integrations.digiflazz.ready ? "Online" : "Periksa"} note="status provider" />
+        {!isStaff && <MetricCard Icon={Boxes} label="Produk Aktif" value={String(summary?.todayMetrics.activeProducts || 0)} delta="Live" note="tersedia di toko" neutral />}
+        {!isStaff && <MetricCard Icon={CircleDollarSign} label="Saldo Digiflazz" value={money(summary?.integrations.digiflazz.balance)} delta={summary?.integrations.digiflazz.ready ? "Online" : "Periksa"} note="status provider" />}
         <MetricCard Icon={CheckCircle2} label="Pembayaran Berhasil" value={String(summary?.metrics.fulfilledOrders || 0)} delta="Live" note="periode dipilih" success />
       </section>
 
       {error && <button type="button" onClick={() => setError("")} className="w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-[9px] text-red-700">{error}</button>}
 
       <section className="grid grid-cols-[1.25fr_1fr_0.94fr] gap-3">
-        <Panel className="min-h-[282px]">
+        {!isStaff && <Panel className="min-h-[282px]">
           <PanelHeader title="Grafik Penjualan">
             <label className="relative"><select value={range} onChange={(event) => setRange(event.target.value)} className="h-7 appearance-none rounded-md border border-[#e0e5ec] bg-white pl-2.5 pr-7 text-[8px] font-semibold text-[#607089]"><option value="today">Hari Ini</option><option value="7d">7 Hari Terakhir</option><option value="30d">30 Hari Terakhir</option><option value="90d">90 Hari Terakhir</option></select><ChevronDown className="pointer-events-none absolute right-2 top-2 size-3" /></label>
           </PanelHeader>
@@ -115,17 +119,17 @@ export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => 
             </div>
           </div>
           <SalesBars sales={sales} />
-        </Panel>
+        </Panel>}
 
         <Panel className="min-h-[282px]">
-          <PanelHeader title="Aktivitas Terbaru"><button type="button" onClick={() => onNavigate?.("team")} className="text-[8px] font-bold text-[#1769e8]">Lihat Semua</button></PanelHeader>
+          <PanelHeader title="Aktivitas Terbaru"><button type="button" onClick={() => onNavigate?.(role === "super_admin" ? "team" : "orders")} className="text-[8px] font-bold text-[#1769e8]">Lihat Semua</button></PanelHeader>
           <div className="relative px-4 py-2">
             <span className="absolute bottom-5 left-[27px] top-6 w-px bg-[#dbe3ed]" />
             {activities.map((activity) => <ActivityRow key={activity.title} {...activity} />)}
           </div>
         </Panel>
 
-        <Panel className="min-h-[282px]">
+        {!isStaff && <Panel className="min-h-[282px]">
           <PanelHeader title="Status Integrasi"><button type="button" onClick={() => onNavigate?.("integrations")} className="flex items-center gap-1.5 text-[8px] font-semibold text-[#1769e8]"><CheckCircle2 className="size-3" />Lihat Integrasi</button></PanelHeader>
           <div className="space-y-2 px-4 py-3">
             <IntegrationRow letter="D" name="Digiflazz API" ready={Boolean(summary?.integrations.digiflazz.ready)} />
@@ -137,15 +141,15 @@ export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => 
               <StatusLine label="Data" value="Live" dot />
             </dl>
           </div>
-        </Panel>
+        </Panel>}
       </section>
 
-      <section className="grid grid-cols-5 gap-3">
-        {featureCards.slice(0, 5).map((item) => <FeatureCard key={item.title} {...item} onNavigate={onNavigate} />)}
+      <section className={`grid gap-3 ${isStaff ? "grid-cols-2" : "grid-cols-5"}`}>
+        {visibleFeatureCards.slice(0, 5).map((item) => <FeatureCard key={item.title} {...item} onNavigate={onNavigate} />)}
       </section>
 
       <section className="grid grid-cols-6 gap-3">
-        {featureCards.slice(5).map((item) => <FeatureCard key={item.title} {...item} onNavigate={onNavigate} />)}
+        {visibleFeatureCards.slice(5).map((item) => <FeatureCard key={item.title} {...item} onNavigate={onNavigate} />)}
       </section>
 
       <section className="grid grid-cols-[minmax(0,2.5fr)_minmax(250px,1fr)] gap-3">
@@ -174,7 +178,7 @@ export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => 
           </div>
         </Panel>
 
-        <Panel>
+        {!isStaff && <Panel>
           <PanelHeader title="Produk Populer"><button type="button" onClick={() => onNavigate?.("products")} className="text-[8px] font-bold text-[#1769e8]">Lihat Semua</button></PanelHeader>
           <div className="divide-y divide-[#edf0f4] px-3">
             {products.map(([name, amount], index) => (
@@ -186,7 +190,7 @@ export function AdminOverview({ onNavigate }: { onNavigate?: (value: string) => 
               </div>
             ))}
           </div>
-        </Panel>
+        </Panel>}
       </section>
     </div>
   );

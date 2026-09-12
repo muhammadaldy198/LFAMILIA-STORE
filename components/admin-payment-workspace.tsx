@@ -15,8 +15,6 @@ const initialChannels: Channel[] = [
   { dbId: null, id: "bri", method: "va", name: "Virtual Account BRI", description: "Virtual Account BRI", imageUrl: "", group: "VA Bank", fee: "Rp 4.000", settlement: "Realtime", enabled: false, sortOrder: 2, tone: "green" },
   { dbId: null, id: "bni", method: "va", name: "Virtual Account BNI", description: "Virtual Account BNI", imageUrl: "", group: "VA Bank", fee: "Rp 4.000", settlement: "Realtime", enabled: false, sortOrder: 3, tone: "green" },
   { dbId: null, id: "mandiri", method: "va", name: "Virtual Account Mandiri", description: "Virtual Account Mandiri", imageUrl: "", group: "VA Bank", fee: "Rp 4.000", settlement: "Realtime", enabled: false, sortOrder: 4, tone: "green" },
-  { dbId: null, id: "gopay", method: "ewallet", name: "GoPay", description: "GoPay", imageUrl: "", group: "E-Wallet", fee: "Sesuai DOKU", settlement: "Belum aktif", enabled: false, sortOrder: 5, tone: "amber" },
-  { dbId: null, id: "ovo", method: "ewallet", name: "OVO", description: "OVO", imageUrl: "", group: "E-Wallet", fee: "Sesuai DOKU", settlement: "Belum aktif", enabled: false, sortOrder: 6, tone: "amber" },
 ];
 
 export function AdminPaymentWorkspace() {

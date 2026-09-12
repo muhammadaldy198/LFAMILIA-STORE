@@ -20,7 +20,8 @@ test("public catalog strips supplier pricing and provider SKU metadata", () => {
   const route = read("app/api/products/route.ts");
   const checkout = read("app/checkout/page.tsx");
 
-  assert.match(route, /providerConfigured: Boolean\(pkg\.providerCode && pkg\.providerSku\)/);
+  assert.match(route, /fulfillmentReady: item\.fulfillmentType === "manual" \|\| Boolean\(pkg\.providerCode && pkg\.providerSku\)/);
+assert.doesNotMatch(route, /providerConfigured:/);
   assert.doesNotMatch(route, /providerCode: pkg\.providerCode/);
   assert.doesNotMatch(route, /supplierPrice: pkg\./);
   assert.doesNotMatch(route, /marginValue: pkg\./);
@@ -28,8 +29,12 @@ test("public catalog strips supplier pricing and provider SKU metadata", () => {
   assert.doesNotMatch(route, /pricingMode: pkg\./);
   assert.doesNotMatch(route, /providerSku: pkg\./);
   assert.doesNotMatch(route, /\.\.\.item/);
-  assert.match(checkout, /selectedPackage\?\.providerConfigured/);
+  assert.match(checkout, /selectedPackage\?\.fulfillmentReady/);
+assert.match(checkout, /item\.fulfillmentReady/);
   assert.doesNotMatch(checkout, /selectedPackage\?\.providerSku/);
+assert.doesNotMatch(checkout, /selectedPackage\?\.providerCode/);
+assert.doesNotMatch(checkout, /item\.provider(Code|Sku)/);
+assert.match(route, /Cache-Control\": \"no-store\"/);
 });
 
 test("checkout only accepts products and packages that exist in D1", () => {

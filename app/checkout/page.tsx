@@ -270,10 +270,8 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
   const eligiblePaymentChannels = availablePaymentChannels;
   const isManual = product.fulfillmentType === "manual";
-  const isVoucherStock = selectedPackage?.providerCode === "voucher-stock";
-  const providerReady =
-    isManual ||
-    Boolean(selectedPackage?.providerCode && selectedPackage?.providerConfigured);
+  const isVoucherStock = isVoucherProduct && !isManual;
+  const providerReady = Boolean(selectedPackage?.fulfillmentReady);
   const nicknameRequired =
     !isVoucherProduct && supportsNicknameLookup(product.slug);
   const canCheckNickname = nicknameRequired;
@@ -880,7 +878,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                       )}
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                         {section.packages.map((item) => {
-                          const ready = isManual || Boolean(item.providerCode && item.providerSku);
+                          const ready = Boolean(item.fulfillmentReady);
                           return (
                             <button
                               key={item.id}
@@ -960,7 +958,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                         {group.code !== "wallet" && (
                           <div className="flex min-h-8 items-center gap-2 overflow-hidden border-t border-white/[0.08] bg-black/10 px-3 py-1.5">
                             {group.code === "qris" ? (
-                              <span className="truncate text-[9px] font-bold text-white/65">QRIS • DANA • GoPay • ShopeePay • OVO</span>
+                              <span className="truncate text-[9px] font-bold text-white/65">QRIS • DANA • ShopeePay</span>
                             ) : (
                               displayChannels
                                 .filter((channel) => channel.method === group.code)

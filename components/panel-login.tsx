@@ -32,7 +32,7 @@ export function PanelLogin({ role, initialError = "" }: { role: "owner" | "staff
             <p className="mt-4 text-xs leading-6 text-white/40">
               {owner
                 ? "Pemilik mengatur katalog, pembayaran, saldo, integrasi, dan akun Staff."
-                : "Staff masuk cukup dengan ID dan password yang dibuat oleh Pemilik. Tidak memerlukan login Cloudflare."}
+                : "Staff masuk cukup dengan ID dan password yang dibuat oleh Super Admin. Tidak memerlukan login Cloudflare."}
             </p>
           </section>
           <form action={owner ? "/admin/panel/auth/login" : "/staff/panel/auth/login"} method="post" onSubmit={beginSubmit} className="p-6 sm:p-10">
@@ -40,7 +40,7 @@ export function PanelLogin({ role, initialError = "" }: { role: "owner" | "staff
             <p className="eyebrow mt-5 lg:mt-0">{owner ? "Admin LFAMILIA" : "Staff LFAMILIA"}</p>
             <h2 className="text-2xl font-black tracking-[-0.03em]">{owner ? "Masuk sebagai Admin" : "Masuk sebagai Staff"}</h2>
             <p className="mt-2 text-xs leading-5 text-white/35">
-              {owner ? "Gunakan ID Pemilik dan password." : "Gunakan ID Staff dan password yang dibuat oleh Admin."}
+              {owner ? "Gunakan ID Pemilik dan password." : "Gunakan ID Staff dan password yang dibuat oleh Super Admin."}
             </p>
             {error && <div role="alert" className="mt-5 rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-xs text-red-200">{error}</div>}
             <label className="mt-6 block"><span className="field-label">{owner ? "ID admin" : "ID staff"}</span><Input required autoComplete="username" name="username" value={username} onChange={(event) => setUsername(event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ""))} placeholder={owner ? "contoh: owner" : "contoh: staff01"} className="h-12 rounded-xl border-white/10 bg-white/[0.035] text-white placeholder:text-white/22" /></label>

@@ -102,10 +102,13 @@ export function AdminDashboard({
     const query = globalSearch.trim().toLowerCase();
     if (!query) return;
     const target = visibleNavigation.find((item) => item.label.toLowerCase().includes(query));
-    if (target) setActiveTab(target.value);
-    else if (query.includes("sku") || query.includes("produk")) setActiveTab("products");
-    else if (query.includes("pelanggan")) setActiveTab("customers");
-    else setActiveTab("orders");
+    const preferred = query.includes("sku") || query.includes("produk")
+      ? "products"
+      : query.includes("pelanggan")
+        ? "customers"
+        : "orders";
+    const allowed = target ?? visibleNavigation.find((item) => item.value === preferred) ?? visibleNavigation.find((item) => item.value === "orders") ?? visibleNavigation[0];
+    if (allowed) setActiveTab(allowed.value);
     setMobileNavigationOpen(false);
   }
 
@@ -169,7 +172,7 @@ export function AdminDashboard({
 
         <main className="admin-v3-content min-w-0 overflow-x-hidden p-3 sm:p-4 lg:p-5">
           <div className="mx-auto min-w-0 max-w-[1540px]">
-            <TabsContent value="overview" className="mt-0"><AdminOverview onNavigate={setActiveTab} /></TabsContent>
+            <TabsContent value="overview" className="mt-0"><AdminOverview role={initialSession.role} onNavigate={setActiveTab} /></TabsContent>
             <TabsContent value="orders" className="mt-0"><AdminOrderManager /></TabsContent>
             {(isOwner || isAdmin) && <TabsContent value="products" className="mt-0"><AdminProductManager /></TabsContent>}
             <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} />{initialSession.role === "staff" && <StaffProductContentWorkspace />}</TabsContent>

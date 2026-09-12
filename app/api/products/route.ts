@@ -40,18 +40,18 @@ export async function GET() {
           note: pkg.note,
           group: pkg.group,
           imageUrl: pkg.imageUrl,
-          providerConfigured: Boolean(pkg.providerCode && pkg.providerSku),
+          fulfillmentReady: item.fulfillmentType === "manual" || Boolean(pkg.providerCode && pkg.providerSku),
         })),
         ...(summaries.get(item.slug) ?? { ratingAverage: 0, ratingCount: 0 }),
       }));
     return Response.json({
       products,
       databaseReady: true,
-    });
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return Response.json(
       { products: [], databaseReady: false },
-      { status: 503 },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }
 }
