@@ -5,7 +5,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { hmacBase64 } from "@/lib/server/crypto";
-import {
+import { isAutomatedTestRuntime,
   getRuntimeEnv,
   requireRuntimeChoice,
   requireRuntimeValue,

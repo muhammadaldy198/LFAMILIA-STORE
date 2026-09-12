@@ -1,7 +1,7 @@
 import { hashHex } from "@/lib/server/crypto";
 import type { ProviderAdapter, ProviderResult } from "@/lib/server/providers/types";
 import { providerRelayRequest } from "@/lib/server/provider-relay";
-import {
+import { isAutomatedTestRuntime,
   getRuntimeEnv,
   requireRuntimeChoice,
   requireRuntimeValue,
