@@ -14,7 +14,6 @@ import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-noti
 export const dynamic = "force-dynamic";
 
 type DeliveryMode = "direct" | "voucher" | "manual";
-type OrderWithMode = OrderRecord & { delivery_mode: DeliveryMode };
 
 function deliveryMode(order: OrderRecord): DeliveryMode {
   if (order.delivery_mode === "manual" || order.delivery_mode === "voucher" || order.delivery_mode === "direct") return order.delivery_mode;
