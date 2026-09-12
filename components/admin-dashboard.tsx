@@ -40,7 +40,7 @@ type Session = {
   id: number;
   email: string;
   name: string;
-  role: "owner" | "staff";
+  role: "super_admin" | "admin" | "staff";
 };
 
 type NavigationItem = {
@@ -77,7 +77,7 @@ export function AdminDashboard({
   const [globalSearch, setGlobalSearch] = useState("");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
-  const isOwner = initialSession.role === "owner";
+  const isOwner = initialSession.role === "super_admin";
   const visibleNavigation = navigation.filter((item) => isOwner || !item.ownerOnly);
   const logoutPath = expectedRole === "owner" ? "/admin/panel/auth/logout" : "/staff/panel/auth/logout";
 
@@ -167,7 +167,7 @@ export function AdminDashboard({
             <TabsContent value="overview" className="mt-0"><AdminOverview onNavigate={setActiveTab} /></TabsContent>
             <TabsContent value="orders" className="mt-0"><AdminOrderManager /></TabsContent>
             <TabsContent value="products" className="mt-0"><AdminProductManager /></TabsContent>
-            <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} /></TabsContent>
+            <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role === "staff" ? "staff" : "owner"} /></TabsContent>
 
             {isOwner && <TabsContent value="digiflazz" className="mt-0"><AdminDigiflazzWorkspace /></TabsContent>}
 

@@ -7,7 +7,7 @@ const schema = z.object({
   id: z.number().int().positive().nullable().optional(),
   username: z.string().trim().min(3, "ID login minimal 3 karakter.").max(32).refine(isValidAdminId, "ID login hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda minus.").transform(normalizeAdminId),
   name: z.string().trim().min(2).max(80),
-  role: z.enum(["owner", "staff"]),
+  role: z.enum(["super_admin", "admin", "staff"]),
   isActive: z.boolean().default(true),
   password: z.string().max(72).optional().default(""),
 });
@@ -27,9 +27,9 @@ export async function POST(request: Request) {
     const db = getD1();
     if (input.password && input.password.length < 10) throw new Error("Password minimal 10 karakter.");
     if (input.id) {
-      const current = await db.prepare("SELECT email, role, is_active FROM admin_users WHERE id = ?").bind(input.id).first<{ email: string; role: "owner" | "staff"; is_active: number }>();
+      const current = await db.prepare("SELECT email, role, is_active FROM admin_users WHERE id = ?").bind(input.id).first<{ email: string; role: "super_admin" | "admin" | "staff"; is_active: number }>();
       if (!current) throw new Error("Akun panel tidak ditemukan.");
-      if (current.role === "owner" && current.is_active && (input.role !== "owner" || !input.isActive)) await ensureAnotherOwner(input.id);
+      if (current.role === "super_admin" && current.is_active && (input.role !== "super_admin" || !input.isActive)) await ensureAnotherOwner(input.id);
       const duplicate = await db.prepare("SELECT id FROM admin_users WHERE lower(email) = ? AND id <> ? LIMIT 1").bind(input.username, input.id).first<{ id: number }>();
       if (duplicate) throw new Error("ID login sudah digunakan.");
       await updateAdminCredential(current.email, { username: input.username, name: input.name, password: input.password || undefined, isActive: input.isActive });
@@ -60,9 +60,9 @@ export async function DELETE(request: Request) {
   try {
     const id = Number(new URL(request.url).searchParams.get("id"));
     if (!Number.isInteger(id) || id < 1) throw new Error("ID login tidak valid.");
-    const row = await getD1().prepare("SELECT email, role FROM admin_users WHERE id = ?").bind(id).first<{ email: string; role: "owner" | "staff" }>();
+    const row = await getD1().prepare("SELECT email, role FROM admin_users WHERE id = ?").bind(id).first<{ email: string; role: "super_admin" | "admin" | "staff" }>();
     if (!row) throw new Error("Akun panel tidak ditemukan.");
-    if (row?.role === "owner") await ensureAnotherOwner(id);
+    if (row?.role === "super_admin") await ensureAnotherOwner(id);
     await deleteAdminCredential(row.email);
     await getD1().prepare("DELETE FROM admin_users WHERE id = ?").bind(id).run();
     return Response.json({ ok: true });
@@ -72,6 +72,6 @@ export async function DELETE(request: Request) {
 }
 
 async function ensureAnotherOwner(excludedId: number) {
-  const row = await getD1().prepare("SELECT COUNT(*) AS count FROM admin_users WHERE role = 'owner' AND is_active = 1 AND id <> ?").bind(excludedId).first<{ count: number }>();
-  if (Number(row?.count || 0) < 1) throw new Error("Toko harus memiliki setidaknya satu Pemilik aktif.");
+  const row = await getD1().prepare("SELECT COUNT(*) AS count FROM admin_users WHERE role = 'super_admin' AND is_active = 1 AND id <> ?").bind(excludedId).first<{ count: number }>();
+  if (Number(row?.count || 0) < 1) throw new Error("Toko harus memiliki setidaknya satu Super Admin aktif.");
 }

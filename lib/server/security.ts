@@ -26,7 +26,7 @@ async function sha256(value: string) {
 }
 
 function clientKey(request: Request) {
-  const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
   return sha256(ip);
 }
 
@@ -43,8 +43,8 @@ export async function allowRequest(request: Request, scope: string, limit: numbe
     ).bind(scope, bucket, keyHash).first<{ hits: number }>();
     return { allowed: (row?.hits ?? 1) <= limit, retryAfter: windowSeconds - (Math.floor(Date.now() / 1000) - bucket) };
   } catch {
-    // Do not make login unavailable if D1 is temporarily unavailable.
-    return { allowed: true, retryAfter: 0 };
+    // Every protected route also needs D1. Failing closed prevents an outage from disabling abuse protection.
+    return { allowed: false, retryAfter: windowSeconds };
   }
 }
 

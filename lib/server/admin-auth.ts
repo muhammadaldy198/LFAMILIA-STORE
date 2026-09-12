@@ -5,18 +5,21 @@ export const PANEL_COOKIE_NAME = "lfamilia_panel_session";
 const ADMIN_SESSION_HOURS = 12;
 const PASSWORD_ITERATIONS = 100_000;
 
+export type AdminRole = "super_admin" | "admin" | "staff";
+export type AdminLoginArea = "backoffice" | "staff";
+
 export type PasswordAdminSession = {
   id: number;
   email: string;
   name: string;
-  role: "owner" | "staff";
+  role: AdminRole;
 };
 
 type CredentialRow = {
   admin_id: number;
   username: string;
   admin_name: string;
-  role: "owner" | "staff";
+  role: AdminRole;
   admin_active: number;
   credential_id: string;
   password_hash: string;
@@ -28,7 +31,7 @@ type SessionSigningRow = {
   admin_id: number;
   username: string;
   admin_name: string;
-  role: "owner" | "staff";
+  role: AdminRole;
   admin_active: number;
   credential_id: string;
   credential_active: number;
@@ -37,7 +40,7 @@ type SessionSigningRow = {
 
 type SessionTokenPayload = {
   u: string;
-  r: "owner" | "staff";
+  r: AdminRole;
   e: number;
   n: string;
 };
@@ -155,7 +158,11 @@ export const staffSessionCookie = panelSessionCookie;
 export const clearAdminSessionCookie = clearPanelSessionCookie;
 export const clearStaffSessionCookie = clearPanelSessionCookie;
 
-export async function loginAdmin(usernameInput: string, password: string, expectedRole?: "owner" | "staff") {
+function isRoleAllowedInArea(role: AdminRole, area: AdminLoginArea) {
+  return area === "backoffice" ? role === "super_admin" || role === "admin" : role === "staff";
+}
+
+export async function loginAdmin(usernameInput: string, password: string, expectedRole?: AdminLoginArea) {
   const username = normalizeAdminId(usernameInput);
   const row = await getD1().prepare(
     `SELECT a.id AS admin_id, a.email AS username, a.name AS admin_name, a.role,
@@ -171,8 +178,8 @@ export async function loginAdmin(usernameInput: string, password: string, expect
   if (!row || !row.admin_active || !row.credential_active || !constantTimeEqual(digest, row.password_hash)) {
     throw new Error("ID atau password salah.");
   }
-  if (expectedRole && row.role !== expectedRole) {
-    throw new Error(expectedRole === "owner" ? "Akun ini bukan akun Admin/Pemilik." : "Akun ini bukan akun Staff.");
+  if (expectedRole && !isRoleAllowedInArea(row.role, expectedRole)) {
+    throw new Error(expectedRole === "backoffice" ? "Akun ini bukan akun Super Admin atau Admin." : "Akun ini bukan akun Staff.");
   }
 
   await getD1().prepare("UPDATE customer_users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
@@ -197,7 +204,7 @@ export async function getPanelSessionFromToken(token: string | null | undefined)
     return null;
   }
 
-  if (!payload.u || !["owner", "staff"].includes(payload.r) || !Number.isFinite(payload.e) || payload.e <= Date.now()) {
+  if (!payload.u || !["super_admin", "admin", "staff"].includes(payload.r) || !Number.isFinite(payload.e) || payload.e <= Date.now()) {
     return null;
   }
 
@@ -224,7 +231,7 @@ export async function getPanelSessionFromToken(token: string | null | undefined)
   };
 }
 
-export async function getRolePanelSession(request: Request, expectedRole: "owner" | "staff") {
+export async function getRolePanelSession(request: Request, expectedRole: AdminRole) {
   const session = await getPanelSessionFromToken(cookieValue(request, PANEL_COOKIE_NAME));
   return session?.role === expectedRole ? session : null;
 }
@@ -233,7 +240,7 @@ export async function getPasswordAdminSession(request: Request): Promise<Passwor
   return getPanelSessionFromToken(cookieValue(request, PANEL_COOKIE_NAME));
 }
 
-export async function deleteRolePanelSession(_request: Request, _role: "owner" | "staff") {
+export async function deleteRolePanelSession(_request: Request, _role: AdminRole) {
   void _request;
   void _role;
   // Stateless session: logout invalidates it by clearing PANEL_COOKIE_NAME.
@@ -249,7 +256,7 @@ export async function getOwnerCredentialState() {
     `SELECT a.id, a.email AS username, a.name
      FROM admin_users a
      JOIN customer_users c ON c.email = (? || lower(a.email))
-     WHERE a.role = 'owner' AND a.is_active = 1 AND c.is_active = 1
+     WHERE a.role = 'super_admin' AND a.is_active = 1 AND c.is_active = 1
      ORDER BY a.id ASC LIMIT 1`,
   ).bind(ADMIN_CREDENTIAL_PREFIX).first<{ id: number; username: string; name: string }>();
   return { configured: Boolean(row), username: row?.username ?? null, name: row?.name ?? "Pemilik LFAMILIA" };
@@ -258,10 +265,10 @@ export async function getOwnerCredentialState() {
 export async function configurePrimaryOwner(input: { accessEmail: string; username: string; name: string; password: string }) {
   const db = getD1();
   const username = normalizeAdminId(input.username);
-  let owner = await db.prepare("SELECT id, email FROM admin_users WHERE role = 'owner' ORDER BY id ASC LIMIT 1")
+  let owner = await db.prepare("SELECT id, email FROM admin_users WHERE role = 'super_admin' ORDER BY id ASC LIMIT 1")
     .first<{ id: number; email: string }>();
   if (!owner) {
-    owner = await db.prepare("INSERT INTO admin_users (email, name, role, is_active) VALUES (?, ?, 'owner', 1) RETURNING id, email")
+    owner = await db.prepare("INSERT INTO admin_users (email, name, role, is_active) VALUES (?, ?, 'super_admin', 1) RETURNING id, email")
       .bind(input.accessEmail.trim().toLowerCase(), input.name.trim()).first<{ id: number; email: string }>();
   }
   if (!owner) throw new Error("Akun Pemilik gagal disiapkan.");
@@ -279,14 +286,14 @@ export async function configurePrimaryOwner(input: { accessEmail: string; userna
     credentialId = await createAdminCredential({ username, name: input.name, password: input.password, isActive: true });
   }
   try {
-    await db.prepare("UPDATE admin_users SET email = ?, name = ?, role = 'owner', is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    await db.prepare("UPDATE admin_users SET email = ?, name = ?, role = 'super_admin', is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
       .bind(username, input.name.trim(), owner.id).run();
   } catch (error) {
     if (!existingCredential) await deleteAdminCredential(username).catch(() => undefined);
     throw error;
   }
   const session = await createAdminSession(credentialId);
-  return { admin: { id: owner.id, email: username, name: input.name.trim(), role: "owner" as const }, ...session };
+  return { admin: { id: owner.id, email: username, name: input.name.trim(), role: "super_admin" as const }, ...session };
 }
 
 export async function createAdminCredential(input: { username: string; name: string; password: string; isActive: boolean }) {

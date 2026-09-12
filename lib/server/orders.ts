@@ -711,8 +711,22 @@ export async function applyProviderWebhook(input: {
     )
     .bind(input.providerCode, input.providerRefId, input.providerRefId)
     .first<OrderRecord>();
-  if (!order) return false;
-  await applyProviderResult(order, input.result, input.eventId);
+  // A provider may only report a transaction this store has already paid for.
+  if (!order || order.payment_status !== "paid") return false;
+
+  const recorded = await recordOrderEvent({
+    orderId: order.id,
+    source: input.providerCode === "digiflazz" ? "digiflazz" : "admin",
+    eventId: input.eventId,
+    status: input.result.status,
+    payload: input.result.raw,
+  });
+  // (source, event_id) is unique, so a signed callback replay becomes a no-op.
+  if (Number(recorded.meta.changes ?? 0) === 0) return true;
+
+  // Provider callbacks can arrive out of order. A completed order is never downgraded.
+  if (order.fulfillment_status === "success" && input.result.status !== "success") return true;
+  await applyProviderResult(order, input.result, `applied-${input.eventId}`);
   return true;
 }
 

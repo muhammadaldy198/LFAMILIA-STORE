@@ -49,7 +49,7 @@ function loginCompleteResponse(token: string, expiresAt: string) {
 export async function POST(request: Request) {
   const originBlock = rejectCrossOriginMutation(request);
   if (originBlock) return originBlock;
-  const rate = await allowRequest(request, "owner-login", 5, 900);
+  const rate = await allowRequest(request, "backoffice-login", 5, 900);
   if (!rate.allowed) return backToLogin(request, "Terlalu banyak percobaan masuk. Coba lagi 15 menit.");
 
   try {
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       password: String(form.get("password") ?? ""),
     });
 
-    const session = await loginAdmin(input.username, input.password, "owner");
+    const session = await loginAdmin(input.username, input.password, "backoffice");
     return loginCompleteResponse(session.token, session.expiresAt);
   } catch (error) {
     const message =

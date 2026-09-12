@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   const topupPeriod = periodClause(range, "created_at");
   const days = trendDays(range);
   const firstTrendDay = `-${days - 1} day`;
-  const canViewFinance = access.role === "owner";
+  const canViewFinance = access.role === "super_admin";
 
   try {
     const common = await db.batch([

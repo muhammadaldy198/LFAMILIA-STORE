@@ -476,7 +476,7 @@ export const adminUsers = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     email: text("email").notNull(),
     name: text("name").notNull(),
-    role: text("role", { enum: ["owner", "staff"] }).notNull(),
+    role: text("role", { enum: ["super_admin", "admin", "staff"] }).notNull(),
     isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),

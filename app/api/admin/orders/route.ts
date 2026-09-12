@@ -41,7 +41,7 @@ function withDeliveryMode(order: OrderRecord, deliveryModes: Map<string, Deliver
 }
 
 function visibleOrder(order: OrderWithMode, role: AdminRole) {
-  if (role === "owner") return order;
+  if (role === "super_admin") return order;
   return {
     id: order.id,
     reference_id: order.reference_id,
