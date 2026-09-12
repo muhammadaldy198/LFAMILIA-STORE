@@ -1,4 +1,8 @@
 import { getD1 } from "@/db";
+import {
+  isCutoffActiveAtMinute,
+  isDigiflazzSnapshotAvailable,
+} from "@/lib/server/final-audit-rules";
 
 export type DigiflazzAvailabilityRow = {
   package_id: number;
@@ -9,13 +13,6 @@ export type DigiflazzAvailabilityRow = {
   start_cut_off: string | null;
   end_cut_off: string | null;
 };
-
-function parseClock(value: string | null) {
-  if (!value || !/^\d{2}:\d{2}$/.test(value)) return null;
-  const [hour, minute] = value.split(":").map(Number);
-  if (hour > 23 || minute > 59) return null;
-  return hour * 60 + minute;
-}
 
 function currentMinutes(date: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -35,20 +32,23 @@ export function isCutoffActive(
   date = new Date(),
   timeZone = "Asia/Jakarta",
 ) {
-  const start = parseClock(startCutOff);
-  const end = parseClock(endCutOff);
-  if (start === null || end === null || start === end) return false;
-  const now = currentMinutes(date, timeZone);
-  return start < end ? now >= start && now < end : now >= start || now < end;
+  return isCutoffActiveAtMinute(
+    startCutOff,
+    endCutOff,
+    currentMinutes(date, timeZone),
+  );
 }
 
 function digiflazzRowAvailable(row: DigiflazzAvailabilityRow, date = new Date()) {
-  return Boolean(
-    row.buyer_product_status &&
-    row.seller_product_status &&
-    (row.unlimited_stock || Number(row.stock) > 0) &&
-    !isCutoffActive(row.start_cut_off, row.end_cut_off, date),
-  );
+  return isDigiflazzSnapshotAvailable({
+    buyerProductStatus: row.buyer_product_status,
+    sellerProductStatus: row.seller_product_status,
+    unlimitedStock: row.unlimited_stock,
+    stock: row.stock,
+    startCutOff: row.start_cut_off,
+    endCutOff: row.end_cut_off,
+    currentMinute: currentMinutes(date, "Asia/Jakarta"),
+  });
 }
 
 export async function readDigiflazzPackageAvailability() {
