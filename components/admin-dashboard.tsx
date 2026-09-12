@@ -33,6 +33,8 @@ import { AdminOrderManager } from "@/components/admin-order-manager";
 import { AdminOverview } from "@/components/admin-overview";
 import { AdminPaymentWorkspace } from "@/components/admin-payment-workspace";
 import { AdminProductManager } from "@/components/admin-product-manager";
+import { StaffProductContentWorkspace } from "@/components/staff-product-content-workspace";
+import { AdminCustomerDirectory } from "@/components/admin-customer-directory";
 import { AdminCustomerWorkspace } from "@/components/admin-customer-workspace";
 import { AdminPromoWorkspace, AdminReportsWorkspace, AdminSettingsWorkspace, AdminSupportWorkspace, AdminTeamWorkspace } from "@/components/admin-operations-workspaces";
 
@@ -47,30 +49,32 @@ type NavigationItem = {
   value: string;
   label: string;
   Icon: LucideIcon;
-  ownerOnly?: boolean;
+  minimumRole: "staff" | "admin" | "super_admin";
 };
 
 const navigation: NavigationItem[] = [
-  { value: "overview", label: "Dashboard", Icon: LayoutDashboard },
-  { value: "orders", label: "Pesanan", Icon: FileText },
-  { value: "products", label: "Produk", Icon: Boxes },
-  { value: "content", label: "Banner & Konten", Icon: ImageIcon },
-  { value: "digiflazz", label: "Digiflazz", Icon: PackageSearch, ownerOnly: true },
-  { value: "payments", label: "Pembayaran", Icon: CreditCard, ownerOnly: true },
-  { value: "customers", label: "Pelanggan", Icon: Users, ownerOnly: true },
-  { value: "promotions", label: "Promo", Icon: Sparkles, ownerOnly: true },
-  { value: "support", label: "Layanan Pelanggan", Icon: Headphones },
-  { value: "reports", label: "Laporan", Icon: BarChart3, ownerOnly: true },
-  { value: "team", label: "Staff & Admin Akses", Icon: UserCog, ownerOnly: true },
-  { value: "integrations", label: "Integrasi", Icon: Layers3, ownerOnly: true },
-  { value: "settings", label: "Pengaturan", Icon: Settings, ownerOnly: true },
+  { value: "overview", label: "Dashboard", Icon: LayoutDashboard, minimumRole: "staff" },
+  { value: "orders", label: "Pesanan", Icon: FileText, minimumRole: "staff" },
+  { value: "products", label: "Produk", Icon: Boxes, minimumRole: "admin" },
+  { value: "content", label: "Banner & Konten", Icon: ImageIcon, minimumRole: "staff" },
+  { value: "digiflazz", label: "Digiflazz", Icon: PackageSearch, minimumRole: "admin" },
+  { value: "payments", label: "Pembayaran", Icon: CreditCard, minimumRole: "admin" },
+  { value: "customers", label: "Pelanggan", Icon: Users, minimumRole: "admin" },
+  { value: "promotions", label: "Promo", Icon: Sparkles, minimumRole: "admin" },
+  { value: "support", label: "Layanan Pelanggan", Icon: Headphones, minimumRole: "staff" },
+  { value: "reports", label: "Laporan", Icon: BarChart3, minimumRole: "admin" },
+  { value: "team", label: "Staff & Admin Akses", Icon: UserCog, minimumRole: "super_admin" },
+  { value: "integrations", label: "Integrasi", Icon: Layers3, minimumRole: "super_admin" },
+  { value: "settings", label: "Pengaturan", Icon: Settings, minimumRole: "super_admin" },
 ];
+
+const roleRank = { staff: 0, admin: 1, super_admin: 2 } as const;
 
 export function AdminDashboard({
   expectedRole,
   initialSession,
 }: {
-  expectedRole: "owner" | "staff";
+  expectedRole: "backoffice" | "staff";
   initialSession: Session;
 }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -78,8 +82,9 @@ export function AdminDashboard({
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const isOwner = initialSession.role === "super_admin";
-  const visibleNavigation = navigation.filter((item) => isOwner || !item.ownerOnly);
-  const logoutPath = expectedRole === "owner" ? "/admin/panel/auth/logout" : "/staff/panel/auth/logout";
+  const isAdmin = initialSession.role === "admin";
+  const visibleNavigation = navigation.filter((item) => roleRank[initialSession.role] >= roleRank[item.minimumRole]);
+  const logoutPath = expectedRole === "backoffice" ? "/admin/panel/auth/logout" : "/staff/panel/auth/logout";
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
@@ -158,7 +163,7 @@ export function AdminDashboard({
           <div className="ml-auto flex shrink-0 items-center gap-2 lg:gap-3">
             <AdminNotifications sessionId={initialSession.id} isOwner={isOwner} onNavigate={setActiveTab} />
             <span className="hidden h-7 w-px bg-[#e7ebf1] sm:block" />
-            <AdminAccountMenu session={{ ...initialSession, role: initialSession.role === "staff" ? "staff" : "owner" }} logoutPath={logoutPath} onNavigate={setActiveTab} />
+            <AdminAccountMenu session={initialSession} logoutPath={logoutPath} onNavigate={setActiveTab} />
           </div>
         </header>
 
@@ -166,16 +171,16 @@ export function AdminDashboard({
           <div className="mx-auto min-w-0 max-w-[1540px]">
             <TabsContent value="overview" className="mt-0"><AdminOverview onNavigate={setActiveTab} /></TabsContent>
             <TabsContent value="orders" className="mt-0"><AdminOrderManager /></TabsContent>
-            <TabsContent value="products" className="mt-0"><AdminProductManager /></TabsContent>
-            <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role === "staff" ? "staff" : "owner"} /></TabsContent>
+            {(isOwner || isAdmin) && <TabsContent value="products" className="mt-0"><AdminProductManager /></TabsContent>}
+            <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} />{initialSession.role === "staff" && <StaffProductContentWorkspace />}</TabsContent>
 
-            {isOwner && <TabsContent value="digiflazz" className="mt-0"><AdminDigiflazzWorkspace /></TabsContent>}
+            {(isOwner || isAdmin) && <TabsContent value="digiflazz" className="mt-0"><AdminDigiflazzWorkspace /></TabsContent>}
 
-            {isOwner && <TabsContent value="payments" className="mt-0"><AdminPaymentWorkspace /></TabsContent>}
-            {isOwner && <TabsContent value="customers" className="mt-0"><AdminCustomerWorkspace /></TabsContent>}
-            {isOwner && <TabsContent value="promotions" className="mt-0"><AdminPromoWorkspace /></TabsContent>}
+            {(isOwner || isAdmin) && <TabsContent value="payments" className="mt-0"><AdminPaymentWorkspace /></TabsContent>}
+            {(isOwner || isAdmin) && <TabsContent value="customers" className="mt-0">{isOwner ? <AdminCustomerWorkspace /> : <AdminCustomerDirectory />}</TabsContent>}
+            {(isOwner || isAdmin) && <TabsContent value="promotions" className="mt-0"><AdminPromoWorkspace /></TabsContent>}
             <TabsContent value="support" className="mt-0"><AdminSupportWorkspace /></TabsContent>
-            {isOwner && <TabsContent value="reports" className="mt-0"><AdminReportsWorkspace /></TabsContent>}
+            {(isOwner || isAdmin) && <TabsContent value="reports" className="mt-0"><AdminReportsWorkspace /></TabsContent>}
             {isOwner && <TabsContent value="team" className="mt-0"><AdminTeamWorkspace /></TabsContent>}
             {isOwner && <TabsContent value="integrations" className="mt-0"><AdminIntegrationWorkspace /></TabsContent>}
             {isOwner && <TabsContent value="settings" className="mt-0"><AdminSettingsWorkspace /></TabsContent>}

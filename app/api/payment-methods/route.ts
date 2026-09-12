@@ -1,5 +1,4 @@
 import {
-  getDokuEnvironment,
   getDokuReadiness,
   isDokuChannelSupported,
 } from "@/lib/server/doku";
@@ -14,7 +13,6 @@ export const dynamic = "force-dynamic";
 type CheckoutGateway = {
   code: "doku";
   label: string;
-  environment: "sandbox" | "production" | null;
   channels: ManagedPaymentChannel[];
 };
 
@@ -27,8 +25,7 @@ export async function GET() {
   if (settings.dokuCheckoutEnabled && readiness.ready) {
     gateways.push({
       code: "doku",
-      label: `Pembayaran Otomatis · ${getDokuEnvironment() === "production" ? "Aktif" : "Uji Coba"}`,
-      environment: readiness.environment,
+      label: "Pembayaran Otomatis",
       channels: activeChannels.filter((item) =>
         isDokuChannelSupported(item.method, item.channel),
       ),
@@ -39,7 +36,6 @@ export async function GET() {
   return Response.json(
     {
       gateway: primary?.code ?? null,
-      environment: primary?.environment ?? null,
       channels: primary?.channels ?? [],
       allChannels: primary?.channels ?? [],
       gateways,

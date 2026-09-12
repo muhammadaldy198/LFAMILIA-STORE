@@ -30,7 +30,7 @@ async function readDashboard() {
 }
 
 export async function GET(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
 
   try {
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
 
   try {

@@ -6,7 +6,7 @@ import { ChevronDown, LayoutDashboard, LogOut, Settings, ShieldCheck } from "luc
 type AccountSession = {
   email: string;
   name: string;
-  role: "owner" | "staff";
+  role: "super_admin" | "admin" | "staff";
 };
 
 export function AdminAccountMenu({
@@ -20,7 +20,8 @@ export function AdminAccountMenu({
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const isOwner = session.role === "owner";
+  const isOwner = session.role === "super_admin";
+  const roleLabel = isOwner ? "Super Admin" : session.role === "admin" ? "Admin" : "Staff";
   const initial = session.name.trim().charAt(0).toUpperCase() || "A";
 
   useEffect(() => {
@@ -58,7 +59,7 @@ export function AdminAccountMenu({
         </span>
         <span className="hidden min-w-0 leading-tight sm:block">
           <strong className="block max-w-28 truncate text-[10px] text-[#1e293b]">{session.name}</strong>
-          <span className="block text-[8px] text-[#94a3b8]">{isOwner ? "Super Admin" : "Staff"}</span>
+          <span className="block text-[8px] text-[#94a3b8]">{roleLabel}</span>
         </span>
         <ChevronDown className={`hidden size-3.5 text-[#94a3b8] transition sm:block ${open ? "rotate-180" : ""}`} />
       </button>
@@ -79,7 +80,7 @@ export function AdminAccountMenu({
             </div>
             <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#edf4ff] px-2 py-1 text-[8px] font-bold text-[#155eef]">
               <ShieldCheck className="size-3" />
-              {isOwner ? "Super Admin" : "Staff"}
+              {roleLabel}
             </span>
           </div>
 

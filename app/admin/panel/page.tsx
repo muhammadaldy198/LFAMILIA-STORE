@@ -11,5 +11,5 @@ export default async function AdminPanelPage() {
     redirect("/admin/panel/login");
   }
 
-  return <AdminDashboard expectedRole="owner" initialSession={session} />;
+  return <AdminDashboard expectedRole="backoffice" initialSession={session} />;
 }

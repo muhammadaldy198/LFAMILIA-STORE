@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
-import { saveProductContent } from "@/lib/server/products";
+import { readProducts, saveProductContent } from "@/lib/server/products";
 import { isAllowedMediaUrl } from "@/lib/media-url";
 
 const noticeSchema = z.object({
@@ -20,6 +20,30 @@ const schema = z.object({
   manualTimezone: z.enum(["Asia/Jakarta", "Asia/Makassar", "Asia/Jayapura"]).default("Asia/Jakarta"),
   notices: z.array(noticeSchema).max(10).default([]),
 });
+
+export async function GET(request: Request) {
+  const access = await requireAdminSession(request, "staff");
+  if (access instanceof Response) return access;
+  try {
+    const products = await readProducts(true);
+    return Response.json({
+      products: products.map((product) => ({
+        dbId: product.dbId,
+        name: product.name,
+        slug: product.slug,
+        imageUrl: product.imageUrl || "",
+        bannerUrl: product.bannerUrl || "",
+        manualInstructions: product.manualInstructions || "",
+        manualOpenTime: product.manualOpenTime || "",
+        manualCloseTime: product.manualCloseTime || "",
+        manualTimezone: product.manualTimezone || "Asia/Jakarta",
+        notices: product.notices.map((notice) => ({ title: notice.title, body: notice.body, isActive: notice.isActive, sortOrder: notice.sortOrder })),
+      })),
+    }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return Response.json({ error: error instanceof Error ? error.message : "Konten produk gagal dimuat." }, { status: 503 });
+  }
+}
 
 export async function PUT(request: Request) {
   const access = await requireAdminSession(request, "staff");

@@ -12,7 +12,7 @@ const schema = z.object({
 });
 
 export async function PATCH(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
 
   try {

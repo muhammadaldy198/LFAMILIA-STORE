@@ -49,7 +49,7 @@ const routes: Record<string, RouteHandlers> = {
   "payment-methods": { GET: paymentMethods.GET, POST: paymentMethods.POST, DELETE: paymentMethods.DELETE },
   "payment-page": { GET: paymentPage.GET, PUT: paymentPage.PUT },
   orders: { GET: orders.GET, POST: orders.POST, PATCH: orders.PATCH },
-  "product-content": { PUT: productContent.PUT },
+  "product-content": { GET: productContent.GET, PUT: productContent.PUT },
   "product-input": { GET: productInput.GET, PATCH: productInput.PATCH },
   "product-package-provider": { PATCH: productPackageProvider.PATCH },
   "product-package-status": { PATCH: productPackageStatus.PATCH },

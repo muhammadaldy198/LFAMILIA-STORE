@@ -72,7 +72,7 @@ function editPayload(kind: Exclude<ContentKind, "review">, raw: NonNullable<Bann
   return { ...(raw as FaqPayload), question: title, answer: text("answer", "Jawaban FAQ"), sortOrder: order, isActive: active };
 }
 
-export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
+export function AdminExperienceManager({ role }: { role: "super_admin" | "admin" | "staff" }) {
   const [activeTab, setActiveTab] = useState<ContentKind>("banner");
   const [banners, setBanners] = useState<Banner[]>([]);
   const [popups, setPopups] = useState<MiniItem[]>([]);
@@ -209,7 +209,7 @@ export function AdminExperienceManager({ role }: { role: "owner" | "staff" }) {
           </div>
         </main>
 
-        <EditorPanel editor={editor} banners={banners} popups={popups} news={news} reviews={reviews} faqs={faqs} canDelete={role === "owner"} saving={saving} onAdd={() => add(editor.kind)} onDelete={() => void deleteEditor()} onImage={updateImage} onError={setError} onSubmit={saveEditor} />
+        <EditorPanel editor={editor} banners={banners} popups={popups} news={news} reviews={reviews} faqs={faqs} canDelete={role !== "staff"} saving={saving} onAdd={() => add(editor.kind)} onDelete={() => void deleteEditor()} onImage={updateImage} onError={setError} onSubmit={saveEditor} />
       </div>
 
       <PreviewPanel banners={banners} popups={popups} news={news} reviews={reviews} faqs={faqs} mode={previewMode} onMode={setPreviewMode} />

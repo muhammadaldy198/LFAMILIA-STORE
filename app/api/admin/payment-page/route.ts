@@ -48,13 +48,13 @@ const schema = z.object({
 });
 
 export async function GET(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   return Response.json({ settings: await readPaymentPageSettings() });
 }
 
 export async function PUT(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
     const settings = schema.parse(await request.json());

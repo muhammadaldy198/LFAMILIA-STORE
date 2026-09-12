@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   const url = new URL(request.url);
   const kind = url.searchParams.get("kind");

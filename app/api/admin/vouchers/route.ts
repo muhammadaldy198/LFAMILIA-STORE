@@ -27,7 +27,7 @@ function message(error: unknown, fallback: string) {
 }
 
 export async function GET(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
     return Response.json(await listVoucherDashboard(), { headers: { "Cache-Control": "no-store" } });
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
     const body = await request.json();
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
     const input = retrySchema.parse(await request.json());

@@ -134,7 +134,7 @@ const manualOrderSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
     const input = manualOrderSchema.parse(await request.json());

@@ -26,7 +26,6 @@ export async function GET() {
         popular: item.popular,
         instant: item.instant,
         fulfillmentType: item.fulfillmentType,
-        targetTemplate: item.targetTemplate,
         manualInstructions: item.manualInstructions,
         manualOpenTime: item.manualOpenTime,
         manualCloseTime: item.manualCloseTime,
@@ -41,8 +40,6 @@ export async function GET() {
           note: pkg.note,
           group: pkg.group,
           imageUrl: pkg.imageUrl,
-          providerCode: pkg.providerCode,
-          providerConfigured: Boolean(pkg.providerCode && pkg.providerSku),
         })),
         ...(summaries.get(item.slug) ?? { ratingAverage: 0, ratingCount: 0 }),
       }));

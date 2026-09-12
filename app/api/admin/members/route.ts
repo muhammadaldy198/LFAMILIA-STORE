@@ -21,13 +21,16 @@ const updateSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
     const [settings, members] = await Promise.all([
       listMemberTierSettings(),
       listMembersWithTiers(),
     ]);
+    if (access.role !== "super_admin") {
+      return Response.json({ members: members.map(({ balance: _balance, lifetimeSpend: _lifetimeSpend, tierProgress: _tierProgress, tierProgressBonus: _tierProgressBonus, ...member }) => member) });
+    }
     return Response.json({ settings, members });
   } catch (error) {
     return Response.json(

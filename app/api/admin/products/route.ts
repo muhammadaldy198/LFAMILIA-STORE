@@ -100,7 +100,7 @@ function validateProduct(input: z.infer<typeof productSchema>) {
 }
 
 export async function GET(request: Request) {
-  const access = await requireAdminSession(request, "staff");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
     const products = await readProducts(true);
@@ -112,7 +112,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
     const input = productSchema.parse(await request.json());
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
     const input = productSchema.extend({ dbId: z.number().int().positive() }).parse(await request.json());
@@ -140,7 +140,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   const id = Number(new URL(request.url).searchParams.get("id"));
   if (!Number.isInteger(id) || id < 1) return Response.json({ error: "ID produk tidak valid." }, { status: 400 });

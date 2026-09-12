@@ -353,13 +353,13 @@ export async function GET(request: Request) {
         integrations: {
           doku: {
             ready: doku.ready,
-            environment: doku.environment,
-            reason: doku.reason,
+            environment: canViewFinance ? doku.environment : null,
+            reason: canViewFinance ? doku.reason : null,
           },
           digiflazz: {
             ready: digiflazz.ready,
-            environment: digiflazz.environment,
-            reason: digiflazz.reason,
+            environment: canViewFinance ? digiflazz.environment : null,
+            reason: canViewFinance ? digiflazz.reason : null,
             balance: digiflazzBalance,
             issues:
               attention.sellerOff +
@@ -369,7 +369,7 @@ export async function GET(request: Request) {
           },
           webhook: {
             ready: Boolean(publicBaseUrl),
-            baseUrl: publicBaseUrl || null,
+            baseUrl: canViewFinance ? publicBaseUrl || null : null,
           },
         },
         attention,

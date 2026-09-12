@@ -42,7 +42,18 @@ export async function PUT(request: Request) {
   if (access instanceof Response) return access;
   try {
     const input = schema.parse(await request.json());
-    await saveStorefrontSettings(input);
+    const current = access.role === "staff" ? await readStorefrontSettings() : null;
+    await saveStorefrontSettings(current ? {
+      ...input,
+      storeName: current.storeName,
+      storeShortName: current.storeShortName,
+      tagline: current.tagline,
+      logoUrl: current.logoUrl,
+      supportWhatsapp: current.supportWhatsapp,
+      supportEmail: current.supportEmail,
+      instagramUrl: current.instagramUrl,
+      discordUrl: current.discordUrl,
+    } : input);
     return Response.json({ ok: true });
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Pengaturan toko gagal disimpan.";
