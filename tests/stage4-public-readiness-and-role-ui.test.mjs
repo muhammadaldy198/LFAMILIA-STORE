@@ -16,7 +16,8 @@ test("public product contract exposes neutral delivery mode and readiness", () =
   assert.match(route, /voucherStockKeys\.has\(pkg\.providerSku\)/);
   assert.match(route, /digiflazzAvailability\.get\(pkg\.dbId\) === true/);
   assert.match(availability, /start_cut_off, end_cut_off/);
-  assert.match(availability, /!isCutoffActive\(row\.start_cut_off, row\.end_cut_off(?:, date)?\)/);
+  assert.match(availability, /isDigiflazzSnapshotAvailable\(/);
+  assert.match(availability, /currentMinutes\(date, "Asia\/Jakarta"\)/);
   assert.doesNotMatch(route, /provider(Code|Sku|Configured):/);
   assert.match(checkout, /selectedPackage\?\.fulfillmentMode/);
   assert.match(checkout, /isVoucherStock = fulfillmentMode === "voucher_stock"/);
