@@ -4,6 +4,7 @@ import handler from "vinext/server/app-router-entry";
 import { getPublicBaseUrl, setRuntimeEnv } from "../lib/server/runtime-env";
 import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
 import { recoverStaleAutomaticOrders } from "../lib/server/orders";
+import { releaseExpiredExternalPromotions } from "../lib/server/promotions";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 import { cleanupSecurityRateLimits } from "../lib/server/security";
 import {
@@ -202,6 +203,7 @@ const worker = {
     setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
     const tasks: Promise<unknown>[] = [
       cleanupSecurityRateLimits().catch(() => undefined),
+      releaseExpiredExternalPromotions().catch(() => undefined),
       Promise.resolve()
         .then(() => recoverStaleAutomaticOrders(getPublicBaseUrl()))
         .catch(() => undefined),
