@@ -7,7 +7,10 @@ const read = (file) => fs.readFileSync(path.join(process.cwd(), file), "utf8");
 
 test("panel authorization supports Super Admin, Admin, and Staff", () => {
   assert.match(read("lib/server/admin-auth.ts"), /AdminRole = "super_admin" \| "admin" \| "staff"/);
-  assert.match(read("lib/server/admin.ts"), /role === "super_admin" \|\| role === "admin"/);
+  assert.match(read("lib/server/admin.ts"), /hasMinimumAdminRole\(session\.role, minimumRole\)/);
+  const rules = read("lib/server/final-audit-rules.ts");
+  assert.match(rules, /role === "super_admin" \|\| role === "admin"/);
+  assert.match(rules, /minimumRole === "owner" \|\| minimumRole === "super_admin"/);
   assert.match(read("app/api/admin/team/route.ts"), /z\.enum\(\["super_admin", "admin", "staff"\]\)/);
 });
 
