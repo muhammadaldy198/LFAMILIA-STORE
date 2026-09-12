@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Save, Upload } from "lucide-react";
 
 type Notice = { title: string; body: string; isActive: boolean; sortOrder: number };
@@ -13,15 +13,18 @@ export function StaffProductContentWorkspace() {
   const [draft, setDraft] = useState<ProductContent | null>(null);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
-  async function load() {
+  const load = useCallback(async () => {
     const response = await fetch("/api/panel/product-content", { cache: "no-store" });
     const payload = await response.json().catch(() => ({})) as { products?: ProductContent[]; error?: string };
     if (!response.ok) { setMessage(payload.error || "Konten produk gagal dimuat."); return; }
     const next = payload.products || []; setProducts(next);
-    const current = next.find((item) => item.dbId === selectedId) || next[0] || null;
-    setSelectedId(current?.dbId || null); setDraft(current ? { ...current, notices: current.notices.map((notice) => ({ ...notice })) } : null);
-  }
-  useEffect(() => { void load(); }, []);
+    setSelectedId((currentSelectedId) => {
+      const current = next.find((item) => item.dbId === currentSelectedId) || next[0] || null;
+      setDraft(current ? { ...current, notices: current.notices.map((notice) => ({ ...notice })) } : null);
+      return current?.dbId || null;
+    });
+  }, []);
+  useEffect(() => { void load(); }, [load]);
   function select(id: number) { const current = products.find((item) => item.dbId === id) || null; setSelectedId(id); setDraft(current ? { ...current, notices: current.notices.map((notice) => ({ ...notice })) } : null); }
   async function upload(file: File | undefined, field: "imageUrl" | "bannerUrl") {
     if (!file) return; const form = new FormData(); form.set("file", file);
