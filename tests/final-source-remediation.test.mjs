@@ -30,12 +30,13 @@ test("staff API contract masks event payloads and financial/provider fields", as
   assert.match(summary, /recentActivities: access\.role === "staff" \? \[\]/);
 });
 
-test("DOKU callback binds signature validation to one environment and acknowledges ignored signed callbacks", async () => {
+test("DOKU callback binds signature validation to one transaction environment and acknowledges ignored signed callbacks", async () => {
   const doku = await source("lib/server/doku.ts");
   const callback = await source("app/api/payments/doku/callback/route.ts");
   assert.match(doku, /expectedEnvironment/);
   assert.doesNotMatch(doku, /for \(const environment of \["sandbox", "production"\]/);
-  assert.match(callback, /expectedEnvironment: expectedOrder\?\.doku_environment/);
+  assert.match(callback, /expectedOrder\?\.doku_environment \?\? expectedWallet\?\.doku_environment/);
+  assert.match(callback, /expectedEnvironment,/);
   assert.match(callback, /if \(!order\) return notificationResponse/);
 });
 
