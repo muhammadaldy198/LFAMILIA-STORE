@@ -1,11 +1,11 @@
-import { requireAdminSession } from "@/lib/server/admin";
+import { requireAdminSession, type AdminRole } from "@/lib/server/admin";
 import { readDigiflazzSellerMonitor } from "@/lib/server/digiflazz-monitor";
 import { syncDigiflazzPrices } from "@/lib/server/digiflazz-pricing";
 import { getDigiflazzBalance, getDigiflazzReadiness } from "@/lib/server/providers/digiflazz";
 
 export const dynamic = "force-dynamic";
 
-async function readDashboard(role: "super_admin" | "admin") {
+async function readDashboard(role: AdminRole) {
   const monitor = await readDigiflazzSellerMonitor();
   const readiness = getDigiflazzReadiness();
   let balance: number | null = null;
