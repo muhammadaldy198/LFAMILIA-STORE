@@ -162,8 +162,7 @@ async function completeManualVoucher(id: string, serialNumber: string | undefine
     throw new Error("Voucher manual belum siap dikirim atau tidak ditemukan.");
   }
 
-  const deliveryModes = await readDeliveryModes();
-  if (deliveryModes.get(order.product_slug) !== "voucher") {
+  if (deliveryMode(order) !== "voucher") {
     await completeManualOrder(id, adminEmail);
     return;
   }
