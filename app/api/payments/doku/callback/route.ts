@@ -77,7 +77,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const expectedOrder = referenceId ? await getOrderByReference(referenceId) : null;
+    const notification = parseDokuNotification(payload);
+    const referenceId = notification.referenceId;
+    if (!referenceId) {
+      return Response.json({ error: "Referensi transaksi DOKU tidak ada." }, { status: 400 });
+    }
+
+    const expectedOrder = await getOrderByReference(referenceId);
     const target = new URL(request.url).pathname;
     const validation = validateDokuNotification({
       rawBody,
@@ -94,12 +100,6 @@ export async function POST(request: Request) {
     });
     if (!validation.valid) {
       return Response.json({ error: "Signature callback DOKU tidak valid." }, { status: 401 });
-    }
-
-    const notification = parseDokuNotification(payload);
-    const referenceId = notification.referenceId;
-    if (!referenceId) {
-      return Response.json({ error: "Referensi transaksi DOKU tidak ada." }, { status: 400 });
     }
 
     const status = notification.status;
