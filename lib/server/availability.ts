@@ -42,6 +42,15 @@ export function isCutoffActive(
   return start < end ? now >= start && now < end : now >= start || now < end;
 }
 
+function digiflazzRowAvailable(row: DigiflazzAvailabilityRow, date = new Date()) {
+  return Boolean(
+    row.buyer_product_status &&
+    row.seller_product_status &&
+    (row.unlimited_stock || Number(row.stock) > 0) &&
+    !isCutoffActive(row.start_cut_off, row.end_cut_off, date),
+  );
+}
+
 export async function readDigiflazzPackageAvailability() {
   const rows = await getD1()
     .prepare(
@@ -50,17 +59,7 @@ export async function readDigiflazzPackageAvailability() {
        FROM digiflazz_seller_monitor`,
     )
     .all<DigiflazzAvailabilityRow>();
-  return new Map(
-    rows.results.map((row) => [
-      row.package_id,
-      Boolean(
-        row.buyer_product_status &&
-        row.seller_product_status &&
-        (row.unlimited_stock || Number(row.stock) > 0) &&
-        !isCutoffActive(row.start_cut_off, row.end_cut_off),
-      ),
-    ]),
-  );
+  return new Map(rows.results.map((row) => [row.package_id, digiflazzRowAvailable(row)]));
 }
 
 export async function readAvailableVoucherStockKeys() {
@@ -73,4 +72,31 @@ export async function readAvailableVoucherStockKeys() {
     )
     .all<{ stock_key: string }>();
   return new Set(rows.results.map((row) => row.stock_key));
+}
+
+export async function isAutomaticPackageAvailable(input: {
+  packageId: number;
+  providerCode: string | null;
+  providerSku: string | null;
+}) {
+  if (input.providerCode === "digiflazz") {
+    const row = await getD1()
+      .prepare(
+        `SELECT package_id, buyer_product_status, seller_product_status,
+          unlimited_stock, stock, start_cut_off, end_cut_off
+         FROM digiflazz_seller_monitor WHERE package_id = ? LIMIT 1`,
+      )
+      .bind(input.packageId)
+      .first<DigiflazzAvailabilityRow>();
+    return row ? digiflazzRowAvailable(row) : false;
+  }
+  if (input.providerCode === "voucher-stock") {
+    if (!input.providerSku) return false;
+    const row = await getD1()
+      .prepare("SELECT 1 AS available FROM voucher_codes WHERE stock_key = ? AND status = 'available' LIMIT 1")
+      .bind(input.providerSku)
+      .first<{ available: number }>();
+    return Boolean(row?.available);
+  }
+  return false;
 }
