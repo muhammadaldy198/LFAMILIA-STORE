@@ -40,7 +40,7 @@ test("public customer APIs omit provider metadata and environment", () => {
   const catalog = read("app/api/products/route.ts");
   const methods = read("app/api/payment-methods/route.ts");
   assert.doesNotMatch(catalog, /providerCode: pkg\.providerCode/);
-  assert.doesNotMatch(catalog, /providerSku/);
+  assert.doesNotMatch(catalog, /providerSku: pkg\.providerSku/);
   assert.doesNotMatch(catalog, /targetTemplate:/);
   assert.doesNotMatch(methods, /environment:/);
   assert.doesNotMatch(methods, /getDokuEnvironment/);

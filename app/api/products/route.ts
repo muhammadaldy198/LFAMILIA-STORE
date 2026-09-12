@@ -40,6 +40,7 @@ export async function GET() {
           note: pkg.note,
           group: pkg.group,
           imageUrl: pkg.imageUrl,
+          providerConfigured: Boolean(pkg.providerCode && pkg.providerSku),
         })),
         ...(summaries.get(item.slug) ?? { ratingAverage: 0, ratingCount: 0 }),
       }));

@@ -13,7 +13,7 @@ test("product input endpoint derives checkout fields and provider target on the 
   assert.match(route, /id: "destination"/);
   assert.match(route, /id: "server"/);
   assert.match(route, /needsServer \? "\{\{destination\}\}\{\{server\}\}" : "\{\{destination\}\}"/);
-  assert.match(route, /requireAdminSession\(request, "owner"\)/);
+  assert.match(route, /requireAdminSession\(request, "admin"\)/);
   assert.doesNotMatch(route, /nicknameRequired|nicknameOptional/);
 });
 

@@ -21,6 +21,7 @@ test("public catalog strips supplier pricing and provider SKU metadata", () => {
   const checkout = read("app/checkout/page.tsx");
 
   assert.match(route, /providerConfigured: Boolean\(pkg\.providerCode && pkg\.providerSku\)/);
+  assert.doesNotMatch(route, /providerCode: pkg\.providerCode/);
   assert.doesNotMatch(route, /supplierPrice: pkg\./);
   assert.doesNotMatch(route, /marginValue: pkg\./);
   assert.doesNotMatch(route, /marginType: pkg\./);
