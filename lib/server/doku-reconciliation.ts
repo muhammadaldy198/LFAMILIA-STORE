@@ -1,12 +1,15 @@
 import { getD1 } from "@/db";
-import { applyPaymentStatus, type OrderRecord } from "@/lib/server/orders";
+import {
+  applyPaymentStatus,
+  recordOrderEvent,
+  type OrderRecord,
+} from "@/lib/server/orders";
 import { applyDokuWalletTopup } from "@/lib/server/wallet";
 
 /**
  * Finalize locally expired DOKU transactions without inventing unsupported
- * provider query endpoints. Signed callbacks can still settle a transaction
- * before its expiry; once the stored DOKU expiry is reached, pending records
- * are made final and their reserved resources are released exactly once.
+ * provider query endpoints. Once the stored DOKU expiry is reached, pending
+ * records become terminal and their reserved resources are released once.
  */
 export async function finalizeExpiredDokuPayments(limit = 100) {
   const db = getD1();
@@ -16,6 +19,7 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
     `SELECT * FROM orders
      WHERE payment_status = 'pending'
        AND payment_method <> 'wallet'
+       AND doku_request_id IS NOT NULL
        AND doku_expired_at IS NOT NULL
        AND datetime(doku_expired_at) <= datetime('now')
      ORDER BY doku_expired_at ASC
@@ -24,6 +28,13 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
 
   for (const order of orders.results) {
     await applyPaymentStatus(order, "expired");
+    await recordOrderEvent({
+      orderId: order.id,
+      source: "doku",
+      eventId: `local-expiry-${order.id}`,
+      status: "expired",
+      payload: { expiredAt: order.doku_expired_at, reason: "stored_doku_expiry" },
+    });
   }
 
   const topups = await db.prepare(
@@ -31,6 +42,7 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
      FROM wallet_topups
      WHERE source = 'doku'
        AND status = 'pending'
+       AND doku_request_id IS NOT NULL
        AND doku_expired_at IS NOT NULL
        AND datetime(doku_expired_at) <= datetime('now')
      ORDER BY doku_expired_at ASC
