@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Edit3, RefreshCw, Search, ShieldCheck, Users, WalletCards } from "lucide-react";
+import { AdminBalanceManager } from "@/components/admin-balance-manager";
 import {
   Field,
   MetricCard,
@@ -219,6 +220,8 @@ export function AdminCustomerWorkspace() {
       </div>
       <div className="border-t border-[#edf0f4] px-4 py-3 text-[9px] text-[#718198]">Menampilkan {filtered.length} dari {members.length} pelanggan</div>
     </Panel>
+
+    <div className="mt-4"><AdminBalanceManager /></div>
 
     <Modal open={Boolean(editing)} title={`Kelola Member — ${editing?.name ?? ""}`} description="Atur tier otomatis/manual dan tambah saldo pelanggan." onClose={() => setEditing(null)} footer={null}>
       {editing && <form onSubmit={saveMember}>
