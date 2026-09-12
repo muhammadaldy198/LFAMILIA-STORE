@@ -63,7 +63,9 @@ export async function GET(request: Request) {
       return Response.json(
         {
           order: visibleOrder(order, access.role),
-          events: access.role === "staff" ? eventRows.results.map(({ id, source, event_id, status, created_at }) => ({ id, source, event_id, status, created_at })) : eventRows.results,
+          events: access.role === "staff"
+            ? eventRows.results.map(({ id, status, created_at }) => ({ id, source: "system", status, created_at }))
+            : eventRows.results,
           role: access.role,
         },
         { headers: { "Cache-Control": "no-store" } },
