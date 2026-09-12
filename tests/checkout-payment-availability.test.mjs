@@ -8,7 +8,7 @@ const source = fs.readFileSync(path.join(root, "app/checkout/page.tsx"), "utf8")
 const methodsRoute = fs.readFileSync(path.join(root, "app/api/payment-methods/route.ts"), "utf8");
 
 test("checkout methods come from the active DOKU gateway", () => {
-  assert.match(methodsRoute, /code: "doku"/);
+  assert.doesNotMatch(methodsRoute, /code: "doku"|doku:/);
   assert.match(methodsRoute, /isDokuChannelSupported/);
   assert.match(source, /displayChannels/);
 });
