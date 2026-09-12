@@ -1,5 +1,6 @@
 import { getD1 } from "@/db";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
+import { resolveMemberTierFromProgress } from "@/lib/server/final-audit-rules";
 
 export type MemberTier = "basic" | "gold" | "diamond" | "platinum";
 export type MemberTierMode = "automatic" | "manual";
@@ -56,11 +57,7 @@ async function ensureMemberTierSettings() {
 }
 
 export function resolveMemberTier(progress: number): MemberTier {
-  const value = Math.max(0, Number(progress) || 0);
-  if (value >= 50_000_000) return "platinum";
-  if (value >= 10_000_000) return "diamond";
-  if (value >= 1_000_000) return "gold";
-  return "basic";
+  return resolveMemberTierFromProgress(progress);
 }
 
 function isMemberTier(value: unknown): value is MemberTier {
