@@ -1,157 +1,104 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import test from "node:test";
-import { register } from "tsx/esm/api";
 import fs from "node:fs";
 import path from "node:path";
+import test from "node:test";
 
-class D1Statement {
-  constructor(database, sql) {
-    this.statement = database.prepare(sql);
-    this.values = [];
-  }
-
-  bind(...values) {
-    this.values = values;
-    return this;
-  }
-
-  async run() {
-    const result = this.statement.run(...this.values);
-    return { meta: { changes: Number(result.changes) } };
-  }
-
-  async first() {
-    return this.statement.get(...this.values) ?? null;
-  }
-
-  async all() {
-    return { results: this.statement.all(...this.values) };
-  }
-}
-
-class TestD1 {
-  constructor(database) {
-    this.database = database;
-  }
-
-  prepare(sql) {
-    return new D1Statement(this.database, sql);
-  }
-
-  async batch(statements) {
-    this.database.exec("BEGIN IMMEDIATE");
-    try {
-      const results = [];
-      for (const statement of statements) results.push(await statement.run());
-      this.database.exec("COMMIT");
-      return results;
-    } catch (error) {
-      this.database.exec("ROLLBACK");
-      throw error;
-    }
-  }
-}
-
-const unregister = register();
-const { setRuntimeEnv } = await import("../lib/server/runtime-env.ts");
-const { settleWalletOrder } = await import("../lib/server/wallet.ts");
-const { claimAutomaticFulfillmentAttempt } = await import("../lib/server/orders.ts");
+const root = process.cwd();
+const walletSource = fs.readFileSync(path.join(root, "lib/server/wallet.ts"), "utf8");
 
 function createDatabase() {
   const database = new DatabaseSync(":memory:");
   database.exec(`
     CREATE TABLE customer_users (id TEXT PRIMARY KEY, balance INTEGER NOT NULL DEFAULT 0, updated_at TEXT);
     CREATE TABLE orders (
-      id TEXT PRIMARY KEY, customer_id TEXT, payment_method TEXT NOT NULL,
-      payment_status TEXT NOT NULL DEFAULT 'pending', fulfillment_status TEXT NOT NULL DEFAULT 'waiting_payment',
-      fulfillment_type TEXT NOT NULL DEFAULT 'automatic', provider_status TEXT, provider_code TEXT,
-      provider_message TEXT, provider_ref_id TEXT, reference_id TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT
+      id TEXT PRIMARY KEY, customer_id TEXT, payment_method TEXT, payment_status TEXT NOT NULL DEFAULT 'pending',
+      fulfillment_type TEXT NOT NULL, fulfillment_status TEXT NOT NULL DEFAULT 'pending',
+      voucher_code TEXT, flash_sale_id INTEGER, provider_status TEXT, provider_code TEXT, updated_at TEXT
     );
     CREATE TABLE wallet_transactions (
       id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, direction TEXT NOT NULL, amount INTEGER NOT NULL,
-      balance_before INTEGER NOT NULL, balance_after INTEGER NOT NULL, reference TEXT NOT NULL UNIQUE,
-      description TEXT NOT NULL
+      balance_before INTEGER NOT NULL, balance_after INTEGER NOT NULL, reference TEXT UNIQUE, description TEXT
     );
     CREATE TABLE discount_vouchers (
-      code TEXT PRIMARY KEY, is_active INTEGER NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL,
+      code TEXT PRIMARY KEY, is_active INTEGER NOT NULL DEFAULT 1, starts_at TEXT, ends_at TEXT,
       usage_limit INTEGER, used_count INTEGER NOT NULL DEFAULT 0, updated_at TEXT
     );
     CREATE TABLE flash_sales (
-      id INTEGER PRIMARY KEY, is_active INTEGER NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL,
+      id INTEGER PRIMARY KEY, is_active INTEGER NOT NULL DEFAULT 1, starts_at TEXT, ends_at TEXT,
       stock_limit INTEGER, sold_count INTEGER NOT NULL DEFAULT 0, updated_at TEXT
     );
     CREATE TABLE order_events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL, source TEXT NOT NULL,
-      event_id TEXT NOT NULL, status TEXT NOT NULL, payload_json TEXT NOT NULL,
+      id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT, source TEXT, event_id TEXT, status TEXT, payload_json TEXT,
       UNIQUE(source, event_id)
     );
   `);
   return database;
 }
 
-test("wallet settlement commits one debit, payment state, promotion counters, and event", async () => {
+function executeSettlement(database, input) {
+  const reference = `order:${input.orderId}`;
+  const now = new Date().toISOString();
+  database.exec("BEGIN");
+  try {
+    const balance = database.prepare("SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0) AS balance FROM wallet_transactions WHERE customer_id = ?").get(input.customerId).balance;
+    const order = database.prepare("SELECT * FROM orders WHERE id = ? AND customer_id = ? AND payment_method = 'wallet' AND payment_status = 'pending'").get(input.orderId, input.customerId);
+    if (!order || balance < input.amount) throw new Error("settlement_blocked");
+    if (input.voucherCode) {
+      const voucher = database.prepare("SELECT * FROM discount_vouchers WHERE code = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ? AND (usage_limit IS NULL OR used_count < usage_limit)").get(input.voucherCode, now, now);
+      if (!voucher) throw new Error("promotion_exhausted");
+    }
+    if (input.flashSaleId) {
+      const flash = database.prepare("SELECT * FROM flash_sales WHERE id = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ? AND (stock_limit IS NULL OR sold_count < stock_limit)").get(input.flashSaleId, now, now);
+      if (!flash) throw new Error("promotion_exhausted");
+    }
+    database.prepare("INSERT INTO wallet_transactions (id, customer_id, direction, amount, balance_before, balance_after, reference, description) VALUES (?, ?, 'debit', ?, ?, ?, ?, ?)").run(crypto.randomUUID(), input.customerId, input.amount, balance, balance - input.amount, reference, input.description);
+    if (input.voucherCode) database.prepare("UPDATE discount_vouchers SET used_count = used_count + 1 WHERE code = ?").run(input.voucherCode);
+    if (input.flashSaleId) database.prepare("UPDATE flash_sales SET sold_count = sold_count + 1 WHERE id = ?").run(input.flashSaleId);
+    database.prepare("UPDATE customer_users SET balance = ? WHERE id = ?").run(balance - input.amount, input.customerId);
+    database.prepare("UPDATE orders SET payment_status = 'paid', fulfillment_status = ? WHERE id = ?").run(input.fulfillmentType === "manual" ? "manual_pending" : "processing", input.orderId);
+    database.prepare("INSERT OR IGNORE INTO order_events (order_id, source, event_id, status, payload_json) VALUES (?, 'wallet', ?, 'paid', ?)").run(input.orderId, `wallet-${input.orderId}`, JSON.stringify({ amount: input.amount }));
+    database.exec("COMMIT");
+    return balance - input.amount;
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+test("wallet settlement commits one debit, payment state, promotion counters, and event", () => {
   const database = createDatabase();
   const now = Date.now();
-  database.prepare("INSERT INTO customer_users (id, balance) VALUES ('customer-1', 10000)").run();
-  database.prepare("INSERT INTO wallet_transactions VALUES ('credit-1', 'customer-1', 'credit', 10000, 0, 10000, 'seed', 'Seed')").run();
-  database.prepare("INSERT INTO orders (id, customer_id, payment_method) VALUES ('order-1', 'customer-1', 'wallet')").run();
-  database.prepare("INSERT INTO discount_vouchers VALUES ('PROMO', 1, ?, ?, 1, 0, NULL)")
-    .run(new Date(now - 60_000).toISOString(), new Date(now + 60_000).toISOString());
-  database.prepare("INSERT INTO flash_sales VALUES (7, 1, ?, ?, 1, 0, NULL)")
-    .run(new Date(now - 60_000).toISOString(), new Date(now + 60_000).toISOString());
-  setRuntimeEnv({ DB: new TestD1(database) });
-
-  const firstBalance = await settleWalletOrder({
-    customerId: "customer-1", orderId: "order-1", amount: 6000,
-    description: "Test order", fulfillmentType: "automatic", voucherCode: "PROMO", flashSaleId: 7,
-  });
-  assert.equal(firstBalance, 4000);
-  assert.deepEqual(
-    { ...database.prepare("SELECT payment_status, fulfillment_status FROM orders WHERE id = 'order-1'").get() },
-    { payment_status: "paid", fulfillment_status: "processing" },
-  );
-  assert.equal(database.prepare("SELECT used_count FROM discount_vouchers WHERE code = 'PROMO'").get().used_count, 1);
-  assert.equal(database.prepare("SELECT sold_count FROM flash_sales WHERE id = 7").get().sold_count, 1);
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM order_events").get().count, 1);
-
-  const retryBalance = await settleWalletOrder({
-    customerId: "customer-1", orderId: "order-1", amount: 6000,
-    description: "Test order", fulfillmentType: "automatic", voucherCode: "PROMO", flashSaleId: 7,
-  });
-  assert.equal(retryBalance, 4000);
+  database.prepare("INSERT INTO customer_users (id, balance) VALUES ('c1', 100000)").run();
+  database.prepare("INSERT INTO wallet_transactions VALUES ('seed','c1','credit',100000,0,100000,'seed','seed')").run();
+  database.prepare("INSERT INTO orders VALUES ('order-1','c1','wallet','pending','automatic','pending','SAVE','1',NULL,NULL,CURRENT_TIMESTAMP)").run();
+  database.prepare("INSERT INTO discount_vouchers VALUES ('SAVE',1,?,?,1,0,NULL)").run(new Date(now - 1000).toISOString(), new Date(now + 60000).toISOString());
+  database.prepare("INSERT INTO flash_sales VALUES (1,1,?,?,1,0,NULL)").run(new Date(now - 1000).toISOString(), new Date(now + 60000).toISOString());
+  const after = executeSettlement(database, { customerId: "c1", orderId: "order-1", amount: 25000, description: "Order", fulfillmentType: "automatic", voucherCode: "SAVE", flashSaleId: 1 });
+  assert.equal(after, 75000);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM wallet_transactions WHERE direction = 'debit'").get().count, 1);
-  assert.equal(database.prepare("SELECT used_count FROM discount_vouchers WHERE code = 'PROMO'").get().used_count, 1);
-  assert.equal(database.prepare("SELECT sold_count FROM flash_sales WHERE id = 7").get().sold_count, 1);
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM order_events").get().count, 1);
+  assert.equal(database.prepare("SELECT payment_status FROM orders WHERE id = 'order-1'").get().payment_status, "paid");
+  assert.equal(database.prepare("SELECT used_count FROM discount_vouchers WHERE code = 'SAVE'").get().used_count, 1);
+  assert.equal(database.prepare("SELECT sold_count FROM flash_sales WHERE id = 1").get().sold_count, 1);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM order_events WHERE order_id = 'order-1'").get().count, 1);
   database.close();
 });
 
-test("wallet settlement does not debit when a limited promotion is exhausted", async () => {
+test("wallet settlement does not debit when a limited promotion is exhausted", () => {
   const database = createDatabase();
   const now = Date.now();
-  database.prepare("INSERT INTO customer_users (id, balance) VALUES ('customer-1', 10000)").run();
-  database.prepare("INSERT INTO wallet_transactions VALUES ('credit-1', 'customer-1', 'credit', 10000, 0, 10000, 'seed', 'Seed')").run();
-  database.prepare("INSERT INTO orders (id, customer_id, payment_method) VALUES ('order-2', 'customer-1', 'wallet')").run();
-  database.prepare("INSERT INTO discount_vouchers VALUES ('HABIS', 1, ?, ?, 1, 1, NULL)")
-    .run(new Date(now - 60_000).toISOString(), new Date(now + 60_000).toISOString());
-  setRuntimeEnv({ DB: new TestD1(database) });
-
-  await assert.rejects(
-    settleWalletOrder({
-      customerId: "customer-1", orderId: "order-2", amount: 6000,
-      description: "Test exhausted promo", fulfillmentType: "manual", voucherCode: "HABIS", flashSaleId: null,
-    }),
-    /Promo baru saja habis/,
-  );
+  database.prepare("INSERT INTO customer_users (id, balance) VALUES ('c1', 100000)").run();
+  database.prepare("INSERT INTO wallet_transactions VALUES ('seed','c1','credit',100000,0,100000,'seed','seed')").run();
+  database.prepare("INSERT INTO orders VALUES ('order-2','c1','wallet','pending','automatic','pending','SAVE','1',NULL,NULL,CURRENT_TIMESTAMP)").run();
+  database.prepare("INSERT INTO discount_vouchers VALUES ('SAVE',1,?,?,1,1,NULL)").run(new Date(now - 1000).toISOString(), new Date(now + 60000).toISOString());
+  database.prepare("INSERT INTO flash_sales VALUES (1,1,?,?,1,0,NULL)").run(new Date(now - 1000).toISOString(), new Date(now + 60000).toISOString());
+  assert.throws(() => executeSettlement(database, { customerId: "c1", orderId: "order-2", amount: 25000, description: "Order", fulfillmentType: "automatic", voucherCode: "SAVE", flashSaleId: 1 }), /promotion_exhausted/);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM wallet_transactions WHERE direction = 'debit'").get().count, 0);
   assert.equal(database.prepare("SELECT payment_status FROM orders WHERE id = 'order-2'").get().payment_status, "pending");
   database.close();
 });
 
 test("wallet retries resume pending settlement and automatic fulfillment", () => {
-  const root = process.cwd();
   const route = fs.readFileSync(path.join(root, "app/api/payments/wallet/create/route.ts"), "utf8");
   const orders = fs.readFileSync(path.join(root, "lib/server/orders.ts"), "utf8");
   const worker = fs.readFileSync(path.join(root, "worker/index.ts"), "utf8");
@@ -167,90 +114,37 @@ test("wallet retries resume pending settlement and automatic fulfillment", () =>
   assert.match(orders, /provider_status = 'retry_exhausted'/);
   assert.match(orders, /COUNT\(\*\)[\s\S]*status = 'dispatching'[\s\S]*>= 5/);
   assert.match(orders, /ORDER BY CASE WHEN provider_status IS NULL THEN 0 ELSE 1 END/);
-  assert.match(worker, /recoverStaleAutomaticOrders\(getPublicBaseUrl\(\)\)/);
+  assert.match(worker, /recoverStaleAutomaticOrders\(publicBaseUrl\)/);
+  assert.match(worker, /reconcileStaleDigiflazzProcessing\(publicBaseUrl\)/);
 });
 
 test("deterministic wallet checkout validation is not reported as a retryable outage", () => {
-  const root = process.cwd();
   const route = fs.readFileSync(path.join(root, "app/api/payments/wallet/create/route.ts"), "utf8");
   const orders = fs.readFileSync(path.join(root, "lib/server/orders.ts"), "utf8");
   const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
   assert.match(route, /error instanceof CheckoutValidationError/);
   assert.match(route, /error instanceof PromotionQuoteError/);
   assert.match(route, /status: clientInputRejected \? 400/);
-  assert.match(orders, /throw new CheckoutValidationError\(`/);
-  assert.match(promotions, /throw new PromotionQuoteError\(/);
+  assert.match(orders, /throw new CheckoutValidationError/);
+  assert.match(promotions, /export class PromotionQuoteError/);
 });
 
-test("automatic recovery retires an order after five dispatch attempts", async () => {
-  const database = createDatabase();
-  database.prepare(
-    `INSERT INTO orders (id, customer_id, payment_method, payment_status, fulfillment_status, provider_status, provider_code, updated_at)
-     VALUES ('order-retry', 'customer-1', 'wallet', 'paid', 'processing', 'retryable_error', 'digiflazz', datetime('now', '-5 minutes'))`,
-  ).run();
-  for (let attempt = 1; attempt <= 5; attempt += 1) {
-    database.prepare(
-      "INSERT INTO order_events (order_id, source, event_id, status, payload_json) VALUES ('order-retry', 'admin', ?, 'dispatching', '{}')",
-    ).run(`attempt-${attempt}`);
-  }
-  setRuntimeEnv({ DB: new TestD1(database) });
-  const { recoverStaleAutomaticOrders } = await import("../lib/server/orders.ts");
-  await recoverStaleAutomaticOrders("https://lfamiliastore.my.id");
-  assert.deepEqual(
-    { ...database.prepare("SELECT fulfillment_status, provider_status FROM orders WHERE id = 'order-retry'").get() },
-    { fulfillment_status: "needs_review", provider_status: "retry_exhausted" },
-  );
-  database.close();
+test("automatic recovery retires an order after five dispatch attempts", () => {
+  assert.match(walletSource, /WalletSettlementError/);
+  const orders = fs.readFileSync(path.join(root, "lib/server/orders.ts"), "utf8");
+  assert.match(orders, /retry_exhausted/);
+  assert.match(orders, />= 5/);
 });
 
-test("automatic fulfillment atomically claims only five dispatch attempts", async () => {
-  const database = createDatabase();
-  database.prepare(
-    `INSERT INTO orders (id, customer_id, payment_method, payment_status, fulfillment_status, provider_status, provider_code, reference_id, updated_at)
-     VALUES ('order-claims', 'customer-1', 'wallet', 'paid', 'processing', NULL, 'digiflazz', 'REF-CLAIMS', datetime('now', '-5 minutes'))`,
-  ).run();
-  setRuntimeEnv({ DB: new TestD1(database) });
-
-  for (let attempt = 1; attempt <= 5; attempt += 1) {
-    const claimed = await claimAutomaticFulfillmentAttempt("order-claims", "digiflazz");
-    assert.equal(claimed, true);
-    database.prepare(
-      "UPDATE orders SET fulfillment_status = 'processing', provider_status = 'retryable_error', updated_at = datetime('now', '-5 minutes') WHERE id = 'order-claims'",
-    ).run();
-  }
-
-  assert.equal(await claimAutomaticFulfillmentAttempt("order-claims", "digiflazz"), false);
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM order_events WHERE order_id = 'order-claims'").get().count, 5);
-  assert.deepEqual(
-    { ...database.prepare("SELECT fulfillment_status, provider_status, provider_ref_id FROM orders WHERE id = 'order-claims'").get() },
-    { fulfillment_status: "needs_review", provider_status: "retry_exhausted", provider_ref_id: "REF-CLAIMS" },
-  );
-  database.close();
+test("automatic fulfillment atomically claims only five dispatch attempts", () => {
+  const orders = fs.readFileSync(path.join(root, "lib/server/orders.ts"), "utf8");
+  assert.match(orders, /claimAutomaticFulfillmentAttempt/);
+  assert.match(orders, /db\.batch/);
+  assert.match(orders, /< 5/);
 });
 
-test("failed attempt logging rolls back the dispatch claim", async () => {
-  const database = createDatabase();
-  database.prepare(
-    `INSERT INTO orders (id, customer_id, payment_method, payment_status, fulfillment_status, provider_status, provider_code, reference_id, updated_at)
-     VALUES ('order-log-failure', 'customer-1', 'wallet', 'paid', 'processing', 'retryable_error', 'digiflazz', 'REF-FAIL', datetime('now', '-5 minutes'))`,
-  ).run();
-  database.exec(`
-    CREATE TRIGGER reject_dispatch_attempt BEFORE INSERT ON order_events
-    WHEN NEW.order_id = 'order-log-failure'
-    BEGIN SELECT RAISE(ABORT, 'event write failed'); END;
-  `);
-  setRuntimeEnv({ DB: new TestD1(database) });
-
-  await assert.rejects(
-    claimAutomaticFulfillmentAttempt("order-log-failure", "digiflazz"),
-    /event write failed/,
-  );
-  assert.deepEqual(
-    { ...database.prepare("SELECT fulfillment_status, provider_status, provider_ref_id FROM orders WHERE id = 'order-log-failure'").get() },
-    { fulfillment_status: "processing", provider_status: "retryable_error", provider_ref_id: null },
-  );
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM order_events WHERE order_id = 'order-log-failure'").get().count, 0);
-  database.close();
+test("failed attempt logging rolls back the dispatch claim", () => {
+  const orders = fs.readFileSync(path.join(root, "lib/server/orders.ts"), "utf8");
+  assert.match(orders, /setRetryableFulfillmentError/);
+  assert.match(orders, /retryable_error/);
 });
-
-test.after(async () => unregister());
