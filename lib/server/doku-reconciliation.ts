@@ -1,10 +1,10 @@
 import { getD1 } from "@/db";
+import { applyPendingDokuPaymentStatus } from "@/lib/server/doku-payment-transition";
 import {
   queryDokuEwalletStatus,
   queryDokuVaStatus,
 } from "@/lib/server/doku-status";
 import {
-  applyPaymentStatus,
   fulfillAutomaticOrder,
   markDokuStatusChecked,
   recordOrderEvent,
@@ -114,7 +114,7 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
         Number.isFinite(query.amount) &&
         query.amount === order.total
       ) {
-        const firstPaid = await applyPaymentStatus(order, "paid");
+        const firstPaid = await applyPendingDokuPaymentStatus(order, "paid");
         if (firstPaid && order.fulfillment_type === "automatic") {
           await fulfillAutomaticOrder(order.id, publicBaseUrl);
           await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
@@ -122,7 +122,7 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
           );
         }
       } else if (query.status === "failed") {
-        await applyPaymentStatus(order, "failed");
+        await applyPendingDokuPaymentStatus(order, "failed");
       }
     } catch (error) {
       console.error("Rekonsiliasi status order DOKU gagal:", error);
@@ -182,7 +182,7 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
   ).bind(safeLimit).all<OrderRecord>();
 
   for (const order of expiredOrders.results) {
-    await applyPaymentStatus(order, "expired");
+    await applyPendingDokuPaymentStatus(order, "expired");
     await recordOrderEvent({
       orderId: order.id,
       source: "doku",
