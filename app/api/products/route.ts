@@ -45,7 +45,7 @@ export async function GET() {
           imageUrl: pkg.imageUrl,
           fulfillmentMode: item.fulfillmentType === "manual" ? "manual" : pkg.providerCode === "voucher-stock" ? "voucher_stock" : "provider",
           fulfillmentReady: item.fulfillmentType === "manual" || Boolean(pkg.providerCode && pkg.providerSku),
-          fulfillmentAvailable: item.fulfillmentType === "manual" || availability.get(pkg.dbId) !== false,
+          fulfillmentAvailable: item.fulfillmentType === "manual" || pkg.dbId == null || availability.get(pkg.dbId) !== false,
         })),
         ...(summaries.get(item.slug) ?? { ratingAverage: 0, ratingCount: 0 }),
       }));
