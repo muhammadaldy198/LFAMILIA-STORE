@@ -158,7 +158,7 @@ export function AdminDashboard({
           <div className="ml-auto flex shrink-0 items-center gap-2 lg:gap-3">
             <AdminNotifications sessionId={initialSession.id} isOwner={isOwner} onNavigate={setActiveTab} />
             <span className="hidden h-7 w-px bg-[#e7ebf1] sm:block" />
-            <AdminAccountMenu session={initialSession} logoutPath={logoutPath} onNavigate={setActiveTab} />
+            <AdminAccountMenu session={{ ...initialSession, role: initialSession.role === "staff" ? "staff" : "owner" }} logoutPath={logoutPath} onNavigate={setActiveTab} />
           </div>
         </header>
 

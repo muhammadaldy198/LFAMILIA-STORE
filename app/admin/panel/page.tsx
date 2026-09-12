@@ -7,7 +7,7 @@ export default async function AdminPanelPage() {
   const cookieStore = await cookies();
   const session = await getPanelSessionFromToken(cookieStore.get(PANEL_COOKIE_NAME)?.value);
 
-  if (!session || session.role !== "owner") {
+  if (!session || (session.role !== "super_admin" && session.role !== "admin")) {
     redirect("/admin/panel/login");
   }
 
