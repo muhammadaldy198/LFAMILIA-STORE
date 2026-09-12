@@ -83,8 +83,22 @@ export function AdminCustomerWorkspace() {
   }, []);
 
   useEffect(() => {
-    void load().catch((reason) => setError(reason instanceof Error ? reason.message : "Data member gagal dimuat."));
-  }, [load]);
+    let cancelled = false;
+    void requestJson<MemberPayload>("/api/panel/members", { cache: "no-store" })
+      .then((payload) => {
+        if (cancelled) return;
+        setSettings(payload.settings ?? []);
+        setMembers(payload.members ?? []);
+        setError("");
+      })
+      .catch((reason) => {
+        if (cancelled) return;
+        setError(reason instanceof Error ? reason.message : "Data member gagal dimuat.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
