@@ -42,6 +42,21 @@ function splitPaymentMethod(value: string) {
 }
 
 function existingResponse(topup: ExistingTopup) {
+  if (topup.status === "rejected") {
+    return Response.json(
+      { error: "Permintaan top up sebelumnya sudah gagal. Buat permintaan baru dengan idempotency key baru." },
+      { status: 409 },
+    );
+  }
+  const hasInstructions = Boolean(
+    topup.doku_payment_no || topup.doku_qr_content || topup.doku_payment_url,
+  );
+  if (topup.status === "pending" && !hasInstructions) {
+    return Response.json(
+      { error: "Permintaan top up sedang dibuat. Coba lagi beberapa detik." },
+      { status: 409 },
+    );
+  }
   const method = splitPaymentMethod(topup.payment_method);
   return Response.json({
     ok: true,
@@ -55,6 +70,7 @@ function existingResponse(topup: ExistingTopup) {
     total: topup.amount,
     fee: 0,
     expiredAt: topup.doku_expired_at,
+    status: topup.status,
     reused: true,
   });
 }
@@ -145,15 +161,7 @@ export async function POST(request: Request) {
     }
 
     const pending = await findMatchingPendingTopup(customer.id, input.amount, paymentMethodKey);
-    if (pending?.doku_payment_no || pending?.doku_qr_content || pending?.doku_payment_url) {
-      return existingResponse(pending);
-    }
-    if (pending) {
-      return Response.json(
-        { error: "Permintaan top up yang sama sedang dibuat. Coba lagi beberapa detik." },
-        { status: 409 },
-      );
-    }
+    if (pending) return existingResponse(pending);
 
     referenceId = `WLT-${crypto.randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
     const topupId = crypto.randomUUID();
@@ -189,9 +197,7 @@ export async function POST(request: Request) {
       const winner = idempotencyKey
         ? await findTopupByKey(customer.id, idempotencyKey)
         : await findMatchingPendingTopup(customer.id, input.amount, paymentMethodKey);
-      if (winner?.doku_payment_no || winner?.doku_qr_content || winner?.doku_payment_url) {
-        return existingResponse(winner);
-      }
+      if (winner) return existingResponse(winner);
       return Response.json(
         { error: "Permintaan top up yang sama sedang dibuat. Coba lagi beberapa detik." },
         { status: 409 },
