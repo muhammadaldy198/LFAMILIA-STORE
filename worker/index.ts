@@ -5,6 +5,7 @@ import { getPublicBaseUrl, setRuntimeEnv } from "../lib/server/runtime-env";
 import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
 import { recoverStaleAutomaticOrders } from "../lib/server/orders";
 import { releaseExpiredExternalPromotions } from "../lib/server/promotions";
+import { reconcileStaleDigiflazzProcessing } from "../lib/server/digiflazz-reconciliation";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 import { cleanupSecurityRateLimits } from "../lib/server/security";
 import {
@@ -201,11 +202,15 @@ const worker = {
   },
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
+    const publicBaseUrl = getPublicBaseUrl();
     const tasks: Promise<unknown>[] = [
       cleanupSecurityRateLimits().catch(() => undefined),
       releaseExpiredExternalPromotions().catch(() => undefined),
       Promise.resolve()
-        .then(() => recoverStaleAutomaticOrders(getPublicBaseUrl()))
+        .then(() => recoverStaleAutomaticOrders(publicBaseUrl))
+        .catch(() => undefined),
+      Promise.resolve()
+        .then(() => reconcileStaleDigiflazzProcessing(publicBaseUrl))
         .catch(() => undefined),
     ];
     if (event.cron === "15 2 * * *") {
