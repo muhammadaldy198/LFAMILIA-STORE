@@ -15,13 +15,19 @@ function createPreMigrationDatabase() {
   db.exec(`
     CREATE TABLE orders (
       id TEXT PRIMARY KEY,
+      product_slug TEXT NOT NULL,
       package_sku TEXT NOT NULL,
       fulfillment_type TEXT NOT NULL,
       provider_code TEXT,
       payment_status TEXT NOT NULL DEFAULT 'pending'
     );
+    CREATE TABLE products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT NOT NULL UNIQUE
+    );
     CREATE TABLE product_packages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
       sku TEXT NOT NULL,
       supplier_price INTEGER
     );
@@ -106,10 +112,20 @@ test("expired promotion recovery releases reserved_count once and is idempotent"
   db.close();
 });
 
-test("order delivery mode and supplier cost are backfilled as immutable snapshots", () => {
+test("order delivery mode and supplier cost are backfilled as immutable product-specific snapshots", () => {
   const db = createPreMigrationDatabase();
-  db.prepare("INSERT INTO product_packages (sku,supplier_price) VALUES ('DIGI',7000),('VCHR',8000),('MAN',9000)").run();
-  db.prepare("INSERT INTO orders (id,package_sku,fulfillment_type,provider_code) VALUES ('d','DIGI','automatic','digiflazz'),('v','VCHR','automatic','voucher-stock'),('m','MAN','manual',NULL)").run();
+  db.exec(`
+    INSERT INTO products (id,slug) VALUES (1,'game-a'),(2,'game-b'),(3,'voucher'),(4,'manual');
+    INSERT INTO product_packages (product_id,sku,supplier_price) VALUES
+      (1,'DUPLICATE',7000),
+      (2,'DUPLICATE',99000),
+      (3,'VCHR',8000),
+      (4,'MAN',9000);
+    INSERT INTO orders (id,product_slug,package_sku,fulfillment_type,provider_code) VALUES
+      ('d','game-a','DUPLICATE','automatic','digiflazz'),
+      ('v','voucher','VCHR','automatic','voucher-stock'),
+      ('m','manual','MAN','manual',NULL);
+  `);
   applyMigration(db);
 
   assert.deepEqual(
@@ -125,7 +141,7 @@ test("order delivery mode and supplier cost are backfilled as immutable snapshot
     { delivery_mode: "manual", supplier_cost_snapshot: 9000 },
   );
 
-  db.prepare("UPDATE product_packages SET supplier_price=1 WHERE sku='DIGI'").run();
+  db.prepare("UPDATE product_packages SET supplier_price=1 WHERE product_id=1 AND sku='DUPLICATE'").run();
   assert.equal(db.prepare("SELECT supplier_cost_snapshot FROM orders WHERE id='d'").get().supplier_cost_snapshot, 7000);
   db.close();
 });
