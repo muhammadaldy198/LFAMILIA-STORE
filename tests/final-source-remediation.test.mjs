@@ -25,7 +25,10 @@ test("order delivery and supplier accounting are snapshots, not current category
 test("staff API contract masks event payloads and financial/provider fields", async () => {
   const route = await source("app/api/admin/orders/route.ts");
   const summary = await source("app/api/admin/summary/route.ts");
-  assert.match(route, /access\.role === "staff" \? eventRows\.results\.map/);
+  assert.match(route, /access\.role === "staff"[\s\S]*eventRows\.results\.map/);
+  assert.match(route, /source: "system"/);
+  const staffEvents = route.slice(route.indexOf('events: access.role === "staff"'), route.indexOf('role: access.role'));
+  assert.doesNotMatch(staffEvents, /event_id|payload_json|provider/);
   assert.match(route, /total: null/);
   assert.match(summary, /recentActivities: access\.role === "staff" \? \[\]/);
 });
