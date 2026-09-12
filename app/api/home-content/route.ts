@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const [storedBanners, popups, settings] = await Promise.all([listHomeBanners(false), listSitePopups(false), readStorefrontSettings()]);
-    const banners = storedBanners.length ? storedBanners : fallbackBanners(settings);
-    const visiblePopups = popups.length ? popups : fallbackPopups;
+    const banners = settings.bannerEnabled ? storedBanners : [];
+    const visiblePopups = popups;
     return Response.json({ banners, popups: visiblePopups }, { headers: { "Cache-Control": "public, max-age=30" } });
   } catch {
     return Response.json({ banners: fallbackBanners(defaultStorefrontSettings), popups: fallbackPopups }, { headers: { "Cache-Control": "public, max-age=15" } });

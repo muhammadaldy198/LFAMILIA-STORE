@@ -357,7 +357,7 @@ export async function GET(request: Request) {
             reason: canViewFinance ? doku.reason : null,
           },
           digiflazz: {
-            ready: digiflazz.ready,
+            ready: access.role === "staff" ? false : digiflazz.ready,
             environment: canViewFinance ? digiflazz.environment : null,
             reason: canViewFinance ? digiflazz.reason : null,
             balance: digiflazzBalance,
@@ -372,8 +372,8 @@ export async function GET(request: Request) {
             baseUrl: canViewFinance ? publicBaseUrl || null : null,
           },
         },
-        attention,
-        recentActivities,
+        attention: access.role === "staff" ? { pendingPayments: 0, pendingFulfillments: 0, failedOrders: 0, lowStock: 0, sellerOff: 0, outOfStock: 0, priceChanged: 0 } : attention,
+        recentActivities: access.role === "staff" ? [] : recentActivities,
         recentOrders: common[9].results.map((row) => {
           const item = row as {
             id?: string;

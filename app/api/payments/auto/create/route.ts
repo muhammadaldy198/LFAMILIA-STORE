@@ -13,7 +13,7 @@ import {
   verifyNicknameForCheckout,
 } from "@/lib/server/nickname-check";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
-import { quotePromotion } from "@/lib/server/promotions";
+import { quotePromotion, releaseExternalPromotion, reserveExternalPromotion, updateExternalPromotionExpiry } from "@/lib/server/promotions";
 import {
   createOrderIdentity,
   getExternalOrderByCheckoutKey,
@@ -107,6 +107,7 @@ export async function POST(request: Request) {
 
   let referenceId: string | null = null;
   let checkoutKey: string | null = null;
+  let orderId: string | null = null;
   try {
     const input = routingSchema.parse(await request.json());
     checkoutKey = input.idempotencyKey;
@@ -199,6 +200,9 @@ export async function POST(request: Request) {
       promotion,
     });
 
+    orderId = identity.id;
+    await reserveExternalPromotion({ orderId, voucherCode: promotion.voucherCode, flashSaleId: promotion.flashSaleId, expiresAt: new Date(Date.now() + 30 * 60_000).toISOString() });
+
     const baseUrl = getPublicBaseUrl();
     const invoice = publicInvoice(identity.referenceId);
     const payment = await createDokuDirectPayment({
@@ -223,7 +227,9 @@ export async function POST(request: Request) {
       paymentUrl: payment.paymentUrl,
       expiredAt: payment.expiredAt,
       total: promotion.finalPrice,
+      environment: readiness.environment,
     });
+    await updateExternalPromotionExpiry(identity.id, payment.expiredAt);
     await recordOrderEvent({
       orderId: identity.id,
       source: "doku",
@@ -274,6 +280,7 @@ export async function POST(request: Request) {
       if (priorOrder) return existingExternalResponse(priorOrder);
     }
 
+    if (orderId) await releaseExternalPromotion(orderId).catch(() => undefined);
     if (referenceId) {
       await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
     }

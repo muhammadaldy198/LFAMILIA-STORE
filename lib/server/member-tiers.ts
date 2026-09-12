@@ -134,7 +134,7 @@ export async function setMemberRole(customerId: string, role: "automatic" | Memb
   const db = getD1();
   const current = await getRoleState(customerId);
   if (role === "automatic") {
-    await db.prepare(`UPDATE customer_users SET tier_mode = 'automatic', tier_override = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(customerId).run();
+    await db.prepare(`UPDATE customer_users SET tier_mode = 'automatic', tier_override = NULL, tier_progress_bonus = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(customerId).run();
     return;
   }
   const lifetimeSpend = await getMemberLifetimeSpend(customerId);

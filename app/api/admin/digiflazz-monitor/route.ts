@@ -5,12 +5,12 @@ import { getDigiflazzBalance, getDigiflazzReadiness } from "@/lib/server/provide
 
 export const dynamic = "force-dynamic";
 
-async function readDashboard() {
+async function readDashboard(role: "super_admin" | "admin") {
   const monitor = await readDigiflazzSellerMonitor();
   const readiness = getDigiflazzReadiness();
   let balance: number | null = null;
   let reason = readiness.reason;
-  if (readiness.ready) {
+  if (role === "super_admin" && readiness.ready) {
     try {
       balance = (await getDigiflazzBalance()).balance;
       reason = null;
@@ -23,7 +23,7 @@ async function readDashboard() {
     api: {
       ready: readiness.ready && reason === null,
       balance,
-      environment: readiness.environment,
+      environment: role === "super_admin" ? readiness.environment : null,
       reason,
     },
   };
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   if (access instanceof Response) return access;
 
   try {
-    return Response.json(await readDashboard(), {
+    return Response.json(await readDashboard(access.role), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await syncDigiflazzPrices({ force: true });
-    return Response.json({ ok: true, result, ...(await readDashboard()) });
+    return Response.json({ ok: true, result, ...(await readDashboard(access.role)) });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Monitor seller DigiFlazz gagal diperbarui." },

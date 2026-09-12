@@ -41,7 +41,7 @@ type Order = {
   destinationNote: string;
   payment: string;
   provider: string;
-  total: number;
+  total: number | null;
   status: OrderStatus;
   createdAt?: string;
   fulfillmentStatus?: string;
@@ -99,8 +99,8 @@ function mapApiOrder(order: ApiOrder): Order {
     destination: order.destination,
     destinationNote: [order.server ? `Server: ${order.server}` : "", order.nickname ? `Nickname: ${order.nickname}` : ""].filter(Boolean).join(" · "),
     payment: friendlyPayment(order.payment_channel),
-    provider: order.provider_code === "digiflazz" ? "Digiflazz" : "Manual",
-    total: Number(order.total || 0),
+    provider: order.provider_code === "digiflazz" ? "Digiflazz" : order.provider_code === "voucher-stock" ? "Stok Voucher" : order.provider_code ? "Provider" : "-",
+    total: order.total,
     status: mapOrderStatus(order),
     createdAt: order.created_at,
     fulfillmentStatus: order.fulfillment_status,
@@ -143,6 +143,7 @@ function exportRows(rows: Order[], filename: string) {
 
 export function AdminOrderManager() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [role, setRole] = useState<"super_admin" | "admin" | "staff">("staff");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Semua Status");
   const [provider, setProvider] = useState("Semua Provider");
@@ -165,8 +166,9 @@ export function AdminOrderManager() {
     setLoading(true); setError("");
     try {
       const response = await fetch("/api/panel/orders", { cache: "no-store", signal });
-      const payload = await response.json().catch(() => ({})) as { orders?: ApiOrder[]; error?: string };
+      const payload = await response.json().catch(() => ({})) as { orders?: ApiOrder[]; role?: "super_admin" | "admin" | "staff"; error?: string };
       if (!response.ok || !payload.orders) throw new Error(payload.error || "Pesanan gagal dimuat.");
+      setRole(payload.role || "staff");
       setOrders(payload.orders.map(mapApiOrder));
       setLastUpdated(`${new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date())} WIB`);
     } catch (reason) {
@@ -280,10 +282,10 @@ export function AdminOrderManager() {
             </button>
           </div>
           <ToolbarButton onClick={refresh}><RefreshCw className="size-[13px]" />Refresh</ToolbarButton>
-          <ToolbarButton onClick={exportCsv}><Download className="size-[13px]" />Export</ToolbarButton>
-          <button type="button" onClick={() => setManualOpen(true)} className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] bg-[#0875ed] px-[14px] text-[9px] font-bold text-white shadow-[0_5px_14px_rgba(8,117,237,0.2)] hover:bg-[#0667d3]">
+          {role !== "staff" && <ToolbarButton onClick={exportCsv}><Download className="size-[13px]" />Export</ToolbarButton>}
+          {role !== "staff" && <button type="button" onClick={() => setManualOpen(true)} className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] bg-[#0875ed] px-[14px] text-[9px] font-bold text-white shadow-[0_5px_14px_rgba(8,117,237,0.2)] hover:bg-[#0667d3]">
             <Plus className="size-[15px]" /> Pesanan Manual
-          </button>
+          </button>}
         </div>
       </header>
 
@@ -541,10 +543,10 @@ function FormField({ label, ...props }: { label: string; name: string; placehold
   return <label className="text-[8px] font-bold text-[#42536b]">{label}<input {...props} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px] font-medium outline-none placeholder:text-[#9aa6b5] focus:border-[#2380ec]" /></label>;
 }
 
-function formatRupiah(value: number) {
-  return `Rp ${new Intl.NumberFormat("id-ID").format(value)}`;
+function formatRupiah(value: number | null) {
+  return value == null ? "-" : `Rp ${new Intl.NumberFormat("id-ID").format(value)}`;
 }
 
-function csvCell(value: string | number) {
+function csvCell(value: string | number | null) {
   return `"${String(value).replaceAll('"', '""')}"`;
 }

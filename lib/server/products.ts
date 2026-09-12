@@ -244,7 +244,6 @@ async function applyOneTimeCatalogRepopulation() {
 
 export async function readProducts(includeInactive = false): Promise<ManagedProduct[]> {
   await ensureLegacyDatabaseColumns();
-  await applyOneTimeCatalogRepopulation();
   const db = getD1();
   const productSql = includeInactive
     ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json,
@@ -387,13 +386,21 @@ export async function saveProduct(input: ProductWrite, id?: number) {
     .bind(JSON.stringify(input.inputFields ?? []), productRow.id)
     .run();
 
-  const packageStatements = [
-    db.prepare("DELETE FROM product_packages WHERE product_id = ?").bind(productRow.id),
-    ...input.packages.map((item, index) => db.prepare(
-      `INSERT INTO product_packages (product_id, sku, label, price, note, package_group, image_url, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(productRow.id, item.id, item.label, item.price, item.note ?? null, item.group?.trim() || null, item.imageUrl ?? null, item.providerCode ?? null, item.providerSku ?? null, item.supplierPrice ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index)),
-  ];
+  const packageStatements = input.packages.map((item, index) => db.prepare(
+    `INSERT INTO product_packages (product_id, sku, label, price, note, package_group, image_url, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(sku) DO UPDATE SET
+       label = excluded.label, price = excluded.price, note = excluded.note, package_group = excluded.package_group,
+       image_url = excluded.image_url, provider_code = excluded.provider_code, provider_sku = excluded.provider_sku,
+       supplier_price = excluded.supplier_price, pricing_mode = excluded.pricing_mode, margin_type = excluded.margin_type,
+       margin_value = excluded.margin_value, is_active = excluded.is_active, sort_order = excluded.sort_order`,
+  ).bind(productRow.id, item.id, item.label, item.price, item.note ?? null, item.group?.trim() || null, item.imageUrl ?? null, item.providerCode ?? null, item.providerSku ?? null, item.supplierPrice ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index));
+  if (input.packages.length) {
+    const placeholders = input.packages.map(() => "?").join(", ");
+    packageStatements.push(db.prepare(`DELETE FROM product_packages WHERE product_id = ? AND sku NOT IN (${placeholders})`).bind(productRow.id, ...input.packages.map((item) => item.id)));
+  } else {
+    packageStatements.push(db.prepare("DELETE FROM product_packages WHERE product_id = ?").bind(productRow.id));
+  }
   await db.batch(packageStatements);
   const noticeStatements = [
     db.prepare("DELETE FROM product_notices WHERE product_id = ?").bind(productRow.id),

@@ -77,6 +77,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const expectedOrder = referenceId ? await getOrderByReference(referenceId) : null;
     const target = new URL(request.url).pathname;
     const validation = validateDokuNotification({
       rawBody,
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
       requestId: request.headers.get("request-id"),
       legacyTimestamp: request.headers.get("request-timestamp"),
       legacySignature: request.headers.get("signature"),
+      expectedEnvironment: expectedOrder?.doku_environment ?? null,
     });
     if (!validation.valid) {
       return Response.json({ error: "Signature callback DOKU tidak valid." }, { status: 401 });
@@ -121,22 +123,22 @@ export async function POST(request: Request) {
       return notificationResponse(validation.scheme, payload, eventId);
     }
 
-    const order = await getOrderByReference(referenceId);
-    if (!order) return Response.json({ ok: true, ignored: "order_not_found" });
+    const order = expectedOrder;
+    if (!order) return notificationResponse(validation.scheme, payload, eventId);
 
     if (
       order.doku_request_id &&
       originalRequestId &&
       order.doku_request_id !== originalRequestId
     ) {
-      return Response.json({ ok: true, ignored: "request_mismatch" });
+      return notificationResponse(validation.scheme, payload, eventId);
     }
 
     if (
       status === "paid" &&
       (!Number.isFinite(callbackAmount) || callbackAmount !== order.total)
     ) {
-      return Response.json({ ok: true, ignored: "amount_mismatch" });
+      return notificationResponse(validation.scheme, payload, eventId);
     }
 
     await recordOrderEvent({

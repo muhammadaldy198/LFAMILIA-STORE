@@ -196,9 +196,31 @@ export async function quotePromotion(
   };
 }
 
-export async function consumeOrderPromotion(voucherCode: string | null, flashSaleId: number | null) {
-  const statements = [];
+export async function reserveExternalPromotion(input: { orderId: string; voucherCode: string | null; flashSaleId: number | null; expiresAt: string }) {
+  if (!input.voucherCode && !input.flashSaleId) return;
+  await getD1().prepare(`INSERT INTO promotion_reservations (order_id, voucher_code, flash_sale_id, status, expires_at) VALUES (?, ?, ?, 'reserved', ?)`).bind(input.orderId, input.voucherCode, input.flashSaleId, input.expiresAt).run();
+}
+
+export async function updateExternalPromotionExpiry(orderId: string, expiresAt: string | null) {
+  if (!expiresAt) return;
+  await getD1().prepare(`UPDATE promotion_reservations SET expires_at = ?, updated_at = CURRENT_TIMESTAMP WHERE order_id = ? AND status = 'reserved'`).bind(expiresAt, orderId).run();
+}
+
+export async function releaseExternalPromotion(orderId: string) {
+  await getD1().prepare(`UPDATE promotion_reservations SET status = 'released', updated_at = CURRENT_TIMESTAMP WHERE order_id = ? AND status = 'reserved'`).bind(orderId).run();
+}
+
+export async function releaseExpiredExternalPromotions() {
+  await getD1().prepare(`UPDATE promotion_reservations SET status = 'released', updated_at = CURRENT_TIMESTAMP WHERE status = 'reserved' AND datetime(expires_at) <= datetime('now')`).run();
+}
+
+export async function consumeOrderPromotion(voucherCode: string | null, flashSaleId: number | null, orderId?: string) {
   const db = getD1();
+  if (orderId) {
+    const reserved = await db.prepare(`UPDATE promotion_reservations SET status = 'consumed', updated_at = CURRENT_TIMESTAMP WHERE order_id = ? AND status = 'reserved'`).bind(orderId).run();
+    if (Number(reserved.meta.changes ?? 0) > 0) return;
+  }
+  const statements = [];
   if (voucherCode) statements.push(db.prepare("UPDATE discount_vouchers SET used_count = used_count + 1, updated_at = CURRENT_TIMESTAMP WHERE code = ?").bind(voucherCode));
   if (flashSaleId) statements.push(db.prepare("UPDATE flash_sales SET sold_count = sold_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(flashSaleId));
   if (statements.length) await db.batch(statements);
