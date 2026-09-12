@@ -113,15 +113,15 @@ test("order delivery mode and supplier cost are backfilled as immutable snapshot
   applyMigration(db);
 
   assert.deepEqual(
-    db.prepare("SELECT delivery_mode,supplier_cost_snapshot FROM orders WHERE id='d'").get(),
+    { ...db.prepare("SELECT delivery_mode,supplier_cost_snapshot FROM orders WHERE id='d'").get() },
     { delivery_mode: "direct", supplier_cost_snapshot: 7000 },
   );
   assert.deepEqual(
-    db.prepare("SELECT delivery_mode,supplier_cost_snapshot FROM orders WHERE id='v'").get(),
+    { ...db.prepare("SELECT delivery_mode,supplier_cost_snapshot FROM orders WHERE id='v'").get() },
     { delivery_mode: "voucher", supplier_cost_snapshot: 8000 },
   );
   assert.deepEqual(
-    db.prepare("SELECT delivery_mode,supplier_cost_snapshot FROM orders WHERE id='m'").get(),
+    { ...db.prepare("SELECT delivery_mode,supplier_cost_snapshot FROM orders WHERE id='m'").get() },
     { delivery_mode: "manual", supplier_cost_snapshot: 9000 },
   );
 
