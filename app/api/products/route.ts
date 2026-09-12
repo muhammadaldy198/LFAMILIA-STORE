@@ -40,6 +40,7 @@ export async function GET() {
           note: pkg.note,
           group: pkg.group,
           imageUrl: pkg.imageUrl,
+          fulfillmentMode: item.fulfillmentType === "manual" ? "manual" : pkg.providerCode === "voucher-stock" ? "voucher_stock" : "provider",
           fulfillmentReady: item.fulfillmentType === "manual" || Boolean(pkg.providerCode && pkg.providerSku),
         })),
         ...(summaries.get(item.slug) ?? { ratingAverage: 0, ratingCount: 0 }),

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 type Summary = {
+  canViewFinance: boolean;
   todayMetrics: { paidRevenue: number | null; totalOrders: number; pendingPayments: number; failedOrders: number; activeProducts: number };
   metrics: { customers: number; fulfilledOrders: number };
   chart: Array<{ day: string; orders: number; revenue: number | null }>;
@@ -53,6 +54,7 @@ const featureCards = [
 
 export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigate?: (value: string) => void }) {
   const isStaff = role === "staff";
+  const canExpectFinance = role === "super_admin";
   const visibleFeatureCards = featureCards.filter((item) => roleRank[role] >= roleRank[item.minimumRole as AdminRole]);
   const [now, setNow] = useState<Date | null>(null);
   const [range, setRange] = useState("7d");
@@ -76,6 +78,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
     return () => controller.abort();
   }, [range]);
 
+  const canViewFinance = summary?.canViewFinance === true;
   const sales = summary?.chart.map((point) => ({ day: new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short" }).format(new Date(point.day)), revenue: Number(point.revenue || 0), orders: point.orders })) || [];
   const activities = (summary?.recentActivities.length ? summary.recentActivities.map((item) => ({ tone: "purple", title: item.action, detail: item.target, time: relativeTime(item.createdAt), Icon: UserCog })) : summary?.recentOrders.map((item) => ({ tone: item.paymentStatus === "paid" ? "green" : "blue", title: item.paymentStatus === "paid" ? "Pembayaran berhasil" : "Pesanan diperbarui", detail: `${item.referenceId} - ${item.productName}`, time: relativeTime(item.createdAt), Icon: item.paymentStatus === "paid" ? CheckCircle2 : ShoppingCart })) || []).slice(0, 5);
   const orders = summary?.recentOrders.slice(0, 4).map((item) => ({ invoice: item.referenceId, customer: item.buyerName, product: `${item.productName} ${item.packageLabel}`, payment: item.paymentChannel, total: money(item.total), status: item.fulfillmentStatus === "success" ? "Berhasil" : item.paymentStatus === "failed" || item.fulfillmentStatus === "failed" ? "Gagal" : item.paymentStatus === "paid" ? "Diproses" : "Pending" })) || [];
@@ -85,8 +88,8 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
     <div className="admin-dashboard-reference space-y-3.5">
       <section className="flex items-start justify-between">
         <div>
-          <h1 className="text-[25px] font-black tracking-[-0.04em] text-[#0c1c3b]">{isStaff ? "Panel Staff LFAMILIA STORE" : "Panel Admin LFAMILIA STORE"}</h1>
-          <p className="mt-0.5 text-[10px] text-[#61708a]">{isStaff ? "Tangani pesanan, tiket, dan konten pelanggan sesuai akses Staff." : "Kelola operasional toko sesuai akses akun."}</p>
+          <h1 className="text-[25px] font-black tracking-[-0.04em] text-[#0c1c3b]">{role === "super_admin" ? "Panel Super Admin LFAMILIA STORE" : isStaff ? "Panel Staff LFAMILIA STORE" : "Panel Admin LFAMILIA STORE"}</h1>
+          <p className="mt-0.5 text-[10px] text-[#61708a]">{isStaff ? "Tangani pesanan, tiket, dan konten pelanggan sesuai akses Staff." : role === "super_admin" ? "Kelola seluruh sistem dan data finansial toko." : "Kelola operasional toko sesuai akses akun."}</p>
         </div>
         <div className="flex min-w-[176px] items-center gap-3 rounded-lg border border-[#e2e7ee] bg-white px-4 py-2.5 shadow-[0_2px_10px_rgba(15,23,42,0.035)]">
           <CalendarDays className="size-[18px] text-[#275fae]" />
@@ -97,18 +100,18 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
         </div>
       </section>
 
-      <section className={`grid gap-3 ${isStaff ? "grid-cols-2" : "grid-cols-5"}`}>
-        {!isStaff && <MetricCard Icon={WalletCards} label="Omzet Hari Ini" value={money(summary?.todayMetrics.paidRevenue)} delta="Live" note="dari transaksi dibayar" />}
+      <section className={`grid gap-3 ${isStaff ? "grid-cols-2" : canExpectFinance ? "grid-cols-5" : "grid-cols-3"}`}>
+        {canViewFinance && <MetricCard Icon={WalletCards} label="Omzet Hari Ini" value={money(summary?.todayMetrics.paidRevenue)} delta="Live" note="dari transaksi dibayar" />}
         <MetricCard Icon={ShoppingCart} label="Pesanan Hari Ini" value={String(summary?.todayMetrics.totalOrders || 0)} delta="Live" note="pesanan tercatat" />
         {!isStaff && <MetricCard Icon={Boxes} label="Produk Aktif" value={String(summary?.todayMetrics.activeProducts || 0)} delta="Live" note="tersedia di toko" neutral />}
-        {!isStaff && <MetricCard Icon={CircleDollarSign} label="Saldo Digiflazz" value={money(summary?.integrations.digiflazz.balance)} delta={summary?.integrations.digiflazz.ready ? "Online" : "Periksa"} note="status provider" />}
+        {canViewFinance && <MetricCard Icon={CircleDollarSign} label="Saldo Digiflazz" value={money(summary?.integrations.digiflazz.balance)} delta={summary?.integrations.digiflazz.ready ? "Online" : "Periksa"} note="status provider" />}
         <MetricCard Icon={CheckCircle2} label="Pembayaran Berhasil" value={String(summary?.metrics.fulfilledOrders || 0)} delta="Live" note="periode dipilih" success />
       </section>
 
       {error && <button type="button" onClick={() => setError("")} className="w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-[9px] text-red-700">{error}</button>}
 
       <section className="grid grid-cols-[1.25fr_1fr_0.94fr] gap-3">
-        {!isStaff && <Panel className="min-h-[282px]">
+        {canViewFinance && <Panel className="min-h-[282px]">
           <PanelHeader title="Grafik Penjualan">
             <label className="relative"><select value={range} onChange={(event) => setRange(event.target.value)} className="h-7 appearance-none rounded-md border border-[#e0e5ec] bg-white pl-2.5 pr-7 text-[8px] font-semibold text-[#607089]"><option value="today">Hari Ini</option><option value="7d">7 Hari Terakhir</option><option value="30d">30 Hari Terakhir</option><option value="90d">90 Hari Terakhir</option></select><ChevronDown className="pointer-events-none absolute right-2 top-2 size-3" /></label>
           </PanelHeader>
@@ -130,7 +133,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
         </Panel>
 
         {!isStaff && <Panel className="min-h-[282px]">
-          <PanelHeader title="Status Integrasi"><button type="button" onClick={() => onNavigate?.("integrations")} className="flex items-center gap-1.5 text-[8px] font-semibold text-[#1769e8]"><CheckCircle2 className="size-3" />Lihat Integrasi</button></PanelHeader>
+          <PanelHeader title="Status Integrasi">{role === "super_admin" && <button type="button" onClick={() => onNavigate?.("integrations")} className="flex items-center gap-1.5 text-[8px] font-semibold text-[#1769e8]"><CheckCircle2 className="size-3" />Lihat Integrasi</button>}</PanelHeader>
           <div className="space-y-2 px-4 py-3">
             <IntegrationRow letter="D" name="Digiflazz API" ready={Boolean(summary?.integrations.digiflazz.ready)} />
             <IntegrationRow letter="DO" name="DOKU Direct API" ready={Boolean(summary?.integrations.doku.ready)} red />
@@ -158,7 +161,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
           <div className="overflow-hidden">
             <table className="w-full table-fixed text-left">
               <thead className="bg-[#fafbfd] text-[7px] font-semibold text-[#75839a]">
-                <tr><th className="w-7 px-3 py-2">#</th><th className="w-[18%] px-2 py-2">Invoice</th><th className="w-[18%] px-2 py-2">Pelanggan</th><th className="px-2 py-2">Produk</th><th className="w-[15%] px-2 py-2">Pembayaran</th><th className="w-[11%] px-2 py-2">Total</th><th className="w-[10%] px-2 py-2">Status</th><th className="w-[8%] px-2 py-2">Aksi</th></tr>
+                <tr><th className="w-7 px-3 py-2">#</th><th className="w-[18%] px-2 py-2">Invoice</th><th className="w-[18%] px-2 py-2">Pelanggan</th><th className="px-2 py-2">Produk</th><th className="w-[15%] px-2 py-2">Pembayaran</th>{canViewFinance && <th className="w-[11%] px-2 py-2">Total</th>}<th className="w-[10%] px-2 py-2">Status</th><th className="w-[8%] px-2 py-2">Aksi</th></tr>
               </thead>
               <tbody className="divide-y divide-[#edf0f4] text-[8px] text-[#40506a]">
                 {orders.map((order, index) => (
@@ -168,7 +171,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
                     <td className="truncate px-2 py-2.5">{order.customer}</td>
                     <td className="truncate px-2 py-2.5 font-medium text-[#25344d]">{order.product}</td>
                     <td className="truncate px-2 py-2.5">● {order.payment}</td>
-                    <td className="px-2 py-2.5">{order.total}</td>
+                    {canViewFinance && <td className="px-2 py-2.5">{order.total}</td>}
                     <td className="px-2 py-2.5"><StatusBadge value={order.status} /></td>
                     <td className="px-2 py-2.5"><button type="button" onClick={() => onNavigate?.("orders")} className="rounded bg-[#eaf3ff] px-2 py-1 font-semibold text-[#1769e8]">Lihat</button></td>
                   </tr>

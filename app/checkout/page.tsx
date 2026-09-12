@@ -269,8 +269,9 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       : "";
   const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
   const eligiblePaymentChannels = availablePaymentChannels;
-  const isManual = product.fulfillmentType === "manual";
-  const isVoucherStock = isVoucherProduct && !isManual;
+  const fulfillmentMode = selectedPackage?.fulfillmentMode ?? (product.fulfillmentType === "manual" ? "manual" : "provider");
+  const isManual = fulfillmentMode === "manual";
+  const isVoucherStock = fulfillmentMode === "voucher_stock";
   const providerReady = Boolean(selectedPackage?.fulfillmentReady);
   const nicknameRequired =
     !isVoucherProduct && supportsNicknameLookup(product.slug);

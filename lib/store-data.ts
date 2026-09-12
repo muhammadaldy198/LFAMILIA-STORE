@@ -2,6 +2,8 @@
 // open-ended instead of limiting the catalog to a fixed set of slugs.
 export type ProductCategory = string;
 
+export type PublicFulfillmentMode = "manual" | "provider" | "voucher_stock";
+
 export type ProductPackage = {
   id: string;
   label: string;
@@ -13,6 +15,7 @@ export type ProductPackage = {
   providerSku?: string;
   providerConfigured?: boolean;
   fulfillmentReady?: boolean;
+  fulfillmentMode?: PublicFulfillmentMode;
 };
 
 export type FulfillmentType = "automatic" | "manual";

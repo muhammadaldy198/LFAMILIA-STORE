@@ -20,6 +20,7 @@ test("public catalog strips supplier pricing and provider SKU metadata", () => {
   const route = read("app/api/products/route.ts");
   const checkout = read("app/checkout/page.tsx");
 
+  assert.match(route, /fulfillmentMode: item\.fulfillmentType === "manual" \? "manual" : pkg\.providerCode === "voucher-stock" \? "voucher_stock" : "provider"/);
   assert.match(route, /fulfillmentReady: item\.fulfillmentType === "manual" \|\| Boolean\(pkg\.providerCode && pkg\.providerSku\)/);
 assert.doesNotMatch(route, /providerConfigured:/);
   assert.doesNotMatch(route, /providerCode: pkg\.providerCode/);
@@ -30,6 +31,8 @@ assert.doesNotMatch(route, /providerConfigured:/);
   assert.doesNotMatch(route, /providerSku: pkg\./);
   assert.doesNotMatch(route, /\.\.\.item/);
   assert.match(checkout, /selectedPackage\?\.fulfillmentReady/);
+  assert.match(checkout, /selectedPackage\?\.fulfillmentMode/);
+  assert.match(checkout, /isVoucherStock = fulfillmentMode === "voucher_stock"/);
 assert.match(checkout, /item\.fulfillmentReady/);
   assert.doesNotMatch(checkout, /selectedPackage\?\.providerSku/);
 assert.doesNotMatch(checkout, /selectedPackage\?\.providerCode/);
