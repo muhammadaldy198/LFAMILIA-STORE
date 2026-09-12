@@ -29,7 +29,11 @@ export async function GET(request: Request) {
       listMembersWithTiers(),
     ]);
     if (access.role !== "super_admin") {
-      return Response.json({ members: members.map(({ balance: _balance, lifetimeSpend: _lifetimeSpend, tierProgress: _tierProgress, tierProgressBonus: _tierProgressBonus, ...member }) => member) });
+      return Response.json({ members: members.map((member) => ({
+        id: member.id, name: member.name, email: member.email, phone: member.phone,
+        isActive: member.isActive, createdAt: member.createdAt, paidOrders: member.paidOrders,
+        tierMode: member.tierMode, tierOverride: member.tierOverride, tier: member.tier, tierLabel: member.tierLabel,
+      })) });
     }
     return Response.json({ settings, members });
   } catch (error) {

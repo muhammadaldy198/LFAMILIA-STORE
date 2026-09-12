@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Save, Upload } from "lucide-react";
