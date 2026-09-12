@@ -292,12 +292,12 @@ export async function settleWalletOrder(input: {
          AND (? IS NULL OR EXISTS (
            SELECT 1 FROM discount_vouchers
            WHERE code = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
-             AND (usage_limit IS NULL OR used_count < usage_limit)
+             AND (usage_limit IS NULL OR used_count + reserved_count < usage_limit)
          ))
          AND (? IS NULL OR EXISTS (
            SELECT 1 FROM flash_sales
            WHERE id = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
-             AND (stock_limit IS NULL OR sold_count < stock_limit)
+             AND (stock_limit IS NULL OR sold_count + reserved_count < stock_limit)
          ))`,
       )
       .bind(
@@ -334,7 +334,7 @@ export async function settleWalletOrder(input: {
     statements.push(db.prepare(
       `UPDATE discount_vouchers SET used_count = used_count + 1, updated_at = CURRENT_TIMESTAMP
        WHERE code = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
-         AND (usage_limit IS NULL OR used_count < usage_limit)
+         AND (usage_limit IS NULL OR used_count + reserved_count < usage_limit)
          AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND payment_status = 'pending')
          AND EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?)`,
     ).bind(input.voucherCode, now, now, input.orderId, reference));
@@ -343,7 +343,7 @@ export async function settleWalletOrder(input: {
     statements.push(db.prepare(
       `UPDATE flash_sales SET sold_count = sold_count + 1, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
-         AND (stock_limit IS NULL OR sold_count < stock_limit)
+         AND (stock_limit IS NULL OR sold_count + reserved_count < stock_limit)
          AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND payment_status = 'pending')
          AND EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?)`,
     ).bind(input.flashSaleId, now, now, input.orderId, reference));
