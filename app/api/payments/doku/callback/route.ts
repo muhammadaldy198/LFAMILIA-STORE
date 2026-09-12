@@ -141,6 +141,12 @@ export async function POST(request: Request) {
     const order = expectedOrder;
     if (!order) return notificationResponse(validation.scheme, payload, eventId);
 
+    // Local expiry/failure and a successful payment are terminal. Signed callback replays or
+    // delayed notifications are acknowledged but may not revive or downgrade a finalized order.
+    if (order.payment_status !== "pending") {
+      return notificationResponse(validation.scheme, payload, eventId);
+    }
+
     if (
       order.doku_request_id &&
       originalRequestId &&
