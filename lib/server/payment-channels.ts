@@ -97,9 +97,6 @@ export async function syncPaymentChannelsForGateways(
   const supported = paymentChannels.filter((item) =>
     isDokuChannelSupported(item.method, item.channel),
   );
-  const supportedKeys = new Set(
-    supported.map((item) => `${item.method}:${item.channel}`),
-  );
   const db = getD1();
   await db.batch(paymentChannels.map((item, index) =>
     db.prepare(`INSERT INTO payment_channels (method, channel, name, description, image_url, is_active, sort_order)
