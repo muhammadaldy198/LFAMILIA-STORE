@@ -5,9 +5,9 @@ import {
   validateDokuNotification,
   type DokuEnvironment,
 } from "@/lib/server/doku";
+import { applyPendingDokuPaymentStatus } from "@/lib/server/doku-payment-transition";
 import { canProcessDokuOrderCallback } from "@/lib/server/final-audit-rules";
 import {
-  applyPaymentStatus,
   fulfillAutomaticOrder,
   getOrderByReference,
   recordOrderEvent,
@@ -142,8 +142,6 @@ export async function POST(request: Request) {
     const order = expectedOrder;
     if (!order) return notificationResponse(validation.scheme, payload, eventId);
 
-    // Local expiry/failure and a successful payment are terminal. Signed callback replays or
-    // delayed notifications are acknowledged but may not revive or downgrade a finalized order.
     if (!canProcessDokuOrderCallback(order.payment_status)) {
       return notificationResponse(validation.scheme, payload, eventId);
     }
@@ -171,7 +169,7 @@ export async function POST(request: Request) {
       payload,
     });
 
-    const firstPaid = await applyPaymentStatus(order, status);
+    const firstPaid = await applyPendingDokuPaymentStatus(order, status);
     if (firstPaid && order.fulfillment_type === "automatic") {
       await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
       await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
