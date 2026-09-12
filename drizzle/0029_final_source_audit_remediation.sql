@@ -35,4 +35,15 @@ CREATE TRIGGER IF NOT EXISTS promotion_reservation_released AFTER UPDATE OF stat
   UPDATE flash_sales SET reserved_count = MAX(0, reserved_count - 1), updated_at = CURRENT_TIMESTAMP WHERE id = NEW.flash_sale_id;
 END;
 UPDATE orders SET delivery_mode = CASE WHEN fulfillment_type = 'manual' THEN 'manual' WHEN provider_code = 'voucher-stock' THEN 'voucher' ELSE 'direct' END WHERE delivery_mode IS NULL;
-UPDATE orders SET supplier_cost_snapshot = (SELECT supplier_price FROM product_packages pp WHERE pp.sku = orders.package_sku AND pp.supplier_price IS NOT NULL ORDER BY pp.id DESC LIMIT 1) WHERE supplier_cost_snapshot IS NULL;
+UPDATE orders
+SET supplier_cost_snapshot = (
+  SELECT pp.supplier_price
+  FROM product_packages pp
+  JOIN products p ON p.id = pp.product_id
+  WHERE p.slug = orders.product_slug
+    AND pp.sku = orders.package_sku
+    AND pp.supplier_price IS NOT NULL
+  ORDER BY pp.id DESC
+  LIMIT 1
+)
+WHERE supplier_cost_snapshot IS NULL;
