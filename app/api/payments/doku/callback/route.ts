@@ -5,6 +5,7 @@ import {
   validateDokuNotification,
   type DokuEnvironment,
 } from "@/lib/server/doku";
+import { canProcessDokuOrderCallback } from "@/lib/server/final-audit-rules";
 import {
   applyPaymentStatus,
   fulfillAutomaticOrder,
@@ -143,7 +144,7 @@ export async function POST(request: Request) {
 
     // Local expiry/failure and a successful payment are terminal. Signed callback replays or
     // delayed notifications are acknowledged but may not revive or downgrade a finalized order.
-    if (order.payment_status !== "pending") {
+    if (!canProcessDokuOrderCallback(order.payment_status)) {
       return notificationResponse(validation.scheme, payload, eventId);
     }
 
