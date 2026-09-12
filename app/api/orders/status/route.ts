@@ -3,9 +3,9 @@ import { getD1 } from "@/db";
 import { publicPaymentLabel } from "@/lib/public-payment";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { queryDokuQrisStatus } from "@/lib/server/doku";
+import { applyPendingDokuPaymentStatus } from "@/lib/server/doku-payment-transition";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
 import {
-  applyPaymentStatus,
   fulfillAutomaticOrder,
   getOrderById,
   markDokuStatusChecked,
@@ -89,7 +89,7 @@ async function expirePendingInvoice(order: OrderRecord) {
   if (order.payment_status !== "pending" || !order.doku_expired_at) return order;
   const expiresAt = Date.parse(order.doku_expired_at);
   if (!Number.isFinite(expiresAt) || expiresAt > Date.now()) return order;
-  await applyPaymentStatus(order, "expired");
+  await applyPendingDokuPaymentStatus(order, "expired");
   return (await getOrderById(order.id)) ?? order;
 }
 
@@ -113,12 +113,12 @@ async function refreshQrisStatus(order: OrderRecord) {
       Number.isFinite(query.amount) &&
       query.amount === order.total
     ) {
-      const firstPaid = await applyPaymentStatus(order, "paid");
+      const firstPaid = await applyPendingDokuPaymentStatus(order, "paid");
       if (firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
       }
     } else if (query.status === "failed") {
-      await applyPaymentStatus(order, "failed");
+      await applyPendingDokuPaymentStatus(order, "failed");
     }
     return (await getOrderById(order.id)) ?? order;
   } catch {
