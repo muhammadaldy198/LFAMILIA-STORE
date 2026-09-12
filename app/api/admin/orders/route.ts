@@ -41,33 +41,17 @@ function withDeliveryMode(order: OrderRecord, deliveryModes: Map<string, Deliver
 }
 
 function visibleOrder(order: OrderWithMode, role: AdminRole) {
-  if (role === "super_admin") return order;
+  if (role !== "staff") return order;
   return {
-    id: order.id,
-    reference_id: order.reference_id,
-    product_slug: order.product_slug,
-    product_name: order.product_name,
-    package_sku: order.package_sku,
-    package_label: order.package_label,
-    destination: order.destination,
-    server: order.server,
-    nickname: order.nickname,
-    buyer_name: order.buyer_name,
-    buyer_phone: order.buyer_phone,
-    customer_inputs_json: order.customer_inputs_json,
-    total: null,
-    payment_method: order.payment_method,
-    payment_channel: order.payment_channel,
-    payment_status: order.payment_status,
-    fulfillment_type: order.fulfillment_type,
-    fulfillment_status: order.fulfillment_status,
-    provider_code: order.provider_code,
-    provider_status: order.provider_status,
-    provider_message: order.provider_message,
-    provider_serial_number: order.provider_serial_number,
-    delivery_mode: order.delivery_mode,
-    created_at: order.created_at,
-    updated_at: order.updated_at,
+    id: order.id, reference_id: order.reference_id, product_slug: order.product_slug,
+    product_name: order.product_name, package_sku: order.package_sku,
+    package_label: order.package_label, destination: order.destination, server: order.server,
+    nickname: order.nickname, buyer_name: order.buyer_name, buyer_phone: order.buyer_phone,
+    customer_inputs_json: order.customer_inputs_json, total: null,
+    payment_method: order.payment_method, payment_channel: order.payment_channel,
+    payment_status: order.payment_status, fulfillment_type: order.fulfillment_type,
+    fulfillment_status: order.fulfillment_status, delivery_mode: order.delivery_mode,
+    created_at: order.created_at, updated_at: order.updated_at,
   };
 }
 

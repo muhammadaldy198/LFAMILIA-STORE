@@ -44,7 +44,7 @@ test("nickname verification blocks supported games in UI and is enforced again b
 
 test("checkout payment type is DOKU only", () => {
   const checkout = read("app/checkout/page.tsx");
-  assert.match(checkout, /code: "doku"/);
+  assert.doesNotMatch(checkout, /code: "doku"/);
   assert.doesNotMatch(checkout, /"DOKU Direct API"|Pesanan diteruskan otomatis ke provider|Pembayaran melalui gateway/);
   assert.doesNotMatch(checkout, /midtrans|ipaymu|bisnap/i);
 });

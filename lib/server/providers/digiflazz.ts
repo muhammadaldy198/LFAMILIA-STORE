@@ -82,6 +82,7 @@ export function getDigiflazzReadiness() {
 let balanceCache: { value: number; checkedAt: number } | null = null;
 
 export async function getDigiflazzBalance() {
+  if (isAutomatedTestRuntime() && runtimeConfig().environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
   const { username, apiKey, apiUrl } = runtimeConfig();
   if (balanceCache && Date.now() - balanceCache.checkedAt < 60_000) {
     return { balance: balanceCache.value, cached: true as const };
@@ -124,6 +125,7 @@ export const digiflazzAdapter: ProviderAdapter = {
   name: "DigiFlazz",
   async fulfill(order, publicBaseUrl) {
     const { environment, username, apiKey, apiUrl } = runtimeConfig();
+    if (isAutomatedTestRuntime() && environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
 
     const body = {
       username,

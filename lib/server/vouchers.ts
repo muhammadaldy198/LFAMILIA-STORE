@@ -261,14 +261,12 @@ async function deliverChannel(order: ProviderOrder, voucher: VoucherCodeRow, cod
   if (previous?.status === "sent") return { channel, status: "sent", providerId: null, message: "Sudah dikirim sebelumnya." };
 
   const db = getD1();
-  await db.prepare(
-    `INSERT INTO voucher_deliveries
-     (order_id, voucher_code_id, channel, status, attempts, last_attempt_at)
-     VALUES (?, ?, ?, 'pending', 1, CURRENT_TIMESTAMP)
-     ON CONFLICT(order_id, channel) DO UPDATE SET
-      status = 'pending', attempts = voucher_deliveries.attempts + 1,
-      provider_message = NULL, last_attempt_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP`,
-  ).bind(order.id, voucher.id, channel).run();
+  const claim = await db.prepare(
+    "INSERT INTO voucher_deliveries (order_id, voucher_code_id, channel, status, attempts, last_attempt_at) VALUES (?, ?, ?, 'sending', 1, CURRENT_TIMESTAMP) ON CONFLICT(order_id, channel) DO UPDATE SET status = 'sending', attempts = voucher_deliveries.attempts + 1, provider_message = NULL, last_attempt_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE voucher_deliveries.status IN ('failed', 'pending') RETURNING id",
+  ).bind(order.id, voucher.id, channel).all<{ id: number }>();
+  if (!claim.results[0]) {
+    return { channel, status: "failed", providerId: null, message: "Pengiriman kode sedang diproses atau sudah selesai." };
+  }
 
   let outcome: DeliveryOutcome;
   try {

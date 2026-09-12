@@ -453,6 +453,9 @@ export async function createDokuDirectPayment(input: {
   finishUrl: string;
 }) {
   const config = activeConfig();
+  if (isAutomatedTestRuntime() && config.environment === "production") {
+    throw new Error("DOKU production dinonaktifkan saat automated test.");
+  }
   const expiresAt = futureTimestamp(60);
 
   if (

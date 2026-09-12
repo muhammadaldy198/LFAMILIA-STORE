@@ -60,3 +60,18 @@ test("DigiFlazz is the only external fulfillment provider", () => {
   assert.match(providerOptions, /code: "digiflazz"/);
   assert.doesNotMatch(providerOptions, /vippayment|VIPPayment/i);
 });
+
+test("DOKU callback replay fallback and customer invoice expiry are deterministic", () => {
+  const status = fs.readFileSync(path.join(root, "app/api/orders/status/route.ts"), "utf8");
+  assert.match(callback, /hashHex\("sha256", rawBody\)/);
+  assert.match(status, /async function expirePendingInvoice/);
+  assert.match(status, /order = await expirePendingInvoice\(order\)/);
+});
+
+test("production DOKU and DigiFlazz calls are guarded in automated tests", () => {
+  const runtime = fs.readFileSync(path.join(root, "lib/server/runtime-env.ts"), "utf8");
+  const digiflazz = fs.readFileSync(path.join(root, "lib/server/providers/digiflazz.ts"), "utf8");
+  assert.match(runtime, /isAutomatedTestRuntime/);
+  assert.match(doku, /DOKU production dinonaktifkan saat automated test/);
+  assert.match(digiflazz, /DigiFlazz production dinonaktifkan saat automated test/);
+});

@@ -39,3 +39,12 @@ export function getPublicBaseUrl() {
     throw new Error("PUBLIC_BASE_URL di Cloudflare bukan URL yang valid.");
   }
 }
+
+
+export function isAutomatedTestRuntime() {
+  const processEnv = (globalThis as RuntimeGlobal & {
+    process?: { env?: Record<string, string | undefined> };
+  }).process?.env;
+  const nodeEnv = processEnv?.NODE_ENV?.trim().toLowerCase();
+  return nodeEnv === "test" || nodeEnv === "testing" || Boolean(processEnv?.VITEST || processEnv?.JEST_WORKER_ID);
+}

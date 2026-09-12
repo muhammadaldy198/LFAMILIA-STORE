@@ -17,7 +17,7 @@ const flashSchema = base.extend({
 }).refine((value) => new Date(value.endsAt) > new Date(value.startsAt), { path: ["endsAt"], message: "Waktu berakhir harus setelah waktu mulai." });
 
 export async function GET(request: Request) {
-  const access = await requireAdminSession(request, "staff");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   const [vouchers, flashSales] = await Promise.all([listDiscountVouchers(true), listFlashSales(true)]);
   return Response.json({ vouchers, flashSales, role: access.role });

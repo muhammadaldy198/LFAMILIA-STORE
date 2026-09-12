@@ -45,7 +45,7 @@ function serialize(row: InputRow) {
 }
 
 export async function GET(request: Request) {
-  const access = await requireAdminSession(request, "staff");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
     const slug = slugSchema.parse(new URL(request.url).searchParams.get("slug"));

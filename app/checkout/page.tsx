@@ -100,18 +100,8 @@ type PromotionQuote = {
 
 type CheckoutPaymentMethod = PaymentMethodCode | "wallet";
 type DisplayPaymentChannel = PaymentChannel & { imageUrl?: string };
-type CheckoutGateway = {
-  code: "doku";
-  label: string;
-  environment: "sandbox" | "production" | null;
-  channels: DisplayPaymentChannel[];
-};
-
-type CheckoutGatewayConfig = {
-  gateway: "doku" | null;
-  environment: "sandbox" | "production" | null;
+type CheckoutPaymentConfig = {
   channels?: DisplayPaymentChannel[];
-  gateways?: CheckoutGateway[];
 };
 const groupIcons = {
   va: Landmark,
@@ -233,7 +223,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const [account, setAccount] = useState<CustomerSession | null>(null);
   const [savedGameAccounts, setSavedGameAccounts] = useState<SavedGameAccount[]>([]);
   const [selectedSavedGameAccountId, setSelectedSavedGameAccountId] = useState("");
-  const [gatewayOptions, setGatewayOptions] = useState<CheckoutGateway[]>([]);
+  const [availablePaymentChannels, setAvailablePaymentChannels] = useState<DisplayPaymentChannel[]>([]);
   const [paymentMethodsLoaded, setPaymentMethodsLoaded] = useState(false);
 
   const selectedPackage = product.packages.find(
@@ -278,7 +268,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       ? (customerInputValues[productInputFields[1].id] ?? "")
       : "";
   const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
-  const eligibleGatewayOptions = gatewayOptions;
+  const eligiblePaymentChannels = availablePaymentChannels;
   const isManual = product.fulfillmentType === "manual";
   const isVoucherStock = selectedPackage?.providerCode === "voucher-stock";
   const providerReady =
@@ -295,20 +285,14 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     paymentMethod === "va" ||
     paymentMethod === "ewallet" ||
     paymentMethod === "qris";
-  const checkoutGatewayCandidates = useMemo(
-    () => eligibleGatewayOptions.filter((gateway) => gateway.channels.length > 0),
-    [eligibleGatewayOptions],
-  );
   const displayChannels = useMemo(() => {
     const unique = new Map<string, DisplayPaymentChannel>();
-    for (const gateway of checkoutGatewayCandidates) {
-      for (const channel of gateway.channels) {
-        const key = `${channel.method}:${channel.channel}`;
-        if (!unique.has(key)) unique.set(key, channel);
-      }
+    for (const channel of eligiblePaymentChannels) {
+      const key = channel.method + ":" + channel.channel;
+      if (!unique.has(key)) unique.set(key, channel);
     }
     return [...unique.values()];
-  }, [checkoutGatewayCandidates]);
+  }, [eligiblePaymentChannels]);
   const gatewayPaymentGroups = useMemo(() => {
     const availableGatewayMethods = new Set(
       displayChannels.map((item) => item.method),
@@ -353,25 +337,14 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     void fetch("/api/payment-methods", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) {
-          setGatewayOptions([]);
+          setAvailablePaymentChannels([]);
           return;
         }
-        const data = (await response.json()) as CheckoutGatewayConfig;
-        const fallbackGateways: CheckoutGateway[] = data.gateway
-          ? [{
-              code: data.gateway,
-              label: "Pembayaran Otomatis",
-              environment: data.environment ?? null,
-              channels: data.channels ?? [],
-            }]
-          : [];
-        const gateways = data.gateways?.length
-          ? data.gateways
-          : fallbackGateways;
-        setGatewayOptions(gateways);
+        const data = (await response.json()) as CheckoutPaymentConfig;
+        setAvailablePaymentChannels(data.channels ?? []);
       })
       .catch(() => {
-        setGatewayOptions([]);
+        setAvailablePaymentChannels([]);
       })
       .finally(() => {
         setPaymentMethodsLoaded(true);

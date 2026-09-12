@@ -85,6 +85,14 @@ function publicEventSource(source: string) {
   return source === "admin" ? "admin" : "system";
 }
 
+async function expirePendingInvoice(order: OrderRecord) {
+  if (order.payment_status !== "pending" || !order.doku_expired_at) return order;
+  const expiresAt = Date.parse(order.doku_expired_at);
+  if (!Number.isFinite(expiresAt) || expiresAt > Date.now()) return order;
+  await applyPaymentStatus(order, "expired");
+  return (await getOrderById(order.id)) ?? order;
+}
+
 async function refreshQrisStatus(order: OrderRecord) {
   if (!shouldQueryQris(order) || !order.doku_reference_no) return order;
   try {
@@ -131,6 +139,7 @@ export async function POST(request: Request) {
     }
 
     order = await refreshQrisStatus(order);
+    order = await expirePendingInvoice(order);
 
     const voucherCode = order.payment_status === "paid"
       ? await getWebsiteVoucherCodeByReference(order.reference_id).catch(() => null)

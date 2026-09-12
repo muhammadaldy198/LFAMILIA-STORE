@@ -44,4 +44,16 @@ test("public customer APIs omit provider metadata and environment", () => {
   assert.doesNotMatch(catalog, /targetTemplate:/);
   assert.doesNotMatch(methods, /environment:/);
   assert.doesNotMatch(methods, /getDokuEnvironment/);
+  assert.doesNotMatch(methods, /gateway:/);
+  assert.doesNotMatch(methods, /doku:/);
+});
+
+test("Staff cannot read provider input templates, toggle packages, promotions, or provider order details", () => {
+  assert.match(read("app/api/admin/product-input/route.ts"), /requireAdminSession\(request, "admin"\)/);
+  assert.match(read("app/api/admin/product-package-status/route.ts"), /requireAdminSession\(request, "admin"\)/);
+  assert.match(read("app/api/admin/promotions/route.ts"), /requireAdminSession\(request, "admin"\)/);
+  const orders = read("app/api/admin/orders/route.ts");
+  assert.match(orders, /if \(role !== "staff"\) return order/);
+  const visible = orders.slice(orders.indexOf("function visibleOrder"), orders.indexOf("export async function GET"));
+  assert.doesNotMatch(visible, /provider_code|provider_status|provider_message|provider_serial_number/);
 });

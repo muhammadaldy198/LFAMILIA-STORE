@@ -132,3 +132,11 @@ test("voucher stock defaults to website delivery when no optional email channel 
   assert.match(source, /VOUCHER_DELIVERY_CHANNEL\?\.trim\(\) \|\| "website"/);
   assert.doesNotMatch(source, /requireRuntimeValue\(runtime\(\)\.VOUCHER_DELIVERY_CHANNEL/);
 });
+
+test("voucher email delivery is atomically claimed before an external send", () => {
+  const source = fs.readFileSync(path.join(projectRoot, "lib/server/vouchers.ts"), "utf8");
+  assert.match(source, /status = 'sending'/);
+  assert.match(source, /WHERE voucher_deliveries\.status IN \('failed', 'pending'\)/);
+  assert.match(source, /RETURNING id/);
+  assert.match(source, /idempotency-key/);
+});

@@ -1,3 +1,4 @@
+import { hashHex } from "@/lib/server/crypto";
 import {
   parseDokuNotification,
   validateDokuNotification,
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
     const status = notification.status;
     const callbackAmount = notification.amount;
     const originalRequestId = notification.originalRequestId;
-    const eventId = request.headers.get("x-external-id") || request.headers.get("request-id") || crypto.randomUUID();
+    const eventId = request.headers.get("x-external-id") || request.headers.get("request-id") || "body-" + hashHex("sha256", rawBody);
 
     const walletTopup = await getDokuWalletTopup(referenceId);
     if (walletTopup) {
