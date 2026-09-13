@@ -196,6 +196,16 @@ function object(value: unknown) {
     : {};
 }
 
+function records(value: unknown) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => object(item))
+      .filter((item) => Object.keys(item).length > 0);
+  }
+  const single = object(value);
+  return Object.keys(single).length > 0 ? [single] : [];
+}
+
 function numericAmount(value: unknown) {
   if (typeof value === "number") return value;
   if (typeof value === "string") return Number(value);
@@ -225,11 +235,55 @@ function parseVaChannel(config: StatusConfig, channel: string) {
   return { partnerServiceId, customerNo };
 }
 
+function vaReference(record: Record<string, unknown>) {
+  const additionalInfo = object(record.additionalInfo);
+  return String(
+    record.trxId ??
+    record.partnerReferenceNo ??
+    additionalInfo.trxId ??
+    additionalInfo.partnerReferenceNo ??
+    "",
+  ).trim();
+}
+
+export function parseDokuVaStatusPayload(
+  payload: Record<string, unknown>,
+  referenceId: string,
+) {
+  let candidates = records(payload.virtualAccountData);
+  if (candidates.length > 1) {
+    const referenceMatches = candidates.filter(
+      (candidate) => vaReference(candidate) === referenceId,
+    );
+    if (referenceMatches.length !== 1) {
+      return { status: "pending" as const, amount: 0 };
+    }
+    candidates = referenceMatches;
+  }
+
+  const data = candidates[0] ?? {};
+  const reason = object(data.paymentFlagReason);
+  const paidAmount = numericAmount(data.paidAmount);
+  let status = statusFromCode(
+    data.paymentFlagStatus ?? object(data.additionalInfo).latestTransactionStatus,
+  );
+  if (
+    status === "pending" &&
+    String(reason.english ?? "").trim().toUpperCase() === "SUCCESS" &&
+    Number.isFinite(paidAmount) &&
+    paidAmount > 0
+  ) {
+    status = "paid";
+  }
+  return { status, amount: paidAmount };
+}
+
 /** Official SNAP Check Status API: POST /orders/v1.0/transfer-va/status. */
 export async function queryDokuVaStatus(input: {
   environment: DokuEnvironment;
   channel: string;
   paymentNo: string;
+  referenceId: string;
 }) : Promise<DokuStatusResult> {
   const config = configFor(input.environment);
   const va = parseVaChannel(config, input.channel);
@@ -242,18 +296,8 @@ export async function queryDokuVaStatus(input: {
       virtualAccountNo: input.paymentNo,
     },
   );
-  const data = object(payload.virtualAccountData);
-  const reason = object(data.paymentFlagReason);
-  const paidAmount = numericAmount(data.paidAmount);
-  let status = statusFromCode(data.paymentFlagStatus ?? object(data.additionalInfo).latestTransactionStatus);
-  if (
-    status === "pending" &&
-    String(reason.english ?? "").trim().toUpperCase() === "SUCCESS" &&
-    Number.isFinite(paidAmount) && paidAmount > 0
-  ) {
-    status = "paid";
-  }
-  return { requestId, status, amount: paidAmount, raw: payload };
+  const parsed = parseDokuVaStatusPayload(payload, input.referenceId);
+  return { requestId, status: parsed.status, amount: parsed.amount, raw: payload };
 }
 
 /** Official SNAP E-Wallet Check Status API: POST /orders/v1.0/debit/status, serviceCode 55. */
