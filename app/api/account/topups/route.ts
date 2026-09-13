@@ -116,6 +116,7 @@ export async function POST(request: Request) {
   }
 
   let referenceId: string | null = null;
+  let idempotencyKey = "";
   try {
     if (!request.headers.get("content-type")?.includes("application/json")) {
       throw new Error("Top up saldo hanya tersedia melalui pembayaran otomatis.");
@@ -149,7 +150,7 @@ export async function POST(request: Request) {
 
     const paymentMethodKey = `${input.paymentMethod}:${paymentChannel}`;
     const headerKey = request.headers.get("idempotency-key")?.trim() || "";
-    const idempotencyKey = input.idempotencyKey || (/^[0-9a-f-]{36}$/i.test(headerKey) ? headerKey : "");
+    idempotencyKey = input.idempotencyKey || (/^[0-9a-f-]{36}$/i.test(headerKey) ? headerKey : "");
     if (idempotencyKey) {
       const existing = await findTopupByKey(customer.id, idempotencyKey);
       if (existing) {
@@ -246,6 +247,11 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    if (idempotencyKey && error instanceof Error && /UNIQUE constraint failed/i.test(error.message)) {
+      const winner = await findTopupByKey(customer.id, idempotencyKey).catch(() => null);
+      if (winner) return existingResponse(winner);
+    }
+
     const message =
       error instanceof z.ZodError
         ? error.issues[0]?.message || "Data top up tidak valid."
