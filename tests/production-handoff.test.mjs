@@ -11,7 +11,7 @@ const migrationName = "0029_final_source_audit_remediation.sql";
 
 test("runtime records healed 0029 only through an existing Wrangler migration ledger", () => {
   assert.match(repair, new RegExp(migrationName.replaceAll(".", "\\.")));
-  assert.match(repair, /PRAGMA table_info\(d1_migrations\)/);
+  assert.match(repair, /tableColumns\("d1_migrations"\)/);
   assert.match(repair, /INSERT OR IGNORE INTO d1_migrations \(name\) VALUES \(\?\)/);
   assert.match(repair, /schemaObjects\.results\.length !== 8/);
   assert.match(repair, /unsupportedRequiredColumn/);
