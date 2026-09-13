@@ -1,6 +1,34 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { registerHooks } from "node:module";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
-import { parseDokuVaStatusPayload } from "../lib/server/doku-status.ts";
+
+const root = process.cwd();
+
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier.startsWith("@/")) {
+      const relative = specifier.slice(2);
+      const candidates = [
+        `${relative}.ts`,
+        `${relative}.tsx`,
+        path.join(relative, "index.ts"),
+        path.join(relative, "index.tsx"),
+      ];
+      for (const candidate of candidates) {
+        const absolute = path.join(root, candidate);
+        if (fs.existsSync(absolute)) {
+          return { url: pathToFileURL(absolute).href, shortCircuit: true };
+        }
+      }
+    }
+    return nextResolve(specifier, context);
+  },
+});
+
+const { parseDokuVaStatusPayload } = await import("../lib/server/doku-status.ts");
 
 test("single DOKU VA status payload maps paid amount normally", () => {
   const result = parseDokuVaStatusPayload({
