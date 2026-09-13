@@ -17,7 +17,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: "24"
-      - name: Read-only production audit
+      - name: Read-only Cloudflare preview audit
         env:
-          PRODUCTION_BASE_URL: https://lfamiliastore.my.id
+          PRODUCTION_BASE_URL: https://3c983103-lfamilia-store.muhammadaldy198.workers.dev
         run: node scripts/live-public-audit.mjs
