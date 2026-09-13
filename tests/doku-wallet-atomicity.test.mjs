@@ -19,7 +19,14 @@ test("DOKU wallet credit is derived from committed D1 writes", () => {
   assert.match(section, /const results = await db\.batch\(\[/);
   assert.match(section, /results\[0\]\?\.meta\.changes/);
   assert.match(section, /results\[1\]\?\.meta\.changes/);
-  assert.match(section, /credited: inserted && approved/);
+  assert.match(section, /if \(inserted && approved\)/);
+  assert.match(section, /EXISTS \(SELECT 1 FROM wallet_transactions WHERE reference = \?\)/);
+});
+
+test("late DOKU wallet paid status cannot credit an expired topup", () => {
+  assert.match(section, /t\.doku_expired_at IS NULL OR datetime\(t\.doku_expired_at\) > datetime\('now'\)/);
+  assert.match(section, /datetime\(doku_expired_at\) <= datetime\('now'\)/);
+  assert.match(section, /ignored: "expired"/);
 });
 
 test("wallet ledger keeps a unique reference for callback idempotency", () => {
