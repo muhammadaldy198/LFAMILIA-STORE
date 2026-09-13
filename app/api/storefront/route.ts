@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import { neutralizePublicCopy } from "@/lib/public-copy";
 import { readCategories, readFaqs, readStorefrontSettings } from "@/lib/server/storefront";
 
 export const dynamic = "force-dynamic";
@@ -15,14 +16,35 @@ async function readPublicFaqs() {
       .all<{ id: number; question: string; answer: string; is_active: number; sort_order: number }>();
     return result.results.map((row) => ({
       id: row.id,
-      question: row.question,
-      answer: row.answer,
+      question: neutralizePublicCopy(row.question),
+      answer: neutralizePublicCopy(row.answer),
       isActive: Boolean(row.is_active),
       sortOrder: row.sort_order,
     }));
   } catch {
-    return readFaqs(false);
+    const faqs = await readFaqs(false);
+    return faqs.map((row) => ({
+      ...row,
+      question: neutralizePublicCopy(row.question),
+      answer: neutralizePublicCopy(row.answer),
+    }));
   }
+}
+
+function neutralizeStorefrontSettings<T extends Awaited<ReturnType<typeof readStorefrontSettings>>>(settings: T): T {
+  return {
+    ...settings,
+    storeName: neutralizePublicCopy(settings.storeName),
+    storeShortName: neutralizePublicCopy(settings.storeShortName),
+    tagline: neutralizePublicCopy(settings.tagline),
+    announcement: settings.announcement ? neutralizePublicCopy(settings.announcement) : settings.announcement,
+    bannerEyebrow: neutralizePublicCopy(settings.bannerEyebrow),
+    bannerTitle: neutralizePublicCopy(settings.bannerTitle),
+    bannerHighlight: neutralizePublicCopy(settings.bannerHighlight),
+    bannerDescription: neutralizePublicCopy(settings.bannerDescription),
+    bannerCtaLabel: neutralizePublicCopy(settings.bannerCtaLabel),
+    supportHours: neutralizePublicCopy(settings.supportHours),
+  };
 }
 
 export async function GET() {
@@ -32,7 +54,7 @@ export async function GET() {
     readPublicFaqs(),
   ]);
   return Response.json(
-    { settings, categories, faqs },
+    { settings: neutralizeStorefrontSettings(settings), categories, faqs },
     { headers: { "Cache-Control": "public, max-age=60" } },
   );
 }
