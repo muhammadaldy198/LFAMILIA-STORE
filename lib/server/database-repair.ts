@@ -3,6 +3,16 @@ import { getD1 } from "@/db";
 let repairPromise: Promise<void> | null = null;
 
 const FINAL_AUDIT_MIGRATION = "0029_final_source_audit_remediation.sql";
+const FINAL_SCHEMA_OBJECTS = [
+  "promotion_reservations",
+  "promotion_reservations_expiry_idx",
+  "wallet_topups_external_checkout_key_unique",
+  "promotion_reservation_voucher_guard",
+  "promotion_reservation_flash_guard",
+  "promotion_reservation_insert",
+  "promotion_reservation_consumed",
+  "promotion_reservation_released",
+] as const;
 
 const columns: Array<[table: string, column: string, definition: string]> = [
   ["products", "image_url", "image_url TEXT"],
@@ -113,11 +123,72 @@ type TableInfo = {
   pk?: number;
 };
 
+function resultRows(result: { results?: unknown[] }) {
+  return Array.isArray(result.results) ? result.results as Array<Record<string, unknown>> : [];
+}
+
+async function runtimeRepairAlreadyComplete(db: D1Database) {
+  try {
+    // One D1 batch keeps the normal, already-migrated request path to a single
+    // round-trip instead of repeating dozens of PRAGMA/DDL/backfill calls on
+    // every fresh Worker isolate.
+    const [ledger, products, packages, settings, orders, topups, vouchers, flash, objects] =
+      await db.batch([
+        db.prepare("SELECT name FROM d1_migrations WHERE name = ? LIMIT 1").bind(FINAL_AUDIT_MIGRATION),
+        db.prepare("PRAGMA table_info(products)"),
+        db.prepare("PRAGMA table_info(product_packages)"),
+        db.prepare("PRAGMA table_info(store_settings)"),
+        db.prepare("PRAGMA table_info(orders)"),
+        db.prepare("PRAGMA table_info(wallet_topups)"),
+        db.prepare("PRAGMA table_info(discount_vouchers)"),
+        db.prepare("PRAGMA table_info(flash_sales)"),
+        db.prepare(`SELECT name FROM sqlite_master WHERE name IN (
+          'promotion_reservations',
+          'promotion_reservations_expiry_idx',
+          'wallet_topups_external_checkout_key_unique',
+          'promotion_reservation_voucher_guard',
+          'promotion_reservation_flash_guard',
+          'promotion_reservation_insert',
+          'promotion_reservation_consumed',
+          'promotion_reservation_released'
+        )`),
+      ]);
+
+    if (!resultRows(ledger).some((row) => row.name === FINAL_AUDIT_MIGRATION)) return false;
+
+    const names = (result: { results?: unknown[] }) =>
+      new Set(resultRows(result).map((row) => String(row.name ?? "")));
+    const productColumns = names(products);
+    const packageColumns = names(packages);
+    const settingColumns = names(settings);
+    const orderColumns = names(orders);
+    const topupColumns = names(topups);
+    const voucherColumns = names(vouchers);
+    const flashColumns = names(flash);
+
+    if (!productColumns.has("package_tabs_enabled") || !productColumns.has("package_tabs_json")) return false;
+    if (!packageColumns.has("package_group")) return false;
+    if (!settingColumns.has("support_widget_enabled")) return false;
+    if (!["delivery_mode", "supplier_cost_snapshot", "doku_environment"].every((column) => orderColumns.has(column))) return false;
+    if (!["doku_environment", "external_checkout_key"].every((column) => topupColumns.has(column))) return false;
+    if (!voucherColumns.has("reserved_count") || !flashColumns.has("reserved_count")) return false;
+
+    const schemaObjects = new Set(resultRows(objects).map((row) => String(row.name ?? "")));
+    return FINAL_SCHEMA_OBJECTS.every((name) => schemaObjects.has(name));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/no such table|no such column/i.test(message)) return false;
+    throw error;
+  }
+}
+
 /** Repairs columns from old, partially-applied D1 migrations without dropping any data. */
 export async function ensureLegacyDatabaseColumns() {
   if (!repairPromise) {
     repairPromise = (async () => {
       const db = getD1();
+
+      if (await runtimeRepairAlreadyComplete(db)) return;
 
       const messageOf = (error: unknown) =>
         error instanceof Error ? error.message : String(error);
