@@ -4,6 +4,8 @@ import { readCategories, readFaqs, readStorefrontSettings } from "@/lib/server/s
 
 export const dynamic = "force-dynamic";
 
+type PublicStorefrontSettings = Awaited<ReturnType<typeof readStorefrontSettings>>;
+
 async function readPublicFaqs() {
   try {
     const result = await getD1()
@@ -31,7 +33,7 @@ async function readPublicFaqs() {
   }
 }
 
-function neutralizeStorefrontSettings<T extends Awaited<ReturnType<typeof readStorefrontSettings>>>(settings: T): T {
+function neutralizeStorefrontSettings(settings: PublicStorefrontSettings): PublicStorefrontSettings {
   return {
     ...settings,
     storeName: neutralizePublicCopy(settings.storeName),
