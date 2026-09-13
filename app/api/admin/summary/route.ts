@@ -61,7 +61,7 @@ export async function GET(request: Request) {
           COUNT(*) AS total_orders,
           COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN o.total ELSE 0 END), 0) AS paid_revenue,
           COALESCE(SUM(CASE WHEN o.payment_status = 'paid'
-            THEN MAX(o.total - COALESCE(pp.supplier_price, 0), 0) ELSE 0 END), 0) AS profit,
+            THEN MAX(o.total - COALESCE(o.supplier_cost_snapshot, 0), 0) ELSE 0 END), 0) AS profit,
           COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN o.discount_amount ELSE 0 END), 0) AS total_discount,
           COALESCE(SUM(CASE WHEN o.fulfillment_status = 'success' THEN 1 ELSE 0 END), 0) AS fulfilled_orders,
           COALESCE(SUM(CASE WHEN o.payment_status = 'pending' THEN 1 ELSE 0 END), 0) AS pending_payments,
@@ -69,7 +69,6 @@ export async function GET(request: Request) {
             AND o.fulfillment_status NOT IN ('success', 'failed', 'cancelled') THEN 1 ELSE 0 END), 0) AS pending_fulfillments,
           COALESCE(SUM(CASE WHEN o.payment_status = 'failed' OR o.fulfillment_status = 'failed' THEN 1 ELSE 0 END), 0) AS failed_orders
         FROM orders o
-        LEFT JOIN product_packages pp ON pp.sku = o.package_sku
         WHERE ${orderPeriod}`,
       ),
       db.prepare(
@@ -77,11 +76,10 @@ export async function GET(request: Request) {
           COUNT(*) AS total_orders,
           COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN o.total ELSE 0 END), 0) AS paid_revenue,
           COALESCE(SUM(CASE WHEN o.payment_status = 'paid'
-            THEN MAX(o.total - COALESCE(pp.supplier_price, 0), 0) ELSE 0 END), 0) AS profit,
+            THEN MAX(o.total - COALESCE(o.supplier_cost_snapshot, 0), 0) ELSE 0 END), 0) AS profit,
           COALESCE(SUM(CASE WHEN o.payment_status = 'pending' THEN 1 ELSE 0 END), 0) AS pending_payments,
           COALESCE(SUM(CASE WHEN o.payment_status = 'failed' OR o.fulfillment_status = 'failed' THEN 1 ELSE 0 END), 0) AS failed_orders
         FROM orders o
-        LEFT JOIN product_packages pp ON pp.sku = o.package_sku
         WHERE date(o.created_at) = date('now')`,
       ),
       db.prepare("SELECT COUNT(*) AS count FROM products WHERE is_active = 1"),
@@ -99,10 +97,9 @@ export async function GET(request: Request) {
           COUNT(o.id) AS orders,
           COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN o.total ELSE 0 END), 0) AS revenue,
           COALESCE(SUM(CASE WHEN o.payment_status = 'paid'
-            THEN MAX(o.total - COALESCE(pp.supplier_price, 0), 0) ELSE 0 END), 0) AS profit
+            THEN MAX(o.total - COALESCE(o.supplier_cost_snapshot, 0), 0) ELSE 0 END), 0) AS profit
         FROM dates
         LEFT JOIN orders o ON date(o.created_at) = dates.day
-        LEFT JOIN product_packages pp ON pp.sku = o.package_sku
         GROUP BY dates.day
         ORDER BY dates.day ASC`,
       ),
@@ -114,9 +111,8 @@ export async function GET(request: Request) {
           COALESCE(SUM(CASE WHEN o.fulfillment_status = 'success' THEN 1 ELSE 0 END), 0) AS fulfilled_orders,
           COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN o.total ELSE 0 END), 0) AS revenue,
           COALESCE(SUM(CASE WHEN o.payment_status = 'paid'
-            THEN MAX(o.total - COALESCE(pp.supplier_price, 0), 0) ELSE 0 END), 0) AS profit
+            THEN MAX(o.total - COALESCE(o.supplier_cost_snapshot, 0), 0) ELSE 0 END), 0) AS profit
         FROM orders o
-        LEFT JOIN product_packages pp ON pp.sku = o.package_sku
         WHERE ${orderPeriod}
         GROUP BY o.product_slug, o.product_name
         ORDER BY fulfilled_orders DESC, total_orders DESC, revenue DESC
@@ -357,7 +353,7 @@ export async function GET(request: Request) {
             reason: canViewFinance ? doku.reason : null,
           },
           digiflazz: {
-            ready: digiflazz.ready,
+            ready: access.role === "staff" ? false : digiflazz.ready,
             environment: canViewFinance ? digiflazz.environment : null,
             reason: canViewFinance ? digiflazz.reason : null,
             balance: digiflazzBalance,
@@ -372,8 +368,8 @@ export async function GET(request: Request) {
             baseUrl: canViewFinance ? publicBaseUrl || null : null,
           },
         },
-        attention,
-        recentActivities,
+        attention: access.role === "staff" ? { pendingPayments: 0, pendingFulfillments: 0, failedOrders: 0, lowStock: 0, sellerOff: 0, outOfStock: 0, priceChanged: 0 } : attention,
+        recentActivities: access.role === "staff" ? [] : recentActivities,
         recentOrders: common[9].results.map((row) => {
           const item = row as {
             id?: string;

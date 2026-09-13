@@ -45,8 +45,8 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   </button>;
 }
 
-export function Status({ children, tone = "green" }: { children: ReactNode; tone?: "green" | "amber" | "red" | "blue" | "gray" }) {
-  const colors = { green: "bg-emerald-50 text-emerald-600", amber: "bg-amber-50 text-amber-600", red: "bg-rose-50 text-rose-600", blue: "bg-blue-50 text-blue-600", gray: "bg-slate-100 text-slate-500" };
+export function Status({ children, tone = "green" }: { children: ReactNode; tone?: "green" | "amber" | "red" | "blue" | "gray" | "violet" }) {
+  const colors = { green: "bg-emerald-50 text-emerald-600", amber: "bg-amber-50 text-amber-600", red: "bg-rose-50 text-rose-600", blue: "bg-blue-50 text-blue-600", gray: "bg-slate-100 text-slate-500", violet: "bg-violet-50 text-violet-600" };
   return <span className={`inline-flex rounded px-2 py-1 text-[8px] font-extrabold ${colors[tone]}`}>{children}</span>;
 }
 

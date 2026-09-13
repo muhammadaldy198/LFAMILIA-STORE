@@ -6,6 +6,7 @@ import type { ProviderResult } from "@/lib/server/providers/types";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 import {
   consumeOrderPromotion,
+  releaseExternalPromotion,
   type PromotionQuote,
 } from "@/lib/server/promotions";
 
@@ -22,6 +23,11 @@ export type PurchasableItem = {
   price: number;
   providerCode: string | null;
   providerSku: string | null;
+  packageId: number;
+  supplierCost: number | null;
+  manualOpenTime: string | null;
+  manualCloseTime: string | null;
+  manualTimezone: string | null;
 };
 
 export class CheckoutValidationError extends Error {}
@@ -39,6 +45,9 @@ export type OrderRecord = {
   provider_code: string | null;
   provider_sku: string | null;
   fulfillment_type: "automatic" | "manual";
+  delivery_mode: "direct" | "voucher" | "manual" | null;
+  supplier_cost_snapshot: number | null;
+  doku_environment: "sandbox" | "production" | null;
   target_template: string;
   destination: string;
   server: string | null;
@@ -87,6 +96,11 @@ type StoredItemRow = {
   input_placeholder: string;
   input_fields_json: string | null;
   manual_instructions: string | null;
+  manual_open_time: string | null;
+  manual_close_time: string | null;
+  manual_timezone: string | null;
+  package_id: number;
+  supplier_price: number | null;
   package_sku: string;
   package_label: string;
   price: number;
@@ -160,8 +174,8 @@ export async function resolvePurchasableItem(
   const row = await db
     .prepare(
       `SELECT p.slug AS product_slug, p.name AS product_name, p.needs_server,
-      p.fulfillment_type, p.target_template, p.input_label, p.input_placeholder, p.input_fields_json, p.manual_instructions,
-      pp.sku AS package_sku, pp.label AS package_label, pp.price, pp.provider_code, pp.provider_sku
+      p.fulfillment_type, p.target_template, p.input_label, p.input_placeholder, p.input_fields_json, p.manual_instructions, p.manual_open_time, p.manual_close_time, p.manual_timezone,
+      pp.id AS package_id, pp.sku AS package_sku, pp.label AS package_label, pp.price, pp.provider_code, pp.provider_sku, pp.supplier_price
      FROM products p
      JOIN product_packages pp ON pp.product_id = p.id
      WHERE p.slug = ? AND pp.sku = ? AND p.is_active = 1 AND pp.is_active = 1
@@ -183,6 +197,11 @@ export async function resolvePurchasableItem(
       price: row.price,
       providerCode: row.provider_code,
       providerSku: row.provider_sku,
+      packageId: row.package_id,
+      supplierCost: row.supplier_price,
+      manualOpenTime: row.manual_open_time,
+      manualCloseTime: row.manual_close_time,
+      manualTimezone: row.manual_timezone,
     };
   }
 
@@ -217,6 +236,17 @@ export function renderCustomerNo(
   return value;
 }
 
+function assertManualServiceOpen(item: PurchasableItem) {
+  if (item.fulfillmentType !== "manual" || !item.manualOpenTime || !item.manualCloseTime) return;
+  const zone = item.manualTimezone || "Asia/Jakarta";
+  const time = new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+  const [hour, minute] = time.split(":").map(Number); const current = hour * 60 + minute;
+  const parse = (value: string) => { const [h, m] = value.split(":").map(Number); return h * 60 + m; };
+  const open = parse(item.manualOpenTime), close = parse(item.manualCloseTime);
+  const openNow = open === close || (open < close ? current >= open && current < close : current >= open || current < close);
+  if (!openNow) throw new CheckoutValidationError("Layanan manual sedang di luar jam operasional.");
+}
+
 export function createOrderIdentity() {
   const id = crypto.randomUUID();
   const date = new Date().toISOString().slice(2, 10).replaceAll("-", "");
@@ -225,6 +255,22 @@ export function createOrderIdentity() {
     id,
     referenceId: `LF${date}${referenceToken}`,
   };
+}
+
+async function assertAutomaticAvailability(item: PurchasableItem) {
+  if (item.fulfillmentType !== "automatic" || item.providerCode !== "digiflazz") return;
+  try {
+    const monitor = await getD1().prepare(`SELECT buyer_product_status, seller_product_status, unlimited_stock, stock, start_cut_off, end_cut_off FROM digiflazz_seller_monitor WHERE package_id = ? LIMIT 1`).bind(item.packageId).first<{ buyer_product_status: number; seller_product_status: number; unlimited_stock: number; stock: number; start_cut_off: string | null; end_cut_off: string | null }>();
+    if (!monitor) return;
+    const now = new Date(); const minutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+    const parse = (value: string | null) => { if (!value || !/^\d{2}:\d{2}$/.test(value)) return null; const [h, m] = value.split(":").map(Number); return h * 60 + m; };
+    const start = parse(monitor.start_cut_off), end = parse(monitor.end_cut_off);
+    const cutoff = start !== null && end !== null && (start === end || (start < end ? minutes >= start && minutes < end : minutes >= start || minutes < end));
+    if (!monitor.buyer_product_status || !monitor.seller_product_status || (!monitor.unlimited_stock && Number(monitor.stock) <= 0) || cutoff) throw new CheckoutValidationError("Nominal otomatis sedang tidak tersedia.");
+  } catch (error) {
+    if (error instanceof CheckoutValidationError) throw error;
+    // Monitor is optional operational data; an unavailable monitor must not alter Admin package state.
+  }
 }
 
 export async function insertPendingOrder(input: {
@@ -247,6 +293,7 @@ export async function insertPendingOrder(input: {
   promotion: PromotionQuote;
 }) {
   const db = getD1();
+  await assertAutomaticAvailability(input.item);
   if (input.item.fulfillmentType === "automatic") {
     if (!input.item.providerCode || !input.item.providerSku)
       throw new CheckoutValidationError(
@@ -257,6 +304,7 @@ export async function insertPendingOrder(input: {
         "Sistem pemrosesan otomatis belum tersedia.",
       );
   }
+  assertManualServiceOpen(input.item);
   const customerNo = renderCustomerNo(
     input.item.targetTemplate,
     input.destination,
@@ -267,11 +315,11 @@ export async function insertPendingOrder(input: {
     .prepare(
       `INSERT INTO orders (
       id, customer_id, wallet_checkout_key, external_checkout_key, reference_id, product_slug, product_name, package_sku, package_label,
-      provider_code, provider_sku, fulfillment_type, target_template, destination, server,
+      provider_code, provider_sku, fulfillment_type, delivery_mode, supplier_cost_snapshot, target_template, destination, server,
       nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json,
       base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
       admin_fee, total, payment_method, payment_channel
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
     )
     .bind(
       input.id,
@@ -286,6 +334,8 @@ export async function insertPendingOrder(input: {
       input.item.providerCode,
       input.item.providerSku,
       input.item.fulfillmentType,
+      input.item.fulfillmentType === "manual" ? "manual" : input.item.providerCode === "voucher-stock" ? "voucher" : "direct",
+      input.item.supplierCost,
       input.item.targetTemplate,
       input.destination,
       input.server,
@@ -357,6 +407,7 @@ export async function updateDokuPayment(input: {
   paymentUrl: string | null;
   expiredAt: string | null;
   total: number;
+  environment?: "sandbox" | "production" | null;
 }) {
   await ensureLegacyDatabaseColumns();
   await getD1()
@@ -370,6 +421,7 @@ export async function updateDokuPayment(input: {
        doku_payment_name = ?,
        doku_payment_url = ?,
        doku_expired_at = ?,
+       doku_environment = ?,
        doku_status_checked_at = NULL,
        admin_fee = 0,
        total = ?,
@@ -384,6 +436,7 @@ export async function updateDokuPayment(input: {
       input.paymentName,
       input.paymentUrl,
       input.expiredAt,
+      input.environment ?? null,
       input.total,
       input.referenceId,
     )
@@ -457,7 +510,7 @@ export async function applyPaymentStatus(
       .run();
     const changed = Number(result.meta.changes ?? 0) > 0;
     if (changed)
-      await consumeOrderPromotion(order.voucher_code, order.flash_sale_id);
+      await consumeOrderPromotion(order.voucher_code, order.flash_sale_id, order.id);
     return changed;
   }
   await db
@@ -467,6 +520,7 @@ export async function applyPaymentStatus(
     )
     .bind(status, order.id)
     .run();
+  if (status === "expired" || status === "failed") await releaseExternalPromotion(order.id);
   return false;
 }
 

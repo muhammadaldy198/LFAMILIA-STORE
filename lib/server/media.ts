@@ -2,6 +2,8 @@ import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 const MAX_MEDIA_BYTES = 6 * 1024 * 1024;
 const MAX_D1_MEDIA_BYTES = 1_800_000;
+const ORPHAN_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+const MEDIA_KEY = /^media-[0-9a-f-]{36}\.(?:jpg|png|webp|gif)$/;
 const mediaTypes: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -15,15 +17,20 @@ type StoredMedia = {
   writeHttpMetadata(headers: Headers): void;
 };
 
+type BucketObject = { key: string; uploaded?: Date | string };
+type BucketList = { objects: BucketObject[]; truncated: boolean; cursor?: string };
 type MediaBucket = {
   put(key: string, value: ArrayBuffer, options: { httpMetadata: { contentType: string; cacheControl: string }; customMetadata: { originalName: string } }): Promise<unknown>;
   get(key: string): Promise<StoredMedia | null>;
+  list?(options?: { prefix?: string; cursor?: string; limit?: number }): Promise<BucketList>;
+  delete?(keys: string | string[]): Promise<unknown>;
 };
 
 type MediaStatement = {
   bind(...values: Array<string | number | ArrayBuffer | null>): MediaStatement;
-  run(): Promise<unknown>;
+  run(): Promise<{ meta?: { changes?: number } }>;
   first<T>(): Promise<T | null>;
+  all<T>(): Promise<{ results: T[] }>;
 };
 
 type MediaDatabase = {
@@ -56,6 +63,40 @@ function hasExpectedSignature(bytes: Uint8Array, type: string) {
   if (type === "image/gif") return String.fromCharCode(...bytes.slice(0, 6)) === "GIF87a" || String.fromCharCode(...bytes.slice(0, 6)) === "GIF89a";
   if (type === "image/webp") return String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
   return false;
+}
+
+function mediaKeyFromValue(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (MEDIA_KEY.test(trimmed)) return trimmed;
+  const match = trimmed.match(/\/api\/media\/(media-[0-9a-f-]{36}\.(?:jpg|png|webp|gif))(?:[?#].*)?$/i);
+  return match?.[1] ?? null;
+}
+
+async function collectReferencedMediaKeys(database: MediaDatabase) {
+  const referenced = new Set<string>();
+  const queries = [
+    "SELECT image_url AS a, banner_url AS b FROM products",
+    "SELECT image_url AS a, NULL AS b FROM product_packages",
+    "SELECT image_url AS a, NULL AS b FROM home_banners",
+    "SELECT cover_url AS a, NULL AS b FROM news_articles",
+    "SELECT logo_url AS a, banner_image_url AS b FROM store_settings",
+    "SELECT proof_url AS a, NULL AS b FROM wallet_topups",
+  ];
+  for (const query of queries) {
+    try {
+      const rows = await database.prepare(query).all<{ a: string | null; b: string | null }>();
+      for (const row of rows.results) {
+        const first = mediaKeyFromValue(row.a);
+        const second = mediaKeyFromValue(row.b);
+        if (first) referenced.add(first);
+        if (second) referenced.add(second);
+      }
+    } catch {
+      // Older databases can legitimately miss optional tables/columns.
+    }
+  }
+  return referenced;
 }
 
 export async function uploadStoreMedia(file: File) {
@@ -91,7 +132,7 @@ export async function uploadStoreMedia(file: File) {
 }
 
 export async function readStoreMedia(key: string) {
-  if (!/^media-[0-9a-f-]{36}\.(?:jpg|png|webp|gif)$/.test(key)) return null;
+  if (!MEDIA_KEY.test(key)) return null;
   const { BUCKET: bucket, DB: database } = getMediaBindings();
   const bucketObject = bucket ? await bucket.get(key) : null;
   if (bucketObject) return bucketObject;
@@ -112,4 +153,52 @@ export async function readStoreMedia(key: string) {
       headers.set("Content-Type", row.content_type);
     },
   } satisfies StoredMedia;
+}
+
+export async function cleanupOrphanStoreMedia(now = Date.now()) {
+  const { BUCKET: bucket, DB: database } = getMediaBindings();
+  if (!database) return { scanned: 0, deleted: 0 };
+  const referenced = await collectReferencedMediaKeys(database);
+  const cutoff = now - ORPHAN_GRACE_MS;
+  let scanned = 0;
+  let deleted = 0;
+
+  if (bucket?.list && bucket.delete) {
+    let cursor: string | undefined;
+    for (let page = 0; page < 5; page += 1) {
+      const result = await bucket.list({ prefix: "media-", cursor, limit: 100 });
+      const stale: string[] = [];
+      for (const object of result.objects) {
+        scanned += 1;
+        if (!MEDIA_KEY.test(object.key) || referenced.has(object.key)) continue;
+        const uploadedAt = object.uploaded ? new Date(object.uploaded).getTime() : NaN;
+        if (!Number.isFinite(uploadedAt) || uploadedAt > cutoff) continue;
+        stale.push(object.key);
+      }
+      if (stale.length) {
+        await bucket.delete(stale);
+        deleted += stale.length;
+      }
+      if (!result.truncated || !result.cursor) break;
+      cursor = result.cursor;
+    }
+  }
+
+  try {
+    await ensureMediaTable(database);
+    const rows = await database.prepare("SELECT media_key, created_at FROM media_assets WHERE datetime(created_at) <= datetime('now', '-7 days') LIMIT 500")
+      .all<{ media_key: string; created_at: string }>();
+    for (const row of rows.results) {
+      scanned += 1;
+      if (!MEDIA_KEY.test(row.media_key) || referenced.has(row.media_key)) continue;
+      const result = await database.prepare("DELETE FROM media_assets WHERE media_key = ? AND datetime(created_at) <= datetime('now', '-7 days')")
+        .bind(row.media_key)
+        .run();
+      deleted += Number(result.meta?.changes ?? 0);
+    }
+  } catch {
+    // R2 is primary storage; D1 fallback cleanup is best-effort.
+  }
+
+  return { scanned, deleted };
 }

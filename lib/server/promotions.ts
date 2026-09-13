@@ -39,13 +39,13 @@ export type FlashSale = {
 type VoucherRow = {
   id: number; code: string; name: string; description: string; discount_type: "fixed" | "percentage";
   discount_value: number; min_purchase: number; max_discount: number | null; usage_limit: number | null;
-  used_count: number; starts_at: string; ends_at: string; is_active: number;
+  used_count: number; reserved_count: number; starts_at: string; ends_at: string; is_active: number;
 };
 
 type FlashRow = {
   id: number; product_slug: string; product_name: string; package_sku: string; package_label: string;
   image_url: string | null; accent: string; initials: string; base_price: number; sale_price: number;
-  badge: string; starts_at: string; ends_at: string; stock_limit: number | null; sold_count: number; is_active: number;
+  badge: string; starts_at: string; ends_at: string; stock_limit: number | null; sold_count: number; reserved_count: number; is_active: number;
 };
 
 function voucherFromRow(row: VoucherRow): DiscountVoucher {
@@ -69,7 +69,7 @@ function flashFromRow(row: FlashRow): FlashSale {
 
 export async function listDiscountVouchers(includeInactive = false) {
   const now = new Date().toISOString();
-  const where = includeInactive ? "" : "WHERE is_active = 1 AND starts_at <= ? AND ends_at >= ? AND (usage_limit IS NULL OR used_count < usage_limit)";
+  const where = includeInactive ? "" : "WHERE is_active = 1 AND starts_at <= ? AND ends_at >= ? AND (usage_limit IS NULL OR used_count + reserved_count < usage_limit)";
   const statement = getD1().prepare(`SELECT * FROM discount_vouchers ${where} ORDER BY created_at DESC`);
   const result = includeInactive ? await statement.all<VoucherRow>() : await statement.bind(now, now).all<VoucherRow>();
   return result.results.map(voucherFromRow);
@@ -77,11 +77,11 @@ export async function listDiscountVouchers(includeInactive = false) {
 
 export async function listFlashSales(includeInactive = false) {
   const now = new Date().toISOString();
-  const where = includeInactive ? "" : "WHERE fs.is_active = 1 AND fs.starts_at <= ? AND fs.ends_at >= ? AND (fs.stock_limit IS NULL OR fs.sold_count < fs.stock_limit)";
+  const where = includeInactive ? "" : "WHERE fs.is_active = 1 AND fs.starts_at <= ? AND fs.ends_at >= ? AND (fs.stock_limit IS NULL OR fs.sold_count + fs.reserved_count < fs.stock_limit)";
   const statement = getD1().prepare(
     `SELECT fs.id, fs.product_slug, p.name AS product_name, fs.package_sku, pp.label AS package_label,
       p.image_url, p.accent, p.initials, pp.price AS base_price, fs.sale_price, fs.badge,
-      fs.starts_at, fs.ends_at, fs.stock_limit, fs.sold_count, fs.is_active
+      fs.starts_at, fs.ends_at, fs.stock_limit, fs.sold_count, fs.reserved_count, fs.is_active
      FROM flash_sales fs
      JOIN products p ON p.slug = fs.product_slug
      JOIN product_packages pp ON pp.product_id = p.id AND pp.sku = fs.package_sku
@@ -150,7 +150,7 @@ export async function quotePromotion(
   const flash = await db.prepare(
     `SELECT id, sale_price, ends_at FROM flash_sales
      WHERE product_slug = ? AND package_sku = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
-       AND (stock_limit IS NULL OR sold_count < stock_limit) LIMIT 1`,
+       AND (stock_limit IS NULL OR sold_count + reserved_count < stock_limit) LIMIT 1`,
   ).bind(productSlug, packageSku, now, now).first<{ id: number; sale_price: number; ends_at: string }>();
   const sellingPrice = flash && flash.sale_price < basePrice ? flash.sale_price : basePrice;
   let voucherDiscountAmount = 0;
@@ -160,7 +160,7 @@ export async function quotePromotion(
     const code = voucherCode.trim().toUpperCase();
     voucher = await db.prepare(
       `SELECT * FROM discount_vouchers WHERE code = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
-       AND (usage_limit IS NULL OR used_count < usage_limit) LIMIT 1`,
+       AND (usage_limit IS NULL OR used_count + reserved_count < usage_limit) LIMIT 1`,
     ).bind(code, now, now).first<VoucherRow>();
     if (!voucher) throw new PromotionQuoteError("Kode voucher tidak aktif, sudah habis, atau tidak ditemukan.");
     if (sellingPrice < voucher.min_purchase) throw new PromotionQuoteError(`Minimum transaksi voucher ini Rp${voucher.min_purchase.toLocaleString("id-ID")}.`);
@@ -196,9 +196,33 @@ export async function quotePromotion(
   };
 }
 
-export async function consumeOrderPromotion(voucherCode: string | null, flashSaleId: number | null) {
-  const statements = [];
+export async function reserveExternalPromotion(input: { orderId: string; voucherCode: string | null; flashSaleId: number | null; expiresAt: string }) {
+  if (!input.voucherCode && !input.flashSaleId) return;
+  await getD1().prepare(`INSERT INTO promotion_reservations (order_id, voucher_code, flash_sale_id, status, expires_at) VALUES (?, ?, ?, 'reserved', ?)`).bind(input.orderId, input.voucherCode, input.flashSaleId, input.expiresAt).run();
+}
+
+export async function updateExternalPromotionExpiry(orderId: string, expiresAt: string | null) {
+  if (!expiresAt) return;
+  await getD1().prepare(`UPDATE promotion_reservations SET expires_at = ?, updated_at = CURRENT_TIMESTAMP WHERE order_id = ? AND status = 'reserved'`).bind(expiresAt, orderId).run();
+}
+
+export async function releaseExternalPromotion(orderId: string) {
+  await getD1().prepare(`UPDATE promotion_reservations SET status = 'released', updated_at = CURRENT_TIMESTAMP WHERE order_id = ? AND status = 'reserved'`).bind(orderId).run();
+}
+
+export async function releaseExpiredExternalPromotions() {
+  await getD1().prepare(`UPDATE promotion_reservations SET status = 'released', updated_at = CURRENT_TIMESTAMP WHERE status = 'reserved' AND datetime(expires_at) <= datetime('now')`).run();
+}
+
+export async function consumeOrderPromotion(voucherCode: string | null, flashSaleId: number | null, orderId?: string) {
   const db = getD1();
+  if (orderId) {
+    const reserved = await db.prepare(`UPDATE promotion_reservations SET status = 'consumed', updated_at = CURRENT_TIMESTAMP WHERE order_id = ? AND status = 'reserved'`).bind(orderId).run();
+    if (Number(reserved.meta.changes ?? 0) > 0) return;
+    const existingReservation = await db.prepare(`SELECT status FROM promotion_reservations WHERE order_id = ? LIMIT 1`).bind(orderId).first<{ status: string }>();
+    if (existingReservation) return;
+  }
+  const statements = [];
   if (voucherCode) statements.push(db.prepare("UPDATE discount_vouchers SET used_count = used_count + 1, updated_at = CURRENT_TIMESTAMP WHERE code = ?").bind(voucherCode));
   if (flashSaleId) statements.push(db.prepare("UPDATE flash_sales SET sold_count = sold_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(flashSaleId));
   if (statements.length) await db.batch(statements);

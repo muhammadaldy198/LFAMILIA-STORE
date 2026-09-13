@@ -658,12 +658,15 @@ export function validateDokuNotification(input: {
   requestId: string | null;
   legacyTimestamp: string | null;
   legacySignature: string | null;
+  expectedEnvironment?: DokuEnvironment | null;
 }) {
   const accessToken = (input.authorization || "")
     .replace(/^Bearer\s+/i, "")
     .trim();
 
-  for (const environment of ["sandbox", "production"] as const) {
+  const activeEnvironment = getDokuReadiness().environment;
+  const environments: DokuEnvironment[] = input.expectedEnvironment ? [input.expectedEnvironment] : activeEnvironment ? [activeEnvironment] : [];
+  for (const environment of environments) {
     let config: DirectConfig;
     try {
       config = environmentConfig(environment);

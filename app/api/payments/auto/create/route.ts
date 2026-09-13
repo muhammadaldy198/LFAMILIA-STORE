@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { publicPaymentLabel } from "@/lib/public-payment";
+import { isAutomaticPackageAvailable } from "@/lib/server/availability";
 import { getCustomerSession } from "@/lib/server/customer-auth";
 import {
   createDokuDirectPayment,
@@ -13,7 +14,7 @@ import {
   verifyNicknameForCheckout,
 } from "@/lib/server/nickname-check";
 import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
-import { quotePromotion } from "@/lib/server/promotions";
+import { quotePromotion, releaseExternalPromotion, reserveExternalPromotion, updateExternalPromotionExpiry } from "@/lib/server/promotions";
 import {
   createOrderIdentity,
   getExternalOrderByCheckoutKey,
@@ -27,7 +28,6 @@ import {
 } from "@/lib/server/orders";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
-import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
 import { readWalletSettings } from "@/lib/server/wallet";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +57,6 @@ function publicInvoice(referenceId: string) {
   const token = clean.split("-").at(-1) ?? clean.replace(/^LF/, "");
   return `LF${token}`;
 }
-
 
 function existingExternalResponse(order: OrderRecord) {
   if (["failed", "expired"].includes(order.payment_status)) {
@@ -107,6 +106,7 @@ export async function POST(request: Request) {
 
   let referenceId: string | null = null;
   let checkoutKey: string | null = null;
+  let orderId: string | null = null;
   try {
     const input = routingSchema.parse(await request.json());
     checkoutKey = input.idempotencyKey;
@@ -145,11 +145,14 @@ export async function POST(request: Request) {
       return Response.json({ error: "Produk atau nominal tidak tersedia." }, { status: 404 });
     }
     if (
-      item.providerCode === "voucher-stock" &&
-      item.providerSku &&
-      !(await hasAvailableVoucherStock(item.providerSku))
+      item.fulfillmentType === "automatic" &&
+      !(await isAutomaticPackageAvailable({
+        packageId: item.packageId,
+        providerCode: item.providerCode,
+        providerSku: item.providerSku,
+      }))
     ) {
-      return Response.json({ error: "Stok kode untuk paket ini sedang habis." }, { status: 409 });
+      return Response.json({ error: "Nominal otomatis sedang tidak tersedia." }, { status: 409 });
     }
 
     const customer = await getCustomerSession(request);
@@ -199,6 +202,9 @@ export async function POST(request: Request) {
       promotion,
     });
 
+    orderId = identity.id;
+    await reserveExternalPromotion({ orderId, voucherCode: promotion.voucherCode, flashSaleId: promotion.flashSaleId, expiresAt: new Date(Date.now() + 30 * 60_000).toISOString() });
+
     const baseUrl = getPublicBaseUrl();
     const invoice = publicInvoice(identity.referenceId);
     const payment = await createDokuDirectPayment({
@@ -223,7 +229,9 @@ export async function POST(request: Request) {
       paymentUrl: payment.paymentUrl,
       expiredAt: payment.expiredAt,
       total: promotion.finalPrice,
+      environment: readiness.environment,
     });
+    await updateExternalPromotionExpiry(identity.id, payment.expiredAt);
     await recordOrderEvent({
       orderId: identity.id,
       source: "doku",
@@ -274,6 +282,7 @@ export async function POST(request: Request) {
       if (priorOrder) return existingExternalResponse(priorOrder);
     }
 
+    if (orderId) await releaseExternalPromotion(orderId).catch(() => undefined);
     if (referenceId) {
       await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
     }

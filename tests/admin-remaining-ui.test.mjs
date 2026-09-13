@@ -7,6 +7,7 @@ const read = (name) => fs.readFileSync(path.join(process.cwd(), "components", na
 const dashboard = read("admin-dashboard.tsx");
 const payment = read("admin-payment-workspace.tsx");
 const customer = read("admin-customer-workspace.tsx");
+const balance = read("admin-balance-manager.tsx");
 const integration = read("admin-integration-workspace.tsx");
 const operations = read("admin-operations-workspaces.tsx");
 const ui = read("admin-workspace-ui.tsx");
@@ -23,7 +24,8 @@ test("DOKU payment UI includes channels and editable payment page images", () =>
 });
 
 test("Super Admin can design balance changes for customer or admin accounts", () => {
-  for (const label of ["Atur Saldo", "Pelanggan", "Admin", "Tambah", "Kurangi", "Simpan Perubahan Saldo", "audit log"]) assert.ok(customer.includes(label), `missing balance UI: ${label}`);
+  for (const label of ["Atur Saldo", "Pelanggan", "Admin", "Tambah", "Kurangi", "Simpan Perubahan Saldo", "audit log"]) assert.ok(balance.includes(label), `missing balance UI: ${label}`);
+  assert.match(customer, /<AdminBalanceManager \/>/);
 });
 
 test("integration UI contains credentials, copyable provider URLs, and relay", () => {
@@ -46,8 +48,8 @@ test("all remaining workspaces use real panel APIs", () => {
   assert.doesNotMatch(integration, /Simulasi tes|UI sementara/);
   for (const endpoint of ["payment-methods", "payment-page", "wallet", "media"]) assert.ok(payment.includes(`/api/panel/${endpoint}`), `payment does not use ${endpoint}`);
   assert.doesNotMatch(payment, /Simulasi UI|backend dikerjakan/);
-  assert.match(customer, /fetch\("\/api\/panel\/balances"/);
-  assert.doesNotMatch(customer, /dicatat pada UI/);
+  assert.match(balance, /requestJson<BalancePayload>\("\/api\/panel\/balances"/);
+  assert.doesNotMatch(balance, /dicatat pada UI/);
   for (const endpoint of ["promotions", "support", "summary", "team", "storefront", "wallet", "media"]) {
     assert.ok(operations.includes(`/api/panel/${endpoint}`), `operations does not use ${endpoint}`);
   }

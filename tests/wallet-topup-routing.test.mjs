@@ -8,9 +8,11 @@ const route = fs.readFileSync(path.join(root, "app/api/account/topups/route.ts")
 const account = fs.readFileSync(path.join(root, "components/customer-account.tsx"), "utf8");
 
 test("wallet topup uses DOKU only on the server", () => {
-  assert.match(route, /createDokuWalletTopup\(/);
   assert.match(route, /createDokuDirectPayment\(/);
+  assert.match(route, /source, reference_id, external_checkout_key, doku_environment/);
+  assert.match(route, /'doku'/);
   assert.match(route, /updateDokuWalletTopup\(/);
+  assert.match(route, /idempotencyKey/);
   assert.doesNotMatch(route, /paymentGateway: "doku"/);
   assert.doesNotMatch(route, /midtrans|ipaymu|fallback/i);
 });

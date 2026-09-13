@@ -4,8 +4,12 @@ import handler from "vinext/server/app-router-entry";
 import { getPublicBaseUrl, setRuntimeEnv } from "../lib/server/runtime-env";
 import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
 import { recoverStaleAutomaticOrders } from "../lib/server/orders";
+import { releaseExpiredExternalPromotions } from "../lib/server/promotions";
+import { reconcileStaleDigiflazzProcessing } from "../lib/server/digiflazz-reconciliation";
+import { finalizeExpiredDokuPayments } from "../lib/server/doku-reconciliation";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 import { cleanupSecurityRateLimits } from "../lib/server/security";
+import { cleanupOrphanStoreMedia } from "../lib/server/media";
 import {
   diagnoseCloudflareAccessRequest,
   getCloudflareAccessAssertion,
@@ -61,12 +65,6 @@ function withSecurityHeaders(response: Response, url: URL) {
     headers,
   });
 }
-
-// Image security config. SVG sources with .svg extension auto-skip the
-// optimization endpoint on the client side (served directly, no proxy).
-// To route SVGs through the optimizer (with security headers), set
-// dangerouslyAllowSVG: true in next.config.js and uncomment below:
-// const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -200,14 +198,21 @@ const worker = {
   },
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
+    const publicBaseUrl = getPublicBaseUrl();
     const tasks: Promise<unknown>[] = [
       cleanupSecurityRateLimits().catch(() => undefined),
+      releaseExpiredExternalPromotions().catch(() => undefined),
+      finalizeExpiredDokuPayments().catch(() => undefined),
       Promise.resolve()
-        .then(() => recoverStaleAutomaticOrders(getPublicBaseUrl()))
+        .then(() => recoverStaleAutomaticOrders(publicBaseUrl))
+        .catch(() => undefined),
+      Promise.resolve()
+        .then(() => reconcileStaleDigiflazzProcessing(publicBaseUrl))
         .catch(() => undefined),
     ];
     if (event.cron === "15 2 * * *") {
       tasks.push(syncDigiflazzPrices().catch(() => undefined));
+      tasks.push(cleanupOrphanStoreMedia().catch(() => undefined));
     }
     ctx.waitUntil(Promise.all(tasks));
   },

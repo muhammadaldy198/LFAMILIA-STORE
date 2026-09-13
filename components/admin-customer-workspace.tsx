@@ -1,86 +1,239 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Ban, Eye, Search, ShieldCheck, UserPlus, Users, Wallet, WalletCards } from "lucide-react";
-import { Field, MetricCard, Modal, Panel, Status, WorkspaceHeader, buttonClass, inputClass, primaryButtonClass } from "@/components/admin-workspace-ui";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Edit3, RefreshCw, Search, ShieldCheck, Users, WalletCards } from "lucide-react";
+import { AdminBalanceManager } from "@/components/admin-balance-manager";
+import {
+  Field,
+  MetricCard,
+  Modal,
+  Panel,
+  Status,
+  WorkspaceHeader,
+  buttonClass,
+  inputClass,
+  primaryButtonClass,
+} from "@/components/admin-workspace-ui";
 
-type Customer = { id: string; name: string; email: string; phone: string; level: string; balance: number; orders: number; spent: string; status: "Aktif" | "Suspend"; joined: string };
-type AdminAccount = { id: string; name: string; email: string; role: string; balance: number; active: boolean };
-const initialCustomers: Customer[] = [
-  { id: "loading", name: "Memuat pelanggan…", email: "", phone: "", level: "Member", balance: 0, orders: 0, spent: "Rp 0", status: "Aktif", joined: "" },
-];
+type Tier = "basic" | "gold" | "diamond" | "platinum";
+type TierSetting = {
+  tier: Tier;
+  label: string;
+  minSpend: number;
+  discountPercent: number;
+  benefits: string;
+};
+type Member = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  balance: number;
+  isActive: boolean;
+  createdAt: string;
+  lifetimeSpend: number;
+  paidOrders: number;
+  tierProgress: number;
+  tierProgressBonus: number;
+  tierMode: "automatic" | "manual";
+  tierOverride: Tier | null;
+  tier: Tier;
+  tierLabel: string;
+};
+
+type MemberPayload = {
+  settings?: TierSetting[];
+  members?: Member[];
+  error?: string;
+};
+
+const tierOrder: Tier[] = ["basic", "gold", "diamond", "platinum"];
+const tierTone: Record<Tier, "gray" | "amber" | "blue" | "violet"> = {
+  basic: "gray",
+  gold: "amber",
+  diamond: "blue",
+  platinum: "violet",
+};
+
+function rupiah(value: number) {
+  return `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
+}
+
+async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, init);
+  const payload = await response.json().catch(() => ({})) as T & { error?: string };
+  if (!response.ok) throw new Error(payload.error || "Permintaan gagal diproses.");
+  return payload;
+}
 
 export function AdminCustomerWorkspace() {
-  const [customers, setCustomers] = useState(initialCustomers);
-  const [admins, setAdmins] = useState<AdminAccount[]>([]);
+  const [settings, setSettings] = useState<TierSetting[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [query, setQuery] = useState("");
-  const [level, setLevel] = useState("Semua Level");
-  const [selected, setSelected] = useState<Customer | null>(null);
-  const [balanceOpen, setBalanceOpen] = useState(false);
-  const [accountType, setAccountType] = useState<"Pelanggan" | "Admin">("Pelanggan");
-  const [targetId, setTargetId] = useState("");
-  const [operation, setOperation] = useState<"Tambah" | "Kurangi">("Tambah");
-  const [amount, setAmount] = useState("100000");
-  const [note, setNote] = useState("");
-  const [notice, setNotice] = useState("");
+  const [tier, setTier] = useState<"all" | Tier>("all");
+  const [editing, setEditing] = useState<Member | null>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const filtered = useMemo(() => customers.filter((customer) => `${customer.name} ${customer.email} ${customer.phone}`.toLowerCase().includes(query.toLowerCase()) && (level === "Semua Level" || customer.level === level)), [customers, query, level]);
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/panel/balances", { cache: "no-store" });
-    const payload = await response.json().catch(() => ({})) as {
-      error?: string;
-      customers?: Array<{ id: string; name: string; email: string; phone: string; balance: number; is_active: number; created_at: string; lifetime_spend: number; paid_orders: number }>;
-      admins?: Array<{ id: string; name: string; email: string; role: string; balance: number; is_active: number }>;
-    };
-    if (!response.ok) throw new Error(payload.error || "Data pelanggan gagal dimuat.");
-    const nextCustomers = (payload.customers || []).map((item) => ({ id: item.id, name: item.name, email: item.email, phone: item.phone, level: Number(item.lifetime_spend || 0) >= 10_000_000 ? "Gold" : Number(item.lifetime_spend || 0) >= 1_000_000 ? "Silver" : "Member", balance: Number(item.balance || 0), orders: Number(item.paid_orders || 0), spent: `Rp ${Number(item.lifetime_spend || 0).toLocaleString("id-ID")}`, status: item.is_active ? "Aktif" as const : "Suspend" as const, joined: item.created_at ? new Date(item.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "-" }));
-    const nextAdmins = (payload.admins || []).map((item) => ({ id: item.id, name: item.name, email: item.email, role: item.role, balance: Number(item.balance || 0), active: Boolean(item.is_active) }));
-    setCustomers(nextCustomers); setAdmins(nextAdmins);
-    setTargetId((current) => current || nextCustomers[0]?.id || nextAdmins[0]?.id || "");
+    const payload = await requestJson<MemberPayload>("/api/panel/members", { cache: "no-store" });
+    setSettings(payload.settings ?? []);
+    setMembers(payload.members ?? []);
+    setError("");
   }, []);
 
-  useEffect(() => { load().catch((reason) => setError(reason instanceof Error ? reason.message : "Data pelanggan gagal dimuat.")); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    void requestJson<MemberPayload>("/api/panel/members", { cache: "no-store" })
+      .then((payload) => {
+        if (cancelled) return;
+        setSettings(payload.settings ?? []);
+        setMembers(payload.members ?? []);
+        setError("");
+      })
+      .catch((reason) => {
+        if (cancelled) return;
+        setError(reason instanceof Error ? reason.message : "Data member gagal dimuat.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  async function adjustBalance() {
-    const value = Math.max(0, Number(amount) || 0);
-    setNotice(""); setError("");
-    if (!targetId || value < 1 || note.trim().length < 3) { setError("Pilih akun, isi nominal, dan tulis alasan minimal 3 karakter."); return; }
-    setBusy(true);
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return members.filter((member) => {
+      const text = `${member.name} ${member.email} ${member.phone}`.toLowerCase();
+      return (!needle || text.includes(needle)) && (tier === "all" || member.tier === tier);
+    });
+  }, [members, query, tier]);
+
+  async function saveTierSettings() {
+    setBusy(true); setError(""); setNotice("");
     try {
-      const response = await fetch("/api/panel/balances", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountType: accountType === "Pelanggan" ? "customer" : "admin", targetId, operation: operation === "Tambah" ? "credit" : "debit", amount: value, reason: note }) });
-      const payload = await response.json().catch(() => ({})) as { error?: string; balanceBefore?: number; balanceAfter?: number };
-      if (!response.ok) throw new Error(payload.error || "Saldo gagal diperbarui.");
-      await load();
-      setNotice(`${operation} saldo ${accountType.toLowerCase()} Rp ${value.toLocaleString("id-ID")} berhasil. Saldo: Rp ${Number(payload.balanceBefore || 0).toLocaleString("id-ID")} → Rp ${Number(payload.balanceAfter || 0).toLocaleString("id-ID")}.`);
-      setBalanceOpen(false); setNote("");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Saldo gagal diperbarui."); }
-    finally { setBusy(false); }
+      const payload = await requestJson<{ settings: TierSetting[] }>("/api/panel/members", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          settings: tierOrder.map((key) => {
+            const current = settings.find((item) => item.tier === key);
+            return {
+              tier: key,
+              discountPercent: Number(current?.discountPercent ?? 0),
+              benefits: current?.benefits ?? "",
+            };
+          }),
+        }),
+      });
+      setSettings(payload.settings);
+      setNotice("Pengaturan membership berhasil disimpan.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Pengaturan membership gagal disimpan.");
+    } finally { setBusy(false); }
+  }
+
+  async function saveMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    const data = new FormData(event.currentTarget);
+    const role = String(data.get("role") || "automatic") as "automatic" | Tier;
+    const addBalance = Math.max(0, Number(data.get("addBalance") || 0));
+    const reason = String(data.get("reason") || "").trim();
+    if (addBalance > 0 && reason.length < 3) {
+      setError("Alasan minimal 3 karakter wajib diisi jika menambah saldo.");
+      return;
+    }
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const payload = await requestJson<{ members: Member[] }>("/api/panel/members", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: editing.id, role, addBalance, reason: reason || undefined }),
+      });
+      setMembers(payload.members);
+      setEditing(null);
+      setNotice("Member berhasil diperbarui.");
+    } catch (reasonValue) {
+      setError(reasonValue instanceof Error ? reasonValue.message : "Member gagal diperbarui.");
+    } finally { setBusy(false); }
+  }
+
+  function updateSetting(key: Tier, patch: Partial<TierSetting>) {
+    setSettings((current) => current.map((item) => item.tier === key ? { ...item, ...patch } : item));
   }
 
   return <div>
-    <WorkspaceHeader title="Pelanggan" description="Kelola akun, level member, saldo wallet, aktivitas, dan status pelanggan." actions={<button type="button" onClick={() => setBalanceOpen(true)} className={primaryButtonClass}><WalletCards className="size-3.5" />Atur Saldo</button>} />
-    {notice && <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[9px] font-semibold text-emerald-700">{notice}</div>}
+    <WorkspaceHeader
+      title="Pelanggan"
+      description="Kelola membership BASIC, GOLD, DIAMOND, PLATINUM, saldo, dan status pelanggan."
+      actions={<button type="button" onClick={() => void load()} className={buttonClass}><RefreshCw className="size-3.5" />Refresh</button>}
+    />
+    {notice && <button type="button" onClick={() => setNotice("")} className="mb-3 w-full rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-left text-[9px] font-semibold text-emerald-700">{notice}</button>}
     {error && <button type="button" onClick={() => setError("")} className="mb-3 w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-[9px] font-semibold text-red-700">{error}</button>}
-    <div className="mb-4 grid grid-cols-5 gap-3"><MetricCard icon={Users} label="Total Pelanggan" value={customers.length.toLocaleString("id-ID")} detail="Data database aktif" /><MetricCard icon={UserPlus} label="Pelanggan Bertransaksi" value={customers.filter((item) => item.orders > 0).length.toLocaleString("id-ID")} detail="Memiliki pesanan dibayar" tone="green" /><MetricCard icon={Wallet} label="Total Saldo Wallet" value={`Rp ${customers.reduce((sum, item) => sum + item.balance, 0).toLocaleString("id-ID")}`} detail="Saldo seluruh pelanggan" tone="violet" /><MetricCard icon={ShieldCheck} label="Member Aktif" value={customers.filter((item) => item.status === "Aktif").length.toLocaleString("id-ID")} detail="Akun dapat digunakan" tone="green" /><MetricCard icon={Ban} label="Akun Suspend" value={customers.filter((item) => item.status === "Suspend").length.toLocaleString("id-ID")} detail="Perlu peninjauan" tone="red" /></div>
-    <Panel title="Daftar Pelanggan" description="Cari dan kelola seluruh akun LFAMILIA." action={<div className="flex gap-2"><div className="relative"><Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#8190a5]" /><input value={query} onChange={(e) => setQuery(e.target.value)} className={`${inputClass} w-60 pl-8`} placeholder="Nama, email, atau nomor HP..." /></div><select className={`${inputClass} w-32`} value={level} onChange={(e) => setLevel(e.target.value)}><option>Semua Level</option><option>Member</option><option>Silver</option><option>Gold</option></select></div>}>
-      <table className="w-full text-left"><thead className="bg-[#f6f8fb] text-[8px] uppercase text-[#718198]"><tr>{["Pelanggan", "Kontak", "Level", "Saldo Wallet", "Pesanan", "Total Belanja", "Status", "Bergabung", "Aksi"].map((head) => <th key={head} className="px-3 py-2.5">{head}</th>)}</tr></thead><tbody className="divide-y divide-[#edf0f4]">{filtered.map((customer) => <tr key={customer.id} className="text-[9px] text-[#42516a]"><td className="px-3 py-2.5"><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-full bg-blue-50 font-extrabold text-[#0769e9]">{customer.name.charAt(0)}</span><strong className="text-[#23334e]">{customer.name}</strong></div></td><td className="px-3"><strong className="block font-semibold">{customer.email}</strong><span className="text-[8px] text-[#8a98aa]">{customer.phone}</span></td><td className="px-3"><Status tone={customer.level === "Gold" ? "amber" : customer.level === "Silver" ? "blue" : "gray"}>{customer.level}</Status></td><td className="px-3 font-bold text-[#23334e]">Rp {customer.balance.toLocaleString("id-ID")}</td><td className="px-3">{customer.orders}</td><td className="px-3">{customer.spent}</td><td className="px-3"><Status tone={customer.status === "Aktif" ? "green" : "red"}>{customer.status}</Status></td><td className="px-3">{customer.joined}</td><td className="px-3"><button type="button" className={buttonClass} onClick={() => setSelected(customer)}><Eye className="size-3.5" />Detail</button></td></tr>)}</tbody></table>
-      <div className="border-t border-[#edf0f4] px-4 py-3 text-[9px] text-[#718198]">Menampilkan {filtered.length} dari {customers.length} pelanggan</div>
+
+    <div className="mb-4 grid grid-cols-5 gap-3">
+      <MetricCard icon={Users} label="Total Pelanggan" value={members.length.toLocaleString("id-ID")} detail="Akun customer" />
+      <MetricCard icon={ShieldCheck} label="BASIC" value={String(members.filter((item) => item.tier === "basic").length)} detail="Tier awal" />
+      <MetricCard icon={ShieldCheck} label="GOLD" value={String(members.filter((item) => item.tier === "gold").length)} detail="Member Gold" tone="amber" />
+      <MetricCard icon={ShieldCheck} label="DIAMOND" value={String(members.filter((item) => item.tier === "diamond").length)} detail="Member Diamond" tone="blue" />
+      <MetricCard icon={WalletCards} label="Total Saldo" value={rupiah(members.reduce((sum, item) => sum + item.balance, 0))} detail="Saldo pelanggan" tone="violet" />
+    </div>
+
+    <Panel title="Pengaturan Membership" description="Diskon dan benefit tier dipakai backend saat menghitung promo member." action={<button type="button" disabled={busy || settings.length !== 4} onClick={() => void saveTierSettings()} className={primaryButtonClass}>{busy ? "Menyimpan..." : "Simpan Membership"}</button>}>
+      <div className="grid grid-cols-4 gap-3 p-4">
+        {tierOrder.map((key) => {
+          const item = settings.find((entry) => entry.tier === key);
+          if (!item) return <div key={key} className="h-28 rounded-md border border-dashed border-[#dfe5ed]" />;
+          return <div key={key} className="rounded-md border border-[#e3e8ef] p-3">
+            <div className="flex items-center justify-between"><strong className="text-[10px] text-[#14213a]">{item.label}</strong><Status tone={tierTone[key]}>{rupiah(item.minSpend)}+</Status></div>
+            <label className="mt-3 block text-[8px] font-bold text-[#60718a]">Diskon (%)<input type="number" min="0" max="100" step="0.01" className={`${inputClass} mt-1`} value={item.discountPercent} onChange={(event) => updateSetting(key, { discountPercent: Number(event.target.value) })} /></label>
+            <label className="mt-2 block text-[8px] font-bold text-[#60718a]">Benefit<textarea className={`${inputClass} mt-1 h-16 py-2`} value={item.benefits} onChange={(event) => updateSetting(key, { benefits: event.target.value })} placeholder="Benefit tier..." /></label>
+          </div>;
+        })}
+      </div>
     </Panel>
 
-    <Modal open={balanceOpen} title="Atur Saldo" description="Super Admin dapat menambah atau mengurangi saldo pelanggan maupun akun admin sendiri." onClose={() => setBalanceOpen(false)} footer={<><button type="button" onClick={() => setBalanceOpen(false)} className={buttonClass}>Batal</button><button type="button" disabled={busy} onClick={adjustBalance} className={primaryButtonClass}>{busy ? "Menyimpan..." : "Simpan Perubahan Saldo"}</button></>}><div className="grid grid-cols-2 gap-4">
-      <Field label="Jenis akun"><div className="grid grid-cols-2 gap-2">{(["Pelanggan", "Admin"] as const).map((type) => <button type="button" key={type} onClick={() => { setAccountType(type); setTargetId(type === "Pelanggan" ? customers[0]?.id || "" : admins[0]?.id || ""); }} className={`h-9 rounded-md border text-[9px] font-bold ${accountType === type ? "border-[#0769e9] bg-blue-50 text-[#0769e9]" : "border-[#dfe5ed] text-[#52627a]"}`}>{type}</button>)}</div></Field>
-      <Field label="Akun tujuan"><select className={inputClass} value={targetId} onChange={(e) => setTargetId(e.target.value)}>{accountType === "Pelanggan" ? customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name} — Rp {customer.balance.toLocaleString("id-ID")}</option>) : admins.map((admin) => <option key={admin.id} value={admin.id}>{admin.name} ({admin.role}) — Rp {admin.balance.toLocaleString("id-ID")}</option>)}</select></Field>
-      <Field label="Tindakan"><select className={inputClass} value={operation} onChange={(e) => setOperation(e.target.value as "Tambah" | "Kurangi")}><option>Tambah</option><option>Kurangi</option></select></Field>
-      <Field label="Nominal"><input className={inputClass} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} /></Field>
-      <Field label="Catatan wajib" wide><textarea className={`${inputClass} h-20 py-2`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Contoh: bonus kompensasi atau koreksi saldo..." /></Field>
-      <div className="col-span-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-[9px] leading-4 text-amber-700">Setiap perubahan saldo langsung dicatat di ledger dan audit log: pelaku, akun tujuan, nominal, saldo sebelum/sesudah, alasan, dan waktu.</div>
-    </div></Modal>
+    <Panel
+      title="Daftar Pelanggan"
+      description="Tier otomatis mengikuti total belanja; Super Admin dapat memberi override manual bila diperlukan."
+      className="mt-4"
+      action={<div className="flex gap-2"><div className="relative"><Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#8190a5]" /><input value={query} onChange={(event) => setQuery(event.target.value)} className={`${inputClass} w-60 pl-8`} placeholder="Nama, email, atau nomor HP..." /></div><select className={`${inputClass} w-36`} value={tier} onChange={(event) => setTier(event.target.value as "all" | Tier)}><option value="all">Semua Tier</option><option value="basic">BASIC</option><option value="gold">GOLD</option><option value="diamond">DIAMOND</option><option value="platinum">PLATINUM</option></select></div>}
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[980px] text-left">
+          <thead className="bg-[#f6f8fb] text-[8px] uppercase text-[#718198]"><tr>{["Pelanggan", "Kontak", "Tier", "Mode", "Saldo", "Pesanan", "Total Belanja", "Status", "Aksi"].map((head) => <th key={head} className="px-3 py-2.5">{head}</th>)}</tr></thead>
+          <tbody className="divide-y divide-[#edf0f4]">
+            {filtered.map((member) => <tr key={member.id} className="text-[9px] text-[#42516a]">
+              <td className="px-3 py-2.5"><strong className="text-[#23334e]">{member.name}</strong></td>
+              <td className="px-3"><strong className="block font-semibold">{member.email}</strong><span className="text-[8px] text-[#8a98aa]">{member.phone}</span></td>
+              <td className="px-3"><Status tone={tierTone[member.tier]}>{member.tierLabel}</Status></td>
+              <td className="px-3">{member.tierMode === "manual" ? "Manual" : "Otomatis"}</td>
+              <td className="px-3 font-bold text-[#23334e]">{rupiah(member.balance)}</td>
+              <td className="px-3">{member.paidOrders}</td>
+              <td className="px-3">{rupiah(member.lifetimeSpend)}</td>
+              <td className="px-3"><Status tone={member.isActive ? "green" : "red"}>{member.isActive ? "Aktif" : "Suspend"}</Status></td>
+              <td className="px-3"><button type="button" className={buttonClass} onClick={() => setEditing(member)}><Edit3 className="size-3.5" />Kelola</button></td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+      <div className="border-t border-[#edf0f4] px-4 py-3 text-[9px] text-[#718198]">Menampilkan {filtered.length} dari {members.length} pelanggan</div>
+    </Panel>
 
-    <Modal open={Boolean(selected)} title={`Detail Pelanggan — ${selected?.name || ""}`} description="Profil, saldo, dan ringkasan transaksi pelanggan." onClose={() => setSelected(null)} width="max-w-[760px]" footer={<><button type="button" className={buttonClass} onClick={() => setSelected(null)}>Tutup</button><button type="button" className={primaryButtonClass} onClick={() => { setAccountType("Pelanggan"); setTargetId(selected?.id || ""); setBalanceOpen(true); setSelected(null); }}><WalletCards className="size-3.5" />Atur Saldo</button></>}><div className="grid grid-cols-[220px_1fr] gap-4"><div className="rounded-lg border border-[#e3e8ef] p-4"><span className="mx-auto grid size-16 place-items-center rounded-full bg-blue-50 text-xl font-black text-[#0769e9]">{selected?.name.charAt(0)}</span><strong className="mt-3 block text-center text-sm text-[#14213a]">{selected?.name}</strong><p className="text-center text-[9px] text-[#8190a5]">{selected?.email}</p><div className="mt-4 space-y-2 text-[9px]"><Info label="Level" value={selected?.level || ""} /><Info label="Saldo" value={`Rp ${(selected?.balance || 0).toLocaleString("id-ID")}`} /><Info label="Pesanan dibayar" value={String(selected?.orders || 0)} /><Info label="Total belanja" value={selected?.spent || ""} /></div></div><div className="rounded-lg border border-[#e3e8ef] p-4"><h3 className="text-[11px] font-extrabold text-[#14213a]">Ringkasan Akun</h3><p className="mt-2 text-[9px] leading-5 text-[#718198]">Perubahan saldo hanya dilakukan melalui tombol Atur Saldo. Backend menolak pengurangan yang membuat saldo negatif dan mencatat transaksi ke ledger.</p><div className="mt-4 grid grid-cols-2 gap-2"><Info label="Status" value={selected?.status || ""} /><Info label="Bergabung" value={selected?.joined || ""} /></div></div></div></Modal>
+    <div className="mt-4"><AdminBalanceManager /></div>
+
+    <Modal open={Boolean(editing)} title={`Kelola Member — ${editing?.name ?? ""}`} description="Atur tier otomatis/manual dan tambah saldo pelanggan." onClose={() => setEditing(null)} footer={null}>
+      {editing && <form onSubmit={saveMember}>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Role membership"><select name="role" defaultValue={editing.tierMode === "manual" ? editing.tierOverride ?? editing.tier : "automatic"} className={inputClass}><option value="automatic">Otomatis sesuai total belanja</option><option value="basic">BASIC</option><option value="gold">GOLD</option><option value="diamond">DIAMOND</option><option value="platinum">PLATINUM</option></select></Field>
+          <Field label="Saldo saat ini"><input disabled value={rupiah(editing.balance)} className={inputClass} /></Field>
+          <Field label="Tambah saldo"><input name="addBalance" type="number" min="0" max="100000000" defaultValue="0" className={inputClass} /></Field>
+          <Field label="Alasan penambahan saldo"><input name="reason" className={inputClass} placeholder="Contoh: kompensasi CS" /></Field>
+          <div className="col-span-2 rounded-md border border-blue-100 bg-blue-50 p-3 text-[9px] leading-4 text-blue-700">Tier otomatis memakai lifetime spend. Jika kembali ke otomatis, override manual dan progress bonus lama dibersihkan oleh backend.</div>
+        </div>
+        <div className="mt-4 flex justify-end gap-2"><button type="button" className={buttonClass} onClick={() => setEditing(null)}>Batal</button><button type="submit" disabled={busy} className={primaryButtonClass}>{busy ? "Menyimpan..." : "Simpan Member"}</button></div>
+      </form>}
+    </Modal>
   </div>;
 }
-
-function Info({ label, value }: { label: string; value: string }) { return <div className="flex justify-between border-b border-[#edf0f4] pb-2"><span className="text-[#8190a5]">{label}</span><strong className="text-[#34445f]">{value}</strong></div>; }

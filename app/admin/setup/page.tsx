@@ -1,12 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, Eye, EyeOff, LoaderCircle, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StoreLayout } from "@/components/store-layout";
 
 export default function OwnerSetupPage() {
+  const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [configured, setConfigured] = useState(false);
   const [username, setUsername] = useState("");
@@ -40,7 +42,7 @@ export default function OwnerSetupPage() {
       });
       const data = await readSetupResponse(response);
       if (!response.ok) throw new Error(data.error || "Setup gagal.");
-      window.location.assign("/panel");
+      router.push("/panel");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Setup gagal.");
     } finally {

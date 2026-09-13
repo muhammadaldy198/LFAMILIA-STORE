@@ -6,7 +6,8 @@ import test from "node:test";
 const root = process.cwd();
 const route = fs.readFileSync(path.join(root, "app/api/admin/balances/route.ts"), "utf8");
 const panel = fs.readFileSync(path.join(root, "app/api/panel/[...path]/route.ts"), "utf8");
-const manager = fs.readFileSync(path.join(root, "components/admin-customer-workspace.tsx"), "utf8");
+const manager = fs.readFileSync(path.join(root, "components/admin-balance-manager.tsx"), "utf8");
+const customer = fs.readFileSync(path.join(root, "components/admin-customer-workspace.tsx"), "utf8");
 
 test("owner can adjust customer or admin ledger balance with a mandatory reason", () => {
   assert.match(route, /accountType: z\.enum\(\["customer", "admin"\]\)/);
@@ -21,8 +22,10 @@ test("owner can adjust customer or admin ledger balance with a mandatory reason"
 test("admin credentials use their private ledger row and UI calls the endpoint", () => {
   assert.match(route, /'__lfadmin__:' \|\| lower\(a\.email\)/);
   assert.match(panel, /balances: \{ GET: balances\.GET, PUT: balances\.PUT \}/);
-  assert.match(manager, /fetch\("\/api\/panel\/balances"/);
+  assert.match(manager, /fetch\(url, init\)/);
+  assert.match(manager, /requestJson<BalancePayload>\("\/api\/panel\/balances"/);
   assert.match(manager, /accountType === "Pelanggan" \? "customer" : "admin"/);
   assert.match(manager, /operation === "Tambah" \? "credit" : "debit"/);
+  assert.match(customer, /<AdminBalanceManager \/>/);
   assert.doesNotMatch(manager, /dicatat pada UI/);
 });

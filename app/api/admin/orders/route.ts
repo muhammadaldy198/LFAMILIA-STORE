@@ -14,34 +14,15 @@ import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-noti
 export const dynamic = "force-dynamic";
 
 type DeliveryMode = "direct" | "voucher" | "manual";
-type OrderWithMode = OrderRecord & { delivery_mode: DeliveryMode };
 
-async function readDeliveryModes() {
-  const result = await getD1()
-    .prepare(
-      `SELECT slug,
-       CASE
-         WHEN LOWER(TRIM(category)) = 'voucher' THEN 'voucher'
-         WHEN fulfillment_type = 'manual' THEN 'manual'
-         ELSE 'direct'
-       END AS mode
-       FROM products`,
-    )
-    .all<{ slug: string; mode: DeliveryMode }>();
-  return new Map(result.results.map((row) => [row.slug, row.mode]));
+function deliveryMode(order: OrderRecord): DeliveryMode {
+  if (order.delivery_mode === "manual" || order.delivery_mode === "voucher" || order.delivery_mode === "direct") return order.delivery_mode;
+  return order.fulfillment_type === "manual" ? "manual" : order.provider_code === "voucher-stock" ? "voucher" : "direct";
 }
 
-function withDeliveryMode(order: OrderRecord, deliveryModes: Map<string, DeliveryMode>): OrderWithMode {
-  return {
-    ...order,
-    delivery_mode:
-      deliveryModes.get(order.product_slug) ??
-      (order.fulfillment_type === "manual" ? "manual" : "direct"),
-  };
-}
-
-function visibleOrder(order: OrderWithMode, role: AdminRole) {
-  if (role !== "staff") return order;
+function visibleOrder(order: OrderRecord, role: AdminRole) {
+  const snapshot = { ...order, delivery_mode: deliveryMode(order) };
+  if (role !== "staff") return snapshot;
   return {
     id: order.id, reference_id: order.reference_id, product_slug: order.product_slug,
     product_name: order.product_name, package_sku: order.package_sku,
@@ -50,7 +31,7 @@ function visibleOrder(order: OrderWithMode, role: AdminRole) {
     customer_inputs_json: order.customer_inputs_json, total: null,
     payment_method: order.payment_method, payment_channel: order.payment_channel,
     payment_status: order.payment_status, fulfillment_type: order.fulfillment_type,
-    fulfillment_status: order.fulfillment_status, delivery_mode: order.delivery_mode,
+    fulfillment_status: order.fulfillment_status, delivery_mode: snapshot.delivery_mode,
     created_at: order.created_at, updated_at: order.updated_at,
   };
 }
@@ -60,8 +41,6 @@ export async function GET(request: Request) {
   if (access instanceof Response) return access;
   try {
     const requestedId = new URL(request.url).searchParams.get("id");
-    const deliveryModes = await readDeliveryModes();
-
     if (requestedId) {
       const parsedId = z.string().uuid().safeParse(requestedId);
       if (!parsedId.success) return Response.json({ error: "ID pesanan tidak valid." }, { status: 400 });
@@ -83,8 +62,10 @@ export async function GET(request: Request) {
         }>();
       return Response.json(
         {
-          order: visibleOrder(withDeliveryMode(order, deliveryModes), access.role),
-          events: eventRows.results,
+          order: visibleOrder(order, access.role),
+          events: access.role === "staff"
+            ? eventRows.results.map(({ id, status, created_at }) => ({ id, source: "system", status, created_at }))
+            : eventRows.results,
           role: access.role,
         },
         { headers: { "Cache-Control": "no-store" } },
@@ -94,7 +75,7 @@ export async function GET(request: Request) {
     const orders = await listOrders(500);
     return Response.json(
       {
-        orders: orders.map((order) => visibleOrder(withDeliveryMode(order, deliveryModes), access.role)),
+        orders: orders.map((order) => visibleOrder(order, access.role)),
         role: access.role,
       },
       { headers: { "Cache-Control": "no-store" } },
@@ -110,6 +91,7 @@ export async function GET(request: Request) {
 const manualOrderSchema = z.object({
   customer: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(5).max(30),
+  customerEmail: z.string().trim().email().max(150).optional(),
   product: z.string().trim().min(2).max(120),
   packageName: z.string().trim().min(2).max(120),
   destination: z.string().trim().min(1).max(300),
@@ -127,11 +109,11 @@ export async function POST(request: Request) {
     await getD1().prepare(
       `INSERT INTO orders (
         id, reference_id, product_slug, product_name, package_sku, package_label,
-        provider_code, provider_sku, fulfillment_type, target_template, destination,
+        provider_code, provider_sku, fulfillment_type, delivery_mode, target_template, destination,
         server, nickname, customer_no, buyer_name, buyer_email, buyer_phone,
         customer_notes, customer_inputs_json, base_subtotal, subtotal, discount_amount,
         admin_fee, total, payment_method, payment_channel, payment_status, fulfillment_status
-      ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 'manual', '{{destination}}', ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 'admin_manual', 'admin_manual', 'paid', 'manual_pending')`
+      ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 'manual', 'manual', '{{destination}}', ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 'admin_manual', 'admin_manual', 'paid', 'manual_pending')`
     ).bind(
       identity.id,
       identity.referenceId,
@@ -142,7 +124,7 @@ export async function POST(request: Request) {
       input.destination,
       input.destination,
       input.customer,
-      access.email,
+      input.customerEmail ?? "",
       input.phone,
       `Dibuat manual oleh ${access.email}`,
       JSON.stringify([{ id: "destination", label: "Tujuan", value: input.destination }]),
@@ -181,8 +163,7 @@ async function completeManualVoucher(id: string, serialNumber: string | undefine
     throw new Error("Voucher manual belum siap dikirim atau tidak ditemukan.");
   }
 
-  const deliveryModes = await readDeliveryModes();
-  if (deliveryModes.get(order.product_slug) !== "voucher") {
+  if (deliveryMode(order) !== "voucher") {
     await completeManualOrder(id, adminEmail);
     return;
   }

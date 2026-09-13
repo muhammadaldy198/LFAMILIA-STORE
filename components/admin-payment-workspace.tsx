@@ -26,6 +26,7 @@ export function AdminPaymentWorkspace() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [dokuReady, setDokuReady] = useState(false);
+  const [canManageWallet, setCanManageWallet] = useState(false);
   const [walletSettings, setWalletSettings] = useState({ minTopup: 10_000, dokuTopupEnabled: true, dokuCheckoutEnabled: true });
   const [pageSettings, setPageSettings] = useState<PaymentPageSettings>(defaultPaymentPageSettings);
   const [heroImage, setHeroImage] = useState("");
@@ -59,12 +60,14 @@ export function AdminPaymentWorkspace() {
     ];
     if (!channelResponse.ok) throw new Error(channelPayload.error || "Channel pembayaran gagal dimuat.");
     if (!pageResponse.ok) throw new Error(pagePayload.error || "Halaman pembayaran gagal dimuat.");
-    if (!walletResponse.ok) throw new Error(walletPayload.error || "Pengaturan checkout gagal dimuat.");
+    if (!walletResponse.ok && walletResponse.status !== 403) throw new Error(walletPayload.error || "Pengaturan checkout gagal dimuat.");
     if (!orderResponse.ok) throw new Error(orderPayload.error || "Transaksi gagal dimuat.");
     if (channelPayload.channels) setChannels(channelPayload.channels.map((item) => ({ dbId: item.id, id: item.channel, method: item.method, name: item.name, description: item.description, imageUrl: item.imageUrl || "", group: item.method === "qris" ? "QRIS" : item.method === "va" ? "VA Bank" : "E-Wallet", fee: "Sesuai kontrak", settlement: item.isActive ? "Aktif" : "Belum aktif", enabled: item.isActive, sortOrder: item.sortOrder, tone: item.isActive ? "green" : "amber" })));
     if (pagePayload.settings) { setPageSettings(pagePayload.settings); setHeroImage(pagePayload.settings.headerImageUrl); }
-    if (walletPayload.settings) setWalletSettings(walletPayload.settings);
-    setDokuReady(Boolean(walletPayload.gatewayReadiness?.doku?.ready));
+    const walletAllowed = walletResponse.ok;
+    setCanManageWallet(walletAllowed);
+    if (walletAllowed && walletPayload.settings) setWalletSettings(walletPayload.settings);
+    setDokuReady(walletAllowed && Boolean(walletPayload.gatewayReadiness?.doku?.ready));
     setTransactions(orderPayload.orders || []);
     return walletPayload.gatewayReadiness?.doku;
   }, []);
@@ -105,7 +108,7 @@ export function AdminPaymentWorkspace() {
     try {
       if (tab === "Channel Pembayaran") {
         await Promise.all(channels.map(saveChannel));
-        await request("/api/panel/wallet", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(walletSettings) });
+        if (canManageWallet) await request("/api/panel/wallet", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(walletSettings) });
       } else if (tab === "Tampilan Halaman") {
         let headerImageUrl = pageSettings.headerImageUrl;
         if (heroFile) {

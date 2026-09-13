@@ -7,9 +7,17 @@ const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "
 test("public product contract exposes neutral delivery mode and readiness", () => {
   const route = read("app/api/products/route.ts");
   const checkout = read("app/checkout/page.tsx");
+  const availability = read("lib/server/availability.ts");
 
-  assert.match(route, /fulfillmentMode: item\.fulfillmentType === "manual" \? "manual" : pkg\.providerCode === "voucher-stock" \? "voucher_stock" : "provider"/);
-  assert.match(route, /fulfillmentReady: item\.fulfillmentType === "manual" \|\| Boolean\(pkg\.providerCode && pkg\.providerSku\)/);
+  assert.match(route, /const fulfillmentMode = item\.fulfillmentType === "manual"/);
+  assert.match(route, /pkg\.providerCode === "voucher-stock"/);
+  assert.match(route, /const fulfillmentReady = item\.fulfillmentType === "manual" \|\| Boolean\(pkg\.providerCode && pkg\.providerSku\)/);
+  assert.match(route, /fulfillmentAvailable/);
+  assert.match(route, /voucherStockKeys\.has\(pkg\.providerSku\)/);
+  assert.match(route, /digiflazzAvailability\.get\(pkg\.dbId\) === true/);
+  assert.match(availability, /start_cut_off, end_cut_off/);
+  assert.match(availability, /isDigiflazzSnapshotAvailable\(/);
+  assert.match(availability, /currentMinutes\(date, "Asia\/Jakarta"\)/);
   assert.doesNotMatch(route, /provider(Code|Sku|Configured):/);
   assert.match(checkout, /selectedPackage\?\.fulfillmentMode/);
   assert.match(checkout, /isVoucherStock = fulfillmentMode === "voucher_stock"/);

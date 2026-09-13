@@ -27,11 +27,11 @@ export function PanelLogin({ role, initialError = "" }: { role: "owner" | "staff
         <div className="grid w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#0d1017] shadow-2xl shadow-black/30 lg:grid-cols-[.85fr_1.15fr]">
           <section className="hidden bg-[radial-gradient(circle_at_top_left,rgba(185,255,53,0.15),transparent_52%),#090c11] p-9 lg:block">
             <span className="grid size-12 place-items-center rounded-2xl border border-[#b9ff35]/20 bg-[#b9ff35]/10 text-[#b9ff35]"><ShieldCheck className="size-6" /></span>
-            <p className="eyebrow mt-8">{owner ? "Panel Admin" : "Panel Staff"}</p>
+            <p className="eyebrow mt-8">{owner ? "Panel Backoffice" : "Panel Staff"}</p>
             <h1 className="text-3xl font-black tracking-[-0.04em]">{owner ? "Akses penuh LFAMILIA." : "Operasional LFAMILIA."}</h1>
             <p className="mt-4 text-xs leading-6 text-white/40">
               {owner
-                ? "Pemilik mengatur katalog, pembayaran, saldo, integrasi, dan akun Staff."
+                ? "Super Admin dan Admin yang berwenang mengatur operasional toko Staff."
                 : "Staff masuk cukup dengan ID dan password yang dibuat oleh Super Admin. Tidak memerlukan login Cloudflare."}
             </p>
           </section>

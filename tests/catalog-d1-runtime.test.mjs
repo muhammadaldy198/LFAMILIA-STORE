@@ -20,9 +20,14 @@ test("public catalog strips supplier pricing and provider SKU metadata", () => {
   const route = read("app/api/products/route.ts");
   const checkout = read("app/checkout/page.tsx");
 
-  assert.match(route, /fulfillmentMode: item\.fulfillmentType === "manual" \? "manual" : pkg\.providerCode === "voucher-stock" \? "voucher_stock" : "provider"/);
-  assert.match(route, /fulfillmentReady: item\.fulfillmentType === "manual" \|\| Boolean\(pkg\.providerCode && pkg\.providerSku\)/);
-assert.doesNotMatch(route, /providerConfigured:/);
+  assert.match(route, /const fulfillmentMode = item\.fulfillmentType === "manual"/);
+  assert.match(route, /pkg\.providerCode === "voucher-stock"/);
+  assert.match(route, /\? "voucher_stock"/);
+  assert.match(route, /const fulfillmentReady = item\.fulfillmentType === "manual" \|\| Boolean\(pkg\.providerCode && pkg\.providerSku\)/);
+  assert.match(route, /fulfillmentAvailable/);
+  assert.match(route, /voucherStockKeys\.has\(pkg\.providerSku\)/);
+  assert.match(route, /digiflazzAvailability\.get\(pkg\.dbId\) === true/);
+  assert.doesNotMatch(route, /providerConfigured:/);
   assert.doesNotMatch(route, /providerCode: pkg\.providerCode/);
   assert.doesNotMatch(route, /supplierPrice: pkg\./);
   assert.doesNotMatch(route, /marginValue: pkg\./);
@@ -33,11 +38,11 @@ assert.doesNotMatch(route, /providerConfigured:/);
   assert.match(checkout, /selectedPackage\?\.fulfillmentReady/);
   assert.match(checkout, /selectedPackage\?\.fulfillmentMode/);
   assert.match(checkout, /isVoucherStock = fulfillmentMode === "voucher_stock"/);
-assert.match(checkout, /item\.fulfillmentReady/);
+  assert.match(checkout, /item\.fulfillmentReady/);
   assert.doesNotMatch(checkout, /selectedPackage\?\.providerSku/);
-assert.doesNotMatch(checkout, /selectedPackage\?\.providerCode/);
-assert.doesNotMatch(checkout, /item\.provider(Code|Sku)/);
-assert.match(route, /Cache-Control\": \"no-store\"/);
+  assert.doesNotMatch(checkout, /selectedPackage\?\.providerCode/);
+  assert.doesNotMatch(checkout, /item\.provider(Code|Sku)/);
+  assert.match(route, /Cache-Control\": \"no-store\"/);
 });
 
 test("checkout only accepts products and packages that exist in D1", () => {

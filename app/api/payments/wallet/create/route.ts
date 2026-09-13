@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isAutomaticPackageAvailable } from "@/lib/server/availability";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
 import {
@@ -20,7 +21,6 @@ import {
 import { PromotionQuoteError, quotePromotion } from "@/lib/server/promotions";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
-import { hasAvailableVoucherStock } from "@/lib/server/vouchers";
 import { getWalletOrderBalance, settleWalletOrder, WalletSettlementError } from "@/lib/server/wallet";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
@@ -133,7 +133,16 @@ export async function POST(request: Request) {
     if (priorResponse) return priorResponse;
     const item = await resolvePurchasableItem(input.productSlug, input.packageSku);
     if (!item) return Response.json({ error: "Produk atau nominal tidak tersedia." }, { status: 404 });
-    if (item.providerCode === "voucher-stock" && item.providerSku && !await hasAvailableVoucherStock(item.providerSku)) return Response.json({ error: "Stok kode untuk paket ini sedang habis." }, { status: 409 });
+    if (
+      item.fulfillmentType === "automatic" &&
+      !(await isAutomaticPackageAvailable({
+        packageId: item.packageId,
+        providerCode: item.providerCode,
+        providerSku: item.providerSku,
+      }))
+    ) {
+      return Response.json({ error: "Nominal otomatis sedang tidak tersedia." }, { status: 409 });
+    }
     const membership = await getMemberTierProfile(customer.id);
     const promotion = await quotePromotion(
       item.productSlug,
