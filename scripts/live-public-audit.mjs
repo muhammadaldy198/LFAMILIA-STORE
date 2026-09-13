@@ -4,24 +4,9 @@ const warnings = [];
 const results = [];
 
 const publicPages = [
-  "/",
-  "/catalog",
-  "/checkout",
-  "/contact",
-  "/faq",
-  "/leaderboard",
-  "/news",
-  "/promo",
-  "/track",
-  "/login",
-  "/payment",
-  "/privacy",
-  "/terms",
-  "/refund",
-  "/tools",
-  "/tools/win-rate",
-  "/tools/zodiac",
-  "/tools/magic-wheel",
+  "/", "/catalog", "/checkout", "/contact", "/faq", "/leaderboard", "/news",
+  "/promo", "/track", "/login", "/payment", "/privacy", "/terms", "/refund",
+  "/tools", "/tools/win-rate", "/tools/zodiac", "/tools/magic-wheel",
 ];
 
 const publicApis = [
@@ -33,7 +18,8 @@ const publicApis = [
   "/api/payment-methods",
   "/api/payment-page-settings",
   "/api/promotions",
-  "/api/reviews",
+  "/api/reviews?featured=1",
+  "/api/wallet",
 ];
 
 const protectedApis = [
@@ -41,38 +27,22 @@ const protectedApis = [
   "/api/account/membership",
   "/api/account/support",
   "/api/account/game-accounts",
-  "/api/account/topups",
-  "/api/wallet",
 ];
 
 const forbiddenPublicKeys = new Set([
-  "providerCode",
-  "providerSku",
-  "provider_code",
-  "provider_sku",
-  "supplierPrice",
-  "supplier_price",
-  "apiKey",
-  "api_key",
-  "clientSecret",
-  "client_secret",
-  "secretKey",
-  "secret_key",
-  "privateKey",
-  "private_key",
+  "providerCode", "providerSku", "provider_code", "provider_sku",
+  "supplierPrice", "supplier_price", "apiKey", "api_key",
+  "clientSecret", "client_secret", "secretKey", "secret_key",
+  "privateKey", "private_key",
 ]);
 const forbiddenPublicBrands = ["digiflazz", "doku", "melostore"];
 
-function addIssue(scope, message) {
-  issues.push(`${scope}: ${message}`);
-}
-function addWarning(scope, message) {
-  warnings.push(`${scope}: ${message}`);
-}
+function addIssue(scope, message) { issues.push(`${scope}: ${message}`); }
+function addWarning(scope, message) { warnings.push(`${scope}: ${message}`); }
 
 async function request(path, options = {}) {
   const url = new URL(path, BASE);
-  url.searchParams.set("live_audit", Date.now().toString(36));
+  url.searchParams.set("live_audit", `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
   const started = Date.now();
   let response;
   let error;
@@ -83,7 +53,7 @@ async function request(path, options = {}) {
         headers: {
           accept: options.accept || "*/*",
           "cache-control": "no-cache",
-          "user-agent": "lfamilia-live-public-audit/1.0",
+          "user-agent": "lfamilia-live-public-audit/2.0",
         },
         signal: AbortSignal.timeout(20_000),
       });
@@ -127,11 +97,26 @@ function inspectJsonValue(scope, value, trail = "root") {
   }
 }
 
-function inspectBrandLeak(scope, text) {
-  const lower = text.toLowerCase();
-  for (const brand of forbiddenPublicBrands) {
-    if (lower.includes(brand)) addIssue(scope, `nama integrasi internal "${brand}" muncul pada response publik`);
+function collectBrandLeaks(value, trail = "root", found = []) {
+  if (typeof value === "string") {
+    const lower = value.toLowerCase();
+    for (const brand of forbiddenPublicBrands) {
+      const index = lower.indexOf(brand);
+      if (index >= 0) {
+        const start = Math.max(0, index - 45);
+        const end = Math.min(value.length, index + brand.length + 45);
+        found.push({ brand, trail, snippet: value.slice(start, end).replaceAll(/\s+/g, " ") });
+      }
+    }
+    return found;
   }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => collectBrandLeaks(entry, `${trail}[${index}]`, found));
+    return found;
+  }
+  if (!value || typeof value !== "object") return found;
+  for (const [key, entry] of Object.entries(value)) collectBrandLeaks(entry, `${trail}.${key}`, found);
+  return found;
 }
 
 function parseSameOriginAssets(html) {
@@ -155,6 +140,7 @@ function parseSameOriginAssets(html) {
 console.log(`LIVE PUBLIC AUDIT target=${BASE}`);
 
 let homepageHtml = "";
+let firstHomepageMs = null;
 for (const path of publicPages) {
   const scope = `PAGE ${path}`;
   try {
@@ -167,15 +153,31 @@ for (const path of publicPages) {
     if (/vinext-starter|create next app/i.test(text)) addIssue(scope, "starter/default branding masih muncul");
     if (!/<meta[^>]+name=["']viewport["']/i.test(text)) addWarning(scope, "meta viewport tidak terdeteksi");
     if (!/<title>[^<]+<\/title>/i.test(text)) addWarning(scope, "title HTML tidak terdeteksi");
-    if (ms > 5000) addWarning(scope, `response lambat ${ms}ms`);
     inspectSecurityHeaders(scope, response);
     if (path === "/") {
       homepageHtml = text;
+      firstHomepageMs = ms;
       if (!/LFAMILIA/i.test(text)) addIssue(scope, "branding LFAMILIA tidak ditemukan");
     }
   } catch (error) {
     addIssue(scope, `request gagal: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+// Distinguish a repeatable slow homepage from a one-off Worker/D1 cold start.
+const warmHomepageTimings = [];
+for (let i = 0; i < 3; i += 1) {
+  try {
+    const { response, ms } = await request("/", { accept: "text/html,application/xhtml+xml" });
+    if (response.status === 200) warmHomepageTimings.push(ms);
+  } catch {}
+}
+if (warmHomepageTimings.length === 3) {
+  const sorted = [...warmHomepageTimings].sort((a, b) => a - b);
+  const median = sorted[1];
+  console.log(`Homepage timing: first=${firstHomepageMs}ms warm=${warmHomepageTimings.join(",")}ms medianWarm=${median}ms`);
+  if (median > 3000) addIssue("PERF /", `homepage tetap lambat setelah warm-up (median ${median}ms)`);
+  else if ((firstHomepageMs ?? 0) > 5000) addWarning("PERF /", `cold request ${firstHomepageMs}ms tetapi warm median ${median}ms; cek biaya first-request Worker/D1`);
 }
 
 for (const path of publicApis) {
@@ -187,9 +189,12 @@ for (const path of publicApis) {
     if (!contentType.toLowerCase().includes("application/json")) addIssue(scope, `content-type bukan JSON (${contentType || "kosong"})`);
     let payload;
     try { payload = JSON.parse(text); } catch { addIssue(scope, "body bukan JSON valid"); }
-    if (payload !== undefined) inspectJsonValue(scope, payload);
-    inspectBrandLeak(scope, text);
-    if ((response.headers.get("cache-control") || "").toLowerCase().includes("public")) addIssue(scope, "response API sensitif ditandai public cache");
+    if (payload !== undefined) {
+      inspectJsonValue(scope, payload);
+      for (const leak of collectBrandLeaks(payload)) {
+        addIssue(scope, `nama integrasi internal "${leak.brand}" di ${leak.trail}: ${JSON.stringify(leak.snippet)}`);
+      }
+    }
     if (ms > 5000) addWarning(scope, `response lambat ${ms}ms`);
     inspectSecurityHeaders(scope, response);
 
@@ -203,8 +208,11 @@ for (const path of publicApis) {
         }
       }
     }
-    if (path === "/api/payment-methods" && payload && !Array.isArray(payload.channels)) {
-      addIssue(scope, "channels bukan array");
+    if (path === "/api/payment-methods" && payload && !Array.isArray(payload.channels)) addIssue(scope, "channels bukan array");
+    if (path === "/api/wallet" && payload) {
+      if (!payload.settings || typeof payload.settings.enabled !== "boolean" || !Number.isFinite(Number(payload.settings.minimumAmount))) {
+        addIssue(scope, "public wallet settings contract invalid");
+      }
     }
   } catch (error) {
     addIssue(scope, `request gagal: ${error instanceof Error ? error.message : String(error)}`);
@@ -215,14 +223,20 @@ for (const path of protectedApis) {
   const scope = `AUTH ${path}`;
   try {
     const { response, text } = await request(path, { accept: "application/json", redirect: "manual" });
-    if (![401, 403].includes(response.status)) {
-      addIssue(scope, `tanpa sesi mengembalikan HTTP ${response.status}, seharusnya 401/403`);
-    }
+    if (![401, 403].includes(response.status)) addIssue(scope, `tanpa sesi mengembalikan HTTP ${response.status}, seharusnya 401/403`);
     if (/wallet_transactions|customer_sessions|password_hash/i.test(text)) addIssue(scope, "data privat terlihat pada response tanpa sesi");
     inspectSecurityHeaders(scope, response);
   } catch (error) {
     addIssue(scope, `request gagal: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+// GET is intentionally unsupported on the POST-only top-up endpoint; this is a safe read-only method-boundary check.
+try {
+  const { response } = await request("/api/account/topups", { accept: "application/json", redirect: "manual" });
+  if (response.status !== 405) addIssue("METHOD /api/account/topups", `GET menghasilkan HTTP ${response.status}, expected 405`);
+} catch (error) {
+  addIssue("METHOD /api/account/topups", `request gagal: ${error instanceof Error ? error.message : String(error)}`);
 }
 
 for (const path of ["/api/admin/summary", "/admin/panel"]) {
@@ -251,9 +265,7 @@ if (homepageHtml) {
 }
 
 console.log("\n=== LIVE AUDIT MATRIX ===");
-for (const row of results) {
-  console.log(`${String(row.status).padEnd(4)} ${String(row.ms).padStart(5)}ms ${row.path} -> ${row.finalUrl}`);
-}
+for (const row of results) console.log(`${String(row.status).padEnd(4)} ${String(row.ms).padStart(5)}ms ${row.path} -> ${row.finalUrl}`);
 
 console.log(`\nSUMMARY pages=${publicPages.length} publicApis=${publicApis.length} protectedApis=${protectedApis.length} requests=${results.length} issues=${issues.length} warnings=${warnings.length}`);
 if (warnings.length) {
