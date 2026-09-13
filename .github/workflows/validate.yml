@@ -40,6 +40,12 @@ jobs:
       - name: Tests
         run: node --test tests/*.test.mjs
 
+      - name: Live public production audit
+        if: github.event_name == 'pull_request'
+        env:
+          PRODUCTION_BASE_URL: https://lfamiliastore.my.id
+        run: node scripts/live-public-audit.mjs
+
       - name: Wait for Cloudflare production deployment
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
