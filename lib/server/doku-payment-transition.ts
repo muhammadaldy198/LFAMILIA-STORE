@@ -7,10 +7,24 @@ import {
 
 export type DokuTerminalStatus = "paid" | "pending" | "expired" | "failed";
 
+async function expirePendingOrderIfDue(order: OrderRecord) {
+  const result = await getD1().prepare(
+    `UPDATE orders
+     SET payment_status = 'expired', updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND payment_status = 'pending'
+       AND doku_expired_at IS NOT NULL
+       AND datetime(doku_expired_at) <= datetime('now')`,
+  ).bind(order.id).run();
+  const changed = Number(result.meta.changes ?? 0) > 0;
+  if (changed) await releaseExternalPromotion(order.id);
+  return changed;
+}
+
 /**
- * DOKU may send or return delayed status updates. Only a locally pending order
- * may transition, so a late paid event cannot revive an expired/failed order
- * and a delayed failure cannot downgrade a paid order.
+ * DOKU may send or return delayed status updates. Only a locally pending and
+ * not-yet-expired order may become paid. The database deadline check is part of
+ * the conditional UPDATE so a late paid callback cannot race the expiry job and
+ * revive an invoice whose stored DOKU validity has already elapsed.
  */
 export async function applyPendingDokuPaymentStatus(
   order: OrderRecord,
@@ -25,13 +39,22 @@ export async function applyPendingDokuPaymentStatus(
     const result = await db.prepare(
       `UPDATE orders
        SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND payment_status = 'pending'`,
+       WHERE id = ? AND payment_status = 'pending'
+         AND (doku_expired_at IS NULL OR datetime(doku_expired_at) > datetime('now'))`,
     ).bind(nextFulfillment, order.id).run();
     const changed = Number(result.meta.changes ?? 0) > 0;
     if (changed) {
       await consumeOrderPromotion(order.voucher_code, order.flash_sale_id, order.id);
+      return true;
     }
-    return changed;
+
+    await expirePendingOrderIfDue(order);
+    return false;
+  }
+
+  if (status === "expired") {
+    await expirePendingOrderIfDue(order);
+    return false;
   }
 
   const result = await db.prepare(
@@ -39,7 +62,7 @@ export async function applyPendingDokuPaymentStatus(
      WHERE id = ? AND payment_status = 'pending'`,
   ).bind(status, order.id).run();
   const changed = Number(result.meta.changes ?? 0) > 0;
-  if (changed && (status === "expired" || status === "failed")) {
+  if (changed && status === "failed") {
     await releaseExternalPromotion(order.id);
   }
   return false;
