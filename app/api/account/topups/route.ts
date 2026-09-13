@@ -117,6 +117,8 @@ export async function POST(request: Request) {
 
   let referenceId: string | null = null;
   let idempotencyKey = "";
+  let requestedAmount: number | null = null;
+  let requestedPaymentMethodKey = "";
   try {
     if (!request.headers.get("content-type")?.includes("application/json")) {
       throw new Error("Top up saldo hanya tersedia melalui pembayaran otomatis.");
@@ -149,6 +151,8 @@ export async function POST(request: Request) {
     }
 
     const paymentMethodKey = `${input.paymentMethod}:${paymentChannel}`;
+    requestedAmount = input.amount;
+    requestedPaymentMethodKey = paymentMethodKey;
     const headerKey = request.headers.get("idempotency-key")?.trim() || "";
     idempotencyKey = input.idempotencyKey || (/^[0-9a-f-]{36}$/i.test(headerKey) ? headerKey : "");
     if (idempotencyKey) {
@@ -249,7 +253,18 @@ export async function POST(request: Request) {
   } catch (error) {
     if (idempotencyKey && error instanceof Error && /UNIQUE constraint failed/i.test(error.message)) {
       const winner = await findTopupByKey(customer.id, idempotencyKey).catch(() => null);
-      if (winner) return existingResponse(winner);
+      if (winner) {
+        if (
+          winner.amount !== requestedAmount ||
+          winner.payment_method !== requestedPaymentMethodKey
+        ) {
+          return Response.json(
+            { error: "Idempotency key sudah dipakai untuk permintaan top up berbeda." },
+            { status: 409 },
+          );
+        }
+        return existingResponse(winner);
+      }
     }
 
     const message =
