@@ -2,6 +2,8 @@ import { getD1 } from "@/db";
 
 let repairPromise: Promise<void> | null = null;
 
+const FINAL_AUDIT_MIGRATION = "0029_final_source_audit_remediation.sql";
+
 const columns: Array<[table: string, column: string, definition: string]> = [
   ["products", "image_url", "image_url TEXT"],
   ["products", "banner_url", "banner_url TEXT"],
@@ -104,6 +106,13 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ],
 ];
 
+type TableInfo = {
+  name: string;
+  notnull?: number;
+  dflt_value?: string | null;
+  pk?: number;
+};
+
 /** Repairs columns from old, partially-applied D1 migrations without dropping any data. */
 export async function ensureLegacyDatabaseColumns() {
   if (!repairPromise) {
@@ -114,7 +123,7 @@ export async function ensureLegacyDatabaseColumns() {
         error instanceof Error ? error.message : String(error);
 
       const tableColumns = async (table: string) =>
-        db.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>();
+        db.prepare(`PRAGMA table_info(${table})`).all<TableInfo>();
 
       for (const [table, column, definition] of columns) {
         try {
@@ -249,6 +258,65 @@ export async function ensureLegacyDatabaseColumns() {
           LIMIT 1
         )
         WHERE supplier_cost_snapshot IS NULL`);
+
+      // If Wrangler's migration ledger already exists, record 0029 only after the
+      // complete target schema is present. This prevents a later Wrangler apply
+      // from replaying ALTER TABLE statements that Cloudflare runtime already healed.
+      try {
+        const requiredColumns: Array<[string, string[]]> = [
+          ["orders", ["delivery_mode", "supplier_cost_snapshot", "doku_environment"]],
+          ["wallet_topups", ["doku_environment", "external_checkout_key"]],
+          ["discount_vouchers", ["reserved_count"]],
+          ["flash_sales", ["reserved_count"]],
+        ];
+        let complete = true;
+        for (const [table, required] of requiredColumns) {
+          const info = await tableColumns(table);
+          const names = new Set(info.results.map((entry) => entry.name));
+          if (required.some((column) => !names.has(column))) {
+            complete = false;
+            break;
+          }
+        }
+
+        if (complete) {
+          const schemaObjects = await db.prepare(
+            `SELECT name FROM sqlite_master WHERE name IN (
+              'promotion_reservations',
+              'promotion_reservations_expiry_idx',
+              'wallet_topups_external_checkout_key_unique',
+              'promotion_reservation_voucher_guard',
+              'promotion_reservation_flash_guard',
+              'promotion_reservation_insert',
+              'promotion_reservation_consumed',
+              'promotion_reservation_released'
+            )`,
+          ).all<{ name: string }>();
+          if (schemaObjects.results.length !== 8) complete = false;
+        }
+
+        if (complete) {
+          const ledger = await tableColumns("d1_migrations");
+          const nameColumn = ledger.results.some((entry) => entry.name === "name");
+          const unsupportedRequiredColumn = ledger.results.some(
+            (entry) =>
+              entry.name !== "name" &&
+              Boolean(entry.notnull) &&
+              !entry.dflt_value &&
+              !entry.pk,
+          );
+          if (nameColumn && !unsupportedRequiredColumn) {
+            await db.prepare(
+              "INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)",
+            ).bind(FINAL_AUDIT_MIGRATION).run();
+          }
+        }
+      } catch (error) {
+        const message = messageOf(error);
+        if (!/no such table.*d1_migrations/i.test(message)) {
+          console.error("D1 migration ledger marker gagal:", error);
+        }
+      }
     })().catch((error) => {
       repairPromise = null;
       throw error;
