@@ -157,7 +157,7 @@ const worker = {
     }
 
     setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
-    await ensureLegacyDatabaseColumns();
+    if (env.DB) await ensureLegacyDatabaseColumns();
 
     if (url.pathname === "/_vinext/image") {
       if (!env.IMAGES) return withSecurityHeaders(new Response("Image optimization is unavailable.", { status: 404 }), url);
