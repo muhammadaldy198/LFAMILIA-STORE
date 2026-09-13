@@ -35,6 +35,7 @@ async function queryOrderStatus(order: OrderRecord) {
       environment: order.doku_environment,
       channel: order.payment_channel,
       paymentNo: order.doku_payment_no,
+      referenceId: order.reference_id,
     });
   }
   if (order.payment_method === "ewallet") {
@@ -56,6 +57,7 @@ async function queryTopupStatus(topup: PendingTopup) {
       environment: topup.doku_environment,
       channel,
       paymentNo: topup.doku_payment_no,
+      referenceId: topup.reference_id,
     });
   }
   if (method === "ewallet") {
