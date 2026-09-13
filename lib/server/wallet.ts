@@ -154,6 +154,7 @@ export async function updateDokuWalletTopup(input: {
     )
     .run();
 }
+
 export async function getDokuWalletTopup(referenceId: string) {
   await ensureLegacyDatabaseColumns();
   return getD1()
@@ -206,7 +207,9 @@ export async function applyDokuWalletTopup(input: {
            FROM wallet_topups t CROSS JOIN (
              SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0) AS balance
              FROM wallet_transactions WHERE customer_id = ?
-           ) ledger WHERE t.id = ? AND t.status = 'pending'`,
+           ) ledger
+           WHERE t.id = ? AND t.status = 'pending'
+             AND (t.doku_expired_at IS NULL OR datetime(t.doku_expired_at) > datetime('now'))`,
         )
         .bind(
           crypto.randomUUID(),
@@ -217,18 +220,43 @@ export async function applyDokuWalletTopup(input: {
         ),
       db
         .prepare(
-          "UPDATE wallet_topups SET status = 'approved', reviewed_by = 'doku-callback', reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
+          `UPDATE wallet_topups
+           SET status = 'approved', reviewed_by = 'doku-callback',
+               reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND status = 'pending'
+             AND EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?)`,
         )
-        .bind(topup.id),
+        .bind(topup.id, reference),
       db
         .prepare(
-          "UPDATE customer_users SET balance = (SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0) FROM wallet_transactions WHERE customer_id = ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+          `UPDATE customer_users
+           SET balance = (
+             SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0)
+             FROM wallet_transactions WHERE customer_id = ?
+           ), updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?)`,
         )
-        .bind(topup.customer_id, topup.customer_id),
+        .bind(topup.customer_id, topup.customer_id, reference),
     ]);
     const inserted = Number(results[0]?.meta.changes ?? 0) > 0;
     const approved = Number(results[1]?.meta.changes ?? 0) > 0;
-    return { found: true, credited: inserted && approved };
+    if (inserted && approved) return { found: true, credited: true };
+
+    const expired = await db
+      .prepare(
+        `UPDATE wallet_topups
+         SET status = 'rejected', admin_notes = 'Pembayaran DOKU kedaluwarsa.',
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND status = 'pending'
+           AND doku_expired_at IS NOT NULL
+           AND datetime(doku_expired_at) <= datetime('now')`,
+      )
+      .bind(topup.id)
+      .run();
+    if (Number(expired.meta.changes ?? 0) > 0) {
+      return { found: true, credited: false, ignored: "expired" };
+    }
+    return { found: true, credited: false };
   }
 
   if (input.status === "expired" || input.status === "failed") {
