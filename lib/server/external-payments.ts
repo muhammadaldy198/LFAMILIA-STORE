@@ -101,6 +101,19 @@ export async function updateExternalPayment(input: {
     ).run();
 }
 
+export async function recordExternalPaymentEvent(input: {
+  orderId: string;
+  gateway: PaymentGatewayName;
+  eventId: string;
+  status: string;
+  payload: unknown;
+}) {
+  return getD1().prepare(`INSERT OR IGNORE INTO order_events (order_id, source, event_id, status, payload_json)
+    VALUES (?, ?, ?, ?, ?)`)
+    .bind(input.orderId, input.gateway, input.eventId, input.status, JSON.stringify(input.payload))
+    .run();
+}
+
 export function externalArtifactsFromOrder(order: Record<string, unknown>) {
   const gateway = order.payment_gateway === "midtrans" || order.payment_gateway === "doku"
     ? order.payment_gateway
