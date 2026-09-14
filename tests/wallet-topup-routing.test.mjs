@@ -7,14 +7,16 @@ const root = process.cwd();
 const route = fs.readFileSync(path.join(root, "app/api/account/topups/route.ts"), "utf8");
 const account = fs.readFileSync(path.join(root, "components/customer-account.tsx"), "utf8");
 
-test("wallet topup uses DOKU only on the server", () => {
-  assert.match(route, /createDokuDirectPayment\(/);
-  assert.match(route, /source, reference_id, external_checkout_key, doku_environment/);
-  assert.match(route, /'doku'/);
-  assert.match(route, /updateDokuWalletTopup\(/);
+test("wallet topup follows the Admin-selected gateway and mode on the server", () => {
+  assert.match(route, /getPaymentChannel\(/);
+  assert.match(route, /getConfiguredGatewayReadiness\(/);
+  assert.match(route, /createConfiguredPayment\(/);
+  assert.match(route, /gateway: managedChannel\.gateway/);
+  assert.match(route, /mode: readiness\.mode/);
+  assert.match(route, /updateExternalWalletTopup\(/);
   assert.match(route, /idempotencyKey/);
   assert.doesNotMatch(route, /paymentGateway: "doku"/);
-  assert.doesNotMatch(route, /midtrans|ipaymu|fallback/i);
+  assert.doesNotMatch(route, /ipaymu|fallback/i);
 });
 
 test("customer topup UI does not ask which gateway to use", () => {
@@ -23,7 +25,7 @@ test("customer topup UI does not ask which gateway to use", () => {
   assert.doesNotMatch(account, /DOKU|DigiFlazz|Melostore|payment gateway|provider/);
 });
 
-test("customer topup renders Direct API payment artifacts in LFAMILIA", () => {
+test("customer topup renders native artifacts and can follow a hosted payment URL", () => {
   assert.match(account, /QRCodeSVG/);
   assert.match(account, /payment\.paymentNo/);
   assert.match(account, /window\.location\.assign\(payment\.paymentUrl\)/);
