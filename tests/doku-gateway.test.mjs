@@ -5,12 +5,14 @@ import test from "node:test";
 
 const root = process.cwd();
 const doku = fs.readFileSync(path.join(root, "lib/server/doku.ts"), "utf8");
+const dokuCheckout = fs.readFileSync(path.join(root, "lib/server/doku-checkout.ts"), "utf8");
 const callback = fs.readFileSync(path.join(root, "app/api/payments/doku/callback/route.ts"), "utf8");
 const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/route.ts"), "utf8");
+const router = fs.readFileSync(path.join(root, "lib/server/payment-router.ts"), "utf8");
 const providers = fs.readFileSync(path.join(root, "lib/server/providers/index.ts"), "utf8");
 const providerOptions = fs.readFileSync(path.join(root, "lib/provider-options.ts"), "utf8");
 
-test("DOKU Direct API keeps signed QRIS and e-wallet primitives", () => {
+test("DOKU Direct API remains available for future activation", () => {
   assert.match(doku, /authorization\/v1\/access-token\/b2b/);
   assert.match(doku, /snap-adapter\/b2b\/v1\.0\/qr\/qr-mpm-generate/);
   assert.match(doku, /direct-debit\/core\/v1\/debit\/payment-host-to-host/);
@@ -20,18 +22,26 @@ test("DOKU Direct API keeps signed QRIS and e-wallet primitives", () => {
   assert.match(doku, /x-partner-id/);
 });
 
-test("DOKU callback validates signature, amount, and request identity before fulfillment", () => {
+test("DOKU Checkout is available as a selectable hosted mode", () => {
+  assert.match(dokuCheckout, /\/checkout\/v1\/payment/);
+  assert.match(dokuCheckout, /payment_method_types/);
+  assert.match(dokuCheckout, /Client-Id/);
+  assert.match(dokuCheckout, /HMACSHA256/);
+});
+
+test("DOKU callback validates both Checkout and Direct notifications before fulfillment", () => {
   assert.match(callback, /validateDokuNotification\(/);
+  assert.match(callback, /validateDokuCheckoutNotification\(/);
   assert.match(callback, /callbackAmount !== order\.total/);
-  assert.match(callback, /order\.doku_request_id/);
-  assert.match(callback, /originalRequestId/);
   assert.match(callback, /fulfillAutomaticOrder\(/);
 });
 
-test("checkout routes DOKU only for its assigned methods and also supports Midtrans VA", () => {
-  assert.match(autoRoute, /createDokuDirectPayment\(/);
-  assert.match(autoRoute, /createMidtransVirtualAccount\(/);
-  assert.match(autoRoute, /managedChannel\.gateway === "midtrans"/);
+test("checkout dispatches through the selected mode router", () => {
+  assert.match(autoRoute, /createConfiguredPayment\(/);
+  assert.match(router, /createDokuCheckoutPayment\(/);
+  assert.match(router, /createDokuDirectPayment\(/);
+  assert.match(router, /createMidtransSnapPayment\(/);
+  assert.match(router, /createMidtransVirtualAccount\(/);
   assert.doesNotMatch(autoRoute, /ipaymu/i);
 });
 
@@ -68,7 +78,7 @@ test("DOKU callback replay fallback and customer invoice expiry are deterministi
   assert.match(status, /order = await expirePendingInvoice\(order\)/);
 });
 
-test("production DOKU and DigiFlazz calls are guarded in automated tests", () => {
+test("production Direct API and DigiFlazz calls remain guarded in automated tests", () => {
   const runtime = fs.readFileSync(path.join(root, "lib/server/runtime-env.ts"), "utf8");
   const digiflazz = fs.readFileSync(path.join(root, "lib/server/providers/digiflazz.ts"), "utf8");
   assert.match(runtime, /isAutomatedTestRuntime/);

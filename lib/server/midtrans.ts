@@ -97,9 +97,8 @@ function normalizeApiOrigin(value: string, environment: MidtransEnvironment) {
   return parsed.origin;
 }
 
-function getConfig(): MidtransConfig {
+function getConfig(environment: MidtransEnvironment = getMidtransEnvironment()): MidtransConfig {
   const env = runtime();
-  const environment = getMidtransEnvironment();
   const prefix = `MIDTRANS_${environment.toUpperCase()}_`;
   const read = (key: string) => text(env[`${prefix}${key}`]);
   return {
@@ -136,13 +135,13 @@ function createVerificationKey(config: MidtransConfig) {
   }
 }
 
-export function getMidtransReadiness() {
+export function getMidtransReadiness(environment: MidtransEnvironment = getMidtransEnvironment()) {
   let config: MidtransConfig;
   try {
-    config = getConfig();
+    config = getConfig(environment);
   } catch (error) {
     return {
-      environment: getMidtransEnvironment(),
+      environment,
       ready: false,
       missing: [error instanceof Error ? error.message : "Konfigurasi Midtrans tidak valid."],
     };
@@ -313,7 +312,7 @@ export async function createMidtransVirtualAccount(input: {
   expiryMinutes?: number;
 }) {
   const config = getConfig();
-  const readiness = getMidtransReadiness();
+  const readiness = getMidtransReadiness(config.environment);
   if (!readiness.ready) throw new Error(`Konfigurasi Midtrans belum lengkap: ${readiness.missing.join(", ")}`);
   const channel = input.channel.toLowerCase();
   if (!isMidtransChannelSupported("va", channel)) throw new Error("Channel VA Midtrans tidak didukung.");
@@ -379,8 +378,9 @@ export function verifyMidtransNotification(input: {
   timestamp: string;
   signature: string;
   endpointPath: string;
+  expectedEnvironment?: MidtransEnvironment | null;
 }) {
-  const config = getConfig();
+  const config = getConfig(input.expectedEnvironment ?? getMidtransEnvironment());
   if (!input.timestamp || !input.signature) return false;
   const stringToVerify = [
     "POST",
@@ -400,6 +400,6 @@ export function verifyMidtransNotification(input: {
   }
 }
 
-export function getMidtransPartnerId() {
-  return getConfig().partnerId;
+export function getMidtransPartnerId(environment: MidtransEnvironment = getMidtransEnvironment()) {
+  return getConfig(environment).partnerId;
 }

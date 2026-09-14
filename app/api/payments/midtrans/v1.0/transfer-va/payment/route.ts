@@ -2,6 +2,7 @@ import { getD1 } from "@/db";
 import {
   getMidtransPartnerId,
   verifyMidtransNotification,
+  type MidtransEnvironment,
 } from "@/lib/server/midtrans";
 import {
   applyPaymentStatus,
@@ -10,7 +11,11 @@ import {
 } from "@/lib/server/orders";
 import { recordExternalPaymentEvent } from "@/lib/server/external-payments";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
-import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
+import {
+  notifyOrderFulfillmentSuccessById,
+  notifyWalletTopupSuccessById,
+} from "@/lib/server/transaction-notifications";
+import { applyExternalWalletTopup, getExternalWalletTopup } from "@/lib/server/wallet-external";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +35,14 @@ type NotificationBody = {
     merchantId?: string;
     paymentFlagStatus?: string;
   };
+};
+
+type Routing = {
+  payment_gateway: string | null;
+  payment_gateway_mode: string | null;
+  payment_gateway_environment: MidtransEnvironment | null;
+  gateway_reference_no: string | null;
+  gateway_payment_no: string | null;
 };
 
 function clean(value: unknown) {
@@ -67,7 +80,7 @@ function mappedStatus(flag: string): "paid" | "pending" | "expired" | "failed" |
   if (flag === "01" || flag === "02" || flag === "03") return "pending";
   if (flag === "08") return "expired";
   if (flag === "05" || flag === "06" || flag === "07" || flag === "09") return "failed";
-  // A refund notification must never move an already-paid order backwards.
+  // A refund notification must never move an already-paid transaction backwards.
   if (flag === "04") return "ignore";
   return "ignore";
 }
@@ -90,6 +103,10 @@ function invalidAmountResponse() {
     { responseCode: "4042513", responseMessage: "Invalid Amount" },
     404,
   );
+}
+
+function walletChannel(paymentMethod: string) {
+  return paymentMethod.split(":", 2)[1]?.trim().toLowerCase() || "";
 }
 
 export async function GET() {
@@ -117,31 +134,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (!partnerId || partnerId !== getMidtransPartnerId()) {
-      return snapResponse(
-        { responseCode: "4012500", responseMessage: "Unauthorized" },
-        401,
-      );
-    }
     if (!/^\d+$/.test(externalId)) {
       return snapResponse(
         { responseCode: "4002502", responseMessage: "Invalid Mandatory Field X-EXTERNAL-ID" },
         400,
-      );
-    }
-
-    // Midtrans BI-SNAP signs SHA-256(minify(RequestBody)). Parse + stringify
-    // before verification so transport whitespace does not alter the digest.
-    const minifiedBody = JSON.stringify(body);
-    if (!verifyMidtransNotification({
-      rawBody: minifiedBody,
-      timestamp,
-      signature,
-      endpointPath: PROVIDER_ENDPOINT,
-    })) {
-      return snapResponse(
-        { responseCode: "4012500", responseMessage: "Unauthorized" },
-        401,
       );
     }
 
@@ -163,17 +159,53 @@ export async function POST(request: Request) {
     }
 
     const order = await getOrderByReference(referenceId);
-    if (!order) return successResponse(body);
+    const walletTopup = order ? null : await getExternalWalletTopup(referenceId, "midtrans");
+    const routing: Routing | null = order
+      ? await getD1().prepare(
+          `SELECT payment_gateway, payment_gateway_mode, payment_gateway_environment,
+                  gateway_reference_no, gateway_payment_no
+           FROM orders WHERE id = ? LIMIT 1`,
+        ).bind(order.id).first<Routing>()
+      : walletTopup
+        ? {
+            payment_gateway: walletTopup.payment_gateway,
+            payment_gateway_mode: walletTopup.payment_gateway_mode,
+            payment_gateway_environment: walletTopup.gateway_environment,
+            gateway_reference_no: walletTopup.gateway_reference_no,
+            gateway_payment_no: walletTopup.gateway_payment_no,
+          }
+        : null;
+    const expectedEnvironment = routing?.payment_gateway_environment ?? null;
 
-    const routing = await getD1().prepare(
-      `SELECT payment_gateway, gateway_reference_no, gateway_payment_no
-       FROM orders WHERE id = ? LIMIT 1`,
-    ).bind(order.id).first<{
-      payment_gateway: string | null;
-      gateway_reference_no: string | null;
-      gateway_payment_no: string | null;
-    }>();
-    if (routing?.payment_gateway !== "midtrans") return successResponse(body);
+    if (!partnerId || partnerId !== (expectedEnvironment
+      ? getMidtransPartnerId(expectedEnvironment)
+      : getMidtransPartnerId())) {
+      return snapResponse(
+        { responseCode: "4012500", responseMessage: "Unauthorized" },
+        401,
+      );
+    }
+
+    // Midtrans BI-SNAP signs SHA-256(minify(RequestBody)). Parse + stringify
+    // before verification so transport whitespace does not alter the digest.
+    const minifiedBody = JSON.stringify(body);
+    if (!verifyMidtransNotification({
+      rawBody: minifiedBody,
+      timestamp,
+      signature,
+      endpointPath: PROVIDER_ENDPOINT,
+      expectedEnvironment,
+    })) {
+      return snapResponse(
+        { responseCode: "4012500", responseMessage: "Unauthorized" },
+        401,
+      );
+    }
+
+    if (!order && !walletTopup) return successResponse(body);
+    if (routing?.payment_gateway !== "midtrans" || routing.payment_gateway_mode !== "bisnap") {
+      return successResponse(body);
+    }
     if (routing.gateway_payment_no && routing.gateway_payment_no !== virtualAccountNo) {
       return snapResponse(
         { responseCode: "4002502", responseMessage: "Invalid Virtual Account" },
@@ -181,8 +213,9 @@ export async function POST(request: Request) {
       );
     }
 
+    const expectedChannel = order?.payment_channel.toLowerCase() || walletChannel(walletTopup?.payment_method || "");
     const bank = clean(body.additionalInfo?.bank).toLowerCase();
-    if (bank && bank !== order.payment_channel.toLowerCase()) return successResponse(body);
+    if (bank && expectedChannel && bank !== expectedChannel) return successResponse(body);
     const callbackReference = clean(body.referenceNo);
     if (
       routing.gateway_reference_no &&
@@ -193,6 +226,26 @@ export async function POST(request: Request) {
     const flag = clean(body.additionalInfo?.paymentFlagStatus);
     const status = mappedStatus(flag);
     const callbackAmount = paymentAmount(body);
+
+    if (walletTopup) {
+      if (status === "paid" && callbackAmount !== walletTopup.amount) return invalidAmountResponse();
+      const result = status === "ignore"
+        ? { found: true, credited: false }
+        : await applyExternalWalletTopup({
+            referenceId,
+            gateway: "midtrans",
+            status,
+            callbackAmount: callbackAmount ?? 0,
+          });
+      if (result.credited) {
+        await notifyWalletTopupSuccessById(walletTopup.id, referenceId).catch((error) =>
+          console.error("Notifikasi top up Midtrans BI-SNAP gagal:", error),
+        );
+      }
+      return successResponse(body);
+    }
+
+    if (!order) return successResponse(body);
     if (status === "paid" && callbackAmount !== order.total) return invalidAmountResponse();
 
     await recordExternalPaymentEvent({

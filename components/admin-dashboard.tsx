@@ -32,6 +32,7 @@ import { AdminIntegrationWorkspace } from "@/components/admin-integration-worksp
 import { AdminOrderManager } from "@/components/admin-order-manager";
 import { AdminOverview } from "@/components/admin-overview";
 import { AdminPaymentWorkspace } from "@/components/admin-payment-workspace";
+import { AdminGatewayRoutingPanel, AdminHostedGatewayCredentialsPanel } from "@/components/admin-payment-routing-panel";
 import { AdminProductManager } from "@/components/admin-product-manager";
 import { StaffProductContentWorkspace } from "@/components/staff-product-content-workspace";
 import { AdminCustomerDirectory } from "@/components/admin-customer-directory";
@@ -178,14 +179,13 @@ export function AdminDashboard({
             <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} />{initialSession.role === "staff" && <StaffProductContentWorkspace />}</TabsContent>
 
             {(isOwner || isAdmin) && <TabsContent value="digiflazz" className="mt-0"><AdminDigiflazzWorkspace /></TabsContent>}
-
-            {(isOwner || isAdmin) && <TabsContent value="payments" className="mt-0"><AdminPaymentWorkspace /></TabsContent>}
+            {(isOwner || isAdmin) && <TabsContent value="payments" className="mt-0">{isOwner && <AdminGatewayRoutingPanel />}<AdminPaymentWorkspace /></TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="customers" className="mt-0">{isOwner ? <AdminCustomerWorkspace /> : <AdminCustomerDirectory />}</TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="promotions" className="mt-0"><AdminPromoWorkspace /></TabsContent>}
             <TabsContent value="support" className="mt-0"><AdminSupportWorkspace /></TabsContent>
             {(isOwner || isAdmin) && <TabsContent value="reports" className="mt-0"><AdminReportsWorkspace /></TabsContent>}
             {isOwner && <TabsContent value="team" className="mt-0"><AdminTeamWorkspace /></TabsContent>}
-            {isOwner && <TabsContent value="integrations" className="mt-0"><AdminIntegrationWorkspace /></TabsContent>}
+            {isOwner && <TabsContent value="integrations" className="mt-0"><AdminHostedGatewayCredentialsPanel /><AdminIntegrationWorkspace /></TabsContent>}
             {isOwner && <TabsContent value="settings" className="mt-0"><AdminSettingsWorkspace /></TabsContent>}
           </div>
         </main>

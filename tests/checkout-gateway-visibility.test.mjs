@@ -14,10 +14,12 @@ test("checkout hides payment gateway selection from customers", () => {
   assert.match(checkout, /Pilih metode pembayaran yang ingin digunakan/);
 });
 
-test("automatic checkout routes internally between DOKU and Midtrans", () => {
-  assert.match(autoRoute, /createDokuDirectPayment\(/);
-  assert.match(autoRoute, /createMidtransVirtualAccount\(/);
-  assert.match(autoRoute, /managedChannel\.gateway === "midtrans"/);
+test("automatic checkout routes internally through the Admin-selected gateway mode", () => {
+  assert.match(autoRoute, /getPaymentChannel\(/);
+  assert.match(autoRoute, /getConfiguredGatewayReadiness\(/);
+  assert.match(autoRoute, /createConfiguredPayment\(/);
+  assert.match(autoRoute, /gateway: managedChannel\.gateway/);
+  assert.match(autoRoute, /mode: payment\.mode/);
   assert.match(autoRoute, /const identity = createOrderIdentity\(\)/);
   assert.doesNotMatch(autoRoute, /iPaymu/i);
 });

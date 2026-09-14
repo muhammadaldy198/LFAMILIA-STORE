@@ -77,7 +77,7 @@ test("same topup idempotency key cannot be rebound to a different request", () =
 test("production topup route re-reads the winner and validates request binding after a UNIQUE race", () => {
   const route = fs.readFileSync(path.join(root, "app/api/account/topups/route.ts"), "utf8");
   assert.match(route, /UNIQUE constraint failed/);
-  assert.match(route, /findTopupByKey\(customer\.id, idempotencyKey\)/);
+  assert.match(route, /findExternalTopupByKey\(customer\.id, idempotencyKey\)/);
   assert.match(route, /winner\.amount !== requestedAmount/);
   assert.match(route, /winner\.payment_method !== requestedPaymentMethodKey/);
 });
