@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
-import { testDokuB2BConnection } from "@/lib/server/doku-connection-test";
+import { dokuApiOrigin, testDokuB2BConnection } from "@/lib/server/doku-connection-test";
 import {
   getIntegrationOverview,
   saveIntegrationProfile,
@@ -76,7 +76,17 @@ export async function PUT(request: Request) {
       );
     }
     if (input.action === "save_profile") {
-      await saveIntegrationProfile(input);
+      if (input.provider === "doku" && (input.environment === "sandbox" || input.environment === "production")) {
+        await saveIntegrationProfile({
+          ...input,
+          values: {
+            ...input.values,
+            apiUrl: dokuApiOrigin(input.environment),
+          },
+        });
+      } else {
+        await saveIntegrationProfile(input);
+      }
     } else {
       await saveIntegrationSelections(input.selections);
     }
