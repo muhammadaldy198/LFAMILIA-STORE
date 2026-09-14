@@ -2,6 +2,7 @@ import { getD1 } from "@/db";
 import {
   getMidtransPartnerId,
   verifyMidtransNotification,
+  type MidtransEnvironment,
 } from "@/lib/server/midtrans";
 import {
   applyPaymentStatus,
@@ -39,6 +40,7 @@ type NotificationBody = {
 type Routing = {
   payment_gateway: string | null;
   payment_gateway_mode: string | null;
+  payment_gateway_environment: MidtransEnvironment | null;
   gateway_reference_no: string | null;
   gateway_payment_no: string | null;
 };
@@ -132,31 +134,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (!partnerId || partnerId !== getMidtransPartnerId()) {
-      return snapResponse(
-        { responseCode: "4012500", responseMessage: "Unauthorized" },
-        401,
-      );
-    }
     if (!/^\d+$/.test(externalId)) {
       return snapResponse(
         { responseCode: "4002502", responseMessage: "Invalid Mandatory Field X-EXTERNAL-ID" },
         400,
-      );
-    }
-
-    // Midtrans BI-SNAP signs SHA-256(minify(RequestBody)). Parse + stringify
-    // before verification so transport whitespace does not alter the digest.
-    const minifiedBody = JSON.stringify(body);
-    if (!verifyMidtransNotification({
-      rawBody: minifiedBody,
-      timestamp,
-      signature,
-      endpointPath: PROVIDER_ENDPOINT,
-    })) {
-      return snapResponse(
-        { responseCode: "4012500", responseMessage: "Unauthorized" },
-        401,
       );
     }
 
@@ -179,21 +160,49 @@ export async function POST(request: Request) {
 
     const order = await getOrderByReference(referenceId);
     const walletTopup = order ? null : await getExternalWalletTopup(referenceId, "midtrans");
-    if (!order && !walletTopup) return successResponse(body);
-
     const routing: Routing | null = order
       ? await getD1().prepare(
-          `SELECT payment_gateway, payment_gateway_mode, gateway_reference_no, gateway_payment_no
+          `SELECT payment_gateway, payment_gateway_mode, payment_gateway_environment,
+                  gateway_reference_no, gateway_payment_no
            FROM orders WHERE id = ? LIMIT 1`,
         ).bind(order.id).first<Routing>()
       : walletTopup
         ? {
             payment_gateway: walletTopup.payment_gateway,
             payment_gateway_mode: walletTopup.payment_gateway_mode,
+            payment_gateway_environment: walletTopup.gateway_environment,
             gateway_reference_no: walletTopup.gateway_reference_no,
             gateway_payment_no: walletTopup.gateway_payment_no,
           }
         : null;
+    const expectedEnvironment = routing?.payment_gateway_environment ?? null;
+
+    if (!partnerId || partnerId !== (expectedEnvironment
+      ? getMidtransPartnerId(expectedEnvironment)
+      : getMidtransPartnerId())) {
+      return snapResponse(
+        { responseCode: "4012500", responseMessage: "Unauthorized" },
+        401,
+      );
+    }
+
+    // Midtrans BI-SNAP signs SHA-256(minify(RequestBody)). Parse + stringify
+    // before verification so transport whitespace does not alter the digest.
+    const minifiedBody = JSON.stringify(body);
+    if (!verifyMidtransNotification({
+      rawBody: minifiedBody,
+      timestamp,
+      signature,
+      endpointPath: PROVIDER_ENDPOINT,
+      expectedEnvironment,
+    })) {
+      return snapResponse(
+        { responseCode: "4012500", responseMessage: "Unauthorized" },
+        401,
+      );
+    }
+
+    if (!order && !walletTopup) return successResponse(body);
     if (routing?.payment_gateway !== "midtrans" || routing.payment_gateway_mode !== "bisnap") {
       return successResponse(body);
     }
