@@ -1,7 +1,11 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { hmacBase64 } from "@/lib/server/crypto";
 import { dokuCheckoutPaymentType } from "@/lib/server/hosted-payment-methods";
-import { getDokuCheckoutConfig, type PaymentEnvironment } from "@/lib/server/payment-mode-config";
+import {
+  getDokuCheckoutConfig,
+  getHostedGatewayProfileForEnvironment,
+  type PaymentEnvironment,
+} from "@/lib/server/payment-mode-config";
 
 export type HostedPaymentResult = {
   requestId: string;
@@ -92,7 +96,7 @@ export async function createDokuCheckoutPayment(input: {
       callback_url_result: input.finishUrl,
       language: "ID",
       auto_redirect: true,
-      disable_retry_payment: true,
+      disable_retry_payment: false,
       line_items: [{ id: input.referenceId.slice(-32), name: input.productName.slice(0, 255), quantity: 1, price: input.amount }],
     },
     payment: {
@@ -151,35 +155,22 @@ export async function validateDokuCheckoutNotification(input: {
   environment: PaymentEnvironment;
 }) {
   try {
-    const config = await getDokuCheckoutConfigForEnvironment(input.environment);
-    if (!input.clientId || input.clientId !== config.clientId || !input.requestId || !input.requestTimestamp || !input.receivedSignature) return false;
+    const values = await getHostedGatewayProfileForEnvironment("doku", "checkout", input.environment);
+    const clientId = values?.clientId?.trim() || "";
+    const secretKey = values?.secretKey?.trim() || "";
+    if (!clientId || !secretKey || !input.clientId || input.clientId !== clientId || !input.requestId || !input.requestTimestamp || !input.receivedSignature) return false;
     const expected = signature({
-      clientId: config.clientId,
+      clientId,
       requestId: input.requestId,
       requestTimestamp: input.requestTimestamp,
       requestTarget: input.requestTarget,
       rawBody: input.rawBody,
-      secretKey: config.secretKey,
+      secretKey,
     });
-    const left = Buffer.from(input.receivedSignature.trim());
-    const right = Buffer.from(expected);
-    if (left.length !== right.length) return false;
-    return crypto.subtle ? await crypto.subtle.digest("SHA-256", left).then(async (a) => {
-      const b = await crypto.subtle.digest("SHA-256", right);
-      return Buffer.from(a).equals(Buffer.from(b));
-    }) : input.receivedSignature === expected;
+    const left = Buffer.from(input.receivedSignature.trim(), "utf8");
+    const right = Buffer.from(expected, "utf8");
+    return left.length === right.length && timingSafeEqual(left, right);
   } catch {
     return false;
   }
-}
-
-async function getDokuCheckoutConfigForEnvironment(environment: PaymentEnvironment) {
-  const { getHostedGatewayProfileForEnvironment } = await import("@/lib/server/payment-mode-config");
-  const values = await getHostedGatewayProfileForEnvironment("doku", "checkout", environment);
-  if (!values?.clientId || !values.secretKey) throw new Error("Kredensial DOKU Checkout tidak lengkap.");
-  return {
-    clientId: values.clientId,
-    secretKey: values.secretKey,
-    apiOrigin: environment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com",
-  };
 }
