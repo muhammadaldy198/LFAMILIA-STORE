@@ -1,20 +1,23 @@
 import { z } from "zod";
-import { getD1 } from "@/db";
 import { publicPaymentLabel } from "@/lib/public-payment";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
 import {
-  createDokuDirectPayment,
-  getDokuReadiness,
-  isDokuChannelSupported,
-} from "@/lib/server/doku";
-import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
+  getPaymentChannel,
+  isGatewayChannelSupported,
+  isPaymentGatewayActive,
+} from "@/lib/server/payment-channels";
+import { createConfiguredPayment, getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
+import { readWalletSettings } from "@/lib/server/wallet";
 import {
-  markAutomaticWalletTopupCreationFailed,
-  readWalletSettings,
-  updateDokuWalletTopup,
-} from "@/lib/server/wallet";
+  findExternalTopupByKey,
+  findMatchingExternalTopup,
+  insertExternalWalletTopup,
+  markExternalWalletTopupCreationFailed,
+  updateExternalWalletTopup,
+  type ExternalWalletTopup,
+} from "@/lib/server/wallet-external";
 
 const automaticSchema = z.object({
   amount: z.number().int().min(1000).max(100_000_000),
@@ -23,25 +26,12 @@ const automaticSchema = z.object({
   idempotencyKey: z.string().uuid().optional(),
 });
 
-type ExistingTopup = {
-  id: string;
-  amount: number;
-  payment_method: string;
-  reference_id: string;
-  status: string;
-  doku_payment_no: string | null;
-  doku_qr_content: string | null;
-  doku_payment_name: string | null;
-  doku_payment_url: string | null;
-  doku_expired_at: string | null;
-};
-
 function splitPaymentMethod(value: string) {
   const [paymentMethod = "", paymentChannel = ""] = value.split(":", 2);
   return { paymentMethod, paymentChannel };
 }
 
-function existingResponse(topup: ExistingTopup) {
+function existingResponse(topup: ExternalWalletTopup) {
   if (topup.status === "rejected") {
     return Response.json(
       { error: "Permintaan top up sebelumnya sudah gagal. Buat permintaan baru dengan idempotency key baru." },
@@ -49,7 +39,7 @@ function existingResponse(topup: ExistingTopup) {
     );
   }
   const hasInstructions = Boolean(
-    topup.doku_payment_no || topup.doku_qr_content || topup.doku_payment_url,
+    topup.gateway_payment_no || topup.gateway_qr_content || topup.gateway_payment_url,
   );
   if (topup.status === "pending" && !hasInstructions) {
     return Response.json(
@@ -63,43 +53,16 @@ function existingResponse(topup: ExistingTopup) {
     referenceId: topup.reference_id,
     paymentMethod: method.paymentMethod,
     paymentChannel: method.paymentChannel,
-    paymentNo: topup.doku_payment_no,
-    qrContent: topup.doku_qr_content,
-    paymentName: topup.doku_payment_name || publicPaymentLabel(method.paymentMethod, method.paymentChannel),
-    paymentUrl: topup.doku_payment_url,
+    paymentNo: topup.gateway_payment_no,
+    qrContent: topup.gateway_qr_content,
+    paymentName: topup.gateway_payment_name || publicPaymentLabel(method.paymentMethod, method.paymentChannel),
+    paymentUrl: topup.gateway_payment_url,
     total: topup.amount,
     fee: 0,
-    expiredAt: topup.doku_expired_at,
+    expiredAt: topup.gateway_expired_at,
     status: topup.status,
     reused: true,
   });
-}
-
-async function findTopupByKey(customerId: string, idempotencyKey: string) {
-  return getD1()
-    .prepare(
-      `SELECT id, amount, payment_method, reference_id, status,
-        doku_payment_no, doku_qr_content, doku_payment_name, doku_payment_url, doku_expired_at
-       FROM wallet_topups
-       WHERE customer_id = ? AND external_checkout_key = ? AND source = 'doku'
-       LIMIT 1`,
-    )
-    .bind(customerId, idempotencyKey)
-    .first<ExistingTopup>();
-}
-
-async function findMatchingPendingTopup(customerId: string, amount: number, paymentMethod: string) {
-  return getD1()
-    .prepare(
-      `SELECT id, amount, payment_method, reference_id, status,
-        doku_payment_no, doku_qr_content, doku_payment_name, doku_payment_url, doku_expired_at
-       FROM wallet_topups
-       WHERE customer_id = ? AND amount = ? AND payment_method = ?
-         AND source = 'doku' AND status = 'pending'
-       ORDER BY created_at DESC LIMIT 1`,
-    )
-    .bind(customerId, amount, paymentMethod)
-    .first<ExistingTopup>();
 }
 
 export async function POST(request: Request) {
@@ -125,13 +88,8 @@ export async function POST(request: Request) {
     }
 
     const settings = await readWalletSettings();
-    const readiness = getDokuReadiness();
-    if (!settings.dokuTopupEnabled || !readiness.ready) {
-      throw new Error(
-        readiness.ready
-          ? "Top up saldo otomatis sedang dinonaktifkan."
-          : "Pembayaran otomatis belum siap.",
-      );
+    if (!settings.dokuTopupEnabled) {
+      throw new Error("Top up saldo otomatis sedang dinonaktifkan.");
     }
 
     const input = automaticSchema.parse(await request.json());
@@ -143,12 +101,22 @@ export async function POST(request: Request) {
       input.paymentMethod === "qris" && input.paymentChannel === "qris"
         ? "mpm"
         : input.paymentChannel;
+    const managedChannel = await getPaymentChannel(input.paymentMethod, paymentChannel, false);
     if (
-      !isDokuChannelSupported(input.paymentMethod, paymentChannel) ||
-      !(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel))
+      !managedChannel ||
+      !isGatewayChannelSupported(managedChannel.gateway, input.paymentMethod, paymentChannel) ||
+      !(await isPaymentGatewayActive(managedChannel.gateway))
     ) {
       throw new Error("Metode pembayaran ini belum didukung atau sedang dinonaktifkan.");
     }
+
+    const readiness = await getConfiguredGatewayReadiness({
+      gateway: managedChannel.gateway,
+      paymentMethod: input.paymentMethod,
+      paymentChannel,
+      gatewayConfig: managedChannel.gatewayConfig,
+    });
+    if (!readiness.ready) throw new Error("Metode pembayaran otomatis belum siap.");
 
     const paymentMethodKey = `${input.paymentMethod}:${paymentChannel}`;
     requestedAmount = input.amount;
@@ -156,7 +124,7 @@ export async function POST(request: Request) {
     const headerKey = request.headers.get("idempotency-key")?.trim() || "";
     idempotencyKey = input.idempotencyKey || (/^[0-9a-f-]{36}$/i.test(headerKey) ? headerKey : "");
     if (idempotencyKey) {
-      const existing = await findTopupByKey(customer.id, idempotencyKey);
+      const existing = await findExternalTopupByKey(customer.id, idempotencyKey);
       if (existing) {
         if (existing.amount !== input.amount || existing.payment_method !== paymentMethodKey) {
           return Response.json({ error: "Idempotency key sudah dipakai untuk permintaan top up berbeda." }, { status: 409 });
@@ -165,43 +133,28 @@ export async function POST(request: Request) {
       }
     }
 
-    const pending = await findMatchingPendingTopup(customer.id, input.amount, paymentMethodKey);
+    const pending = await findMatchingExternalTopup(customer.id, input.amount, paymentMethodKey);
     if (pending) return existingResponse(pending);
 
     referenceId = `WLT-${crypto.randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
     const topupId = crypto.randomUUID();
-    const inserted = await getD1()
-      .prepare(
-        `INSERT INTO wallet_topups (
-          id, customer_id, amount, sender_name, payment_method, proof_url,
-          source, reference_id, external_checkout_key, doku_environment
-        )
-        SELECT ?, ?, ?, ?, ?, '', 'doku', ?, ?, ?
-        WHERE NOT EXISTS (
-          SELECT 1 FROM wallet_topups
-          WHERE customer_id = ? AND amount = ? AND payment_method = ?
-            AND source = 'doku' AND status = 'pending'
-        )`,
-      )
-      .bind(
-        topupId,
-        customer.id,
-        input.amount,
-        customer.name,
-        paymentMethodKey,
-        referenceId,
-        idempotencyKey || null,
-        readiness.environment,
-        customer.id,
-        input.amount,
-        paymentMethodKey,
-      )
-      .run();
+    const inserted = await insertExternalWalletTopup({
+      id: topupId,
+      customerId: customer.id,
+      amount: input.amount,
+      customerName: customer.name,
+      paymentMethodKey,
+      referenceId,
+      idempotencyKey: idempotencyKey || null,
+      gateway: managedChannel.gateway,
+      mode: readiness.mode,
+      environment: readiness.environment,
+    });
 
     if (Number(inserted.meta.changes ?? 0) === 0) {
       const winner = idempotencyKey
-        ? await findTopupByKey(customer.id, idempotencyKey)
-        : await findMatchingPendingTopup(customer.id, input.amount, paymentMethodKey);
+        ? await findExternalTopupByKey(customer.id, idempotencyKey)
+        : await findMatchingExternalTopup(customer.id, input.amount, paymentMethodKey);
       if (winner) return existingResponse(winner);
       return Response.json(
         { error: "Permintaan top up yang sama sedang dibuat. Coba lagi beberapa detik." },
@@ -210,20 +163,27 @@ export async function POST(request: Request) {
     }
 
     const baseUrl = getPublicBaseUrl();
-    const payment = await createDokuDirectPayment({
+    const payment = await createConfiguredPayment({
+      gateway: managedChannel.gateway,
+      referenceId,
+      amount: input.amount,
+      paymentMethod: input.paymentMethod,
+      paymentChannel,
+      gatewayConfig: managedChannel.gatewayConfig,
       buyerName: customer.name,
       buyerPhone: customer.phone,
       buyerEmail: customer.email,
-      amount: input.amount,
-      referenceId,
-      paymentMethod: input.paymentMethod,
-      paymentChannel,
       productName: "Top up Saldo LFAMILIA",
+      packageLabel: "Saldo akun",
       finishUrl: `${baseUrl}/account`,
+      deviceId: idempotencyKey || referenceId,
     });
 
-    await updateDokuWalletTopup({
+    await updateExternalWalletTopup({
       referenceId,
+      gateway: payment.gateway,
+      mode: payment.mode,
+      environment: payment.environment,
       requestId: payment.requestId,
       referenceNo: payment.referenceNo,
       paymentNo: payment.paymentNo,
@@ -252,7 +212,7 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     if (idempotencyKey && error instanceof Error && /UNIQUE constraint failed/i.test(error.message)) {
-      const winner = await findTopupByKey(customer.id, idempotencyKey).catch(() => null);
+      const winner = await findExternalTopupByKey(customer.id, idempotencyKey).catch(() => null);
       if (winner) {
         if (
           winner.amount !== requestedAmount ||
@@ -275,9 +235,7 @@ export async function POST(request: Request) {
           : "Permintaan top up gagal.";
 
     if (referenceId) {
-      await markAutomaticWalletTopupCreationFailed(referenceId, message).catch(
-        () => undefined,
-      );
+      await markExternalWalletTopupCreationFailed(referenceId, message).catch(() => undefined);
     }
     return Response.json(
       { error: message },
