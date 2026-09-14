@@ -42,9 +42,9 @@ test("nickname verification blocks supported games in UI and is enforced again b
   assert.match(checkout, /blocking=\{nicknameRequired\}/);
 });
 
-test("checkout payment type is DOKU only", () => {
+test("customer checkout remains gateway-neutral under dual routing", () => {
   const checkout = read("app/checkout/page.tsx");
-  assert.doesNotMatch(checkout, /code: "doku"/);
-  assert.doesNotMatch(checkout, /"DOKU Direct API"|Pesanan diteruskan otomatis ke provider|Pembayaran melalui gateway/);
-  assert.doesNotMatch(checkout, /midtrans|ipaymu|bisnap/i);
+  assert.doesNotMatch(checkout, /code: "doku"|code: "midtrans"/i);
+  assert.doesNotMatch(checkout, /"DOKU Direct API"|"Midtrans BI-SNAP"|Pesanan diteruskan otomatis ke provider|Pembayaran melalui gateway/);
+  assert.doesNotMatch(checkout, /Pilih gateway pembayaran/);
 });
