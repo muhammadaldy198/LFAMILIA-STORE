@@ -18,6 +18,12 @@ export type HostedPaymentResult = {
   raw: unknown;
 };
 
+function object(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
 function digest(rawBody: string) {
   return createHash("sha256").update(rawBody, "utf8").digest("base64");
 }
@@ -125,11 +131,16 @@ export async function createDokuCheckoutPayment(input: {
     body: rawBody,
     signal: AbortSignal.timeout(15_000),
   });
-  const payload = await response.json().catch(() => ({})) as Record<string, any>;
-  const payment = payload?.response?.payment ?? {};
+  const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+  const payment = object(object(payload.response).payment);
   const paymentUrl = typeof payment.url === "string" ? payment.url.trim() : "";
   if (!response.ok || !paymentUrl) {
-    const message = Array.isArray(payload.message) ? payload.message.join("; ") : typeof payload.message === "string" ? payload.message : "DOKU Checkout gagal membuat pembayaran.";
+    const rawMessage = payload.message;
+    const message = Array.isArray(rawMessage)
+      ? rawMessage.filter((item): item is string => typeof item === "string").join("; ")
+      : typeof rawMessage === "string"
+        ? rawMessage
+        : "DOKU Checkout gagal membuat pembayaran.";
     throw new Error(message || "DOKU Checkout gagal membuat pembayaran.");
   }
 
