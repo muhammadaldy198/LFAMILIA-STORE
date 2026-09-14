@@ -3,6 +3,7 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import handler from "vinext/server/app-router-entry";
 import { getPublicBaseUrl, setRuntimeEnv } from "../lib/server/runtime-env";
 import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
+import { ensureLegacyDatabaseColumns } from "../lib/server/database-repair";
 import { recoverStaleAutomaticOrders } from "../lib/server/orders";
 import { releaseExpiredExternalPromotions } from "../lib/server/promotions";
 import { reconcileStaleDigiflazzProcessing } from "../lib/server/digiflazz-reconciliation";
@@ -156,6 +157,7 @@ const worker = {
     }
 
     setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
+    if (env.DB) await ensureLegacyDatabaseColumns();
 
     if (url.pathname === "/_vinext/image") {
       if (!env.IMAGES) return withSecurityHeaders(new Response("Image optimization is unavailable.", { status: 404 }), url);
@@ -198,6 +200,7 @@ const worker = {
   },
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
+    await ensureLegacyDatabaseColumns();
     const publicBaseUrl = getPublicBaseUrl();
     const tasks: Promise<unknown>[] = [
       cleanupSecurityRateLimits().catch(() => undefined),

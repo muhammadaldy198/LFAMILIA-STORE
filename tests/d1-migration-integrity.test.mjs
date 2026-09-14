@@ -27,7 +27,11 @@ function migratedDatabase() {
 
 function repairColumns() {
   const source = fs.readFileSync(path.join(root, "lib/server/database-repair.ts"), "utf8");
-  return [...source.matchAll(/\[\s*"([A-Za-z0-9_]+)"\s*,\s*"([A-Za-z0-9_]+)"\s*,\s*"[^"]+"/g)]
+  const start = source.indexOf("const columns:");
+  const end = source.indexOf("\n];", start);
+  assert.ok(start >= 0 && end > start, "database repair columns array must remain discoverable");
+  const columnSource = source.slice(start, end + 3);
+  return [...columnSource.matchAll(/\[\s*"([A-Za-z0-9_]+)"\s*,\s*"([A-Za-z0-9_]+)"\s*,\s*"[^"]+"/g)]
     .map((match) => [match[1], match[2]]);
 }
 
