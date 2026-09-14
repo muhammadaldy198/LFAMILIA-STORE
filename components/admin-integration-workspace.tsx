@@ -13,9 +13,16 @@ type Profile = { provider: Provider; mode: "direct" | "service"; environment: En
 type Callback = { id: string; label: string; description: string; url: string };
 type Overview = { encryptionReady: boolean; encryptionHint: string; selections: { dokuEnvironment: "sandbox" | "production"; midtransEnvironment: "sandbox" | "production"; digiflazzEnvironment: "development" | "production" }; profiles: Profile[]; callbacks: Callback[] };
 type FormValues = Record<string, string>;
+type DokuConnectionResult = { environment: "sandbox" | "production"; apiOrigin: string; tokenType: string; expiresIn: number };
+
+function dokuApiUrlForEnvironment(environment: "sandbox" | "production") {
+  return environment === "sandbox"
+    ? "https://api-sandbox.doku.com"
+    : "https://api.doku.com";
+}
 
 const defaultValues: FormValues = {
-  dokuApiUrl: "https://api.doku.com",
+  dokuApiUrl: dokuApiUrlForEnvironment("sandbox"),
   digiflazzTransactionApiUrl: "https://api.digiflazz.com/v1/transaction",
   digiflazzPriceListUrl: "https://api.digiflazz.com/v1/price-list",
   resendApiUrl: "https://api.resend.com/emails",
@@ -38,8 +45,8 @@ export function AdminIntegrationWorkspace() {
   const [tab, setTab] = useState<Tab>("Ringkasan");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [values, setValues] = useState<FormValues>(defaultValues);
-  const [dokuEnvironment, setDokuEnvironment] = useState<"sandbox" | "production">("production");
-  const [midtransEnvironment, setMidtransEnvironment] = useState<"sandbox" | "production">("production");
+  const [dokuEnvironment, setDokuEnvironment] = useState<"sandbox" | "production">("sandbox");
+  const [midtransEnvironment, setMidtransEnvironment] = useState<"sandbox" | "production">("sandbox");
   const [digiflazzEnvironment, setDigiflazzEnvironment] = useState<"development" | "production">("production");
   const [showSecrets, setShowSecrets] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -56,6 +63,10 @@ export function AdminIntegrationWorkspace() {
     setDokuEnvironment(next.selections.dokuEnvironment);
     setMidtransEnvironment(next.selections.midtransEnvironment);
     setDigiflazzEnvironment(next.selections.digiflazzEnvironment);
+    setValues((current) => ({
+      ...current,
+      dokuApiUrl: dokuApiUrlForEnvironment(next.selections.dokuEnvironment),
+    }));
     return next;
   }, []);
 
@@ -69,7 +80,7 @@ export function AdminIntegrationWorkspace() {
 
   async function put(body: object) {
     const response = await fetch("/api/panel/integrations", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const payload = await response.json().catch(() => ({})) as { error?: string; overview?: Overview; relay?: unknown };
+    const payload = await response.json().catch(() => ({})) as { error?: string; overview?: Overview; relay?: unknown; doku?: DokuConnectionResult };
     if (!response.ok) throw new Error(payload.error || "Konfigurasi integrasi gagal disimpan.");
     if (payload.overview) setOverview(payload.overview);
     return payload;
@@ -85,7 +96,17 @@ export function AdminIntegrationWorkspace() {
     setBusy(true);
     try {
       if (tab === "DOKU Direct API") {
-        await saveProfile("doku", "direct", dokuEnvironment, { clientId: values.dokuClientId || "", secretKey: values.dokuSecretKey || "", privateKey: values.dokuPrivateKey || "", privateKeyPassphrase: values.dokuPrivateKeyPassphrase || "", apiUrl: values.dokuApiUrl || "", qrisMerchantId: values.dokuMerchantId || "", qrisTerminalId: values.dokuTerminalId || "", qrisPostalCode: values.dokuPostalCode || "", vaConfigJson: values.dokuVaConfig || "" });
+        await saveProfile("doku", "direct", dokuEnvironment, {
+          clientId: values.dokuClientId || "",
+          secretKey: values.dokuSecretKey || "",
+          privateKey: values.dokuPrivateKey || "",
+          privateKeyPassphrase: values.dokuPrivateKeyPassphrase || "",
+          apiUrl: dokuApiUrlForEnvironment(dokuEnvironment),
+          qrisMerchantId: values.dokuMerchantId || "",
+          qrisTerminalId: values.dokuTerminalId || "",
+          qrisPostalCode: values.dokuPostalCode || "",
+          vaConfigJson: values.dokuVaConfig || "",
+        });
         await put({ action: "save_selections", selections: { dokuEnvironment } });
       } else if (tab === "Midtrans BI-SNAP") {
         const apiUrl = values.midtransApiUrl || (midtransEnvironment === "production" ? "https://merchants.midtrans.com" : "https://merchants.sbx.midtrans.com");
@@ -116,9 +137,16 @@ export function AdminIntegrationWorkspace() {
       if (tab === "Relay & Keamanan") {
         const payload = await put({ action: "test_relay" });
         setMessage(`Pemeriksaan relay selesai: ${JSON.stringify(payload.relay ?? {})}`);
+      } else if (tab === "DOKU Direct API") {
+        const latest = await loadOverview();
+        const ready = latest.profiles.some((item) => item.provider === "doku" && item.environment === dokuEnvironment && item.configured && !item.decryptionError);
+        if (!ready) throw new Error(`Kredensial DOKU ${dokuEnvironment} belum lengkap atau belum bisa didekripsi.`);
+        const result = await put({ action: "test_doku", environment: dokuEnvironment });
+        if (!result.doku) throw new Error("DOKU tidak mengembalikan hasil tes koneksi.");
+        setMessage(`Tes koneksi DOKU ${result.doku.environment} berhasil. B2B token diterbitkan dari ${result.doku.apiOrigin} dan berlaku sekitar ${result.doku.expiresIn} detik.`);
       } else {
         const latest = await loadOverview();
-        const target = tab === "DOKU Direct API" ? ["doku", dokuEnvironment] : tab === "Midtrans BI-SNAP" ? ["midtrans", midtransEnvironment] : tab === "Digiflazz" ? ["digiflazz", digiflazzEnvironment] : tab === "Melostore Nickname" ? ["melostore", "global"] : tab === "Resend Email" ? ["resend", "global"] : null;
+        const target = tab === "Midtrans BI-SNAP" ? ["midtrans", midtransEnvironment] : tab === "Digiflazz" ? ["digiflazz", digiflazzEnvironment] : tab === "Melostore Nickname" ? ["melostore", "global"] : tab === "Resend Email" ? ["resend", "global"] : null;
         const ready = target && latest.profiles.some((item) => item.provider === target[0] && item.environment === target[1] && item.configured && !item.decryptionError);
         if (!ready) throw new Error("Kredensial belum lengkap atau belum bisa didekripsi oleh backend.");
         setMessage(`${tab} terbaca dan siap dipakai oleh backend.`);
@@ -144,7 +172,7 @@ export function AdminIntegrationWorkspace() {
   const midtransApiUrl = values.midtransApiUrl || (midtransEnvironment === "production" ? "https://merchants.midtrans.com" : "https://merchants.sbx.midtrans.com");
 
   return <div>
-    <WorkspaceHeader title="Integrasi" description="Pusat kredensial DOKU, Midtrans BI-SNAP, Digiflazz, layanan internal, callback, relay, dan keamanan. Khusus Super Admin." actions={<><button type="button" disabled={busy || tab === "Ringkasan"} onClick={testCurrent} className={buttonClass}><RefreshCw className={`size-3.5 ${busy ? "animate-spin" : ""}`} />Periksa Konfigurasi</button><button type="button" disabled={busy || tab === "Ringkasan"} onClick={save} className={primaryButtonClass}><Save className="size-3.5" />{busy ? "Memproses..." : "Simpan"}</button></>} />
+    <WorkspaceHeader title="Integrasi" description="Pusat kredensial DOKU, Midtrans BI-SNAP, Digiflazz, layanan internal, callback, relay, dan keamanan. Khusus Super Admin." actions={<><button type="button" disabled={busy || tab === "Ringkasan"} onClick={testCurrent} className={buttonClass}><RefreshCw className={`size-3.5 ${busy ? "animate-spin" : ""}`} />{tab === "DOKU Direct API" ? "Tes Koneksi DOKU" : "Periksa Konfigurasi"}</button><button type="button" disabled={busy || tab === "Ringkasan"} onClick={save} className={primaryButtonClass}><Save className="size-3.5" />{busy ? "Memproses..." : "Simpan"}</button></>} />
     {message && <Notice ok text={message} onClose={() => setMessage("")} />}
     {error && <Notice text={error} onClose={() => setError("")} />}
     {overview && !overview.encryptionReady && <Notice text={overview.encryptionHint} onClose={() => {}} />}
@@ -161,19 +189,19 @@ export function AdminIntegrationWorkspace() {
     </div>}
 
     {tab === "DOKU Direct API" && <TwoColumn main={<Panel title="Kredensial DOKU Direct API" description="Kredensial disimpan terenkripsi. Field rahasia dikosongkan setelah tersimpan dan tidak pernah dikirim kembali ke browser." action={<SecretToggle show={showSecrets} onClick={() => setShowSecrets((current) => !current)} />}><div className="grid grid-cols-2 gap-4 p-4">
-      <SelectField label="Environment" value={dokuEnvironment} onChange={(value) => setDokuEnvironment(value as "sandbox" | "production")} options={["production", "sandbox"]} />
-      <TextField label="Direct API Base URL" value={values.dokuApiUrl || ""} onChange={(value) => setValue("dokuApiUrl", value)} />
+      <SelectField label="Environment" value={dokuEnvironment} onChange={(value) => { const environment = value as "sandbox" | "production"; setDokuEnvironment(environment); setValue("dokuApiUrl", dokuApiUrlForEnvironment(environment)); }} options={["sandbox", "production"]} />
+      <TextField label="Direct API Base URL" value={values.dokuApiUrl || dokuApiUrlForEnvironment(dokuEnvironment)} readOnly />
       <SecretField label="Client ID" value={values.dokuClientId || ""} onChange={(value) => setValue("dokuClientId", value)} placeholder={profileConfigured("doku", dokuEnvironment) ? "Tersimpan — isi hanya untuk mengganti" : "Masukkan Client ID DOKU"} show={showSecrets} />
       <SecretField label="Secret Key" value={values.dokuSecretKey || ""} onChange={(value) => setValue("dokuSecretKey", value)} placeholder={profileConfigured("doku", dokuEnvironment) ? "Tersimpan — isi hanya untuk mengganti" : "Masukkan Secret Key DOKU"} show={showSecrets} />
       <TextField label="Merchant ID / Mall ID" value={values.dokuMerchantId || ""} onChange={(value) => setValue("dokuMerchantId", value)} placeholder="ID merchant QRIS" />
       <TextField label="QRIS Terminal ID" value={values.dokuTerminalId || ""} onChange={(value) => setValue("dokuTerminalId", value)} />
       <TextField label="QRIS Postal Code" value={values.dokuPostalCode || ""} onChange={(value) => setValue("dokuPostalCode", value)} placeholder="5 digit" />
-      <SecretField label="Private Key Passphrase" value={values.dokuPrivateKeyPassphrase || ""} onChange={(value) => setValue("dokuPrivateKeyPassphrase", value)} placeholder="Opsional jika private key terenkripsi" show={showSecrets} />
+      <SecretField label="Private Key Passphrase" value={values.dokuPrivateKeyPassphrase || ""} onChange={(value) => setValue("dokuPrivateKeyPassphrase", value)} placeholder={profileConfigured("doku", dokuEnvironment) ? "Tersimpan — isi hanya untuk mengganti" : "Passphrase merchant private key"} show={showSecrets} />
       <Field label="RSA Private Key (PKCS#8)" help="Disimpan terenkripsi dan tidak pernah dikirim kembali ke frontend." wide><textarea value={values.dokuPrivateKey || ""} onChange={(event) => setValue("dokuPrivateKey", event.target.value)} className={`${inputClass} h-24 py-2 font-mono`} placeholder={profileConfigured("doku", dokuEnvironment) ? "Tersimpan — isi hanya untuk mengganti" : "-----BEGIN PRIVATE KEY-----"} /></Field>
     </div></Panel>} side={<><Panel title="URL DOKU" description="DOKU hanya menangani QRIS dan E-Wallet pada split gateway ini."><div className="space-y-2 p-4"><CopyUrl label="Notification URL" value={callback("doku", fallbackCallbacks[0].url)} /><CopyUrl label="Redirect / Return URL" value={callback("doku-fallback", fallbackCallbacks[1].url)} /><CopyUrl label="Origin Website" value="https://lfamiliastore.my.id" /></div></Panel><SecurityPanel /></>} />}
 
     {tab === "Midtrans BI-SNAP" && <TwoColumn main={<Panel title="Kredensial Midtrans BI-SNAP / Core API" description="Semua credential merchant disimpan terenkripsi di D1 melalui Admin Panel. VPS tidak menyimpan Client Secret atau private key." action={<SecretToggle show={showSecrets} onClick={() => setShowSecrets((current) => !current)} />}><div className="grid grid-cols-2 gap-4 p-4">
-      <SelectField label="Environment" value={midtransEnvironment} onChange={(value) => { setMidtransEnvironment(value as "sandbox" | "production"); setValue("midtransApiUrl", ""); }} options={["production", "sandbox"]} />
+      <SelectField label="Environment" value={midtransEnvironment} onChange={(value) => { setMidtransEnvironment(value as "sandbox" | "production"); setValue("midtransApiUrl", ""); }} options={["sandbox", "production"]} />
       <TextField label="BI-SNAP API Base URL" value={midtransApiUrl} onChange={(value) => setValue("midtransApiUrl", value)} />
       <SecretField label="Merchant ID" value={values.midtransMerchantId || ""} onChange={(value) => setValue("midtransMerchantId", value)} placeholder={profileConfigured("midtrans", midtransEnvironment) ? "Tersimpan — isi hanya untuk mengganti" : "Merchant ID"} show={showSecrets} />
       <SecretField label="Client ID" value={values.midtransClientId || ""} onChange={(value) => setValue("midtransClientId", value)} placeholder={profileConfigured("midtrans", midtransEnvironment) ? "Tersimpan — isi hanya untuk mengganti" : "Client ID BI-SNAP"} show={showSecrets} />
