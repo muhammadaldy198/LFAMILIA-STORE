@@ -6,6 +6,10 @@ UPDATE `payment_channels` SET `gateway` = 'midtrans' WHERE `method` = 'va';
 --> statement-breakpoint
 UPDATE `payment_channels` SET `gateway` = 'doku' WHERE `method` IN ('ewallet', 'qris');
 --> statement-breakpoint
+UPDATE `payment_channels`
+SET `is_active` = 0, `updated_at` = CURRENT_TIMESTAMP
+WHERE `method` = 'va' AND `channel` NOT IN ('bca', 'mandiri', 'bni', 'bri', 'cimb', 'permata', 'danamon');
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS `payment_gateway_settings` (
   `gateway` text PRIMARY KEY NOT NULL,
   `is_active` integer NOT NULL DEFAULT 0,
