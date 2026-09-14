@@ -11,9 +11,9 @@ const { neutralizePublicCopy } = await import(
 );
 
 test("customer-facing copy removes integration brand names without touching ordinary copy", () => {
-  const input = "VA melalui DOKU, produk Digiflazz, validasi Melostore. LFAMILIA tetap tampil.";
+  const input = "VA melalui Midtrans, QRIS DOKU, produk Digiflazz, validasi Melostore. LFAMILIA tetap tampil.";
   const output = neutralizePublicCopy(input);
-  assert.doesNotMatch(output, /doku|digiflazz|melostore/i);
+  assert.doesNotMatch(output, /doku|midtrans|digiflazz|melostore/i);
   assert.match(output, /sistem LFAMILIA/);
   assert.match(output, /LFAMILIA tetap tampil/);
   assert.equal(neutralizePublicCopy("Pembayaran aman di LFAMILIA STORE."), "Pembayaran aman di LFAMILIA STORE.");

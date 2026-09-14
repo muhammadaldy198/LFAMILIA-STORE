@@ -5,7 +5,9 @@ import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { queryDokuQrisStatus } from "@/lib/server/doku";
 import { applyPendingDokuPaymentStatus } from "@/lib/server/doku-payment-transition";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
+import { externalArtifactsFromOrder } from "@/lib/server/external-payments";
 import {
+  applyPaymentStatus,
   fulfillAutomaticOrder,
   getOrderById,
   markDokuStatusChecked,
@@ -55,6 +57,10 @@ async function resolveOrder(referenceId: string) {
   return null;
 }
 
+function externalArtifacts(order: OrderRecord) {
+  return externalArtifactsFromOrder(order as unknown as Record<string, unknown>);
+}
+
 function maskDestination(value: string, server: string | null) {
   const trimmed = value.trim();
   const visible = trimmed.length <= 6
@@ -64,7 +70,9 @@ function maskDestination(value: string, server: string | null) {
 }
 
 function shouldQueryQris(order: OrderRecord) {
+  const artifacts = externalArtifacts(order);
   if (
+    artifacts.gateway !== "doku" ||
     order.payment_status !== "pending" ||
     order.payment_method !== "qris" ||
     !order.doku_reference_no
@@ -78,7 +86,7 @@ function shouldQueryQris(order: OrderRecord) {
 }
 
 function publicEventSource(source: string) {
-  if (source === "doku") return "payment";
+  if (source === "doku" || source === "midtrans") return "payment";
   if (source === "digiflazz") return "processing";
   if (source === "wallet") return "balance";
   if (source === "voucher_stock") return "delivery";
@@ -86,10 +94,17 @@ function publicEventSource(source: string) {
 }
 
 async function expirePendingInvoice(order: OrderRecord) {
-  if (order.payment_status !== "pending" || !order.doku_expired_at) return order;
-  const expiresAt = Date.parse(order.doku_expired_at);
+  if (order.payment_status !== "pending") return order;
+  const artifacts = externalArtifacts(order);
+  if (!artifacts.expiredAt) return order;
+  const expiresAt = Date.parse(artifacts.expiredAt);
   if (!Number.isFinite(expiresAt) || expiresAt > Date.now()) return order;
-  await applyPendingDokuPaymentStatus(order, "expired");
+
+  if (artifacts.gateway === "doku") {
+    await applyPendingDokuPaymentStatus(order, "expired");
+  } else if (artifacts.gateway === "midtrans") {
+    await applyPaymentStatus(order, "expired");
+  }
   return (await getOrderById(order.id)) ?? order;
 }
 
@@ -158,6 +173,8 @@ export async function POST(request: Request) {
         createdAt: event.created_at,
       })),
     ];
+    const artifacts = externalArtifacts(order);
+    const pending = order.payment_status === "pending";
 
     return Response.json({
       order: {
@@ -171,11 +188,11 @@ export async function POST(request: Request) {
         paymentStatus: order.payment_status,
         fulfillmentStatus: order.fulfillment_status,
         fulfillmentType: order.fulfillment_type,
-        paymentNo: order.payment_status === "pending" ? order.doku_payment_no : null,
-        qrContent: order.payment_status === "pending" ? order.doku_qr_content : null,
+        paymentNo: pending ? artifacts.paymentNo : null,
+        qrContent: pending ? artifacts.qrContent : null,
         paymentName: publicPaymentLabel(order.payment_method, order.payment_channel),
-        paymentUrl: order.payment_status === "pending" ? order.doku_payment_url : null,
-        expiredAt: order.payment_status === "pending" ? order.doku_expired_at : null,
+        paymentUrl: pending ? artifacts.paymentUrl : null,
+        expiredAt: pending ? artifacts.expiredAt : null,
         voucherCode,
         createdAt: order.created_at,
         updatedAt: order.updated_at,

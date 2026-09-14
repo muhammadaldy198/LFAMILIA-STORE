@@ -12,17 +12,18 @@ export const dynamic = "force-dynamic";
 
 const profileInput = z.object({
   action: z.literal("save_profile"),
-  provider: z.enum(["doku", "digiflazz", "melostore", "resend", "relay", "security"]),
+  provider: z.enum(["doku", "midtrans", "digiflazz", "melostore", "resend", "relay", "security"]),
   mode: z.enum(["direct", "service"]),
   environment: z.enum(["sandbox", "production", "development", "global"]),
-  values: z.record(z.string().min(1).max(80), z.string().max(8_000)).default({}),
-  clearFields: z.array(z.string().min(1).max(80)).max(24).default([]),
+  values: z.record(z.string().min(1).max(80), z.string().max(12_000)).default({}),
+  clearFields: z.array(z.string().min(1).max(80)).max(32).default([]),
 });
 
 const selectionInput = z.object({
   action: z.literal("save_selections"),
   selections: z.object({
     dokuEnvironment: z.enum(["sandbox", "production"]).optional(),
+    midtransEnvironment: z.enum(["sandbox", "production"]).optional(),
     digiflazzEnvironment: z.enum(["development", "production"]).optional(),
   }),
 });

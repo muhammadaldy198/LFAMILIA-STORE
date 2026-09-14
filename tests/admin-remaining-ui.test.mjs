@@ -18,9 +18,13 @@ test("remaining admin menus use the new desktop workspaces", () => {
   }
 });
 
-test("DOKU payment UI includes channels and editable payment page images", () => {
-  for (const label of ["DOKU Direct API", "QRIS DOKU", "Virtual Account BCA", "Tampilan Halaman", "Editor Halaman Pembayaran", "Ganti Gambar", "Preview Halaman Pembayaran"]) assert.ok(payment.includes(label), `missing payment UI: ${label}`);
+test("dual-gateway payment UI includes channel controls and editable gateway-neutral payment page", () => {
+  for (const label of ["Midtrans", "DOKU", "Partner Service ID VA", "Tampilan Halaman", "Editor Halaman Pembayaran", "Ganti Gambar", "Preview Halaman Pembayaran", ">QRIS<"]) {
+    assert.ok(payment.includes(label), `missing payment UI: ${label}`);
+  }
   assert.ok(payment.includes("image/png,image/jpeg,image/webp"));
+  assert.match(payment, /Preview customer tanpa nama payment gateway/);
+  assert.doesNotMatch(payment, />QRIS DOKU</);
 });
 
 test("Super Admin can design balance changes for customer or admin accounts", () => {
@@ -28,9 +32,24 @@ test("Super Admin can design balance changes for customer or admin accounts", ()
   assert.match(customer, /<AdminBalanceManager \/>/);
 });
 
-test("integration UI contains credentials, copyable provider URLs, and relay", () => {
-  for (const label of ["DOKU Notification URL", "Digiflazz Webhook URL", "Melostore Nickname", "API Keys Check Nickname", "API Key", "Secret Key", "Relay Token", "Webhook Secret", "digiflazz-relay@lfamilia.my.id", "https://digiflazz-relay.lfamiliastore.my.id"]) assert.ok(integration.includes(label), `missing integration UI: ${label}`);
+test("integration UI contains encrypted credentials, copyable provider URLs, and separate relay endpoints", () => {
+  for (const label of [
+    "DOKU Notification URL",
+    "Midtrans BI-SNAP VA Notification URL",
+    "Digiflazz Webhook URL",
+    "Melostore Nickname",
+    "API Keys Check Nickname",
+    "API Key",
+    "Secret Key",
+    "Client Secret",
+    "Partner ID",
+    "Relay Token",
+    "Webhook Secret",
+    "https://digiflazz-relay.lfamiliastore.my.id",
+    "https://midtrans-relay.lfamiliastore.my.id",
+  ]) assert.ok(integration.includes(label), `missing integration UI: ${label}`);
   assert.ok(integration.includes("https://lfamiliastore.my.id/api/payments/doku/callback"));
+  assert.ok(integration.includes("https://lfamiliastore.my.id/api/payments/midtrans/v1.0/transfer-va/payment"));
   assert.ok(integration.includes("https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback"));
   assert.ok(ui.includes("navigator.clipboard.writeText"));
   assert.doesNotMatch(integration, /SwitchLine label="(?:Wajib|Tidak Wajib).*nickname/i);

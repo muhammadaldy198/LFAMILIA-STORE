@@ -49,7 +49,19 @@ const providerDefinitions = [
       optionalEnv("DIGIFLAZZ_PRODUCTION_UPSTREAM_ORIGIN"),
       "DIGIFLAZZ_PRODUCTION_UPSTREAM_ORIGIN",
     ),
-  }
+  },
+  {
+    name: "midtrans",
+    host: optionalEnv("MIDTRANS_RELAY_HOST").toLowerCase(),
+    sandboxUpstream: normalizeOrigin(
+      optionalEnv("MIDTRANS_SANDBOX_UPSTREAM_ORIGIN"),
+      "MIDTRANS_SANDBOX_UPSTREAM_ORIGIN",
+    ),
+    productionUpstream: normalizeOrigin(
+      optionalEnv("MIDTRANS_PRODUCTION_UPSTREAM_ORIGIN"),
+      "MIDTRANS_PRODUCTION_UPSTREAM_ORIGIN",
+    ),
+  },
 ];
 
 const providers = new Map(
@@ -61,6 +73,7 @@ const providers = new Map(
 const internalHeaders = new Set([
   "x-lfamilia-relay-token",
   "x-lfamilia-digiflazz-environment",
+  "x-lfamilia-midtrans-environment",
 ]);
 
 const hopByHopHeaders = new Set([
@@ -76,6 +89,11 @@ const hopByHopHeaders = new Set([
   "upgrade",
   "cookie",
   ...internalHeaders,
+]);
+
+const midtransAllowedPaths = new Set([
+  "/v1.0/access-token/b2b",
+  "/v1.0/transfer-va/create-va",
 ]);
 
 function json(res, status, payload) {
@@ -101,6 +119,10 @@ function requestHostname(req) {
     .split(":")[0]
     .trim()
     .toLowerCase();
+}
+
+function requestPath(req) {
+  return new URL(req.url || "/", "http://relay.local").pathname;
 }
 
 function buildUpstreamUrl(req, upstreamOrigin) {
@@ -169,6 +191,11 @@ function isMethodAllowed(_provider, method) {
   return method === "POST";
 }
 
+function isPathAllowed(provider, path) {
+  if (provider.name === "midtrans") return midtransAllowedPaths.has(path);
+  return true;
+}
+
 function resolveProviderUpstream(provider, req) {
   if (provider.name === "digiflazz") {
     const environment = String(
@@ -176,6 +203,16 @@ function resolveProviderUpstream(provider, req) {
     ).toLowerCase();
 
     if (environment === "development") return provider.developmentUpstream;
+    if (environment === "production") return provider.productionUpstream;
+    return "";
+  }
+
+  if (provider.name === "midtrans") {
+    const environment = String(
+      req.headers["x-lfamilia-midtrans-environment"] || "",
+    ).toLowerCase();
+
+    if (environment === "sandbox") return provider.sandboxUpstream;
     if (environment === "production") return provider.productionUpstream;
     return "";
   }
@@ -188,6 +225,14 @@ function providerConfigured(provider) {
     return Boolean(
       provider.host &&
         provider.developmentUpstream &&
+        provider.productionUpstream,
+    );
+  }
+
+  if (provider.name === "midtrans") {
+    return Boolean(
+      provider.host &&
+        provider.sandboxUpstream &&
         provider.productionUpstream,
     );
   }
@@ -229,6 +274,12 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  const path = requestPath(req);
+  if (!isPathAllowed(provider, path)) {
+    json(res, 404, { error: "Endpoint provider tidak diizinkan melalui relay." });
+    return;
+  }
+
   const providerUpstream = resolveProviderUpstream(provider, req);
   if (!providerUpstream) {
     json(res, 503, {
@@ -238,7 +289,7 @@ const server = createServer(async (req, res) => {
   }
 
   try {
-    const body = req.method === "GET" ? undefined : await readBody(req);
+    const body = await readBody(req);
     const target = buildUpstreamUrl(req, providerUpstream);
     const upstream = await fetch(target, {
       method: req.method,
@@ -259,7 +310,7 @@ const server = createServer(async (req, res) => {
       JSON.stringify({
         time: new Date().toISOString(),
         provider: provider.name,
-        path: new URL(req.url || "/", "http://relay.local").pathname,
+        path,
         status: upstream.status,
         elapsedMs: Date.now() - startedAt,
       }) + "\n",
@@ -277,7 +328,7 @@ const server = createServer(async (req, res) => {
       JSON.stringify({
         time: new Date().toISOString(),
         provider: provider.name,
-        path: new URL(req.url || "/", "http://relay.local").pathname,
+        path,
         error: error instanceof Error ? error.name : "UnknownError",
         elapsedMs: Date.now() - startedAt,
       }) + "\n",

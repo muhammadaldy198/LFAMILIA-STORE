@@ -6,10 +6,16 @@ import test from "node:test";
 const root = process.cwd();
 const source = fs.readFileSync(path.join(root, "app/checkout/page.tsx"), "utf8");
 const methodsRoute = fs.readFileSync(path.join(root, "app/api/payment-methods/route.ts"), "utf8");
+const channelsSource = fs.readFileSync(path.join(root, "lib/server/payment-channels.ts"), "utf8");
 
-test("checkout methods come from the active DOKU gateway", () => {
-  assert.doesNotMatch(methodsRoute, /code: "doku"|doku:/);
-  assert.match(methodsRoute, /isDokuChannelSupported/);
+test("checkout methods are filtered by active and ready internal gateways without exposing them", () => {
+  assert.match(methodsRoute, /listPaymentGatewaySettings/);
+  assert.match(methodsRoute, /getDokuReadiness/);
+  assert.match(methodsRoute, /getMidtransReadiness/);
+  assert.match(methodsRoute, /isProviderRelayConfigured\("midtrans"\)/);
+  assert.match(methodsRoute, /\.map\(\(item\) => \(\{/);
+  assert.doesNotMatch(methodsRoute, /gateway: item\.gateway/);
+  assert.doesNotMatch(methodsRoute, /gatewayConfig: item\.gatewayConfig/);
   assert.match(source, /displayChannels/);
 });
 
@@ -33,14 +39,17 @@ test("checkout waits for payment methods before defaulting to wallet", () => {
   assert.match(source, /Memuat metode pembayaran/);
 });
 
-
-test("DOKU channel sync never enables merchant channels automatically", () => {
-  const channels = fs.readFileSync(path.join(root, "lib/server/payment-channels.ts"), "utf8");
-  const syncStart = channels.indexOf("export async function syncPaymentChannelsForGateways");
-  const syncEnd = channels.indexOf("\nexport async function syncPaymentChannelsForGateway(", syncStart + 1);
-  const syncSource = channels.slice(syncStart, syncEnd);
-  assert.match(channels, /isActive: false/);
+test("gateway channel sync never enables merchant channels automatically", () => {
+  const syncStart = channelsSource.indexOf("export async function syncPaymentChannelsForGateways");
+  const syncEnd = channelsSource.indexOf("\nexport async function syncPaymentChannelsForGateway(", syncStart + 1);
+  const syncSource = channelsSource.slice(syncStart, syncEnd);
+  assert.match(channelsSource, /isActive: false/);
   assert.match(syncSource, /activationPolicy: "manual"/);
-  assert.match(syncSource, /\.bind\([\s\S]*?item\.description,[\s\S]*?0,[\s\S]*?index/);
+  assert.match(syncSource, /VALUES \(\?, \?, \?, \?, NULL, 0,/);
   assert.doesNotMatch(syncSource, /is_active = excluded\.is_active/);
+});
+
+test("exclusive routing maps VA to Midtrans and QRIS e-wallet to DOKU", () => {
+  assert.match(channelsSource, /gateway === "midtrans".*isMidtransChannelSupported/s);
+  assert.match(channelsSource, /method !== "va" && isDokuChannelSupported/);
 });

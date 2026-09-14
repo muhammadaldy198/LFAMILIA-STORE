@@ -4,19 +4,23 @@ import path from "node:path";
 import test from "node:test";
 
 const root = process.cwd();
-const route = fs.readFileSync(path.join(root, "app/api/admin/wallet/route.ts"), "utf8");
+const route = fs.readFileSync(path.join(root, "app/api/admin/payment-methods/route.ts"), "utf8");
 const manager = fs.readFileSync(path.join(root, "components/admin-payment-workspace.tsx"), "utf8");
 
-test("owner payment API exposes DOKU readiness without exposing credentials", () => {
-  assert.match(route, /gatewayReadiness: \{ doku: getDokuReadiness\(\) \}/);
-  assert.doesNotMatch(route, /secretKey|clientId/);
+test("payment admin API exposes DOKU and Midtrans readiness without credentials", () => {
+  assert.match(route, /getDokuReadiness\(\)/);
+  assert.match(route, /getMidtransReadiness\(\)/);
+  assert.match(route, /isProviderRelayConfigured\("midtrans"\)/);
+  assert.match(route, /gatewayReadiness/);
+  assert.doesNotMatch(route, /clientSecret\s*:|secretKey\s*:|privateKey\s*:/);
 });
 
-test("payment admin shows the single DOKU Direct API workspace", () => {
+test("payment admin shows dual exclusive gateway controls", () => {
   assert.match(manager, /DOKU Direct API/);
-  assert.match(manager, /Periksa Konfigurasi/);
-  assert.match(manager, /Uji koneksi dan transaksi live dilakukan pada tahap pra-peluncuran/);
-  assert.match(manager, /Channel Pembayaran/);
+  assert.match(manager, /Midtrans BI-SNAP/);
+  assert.match(manager, /Master Gateway/);
+  assert.match(manager, /Metode Pembayaran/);
   assert.match(manager, /Editor Halaman Pembayaran/);
-  assert.doesNotMatch(manager, /midtrans|ipaymu/i);
+  assert.match(manager, /Tidak ada fallback otomatis antar gateway/);
+  assert.doesNotMatch(manager, /QRIS DOKU/);
 });
