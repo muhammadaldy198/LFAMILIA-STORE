@@ -35,19 +35,25 @@ test("Midtrans BI-SNAP client signs token and transactional requests and require
   assert.match(source, /BI-SNAP membutuhkan outgoing IP statis/);
 });
 
-test("Midtrans VA notification verifies minified signed body, amount, gateway ownership, and response timestamp", () => {
+test("Midtrans VA notification verifies signature, VA identity, amount, gateway ownership, and BI-SNAP response contract", () => {
   const source = read("app/api/payments/midtrans/v1.0/transfer-va/payment/route.ts");
   assert.match(source, /verifyMidtransNotification/);
   assert.match(source, /const minifiedBody = JSON\.stringify\(body\)/);
   assert.match(source, /rawBody: minifiedBody/);
   assert.match(source, /"X-TIMESTAMP": responseTimestamp\(\)/);
   assert.match(source, /partnerId !== getMidtransPartnerId\(\)/);
+  assert.match(source, /\^\\d\+\$/.source ? /externalId/ : /externalId/);
+  assert.match(source, /gateway_payment_no/);
+  assert.match(source, /virtualAccountNo !== `\$\{partnerServiceId\}\$\{customerNo\}`/);
   assert.match(source, /payment_gateway.*midtrans/);
   assert.match(source, /callbackAmount !== order\.total/);
+  assert.match(source, /responseCode: "4042513"/);
+  assert.match(source, /eventId: `notification-\$\{externalId\}`/);
   assert.match(source, /recordExternalPaymentEvent/);
   assert.match(source, /applyPaymentStatus/);
   assert.match(source, /fulfillAutomaticOrder/);
   assert.match(source, /responseCode: "2002500"/);
+  assert.match(source, /responseMessage: "Successful"/);
 });
 
 test("provider credentials are encrypted Admin-managed config, not relay environment secrets", () => {
