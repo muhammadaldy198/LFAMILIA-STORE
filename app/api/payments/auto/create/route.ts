@@ -3,19 +3,11 @@ import { publicPaymentLabel } from "@/lib/public-payment";
 import { isAutomaticPackageAvailable } from "@/lib/server/availability";
 import { getCustomerSession } from "@/lib/server/customer-auth";
 import {
-  createDokuDirectPayment,
-  getDokuReadiness,
-} from "@/lib/server/doku";
-import {
   externalArtifactsFromOrder,
   recordExternalPaymentEvent,
   updateExternalPayment,
 } from "@/lib/server/external-payments";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
-import {
-  createMidtransVirtualAccount,
-  getMidtransReadiness,
-} from "@/lib/server/midtrans";
 import {
   NicknameServiceError,
   NicknameValidationError,
@@ -26,7 +18,7 @@ import {
   isGatewayChannelSupported,
   isPaymentGatewayActive,
 } from "@/lib/server/payment-channels";
-import { isProviderRelayConfigured } from "@/lib/server/provider-relay";
+import { createConfiguredPayment, getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
 import {
   quotePromotion,
   releaseExternalPromotion,
@@ -150,22 +142,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const dokuReadiness = managedChannel.gateway === "doku" ? getDokuReadiness() : null;
-    const midtransReadiness = managedChannel.gateway === "midtrans" ? getMidtransReadiness() : null;
-    if (managedChannel.gateway === "doku" && !dokuReadiness?.ready) {
+    const readiness = await getConfiguredGatewayReadiness({
+      gateway: managedChannel.gateway,
+      paymentMethod: input.paymentMethod,
+      paymentChannel,
+      gatewayConfig: managedChannel.gatewayConfig,
+    });
+    if (!readiness.ready) {
       return Response.json({ error: "Metode pembayaran ini belum siap." }, { status: 503 });
-    }
-    if (
-      managedChannel.gateway === "midtrans" &&
-      (!midtransReadiness?.ready || !isProviderRelayConfigured("midtrans"))
-    ) {
-      return Response.json({ error: "Metode pembayaran ini belum siap." }, { status: 503 });
-    }
-    if (
-      managedChannel.gateway === "midtrans" &&
-      managedChannel.gatewayConfig.partnerServiceId?.length !== 8
-    ) {
-      return Response.json({ error: "Konfigurasi Virtual Account belum lengkap." }, { status: 503 });
     }
 
     const item = await resolvePurchasableItem(input.productSlug, input.packageSku);
@@ -240,38 +224,27 @@ export async function POST(request: Request) {
 
     const baseUrl = getPublicBaseUrl();
     const invoice = publicInvoice(identity.referenceId);
-    const payment = managedChannel.gateway === "midtrans"
-      ? await createMidtransVirtualAccount({
-          referenceId: identity.referenceId,
-          amount: promotion.finalPrice,
-          channel: paymentChannel,
-          partnerServiceId: managedChannel.gatewayConfig.partnerServiceId,
-          buyerName: input.buyerName,
-          buyerEmail: input.buyerEmail,
-          buyerPhone: input.buyerPhone,
-          productName: item.productName,
-          packageLabel: item.packageLabel,
-          deviceId: input.idempotencyKey,
-        })
-      : await createDokuDirectPayment({
-          referenceId: identity.referenceId,
-          amount: promotion.finalPrice,
-          productName: `${item.productName} - ${item.packageLabel}`,
-          buyerName: input.buyerName,
-          buyerEmail: input.buyerEmail,
-          buyerPhone: input.buyerPhone,
-          paymentMethod: input.paymentMethod,
-          paymentChannel,
-          finishUrl: `${baseUrl}/payment?invoice=${encodeURIComponent(invoice)}`,
-        });
+    const payment = await createConfiguredPayment({
+      gateway: managedChannel.gateway,
+      referenceId: identity.referenceId,
+      amount: promotion.finalPrice,
+      paymentMethod: input.paymentMethod,
+      paymentChannel,
+      gatewayConfig: managedChannel.gatewayConfig,
+      buyerName: input.buyerName,
+      buyerEmail: input.buyerEmail,
+      buyerPhone: input.buyerPhone,
+      productName: item.productName,
+      packageLabel: item.packageLabel,
+      finishUrl: `${baseUrl}/payment?invoice=${encodeURIComponent(invoice)}`,
+      deviceId: input.idempotencyKey,
+    });
 
-    const environment = managedChannel.gateway === "midtrans"
-      ? midtransReadiness?.environment ?? null
-      : dokuReadiness?.environment ?? null;
     await updateExternalPayment({
       referenceId: identity.referenceId,
-      gateway: managedChannel.gateway,
-      environment,
+      gateway: payment.gateway,
+      mode: payment.mode,
+      environment: payment.environment,
       requestId: payment.requestId,
       referenceNo: payment.referenceNo || null,
       paymentNo: payment.paymentNo || null,
@@ -284,7 +257,7 @@ export async function POST(request: Request) {
     await updateExternalPromotionExpiry(identity.id, payment.expiredAt || null);
     await recordExternalPaymentEvent({
       orderId: identity.id,
-      gateway: managedChannel.gateway,
+      gateway: payment.gateway,
       eventId: `create-${payment.requestId}`,
       status: "pending",
       payload: payment.raw,
