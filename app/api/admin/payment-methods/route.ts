@@ -13,7 +13,10 @@ import {
 import { isAllowedMediaUrl } from "@/lib/media-url";
 import { findPaymentChannel } from "@/lib/payment-methods";
 import { getDokuReadiness } from "@/lib/server/doku";
+import { getDokuCheckoutReadiness } from "@/lib/server/doku-checkout";
 import { getMidtransReadiness } from "@/lib/server/midtrans";
+import { getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
+import { getActivePaymentModes } from "@/lib/server/payment-mode-config";
 import { isProviderRelayConfigured } from "@/lib/server/provider-relay";
 
 const gatewayConfigSchema = z.record(
@@ -48,35 +51,40 @@ const syncSchema = z.object({
 function validateChannel(input: z.infer<typeof channelSchema>) {
   const known = findPaymentChannel(input.method, input.channel);
   if (!known) throw new Error("Channel pembayaran tidak dikenali.");
-  if (known.gateway !== input.gateway || !isGatewayChannelSupported(input.gateway, input.method, input.channel)) {
-    throw new Error("Mapping gateway tidak sesuai kebijakan eksklusif LFAMILIA.");
+  if (!isGatewayChannelSupported(input.gateway, input.method, input.channel)) {
+    throw new Error("Channel ini belum didukung oleh gateway yang dipilih.");
   }
-  if (input.gateway === "midtrans" && input.isActive) {
-    const partnerServiceId = input.gatewayConfig.partnerServiceId ?? "";
-    if (partnerServiceId.length !== 8) {
-      throw new Error("Isi Partner Service ID Midtrans 8 karakter (termasuk left-padding spasi) sebelum mengaktifkan VA.");
-    }
-  }
+}
+
+async function gatewayReadiness() {
+  const modes = await getActivePaymentModes();
+  const doku = modes.dokuMode === "checkout"
+    ? await getDokuCheckoutReadiness()
+    : getDokuReadiness();
+  const midtransBase = modes.midtransMode === "snap"
+    ? await getMidtransSnapReadiness()
+    : getMidtransReadiness();
+  const relayReady = modes.midtransMode === "snap" || isProviderRelayConfigured("midtrans");
+  return {
+    doku: { ...doku, mode: modes.dokuMode },
+    midtrans: {
+      ...midtransBase,
+      mode: modes.midtransMode,
+      relayReady,
+      ready: Boolean(midtransBase.ready && relayReady),
+    },
+  };
 }
 
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   const gatewaySettings = await listPaymentGatewaySettings();
-  const doku = getDokuReadiness();
-  const midtrans = getMidtransReadiness();
   return Response.json({
     channels: await listPaymentChannels(true),
     gatewaySettings,
     gateways: gatewaySettings.filter((item) => item.isActive).map((item) => item.gateway),
-    gatewayReadiness: {
-      doku,
-      midtrans: {
-        ...midtrans,
-        relayReady: isProviderRelayConfigured("midtrans"),
-        ready: midtrans.ready && isProviderRelayConfigured("midtrans"),
-      },
-    },
+    gatewayReadiness: await gatewayReadiness(),
   });
 }
 
