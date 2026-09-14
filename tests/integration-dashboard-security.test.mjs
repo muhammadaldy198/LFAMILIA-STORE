@@ -42,6 +42,7 @@ test("DOKU Admin form binds official API origin to the selected environment", ()
   assert.match(manager, /Direct API Base URL/);
   assert.match(manager, /readOnly/);
   assert.match(manager, /options=\{\["sandbox", "production"\]\}/);
+  assert.match(route, /apiUrl: dokuApiOrigin\(input\.environment\)/);
 });
 
 test("DOKU encrypted private key passphrase is editable and persisted securely", () => {
