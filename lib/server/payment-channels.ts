@@ -5,8 +5,7 @@ import {
   type PaymentGatewayCode,
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
-import { isDokuChannelSupported } from "@/lib/server/doku";
-import { isMidtransChannelSupported } from "@/lib/server/midtrans";
+import { isHostedGatewayChannelSupported } from "@/lib/server/hosted-payment-methods";
 
 export type PaymentGatewayName = PaymentGatewayCode;
 
@@ -45,9 +44,10 @@ function parseGatewayConfig(value: string | null | undefined) {
   }
 }
 
+// Routing is an Admin decision. This validates whether a gateway has at least one
+// supported mode for the channel; the currently selected mode is checked at runtime.
 export function isGatewayChannelSupported(gateway: PaymentGatewayName, method: string, channel: string) {
-  if (gateway === "midtrans") return isMidtransChannelSupported(method, channel);
-  return method !== "va" && isDokuChannelSupported(method, channel);
+  return isHostedGatewayChannelSupported(gateway, method, channel);
 }
 
 export async function listPaymentGatewaySettings(): Promise<PaymentGatewaySetting[]> {
@@ -161,15 +161,11 @@ export async function deletePaymentChannel(id: number) {
   await getD1().prepare("DELETE FROM payment_channels WHERE id = ?").bind(id).run();
 }
 
-export async function syncPaymentChannelsForGateways(
-  gateways: PaymentGatewayName[],
-) {
+export async function syncPaymentChannelsForGateways(gateways: PaymentGatewayName[]) {
   const activeGateways = [...new Set(gateways)].filter((item): item is PaymentGatewayName => item === "doku" || item === "midtrans");
   if (!activeGateways.length) throw new Error("Pilih minimal satu gateway untuk sinkronisasi.");
 
-  const supported = paymentChannels.filter((item) =>
-    activeGateways.includes(item.gateway) && isGatewayChannelSupported(item.gateway, item.method, item.channel),
-  );
+  const supported = paymentChannels.filter((item) => activeGateways.includes(item.gateway));
   const db = getD1();
   await db.batch(supported.map((item, index) =>
     db.prepare(`INSERT INTO payment_channels (method, channel, name, description, image_url, is_active, sort_order, gateway, gateway_config_json)
@@ -177,7 +173,6 @@ export async function syncPaymentChannelsForGateways(
       ON CONFLICT(method, channel) DO UPDATE SET
         name = excluded.name,
         description = excluded.description,
-        gateway = excluded.gateway,
         sort_order = excluded.sort_order,
         updated_at = CURRENT_TIMESTAMP`)
       .bind(
@@ -191,7 +186,7 @@ export async function syncPaymentChannelsForGateways(
   ));
   return {
     gateways: activeGateways,
-    mode: "checkout" as const,
+    mode: "admin-routed" as const,
     synced: supported.length,
     activationPolicy: "manual" as const,
     channels: await listPaymentChannels(true),
