@@ -266,7 +266,7 @@ export async function POST(request: Request) {
         });
 
     const environment = managedChannel.gateway === "midtrans"
-      ? payment.environment
+      ? midtransReadiness?.environment ?? null
       : dokuReadiness?.environment ?? null;
     await updateExternalPayment({
       referenceId: identity.referenceId,
