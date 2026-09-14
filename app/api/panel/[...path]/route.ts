@@ -9,6 +9,7 @@ import * as media from "@/app/api/admin/media/route";
 import * as members from "@/app/api/admin/members/route";
 import * as paymentMethods from "@/app/api/admin/payment-methods/route";
 import * as paymentPage from "@/app/api/admin/payment-page/route";
+import * as paymentRouting from "@/app/api/admin/payment-routing/route";
 import * as orders from "@/app/api/admin/orders/route";
 import * as integrations from "@/app/api/admin/integrations/route";
 import * as productContent from "@/app/api/admin/product-content/route";
@@ -48,6 +49,7 @@ const routes: Record<string, RouteHandlers> = {
   members: { GET: members.GET, PUT: members.PUT, PATCH: members.PATCH },
   "payment-methods": { GET: paymentMethods.GET, POST: paymentMethods.POST, DELETE: paymentMethods.DELETE },
   "payment-page": { GET: paymentPage.GET, PUT: paymentPage.PUT },
+  "payment-routing": { GET: paymentRouting.GET, PUT: paymentRouting.PUT },
   orders: { GET: orders.GET, POST: orders.POST, PATCH: orders.PATCH },
   "product-content": { GET: productContent.GET, PUT: productContent.PUT },
   "product-input": { GET: productInput.GET, PATCH: productInput.PATCH },
