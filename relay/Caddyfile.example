@@ -11,3 +11,7 @@
 {$DIGIFLAZZ_RELAY_HOST} {
   import lfamilia_provider_relay
 }
+
+{$MIDTRANS_RELAY_HOST} {
+  import lfamilia_provider_relay
+}
