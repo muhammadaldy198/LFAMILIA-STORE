@@ -74,7 +74,6 @@ export async function getActivePaymentModes() {
     midtransMode: (current.get("midtrans_payment_mode") === "bisnap" ? "bisnap" : "snap") as MidtransPaymentMode,
     dokuEnvironment: env(current.get("doku_environment")),
     midtransEnvironment: env(current.get("midtrans_environment")),
-    walletGateway: (current.get("wallet_topup_gateway") === "midtrans" ? "midtrans" : "doku") as HostedProvider,
   };
 }
 
@@ -83,7 +82,6 @@ export async function savePaymentModeSelections(input: {
   midtransMode?: MidtransPaymentMode;
   dokuEnvironment?: PaymentEnvironment;
   midtransEnvironment?: PaymentEnvironment;
-  walletGateway?: HostedProvider;
 }) {
   await ensureTables();
   const db = getD1();
@@ -92,7 +90,6 @@ export async function savePaymentModeSelections(input: {
     ["midtrans_payment_mode", input.midtransMode],
     ["doku_environment", input.dokuEnvironment],
     ["midtrans_environment", input.midtransEnvironment],
-    ["wallet_topup_gateway", input.walletGateway],
   ];
   const statements = rows.flatMap(([key, value]) => value ? [db.prepare(`INSERT INTO integration_settings (setting_key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(setting_key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`).bind(key, value)] : []);
@@ -134,6 +131,10 @@ async function profile(provider: HostedProvider, mode: HostedMode, environment: 
     .bind(provider, mode, environment).first<ProfileRow>();
   if (!row?.encrypted_config) return null;
   try { return await decrypt(row.encrypted_config); } catch { return null; }
+}
+
+export async function getHostedGatewayProfileForEnvironment(provider: HostedProvider, mode: HostedMode, environment: PaymentEnvironment) {
+  return profile(provider, mode, environment);
 }
 
 export async function getDokuCheckoutConfig() {
