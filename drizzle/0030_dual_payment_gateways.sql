@@ -1,5 +1,7 @@
 ALTER TABLE `payment_channels` ADD COLUMN `gateway` text NOT NULL DEFAULT 'doku';
 --> statement-breakpoint
+ALTER TABLE `payment_channels` ADD COLUMN `gateway_config_json` text NOT NULL DEFAULT '{}';
+--> statement-breakpoint
 UPDATE `payment_channels` SET `gateway` = 'midtrans' WHERE `method` = 'va';
 --> statement-breakpoint
 UPDATE `payment_channels` SET `gateway` = 'doku' WHERE `method` IN ('ewallet', 'qris');
