@@ -33,15 +33,19 @@ test("Midtrans BI-SNAP client signs token and transactional requests and require
   assert.match(source, /channel-id/);
   assert.match(source, /providerRelayRequest/);
   assert.match(source, /BI-SNAP membutuhkan outgoing IP statis/);
+  assert.match(source, /expectedEnvironment\?: MidtransEnvironment/);
+  assert.match(source, /getConfig\(input\.expectedEnvironment \?\? getMidtransEnvironment\(\)\)/);
 });
 
-test("Midtrans VA notification verifies signature, VA identity, amount, gateway ownership, and BI-SNAP response contract", () => {
+test("Midtrans VA notification verifies signature, stored environment, VA identity, amount, gateway ownership, and BI-SNAP response contract", () => {
   const source = read("app/api/payments/midtrans/v1.0/transfer-va/payment/route.ts");
   assert.match(source, /verifyMidtransNotification/);
   assert.match(source, /const minifiedBody = JSON\.stringify\(body\)/);
   assert.match(source, /rawBody: minifiedBody/);
   assert.match(source, /"X-TIMESTAMP": responseTimestamp\(\)/);
-  assert.match(source, /partnerId !== getMidtransPartnerId\(\)/);
+  assert.match(source, /payment_gateway_environment/);
+  assert.match(source, /getMidtransPartnerId\(expectedEnvironment\)/);
+  assert.match(source, /expectedEnvironment,/);
   assert.match(source, /\/\^\\d\+\$\/\.test\(externalId\)/);
   assert.match(source, /gateway_payment_no/);
   assert.match(source, /virtualAccountNo !== `\$\{partnerServiceId\}\$\{customerNo\}`/);
