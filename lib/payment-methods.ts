@@ -9,6 +9,8 @@ export type PaymentChannel = {
   gateway: PaymentGatewayCode;
 };
 
+// Default assignment is only a first-install fallback. Admin selections stored in D1
+// always win and sync must never overwrite a saved gateway assignment.
 export const paymentChannels: PaymentChannel[] = [
   { method: "va", channel: "bca", name: "BCA", description: "Virtual Account BCA", gateway: "midtrans" },
   { method: "va", channel: "mandiri", name: "Mandiri", description: "Virtual Account Mandiri", gateway: "midtrans" },
@@ -17,8 +19,10 @@ export const paymentChannels: PaymentChannel[] = [
   { method: "va", channel: "cimb", name: "CIMB Niaga", description: "Virtual Account CIMB Niaga", gateway: "midtrans" },
   { method: "va", channel: "permata", name: "Permata", description: "Virtual Account Permata", gateway: "midtrans" },
   { method: "va", channel: "danamon", name: "Danamon", description: "Virtual Account Danamon", gateway: "midtrans" },
-  { method: "ewallet", channel: "dana", name: "DANA", description: "Bayar melalui aplikasi DANA", gateway: "doku" },
-  { method: "ewallet", channel: "shopeepay", name: "ShopeePay", description: "Bayar melalui aplikasi ShopeePay", gateway: "doku" },
+  { method: "ewallet", channel: "gopay", name: "GoPay", description: "Bayar melalui GoPay", gateway: "midtrans" },
+  { method: "ewallet", channel: "ovo", name: "OVO", description: "Bayar melalui OVO", gateway: "midtrans" },
+  { method: "ewallet", channel: "dana", name: "DANA", description: "Bayar melalui aplikasi DANA", gateway: "midtrans" },
+  { method: "ewallet", channel: "shopeepay", name: "ShopeePay", description: "Bayar melalui aplikasi ShopeePay", gateway: "midtrans" },
   { method: "qris", channel: "mpm", name: "QRIS", description: "Scan dari aplikasi bank atau e-wallet", gateway: "doku" },
 ];
 
