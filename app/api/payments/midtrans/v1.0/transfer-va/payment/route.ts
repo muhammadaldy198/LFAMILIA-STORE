@@ -36,6 +36,21 @@ function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function responseTimestamp(date = new Date()) {
+  const shifted = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+  return `${shifted.toISOString().slice(0, 19)}+07:00`;
+}
+
+function snapResponse(payload: Record<string, unknown>, status = 200) {
+  return Response.json(payload, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+      "X-TIMESTAMP": responseTimestamp(),
+    },
+  });
+}
+
 function paymentAmount(body: NotificationBody) {
   const currency = clean(body.paidAmount?.currency).toUpperCase();
   const amount = Number(body.paidAmount?.value);
@@ -53,7 +68,7 @@ function mappedStatus(flag: string): "paid" | "pending" | "expired" | "failed" |
 }
 
 function successResponse(body: NotificationBody) {
-  return Response.json({
+  return snapResponse({
     responseCode: "2002500",
     responseMessage: "Success",
     virtualAccountData: {
@@ -84,25 +99,42 @@ export async function POST(request: Request) {
   try {
     body = JSON.parse(rawBody) as NotificationBody;
   } catch {
-    return Response.json({ responseCode: "4002500", responseMessage: "Invalid request" }, { status: 400 });
+    return snapResponse(
+      { responseCode: "4002500", responseMessage: "Invalid request" },
+      400,
+    );
   }
 
   try {
     if (!partnerId || partnerId !== getMidtransPartnerId()) {
-      return Response.json({ responseCode: "4012500", responseMessage: "Unauthorized" }, { status: 401 });
+      return snapResponse(
+        { responseCode: "4012500", responseMessage: "Unauthorized" },
+        401,
+      );
     }
+
+    // Midtrans BI-SNAP signs the SHA-256 of the minified JSON body. Parse and
+    // stringify before verification so harmless transport whitespace cannot
+    // change the signature input.
+    const minifiedBody = JSON.stringify(body);
     if (!verifyMidtransNotification({
-      rawBody,
+      rawBody: minifiedBody,
       timestamp,
       signature,
       endpointPath: PROVIDER_ENDPOINT,
     })) {
-      return Response.json({ responseCode: "4012500", responseMessage: "Unauthorized" }, { status: 401 });
+      return snapResponse(
+        { responseCode: "4012500", responseMessage: "Unauthorized" },
+        401,
+      );
     }
 
     const referenceId = clean(body.trxId);
     if (!referenceId) {
-      return Response.json({ responseCode: "4002500", responseMessage: "Missing transaction reference" }, { status: 400 });
+      return snapResponse(
+        { responseCode: "4002500", responseMessage: "Missing transaction reference" },
+        400,
+      );
     }
     const order = await getOrderByReference(referenceId);
     if (!order) return successResponse(body);
@@ -148,9 +180,9 @@ export async function POST(request: Request) {
     return successResponse(body);
   } catch (error) {
     console.error("Callback Midtrans BI-SNAP gagal:", error);
-    return Response.json(
+    return snapResponse(
       { responseCode: "5002500", responseMessage: "Internal server error" },
-      { status: 500 },
+      500,
     );
   }
 }
