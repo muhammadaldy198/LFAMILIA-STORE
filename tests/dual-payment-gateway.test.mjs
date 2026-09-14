@@ -42,7 +42,7 @@ test("Midtrans VA notification verifies signature, VA identity, amount, gateway 
   assert.match(source, /rawBody: minifiedBody/);
   assert.match(source, /"X-TIMESTAMP": responseTimestamp\(\)/);
   assert.match(source, /partnerId !== getMidtransPartnerId\(\)/);
-  assert.match(source, /\^\\d\+\$/.source ? /externalId/ : /externalId/);
+  assert.match(source, /\/\^\\d\+\$\/\.test\(externalId\)/);
   assert.match(source, /gateway_payment_no/);
   assert.match(source, /virtualAccountNo !== `\$\{partnerServiceId\}\$\{customerNo\}`/);
   assert.match(source, /payment_gateway.*midtrans/);
