@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
+import { dokuApiOrigin, testDokuB2BConnection } from "@/lib/server/doku-connection-test";
 import {
   getIntegrationOverview,
   saveIntegrationProfile,
@@ -31,7 +32,17 @@ const relayTestInput = z.object({
   action: z.literal("test_relay"),
 });
 
-const schema = z.discriminatedUnion("action", [profileInput, selectionInput, relayTestInput]);
+const dokuTestInput = z.object({
+  action: z.literal("test_doku"),
+  environment: z.enum(["sandbox", "production"]),
+});
+
+const schema = z.discriminatedUnion("action", [
+  profileInput,
+  selectionInput,
+  relayTestInput,
+  dokuTestInput,
+]);
 
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
@@ -59,8 +70,24 @@ export async function PUT(request: Request) {
         { headers: { "Cache-Control": "no-store" } },
       );
     }
+    if (input.action === "test_doku") {
+      return Response.json(
+        { ok: true, doku: await testDokuB2BConnection(input.environment) },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     if (input.action === "save_profile") {
-      await saveIntegrationProfile(input);
+      if (input.provider === "doku" && (input.environment === "sandbox" || input.environment === "production")) {
+        await saveIntegrationProfile({
+          ...input,
+          values: {
+            ...input.values,
+            apiUrl: dokuApiOrigin(input.environment),
+          },
+        });
+      } else {
+        await saveIntegrationProfile(input);
+      }
     } else {
       await saveIntegrationSelections(input.selections);
     }
