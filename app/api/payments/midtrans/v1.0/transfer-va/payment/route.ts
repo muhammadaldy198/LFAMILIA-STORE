@@ -36,6 +36,10 @@ function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function rawText(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
 function responseTimestamp(date = new Date()) {
   const shifted = new Date(date.getTime() + 7 * 60 * 60 * 1000);
   return `${shifted.toISOString().slice(0, 19)}+07:00`;
@@ -63,6 +67,7 @@ function mappedStatus(flag: string): "paid" | "pending" | "expired" | "failed" |
   if (flag === "01" || flag === "02" || flag === "03") return "pending";
   if (flag === "08") return "expired";
   if (flag === "05" || flag === "06" || flag === "07" || flag === "09") return "failed";
+  // A refund notification must never move an already-paid order backwards.
   if (flag === "04") return "ignore";
   return "ignore";
 }
@@ -70,16 +75,21 @@ function mappedStatus(flag: string): "paid" | "pending" | "expired" | "failed" |
 function successResponse(body: NotificationBody) {
   return snapResponse({
     responseCode: "2002500",
-    responseMessage: "Success",
+    responseMessage: "Successful",
     virtualAccountData: {
       partnerServiceId: body.partnerServiceId,
       customerNo: body.customerNo,
       virtualAccountNo: body.virtualAccountNo,
-      virtualAccountName: body.virtualAccountName,
       trxId: body.trxId,
-      paymentRequestId: body.paymentRequestId,
     },
   });
+}
+
+function invalidAmountResponse() {
+  return snapResponse(
+    { responseCode: "4042513", responseMessage: "Invalid Amount" },
+    404,
+  );
 }
 
 export async function GET() {
@@ -94,6 +104,7 @@ export async function POST(request: Request) {
   const timestamp = request.headers.get("x-timestamp") || "";
   const signature = request.headers.get("x-signature") || "";
   const partnerId = request.headers.get("x-partner-id") || "";
+  const externalId = request.headers.get("x-external-id") || "";
 
   let body: NotificationBody;
   try {
@@ -112,10 +123,15 @@ export async function POST(request: Request) {
         401,
       );
     }
+    if (!/^\d+$/.test(externalId)) {
+      return snapResponse(
+        { responseCode: "4002502", responseMessage: "Invalid Mandatory Field X-EXTERNAL-ID" },
+        400,
+      );
+    }
 
-    // Midtrans BI-SNAP signs the SHA-256 of the minified JSON body. Parse and
-    // stringify before verification so harmless transport whitespace cannot
-    // change the signature input.
+    // Midtrans BI-SNAP signs SHA-256(minify(RequestBody)). Parse + stringify
+    // before verification so transport whitespace does not alter the digest.
     const minifiedBody = JSON.stringify(body);
     if (!verifyMidtransNotification({
       rawBody: minifiedBody,
@@ -130,19 +146,40 @@ export async function POST(request: Request) {
     }
 
     const referenceId = clean(body.trxId);
-    if (!referenceId) {
+    const partnerServiceId = rawText(body.partnerServiceId);
+    const customerNo = clean(body.customerNo);
+    const virtualAccountNo = rawText(body.virtualAccountNo);
+    if (
+      !referenceId ||
+      partnerServiceId.length !== 8 ||
+      !customerNo ||
+      !virtualAccountNo ||
+      virtualAccountNo !== `${partnerServiceId}${customerNo}`
+    ) {
       return snapResponse(
-        { responseCode: "4002500", responseMessage: "Missing transaction reference" },
+        { responseCode: "4002502", responseMessage: "Invalid Mandatory Field" },
         400,
       );
     }
+
     const order = await getOrderByReference(referenceId);
     if (!order) return successResponse(body);
 
     const routing = await getD1().prepare(
-      "SELECT payment_gateway, gateway_reference_no FROM orders WHERE id = ? LIMIT 1",
-    ).bind(order.id).first<{ payment_gateway: string | null; gateway_reference_no: string | null }>();
+      `SELECT payment_gateway, gateway_reference_no, gateway_payment_no
+       FROM orders WHERE id = ? LIMIT 1`,
+    ).bind(order.id).first<{
+      payment_gateway: string | null;
+      gateway_reference_no: string | null;
+      gateway_payment_no: string | null;
+    }>();
     if (routing?.payment_gateway !== "midtrans") return successResponse(body);
+    if (routing.gateway_payment_no && routing.gateway_payment_no !== virtualAccountNo) {
+      return snapResponse(
+        { responseCode: "4002502", responseMessage: "Invalid Virtual Account" },
+        400,
+      );
+    }
 
     const bank = clean(body.additionalInfo?.bank).toLowerCase();
     if (bank && bank !== order.payment_channel.toLowerCase()) return successResponse(body);
@@ -156,13 +193,12 @@ export async function POST(request: Request) {
     const flag = clean(body.additionalInfo?.paymentFlagStatus);
     const status = mappedStatus(flag);
     const callbackAmount = paymentAmount(body);
-    if (status === "paid" && callbackAmount !== order.total) return successResponse(body);
+    if (status === "paid" && callbackAmount !== order.total) return invalidAmountResponse();
 
-    const eventId = callbackReference || clean(body.paymentRequestId) || `${referenceId}-${flag || "unknown"}`;
     await recordExternalPaymentEvent({
       orderId: order.id,
       gateway: "midtrans",
-      eventId: `notification-${eventId}`,
+      eventId: `notification-${externalId}`,
       status,
       payload: body,
     });
