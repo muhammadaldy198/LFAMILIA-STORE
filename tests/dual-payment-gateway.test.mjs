@@ -35,9 +35,12 @@ test("Midtrans BI-SNAP client signs token and transactional requests and require
   assert.match(source, /BI-SNAP membutuhkan outgoing IP statis/);
 });
 
-test("Midtrans VA notification verifies signature amount and gateway ownership before fulfillment", () => {
+test("Midtrans VA notification verifies minified signed body, amount, gateway ownership, and response timestamp", () => {
   const source = read("app/api/payments/midtrans/v1.0/transfer-va/payment/route.ts");
   assert.match(source, /verifyMidtransNotification/);
+  assert.match(source, /const minifiedBody = JSON\.stringify\(body\)/);
+  assert.match(source, /rawBody: minifiedBody/);
+  assert.match(source, /"X-TIMESTAMP": responseTimestamp\(\)/);
   assert.match(source, /partnerId !== getMidtransPartnerId\(\)/);
   assert.match(source, /payment_gateway.*midtrans/);
   assert.match(source, /callbackAmount !== order\.total/);
