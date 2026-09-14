@@ -12,6 +12,9 @@ import {
 } from "@/lib/server/payment-channels";
 import { isAllowedMediaUrl } from "@/lib/media-url";
 import { findPaymentChannel } from "@/lib/payment-methods";
+import { getDokuReadiness } from "@/lib/server/doku";
+import { getMidtransReadiness } from "@/lib/server/midtrans";
+import { isProviderRelayConfigured } from "@/lib/server/provider-relay";
 
 const gatewayConfigSchema = z.record(
   z.string().trim().min(1).max(60),
@@ -60,10 +63,20 @@ export async function GET(request: Request) {
   const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   const gatewaySettings = await listPaymentGatewaySettings();
+  const doku = getDokuReadiness();
+  const midtrans = getMidtransReadiness();
   return Response.json({
     channels: await listPaymentChannels(true),
     gatewaySettings,
     gateways: gatewaySettings.filter((item) => item.isActive).map((item) => item.gateway),
+    gatewayReadiness: {
+      doku,
+      midtrans: {
+        ...midtrans,
+        relayReady: isProviderRelayConfigured("midtrans"),
+        ready: midtrans.ready && isProviderRelayConfigured("midtrans"),
+      },
+    },
   });
 }
 
