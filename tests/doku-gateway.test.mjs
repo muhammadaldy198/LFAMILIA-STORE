@@ -10,11 +10,10 @@ const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/
 const providers = fs.readFileSync(path.join(root, "lib/server/providers/index.ts"), "utf8");
 const providerOptions = fs.readFileSync(path.join(root, "lib/provider-options.ts"), "utf8");
 
-test("DOKU Direct API uses SNAP token and payment endpoints with asymmetric and symmetric signatures", () => {
+test("DOKU Direct API keeps signed QRIS and e-wallet primitives", () => {
   assert.match(doku, /authorization\/v1\/access-token\/b2b/);
   assert.match(doku, /snap-adapter\/b2b\/v1\.0\/qr\/qr-mpm-generate/);
   assert.match(doku, /direct-debit\/core\/v1\/debit\/payment-host-to-host/);
-  assert.match(doku, /virtual-accounts\/bi-snap-va\/v1\.1\/transfer-va\/create-va/);
   assert.match(doku, /RSA-SHA256/);
   assert.match(doku, /hmacBase64\("sha512"/);
   assert.match(doku, /x-signature/);
@@ -29,10 +28,11 @@ test("DOKU callback validates signature, amount, and request identity before ful
   assert.match(callback, /fulfillAutomaticOrder\(/);
 });
 
-test("checkout creates one DOKU payment without legacy gateway fallback", () => {
+test("checkout routes DOKU only for its assigned methods and also supports Midtrans VA", () => {
   assert.match(autoRoute, /createDokuDirectPayment\(/);
-  assert.doesNotMatch(autoRoute, /paymentGateway: "doku"/);
-  assert.doesNotMatch(autoRoute, /midtrans|ipaymu|fallback/i);
+  assert.match(autoRoute, /createMidtransVirtualAccount\(/);
+  assert.match(autoRoute, /managedChannel\.gateway === "midtrans"/);
+  assert.doesNotMatch(autoRoute, /ipaymu/i);
 });
 
 test("DOKU database readiness includes current Direct API artifacts", () => {
