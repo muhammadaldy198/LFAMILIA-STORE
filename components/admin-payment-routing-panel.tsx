@@ -32,10 +32,11 @@ type Channel = {
   gateway: Gateway;
   gatewayConfig?: Record<string, string>;
 };
+type JsonPayload = { error?: string; [key: string]: unknown };
 
 async function jsonRequest(url: string, init?: RequestInit) {
   const response = await fetch(url, { cache: "no-store", ...init });
-  const payload = await response.json().catch(() => ({})) as Record<string, any>;
+  const payload = await response.json().catch(() => ({})) as JsonPayload;
   if (!response.ok) throw new Error(payload.error || "Pengaturan pembayaran gagal diproses.");
   return payload;
 }
