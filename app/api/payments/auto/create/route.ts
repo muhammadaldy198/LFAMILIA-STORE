@@ -5,30 +5,45 @@ import { getCustomerSession } from "@/lib/server/customer-auth";
 import {
   createDokuDirectPayment,
   getDokuReadiness,
-  isDokuChannelSupported,
 } from "@/lib/server/doku";
+import {
+  externalArtifactsFromOrder,
+  recordExternalPaymentEvent,
+  updateExternalPayment,
+} from "@/lib/server/external-payments";
 import { getMemberTierProfile } from "@/lib/server/member-tiers";
+import {
+  createMidtransVirtualAccount,
+  getMidtransReadiness,
+} from "@/lib/server/midtrans";
 import {
   NicknameServiceError,
   NicknameValidationError,
   verifyNicknameForCheckout,
 } from "@/lib/server/nickname-check";
-import { isPaymentChannelAvailable } from "@/lib/server/payment-channels";
-import { quotePromotion, releaseExternalPromotion, reserveExternalPromotion, updateExternalPromotionExpiry } from "@/lib/server/promotions";
+import {
+  getPaymentChannel,
+  isGatewayChannelSupported,
+  isPaymentGatewayActive,
+} from "@/lib/server/payment-channels";
+import { isProviderRelayConfigured } from "@/lib/server/provider-relay";
+import {
+  quotePromotion,
+  releaseExternalPromotion,
+  reserveExternalPromotion,
+  updateExternalPromotionExpiry,
+} from "@/lib/server/promotions";
 import {
   createOrderIdentity,
   getExternalOrderByCheckoutKey,
   insertPendingOrder,
   markPaymentCreationFailed,
   normalizeCustomerInputs,
-  recordOrderEvent,
   resolvePurchasableItem,
-  updateDokuPayment,
   type OrderRecord,
 } from "@/lib/server/orders";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
-import { readWalletSettings } from "@/lib/server/wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +80,8 @@ function existingExternalResponse(order: OrderRecord) {
       { status: 409 },
     );
   }
-  if (!order.doku_request_id) {
+  const artifacts = externalArtifactsFromOrder(order as unknown as Record<string, unknown>);
+  if (!artifacts.requestId) {
     return Response.json(
       { error: "Invoice sedang dibuat. Coba lagi dengan data yang sama.", retryable: true },
       { status: 409 },
@@ -82,13 +98,13 @@ function existingExternalResponse(order: OrderRecord) {
     voucherCode: order.voucher_code,
     flashSaleId: order.flash_sale_id,
     paymentMethod: order.payment_method,
-    paymentNo: order.doku_payment_no,
-    qrContent: order.doku_qr_content,
+    paymentNo: artifacts.paymentNo,
+    qrContent: artifacts.qrContent,
     paymentName: publicPaymentLabel(order.payment_method, order.payment_channel),
-    paymentUrl: order.doku_payment_url,
+    paymentUrl: artifacts.paymentUrl,
     fee: order.admin_fee,
     total: order.total,
-    expiredAt: order.doku_expired_at,
+    expiredAt: artifacts.expiredAt,
     paymentStatus: order.payment_status,
   });
 }
@@ -112,32 +128,44 @@ export async function POST(request: Request) {
     checkoutKey = input.idempotencyKey;
     const priorOrder = await getExternalOrderByCheckoutKey(input.idempotencyKey);
     if (priorOrder) return existingExternalResponse(priorOrder);
+
     const paymentChannel =
       input.paymentMethod === "qris" && input.paymentChannel === "qris"
         ? "mpm"
         : input.paymentChannel;
-
+    const managedChannel = await getPaymentChannel(input.paymentMethod, paymentChannel, false);
     if (
-      !isDokuChannelSupported(input.paymentMethod, paymentChannel) ||
-      !(await isPaymentChannelAvailable(input.paymentMethod, paymentChannel))
+      !managedChannel ||
+      !isGatewayChannelSupported(managedChannel.gateway, input.paymentMethod, paymentChannel)
     ) {
       return Response.json(
         { error: "Metode pembayaran belum didukung atau sedang dinonaktifkan." },
         { status: 400 },
       );
     }
-
-    const settings = await readWalletSettings();
-    const readiness = getDokuReadiness();
-    if (!settings.dokuCheckoutEnabled || !readiness.ready) {
+    if (!(await isPaymentGatewayActive(managedChannel.gateway))) {
       return Response.json(
-        {
-          error: readiness.ready
-            ? "Pembayaran otomatis sedang dinonaktifkan."
-            : "Pembayaran otomatis belum siap.",
-        },
+        { error: "Metode pembayaran sedang dinonaktifkan." },
         { status: 503 },
       );
+    }
+
+    const dokuReadiness = managedChannel.gateway === "doku" ? getDokuReadiness() : null;
+    const midtransReadiness = managedChannel.gateway === "midtrans" ? getMidtransReadiness() : null;
+    if (managedChannel.gateway === "doku" && !dokuReadiness?.ready) {
+      return Response.json({ error: "Metode pembayaran ini belum siap." }, { status: 503 });
+    }
+    if (
+      managedChannel.gateway === "midtrans" &&
+      (!midtransReadiness?.ready || !isProviderRelayConfigured("midtrans"))
+    ) {
+      return Response.json({ error: "Metode pembayaran ini belum siap." }, { status: 503 });
+    }
+    if (
+      managedChannel.gateway === "midtrans" &&
+      managedChannel.gatewayConfig.partnerServiceId?.length !== 8
+    ) {
+      return Response.json({ error: "Konfigurasi Virtual Account belum lengkap." }, { status: 503 });
     }
 
     const item = await resolvePurchasableItem(input.productSlug, input.packageSku);
@@ -203,38 +231,60 @@ export async function POST(request: Request) {
     });
 
     orderId = identity.id;
-    await reserveExternalPromotion({ orderId, voucherCode: promotion.voucherCode, flashSaleId: promotion.flashSaleId, expiresAt: new Date(Date.now() + 30 * 60_000).toISOString() });
+    await reserveExternalPromotion({
+      orderId,
+      voucherCode: promotion.voucherCode,
+      flashSaleId: promotion.flashSaleId,
+      expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+    });
 
     const baseUrl = getPublicBaseUrl();
     const invoice = publicInvoice(identity.referenceId);
-    const payment = await createDokuDirectPayment({
-      referenceId: identity.referenceId,
-      amount: promotion.finalPrice,
-      productName: `${item.productName} - ${item.packageLabel}`,
-      buyerName: input.buyerName,
-      buyerEmail: input.buyerEmail,
-      buyerPhone: input.buyerPhone,
-      paymentMethod: input.paymentMethod,
-      paymentChannel,
-      finishUrl: `${baseUrl}/payment?invoice=${encodeURIComponent(invoice)}`,
-    });
+    const payment = managedChannel.gateway === "midtrans"
+      ? await createMidtransVirtualAccount({
+          referenceId: identity.referenceId,
+          amount: promotion.finalPrice,
+          channel: paymentChannel,
+          partnerServiceId: managedChannel.gatewayConfig.partnerServiceId,
+          buyerName: input.buyerName,
+          buyerEmail: input.buyerEmail,
+          buyerPhone: input.buyerPhone,
+          productName: item.productName,
+          packageLabel: item.packageLabel,
+          deviceId: input.idempotencyKey,
+        })
+      : await createDokuDirectPayment({
+          referenceId: identity.referenceId,
+          amount: promotion.finalPrice,
+          productName: `${item.productName} - ${item.packageLabel}`,
+          buyerName: input.buyerName,
+          buyerEmail: input.buyerEmail,
+          buyerPhone: input.buyerPhone,
+          paymentMethod: input.paymentMethod,
+          paymentChannel,
+          finishUrl: `${baseUrl}/payment?invoice=${encodeURIComponent(invoice)}`,
+        });
 
-    await updateDokuPayment({
+    const environment = managedChannel.gateway === "midtrans"
+      ? payment.environment
+      : dokuReadiness?.environment ?? null;
+    await updateExternalPayment({
       referenceId: identity.referenceId,
+      gateway: managedChannel.gateway,
+      environment,
       requestId: payment.requestId,
-      referenceNo: payment.referenceNo,
-      paymentNo: payment.paymentNo,
-      qrContent: payment.qrContent,
-      paymentName: payment.paymentName,
-      paymentUrl: payment.paymentUrl,
-      expiredAt: payment.expiredAt,
+      referenceNo: payment.referenceNo || null,
+      paymentNo: payment.paymentNo || null,
+      qrContent: payment.qrContent || null,
+      paymentName: payment.paymentName || null,
+      paymentUrl: payment.paymentUrl || null,
+      expiredAt: payment.expiredAt || null,
       total: promotion.finalPrice,
-      environment: readiness.environment,
     });
-    await updateExternalPromotionExpiry(identity.id, payment.expiredAt);
-    await recordOrderEvent({
+    await updateExternalPromotionExpiry(identity.id, payment.expiredAt || null);
+    await recordExternalPaymentEvent({
       orderId: identity.id,
-      source: "doku",
+      gateway: managedChannel.gateway,
       eventId: `create-${payment.requestId}`,
       status: "pending",
       payload: payment.raw,
@@ -255,13 +305,13 @@ export async function POST(request: Request) {
         memberDiscountPercent: promotion.memberDiscountPercent,
         discountSource: promotion.discountSource,
         paymentMethod: input.paymentMethod,
-        paymentNo: payment.paymentNo,
-        qrContent: payment.qrContent,
+        paymentNo: payment.paymentNo || null,
+        qrContent: payment.qrContent || null,
         paymentName: publicPaymentLabel(input.paymentMethod, paymentChannel),
-        paymentUrl: payment.paymentUrl,
+        paymentUrl: payment.paymentUrl || null,
         fee: 0,
         total: promotion.finalPrice,
-        expiredAt: payment.expiredAt,
+        expiredAt: payment.expiredAt || null,
       },
       { status: 201 },
     );
