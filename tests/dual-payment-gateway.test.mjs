@@ -46,6 +46,7 @@ test("Midtrans VA notification verifies signature, VA identity, amount, gateway 
   assert.match(source, /gateway_payment_no/);
   assert.match(source, /virtualAccountNo !== `\$\{partnerServiceId\}\$\{customerNo\}`/);
   assert.match(source, /payment_gateway.*midtrans/);
+  assert.match(source, /payment_gateway_mode.*bisnap/s);
   assert.match(source, /callbackAmount !== order\.total/);
   assert.match(source, /responseCode: "4042513"/);
   assert.match(source, /eventId: `notification-\$\{externalId\}`/);
@@ -54,6 +55,15 @@ test("Midtrans VA notification verifies signature, VA identity, amount, gateway 
   assert.match(source, /fulfillAutomaticOrder/);
   assert.match(source, /responseCode: "2002500"/);
   assert.match(source, /responseMessage: "Successful"/);
+});
+
+test("Midtrans BI-SNAP VA callback also credits wallet topups through the generic ledger", () => {
+  const source = read("app/api/payments/midtrans/v1.0/transfer-va/payment/route.ts");
+  assert.match(source, /getExternalWalletTopup\(referenceId, "midtrans"\)/);
+  assert.match(source, /callbackAmount !== walletTopup\.amount/);
+  assert.match(source, /applyExternalWalletTopup\(\{/);
+  assert.match(source, /gateway: "midtrans"/);
+  assert.match(source, /notifyWalletTopupSuccessById/);
 });
 
 test("provider credentials are encrypted Admin-managed config, not relay environment secrets", () => {
