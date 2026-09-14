@@ -5,9 +5,11 @@ export type DokuTestEnvironment = "sandbox" | "production";
 
 type DokuTestRuntime = {
   DOKU_SANDBOX_CLIENT_ID?: string;
+  DOKU_SANDBOX_SECRET_KEY?: string;
   DOKU_SANDBOX_PRIVATE_KEY?: string;
   DOKU_SANDBOX_PRIVATE_KEY_PASSPHRASE?: string;
   DOKU_PRODUCTION_CLIENT_ID?: string;
+  DOKU_PRODUCTION_SECRET_KEY?: string;
   DOKU_PRODUCTION_PRIVATE_KEY?: string;
   DOKU_PRODUCTION_PRIVATE_KEY_PASSPHRASE?: string;
 };
@@ -39,6 +41,10 @@ function credentials(environment: DokuTestEnvironment) {
       sandbox ? source.DOKU_SANDBOX_CLIENT_ID : source.DOKU_PRODUCTION_CLIENT_ID,
       `${prefix}_CLIENT_ID`,
     ),
+    secretKey: requireRuntimeValue(
+      sandbox ? source.DOKU_SANDBOX_SECRET_KEY : source.DOKU_PRODUCTION_SECRET_KEY,
+      `${prefix}_SECRET_KEY`,
+    ),
     privateKey: requireRuntimeValue(
       sandbox ? source.DOKU_SANDBOX_PRIVATE_KEY : source.DOKU_PRODUCTION_PRIVATE_KEY,
       `${prefix}_PRIVATE_KEY`,
@@ -53,7 +59,9 @@ function credentials(environment: DokuTestEnvironment) {
 
 /**
  * Performs a real DOKU SNAP B2B token request only.
- * No payment, refund, top-up, or fulfillment transaction is created.
+ * This validates the Client ID and RSA key pair against DOKU and also requires
+ * Secret Key presence for subsequent SNAP HMAC requests. No payment, refund,
+ * top-up, or fulfillment transaction is created.
  */
 export async function testDokuB2BConnection(environment: DokuTestEnvironment) {
   const config = credentials(environment);
@@ -100,6 +108,8 @@ export async function testDokuB2BConnection(environment: DokuTestEnvironment) {
     );
   }
 
+  // Do not return the access token or any credential to the browser.
+  void config.secretKey;
   return {
     ok: true as const,
     environment,
