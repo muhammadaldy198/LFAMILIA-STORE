@@ -5,14 +5,16 @@ import test from "node:test";
 
 const source = fs.readFileSync(path.join(process.cwd(), "components/admin-payment-workspace.tsx"), "utf8");
 
-test("DOKU workspace loads and saves live channel and checkout configuration", () => {
+test("payment workspace loads and saves live dual-gateway channel configuration", () => {
   assert.match(source, /fetch\("\/api\/panel\/payment-methods"/);
   assert.match(source, /fetch\("\/api\/panel\/payment-page"/);
   assert.match(source, /fetch\("\/api\/panel\/wallet"/);
   assert.match(source, /fetch\("\/api\/panel\/orders"/);
-  assert.match(source, /method: "POST"/);
-  assert.match(source, /method: "PUT"/);
-  assert.match(source, /DOKU sebagai satu-satunya jalur eksternal/);
+  assert.match(source, /gateway_status/);
+  assert.match(source, /gatewayConfig/);
+  assert.match(source, /Partner Service ID VA/);
+  assert.match(source, /Midtrans BI-SNAP/);
+  assert.match(source, /DOKU Direct API/);
 });
 
 test("payment and channel images are uploaded before their URLs are persisted", () => {
@@ -34,8 +36,8 @@ test("payment page editor exposes every persisted customer-facing setting", () =
   ]) assert.ok(source.includes(`pageSettings.${field}`), `payment page setting is not editable: ${field}`);
 });
 
-test("configuration checks do not pretend to be live DOKU tests", () => {
-  assert.match(source, /Periksa Konfigurasi/);
-  assert.match(source, /Uji koneksi dan transaksi live dilakukan pada tahap pra-peluncuran/);
-  assert.doesNotMatch(source, /kunci tanda tangan valid/);
+test("customer payment preview stays gateway-neutral", () => {
+  assert.match(source, /Preview customer tanpa nama payment gateway/);
+  assert.match(source, />QRIS</);
+  assert.doesNotMatch(source, /QRIS DOKU/);
 });
