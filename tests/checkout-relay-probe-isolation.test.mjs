@@ -10,7 +10,7 @@ const doku = fs.readFileSync(path.join(root, "lib/server/doku.ts"), "utf8");
 
 test("DOKU storefront discovery does not depend on VPS relay probes", () => {
   assert.match(methods, /getDokuReadiness\(\)/);
-  assert.match(autoRoute, /getDokuReadiness\(\)/);
+  assert.match(autoRoute, /getConfiguredGatewayReadiness\(/);
   assert.doesNotMatch(methods, /providerRelay|probeProviderRelay/);
   assert.doesNotMatch(autoRoute, /providerRelay|probeProviderRelay/);
   assert.doesNotMatch(doku, /providerRelay|probeProviderRelay/);
