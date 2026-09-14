@@ -6,7 +6,7 @@ import test from "node:test";
 const root = process.cwd();
 const checkout = fs.readFileSync(path.join(root, "app/checkout/page.tsx"), "utf8");
 const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/route.ts"), "utf8");
-const doku = fs.readFileSync(path.join(root, "lib/server/doku.ts"), "utf8");
+const publicMethods = fs.readFileSync(path.join(root, "app/api/payment-methods/route.ts"), "utf8");
 
 test("checkout hides payment gateway selection from customers", () => {
   assert.doesNotMatch(checkout, /Pilih gateway pembayaran/);
@@ -14,11 +14,17 @@ test("checkout hides payment gateway selection from customers", () => {
   assert.match(checkout, /Pilih metode pembayaran yang ingin digunakan/);
 });
 
-test("automatic checkout uses DOKU as the only external gateway", () => {
+test("automatic checkout routes internally between DOKU and Midtrans", () => {
   assert.match(autoRoute, /createDokuDirectPayment\(/);
-  assert.doesNotMatch(autoRoute, /paymentGateway: "doku"/);
+  assert.match(autoRoute, /createMidtransVirtualAccount\(/);
+  assert.match(autoRoute, /managedChannel\.gateway === "midtrans"/);
   assert.match(autoRoute, /const identity = createOrderIdentity\(\)/);
-  assert.doesNotMatch(autoRoute, /routePaymentGateway|Midtrans|iPaymu/i);
-  assert.match(doku, /authorization\/v1\/access-token\/b2b/);
-  assert.match(doku, /qr-mpm-generate/);
+  assert.doesNotMatch(autoRoute, /iPaymu/i);
+});
+
+test("public method response strips gateway identity and private gateway config", () => {
+  assert.match(publicMethods, /name: item\.name/);
+  assert.match(publicMethods, /description: item\.description/);
+  assert.doesNotMatch(publicMethods, /gateway: item\.gateway/);
+  assert.doesNotMatch(publicMethods, /gatewayConfig: item\.gatewayConfig/);
 });
