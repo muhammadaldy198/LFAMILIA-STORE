@@ -7,11 +7,15 @@ const root = process.cwd();
 const checkout = fs.readFileSync(path.join(root, "app/checkout/page.tsx"), "utf8");
 const payment = fs.readFileSync(path.join(root, "app/payment/page.tsx"), "utf8");
 const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/route.ts"), "utf8");
+const router = fs.readFileSync(path.join(root, "lib/server/payment-router.ts"), "utf8");
 
-test("automatic checkout supports exclusive DOKU plus Midtrans routing", () => {
-  assert.match(autoRoute, /createDokuDirectPayment\(/);
-  assert.match(autoRoute, /createMidtransVirtualAccount\(/);
+test("automatic checkout uses Admin-selected gateway routing", () => {
+  assert.match(autoRoute, /createConfiguredPayment\(/);
   assert.match(autoRoute, /managedChannel\.gateway/);
+  assert.match(router, /createDokuCheckoutPayment\(/);
+  assert.match(router, /createDokuDirectPayment\(/);
+  assert.match(router, /createMidtransSnapPayment\(/);
+  assert.match(router, /createMidtransVirtualAccount\(/);
   assert.doesNotMatch(autoRoute, /ipaymu/i);
 });
 
@@ -33,22 +37,20 @@ test("external checkout retries reuse one idempotency key and one provider invoi
   assert.match(migration, /orders_external_checkout_key_unique/);
 });
 
-test("LFAMILIA payment page owns QRIS and VA rendering while e-wallet can redirect", () => {
+test("LFAMILIA payment page owns native artifacts and can redirect to hosted flows", () => {
   assert.match(payment, /QRCodeSVG/);
   assert.match(payment, /order\.paymentNo/);
   assert.match(payment, /window\.location\.assign\(order\.paymentUrl\)/);
-  assert.doesNotMatch(payment, /DOKU Checkout|snap\.pay|Midtrans Snap|iPaymu/i);
+  assert.doesNotMatch(payment, /Pilih gateway pembayaran/i);
 });
 
-test("legacy hosted payment endpoints stay deleted while BI-SNAP notification exists", () => {
+test("both Midtrans Snap and BI-SNAP notification routes exist", () => {
+  assert.equal(fs.existsSync(path.join(root, "app/api/payments/midtrans/snap/notification/route.ts")), true);
+  assert.equal(fs.existsSync(path.join(root, "app/api/payments/midtrans/v1.0/transfer-va/payment/route.ts")), true);
   for (const file of [
-    "app/api/payments/midtrans/create/route.ts",
-    "app/api/payments/midtrans/callback/route.ts",
-    "app/api/payments/midtrans/client-config/route.ts",
     "app/api/payments/ipaymu/create/route.ts",
     "app/api/payments/ipaymu/callback/route.ts",
   ]) {
     assert.equal(fs.existsSync(path.join(root, file)), false, file);
   }
-  assert.equal(fs.existsSync(path.join(root, "app/api/payments/midtrans/v1.0/transfer-va/payment/route.ts")), true);
 });
