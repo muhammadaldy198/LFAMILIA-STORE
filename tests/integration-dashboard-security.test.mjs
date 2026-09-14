@@ -8,10 +8,11 @@ const manager = fs.readFileSync(path.join(root, "components/admin-integration-wo
 const route = fs.readFileSync(path.join(root, "app/api/admin/integrations/route.ts"), "utf8");
 const config = fs.readFileSync(path.join(root, "lib/server/integration-config.ts"), "utf8");
 
-test("DOKU and DigiFlazz environments are selected from Admin Dashboard", () => {
+test("DOKU Midtrans and DigiFlazz environments are selected from Admin Dashboard", () => {
   assert.match(manager, /DOKU Direct API/);
+  assert.match(manager, /Midtrans BI-SNAP/);
   assert.match(manager, /Kredensial Digiflazz/);
-  assert.doesNotMatch(manager, /Midtrans|iPaymu|VIPayment/i);
+  assert.match(manager, /midtransEnvironment/);
 });
 
 test("integration credentials stay owner-only and encrypted", () => {
@@ -25,11 +26,20 @@ test("integration credentials stay owner-only and encrypted", () => {
   assert.match(manager, /action: "save_selections"/);
 });
 
+test("Midtrans payment secrets are dashboard-managed and never returned to the frontend", () => {
+  assert.match(config, /"midtrans:direct"/);
+  for (const field of ["clientSecret", "privateKey", "midtransPublicKey", "partnerId", "channelId"]) {
+    assert.match(config, new RegExp(field));
+  }
+  assert.match(manager, /Tersimpan — isi hanya untuk mengganti/);
+  assert.doesNotMatch(config, /return .*clientSecret/);
+});
+
 test("dashboard-managed credentials fail closed instead of using stale Cloudflare provider secrets", () => {
   assert.match(config, /withoutDashboardManagedRuntime/);
-  for (const prefix of ["DOKU_", "DIGIFLAZZ_", "MELOSTORE_", "RESEND_", "PROVIDER_RELAY_"]) {
+  for (const prefix of ["DOKU_", "MIDTRANS_", "DIGIFLAZZ_", "MELOSTORE_", "RESEND_", "PROVIDER_RELAY_"]) {
     assert.match(config, new RegExp(`"${prefix}"`));
   }
   assert.match(config, /return systemOnly as T/);
-  assert.doesNotMatch(config, /MIDTRANS_|IPAYMU_|VIPPAYMENT_/);
+  assert.doesNotMatch(config, /IPAYMU_|VIPPAYMENT_/);
 });
