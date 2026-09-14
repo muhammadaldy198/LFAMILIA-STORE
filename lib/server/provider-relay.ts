@@ -4,9 +4,10 @@ type ProviderRelayEnv = {
   PROVIDER_RELAY_TOKEN?: string;
   PROVIDER_RELAY_HOSTS?: string;
   PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?: string;
+  PROVIDER_RELAY_MIDTRANS_ORIGIN?: string;
 };
 
-export type RelayProvider = "digiflazz";
+export type RelayProvider = "digiflazz" | "midtrans";
 
 function relayHosts(value?: string) {
   return (value ?? "")
@@ -17,13 +18,15 @@ function relayHosts(value?: string) {
 
 function legacyOriginFor(provider: RelayProvider, hosts?: string) {
   const candidates = relayHosts(hosts);
-  const selected = candidates.find((host) => host.toLowerCase().includes("digiflazz"));
+  const selected = candidates.find((host) => host.toLowerCase().includes(provider));
   if (!selected) return "";
   return selected.startsWith("https://") ? selected : `https://${selected}`;
 }
 
 function configuredOrigin(runtime: ProviderRelayEnv, provider: RelayProvider) {
-  const explicit = runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN;
+  const explicit = provider === "digiflazz"
+    ? runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN
+    : runtime.PROVIDER_RELAY_MIDTRANS_ORIGIN;
   return explicit?.trim() || legacyOriginFor(provider, runtime.PROVIDER_RELAY_HOSTS);
 }
 
@@ -130,10 +133,6 @@ export async function testRelayConnection(
       };
     }
 
-    // HEAD is deliberately unsupported by relay/server.mjs. The relay checks
-    // token + hostname before returning 405, so this verifies Worker → VPS,
-    // the saved token, and the intended relay hostname without hitting a
-    // provider transaction endpoint.
     const authResponse = await fetch(parsed.origin, {
       method: "HEAD",
       headers: { "x-lfamilia-relay-token": token },
@@ -196,10 +195,10 @@ export async function probeProviderRelay(
 export async function testProviderRelayConnections() {
   return Promise.all([
     testRelayConnection("digiflazz", "DigiFlazz"),
+    testRelayConnection("midtrans", "Midtrans BI-SNAP"),
   ]);
 }
 
-// Backward-compatible helper for code that only needs headers.
 export function withProviderRelayHeaders(
   url: string,
   headers: Record<string, string>,
