@@ -1,8 +1,10 @@
 import { getD1 } from "@/db";
 import type { PaymentGatewayName } from "@/lib/server/payment-channels";
+import type { RoutedPaymentMode } from "@/lib/server/payment-router";
 
 export type ExternalPaymentArtifacts = {
   gateway: PaymentGatewayName;
+  mode: RoutedPaymentMode | null;
   environment: "sandbox" | "production" | null;
   requestId: string;
   referenceNo: string | null;
@@ -16,6 +18,7 @@ export type ExternalPaymentArtifacts = {
 export async function updateExternalPayment(input: {
   referenceId: string;
   gateway: PaymentGatewayName;
+  mode: RoutedPaymentMode;
   environment: "sandbox" | "production" | null;
   requestId: string;
   referenceNo: string | null;
@@ -30,6 +33,7 @@ export async function updateExternalPayment(input: {
   if (input.gateway === "doku") {
     await db.prepare(`UPDATE orders SET
       payment_gateway = 'doku',
+      payment_gateway_mode = ?,
       payment_gateway_environment = ?,
       gateway_request_id = ?,
       gateway_reference_no = ?,
@@ -53,6 +57,7 @@ export async function updateExternalPayment(input: {
       updated_at = CURRENT_TIMESTAMP
       WHERE reference_id = ?`)
       .bind(
+        input.mode,
         input.environment,
         input.requestId,
         input.referenceNo,
@@ -76,6 +81,7 @@ export async function updateExternalPayment(input: {
 
   await db.prepare(`UPDATE orders SET
     payment_gateway = 'midtrans',
+    payment_gateway_mode = ?,
     payment_gateway_environment = ?,
     gateway_request_id = ?,
     gateway_reference_no = ?,
@@ -89,6 +95,7 @@ export async function updateExternalPayment(input: {
     updated_at = CURRENT_TIMESTAMP
     WHERE reference_id = ?`)
     .bind(
+      input.mode,
       input.environment,
       input.requestId,
       input.referenceNo,
@@ -120,8 +127,10 @@ export function externalArtifactsFromOrder(order: Record<string, unknown>) {
     : order.doku_request_id
       ? "doku"
       : null;
+  const mode = typeof order.payment_gateway_mode === "string" ? order.payment_gateway_mode : null;
   return {
     gateway,
+    mode,
     requestId: String(order.gateway_request_id || order.doku_request_id || ""),
     referenceNo: String(order.gateway_reference_no || order.doku_reference_no || "") || null,
     paymentNo: String(order.gateway_payment_no || order.doku_payment_no || "") || null,
