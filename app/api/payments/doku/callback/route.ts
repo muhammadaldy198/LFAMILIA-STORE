@@ -1,5 +1,6 @@
 import { getD1 } from "@/db";
 import { hashHex } from "@/lib/server/crypto";
+import { validateDokuCheckoutNotification } from "@/lib/server/doku-checkout";
 import {
   parseDokuNotification,
   validateDokuNotification,
@@ -21,6 +22,10 @@ import {
   applyDokuWalletTopup,
   getDokuWalletTopup,
 } from "@/lib/server/wallet";
+import {
+  applyExternalWalletTopup,
+  getExternalWalletTopup,
+} from "@/lib/server/wallet-external";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +59,7 @@ function notificationAck(payload: Record<string, unknown>, eventId: string) {
 }
 
 function notificationResponse(
-  scheme: "snap" | "non-snap",
+  scheme: "snap" | "non-snap" | "checkout",
   payload: Record<string, unknown>,
   eventId: string,
 ) {
@@ -87,44 +92,94 @@ export async function POST(request: Request) {
     }
 
     const expectedOrder = await getOrderByReference(referenceId);
-    const expectedWallet = expectedOrder
+    const orderRouting = expectedOrder
+      ? await getD1().prepare(`SELECT payment_gateway, payment_gateway_mode, payment_gateway_environment
+          FROM orders WHERE id = ? LIMIT 1`)
+          .bind(expectedOrder.id)
+          .first<{
+            payment_gateway: string | null;
+            payment_gateway_mode: string | null;
+            payment_gateway_environment: DokuEnvironment | null;
+          }>()
+      : null;
+    const externalWallet = expectedOrder ? null : await getExternalWalletTopup(referenceId, "doku");
+    const legacyWallet = expectedOrder || externalWallet
       ? null
       : await getD1()
-          .prepare(
-            `SELECT doku_environment
-             FROM wallet_topups
-             WHERE reference_id = ? AND source = 'doku'
-             LIMIT 1`,
-          )
+          .prepare(`SELECT doku_environment FROM wallet_topups
+            WHERE reference_id = ? AND source = 'doku' LIMIT 1`)
           .bind(referenceId)
           .first<{ doku_environment: DokuEnvironment | null }>();
-    const expectedEnvironment = expectedOrder?.doku_environment ?? expectedWallet?.doku_environment ?? null;
 
+    const expectedMode = orderRouting?.payment_gateway_mode ?? externalWallet?.payment_gateway_mode ?? null;
+    const expectedEnvironment = orderRouting?.payment_gateway_environment
+      ?? externalWallet?.gateway_environment
+      ?? expectedOrder?.doku_environment
+      ?? legacyWallet?.doku_environment
+      ?? null;
     const target = new URL(request.url).pathname;
-    const validation = validateDokuNotification({
-      rawBody,
-      requestTarget: target,
-      partnerId: request.headers.get("x-partner-id"),
-      requestTimestamp: request.headers.get("x-timestamp"),
-      receivedSignature: request.headers.get("x-signature"),
-      authorization: request.headers.get("authorization"),
-      clientId: request.headers.get("client-id"),
-      requestId: request.headers.get("request-id"),
-      legacyTimestamp: request.headers.get("request-timestamp"),
-      legacySignature: request.headers.get("signature"),
-      expectedEnvironment,
-    });
-    if (!validation.valid) {
+
+    let scheme: "snap" | "non-snap" | "checkout" | null = null;
+    if (expectedMode === "checkout" && expectedEnvironment) {
+      const valid = await validateDokuCheckoutNotification({
+        rawBody,
+        requestTarget: target,
+        clientId: request.headers.get("client-id"),
+        requestId: request.headers.get("request-id"),
+        requestTimestamp: request.headers.get("request-timestamp"),
+        receivedSignature: request.headers.get("signature"),
+        environment: expectedEnvironment,
+      });
+      if (valid) scheme = "checkout";
+    } else {
+      const validation = validateDokuNotification({
+        rawBody,
+        requestTarget: target,
+        partnerId: request.headers.get("x-partner-id"),
+        requestTimestamp: request.headers.get("x-timestamp"),
+        receivedSignature: request.headers.get("x-signature"),
+        authorization: request.headers.get("authorization"),
+        clientId: request.headers.get("client-id"),
+        requestId: request.headers.get("request-id"),
+        legacyTimestamp: request.headers.get("request-timestamp"),
+        legacySignature: request.headers.get("signature"),
+        expectedEnvironment,
+      });
+      if (validation.valid) scheme = validation.scheme;
+    }
+
+    if (!scheme) {
       return Response.json({ error: "Signature callback DOKU tidak valid." }, { status: 401 });
     }
 
     const status = notification.status;
     const callbackAmount = notification.amount;
     const originalRequestId = notification.originalRequestId;
-    const eventId = request.headers.get("x-external-id") || request.headers.get("request-id") || "body-" + hashHex("sha256", rawBody);
+    const eventId = request.headers.get("x-external-id") || request.headers.get("request-id") || `body-${hashHex("sha256", rawBody)}`;
 
-    const walletTopup = await getDokuWalletTopup(referenceId);
-    if (walletTopup) {
+    if (externalWallet) {
+      // DOKU Checkout may emit FAILED while its hosted page still permits retry.
+      // Acknowledge it without rejecting the top-up; SUCCESS is authoritative.
+      if (scheme === "checkout" && status === "failed") {
+        return notificationResponse(scheme, payload, eventId);
+      }
+      const result = await applyExternalWalletTopup({
+        referenceId,
+        gateway: "doku",
+        status,
+        originalRequestId: scheme === "checkout" ? null : originalRequestId,
+        callbackAmount,
+      });
+      if (result.credited) {
+        await notifyWalletTopupSuccessById(externalWallet.id, referenceId).catch((error) =>
+          console.error("Notifikasi top up DOKU gagal:", error),
+        );
+      }
+      return notificationResponse(scheme, payload, eventId);
+    }
+
+    const legacyTopup = await getDokuWalletTopup(referenceId);
+    if (legacyTopup) {
       const result = await applyDokuWalletTopup({
         referenceId,
         status,
@@ -132,33 +187,32 @@ export async function POST(request: Request) {
         callbackAmount,
       });
       if (result.credited) {
-        await notifyWalletTopupSuccessById(walletTopup.id, referenceId).catch(
-          (error) => console.error("Notifikasi top up DOKU gagal:", error),
+        await notifyWalletTopupSuccessById(legacyTopup.id, referenceId).catch((error) =>
+          console.error("Notifikasi top up DOKU gagal:", error),
         );
       }
-      return notificationResponse(validation.scheme, payload, eventId);
+      return notificationResponse(scheme, payload, eventId);
     }
 
     const order = expectedOrder;
-    if (!order) return notificationResponse(validation.scheme, payload, eventId);
-
+    if (!order) return notificationResponse(scheme, payload, eventId);
+    if (orderRouting?.payment_gateway && orderRouting.payment_gateway !== "doku") {
+      return notificationResponse(scheme, payload, eventId);
+    }
     if (!canProcessDokuOrderCallback(order.payment_status)) {
-      return notificationResponse(validation.scheme, payload, eventId);
+      return notificationResponse(scheme, payload, eventId);
     }
 
-    if (
-      order.doku_request_id &&
-      originalRequestId &&
-      order.doku_request_id !== originalRequestId
-    ) {
-      return notificationResponse(validation.scheme, payload, eventId);
+    if (scheme !== "checkout" && order.doku_request_id && originalRequestId && order.doku_request_id !== originalRequestId) {
+      return notificationResponse(scheme, payload, eventId);
+    }
+    if (status === "paid" && (!Number.isFinite(callbackAmount) || callbackAmount !== order.total)) {
+      return notificationResponse(scheme, payload, eventId);
     }
 
-    if (
-      status === "paid" &&
-      (!Number.isFinite(callbackAmount) || callbackAmount !== order.total)
-    ) {
-      return notificationResponse(validation.scheme, payload, eventId);
+    // Checkout FAILED is not final because DOKU can allow retry on the hosted page.
+    if (scheme === "checkout" && status === "failed") {
+      return notificationResponse(scheme, payload, eventId);
     }
 
     await recordOrderEvent({
@@ -177,14 +231,11 @@ export async function POST(request: Request) {
       );
     }
 
-    return notificationResponse(validation.scheme, payload, eventId);
+    return notificationResponse(scheme, payload, eventId);
   } catch (error) {
     return Response.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Callback DOKU gagal diproses.",
+        error: error instanceof Error ? error.message : "Callback DOKU gagal diproses.",
       },
       { status: 503 },
     );
