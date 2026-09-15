@@ -37,8 +37,24 @@ export function midtransSnapPaymentType(method: string, channel: string) {
   return map[key] || null;
 }
 
-export function isHostedGatewayChannelSupported(gateway: "doku" | "midtrans", method: string, channel: string) {
+export function hostedPaymentType(
+  gateway: "doku" | "midtrans",
+  method: string,
+  channel: string,
+  gatewayConfig?: Record<string, string>,
+) {
+  const custom = gatewayConfig?.paymentType?.trim();
+  if (custom) return custom;
   return gateway === "doku"
-    ? Boolean(dokuCheckoutPaymentType(method, channel))
-    : Boolean(midtransSnapPaymentType(method, channel));
+    ? dokuCheckoutPaymentType(method, channel)
+    : midtransSnapPaymentType(method, channel);
+}
+
+export function isHostedGatewayChannelSupported(
+  gateway: "doku" | "midtrans",
+  method: string,
+  channel: string,
+  gatewayConfig?: Record<string, string>,
+) {
+  return Boolean(hostedPaymentType(gateway, method, channel, gatewayConfig));
 }
