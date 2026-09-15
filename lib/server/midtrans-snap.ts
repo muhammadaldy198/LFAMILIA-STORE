@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { midtransSnapPaymentType } from "@/lib/server/hosted-payment-methods";
+import { hostedPaymentType } from "@/lib/server/hosted-payment-methods";
 import { getHostedGatewayProfileForEnvironment, getMidtransSnapConfig, type PaymentEnvironment } from "@/lib/server/payment-mode-config";
 import type { HostedPaymentResult } from "@/lib/server/doku-checkout";
 
@@ -30,10 +30,11 @@ export async function createMidtransSnapPayment(input: {
   buyerPhone: string;
   paymentMethod: string;
   paymentChannel: string;
+  gatewayConfig?: Record<string, string>;
   finishUrl: string;
 }): Promise<HostedPaymentResult> {
-  const enabledPayment = midtransSnapPaymentType(input.paymentMethod, input.paymentChannel);
-  if (!enabledPayment) throw new Error("Channel ini belum didukung Midtrans Snap.");
+  const enabledPayment = hostedPaymentType("midtrans", input.paymentMethod, input.paymentChannel, input.gatewayConfig);
+  if (!enabledPayment) throw new Error("Channel ini belum memiliki kode Midtrans Snap yang valid.");
   if (!Number.isInteger(input.amount) || input.amount <= 0) throw new Error("Nominal Midtrans tidak valid.");
   const config = await getMidtransSnapConfig();
   const payload = {
