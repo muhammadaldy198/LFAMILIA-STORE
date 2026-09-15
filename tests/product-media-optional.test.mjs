@@ -16,6 +16,9 @@ test("admin labels product images as optional", () => {
   assert.match(manager, /Gambar produk \(opsional, rasio 1:1\)/);
   assert.match(manager, /Boleh dikosongkan dan ditambahkan nanti/);
   assert.match(manager, /Banner halaman produk \(opsional\)/);
+  assert.match(manager, /Pilih & Unggah Foto/);
+  assert.match(manager, /uploadProductImage/);
+  assert.match(manager, /\/api\/panel\/media/);
 });
 
 
