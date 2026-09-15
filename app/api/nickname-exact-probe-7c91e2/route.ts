@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 type RuntimeEnv = {
   MELOSTORE_API_KEY?: string;
   MELOSTORE_SECRET_KEY?: string;
+  NICKNAME_API_KEY?: string;
 };
 
 type JsonRecord = Record<string, unknown>;
@@ -35,38 +36,50 @@ export async function GET() {
   const runtime = getRuntimeEnv<RuntimeEnv>();
   const apiKey = runtime.MELOSTORE_API_KEY?.trim();
   const secretKey = runtime.MELOSTORE_SECRET_KEY?.trim();
+  const nicknameApiKey = runtime.NICKNAME_API_KEY?.trim();
   if (!apiKey || !secretKey) {
-    return Response.json({ configured: false }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    return Response.json({ configured: false, nicknameApiKeyConfigured: Boolean(nicknameApiKey) }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 
-  const headers = {
-    accept: "application/json",
-    "content-type": "application/json",
-    "X-API-Key": apiKey,
-    "X-Secret-Key": secretKey,
-  };
-
-  const lookup = (payload: Record<string, string>) => fetch("https://api.melostore.id/api/v1/h2h/check-nickname", {
+  const lookup = (key: string, payload: Record<string, string>) => fetch("https://api.melostore.id/api/v1/h2h/check-nickname", {
     method: "POST",
-    headers,
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "X-API-Key": key,
+      "X-Secret-Key": secretKey,
+    },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(8000),
   });
 
-  const [targetMinimalResponse, targetServerCodeResponse, docsExactResponse] = await Promise.all([
-    lookup({ game_code: "mobile-legends", customer_target: "309412350", customer_target_zone: "9615" }),
-    lookup({ game_code: "mobile-legends", customer_target: "309412350", customer_target_zone: "9615", server_code: "S1" }),
-    lookup({ game_code: "mobile-legends", customer_target: "47486147", customer_target_zone: "2076", server_code: "S1", sku_code: "ml-id-ft150" }),
-  ]);
+  const target = { game_code: "mobile-legends", customer_target: "309412350", customer_target_zone: "9615" };
+  const docsExact = { game_code: "mobile-legends", customer_target: "47486147", customer_target_zone: "2076", server_code: "S1", sku_code: "ml-id-ft150" };
 
-  const [targetMinimalBody, targetServerCodeBody, docsExactBody] = await Promise.all([
-    readJson(targetMinimalResponse), readJson(targetServerCodeResponse), readJson(docsExactResponse),
-  ]);
+  const requests: Array<Promise<Response>> = [
+    lookup(apiKey, target),
+    lookup(apiKey, { ...target, server_code: "S1" }),
+    lookup(apiKey, docsExact),
+  ];
+  if (nicknameApiKey) {
+    requests.push(lookup(nicknameApiKey, target));
+    requests.push(lookup(nicknameApiKey, docsExact));
+  }
+
+  const responses = await Promise.all(requests);
+  const bodies = await Promise.all(responses.map(readJson));
 
   return Response.json({
     configured: true,
-    targetMinimal: summarize(targetMinimalResponse, targetMinimalBody),
-    targetWithServerCode: summarize(targetServerCodeResponse, targetServerCodeBody),
-    docsExact: summarize(docsExactResponse, docsExactBody),
+    nicknameApiKeyConfigured: Boolean(nicknameApiKey),
+    primaryKey: {
+      targetMinimal: summarize(responses[0], bodies[0]),
+      targetWithServerCode: summarize(responses[1], bodies[1]),
+      docsExact: summarize(responses[2], bodies[2]),
+    },
+    dedicatedNicknameKey: nicknameApiKey ? {
+      targetMinimal: summarize(responses[3], bodies[3]),
+      docsExact: summarize(responses[4], bodies[4]),
+    } : null,
   }, { headers: { "Cache-Control": "no-store" } });
 }
