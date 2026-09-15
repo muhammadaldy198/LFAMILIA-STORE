@@ -22,6 +22,11 @@ type ProviderResponse = {
 type MelostoreResponse = {
   success?: boolean;
   message?: unknown;
+  error?: {
+    code?: unknown;
+    message?: unknown;
+    category?: unknown;
+  };
   data?: {
     username?: unknown;
     nickname?: unknown;
@@ -68,6 +73,76 @@ function validateTarget(productSlug: string, userId: string, server?: string) {
     throw new NicknameValidationError("Server / Zone ID wajib diisi dengan angka.");
   }
   return { policy, userId: cleanUserId, server: cleanServer };
+}
+
+function melostoreNicknameEndpoint(baseUrl: string) {
+  const base = baseUrl.trim().replace(/\/+$/, "");
+  if (/\/api\/v1\/h2h\/check-nickname$/i.test(base)) return base;
+  if (/\/api\/v1\/h2h$/i.test(base)) return `${base}/check-nickname`;
+  return `${base}/api/v1/h2h/check-nickname`;
+}
+
+function melostoreErrorInfo(data: MelostoreResponse) {
+  const category = typeof data.error?.category === "string"
+    ? data.error.category.trim().toLowerCase()
+    : "";
+  const rawCode = data.error?.code;
+  const code = typeof rawCode === "number"
+    ? rawCode
+    : typeof rawCode === "string" && /^\d+$/.test(rawCode.trim())
+      ? Number(rawCode.trim())
+      : null;
+  const message = nonEmptyString([data.error?.message, data.message]);
+  return { category, code, message };
+}
+
+function throwMelostoreError(status: number, data: MelostoreResponse): never {
+  const { category, code, message } = melostoreErrorInfo(data);
+
+  if (category === "not_found" || code === 4001) {
+    throw new NicknameValidationError("ID atau Server tidak ditemukan.");
+  }
+
+  if (category === "validation" || code === 4006) {
+    throw new NicknameValidationError(
+      message || "Format ID atau Server tidak valid untuk game ini.",
+    );
+  }
+
+  if (category === "restricted" || code === 4002) {
+    throw new NicknameValidationError(
+      "Akun ditemukan, tetapi tidak memenuhi syarat layanan untuk pengecekan ini.",
+    );
+  }
+
+  if (
+    ["unavailable", "limit_reached", "server", "unknown", "maintenance"].includes(category) ||
+    [4003, 4004, 4007, 4008, 4009].includes(code ?? -1)
+  ) {
+    throw new NicknameServiceError(
+      category === "maintenance"
+        ? "Verifikasi nickname untuk game ini sedang maintenance. Coba lagi nanti."
+        : "Verifikasi akun sedang tidak tersedia dari layanan pengecekan. Coba lagi beberapa saat.",
+    );
+  }
+
+  // HTTP 404 tanpa error terstruktur biasanya berarti endpoint konfigurasi salah/tidak tersedia,
+  // bukan bukti bahwa ID pemain tidak ditemukan.
+  if (status === 404 && !category && code === null) {
+    throw new NicknameServiceError(
+      "Layanan verifikasi akun belum terhubung dengan benar. Coba lagi beberapa saat.",
+    );
+  }
+
+  // Jangan mengubah semua 400/422 menjadi "ID tidak ditemukan". Melostore memakai
+  // status tersebut juga untuk format input/game yang tidak didukung.
+  if (status === 400 || status === 422) {
+    throw new NicknameValidationError(
+      message || "Data akun belum dapat diverifikasi. Periksa kembali ID dan Server.",
+    );
+  }
+
+  throw new NicknameServiceError();
 }
 
 export async function verifyNicknameForCheckout(input: {
@@ -120,7 +195,7 @@ async function lookupMelostore(input: {
   userId: string;
   server?: string;
 }): Promise<NicknameVerification> {
-  const endpoint = `${input.runtime.MELOSTORE_API_URL!.trim().replace(/\/$/, "")}/api/v1/h2h/check-nickname`;
+  const endpoint = melostoreNicknameEndpoint(input.runtime.MELOSTORE_API_URL!);
   const body: Record<string, string> = {
     game_code: input.game,
     customer_target: input.userId,
@@ -152,15 +227,14 @@ async function lookupMelostore(input: {
   }
 
   if (!upstream.ok || data.success === false) {
-    if ([400, 404, 422].includes(upstream.status)) {
-      throw new NicknameValidationError("ID atau Server tidak ditemukan.");
-    }
-    throw new NicknameServiceError();
+    throwMelostoreError(upstream.status, data);
   }
 
   const nickname = nonEmptyString([data.data?.username, data.data?.nickname]);
   if (!nickname) {
-    throw new NicknameValidationError("Nickname tidak ditemukan.");
+    throw new NicknameServiceError(
+      "Layanan pengecekan tidak mengembalikan nickname. Coba lagi beberapa saat.",
+    );
   }
   const country = nonEmptyString([data.data?.region, data.data?.country]) ?? null;
   return { supported: true, nickname, country };
