@@ -11,7 +11,6 @@ import {
   type PaymentGatewayName,
 } from "@/lib/server/payment-channels";
 import { isAllowedMediaUrl } from "@/lib/media-url";
-import { findPaymentChannel } from "@/lib/payment-methods";
 import { getDokuReadiness } from "@/lib/server/doku";
 import { getDokuCheckoutReadiness } from "@/lib/server/doku-checkout";
 import { getMidtransReadiness } from "@/lib/server/midtrans";
@@ -49,10 +48,8 @@ const syncSchema = z.object({
 });
 
 function validateChannel(input: z.infer<typeof channelSchema>) {
-  const known = findPaymentChannel(input.method, input.channel);
-  if (!known) throw new Error("Channel pembayaran tidak dikenali.");
-  if (!isGatewayChannelSupported(input.gateway, input.method, input.channel)) {
-    throw new Error("Channel ini belum didukung oleh gateway yang dipilih.");
+  if (!isGatewayChannelSupported(input.gateway, input.method, input.channel, input.gatewayConfig)) {
+    throw new Error("Isi kode gateway resmi untuk channel custom, atau pilih channel bawaan yang didukung provider.");
   }
 }
 
