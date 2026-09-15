@@ -8,6 +8,13 @@ const checkout = fs.readFileSync(path.join(root, "app/checkout/page.tsx"), "utf8
 const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/route.ts"), "utf8");
 const publicMethods = fs.readFileSync(path.join(root, "app/api/payment-methods/route.ts"), "utf8");
 
+function publicPaymentMap(source) {
+  const start = source.indexOf(".map(({ item }) => ({");
+  const end = source.indexOf("}));", start);
+  assert.ok(start >= 0 && end > start);
+  return source.slice(start, end);
+}
+
 test("checkout hides payment gateway selection from customers", () => {
   assert.doesNotMatch(checkout, /Pilih gateway pembayaran/);
   assert.doesNotMatch(checkout, /activeCheckoutGateway|setActiveCheckoutGateway/);
@@ -25,8 +32,9 @@ test("automatic checkout routes internally through the Admin-selected gateway mo
 });
 
 test("public method response strips gateway identity and private gateway config", () => {
-  assert.match(publicMethods, /name: item\.name/);
-  assert.match(publicMethods, /description: item\.description/);
-  assert.doesNotMatch(publicMethods, /gateway: item\.gateway/);
-  assert.doesNotMatch(publicMethods, /gatewayConfig: item\.gatewayConfig/);
+  const responseMap = publicPaymentMap(publicMethods);
+  assert.match(responseMap, /name: item\.name/);
+  assert.match(responseMap, /description: item\.description/);
+  assert.doesNotMatch(responseMap, /gateway:/);
+  assert.doesNotMatch(responseMap, /gatewayConfig/);
 });

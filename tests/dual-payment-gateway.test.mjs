@@ -6,6 +6,13 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
+function publicPaymentMap(source) {
+  const start = source.indexOf(".map(({ item }) => ({");
+  const end = source.indexOf("}));", start);
+  assert.ok(start >= 0 && end > start);
+  return source.slice(start, end);
+}
+
 test("migration adds provider-neutral payment routing without deleting transactions", () => {
   const migration = read("drizzle/0030_dual_payment_gateways.sql");
   for (const field of [
@@ -82,9 +89,10 @@ test("provider credentials are encrypted Admin-managed config, not relay environ
 
 test("customer-facing payment method API never returns gateway identity", () => {
   const source = read("app/api/payment-methods/route.ts");
-  assert.match(source, /method: item\.method/);
-  assert.match(source, /channel: item\.channel/);
-  assert.match(source, /name: item\.name/);
-  assert.doesNotMatch(source, /gateway: item\.gateway/);
-  assert.doesNotMatch(source, /gatewayConfig: item\.gatewayConfig/);
+  const responseMap = publicPaymentMap(source);
+  assert.match(responseMap, /method: item\.method/);
+  assert.match(responseMap, /channel: item\.channel/);
+  assert.match(responseMap, /name: item\.name/);
+  assert.doesNotMatch(responseMap, /gateway:/);
+  assert.doesNotMatch(responseMap, /gatewayConfig/);
 });

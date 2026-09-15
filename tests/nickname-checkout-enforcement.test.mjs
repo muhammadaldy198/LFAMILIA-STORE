@@ -43,11 +43,15 @@ test("Melostore nickname endpoint accepts either API origin or h2h base path", (
 
 test("Melostore errors distinguish missing accounts from service and validation failures", () => {
   const checker = read("lib/server/nickname-check.ts");
-  assert.match(checker, /category === "not_found" \|\| code === 4001/);
-  assert.match(checker, /category === "validation" \|\| code === 4006/);
-  assert.match(checker, /"maintenance"/);
-  assert.match(checker, /status === 404 && !category && code === null/);
-  assert.doesNotMatch(checker, /if \(\[400, 404, 422\]\.includes\(upstream\.status\)\) \{\s*throw new NicknameValidationError\("ID atau Server tidak ditemukan\."\);\s*\}/s);
+  const start = checker.indexOf("function throwMelostoreError");
+  const end = checker.indexOf("export async function verifyNicknameForCheckout", start);
+  const melostoreErrors = checker.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(melostoreErrors, /category === "not_found" \|\| code === 4001/);
+  assert.match(melostoreErrors, /category === "validation" \|\| code === 4006/);
+  assert.match(melostoreErrors, /"maintenance"/);
+  assert.match(melostoreErrors, /status === 404 && !category && code === null/);
+  assert.doesNotMatch(melostoreErrors, /\[400, 404, 422\]\.includes\(upstream\.status\)/);
 });
 
 test("public nickname response never exposes integration identity", () => {

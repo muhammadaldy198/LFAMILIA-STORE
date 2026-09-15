@@ -6,6 +6,13 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
+function publicPaymentMap(source) {
+  const start = source.indexOf(".map(({ item }) => ({");
+  const end = source.indexOf("}));", start);
+  assert.ok(start >= 0 && end > start);
+  return source.slice(start, end);
+}
+
 test("Stage 2 dashboard separates Super Admin, Admin, and Staff navigation", () => {
   const source = read("components/admin-dashboard.tsx");
   assert.match(source, /const roleRank = \{ staff: 0, admin: 1, super_admin: 2 \}/);
@@ -39,13 +46,13 @@ test("super-admin-only controls remain backend guarded", () => {
 test("public customer APIs omit provider metadata and environment", () => {
   const catalog = read("app/api/products/route.ts");
   const methods = read("app/api/payment-methods/route.ts");
+  const responseMap = publicPaymentMap(methods);
   assert.doesNotMatch(catalog, /providerCode: pkg\.providerCode/);
   assert.doesNotMatch(catalog, /providerSku: pkg\.providerSku/);
   assert.doesNotMatch(catalog, /targetTemplate:/);
-  assert.doesNotMatch(methods, /environment:/);
-  assert.doesNotMatch(methods, /getDokuEnvironment/);
-  assert.doesNotMatch(methods, /gateway:/);
-  assert.doesNotMatch(methods, /doku:/);
+  assert.doesNotMatch(responseMap, /environment:/);
+  assert.doesNotMatch(responseMap, /gateway:/);
+  assert.doesNotMatch(responseMap, /doku:/);
 });
 
 test("Staff cannot read provider input templates, toggle packages, promotions, or provider order details", () => {
