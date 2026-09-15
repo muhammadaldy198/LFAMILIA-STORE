@@ -36,6 +36,8 @@ jobs:
           }
           throw new Error("Cloudflare deployment timeout");
           NODE
+      - name: Wait for production propagation
+        run: sleep 20
       - name: Probe exact Melostore payload variants
         run: |
           curl -sS -w '\nHTTP_STATUS:%{http_code}\n' \
