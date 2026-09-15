@@ -25,12 +25,19 @@ function legacyOriginFor(provider: RelayProvider, hosts?: string) {
 }
 
 function configuredOrigin(runtime: ProviderRelayEnv, provider: RelayProvider) {
-  const explicit = provider === "digiflazz"
-    ? runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN
-    : provider === "midtrans"
-      ? runtime.PROVIDER_RELAY_MIDTRANS_ORIGIN
-      : runtime.PROVIDER_RELAY_MELOSTORE_ORIGIN;
-  return explicit?.trim() || legacyOriginFor(provider, runtime.PROVIDER_RELAY_HOSTS);
+  if (provider === "digiflazz") {
+    return runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?.trim()
+      || legacyOriginFor("digiflazz", runtime.PROVIDER_RELAY_HOSTS);
+  }
+  if (provider === "midtrans") {
+    return runtime.PROVIDER_RELAY_MIDTRANS_ORIGIN?.trim()
+      || legacyOriginFor("midtrans", runtime.PROVIDER_RELAY_HOSTS);
+  }
+
+  return runtime.PROVIDER_RELAY_MELOSTORE_ORIGIN?.trim()
+    || legacyOriginFor("melostore", runtime.PROVIDER_RELAY_HOSTS)
+    || runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?.trim()
+    || legacyOriginFor("digiflazz", runtime.PROVIDER_RELAY_HOSTS);
 }
 
 function routeUrl(originalUrl: string, relayOrigin: string) {
@@ -67,6 +74,7 @@ export function providerRelayRequest(
     headers: {
       ...headers,
       "x-lfamilia-relay-token": token,
+      "x-lfamilia-relay-provider": route.provider,
       [`x-lfamilia-${route.provider}-environment`]: route.environment,
     },
     relayed: true,
@@ -138,7 +146,10 @@ export async function testRelayConnection(
 
     const authResponse = await fetch(parsed.origin, {
       method: "HEAD",
-      headers: { "x-lfamilia-relay-token": token },
+      headers: {
+        "x-lfamilia-relay-token": token,
+        "x-lfamilia-relay-provider": provider,
+      },
       cache: "no-store",
       redirect: "manual",
       signal: AbortSignal.timeout(8_000),
@@ -151,7 +162,7 @@ export async function testRelayConnection(
       return { provider, label, connected: false, status: 401, message: "Relay Token tidak cocok dengan VPS." };
     }
     if (authResponse.status === 404) {
-      return { provider, label, connected: false, status: 404, message: "Hostname relay tidak dikenal oleh VPS." };
+      return { provider, label, connected: false, status: 404, message: "Provider/hostname relay tidak dikenal oleh VPS." };
     }
 
     return {
