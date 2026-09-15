@@ -48,6 +48,7 @@ const syncSchema = z.object({
 });
 
 function validateChannel(input: z.infer<typeof channelSchema>) {
+  if (!input.isActive) return;
   if (!isGatewayChannelSupported(input.gateway, input.method, input.channel, input.gatewayConfig)) {
     throw new Error("Isi kode gateway resmi untuk channel custom, atau pilih channel bawaan yang didukung provider.");
   }
