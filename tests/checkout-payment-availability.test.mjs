@@ -8,14 +8,23 @@ const source = fs.readFileSync(path.join(root, "app/checkout/page.tsx"), "utf8")
 const methodsRoute = fs.readFileSync(path.join(root, "app/api/payment-methods/route.ts"), "utf8");
 const channelsSource = fs.readFileSync(path.join(root, "lib/server/payment-channels.ts"), "utf8");
 
-test("checkout methods are filtered by active and ready internal gateways without exposing them", () => {
+test("checkout methods use mode-aware gateway readiness without exposing gateway identity", () => {
   assert.match(methodsRoute, /listPaymentGatewaySettings/);
-  assert.match(methodsRoute, /getDokuReadiness/);
-  assert.match(methodsRoute, /getMidtransReadiness/);
-  assert.match(methodsRoute, /isProviderRelayConfigured\("midtrans"\)/);
-  assert.match(methodsRoute, /\.map\(\(item\) => \(\{/);
-  assert.doesNotMatch(methodsRoute, /gateway: item\.gateway/);
-  assert.doesNotMatch(methodsRoute, /gatewayConfig: item\.gatewayConfig/);
+  assert.match(methodsRoute, /getConfiguredGatewayReadiness/);
+  assert.match(methodsRoute, /paymentMethod: item\.method/);
+  assert.match(methodsRoute, /paymentChannel: item\.channel/);
+  assert.match(methodsRoute, /gatewayConfig: item\.gatewayConfig/);
+  assert.doesNotMatch(methodsRoute, /getDokuReadiness/);
+  assert.doesNotMatch(methodsRoute, /getMidtransReadiness/);
+  assert.doesNotMatch(methodsRoute, /isProviderRelayConfigured/);
+  assert.doesNotMatch(methodsRoute, /partnerServiceId\?\.length === 8/);
+
+  const publicMapStart = methodsRoute.indexOf(".map(({ item }) => ({");
+  const publicMapEnd = methodsRoute.indexOf("}));", publicMapStart);
+  const publicMapSource = methodsRoute.slice(publicMapStart, publicMapEnd);
+  assert.ok(publicMapStart >= 0 && publicMapEnd > publicMapStart);
+  assert.doesNotMatch(publicMapSource, /gateway:/);
+  assert.doesNotMatch(publicMapSource, /gatewayConfig/);
   assert.match(source, /displayChannels/);
 });
 

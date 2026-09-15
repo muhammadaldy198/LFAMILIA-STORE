@@ -1,11 +1,8 @@
-import { getDokuReadiness } from "@/lib/server/doku";
-import { getMidtransReadiness } from "@/lib/server/midtrans";
 import {
-  isGatewayChannelSupported,
   listPaymentChannels,
   listPaymentGatewaySettings,
 } from "@/lib/server/payment-channels";
-import { isProviderRelayConfigured } from "@/lib/server/provider-relay";
+import { getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
 
 export const dynamic = "force-dynamic";
 
@@ -15,15 +12,24 @@ export async function GET() {
     listPaymentGatewaySettings(),
   ]);
   const activeGateway = new Map(gatewaySettings.map((item) => [item.gateway, item.isActive]));
-  const dokuReady = getDokuReadiness().ready;
-  const midtransReady = getMidtransReadiness().ready && isProviderRelayConfigured("midtrans");
 
-  const activeChannels = channels
-    .filter((item) => activeGateway.get(item.gateway) === true)
-    .filter((item) => isGatewayChannelSupported(item.gateway, item.method, item.channel))
-    .filter((item) => item.gateway === "doku" ? dokuReady : midtransReady)
-    .filter((item) => item.gateway !== "midtrans" || item.gatewayConfig.partnerServiceId?.length === 8)
-    .map((item) => ({
+  const readyChannels = await Promise.all(
+    channels
+      .filter((item) => activeGateway.get(item.gateway) === true)
+      .map(async (item) => {
+        const readiness = await getConfiguredGatewayReadiness({
+          gateway: item.gateway,
+          paymentMethod: item.method,
+          paymentChannel: item.channel,
+          gatewayConfig: item.gatewayConfig,
+        });
+        return { item, ready: readiness.ready };
+      }),
+  );
+
+  const activeChannels = readyChannels
+    .filter(({ ready }) => ready)
+    .map(({ item }) => ({
       method: item.method,
       channel: item.channel,
       name: item.name,
