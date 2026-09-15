@@ -1,6 +1,6 @@
 import { createDokuCheckoutPayment, getDokuCheckoutReadiness } from "@/lib/server/doku-checkout";
 import { createDokuDirectPayment, getDokuReadiness, isDokuChannelSupported } from "@/lib/server/doku";
-import { dokuCheckoutPaymentType, midtransSnapPaymentType } from "@/lib/server/hosted-payment-methods";
+import { hostedPaymentType } from "@/lib/server/hosted-payment-methods";
 import { createMidtransSnapPayment, getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
 import { createMidtransVirtualAccount, getMidtransReadiness, isMidtransChannelSupported } from "@/lib/server/midtrans";
 import { getActivePaymentModes } from "@/lib/server/payment-mode-config";
@@ -19,11 +19,12 @@ export async function getConfiguredGatewayReadiness(input: {
   if (input.gateway === "doku") {
     if (modes.dokuMode === "checkout") {
       const readiness = await getDokuCheckoutReadiness();
+      const paymentType = hostedPaymentType("doku", input.paymentMethod, input.paymentChannel, input.gatewayConfig);
       return {
-        ready: readiness.ready && Boolean(dokuCheckoutPaymentType(input.paymentMethod, input.paymentChannel)),
+        ready: readiness.ready && Boolean(paymentType),
         environment: readiness.environment,
         mode: "checkout" as const,
-        reason: readiness.ready ? (dokuCheckoutPaymentType(input.paymentMethod, input.paymentChannel) ? null : "Channel tidak didukung DOKU Checkout.") : readiness.reason,
+        reason: readiness.ready ? (paymentType ? null : "Channel belum memiliki kode DOKU Checkout.") : readiness.reason,
       };
     }
     const readiness = getDokuReadiness();
@@ -37,11 +38,12 @@ export async function getConfiguredGatewayReadiness(input: {
 
   if (modes.midtransMode === "snap") {
     const readiness = await getMidtransSnapReadiness();
+    const paymentType = hostedPaymentType("midtrans", input.paymentMethod, input.paymentChannel, input.gatewayConfig);
     return {
-      ready: readiness.ready && Boolean(midtransSnapPaymentType(input.paymentMethod, input.paymentChannel)),
+      ready: readiness.ready && Boolean(paymentType),
       environment: readiness.environment,
       mode: "snap" as const,
-      reason: readiness.ready ? (midtransSnapPaymentType(input.paymentMethod, input.paymentChannel) ? null : "Channel tidak didukung Midtrans Snap.") : readiness.reason,
+      reason: readiness.ready ? (paymentType ? null : "Channel belum memiliki kode Midtrans Snap.") : readiness.reason,
     };
   }
   const readiness = getMidtransReadiness();
