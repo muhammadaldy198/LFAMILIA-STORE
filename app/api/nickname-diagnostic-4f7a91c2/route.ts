@@ -21,6 +21,20 @@ async function readJson(response: Response): Promise<JsonRecord> {
   }
 }
 
+function summarize(response: Response, body: JsonRecord) {
+  const data = record(body.data);
+  const error = record(body.error);
+  return {
+    httpStatus: response.status,
+    success: response.ok && body.success !== false,
+    errorCode: error.code ?? null,
+    errorCategory: error.category ?? null,
+    message: error.message ?? body.message ?? null,
+    nickname: data.username ?? data.nickname ?? null,
+    region: data.region ?? data.country ?? null,
+  };
+}
+
 export async function GET() {
   const runtime = getRuntimeEnv<RuntimeEnv>();
   const apiKey = runtime.MELOSTORE_API_KEY?.trim();
@@ -36,24 +50,30 @@ export async function GET() {
     "X-Secret-Key": secretKey,
   };
 
-  const [profileResponse, lookupResponse] = await Promise.all([
-    fetch("https://api.melostore.id/api/v1/h2h/profile", { headers, signal: AbortSignal.timeout(8000) }),
+  const lookup = (customer_target: string, customer_target_zone: string) =>
     fetch("https://api.melostore.id/api/v1/h2h/check-nickname", {
       method: "POST",
       headers,
       body: JSON.stringify({
         game_code: "mobile-legends",
-        customer_target: "309412350",
-        customer_target_zone: "9615",
+        customer_target,
+        customer_target_zone,
       }),
       signal: AbortSignal.timeout(8000),
-    }),
+    });
+
+  const [profileResponse, targetResponse, docsExampleResponse] = await Promise.all([
+    fetch("https://api.melostore.id/api/v1/h2h/profile", { headers, signal: AbortSignal.timeout(8000) }),
+    lookup("309412350", "9615"),
+    lookup("47486147", "2076"),
   ]);
 
-  const [profileBody, lookupBody] = await Promise.all([readJson(profileResponse), readJson(lookupResponse)]);
+  const [profileBody, targetBody, docsExampleBody] = await Promise.all([
+    readJson(profileResponse),
+    readJson(targetResponse),
+    readJson(docsExampleResponse),
+  ]);
   const profileData = record(profileBody.data);
-  const lookupData = record(lookupBody.data);
-  const lookupError = record(lookupBody.error);
 
   return Response.json({
     configured: true,
@@ -62,14 +82,7 @@ export async function GET() {
       success: profileResponse.ok && profileBody.success !== false,
       sandboxMode: typeof profileData.is_sandbox_mode === "boolean" ? profileData.is_sandbox_mode : null,
     },
-    lookup: {
-      httpStatus: lookupResponse.status,
-      success: lookupResponse.ok && lookupBody.success !== false,
-      errorCode: lookupError.code ?? null,
-      errorCategory: lookupError.category ?? null,
-      message: lookupError.message ?? lookupBody.message ?? null,
-      nickname: lookupData.username ?? lookupData.nickname ?? null,
-      region: lookupData.region ?? lookupData.country ?? null,
-    },
+    target: summarize(targetResponse, targetBody),
+    docsExample: summarize(docsExampleResponse, docsExampleBody),
   }, { headers: { "Cache-Control": "no-store" } });
 }
