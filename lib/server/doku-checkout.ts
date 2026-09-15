@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { hmacBase64 } from "@/lib/server/crypto";
-import { dokuCheckoutPaymentType } from "@/lib/server/hosted-payment-methods";
+import { hostedPaymentType } from "@/lib/server/hosted-payment-methods";
 import {
   getDokuCheckoutConfig,
   getHostedGatewayProfileForEnvironment,
@@ -83,10 +83,11 @@ export async function createDokuCheckoutPayment(input: {
   buyerPhone: string;
   paymentMethod: string;
   paymentChannel: string;
+  gatewayConfig?: Record<string, string>;
   finishUrl: string;
 }) : Promise<HostedPaymentResult> {
-  const paymentType = dokuCheckoutPaymentType(input.paymentMethod, input.paymentChannel);
-  if (!paymentType) throw new Error("Channel ini belum didukung DOKU Checkout.");
+  const paymentType = hostedPaymentType("doku", input.paymentMethod, input.paymentChannel, input.gatewayConfig);
+  if (!paymentType) throw new Error("Channel ini belum memiliki kode DOKU Checkout yang valid.");
   if (!Number.isInteger(input.amount) || input.amount <= 0) throw new Error("Nominal DOKU Checkout tidak valid.");
 
   const config = await getDokuCheckoutConfig();

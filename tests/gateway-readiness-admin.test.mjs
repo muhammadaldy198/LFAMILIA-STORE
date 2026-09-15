@@ -15,12 +15,16 @@ test("payment admin API exposes DOKU and Midtrans readiness without credentials"
   assert.doesNotMatch(route, /clientSecret\s*:|secretKey\s*:|privateKey\s*:/);
 });
 
-test("payment admin shows dual exclusive gateway controls", () => {
-  assert.match(manager, /DOKU Direct API/);
-  assert.match(manager, /Midtrans BI-SNAP/);
-  assert.match(manager, /Master Gateway/);
+test("payment admin shows configurable gateway mode and environment controls", () => {
+  assert.match(manager, /Gateway & Environment/);
+  assert.match(manager, /Checkout Biasa/);
+  assert.match(manager, /Direct API/);
+  assert.match(manager, /Snap/);
+  assert.match(manager, /BI-SNAP/);
+  assert.match(manager, /Sandbox/);
+  assert.match(manager, /Production/);
   assert.match(manager, /Metode Pembayaran/);
+  assert.match(manager, /Tambah Metode/);
   assert.match(manager, /Editor Halaman Pembayaran/);
-  assert.match(manager, /Tidak ada fallback otomatis antar gateway/);
   assert.doesNotMatch(manager, /QRIS DOKU/);
 });

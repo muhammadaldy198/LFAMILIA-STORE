@@ -164,15 +164,28 @@ export async function getMidtransSnapConfig() {
 
 export async function getPaymentModeOverview() {
   const modes = await getActivePaymentModes();
-  const [doku, midtrans] = await Promise.all([
-    profile("doku", "checkout", modes.dokuEnvironment),
-    profile("midtrans", "snap", modes.midtransEnvironment),
+  const [dokuSandbox, dokuProduction, midtransSandbox, midtransProduction] = await Promise.all([
+    profile("doku", "checkout", "sandbox"),
+    profile("doku", "checkout", "production"),
+    profile("midtrans", "snap", "sandbox"),
+    profile("midtrans", "snap", "production"),
   ]);
+  const configured = {
+    doku: {
+      sandbox: Boolean(dokuSandbox?.clientId && dokuSandbox.secretKey),
+      production: Boolean(dokuProduction?.clientId && dokuProduction.secretKey),
+    },
+    midtrans: {
+      sandbox: Boolean(midtransSandbox?.serverKey && midtransSandbox.clientKey),
+      production: Boolean(midtransProduction?.serverKey && midtransProduction.clientKey),
+    },
+  };
   const base = (() => { try { return new URL(runtime().PUBLIC_BASE_URL || "").origin; } catch { return ""; } })();
   return {
     ...modes,
-    dokuCheckoutConfigured: Boolean(doku?.clientId && doku.secretKey),
-    midtransSnapConfigured: Boolean(midtrans?.serverKey && midtrans.clientKey),
+    dokuCheckoutConfigured: configured.doku[modes.dokuEnvironment],
+    midtransSnapConfigured: configured.midtrans[modes.midtransEnvironment],
+    hostedConfigured: configured,
     callbacks: {
       dokuNotification: `${base}/api/payments/doku/callback`,
       midtransSnapNotification: `${base}/api/payments/midtrans/snap/notification`,

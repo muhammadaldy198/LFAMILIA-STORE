@@ -44,10 +44,13 @@ function parseGatewayConfig(value: string | null | undefined) {
   }
 }
 
-// Routing is an Admin decision. This validates whether a gateway has at least one
-// supported mode for the channel; the currently selected mode is checked at runtime.
-export function isGatewayChannelSupported(gateway: PaymentGatewayName, method: string, channel: string) {
-  return isHostedGatewayChannelSupported(gateway, method, channel);
+export function isGatewayChannelSupported(
+  gateway: PaymentGatewayName,
+  method: string,
+  channel: string,
+  gatewayConfig?: Record<string, string>,
+) {
+  return isHostedGatewayChannelSupported(gateway, method, channel, gatewayConfig);
 }
 
 export async function listPaymentGatewaySettings(): Promise<PaymentGatewaySetting[]> {
@@ -92,7 +95,7 @@ export async function listPaymentChannels(includeInactive = false): Promise<Mana
       gateway: PaymentGatewayName;
       gateway_config_json: string | null;
     }>();
-    const saved = result.results.flatMap((item) => {
+    return result.results.flatMap((item) => {
       if (item.gateway !== "doku" && item.gateway !== "midtrans") return [];
       return [{
         id: item.id,
@@ -107,21 +110,14 @@ export async function listPaymentChannels(includeInactive = false): Promise<Mana
         sortOrder: item.sort_order,
       } satisfies ManagedPaymentChannel];
     });
-    const savedByChannel = new Map(saved.map((item) => [`${item.method}:${item.channel}`, item]));
-    const defaults = new Set(fallback.map((item) => `${item.method}:${item.channel}`));
-    const merged = [
-      ...fallback.map((item) => savedByChannel.get(`${item.method}:${item.channel}`) ?? item),
-      ...saved.filter((item) => !defaults.has(`${item.method}:${item.channel}`)),
-    ].sort((a, b) => a.sortOrder - b.sortOrder || (a.id ?? 0) - (b.id ?? 0));
-    return includeInactive ? merged : merged.filter((item) => item.isActive);
   } catch {
     return includeInactive ? fallback : fallback.filter((item) => item.isActive);
   }
 }
 
 export async function savePaymentChannel(input: Omit<ManagedPaymentChannel, "id"> & { id?: number | null }) {
-  if (!isGatewayChannelSupported(input.gateway, input.method, input.channel)) {
-    throw new Error("Metode tersebut tidak didukung oleh gateway yang dipilih.");
+  if (input.isActive && !isGatewayChannelSupported(input.gateway, input.method, input.channel, input.gatewayConfig)) {
+    throw new Error("Metode tersebut belum memiliki kode pembayaran yang valid untuk gateway yang dipilih.");
   }
   const db = getD1();
   const gatewayConfigJson = JSON.stringify(input.gatewayConfig ?? {});
@@ -204,6 +200,6 @@ export async function getPaymentChannel(method: string, channel: string, include
 
 export async function isPaymentChannelAvailable(method: string, channel: string) {
   const paymentChannel = await getPaymentChannel(method, channel, false);
-  if (!paymentChannel || !isGatewayChannelSupported(paymentChannel.gateway, method, channel)) return false;
+  if (!paymentChannel || !isGatewayChannelSupported(paymentChannel.gateway, method, channel, paymentChannel.gatewayConfig)) return false;
   return isPaymentGatewayActive(paymentChannel.gateway);
 }

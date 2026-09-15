@@ -72,16 +72,32 @@ test("migration 0031 adds gateway mode identity to orders and wallet topups with
   assert.doesNotMatch(migration, /DELETE FROM/i);
 });
 
-test("Super Admin UI exposes gateway modes, per-channel routing, hosted credentials, and topup routing note", () => {
-  const panel = read("components/admin-payment-routing-panel.tsx");
+test("Super Admin UI keeps routing inside existing Payment and Integration workspaces", () => {
+  const payment = read("components/admin-payment-workspace.tsx");
+  const integration = read("components/admin-integration-workspace.tsx");
+  const hosted = read("components/admin-hosted-gateway-integration.tsx");
   const dashboard = read("components/admin-dashboard.tsx");
-  assert.match(panel, /Mode DOKU/);
-  assert.match(panel, /Mode Midtrans/);
-  assert.match(panel, /Checkout Biasa/);
-  assert.match(panel, /BI-SNAP/);
-  assert.match(panel, /Top up saldo memakai routing channel yang sama/);
-  assert.match(panel, /DOKU Checkout/);
-  assert.match(panel, /Midtrans Snap/);
-  assert.match(dashboard, /AdminGatewayRoutingPanel/);
-  assert.match(dashboard, /AdminHostedGatewayCredentialsPanel/);
+
+  assert.match(payment, /Gateway & Environment/);
+  assert.match(payment, /Checkout Biasa/);
+  assert.match(payment, /Direct API/);
+  assert.match(payment, /Snap/);
+  assert.match(payment, /BI-SNAP/);
+  assert.match(payment, /Tambah Metode/);
+  assert.match(payment, /Hapus/);
+  assert.match(payment, /Top up saldo memakai daftar metode dan routing gateway yang sama/);
+  assert.match(payment, /Sandbox/);
+  assert.match(payment, /Production/);
+
+  assert.match(integration, /DOKU Checkout/);
+  assert.match(integration, /DOKU Direct API/);
+  assert.match(integration, /Midtrans Snap/);
+  assert.match(integration, /Midtrans BI-SNAP/);
+  assert.match(hosted, /Sandbox/);
+  assert.match(hosted, /Production/);
+
+  assert.doesNotMatch(dashboard, /AdminGatewayRoutingPanel/);
+  assert.doesNotMatch(dashboard, /AdminHostedGatewayCredentialsPanel/);
+  assert.match(dashboard, /<AdminPaymentWorkspace \/>/);
+  assert.match(dashboard, /<AdminIntegrationWorkspace \/>/);
 });
