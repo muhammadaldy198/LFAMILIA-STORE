@@ -49,9 +49,10 @@ test("gateway channel sync never enables merchant channels automatically", () =>
   assert.doesNotMatch(syncSource, /is_active = excluded\.is_active/);
 });
 
-test("routing uses the gateway assignment persisted for each payment channel", () => {
+test("routing uses the gateway assignment and per-channel provider code persisted in D1", () => {
   assert.match(channelsSource, /gateway: item\.gateway/);
-  assert.match(channelsSource, /isGatewayChannelSupported\(input\.gateway, input\.method, input\.channel\)/);
+  assert.match(channelsSource, /isGatewayChannelSupported\(input\.gateway, input\.method, input\.channel, input\.gatewayConfig\)/);
+  assert.match(channelsSource, /gateway_config_json/);
   assert.match(channelsSource, /gateway = excluded\.gateway/);
   assert.doesNotMatch(channelsSource, /method !== "va" && isDokuChannelSupported/);
 });
