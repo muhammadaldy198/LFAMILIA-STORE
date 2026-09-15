@@ -72,6 +72,10 @@ const providerDefinitions = [
   },
 ];
 
+const providerByName = new Map(
+  providerDefinitions.map((provider) => [provider.name, provider]),
+);
+
 const providers = new Map(
   providerDefinitions
     .filter((provider) => provider.host)
@@ -80,6 +84,7 @@ const providers = new Map(
 
 const internalHeaders = new Set([
   "x-lfamilia-relay-token",
+  "x-lfamilia-relay-provider",
   "x-lfamilia-digiflazz-environment",
   "x-lfamilia-midtrans-environment",
   "x-lfamilia-melostore-environment",
@@ -259,10 +264,18 @@ function providerConfigured(provider) {
   }
 
   if (provider.name === "melostore") {
-    return Boolean(provider.host && provider.productionUpstream);
+    return Boolean(provider.productionUpstream);
   }
 
   return false;
+}
+
+function resolveProvider(req, hostname) {
+  const override = String(req.headers["x-lfamilia-relay-provider"] || "")
+    .trim()
+    .toLowerCase();
+  if (override) return providerByName.get(override) || null;
+  return providers.get(hostname) || null;
 }
 
 const server = createServer(async (req, res) => {
@@ -288,9 +301,9 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const provider = providers.get(hostname);
+  const provider = resolveProvider(req, hostname);
   if (!provider) {
-    json(res, 404, { error: "Host relay tidak dikenal." });
+    json(res, 404, { error: "Provider/host relay tidak dikenal." });
     return;
   }
 
