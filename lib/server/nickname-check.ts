@@ -1,5 +1,9 @@
 import { getNicknamePolicy } from "@/lib/nickname-policy";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import {
+  isProviderRelayConfigured,
+  providerRelayRequest,
+} from "@/lib/server/provider-relay";
 
 type RuntimeEnv = {
   MELOSTORE_API_KEY?: string;
@@ -137,16 +141,12 @@ function throwMelostoreError(status: number, data: MelostoreResponse): never {
     );
   }
 
-  // HTTP 404 tanpa error terstruktur biasanya berarti endpoint konfigurasi salah/tidak tersedia,
-  // bukan bukti bahwa ID pemain tidak ditemukan.
   if (status === 404 && !category && code === null) {
     throw new NicknameServiceError(
       "Layanan verifikasi akun belum terhubung dengan benar. Coba lagi beberapa saat.",
     );
   }
 
-  // Jangan mengubah semua 400/422 menjadi "ID tidak ditemukan". Provider memakai
-  // status tersebut juga untuk format input/game yang tidak didukung.
   if (status === 400 || status === 422) {
     throw new NicknameValidationError(
       message || "Data akun belum dapat diverifikasi. Periksa kembali ID dan Server.",
@@ -179,6 +179,12 @@ export async function verifyNicknameForCheckout(input: {
     );
   }
 
+  if (!isProviderRelayConfigured("melostore")) {
+    throw new NicknameServiceError(
+      "Relay IP statis untuk verifikasi akun belum dikonfigurasi. Checkout sementara tidak dapat dilanjutkan.",
+    );
+  }
+
   return lookupMelostore({
     apiBase: melostoreApiBase(runtime.MELOSTORE_API_URL),
     apiKey,
@@ -204,16 +210,22 @@ async function lookupMelostore(input: {
   };
   if (input.server) body.customer_target_zone = input.server;
 
+  const headers = {
+    accept: "application/json",
+    "content-type": "application/json",
+    "X-API-Key": input.apiKey,
+    "X-Secret-Key": input.secretKey,
+  };
+  const relayed = providerRelayRequest(endpoint, headers, {
+    provider: "melostore",
+    environment: "production",
+  });
+
   let upstream: Response;
   try {
-    upstream = await fetch(endpoint, {
+    upstream = await fetch(relayed.url, {
       method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-        "X-API-Key": input.apiKey,
-        "X-Secret-Key": input.secretKey,
-      },
+      headers: relayed.headers,
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(8_000),
     });
