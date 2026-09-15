@@ -115,6 +115,15 @@ export function AdminExperienceManager({ role }: { role: "super_admin" | "admin"
   function focus(kind: ContentKind, id: number) {
     setActiveTab(kind);
     setEditor({ kind, id });
+
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      window.requestAnimationFrame(() => {
+        document.getElementById("admin-content-editor")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    }
   }
 
   function add(kind: ContentKind) {
@@ -247,7 +256,7 @@ function EditorPanel({ editor, banners, popups, news, reviews, faqs, canDelete, 
     } catch (reason) { onError(reason instanceof Error ? reason.message : "Gambar gagal diunggah."); }
   }
   return (
-    <aside className="sticky top-[70px] self-start overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white shadow-[0_8px_24px_rgba(18,35,60,.08)]">
+    <aside id="admin-content-editor" className="sticky top-[70px] self-start overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white shadow-[0_8px_24px_rgba(18,35,60,.08)]">
       <header className="flex h-[47px] items-center justify-between border-b border-[#e5eaf0] px-[13px]">
         <h2 className="text-[12px] font-extrabold">{title}</h2>
         <button type="button" onClick={onAdd} className="inline-flex h-[29px] items-center gap-[5px] rounded-[4px] bg-[#0875ed] px-[10px] text-[7.5px] font-bold text-white"><Plus className="size-[11px]" />Tambah {labelKind(editor.kind)}</button>
