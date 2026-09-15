@@ -62,6 +62,14 @@ const providerDefinitions = [
       "MIDTRANS_PRODUCTION_UPSTREAM_ORIGIN",
     ),
   },
+  {
+    name: "melostore",
+    host: optionalEnv("MELOSTORE_RELAY_HOST").toLowerCase(),
+    productionUpstream: normalizeOrigin(
+      optionalEnv("MELOSTORE_PRODUCTION_UPSTREAM_ORIGIN"),
+      "MELOSTORE_PRODUCTION_UPSTREAM_ORIGIN",
+    ),
+  },
 ];
 
 const providers = new Map(
@@ -74,6 +82,7 @@ const internalHeaders = new Set([
   "x-lfamilia-relay-token",
   "x-lfamilia-digiflazz-environment",
   "x-lfamilia-midtrans-environment",
+  "x-lfamilia-melostore-environment",
 ]);
 
 const hopByHopHeaders = new Set([
@@ -94,6 +103,10 @@ const hopByHopHeaders = new Set([
 const midtransAllowedPaths = new Set([
   "/v1.0/access-token/b2b",
   "/v1.0/transfer-va/create-va",
+]);
+
+const melostoreAllowedPaths = new Set([
+  "/api/v1/h2h/check-nickname",
 ]);
 
 function json(res, status, payload) {
@@ -193,6 +206,7 @@ function isMethodAllowed(_provider, method) {
 
 function isPathAllowed(provider, path) {
   if (provider.name === "midtrans") return midtransAllowedPaths.has(path);
+  if (provider.name === "melostore") return melostoreAllowedPaths.has(path);
   return true;
 }
 
@@ -217,6 +231,13 @@ function resolveProviderUpstream(provider, req) {
     return "";
   }
 
+  if (provider.name === "melostore") {
+    const environment = String(
+      req.headers["x-lfamilia-melostore-environment"] || "production",
+    ).toLowerCase();
+    return environment === "production" ? provider.productionUpstream : "";
+  }
+
   return "";
 }
 
@@ -235,6 +256,10 @@ function providerConfigured(provider) {
         provider.sandboxUpstream &&
         provider.productionUpstream,
     );
+  }
+
+  if (provider.name === "melostore") {
+    return Boolean(provider.host && provider.productionUpstream);
   }
 
   return false;
