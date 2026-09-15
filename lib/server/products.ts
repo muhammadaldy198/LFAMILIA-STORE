@@ -242,8 +242,26 @@ async function applyOneTimeCatalogRepopulation() {
   ).bind(oneTimeCatalogRepopulationKey).run();
 }
 
+async function reconcileAutomaticProviderProducts() {
+  const db = getD1();
+  await db.prepare(
+    `UPDATE products
+     SET fulfillment_type = 'automatic', updated_at = CURRENT_TIMESTAMP
+     WHERE fulfillment_type = 'manual'
+       AND EXISTS (
+         SELECT 1
+         FROM product_packages package
+         WHERE package.product_id = products.id
+           AND package.is_active = 1
+           AND lower(trim(coalesce(package.provider_code, ''))) = 'digiflazz'
+           AND trim(coalesce(package.provider_sku, '')) <> ''
+       )`,
+  ).run();
+}
+
 export async function readProducts(includeInactive = false): Promise<ManagedProduct[]> {
   await ensureLegacyDatabaseColumns();
+  await reconcileAutomaticProviderProducts();
   const db = getD1();
   const productSql = includeInactive
     ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json,
