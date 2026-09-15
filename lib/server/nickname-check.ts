@@ -23,6 +23,18 @@ type MelostoreResponse = {
   };
 };
 
+type SecondaryNicknameResponse = {
+  success?: boolean;
+  name?: unknown;
+  nickname?: unknown;
+  message?: unknown;
+  data?: {
+    name?: unknown;
+    nickname?: unknown;
+    username?: unknown;
+  };
+};
+
 export type NicknameVerification = {
   supported: boolean;
   nickname: string | null;
@@ -43,7 +55,15 @@ export class NicknameServiceError extends Error {
   }
 }
 
+class NicknameNotFoundError extends NicknameValidationError {
+  constructor(message = "ID atau Server tidak ditemukan.") {
+    super(message);
+    this.name = "NicknameNotFoundError";
+  }
+}
+
 const OFFICIAL_MELOSTORE_API_ORIGIN = "https://api.melostore.id";
+const SECONDARY_NICKNAME_API_ORIGIN = "https://api.isan.eu.org/nickname";
 
 function nonEmptyString(values: unknown[]) {
   return values.find(
@@ -105,7 +125,7 @@ function throwMelostoreError(status: number, data: MelostoreResponse): never {
   const { category, code, message } = melostoreErrorInfo(data);
 
   if (category === "not_found" || code === 4001) {
-    throw new NicknameValidationError("ID atau Server tidak ditemukan.");
+    throw new NicknameNotFoundError();
   }
 
   if (category === "validation" || code === 4006) {
@@ -137,16 +157,12 @@ function throwMelostoreError(status: number, data: MelostoreResponse): never {
     );
   }
 
-  // HTTP 404 tanpa error terstruktur biasanya berarti endpoint konfigurasi salah/tidak tersedia,
-  // bukan bukti bahwa ID pemain tidak ditemukan.
   if (status === 404 && !category && code === null) {
     throw new NicknameServiceError(
       "Layanan verifikasi akun belum terhubung dengan benar. Coba lagi beberapa saat.",
     );
   }
 
-  // Jangan mengubah semua 400/422 menjadi "ID tidak ditemukan". Provider memakai
-  // status tersebut juga untuk format input/game yang tidak didukung.
   if (status === 400 || status === 422) {
     throw new NicknameValidationError(
       message || "Data akun belum dapat diverifikasi. Periksa kembali ID dan Server.",
@@ -179,14 +195,32 @@ export async function verifyNicknameForCheckout(input: {
     );
   }
 
-  return lookupMelostore({
-    apiBase: melostoreApiBase(runtime.MELOSTORE_API_URL),
-    apiKey,
-    secretKey,
-    game: input.productSlug,
-    userId: target.userId,
-    server: target.server,
-  });
+  try {
+    return await lookupMelostore({
+      apiBase: melostoreApiBase(runtime.MELOSTORE_API_URL),
+      apiKey,
+      secretKey,
+      game: input.productSlug,
+      userId: target.userId,
+      server: target.server,
+    });
+  } catch (error) {
+    // Melostore can occasionally return a false 4001/not_found for valid MLBB
+    // accounts. Verify the same target against an independent nickname source
+    // before blocking checkout. We only use the secondary source for this exact
+    // disagreement case; Melostore remains the primary verifier.
+    if (
+      error instanceof NicknameNotFoundError &&
+      input.productSlug.trim().toLowerCase() === "mobile-legends"
+    ) {
+      const secondary = await lookupSecondaryMobileLegends({
+        userId: target.userId,
+        server: target.server,
+      }).catch(() => null);
+      if (secondary) return secondary;
+    }
+    throw error;
+  }
 }
 
 async function lookupMelostore(input: {
@@ -240,4 +274,52 @@ async function lookupMelostore(input: {
   }
   const country = nonEmptyString([data.data?.region, data.data?.country]) ?? null;
   return { supported: true, nickname, country };
+}
+
+async function lookupSecondaryMobileLegends(input: {
+  userId: string;
+  server?: string;
+}): Promise<NicknameVerification | null> {
+  if (!input.server) return null;
+
+  const url = new URL(`${SECONDARY_NICKNAME_API_ORIGIN}/ml`);
+  url.searchParams.set("id", input.userId);
+  url.searchParams.set("server", input.server);
+  url.searchParams.set("decode", "false");
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(url, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(8_000),
+    });
+  } catch {
+    return null;
+  }
+  if (!upstream.ok) return null;
+
+  let data: SecondaryNicknameResponse;
+  try {
+    data = (await upstream.json()) as SecondaryNicknameResponse;
+  } catch {
+    return null;
+  }
+  if (data.success === false) return null;
+
+  const rawNickname = nonEmptyString([
+    data.name,
+    data.nickname,
+    data.data?.name,
+    data.data?.nickname,
+    data.data?.username,
+  ]);
+  if (!rawNickname) return null;
+
+  let nickname = rawNickname;
+  try {
+    nickname = decodeURIComponent(rawNickname);
+  } catch {
+    // Upstream already returned plain text.
+  }
+  return { supported: true, nickname, country: null };
 }
