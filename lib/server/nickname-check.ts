@@ -2,21 +2,9 @@ import { getNicknamePolicy } from "@/lib/nickname-policy";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 type RuntimeEnv = {
-  NICKNAME_API_URL?: string;
-  NICKNAME_API_KEY?: string;
   MELOSTORE_API_KEY?: string;
   MELOSTORE_SECRET_KEY?: string;
   MELOSTORE_API_URL?: string;
-};
-
-type ProviderResponse = {
-  success?: boolean;
-  name?: unknown;
-  nickname?: unknown;
-  username?: unknown;
-  country?: unknown;
-  message?: unknown;
-  data?: { name?: unknown; nickname?: unknown; username?: unknown };
 };
 
 type MelostoreResponse = {
@@ -55,6 +43,8 @@ export class NicknameServiceError extends Error {
   }
 }
 
+const OFFICIAL_MELOSTORE_API_ORIGIN = "https://api.melostore.id";
+
 function nonEmptyString(values: unknown[]) {
   return values.find(
     (value): value is string =>
@@ -73,6 +63,21 @@ function validateTarget(productSlug: string, userId: string, server?: string) {
     throw new NicknameValidationError("Server / Zone ID wajib diisi dengan angka.");
   }
   return { policy, userId: cleanUserId, server: cleanServer };
+}
+
+function melostoreApiBase(configured?: string) {
+  const value = configured?.trim();
+  if (!value) return OFFICIAL_MELOSTORE_API_ORIGIN;
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== "api.melostore.id") {
+      return OFFICIAL_MELOSTORE_API_ORIGIN;
+    }
+    return value;
+  } catch {
+    return OFFICIAL_MELOSTORE_API_ORIGIN;
+  }
 }
 
 function melostoreNicknameEndpoint(baseUrl: string) {
@@ -126,6 +131,12 @@ function throwMelostoreError(status: number, data: MelostoreResponse): never {
     );
   }
 
+  if (status === 401 || status === 403) {
+    throw new NicknameServiceError(
+      "Layanan verifikasi akun belum terautentikasi dengan benar.",
+    );
+  }
+
   // HTTP 404 tanpa error terstruktur biasanya berarti endpoint konfigurasi salah/tidak tersedia,
   // bukan bukti bahwa ID pemain tidak ditemukan.
   if (status === 404 && !category && code === null) {
@@ -134,7 +145,7 @@ function throwMelostoreError(status: number, data: MelostoreResponse): never {
     );
   }
 
-  // Jangan mengubah semua 400/422 menjadi "ID tidak ditemukan". Melostore memakai
+  // Jangan mengubah semua 400/422 menjadi "ID tidak ditemukan". Provider memakai
   // status tersebut juga untuk format input/game yang tidak didukung.
   if (status === 400 || status === 422) {
     throw new NicknameValidationError(
@@ -162,40 +173,31 @@ export async function verifyNicknameForCheckout(input: {
   const runtime = getRuntimeEnv<RuntimeEnv>();
   const apiKey = runtime.MELOSTORE_API_KEY?.trim();
   const secretKey = runtime.MELOSTORE_SECRET_KEY?.trim();
-  if (apiKey && secretKey && runtime.MELOSTORE_API_URL?.trim()) {
-    return lookupMelostore({
-      runtime,
-      apiKey,
-      secretKey,
-      game: input.productSlug,
-      userId: target.userId,
-      server: target.server,
-    });
+  if (!apiKey || !secretKey) {
+    throw new NicknameServiceError(
+      "Verifikasi akun belum terhubung dengan benar. Checkout sementara tidak dapat dilanjutkan.",
+    );
   }
 
-  if (target.policy.fallbackEndpoint && runtime.NICKNAME_API_URL?.trim()) {
-    return lookupFallback({
-      runtime,
-      endpoint: target.policy.fallbackEndpoint,
-      userId: target.userId,
-      server: target.server,
-    });
-  }
-
-  throw new NicknameServiceError(
-    "Verifikasi akun untuk game ini belum siap. Checkout sementara tidak dapat dilanjutkan.",
-  );
+  return lookupMelostore({
+    apiBase: melostoreApiBase(runtime.MELOSTORE_API_URL),
+    apiKey,
+    secretKey,
+    game: input.productSlug,
+    userId: target.userId,
+    server: target.server,
+  });
 }
 
 async function lookupMelostore(input: {
-  runtime: RuntimeEnv;
+  apiBase: string;
   apiKey: string;
   secretKey: string;
   game: string;
   userId: string;
   server?: string;
 }): Promise<NicknameVerification> {
-  const endpoint = melostoreNicknameEndpoint(input.runtime.MELOSTORE_API_URL!);
+  const endpoint = melostoreNicknameEndpoint(input.apiBase);
   const body: Record<string, string> = {
     game_code: input.game,
     customer_target: input.userId,
@@ -237,71 +239,5 @@ async function lookupMelostore(input: {
     );
   }
   const country = nonEmptyString([data.data?.region, data.data?.country]) ?? null;
-  return { supported: true, nickname, country };
-}
-
-async function lookupFallback(input: {
-  runtime: RuntimeEnv;
-  endpoint: string;
-  userId: string;
-  server?: string;
-}): Promise<NicknameVerification> {
-  const baseUrl = input.runtime.NICKNAME_API_URL!.trim().replace(/\/$/, "");
-  const url = new URL(`${baseUrl}/${input.endpoint}`);
-  url.searchParams.set("id", input.userId);
-  if (input.server) url.searchParams.set("server", input.server);
-  url.searchParams.set("decode", "false");
-
-  const headers = new Headers({ accept: "application/json" });
-  if (input.runtime.NICKNAME_API_KEY?.trim()) {
-    headers.set("authorization", `Bearer ${input.runtime.NICKNAME_API_KEY.trim()}`);
-  }
-
-  let upstream: Response;
-  try {
-    upstream = await fetch(url, {
-      headers,
-      signal: AbortSignal.timeout(8_000),
-    });
-  } catch {
-    throw new NicknameServiceError();
-  }
-  if (!upstream.ok) {
-    if ([400, 404, 422].includes(upstream.status)) {
-      throw new NicknameValidationError("ID atau Server tidak ditemukan.");
-    }
-    throw new NicknameServiceError();
-  }
-
-  let data: ProviderResponse;
-  try {
-    data = (await upstream.json()) as ProviderResponse;
-  } catch {
-    throw new NicknameServiceError();
-  }
-  if (data.success === false) {
-    throw new NicknameValidationError("ID atau Server tidak ditemukan.");
-  }
-
-  const rawNickname = nonEmptyString([
-    data.name,
-    data.nickname,
-    data.username,
-    data.data?.name,
-    data.data?.nickname,
-    data.data?.username,
-  ]);
-  if (!rawNickname) throw new NicknameValidationError("Nickname tidak ditemukan.");
-
-  let nickname = rawNickname;
-  try {
-    nickname = decodeURIComponent(rawNickname);
-  } catch {
-    // Nilai upstream sudah berupa teks biasa.
-  }
-  const country =
-    typeof data.country === "string" && data.country.trim()
-      ? data.country.trim()
-      : null;
   return { supported: true, nickname, country };
 }
