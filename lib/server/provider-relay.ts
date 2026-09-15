@@ -7,7 +7,7 @@ type ProviderRelayEnv = {
   PROVIDER_RELAY_MIDTRANS_ORIGIN?: string;
 };
 
-export type RelayProvider = "digiflazz" | "midtrans";
+export type RelayProvider = "digiflazz" | "midtrans" | "melostore";
 
 function relayHosts(value?: string) {
   return (value ?? "")
@@ -16,7 +16,7 @@ function relayHosts(value?: string) {
     .filter(Boolean);
 }
 
-function legacyOriginFor(provider: RelayProvider, hosts?: string) {
+function legacyOriginFor(provider: "digiflazz" | "midtrans", hosts?: string) {
   const candidates = relayHosts(hosts);
   const selected = candidates.find((host) => host.toLowerCase().includes(provider));
   if (!selected) return "";
@@ -24,10 +24,20 @@ function legacyOriginFor(provider: RelayProvider, hosts?: string) {
 }
 
 function configuredOrigin(runtime: ProviderRelayEnv, provider: RelayProvider) {
-  const explicit = provider === "digiflazz"
-    ? runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN
-    : runtime.PROVIDER_RELAY_MIDTRANS_ORIGIN;
-  return explicit?.trim() || legacyOriginFor(provider, runtime.PROVIDER_RELAY_HOSTS);
+  if (provider === "digiflazz") {
+    return runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?.trim()
+      || legacyOriginFor("digiflazz", runtime.PROVIDER_RELAY_HOSTS);
+  }
+  if (provider === "midtrans") {
+    return runtime.PROVIDER_RELAY_MIDTRANS_ORIGIN?.trim()
+      || legacyOriginFor("midtrans", runtime.PROVIDER_RELAY_HOSTS);
+  }
+
+  // Nickname lookup only reuses the existing authenticated VPS transport.
+  // It does not make Melostore a fulfillment provider and does not expose a
+  // generic Melostore proxy. The VPS allowlists only check-nickname.
+  return runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?.trim()
+    || legacyOriginFor("digiflazz", runtime.PROVIDER_RELAY_HOSTS);
 }
 
 function routeUrl(originalUrl: string, relayOrigin: string) {
@@ -59,13 +69,22 @@ export function providerRelayRequest(
   if (!token || !relayOrigin) return { url, headers, relayed: false };
 
   const routedUrl = routeUrl(url, relayOrigin);
+  const relayHeaders: Record<string, string> = {
+    ...headers,
+    "x-lfamilia-relay-token": token,
+    [`x-lfamilia-${route.provider}-environment`]: route.environment,
+  };
+
+  // The nickname service intentionally shares the existing relay hostname.
+  // This authenticated internal selector is stripped by the VPS before the
+  // request is forwarded upstream.
+  if (route.provider === "melostore") {
+    relayHeaders["x-lfamilia-relay-provider"] = "melostore";
+  }
+
   return {
     url: routedUrl,
-    headers: {
-      ...headers,
-      "x-lfamilia-relay-token": token,
-      [`x-lfamilia-${route.provider}-environment`]: route.environment,
-    },
+    headers: relayHeaders,
     relayed: true,
   };
 }
@@ -133,9 +152,16 @@ export async function testRelayConnection(
       };
     }
 
+    const authHeaders: Record<string, string> = {
+      "x-lfamilia-relay-token": token,
+    };
+    if (provider === "melostore") {
+      authHeaders["x-lfamilia-relay-provider"] = "melostore";
+    }
+
     const authResponse = await fetch(parsed.origin, {
       method: "HEAD",
-      headers: { "x-lfamilia-relay-token": token },
+      headers: authHeaders,
       cache: "no-store",
       redirect: "manual",
       signal: AbortSignal.timeout(8_000),
@@ -148,7 +174,7 @@ export async function testRelayConnection(
       return { provider, label, connected: false, status: 401, message: "Relay Token tidak cocok dengan VPS." };
     }
     if (authResponse.status === 404) {
-      return { provider, label, connected: false, status: 404, message: "Hostname relay tidak dikenal oleh VPS." };
+      return { provider, label, connected: false, status: 404, message: "Hostname/provider relay tidak dikenal oleh VPS." };
     }
 
     return {
@@ -196,6 +222,7 @@ export async function testProviderRelayConnections() {
   return Promise.all([
     testRelayConnection("digiflazz", "DigiFlazz"),
     testRelayConnection("midtrans", "Midtrans BI-SNAP"),
+    testRelayConnection("melostore", "Nickname Verification"),
   ]);
 }
 
