@@ -5,9 +5,10 @@ type ProviderRelayEnv = {
   PROVIDER_RELAY_HOSTS?: string;
   PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?: string;
   PROVIDER_RELAY_MIDTRANS_ORIGIN?: string;
+  PROVIDER_RELAY_MELOSTORE_ORIGIN?: string;
 };
 
-export type RelayProvider = "digiflazz" | "midtrans";
+export type RelayProvider = "digiflazz" | "midtrans" | "melostore";
 
 function relayHosts(value?: string) {
   return (value ?? "")
@@ -26,7 +27,9 @@ function legacyOriginFor(provider: RelayProvider, hosts?: string) {
 function configuredOrigin(runtime: ProviderRelayEnv, provider: RelayProvider) {
   const explicit = provider === "digiflazz"
     ? runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN
-    : runtime.PROVIDER_RELAY_MIDTRANS_ORIGIN;
+    : provider === "midtrans"
+      ? runtime.PROVIDER_RELAY_MIDTRANS_ORIGIN
+      : runtime.PROVIDER_RELAY_MELOSTORE_ORIGIN;
   return explicit?.trim() || legacyOriginFor(provider, runtime.PROVIDER_RELAY_HOSTS);
 }
 
@@ -196,6 +199,7 @@ export async function testProviderRelayConnections() {
   return Promise.all([
     testRelayConnection("digiflazz", "DigiFlazz"),
     testRelayConnection("midtrans", "Midtrans BI-SNAP"),
+    testRelayConnection("melostore", "Melostore Nickname"),
   ]);
 }
 
