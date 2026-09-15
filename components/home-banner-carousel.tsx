@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { HomeBannerRecord } from "@/lib/server/content";
 
 export function HomeBannerCarousel() {
@@ -49,6 +49,7 @@ export function HomeBannerCarousel() {
   const banner = visibleBanners[Math.min(active, visibleBanners.length - 1)];
   const mobileImageUrl = banner.mobileImageUrl || mobileFallback(banner.imageUrl);
   const showControls = visibleBanners.length > 1;
+  const bannerHref = banner.ctaHref?.trim();
 
   function previousSlide() {
     setActive((value) => (value - 1 + visibleBanners.length) % visibleBanners.length);
@@ -61,39 +62,26 @@ export function HomeBannerCarousel() {
   return (
     <section className="mx-auto max-w-7xl px-4 pb-1 pt-3 sm:px-6 sm:pb-2 sm:pt-4 lg:px-8">
       <div className="relative">
-        <article className="group relative h-[148px] overflow-hidden rounded-[12px] border border-white/10 bg-[#10131b] sm:h-[204px] sm:rounded-[14px] lg:h-[240px]">
-          <picture>
-            <source media="(max-width: 639px)" srcSet={mobileImageUrl} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={banner.imageUrl}
+        <article className="relative overflow-hidden rounded-[12px] border border-white/10 bg-[#10131b] sm:rounded-[14px]">
+          {bannerHref ? (
+            <Link
+              href={bannerHref}
+              aria-label={`Buka banner ${banner.title || "LFAMILIA STORE"}`}
+              className="group block"
+            >
+              <BannerImage
+                desktopImageUrl={banner.imageUrl}
+                mobileImageUrl={mobileImageUrl}
+                alt={banner.title || "Banner LFAMILIA STORE"}
+              />
+            </Link>
+          ) : (
+            <BannerImage
+              desktopImageUrl={banner.imageUrl}
+              mobileImageUrl={mobileImageUrl}
               alt={banner.title || "Banner LFAMILIA STORE"}
-              className="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-[1.015]"
             />
-          </picture>
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,8,14,.9)_0%,rgba(5,8,14,.53)_48%,rgba(5,8,14,.04)_100%)]" />
-
-          <div className="relative z-10 flex size-full items-end p-4 sm:items-center sm:p-7 lg:p-9">
-            <div className="max-w-[78%] sm:max-w-xl">
-              <h1 className="text-balance text-lg font-black leading-tight tracking-[-0.035em] text-white sm:text-3xl lg:text-4xl">
-                {banner.title}
-              </h1>
-              {banner.subtitle && (
-                <p className="mt-2 hidden text-balance text-xs leading-5 text-white/75 sm:block lg:text-sm">
-                  {banner.subtitle}
-                </p>
-              )}
-              {banner.ctaLabel && (
-                <Link
-                  href={banner.ctaHref || "/catalog"}
-                  className="mt-3 inline-flex h-8 items-center rounded-lg bg-[#b9ff35] px-3 text-[10px] font-black text-[#091006] transition hover:bg-[#d0ff75] sm:mt-4 sm:h-10 sm:rounded-xl sm:px-4 sm:text-xs"
-                >
-                  {banner.ctaLabel}
-                  <ArrowRight className="ml-1.5 size-3.5 sm:size-4" />
-                </Link>
-              )}
-            </div>
-          </div>
+          )}
         </article>
 
         {showControls && (
@@ -118,6 +106,28 @@ export function HomeBannerCarousel() {
         )}
       </div>
     </section>
+  );
+}
+
+function BannerImage({
+  desktopImageUrl,
+  mobileImageUrl,
+  alt,
+}: {
+  desktopImageUrl: string;
+  mobileImageUrl: string;
+  alt: string;
+}) {
+  return (
+    <picture className="block">
+      <source media="(max-width: 639px)" srcSet={mobileImageUrl} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={desktopImageUrl}
+        alt={alt}
+        className="block h-auto w-full transition duration-500 group-hover:scale-[1.01]"
+      />
+    </picture>
   );
 }
 
