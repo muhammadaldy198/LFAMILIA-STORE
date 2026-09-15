@@ -116,7 +116,7 @@ export async function listPaymentChannels(includeInactive = false): Promise<Mana
 }
 
 export async function savePaymentChannel(input: Omit<ManagedPaymentChannel, "id"> & { id?: number | null }) {
-  if (!isGatewayChannelSupported(input.gateway, input.method, input.channel, input.gatewayConfig)) {
+  if (input.isActive && !isGatewayChannelSupported(input.gateway, input.method, input.channel, input.gatewayConfig)) {
     throw new Error("Metode tersebut belum memiliki kode pembayaran yang valid untuk gateway yang dipilih.");
   }
   const db = getD1();
