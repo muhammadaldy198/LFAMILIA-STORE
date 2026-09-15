@@ -5,10 +5,9 @@ type ProviderRelayEnv = {
   PROVIDER_RELAY_HOSTS?: string;
   PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?: string;
   PROVIDER_RELAY_MIDTRANS_ORIGIN?: string;
-  PROVIDER_RELAY_MELOSTORE_ORIGIN?: string;
 };
 
-export type RelayProvider = "digiflazz" | "midtrans" | "melostore";
+export type RelayProvider = "digiflazz" | "midtrans";
 
 function relayHosts(value?: string) {
   return (value ?? "")
@@ -25,19 +24,10 @@ function legacyOriginFor(provider: RelayProvider, hosts?: string) {
 }
 
 function configuredOrigin(runtime: ProviderRelayEnv, provider: RelayProvider) {
-  if (provider === "digiflazz") {
-    return runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?.trim()
-      || legacyOriginFor("digiflazz", runtime.PROVIDER_RELAY_HOSTS);
-  }
-  if (provider === "midtrans") {
-    return runtime.PROVIDER_RELAY_MIDTRANS_ORIGIN?.trim()
-      || legacyOriginFor("midtrans", runtime.PROVIDER_RELAY_HOSTS);
-  }
-
-  return runtime.PROVIDER_RELAY_MELOSTORE_ORIGIN?.trim()
-    || legacyOriginFor("melostore", runtime.PROVIDER_RELAY_HOSTS)
-    || runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?.trim()
-    || legacyOriginFor("digiflazz", runtime.PROVIDER_RELAY_HOSTS);
+  const explicit = provider === "digiflazz"
+    ? runtime.PROVIDER_RELAY_DIGIFLAZZ_ORIGIN
+    : runtime.PROVIDER_RELAY_MIDTRANS_ORIGIN;
+  return explicit?.trim() || legacyOriginFor(provider, runtime.PROVIDER_RELAY_HOSTS);
 }
 
 function routeUrl(originalUrl: string, relayOrigin: string) {
@@ -74,7 +64,6 @@ export function providerRelayRequest(
     headers: {
       ...headers,
       "x-lfamilia-relay-token": token,
-      "x-lfamilia-relay-provider": route.provider,
       [`x-lfamilia-${route.provider}-environment`]: route.environment,
     },
     relayed: true,
@@ -146,10 +135,7 @@ export async function testRelayConnection(
 
     const authResponse = await fetch(parsed.origin, {
       method: "HEAD",
-      headers: {
-        "x-lfamilia-relay-token": token,
-        "x-lfamilia-relay-provider": provider,
-      },
+      headers: { "x-lfamilia-relay-token": token },
       cache: "no-store",
       redirect: "manual",
       signal: AbortSignal.timeout(8_000),
@@ -162,7 +148,7 @@ export async function testRelayConnection(
       return { provider, label, connected: false, status: 401, message: "Relay Token tidak cocok dengan VPS." };
     }
     if (authResponse.status === 404) {
-      return { provider, label, connected: false, status: 404, message: "Provider/hostname relay tidak dikenal oleh VPS." };
+      return { provider, label, connected: false, status: 404, message: "Hostname relay tidak dikenal oleh VPS." };
     }
 
     return {
@@ -210,7 +196,6 @@ export async function testProviderRelayConnections() {
   return Promise.all([
     testRelayConnection("digiflazz", "DigiFlazz"),
     testRelayConnection("midtrans", "Midtrans BI-SNAP"),
-    testRelayConnection("melostore", "Melostore Nickname"),
   ]);
 }
 
