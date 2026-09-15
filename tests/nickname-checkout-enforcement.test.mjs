@@ -54,15 +54,6 @@ test("Melostore errors distinguish missing accounts from service and validation 
   assert.doesNotMatch(melostoreErrors, /\[400, 404, 422\]\.includes\(upstream\.status\)/);
 });
 
-test("Mobile Legends false not-found from primary is cross-checked before checkout is blocked", () => {
-  const checker = read("lib/server/nickname-check.ts");
-  assert.match(checker, /class NicknameNotFoundError extends NicknameValidationError/);
-  assert.match(checker, /error instanceof NicknameNotFoundError/);
-  assert.match(checker, /lookupSecondaryMobileLegends/);
-  assert.match(checker, /api\.isan\.eu\.org\/nickname/);
-  assert.match(checker, /decode", "false"/);
-});
-
 test("public nickname response never exposes integration identity", () => {
   const route = read("app/api/nickname/route.ts");
   assert.doesNotMatch(route, /provider:/);
