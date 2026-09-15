@@ -10,11 +10,16 @@ test("payment workspace loads and saves live dual-gateway channel configuration"
   assert.match(source, /fetch\("\/api\/panel\/payment-page"/);
   assert.match(source, /fetch\("\/api\/panel\/wallet"/);
   assert.match(source, /fetch\("\/api\/panel\/orders"/);
+  assert.match(source, /fetch\("\/api\/panel\/payment-routing"/);
   assert.match(source, /gateway_status/);
   assert.match(source, /gatewayConfig/);
   assert.match(source, /Partner Service ID VA/);
-  assert.match(source, /Midtrans BI-SNAP/);
-  assert.match(source, /DOKU Direct API/);
+  assert.match(source, /Checkout Biasa/);
+  assert.match(source, /Direct API/);
+  assert.match(source, /Snap/);
+  assert.match(source, /BI-SNAP/);
+  assert.match(source, /Sandbox/);
+  assert.match(source, /Production/);
 });
 
 test("payment and channel images are uploaded before their URLs are persisted", () => {
