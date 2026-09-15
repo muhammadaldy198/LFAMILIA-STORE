@@ -1,0 +1,42 @@
+name: Temporary Melostore Exact Probe
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  checks: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Wait for Cloudflare deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node <<'NODE'
+          const repo = process.env.GITHUB_REPOSITORY;
+          const sha = process.env.GITHUB_SHA;
+          const token = process.env.GH_TOKEN;
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          for (let attempt = 1; attempt <= 36; attempt++) {
+            const response = await fetch(`https://api.github.com/repos/${repo}/commits/${sha}/check-runs`, {
+              headers: { accept: "application/vnd.github+json", authorization: `Bearer ${token}`, "x-github-api-version": "2022-11-28" },
+            });
+            const payload = await response.json();
+            const cloudflare = (payload.check_runs || []).find((item) => typeof item.name === "string" && item.name.startsWith("Workers Builds:"));
+            if (cloudflare?.status === "completed") {
+              if (cloudflare.conclusion !== "success") throw new Error(`Cloudflare build: ${cloudflare.conclusion}`);
+              process.exit(0);
+            }
+            await sleep(10000);
+          }
+          throw new Error("Cloudflare deployment timeout");
+          NODE
+      - name: Probe exact Melostore payload variants
+        run: |
+          curl -sS -w '\nHTTP_STATUS:%{http_code}\n' \
+            'https://lfamiliastore.my.id/api/nickname-exact-probe-7c91e2'
