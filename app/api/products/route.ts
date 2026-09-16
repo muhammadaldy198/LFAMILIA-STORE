@@ -31,6 +31,7 @@ export async function GET() {
         inputLabel: item.inputLabel,
         inputPlaceholder: item.inputPlaceholder,
         inputFields: item.inputFields,
+        nicknameRequired: Boolean(item.nicknameRequired),
         needsServer: item.needsServer,
         popular: item.popular,
         instant: item.instant,
