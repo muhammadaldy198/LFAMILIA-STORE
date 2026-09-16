@@ -38,10 +38,12 @@ test("Midtrans payment secrets are dashboard-managed and never returned to the f
 
 test("dashboard-managed credentials fail closed instead of using stale Cloudflare provider secrets", () => {
   assert.match(config, /withoutDashboardManagedRuntime/);
-  for (const prefix of ["DOKU_", "MIDTRANS_", "DIGIFLAZZ_", "KOKINPAY_", "RESEND_", "PROVIDER_RELAY_"]) {
+  for (const prefix of ["DOKU_", "MIDTRANS_", "DIGIFLAZZ_", "KOKINPAY_", "MELOSTORE_", "RESEND_", "PROVIDER_RELAY_"]) {
     assert.match(config, new RegExp(`"${prefix}"`));
   }
   assert.match(config, /return systemOnly as T/);
+  assert.match(config, /put\(target, "KOKINPAY_API_KEY", config\.apiKey\)/);
+  assert.doesNotMatch(config, /applyMelostoreConfig/);
   assert.doesNotMatch(config, /IPAYMU_|VIPPAYMENT_/);
 });
 

@@ -101,6 +101,7 @@ function withoutDashboardManagedRuntime(source: RuntimeLike) {
     "MIDTRANS_",
     "DIGIFLAZZ_",
     "KOKINPAY_",
+    "MELOSTORE_",
     "RESEND_",
     "PROVIDER_RELAY_",
   ];
@@ -375,11 +376,8 @@ function applyDigiflazzConfig(target: Record<string, unknown>, environment: "dev
   }
 }
 
-function applyMelostoreConfig(target: Record<string, unknown>, config: Record<string, string>) {
-  put(target, "MELOSTORE_API_KEY", config.apiKey);
-  put(target, "MELOSTORE_SECRET_KEY", config.secretKey);
-  put(target, "MELOSTORE_API_URL", config.apiUrl);
-  put(target, "NICKNAME_API_KEY", config.nicknameApiKey);
+function applyKokinpayConfig(target: Record<string, unknown>, config: Record<string, string>) {
+  put(target, "KOKINPAY_API_KEY", config.apiKey);
 }
 function applyResendConfig(target: Record<string, unknown>, config: Record<string, string>) {
   put(target, "RESEND_API_KEY", config.apiKey);
@@ -432,7 +430,7 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
       if (profile.provider === "digiflazz" && profile.mode === "direct" && (profile.environment === "development" || profile.environment === "production")) {
         applyDigiflazzConfig(target, profile.environment, config, profile.environment === digiflazzEnvironment);
       }
-      if (profile.provider === "kokinpay" && profile.mode === "service" && profile.environment === "global") applyMelostoreConfig(target, config);
+      if (profile.provider === "kokinpay" && profile.mode === "service" && profile.environment === "global") applyKokinpayConfig(target, config);
       if (profile.provider === "resend" && profile.mode === "service" && profile.environment === "global") applyResendConfig(target, config);
       if (profile.provider === "relay" && profile.mode === "service" && profile.environment === "global") applyRelayConfig(target, config);
       if (profile.provider === "security" && profile.mode === "service" && profile.environment === "global") applySecurityConfig(target, config);
