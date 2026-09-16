@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import { classifyKokinpayFailure } from "@/lib/server/kokinpay-errors";
 import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
@@ -60,12 +61,13 @@ function validateUserId(userId: string) {
 }
 
 function throwKokinpayError(status: number): never {
-  if (status === 401 || status === 403) {
+  const kind = classifyKokinpayFailure(status);
+  if (kind === "authentication") {
     throw new NicknameServiceError(
       "Layanan verifikasi akun belum terautentikasi dengan benar.",
     );
   }
-  if (status === 400 || status === 404) {
+  if (kind === "validation") {
     throw new NicknameValidationError(
       "ID, Server, atau kode game tidak valid.",
     );
