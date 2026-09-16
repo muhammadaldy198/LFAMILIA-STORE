@@ -6,10 +6,10 @@ import { getDigiflazzBalance, getDigiflazzReadiness } from "@/lib/server/provide
 export const dynamic = "force-dynamic";
 
 async function readDashboard(role: AdminRole) {
-  const [monitor, cache] = await Promise.all([
-    readDigiflazzSellerMonitor(),
-    getDigiflazzPriceListCacheMeta(),
-  ]);
+  // The monitor joins the cached pricelist to expose category, brand and the
+  // current provider price. Ensure the cache table exists before that join.
+  const cache = await getDigiflazzPriceListCacheMeta();
+  const monitor = await readDigiflazzSellerMonitor();
   const readiness = getDigiflazzReadiness();
   let balance: number | null = null;
   let reason = readiness.reason;
