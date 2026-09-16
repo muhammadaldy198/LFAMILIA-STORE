@@ -2,11 +2,12 @@
 
 Arsitektur aktif:
 
-- **Payment gateway:** DOKU Direct API / SNAP
+- **Payment gateway:** DOKU Checkout / Direct API dan Midtrans Snap / BI-SNAP sesuai routing channel yang diaktifkan dari Admin Panel
 - **Provider produk otomatis:** DigiFlazz
+- **Validasi akun/nickname:** KokinPay, server-side
 - **Produk lain:** manual / stok internal LFAMILIA
 
-Credential operasional disimpan terenkripsi dari Admin Panel. DOKU Client ID, Secret Key, RSA private key, dan DigiFlazz API key tidak ditulis di repository.
+Credential operasional disimpan terenkripsi dari Admin Panel. Credential payment, DigiFlazz API key, dan KokinPay API key tidak ditulis di repository.
 
 ## Cloudflare root secret
 
@@ -68,13 +69,30 @@ DIGIFLAZZ_WEBHOOK_SECRET
 
 Semua credential diisi melalui Integration Manager.
 
-## VPS Relay
+## KokinPay Validasi Akun
 
-Relay hanya untuk DigiFlazz:
+KokinPay hanya dipakai server untuk validasi akun/nickname. API key disimpan dari **Super Admin → Integrasi → KokinPay** dan dihidrasi sebagai runtime internal:
 
 ```text
-DigiFlazz Relay URL
-Relay Token
+KOKINPAY_API_KEY
 ```
 
-DOKU tidak menggunakan VPS relay. Lihat `relay/README.md`.
+Jangan membuat `KOKINPAY_API_KEY` sebagai Cloudflare Variable/Secret terpisah. Sumber credential aktif adalah profil terenkripsi di Admin/D1.
+
+Endpoint backend aktif:
+
+```text
+https://api.kokinpay.com/v1/check-nickname
+https://api.kokinpay.com/v1/check-region
+https://api.kokinpay.com/v1/check-pln
+```
+
+Menu **Validasi Akun** dipakai untuk tes nickname game, nickname + region Mobile Legends, PLN, dan melihat daftar game code. Produk mengaktifkan validasi melalui **Produk → Input Customer → Kode Game Nickname**. Kode kosong berarti produk tidak menjalankan validasi nickname.
+
+Mobile Legends membutuhkan User ID + Server/Zone dan wajib lolos nickname serta region. Checkout melakukan verifikasi ulang di server sebelum order/pembayaran dibuat; hasil dari browser tidak dipercaya sebagai sumber kebenaran.
+
+## VPS Relay
+
+Relay hanya digunakan untuk integrasi yang memang memerlukan egress/IP statis sesuai konfigurasi Admin. Credential merchant tetap disimpan terenkripsi di D1 dan tidak ditaruh di VPS.
+
+Lihat `relay/README.md` untuk konfigurasi relay yang sedang dipakai.
