@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { getD1 } from "@/db";
+import { kokinpayGameRequiresServer } from "@/lib/kokinpay-game-codes";
 import { requireAdminSession } from "@/lib/server/admin";
 import { deleteProduct, readProducts, saveProduct } from "@/lib/server/products";
 import { isAllowedMediaUrl } from "@/lib/media-url";
@@ -69,7 +71,9 @@ const productSchema = z.object({
   notices: z.array(noticeSchema).max(10).default([]),
 });
 
-function validateProduct(input: z.infer<typeof productSchema>) {
+type ProductInput = z.infer<typeof productSchema>;
+
+function validateProduct(input: ProductInput) {
   if (input.isActive && input.packages.length === 0) {
     throw new Error("Tambahkan minimal satu nominal dari katalog sebelum mengaktifkan produk.");
   }
@@ -97,6 +101,21 @@ function validateProduct(input: z.infer<typeof productSchema>) {
     if (input.packageTabsEnabled && item.group && !tabs.includes(item.group.trim())) {
       throw new Error(`Tab nominal "${item.group}" belum dibuat pada produk ini.`);
     }
+  }
+}
+
+async function validateNicknameCheckoutContract(dbId: number, input: ProductInput) {
+  await ensureKokinpayNicknameGameCodeBackfill();
+  const row = await getD1().prepare(
+    "SELECT nickname_game_code FROM products WHERE id = ? LIMIT 1",
+  ).bind(dbId).first<{ nickname_game_code: string | null }>();
+  const gameCode = row?.nickname_game_code?.trim();
+  if (!gameCode || !kokinpayGameRequiresServer(gameCode)) return;
+
+  const hasServerField = input.inputFields.some((field) => field.id.toLowerCase() === "server");
+  const hasServerTarget = /\{\{server\}\}/i.test(input.targetTemplate);
+  if (!input.needsServer || !hasServerField || !hasServerTarget) {
+    throw new Error("Produk dengan kode game nickname ini wajib memakai input ID + Server dan target {{server}}.");
   }
 }
 
@@ -133,6 +152,7 @@ export async function PATCH(request: Request) {
   try {
     const input = productSchema.extend({ dbId: z.number().int().positive() }).parse(await request.json());
     validateProduct(input);
+    await validateNicknameCheckoutContract(input.dbId, input);
     await saveProduct(input, input.dbId);
     return Response.json({ ok: true });
   } catch (error) {
