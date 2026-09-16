@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
 import { requireAdminSession } from "@/lib/server/admin";
-import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
+import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   if (access instanceof Response) return access;
   try {
     const slug = slugSchema.parse(new URL(request.url).searchParams.get("slug"));
-    await ensureLegacyDatabaseColumns();
+    await ensureKokinpayNicknameGameCodeBackfill();
     const row = await getD1().prepare(`SELECT slug, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
       FROM products WHERE slug = ? LIMIT 1`).bind(slug).first<InputRow>();
     if (!row) return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
@@ -75,7 +75,7 @@ export async function PATCH(request: Request) {
       ...(needsServer ? [{ id: "server", label: labelServer, placeholder: `Masukkan ${labelServer}`, required: true }] : []),
     ];
     const targetTemplate = needsServer ? "{{destination}}{{server}}" : "{{destination}}";
-    await ensureLegacyDatabaseColumns();
+    await ensureKokinpayNicknameGameCodeBackfill();
     const result = await getD1().prepare(`UPDATE products
       SET input_label = ?, input_placeholder = ?, input_fields_json = ?, needs_server = ?, target_template = ?, nickname_game_code = ?, updated_at = CURRENT_TIMESTAMP
       WHERE slug = ?`).bind(
