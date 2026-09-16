@@ -33,8 +33,10 @@ UPDATE products
 SET needs_server = 1,
     target_template = CASE
       WHEN instr(lower(target_template), '{{server}}') > 0 THEN target_template
-      WHEN instr(target_template, '{{destination}}') > 0
-        THEN replace(target_template, '{{destination}}', '{{destination}}{{server}}')
+      WHEN instr(lower(target_template), '{{destination}}') > 0
+        THEN substr(target_template, 1, instr(lower(target_template), '{{destination}}') - 1)
+          || '{{destination}}{{server}}'
+          || substr(target_template, instr(lower(target_template), '{{destination}}') + length('{{destination}}'))
       WHEN target_template IS NULL OR trim(target_template) = ''
         THEN '{{destination}}{{server}}'
       ELSE target_template || '{{server}}'
@@ -64,8 +66,8 @@ WHERE slug = 'genshin-impact'
   AND nickname_game_code = 'genshin-impact';
 
 -- Track the original game-code backfill and later Genshin compatibility repair
--- independently. The v4 marker makes databases that recorded older repair
--- variants run the preservation-safe target normalization exactly once.
+-- independently. The v5 marker makes databases that recorded older repair
+-- variants rerun the case-insensitive preservation-safe normalization once.
 CREATE TABLE IF NOT EXISTS one_time_operations (
   operation_key TEXT PRIMARY KEY NOT NULL,
   completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -74,5 +76,5 @@ INSERT INTO one_time_operations (operation_key, completed_at)
 VALUES ('kokinpay_nickname_game_code_backfill_0032', CURRENT_TIMESTAMP)
 ON CONFLICT(operation_key) DO UPDATE SET completed_at = excluded.completed_at;
 INSERT INTO one_time_operations (operation_key, completed_at)
-VALUES ('kokinpay_genshin_server_input_repair_0032_v4_preserve_target', CURRENT_TIMESTAMP)
+VALUES ('kokinpay_genshin_server_input_repair_0032_v5_case_insensitive_target', CURRENT_TIMESTAMP)
 ON CONFLICT(operation_key) DO UPDATE SET completed_at = excluded.completed_at;
