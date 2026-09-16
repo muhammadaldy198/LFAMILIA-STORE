@@ -48,6 +48,10 @@ const syncSchema = z.object({
 });
 
 function validateChannel(input: z.infer<typeof channelSchema>) {
+  const feeBps = input.gatewayConfig.customerFeeBps;
+  if (feeBps !== undefined && (!/^(?:0|[1-9]\d{0,4})$/.test(feeBps) || Number(feeBps) > 10_000)) {
+    throw new Error("Biaya customer harus berupa basis poin antara 0 sampai 10000.");
+  }
   if (!input.isActive) return;
   if (!isGatewayChannelSupported(input.gateway, input.method, input.channel, input.gatewayConfig)) {
     throw new Error("Isi kode gateway resmi untuk channel custom, atau pilih channel bawaan yang didukung provider.");

@@ -4,6 +4,7 @@ let repairPromise: Promise<void> | null = null;
 
 const FINAL_AUDIT_MIGRATION = "0029_final_source_audit_remediation.sql";
 const KOKINPAY_NICKNAME_MIGRATION = "0032_kokinpay_nickname_game_codes.sql";
+const DIGIFLAZZ_MAX_PRICE_MIGRATION = "0033_digiflazz_max_price.sql";
 const FINAL_SCHEMA_OBJECTS = [
   "promotion_reservations",
   "promotion_reservations_expiry_idx",
@@ -59,6 +60,7 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["orders", "customer_inputs_json", "customer_inputs_json TEXT DEFAULT '[]' NOT NULL"],
   ["orders", "delivery_mode", "delivery_mode TEXT"],
   ["orders", "supplier_cost_snapshot", "supplier_cost_snapshot INTEGER"],
+  ["orders", "provider_max_price_snapshot", "provider_max_price_snapshot INTEGER"],
   ["orders", "doku_environment", "doku_environment TEXT"],
   ["customer_users", "tier_mode", "tier_mode TEXT DEFAULT 'automatic' NOT NULL"],
   ["customer_users", "tier_override", "tier_override TEXT"],
@@ -70,6 +72,7 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["product_packages", "provider_code", "provider_code TEXT"],
   ["product_packages", "provider_sku", "provider_sku TEXT"],
   ["product_packages", "supplier_price", "supplier_price INTEGER"],
+  ["product_packages", "provider_max_price", "provider_max_price INTEGER"],
   [
     "product_packages",
     "pricing_mode",
@@ -136,7 +139,7 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
     // every fresh Worker isolate.
     const [ledger, products, packages, settings, orders, topups, vouchers, flash, objects] =
       await db.batch([
-        db.prepare("SELECT name FROM d1_migrations WHERE name = ? LIMIT 1").bind(FINAL_AUDIT_MIGRATION),
+        db.prepare("SELECT name FROM d1_migrations WHERE name IN (?, ?)").bind(FINAL_AUDIT_MIGRATION, DIGIFLAZZ_MAX_PRICE_MIGRATION),
         db.prepare("PRAGMA table_info(products)"),
         db.prepare("PRAGMA table_info(product_packages)"),
         db.prepare("PRAGMA table_info(store_settings)"),
@@ -157,6 +160,7 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
       ]);
 
     if (!resultRows(ledger).some((row) => row.name === FINAL_AUDIT_MIGRATION)) return false;
+    if (!resultRows(ledger).some((row) => row.name === DIGIFLAZZ_MAX_PRICE_MIGRATION)) return false;
 
     const names = (result: { results?: unknown[] }) =>
       new Set(resultRows(result).map((row) => String(row.name ?? "")));
@@ -169,9 +173,9 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
     const flashColumns = names(flash);
 
     if (!productColumns.has("package_tabs_enabled") || !productColumns.has("package_tabs_json") || !productColumns.has("nickname_game_code")) return false;
-    if (!packageColumns.has("package_group")) return false;
+    if (!packageColumns.has("package_group") || !packageColumns.has("provider_max_price")) return false;
     if (!settingColumns.has("support_widget_enabled")) return false;
-    if (!["delivery_mode", "supplier_cost_snapshot", "doku_environment"].every((column) => orderColumns.has(column))) return false;
+    if (!["delivery_mode", "supplier_cost_snapshot", "provider_max_price_snapshot", "doku_environment"].every((column) => orderColumns.has(column))) return false;
     if (!["doku_environment", "external_checkout_key"].every((column) => topupColumns.has(column))) return false;
     if (!voucherColumns.has("reserved_count") || !flashColumns.has("reserved_count")) return false;
 
@@ -319,6 +323,23 @@ export async function ensureLegacyDatabaseColumns() {
           ELSE 'direct'
         END
         WHERE delivery_mode IS NULL`);
+      await runSchemaStatement(`UPDATE product_packages
+        SET provider_max_price = supplier_price
+        WHERE provider_code = 'digiflazz'
+          AND provider_max_price IS NULL
+          AND supplier_price IS NOT NULL`);
+      await runSchemaStatement(`UPDATE orders
+        SET provider_max_price_snapshot = (
+          SELECT pp.provider_max_price
+          FROM product_packages pp
+          JOIN products p ON p.id = pp.product_id
+          WHERE p.slug = orders.product_slug
+            AND pp.sku = orders.package_sku
+            AND pp.provider_max_price IS NOT NULL
+          ORDER BY pp.id DESC
+          LIMIT 1
+        )
+        WHERE provider_max_price_snapshot IS NULL`);
       await runSchemaStatement(`UPDATE orders
         SET supplier_cost_snapshot = (
           SELECT pp.supplier_price
@@ -338,7 +359,8 @@ export async function ensureLegacyDatabaseColumns() {
       try {
         const requiredColumns: Array<[string, string[]]> = [
           ["products", ["nickname_game_code"]],
-          ["orders", ["delivery_mode", "supplier_cost_snapshot", "doku_environment"]],
+          ["product_packages", ["provider_max_price"]],
+          ["orders", ["delivery_mode", "supplier_cost_snapshot", "provider_max_price_snapshot", "doku_environment"]],
           ["wallet_topups", ["doku_environment", "external_checkout_key"]],
           ["discount_vouchers", ["reserved_count"]],
           ["flash_sales", ["reserved_count"]],
@@ -386,6 +408,9 @@ export async function ensureLegacyDatabaseColumns() {
             await db.prepare(
               "INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)",
             ).bind(KOKINPAY_NICKNAME_MIGRATION).run();
+            await db.prepare(
+              "INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)",
+            ).bind(DIGIFLAZZ_MAX_PRICE_MIGRATION).run();
           }
         }
       } catch (error) {

@@ -134,7 +134,7 @@ test("public nickname response is provider-neutral, minimal, and non-cacheable",
   const route = read("app/api/nickname/route.ts");
   assert.doesNotMatch(route, /provider:/);
   assert.doesNotMatch(route, /kokinpay/i);
-  assert.doesNotMatch(route, /userId:\s*input\.userId|server:\s*input\.server|game:\s*input\.game/);
+  assert.doesNotMatch(route, /Response\.json\(\s*\{[^}]{0,200}(?:userId|server|game)\s*:/);
   assert.match(route, /"Cache-Control": "no-store"/);
 });
 

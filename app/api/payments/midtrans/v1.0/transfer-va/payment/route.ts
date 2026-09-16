@@ -228,7 +228,7 @@ export async function POST(request: Request) {
     const callbackAmount = paymentAmount(body);
 
     if (walletTopup) {
-      if (status === "paid" && callbackAmount !== walletTopup.amount) return invalidAmountResponse();
+      if (status === "paid" && callbackAmount !== (walletTopup.payment_total || walletTopup.amount)) return invalidAmountResponse();
       const result = status === "ignore"
         ? { found: true, credited: false }
         : await applyExternalWalletTopup({

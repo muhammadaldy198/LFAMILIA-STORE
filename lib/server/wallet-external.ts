@@ -6,6 +6,8 @@ export type ExternalWalletTopup = {
   id: string;
   customer_id: string;
   amount: number;
+  payment_fee: number;
+  payment_total: number;
   payment_method: string;
   reference_id: string;
   status: string;
@@ -21,7 +23,7 @@ export type ExternalWalletTopup = {
   gateway_expired_at: string | null;
 };
 
-const columns = `id, customer_id, amount, payment_method, reference_id, status,
+const columns = `id, customer_id, amount, payment_fee, payment_total, payment_method, reference_id, status,
   payment_gateway, payment_gateway_mode, gateway_environment, gateway_request_id,
   gateway_reference_no, gateway_payment_no, gateway_qr_content, gateway_payment_name,
   gateway_payment_url, gateway_expired_at`;
@@ -44,6 +46,8 @@ export async function insertExternalWalletTopup(input: {
   id: string;
   customerId: string;
   amount: number;
+  paymentFee: number;
+  paymentTotal: number;
   customerName: string;
   paymentMethodKey: string;
   referenceId: string;
@@ -53,12 +57,12 @@ export async function insertExternalWalletTopup(input: {
   environment: "sandbox" | "production" | null;
 }) {
   return getD1().prepare(`INSERT INTO wallet_topups (
-      id, customer_id, amount, sender_name, payment_method, proof_url,
+      id, customer_id, amount, payment_fee, payment_total, sender_name, payment_method, proof_url,
       source, reference_id, external_checkout_key,
       payment_gateway, payment_gateway_mode, gateway_environment,
       doku_environment
     )
-    SELECT ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?
+    SELECT ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?
     WHERE NOT EXISTS (
       SELECT 1 FROM wallet_topups
       WHERE customer_id = ? AND amount = ? AND payment_method = ?
@@ -68,6 +72,8 @@ export async function insertExternalWalletTopup(input: {
       input.id,
       input.customerId,
       input.amount,
+      input.paymentFee,
+      input.paymentTotal,
       input.customerName,
       input.paymentMethodKey,
       input.gateway,
@@ -106,7 +112,7 @@ export async function updateExternalWalletTopup(input: {
       doku_environment = ?, doku_request_id = ?, doku_token_id = NULL,
       doku_reference_no = ?, doku_payment_no = ?, doku_qr_content = ?, doku_payment_name = ?,
       doku_payment_url = ?, doku_expired_at = ?, doku_status_checked_at = NULL,
-      payment_fee = 0, payment_total = ?, updated_at = CURRENT_TIMESTAMP
+      payment_total = ?, updated_at = CURRENT_TIMESTAMP
       WHERE reference_id = ? AND source = 'doku'`)
       .bind(
         input.mode, input.environment, input.requestId, input.referenceNo, input.paymentNo,
@@ -121,7 +127,7 @@ export async function updateExternalWalletTopup(input: {
     payment_gateway = 'midtrans', payment_gateway_mode = ?, gateway_environment = ?,
     gateway_request_id = ?, gateway_reference_no = ?, gateway_payment_no = ?,
     gateway_qr_content = ?, gateway_payment_name = ?, gateway_payment_url = ?, gateway_expired_at = ?,
-    payment_fee = 0, payment_total = ?, updated_at = CURRENT_TIMESTAMP
+    payment_total = ?, updated_at = CURRENT_TIMESTAMP
     WHERE reference_id = ? AND source = 'midtrans'`)
     .bind(
       input.mode, input.environment, input.requestId, input.referenceNo, input.paymentNo,
@@ -154,7 +160,7 @@ export async function applyExternalWalletTopup(input: {
   if (topup.gateway_request_id && input.originalRequestId && topup.gateway_request_id !== input.originalRequestId) {
     return { found: true, credited: false, ignored: "request_mismatch" };
   }
-  if (input.status === "paid" && (!Number.isFinite(input.callbackAmount) || input.callbackAmount <= 0 || input.callbackAmount !== topup.amount)) {
+  if (input.status === "paid" && (!Number.isFinite(input.callbackAmount) || input.callbackAmount <= 0 || input.callbackAmount !== (topup.payment_total || topup.amount))) {
     return { found: true, credited: false, ignored: "amount_mismatch" };
   }
 

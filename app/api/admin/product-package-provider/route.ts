@@ -9,6 +9,7 @@ const schema = z.object({
   pricingMode: z.enum(["manual", "auto"]).default("auto"),
   marginType: z.enum(["fixed", "percent"]).default("fixed"),
   marginValue: z.number().int().min(0).max(1_000_000).default(0),
+  providerMaxPrice: z.number().int().min(1).max(100_000_000).nullable().optional(),
 });
 
 export async function PATCH(request: Request) {
@@ -17,8 +18,8 @@ export async function PATCH(request: Request) {
 
   try {
     const input = schema.parse(await request.json());
-    if (input.providerCode === "digiflazz" && !input.providerSku) {
-      throw new Error("SKU DigiFlazz wajib diisi.");
+    if (input.providerCode === "digiflazz" && (!input.providerSku || !input.providerMaxPrice)) {
+      throw new Error("SKU dan Max Price DigiFlazz wajib diisi.");
     }
     if (
       input.providerCode === "voucher-stock" &&
@@ -27,7 +28,7 @@ export async function PATCH(request: Request) {
       throw new Error("Kunci stok internal tidak valid.");
     }
 
-    await updateProductPackageProvider(input);
+    await updateProductPackageProvider({ ...input, providerMaxPrice: input.providerMaxPrice ?? null });
     return Response.json({ ok: true });
   } catch (error) {
     const message =

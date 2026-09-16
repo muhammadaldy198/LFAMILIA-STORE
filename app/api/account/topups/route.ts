@@ -2,6 +2,7 @@ import { z } from "zod";
 import { publicPaymentLabel } from "@/lib/public-payment";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
 import {
+  calculateCustomerPaymentFee,
   getPaymentChannel,
   isGatewayChannelSupported,
   isPaymentGatewayActive,
@@ -57,8 +58,8 @@ function existingResponse(topup: ExternalWalletTopup) {
     qrContent: topup.gateway_qr_content,
     paymentName: topup.gateway_payment_name || publicPaymentLabel(method.paymentMethod, method.paymentChannel),
     paymentUrl: topup.gateway_payment_url,
-    total: topup.amount,
-    fee: 0,
+    total: topup.payment_total || topup.amount,
+    fee: topup.payment_fee || 0,
     expiredAt: topup.gateway_expired_at,
     status: topup.status,
     reused: true,
@@ -119,6 +120,8 @@ export async function POST(request: Request) {
     if (!readiness.ready) throw new Error("Metode pembayaran otomatis belum siap.");
 
     const paymentMethodKey = `${input.paymentMethod}:${paymentChannel}`;
+    const paymentFee = calculateCustomerPaymentFee(input.amount, managedChannel.gatewayConfig);
+    const paymentTotal = input.amount + paymentFee;
     requestedAmount = input.amount;
     requestedPaymentMethodKey = paymentMethodKey;
     const headerKey = request.headers.get("idempotency-key")?.trim() || "";
@@ -142,6 +145,8 @@ export async function POST(request: Request) {
       id: topupId,
       customerId: customer.id,
       amount: input.amount,
+      paymentFee,
+      paymentTotal,
       customerName: customer.name,
       paymentMethodKey,
       referenceId,
@@ -166,7 +171,7 @@ export async function POST(request: Request) {
     const payment = await createConfiguredPayment({
       gateway: managedChannel.gateway,
       referenceId,
-      amount: input.amount,
+      amount: paymentTotal,
       paymentMethod: input.paymentMethod,
       paymentChannel,
       gatewayConfig: managedChannel.gatewayConfig,
@@ -191,7 +196,7 @@ export async function POST(request: Request) {
       paymentName: payment.paymentName,
       paymentUrl: payment.paymentUrl,
       expiredAt: payment.expiredAt,
-      total: input.amount,
+      total: paymentTotal,
     });
 
     return Response.json(
@@ -204,8 +209,8 @@ export async function POST(request: Request) {
         qrContent: payment.qrContent,
         paymentName: publicPaymentLabel(input.paymentMethod, paymentChannel),
         paymentUrl: payment.paymentUrl,
-        total: input.amount,
-        fee: 0,
+        total: paymentTotal,
+        fee: paymentFee,
         expiredAt: payment.expiredAt,
       },
       { status: 201 },
