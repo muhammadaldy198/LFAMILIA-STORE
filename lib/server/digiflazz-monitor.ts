@@ -23,9 +23,16 @@ export type DigiflazzSellerMonitorItem = {
   productName: string;
   packageLabel: string;
   providerSku: string;
+  category: string;
+  brand: string;
   sellerName: string | null;
   currentPrice: number | null;
   baselinePrice: number | null;
+  maxPrice: number | null;
+  marginType: "fixed" | "percent";
+  marginValue: number;
+  sellingPrice: number;
+  blockedByMaxPrice: boolean;
   buyerProductStatus: boolean;
   sellerProductStatus: boolean;
   unlimitedStock: boolean;
@@ -93,43 +100,24 @@ function isInsideCutOff(start: string, end: string) {
 }
 
 export function evaluateDigiflazzSellerSnapshot(input: DigiflazzSellerSnapshotInput) {
-  const sameSeller =
-    Boolean(input.sellerName) &&
-    input.sellerName === input.previousSellerName &&
-    Number(input.previousBaselinePrice) > 0;
-  const baselinePrice = sameSeller
-    ? Number(input.previousBaselinePrice)
-    : input.currentPrice;
-
+  const sameSeller = Boolean(input.sellerName) && input.sellerName === input.previousSellerName && Number(input.previousBaselinePrice) > 0;
+  const baselinePrice = sameSeller ? Number(input.previousBaselinePrice) : input.currentPrice;
   const critical: string[] = [];
   const warnings: string[] = [];
 
   if (!input.buyerProductStatus) critical.push("Produk Buyer DigiFlazz sedang nonaktif.");
   if (!input.sellerProductStatus) critical.push("Seller DigiFlazz sedang nonaktif.");
   if (!input.unlimitedStock && input.stock <= 0) critical.push("Stok seller habis.");
-
-  if (!input.unlimitedStock && input.stock > 0 && input.stock <= 5) {
-    warnings.push(`Stok seller menipis: ${input.stock} tersisa.`);
-  }
-
-  if (isInsideCutOff(input.startCutOff, input.endCutOff)) {
-    warnings.push(`Seller sedang cut-off ${input.startCutOff}–${input.endCutOff} WIB.`);
-  }
+  if (!input.unlimitedStock && input.stock > 0 && input.stock <= 5) warnings.push(`Stok seller menipis: ${input.stock} tersisa.`);
+  if (isInsideCutOff(input.startCutOff, input.endCutOff)) warnings.push(`Seller sedang cut-off ${input.startCutOff}–${input.endCutOff} WIB.`);
 
   if (baselinePrice > 0 && input.currentPrice > baselinePrice) {
     const increasePercent = ((input.currentPrice - baselinePrice) / baselinePrice) * 100;
-    if (increasePercent >= 3) {
-      warnings.push(
-        `Harga seller naik ${increasePercent.toFixed(1)}% dari baseline. Cek seller lain di DigiFlazz.`,
-      );
-    }
+    if (increasePercent >= 3) warnings.push(`Harga seller naik ${increasePercent.toFixed(1)}% dari baseline. Cek seller lain di DigiFlazz.`);
   }
 
-  const health: DigiflazzMonitorHealth =
-    critical.length > 0 ? "critical" : warnings.length > 0 ? "warning" : "healthy";
-  const alertReason = [...critical, ...warnings].join(" ") || null;
-
-  return { baselinePrice, health, alertReason };
+  const health: DigiflazzMonitorHealth = critical.length > 0 ? "critical" : warnings.length > 0 ? "warning" : "healthy";
+  return { baselinePrice, health, alertReason: [...critical, ...warnings].join(" ") || null };
 }
 
 export function buildDigiflazzSellerMonitorStatement(input: DigiflazzSellerSnapshotInput) {
@@ -182,9 +170,15 @@ export async function readDigiflazzSellerMonitor() {
       products.name AS product_name,
       p.label AS package_label,
       p.provider_sku,
+      COALESCE(c.category, '') AS category,
+      COALESCE(c.brand, '') AS brand,
       m.seller_name,
-      m.current_price,
+      COALESCE(m.current_price, c.price) AS current_price,
       m.baseline_price,
+      p.provider_max_price,
+      COALESCE(p.margin_type, 'fixed') AS margin_type,
+      COALESCE(p.margin_value, 0) AS margin_value,
+      p.price AS selling_price,
       m.buyer_product_status,
       m.seller_product_status,
       m.unlimited_stock,
@@ -192,21 +186,18 @@ export async function readDigiflazzSellerMonitor() {
       m.multi,
       m.start_cut_off,
       m.end_cut_off,
-      m.description,
+      COALESCE(m.description, c.description) AS description,
       COALESCE(m.health, 'unknown') AS health,
       m.alert_reason,
       m.last_checked_at
     FROM product_packages p
     JOIN products ON products.id = p.product_id
     LEFT JOIN digiflazz_seller_monitor m ON m.package_id = p.id
+    LEFT JOIN digiflazz_pricelist_cache c ON c.buyer_sku_code = p.provider_sku
     WHERE p.provider_code = 'digiflazz' AND p.provider_sku IS NOT NULL
     ORDER BY
-      CASE COALESCE(m.health, 'unknown')
-        WHEN 'critical' THEN 0
-        WHEN 'warning' THEN 1
-        WHEN 'unknown' THEN 2
-        ELSE 3
-      END,
+      COALESCE(c.category, '') ASC,
+      COALESCE(c.brand, '') ASC,
       products.name ASC,
       p.sort_order ASC
   `).all<{
@@ -214,9 +205,15 @@ export async function readDigiflazzSellerMonitor() {
     product_name: string;
     package_label: string;
     provider_sku: string;
+    category: string;
+    brand: string;
     seller_name: string | null;
     current_price: number | null;
     baseline_price: number | null;
+    provider_max_price: number | null;
+    margin_type: "fixed" | "percent";
+    margin_value: number;
+    selling_price: number;
     buyer_product_status: number | null;
     seller_product_status: number | null;
     unlimited_stock: number | null;
@@ -230,34 +227,49 @@ export async function readDigiflazzSellerMonitor() {
     last_checked_at: string | null;
   }>();
 
-  const items: DigiflazzSellerMonitorItem[] = rows.results.map((row) => ({
-    packageId: row.package_id,
-    productName: row.product_name,
-    packageLabel: row.package_label,
-    providerSku: row.provider_sku,
-    sellerName: row.seller_name,
-    currentPrice: row.current_price,
-    baselinePrice: row.baseline_price,
-    buyerProductStatus: row.buyer_product_status !== 0,
-    sellerProductStatus: row.seller_product_status !== 0,
-    unlimitedStock: row.unlimited_stock === 1,
-    stock: Number(row.stock ?? 0),
-    multi: row.multi === 1,
-    startCutOff: row.start_cut_off,
-    endCutOff: row.end_cut_off,
-    description: row.description,
-    health: row.health,
-    alertReason: row.alert_reason,
-    lastCheckedAt: row.last_checked_at,
-  }));
+  const items: DigiflazzSellerMonitorItem[] = rows.results.map((row) => {
+    const currentPrice = row.current_price === null ? null : Number(row.current_price);
+    const maxPrice = row.provider_max_price === null ? null : Number(row.provider_max_price);
+    const blockedByMaxPrice = Boolean(currentPrice !== null && maxPrice !== null && currentPrice > maxPrice);
+    const health: DigiflazzMonitorHealth = blockedByMaxPrice ? "critical" : row.health;
+    const maxPriceReason = blockedByMaxPrice ? `Harga Digiflazz ${currentPrice} melewati Max Price LFAMILIA ${maxPrice}.` : null;
+    return {
+      packageId: row.package_id,
+      productName: row.product_name,
+      packageLabel: row.package_label,
+      providerSku: row.provider_sku,
+      category: row.category || "Tanpa Kategori",
+      brand: row.brand || row.product_name,
+      sellerName: row.seller_name,
+      currentPrice,
+      baselinePrice: row.baseline_price,
+      maxPrice,
+      marginType: row.margin_type,
+      marginValue: Number(row.margin_value ?? 0),
+      sellingPrice: Number(row.selling_price),
+      blockedByMaxPrice,
+      buyerProductStatus: row.buyer_product_status !== 0,
+      sellerProductStatus: row.seller_product_status !== 0,
+      unlimitedStock: row.unlimited_stock === 1,
+      stock: Number(row.stock ?? 0),
+      multi: row.multi === 1,
+      startCutOff: row.start_cut_off,
+      endCutOff: row.end_cut_off,
+      description: row.description,
+      health,
+      alertReason: [maxPriceReason, row.alert_reason].filter(Boolean).join(" ") || null,
+      lastCheckedAt: row.last_checked_at,
+    };
+  });
 
-  const summary = {
-    total: items.length,
-    healthy: items.filter((item) => item.health === "healthy").length,
-    warning: items.filter((item) => item.health === "warning").length,
-    critical: items.filter((item) => item.health === "critical").length,
-    unknown: items.filter((item) => item.health === "unknown").length,
+  return {
+    items,
+    summary: {
+      total: items.length,
+      healthy: items.filter((item) => item.health === "healthy").length,
+      warning: items.filter((item) => item.health === "warning").length,
+      critical: items.filter((item) => item.health === "critical").length,
+      unknown: items.filter((item) => item.health === "unknown").length,
+    },
   };
-
-  return { items, summary };
 }
