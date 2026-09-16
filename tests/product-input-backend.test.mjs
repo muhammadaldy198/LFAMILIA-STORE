@@ -43,7 +43,7 @@ test("full product writes cannot corrupt a server-required nickname checkout con
   assert.match(productsRoute, /serverField\.required !== false/);
   assert.match(productsRoute, /hasServerTarget/);
   assert.match(productsRoute, /input\.targetTemplate/);
-  assert.match(productsRoute, /await validateNicknameCheckoutContract\(input\.dbId, input\)/);
+  assert.match(productsRoute, /await validateNicknameCheckoutContract\(input\.dbId!?, input\)/);
 });
 
 test("all admin product read paths apply nickname compatibility repair first", () => {
