@@ -1,7 +1,12 @@
 import { z } from "zod";
-import { getD1 } from "@/db";
 import { requireAdminSession } from "@/lib/server/admin";
 import { dokuApiOrigin, testDokuB2BConnection } from "@/lib/server/doku-connection-test";
+import {
+  acquireDigiflazzConfigurationGuard,
+  invalidateDigiflazzOperationalCache,
+  releaseDigiflazzConfigurationGuard,
+} from "@/lib/server/digiflazz-config-guard";
+import { clearDigiflazzBalanceCache } from "@/lib/server/providers/digiflazz";
 import {
   getIntegrationOverview,
   saveIntegrationProfile,
@@ -45,38 +50,19 @@ const schema = z.discriminatedUnion("action", [
   dokuTestInput,
 ]);
 
-async function assertNoActiveDigiflazzOrders(action: string) {
-  const row = await getD1().prepare(`
-    SELECT COUNT(*) AS count
-    FROM orders
-    WHERE provider_code = 'digiflazz'
-      AND (
-        payment_status = 'pending'
-        OR (
-          payment_status = 'paid'
-          AND fulfillment_status NOT IN ('success', 'failed', 'cancelled')
-        )
-      )
-  `).first<{ count: number }>();
-  const count = Number(row?.count ?? 0);
-  if (count > 0) {
-    throw new Error(`${action} tidak boleh dilakukan karena masih ada ${count} pesanan DigiFlazz yang belum terminal. Selesaikan/expire pesanan tersebut terlebih dahulu.`);
-  }
-}
-
-async function invalidateDigiflazzOperationalCache() {
-  const db = getD1();
-  for (const sql of [
-    "DELETE FROM digiflazz_pricelist_cache",
-    "DELETE FROM digiflazz_seller_monitor",
-    "UPDATE digiflazz_pricelist_sync_state SET lock_token = NULL, locked_until = NULL, last_success_at = NULL WHERE id = 1",
-  ]) {
-    try {
-      await db.prepare(sql).run();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!/no such table/i.test(message)) throw error;
-    }
+async function withDigiflazzConfigurationGuard(action: () => Promise<void>) {
+  const token = await acquireDigiflazzConfigurationGuard();
+  let successful = false;
+  try {
+    // Fail closed: remove data created with the old environment/credentials
+    // before mutating the active configuration. The shared sync lock prevents
+    // an old-environment pricelist request from repopulating the cache.
+    await invalidateDigiflazzOperationalCache(token);
+    await action();
+    clearDigiflazzBalanceCache();
+    successful = true;
+  } finally {
+    await releaseDigiflazzConfigurationGuard(token, successful);
   }
 }
 
@@ -126,10 +112,10 @@ export async function PUT(request: Request) {
         const activeProfileChanged = input.environment === activeEnvironment &&
           (Object.values(input.values).some((value) => value.trim()) || input.clearFields.length > 0);
         if (activeProfileChanged) {
-          await assertNoActiveDigiflazzOrders("Kredensial DigiFlazz aktif");
+          await withDigiflazzConfigurationGuard(() => saveIntegrationProfile(input).then(() => undefined));
+        } else {
+          await saveIntegrationProfile(input);
         }
-        await saveIntegrationProfile(input);
-        if (activeProfileChanged) await invalidateDigiflazzOperationalCache();
       } else {
         await saveIntegrationProfile(input);
       }
@@ -140,9 +126,11 @@ export async function PUT(request: Request) {
       const changingDigiflazzEnvironment = Boolean(
         input.selections.digiflazzEnvironment && before !== input.selections.digiflazzEnvironment,
       );
-      if (changingDigiflazzEnvironment) await assertNoActiveDigiflazzOrders("Environment DigiFlazz");
-      await saveIntegrationSelections(input.selections);
-      if (changingDigiflazzEnvironment) await invalidateDigiflazzOperationalCache();
+      if (changingDigiflazzEnvironment) {
+        await withDigiflazzConfigurationGuard(() => saveIntegrationSelections(input.selections));
+      } else {
+        await saveIntegrationSelections(input.selections);
+      }
     }
     return Response.json({ ok: true, overview: await getIntegrationOverview() });
   } catch (error) {
