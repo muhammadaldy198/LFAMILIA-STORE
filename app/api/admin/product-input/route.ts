@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
+import { kokinpayGameRequiresServer } from "@/lib/kokinpay-game-codes";
 import { requireAdminSession } from "@/lib/server/admin";
 import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
 
@@ -68,17 +69,32 @@ export async function PATCH(request: Request) {
   if (access instanceof Response) return access;
   try {
     const input = updateSchema.parse(await request.json());
+    await ensureKokinpayNicknameGameCodeBackfill();
+    const db = getD1();
+    const current = await db.prepare(`SELECT slug, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
+      FROM products WHERE slug = ? LIMIT 1`).bind(input.slug).first<InputRow>();
+    if (!current) return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
+
     const needsServer = input.checkoutType === "id-server";
+    const nicknameGameCodeProvided = input.nicknameGameCode !== undefined;
+    const nicknameGameCode = input.nicknameGameCode?.trim() || null;
+    const effectiveNicknameGameCode = nicknameGameCodeProvided
+      ? nicknameGameCode
+      : current.nickname_game_code?.trim() || null;
+
+    if (effectiveNicknameGameCode && kokinpayGameRequiresServer(effectiveNicknameGameCode) && !needsServer) {
+      return Response.json(
+        { error: "Kode game nickname ini membutuhkan Checkout Type ID + Server." },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
     const labelServer = input.labelServer?.trim() || "Server ID";
     const fields = [
       { id: "destination", label: input.labelId, placeholder: `Masukkan ${input.labelId}`, required: true },
       ...(needsServer ? [{ id: "server", label: labelServer, placeholder: `Masukkan ${labelServer}`, required: true }] : []),
     ];
     const targetTemplate = needsServer ? "{{destination}}{{server}}" : "{{destination}}";
-    const nicknameGameCodeProvided = input.nicknameGameCode !== undefined;
-    const nicknameGameCode = input.nicknameGameCode?.trim() || null;
-    await ensureKokinpayNicknameGameCodeBackfill();
-    const db = getD1();
     const result = await db.prepare(`UPDATE products
       SET input_label = ?, input_placeholder = ?, input_fields_json = ?, needs_server = ?, target_template = ?,
           nickname_game_code = CASE WHEN ? = 1 THEN ? ELSE nickname_game_code END,
