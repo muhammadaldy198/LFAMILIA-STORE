@@ -487,6 +487,12 @@ export async function updateProductPackageProvider(input: {
   providerMaxPrice: number | null;
 }) {
   const db = getD1();
+  const maxPrice = input.providerCode === "digiflazz" ? Number(input.providerMaxPrice) : null;
+  const sellingPrice = maxPrice && maxPrice > 0
+    ? input.marginType === "percent"
+      ? Math.ceil((maxPrice * (100 + input.marginValue)) / 100)
+      : Math.ceil(maxPrice + input.marginValue)
+    : null;
   const result = await db.prepare(
     `UPDATE product_packages
      SET provider_code = ?,
@@ -494,7 +500,8 @@ export async function updateProductPackageProvider(input: {
          pricing_mode = ?,
          margin_type = ?,
          margin_value = ?,
-         provider_max_price = ?
+         provider_max_price = ?,
+         price = COALESCE(?, price)
      WHERE id = ?`,
   ).bind(
     input.providerCode,
@@ -503,6 +510,7 @@ export async function updateProductPackageProvider(input: {
     input.marginType,
     input.marginValue,
     input.providerMaxPrice,
+    sellingPrice,
     input.packageId,
   ).run();
 
