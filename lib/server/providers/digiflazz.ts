@@ -25,6 +25,9 @@ type DigiFlazzBalanceResponse = {
 type DigiFlazzResponse = {
   data?: {
     ref_id?: string;
+    buyer_sku_code?: string;
+    customer_no?: string;
+    price?: number;
     message?: string;
     status?: string;
     rc?: string;
@@ -83,7 +86,7 @@ let balanceCache: { value: number; checkedAt: number } | null = null;
 
 export async function getDigiflazzBalance() {
   if (isAutomatedTestRuntime() && runtimeConfig().environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
-  const { username, apiKey, apiUrl } = runtimeConfig();
+  const { environment, username, apiKey, apiUrl } = runtimeConfig();
   if (balanceCache && Date.now() - balanceCache.checkedAt < 60_000) {
     return { balance: balanceCache.value, cached: true as const };
   }
@@ -92,7 +95,7 @@ export async function getDigiflazzBalance() {
   const relay = providerRelayRequest(
     balanceUrl,
     { "content-type": "application/json", accept: "application/json" },
-    { provider: "digiflazz", environment: runtimeConfig().environment },
+    { provider: "digiflazz", environment },
   );
   const response = await fetch(relay.url, {
     method: "POST",
@@ -104,8 +107,8 @@ export async function getDigiflazzBalance() {
     }),
     signal: AbortSignal.timeout(12_000),
   });
-  const payload = (await response.json().catch(() => ({}))) as DigiFlazzBalanceResponse;
-  const deposit = Number(payload.data?.deposit);
+  const payload = (await response.json().catch(() => null)) as DigiFlazzBalanceResponse | null;
+  const deposit = Number(payload?.data?.deposit);
   if (!response.ok || !Number.isFinite(deposit)) {
     throw new Error("Saldo DigiFlazz tidak dapat dibaca.");
   }
@@ -156,12 +159,17 @@ export const digiflazzAdapter: ProviderAdapter = {
       signal: AbortSignal.timeout(15_000),
     });
 
-    const payload = (await response.json()) as DigiFlazzResponse;
-    const data = payload.data;
-    if (!response.ok || !data)
-      throw new Error(
-        "DigiFlazz tidak memberikan jawaban transaksi yang valid.",
-      );
+    const payload = (await response.json().catch(() => null)) as DigiFlazzResponse | null;
+    const data = payload?.data;
+    if (!response.ok || !data) {
+      throw new Error("DigiFlazz tidak memberikan jawaban transaksi yang valid.");
+    }
+    if (data.ref_id && data.ref_id !== order.referenceId) {
+      throw new Error("Ref ID jawaban DigiFlazz tidak cocok dengan order LFAMILIA.");
+    }
+    if (data.buyer_sku_code && data.buyer_sku_code !== order.providerSku) {
+      throw new Error("SKU jawaban DigiFlazz tidak cocok dengan order LFAMILIA.");
+    }
 
     return {
       externalId: data.ref_id ?? order.referenceId,
