@@ -5,6 +5,7 @@ import { requireAdminSession } from "@/lib/server/admin";
 import { deleteProduct, readProducts, saveProduct } from "@/lib/server/products";
 import { isAllowedMediaUrl } from "@/lib/media-url";
 import { readDigiflazzSellerMonitor } from "@/lib/server/digiflazz-monitor";
+import { syncDigiflazzProduct } from "@/lib/server/digiflazz-pricing";
 import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
 
 export const dynamic = "force-dynamic";
@@ -122,13 +123,21 @@ async function validateNicknameCheckoutContract(dbId: number, input: ProductInpu
 
   if (!kokinpayGameRequiresServer(gameCode)) return;
 
-  // Order normalization treats the second configured customer field as Server.
-  // Accept legacy ids such as `server-zone`, but require that second field to exist.
   const serverField = input.inputFields[1];
   const hasServerField = Boolean(serverField && serverField.required !== false);
   const hasServerTarget = /\{\{server\}\}/i.test(input.targetTemplate);
   if (!input.needsServer || !hasServerField || !hasServerTarget) {
     throw new Error("Produk dengan kode game nickname ini wajib memakai input ID + Server dan target {{server}}.");
+  }
+}
+
+async function refreshSavedDigiflazzSnapshots(productId: number, input: ProductInput) {
+  if (!input.packages.some((item) => item.providerCode === "digiflazz" && item.providerSku)) return null;
+  try {
+    await syncDigiflazzProduct(productId);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : "Snapshot DigiFlazz belum dapat diperbarui dari cache.";
   }
 }
 
@@ -152,7 +161,8 @@ export async function POST(request: Request) {
     const input = productSchema.parse(await request.json());
     validateProduct(input);
     const id = await saveProduct(input);
-    return Response.json({ ok: true, id }, { status: 201 });
+    const digiflazzSyncWarning = await refreshSavedDigiflazzSnapshots(id, input);
+    return Response.json({ ok: true, id, digiflazzSyncWarning }, { status: 201 });
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Produk gagal disimpan.";
     return Response.json({ error: message }, { status: 400 });
@@ -167,7 +177,8 @@ export async function PATCH(request: Request) {
     validateProduct(input);
     await validateNicknameCheckoutContract(input.dbId, input);
     await saveProduct(input, input.dbId);
-    return Response.json({ ok: true });
+    const digiflazzSyncWarning = await refreshSavedDigiflazzSnapshots(input.dbId, input);
+    return Response.json({ ok: true, digiflazzSyncWarning });
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Produk gagal diperbarui.";
     return Response.json({ error: message }, { status: 400 });
