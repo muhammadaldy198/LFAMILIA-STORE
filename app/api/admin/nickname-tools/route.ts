@@ -27,43 +27,53 @@ const plnRequest = z.object({
 const requestSchema = z.discriminatedUnion("action", [gameRequest, regionRequest, plnRequest]);
 
 type RuntimeEnv = { KOKINPAY_API_KEY?: string };
-type KokinpayResponse = {
+type KokinpayPlnResponse = {
   status?: unknown;
   message?: unknown;
-  data?: { nickname?: unknown; username?: unknown; region?: unknown; customer_name?: unknown; name?: unknown };
+  data?: { customer_name?: unknown; name?: unknown };
 };
 
 function text(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-async function kokinpayPost(path: "check-region-mlbb" | "check-nick-pln", body: Record<string, string>) {
-  const apiKey = getRuntimeEnv<RuntimeEnv>().KOKINPAY_API_KEY?.trim();
-  if (!apiKey) throw new NicknameServiceError("API Key KokinPay belum disimpan.");
+function apiKey() {
+  const value = getRuntimeEnv<RuntimeEnv>().KOKINPAY_API_KEY?.trim();
+  if (!value) throw new NicknameServiceError("API Key KokinPay belum disimpan.");
+  return value;
+}
+
+async function checkPln(customerNumber: string) {
   let response: Response;
   try {
-    response = await fetch(`https://api.kokinpay.com/${path}`, {
+    response = await fetch("https://api.kokinpay.com/check-nick-pln", {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({ api_key: apiKey, ...body }),
+      body: JSON.stringify({ api_key: apiKey(), customer_number: customerNumber }),
       signal: AbortSignal.timeout(8_000),
     });
   } catch {
     throw new NicknameServiceError();
   }
-  let payload: KokinpayResponse;
+
+  let payload: KokinpayPlnResponse;
   try {
-    payload = await response.json() as KokinpayResponse;
+    payload = await response.json() as KokinpayPlnResponse;
   } catch {
     throw new NicknameServiceError();
   }
   if (!response.ok || payload.status !== true) {
     if (response.status === 400 || response.status === 404 || payload.status === false) {
-      throw new NicknameValidationError(text(payload.message) || "Data tidak ditemukan atau tidak valid.");
+      throw new NicknameValidationError(text(payload.message) || "Data PLN tidak ditemukan atau tidak valid.");
     }
     throw new NicknameServiceError(text(payload.message) || undefined);
   }
-  return payload;
+
+  const customerName = text(payload.data?.customer_name) || text(payload.data?.name);
+  if (!customerName) {
+    throw new NicknameServiceError("Layanan pengecekan PLN tidak mengembalikan nama pelanggan.");
+  }
+  return customerName;
 }
 
 export async function POST(request: Request) {
@@ -72,10 +82,8 @@ export async function POST(request: Request) {
   try {
     const input = requestSchema.parse(await request.json());
     if (input.action === "game") {
-      const apiKey = getRuntimeEnv<RuntimeEnv>().KOKINPAY_API_KEY?.trim();
-      if (!apiKey) throw new NicknameServiceError("API Key KokinPay belum disimpan.");
       const result = await lookupKokinpayNickname({
-        apiKey,
+        apiKey: apiKey(),
         gameCode: input.gameCode,
         userId: input.userId,
         server: input.server,
@@ -83,16 +91,25 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, action: input.action, nickname: result.nickname, region: result.country });
     }
     if (input.action === "region") {
-      const result = await kokinpayPost("check-region-mlbb", { id: input.userId, server: input.server });
+      const result = await lookupKokinpayNickname({
+        apiKey: apiKey(),
+        gameCode: "mobile-legends",
+        userId: input.userId,
+        server: input.server,
+      });
+      if (!result.nickname || !result.country) {
+        throw new NicknameServiceError("Validasi Mobile Legends tidak mengembalikan nickname dan region lengkap.");
+      }
       return Response.json({
         ok: true,
         action: input.action,
-        nickname: text(result.data?.nickname) || text(result.data?.username),
-        region: text(result.data?.region),
+        nickname: result.nickname,
+        region: result.country,
       });
     }
-    const result = await kokinpayPost("check-nick-pln", { customer_number: input.customerNumber });
-    return Response.json({ ok: true, action: input.action, customerName: text(result.data?.customer_name) || text(result.data?.name) });
+
+    const customerName = await checkPln(input.customerNumber);
+    return Response.json({ ok: true, action: input.action, customerName });
   } catch (error) {
     const message = error instanceof z.ZodError
       ? error.issues[0]?.message || "Data pemeriksaan tidak valid."
