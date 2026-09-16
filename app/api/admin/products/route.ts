@@ -74,6 +74,15 @@ const productSchema = z.object({
 });
 
 type ProductInput = z.infer<typeof productSchema>;
+type PricingSnapshot = {
+  sku: string;
+  provider_sku: string;
+  supplier_price: number | null;
+  provider_max_price: number | null;
+  margin_type: "fixed" | "percent";
+  margin_value: number;
+  price: number;
+};
 
 function validateProduct(input: ProductInput) {
   if (input.isActive && input.packages.length === 0) {
@@ -97,8 +106,8 @@ function validateProduct(input: ProductInput) {
     throw new Error("Nama tab nominal tidak boleh duplikat.");
   }
   for (const item of input.packages) {
-    if (item.providerCode === "digiflazz" && item.isActive && (!item.providerSku || !item.providerMaxPrice)) {
-      throw new Error("Nominal DigiFlazz aktif wajib memiliki SKU dan Max Price.");
+    if (item.providerCode === "digiflazz" && item.isActive && !item.providerSku) {
+      throw new Error("Nominal DigiFlazz aktif wajib memiliki SKU provider.");
     }
     if (item.providerCode === "voucher-stock" && (!item.providerSku || !/^[a-z0-9][a-z0-9._:-]{1,99}$/.test(item.providerSku))) {
       throw new Error("Kunci stok internal hanya boleh berisi huruf kecil, angka, titik, garis, titik dua, atau underscore.");
@@ -120,7 +129,6 @@ async function validateNicknameCheckoutContract(dbId: number, input: ProductInpu
   if (input.category.trim().toLowerCase() === "voucher") {
     throw new Error("Produk voucher tidak boleh memakai Kode Game Nickname. Kosongkan kode game terlebih dahulu.");
   }
-
   if (!kokinpayGameRequiresServer(gameCode)) return;
 
   const serverField = input.inputFields[1];
@@ -129,6 +137,72 @@ async function validateNicknameCheckoutContract(dbId: number, input: ProductInpu
   if (!input.needsServer || !hasServerField || !hasServerTarget) {
     throw new Error("Produk dengan kode game nickname ini wajib memakai input ID + Server dan target {{server}}.");
   }
+}
+
+async function captureDigiflazzPricing(productId: number) {
+  const result = await getD1().prepare(`
+    SELECT sku, provider_sku, supplier_price, provider_max_price,
+           COALESCE(margin_type, 'fixed') AS margin_type,
+           COALESCE(margin_value, 0) AS margin_value,
+           price
+    FROM product_packages
+    WHERE product_id = ? AND provider_code = 'digiflazz' AND provider_sku IS NOT NULL
+  `).bind(productId).all<PricingSnapshot>();
+  return result.results;
+}
+
+function pricingKey(sku: string, providerSku: string | undefined | null) {
+  return `${sku}\u0000${providerSku || ""}`;
+}
+
+function removePricingAuthorityFromProduct(input: ProductInput, snapshots: PricingSnapshot[]): ProductInput {
+  const stored = new Map(snapshots.map((item) => [pricingKey(item.sku, item.provider_sku), item]));
+  return {
+    ...input,
+    packages: input.packages.map((item) => {
+      if (item.providerCode !== "digiflazz") return item;
+      const existing = stored.get(pricingKey(item.id, item.providerSku));
+      return {
+        ...item,
+        // Product management owns catalog/SKU presentation only. Existing
+        // LFAMILIA pricing is kept from D1 and restored after the catalog save.
+        price: existing?.price ?? item.price,
+        supplierPrice: existing?.supplier_price ?? null,
+        providerMaxPrice: null,
+        pricingMode: "auto" as const,
+        marginType: existing?.margin_type ?? "fixed",
+        marginValue: existing?.margin_value ?? 0,
+      };
+    }),
+  };
+}
+
+async function restoreDigiflazzPricing(productId: number, input: ProductInput, snapshots: PricingSnapshot[]) {
+  const activeKeys = new Set(input.packages
+    .filter((item) => item.providerCode === "digiflazz" && item.providerSku)
+    .map((item) => pricingKey(item.id, item.providerSku)));
+  const keep = snapshots.filter((item) => activeKeys.has(pricingKey(item.sku, item.provider_sku)));
+  if (!keep.length) return;
+  await getD1().batch(keep.map((item) => getD1().prepare(`
+    UPDATE product_packages
+       SET supplier_price = ?,
+           provider_max_price = ?,
+           margin_type = ?,
+           margin_value = ?,
+           pricing_mode = 'auto',
+           price = ?,
+           updated_at = CURRENT_TIMESTAMP
+     WHERE product_id = ? AND sku = ? AND provider_code = 'digiflazz' AND provider_sku = ?
+  `).bind(
+    item.supplier_price,
+    item.provider_max_price,
+    item.margin_type,
+    item.margin_value,
+    item.price,
+    productId,
+    item.sku,
+    item.provider_sku,
+  )));
 }
 
 async function refreshSavedDigiflazzSnapshots(productId: number, input: ProductInput) {
@@ -158,7 +232,8 @@ export async function POST(request: Request) {
   const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
-    const input = productSchema.parse(await request.json());
+    const parsed = productSchema.parse(await request.json());
+    const input = removePricingAuthorityFromProduct(parsed, []);
     validateProduct(input);
     const id = await saveProduct(input);
     const digiflazzSyncWarning = await refreshSavedDigiflazzSnapshots(id, input);
@@ -173,11 +248,14 @@ export async function PATCH(request: Request) {
   const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
-    const input = productSchema.extend({ dbId: z.number().int().positive() }).parse(await request.json());
+    const parsed = productSchema.extend({ dbId: z.number().int().positive() }).parse(await request.json());
+    const snapshots = await captureDigiflazzPricing(parsed.dbId);
+    const input = removePricingAuthorityFromProduct(parsed, snapshots);
     validateProduct(input);
-    await validateNicknameCheckoutContract(input.dbId, input);
-    await saveProduct(input, input.dbId);
-    const digiflazzSyncWarning = await refreshSavedDigiflazzSnapshots(input.dbId, input);
+    await validateNicknameCheckoutContract(input.dbId!, input);
+    await saveProduct(input, input.dbId!);
+    await restoreDigiflazzPricing(input.dbId!, input, snapshots);
+    const digiflazzSyncWarning = await refreshSavedDigiflazzSnapshots(input.dbId!, input);
     return Response.json({ ok: true, digiflazzSyncWarning });
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Produk gagal diperbarui.";
