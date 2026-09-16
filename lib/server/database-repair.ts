@@ -3,6 +3,7 @@ import { getD1 } from "@/db";
 let repairPromise: Promise<void> | null = null;
 
 const FINAL_AUDIT_MIGRATION = "0029_final_source_audit_remediation.sql";
+const KOKINPAY_NICKNAME_MIGRATION = "0032_kokinpay_nickname_game_codes.sql";
 const FINAL_SCHEMA_OBJECTS = [
   "promotion_reservations",
   "promotion_reservations_expiry_idx",
@@ -336,6 +337,7 @@ export async function ensureLegacyDatabaseColumns() {
       // from replaying ALTER TABLE statements that Cloudflare runtime already healed.
       try {
         const requiredColumns: Array<[string, string[]]> = [
+          ["products", ["nickname_game_code"]],
           ["orders", ["delivery_mode", "supplier_cost_snapshot", "doku_environment"]],
           ["wallet_topups", ["doku_environment", "external_checkout_key"]],
           ["discount_vouchers", ["reserved_count"]],
@@ -381,6 +383,9 @@ export async function ensureLegacyDatabaseColumns() {
             await db.prepare(
               "INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)",
             ).bind(FINAL_AUDIT_MIGRATION).run();
+            await db.prepare(
+              "INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)",
+            ).bind(KOKINPAY_NICKNAME_MIGRATION).run();
           }
         }
       } catch (error) {
