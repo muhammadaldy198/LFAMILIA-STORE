@@ -16,13 +16,13 @@ test("nickname requirement is configured per product and legacy repairs have ind
   assert.match(route, /nicknameGameCode/);
   assert.match(route, /nickname_game_code/);
   assert.match(route, /ensureKokinpayNicknameGameCodeBackfill/);
-  assert.match(checker, /SELECT nickname_game_code, needs_server FROM products/);
+  assert.match(checker, /SELECT nickname_game_code, needs_server, category FROM products/);
   assert.match(checker, /if \(!gameCode\) return \{ supported: false/);
   assert.match(checker, /ensureKokinpayNicknameGameCodeBackfill/);
   assert.match(publicProducts, /ensureKokinpayNicknameGameCodeBackfill/);
 
   assert.match(config, /GAME_CODE_BACKFILL_OPERATION_KEY = "kokinpay_nickname_game_code_backfill_0032"/);
-  assert.match(config, /GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v2"/);
+  assert.match(config, /GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v3_preserve_fields"/);
   assert.match(config, /gameBackfillCompleted && genshinRepairCompleted/);
   assert.match(config, /if \(!gameBackfillCompleted\)/);
   assert.match(config, /if \(!genshinRepairCompleted\)/);
@@ -31,16 +31,31 @@ test("nickname requirement is configured per product and legacy repairs have ind
   assert.match(config, /WHERE slug = 'genshin-impact'[\s\S]*nickname_game_code = 'genshin-impact'/);
   assert.match(config, /SET needs_server = 1/);
   assert.match(config, /target_template = '\{\{destination\}\}\{\{server\}\}'/);
-  assert.match(config, /"id":"server","label":"Server"/);
+  assert.match(config, /json_array_length\(input_fields_json\) = 1/);
+  assert.match(config, /json_insert\(/);
+  assert.match(config, /json_set\(input_fields_json, '\$\[1\]\.required', 1\)/);
 
   assert.match(migration, /UPDATE products/);
   assert.match(migration, /WHEN 'mobile-legends' THEN 'mobile-legends'/);
   assert.match(migration, /WHERE slug = 'genshin-impact'[\s\S]*nickname_game_code = 'genshin-impact'/);
   assert.match(migration, /SET needs_server = 1/);
   assert.match(migration, /target_template = '\{\{destination\}\}\{\{server\}\}'/);
-  assert.match(migration, /"id":"server","label":"Server"/);
+  assert.match(migration, /json_array_length\(input_fields_json\) = 1/);
+  assert.match(migration, /json_insert\(/);
   assert.match(migration, /kokinpay_nickname_game_code_backfill_0032/);
-  assert.match(migration, /kokinpay_genshin_server_input_repair_0032_v2/);
+  assert.match(migration, /kokinpay_genshin_server_input_repair_0032_v3_preserve_fields/);
+});
+
+test("voucher products never invoke nickname verification and admin writes reject voucher game codes", () => {
+  const checker = read("lib/server/nickname-check.ts");
+  const inputRoute = read("app/api/admin/product-input/route.ts");
+  const productsRoute = read("app/api/admin/products/route.ts");
+  assert.match(checker, /category\?\.trim\(\)\.toLowerCase\(\) === "voucher"/);
+  assert.match(checker, /supported: false, nickname: null, country: null/);
+  assert.match(inputRoute, /category\.trim\(\)\.toLowerCase\(\) === "voucher"/);
+  assert.match(inputRoute, /Produk voucher tidak memakai Kode Game Nickname/);
+  assert.match(productsRoute, /input\.category\.trim\(\)\.toLowerCase\(\) === "voucher"/);
+  assert.match(productsRoute, /Produk voucher tidak boleh memakai Kode Game Nickname/);
 });
 
 test("both checkout routes verify account server-side and never trust browser nickname", () => {
