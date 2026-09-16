@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import {
+  getDigiflazzPriceListCacheMeta,
   getPricingSettings,
   listDigiflazzPriceList,
   savePricingSettings,
@@ -24,12 +25,14 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     if (url.searchParams.get("catalog") === "1") {
-      return Response.json({
-        settings: await getPricingSettings(),
-        catalog: await listDigiflazzPriceList(),
-      });
+      const [settings, catalog, cache] = await Promise.all([
+        getPricingSettings(),
+        listDigiflazzPriceList(),
+        getDigiflazzPriceListCacheMeta(),
+      ]);
+      return Response.json({ settings, catalog, cache });
     }
-    return Response.json({ settings: await getPricingSettings() });
+    return Response.json({ settings: await getPricingSettings(), cache: await getDigiflazzPriceListCacheMeta() });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Pengaturan harga belum siap." }, { status: 503 });
   }
@@ -48,7 +51,7 @@ export async function POST(request: Request) {
         : input.syncNow
           ? await syncDigiflazzPrices({ force: true })
           : null;
-    return Response.json({ ok: true, result });
+    return Response.json({ ok: true, result, cache: await getDigiflazzPriceListCacheMeta() });
   } catch (error) {
     return Response.json({
       error: error instanceof z.ZodError
