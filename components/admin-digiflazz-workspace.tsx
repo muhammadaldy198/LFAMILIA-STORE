@@ -27,7 +27,6 @@ type MonitorItem = {
   marginType: MarginType;
   marginValue: number;
   sellingPrice: number;
-  blockedByMaxPrice: boolean;
   buyerProductStatus: boolean;
   sellerProductStatus: boolean;
   unlimitedStock: boolean;
@@ -80,8 +79,8 @@ function formatDate(value: string | null | undefined) {
   return new Intl.DateTimeFormat("id-ID", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(parsed);
 }
 
-function calculateSale(cost: number, type: MarginType, value: number) {
-  return type === "percent" ? Math.ceil(cost * (100 + value) / 100) : Math.ceil(cost + value);
+function calculateSale(basePrice: number, type: MarginType, value: number) {
+  return type === "percent" ? Math.ceil(basePrice * (100 + value) / 100) : Math.ceil(basePrice + value);
 }
 
 export function AdminDigiflazzWorkspace() {
@@ -206,14 +205,12 @@ export function AdminDigiflazzWorkspace() {
     setSaving(true);
     setError("");
     try {
-      const payload = await readJson<{ pricing: { sellingPrice: number; blockedByMaxPrice: boolean } }>(await fetch("/api/panel/digiflazz-pricing", {
+      const payload = await readJson<{ pricing: { sellingPrice: number } }>(await fetch("/api/panel/digiflazz-pricing", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ packageId: editing.packageId, maxPrice, marginType, marginValue }),
       }));
-      setNotice(payload.pricing.blockedByMaxPrice
-        ? `${editing.productName} - ${editing.packageLabel}: harga provider sudah melewati Max Price dan otomatis diblokir.`
-        : `${editing.productName} - ${editing.packageLabel}: Price Control LFAMILIA disimpan. Harga jual ${formatRupiah(payload.pricing.sellingPrice)}.`);
+      setNotice(`${editing.productName} - ${editing.packageLabel}: Price Control LFAMILIA disimpan. Harga jual ${formatRupiah(payload.pricing.sellingPrice)}.`);
       setEditing(null);
       await load();
     } catch (reason) {
@@ -245,7 +242,7 @@ export function AdminDigiflazzWorkspace() {
           <Stat label="Status API" value={data.api?.ready ? "Online" : "Belum Siap"} note={data.api?.reason || data.api?.environment || "-"} />
           <Stat label="Saldo" value={data.api?.balance === null || data.api?.balance === undefined ? "-" : formatRupiah(data.api.balance)} note="Akun provider" />
           <Stat label="SKU Terhubung" value={String(data.summary.total)} note={`${data.summary.healthy} normal`} />
-          <Stat label="Diblokir / Kritis" value={String(data.summary.critical)} note="Termasuk Max Price" danger={data.summary.critical > 0} />
+          <Stat label="Kritis" value={String(data.summary.critical)} note="Seller / stok" danger={data.summary.critical > 0} />
           <Stat label="Peringatan" value={String(data.summary.warning)} note="Stok / cutoff / harga" danger={data.summary.warning > 0} />
           <Stat label="Sync Terakhir" value={formatDate(data.cache?.lastSyncedAt)} note={`${data.cache?.count ?? 0} SKU di cache`} />
         </div>
@@ -253,7 +250,7 @@ export function AdminDigiflazzWorkspace() {
         <div className="flex flex-wrap items-end justify-between gap-[10px] border-b border-[#e4e9ef] px-[14px] py-[11px]">
           <div>
             <div className="flex items-center gap-[7px]"><SlidersHorizontal className="size-[14px] text-[#0875ed]" /><h2 className="text-[13px] font-extrabold">Price Control LFAMILIA</h2></div>
-            <p className="mt-[2px] text-[8px] text-[#687a91]">Harga Digiflazz = modal aktual · Max Price = batas aman · Margin = keuntungan · Harga Jual = modal aktual + margin.</p>
+            <p className="mt-[2px] text-[8px] text-[#687a91]">Harga Digiflazz = modal aktual · Max Price = nilai Harga Max yang diatur di dashboard Digiflazz · Margin = keuntungan · Harga Jual = Max Price + margin.</p>
           </div>
           <span className="rounded-[4px] bg-[#eef6ff] px-[8px] py-[5px] text-[7px] font-bold text-[#0875df]">Kategori → Subkategori / Brand → SKU</span>
         </div>
@@ -262,14 +259,14 @@ export function AdminDigiflazzWorkspace() {
           <label className="relative"><Search className="absolute left-[9px] top-1/2 size-[12px] -translate-y-1/2 text-[#74849a]" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Cari produk, nominal, SKU, kategori..." className="h-[32px] w-full rounded-[4px] border border-[#dce3eb] pl-[28px] pr-[8px] text-[8px] outline-none focus:border-[#2680eb]" /></label>
           <select value={category} onChange={(event) => chooseCategory(event.target.value)} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[8px] text-[8px]"><option>Semua Kategori</option>{categories.map((item) => <option key={item}>{item}</option>)}</select>
           <select value={brand} onChange={(event) => { setBrand(event.target.value); setPage(1); }} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[8px] text-[8px]"><option>Semua Subkategori</option>{brands.map((item) => <option key={item}>{item}</option>)}</select>
-          <select value={health} onChange={(event) => { setHealth(event.target.value); setPage(1); }} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[8px] text-[8px]"><option>Semua Status</option><option value="healthy">Normal</option><option value="warning">Peringatan</option><option value="critical">Kritis / Diblokir</option><option value="unknown">Belum Dicek</option></select>
+          <select value={health} onChange={(event) => { setHealth(event.target.value); setPage(1); }} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[8px] text-[8px]"><option>Semua Status</option><option value="healthy">Normal</option><option value="warning">Peringatan</option><option value="critical">Kritis</option><option value="unknown">Belum Dicek</option></select>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1250px] table-fixed text-left">
-            <thead className="bg-[#f4f7fa] text-[7px] font-bold uppercase tracking-[.02em] text-[#58697f]"><tr><th className="w-[95px] px-[10px] py-[9px]">Kategori</th><th className="w-[125px]">Subkategori</th><th className="w-[130px]">Produk</th><th className="w-[150px]">Nominal</th><th className="w-[105px]">SKU</th><th className="w-[105px]">Harga Digiflazz</th><th className="w-[110px]">Max Price LFAMILIA</th><th className="w-[90px]">Margin</th><th className="w-[105px]">Harga Jual</th><th className="w-[100px]">Status</th><th className="w-[70px]">Aksi</th></tr></thead>
+            <thead className="bg-[#f4f7fa] text-[7px] font-bold uppercase tracking-[.02em] text-[#58697f]"><tr><th className="w-[95px] px-[10px] py-[9px]">Kategori</th><th className="w-[125px]">Subkategori</th><th className="w-[130px]">Produk</th><th className="w-[150px]">Nominal</th><th className="w-[105px]">SKU</th><th className="w-[105px]">Harga Digiflazz</th><th className="w-[110px]">Max Price Digiflazz</th><th className="w-[90px]">Margin</th><th className="w-[105px]">Harga Jual</th><th className="w-[100px]">Status</th><th className="w-[70px]">Aksi</th></tr></thead>
             <tbody>
-              {rows.map((item) => <tr key={item.packageId} className="border-t border-[#e7ebf0] text-[7.5px] text-[#35475f] hover:bg-[#fafcfe]"><td className="px-[10px] py-[8px] font-semibold">{item.category}</td><td className="truncate pr-[8px] font-semibold text-[#213752]">{item.brand}</td><td className="truncate pr-[8px]">{item.productName}</td><td className="truncate pr-[8px]">{item.packageLabel}</td><td className="truncate font-mono text-[7px]">{item.providerSku}</td><td className="font-semibold">{formatRupiah(item.currentPrice)}</td><td className={item.blockedByMaxPrice ? "font-bold text-red-600" : "font-semibold"}>{formatRupiah(item.maxPrice)}</td><td>{item.marginType === "percent" ? `${item.marginValue}%` : formatRupiah(item.marginValue)}</td><td className="font-bold text-[#0c6fd4]">{formatRupiah(item.sellingPrice)}</td><td><Status item={item} /></td><td><button type="button" onClick={() => setEditing(item)} className="inline-flex h-[27px] items-center gap-[5px] rounded-[4px] border border-[#cfe0f2] bg-white px-[8px] font-bold text-[#0875df]"><Settings2 className="size-[10px]" />Atur</button></td></tr>)}
+              {rows.map((item) => <tr key={item.packageId} className="border-t border-[#e7ebf0] text-[7.5px] text-[#35475f] hover:bg-[#fafcfe]"><td className="px-[10px] py-[8px] font-semibold">{item.category}</td><td className="truncate pr-[8px] font-semibold text-[#213752]">{item.brand}</td><td className="truncate pr-[8px]">{item.productName}</td><td className="truncate pr-[8px]">{item.packageLabel}</td><td className="truncate font-mono text-[7px]">{item.providerSku}</td><td className="font-semibold">{formatRupiah(item.currentPrice)}</td><td className="font-semibold">{formatRupiah(item.maxPrice)}</td><td>{item.marginType === "percent" ? `${item.marginValue}%` : formatRupiah(item.marginValue)}</td><td className="font-bold text-[#0c6fd4]">{formatRupiah(item.sellingPrice)}</td><td><Status item={item} /></td><td><button type="button" onClick={() => setEditing(item)} className="inline-flex h-[27px] items-center gap-[5px] rounded-[4px] border border-[#cfe0f2] bg-white px-[8px] font-bold text-[#0875df]"><Settings2 className="size-[10px]" />Atur</button></td></tr>)}
               {!loading && !rows.length && <tr><td colSpan={11} className="py-[28px] text-center text-[8px] text-[#728198]">Tidak ada SKU yang cocok dengan filter.</td></tr>}
               {loading && <tr><td colSpan={11} className="py-[28px] text-center text-[8px] text-[#728198]">Memuat Price Control Digiflazz...</td></tr>}
             </tbody>
@@ -292,7 +289,6 @@ function Stat({ label, value, note, danger }: { label: string; value: string; no
 }
 
 function Status({ item }: { item: MonitorItem }) {
-  if (item.blockedByMaxPrice) return <span title={item.alertReason || undefined} className="inline-flex items-center gap-[4px] rounded-[4px] bg-red-50 px-[6px] py-[4px] font-bold text-red-600"><AlertTriangle className="size-[9px]" />Max Price</span>;
   if (item.health === "critical") return <span title={item.alertReason || undefined} className="inline-flex items-center gap-[4px] rounded-[4px] bg-red-50 px-[6px] py-[4px] font-bold text-red-600"><AlertTriangle className="size-[9px]" />Kritis</span>;
   if (item.health === "warning") return <span title={item.alertReason || undefined} className="inline-flex items-center gap-[4px] rounded-[4px] bg-amber-50 px-[6px] py-[4px] font-bold text-amber-700"><AlertTriangle className="size-[9px]" />Peringatan</span>;
   if (item.health === "healthy") return <span className="inline-flex items-center gap-[4px] rounded-[4px] bg-emerald-50 px-[6px] py-[4px] font-bold text-emerald-700"><CheckCircle2 className="size-[9px]" />Normal</span>;
@@ -303,10 +299,8 @@ function PricingDialog({ item, saving, onClose, onSubmit }: { item: MonitorItem;
   const [maxPrice, setMaxPrice] = useState(item.maxPrice ?? item.currentPrice ?? 1);
   const [marginType, setMarginType] = useState<MarginType>(item.marginType);
   const [marginValue, setMarginValue] = useState(item.marginValue);
-  const currentCost = item.currentPrice ?? 0;
-  const sale = currentCost > 0 ? calculateSale(currentCost, marginType, marginValue) : 0;
-  const blocked = currentCost > 0 && maxPrice > 0 && currentCost > maxPrice;
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#071426]/55 p-[20px]" role="dialog" aria-modal="true" aria-label="Atur Price Control LFAMILIA"><form onSubmit={onSubmit} className="w-full max-w-[520px] overflow-hidden rounded-[8px] bg-white shadow-2xl"><header className="flex items-start justify-between border-b border-[#e3e8ef] px-[15px] py-[12px]"><div><h2 className="text-[14px] font-black text-[#101d35]">Atur Price Control LFAMILIA</h2><p className="mt-[2px] text-[8px] text-[#6d7d92]">{item.brand} · {item.productName} · {item.packageLabel}</p></div><button type="button" onClick={onClose} className="grid size-[27px] place-items-center"><X className="size-[14px]" /></button></header><div className="p-[15px]"><div className="grid grid-cols-2 gap-[8px] rounded-[6px] border border-[#e0e7ef] bg-[#f8fafc] p-[10px]"><PriceInfo label="Harga Digiflazz sekarang" value={formatRupiah(item.currentPrice)} /><PriceInfo label="Harga Jual saat ini" value={formatRupiah(item.sellingPrice)} /></div><div className="mt-[12px] grid grid-cols-2 gap-[10px]"><label className="col-span-2 text-[8px] font-bold text-[#3e5068]">Max Price LFAMILIA<input name="maxPrice" type="number" min={1} required value={maxPrice} onChange={(event) => setMaxPrice(Number(event.target.value))} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /><small className="mt-[4px] block font-normal text-[#738296]">Jika harga Digiflazz melewati angka ini, SKU otomatis diblokir dari checkout/fulfillment.</small></label><label className="text-[8px] font-bold text-[#3e5068]">Tipe Margin<select name="marginType" value={marginType} onChange={(event) => setMarginType(event.target.value as MarginType)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="fixed">Rupiah</option><option value="percent">Persen</option></select></label><label className="text-[8px] font-bold text-[#3e5068]">Nilai Margin<input name="marginValue" type="number" min={0} required value={marginValue} onChange={(event) => setMarginValue(Number(event.target.value))} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label></div><div className={`mt-[12px] rounded-[5px] border px-[10px] py-[8px] text-[8px] ${blocked ? "border-red-200 bg-red-50 text-red-700" : "border-[#cfe4fa] bg-[#f0f7ff] text-[#355b7f]"}`}><strong>Preview:</strong> Harga jual = {formatRupiah(sale)}. {blocked ? "Harga provider saat ini sudah melewati Max Price; SKU akan diblokir." : "Max Price hanya batas pengaman, bukan dasar harga jual."}</div></div><footer className="flex justify-end gap-[8px] border-t border-[#e5e9ef] px-[15px] py-[11px]"><button type="button" onClick={onClose} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[13px] text-[8px] font-bold">Batal</button><button type="submit" disabled={saving} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Simpan Price Control"}</button></footer></form></div>;
+  const sale = maxPrice > 0 ? calculateSale(maxPrice, marginType, marginValue) : 0;
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#071426]/55 p-[20px]" role="dialog" aria-modal="true" aria-label="Atur Price Control LFAMILIA"><form onSubmit={onSubmit} className="w-full max-w-[520px] overflow-hidden rounded-[8px] bg-white shadow-2xl"><header className="flex items-start justify-between border-b border-[#e3e8ef] px-[15px] py-[12px]"><div><h2 className="text-[14px] font-black text-[#101d35]">Atur Price Control LFAMILIA</h2><p className="mt-[2px] text-[8px] text-[#6d7d92]">{item.brand} · {item.productName} · {item.packageLabel}</p></div><button type="button" onClick={onClose} className="grid size-[27px] place-items-center"><X className="size-[14px]" /></button></header><div className="p-[15px]"><div className="grid grid-cols-2 gap-[8px] rounded-[6px] border border-[#e0e7ef] bg-[#f8fafc] p-[10px]"><PriceInfo label="Harga Digiflazz sekarang" value={formatRupiah(item.currentPrice)} /><PriceInfo label="Harga Jual saat ini" value={formatRupiah(item.sellingPrice)} /></div><div className="mt-[12px] grid grid-cols-2 gap-[10px]"><label className="col-span-2 text-[8px] font-bold text-[#3e5068]">Max Price Digiflazz<input name="maxPrice" type="number" min={1} required value={maxPrice} onChange={(event) => setMaxPrice(Number(event.target.value))} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /><small className="mt-[4px] block font-normal text-[#738296]">Isi sama dengan kolom Harga Max (Rp) yang kamu atur di dashboard Digiflazz. Guard transaksi tetap dikelola oleh Digiflazz.</small></label><label className="text-[8px] font-bold text-[#3e5068]">Tipe Margin<select name="marginType" value={marginType} onChange={(event) => setMarginType(event.target.value as MarginType)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="fixed">Rupiah</option><option value="percent">Persen</option></select></label><label className="text-[8px] font-bold text-[#3e5068]">Nilai Margin<input name="marginValue" type="number" min={0} required value={marginValue} onChange={(event) => setMarginValue(Number(event.target.value))} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label></div><div className="mt-[12px] rounded-[5px] border border-[#cfe4fa] bg-[#f0f7ff] px-[10px] py-[8px] text-[8px] text-[#355b7f]"><strong>Preview:</strong> Harga jual = {formatRupiah(sale)}. Rumus: Max Price + margin.</div></div><footer className="flex justify-end gap-[8px] border-t border-[#e5e9ef] px-[15px] py-[11px]"><button type="button" onClick={onClose} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[13px] text-[8px] font-bold">Batal</button><button type="submit" disabled={saving} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Simpan Price Control"}</button></footer></form></div>;
 }
 
 function PriceInfo({ label, value }: { label: string; value: string }) {
