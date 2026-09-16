@@ -42,6 +42,7 @@ export class NicknameServiceError extends Error {
 }
 
 const KOKINPAY_API_ORIGIN = "https://api.kokinpay.com";
+const KOKINPAY_GAME_NICKNAME_PATH = "/check-nick-game";
 
 function nonEmptyString(values: unknown[]) {
   return values.find(
@@ -72,7 +73,7 @@ function throwKokinpayError(status: number, data: KokinpayResponse): never {
   throw new NicknameServiceError(message || undefined);
 }
 
-/** Calls Kokinpay's documented game nickname endpoint. Never expose api_key to browsers. */
+/** Calls KokinPay's documented /check-nick-game endpoint. Never expose api_key to browsers. */
 export async function lookupKokinpayNickname(input: {
   apiKey: string;
   gameCode: string;
@@ -88,7 +89,7 @@ export async function lookupKokinpayNickname(input: {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${KOKINPAY_API_ORIGIN}/check-nickname`, {
+    upstream = await fetch(`${KOKINPAY_API_ORIGIN}${KOKINPAY_GAME_NICKNAME_PATH}`, {
       method: "POST",
       headers: {
         accept: "application/json",
