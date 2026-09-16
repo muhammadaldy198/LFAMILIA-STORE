@@ -59,7 +59,7 @@ const navigation: NavigationItem[] = [
   { value: "products", label: "Produk", Icon: Boxes, minimumRole: "admin" },
   { value: "content", label: "Banner & Konten", Icon: ImageIcon, minimumRole: "staff" },
   { value: "digiflazz", label: "Digiflazz", Icon: PackageSearch, minimumRole: "admin" },
-  { value: "account-validation", label: "Validasi Akun", Icon: Gamepad2, minimumRole: "super_admin" },
+  { value: "account-validation", label: "Validasi Akun", Icon: Gamepad2, minimumRole: "admin" },
   { value: "payments", label: "Pembayaran", Icon: CreditCard, minimumRole: "admin" },
   { value: "customers", label: "Pelanggan", Icon: Users, minimumRole: "admin" },
   { value: "promotions", label: "Promo", Icon: Sparkles, minimumRole: "admin" },
@@ -180,7 +180,7 @@ export function AdminDashboard({
             <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} />{initialSession.role === "staff" && <StaffProductContentWorkspace />}</TabsContent>
 
             {(isOwner || isAdmin) && <TabsContent value="digiflazz" className="mt-0"><AdminDigiflazzWorkspace /></TabsContent>}
-            {isOwner && <TabsContent value="account-validation" className="mt-0"><AdminKokinpayWorkspace /></TabsContent>}
+            {(isOwner || isAdmin) && <TabsContent value="account-validation" className="mt-0"><AdminKokinpayWorkspace /></TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="payments" className="mt-0"><AdminPaymentWorkspace /></TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="customers" className="mt-0">{isOwner ? <AdminCustomerWorkspace /> : <AdminCustomerDirectory />}</TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="promotions" className="mt-0"><AdminPromoWorkspace /></TabsContent>}
@@ -229,7 +229,7 @@ function SidebarHelp({ onClick }: { onClick(): void }) {
           <span className="grid size-8 shrink-0 place-items-center rounded-full border border-white/20 text-white"><LifeBuoy className="size-4" /></span>
           <div>
             <p className="text-[10px] font-semibold text-white">Butuh bantuan?</p>
-            <p className="mt-0.5 text-[8px] leading-3.5 text-slate-400">Tim kami siap membantu Anda 24/7.</p>
+            <p className="mt-0.5 text-[8px] leading-3.5 text-slate-400">Buka Layanan Pelanggan untuk melihat dan menangani tiket.</p>
           </div>
         </div>
         <button type="button" onClick={onClick} className="mt-3 h-8 w-full rounded-md bg-white/[0.08] text-[9px] font-semibold text-white transition hover:bg-white/[0.13]">Pusat Bantuan</button>
