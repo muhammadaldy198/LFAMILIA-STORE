@@ -22,7 +22,7 @@ test("nickname requirement is configured per product and legacy repairs have ind
   assert.match(publicProducts, /ensureKokinpayNicknameGameCodeBackfill/);
 
   assert.match(config, /GAME_CODE_BACKFILL_OPERATION_KEY = "kokinpay_nickname_game_code_backfill_0032"/);
-  assert.match(config, /GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v4_preserve_target"/);
+  assert.match(config, /GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v5_case_insensitive_target"/);
   assert.match(config, /gameBackfillCompleted && genshinRepairCompleted/);
   assert.match(config, /if \(!gameBackfillCompleted\)/);
   assert.match(config, /if \(!genshinRepairCompleted\)/);
@@ -31,7 +31,10 @@ test("nickname requirement is configured per product and legacy repairs have ind
   assert.match(config, /WHERE slug = 'genshin-impact'[\s\S]*nickname_game_code = 'genshin-impact'/);
   assert.match(config, /SET needs_server = 1/);
   assert.match(config, /instr\(lower\(target_template\), '\{\{server\}\}'\) > 0 THEN target_template/);
-  assert.match(config, /replace\(target_template, '\{\{destination\}\}', '\{\{destination\}\}\{\{server\}\}'\)/);
+  assert.match(config, /instr\(lower\(target_template\), '\{\{destination\}\}'\) > 0/);
+  assert.match(config, /substr\(target_template, 1, instr\(lower\(target_template\), '\{\{destination\}\}'\) - 1\)/);
+  assert.match(config, /\|\| '\{\{destination\}\}\{\{server\}\}'/);
+  assert.match(config, /substr\(target_template, instr\(lower\(target_template\), '\{\{destination\}\}'\) \+ length\('\{\{destination\}\}'\)\)/);
   assert.match(config, /ELSE target_template \|\| '\{\{server\}\}'/);
   assert.match(config, /json_array_length\(input_fields_json\) = 1/);
   assert.match(config, /json_insert\(/);
@@ -42,12 +45,14 @@ test("nickname requirement is configured per product and legacy repairs have ind
   assert.match(migration, /WHERE slug = 'genshin-impact'[\s\S]*nickname_game_code = 'genshin-impact'/);
   assert.match(migration, /SET needs_server = 1/);
   assert.match(migration, /instr\(lower\(target_template\), '\{\{server\}\}'\) > 0 THEN target_template/);
-  assert.match(migration, /replace\(target_template, '\{\{destination\}\}', '\{\{destination\}\}\{\{server\}\}'\)/);
-  assert.match(migration, /ELSE target_template \|\| '\{\{server\}\}'/);
+  assert.match(migration, /instr\(lower\(target_template\), '\{\{destination\}\}'\) > 0/);
+  assert.match(migration, /substr\(target_template, 1, instr\(lower\(target_template\), '\{\{destination\}\}'\) - 1\)/);
+  assert.match(migration, /\|\| '\{\{destination\}\}\{\{server\}\}'/);
+  assert.match(migration, /substr\(target_template, instr\(lower\(target_template\), '\{\{destination\}\}'\) \+ length\('\{\{destination\}\}'\)\)/);
   assert.match(migration, /json_array_length\(input_fields_json\) = 1/);
   assert.match(migration, /json_insert\(/);
   assert.match(migration, /kokinpay_nickname_game_code_backfill_0032/);
-  assert.match(migration, /kokinpay_genshin_server_input_repair_0032_v4_preserve_target/);
+  assert.match(migration, /kokinpay_genshin_server_input_repair_0032_v5_case_insensitive_target/);
 });
 
 test("voucher products never invoke nickname verification and admin writes reject voucher game codes", () => {
