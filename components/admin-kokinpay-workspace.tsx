@@ -115,6 +115,8 @@ export function AdminKokinpayWorkspace() {
     }
   }
 
+  const gameIsMlbb = tab === "Cek Game" && gameCode.trim() === "mobile-legends";
+
   return <div>
     <WorkspaceHeader
       title="Validasi Akun"
@@ -134,8 +136,9 @@ export function AdminKokinpayWorkspace() {
             <datalist id="kokinpay-game-codes">{gameCodes.map(([name, code]) => <option key={code} value={code}>{name}</option>)}</datalist>
           </Field>}
           {tab !== "PLN" && <Field label="User ID"><input value={userId} onChange={(event) => setUserId(event.target.value)} className={inputClass} placeholder="Masukkan User ID" /></Field>}
-          {tab !== "PLN" && <Field label="Server / Zone" help={tab === "Region MLBB" ? "Wajib untuk pengecekan region MLBB." : "Isi jika game memerlukan Server / Zone ID."}><input value={server} onChange={(event) => setServer(event.target.value)} className={inputClass} placeholder={tab === "Region MLBB" ? "Wajib diisi" : "Opsional"} /></Field>}
+          {tab !== "PLN" && <Field label="Server / Zone" help={tab === "Region MLBB" || gameIsMlbb ? "Wajib untuk Mobile Legends. Nickname dan region harus sama-sama berhasil." : "Isi jika game memerlukan Server / Zone ID."}><input value={server} onChange={(event) => setServer(event.target.value)} className={inputClass} placeholder={tab === "Region MLBB" || gameIsMlbb ? "Wajib diisi" : "Opsional"} /></Field>}
           {tab === "PLN" && <Field label="Nomor Meter / ID Pelanggan PLN" wide><input value={customerNumber} onChange={(event) => setCustomerNumber(event.target.value.replace(/\D/g, "").slice(0, 12))} className={inputClass} placeholder="11–12 angka" inputMode="numeric" /></Field>}
+          {gameIsMlbb && <div className="sm:col-span-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-800">Mobile Legends divalidasi dengan dua endpoint: <strong>/check-nick-game</strong> untuk nickname dan <strong>/check-region-mlbb</strong> untuk region. Keduanya wajib berhasil sebelum akun dianggap valid.</div>}
           <div className="sm:col-span-2 flex flex-wrap items-center gap-2 border-t border-[#edf0f4] pt-4">
             <button type="button" disabled={busy} onClick={() => void runCheck()} className={primaryButtonClass}><RefreshCw className={`size-3.5 ${busy ? "animate-spin" : ""}`} />{busy ? "Memeriksa..." : "Cek Data"}</button>
             <button type="button" disabled={busy} onClick={() => { setGameCode(""); setUserId(""); setServer(""); setCustomerNumber(""); setResult(null); setError(""); }} className={buttonClass}>Bersihkan</button>
@@ -145,10 +148,10 @@ export function AdminKokinpayWorkspace() {
         <aside className="space-y-3">
           <div className="rounded-md border border-[#e1e6ed] bg-[#f8fafc] p-3">
             <div className="flex items-center justify-between gap-2"><strong className="text-[10px] text-[#34445f]">Endpoint aktif</strong><Status tone="gray">KokinPay</Status></div>
-            <code className="mt-2 block break-all rounded border border-[#e5eaf1] bg-white px-2.5 py-2 text-[9px] text-[#1769e8]">{tab === "Cek Game" ? "/check-nick-game" : tab === "Region MLBB" ? "/check-region-mlbb" : "/check-nick-pln"}</code>
+            <code className="mt-2 block break-all rounded border border-[#e5eaf1] bg-white px-2.5 py-2 text-[9px] text-[#1769e8]">{tab === "Cek Game" ? (gameIsMlbb ? "/check-nick-game + /check-region-mlbb" : "/check-nick-game") : tab === "Region MLBB" ? "/check-nick-game + /check-region-mlbb" : "/check-nick-pln"}</code>
           </div>
           {error && <ResultBox tone="error" text={error} />}
-          {result && <ResultBox tone="success" text={tab === "PLN" ? `Nama pelanggan: ${result.customerName || "-"}` : tab === "Region MLBB" ? `Nickname: ${result.nickname || "-"} · Region: ${result.region || "-"}` : `Nickname: ${result.nickname || "-"}`} />}
+          {result && <ResultBox tone="success" text={tab === "PLN" ? `Nama pelanggan: ${result.customerName || "-"}` : result.region ? `Nickname: ${result.nickname || "-"} · Region: ${result.region}` : `Nickname: ${result.nickname || "-"}`} />}
           <div className="rounded-md border border-[#e1e6ed] bg-white p-3">
             <div className="flex items-start gap-2 text-[9px] leading-4 text-[#52627a]"><ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-600" /><span>API key tetap tersimpan terenkripsi di backend dan tidak dikirim ke frontend pelanggan.</span></div>
           </div>
