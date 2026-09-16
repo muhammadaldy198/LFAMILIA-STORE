@@ -5,8 +5,9 @@ import test from "node:test";
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
-const pricing = fs.readFileSync(path.join(root, "lib/server/digiflazz-pricing.ts"), "utf8");
-const manager = fs.readFileSync(path.join(root, "components/admin-product-manager.tsx"), "utf8");
+const pricing = read("lib/server/digiflazz-pricing.ts");
+const manager = read("components/admin-product-manager.tsx");
+const workspace = read("components/admin-digiflazz-workspace.tsx");
 
 test("automatic DigiFlazz pricelist sync runs once per hour", () => {
   const worker = read("worker/index.ts");
@@ -28,16 +29,49 @@ test("admin product import reads the last cached pricelist instead of calling Di
   assert.match(pricing, /CREATE TABLE IF NOT EXISTS digiflazz_pricelist_cache/);
   assert.match(pricing, /FROM digiflazz_pricelist_cache/);
   assert.match(pricing, /writePriceListCache\(items\)/);
-  assert.match(route, /catalog: await listDigiflazzPriceList|const \[settings, catalog, cache\]/);
+  assert.match(route, /listDigiflazzPriceList/);
   assert.match(route, /getDigiflazzPriceListCacheMeta/);
 });
 
-test("seller price refresh preserves LFAMILIA provider max price", () => {
-  assert.match(pricing, /provider_max_price = COALESCE\(provider_max_price, \?\)/);
+test("LFAMILIA max price is a guard while sale price uses current provider cost", () => {
   assert.match(pricing, /const maxPrice = Number\(item\.provider_max_price\) > 0/);
-  assert.match(pricing, /sale\(maxPrice, item\.margin_type, item\.margin_value\)/);
+  assert.match(pricing, /const sellingPrice = sale\(Number\(sourceItem\.price\), item\.margin_type, item\.margin_value\)/);
+  assert.doesNotMatch(pricing, /sale\(maxPrice, item\.margin_type, item\.margin_value\)/);
+  assert.match(pricing, /provider_max_price = COALESCE\(provider_max_price, \?\)/);
 });
 
-test("seller monitor clears stale success message before refresh", () => {
+test("Digiflazz workspace owns LFAMILIA max price and margin controls", () => {
+  const route = read("app/api/admin/digiflazz-pricing/route.ts");
+  const proxy = read("app/api/panel/[...path]/route.ts");
+  assert.match(route, /export async function PUT/);
+  assert.match(route, /updateDigiflazzPackagePricing/);
+  assert.match(proxy, /digiflazzPricing\.PUT/);
+  assert.match(workspace, /Price Control LFAMILIA/);
+  assert.match(workspace, /Max Price LFAMILIA/);
+  assert.match(workspace, /Harga Digiflazz/);
+  assert.match(workspace, /Harga Jual/);
+  assert.match(workspace, /method: "PUT"/);
+});
+
+test("Digiflazz filters use provider category and brand as subcategory", () => {
+  assert.match(workspace, /item\.category/);
+  assert.match(workspace, /item\.brand/);
+  assert.match(workspace, /Semua Subkategori/);
+  assert.match(workspace, /Kategori → Subkategori \/ Brand → SKU/);
+  assert.doesNotMatch(workspace, /Steam Wallet.*Google Play/);
+});
+
+test("product save cannot overwrite existing Digiflazz price control", () => {
+  const route = read("app/api/admin/products/route.ts");
+  const providerRoute = read("app/api/admin/product-package-provider/route.ts");
+  assert.match(route, /captureDigiflazzPricing/);
+  assert.match(route, /removePricingAuthorityFromProduct/);
+  assert.match(route, /restoreDigiflazzPricing/);
+  assert.match(route, /providerMaxPrice: null/);
+  assert.match(providerRoute, /Product management owns the SKU mapping only/);
+  assert.doesNotMatch(providerRoute, /SKU dan Max Price DigiFlazz wajib diisi/);
+});
+
+test("seller monitor clears stale success message before refresh in legacy product editor", () => {
   assert.match(manager, /setMonitorRefreshing\(true\);\s*setError\(""\);\s*setMessage\(""\);/);
 });
