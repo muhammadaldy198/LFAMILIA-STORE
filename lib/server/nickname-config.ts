@@ -20,7 +20,7 @@ export const LEGACY_KOKINPAY_GAME_CODES: Readonly<Record<string, string>> = {
 };
 
 const GAME_CODE_BACKFILL_OPERATION_KEY = "kokinpay_nickname_game_code_backfill_0032";
-const GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v2";
+const GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v3_preserve_fields";
 let backfillPromise: Promise<void> | null = null;
 
 type OperationRow = { completed_at: string };
@@ -90,7 +90,27 @@ export async function ensureKokinpayNicknameGameCodeBackfill() {
           db.prepare(`UPDATE products
             SET needs_server = 1,
                 target_template = '{{destination}}{{server}}',
-                input_fields_json = '[{"id":"destination","label":"UID","placeholder":"Masukkan UID","required":true},{"id":"server","label":"Server","placeholder":"Masukkan Server","required":true}]'
+                input_fields_json = CASE
+                  WHEN input_fields_json IS NULL OR trim(input_fields_json) = '' OR json_valid(input_fields_json) = 0
+                    THEN '[{"id":"destination","label":"UID","placeholder":"Masukkan UID","required":true},{"id":"server","label":"Server","placeholder":"Masukkan Server","required":true}]'
+                  WHEN json_type(input_fields_json) <> 'array' OR json_array_length(input_fields_json) = 0
+                    THEN '[{"id":"destination","label":"UID","placeholder":"Masukkan UID","required":true},{"id":"server","label":"Server","placeholder":"Masukkan Server","required":true}]'
+                  WHEN json_type(input_fields_json, '$[0]') <> 'object'
+                    THEN '[{"id":"destination","label":"UID","placeholder":"Masukkan UID","required":true},{"id":"server","label":"Server","placeholder":"Masukkan Server","required":true}]'
+                  WHEN json_array_length(input_fields_json) = 1
+                    THEN json_insert(
+                      input_fields_json,
+                      '$[#]',
+                      json_object('id', 'server', 'label', 'Server', 'placeholder', 'Masukkan Server', 'required', 1)
+                    )
+                  WHEN json_type(input_fields_json, '$[1]') = 'object'
+                    THEN json_set(input_fields_json, '$[1].required', 1)
+                  ELSE json_set(
+                    input_fields_json,
+                    '$[1]',
+                    json_object('id', 'server', 'label', 'Server', 'placeholder', 'Masukkan Server', 'required', 1)
+                  )
+                END
             WHERE slug = 'genshin-impact'
               AND nickname_game_code = 'genshin-impact'`),
           db.prepare(
