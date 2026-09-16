@@ -87,9 +87,11 @@ https://api.kokinpay.com/v1/check-region
 https://api.kokinpay.com/v1/check-pln
 ```
 
-Menu **Validasi Akun** dipakai untuk tes nickname game, nickname + region Mobile Legends, PLN, dan melihat daftar game code. Produk mengaktifkan validasi melalui **Produk → Input Customer → Kode Game Nickname**. Kode kosong berarti produk tidak menjalankan validasi nickname.
+Menu **Validasi Akun** dapat dipakai **Admin dan Super Admin** untuk tes nickname game, nickname + region Mobile Legends, PLN, serta melihat daftar game code dan kebutuhan Server/Zone. Staff tidak memiliki akses. Credential KokinPay tetap hanya dikelola Super Admin melalui Integrasi.
 
-Mobile Legends membutuhkan User ID + Server/Zone dan wajib lolos nickname serta region. Checkout melakukan verifikasi ulang di server sebelum order/pembayaran dibuat; hasil dari browser tidak dipercaya sebagai sumber kebenaran.
+Produk mengaktifkan validasi melalui **Produk → Input Customer → Kode Game Nickname**. Kode kosong berarti produk tidak menjalankan validasi nickname. Game code yang ditandai membutuhkan Server/Zone harus memakai Checkout Type **ID + Server**; backend menegakkan aturan tersebut pada konfigurasi produk dan saat checkout.
+
+Mobile Legends membutuhkan User ID + Server/Zone dan wajib lolos nickname serta region. Genshin Impact juga membutuhkan Server dan produk legacy diperbaiki oleh compatibility repair terpisah. Checkout selalu melakukan verifikasi ulang di server sebelum order/pembayaran dibuat; hasil dari browser tidak dipercaya sebagai sumber kebenaran.
 
 ## VPS Relay
 
