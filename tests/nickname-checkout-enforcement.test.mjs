@@ -72,14 +72,14 @@ test("KokinPay PLN tool uses active v1 route and fails closed on empty results",
   assert.doesNotMatch(route, /api\.kokinpay\.com\/check-nick-pln/);
 });
 
-test("KokinPay classifies only known input HTTP statuses as validation errors", () => {
+test("KokinPay nickname and PLN flows share one HTTP failure classifier", () => {
   const checker = read("lib/server/nickname-check.ts");
   const adminRoute = read("app/api/admin/nickname-tools/route.ts");
-  assert.match(checker, /if \(status === 401 \|\| status === 403\)/);
-  assert.match(checker, /if \(status === 400 \|\| status === 404\)/);
+  assert.match(checker, /classifyKokinpayFailure/);
+  assert.match(checker, /const kind = classifyKokinpayFailure\(status\)/);
+  assert.match(adminRoute, /classifyKokinpayFailure/);
+  assert.match(adminRoute, /const kind = classifyKokinpayFailure\(response\.status\)/);
   assert.doesNotMatch(checker, /data\.status === false/);
-  assert.match(adminRoute, /if \(response\.status === 401 \|\| response\.status === 403\)/);
-  assert.match(adminRoute, /if \(response\.status === 400 \|\| response\.status === 404\)/);
   assert.doesNotMatch(adminRoute, /payload\.status === false/);
 });
 
