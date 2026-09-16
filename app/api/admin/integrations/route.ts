@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getD1 } from "@/db";
 import { requireAdminSession } from "@/lib/server/admin";
 import { dokuApiOrigin, testDokuB2BConnection } from "@/lib/server/doku-connection-test";
 import {
@@ -43,6 +44,22 @@ const schema = z.discriminatedUnion("action", [
   relayTestInput,
   dokuTestInput,
 ]);
+
+async function invalidateDigiflazzOperationalCache() {
+  const db = getD1();
+  for (const sql of [
+    "DELETE FROM digiflazz_pricelist_cache",
+    "DELETE FROM digiflazz_seller_monitor",
+    "UPDATE digiflazz_pricelist_sync_state SET lock_token = NULL, locked_until = NULL, last_success_at = NULL WHERE id = 1",
+  ]) {
+    try {
+      await db.prepare(sql).run();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/no such table/i.test(message)) throw error;
+    }
+  }
+}
 
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
@@ -89,7 +106,13 @@ export async function PUT(request: Request) {
         await saveIntegrationProfile(input);
       }
     } else {
+      const before = input.selections.digiflazzEnvironment
+        ? (await getIntegrationOverview()).selections.digiflazzEnvironment
+        : null;
       await saveIntegrationSelections(input.selections);
+      if (input.selections.digiflazzEnvironment && before !== input.selections.digiflazzEnvironment) {
+        await invalidateDigiflazzOperationalCache();
+      }
     }
     return Response.json({ ok: true, overview: await getIntegrationOverview() });
   } catch (error) {
