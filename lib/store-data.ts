@@ -55,6 +55,7 @@ export type StoreProduct = {
   packageTabsEnabled?: boolean;
   packageTabs?: string[];
   inputFields?: ProductInputField[];
+  nicknameRequired?: boolean;
   needsServer?: boolean;
   inputLabel: string;
   inputPlaceholder: string;
