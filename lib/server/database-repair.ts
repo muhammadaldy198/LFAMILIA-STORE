@@ -4,6 +4,7 @@ let repairPromise: Promise<void> | null = null;
 
 const FINAL_AUDIT_MIGRATION = "0029_final_source_audit_remediation.sql";
 const KOKINPAY_NICKNAME_MIGRATION = "0032_kokinpay_nickname_game_codes.sql";
+const DIGIFLAZZ_MAX_PRICE_MIGRATION = "0033_digiflazz_max_price.sql";
 const FINAL_SCHEMA_OBJECTS = [
   "promotion_reservations",
   "promotion_reservations_expiry_idx",
@@ -138,7 +139,7 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
     // every fresh Worker isolate.
     const [ledger, products, packages, settings, orders, topups, vouchers, flash, objects] =
       await db.batch([
-        db.prepare("SELECT name FROM d1_migrations WHERE name = ? LIMIT 1").bind(FINAL_AUDIT_MIGRATION),
+        db.prepare("SELECT name FROM d1_migrations WHERE name IN (?, ?)").bind(FINAL_AUDIT_MIGRATION, DIGIFLAZZ_MAX_PRICE_MIGRATION),
         db.prepare("PRAGMA table_info(products)"),
         db.prepare("PRAGMA table_info(product_packages)"),
         db.prepare("PRAGMA table_info(store_settings)"),
@@ -159,6 +160,7 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
       ]);
 
     if (!resultRows(ledger).some((row) => row.name === FINAL_AUDIT_MIGRATION)) return false;
+    if (!resultRows(ledger).some((row) => row.name === DIGIFLAZZ_MAX_PRICE_MIGRATION)) return false;
 
     const names = (result: { results?: unknown[] }) =>
       new Set(resultRows(result).map((row) => String(row.name ?? "")));
@@ -321,6 +323,11 @@ export async function ensureLegacyDatabaseColumns() {
           ELSE 'direct'
         END
         WHERE delivery_mode IS NULL`);
+      await runSchemaStatement(`UPDATE product_packages
+        SET provider_max_price = supplier_price
+        WHERE provider_code = 'digiflazz'
+          AND provider_max_price IS NULL
+          AND supplier_price IS NOT NULL`);
       await runSchemaStatement(`UPDATE orders
         SET provider_max_price_snapshot = (
           SELECT pp.provider_max_price
@@ -352,6 +359,7 @@ export async function ensureLegacyDatabaseColumns() {
       try {
         const requiredColumns: Array<[string, string[]]> = [
           ["products", ["nickname_game_code"]],
+          ["product_packages", ["provider_max_price"]],
           ["orders", ["delivery_mode", "supplier_cost_snapshot", "provider_max_price_snapshot", "doku_environment"]],
           ["wallet_topups", ["doku_environment", "external_checkout_key"]],
           ["discount_vouchers", ["reserved_count"]],
@@ -400,6 +408,9 @@ export async function ensureLegacyDatabaseColumns() {
             await db.prepare(
               "INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)",
             ).bind(KOKINPAY_NICKNAME_MIGRATION).run();
+            await db.prepare(
+              "INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)",
+            ).bind(DIGIFLAZZ_MAX_PRICE_MIGRATION).run();
           }
         }
       } catch (error) {
