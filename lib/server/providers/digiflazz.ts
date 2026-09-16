@@ -84,6 +84,10 @@ export function getDigiflazzReadiness() {
 
 let balanceCache: { value: number; checkedAt: number } | null = null;
 
+export function clearDigiflazzBalanceCache() {
+  balanceCache = null;
+}
+
 export async function getDigiflazzBalance() {
   if (isAutomatedTestRuntime() && runtimeConfig().environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
   const { environment, username, apiKey, apiUrl } = runtimeConfig();
@@ -164,15 +168,15 @@ export const digiflazzAdapter: ProviderAdapter = {
     if (!response.ok || !data) {
       throw new Error("DigiFlazz tidak memberikan jawaban transaksi yang valid.");
     }
-    if (data.ref_id && data.ref_id !== order.referenceId) {
+    if (data.ref_id !== order.referenceId) {
       throw new Error("Ref ID jawaban DigiFlazz tidak cocok dengan order LFAMILIA.");
     }
-    if (data.buyer_sku_code && data.buyer_sku_code !== order.providerSku) {
+    if (data.buyer_sku_code !== order.providerSku) {
       throw new Error("SKU jawaban DigiFlazz tidak cocok dengan order LFAMILIA.");
     }
 
     return {
-      externalId: data.ref_id ?? order.referenceId,
+      externalId: data.ref_id,
       status: mapStatus(data.status),
       message:
         data.message ?? `Status DigiFlazz: ${data.status ?? "tidak diketahui"}`,
