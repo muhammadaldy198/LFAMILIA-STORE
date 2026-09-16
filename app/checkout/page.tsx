@@ -41,7 +41,6 @@ import {
   type PaymentChannel,
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
-import { supportsNicknameLookup } from "@/lib/nickname-policy";
 import { formatRupiah, type StoreProduct } from "@/lib/store-data";
 import type { CustomerSession } from "@/lib/server/customer-auth";
 
@@ -274,9 +273,9 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const isVoucherStock = fulfillmentMode === "voucher_stock";
   const providerReady = Boolean(selectedPackage?.fulfillmentReady);
   const nicknameRequired =
-    !isVoucherProduct && supportsNicknameLookup(product.slug);
+    !isVoucherProduct && Boolean(product.nicknameRequired);
   const canCheckNickname = nicknameRequired;
-  const lookupNeedsServer = product.slug === "mobile-legends";
+  const lookupNeedsServer = Boolean(product.needsServer);
   const lookupKey = `${product.slug}:${destination.trim()}:${server.trim()}`;
   const visibleNickname: NicknameState =
     nickname.key === lookupKey ? nickname : { status: "idle" };
