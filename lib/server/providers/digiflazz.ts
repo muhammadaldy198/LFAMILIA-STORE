@@ -127,7 +127,8 @@ export const digiflazzAdapter: ProviderAdapter = {
     const { environment, username, apiKey, apiUrl } = runtimeConfig();
     if (isAutomatedTestRuntime() && environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
 
-    if (!Number.isInteger(order.maxProviderPrice) || order.maxProviderPrice < 1) {
+    const maxProviderPrice = order.maxProviderPrice;
+    if (!Number.isInteger(maxProviderPrice) || maxProviderPrice < 1) {
       throw new Error("Max Price DigiFlazz pada order tidak valid.");
     }
 
@@ -138,7 +139,7 @@ export const digiflazzAdapter: ProviderAdapter = {
       ref_id: order.referenceId,
       sign: hashHex("md5", `${username}${apiKey}${order.referenceId}`),
       testing: environment === "development",
-      max_price: order.maxProviderPrice,
+      max_price: maxProviderPrice,
       cb_url: `${publicBaseUrl}/api/fulfillment/digiflazz/callback`,
       ...(order.customerNo.includes(".") ? { allow_dot: true } : {}),
     };
