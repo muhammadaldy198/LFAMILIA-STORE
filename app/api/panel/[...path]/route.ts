@@ -17,6 +17,7 @@ import * as productInput from "@/app/api/admin/product-input/route";
 import * as productPackageProvider from "@/app/api/admin/product-package-provider/route";
 import * as productPackageStatus from "@/app/api/admin/product-package-status/route";
 import * as products from "@/app/api/admin/products/route";
+import * as nicknameTools from "@/app/api/admin/nickname-tools/route";
 import * as promotions from "@/app/api/admin/promotions/route";
 import * as reviews from "@/app/api/admin/reviews/route";
 import * as session from "@/app/api/admin/session/route";
@@ -56,6 +57,7 @@ const routes: Record<string, RouteHandlers> = {
   "product-package-provider": { PATCH: productPackageProvider.PATCH },
   "product-package-status": { PATCH: productPackageStatus.PATCH },
   products: { GET: products.GET, POST: products.POST, PATCH: products.PATCH, DELETE: products.DELETE },
+  "nickname-tools": { POST: nicknameTools.POST },
   promotions: { GET: promotions.GET, POST: promotions.POST, DELETE: promotions.DELETE },
   reviews: { GET: reviews.GET, PATCH: reviews.PATCH },
   session: { GET: session.GET },
