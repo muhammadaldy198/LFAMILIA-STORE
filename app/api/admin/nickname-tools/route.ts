@@ -46,7 +46,7 @@ function apiKey() {
 async function checkPln(customerNumber: string) {
   let response: Response;
   try {
-    response = await fetch("https://api.kokinpay.com/check-nick-pln", {
+    response = await fetch("https://api.kokinpay.com/v1/check-pln", {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
       body: JSON.stringify({ api_key: apiKey(), customer_number: customerNumber }),
@@ -63,10 +63,14 @@ async function checkPln(customerNumber: string) {
     throw new NicknameServiceError();
   }
   if (!response.ok || payload.status !== true) {
-    if (response.status === 400 || response.status === 404 || payload.status === false) {
-      throw new NicknameValidationError(text(payload.message) || "Data PLN tidak ditemukan atau tidak valid.");
+    const message = text(payload.message);
+    if (response.status === 401 || response.status === 403) {
+      throw new NicknameServiceError(message || "API Key KokinPay tidak valid atau tidak dapat digunakan.");
     }
-    throw new NicknameServiceError(text(payload.message) || undefined);
+    if (response.status === 400 || response.status === 404 || payload.status === false) {
+      throw new NicknameValidationError(message || "Data PLN tidak ditemukan atau tidak valid.");
+    }
+    throw new NicknameServiceError(message || undefined);
   }
 
   const customerName = text(payload.data?.customer_name) || text(payload.data?.name);
