@@ -1,7 +1,7 @@
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
-export type IntegrationProvider = "doku" | "midtrans" | "digiflazz" | "melostore" | "resend" | "relay" | "security";
+export type IntegrationProvider = "doku" | "midtrans" | "digiflazz" | "kokinpay" | "resend" | "relay" | "security";
 export type IntegrationMode = "direct" | "service";
 export type IntegrationEnvironment = "sandbox" | "production" | "development" | "global";
 
@@ -12,10 +12,7 @@ type RuntimeLike = Record<string, unknown> & {
   DOKU_ENV?: string;
   MIDTRANS_ENV?: string;
   DIGIFLAZZ_ENV?: string;
-  MELOSTORE_API_KEY?: string;
-  MELOSTORE_SECRET_KEY?: string;
-  MELOSTORE_API_URL?: string;
-  NICKNAME_API_KEY?: string;
+  KOKINPAY_API_KEY?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   RESEND_API_URL?: string;
@@ -66,7 +63,7 @@ export const profileFields: Record<string, readonly string[]> = {
   "doku:direct": ["clientId", "secretKey", "privateKey", "privateKeyPassphrase", "apiUrl", "qrisMerchantId", "qrisTerminalId", "qrisPostalCode", "vaConfigJson"],
   "midtrans:direct": ["merchantId", "clientId", "clientSecret", "partnerId", "privateKey", "privateKeyPassphrase", "midtransPublicKey", "channelId", "apiUrl"],
   "digiflazz:direct": ["username", "apiKey", "transactionApiUrl", "priceListUrl", "webhookSecret"],
-  "melostore:service": ["apiKey", "secretKey", "apiUrl", "nicknameApiKey"],
+  "kokinpay:service": ["apiKey"],
   "resend:service": ["apiKey", "fromEmail", "apiUrl", "deliveryChannel"],
   "relay:service": ["digiflazzOrigin", "midtransOrigin", "hosts", "token"],
   "security:service": ["voucherEncryptionKey"],
@@ -83,7 +80,7 @@ function profileFieldKey(provider: IntegrationProvider, mode: IntegrationMode) {
 function isProfileSupported(provider: IntegrationProvider, mode: IntegrationMode, environment: IntegrationEnvironment) {
   if (provider === "doku" || provider === "midtrans") return mode === "direct" && (environment === "sandbox" || environment === "production");
   if (provider === "digiflazz") return mode === "direct" && (environment === "development" || environment === "production");
-  return (provider === "melostore" || provider === "resend" || provider === "relay" || provider === "security")
+  return (provider === "kokinpay" || provider === "resend" || provider === "relay" || provider === "security")
     && mode === "service"
     && environment === "global";
 }
@@ -103,7 +100,7 @@ function withoutDashboardManagedRuntime(source: RuntimeLike) {
     "DOKU_",
     "MIDTRANS_",
     "DIGIFLAZZ_",
-    "MELOSTORE_",
+    "KOKINPAY_",
     "RESEND_",
     "PROVIDER_RELAY_",
   ];
@@ -435,7 +432,7 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
       if (profile.provider === "digiflazz" && profile.mode === "direct" && (profile.environment === "development" || profile.environment === "production")) {
         applyDigiflazzConfig(target, profile.environment, config, profile.environment === digiflazzEnvironment);
       }
-      if (profile.provider === "melostore" && profile.mode === "service" && profile.environment === "global") applyMelostoreConfig(target, config);
+      if (profile.provider === "kokinpay" && profile.mode === "service" && profile.environment === "global") applyMelostoreConfig(target, config);
       if (profile.provider === "resend" && profile.mode === "service" && profile.environment === "global") applyResendConfig(target, config);
       if (profile.provider === "relay" && profile.mode === "service" && profile.environment === "global") applyRelayConfig(target, config);
       if (profile.provider === "security" && profile.mode === "service" && profile.environment === "global") applySecurityConfig(target, config);
