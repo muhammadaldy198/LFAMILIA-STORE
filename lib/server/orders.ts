@@ -506,13 +506,19 @@ export async function applyPaymentStatus(
   status: "paid" | "pending" | "expired" | "failed",
 ) {
   const db = getD1();
+
+  // Gateway notifications may arrive late or out of order. Only a currently
+  // pending invoice may make a payment-state transition; terminal invoices
+  // must never be reopened or fulfilled by an old callback.
+  if (status === "pending") return false;
+
   if (status === "paid") {
     const nextFulfillment =
       order.fulfillment_type === "manual" ? "manual_pending" : "processing";
     const result = await db
       .prepare(
         `UPDATE orders SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND payment_status <> 'paid'`,
+       WHERE id = ? AND payment_status = 'pending'`,
       )
       .bind(nextFulfillment, order.id)
       .run();
@@ -521,14 +527,17 @@ export async function applyPaymentStatus(
       await consumeOrderPromotion(order.voucher_code, order.flash_sale_id, order.id);
     return changed;
   }
-  await db
+
+  const result = await db
     .prepare(
       `UPDATE orders SET payment_status = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE id = ? AND payment_status <> 'paid'`,
+     WHERE id = ? AND payment_status = 'pending'`,
     )
     .bind(status, order.id)
     .run();
-  if (status === "expired" || status === "failed") await releaseExternalPromotion(order.id);
+  if (Number(result.meta.changes ?? 0) > 0) {
+    await releaseExternalPromotion(order.id);
+  }
   return false;
 }
 
