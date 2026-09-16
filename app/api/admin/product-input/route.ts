@@ -75,20 +75,29 @@ export async function PATCH(request: Request) {
       ...(needsServer ? [{ id: "server", label: labelServer, placeholder: `Masukkan ${labelServer}`, required: true }] : []),
     ];
     const targetTemplate = needsServer ? "{{destination}}{{server}}" : "{{destination}}";
+    const nicknameGameCodeProvided = input.nicknameGameCode !== undefined;
+    const nicknameGameCode = input.nicknameGameCode?.trim() || null;
     await ensureKokinpayNicknameGameCodeBackfill();
-    const result = await getD1().prepare(`UPDATE products
-      SET input_label = ?, input_placeholder = ?, input_fields_json = ?, needs_server = ?, target_template = ?, nickname_game_code = ?, updated_at = CURRENT_TIMESTAMP
+    const db = getD1();
+    const result = await db.prepare(`UPDATE products
+      SET input_label = ?, input_placeholder = ?, input_fields_json = ?, needs_server = ?, target_template = ?,
+          nickname_game_code = CASE WHEN ? = 1 THEN ? ELSE nickname_game_code END,
+          updated_at = CURRENT_TIMESTAMP
       WHERE slug = ?`).bind(
         input.labelId,
         `Masukkan ${input.labelId}`,
         JSON.stringify(fields),
         needsServer ? 1 : 0,
         targetTemplate,
-        input.nicknameGameCode?.trim() || null,
+        nicknameGameCodeProvided ? 1 : 0,
+        nicknameGameCode,
         input.slug,
       ).run();
     if (!result.meta.changes) return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
-    return Response.json({ ok: true, input: { ...input, labelServer, nicknameGameCode: input.nicknameGameCode?.trim() || "", targetTemplate } });
+    const updated = await db.prepare(`SELECT slug, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
+      FROM products WHERE slug = ? LIMIT 1`).bind(input.slug).first<InputRow>();
+    if (!updated) return Response.json({ error: "Produk tidak ditemukan setelah diperbarui." }, { status: 404 });
+    return Response.json({ ok: true, input: serialize(updated) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message || "Pengaturan input tidak valid." : error instanceof Error ? error.message : "Pengaturan input gagal disimpan.";
     return Response.json({ error: message }, { status: 400 });
