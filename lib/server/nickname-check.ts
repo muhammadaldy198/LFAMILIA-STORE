@@ -53,29 +53,24 @@ function nonEmptyString(values: unknown[]) {
   )?.trim();
 }
 
-function errorMessage(data: KokinpayResponse) {
-  return nonEmptyString([data.message]);
-}
-
 function validateUserId(userId: string) {
   const value = userId.trim();
   if (value.length < 2) throw new NicknameValidationError("ID akun belum valid.");
   return value;
 }
 
-function throwKokinpayError(status: number, data: KokinpayResponse): never {
-  const message = errorMessage(data);
+function throwKokinpayError(status: number): never {
   if (status === 401 || status === 403) {
     throw new NicknameServiceError(
-      message || "Layanan verifikasi akun belum terautentikasi dengan benar.",
+      "Layanan verifikasi akun belum terautentikasi dengan benar.",
     );
   }
   if (status === 400 || status === 404) {
     throw new NicknameValidationError(
-      message || "ID, Server, atau kode game tidak valid.",
+      "ID, Server, atau kode game tidak valid.",
     );
   }
-  throw new NicknameServiceError(message || undefined);
+  throw new NicknameServiceError();
 }
 
 async function postKokinpay(
@@ -104,7 +99,7 @@ async function postKokinpay(
   } catch {
     throw new NicknameServiceError();
   }
-  if (!upstream.ok || data.status !== true) throwKokinpayError(upstream.status, data);
+  if (!upstream.ok || data.status !== true) throwKokinpayError(upstream.status);
   return data;
 }
 
