@@ -83,6 +83,16 @@ test("KokinPay classifies only known input HTTP statuses as validation errors", 
   assert.doesNotMatch(adminRoute, /payload\.status === false/);
 });
 
+test("public verification never forwards raw upstream KokinPay error messages", () => {
+  const checker = read("lib/server/nickname-check.ts");
+  const classifierStart = checker.indexOf("function throwKokinpayError");
+  const classifierEnd = checker.indexOf("async function postKokinpay", classifierStart);
+  assert.ok(classifierStart >= 0 && classifierEnd > classifierStart);
+  const classifier = checker.slice(classifierStart, classifierEnd);
+  assert.doesNotMatch(classifier, /data\.message|message\s*\|\|/);
+  assert.match(checker, /throwKokinpayError\(upstream\.status\)/);
+});
+
 test("public nickname response never exposes integration identity", () => {
   const route = read("app/api/nickname/route.ts");
   assert.doesNotMatch(route, /provider:/);
