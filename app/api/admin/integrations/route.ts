@@ -45,7 +45,7 @@ const schema = z.discriminatedUnion("action", [
   dokuTestInput,
 ]);
 
-async function assertDigiflazzEnvironmentCanSwitch() {
+async function assertNoActiveDigiflazzOrders(action: string) {
   const row = await getD1().prepare(`
     SELECT COUNT(*) AS count
     FROM orders
@@ -60,7 +60,7 @@ async function assertDigiflazzEnvironmentCanSwitch() {
   `).first<{ count: number }>();
   const count = Number(row?.count ?? 0);
   if (count > 0) {
-    throw new Error(`Environment DigiFlazz tidak boleh diganti karena masih ada ${count} pesanan DigiFlazz yang belum terminal. Selesaikan/expire pesanan tersebut terlebih dahulu.`);
+    throw new Error(`${action} tidak boleh dilakukan karena masih ada ${count} pesanan DigiFlazz yang belum terminal. Selesaikan/expire pesanan tersebut terlebih dahulu.`);
   }
 }
 
@@ -121,6 +121,15 @@ export async function PUT(request: Request) {
             apiUrl: dokuApiOrigin(input.environment),
           },
         });
+      } else if (input.provider === "digiflazz" && (input.environment === "development" || input.environment === "production")) {
+        const activeEnvironment = (await getIntegrationOverview()).selections.digiflazzEnvironment;
+        const activeProfileChanged = input.environment === activeEnvironment &&
+          (Object.values(input.values).some((value) => value.trim()) || input.clearFields.length > 0);
+        if (activeProfileChanged) {
+          await assertNoActiveDigiflazzOrders("Kredensial DigiFlazz aktif");
+        }
+        await saveIntegrationProfile(input);
+        if (activeProfileChanged) await invalidateDigiflazzOperationalCache();
       } else {
         await saveIntegrationProfile(input);
       }
@@ -131,7 +140,7 @@ export async function PUT(request: Request) {
       const changingDigiflazzEnvironment = Boolean(
         input.selections.digiflazzEnvironment && before !== input.selections.digiflazzEnvironment,
       );
-      if (changingDigiflazzEnvironment) await assertDigiflazzEnvironmentCanSwitch();
+      if (changingDigiflazzEnvironment) await assertNoActiveDigiflazzOrders("Environment DigiFlazz");
       await saveIntegrationSelections(input.selections);
       if (changingDigiflazzEnvironment) await invalidateDigiflazzOperationalCache();
     }
