@@ -74,6 +74,49 @@ type RawPriceItem = {
   desc?: string;
 };
 
+type CachedPriceRow = {
+  buyer_sku_code: string;
+  product_name: string;
+  category: string;
+  brand: string;
+  type: string;
+  seller_name: string;
+  price: number;
+  buyer_product_status: number;
+  seller_product_status: number;
+  unlimited_stock: number;
+  stock: number;
+  multi: number;
+  start_cut_off: string;
+  end_cut_off: string;
+  description: string;
+  synced_at: string;
+};
+
+export async function ensureDigiflazzPriceListCacheTable() {
+  await getD1().prepare(`
+    CREATE TABLE IF NOT EXISTS digiflazz_pricelist_cache (
+      buyer_sku_code TEXT PRIMARY KEY,
+      product_name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT '',
+      brand TEXT NOT NULL DEFAULT '',
+      type TEXT NOT NULL DEFAULT '',
+      seller_name TEXT NOT NULL DEFAULT '',
+      price INTEGER NOT NULL,
+      buyer_product_status INTEGER NOT NULL DEFAULT 1,
+      seller_product_status INTEGER NOT NULL DEFAULT 1,
+      unlimited_stock INTEGER NOT NULL DEFAULT 0,
+      stock INTEGER NOT NULL DEFAULT 0,
+      multi INTEGER NOT NULL DEFAULT 0,
+      start_cut_off TEXT NOT NULL DEFAULT '00:00',
+      end_cut_off TEXT NOT NULL DEFAULT '00:00',
+      description TEXT NOT NULL DEFAULT '',
+      synced_at TEXT NOT NULL
+    )
+  `).run();
+  await getD1().prepare("CREATE INDEX IF NOT EXISTS digiflazz_pricelist_cache_brand_idx ON digiflazz_pricelist_cache (brand, product_name)").run();
+}
+
 async function fetchPriceListItems(): Promise<DigiflazzPriceListItem[]> {
   const env = getRuntimeEnv<Env>();
   const environment = requireRuntimeChoice(env.DIGIFLAZZ_ENV, "DIGIFLAZZ_ENV", ["development", "production"] as const);
@@ -110,7 +153,7 @@ async function fetchPriceListItems(): Promise<DigiflazzPriceListItem[]> {
     throw new Error(detail ? `DigiFlazz menolak price list: ${detail}${rc}` : `DigiFlazz price list gagal dengan HTTP ${response.status}.`);
   }
 
-  return payload.data
+  const items = payload.data
     .filter((item) => item.buyer_sku_code && Number.isFinite(Number(item.price)))
     .map((item) => ({
       buyerSkuCode: item.buyer_sku_code!.trim(),
@@ -129,16 +172,101 @@ async function fetchPriceListItems(): Promise<DigiflazzPriceListItem[]> {
       endCutOff: item.end_cut_off || "00:00",
       description: item.desc?.trim() || "",
     }));
+  if (!items.length) throw new Error("DigiFlazz mengembalikan price list kosong; cache lama dipertahankan.");
+  return items;
+}
+
+async function writePriceListCache(items: DigiflazzPriceListItem[]) {
+  await ensureDigiflazzPriceListCacheTable();
+  const db = getD1();
+  const syncedAt = new Date().toISOString();
+  const statements = items.map((item) => db.prepare(`
+    INSERT INTO digiflazz_pricelist_cache (
+      buyer_sku_code, product_name, category, brand, type, seller_name, price,
+      buyer_product_status, seller_product_status, unlimited_stock, stock, multi,
+      start_cut_off, end_cut_off, description, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(buyer_sku_code) DO UPDATE SET
+      product_name = excluded.product_name,
+      category = excluded.category,
+      brand = excluded.brand,
+      type = excluded.type,
+      seller_name = excluded.seller_name,
+      price = excluded.price,
+      buyer_product_status = excluded.buyer_product_status,
+      seller_product_status = excluded.seller_product_status,
+      unlimited_stock = excluded.unlimited_stock,
+      stock = excluded.stock,
+      multi = excluded.multi,
+      start_cut_off = excluded.start_cut_off,
+      end_cut_off = excluded.end_cut_off,
+      description = excluded.description,
+      synced_at = excluded.synced_at
+  `).bind(
+    item.buyerSkuCode,
+    item.productName,
+    item.category,
+    item.brand,
+    item.type,
+    item.sellerName,
+    item.price,
+    item.buyerProductStatus ? 1 : 0,
+    item.sellerProductStatus ? 1 : 0,
+    item.unlimitedStock ? 1 : 0,
+    item.stock,
+    item.multi ? 1 : 0,
+    item.startCutOff,
+    item.endCutOff,
+    item.description,
+    syncedAt,
+  ));
+  for (let index = 0; index < statements.length; index += 100) {
+    await db.batch(statements.slice(index, index + 100));
+  }
+  await db.prepare("DELETE FROM digiflazz_pricelist_cache WHERE synced_at <> ?").bind(syncedAt).run();
+  return syncedAt;
+}
+
+function mapCachedRow(row: CachedPriceRow): DigiflazzPriceListItem {
+  return {
+    buyerSkuCode: row.buyer_sku_code,
+    productName: row.product_name,
+    category: row.category,
+    brand: row.brand,
+    type: row.type,
+    sellerName: row.seller_name,
+    price: Number(row.price),
+    buyerProductStatus: row.buyer_product_status !== 0,
+    sellerProductStatus: row.seller_product_status !== 0,
+    unlimitedStock: row.unlimited_stock === 1,
+    stock: Number(row.stock),
+    multi: row.multi === 1,
+    startCutOff: row.start_cut_off,
+    endCutOff: row.end_cut_off,
+    description: row.description,
+  };
 }
 
 export async function listDigiflazzPriceList() {
-  return (await fetchPriceListItems()).sort((a, b) =>
-    a.brand.localeCompare(b.brand) || a.productName.localeCompare(b.productName) || a.price - b.price,
-  );
+  await ensureDigiflazzPriceListCacheTable();
+  const rows = await getD1().prepare(`
+    SELECT buyer_sku_code, product_name, category, brand, type, seller_name, price,
+           buyer_product_status, seller_product_status, unlimited_stock, stock, multi,
+           start_cut_off, end_cut_off, description, synced_at
+    FROM digiflazz_pricelist_cache
+    ORDER BY brand ASC, product_name ASC, price ASC
+  `).all<CachedPriceRow>();
+  return rows.results.map(mapCachedRow);
 }
 
-async function fetchPriceList() {
-  const items = await fetchPriceListItems();
+export async function getDigiflazzPriceListCacheMeta() {
+  await ensureDigiflazzPriceListCacheTable();
+  const row = await getD1().prepare("SELECT COUNT(*) AS count, MAX(synced_at) AS synced_at FROM digiflazz_pricelist_cache")
+    .first<{ count: number; synced_at: string | null }>();
+  return { count: Number(row?.count ?? 0), lastSyncedAt: row?.synced_at ?? null };
+}
+
+function priceListMap(items: DigiflazzPriceListItem[]) {
   return new Map(items.map((item) => [item.buyerSkuCode, {
     buyer_sku_code: item.buyerSkuCode,
     product_name: item.productName,
@@ -158,10 +286,12 @@ async function fetchPriceList() {
   } satisfies RawPriceItem]));
 }
 
-async function syncRows(target?: { productId: number; packageSku?: string }) {
+async function syncRows(target?: { productId: number; packageSku?: string }, sourceItems?: DigiflazzPriceListItem[]) {
   await ensureLegacyDatabaseColumns();
   await ensureDigiflazzSellerMonitorTable();
-  const source = await fetchPriceList();
+  const items = sourceItems ?? await listDigiflazzPriceList();
+  if (!items.length) throw new Error("Cache pricelist DigiFlazz masih kosong. Jalankan Sync Pricelist sekali terlebih dahulu.");
+  const source = priceListMap(items);
   const query = target
     ? `SELECT p.id, p.provider_sku, p.provider_max_price, p.margin_type, p.margin_value,
         m.seller_name AS previous_seller_name, m.baseline_price AS previous_baseline_price
@@ -201,9 +331,11 @@ async function syncRows(target?: { productId: number; packageSku?: string }) {
     const sellerProductStatus = sourceItem.seller_product_status !== false;
     const unlimitedStock = sourceItem.unlimited_stock === true;
     const stock = Number(sourceItem.stock ?? 0);
+    const maxPrice = Number(item.provider_max_price) > 0 ? Number(item.provider_max_price) : Number(sourceItem.price);
 
     return [
-      // Status seller tetap dipantau, tetapi tidak boleh mengubah tombol Aktif/Nonaktif katalog milik admin.
+      // Harga seller hanya memperbarui supplier_price. provider_max_price adalah batas modal LFAMILIA
+      // dan tidak boleh ikut berubah setiap seller mengganti harga.
       getD1().prepare(`UPDATE product_packages
         SET supplier_price = ?,
             provider_max_price = COALESCE(provider_max_price, ?),
@@ -213,11 +345,7 @@ async function syncRows(target?: { productId: number; packageSku?: string }) {
         .bind(
           sourceItem.price,
           sourceItem.price,
-          sale(
-            Number(item.provider_max_price) > 0 ? Number(item.provider_max_price) : sourceItem.price,
-            item.margin_type,
-            item.margin_value,
-          ),
+          sale(maxPrice, item.margin_type, item.margin_value),
           item.id,
         ),
       buildDigiflazzSellerMonitorStatement({
@@ -239,14 +367,17 @@ async function syncRows(target?: { productId: number; packageSku?: string }) {
   });
   if (statements.length) await getD1().batch(statements);
   if (target && updated === 0)
-    throw new Error(target.packageSku ? "SKU nominal tidak ditemukan pada price list DigiFlazz." : "Tidak ada SKU nominal produk ini pada price list DigiFlazz.");
+    throw new Error(target.packageSku ? "SKU nominal tidak ditemukan pada cache pricelist DigiFlazz." : "Tidak ada SKU nominal produk ini pada cache pricelist DigiFlazz.");
   return { updated, skipped: false };
 }
 
 export async function syncDigiflazzPrices(options: { force?: boolean } = {}) {
   const settings = await getPricingSettings();
-  if (!settings.isAutoSync && !options.force) return { updated: 0, skipped: true };
-  return syncRows();
+  if (!settings.isAutoSync && !options.force) return { updated: 0, cached: 0, lastSyncedAt: null, skipped: true };
+  const items = await fetchPriceListItems();
+  const lastSyncedAt = await writePriceListCache(items);
+  const result = await syncRows(undefined, items);
+  return { ...result, cached: items.length, lastSyncedAt };
 }
 
 export async function syncDigiflazzProduct(productId: number) {
