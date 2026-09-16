@@ -213,8 +213,10 @@ const worker = {
         .then(() => reconcileStaleDigiflazzProcessing(publicBaseUrl))
         .catch(() => undefined),
     ];
-    if (event.cron === "15 2 * * *") {
+    if (event.cron === "5 * * * *") {
       tasks.push(syncDigiflazzPrices().catch(() => undefined));
+    }
+    if (event.cron === "15 2 * * *") {
       tasks.push(cleanupOrphanStoreMedia().catch(() => undefined));
     }
     ctx.waitUntil(Promise.all(tasks));
