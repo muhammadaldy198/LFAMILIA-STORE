@@ -32,7 +32,6 @@ export type DigiflazzSellerMonitorItem = {
   marginType: "fixed" | "percent";
   marginValue: number;
   sellingPrice: number;
-  blockedByMaxPrice: boolean;
   buyerProductStatus: boolean;
   sellerProductStatus: boolean;
   unlimitedStock: boolean;
@@ -227,40 +226,32 @@ export async function readDigiflazzSellerMonitor() {
     last_checked_at: string | null;
   }>();
 
-  const items: DigiflazzSellerMonitorItem[] = rows.results.map((row) => {
-    const currentPrice = row.current_price === null ? null : Number(row.current_price);
-    const maxPrice = row.provider_max_price === null ? null : Number(row.provider_max_price);
-    const blockedByMaxPrice = Boolean(currentPrice !== null && maxPrice !== null && currentPrice > maxPrice);
-    const health: DigiflazzMonitorHealth = blockedByMaxPrice ? "critical" : row.health;
-    const maxPriceReason = blockedByMaxPrice ? `Harga Digiflazz ${currentPrice} melewati Max Price LFAMILIA ${maxPrice}.` : null;
-    return {
-      packageId: row.package_id,
-      productName: row.product_name,
-      packageLabel: row.package_label,
-      providerSku: row.provider_sku,
-      category: row.category || "Tanpa Kategori",
-      brand: row.brand || row.product_name,
-      sellerName: row.seller_name,
-      currentPrice,
-      baselinePrice: row.baseline_price,
-      maxPrice,
-      marginType: row.margin_type,
-      marginValue: Number(row.margin_value ?? 0),
-      sellingPrice: Number(row.selling_price),
-      blockedByMaxPrice,
-      buyerProductStatus: row.buyer_product_status !== 0,
-      sellerProductStatus: row.seller_product_status !== 0,
-      unlimitedStock: row.unlimited_stock === 1,
-      stock: Number(row.stock ?? 0),
-      multi: row.multi === 1,
-      startCutOff: row.start_cut_off,
-      endCutOff: row.end_cut_off,
-      description: row.description,
-      health,
-      alertReason: [maxPriceReason, row.alert_reason].filter(Boolean).join(" ") || null,
-      lastCheckedAt: row.last_checked_at,
-    };
-  });
+  const items: DigiflazzSellerMonitorItem[] = rows.results.map((row) => ({
+    packageId: row.package_id,
+    productName: row.product_name,
+    packageLabel: row.package_label,
+    providerSku: row.provider_sku,
+    category: row.category || "Tanpa Kategori",
+    brand: row.brand || row.product_name,
+    sellerName: row.seller_name,
+    currentPrice: row.current_price === null ? null : Number(row.current_price),
+    baselinePrice: row.baseline_price,
+    maxPrice: row.provider_max_price === null ? null : Number(row.provider_max_price),
+    marginType: row.margin_type,
+    marginValue: Number(row.margin_value ?? 0),
+    sellingPrice: Number(row.selling_price),
+    buyerProductStatus: row.buyer_product_status !== 0,
+    sellerProductStatus: row.seller_product_status !== 0,
+    unlimitedStock: row.unlimited_stock === 1,
+    stock: Number(row.stock ?? 0),
+    multi: row.multi === 1,
+    startCutOff: row.start_cut_off,
+    endCutOff: row.end_cut_off,
+    description: row.description,
+    health: row.health,
+    alertReason: row.alert_reason,
+    lastCheckedAt: row.last_checked_at,
+  }));
 
   return {
     items,
