@@ -100,8 +100,10 @@ test("customer actions tolerate empty responses and Digiflazz workspace exposes 
   const pricing = await readFile(path.join(root, "components/admin-digiflazz-workspace.tsx"), "utf8");
   assert.match(accounts, /const data = await readJson\(response\)/);
   assert.match(accounts, /Akun game gagal dihapus/);
-  assert.match(pricing, /onClick=\{syncPricelist\}/);
-  assert.match(pricing, /setDialog/);
+  assert.match(pricing, /onClick=\{\(\) => void syncNow\(\)\}/);
+  assert.match(pricing, /async function savePricing/);
+  assert.match(pricing, /method: "PUT"/);
+  assert.match(pricing, /setEditing/);
 });
 
 test("Contact Us uses brand marks for WhatsApp, Instagram, and Discord", async () => {
