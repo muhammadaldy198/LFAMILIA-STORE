@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import { kokinpayGameRequiresServer } from "@/lib/kokinpay-game-codes";
 import { classifyKokinpayFailure } from "@/lib/server/kokinpay-errors";
 import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
@@ -106,9 +107,9 @@ async function postKokinpay(
 }
 
 /**
- * Calls KokinPay's active game nickname API. Mobile Legends is special:
- * it must pass both /v1/check-nickname and /v1/check-region before checkout may continue.
- * The API key is server-only and is never exposed to browsers.
+ * Calls KokinPay's active game nickname API. Known game codes that require a
+ * server/zone are enforced here as a final server-side guard. Mobile Legends
+ * additionally requires the region endpoint to succeed before verification.
  */
 export async function lookupKokinpayNickname(input: {
   apiKey: string;
@@ -120,8 +121,8 @@ export async function lookupKokinpayNickname(input: {
   const userId = validateUserId(input.userId);
   const server = input.server?.trim() || undefined;
 
-  if (gameCode === MLBB_GAME_CODE && !server) {
-    throw new NicknameValidationError("Server / Zone ID wajib diisi untuk Mobile Legends.");
+  if (kokinpayGameRequiresServer(gameCode) && !server) {
+    throw new NicknameValidationError("Server / Zone ID wajib diisi untuk game ini.");
   }
 
   const nicknameRequest = postKokinpay(input.apiKey, KOKINPAY_GAME_NICKNAME_PATH, {
@@ -182,7 +183,7 @@ export async function verifyNicknameForCheckout(input: {
   if (!gameCode) return { supported: false, nickname: null, country: null };
 
   const server = input.server?.trim() || undefined;
-  if (product?.needs_server && !server) {
+  if ((product?.needs_server || kokinpayGameRequiresServer(gameCode)) && !server) {
     throw new NicknameValidationError("Server / Zone ID wajib diisi.");
   }
 
