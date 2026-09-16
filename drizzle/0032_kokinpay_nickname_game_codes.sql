@@ -24,3 +24,13 @@ WHERE (nickname_game_code IS NULL OR trim(nickname_game_code) = '')
     'pubg-mobile', 'honor-of-kings', 'call-of-duty-mobile', 'wild-rift',
     'arena-of-valor', 'fc-mobile', 'point-blank'
   );
+
+-- Mark the compatibility backfill complete so runtime repair never re-enables
+-- nickname validation after an Admin intentionally clears a product game code.
+CREATE TABLE IF NOT EXISTS one_time_operations (
+  operation_key TEXT PRIMARY KEY NOT NULL,
+  completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO one_time_operations (operation_key, completed_at)
+VALUES ('kokinpay_nickname_game_code_backfill_0032', CURRENT_TIMESTAMP)
+ON CONFLICT(operation_key) DO UPDATE SET completed_at = excluded.completed_at;
