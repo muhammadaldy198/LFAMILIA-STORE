@@ -45,6 +45,15 @@ test("saving a product refreshes DigiFlazz seller snapshots from cached pricelis
   assert.doesNotMatch(route, /syncDigiflazzPrices/);
 });
 
+test("switching DigiFlazz development and production invalidates operational cache", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  assert.match(route, /invalidateDigiflazzOperationalCache/);
+  assert.match(route, /DELETE FROM digiflazz_pricelist_cache/);
+  assert.match(route, /DELETE FROM digiflazz_seller_monitor/);
+  assert.match(route, /last_success_at = NULL/);
+  assert.match(route, /before !== input\.selections\.digiflazzEnvironment/);
+});
+
 test("DigiFlazz transaction response is JSON-safe and correlated to LFAMILIA order", () => {
   const provider = read("lib/server/providers/digiflazz.ts");
   assert.match(provider, /response\.json\(\)\.catch\(\(\) => null\)/);
