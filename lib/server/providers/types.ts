@@ -8,6 +8,7 @@ export type ProviderOrder = {
   customerNo: string;
   customerNotes: string | null;
   subtotal: number;
+  maxProviderPrice: number | null;
   packageSku: string;
   packageLabel: string;
   productName: string;
