@@ -20,7 +20,7 @@ export const LEGACY_KOKINPAY_GAME_CODES: Readonly<Record<string, string>> = {
 };
 
 const GAME_CODE_BACKFILL_OPERATION_KEY = "kokinpay_nickname_game_code_backfill_0032";
-const GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v3_preserve_fields";
+const GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v4_preserve_target";
 let backfillPromise: Promise<void> | null = null;
 
 type OperationRow = { completed_at: string };
@@ -89,7 +89,14 @@ export async function ensureKokinpayNicknameGameCodeBackfill() {
         statements.push(
           db.prepare(`UPDATE products
             SET needs_server = 1,
-                target_template = '{{destination}}{{server}}',
+                target_template = CASE
+                  WHEN instr(lower(target_template), '{{server}}') > 0 THEN target_template
+                  WHEN instr(target_template, '{{destination}}') > 0
+                    THEN replace(target_template, '{{destination}}', '{{destination}}{{server}}')
+                  WHEN target_template IS NULL OR trim(target_template) = ''
+                    THEN '{{destination}}{{server}}'
+                  ELSE target_template || '{{server}}'
+                END,
                 input_fields_json = CASE
                   WHEN input_fields_json IS NULL OR trim(input_fields_json) = '' OR json_valid(input_fields_json) = 0
                     THEN '[{"id":"destination","label":"UID","placeholder":"Masukkan UID","required":true},{"id":"server","label":"Server","placeholder":"Masukkan Server","required":true}]'
