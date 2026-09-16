@@ -41,7 +41,7 @@ const routes: Record<string, RouteHandlers> = {
   balances: { GET: balances.GET, PUT: balances.PUT },
   categories: { GET: categories.GET, POST: categories.POST, DELETE: categories.DELETE },
   content: { GET: content.GET, POST: content.POST, DELETE: content.DELETE },
-  "digiflazz-pricing": { GET: digiflazzPricing.GET, POST: digiflazzPricing.POST },
+  "digiflazz-pricing": { GET: digiflazzPricing.GET, POST: digiflazzPricing.POST, PUT: digiflazzPricing.PUT },
   "digiflazz-monitor": { GET: digiflazzMonitor.GET, POST: digiflazzMonitor.POST },
   "doku-database": { GET: dokuDatabase.GET, POST: dokuDatabase.POST },
   integrations: { GET: integrations.GET, PUT: integrations.PUT },
