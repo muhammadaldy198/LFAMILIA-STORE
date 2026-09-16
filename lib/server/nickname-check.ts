@@ -1,26 +1,24 @@
-import { getNicknamePolicy } from "@/lib/nickname-policy";
+import { getD1 } from "@/db";
+import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 type RuntimeEnv = {
-  MELOSTORE_API_KEY?: string;
-  MELOSTORE_SECRET_KEY?: string;
-  MELOSTORE_API_URL?: string;
+  KOKINPAY_API_KEY?: string;
 };
 
-type MelostoreResponse = {
-  success?: boolean;
+type KokinpayResponse = {
+  status?: unknown;
   message?: unknown;
-  error?: {
-    code?: unknown;
-    message?: unknown;
-    category?: unknown;
-  };
   data?: {
-    username?: unknown;
     nickname?: unknown;
+    username?: unknown;
     region?: unknown;
-    country?: unknown;
   };
+};
+
+type ProductNicknameConfig = {
+  nickname_game_code: string | null;
+  needs_server: number;
 };
 
 export type NicknameVerification = {
@@ -43,176 +41,58 @@ export class NicknameServiceError extends Error {
   }
 }
 
-const OFFICIAL_MELOSTORE_API_ORIGIN = "https://api.melostore.id";
+const KOKINPAY_API_ORIGIN = "https://api.kokinpay.com";
 
 function nonEmptyString(values: unknown[]) {
   return values.find(
-    (value): value is string =>
-      typeof value === "string" && value.trim().length > 0,
+    (value): value is string => typeof value === "string" && value.trim().length > 0,
   )?.trim();
 }
 
-function validateTarget(productSlug: string, userId: string, server?: string) {
-  const cleanUserId = userId.trim();
-  const cleanServer = server?.trim();
-  if (cleanUserId.length < 2) {
-    throw new NicknameValidationError("ID akun belum valid.");
-  }
-  const policy = getNicknamePolicy(productSlug);
-  if (policy.needsServer && (!cleanServer || !/^\d+$/.test(cleanServer))) {
-    throw new NicknameValidationError("Server / Zone ID wajib diisi dengan angka.");
-  }
-  return { policy, userId: cleanUserId, server: cleanServer };
+function errorMessage(data: KokinpayResponse) {
+  return nonEmptyString([data.message]);
 }
 
-function melostoreApiBase(configured?: string) {
-  const value = configured?.trim();
-  if (!value) return OFFICIAL_MELOSTORE_API_ORIGIN;
-
-  try {
-    const parsed = new URL(value);
-    if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== "api.melostore.id") {
-      return OFFICIAL_MELOSTORE_API_ORIGIN;
-    }
-    return value;
-  } catch {
-    return OFFICIAL_MELOSTORE_API_ORIGIN;
-  }
+function validateUserId(userId: string) {
+  const value = userId.trim();
+  if (value.length < 2) throw new NicknameValidationError("ID akun belum valid.");
+  return value;
 }
 
-function melostoreNicknameEndpoint(baseUrl: string) {
-  const base = baseUrl.trim().replace(/\/+$/, "");
-  if (/\/api\/v1\/h2h\/check-nickname$/i.test(base)) return base;
-  if (/\/api\/v1\/h2h$/i.test(base)) return `${base}/check-nickname`;
-  return `${base}/api/v1/h2h/check-nickname`;
-}
-
-function melostoreErrorInfo(data: MelostoreResponse) {
-  const category = typeof data.error?.category === "string"
-    ? data.error.category.trim().toLowerCase()
-    : "";
-  const rawCode = data.error?.code;
-  const code = typeof rawCode === "number"
-    ? rawCode
-    : typeof rawCode === "string" && /^\d+$/.test(rawCode.trim())
-      ? Number(rawCode.trim())
-      : null;
-  const message = nonEmptyString([data.error?.message, data.message]);
-  return { category, code, message };
-}
-
-function throwMelostoreError(status: number, data: MelostoreResponse): never {
-  const { category, code, message } = melostoreErrorInfo(data);
-
-  if (category === "not_found" || code === 4001) {
-    throw new NicknameValidationError("ID atau Server tidak ditemukan.");
-  }
-
-  if (category === "validation" || code === 4006) {
+function throwKokinpayError(status: number, data: KokinpayResponse): never {
+  const message = errorMessage(data);
+  if (status === 400 || status === 404 || data.status === false) {
     throw new NicknameValidationError(
-      message || "Format ID atau Server tidak valid untuk game ini.",
+      message || "ID, Server, atau kode game tidak valid.",
     );
   }
-
-  if (category === "restricted" || code === 4002) {
-    throw new NicknameValidationError(
-      "Akun ditemukan, tetapi tidak memenuhi syarat layanan untuk pengecekan ini.",
-    );
-  }
-
-  if (
-    ["unavailable", "limit_reached", "server", "unknown", "maintenance"].includes(category) ||
-    [4003, 4004, 4007, 4008, 4009].includes(code ?? -1)
-  ) {
-    throw new NicknameServiceError(
-      category === "maintenance"
-        ? "Verifikasi nickname untuk game ini sedang maintenance. Coba lagi nanti."
-        : "Verifikasi akun sedang tidak tersedia dari layanan pengecekan. Coba lagi beberapa saat.",
-    );
-  }
-
   if (status === 401 || status === 403) {
-    throw new NicknameServiceError(
-      "Layanan verifikasi akun belum terautentikasi dengan benar.",
-    );
+    throw new NicknameServiceError("Layanan verifikasi akun belum terautentikasi dengan benar.");
   }
-
-  // HTTP 404 tanpa error terstruktur biasanya berarti endpoint konfigurasi salah/tidak tersedia,
-  // bukan bukti bahwa ID pemain tidak ditemukan.
-  if (status === 404 && !category && code === null) {
-    throw new NicknameServiceError(
-      "Layanan verifikasi akun belum terhubung dengan benar. Coba lagi beberapa saat.",
-    );
-  }
-
-  // Jangan mengubah semua 400/422 menjadi "ID tidak ditemukan". Provider memakai
-  // status tersebut juga untuk format input/game yang tidak didukung.
-  if (status === 400 || status === 422) {
-    throw new NicknameValidationError(
-      message || "Data akun belum dapat diverifikasi. Periksa kembali ID dan Server.",
-    );
-  }
-
-  throw new NicknameServiceError();
+  throw new NicknameServiceError(message || undefined);
 }
 
-export async function verifyNicknameForCheckout(input: {
-  productSlug: string;
+/** Calls Kokinpay's documented game nickname endpoint. Never expose api_key to browsers. */
+export async function lookupKokinpayNickname(input: {
+  apiKey: string;
+  gameCode: string;
   userId: string;
   server?: string | null;
 }): Promise<NicknameVerification> {
-  const target = validateTarget(
-    input.productSlug,
-    input.userId,
-    input.server ?? undefined,
-  );
-  if (!target.policy.supported) {
-    return { supported: false, nickname: null, country: null };
-  }
-
-  const runtime = getRuntimeEnv<RuntimeEnv>();
-  const apiKey = runtime.MELOSTORE_API_KEY?.trim();
-  const secretKey = runtime.MELOSTORE_SECRET_KEY?.trim();
-  if (!apiKey || !secretKey) {
-    throw new NicknameServiceError(
-      "Verifikasi akun belum terhubung dengan benar. Checkout sementara tidak dapat dilanjutkan.",
-    );
-  }
-
-  return lookupMelostore({
-    apiBase: melostoreApiBase(runtime.MELOSTORE_API_URL),
-    apiKey,
-    secretKey,
-    game: input.productSlug,
-    userId: target.userId,
-    server: target.server,
-  });
-}
-
-async function lookupMelostore(input: {
-  apiBase: string;
-  apiKey: string;
-  secretKey: string;
-  game: string;
-  userId: string;
-  server?: string;
-}): Promise<NicknameVerification> {
-  const endpoint = melostoreNicknameEndpoint(input.apiBase);
   const body: Record<string, string> = {
-    game_code: input.game,
-    customer_target: input.userId,
+    api_key: input.apiKey,
+    id: validateUserId(input.userId),
+    game_code: input.gameCode.trim(),
   };
-  if (input.server) body.customer_target_zone = input.server;
+  if (input.server?.trim()) body.server = input.server.trim();
 
   let upstream: Response;
   try {
-    upstream = await fetch(endpoint, {
+    upstream = await fetch(`${KOKINPAY_API_ORIGIN}/check-nickname`, {
       method: "POST",
       headers: {
         accept: "application/json",
         "content-type": "application/json",
-        "X-API-Key": input.apiKey,
-        "X-Secret-Key": input.secretKey,
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(8_000),
@@ -221,23 +101,57 @@ async function lookupMelostore(input: {
     throw new NicknameServiceError();
   }
 
-  let data: MelostoreResponse;
+  let data: KokinpayResponse;
   try {
-    data = (await upstream.json()) as MelostoreResponse;
+    data = (await upstream.json()) as KokinpayResponse;
   } catch {
     throw new NicknameServiceError();
   }
+  if (!upstream.ok || data.status !== true) throwKokinpayError(upstream.status, data);
 
-  if (!upstream.ok || data.success === false) {
-    throwMelostoreError(upstream.status, data);
-  }
-
-  const nickname = nonEmptyString([data.data?.username, data.data?.nickname]);
+  const nickname = nonEmptyString([data.data?.nickname, data.data?.username]);
   if (!nickname) {
     throw new NicknameServiceError(
       "Layanan pengecekan tidak mengembalikan nickname. Coba lagi beberapa saat.",
     );
   }
-  const country = nonEmptyString([data.data?.region, data.data?.country]) ?? null;
-  return { supported: true, nickname, country };
+  return {
+    supported: true,
+    nickname,
+    country: nonEmptyString([data.data?.region]) ?? null,
+  };
+}
+
+export async function verifyNicknameForCheckout(input: {
+  productSlug: string;
+  userId: string;
+  server?: string | null;
+}): Promise<NicknameVerification> {
+  await ensureLegacyDatabaseColumns();
+  const product = await getD1()
+    .prepare("SELECT nickname_game_code, needs_server FROM products WHERE slug = ? AND is_active = 1 LIMIT 1")
+    .bind(input.productSlug.trim())
+    .first<ProductNicknameConfig>();
+
+  const gameCode = product?.nickname_game_code?.trim();
+  if (!gameCode) return { supported: false, nickname: null, country: null };
+
+  const server = input.server?.trim() || undefined;
+  if (product?.needs_server && !server) {
+    throw new NicknameValidationError("Server / Zone ID wajib diisi.");
+  }
+
+  const apiKey = getRuntimeEnv<RuntimeEnv>().KOKINPAY_API_KEY?.trim();
+  if (!apiKey) {
+    throw new NicknameServiceError(
+      "Verifikasi akun belum terhubung dengan benar. Checkout sementara tidak dapat dilanjutkan.",
+    );
+  }
+
+  return lookupKokinpayNickname({
+    apiKey,
+    gameCode,
+    userId: input.userId,
+    server,
+  });
 }
