@@ -8,6 +8,7 @@ import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
 
+const noStoreHeaders = { "Cache-Control": "no-store" };
 const requestSchema = z.object({
   game: z.string().trim().min(2).max(80).regex(/^[a-z0-9-]+$/, "Kode game tidak valid."),
   userId: z.string().trim().min(2).max(80),
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
       { error: "Terlalu banyak pengecekan nickname. Coba lagi beberapa menit." },
       {
         status: 429,
-        headers: { "Retry-After": String(rate.retryAfter) },
+        headers: { ...noStoreHeaders, "Retry-After": String(rate.retryAfter) },
       },
     );
   }
@@ -35,30 +36,30 @@ export async function POST(request: Request) {
       userId: input.userId,
       server: input.server,
     });
-    return Response.json({
-      supported: result.supported,
-      nickname: result.nickname,
-      country: result.country,
-      game: input.game,
-      userId: input.userId,
-      server: input.server ?? null,
-    });
+    return Response.json(
+      {
+        supported: result.supported,
+        nickname: result.nickname,
+        country: result.country,
+      },
+      { headers: noStoreHeaders },
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       return Response.json(
         { error: error.issues[0]?.message ?? "Permintaan pengecekan tidak valid." },
-        { status: 400 },
+        { status: 400, headers: noStoreHeaders },
       );
     }
     if (error instanceof NicknameValidationError) {
-      return Response.json({ error: error.message }, { status: 404 });
+      return Response.json({ error: error.message }, { status: 404, headers: noStoreHeaders });
     }
     if (error instanceof NicknameServiceError) {
-      return Response.json({ error: error.message }, { status: 503 });
+      return Response.json({ error: error.message }, { status: 503, headers: noStoreHeaders });
     }
     return Response.json(
       { error: "Layanan verifikasi akun sedang bermasalah." },
-      { status: 502 },
+      { status: 502, headers: noStoreHeaders },
     );
   }
 }
