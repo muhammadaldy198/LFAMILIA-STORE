@@ -30,16 +30,16 @@ type RuntimeEnv = { KOKINPAY_API_KEY?: string };
 type KokinpayResponse = {
   status?: unknown;
   message?: unknown;
-  data?: { nickname?: unknown; region?: unknown; customer_name?: unknown };
+  data?: { nickname?: unknown; username?: unknown; region?: unknown; customer_name?: unknown; name?: unknown };
 };
 
 function text(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-async function kokinpayPost(path: string, body: Record<string, string>) {
+async function kokinpayPost(path: "check-region-mlbb" | "check-nick-pln", body: Record<string, string>) {
   const apiKey = getRuntimeEnv<RuntimeEnv>().KOKINPAY_API_KEY?.trim();
-  if (!apiKey) throw new NicknameServiceError("API Key Kokinpay belum disimpan.");
+  if (!apiKey) throw new NicknameServiceError("API Key KokinPay belum disimpan.");
   let response: Response;
   try {
     response = await fetch(`https://api.kokinpay.com/${path}`, {
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     const input = requestSchema.parse(await request.json());
     if (input.action === "game") {
       const apiKey = getRuntimeEnv<RuntimeEnv>().KOKINPAY_API_KEY?.trim();
-      if (!apiKey) throw new NicknameServiceError("API Key Kokinpay belum disimpan.");
+      if (!apiKey) throw new NicknameServiceError("API Key KokinPay belum disimpan.");
       const result = await lookupKokinpayNickname({
         apiKey,
         gameCode: input.gameCode,
@@ -87,12 +87,12 @@ export async function POST(request: Request) {
       return Response.json({
         ok: true,
         action: input.action,
-        nickname: text(result.data?.nickname),
+        nickname: text(result.data?.nickname) || text(result.data?.username),
         region: text(result.data?.region),
       });
     }
-    const result = await kokinpayPost("check-pln", { customer_number: input.customerNumber });
-    return Response.json({ ok: true, action: input.action, customerName: text(result.data?.customer_name) });
+    const result = await kokinpayPost("check-nick-pln", { customer_number: input.customerNumber });
+    return Response.json({ ok: true, action: input.action, customerName: text(result.data?.customer_name) || text(result.data?.name) });
   } catch (error) {
     const message = error instanceof z.ZodError
       ? error.issues[0]?.message || "Data pemeriksaan tidak valid."
