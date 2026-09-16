@@ -29,6 +29,7 @@ import { AdminNotifications } from "@/components/admin-notifications";
 import { AdminDigiflazzWorkspace } from "@/components/admin-digiflazz-workspace";
 import { AdminExperienceManager } from "@/components/admin-experience-manager";
 import { AdminIntegrationWorkspace } from "@/components/admin-integration-workspace";
+import { AdminKokinpayWorkspace } from "@/components/admin-kokinpay-workspace";
 import { AdminOrderManager } from "@/components/admin-order-manager";
 import { AdminOverview } from "@/components/admin-overview";
 import { AdminPaymentWorkspace } from "@/components/admin-payment-workspace";
@@ -58,6 +59,7 @@ const navigation: NavigationItem[] = [
   { value: "products", label: "Produk", Icon: Boxes, minimumRole: "admin" },
   { value: "content", label: "Banner & Konten", Icon: ImageIcon, minimumRole: "staff" },
   { value: "digiflazz", label: "Digiflazz", Icon: PackageSearch, minimumRole: "admin" },
+  { value: "account-validation", label: "Validasi Akun", Icon: Gamepad2, minimumRole: "super_admin" },
   { value: "payments", label: "Pembayaran", Icon: CreditCard, minimumRole: "admin" },
   { value: "customers", label: "Pelanggan", Icon: Users, minimumRole: "admin" },
   { value: "promotions", label: "Promo", Icon: Sparkles, minimumRole: "admin" },
@@ -178,6 +180,7 @@ export function AdminDashboard({
             <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} />{initialSession.role === "staff" && <StaffProductContentWorkspace />}</TabsContent>
 
             {(isOwner || isAdmin) && <TabsContent value="digiflazz" className="mt-0"><AdminDigiflazzWorkspace /></TabsContent>}
+            {isOwner && <TabsContent value="account-validation" className="mt-0"><AdminKokinpayWorkspace /></TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="payments" className="mt-0"><AdminPaymentWorkspace /></TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="customers" className="mt-0">{isOwner ? <AdminCustomerWorkspace /> : <AdminCustomerDirectory />}</TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="promotions" className="mt-0"><AdminPromoWorkspace /></TabsContent>}
