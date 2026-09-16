@@ -20,7 +20,7 @@ export const LEGACY_KOKINPAY_GAME_CODES: Readonly<Record<string, string>> = {
 };
 
 const GAME_CODE_BACKFILL_OPERATION_KEY = "kokinpay_nickname_game_code_backfill_0032";
-const GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v4_preserve_target";
+const GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v5_case_insensitive_target";
 let backfillPromise: Promise<void> | null = null;
 
 type OperationRow = { completed_at: string };
@@ -91,8 +91,10 @@ export async function ensureKokinpayNicknameGameCodeBackfill() {
             SET needs_server = 1,
                 target_template = CASE
                   WHEN instr(lower(target_template), '{{server}}') > 0 THEN target_template
-                  WHEN instr(target_template, '{{destination}}') > 0
-                    THEN replace(target_template, '{{destination}}', '{{destination}}{{server}}')
+                  WHEN instr(lower(target_template), '{{destination}}') > 0
+                    THEN substr(target_template, 1, instr(lower(target_template), '{{destination}}') - 1)
+                      || '{{destination}}{{server}}'
+                      || substr(target_template, instr(lower(target_template), '{{destination}}') + length('{{destination}}'))
                   WHEN target_template IS NULL OR trim(target_template) = ''
                     THEN '{{destination}}{{server}}'
                   ELSE target_template || '{{server}}'
