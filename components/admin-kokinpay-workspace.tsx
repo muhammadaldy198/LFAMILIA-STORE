@@ -12,6 +12,7 @@ import {
   inputClass,
   primaryButtonClass,
 } from "@/components/admin-workspace-ui";
+import { KOKINPAY_GAME_CODES, kokinpayGameRequiresServer } from "@/lib/kokinpay-game-codes";
 
 const tabs = ["Cek Game", "Region MLBB", "PLN", "Kode Game"] as const;
 type Tab = (typeof tabs)[number];
@@ -28,50 +29,6 @@ const docs = [
   { label: "Cek nama PLN", endpoint: "/v1/check-pln", href: "https://api.kokinpay.com/docs/check-nick-pln" },
 ] as const;
 
-const gameCodes = [
-  ["Mobile Legends", "mobile-legends", true],
-  ["Free Fire", "free-fire", false],
-  ["PUBG Mobile", "pubg-mobile", false],
-  ["Call of Duty Mobile", "call-of-duty-mobile", false],
-  ["Valorant", "valorant", false],
-  ["Genshin Impact", "genshin-impact", true],
-  ["Honor of Kings", "honor-of-kings", false],
-  ["League of Legends: Wild Rift", "league-of-legends-wild-rift", false],
-  ["Arena of Valor", "arena-of-valor", false],
-  ["Point Blank", "point-blank", false],
-  ["Free Fire Max", "free-fire-max", false],
-  ["Whiteout Survival", "whiteout-survival", false],
-  ["Honkai Impact 3", "honkai-impact-3", false],
-  ["Honkai: Star Rail", "honkai-star-rail", true],
-  ["Eggy Party", "eggy-party", true],
-  ["Undawn", "undawn", false],
-  ["Growtopia", "growtopia", false],
-  ["League of Legends PC", "league-of-legends-pc", false],
-  ["FC Mobile", "fc-mobile", false],
-  ["Super Sus", "super-sus", false],
-  ["Harry Potter: Magic Awakened", "harry-potter-magic-awakened", true],
-  ["Revelation: Infinite Journey", "revelation-infinite-journey", false],
-  ["MU Origin 3", "mu-origin-3", false],
-  ["Sausage Man", "sausage-man", false],
-  ["Speed Drifters", "speed-drifters", false],
-  ["Tom and Jerry: Chase", "tom-and-jerry-chase", true],
-  ["Teamfight Tactics Mobile", "teamfight-tactics-mobile", false],
-  ["LifeAfter", "lifeafter", true],
-  ["Laplace M", "laplace-m", false],
-  ["Arena Breakout", "arena-breakout", false],
-  ["Zenless Zone Zero", "zenless-zone-zero", true],
-  ["AFK Journey", "afk-journey", false],
-  ["Magic Chess Go Go", "magic-chess-go-go", true],
-  ["Love and Deepspace", "love-and-deepspace", false],
-  ["Pokemon Unite", "pokemon-unite", false],
-  ["Dragon Raja", "dragon-raja", false],
-  ["Football Master 2", "football-master-2", false],
-  ["Garena Shell", "garena-shell", false],
-  ["Goddess of Victory: Nikke", "goddess-of-victory-nikke", true],
-  ["Metal Slug: Awakening", "metal-slug-awakening", false],
-  ["Ragnarok M: Eternal Love", "ragnarok-m-eternal-love", true],
-] as const;
-
 export function AdminKokinpayWorkspace() {
   const [tab, setTab] = useState<Tab>("Cek Game");
   const [gameCode, setGameCode] = useState("");
@@ -85,8 +42,8 @@ export function AdminKokinpayWorkspace() {
 
   const filteredCodes = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return gameCodes;
-    return gameCodes.filter(([name, code]) => name.toLowerCase().includes(needle) || code.includes(needle));
+    if (!needle) return KOKINPAY_GAME_CODES;
+    return KOKINPAY_GAME_CODES.filter(([name, code]) => name.toLowerCase().includes(needle) || code.includes(needle));
   }, [query]);
 
   async function runCheck() {
@@ -116,6 +73,8 @@ export function AdminKokinpayWorkspace() {
   }
 
   const gameIsMlbb = tab === "Cek Game" && gameCode.trim() === "mobile-legends";
+  const gameNeedsServer = tab === "Cek Game" && kokinpayGameRequiresServer(gameCode);
+  const serverRequired = tab === "Region MLBB" || gameNeedsServer;
 
   return <div>
     <WorkspaceHeader
@@ -133,10 +92,10 @@ export function AdminKokinpayWorkspace() {
         <div className="grid content-start grid-cols-1 gap-4 sm:grid-cols-2">
           {tab === "Cek Game" && <Field label="Game Code" help="Isi kode yang sama dengan kolom Kode Game Nickname pada Produk → Input Customer.">
             <input list="kokinpay-game-codes" value={gameCode} onChange={(event) => setGameCode(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} className={inputClass} placeholder="mobile-legends" />
-            <datalist id="kokinpay-game-codes">{gameCodes.map(([name, code]) => <option key={code} value={code}>{name}</option>)}</datalist>
+            <datalist id="kokinpay-game-codes">{KOKINPAY_GAME_CODES.map(([name, code]) => <option key={code} value={code}>{name}</option>)}</datalist>
           </Field>}
           {tab !== "PLN" && <Field label="User ID"><input value={userId} onChange={(event) => setUserId(event.target.value)} className={inputClass} placeholder="Masukkan User ID" /></Field>}
-          {tab !== "PLN" && <Field label="Server / Zone" help={tab === "Region MLBB" || gameIsMlbb ? "Wajib untuk Mobile Legends. Nickname dan region harus sama-sama berhasil." : "Isi jika game memerlukan Server / Zone ID."}><input value={server} onChange={(event) => setServer(event.target.value)} className={inputClass} placeholder={tab === "Region MLBB" || gameIsMlbb ? "Wajib diisi" : "Opsional"} /></Field>}
+          {tab !== "PLN" && <Field label="Server / Zone" help={serverRequired ? (gameIsMlbb ? "Wajib untuk Mobile Legends. Nickname dan region harus sama-sama berhasil." : "Wajib untuk game code ini.") : "Isi jika game memerlukan Server / Zone ID."}><input value={server} onChange={(event) => setServer(event.target.value)} className={inputClass} placeholder={serverRequired ? "Wajib diisi" : "Opsional"} /></Field>}
           {tab === "PLN" && <Field label="Nomor Meter / ID Pelanggan PLN" wide><input value={customerNumber} onChange={(event) => setCustomerNumber(event.target.value.replace(/\D/g, "").slice(0, 12))} className={inputClass} placeholder="11–12 angka" inputMode="numeric" /></Field>}
           {gameIsMlbb && <div className="sm:col-span-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-800">Mobile Legends divalidasi dengan dua endpoint API aktif: <strong>/v1/check-nickname</strong> untuk nickname dan <strong>/v1/check-region</strong> untuk region. Keduanya wajib berhasil sebelum akun dianggap valid.</div>}
           <div className="sm:col-span-2 flex flex-wrap items-center gap-2 border-t border-[#edf0f4] pt-4">
