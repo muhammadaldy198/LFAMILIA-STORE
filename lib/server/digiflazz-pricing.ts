@@ -49,8 +49,8 @@ export async function savePricingSettings(input: PricingSettings) {
     .run();
 }
 
-function sale(cost: number, type: "fixed" | "percent", value: number) {
-  return type === "percent" ? Math.ceil((cost * (100 + value)) / 100) : cost + value;
+function sale(basePrice: number, type: "fixed" | "percent", value: number) {
+  return type === "percent" ? Math.ceil((basePrice * (100 + value)) / 100) : basePrice + value;
 }
 
 export type DigiflazzPriceListItem = {
@@ -417,7 +417,7 @@ async function syncRows(target?: { productId: number; providerSku?: string }, so
     const unlimitedStock = sourceItem.unlimited_stock === true;
     const stock = Number(sourceItem.stock ?? 0);
     const maxPrice = Number(item.provider_max_price) > 0 ? Number(item.provider_max_price) : Number(sourceItem.price);
-    const sellingPrice = sale(Number(sourceItem.price), item.margin_type, item.margin_value);
+    const sellingPrice = sale(maxPrice, item.margin_type, item.margin_value);
 
     return [
       getD1().prepare(`UPDATE product_packages
@@ -487,7 +487,7 @@ export async function updateDigiflazzPackagePricing(input: {
   }
   const maxPrice = Math.max(1, Math.round(input.maxPrice));
   const marginValue = Math.max(0, Math.round(input.marginValue));
-  const sellingPrice = Math.max(1, sale(currentCost, input.marginType, marginValue));
+  const sellingPrice = Math.max(1, sale(maxPrice, input.marginType, marginValue));
   await db.prepare(`
     UPDATE product_packages
     SET provider_max_price = ?,
@@ -507,7 +507,6 @@ export async function updateDigiflazzPackagePricing(input: {
     marginType: input.marginType,
     marginValue,
     sellingPrice,
-    blockedByMaxPrice: currentCost > maxPrice,
   };
 }
 
