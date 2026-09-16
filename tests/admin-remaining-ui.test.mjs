@@ -32,6 +32,7 @@ test("KokinPay operational menu follows the shared admin workspace theme", () =>
   assert.match(kokinpay, /check-nick-game/);
   assert.match(kokinpay, /check-region-mlbb/);
   assert.match(kokinpay, /check-nick-pln/);
+  assert.match(kokinpay, /Mobile Legends divalidasi dengan dua endpoint/);
   assert.match(kokinpay, /api\.kokinpay\.com\/docs\/check-nick-game/);
   assert.match(kokinpay, /api\.kokinpay\.com\/docs\/check-region-mlbb/);
   assert.match(kokinpay, /api\.kokinpay\.com\/docs\/check-nick-pln/);
@@ -51,15 +52,16 @@ test("Super Admin can design balance changes for customer or admin accounts", ()
   assert.match(customer, /<AdminBalanceManager \/>/);
 });
 
-test("integration UI contains encrypted credentials, copyable provider URLs, and separate relay endpoints", () => {
+test("integration UI contains encrypted credentials, provider URLs, and keeps KokinPay operations separate", () => {
   for (const label of [
     "DOKU Notification URL",
     "Midtrans BI-SNAP VA Notification URL",
     "Digiflazz Webhook URL",
-    "Kokinpay Tools",
-    "Kokinpay — Nickname & Validasi",
-    "API Key Kokinpay",
-    "Daftar Kode Game",
+    "Konfigurasi KokinPay",
+    "API Key KokinPay",
+    "/check-nick-game",
+    "/check-region-mlbb",
+    "/check-nick-pln",
     "Client Secret",
     "Partner ID",
     "Relay Token",
@@ -72,6 +74,8 @@ test("integration UI contains encrypted credentials, copyable provider URLs, and
   assert.ok(integration.includes("https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback"));
   assert.ok(ui.includes("navigator.clipboard.writeText"));
   assert.doesNotMatch(integration, /SwitchLine label="(?:Wajib|Tidak Wajib).*nickname/i);
+  assert.doesNotMatch(integration, /KOKINPAY_GAME_CODES|checkKokinpay|\/check-nickname|value="\/check-pln"/);
+  assert.match(integration, /Pemeriksaan operasional berada di menu Validasi Akun/);
   assert.match(integration, /Periksa Konfigurasi Relay/);
   assert.doesNotMatch(integration, /Tes Relay Sekarang/);
 });
@@ -82,7 +86,7 @@ test("promo, support, reports, team, and settings are fully represented", () => 
 
 test("all remaining workspaces use real panel APIs", () => {
   assert.match(integration, /fetch\("\/api\/panel\/integrations"/);
-  assert.match(integration, /fetch\("\/api\/panel\/nickname-tools"/);
+  assert.doesNotMatch(integration, /fetch\("\/api\/panel\/nickname-tools"/);
   assert.match(kokinpay, /fetch\("\/api\/panel\/nickname-tools"/);
   assert.doesNotMatch(integration, /Simulasi tes|UI sementara/);
   for (const endpoint of ["payment-methods", "payment-page", "wallet", "media"]) assert.ok(payment.includes(`/api/panel/${endpoint}`), `payment does not use ${endpoint}`);
