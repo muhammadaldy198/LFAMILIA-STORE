@@ -43,8 +43,8 @@ export class NicknameServiceError extends Error {
 }
 
 const KOKINPAY_API_ORIGIN = "https://api.kokinpay.com";
-const KOKINPAY_GAME_NICKNAME_PATH = "/check-nick-game";
-const KOKINPAY_MLBB_REGION_PATH = "/check-region-mlbb";
+const KOKINPAY_GAME_NICKNAME_PATH = "/v1/check-nickname";
+const KOKINPAY_MLBB_REGION_PATH = "/v1/check-region";
 const MLBB_GAME_CODE = "mobile-legends";
 
 function nonEmptyString(values: unknown[]) {
@@ -65,13 +65,15 @@ function validateUserId(userId: string) {
 
 function throwKokinpayError(status: number, data: KokinpayResponse): never {
   const message = errorMessage(data);
+  if (status === 401 || status === 403) {
+    throw new NicknameServiceError(
+      message || "Layanan verifikasi akun belum terautentikasi dengan benar.",
+    );
+  }
   if (status === 400 || status === 404 || data.status === false) {
     throw new NicknameValidationError(
       message || "ID, Server, atau kode game tidak valid.",
     );
-  }
-  if (status === 401 || status === 403) {
-    throw new NicknameServiceError("Layanan verifikasi akun belum terautentikasi dengan benar.");
   }
   throw new NicknameServiceError(message || undefined);
 }
@@ -107,8 +109,8 @@ async function postKokinpay(
 }
 
 /**
- * Calls KokinPay's documented game nickname endpoint. Mobile Legends is special:
- * it must pass both /check-nick-game and /check-region-mlbb before checkout may continue.
+ * Calls KokinPay's active game nickname API. Mobile Legends is special:
+ * it must pass both /v1/check-nickname and /v1/check-region before checkout may continue.
  * The API key is server-only and is never exposed to browsers.
  */
 export async function lookupKokinpayNickname(input: {
