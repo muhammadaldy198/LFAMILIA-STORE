@@ -100,3 +100,9 @@ test("public nickname response is provider-neutral, minimal, and non-cacheable",
   assert.doesNotMatch(route, /userId:\s*input\.userId|server:\s*input\.server|game:\s*input\.game/);
   assert.match(route, /"Cache-Control": "no-store"/);
 });
+
+test("owner nickname tools reject cross-origin mutations", () => {
+  const route = read("app/api/admin/nickname-tools/route.ts");
+  assert.match(route, /rejectCrossOriginMutation\(request\)/);
+  assert.match(route, /requireAdminSession\(request, "owner"\)/);
+});
