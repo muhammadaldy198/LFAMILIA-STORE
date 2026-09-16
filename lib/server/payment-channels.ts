@@ -113,7 +113,10 @@ export async function listPaymentChannels(includeInactive = false): Promise<Mana
         name: item.name,
         description: item.description,
         gateway: item.gateway,
-        gatewayConfig: parseGatewayConfig(item.gateway_config_json),
+        gatewayConfig: {
+          customerFeeBps: item.method === "qris" ? "70" : "0",
+          ...parseGatewayConfig(item.gateway_config_json),
+        },
         imageUrl: item.image_url ?? undefined,
         isActive: Boolean(item.is_active),
         sortOrder: item.sort_order,
