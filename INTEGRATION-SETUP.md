@@ -2,22 +2,13 @@
 
 Arsitektur aktif LFAMILIA:
 
-- **Payment gateway:** DOKU Direct API / SNAP
+- **Payment gateway:** DOKU Checkout / Direct API dan Midtrans Snap / BI-SNAP sesuai routing channel yang diaktifkan di Admin Panel
 - **Provider otomatis:** DigiFlazz
+- **Validasi akun/nickname:** KokinPay, server-side
 - **Produk manual / stok internal:** diproses oleh LFAMILIA
-- **Halaman pembayaran:** dimiliki dan dirender oleh LFAMILIA, bukan Hosted Checkout DOKU
+- **Halaman pembayaran:** UI pelanggan tetap milik LFAMILIA; nama provider/gateway tidak perlu ditampilkan ke pelanggan
 
-## 1. Persiapan database DOKU
-
-Tidak perlu menjalankan Wrangler dari Cloudflare.
-
-Buka:
-
-**Admin Panel → Integrasi & harga → Persiapan database DOKU**
-
-Tekan **Persiapkan Database DOKU** satu kali sebelum mengaktifkan pembayaran. Proses ini menyiapkan kolom DOKU, menonaktifkan pembayaran selama persiapan, membersihkan transaksi pra-rilis, mempertahankan katalog/akun/staff, dan menyimpan marker agar pembersihan tidak dijalankan ulang pada transaksi baru.
-
-## 2. Root encryption Cloudflare
+## 1. Root encryption Cloudflare
 
 Cloudflare hanya perlu menyimpan root secret Integration Manager:
 
@@ -27,40 +18,16 @@ INTEGRATION_ENCRYPTION_KEY
 
 Gunakan nilai acak minimal 32 karakter. Jangan menggantinya setelah credential terenkripsi tersimpan di D1.
 
-## 3. DOKU Direct API / SNAP
+Credential DOKU, Midtrans, DigiFlazz, KokinPay, dan layanan lain yang didukung panel disimpan melalui **Super Admin → Integrasi** dan dienkripsi di D1. Jangan menaruh credential tersebut di repository.
 
-Buka:
+## 2. DOKU
 
-**Admin Panel → Integrasi & harga → Kredensial API & callback → DOKU Direct API**
+Buka **Super Admin → Integrasi** lalu pilih DOKU Checkout atau DOKU Direct API sesuai mode yang digunakan. Profil Sandbox dan Production dipisahkan.
 
-Simpan profil Sandbox dan Production secara terpisah. Field yang tersedia:
-
-- Client ID
-- Secret Key
-- RSA Private Key PKCS#8
-- Private Key Passphrase, hanya jika key memakai passphrase
-- Direct API Base URL opsional
-- QRIS Merchant ID / Mall ID
-- QRIS Terminal ID
-- QRIS Postal Code
-- konfigurasi Virtual Account per bank dalam JSON
-
-Base URL default:
+Base URL Direct API:
 
 - Sandbox: `https://api-sandbox.doku.com`
 - Production: `https://api.doku.com`
-
-RSA private key hanya disimpan terenkripsi oleh LFAMILIA. Public key pasang/daftarkan ke DOKU sesuai proses aktivasi SNAP. Jangan menaruh private key di GitHub.
-
-Flow aktif:
-
-- QRIS: `/snap-adapter/b2b/v1.0/qr/qr-mpm-generate`
-- Query QRIS: `/snap-adapter/b2b/v1.0/qr/qr-mpm-query`
-- DANA / ShopeePay: `/direct-debit/core/v1/debit/payment-host-to-host`
-- Virtual Account: `/virtual-accounts/bi-snap-va/v1.1/transfer-va/create-va`
-- B2B token: `/authorization/v1/access-token/b2b`
-
-QRIS dan nomor Virtual Account ditampilkan langsung di halaman pembayaran LFAMILIA. DANA/ShopeePay menggunakan redirect hanya pada tahap otorisasi pelanggan.
 
 Notification URL LFAMILIA:
 
@@ -68,19 +35,17 @@ Notification URL LFAMILIA:
 https://lfamiliastore.my.id/api/payments/doku/callback
 ```
 
-Pasang URL tersebut pada konfigurasi Notification URL metode pembayaran DOKU yang diaktifkan. Endpoint LFAMILIA memverifikasi format signature SNAP (`X-SIGNATURE`) maupun notification Direct API non-SNAP (`Signature: HMACSHA256=...`) karena format notifikasi DOKU dapat berbeda per metode.
+DOKU Direct API berjalan langsung dari Worker dan tidak melalui VPS relay.
 
-Setelah credential siap, buka menu **Pembayaran** untuk mengaktifkan DOKU pada checkout dan/atau top up wallet, kemudian sync metode pembayaran.
+## 3. Midtrans
 
-## 4. Halaman pembayaran LFAMILIA
+Buka **Super Admin → Integrasi** lalu pilih Midtrans Snap atau Midtrans BI-SNAP sesuai mode yang digunakan. Profil Sandbox dan Production dipisahkan.
 
-Buka **Admin Panel → Pembayaran → Halaman pembayaran**.
+Notification URL Snap dan BI-SNAP yang aktif ditampilkan langsung di menu Integrasi agar dapat disalin ke dashboard Midtrans. Midtrans BI-SNAP dapat memakai VPS relay untuk egress/IP statis; credential tetap tersimpan terenkripsi di Admin/D1 dan tidak disimpan di VPS.
 
-Pemilik dapat mengubah branding, gambar header, warna, judul/pesan status, pengingat invoice, teks tombol, bantuan, dan elemen yang ditampilkan. QRIS/VA tetap berasal dari DOKU, tetapi UI pembayaran berada di LFAMILIA.
+## 4. DigiFlazz
 
-## 5. DigiFlazz
-
-Buka **Integrasi & harga → Kredensial API & callback → DigiFlazz**.
+Buka **Super Admin → Integrasi → DigiFlazz**.
 
 Isi Username, API Key, Transaction API URL, Price List URL, dan Webhook Secret.
 
@@ -90,29 +55,68 @@ Webhook:
 https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback
 ```
 
-Produk otomatis eksternal hanya memakai DigiFlazz. Produk manual tidak membutuhkan provider eksternal.
+Menu DigiFlazz operasional dipakai untuk sinkronisasi/monitoring. Credential tetap dikelola dari menu Integrasi.
 
-## 6. VPS Relay
+## 5. KokinPay Validasi Akun
 
-VPS relay hanya digunakan untuk DigiFlazz jika membutuhkan IP keluar statis.
+Buka **Super Admin → Integrasi → KokinPay** dan simpan API key. API key hanya tersedia di server setelah didekripsi dari D1 dan tidak dikirim ke browser pelanggan.
 
-Di **Admin Panel → VPS Relay** isi DigiFlazz Relay URL dan Relay Token. Gunakan source `relay/server.mjs` dan `relay/Caddyfile.example` terbaru di VPS.
+Backend memakai endpoint aktif berikut:
 
-DOKU Direct API berjalan langsung dari Worker dan tidak melewati VPS relay.
+```text
+https://api.kokinpay.com/v1/check-nickname
+https://api.kokinpay.com/v1/check-region
+https://api.kokinpay.com/v1/check-pln
+```
 
-## 7. Cloudflare Access
+Untuk penggunaan operasional buka menu **Validasi Akun**. Di sana tersedia:
 
-Area Owner tetap dilindungi Cloudflare Access.
+- cek nickname game;
+- cek nickname + region Mobile Legends;
+- cek nama pelanggan PLN;
+- daftar game code yang dapat dipakai pada produk.
+
+Setiap produk dapat diatur melalui **Produk → Input Customer → Kode Game Nickname**. Kode kosong berarti validasi nickname tidak dijalankan untuk produk tersebut. Produk yang memakai kode akan diverifikasi ulang oleh backend sebelum order/pembayaran dibuat, sehingga nickname dari browser tidak pernah menjadi sumber kebenaran.
+
+Untuk Mobile Legends, User ID dan Server/Zone wajib tersedia dan backend mewajibkan hasil nickname serta region sama-sama berhasil.
+
+Perubahan schema KokinPay menggunakan migration:
+
+```text
+0032_kokinpay_nickname_game_codes.sql
+```
+
+Migration menambahkan `products.nickname_game_code` dan mempertahankan konfigurasi nickname produk lama yang sudah didukung. Runtime compatibility repair juga menangani database yang belum sempat menjalankan migration tanpa mengulang backfill setelah Admin sengaja mengosongkan kode.
+
+## 6. Halaman pembayaran LFAMILIA
+
+Buka **Admin Panel → Pembayaran** untuk mengatur metode/channel aktif, routing, dan tampilan halaman pembayaran. Pelanggan memilih metode pembayaran yang tersedia, bukan nama gateway.
+
+Pastikan hanya channel yang benar-benar aktif pada merchant yang diaktifkan di panel.
+
+## 7. VPS Relay
+
+Relay digunakan hanya untuk integrasi yang memerlukan egress/IP statis sesuai konfigurasi Admin:
+
+- DigiFlazz dapat memakai `https://digiflazz-relay.lfamiliastore.my.id`;
+- Midtrans BI-SNAP dapat memakai relay Midtrans bila konfigurasi merchant memerlukan IP statis;
+- DOKU tidak melalui relay.
+
+Relay hanya meneruskan request. Credential merchant tetap disimpan di Admin/D1.
+
+## 8. Cloudflare Access
+
+Area Super Admin tetap dilindungi Cloudflare Access.
 
 Worker membutuhkan:
 
 ```text
-TEAM_DOMAIN=https://lfamilia.cloudflareaccess.com
+TEAM_DOMAIN=https://<team>.cloudflareaccess.com
 POLICY_AUD=<Application Audience aplikasi Access LFAMILIA>
 ```
 
-Credential DOKU dan DigiFlazz tidak ditempatkan di Cloudflare Variables/Secrets. Credential tersebut dikelola dari Admin Panel dan dienkripsi di D1.
+Endpoint `/admin/panel*` dan `/api/admin*` diverifikasi oleh Worker terhadap Cloudflare Access. Panel staff memakai autentikasi panel sesuai role dan tidak memperoleh akses ke menu Integrasi/Validasi Akun Super Admin.
 
-## 8. Sebelum membuka toko
+## 9. Sebelum membuka toko
 
-Pastikan Persiapan database DOKU sudah siap, Sandbox diuji end-to-end untuk setiap metode yang akan diaktifkan, notification tervalidasi, credential Production sudah lengkap, QRIS/VA benar-benar menampilkan artefak pembayaran di halaman LFAMILIA, DigiFlazz SKU/harga/margin sudah diverifikasi, relay DigiFlazz sehat bila digunakan, produk manual masuk antrean setelah lunas, dan tidak ada credential provider di GitHub.
+Pastikan migration production sudah sesuai branch yang akan dideploy, credential dapat didekripsi, payment channel diuji end-to-end, callback tervalidasi, DigiFlazz SKU/harga/margin diverifikasi, relay sehat bila digunakan, KokinPay berhasil memvalidasi akun nyata untuk game yang diaktifkan, produk tanpa dukungan nickname tidak diberi game code, dan tidak ada credential provider di GitHub atau response publik.
