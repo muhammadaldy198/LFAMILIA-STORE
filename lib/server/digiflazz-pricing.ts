@@ -20,7 +20,21 @@ type Env = {
 
 export type PricingSettings = { isAutoSync: boolean };
 
+async function ensurePricingSettingsTable() {
+  await getD1().prepare(`
+    CREATE TABLE IF NOT EXISTS digiflazz_pricing_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      is_auto_sync INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
+  await getD1().prepare(
+    "INSERT OR IGNORE INTO digiflazz_pricing_settings (id, is_auto_sync) VALUES (1, 1)",
+  ).run();
+}
+
 export async function getPricingSettings(): Promise<PricingSettings> {
+  await ensurePricingSettingsTable();
   const row = await getD1()
     .prepare("SELECT is_auto_sync FROM digiflazz_pricing_settings WHERE id = 1")
     .first<{ is_auto_sync: number }>();
@@ -28,6 +42,7 @@ export async function getPricingSettings(): Promise<PricingSettings> {
 }
 
 export async function savePricingSettings(input: PricingSettings) {
+  await ensurePricingSettingsTable();
   await getD1()
     .prepare("INSERT INTO digiflazz_pricing_settings (id, is_auto_sync, updated_at) VALUES (1, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET is_auto_sync = excluded.is_auto_sync, updated_at = CURRENT_TIMESTAMP")
     .bind(input.isAutoSync ? 1 : 0)
@@ -312,7 +327,7 @@ export async function listDigiflazzPriceList() {
            buyer_product_status, seller_product_status, unlimited_stock, stock, multi,
            start_cut_off, end_cut_off, description, synced_at
     FROM digiflazz_pricelist_cache
-    ORDER BY brand ASC, product_name ASC, price ASC
+    ORDER BY category ASC, brand ASC, product_name ASC, price ASC
   `).all<CachedPriceRow>();
   return rows.results.map(mapCachedRow);
 }
@@ -352,6 +367,16 @@ function priceListMap(items: DigiflazzPriceListItem[]) {
   } satisfies RawPriceItem]));
 }
 
+type SyncRow = {
+  id: number;
+  provider_sku: string;
+  provider_max_price: number | null;
+  margin_type: "fixed" | "percent";
+  margin_value: number;
+  previous_seller_name: string | null;
+  previous_baseline_price: number | null;
+};
+
 async function syncRows(target?: { productId: number; providerSku?: string }, sourceItems?: DigiflazzPriceListItem[]) {
   await ensureLegacyDatabaseColumns();
   await ensureDigiflazzSellerMonitorTable();
@@ -370,22 +395,16 @@ async function syncRows(target?: { productId: number; providerSku?: string }, so
        LEFT JOIN digiflazz_seller_monitor m ON m.package_id = p.id
        WHERE p.provider_code = 'digiflazz' AND p.provider_sku IS NOT NULL`;
   const prepared = getD1().prepare(query);
-  type SyncRow = {
-    id: number;
-    provider_sku: string;
-    provider_max_price: number | null;
-    margin_type: "fixed" | "percent";
-    margin_value: number;
-    previous_seller_name: string | null;
-    previous_baseline_price: number | null;
-  };
   const rows = target
     ? target.providerSku
       ? await prepared.bind(target.productId, target.providerSku).all<SyncRow>()
       : await prepared.bind(target.productId).all<SyncRow>()
     : await prepared.all<SyncRow>();
-  if (target && !rows.results.length)
-    throw new Error(target.providerSku ? "Nominal DigiFlazz belum memiliki SKU provider yang valid." : "Produk ini belum memiliki nominal DigiFlazz yang dapat disinkronkan.");
+  if (target && !rows.results.length) {
+    throw new Error(target.providerSku
+      ? "Nominal DigiFlazz belum memiliki SKU provider yang valid."
+      : "Produk ini belum memiliki nominal DigiFlazz yang dapat disinkronkan.");
+  }
 
   let updated = 0;
   const statements = rows.results.flatMap((item) => {
@@ -398,6 +417,7 @@ async function syncRows(target?: { productId: number; providerSku?: string }, so
     const unlimitedStock = sourceItem.unlimited_stock === true;
     const stock = Number(sourceItem.stock ?? 0);
     const maxPrice = Number(item.provider_max_price) > 0 ? Number(item.provider_max_price) : Number(sourceItem.price);
+    const sellingPrice = sale(Number(sourceItem.price), item.margin_type, item.margin_value);
 
     return [
       getD1().prepare(`UPDATE product_packages
@@ -408,8 +428,8 @@ async function syncRows(target?: { productId: number; providerSku?: string }, so
         WHERE id = ?`)
         .bind(
           sourceItem.price,
-          sourceItem.price,
-          sale(maxPrice, item.margin_type, item.margin_value),
+          maxPrice,
+          sellingPrice,
           item.id,
         ),
       buildDigiflazzSellerMonitorStatement({
@@ -430,9 +450,65 @@ async function syncRows(target?: { productId: number; providerSku?: string }, so
     ];
   });
   if (statements.length) await getD1().batch(statements);
-  if (target && updated === 0)
-    throw new Error(target.providerSku ? "SKU nominal tidak ditemukan pada cache pricelist DigiFlazz." : "Tidak ada SKU nominal produk ini pada cache pricelist DigiFlazz.");
+  if (target && updated === 0) {
+    throw new Error(target.providerSku
+      ? "SKU nominal tidak ditemukan pada cache pricelist DigiFlazz."
+      : "Tidak ada SKU nominal produk ini pada cache pricelist DigiFlazz.");
+  }
   return { updated, skipped: false as const };
+}
+
+export async function updateDigiflazzPackagePricing(input: {
+  packageId: number;
+  maxPrice: number;
+  marginType: "fixed" | "percent";
+  marginValue: number;
+}) {
+  await ensureLegacyDatabaseColumns();
+  await ensureDigiflazzPriceListCacheTable();
+  const db = getD1();
+  const row = await db.prepare(`
+    SELECT p.id, p.provider_sku, p.supplier_price, c.price AS cached_price
+    FROM product_packages p
+    LEFT JOIN digiflazz_pricelist_cache c ON c.buyer_sku_code = p.provider_sku
+    WHERE p.id = ? AND p.provider_code = 'digiflazz' AND p.provider_sku IS NOT NULL
+    LIMIT 1
+  `).bind(input.packageId).first<{
+    id: number;
+    provider_sku: string;
+    supplier_price: number | null;
+    cached_price: number | null;
+  }>();
+  if (!row) throw new Error("Nominal DigiFlazz tidak ditemukan.");
+
+  const currentCost = Number(row.cached_price ?? row.supplier_price ?? 0);
+  if (!Number.isFinite(currentCost) || currentCost <= 0) {
+    throw new Error("Harga Digiflazz belum tersedia. Jalankan Sync Pricelist terlebih dahulu.");
+  }
+  const maxPrice = Math.max(1, Math.round(input.maxPrice));
+  const marginValue = Math.max(0, Math.round(input.marginValue));
+  const sellingPrice = Math.max(1, sale(currentCost, input.marginType, marginValue));
+  await db.prepare(`
+    UPDATE product_packages
+    SET provider_max_price = ?,
+        margin_type = ?,
+        margin_value = ?,
+        pricing_mode = 'auto',
+        supplier_price = ?,
+        price = ?,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND provider_code = 'digiflazz'
+  `).bind(maxPrice, input.marginType, marginValue, currentCost, sellingPrice, row.id).run();
+
+  return {
+    packageId: row.id,
+    currentCost,
+    maxPrice,
+    marginType: input.marginType,
+    marginValue,
+    sellingPrice,
+    blockedByMaxPrice: currentCost > maxPrice,
+  };
 }
 
 export async function syncDigiflazzPrices(options: { force?: boolean } = {}) {
