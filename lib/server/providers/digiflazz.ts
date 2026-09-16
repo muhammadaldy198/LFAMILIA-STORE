@@ -128,7 +128,7 @@ export const digiflazzAdapter: ProviderAdapter = {
     if (isAutomatedTestRuntime() && environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
 
     const maxProviderPrice = order.maxProviderPrice;
-    if (!Number.isInteger(maxProviderPrice) || maxProviderPrice < 1) {
+    if (typeof maxProviderPrice !== "number" || !Number.isInteger(maxProviderPrice) || maxProviderPrice < 1) {
       throw new Error("Max Price DigiFlazz pada order tidak valid.");
     }
 
