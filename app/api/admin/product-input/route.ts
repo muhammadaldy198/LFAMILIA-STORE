@@ -17,6 +17,7 @@ const updateSchema = z.object({
 
 type InputRow = {
   slug: string;
+  category: string;
   input_label: string;
   input_placeholder: string;
   input_fields_json: string | null;
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
   try {
     const slug = slugSchema.parse(new URL(request.url).searchParams.get("slug"));
     await ensureKokinpayNicknameGameCodeBackfill();
-    const row = await getD1().prepare(`SELECT slug, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
+    const row = await getD1().prepare(`SELECT slug, category, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
       FROM products WHERE slug = ? LIMIT 1`).bind(slug).first<InputRow>();
     if (!row) return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
     return Response.json({ input: serialize(row) }, { headers: { "Cache-Control": "no-store" } });
@@ -71,7 +72,7 @@ export async function PATCH(request: Request) {
     const input = updateSchema.parse(await request.json());
     await ensureKokinpayNicknameGameCodeBackfill();
     const db = getD1();
-    const current = await db.prepare(`SELECT slug, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
+    const current = await db.prepare(`SELECT slug, category, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
       FROM products WHERE slug = ? LIMIT 1`).bind(input.slug).first<InputRow>();
     if (!current) return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
 
@@ -81,6 +82,13 @@ export async function PATCH(request: Request) {
     const effectiveNicknameGameCode = nicknameGameCodeProvided
       ? nicknameGameCode
       : current.nickname_game_code?.trim() || null;
+
+    if (current.category.trim().toLowerCase() === "voucher" && effectiveNicknameGameCode) {
+      return Response.json(
+        { error: "Produk voucher tidak memakai Kode Game Nickname. Kosongkan kode game terlebih dahulu." },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
 
     if (effectiveNicknameGameCode && kokinpayGameRequiresServer(effectiveNicknameGameCode) && !needsServer) {
       return Response.json(
@@ -110,7 +118,7 @@ export async function PATCH(request: Request) {
         input.slug,
       ).run();
     if (!result.meta.changes) return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
-    const updated = await db.prepare(`SELECT slug, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
+    const updated = await db.prepare(`SELECT slug, category, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
       FROM products WHERE slug = ? LIMIT 1`).bind(input.slug).first<InputRow>();
     if (!updated) return Response.json({ error: "Produk tidak ditemukan setelah diperbarui." }, { status: 404 });
     return Response.json({ ok: true, input: serialize(updated) }, { headers: { "Cache-Control": "no-store" } });
