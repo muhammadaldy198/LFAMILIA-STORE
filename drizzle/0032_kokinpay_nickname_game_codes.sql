@@ -35,12 +35,15 @@ SET needs_server = 1,
 WHERE slug = 'genshin-impact'
   AND nickname_game_code = 'genshin-impact';
 
--- Mark the compatibility backfill complete so runtime repair never re-enables
--- nickname validation after an Admin intentionally clears a product game code.
+-- Track the original game-code backfill and the later Genshin compatibility
+-- repair independently. Existing databases may already contain the first key.
 CREATE TABLE IF NOT EXISTS one_time_operations (
   operation_key TEXT PRIMARY KEY NOT NULL,
   completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 INSERT INTO one_time_operations (operation_key, completed_at)
 VALUES ('kokinpay_nickname_game_code_backfill_0032', CURRENT_TIMESTAMP)
+ON CONFLICT(operation_key) DO UPDATE SET completed_at = excluded.completed_at;
+INSERT INTO one_time_operations (operation_key, completed_at)
+VALUES ('kokinpay_genshin_server_input_repair_0032_v2', CURRENT_TIMESTAMP)
 ON CONFLICT(operation_key) DO UPDATE SET completed_at = excluded.completed_at;
