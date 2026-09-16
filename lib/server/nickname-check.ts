@@ -70,7 +70,7 @@ function throwKokinpayError(status: number, data: KokinpayResponse): never {
       message || "Layanan verifikasi akun belum terautentikasi dengan benar.",
     );
   }
-  if (status === 400 || status === 404 || data.status === false) {
+  if (status === 400 || status === 404) {
     throw new NicknameValidationError(
       message || "ID, Server, atau kode game tidak valid.",
     );
