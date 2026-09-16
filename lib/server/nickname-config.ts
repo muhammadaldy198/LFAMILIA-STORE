@@ -19,14 +19,17 @@ export const LEGACY_KOKINPAY_GAME_CODES: Readonly<Record<string, string>> = {
   "point-blank": "point-blank",
 };
 
-const BACKFILL_OPERATION_KEY = "kokinpay_nickname_game_code_backfill_0032";
+const GAME_CODE_BACKFILL_OPERATION_KEY = "kokinpay_nickname_game_code_backfill_0032";
+const GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v2";
 let backfillPromise: Promise<void> | null = null;
 
+type OperationRow = { completed_at: string };
+
 /**
- * Runtime-safe companion to migration 0032. This covers databases where the
- * compatibility repair added nickname_game_code before Wrangler replays 0032.
- * The backfill is recorded once, so a later Admin decision to clear a code is
- * respected and will not be silently re-enabled on another Worker isolate.
+ * Runtime-safe companion to migration 0032. Game-code migration and the later
+ * Genshin server-input repair have independent one-time markers so databases
+ * that completed an earlier version of 0032 still receive the compatibility
+ * repair without re-enabling a game code an Admin intentionally cleared.
  */
 export async function ensureKokinpayNicknameGameCodeBackfill() {
   if (!backfillPromise) {
@@ -37,45 +40,68 @@ export async function ensureKokinpayNicknameGameCodeBackfill() {
         operation_key TEXT PRIMARY KEY NOT NULL,
         completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`).run();
-      const completed = await db.prepare(
-        "SELECT completed_at FROM one_time_operations WHERE operation_key = ? LIMIT 1",
-      ).bind(BACKFILL_OPERATION_KEY).first<{ completed_at: string }>();
-      if (completed?.completed_at) return;
 
-      await db.batch([
-        db.prepare(`UPDATE products
-          SET nickname_game_code = CASE slug
-            WHEN 'mobile-legends' THEN 'mobile-legends'
-            WHEN 'free-fire' THEN 'free-fire'
-            WHEN 'genshin-impact' THEN 'genshin-impact'
-            WHEN 'valorant' THEN 'valorant'
-            WHEN 'pubg-mobile' THEN 'pubg-mobile'
-            WHEN 'honor-of-kings' THEN 'honor-of-kings'
-            WHEN 'call-of-duty-mobile' THEN 'call-of-duty-mobile'
-            WHEN 'wild-rift' THEN 'league-of-legends-wild-rift'
-            WHEN 'arena-of-valor' THEN 'arena-of-valor'
-            WHEN 'fc-mobile' THEN 'fc-mobile'
-            WHEN 'point-blank' THEN 'point-blank'
-            ELSE nickname_game_code
-          END
-          WHERE (nickname_game_code IS NULL OR trim(nickname_game_code) = '')
-            AND slug IN (
-              'mobile-legends', 'free-fire', 'genshin-impact', 'valorant',
-              'pubg-mobile', 'honor-of-kings', 'call-of-duty-mobile', 'wild-rift',
-              'arena-of-valor', 'fc-mobile', 'point-blank'
-            )`),
-        db.prepare(`UPDATE products
-          SET needs_server = 1,
-              target_template = '{{destination}}{{server}}',
-              input_fields_json = '[{"id":"destination","label":"UID","placeholder":"Masukkan UID","required":true},{"id":"server","label":"Server","placeholder":"Masukkan Server","required":true}]'
-          WHERE slug = 'genshin-impact'
-            AND nickname_game_code = 'genshin-impact'`),
+      const [gameBackfillResult, genshinRepairResult] = await db.batch([
         db.prepare(
-          `INSERT INTO one_time_operations (operation_key, completed_at)
-           VALUES (?, CURRENT_TIMESTAMP)
-           ON CONFLICT(operation_key) DO UPDATE SET completed_at = excluded.completed_at`,
-        ).bind(BACKFILL_OPERATION_KEY),
+          "SELECT completed_at FROM one_time_operations WHERE operation_key = ? LIMIT 1",
+        ).bind(GAME_CODE_BACKFILL_OPERATION_KEY),
+        db.prepare(
+          "SELECT completed_at FROM one_time_operations WHERE operation_key = ? LIMIT 1",
+        ).bind(GENSHIN_SERVER_REPAIR_OPERATION_KEY),
       ]);
+      const gameBackfillCompleted = (gameBackfillResult.results as OperationRow[])[0]?.completed_at;
+      const genshinRepairCompleted = (genshinRepairResult.results as OperationRow[])[0]?.completed_at;
+      if (gameBackfillCompleted && genshinRepairCompleted) return;
+
+      const statements: D1PreparedStatement[] = [];
+      if (!gameBackfillCompleted) {
+        statements.push(
+          db.prepare(`UPDATE products
+            SET nickname_game_code = CASE slug
+              WHEN 'mobile-legends' THEN 'mobile-legends'
+              WHEN 'free-fire' THEN 'free-fire'
+              WHEN 'genshin-impact' THEN 'genshin-impact'
+              WHEN 'valorant' THEN 'valorant'
+              WHEN 'pubg-mobile' THEN 'pubg-mobile'
+              WHEN 'honor-of-kings' THEN 'honor-of-kings'
+              WHEN 'call-of-duty-mobile' THEN 'call-of-duty-mobile'
+              WHEN 'wild-rift' THEN 'league-of-legends-wild-rift'
+              WHEN 'arena-of-valor' THEN 'arena-of-valor'
+              WHEN 'fc-mobile' THEN 'fc-mobile'
+              WHEN 'point-blank' THEN 'point-blank'
+              ELSE nickname_game_code
+            END
+            WHERE (nickname_game_code IS NULL OR trim(nickname_game_code) = '')
+              AND slug IN (
+                'mobile-legends', 'free-fire', 'genshin-impact', 'valorant',
+                'pubg-mobile', 'honor-of-kings', 'call-of-duty-mobile', 'wild-rift',
+                'arena-of-valor', 'fc-mobile', 'point-blank'
+              )`),
+          db.prepare(
+            `INSERT INTO one_time_operations (operation_key, completed_at)
+             VALUES (?, CURRENT_TIMESTAMP)
+             ON CONFLICT(operation_key) DO UPDATE SET completed_at = excluded.completed_at`,
+          ).bind(GAME_CODE_BACKFILL_OPERATION_KEY),
+        );
+      }
+
+      if (!genshinRepairCompleted) {
+        statements.push(
+          db.prepare(`UPDATE products
+            SET needs_server = 1,
+                target_template = '{{destination}}{{server}}',
+                input_fields_json = '[{"id":"destination","label":"UID","placeholder":"Masukkan UID","required":true},{"id":"server","label":"Server","placeholder":"Masukkan Server","required":true}]'
+            WHERE slug = 'genshin-impact'
+              AND nickname_game_code = 'genshin-impact'`),
+          db.prepare(
+            `INSERT INTO one_time_operations (operation_key, completed_at)
+             VALUES (?, CURRENT_TIMESTAMP)
+             ON CONFLICT(operation_key) DO UPDATE SET completed_at = excluded.completed_at`,
+          ).bind(GENSHIN_SERVER_REPAIR_OPERATION_KEY),
+        );
+      }
+
+      if (statements.length) await db.batch(statements);
     })().catch((error) => {
       backfillPromise = null;
       throw error;
