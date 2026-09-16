@@ -6,56 +6,140 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("nickname policy belongs to backend and distinguishes supported games", () => {
-  const policy = read("lib/nickname-policy.ts");
-  assert.match(policy, /"mobile-legends": \{ supported: true, needsServer: true/);
-  assert.match(policy, /unsupportedPolicy/);
-  assert.match(policy, /supported: false/);
+test("nickname requirement is configured per product and legacy repairs have independent markers", () => {
+  const route = read("app/api/admin/product-input/route.ts");
+  const checker = read("lib/server/nickname-check.ts");
+  const config = read("lib/server/nickname-config.ts");
+  const migration = read("drizzle/0032_kokinpay_nickname_game_codes.sql");
+  const publicProducts = read("app/api/products/route.ts");
+
+  assert.match(route, /nicknameGameCode/);
+  assert.match(route, /nickname_game_code/);
+  assert.match(route, /ensureKokinpayNicknameGameCodeBackfill/);
+  assert.match(checker, /SELECT nickname_game_code, needs_server, category FROM products/);
+  assert.match(checker, /if \(!gameCode\) return \{ supported: false/);
+  assert.match(checker, /ensureKokinpayNicknameGameCodeBackfill/);
+  assert.match(publicProducts, /ensureKokinpayNicknameGameCodeBackfill/);
+
+  assert.match(config, /GAME_CODE_BACKFILL_OPERATION_KEY = "kokinpay_nickname_game_code_backfill_0032"/);
+  assert.match(config, /GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v5_case_insensitive_target"/);
+  assert.match(config, /gameBackfillCompleted && genshinRepairCompleted/);
+  assert.match(config, /if \(!gameBackfillCompleted\)/);
+  assert.match(config, /if \(!genshinRepairCompleted\)/);
+  assert.match(config, /WHEN 'mobile-legends' THEN 'mobile-legends'/);
+  assert.match(config, /WHEN 'wild-rift' THEN 'league-of-legends-wild-rift'/);
+  assert.match(config, /WHERE slug = 'genshin-impact'[\s\S]*nickname_game_code = 'genshin-impact'/);
+  assert.match(config, /SET needs_server = 1/);
+  assert.match(config, /instr\(lower\(target_template\), '\{\{server\}\}'\) > 0 THEN target_template/);
+  assert.match(config, /instr\(lower\(target_template\), '\{\{destination\}\}'\) > 0/);
+  assert.match(config, /substr\(target_template, 1, instr\(lower\(target_template\), '\{\{destination\}\}'\) - 1\)/);
+  assert.match(config, /\|\| '\{\{destination\}\}\{\{server\}\}'/);
+  assert.match(config, /substr\(target_template, instr\(lower\(target_template\), '\{\{destination\}\}'\) \+ length\('\{\{destination\}\}'\)\)/);
+  assert.match(config, /ELSE target_template \|\| '\{\{server\}\}'/);
+  assert.match(config, /json_array_length\(input_fields_json\) = 1/);
+  assert.match(config, /json_insert\(/);
+  assert.match(config, /json_set\(input_fields_json, '\$\[1\]\.required', 1\)/);
+
+  assert.match(migration, /UPDATE products/);
+  assert.match(migration, /WHEN 'mobile-legends' THEN 'mobile-legends'/);
+  assert.match(migration, /WHERE slug = 'genshin-impact'[\s\S]*nickname_game_code = 'genshin-impact'/);
+  assert.match(migration, /SET needs_server = 1/);
+  assert.match(migration, /instr\(lower\(target_template\), '\{\{server\}\}'\) > 0 THEN target_template/);
+  assert.match(migration, /instr\(lower\(target_template\), '\{\{destination\}\}'\) > 0/);
+  assert.match(migration, /substr\(target_template, 1, instr\(lower\(target_template\), '\{\{destination\}\}'\) - 1\)/);
+  assert.match(migration, /\|\| '\{\{destination\}\}\{\{server\}\}'/);
+  assert.match(migration, /substr\(target_template, instr\(lower\(target_template\), '\{\{destination\}\}'\) \+ length\('\{\{destination\}\}'\)\)/);
+  assert.match(migration, /json_array_length\(input_fields_json\) = 1/);
+  assert.match(migration, /json_insert\(/);
+  assert.match(migration, /kokinpay_nickname_game_code_backfill_0032/);
+  assert.match(migration, /kokinpay_genshin_server_input_repair_0032_v5_case_insensitive_target/);
+});
+
+test("voucher products never invoke nickname verification and admin writes reject voucher game codes", () => {
+  const checker = read("lib/server/nickname-check.ts");
+  const inputRoute = read("app/api/admin/product-input/route.ts");
+  const productsRoute = read("app/api/admin/products/route.ts");
+  assert.match(checker, /category\?\.trim\(\)\.toLowerCase\(\) === "voucher"/);
+  assert.match(checker, /supported: false, nickname: null, country: null/);
+  assert.match(inputRoute, /category\.trim\(\)\.toLowerCase\(\) === "voucher"/);
+  assert.match(inputRoute, /Produk voucher tidak memakai Kode Game Nickname/);
+  assert.match(productsRoute, /input\.category\.trim\(\)\.toLowerCase\(\) === "voucher"/);
+  assert.match(productsRoute, /Produk voucher tidak boleh memakai Kode Game Nickname/);
 });
 
 test("both checkout routes verify account server-side and never trust browser nickname", () => {
-  for (const file of [
-    "app/api/payments/auto/create/route.ts",
-    "app/api/payments/wallet/create/route.ts",
-  ]) {
+  for (const file of ["app/api/payments/auto/create/route.ts", "app/api/payments/wallet/create/route.ts"]) {
     const source = read(file);
     assert.match(source, /verifyNicknameForCheckout\(/);
     assert.match(source, /nickname: verifiedAccount\.nickname/);
     assert.doesNotMatch(source, /nickname: input\.nickname/);
-    assert.doesNotMatch(source, /nickname: z\.string/);
   }
 });
 
-test("unsupported games can checkout while supported accounts fail closed", () => {
+test("KokinPay game lookup uses active v1 routes, sends server-side credentials, and keeps them out of public responses", () => {
   const checker = read("lib/server/nickname-check.ts");
-  assert.match(checker, /if \(!target\.policy\.supported\)/);
-  assert.match(checker, /supported: false, nickname: null/);
-  assert.match(checker, /Checkout sementara tidak dapat dilanjutkan/);
-  assert.match(checker, /NicknameValidationError/);
+  const publicRoute = read("app/api/nickname/route.ts");
+  assert.match(checker, /https:\/\/api\.kokinpay\.com/);
+  assert.match(checker, /KOKINPAY_GAME_NICKNAME_PATH = "\/v1\/check-nickname"/);
+  assert.match(checker, /KOKINPAY_MLBB_REGION_PATH = "\/v1\/check-region"/);
+  assert.match(checker, /game_code: gameCode/);
+  assert.match(checker, /api_key: apiKey/);
+  assert.match(checker, /kokinpayGameRequiresServer\(gameCode\)/);
+  assert.doesNotMatch(checker, /"\/check-nick-game"|"\/check-region-mlbb"/);
+  assert.doesNotMatch(publicRoute, /KOKINPAY_API_KEY|api_key/);
 });
 
-test("Melostore nickname endpoint accepts either API origin or h2h base path", () => {
+test("Mobile Legends must pass nickname and region checks before verification succeeds", () => {
   const checker = read("lib/server/nickname-check.ts");
-  assert.match(checker, /melostoreNicknameEndpoint/);
-  assert.match(checker, /\/api\\\/v1\\\/h2h\\\/check-nickname/);
-  assert.match(checker, /`\$\{base\}\/check-nickname`/);
+  const adminRoute = read("app/api/admin/nickname-tools/route.ts");
+  assert.match(checker, /MLBB_GAME_CODE = "mobile-legends"/);
+  assert.match(checker, /Promise\.all\(/);
+  assert.match(checker, /KOKINPAY_MLBB_REGION_PATH/);
+  assert.match(checker, /tidak mengembalikan region Mobile Legends/);
+  assert.match(adminRoute, /gameCode: "mobile-legends"/);
+  assert.match(adminRoute, /!result\.nickname \|\| !result\.country/);
 });
 
-test("Melostore errors distinguish missing accounts from service and validation failures", () => {
-  const checker = read("lib/server/nickname-check.ts");
-  const start = checker.indexOf("function throwMelostoreError");
-  const end = checker.indexOf("export async function verifyNicknameForCheckout", start);
-  const melostoreErrors = checker.slice(start, end);
-  assert.ok(start >= 0 && end > start);
-  assert.match(melostoreErrors, /category === "not_found" \|\| code === 4001/);
-  assert.match(melostoreErrors, /category === "validation" \|\| code === 4006/);
-  assert.match(melostoreErrors, /"maintenance"/);
-  assert.match(melostoreErrors, /status === 404 && !category && code === null/);
-  assert.doesNotMatch(melostoreErrors, /\[400, 404, 422\]\.includes\(upstream\.status\)/);
+test("KokinPay PLN tool uses active v1 route and fails closed on empty results", () => {
+  const route = read("app/api/admin/nickname-tools/route.ts");
+  assert.match(route, /https:\/\/api\.kokinpay\.com\/v1\/check-pln/);
+  assert.match(route, /lookupKokinpayNickname/);
+  assert.match(route, /if \(!customerName\)/);
+  assert.match(route, /tidak mengembalikan nama pelanggan/);
+  assert.doesNotMatch(route, /api\.kokinpay\.com\/check-nick-pln/);
 });
 
-test("public nickname response never exposes integration identity", () => {
+test("KokinPay nickname and PLN flows share one HTTP failure classifier", () => {
+  const checker = read("lib/server/nickname-check.ts");
+  const adminRoute = read("app/api/admin/nickname-tools/route.ts");
+  assert.match(checker, /classifyKokinpayFailure/);
+  assert.match(checker, /const kind = classifyKokinpayFailure\(status\)/);
+  assert.match(adminRoute, /classifyKokinpayFailure/);
+  assert.match(adminRoute, /const kind = classifyKokinpayFailure\(response\.status\)/);
+  assert.doesNotMatch(checker, /data\.status === false/);
+  assert.doesNotMatch(adminRoute, /payload\.status === false/);
+});
+
+test("public verification never forwards raw upstream KokinPay error messages", () => {
+  const checker = read("lib/server/nickname-check.ts");
+  const classifierStart = checker.indexOf("function throwKokinpayError");
+  const classifierEnd = checker.indexOf("async function postKokinpay", classifierStart);
+  assert.ok(classifierStart >= 0 && classifierEnd > classifierStart);
+  const classifier = checker.slice(classifierStart, classifierEnd);
+  assert.doesNotMatch(classifier, /data\.message|message\s*\|\|/);
+  assert.match(checker, /throwKokinpayError\(upstream\.status\)/);
+});
+
+test("public nickname response is provider-neutral, minimal, and non-cacheable", () => {
   const route = read("app/api/nickname/route.ts");
   assert.doesNotMatch(route, /provider:/);
-  assert.doesNotMatch(route, /melostore/i);
+  assert.doesNotMatch(route, /kokinpay/i);
+  assert.doesNotMatch(route, /userId:\s*input\.userId|server:\s*input\.server|game:\s*input\.game/);
+  assert.match(route, /"Cache-Control": "no-store"/);
+});
+
+test("admin nickname tools reject cross-origin mutations", () => {
+  const route = read("app/api/admin/nickname-tools/route.ts");
+  assert.match(route, /rejectCrossOriginMutation\(request\)/);
+  assert.match(route, /requireAdminSession\(request, "admin"\)/);
 });

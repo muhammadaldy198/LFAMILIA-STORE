@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
+import { kokinpayGameRequiresServer } from "@/lib/kokinpay-game-codes";
 import { requireAdminSession } from "@/lib/server/admin";
-import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
+import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
 
 export const dynamic = "force-dynamic";
 
@@ -11,15 +12,18 @@ const updateSchema = z.object({
   checkoutType: z.enum(["id", "id-server"]),
   labelId: z.string().trim().min(1).max(80),
   labelServer: z.string().trim().min(1).max(80).optional(),
+  nicknameGameCode: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100).optional().or(z.literal("")),
 });
 
 type InputRow = {
   slug: string;
+  category: string;
   input_label: string;
   input_placeholder: string;
   input_fields_json: string | null;
   needs_server: number;
   target_template: string;
+  nickname_game_code: string | null;
 };
 
 function parseFields(value: string | null) {
@@ -41,6 +45,7 @@ function serialize(row: InputRow) {
     labelId,
     labelServer,
     targetTemplate: row.target_template,
+    nicknameGameCode: row.nickname_game_code ?? "",
   };
 }
 
@@ -49,8 +54,8 @@ export async function GET(request: Request) {
   if (access instanceof Response) return access;
   try {
     const slug = slugSchema.parse(new URL(request.url).searchParams.get("slug"));
-    await ensureLegacyDatabaseColumns();
-    const row = await getD1().prepare(`SELECT slug, input_label, input_placeholder, input_fields_json, needs_server, target_template
+    await ensureKokinpayNicknameGameCodeBackfill();
+    const row = await getD1().prepare(`SELECT slug, category, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
       FROM products WHERE slug = ? LIMIT 1`).bind(slug).first<InputRow>();
     if (!row) return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
     return Response.json({ input: serialize(row) }, { headers: { "Cache-Control": "no-store" } });
@@ -65,26 +70,58 @@ export async function PATCH(request: Request) {
   if (access instanceof Response) return access;
   try {
     const input = updateSchema.parse(await request.json());
+    await ensureKokinpayNicknameGameCodeBackfill();
+    const db = getD1();
+    const current = await db.prepare(`SELECT slug, category, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
+      FROM products WHERE slug = ? LIMIT 1`).bind(input.slug).first<InputRow>();
+    if (!current) return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
+
     const needsServer = input.checkoutType === "id-server";
+    const nicknameGameCodeProvided = input.nicknameGameCode !== undefined;
+    const nicknameGameCode = input.nicknameGameCode?.trim() || null;
+    const effectiveNicknameGameCode = nicknameGameCodeProvided
+      ? nicknameGameCode
+      : current.nickname_game_code?.trim() || null;
+
+    if (current.category.trim().toLowerCase() === "voucher" && effectiveNicknameGameCode) {
+      return Response.json(
+        { error: "Produk voucher tidak memakai Kode Game Nickname. Kosongkan kode game terlebih dahulu." },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    if (effectiveNicknameGameCode && kokinpayGameRequiresServer(effectiveNicknameGameCode) && !needsServer) {
+      return Response.json(
+        { error: "Kode game nickname ini membutuhkan Checkout Type ID + Server." },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
     const labelServer = input.labelServer?.trim() || "Server ID";
     const fields = [
       { id: "destination", label: input.labelId, placeholder: `Masukkan ${input.labelId}`, required: true },
       ...(needsServer ? [{ id: "server", label: labelServer, placeholder: `Masukkan ${labelServer}`, required: true }] : []),
     ];
     const targetTemplate = needsServer ? "{{destination}}{{server}}" : "{{destination}}";
-    await ensureLegacyDatabaseColumns();
-    const result = await getD1().prepare(`UPDATE products
-      SET input_label = ?, input_placeholder = ?, input_fields_json = ?, needs_server = ?, target_template = ?, updated_at = CURRENT_TIMESTAMP
+    const result = await db.prepare(`UPDATE products
+      SET input_label = ?, input_placeholder = ?, input_fields_json = ?, needs_server = ?, target_template = ?,
+          nickname_game_code = CASE WHEN ? = 1 THEN ? ELSE nickname_game_code END,
+          updated_at = CURRENT_TIMESTAMP
       WHERE slug = ?`).bind(
         input.labelId,
         `Masukkan ${input.labelId}`,
         JSON.stringify(fields),
         needsServer ? 1 : 0,
         targetTemplate,
+        nicknameGameCodeProvided ? 1 : 0,
+        nicknameGameCode,
         input.slug,
       ).run();
     if (!result.meta.changes) return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
-    return Response.json({ ok: true, input: { ...input, labelServer, targetTemplate } });
+    const updated = await db.prepare(`SELECT slug, category, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
+      FROM products WHERE slug = ? LIMIT 1`).bind(input.slug).first<InputRow>();
+    if (!updated) return Response.json({ error: "Produk tidak ditemukan setelah diperbarui." }, { status: 404 });
+    return Response.json({ ok: true, input: serialize(updated) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message || "Pengaturan input tidak valid." : error instanceof Error ? error.message : "Pengaturan input gagal disimpan.";
     return Response.json({ error: message }, { status: 400 });

@@ -21,6 +21,7 @@ test("admin reference exposes the approved desktop information architecture", ()
     "Produk",
     "Banner & Konten",
     "Digiflazz",
+    "Validasi Akun",
     "Pembayaran",
     "Pelanggan",
     "Promo",
@@ -31,7 +32,7 @@ test("admin reference exposes the approved desktop information architecture", ()
     "Pengaturan",
   ]) assert.ok(source.includes(`label: "${label}"`), label);
   assert.doesNotMatch(source, /value: "site-content"/);
-  assert.equal([...source.matchAll(/\{ value: "[^"]+", label: "[^"]+"/g)].length, 13);
+  assert.equal([...source.matchAll(/\{ value: "[^"]+", label: "[^"]+"/g)].length, 14);
   assert.ok(source.indexOf('label: "Integrasi"') < source.indexOf('label: "Pengaturan"'));
 });
 

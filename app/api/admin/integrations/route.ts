@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 const profileInput = z.object({
   action: z.literal("save_profile"),
-  provider: z.enum(["doku", "midtrans", "digiflazz", "melostore", "resend", "relay", "security"]),
+  provider: z.enum(["doku", "midtrans", "digiflazz", "kokinpay", "resend", "relay", "security"]),
   mode: z.enum(["direct", "service"]),
   environment: z.enum(["sandbox", "production", "development", "global"]),
   values: z.record(z.string().min(1).max(80), z.string().max(12_000)).default({}),

@@ -6,10 +6,10 @@ import { CheckCircle2, CreditCard, Eye, EyeOff, KeyRound, Mail, Network, Refresh
 import { CopyUrl, Field, Panel, Status, TabBar, WorkspaceHeader, buttonClass, inputClass, primaryButtonClass } from "@/components/admin-workspace-ui";
 import { AdminHostedGatewayIntegration } from "@/components/admin-hosted-gateway-integration";
 
-const tabs = ["Ringkasan", "DOKU Checkout", "DOKU Direct API", "Midtrans Snap", "Midtrans BI-SNAP", "Digiflazz", "Melostore Nickname", "Resend Email", "Relay & Keamanan"] as const;
+const tabs = ["Ringkasan", "DOKU Checkout", "DOKU Direct API", "Midtrans Snap", "Midtrans BI-SNAP", "Digiflazz", "KokinPay", "Resend Email", "Relay & Keamanan"] as const;
 type Tab = (typeof tabs)[number];
 type Environment = "sandbox" | "production" | "development" | "global";
-type Provider = "doku" | "midtrans" | "digiflazz" | "melostore" | "resend" | "relay" | "security";
+type Provider = "doku" | "midtrans" | "digiflazz" | "kokinpay" | "resend" | "relay" | "security";
 type Profile = { provider: Provider; mode: "direct" | "service"; environment: Environment; configured: boolean; configuredFields: string[]; decryptionError: boolean; updatedAt: string };
 type Callback = { id: string; label: string; description: string; url: string };
 type Overview = { encryptionReady: boolean; encryptionHint: string; selections: { dokuEnvironment: "sandbox" | "production"; midtransEnvironment: "sandbox" | "production"; digiflazzEnvironment: "development" | "production" }; profiles: Profile[]; callbacks: Callback[] };
@@ -17,9 +17,7 @@ type FormValues = Record<string, string>;
 type DokuConnectionResult = { environment: "sandbox" | "production"; apiOrigin: string; tokenType: string; expiresIn: number };
 
 function dokuApiUrlForEnvironment(environment: "sandbox" | "production") {
-  return environment === "sandbox"
-    ? "https://api-sandbox.doku.com"
-    : "https://api.doku.com";
+  return environment === "sandbox" ? "https://api-sandbox.doku.com" : "https://api.doku.com";
 }
 
 const defaultValues: FormValues = {
@@ -66,10 +64,7 @@ export function AdminIntegrationWorkspace() {
     setDokuEnvironment(next.selections.dokuEnvironment);
     setMidtransEnvironment(next.selections.midtransEnvironment);
     setDigiflazzEnvironment(next.selections.digiflazzEnvironment);
-    setValues((current) => ({
-      ...current,
-      dokuApiUrl: dokuApiUrlForEnvironment(next.selections.dokuEnvironment),
-    }));
+    setValues((current) => ({ ...current, dokuApiUrl: dokuApiUrlForEnvironment(next.selections.dokuEnvironment) }));
     return next;
   }, []);
 
@@ -101,15 +96,9 @@ export function AdminIntegrationWorkspace() {
     try {
       if (tab === "DOKU Direct API") {
         await saveProfile("doku", "direct", dokuEnvironment, {
-          clientId: values.dokuClientId || "",
-          secretKey: values.dokuSecretKey || "",
-          privateKey: values.dokuPrivateKey || "",
-          privateKeyPassphrase: values.dokuPrivateKeyPassphrase || "",
-          apiUrl: dokuApiUrlForEnvironment(dokuEnvironment),
-          qrisMerchantId: values.dokuMerchantId || "",
-          qrisTerminalId: values.dokuTerminalId || "",
-          qrisPostalCode: values.dokuPostalCode || "",
-          vaConfigJson: values.dokuVaConfig || "",
+          clientId: values.dokuClientId || "", secretKey: values.dokuSecretKey || "", privateKey: values.dokuPrivateKey || "",
+          privateKeyPassphrase: values.dokuPrivateKeyPassphrase || "", apiUrl: dokuApiUrlForEnvironment(dokuEnvironment),
+          qrisMerchantId: values.dokuMerchantId || "", qrisTerminalId: values.dokuTerminalId || "", qrisPostalCode: values.dokuPostalCode || "", vaConfigJson: values.dokuVaConfig || "",
         });
         await put({ action: "save_selections", selections: { dokuEnvironment } });
       } else if (tab === "Midtrans BI-SNAP") {
@@ -119,8 +108,8 @@ export function AdminIntegrationWorkspace() {
       } else if (tab === "Digiflazz") {
         await saveProfile("digiflazz", "direct", digiflazzEnvironment, { username: values.digiflazzUsername || "", apiKey: values.digiflazzApiKey || "", webhookSecret: values.digiflazzWebhookSecret || "", transactionApiUrl: values.digiflazzTransactionApiUrl || "", priceListUrl: values.digiflazzPriceListUrl || "" });
         await put({ action: "save_selections", selections: { digiflazzEnvironment } });
-      } else if (tab === "Melostore Nickname") {
-        await saveProfile("melostore", "service", "global", { apiUrl: values.melostoreApiUrl || "", apiKey: values.melostoreApiKey || "", secretKey: values.melostoreSecretKey || "", nicknameApiKey: values.melostoreNicknameApiKey || "" });
+      } else if (tab === "KokinPay") {
+        await saveProfile("kokinpay", "service", "global", { apiKey: values.kokinpayApiKey || "" });
       } else if (tab === "Resend Email") {
         await saveProfile("resend", "service", "global", { apiKey: values.resendApiKey || "", fromEmail: values.resendFromEmail || "", apiUrl: values.resendApiUrl || "", deliveryChannel: values.resendDeliveryChannel || "email" });
       } else {
@@ -129,7 +118,7 @@ export function AdminIntegrationWorkspace() {
       }
       await loadOverview();
       setMessage(`${tab} berhasil disimpan terenkripsi di backend.`);
-      setValues((current) => ({ ...current, dokuClientId: "", dokuSecretKey: "", dokuPrivateKey: "", dokuPrivateKeyPassphrase: "", midtransMerchantId: "", midtransClientId: "", midtransClientSecret: "", midtransPartnerId: "", midtransPrivateKey: "", midtransPrivateKeyPassphrase: "", midtransPublicKey: "", midtransChannelId: "", digiflazzApiKey: "", digiflazzWebhookSecret: "", melostoreApiKey: "", melostoreSecretKey: "", melostoreNicknameApiKey: "", resendApiKey: "", relayToken: "", voucherEncryptionKey: "" }));
+      setValues((current) => ({ ...current, dokuClientId: "", dokuSecretKey: "", dokuPrivateKey: "", dokuPrivateKeyPassphrase: "", midtransMerchantId: "", midtransClientId: "", midtransClientSecret: "", midtransPartnerId: "", midtransPrivateKey: "", midtransPrivateKeyPassphrase: "", midtransPublicKey: "", midtransChannelId: "", digiflazzApiKey: "", digiflazzWebhookSecret: "", kokinpayApiKey: "", resendApiKey: "", relayToken: "", voucherEncryptionKey: "" }));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Konfigurasi integrasi gagal disimpan.");
     } finally { setBusy(false); }
@@ -151,23 +140,12 @@ export function AdminIntegrationWorkspace() {
         setMessage(`Tes koneksi DOKU ${result.doku.environment} berhasil. B2B token diterbitkan dari ${result.doku.apiOrigin} dan berlaku sekitar ${result.doku.expiresIn} detik.`);
       } else {
         const latest = await loadOverview();
-        const target = tab === "Midtrans BI-SNAP" ? ["midtrans", midtransEnvironment] : tab === "Digiflazz" ? ["digiflazz", digiflazzEnvironment] : tab === "Melostore Nickname" ? ["melostore", "global"] : tab === "Resend Email" ? ["resend", "global"] : null;
+        const target = tab === "Midtrans BI-SNAP" ? ["midtrans", midtransEnvironment] : tab === "Digiflazz" ? ["digiflazz", digiflazzEnvironment] : tab === "KokinPay" ? ["kokinpay", "global"] : tab === "Resend Email" ? ["resend", "global"] : null;
         const ready = target && latest.profiles.some((item) => item.provider === target[0] && item.environment === target[1] && item.configured && !item.decryptionError);
         if (!ready) throw new Error("Kredensial belum lengkap atau belum bisa didekripsi oleh backend.");
         setMessage(`${tab} terbaca dan siap dipakai oleh backend.`);
       }
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Pemeriksaan integrasi gagal."); }
-    finally { setBusy(false); }
-  }
-
-  async function checkNickname() {
-    setMessage(""); setError(""); setBusy(true);
-    try {
-      const response = await fetch("/api/nickname", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ game: values.nicknameGame || "", userId: values.nicknameUserId || "", server: values.nicknameServer || undefined }) });
-      const payload = await response.json().catch(() => ({})) as { error?: string; nickname?: string | null; supported?: boolean };
-      if (!response.ok) throw new Error(payload.error || "Nickname tidak ditemukan.");
-      setMessage(payload.supported ? `Nickname ditemukan: ${payload.nickname || "-"}` : "Game ini tidak memakai pemeriksaan nickname dan dapat langsung checkout.");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Pemeriksaan nickname gagal."); }
     finally { setBusy(false); }
   }
 
@@ -177,7 +155,7 @@ export function AdminIntegrationWorkspace() {
   const midtransApiUrl = values.midtransApiUrl || (midtransEnvironment === "production" ? "https://merchants.midtrans.com" : "https://merchants.sbx.midtrans.com");
 
   return <div>
-    <WorkspaceHeader title="Integrasi" description="Pusat kredensial DOKU Checkout/Direct API, Midtrans Snap/BI-SNAP, Digiflazz, layanan internal, callback, relay, dan keamanan. Khusus Super Admin." actions={hostedTab ? <Status tone="blue">Simpan credential dari panel di bawah</Status> : <><button type="button" disabled={busy || tab === "Ringkasan"} onClick={testCurrent} className={buttonClass}><RefreshCw className={`size-3.5 ${busy ? "animate-spin" : ""}`} />{tab === "DOKU Direct API" ? "Tes Koneksi DOKU" : "Periksa Konfigurasi"}</button><button type="button" disabled={busy || tab === "Ringkasan"} onClick={save} className={primaryButtonClass}><Save className="size-3.5" />{busy ? "Memproses..." : "Simpan"}</button></>} />
+    <WorkspaceHeader title="Integrasi" description="Pusat kredensial DOKU Checkout/Direct API, Midtrans Snap/BI-SNAP, Digiflazz, KokinPay, layanan internal, callback, relay, dan keamanan. Khusus Super Admin." actions={hostedTab ? <Status tone="blue">Simpan credential dari panel di bawah</Status> : <><button type="button" disabled={busy || tab === "Ringkasan"} onClick={testCurrent} className={buttonClass}><RefreshCw className={`size-3.5 ${busy ? "animate-spin" : ""}`} />{tab === "DOKU Direct API" ? "Tes Koneksi DOKU" : "Periksa Konfigurasi"}</button><button type="button" disabled={busy || tab === "Ringkasan"} onClick={save} className={primaryButtonClass}><Save className="size-3.5" />{busy ? "Memproses..." : "Simpan"}</button></>} />
     {message && <Notice ok text={message} onClose={() => setMessage("")} />}
     {error && <Notice text={error} onClose={() => setError("")} />}
     {overview && !overview.encryptionReady && <Notice text={overview.encryptionHint} onClose={() => {}} />}
@@ -189,7 +167,7 @@ export function AdminIntegrationWorkspace() {
       <IntegrationCard icon={<CreditCard className="size-5" />} title="Midtrans Snap" description="Mode hosted sederhana untuk dipakai sekarang. Credential Sandbox dan Production disimpan terpisah." ready={false} onClick={() => setTab("Midtrans Snap")} neutral />
       <IntegrationCard icon={<CreditCard className="size-5" />} title="Midtrans BI-SNAP" description="Tetap disimpan untuk dipakai setelah onboarding BI-SNAP diterima." ready={profileConfigured("midtrans", midtransEnvironment)} onClick={() => setTab("Midtrans BI-SNAP")} />
       <IntegrationCard icon={<Network className="size-5" />} title="Digiflazz" description="Produk otomatis, sinkron harga, transaksi, webhook, dan relay." ready={profileConfigured("digiflazz", digiflazzEnvironment)} onClick={() => setTab("Digiflazz")} />
-      <IntegrationCard icon={<KeyRound className="size-5" />} title="Melostore Nickname" description="Pemeriksaan nickname berdasarkan ID atau ID + Server sebelum checkout." ready={profileConfigured("melostore", "global")} onClick={() => setTab("Melostore Nickname")} />
+      <IntegrationCard icon={<KeyRound className="size-5" />} title="KokinPay" description="API key terenkripsi untuk layanan Validasi Akun. Pemeriksaan operasional berada di menu Validasi Akun." ready={profileConfigured("kokinpay", "global")} onClick={() => setTab("KokinPay")} />
       <IntegrationCard icon={<Mail className="size-5" />} title="Resend Email" description="Invoice, status pesanan, reset password, dan pengiriman voucher." ready={profileConfigured("resend", "global")} onClick={() => setTab("Resend Email")} />
       <IntegrationCard icon={<Server className="size-5" />} title="VPS Relay" description="Relay Digiflazz dan egress Midtrans BI-SNAP; credential payment tetap tersimpan di Admin/D1." ready={profileConfigured("relay", "global")} onClick={() => setTab("Relay & Keamanan")} />
       <Panel title="URL yang Dipasang di Layanan" description="Salin URL publik ini ke dashboard masing-masing layanan." className="col-span-2"><div className="grid grid-cols-2 gap-3 p-4"><CopyUrl label="DOKU Notification URL" value={callback("doku", fallbackCallbacks[0].url)} note="Tempel di DOKU" /><CopyUrl label="DOKU Return URL" value={callback("doku-fallback", fallbackCallbacks[1].url)} note="Tempel di DOKU" /><CopyUrl label="Midtrans Snap Notification URL" value={callback("midtrans-snap", fallbackCallbacks[2].url)} note="Tempel di Midtrans" /><CopyUrl label="Midtrans BI-SNAP VA Notification URL" value={callback("midtrans-va", fallbackCallbacks[3].url)} note="Tempel di Midtrans" /><CopyUrl label="Digiflazz Webhook URL" value={callback("digiflazz", fallbackCallbacks[4].url)} note="Tempel di Digiflazz" /></div></Panel>
@@ -233,7 +211,7 @@ export function AdminIntegrationWorkspace() {
       <TextField label="Pricelist API URL" value={values.digiflazzPriceListUrl || ""} onChange={(value) => setValue("digiflazzPriceListUrl", value)} />
     </div></Panel>} side={<><Panel title="URL Digiflazz" description="Salin untuk webhook dan relay."><div className="space-y-2 p-4"><CopyUrl label="Webhook / Callback URL" value={callback("digiflazz", fallbackCallbacks[4].url)} note="Tempel di Digiflazz" /><CopyUrl label="Relay Endpoint" value={digiflazzRelayBase} /><CopyUrl label="Website Origin" value="https://lfamiliastore.my.id" /></div></Panel><Panel title="Alur Koneksi" description="Rute backend aktif."><div className="space-y-3 p-4"><Flow number="1" text="Website menerima pesanan" /><Flow number="2" text="Backend memanggil VPS Relay" /><Flow number="3" text="Relay meneruskan ke Digiflazz" /><Flow number="4" text="Webhook memperbarui status" /></div></Panel></>} />}
 
-    {tab === "Melostore Nickname" && <TwoColumn main={<Panel title="API Keys Check Nickname" description="Dipakai backend untuk memvalidasi akun sebelum pesanan dibuat." action={<SecretToggle show={showSecrets} onClick={() => setShowSecrets((current) => !current)} />}><div className="grid grid-cols-2 gap-4 p-4"><TextField label="API URL" value={values.melostoreApiUrl || ""} onChange={(value) => setValue("melostoreApiUrl", value)} placeholder="URL API resmi dari akun Melostore" /><TextField label="Endpoint" value="/api/v1/h2h/check-nickname" readOnly /><SecretField label="API Key" value={values.melostoreApiKey || ""} onChange={(value) => setValue("melostoreApiKey", value)} placeholder={profileConfigured("melostore", "global") ? "Tersimpan — isi hanya untuk mengganti" : "Masukkan API Key"} show={showSecrets} /><SecretField label="Secret Key" value={values.melostoreSecretKey || ""} onChange={(value) => setValue("melostoreSecretKey", value)} placeholder="Masukkan Secret Key" show={showSecrets} /><SecretField label="Nickname API Key Cadangan" value={values.melostoreNicknameApiKey || ""} onChange={(value) => setValue("melostoreNicknameApiKey", value)} placeholder="Opsional" show={showSecrets} /><div className="col-span-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[8px] leading-4 text-blue-800">Keputusan wajib verifikasi atau boleh langsung checkout dikendalikan backend, bukan toggle panel.</div></div></Panel>} side={<><Panel title="Aturan Backend" description="Tidak dapat dimatikan oleh staff."><div className="space-y-3 p-4"><SecurityLine text="Game didukung: nickname wajib ditemukan" /><SecurityLine text="Game tidak didukung: checkout dilanjutkan" /><SecurityLine text="Nickname browser tidak dipercaya" /><SecurityLine text="Kunci API tidak dikirim ke frontend" /></div></Panel><Panel title="Tes Akun" description="Memanggil endpoint validasi backend yang sama dengan checkout."><div className="space-y-3 p-4"><TextField label="Game code" value={values.nicknameGame || ""} onChange={(value) => setValue("nicknameGame", value)} placeholder="mobile-legends" /><TextField label="ID akun" value={values.nicknameUserId || ""} onChange={(value) => setValue("nicknameUserId", value)} placeholder="123456789" /><TextField label="Server / Zone" value={values.nicknameServer || ""} onChange={(value) => setValue("nicknameServer", value)} placeholder="Opsional" /><button type="button" disabled={busy} onClick={checkNickname} className={`${primaryButtonClass} w-full`}><RefreshCw className="size-3.5" />Cek Nickname</button></div></Panel></>} />}
+    {tab === "KokinPay" && <TwoColumn main={<Panel title="Konfigurasi KokinPay" description="API key disimpan terenkripsi dan dipakai server untuk Validasi Akun serta checkout." action={<SecretToggle show={showSecrets} onClick={() => setShowSecrets((current) => !current)} />}><div className="grid grid-cols-2 gap-4 p-4"><TextField label="API Base" value="https://api.kokinpay.com" readOnly /><SecretField label="API Key KokinPay" value={values.kokinpayApiKey || ""} onChange={(value) => setValue("kokinpayApiKey", value)} placeholder={profileConfigured("kokinpay", "global") ? "Tersimpan — isi hanya untuk mengganti" : "Masukkan API Key"} show={showSecrets} /><TextField label="Nickname Game Endpoint" value="/v1/check-nickname" readOnly /><TextField label="Region MLBB Endpoint" value="/v1/check-region" readOnly /><TextField label="PLN Endpoint" value="/v1/check-pln" readOnly /><div className="col-span-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[8px] leading-4 text-blue-800">Tes akun dan daftar kode game berada di menu <strong>Validasi Akun</strong>. Integrasi hanya menyimpan credential agar tidak terjadi duplikasi fungsi.</div></div></Panel>} side={<><Panel title="Status Backend" description="KokinPay hanya dipanggil dari server."><div className="space-y-3 p-4"><SecurityLine text="API key dienkripsi di D1" /><SecurityLine text="API key tidak dikirim ke browser pelanggan" /><SecurityLine text="Mobile Legends wajib lolos nickname dan region" /><SecurityLine text="Hasil kosong dianggap gagal, bukan sukses" /></div></Panel><Panel title="Endpoint Aktif" description="Rute API yang digunakan backend."><div className="space-y-2 p-4"><CopyUrl label="Cek nickname game" value="https://api.kokinpay.com/v1/check-nickname" /><CopyUrl label="Cek region MLBB" value="https://api.kokinpay.com/v1/check-region" /><CopyUrl label="Cek nama PLN" value="https://api.kokinpay.com/v1/check-pln" /></div></Panel></>} />}
 
     {tab === "Resend Email" && <TwoColumn main={<Panel title="Konfigurasi Resend" description="Email transaksi dan pengiriman voucher."><div className="grid grid-cols-2 gap-4 p-4"><SecretField label="Resend API Key" value={values.resendApiKey || ""} onChange={(value) => setValue("resendApiKey", value)} placeholder={profileConfigured("resend", "global") ? "Tersimpan — isi hanya untuk mengganti" : "re_••••••••"} show={showSecrets} /><TextField label="API URL" value={values.resendApiUrl || ""} onChange={(value) => setValue("resendApiUrl", value)} /><TextField label="Nama pengirim" value={values.resendFromName || ""} onChange={(value) => setValue("resendFromName", value)} /><TextField label="Email pengirim" value={values.resendFromEmail || ""} onChange={(value) => setValue("resendFromEmail", value)} placeholder="noreply@lfamiliastore.my.id" /><SelectField label="Channel voucher" value={values.resendDeliveryChannel || "email"} onChange={(value) => setValue("resendDeliveryChannel", value)} options={["email", "website"]} /></div></Panel>} side={<Panel title="Status Backend" description="Konfigurasi email disimpan sebagai service internal."><div className="space-y-3 p-4"><SecurityLine text="API key hanya tersedia di server" /><SecurityLine text="Status pengiriman dicatat backend" /><SecurityLine text="Voucher tidak bocor ke log publik" /></div></Panel>} />}
 

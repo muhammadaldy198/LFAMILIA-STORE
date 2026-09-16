@@ -74,6 +74,7 @@ export const products = sqliteTable(
     inputLabel: text("input_label").notNull(),
     inputPlaceholder: text("input_placeholder").notNull(),
     inputFieldsJson: text("input_fields_json"),
+    nicknameGameCode: text("nickname_game_code"),
     needsServer: integer("needs_server", { mode: "boolean" }).notNull().default(false),
     popular: integer("popular", { mode: "boolean" }).notNull().default(false),
     instant: integer("instant", { mode: "boolean" }).notNull().default(false),

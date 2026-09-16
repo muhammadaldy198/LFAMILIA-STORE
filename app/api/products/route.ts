@@ -1,5 +1,6 @@
 import { readProducts } from "@/lib/server/products";
 import { readReviewSummaries } from "@/lib/server/reviews";
+import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
 import {
   readAvailableVoucherStockKeys,
   readDigiflazzPackageAvailability,
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    await ensureKokinpayNicknameGameCodeBackfill();
     const [stored, summaries, digiflazzAvailability, voucherStockKeys] = await Promise.all([
       readProducts(false),
       readReviewSummaries().catch(() => new Map<string, { ratingAverage: number; ratingCount: number }>()),
@@ -31,6 +33,7 @@ export async function GET() {
         inputLabel: item.inputLabel,
         inputPlaceholder: item.inputPlaceholder,
         inputFields: item.inputFields,
+        nicknameRequired: Boolean(item.nicknameRequired),
         needsServer: item.needsServer,
         popular: item.popular,
         instant: item.instant,

@@ -59,6 +59,7 @@ test("product input editor controls checkout ID labels and customer_no mapping",
     "ID + Server",
     "Label ID",
     "Label Server",
+    "Kode Game Nickname",
     "Preview Input Checkout",
     "Format customer_no",
   ]) assert.ok(source.includes(label), `missing customer input UI: ${label}`);

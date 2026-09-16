@@ -1,8 +1,11 @@
 import { z } from "zod";
+import { getD1 } from "@/db";
+import { kokinpayGameRequiresServer } from "@/lib/kokinpay-game-codes";
 import { requireAdminSession } from "@/lib/server/admin";
 import { deleteProduct, readProducts, saveProduct } from "@/lib/server/products";
 import { isAllowedMediaUrl } from "@/lib/media-url";
 import { readDigiflazzSellerMonitor } from "@/lib/server/digiflazz-monitor";
+import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +71,9 @@ const productSchema = z.object({
   notices: z.array(noticeSchema).max(10).default([]),
 });
 
-function validateProduct(input: z.infer<typeof productSchema>) {
+type ProductInput = z.infer<typeof productSchema>;
+
+function validateProduct(input: ProductInput) {
   if (input.isActive && input.packages.length === 0) {
     throw new Error("Tambahkan minimal satu nominal dari katalog sebelum mengaktifkan produk.");
   }
@@ -99,10 +104,35 @@ function validateProduct(input: z.infer<typeof productSchema>) {
   }
 }
 
+async function validateNicknameCheckoutContract(dbId: number, input: ProductInput) {
+  await ensureKokinpayNicknameGameCodeBackfill();
+  const row = await getD1().prepare(
+    "SELECT nickname_game_code FROM products WHERE id = ? LIMIT 1",
+  ).bind(dbId).first<{ nickname_game_code: string | null }>();
+  const gameCode = row?.nickname_game_code?.trim();
+  if (!gameCode) return;
+
+  if (input.category.trim().toLowerCase() === "voucher") {
+    throw new Error("Produk voucher tidak boleh memakai Kode Game Nickname. Kosongkan kode game terlebih dahulu.");
+  }
+
+  if (!kokinpayGameRequiresServer(gameCode)) return;
+
+  // Order normalization treats the second configured customer field as Server.
+  // Accept legacy ids such as `server-zone`, but require that second field to exist.
+  const serverField = input.inputFields[1];
+  const hasServerField = Boolean(serverField && serverField.required !== false);
+  const hasServerTarget = /\{\{server\}\}/i.test(input.targetTemplate);
+  if (!input.needsServer || !hasServerField || !hasServerTarget) {
+    throw new Error("Produk dengan kode game nickname ini wajib memakai input ID + Server dan target {{server}}.");
+  }
+}
+
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
+    await ensureKokinpayNicknameGameCodeBackfill();
     const products = await readProducts(true);
     const sellerMonitor = access.role === "super_admin" ? await readDigiflazzSellerMonitor() : null;
     return Response.json({ products, databaseReady: true, adminEmail: access.email, role: access.role, sellerMonitor });
@@ -131,6 +161,7 @@ export async function PATCH(request: Request) {
   try {
     const input = productSchema.extend({ dbId: z.number().int().positive() }).parse(await request.json());
     validateProduct(input);
+    await validateNicknameCheckoutContract(input.dbId, input);
     await saveProduct(input, input.dbId);
     return Response.json({ ok: true });
   } catch (error) {

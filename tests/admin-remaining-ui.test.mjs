@@ -9,13 +9,33 @@ const payment = read("admin-payment-workspace.tsx");
 const customer = read("admin-customer-workspace.tsx");
 const balance = read("admin-balance-manager.tsx");
 const integration = read("admin-integration-workspace.tsx");
+const kokinpay = read("admin-kokinpay-workspace.tsx");
 const operations = read("admin-operations-workspaces.tsx");
 const ui = read("admin-workspace-ui.tsx");
 
 test("remaining admin menus use the new desktop workspaces", () => {
-  for (const component of ["AdminPaymentWorkspace", "AdminCustomerWorkspace", "AdminPromoWorkspace", "AdminSupportWorkspace", "AdminReportsWorkspace", "AdminTeamWorkspace", "AdminIntegrationWorkspace", "AdminSettingsWorkspace"]) {
+  for (const component of ["AdminPaymentWorkspace", "AdminCustomerWorkspace", "AdminPromoWorkspace", "AdminSupportWorkspace", "AdminReportsWorkspace", "AdminTeamWorkspace", "AdminIntegrationWorkspace", "AdminSettingsWorkspace", "AdminKokinpayWorkspace"]) {
     assert.ok(dashboard.includes(`<${component}`), `dashboard does not use ${component}`);
   }
+  assert.match(dashboard, /label: "Validasi Akun"/);
+  assert.match(dashboard, /value: "account-validation"/);
+});
+
+test("KokinPay operational menu follows the shared admin workspace theme", () => {
+  for (const sharedComponent of ["WorkspaceHeader", "Panel", "TabBar", "Field", "Status"]) {
+    assert.match(kokinpay, new RegExp(sharedComponent));
+  }
+  assert.match(kokinpay, /inputClass/);
+  assert.match(kokinpay, /buttonClass/);
+  assert.match(kokinpay, /primaryButtonClass/);
+  assert.match(kokinpay, /Daftar Kode Game/);
+  assert.match(kokinpay, /\/v1\/check-nickname/);
+  assert.match(kokinpay, /\/v1\/check-region/);
+  assert.match(kokinpay, /\/v1\/check-pln/);
+  assert.match(kokinpay, /Mobile Legends divalidasi dengan dua endpoint API aktif/);
+  assert.match(kokinpay, /api\.kokinpay\.com\/docs\/check-nick-game/);
+  assert.match(kokinpay, /api\.kokinpay\.com\/docs\/check-region-mlbb/);
+  assert.match(kokinpay, /api\.kokinpay\.com\/docs\/check-nick-pln/);
 });
 
 test("dual-gateway payment UI includes channel controls and editable gateway-neutral payment page", () => {
@@ -32,15 +52,16 @@ test("Super Admin can design balance changes for customer or admin accounts", ()
   assert.match(customer, /<AdminBalanceManager \/>/);
 });
 
-test("integration UI contains encrypted credentials, copyable provider URLs, and separate relay endpoints", () => {
+test("integration UI contains encrypted credentials, provider URLs, and keeps KokinPay operations separate", () => {
   for (const label of [
     "DOKU Notification URL",
     "Midtrans BI-SNAP VA Notification URL",
     "Digiflazz Webhook URL",
-    "Melostore Nickname",
-    "API Keys Check Nickname",
-    "API Key",
-    "Secret Key",
+    "Konfigurasi KokinPay",
+    "API Key KokinPay",
+    "/v1/check-nickname",
+    "/v1/check-region",
+    "/v1/check-pln",
     "Client Secret",
     "Partner ID",
     "Relay Token",
@@ -53,6 +74,8 @@ test("integration UI contains encrypted credentials, copyable provider URLs, and
   assert.ok(integration.includes("https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback"));
   assert.ok(ui.includes("navigator.clipboard.writeText"));
   assert.doesNotMatch(integration, /SwitchLine label="(?:Wajib|Tidak Wajib).*nickname/i);
+  assert.doesNotMatch(integration, /KOKINPAY_GAME_CODES|checkKokinpay|value="\/check-nick-game"|value="\/check-region-mlbb"|value="\/check-nick-pln"/);
+  assert.match(integration, /Pemeriksaan operasional berada di menu Validasi Akun/);
   assert.match(integration, /Periksa Konfigurasi Relay/);
   assert.doesNotMatch(integration, /Tes Relay Sekarang/);
 });
@@ -63,7 +86,8 @@ test("promo, support, reports, team, and settings are fully represented", () => 
 
 test("all remaining workspaces use real panel APIs", () => {
   assert.match(integration, /fetch\("\/api\/panel\/integrations"/);
-  assert.match(integration, /fetch\("\/api\/nickname"/);
+  assert.doesNotMatch(integration, /fetch\("\/api\/panel\/nickname-tools"/);
+  assert.match(kokinpay, /fetch\("\/api\/panel\/nickname-tools"/);
   assert.doesNotMatch(integration, /Simulasi tes|UI sementara/);
   for (const endpoint of ["payment-methods", "payment-page", "wallet", "media"]) assert.ok(payment.includes(`/api/panel/${endpoint}`), `payment does not use ${endpoint}`);
   assert.doesNotMatch(payment, /Simulasi UI|backend dikerjakan/);

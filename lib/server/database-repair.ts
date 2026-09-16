@@ -3,6 +3,7 @@ import { getD1 } from "@/db";
 let repairPromise: Promise<void> | null = null;
 
 const FINAL_AUDIT_MIGRATION = "0029_final_source_audit_remediation.sql";
+const KOKINPAY_NICKNAME_MIGRATION = "0032_kokinpay_nickname_game_codes.sql";
 const FINAL_SCHEMA_OBJECTS = [
   "promotion_reservations",
   "promotion_reservations_expiry_idx",
@@ -19,6 +20,7 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["products", "banner_url", "banner_url TEXT"],
   ["products", "description", "description TEXT"],
   ["products", "input_fields_json", "input_fields_json TEXT"],
+  ["products", "nickname_game_code", "nickname_game_code TEXT"],
   ["products", "manual_open_time", "manual_open_time TEXT"],
   ["products", "manual_close_time", "manual_close_time TEXT"],
   [
@@ -166,7 +168,7 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
     const voucherColumns = names(vouchers);
     const flashColumns = names(flash);
 
-    if (!productColumns.has("package_tabs_enabled") || !productColumns.has("package_tabs_json")) return false;
+    if (!productColumns.has("package_tabs_enabled") || !productColumns.has("package_tabs_json") || !productColumns.has("nickname_game_code")) return false;
     if (!packageColumns.has("package_group")) return false;
     if (!settingColumns.has("support_widget_enabled")) return false;
     if (!["delivery_mode", "supplier_cost_snapshot", "doku_environment"].every((column) => orderColumns.has(column))) return false;
@@ -335,6 +337,7 @@ export async function ensureLegacyDatabaseColumns() {
       // from replaying ALTER TABLE statements that Cloudflare runtime already healed.
       try {
         const requiredColumns: Array<[string, string[]]> = [
+          ["products", ["nickname_game_code"]],
           ["orders", ["delivery_mode", "supplier_cost_snapshot", "doku_environment"]],
           ["wallet_topups", ["doku_environment", "external_checkout_key"]],
           ["discount_vouchers", ["reserved_count"]],
@@ -380,6 +383,9 @@ export async function ensureLegacyDatabaseColumns() {
             await db.prepare(
               "INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)",
             ).bind(FINAL_AUDIT_MIGRATION).run();
+            await db.prepare(
+              "INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)",
+            ).bind(KOKINPAY_NICKNAME_MIGRATION).run();
           }
         }
       } catch (error) {
