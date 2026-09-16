@@ -63,7 +63,7 @@ test("promo, support, reports, team, and settings are fully represented", () => 
 
 test("all remaining workspaces use real panel APIs", () => {
   assert.match(integration, /fetch\("\/api\/panel\/integrations"/);
-  assert.match(integration, /fetch\("\/api\/nickname"/);
+  assert.match(integration, /fetch\("\/api\/panel\/nickname-tools"/);
   assert.doesNotMatch(integration, /Simulasi tes|UI sementara/);
   for (const endpoint of ["payment-methods", "payment-page", "wallet", "media"]) assert.ok(payment.includes(`/api/panel/${endpoint}`), `payment does not use ${endpoint}`);
   assert.doesNotMatch(payment, /Simulasi UI|backend dikerjakan/);
