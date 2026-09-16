@@ -6,7 +6,7 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("nickname requirement is configured per product and legacy enabled products are backfilled once", () => {
+test("nickname requirement is configured per product and legacy repairs have independent markers", () => {
   const route = read("app/api/admin/product-input/route.ts");
   const checker = read("lib/server/nickname-check.ts");
   const config = read("lib/server/nickname-config.ts");
@@ -21,9 +21,11 @@ test("nickname requirement is configured per product and legacy enabled products
   assert.match(checker, /ensureKokinpayNicknameGameCodeBackfill/);
   assert.match(publicProducts, /ensureKokinpayNicknameGameCodeBackfill/);
 
-  assert.match(config, /kokinpay_nickname_game_code_backfill_0032/);
-  assert.match(config, /SELECT completed_at FROM one_time_operations/);
-  assert.match(config, /if \(completed\?\.completed_at\) return/);
+  assert.match(config, /GAME_CODE_BACKFILL_OPERATION_KEY = "kokinpay_nickname_game_code_backfill_0032"/);
+  assert.match(config, /GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v2"/);
+  assert.match(config, /gameBackfillCompleted && genshinRepairCompleted/);
+  assert.match(config, /if \(!gameBackfillCompleted\)/);
+  assert.match(config, /if \(!genshinRepairCompleted\)/);
   assert.match(config, /WHEN 'mobile-legends' THEN 'mobile-legends'/);
   assert.match(config, /WHEN 'wild-rift' THEN 'league-of-legends-wild-rift'/);
   assert.match(config, /WHERE slug = 'genshin-impact'[\s\S]*nickname_game_code = 'genshin-impact'/);
@@ -38,6 +40,7 @@ test("nickname requirement is configured per product and legacy enabled products
   assert.match(migration, /target_template = '\{\{destination\}\}\{\{server\}\}'/);
   assert.match(migration, /"id":"server","label":"Server"/);
   assert.match(migration, /kokinpay_nickname_game_code_backfill_0032/);
+  assert.match(migration, /kokinpay_genshin_server_input_repair_0032_v2/);
 });
 
 test("both checkout routes verify account server-side and never trust browser nickname", () => {
@@ -57,6 +60,7 @@ test("KokinPay game lookup uses active v1 routes, sends server-side credentials,
   assert.match(checker, /KOKINPAY_MLBB_REGION_PATH = "\/v1\/check-region"/);
   assert.match(checker, /game_code: gameCode/);
   assert.match(checker, /api_key: apiKey/);
+  assert.match(checker, /kokinpayGameRequiresServer\(gameCode\)/);
   assert.doesNotMatch(checker, /"\/check-nick-game"|"\/check-region-mlbb"/);
   assert.doesNotMatch(publicRoute, /KOKINPAY_API_KEY|api_key/);
 });
