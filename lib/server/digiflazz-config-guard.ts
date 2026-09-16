@@ -149,15 +149,19 @@ export async function invalidateDigiflazzOperationalCache(token: string) {
     SELECT 1 FROM digiflazz_runtime_state
     WHERE id = 1 AND maintenance_token = ? AND maintenance_until > CURRENT_TIMESTAMP
   )`;
-  await db.batch([
-    db.prepare(`DELETE FROM digiflazz_pricelist_cache WHERE ${ownsGuard}`).bind(token),
-    db.prepare(`DELETE FROM digiflazz_seller_monitor WHERE ${ownsGuard}`).bind(token),
-    db.prepare(`
-      UPDATE digiflazz_pricelist_sync_state
-         SET last_started_at = NULL, last_success_at = NULL
-       WHERE id = 1 AND lock_token = ?
-    `).bind(token),
-  ]);
+  for (const table of ["digiflazz_pricelist_cache", "digiflazz_seller_monitor"] as const) {
+    try {
+      await db.prepare(`DELETE FROM ${table} WHERE ${ownsGuard}`).bind(token).run();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/no such table/i.test(message)) throw error;
+    }
+  }
+  await db.prepare(`
+    UPDATE digiflazz_pricelist_sync_state
+       SET last_started_at = NULL, last_success_at = NULL
+     WHERE id = 1 AND lock_token = ?
+  `).bind(token).run();
 }
 
 export async function releaseDigiflazzConfigurationGuard(token: string, successful: boolean) {
