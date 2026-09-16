@@ -10,6 +10,7 @@ export type ManagedPackage = ProductPackage & {
   isActive: boolean;
   sortOrder: number;
   supplierPrice?: number | null;
+  providerMaxPrice?: number | null;
   pricingMode?: "manual" | "auto";
   marginType?: "fixed" | "percent";
   marginValue?: number;
@@ -74,6 +75,7 @@ type PackageRow = {
   provider_code: string | null;
   provider_sku: string | null;
   supplier_price: number | null;
+  provider_max_price: number | null;
   pricing_mode: "manual" | "auto" | null;
   margin_type: "fixed" | "percent" | null;
   margin_value: number | null;
@@ -274,9 +276,9 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
         manual_open_time, manual_close_time, manual_timezone, package_tabs_enabled, package_tabs_json, is_active, sort_order
        FROM products WHERE is_active = 1 ORDER BY sort_order ASC, name ASC`;
   const packageSql = includeInactive
-    ? `SELECT id, product_id, sku, label, price, note, package_group, image_url, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
+    ? `SELECT id, product_id, sku, label, price, note, package_group, image_url, provider_code, provider_sku, supplier_price, provider_max_price, pricing_mode, margin_type, margin_value, is_active, sort_order
        FROM product_packages ORDER BY sort_order ASC, id ASC`
-    : `SELECT id, product_id, sku, label, price, note, package_group, image_url, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order
+    : `SELECT id, product_id, sku, label, price, note, package_group, image_url, provider_code, provider_sku, supplier_price, provider_max_price, pricing_mode, margin_type, margin_value, is_active, sort_order
        FROM product_packages WHERE is_active = 1 ORDER BY sort_order ASC, id ASC`;
   const noticeSql = includeInactive
     ? `SELECT id, product_id, title, body, is_active, sort_order FROM product_notices ORDER BY sort_order ASC, id ASC`
@@ -338,6 +340,7 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
       providerCode: item.provider_code ?? undefined,
       providerSku: item.provider_sku ?? undefined,
       supplierPrice: item.supplier_price,
+      providerMaxPrice: item.provider_max_price,
       pricingMode: item.pricing_mode ?? "auto",
       marginType: item.margin_type ?? "fixed",
       marginValue: item.margin_value ?? 0,
@@ -406,15 +409,24 @@ export async function saveProduct(input: ProductWrite, id?: number) {
     .bind(JSON.stringify(input.inputFields ?? []), productRow.id)
     .run();
 
-  const packageStatements = input.packages.map((item, index) => db.prepare(
-    `INSERT INTO product_packages (product_id, sku, label, price, note, package_group, image_url, provider_code, provider_sku, supplier_price, pricing_mode, margin_type, margin_value, is_active, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  const packageStatements = input.packages.map((item, index) => {
+    const maxPrice = item.providerCode === "digiflazz" ? Number(item.providerMaxPrice) : null;
+    const margin = Math.max(0, Number(item.marginValue ?? 0));
+    const sellingPrice = maxPrice && maxPrice > 0
+      ? item.marginType === "percent"
+        ? Math.ceil((maxPrice * (100 + margin)) / 100)
+        : Math.ceil(maxPrice + margin)
+      : item.price;
+    return db.prepare(
+    `INSERT INTO product_packages (product_id, sku, label, price, note, package_group, image_url, provider_code, provider_sku, supplier_price, provider_max_price, pricing_mode, margin_type, margin_value, is_active, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(sku) DO UPDATE SET
        label = excluded.label, price = excluded.price, note = excluded.note, package_group = excluded.package_group,
        image_url = excluded.image_url, provider_code = excluded.provider_code, provider_sku = excluded.provider_sku,
-       supplier_price = excluded.supplier_price, pricing_mode = excluded.pricing_mode, margin_type = excluded.margin_type,
+       supplier_price = excluded.supplier_price, provider_max_price = excluded.provider_max_price, pricing_mode = excluded.pricing_mode, margin_type = excluded.margin_type,
        margin_value = excluded.margin_value, is_active = excluded.is_active, sort_order = excluded.sort_order`,
-  ).bind(productRow.id, item.id, item.label, item.price, item.note ?? null, item.group?.trim() || null, item.imageUrl ?? null, item.providerCode ?? null, item.providerSku ?? null, item.supplierPrice ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index));
+  ).bind(productRow.id, item.id, item.label, sellingPrice, item.note ?? null, item.group?.trim() || null, item.imageUrl ?? null, item.providerCode ?? null, item.providerSku ?? null, item.supplierPrice ?? null, item.providerMaxPrice ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index);
+  });
   if (input.packages.length) {
     const placeholders = input.packages.map(() => "?").join(", ");
     packageStatements.push(db.prepare(`DELETE FROM product_packages WHERE product_id = ? AND sku NOT IN (${placeholders})`).bind(productRow.id, ...input.packages.map((item) => item.id)));
@@ -472,6 +484,7 @@ export async function updateProductPackageProvider(input: {
   pricingMode: "manual" | "auto";
   marginType: "fixed" | "percent";
   marginValue: number;
+  providerMaxPrice: number | null;
 }) {
   const db = getD1();
   const result = await db.prepare(
@@ -480,7 +493,8 @@ export async function updateProductPackageProvider(input: {
          provider_sku = ?,
          pricing_mode = ?,
          margin_type = ?,
-         margin_value = ?
+         margin_value = ?,
+         provider_max_price = ?
      WHERE id = ?`,
   ).bind(
     input.providerCode,
@@ -488,6 +502,7 @@ export async function updateProductPackageProvider(input: {
     input.pricingMode,
     input.marginType,
     input.marginValue,
+    input.providerMaxPrice,
     input.packageId,
   ).run();
 
