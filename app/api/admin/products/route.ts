@@ -110,7 +110,13 @@ async function validateNicknameCheckoutContract(dbId: number, input: ProductInpu
     "SELECT nickname_game_code FROM products WHERE id = ? LIMIT 1",
   ).bind(dbId).first<{ nickname_game_code: string | null }>();
   const gameCode = row?.nickname_game_code?.trim();
-  if (!gameCode || !kokinpayGameRequiresServer(gameCode)) return;
+  if (!gameCode) return;
+
+  if (input.category.trim().toLowerCase() === "voucher") {
+    throw new Error("Produk voucher tidak boleh memakai Kode Game Nickname. Kosongkan kode game terlebih dahulu.");
+  }
+
+  if (!kokinpayGameRequiresServer(gameCode)) return;
 
   // Order normalization treats the second configured customer field as Server.
   // Accept legacy ids such as `server-zone`, but require that second field to exist.
