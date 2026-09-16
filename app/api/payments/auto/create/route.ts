@@ -14,6 +14,7 @@ import {
   verifyNicknameForCheckout,
 } from "@/lib/server/nickname-check";
 import {
+  calculateCustomerPaymentFee,
   getPaymentChannel,
   isGatewayChannelSupported,
   isPaymentGatewayActive,
@@ -196,6 +197,12 @@ export async function POST(request: Request) {
     const identity = createOrderIdentity();
     referenceId = identity.referenceId;
 
+    const paymentFee = calculateCustomerPaymentFee(
+      promotion.finalPrice,
+      managedChannel.gatewayConfig,
+    );
+    const paymentTotal = promotion.finalPrice + paymentFee;
+
     await insertPendingOrder({
       ...identity,
       item,
@@ -212,6 +219,7 @@ export async function POST(request: Request) {
       customerId: customer?.id ?? null,
       externalCheckoutKey: input.idempotencyKey,
       promotion,
+      adminFee: paymentFee,
     });
 
     orderId = identity.id;
@@ -227,7 +235,7 @@ export async function POST(request: Request) {
     const payment = await createConfiguredPayment({
       gateway: managedChannel.gateway,
       referenceId: identity.referenceId,
-      amount: promotion.finalPrice,
+      amount: paymentTotal,
       paymentMethod: input.paymentMethod,
       paymentChannel,
       gatewayConfig: managedChannel.gatewayConfig,
@@ -252,7 +260,7 @@ export async function POST(request: Request) {
       paymentName: payment.paymentName || null,
       paymentUrl: payment.paymentUrl || null,
       expiredAt: payment.expiredAt || null,
-      total: promotion.finalPrice,
+      total: paymentTotal,
     });
     await updateExternalPromotionExpiry(identity.id, payment.expiredAt || null);
     await recordExternalPaymentEvent({
@@ -282,8 +290,8 @@ export async function POST(request: Request) {
         qrContent: payment.qrContent || null,
         paymentName: publicPaymentLabel(input.paymentMethod, paymentChannel),
         paymentUrl: payment.paymentUrl || null,
-        fee: 0,
-        total: promotion.finalPrice,
+        fee: paymentFee,
+        total: paymentTotal,
         expiredAt: payment.expiredAt || null,
       },
       { status: 201 },
