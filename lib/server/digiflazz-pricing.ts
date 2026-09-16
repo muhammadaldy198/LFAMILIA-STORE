@@ -149,7 +149,7 @@ async function acquirePriceListSyncLock() {
            last_started_at = CURRENT_TIMESTAMP
      WHERE id = 1
        AND (lock_token IS NULL OR locked_until IS NULL OR locked_until <= CURRENT_TIMESTAMP)
-       AND (last_success_at IS NULL OR last_success_at <= datetime('now', '-${DIGIFLAZZ_SYNC_COOLDOWN_SECONDS} seconds'))
+       AND (last_started_at IS NULL OR last_started_at <= datetime('now', '-${DIGIFLAZZ_SYNC_COOLDOWN_SECONDS} seconds'))
   `).bind(token).run();
   if (Number(result.meta.changes ?? 0) > 0) return { acquired: true as const, token };
 
