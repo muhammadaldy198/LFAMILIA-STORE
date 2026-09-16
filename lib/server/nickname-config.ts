@@ -67,11 +67,7 @@ export async function ensureKokinpayNicknameGameCodeBackfill() {
         db.prepare(`UPDATE products
           SET needs_server = 1,
               target_template = '{{destination}}{{server}}',
-              input_fields_json = CASE
-                WHEN input_fields_json IS NULL OR trim(input_fields_json) = '' OR trim(input_fields_json) = '[]'
-                  THEN '[{"id":"destination","label":"UID","placeholder":"Masukkan UID","required":true},{"id":"server","label":"Server","placeholder":"Masukkan Server","required":true}]'
-                ELSE input_fields_json
-              END
+              input_fields_json = '[{"id":"destination","label":"UID","placeholder":"Masukkan UID","required":true},{"id":"server","label":"Server","placeholder":"Masukkan Server","required":true}]'
           WHERE slug = 'genshin-impact'
             AND nickname_game_code = 'genshin-impact'`),
         db.prepare(
