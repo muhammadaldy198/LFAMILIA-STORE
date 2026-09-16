@@ -69,16 +69,19 @@ https://api.kokinpay.com/v1/check-region
 https://api.kokinpay.com/v1/check-pln
 ```
 
-Untuk penggunaan operasional buka menu **Validasi Akun**. Di sana tersedia:
+Untuk penggunaan operasional, menu **Validasi Akun** tersedia bagi **Admin dan Super Admin**. Di sana tersedia:
 
 - cek nickname game;
 - cek nickname + region Mobile Legends;
 - cek nama pelanggan PLN;
-- daftar game code yang dapat dipakai pada produk.
+- daftar game code yang dapat dipakai pada produk;
+- penanda game code yang membutuhkan Server / Zone.
+
+Staff tidak memiliki akses ke menu Validasi Akun. Pengaturan API key KokinPay tetap hanya dapat dilakukan Super Admin melalui menu Integrasi.
 
 Setiap produk dapat diatur melalui **Produk → Input Customer → Kode Game Nickname**. Kode kosong berarti validasi nickname tidak dijalankan untuk produk tersebut. Produk yang memakai kode akan diverifikasi ulang oleh backend sebelum order/pembayaran dibuat, sehingga nickname dari browser tidak pernah menjadi sumber kebenaran.
 
-Untuk Mobile Legends, User ID dan Server/Zone wajib tersedia dan backend mewajibkan hasil nickname serta region sama-sama berhasil.
+Game code yang pada daftar KokinPay ditandai membutuhkan Server / Zone wajib memakai Checkout Type **ID + Server**. Backend mengecek aturan ini pada endpoint Input Customer, full product update, dan saat verifikasi checkout. Mobile Legends wajib melewati pengecekan nickname dan region. Genshin Impact juga membutuhkan Server dan compatibility repair menormalkan produk legacy menjadi field UID + Server.
 
 Perubahan schema KokinPay menggunakan migration:
 
@@ -86,7 +89,7 @@ Perubahan schema KokinPay menggunakan migration:
 0032_kokinpay_nickname_game_codes.sql
 ```
 
-Migration menambahkan `products.nickname_game_code` dan mempertahankan konfigurasi nickname produk lama yang sudah didukung. Runtime compatibility repair juga menangani database yang belum sempat menjalankan migration tanpa mengulang backfill setelah Admin sengaja mengosongkan kode.
+Migration menambahkan `products.nickname_game_code` dan mempertahankan konfigurasi nickname produk lama yang sudah didukung. Runtime compatibility repair memakai marker terpisah untuk backfill game code dan perbaikan input Genshin, sehingga database yang sudah pernah menjalankan versi backfill sebelumnya tetap mendapat perbaikan Server tanpa mengaktifkan ulang game code yang sengaja dikosongkan Admin.
 
 ## 6. Halaman pembayaran LFAMILIA
 
@@ -115,8 +118,8 @@ TEAM_DOMAIN=https://<team>.cloudflareaccess.com
 POLICY_AUD=<Application Audience aplikasi Access LFAMILIA>
 ```
 
-Endpoint `/admin/panel*` dan `/api/admin*` diverifikasi oleh Worker terhadap Cloudflare Access. Panel staff memakai autentikasi panel sesuai role dan tidak memperoleh akses ke menu Integrasi/Validasi Akun Super Admin.
+Endpoint `/admin/panel*` dan `/api/admin*` diverifikasi oleh Worker terhadap Cloudflare Access. Panel staff memakai autentikasi panel sesuai role dan tidak memperoleh akses ke menu Integrasi atau Validasi Akun.
 
 ## 9. Sebelum membuka toko
 
-Pastikan migration production sudah sesuai branch yang akan dideploy, credential dapat didekripsi, payment channel diuji end-to-end, callback tervalidasi, DigiFlazz SKU/harga/margin diverifikasi, relay sehat bila digunakan, KokinPay berhasil memvalidasi akun nyata untuk game yang diaktifkan, produk tanpa dukungan nickname tidak diberi game code, dan tidak ada credential provider di GitHub atau response publik.
+Pastikan migration production sudah sesuai branch yang akan dideploy, credential dapat didekripsi, payment channel diuji end-to-end, callback tervalidasi, DigiFlazz SKU/harga/margin diverifikasi, relay sehat bila digunakan, KokinPay berhasil memvalidasi akun nyata untuk game yang diaktifkan, produk tanpa dukungan nickname tidak diberi game code, game server-required benar-benar memakai ID + Server, dan tidak ada credential provider di GitHub atau response publik.
