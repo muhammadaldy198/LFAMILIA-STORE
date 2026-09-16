@@ -39,7 +39,8 @@ test("full product writes cannot corrupt a server-required nickname checkout con
   assert.match(productsRoute, /SELECT nickname_game_code FROM products WHERE id = \? LIMIT 1/);
   assert.match(productsRoute, /kokinpayGameRequiresServer\(gameCode\)/);
   assert.match(productsRoute, /input\.needsServer/);
-  assert.match(productsRoute, /field\.id\.toLowerCase\(\) === "server"/);
+  assert.match(productsRoute, /serverField = input\.inputFields\[1\]/);
+  assert.match(productsRoute, /serverField\.required !== false/);
   assert.match(productsRoute, /hasServerTarget/);
   assert.match(productsRoute, /input\.targetTemplate/);
   assert.match(productsRoute, /await validateNicknameCheckoutContract\(input\.dbId, input\)/);
