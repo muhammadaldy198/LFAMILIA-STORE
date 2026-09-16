@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
+import { classifyKokinpayFailure } from "@/lib/server/kokinpay-errors";
 import {
   NicknameServiceError,
   NicknameValidationError,
@@ -9,6 +10,7 @@ import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 export const dynamic = "force-dynamic";
 
+const noStoreHeaders = { "Cache-Control": "no-store" };
 const gameRequest = z.object({
   action: z.literal("game"),
   gameCode: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100),
@@ -64,10 +66,11 @@ async function checkPln(customerNumber: string) {
   }
   if (!response.ok || payload.status !== true) {
     const message = text(payload.message);
-    if (response.status === 401 || response.status === 403) {
+    const kind = classifyKokinpayFailure(response.status);
+    if (kind === "authentication") {
       throw new NicknameServiceError(message || "API Key KokinPay tidak valid atau tidak dapat digunakan.");
     }
-    if (response.status === 400 || response.status === 404) {
+    if (kind === "validation") {
       throw new NicknameValidationError(message || "Data PLN tidak ditemukan atau tidak valid.");
     }
     throw new NicknameServiceError(message || undefined);
@@ -92,7 +95,10 @@ export async function POST(request: Request) {
         userId: input.userId,
         server: input.server,
       });
-      return Response.json({ ok: true, action: input.action, nickname: result.nickname, region: result.country });
+      return Response.json(
+        { ok: true, action: input.action, nickname: result.nickname, region: result.country },
+        { headers: noStoreHeaders },
+      );
     }
     if (input.action === "region") {
       const result = await lookupKokinpayNickname({
@@ -109,11 +115,11 @@ export async function POST(request: Request) {
         action: input.action,
         nickname: result.nickname,
         region: result.country,
-      });
+      }, { headers: noStoreHeaders });
     }
 
     const customerName = await checkPln(input.customerNumber);
-    return Response.json({ ok: true, action: input.action, customerName });
+    return Response.json({ ok: true, action: input.action, customerName }, { headers: noStoreHeaders });
   } catch (error) {
     const message = error instanceof z.ZodError
       ? error.issues[0]?.message || "Data pemeriksaan tidak valid."
@@ -123,6 +129,6 @@ export async function POST(request: Request) {
     const status = error instanceof NicknameValidationError || error instanceof z.ZodError ? 400
       : error instanceof NicknameServiceError ? 503
       : 502;
-    return Response.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
+    return Response.json({ error: message }, { status, headers: noStoreHeaders });
   }
 }
