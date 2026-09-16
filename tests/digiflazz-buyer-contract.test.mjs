@@ -17,7 +17,7 @@ const admin = fs.readFileSync(
   "utf8",
 );
 
-test("DigiFlazz Buyer request follows the official topup contract", () => {
+test("DigiFlazz Buyer request uses the required transaction fields while Max Price stays dashboard-managed", () => {
   for (const field of [
     "username",
     "buyer_sku_code",
@@ -25,11 +25,11 @@ test("DigiFlazz Buyer request follows the official topup contract", () => {
     "ref_id",
     "sign",
     "testing",
-    "max_price",
     "cb_url",
   ]) {
     assert.match(provider, new RegExp(field));
   }
+  assert.doesNotMatch(provider, /max_price\s*:/);
   assert.match(provider, /allow_dot/);
   assert.match(provider, /order\.customerNo\.includes\("\."\)/);
 });
