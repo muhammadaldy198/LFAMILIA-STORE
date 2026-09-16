@@ -5,6 +5,8 @@ import test from "node:test";
 
 const root = process.cwd();
 const route = fs.readFileSync(path.join(root, "app/api/admin/product-input/route.ts"), "utf8");
+const productsRoute = fs.readFileSync(path.join(root, "app/api/admin/products/route.ts"), "utf8");
+const productContentRoute = fs.readFileSync(path.join(root, "app/api/admin/product-content/route.ts"), "utf8");
 const panel = fs.readFileSync(path.join(root, "app/api/panel/[...path]/route.ts"), "utf8");
 const manager = fs.readFileSync(path.join(root, "components/admin-product-manager.tsx"), "utf8");
 
@@ -30,6 +32,21 @@ test("server-required KokinPay game codes cannot be saved with ID-only checkout"
   assert.match(route, /kokinpayGameRequiresServer\(effectiveNicknameGameCode\)/);
   assert.match(route, /!needsServer/);
   assert.match(route, /membutuhkan Checkout Type ID \+ Server/);
+});
+
+test("full product writes cannot corrupt a server-required nickname checkout contract", () => {
+  assert.match(productsRoute, /validateNicknameCheckoutContract/);
+  assert.match(productsRoute, /SELECT nickname_game_code FROM products WHERE id = \? LIMIT 1/);
+  assert.match(productsRoute, /kokinpayGameRequiresServer\(gameCode\)/);
+  assert.match(productsRoute, /input\.needsServer/);
+  assert.match(productsRoute, /field\.id\.toLowerCase\(\) === "server"/);
+  assert.match(productsRoute, /\/\\\{\\\{server\\\}\\\}\/i\.test\(input\.targetTemplate\)/);
+  assert.match(productsRoute, /await validateNicknameCheckoutContract\(input\.dbId, input\)/);
+});
+
+test("all admin product read paths apply nickname compatibility repair first", () => {
+  assert.match(productsRoute, /await ensureKokinpayNicknameGameCodeBackfill\(\);[\s\S]*const products = await readProducts\(true\)/);
+  assert.match(productContentRoute, /await ensureKokinpayNicknameGameCodeBackfill\(\);[\s\S]*const products = await readProducts\(true\)/);
 });
 
 test("panel exposes product-input and editor persists real values", () => {
