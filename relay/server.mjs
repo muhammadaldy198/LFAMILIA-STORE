@@ -91,6 +91,12 @@ const hopByHopHeaders = new Set([
   ...internalHeaders,
 ]);
 
+const digiflazzAllowedPaths = new Set([
+  "/v1/transaction",
+  "/v1/price-list",
+  "/v1/cek-saldo",
+]);
+
 const midtransAllowedPaths = new Set([
   "/v1.0/access-token/b2b",
   "/v1.0/transfer-va/create-va",
@@ -192,8 +198,9 @@ function isMethodAllowed(_provider, method) {
 }
 
 function isPathAllowed(provider, path) {
+  if (provider.name === "digiflazz") return digiflazzAllowedPaths.has(path);
   if (provider.name === "midtrans") return midtransAllowedPaths.has(path);
-  return true;
+  return false;
 }
 
 function resolveProviderUpstream(provider, req) {
