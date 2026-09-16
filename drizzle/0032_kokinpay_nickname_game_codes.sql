@@ -25,6 +25,19 @@ WHERE (nickname_game_code IS NULL OR trim(nickname_game_code) = '')
     'arena-of-valor', 'fc-mobile', 'point-blank'
   );
 
+-- KokinPay requires a server value for Genshin Impact. Legacy Genshin rows did
+-- not collect it, so migrate the checkout contract together with the game code.
+UPDATE products
+SET needs_server = 1,
+    target_template = '{{destination}}{{server}}',
+    input_fields_json = CASE
+      WHEN input_fields_json IS NULL OR trim(input_fields_json) = '' OR trim(input_fields_json) = '[]'
+        THEN '[{"id":"destination","label":"UID","placeholder":"Masukkan UID","required":true},{"id":"server","label":"Server","placeholder":"Masukkan Server","required":true}]'
+      ELSE input_fields_json
+    END
+WHERE slug = 'genshin-impact'
+  AND nickname_game_code = 'genshin-impact';
+
 -- Mark the compatibility backfill complete so runtime repair never re-enables
 -- nickname validation after an Admin intentionally clears a product game code.
 CREATE TABLE IF NOT EXISTS one_time_operations (
