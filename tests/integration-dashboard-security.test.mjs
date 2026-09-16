@@ -38,7 +38,7 @@ test("Midtrans payment secrets are dashboard-managed and never returned to the f
 
 test("dashboard-managed credentials fail closed instead of using stale Cloudflare provider secrets", () => {
   assert.match(config, /withoutDashboardManagedRuntime/);
-  for (const prefix of ["DOKU_", "MIDTRANS_", "DIGIFLAZZ_", "MELOSTORE_", "RESEND_", "PROVIDER_RELAY_"]) {
+  for (const prefix of ["DOKU_", "MIDTRANS_", "DIGIFLAZZ_", "KOKINPAY_", "RESEND_", "PROVIDER_RELAY_"]) {
     assert.match(config, new RegExp(`"${prefix}"`));
   }
   assert.match(config, /return systemOnly as T/);
