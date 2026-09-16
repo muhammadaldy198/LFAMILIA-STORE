@@ -20,9 +20,16 @@ test("product input endpoint derives checkout fields and provider target on the 
 
 test("partial product-input updates do not silently clear an existing nickname game code", () => {
   assert.match(route, /nicknameGameCodeProvided = input\.nicknameGameCode !== undefined/);
+  assert.match(route, /effectiveNicknameGameCode/);
   assert.match(route, /nickname_game_code = CASE WHEN \? = 1 THEN \? ELSE nickname_game_code END/);
   assert.match(route, /nicknameGameCodeProvided \? 1 : 0/);
   assert.match(route, /return Response\.json\(\{ ok: true, input: serialize\(updated\) \}/);
+});
+
+test("server-required KokinPay game codes cannot be saved with ID-only checkout", () => {
+  assert.match(route, /kokinpayGameRequiresServer\(effectiveNicknameGameCode\)/);
+  assert.match(route, /!needsServer/);
+  assert.match(route, /membutuhkan Checkout Type ID \+ Server/);
 });
 
 test("panel exposes product-input and editor persists real values", () => {
