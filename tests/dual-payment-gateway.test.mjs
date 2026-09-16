@@ -71,7 +71,7 @@ test("Midtrans VA notification verifies signature, stored environment, VA identi
 test("Midtrans BI-SNAP VA callback also credits wallet topups through the generic ledger", () => {
   const source = read("app/api/payments/midtrans/v1.0/transfer-va/payment/route.ts");
   assert.match(source, /getExternalWalletTopup\(referenceId, "midtrans"\)/);
-  assert.match(source, /callbackAmount !== \\(walletTopup\\.payment_total \\|\\| walletTopup\\.amount\\)/);
+  assert.match(source, /callbackAmount !== \(walletTopup\.payment_total \|\| walletTopup\.amount\)/);
   assert.match(source, /applyExternalWalletTopup\(\{/);
   assert.match(source, /gateway: "midtrans"/);
   assert.match(source, /notifyWalletTopupSuccessById/);
