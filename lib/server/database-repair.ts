@@ -59,6 +59,7 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["orders", "customer_inputs_json", "customer_inputs_json TEXT DEFAULT '[]' NOT NULL"],
   ["orders", "delivery_mode", "delivery_mode TEXT"],
   ["orders", "supplier_cost_snapshot", "supplier_cost_snapshot INTEGER"],
+  ["orders", "provider_max_price_snapshot", "provider_max_price_snapshot INTEGER"],
   ["orders", "doku_environment", "doku_environment TEXT"],
   ["customer_users", "tier_mode", "tier_mode TEXT DEFAULT 'automatic' NOT NULL"],
   ["customer_users", "tier_override", "tier_override TEXT"],
@@ -70,6 +71,7 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["product_packages", "provider_code", "provider_code TEXT"],
   ["product_packages", "provider_sku", "provider_sku TEXT"],
   ["product_packages", "supplier_price", "supplier_price INTEGER"],
+  ["product_packages", "provider_max_price", "provider_max_price INTEGER"],
   [
     "product_packages",
     "pricing_mode",
@@ -169,9 +171,9 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
     const flashColumns = names(flash);
 
     if (!productColumns.has("package_tabs_enabled") || !productColumns.has("package_tabs_json") || !productColumns.has("nickname_game_code")) return false;
-    if (!packageColumns.has("package_group")) return false;
+    if (!packageColumns.has("package_group") || !packageColumns.has("provider_max_price")) return false;
     if (!settingColumns.has("support_widget_enabled")) return false;
-    if (!["delivery_mode", "supplier_cost_snapshot", "doku_environment"].every((column) => orderColumns.has(column))) return false;
+    if (!["delivery_mode", "supplier_cost_snapshot", "provider_max_price_snapshot", "doku_environment"].every((column) => orderColumns.has(column))) return false;
     if (!["doku_environment", "external_checkout_key"].every((column) => topupColumns.has(column))) return false;
     if (!voucherColumns.has("reserved_count") || !flashColumns.has("reserved_count")) return false;
 
@@ -320,6 +322,18 @@ export async function ensureLegacyDatabaseColumns() {
         END
         WHERE delivery_mode IS NULL`);
       await runSchemaStatement(`UPDATE orders
+        SET provider_max_price_snapshot = (
+          SELECT pp.provider_max_price
+          FROM product_packages pp
+          JOIN products p ON p.id = pp.product_id
+          WHERE p.slug = orders.product_slug
+            AND pp.sku = orders.package_sku
+            AND pp.provider_max_price IS NOT NULL
+          ORDER BY pp.id DESC
+          LIMIT 1
+        )
+        WHERE provider_max_price_snapshot IS NULL`);
+      await runSchemaStatement(`UPDATE orders
         SET supplier_cost_snapshot = (
           SELECT pp.supplier_price
           FROM product_packages pp
@@ -338,7 +352,7 @@ export async function ensureLegacyDatabaseColumns() {
       try {
         const requiredColumns: Array<[string, string[]]> = [
           ["products", ["nickname_game_code"]],
-          ["orders", ["delivery_mode", "supplier_cost_snapshot", "doku_environment"]],
+          ["orders", ["delivery_mode", "supplier_cost_snapshot", "provider_max_price_snapshot", "doku_environment"]],
           ["wallet_topups", ["doku_environment", "external_checkout_key"]],
           ["discount_vouchers", ["reserved_count"]],
           ["flash_sales", ["reserved_count"]],
