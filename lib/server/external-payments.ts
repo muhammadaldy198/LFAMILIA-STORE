@@ -52,7 +52,6 @@ export async function updateExternalPayment(input: {
       doku_payment_url = ?,
       doku_expired_at = ?,
       doku_status_checked_at = NULL,
-      admin_fee = 0,
       total = ?,
       updated_at = CURRENT_TIMESTAMP
       WHERE reference_id = ?`)
@@ -90,7 +89,6 @@ export async function updateExternalPayment(input: {
     gateway_payment_url = ?,
     gateway_expired_at = ?,
     gateway_status_checked_at = NULL,
-    admin_fee = 0,
     total = ?,
     updated_at = CURRENT_TIMESTAMP
     WHERE reference_id = ?`)
