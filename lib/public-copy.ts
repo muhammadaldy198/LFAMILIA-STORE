@@ -1,4 +1,4 @@
-const INTERNAL_PROVIDER_NAMES = /\b(?:doku|midtrans|digiflazz|melostore)\b/gi;
+const INTERNAL_PROVIDER_NAMES = /\b(?:doku|midtrans|digiflazz|melostore|kokinpay)\b/gi;
 
 /**
  * Customer-facing copy must stay provider-neutral even when an old Admin/D1
