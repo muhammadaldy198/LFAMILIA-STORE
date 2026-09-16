@@ -18,6 +18,13 @@ test("product input endpoint derives checkout fields and provider target on the 
   assert.match(route, /nickname_game_code/);
 });
 
+test("partial product-input updates do not silently clear an existing nickname game code", () => {
+  assert.match(route, /nicknameGameCodeProvided = input\.nicknameGameCode !== undefined/);
+  assert.match(route, /nickname_game_code = CASE WHEN \? = 1 THEN \? ELSE nickname_game_code END/);
+  assert.match(route, /nicknameGameCodeProvided \? 1 : 0/);
+  assert.match(route, /return Response\.json\(\{ ok: true, input: serialize\(updated\) \}/);
+});
+
 test("panel exposes product-input and editor persists real values", () => {
   assert.match(panel, /"product-input": \{ GET: productInput\.GET, PATCH: productInput\.PATCH \}/);
   assert.match(manager, /fetch\(`\/api\/panel\/product-input\?slug=/);
