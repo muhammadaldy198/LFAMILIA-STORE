@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { hashHex } from "@/lib/server/crypto";
 import { providerRelayRequest } from "@/lib/server/provider-relay";
 import { buildDigiflazzSellerMonitorStatement, ensureDigiflazzSellerMonitorTable } from "@/lib/server/digiflazz-monitor";
@@ -158,15 +159,16 @@ async function fetchPriceList() {
 }
 
 async function syncRows(target?: { productId: number; packageSku?: string }) {
+  await ensureLegacyDatabaseColumns();
   await ensureDigiflazzSellerMonitorTable();
   const source = await fetchPriceList();
   const query = target
-    ? `SELECT p.id, p.provider_sku, p.margin_type, p.margin_value,
+    ? `SELECT p.id, p.provider_sku, p.provider_max_price, p.margin_type, p.margin_value,
         m.seller_name AS previous_seller_name, m.baseline_price AS previous_baseline_price
        FROM product_packages p
        LEFT JOIN digiflazz_seller_monitor m ON m.package_id = p.id
        WHERE p.product_id = ?${target.packageSku ? " AND p.sku = ?" : ""} AND p.provider_code = 'digiflazz' AND p.provider_sku IS NOT NULL`
-    : `SELECT p.id, p.provider_sku, p.margin_type, p.margin_value,
+    : `SELECT p.id, p.provider_sku, p.provider_max_price, p.margin_type, p.margin_value,
         m.seller_name AS previous_seller_name, m.baseline_price AS previous_baseline_price
        FROM product_packages p
        LEFT JOIN digiflazz_seller_monitor m ON m.package_id = p.id
@@ -175,6 +177,7 @@ async function syncRows(target?: { productId: number; packageSku?: string }) {
   type SyncRow = {
     id: number;
     provider_sku: string;
+    provider_max_price: number | null;
     margin_type: "fixed" | "percent";
     margin_value: number;
     previous_seller_name: string | null;
@@ -202,11 +205,19 @@ async function syncRows(target?: { productId: number; packageSku?: string }) {
     return [
       // Status seller tetap dipantau, tetapi tidak boleh mengubah tombol Aktif/Nonaktif katalog milik admin.
       getD1().prepare(`UPDATE product_packages
-        SET supplier_price = ?, price = ?, supplier_synced_at = CURRENT_TIMESTAMP
+        SET supplier_price = ?,
+            provider_max_price = COALESCE(provider_max_price, ?),
+            price = ?,
+            supplier_synced_at = CURRENT_TIMESTAMP
         WHERE id = ?`)
         .bind(
           sourceItem.price,
-          sale(sourceItem.price, item.margin_type, item.margin_value),
+          sourceItem.price,
+          sale(
+            Number(item.provider_max_price) > 0 ? Number(item.provider_max_price) : sourceItem.price,
+            item.margin_type,
+            item.margin_value,
+          ),
           item.id,
         ),
       buildDigiflazzSellerMonitorStatement({
