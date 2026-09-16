@@ -46,6 +46,7 @@ type ProductRow = {
   input_label: string;
   input_placeholder: string;
   input_fields_json: string | null;
+  nickname_game_code: string | null;
   needs_server: number;
   popular: number;
   instant: number;
@@ -264,11 +265,11 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
   await reconcileAutomaticProviderProducts();
   const db = getD1();
   const productSql = includeInactive
-    ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json,
+    ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json, nickname_game_code,
         needs_server, popular, instant, fulfillment_type, target_template, manual_instructions,
         manual_open_time, manual_close_time, manual_timezone, package_tabs_enabled, package_tabs_json, is_active, sort_order
        FROM products ORDER BY sort_order ASC, name ASC`
-    : `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json,
+    : `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json, nickname_game_code,
         needs_server, popular, instant, fulfillment_type, target_template, manual_instructions,
         manual_open_time, manual_close_time, manual_timezone, package_tabs_enabled, package_tabs_json, is_active, sort_order
        FROM products WHERE is_active = 1 ORDER BY sort_order ASC, name ASC`;
@@ -305,6 +306,7 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
     inputLabel: row.input_label,
     inputPlaceholder: row.input_placeholder,
     inputFields: parseInputFields(row.input_fields_json, row.input_label, row.input_placeholder, Boolean(row.needs_server)),
+    nicknameRequired: Boolean(row.nickname_game_code?.trim()),
     needsServer: Boolean(row.needs_server),
     popular: Boolean(row.popular),
     instant: Boolean(row.instant),
