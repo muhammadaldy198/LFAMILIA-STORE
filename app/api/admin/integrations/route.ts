@@ -45,6 +45,25 @@ const schema = z.discriminatedUnion("action", [
   dokuTestInput,
 ]);
 
+async function assertDigiflazzEnvironmentCanSwitch() {
+  const row = await getD1().prepare(`
+    SELECT COUNT(*) AS count
+    FROM orders
+    WHERE provider_code = 'digiflazz'
+      AND (
+        payment_status = 'pending'
+        OR (
+          payment_status = 'paid'
+          AND fulfillment_status NOT IN ('success', 'failed', 'cancelled')
+        )
+      )
+  `).first<{ count: number }>();
+  const count = Number(row?.count ?? 0);
+  if (count > 0) {
+    throw new Error(`Environment DigiFlazz tidak boleh diganti karena masih ada ${count} pesanan DigiFlazz yang belum terminal. Selesaikan/expire pesanan tersebut terlebih dahulu.`);
+  }
+}
+
 async function invalidateDigiflazzOperationalCache() {
   const db = getD1();
   for (const sql of [
@@ -109,10 +128,12 @@ export async function PUT(request: Request) {
       const before = input.selections.digiflazzEnvironment
         ? (await getIntegrationOverview()).selections.digiflazzEnvironment
         : null;
+      const changingDigiflazzEnvironment = Boolean(
+        input.selections.digiflazzEnvironment && before !== input.selections.digiflazzEnvironment,
+      );
+      if (changingDigiflazzEnvironment) await assertDigiflazzEnvironmentCanSwitch();
       await saveIntegrationSelections(input.selections);
-      if (input.selections.digiflazzEnvironment && before !== input.selections.digiflazzEnvironment) {
-        await invalidateDigiflazzOperationalCache();
-      }
+      if (changingDigiflazzEnvironment) await invalidateDigiflazzOperationalCache();
     }
     return Response.json({ ok: true, overview: await getIntegrationOverview() });
   } catch (error) {
