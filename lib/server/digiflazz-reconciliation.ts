@@ -9,7 +9,7 @@ export async function reconcileStaleDigiflazzProcessing(
   const db = getD1();
   const rows = await db.prepare(
     `SELECT id, reference_id, provider_code, provider_sku, destination, server,
-      customer_no, customer_notes, subtotal, package_sku, package_label,
+      customer_no, customer_notes, subtotal, provider_max_price_snapshot, package_sku, package_label,
       product_name, buyer_name, buyer_email, buyer_phone
      FROM orders
      WHERE payment_status = 'paid'
@@ -30,6 +30,7 @@ export async function reconcileStaleDigiflazzProcessing(
     customer_no: string;
     customer_notes: string | null;
     subtotal: number;
+    provider_max_price_snapshot: number | null;
     package_sku: string;
     package_label: string;
     product_name: string;
@@ -50,6 +51,7 @@ export async function reconcileStaleDigiflazzProcessing(
         customerNo: order.customer_no,
         customerNotes: order.customer_notes,
         subtotal: order.subtotal,
+        maxProviderPrice: order.provider_max_price_snapshot,
         packageSku: order.package_sku,
         packageLabel: order.package_label,
         productName: order.product_name,
