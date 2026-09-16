@@ -7,6 +7,7 @@ import {
   lookupKokinpayNickname,
 } from "@/lib/server/nickname-check";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,8 @@ async function checkPln(customerNumber: string) {
 }
 
 export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
   const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
   try {
