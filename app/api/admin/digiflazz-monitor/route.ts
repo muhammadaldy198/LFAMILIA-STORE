@@ -1,12 +1,15 @@
 import { requireAdminSession, type AdminRole } from "@/lib/server/admin";
 import { readDigiflazzSellerMonitor } from "@/lib/server/digiflazz-monitor";
-import { syncDigiflazzPrices } from "@/lib/server/digiflazz-pricing";
+import { getDigiflazzPriceListCacheMeta, syncDigiflazzPrices } from "@/lib/server/digiflazz-pricing";
 import { getDigiflazzBalance, getDigiflazzReadiness } from "@/lib/server/providers/digiflazz";
 
 export const dynamic = "force-dynamic";
 
 async function readDashboard(role: AdminRole) {
-  const monitor = await readDigiflazzSellerMonitor();
+  const [monitor, cache] = await Promise.all([
+    readDigiflazzSellerMonitor(),
+    getDigiflazzPriceListCacheMeta(),
+  ]);
   const readiness = getDigiflazzReadiness();
   let balance: number | null = null;
   let reason = readiness.reason;
@@ -20,6 +23,7 @@ async function readDashboard(role: AdminRole) {
   }
   return {
     ...monitor,
+    cache,
     api: {
       ready: readiness.ready && reason === null,
       balance,
@@ -51,7 +55,14 @@ export async function POST(request: Request) {
 
   try {
     const result = await syncDigiflazzPrices({ force: true });
-    return Response.json({ ok: true, result, ...(await readDashboard(access.role)) });
+    const message = result.skipped
+      ? result.reason === "sync_in_progress"
+        ? "Sinkronisasi pricelist sedang berjalan. Cache terakhir tetap digunakan."
+        : result.reason === "cooldown"
+          ? "Pricelist baru saja disinkronkan. Cache terakhir tetap digunakan untuk mencegah limit DigiFlazz."
+          : "Auto Sync sedang nonaktif."
+      : `${result.updated} nominal berhasil diperbarui dari pricelist terbaru.`;
+    return Response.json({ ok: true, result, message, ...(await readDashboard(access.role)) });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Monitor seller DigiFlazz gagal diperbarui." },

@@ -2,6 +2,12 @@ import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import { dokuApiOrigin, testDokuB2BConnection } from "@/lib/server/doku-connection-test";
 import {
+  acquireDigiflazzConfigurationGuard,
+  invalidateDigiflazzOperationalCache,
+  releaseDigiflazzConfigurationGuard,
+} from "@/lib/server/digiflazz-config-guard";
+import { clearDigiflazzBalanceCache } from "@/lib/server/providers/digiflazz";
+import {
   getIntegrationOverview,
   saveIntegrationProfile,
   saveIntegrationSelections,
@@ -44,6 +50,22 @@ const schema = z.discriminatedUnion("action", [
   dokuTestInput,
 ]);
 
+async function withDigiflazzConfigurationGuard(action: () => Promise<void>) {
+  const token = await acquireDigiflazzConfigurationGuard();
+  let successful = false;
+  try {
+    // Fail closed: remove data created with the old environment/credentials
+    // before mutating the active configuration. The shared sync lock prevents
+    // an old-environment pricelist request from repopulating the cache.
+    await invalidateDigiflazzOperationalCache(token);
+    await action();
+    clearDigiflazzBalanceCache();
+    successful = true;
+  } finally {
+    await releaseDigiflazzConfigurationGuard(token, successful);
+  }
+}
+
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
@@ -85,11 +107,30 @@ export async function PUT(request: Request) {
             apiUrl: dokuApiOrigin(input.environment),
           },
         });
+      } else if (input.provider === "digiflazz" && (input.environment === "development" || input.environment === "production")) {
+        const activeEnvironment = (await getIntegrationOverview()).selections.digiflazzEnvironment;
+        const activeProfileChanged = input.environment === activeEnvironment &&
+          (Object.values(input.values).some((value) => value.trim()) || input.clearFields.length > 0);
+        if (activeProfileChanged) {
+          await withDigiflazzConfigurationGuard(() => saveIntegrationProfile(input).then(() => undefined));
+        } else {
+          await saveIntegrationProfile(input);
+        }
       } else {
         await saveIntegrationProfile(input);
       }
     } else {
-      await saveIntegrationSelections(input.selections);
+      const before = input.selections.digiflazzEnvironment
+        ? (await getIntegrationOverview()).selections.digiflazzEnvironment
+        : null;
+      const changingDigiflazzEnvironment = Boolean(
+        input.selections.digiflazzEnvironment && before !== input.selections.digiflazzEnvironment,
+      );
+      if (changingDigiflazzEnvironment) {
+        await withDigiflazzConfigurationGuard(() => saveIntegrationSelections(input.selections));
+      } else {
+        await saveIntegrationSelections(input.selections);
+      }
     }
     return Response.json({ ok: true, overview: await getIntegrationOverview() });
   } catch (error) {

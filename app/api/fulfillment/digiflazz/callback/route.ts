@@ -6,7 +6,12 @@ import { notifyOrderFulfillmentSuccessByProviderRef } from "@/lib/server/transac
 export const dynamic = "force-dynamic";
 
 type RuntimeEnv = { DIGIFLAZZ_WEBHOOK_SECRET?: string };
-type Payload = { data?: { ref_id?: string; status?: string; message?: string; sn?: string } };
+type Payload = {
+  data?: { ref_id?: string; status?: string; message?: string; sn?: string };
+  sed?: string;
+  hook_id?: number | string;
+  hook?: Record<string, unknown>;
+};
 
 function mapStatus(status?: string) {
   if (status?.toLowerCase() === "sukses") return "success" as const;
@@ -17,17 +22,26 @@ function mapStatus(status?: string) {
 export async function POST(request: Request) {
   const secret = getRuntimeEnv<RuntimeEnv>().DIGIFLAZZ_WEBHOOK_SECRET?.trim();
   if (!secret) return Response.json({ error: "Secret webhook DigiFlazz belum dikonfigurasi." }, { status: 503 });
+
   const rawBody = await request.text();
   const expected = `sha1=${hmacHex("sha1", secret, rawBody)}`;
   if (!safeEqual(request.headers.get("x-hub-signature"), expected)) {
     return Response.json({ error: "Signature webhook tidak valid." }, { status: 401 });
   }
+
   let payload: Payload;
   try {
     payload = JSON.parse(rawBody) as Payload;
   } catch {
     return Response.json({ error: "Payload webhook tidak valid." }, { status: 400 });
   }
+
+  const event = request.headers.get("x-digiflazz-event")?.trim().toLowerCase();
+  const isPing = event === "ping" || (!payload.data && payload.hook_id != null && payload.hook != null);
+  if (isPing) {
+    return Response.json({ ok: true, event: "ping" });
+  }
+
   const data = payload.data;
   if (!data?.ref_id) return Response.json({ error: "Ref ID DigiFlazz tidak ada." }, { status: 400 });
   const status = mapStatus(data.status);
