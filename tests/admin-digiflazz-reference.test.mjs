@@ -14,25 +14,27 @@ test("Digiflazz workspace owns operational pricing controls", () => {
     "Auto Sync:",
     "Semua Kategori",
     "Semua Subkategori",
-    "Max Price",
+    "Max Price Digiflazz",
   ]) assert.ok(source.includes(label), `missing Digiflazz label: ${label}`);
   assert.match(dashboard, /<AdminDigiflazzWorkspace/);
 });
 
-test("Digiflazz price control separates provider cost, guard, margin and selling price", () => {
+test("Digiflazz price control separates current provider cost, Max Price, margin and selling price", () => {
   for (const field of [
     "currentPrice",
     "maxPrice",
     "marginType",
     "marginValue",
     "sellingPrice",
-    "blockedByMaxPrice",
     "category",
     "brand",
   ]) assert.ok(source.includes(field), `missing Digiflazz pricing field: ${field}`);
+  assert.doesNotMatch(source, /blockedByMaxPrice/);
   assert.match(source, /async function savePricing/);
   assert.match(source, /method: "PUT"/);
   assert.match(source, /packageId: editing\.packageId, maxPrice, marginType, marginValue/);
+  assert.match(source, /calculateSale\(maxPrice, marginType, marginValue\)/);
+  assert.match(source, /Harga Jual = Max Price \+ margin/);
   assert.match(source, /item\.category === category/);
   assert.match(source, /item\.brand === brand/);
 });
