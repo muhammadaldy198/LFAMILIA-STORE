@@ -1,5 +1,6 @@
 import { getD1 } from "@/db";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
+import { isAutomaticPackageAvailable } from "@/lib/server/availability";
 import type { ProductInputField } from "@/lib/store-data";
 import { getProviderAdapter } from "@/lib/server/providers";
 import type { ProviderResult } from "@/lib/server/providers/types";
@@ -25,6 +26,7 @@ export type PurchasableItem = {
   providerSku: string | null;
   packageId: number;
   supplierCost: number | null;
+  providerMaxPrice: number | null;
   manualOpenTime: string | null;
   manualCloseTime: string | null;
   manualTimezone: string | null;
@@ -47,6 +49,7 @@ export type OrderRecord = {
   fulfillment_type: "automatic" | "manual";
   delivery_mode: "direct" | "voucher" | "manual" | null;
   supplier_cost_snapshot: number | null;
+  provider_max_price_snapshot: number | null;
   doku_environment: "sandbox" | "production" | null;
   target_template: string;
   destination: string;
@@ -101,6 +104,7 @@ type StoredItemRow = {
   manual_timezone: string | null;
   package_id: number;
   supplier_price: number | null;
+  provider_max_price: number | null;
   package_sku: string;
   package_label: string;
   price: number;
@@ -170,12 +174,13 @@ export async function resolvePurchasableItem(
   productSlug: string,
   packageSku: string,
 ): Promise<PurchasableItem | null> {
+  await ensureLegacyDatabaseColumns();
   const db = getD1();
   const row = await db
     .prepare(
       `SELECT p.slug AS product_slug, p.name AS product_name, p.needs_server,
       p.fulfillment_type, p.target_template, p.input_label, p.input_placeholder, p.input_fields_json, p.manual_instructions, p.manual_open_time, p.manual_close_time, p.manual_timezone,
-      pp.id AS package_id, pp.sku AS package_sku, pp.label AS package_label, pp.price, pp.provider_code, pp.provider_sku, pp.supplier_price
+      pp.id AS package_id, pp.sku AS package_sku, pp.label AS package_label, pp.price, pp.provider_code, pp.provider_sku, pp.supplier_price, pp.provider_max_price
      FROM products p
      JOIN product_packages pp ON pp.product_id = p.id
      WHERE p.slug = ? AND pp.sku = ? AND p.is_active = 1 AND pp.is_active = 1
@@ -199,6 +204,7 @@ export async function resolvePurchasableItem(
       providerSku: row.provider_sku,
       packageId: row.package_id,
       supplierCost: row.supplier_price,
+      providerMaxPrice: row.provider_max_price,
       manualOpenTime: row.manual_open_time,
       manualCloseTime: row.manual_close_time,
       manualTimezone: row.manual_timezone,
@@ -258,18 +264,17 @@ export function createOrderIdentity() {
 }
 
 async function assertAutomaticAvailability(item: PurchasableItem) {
-  if (item.fulfillmentType !== "automatic" || item.providerCode !== "digiflazz") return;
-  try {
-    const monitor = await getD1().prepare(`SELECT buyer_product_status, seller_product_status, unlimited_stock, stock, start_cut_off, end_cut_off FROM digiflazz_seller_monitor WHERE package_id = ? LIMIT 1`).bind(item.packageId).first<{ buyer_product_status: number; seller_product_status: number; unlimited_stock: number; stock: number; start_cut_off: string | null; end_cut_off: string | null }>();
-    if (!monitor) return;
-    const now = new Date(); const minutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-    const parse = (value: string | null) => { if (!value || !/^\d{2}:\d{2}$/.test(value)) return null; const [h, m] = value.split(":").map(Number); return h * 60 + m; };
-    const start = parse(monitor.start_cut_off), end = parse(monitor.end_cut_off);
-    const cutoff = start !== null && end !== null && (start === end || (start < end ? minutes >= start && minutes < end : minutes >= start || minutes < end));
-    if (!monitor.buyer_product_status || !monitor.seller_product_status || (!monitor.unlimited_stock && Number(monitor.stock) <= 0) || cutoff) throw new CheckoutValidationError("Nominal otomatis sedang tidak tersedia.");
-  } catch (error) {
-    if (error instanceof CheckoutValidationError) throw error;
-    // Monitor is optional operational data; an unavailable monitor must not alter Admin package state.
+  if (item.fulfillmentType !== "automatic") return;
+  if (!item.providerCode || !item.providerSku) {
+    throw new CheckoutValidationError("Konfigurasi pemrosesan otomatis belum lengkap.");
+  }
+  if (!await isAutomaticPackageAvailable({
+    packageId: item.packageId,
+    providerCode: item.providerCode,
+    providerSku: item.providerSku,
+    maxPrice: item.providerMaxPrice,
+  })) {
+    throw new CheckoutValidationError("Nominal otomatis sedang tidak tersedia atau harga provider melebihi Max Price.");
   }
 }
 
@@ -291,6 +296,7 @@ export async function insertPendingOrder(input: {
   walletCheckoutKey?: string | null;
   externalCheckoutKey?: string | null;
   promotion: PromotionQuote;
+  adminFee?: number;
 }) {
   const db = getD1();
   await assertAutomaticAvailability(input.item);
@@ -315,11 +321,11 @@ export async function insertPendingOrder(input: {
     .prepare(
       `INSERT INTO orders (
       id, customer_id, wallet_checkout_key, external_checkout_key, reference_id, product_slug, product_name, package_sku, package_label,
-      provider_code, provider_sku, fulfillment_type, delivery_mode, supplier_cost_snapshot, target_template, destination, server,
+      provider_code, provider_sku, fulfillment_type, delivery_mode, supplier_cost_snapshot, provider_max_price_snapshot, target_template, destination, server,
       nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json,
       base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
       admin_fee, total, payment_method, payment_channel
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       input.id,
@@ -336,6 +342,7 @@ export async function insertPendingOrder(input: {
       input.item.fulfillmentType,
       input.item.fulfillmentType === "manual" ? "manual" : input.item.providerCode === "voucher-stock" ? "voucher" : "direct",
       input.item.supplierCost,
+      input.item.providerMaxPrice,
       input.item.targetTemplate,
       input.destination,
       input.server,
@@ -351,7 +358,8 @@ export async function insertPendingOrder(input: {
       input.promotion.discountAmount,
       input.promotion.voucherCode,
       input.promotion.flashSaleId,
-      input.promotion.finalPrice,
+      input.adminFee ?? 0,
+      input.promotion.finalPrice + (input.adminFee ?? 0),
       input.paymentMethod,
       input.paymentChannel,
     )
@@ -550,6 +558,24 @@ export async function fulfillAutomaticOrder(
     );
     return;
   }
+  const currentItem = await resolvePurchasableItem(order.product_slug, order.package_sku);
+  if (
+    !currentItem ||
+    currentItem.providerCode !== order.provider_code ||
+    currentItem.providerSku !== order.provider_sku ||
+    !await isAutomaticPackageAvailable({
+      packageId: currentItem?.packageId ?? 0,
+      providerCode: order.provider_code,
+      providerSku: order.provider_sku,
+      maxPrice: order.provider_max_price_snapshot,
+    })
+  ) {
+    await setFulfillmentError(
+      order.id,
+      "Nominal tidak lagi tersedia atau harga provider melebihi Max Price saat fulfillment.",
+    );
+    return;
+  }
 
   const claimed = await claimAutomaticFulfillmentAttempt(
     order.id,
@@ -569,6 +595,7 @@ export async function fulfillAutomaticOrder(
         customerNo: order.customer_no,
         customerNotes: order.customer_notes,
         subtotal: order.subtotal,
+        maxProviderPrice: order.provider_max_price_snapshot,
         packageSku: order.package_sku,
         packageLabel: order.package_label,
         productName: order.product_name,
