@@ -22,6 +22,7 @@ type KokinpayResponse = {
 type ProductNicknameConfig = {
   nickname_game_code: string | null;
   needs_server: number;
+  category: string;
 };
 
 export type NicknameVerification = {
@@ -175,9 +176,13 @@ export async function verifyNicknameForCheckout(input: {
 }): Promise<NicknameVerification> {
   await ensureKokinpayNicknameGameCodeBackfill();
   const product = await getD1()
-    .prepare("SELECT nickname_game_code, needs_server FROM products WHERE slug = ? AND is_active = 1 LIMIT 1")
+    .prepare("SELECT nickname_game_code, needs_server, category FROM products WHERE slug = ? AND is_active = 1 LIMIT 1")
     .bind(input.productSlug.trim())
     .first<ProductNicknameConfig>();
+
+  if (product?.category?.trim().toLowerCase() === "voucher") {
+    return { supported: false, nickname: null, country: null };
+  }
 
   const gameCode = product?.nickname_game_code?.trim();
   if (!gameCode) return { supported: false, nickname: null, country: null };
