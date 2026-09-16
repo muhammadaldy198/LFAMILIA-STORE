@@ -3,6 +3,7 @@ import { requireAdminSession } from "@/lib/server/admin";
 import { deleteProduct, readProducts, saveProduct } from "@/lib/server/products";
 import { isAllowedMediaUrl } from "@/lib/media-url";
 import { readDigiflazzSellerMonitor } from "@/lib/server/digiflazz-monitor";
+import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
 
 export const dynamic = "force-dynamic";
 
@@ -103,6 +104,7 @@ export async function GET(request: Request) {
   const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
+    await ensureKokinpayNicknameGameCodeBackfill();
     const products = await readProducts(true);
     const sellerMonitor = access.role === "super_admin" ? await readDigiflazzSellerMonitor() : null;
     return Response.json({ products, databaseReady: true, adminEmail: access.email, role: access.role, sellerMonitor });
