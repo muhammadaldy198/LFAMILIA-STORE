@@ -1,203 +1,314 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
-  Box,
-  FileText,
-  Link2,
+  CheckCircle2,
   RefreshCw,
   Search,
-  Store,
-  Wallet,
-  Wifi,
+  Settings2,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 
+type MarginType = "fixed" | "percent";
+type Health = "healthy" | "warning" | "critical" | "unknown";
+
 type MonitorItem = {
-  id: number;
-  product: string;
-  nominal: string;
-  sku: string;
-  cost: number;
-  seller: "Normal" | "Peringatan" | "Seller Off" | "Belum Dicek";
-  sync: "Auto" | "Manual";
-  code: string;
-  alertReason?: string;
-  lastCheckedAt?: string;
+  packageId: number;
+  productName: string;
+  packageLabel: string;
+  providerSku: string;
+  category: string;
+  brand: string;
+  currentPrice: number | null;
+  maxPrice: number | null;
+  marginType: MarginType;
+  marginValue: number;
+  sellingPrice: number;
+  blockedByMaxPrice: boolean;
+  buyerProductStatus: boolean;
+  sellerProductStatus: boolean;
+  unlimitedStock: boolean;
+  stock: number;
+  startCutOff: string | null;
+  endCutOff: string | null;
+  health: Health;
+  alertReason: string | null;
+  lastCheckedAt: string | null;
 };
 
 type MonitorResponse = {
-  items: Array<{ packageId: number; productName: string; packageLabel: string; providerSku: string; currentPrice: number | null; health: "healthy" | "warning" | "critical" | "unknown"; alertReason: string | null; lastCheckedAt: string | null }>;
+  items: MonitorItem[];
   summary: { total: number; healthy: number; warning: number; critical: number; unknown: number };
+  cache?: { count: number; lastSyncedAt: string | null; lastStartedAt: string | null };
   api?: { ready: boolean; balance: number | null; environment: string | null; reason: string | null };
 };
 
-type ProviderOrder = { reference_id: string; package_sku: string; product_name: string; package_label: string; fulfillment_status: string; provider_status: string | null; provider_message: string | null; created_at: string; provider_code: string | null };
+type PricingResponse = {
+  settings?: { isAutoSync: boolean };
+  cache?: { count: number; lastSyncedAt: string | null };
+};
+
+type ProviderOrder = {
+  reference_id: string;
+  product_name: string;
+  package_label: string;
+  fulfillment_status: string;
+  provider_status: string | null;
+  provider_message: string | null;
+  provider_code: string | null;
+  created_at: string;
+};
+
+async function readJson<T>(response: Response): Promise<T> {
+  const payload = await response.json().catch(() => ({})) as T & { error?: string };
+  if (!response.ok) throw new Error(payload.error || "Permintaan panel gagal diproses.");
+  return payload;
+}
+
+function formatRupiah(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "-";
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "Belum pernah";
+  const parsed = new Date(value.endsWith("Z") || value.includes("+") ? value : `${value}Z`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("id-ID", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(parsed);
+}
+
+function calculateSale(cost: number, type: MarginType, value: number) {
+  return type === "percent" ? Math.ceil(cost * (100 + value) / 100) : Math.ceil(cost + value);
+}
 
 export function AdminDigiflazzWorkspace() {
+  const [data, setData] = useState<MonitorResponse>({
+    items: [],
+    summary: { total: 0, healthy: 0, warning: 0, critical: 0, unknown: 0 },
+  });
+  const [orders, setOrders] = useState<ProviderOrder[]>([]);
+  const [autoSync, setAutoSync] = useState(true);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Semua Kategori");
-  const [seller, setSeller] = useState("Semua Status Seller");
-  const [sync, setSync] = useState("Semua Sync");
+  const [brand, setBrand] = useState("Semua Subkategori");
+  const [health, setHealth] = useState("Semua Status");
   const [page, setPage] = useState(1);
-  const [transactionPage, setTransactionPage] = useState(1);
-  const [notice, setNotice] = useState("");
-  const [dialog, setDialog] = useState<{ title: string; item?: MonitorItem } | null>(null);
-  const [lastSync, setLastSync] = useState("Belum pernah");
-  const [monitorItems, setMonitorItems] = useState<MonitorItem[]>([]);
-  const [transactions, setTransactions] = useState<string[][]>([]);
-  const [syncHistory, setSyncHistory] = useState<string[][]>([]);
-  const [summary, setSummary] = useState({ total: 0, healthy: 0, warning: 0, critical: 0, unknown: 0 });
-  const [api, setApi] = useState({ ready: false, balance: null as number | null, environment: null as string | null, reason: null as string | null });
+  const [editing, setEditing] = useState<MonitorItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
-  async function loadOperationalData() {
-    setLoading(true); setError("");
+  async function load() {
+    setLoading(true);
+    setError("");
     try {
-      const [monitorResponse, ordersResponse] = await Promise.all([
-        fetch("/api/panel/digiflazz-monitor", { cache: "no-store" }),
-        fetch("/api/panel/orders", { cache: "no-store" }),
+      const [monitor, pricing, orderPayload] = await Promise.all([
+        readJson<MonitorResponse>(await fetch("/api/panel/digiflazz-monitor", { cache: "no-store" })),
+        readJson<PricingResponse>(await fetch("/api/panel/digiflazz-pricing", { cache: "no-store" })),
+        readJson<{ orders?: ProviderOrder[] }>(await fetch("/api/panel/orders", { cache: "no-store" })),
       ]);
-      const monitor = await monitorResponse.json().catch(() => ({})) as MonitorResponse & { error?: string };
-      const orderPayload = await ordersResponse.json().catch(() => ({})) as { orders?: ProviderOrder[]; error?: string };
-      if (!monitorResponse.ok) throw new Error(monitor.error || "Monitor Digiflazz gagal dimuat.");
-      if (!ordersResponse.ok) throw new Error(orderPayload.error || "Transaksi provider gagal dimuat.");
-      const items = monitor.items.map((item) => ({
-        id: item.packageId,
-        product: item.productName,
-        nominal: item.packageLabel,
-        sku: item.providerSku,
-        cost: item.currentPrice ?? 0,
-        seller: item.health === "healthy" ? "Normal" as const : item.health === "warning" ? "Peringatan" as const : item.health === "critical" ? "Seller Off" as const : "Belum Dicek" as const,
-        sync: "Auto" as const,
-        code: item.productName.split(/\s+/).map((part) => part[0]).join("").slice(0, 4).toUpperCase(),
-        alertReason: item.alertReason || undefined,
-        lastCheckedAt: item.lastCheckedAt || undefined,
-      }));
-      setMonitorItems(items);
-      setSummary(monitor.summary);
-      setApi(monitor.api || { ready: true, balance: null, environment: null, reason: null });
-      const providerOrders = (orderPayload.orders || []).filter((order) => order.provider_code === "digiflazz");
-      setTransactions(providerOrders.map((order) => [order.reference_id, order.package_sku, order.product_name, order.package_label, displayProviderStatus(order.fulfillment_status), formatDate(order.created_at), order.provider_message || order.provider_status || "-"]));
-      const checked = items.map((item) => item.lastCheckedAt).filter((value): value is string => Boolean(value)).sort().at(-1);
-      if (checked) setLastSync(formatDate(checked));
-      setSyncHistory(items.slice(0, 5).map((item) => [item.seller === "Normal" ? "SKU normal" : item.alertReason || item.seller, item.lastCheckedAt ? formatDate(item.lastCheckedAt) : "Belum diperiksa", item.product, item.seller === "Seller Off" ? "red" : "green"]));
+      setData(monitor);
+      setAutoSync(pricing.settings?.isAutoSync !== false);
+      setOrders((orderPayload.orders || []).filter((item) => item.provider_code === "digiflazz").slice(0, 8));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Operasional Digiflazz gagal dimuat.");
-    } finally { setLoading(false); }
+      setError(reason instanceof Error ? reason.message : "Data Digiflazz gagal dimuat.");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => { void loadOperationalData(); }, []);
+  useEffect(() => { void load(); }, []);
 
+  const categories = useMemo(
+    () => Array.from(new Set(data.items.map((item) => item.category).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [data.items],
+  );
+  const brands = useMemo(
+    () => Array.from(new Set(data.items
+      .filter((item) => category === "Semua Kategori" || item.category === category)
+      .map((item) => item.brand)
+      .filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b)),
+    [category, data.items],
+  );
   const visible = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return monitorItems.filter((item) =>
-      (!term || `${item.product} ${item.nominal} ${item.sku}`.toLowerCase().includes(term)) &&
-      (category === "Semua Kategori" || (category === "Game" ? !["Steam Wallet", "Google Play"].includes(item.product) : ["Steam Wallet", "Google Play"].includes(item.product))) &&
-      (seller === "Semua Status Seller" || item.seller === seller) &&
-      (sync === "Semua Sync" || item.sync === sync),
+    return data.items.filter((item) =>
+      (!term || `${item.productName} ${item.packageLabel} ${item.providerSku} ${item.category} ${item.brand}`.toLowerCase().includes(term)) &&
+      (category === "Semua Kategori" || item.category === category) &&
+      (brand === "Semua Subkategori" || item.brand === brand) &&
+      (health === "Semua Status" || item.health === health),
     );
-  }, [category, query, seller, sync]);
-  const pageSize = 32;
-  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize));
-  const activePage = Math.min(page, pageCount);
-  const pagedItems = visible.slice((activePage - 1) * pageSize, activePage * pageSize);
-  const transactionPageSize = 10;
-  const transactionPageCount = Math.max(1, Math.ceil(transactions.length / transactionPageSize));
-  const activeTransactionPage = Math.min(transactionPage, transactionPageCount);
-  const pagedTransactions = transactions.slice((activeTransactionPage - 1) * transactionPageSize, activeTransactionPage * transactionPageSize);
+  }, [brand, category, data.items, health, query]);
 
-  async function syncPricelist() {
-    setSyncing(true); setError(""); setNotice("");
+  const pageSize = 30;
+  const pages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const activePage = Math.min(page, pages);
+  const rows = visible.slice((activePage - 1) * pageSize, activePage * pageSize);
+
+  async function syncNow() {
+    setSyncing(true);
+    setError("");
+    setNotice("");
     try {
-      const response = await fetch("/api/panel/digiflazz-monitor", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      const payload = await response.json().catch(() => ({})) as MonitorResponse & { error?: string; result?: { updated?: number } };
-      if (!response.ok) throw new Error(payload.error || "Sync pricelist gagal.");
-      setNotice(`${payload.result?.updated ?? 0} nominal berhasil disinkronkan.`);
-      setLastSync("Baru saja");
-      await loadOperationalData();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Sync pricelist gagal."); }
-    finally { setSyncing(false); }
+      const result = await readJson<{ message?: string }>(await fetch("/api/panel/digiflazz-monitor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      }));
+      setNotice(result.message || "Pricelist dan harga modal berhasil disinkronkan.");
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Sync pricelist gagal.");
+    } finally {
+      setSyncing(false);
+    }
   }
 
-  async function refresh() {
-    await loadOperationalData();
-    setNotice("Data monitoring terbaru berhasil dimuat.");
+  async function toggleAutoSync() {
+    const next = !autoSync;
+    setError("");
+    try {
+      await readJson(await fetch("/api/panel/digiflazz-pricing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isAutoSync: next }),
+      }));
+      setAutoSync(next);
+      setNotice(`Auto Sync ${next ? "diaktifkan" : "dinonaktifkan"}.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Pengaturan Auto Sync gagal disimpan.");
+    }
+  }
+
+  function chooseCategory(value: string) {
+    setCategory(value);
+    setBrand("Semua Subkategori");
+    setPage(1);
+  }
+
+  async function savePricing(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    const form = new FormData(event.currentTarget);
+    const maxPrice = Number(form.get("maxPrice"));
+    const marginType = String(form.get("marginType")) as MarginType;
+    const marginValue = Number(form.get("marginValue"));
+    if (!Number.isInteger(maxPrice) || maxPrice < 1 || !Number.isInteger(marginValue) || marginValue < 0) {
+      setError("Max Price dan margin harus berupa angka yang valid.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const payload = await readJson<{ pricing: { sellingPrice: number; blockedByMaxPrice: boolean } }>(await fetch("/api/panel/digiflazz-pricing", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packageId: editing.packageId, maxPrice, marginType, marginValue }),
+      }));
+      setNotice(payload.pricing.blockedByMaxPrice
+        ? `${editing.productName} - ${editing.packageLabel}: harga provider sudah melewati Max Price dan otomatis diblokir.`
+        : `${editing.productName} - ${editing.packageLabel}: Price Control LFAMILIA disimpan. Harga jual ${formatRupiah(payload.pricing.sellingPrice)}.`);
+      setEditing(null);
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Price Control gagal disimpan.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <div className="admin-digiflazz-reference min-w-0 text-[#14213a]">
-      <header className="flex items-start justify-between gap-[16px]">
-        <div><h1 className="text-[24px] font-black tracking-[-0.04em] text-[#0c1933]">Digiflazz</h1><p className="mt-[3px] text-[10px] text-[#62748c]">Pantau operasional provider Digiflazz dan sinkronisasi data untuk LFAMILIA.</p></div>
-        <div className="flex gap-[9px]"><button type="button" disabled={syncing} onClick={syncPricelist} className="inline-flex h-[36px] items-center gap-[7px] rounded-[5px] bg-[#0875ed] px-[16px] text-[9px] font-bold text-white shadow-[0_5px_14px_rgba(8,117,237,.2)] disabled:opacity-50"><RefreshCw className={`size-[13px] ${syncing ? "animate-spin" : ""}`} />{syncing ? "Menyinkron..." : "Sync Pricelist"}</button><button type="button" disabled={loading} onClick={() => void refresh()} className="inline-flex h-[36px] items-center gap-[7px] rounded-[5px] border border-[#dce3eb] bg-white px-[15px] text-[9px] font-bold text-[#35475f] disabled:opacity-50"><RefreshCw className={`size-[13px] ${loading ? "animate-spin" : ""}`} />Refresh</button></div>
+      <header className="flex flex-wrap items-start justify-between gap-[12px]">
+        <div>
+          <h1 className="text-[24px] font-black tracking-[-0.04em] text-[#0c1933]">Digiflazz</h1>
+          <p className="mt-[3px] text-[10px] text-[#62748c]">Pusat operasional provider dan Price Control LFAMILIA.</p>
+        </div>
+        <div className="flex items-center gap-[8px]">
+          <button type="button" onClick={() => void toggleAutoSync()} className={`h-[34px] rounded-[5px] border px-[12px] text-[8px] font-bold ${autoSync ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-[#dce3eb] bg-white text-[#55667c]"}`}>Auto Sync: {autoSync ? "ON" : "OFF"}</button>
+          <button type="button" disabled={syncing} onClick={() => void syncNow()} className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50"><RefreshCw className={`size-[12px] ${syncing ? "animate-spin" : ""}`} />{syncing ? "Sinkron..." : "Sync Pricelist"}</button>
+          <button type="button" disabled={loading} onClick={() => void load()} className="inline-flex h-[34px] items-center gap-[6px] rounded-[5px] border border-[#dce3eb] bg-white px-[12px] text-[8px] font-bold text-[#40516a]"><RefreshCw className={`size-[12px] ${loading ? "animate-spin" : ""}`} />Refresh</button>
+        </div>
       </header>
 
       {notice && <button type="button" onClick={() => setNotice("")} className="mt-[9px] flex w-full items-center justify-between rounded-[5px] border border-[#bce3ce] bg-[#eef9f3] px-[11px] py-[7px] text-left text-[8px] font-semibold text-[#158755]"><span>{notice}</span><X className="size-[11px]" /></button>}
       {error && <button type="button" onClick={() => setError("")} className="mt-[9px] w-full rounded-[5px] border border-red-200 bg-red-50 px-[11px] py-[7px] text-left text-[8px] text-red-700">{error}</button>}
 
-      <section className="mt-[13px] grid grid-cols-5 gap-[10px]">
-        <Metric label="Status API" value={api.ready ? "Online" : "Belum Siap"} note={api.ready ? `Terhubung ${api.environment || ""}` : api.reason || "Periksa Integrasi"} tone={api.ready ? "green" : "red"} Icon={Wifi} />
-        <Metric label="Saldo Digiflazz" value={api.balance === null ? "Belum terbaca" : formatRupiah(api.balance)} note={api.balance === null ? "Tes koneksi untuk membaca saldo" : "Saldo akun saat ini"} tone="blue" Icon={Wallet} compact />
-        <Metric label="SKU Aktif" value={String(summary.total)} note={`${summary.healthy} normal`} tone="blue" Icon={Box} />
-        <Metric label="Sync Terakhir" value={lastSync} note={summary.unknown ? `●  ${summary.unknown} belum dicek` : "●  Data terbaru"} tone="blue" Icon={FileText} compact />
-        <Metric label="Produk Bermasalah" value={String(summary.critical + summary.warning)} note={`${summary.critical} kritis · ${summary.warning} peringatan`} tone="red" Icon={AlertTriangle} />
+      <section className="mt-[12px] overflow-hidden rounded-[8px] border border-[#dfe6ef] bg-white shadow-[0_1px_4px_rgba(20,33,58,.04)]">
+        <div className="grid grid-cols-2 border-b border-[#e4e9ef] sm:grid-cols-3 lg:grid-cols-6">
+          <Stat label="Status API" value={data.api?.ready ? "Online" : "Belum Siap"} note={data.api?.reason || data.api?.environment || "-"} />
+          <Stat label="Saldo" value={data.api?.balance === null || data.api?.balance === undefined ? "-" : formatRupiah(data.api.balance)} note="Akun provider" />
+          <Stat label="SKU Terhubung" value={String(data.summary.total)} note={`${data.summary.healthy} normal`} />
+          <Stat label="Diblokir / Kritis" value={String(data.summary.critical)} note="Termasuk Max Price" danger={data.summary.critical > 0} />
+          <Stat label="Peringatan" value={String(data.summary.warning)} note="Stok / cutoff / harga" danger={data.summary.warning > 0} />
+          <Stat label="Sync Terakhir" value={formatDate(data.cache?.lastSyncedAt)} note={`${data.cache?.count ?? 0} SKU di cache`} />
+        </div>
+
+        <div className="flex flex-wrap items-end justify-between gap-[10px] border-b border-[#e4e9ef] px-[14px] py-[11px]">
+          <div>
+            <div className="flex items-center gap-[7px]"><SlidersHorizontal className="size-[14px] text-[#0875ed]" /><h2 className="text-[13px] font-extrabold">Price Control LFAMILIA</h2></div>
+            <p className="mt-[2px] text-[8px] text-[#687a91]">Harga Digiflazz = modal aktual · Max Price = batas aman · Margin = keuntungan · Harga Jual = modal aktual + margin.</p>
+          </div>
+          <span className="rounded-[4px] bg-[#eef6ff] px-[8px] py-[5px] text-[7px] font-bold text-[#0875df]">Kategori → Subkategori / Brand → SKU</span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-[7px] border-b border-[#e8edf3] px-[14px] py-[10px] md:grid-cols-[1.4fr_.75fr_.75fr_.65fr]">
+          <label className="relative"><Search className="absolute left-[9px] top-1/2 size-[12px] -translate-y-1/2 text-[#74849a]" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Cari produk, nominal, SKU, kategori..." className="h-[32px] w-full rounded-[4px] border border-[#dce3eb] pl-[28px] pr-[8px] text-[8px] outline-none focus:border-[#2680eb]" /></label>
+          <select value={category} onChange={(event) => chooseCategory(event.target.value)} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[8px] text-[8px]"><option>Semua Kategori</option>{categories.map((item) => <option key={item}>{item}</option>)}</select>
+          <select value={brand} onChange={(event) => { setBrand(event.target.value); setPage(1); }} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[8px] text-[8px]"><option>Semua Subkategori</option>{brands.map((item) => <option key={item}>{item}</option>)}</select>
+          <select value={health} onChange={(event) => { setHealth(event.target.value); setPage(1); }} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[8px] text-[8px]"><option>Semua Status</option><option value="healthy">Normal</option><option value="warning">Peringatan</option><option value="critical">Kritis / Diblokir</option><option value="unknown">Belum Dicek</option></select>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1250px] table-fixed text-left">
+            <thead className="bg-[#f4f7fa] text-[7px] font-bold uppercase tracking-[.02em] text-[#58697f]"><tr><th className="w-[95px] px-[10px] py-[9px]">Kategori</th><th className="w-[125px]">Subkategori</th><th className="w-[130px]">Produk</th><th className="w-[150px]">Nominal</th><th className="w-[105px]">SKU</th><th className="w-[105px]">Harga Digiflazz</th><th className="w-[110px]">Max Price LFAMILIA</th><th className="w-[90px]">Margin</th><th className="w-[105px]">Harga Jual</th><th className="w-[100px]">Status</th><th className="w-[70px]">Aksi</th></tr></thead>
+            <tbody>
+              {rows.map((item) => <tr key={item.packageId} className="border-t border-[#e7ebf0] text-[7.5px] text-[#35475f] hover:bg-[#fafcfe]"><td className="px-[10px] py-[8px] font-semibold">{item.category}</td><td className="truncate pr-[8px] font-semibold text-[#213752]">{item.brand}</td><td className="truncate pr-[8px]">{item.productName}</td><td className="truncate pr-[8px]">{item.packageLabel}</td><td className="truncate font-mono text-[7px]">{item.providerSku}</td><td className="font-semibold">{formatRupiah(item.currentPrice)}</td><td className={item.blockedByMaxPrice ? "font-bold text-red-600" : "font-semibold"}>{formatRupiah(item.maxPrice)}</td><td>{item.marginType === "percent" ? `${item.marginValue}%` : formatRupiah(item.marginValue)}</td><td className="font-bold text-[#0c6fd4]">{formatRupiah(item.sellingPrice)}</td><td><Status item={item} /></td><td><button type="button" onClick={() => setEditing(item)} className="inline-flex h-[27px] items-center gap-[5px] rounded-[4px] border border-[#cfe0f2] bg-white px-[8px] font-bold text-[#0875df]"><Settings2 className="size-[10px]" />Atur</button></td></tr>)}
+              {!loading && !rows.length && <tr><td colSpan={11} className="py-[28px] text-center text-[8px] text-[#728198]">Tidak ada SKU yang cocok dengan filter.</td></tr>}
+              {loading && <tr><td colSpan={11} className="py-[28px] text-center text-[8px] text-[#728198]">Memuat Price Control Digiflazz...</td></tr>}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-[#e4e9ef] px-[14px] py-[9px] text-[7.5px] text-[#5e6f84]"><span>{visible.length ? (activePage - 1) * pageSize + 1 : 0}–{Math.min(activePage * pageSize, visible.length)} dari {visible.length} SKU</span><div className="flex items-center gap-[5px]"><button type="button" disabled={activePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="h-[27px] rounded-[4px] border border-[#dce3eb] px-[8px] disabled:opacity-40">Sebelumnya</button><span className="grid h-[27px] min-w-[27px] place-items-center rounded-[4px] bg-[#0875ed] px-[7px] font-bold text-white">{activePage}/{pages}</span><button type="button" disabled={activePage >= pages} onClick={() => setPage((value) => Math.min(pages, value + 1))} className="h-[27px] rounded-[4px] border border-[#dce3eb] px-[8px] disabled:opacity-40">Berikutnya</button></div></div>
+
+        <div className="border-t border-[#e4e9ef] px-[14px] py-[11px]"><h3 className="text-[11px] font-extrabold">Status Sinkronisasi & Transaksi Provider Terbaru</h3><p className="mt-[2px] text-[7.5px] text-[#6d7d91]">Ringkasan operasional tetap berada dalam satu workspace Digiflazz.</p></div>
+        <div className="overflow-x-auto border-t border-[#edf0f4]"><table className="w-full min-w-[760px] text-left text-[7.5px]"><thead className="bg-[#fafbfd] text-[7px] font-bold text-[#5f7084]"><tr><th className="px-[12px] py-[8px]">Invoice</th><th>Produk</th><th>Nominal</th><th>Status</th><th>Waktu</th><th>Catatan</th></tr></thead><tbody>{orders.map((item) => <tr key={item.reference_id} className="border-t border-[#edf0f4]"><td className="px-[12px] py-[8px] font-mono">{item.reference_id}</td><td>{item.product_name}</td><td>{item.package_label}</td><td>{item.fulfillment_status}</td><td>{formatDate(item.created_at)}</td><td className="max-w-[220px] truncate pr-[12px]">{item.provider_message || item.provider_status || "-"}</td></tr>)}{!orders.length && <tr><td colSpan={6} className="py-[18px] text-center text-[#7b8999]">Belum ada transaksi provider terbaru.</td></tr>}</tbody></table></div>
       </section>
 
-      <div className="mt-[12px] grid grid-cols-[minmax(0,1fr)_280px] gap-[12px]">
-        <section className="min-w-0 overflow-hidden rounded-[8px] border border-[#dfe6ef] bg-white shadow-[0_1px_4px_rgba(20,33,58,.04)]">
-          <div className="flex items-start justify-between px-[14px] pt-[12px]"><div><h2 className="text-[14px] font-extrabold text-[#101d35]">Monitoring Produk Digiflazz</h2><p className="mt-[2px] text-[8px] text-[#687a91]">Pantau daftar produk, harga, dan status seller secara real-time.</p></div><button type="button" onClick={() => { setQuery(""); setCategory("Semua Kategori"); setSeller("Semua Status Seller"); setSync("Semua Sync"); setPage(1); }} className="h-[29px] rounded-[4px] border border-[#dce3eb] bg-white px-[10px] text-[7.5px] font-bold text-[#0875df]">Lihat Semua</button></div>
-          <div className="grid grid-cols-[1.55fr_.8fr_.95fr_.75fr] gap-[7px] px-[14px] py-[10px]"><label className="relative"><Search className="absolute left-[9px] top-1/2 size-[12px] -translate-y-1/2 text-[#74849a]" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Cari nama produk, SKU, atau nominal..." className="h-[32px] w-full rounded-[4px] border border-[#dce3eb] pl-[28px] pr-[8px] text-[8px] outline-none placeholder:text-[#8290a2] focus:border-[#2680eb]" /></label><FilterSelect value={category} onChange={(value) => { setCategory(value); setPage(1); }} options={["Semua Kategori", "Game", "Voucher"]} /><FilterSelect value={seller} onChange={(value) => { setSeller(value); setPage(1); }} options={["Semua Status Seller", "Normal", "Peringatan", "Seller Off", "Belum Dicek"]} /><FilterSelect value={sync} onChange={(value) => { setSync(value); setPage(1); }} options={["Semua Sync", "Auto", "Manual"]} /></div>
-          <MonitorTable items={pagedItems} onOpen={(item) => setDialog({ title: "Detail Produk Digiflazz", item })} />
-          <footer className="flex h-[52px] items-center justify-between px-[14px] text-[7.5px] text-[#586a81]"><span>Menampilkan {visible.length ? (activePage - 1) * pageSize + 1 : 0}–{Math.min(activePage * pageSize, visible.length)} dari {visible.length} produk</span><Pagination page={activePage} pages={pageCount} onChange={setPage} /><span className="rounded-[4px] border border-[#dde4ec] bg-white px-[9px] py-[7px]">32 per halaman</span></footer>
-        </section>
-
-        <aside className="space-y-[10px]">
-          <section className="rounded-[8px] border border-[#dfe6ef] bg-white p-[13px]"><h2 className="text-[13px] font-extrabold">Aksi Cepat</h2><p className="mt-[2px] text-[8px] text-[#687a91]">Fitur penting untuk operasional Digiflazz.</p><div className="mt-[10px] space-y-[7px]"><QuickAction primary Icon={RefreshCw} onClick={() => void syncPricelist()}>Sync Pricelist</QuickAction><QuickAction Icon={Link2} onClick={() => setDialog({ title: "Mapping SKU" })}>Mapping SKU</QuickAction><QuickAction Icon={Store} onClick={() => setDialog({ title: "Monitor Seller" })}>Monitor Seller</QuickAction><QuickAction Icon={FileText} onClick={() => setDialog({ title: "Log Digiflazz" })}>Lihat Log</QuickAction></div></section>
-          <section className="rounded-[8px] border border-[#dfe6ef] bg-white p-[13px]"><div className="flex items-center justify-between"><h2 className="text-[13px] font-extrabold">Status Sinkronisasi</h2><button type="button" onClick={() => setDialog({ title: "Riwayat Sinkronisasi" })} className="text-[7.5px] font-bold text-[#0875df]">Lihat Semua</button></div><div className="mt-[8px]">{syncHistory.map(([title, date, time, tone]) => <div key={title} className="grid min-h-[47px] grid-cols-[9px_1fr_auto] gap-[7px] border-t border-[#edf0f4] pt-[8px] first:border-0"><span className={`mt-[4px] size-[7px] rounded-full ${tone === "red" ? "bg-red-500" : "bg-emerald-500"}`} /><span><strong className="block text-[7.5px]">{title}</strong><small className="mt-[2px] block text-[6.5px] text-[#708198]">{date}</small></span><small className="text-[6.5px] text-[#708198]">{time}</small></div>)}</div></section>
-        </aside>
-      </div>
-
-      <TransactionTable transactions={pagedTransactions} total={transactions.length} page={activeTransactionPage} pages={transactionPageCount} onPageChange={setTransactionPage} onOpen={() => setDialog({ title: "Semua Transaksi Digiflazz" })} />
-      {dialog && <OperationDialog title={dialog.title} item={dialog.item} items={monitorItems} history={syncHistory} transactions={transactions} onClose={() => setDialog(null)} />}
+      {editing && <PricingDialog item={editing} saving={saving} onClose={() => setEditing(null)} onSubmit={savePricing} />}
     </div>
   );
 }
 
-function Metric({ label, value, note, tone, Icon, compact }: { label: string; value: string; note: string; tone: "green" | "blue" | "red"; Icon: LucideIcon; compact?: boolean }) {
-  const iconTone = tone === "green" ? "bg-[#dcf8e9] text-[#0eac64]" : tone === "red" ? "bg-[#ffe7e8] text-[#ef263c]" : "bg-[#e7f2ff] text-[#0875ed]";
-  const valueTone = tone === "green" ? "text-[#10a75f]" : tone === "red" ? "text-[#e72d40]" : "text-[#101c35]";
-  return <article className="flex min-h-[92px] items-start gap-[10px] rounded-[8px] border border-[#dfe6ef] bg-white p-[12px] shadow-[0_1px_4px_rgba(20,33,58,.04)]"><span className={`grid size-[42px] shrink-0 place-items-center rounded-[8px] ${iconTone}`}><Icon className="size-[21px]" strokeWidth={2.3} /></span><div className="min-w-0"><p className="truncate text-[8.5px] font-semibold text-[#53657d]">{label}</p><strong className={`mt-[4px] block truncate font-black tracking-[-0.03em] ${compact ? "text-[13px]" : "text-[17px]"} ${valueTone}`}>{value}</strong><p className={`mt-[10px] truncate text-[7px] font-semibold ${tone === "red" ? "text-red-500" : "text-emerald-600"}`}>{note}</p></div></article>;
+function Stat({ label, value, note, danger }: { label: string; value: string; note: string; danger?: boolean }) {
+  return <div className="min-w-0 border-r border-t border-[#edf0f4] px-[12px] py-[10px] first:border-t-0 sm:border-t-0"><p className="text-[6.5px] font-bold uppercase tracking-[.04em] text-[#758398]">{label}</p><strong className={`mt-[3px] block truncate text-[11px] ${danger ? "text-red-600" : "text-[#142842]"}`}>{value}</strong><span className="mt-[1px] block truncate text-[6.5px] text-[#7a899b]">{note}</span></div>;
 }
 
-function MonitorTable({ items, onOpen }: { items: MonitorItem[]; onOpen(item: MonitorItem): void }) {
-  return <div className="overflow-x-auto"><table className="w-full min-w-[760px] table-fixed text-left"><thead className="bg-[#f2f6fa] text-[6.5px] font-bold text-[#52647c]"><tr><th className="w-[30px] px-[12px] py-[8px]">#</th><th className="w-[145px]">Produk LFAMILIA</th><th className="w-[105px]">Nominal</th><th className="w-[95px]">SKU Digiflazz</th><th className="w-[100px]">Harga Modal</th><th className="w-[90px]">Status Seller</th><th className="w-[70px]">Sync</th><th className="w-[95px]">Aksi</th></tr></thead><tbody>{items.map((item, index) => <tr key={item.id} className="border-t border-[#e5eaf0] text-[7px] text-[#35475f]"><td className="px-[12px] py-[6px]">{index + 1}</td><td><div className="flex items-center gap-[7px]"><ProductMark code={item.code} /><strong className="truncate">{item.product}</strong></div></td><td>{item.nominal}</td><td className="font-semibold">{item.sku}</td><td>{item.cost ? formatRupiah(item.cost) : "Belum dicek"}</td><td><span className={`rounded-[4px] px-[8px] py-[4px] font-bold ${item.seller === "Normal" ? "bg-[#ddf8e8] text-[#15955a]" : item.seller === "Seller Off" ? "bg-[#ffe5e7] text-[#dd3347]" : "bg-[#fff0d8] text-[#e18a00]"}`}>{item.seller}</span></td><td><span className={`rounded-[4px] px-[8px] py-[4px] font-bold ${item.sync === "Auto" ? "bg-[#ddf8e8] text-[#15955a]" : "bg-[#e9f1ff] text-[#0875df]"}`}>{item.sync}</span></td><td><button type="button" onClick={() => onOpen(item)} className="h-[27px] rounded-[4px] border border-[#dce3eb] bg-white px-[11px] font-bold text-[#0875df]">Lihat</button></td></tr>)}{!items.length && <tr><td colSpan={8} className="py-[35px] text-center text-[8px] text-[#718198]">Tidak ada produk yang cocok.</td></tr>}</tbody></table></div>;
+function Status({ item }: { item: MonitorItem }) {
+  if (item.blockedByMaxPrice) return <span title={item.alertReason || undefined} className="inline-flex items-center gap-[4px] rounded-[4px] bg-red-50 px-[6px] py-[4px] font-bold text-red-600"><AlertTriangle className="size-[9px]" />Max Price</span>;
+  if (item.health === "critical") return <span title={item.alertReason || undefined} className="inline-flex items-center gap-[4px] rounded-[4px] bg-red-50 px-[6px] py-[4px] font-bold text-red-600"><AlertTriangle className="size-[9px]" />Kritis</span>;
+  if (item.health === "warning") return <span title={item.alertReason || undefined} className="inline-flex items-center gap-[4px] rounded-[4px] bg-amber-50 px-[6px] py-[4px] font-bold text-amber-700"><AlertTriangle className="size-[9px]" />Peringatan</span>;
+  if (item.health === "healthy") return <span className="inline-flex items-center gap-[4px] rounded-[4px] bg-emerald-50 px-[6px] py-[4px] font-bold text-emerald-700"><CheckCircle2 className="size-[9px]" />Normal</span>;
+  return <span className="rounded-[4px] bg-slate-100 px-[6px] py-[4px] font-bold text-slate-600">Belum Dicek</span>;
 }
 
-function TransactionTable({ transactions, total, page, pages, onPageChange, onOpen }: { transactions: string[][]; total: number; page: number; pages: number; onPageChange(value: number): void; onOpen(): void }) {
-  return <section className="mt-[12px] overflow-hidden rounded-[8px] border border-[#dfe6ef] bg-white shadow-[0_1px_4px_rgba(20,33,58,.04)]"><div className="flex items-start justify-between px-[14px] py-[11px]"><div><h2 className="text-[13px] font-extrabold">Transaksi Provider Terbaru</h2><p className="mt-[2px] text-[8px] text-[#687a91]">Riwayat transaksi terbaru melalui Digiflazz.</p></div><button type="button" onClick={onOpen} className="text-[7.5px] font-bold text-[#0875df]">Lihat Semua</button></div><div className="overflow-x-auto border-t border-[#e5eaf0]"><table className="w-full min-w-[850px] table-fixed text-left"><thead className="bg-[#f2f6fa] text-[6.5px] font-bold text-[#52647c]"><tr><th className="w-[30px] px-[12px] py-[8px]">#</th><th className="w-[145px]">Invoice LFAMILIA</th><th className="w-[105px]">SKU Digiflazz</th><th className="w-[130px]">Produk</th><th className="w-[120px]">Nominal</th><th className="w-[95px]">Status</th><th className="w-[145px]">Waktu</th><th>Response</th></tr></thead><tbody>{transactions.map((row, index) => <tr key={row[0]} className="border-t border-[#e5eaf0] text-[7px] text-[#35475f]"><td className="px-[12px] py-[7px]">{(page - 1) * 10 + index + 1}</td><td className="font-bold text-[#0875df]">{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td><TransactionStatus value={row[4]} /></td><td>{row[5]}</td><td>{row[6]}</td></tr>)}{!transactions.length && <tr><td colSpan={8} className="py-[26px] text-center text-[8px] text-[#718198]">Belum ada transaksi Digiflazz.</td></tr>}</tbody></table></div><footer className="flex h-[50px] items-center justify-between px-[14px] text-[7.5px] text-[#586a81]"><span>Menampilkan {total ? (page - 1) * 10 + 1 : 0}–{Math.min(page * 10, total)} dari {total} transaksi</span><Pagination page={page} pages={pages} onChange={onPageChange} /></footer></section>;
+function PricingDialog({ item, saving, onClose, onSubmit }: { item: MonitorItem; saving: boolean; onClose(): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
+  const [maxPrice, setMaxPrice] = useState(item.maxPrice ?? item.currentPrice ?? 1);
+  const [marginType, setMarginType] = useState<MarginType>(item.marginType);
+  const [marginValue, setMarginValue] = useState(item.marginValue);
+  const currentCost = item.currentPrice ?? 0;
+  const sale = currentCost > 0 ? calculateSale(currentCost, marginType, marginValue) : 0;
+  const blocked = currentCost > 0 && maxPrice > 0 && currentCost > maxPrice;
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#071426]/55 p-[20px]" role="dialog" aria-modal="true" aria-label="Atur Price Control LFAMILIA"><form onSubmit={onSubmit} className="w-full max-w-[520px] overflow-hidden rounded-[8px] bg-white shadow-2xl"><header className="flex items-start justify-between border-b border-[#e3e8ef] px-[15px] py-[12px]"><div><h2 className="text-[14px] font-black text-[#101d35]">Atur Price Control LFAMILIA</h2><p className="mt-[2px] text-[8px] text-[#6d7d92]">{item.brand} · {item.productName} · {item.packageLabel}</p></div><button type="button" onClick={onClose} className="grid size-[27px] place-items-center"><X className="size-[14px]" /></button></header><div className="p-[15px]"><div className="grid grid-cols-2 gap-[8px] rounded-[6px] border border-[#e0e7ef] bg-[#f8fafc] p-[10px]"><PriceInfo label="Harga Digiflazz sekarang" value={formatRupiah(item.currentPrice)} /><PriceInfo label="Harga Jual saat ini" value={formatRupiah(item.sellingPrice)} /></div><div className="mt-[12px] grid grid-cols-2 gap-[10px]"><label className="col-span-2 text-[8px] font-bold text-[#3e5068]">Max Price LFAMILIA<input name="maxPrice" type="number" min={1} required value={maxPrice} onChange={(event) => setMaxPrice(Number(event.target.value))} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /><small className="mt-[4px] block font-normal text-[#738296]">Jika harga Digiflazz melewati angka ini, SKU otomatis diblokir dari checkout/fulfillment.</small></label><label className="text-[8px] font-bold text-[#3e5068]">Tipe Margin<select name="marginType" value={marginType} onChange={(event) => setMarginType(event.target.value as MarginType)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="fixed">Rupiah</option><option value="percent">Persen</option></select></label><label className="text-[8px] font-bold text-[#3e5068]">Nilai Margin<input name="marginValue" type="number" min={0} required value={marginValue} onChange={(event) => setMarginValue(Number(event.target.value))} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label></div><div className={`mt-[12px] rounded-[5px] border px-[10px] py-[8px] text-[8px] ${blocked ? "border-red-200 bg-red-50 text-red-700" : "border-[#cfe4fa] bg-[#f0f7ff] text-[#355b7f]"}`}><strong>Preview:</strong> Harga jual = {formatRupiah(sale)}. {blocked ? "Harga provider saat ini sudah melewati Max Price; SKU akan diblokir." : "Max Price hanya batas pengaman, bukan dasar harga jual."}</div></div><footer className="flex justify-end gap-[8px] border-t border-[#e5e9ef] px-[15px] py-[11px]"><button type="button" onClick={onClose} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[13px] text-[8px] font-bold">Batal</button><button type="submit" disabled={saving} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Simpan Price Control"}</button></footer></form></div>;
 }
 
-function OperationDialog({ title, item, items, history, transactions, onClose }: { title: string; item?: MonitorItem; items: MonitorItem[]; history: string[][]; transactions: string[][]; onClose(): void }) {
-  const rows = title.includes("Transaksi") ? transactions.map((row) => `${row[0]} · ${row[2]} · ${row[4]}`) : title.includes("Riwayat") || title.includes("Log") ? history.map((row) => `${row[0]} · ${row[1]}`) : items.map((entry) => `${entry.product} · ${entry.nominal} · ${entry.sku} · ${entry.seller}`);
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#071426]/55 p-[24px]" role="dialog" aria-modal="true" aria-label={title}><section className="w-full max-w-[510px] overflow-hidden rounded-[9px] bg-white shadow-2xl"><header className="flex items-start justify-between border-b border-[#e4e9ef] px-[16px] py-[13px]"><div><h2 className="text-[14px] font-black">{title}</h2><p className="mt-[2px] text-[8px] text-[#6d7d92]">Data operasional terbaru dari backend LFAMILIA.</p></div><button type="button" onClick={onClose} className="grid size-[27px] place-items-center rounded-[4px] hover:bg-[#f2f5f8]"><X className="size-[14px]" /></button></header><div className="max-h-[420px] overflow-auto p-[16px]">{item ? <div className="grid grid-cols-2 gap-[9px]"><Detail label="Produk" value={item.product} /><Detail label="Nominal" value={item.nominal} /><Detail label="SKU Digiflazz" value={item.sku} /><Detail label="Harga Modal" value={item.cost ? formatRupiah(item.cost) : "Belum dicek"} /><Detail label="Status Seller" value={item.seller} /><Detail label="Keterangan" value={item.alertReason || "Normal"} /></div> : rows.length ? <div className="space-y-[6px]">{rows.map((row, index) => <div key={`${row}-${index}`} className="rounded-[5px] border border-[#e0e6ed] px-[10px] py-[8px] text-[8px] text-[#40516a]">{row}</div>)}</div> : <div className="rounded-[6px] border border-dashed border-[#cbd6e2] bg-[#f8fafc] px-[14px] py-[35px] text-center text-[9px] text-[#687a91]">Belum ada data untuk {title}.</div>}</div><footer className="flex justify-end border-t border-[#e4e9ef] bg-[#fafbfd] px-[16px] py-[11px]"><button type="button" onClick={onClose} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white">Selesai</button></footer></section></div>;
+function PriceInfo({ label, value }: { label: string; value: string }) {
+  return <div><p className="text-[7px] text-[#718196]">{label}</p><strong className="mt-[2px] block text-[10px] text-[#18324f]">{value}</strong></div>;
 }
-
-function QuickAction({ children, Icon, onClick, primary }: { children: ReactNode; Icon: LucideIcon; onClick(): void; primary?: boolean }) { return <button type="button" onClick={onClick} className={`inline-flex h-[37px] w-full items-center justify-center gap-[8px] rounded-[5px] border text-[9px] font-bold ${primary ? "border-[#0875ed] bg-[#0875ed] text-white" : "border-[#dce3eb] bg-white text-[#1f3550]"}`}><Icon className={`size-[15px] ${primary ? "" : "text-[#0875ed]"}`} />{children}</button>; }
-function FilterSelect({ value, onChange, options }: { value: string; onChange(value: string): void; options: string[] }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className="h-[32px] min-w-0 rounded-[4px] border border-[#dce3eb] bg-white px-[8px] text-[7.5px] font-semibold text-[#40516a] outline-none">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
-function Pagination({ page, pages, onChange }: { page: number; pages: number; onChange(value: number): void }) {
-  const start = pages <= 5 ? 1 : Math.min(Math.max(1, page - 2), pages - 4);
-  const numbers = Array.from({ length: Math.min(5, pages) }, (_, index) => start + index);
-  const buttonStyle = "grid size-[27px] place-items-center rounded-[4px] border border-[#dde4ec] bg-white text-[7.5px] font-bold text-[#52647b] disabled:cursor-not-allowed disabled:opacity-40";
-  return <nav className="flex items-center gap-[4px]" aria-label="Pagination"><button type="button" disabled={page <= 1} onClick={() => onChange(page - 1)} className={buttonStyle} aria-label="Halaman sebelumnya">‹</button>{numbers.map((number) => <button key={number} type="button" onClick={() => onChange(number)} aria-current={number === page ? "page" : undefined} className={`grid size-[27px] place-items-center rounded-[4px] border text-[7.5px] font-bold ${number === page ? "border-[#0875ed] bg-[#0875ed] text-white" : "border-[#dde4ec] bg-white text-[#52647b]"}`}>{number}</button>)}<button type="button" disabled={page >= pages} onClick={() => onChange(page + 1)} className={buttonStyle} aria-label="Halaman berikutnya">›</button></nav>;
-}
-function ProductMark({ code }: { code: string }) { const tones: Record<string,string> = { ML:"from-blue-600 to-amber-400", FF:"from-amber-500 to-orange-900", PUBG:"from-stone-800 to-amber-600", VAL:"from-slate-900 to-rose-500", GI:"from-blue-400 to-indigo-700", ST:"from-slate-800 to-sky-600", GP:"from-green-500 to-blue-500", RBX:"from-slate-700 to-slate-950" }; return <span className={`grid size-[25px] shrink-0 place-items-center rounded-[5px] bg-gradient-to-br ${tones[code] || "from-blue-500 to-indigo-700"} text-[5px] font-black text-white`}>{code}</span>; }
-function TransactionStatus({ value }: { value: string }) { const style = value === "Berhasil" ? "bg-[#ddf8e8] text-[#15955a]" : value === "Pending" ? "bg-[#fff0d8] text-[#df8900]" : "bg-[#ffe5e7] text-[#dd3347]"; return <span className={`inline-flex min-w-[61px] justify-center rounded-[4px] px-[7px] py-[4px] font-bold ${style}`}>{value}</span>; }
-function Detail({ label, value }: { label: string; value: string }) { return <div className="rounded-[5px] border border-[#e0e6ed] p-[10px]"><span className="block text-[7px] text-[#718198]">{label}</span><strong className="mt-[3px] block text-[9px]">{value}</strong></div>; }
-function displayProviderStatus(value: string) { return value === "success" ? "Berhasil" : value === "failed" ? "Gagal" : "Pending"; }
-function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(date); }
-function formatRupiah(value: number) { return `Rp ${new Intl.NumberFormat("id-ID").format(value)}`; }
