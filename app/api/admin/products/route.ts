@@ -19,6 +19,7 @@ const packageSchema = z.object({
   providerCode: z.enum(["digiflazz", "voucher-stock"]).optional(),
   providerSku: z.string().trim().max(100).optional(),
   supplierPrice: z.number().int().min(0).max(100_000_000).nullable().optional(),
+  providerMaxPrice: z.number().int().min(1).max(100_000_000).nullable().optional(),
   pricingMode: z.enum(["manual", "auto"]).default("auto"),
   marginType: z.enum(["fixed", "percent"]).default("fixed"),
   marginValue: z.number().int().min(0).max(1_000_000).default(0),
@@ -95,6 +96,9 @@ function validateProduct(input: ProductInput) {
     throw new Error("Nama tab nominal tidak boleh duplikat.");
   }
   for (const item of input.packages) {
+    if (item.providerCode === "digiflazz" && item.isActive && (!item.providerSku || !item.providerMaxPrice)) {
+      throw new Error("Nominal DigiFlazz aktif wajib memiliki SKU dan Max Price.");
+    }
     if (item.providerCode === "voucher-stock" && (!item.providerSku || !/^[a-z0-9][a-z0-9._:-]{1,99}$/.test(item.providerSku))) {
       throw new Error("Kunci stok internal hanya boleh berisi huruf kecil, angka, titik, garis, titik dua, atau underscore.");
     }
