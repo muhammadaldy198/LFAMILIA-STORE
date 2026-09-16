@@ -45,18 +45,30 @@ test("saving a product refreshes DigiFlazz seller snapshots from cached pricelis
   assert.doesNotMatch(route, /syncDigiflazzPrices/);
 });
 
-test("switching DigiFlazz development and production invalidates operational cache", () => {
+test("active DigiFlazz configuration changes are serialized against sync and checkout", () => {
   const route = read("app/api/admin/integrations/route.ts");
+  const guard = read("lib/server/digiflazz-config-guard.ts");
+  const migration = read("drizzle/0035_digiflazz_sync_guard.sql");
+
+  assert.match(route, /withDigiflazzConfigurationGuard/);
+  assert.match(route, /acquireDigiflazzConfigurationGuard/);
   assert.match(route, /invalidateDigiflazzOperationalCache/);
-  assert.match(route, /DELETE FROM digiflazz_pricelist_cache/);
-  assert.match(route, /DELETE FROM digiflazz_seller_monitor/);
-  assert.match(route, /last_success_at = NULL/);
-  assert.match(route, /before !== input\.selections\.digiflazzEnvironment/);
+  assert.match(route, /releaseDigiflazzConfigurationGuard/);
+  assert.match(guard, /digiflazz_runtime_state/);
+  assert.match(guard, /digiflazz_pricelist_sync_state/);
+  assert.match(guard, /payment_status = 'pending'/);
+  assert.match(guard, /fulfillment_status NOT IN \('success', 'failed', 'cancelled'\)/);
+  assert.match(guard, /DIGIFLAZZ_CONFIG_MAINTENANCE/);
+  assert.match(migration, /CREATE TRIGGER IF NOT EXISTS `digiflazz_order_maintenance_guard`/);
+  assert.doesNotMatch(route, /lock_token = NULL, locked_until = NULL, last_success_at = NULL/);
 });
 
-test("DigiFlazz transaction response is JSON-safe and correlated to LFAMILIA order", () => {
+test("DigiFlazz transaction response is JSON-safe and requires exact LFAMILIA correlation", () => {
   const provider = read("lib/server/providers/digiflazz.ts");
   assert.match(provider, /response\.json\(\)\.catch\(\(\) => null\)/);
-  assert.match(provider, /data\.ref_id && data\.ref_id !== order\.referenceId/);
-  assert.match(provider, /data\.buyer_sku_code && data\.buyer_sku_code !== order\.providerSku/);
+  assert.match(provider, /data\.ref_id !== order\.referenceId/);
+  assert.match(provider, /data\.buyer_sku_code !== order\.providerSku/);
+  assert.match(provider, /externalId: data\.ref_id/);
+  assert.doesNotMatch(provider, /data\.ref_id && data\.ref_id !== order\.referenceId/);
+  assert.doesNotMatch(provider, /data\.buyer_sku_code && data\.buyer_sku_code !== order\.providerSku/);
 });
