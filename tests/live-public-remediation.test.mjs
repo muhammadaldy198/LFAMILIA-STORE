@@ -42,7 +42,7 @@ test("completed D1 runtime repair exits through one batched preflight before leg
   assert.ok(fastPath >= 0, "missing completed-repair fast path");
   assert.ok(repairLoop > fastPath, "fast path must run before the expensive repair loop");
   assert.match(source, /await db\.batch\(\[/);
-  assert.match(source, /SELECT name FROM d1_migrations WHERE name = \? LIMIT 1/);
+  assert.match(source, /PRAGMA table_info\\(d1_migrations\\)/);
   assert.match(source, /package_tabs_enabled/);
   assert.match(source, /package_group/);
   assert.match(source, /support_widget_enabled/);
