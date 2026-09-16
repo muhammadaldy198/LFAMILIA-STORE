@@ -112,7 +112,10 @@ async function validateNicknameCheckoutContract(dbId: number, input: ProductInpu
   const gameCode = row?.nickname_game_code?.trim();
   if (!gameCode || !kokinpayGameRequiresServer(gameCode)) return;
 
-  const hasServerField = input.inputFields.some((field) => field.id.toLowerCase() === "server");
+  // Order normalization treats the second configured customer field as Server.
+  // Accept legacy ids such as `server-zone`, but require that second field to exist.
+  const serverField = input.inputFields[1];
+  const hasServerField = Boolean(serverField && serverField.required !== false);
   const hasServerTarget = /\{\{server\}\}/i.test(input.targetTemplate);
   if (!input.needsServer || !hasServerField || !hasServerTarget) {
     throw new Error("Produk dengan kode game nickname ini wajib memakai input ID + Server dan target {{server}}.");
