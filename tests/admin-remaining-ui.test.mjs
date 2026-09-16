@@ -29,10 +29,10 @@ test("KokinPay operational menu follows the shared admin workspace theme", () =>
   assert.match(kokinpay, /buttonClass/);
   assert.match(kokinpay, /primaryButtonClass/);
   assert.match(kokinpay, /Daftar Kode Game/);
-  assert.match(kokinpay, /check-nick-game/);
-  assert.match(kokinpay, /check-region-mlbb/);
-  assert.match(kokinpay, /check-nick-pln/);
-  assert.match(kokinpay, /Mobile Legends divalidasi dengan dua endpoint/);
+  assert.match(kokinpay, /\/v1\/check-nickname/);
+  assert.match(kokinpay, /\/v1\/check-region/);
+  assert.match(kokinpay, /\/v1\/check-pln/);
+  assert.match(kokinpay, /Mobile Legends divalidasi dengan dua endpoint API aktif/);
   assert.match(kokinpay, /api\.kokinpay\.com\/docs\/check-nick-game/);
   assert.match(kokinpay, /api\.kokinpay\.com\/docs\/check-region-mlbb/);
   assert.match(kokinpay, /api\.kokinpay\.com\/docs\/check-nick-pln/);
@@ -59,9 +59,9 @@ test("integration UI contains encrypted credentials, provider URLs, and keeps Ko
     "Digiflazz Webhook URL",
     "Konfigurasi KokinPay",
     "API Key KokinPay",
-    "/check-nick-game",
-    "/check-region-mlbb",
-    "/check-nick-pln",
+    "/v1/check-nickname",
+    "/v1/check-region",
+    "/v1/check-pln",
     "Client Secret",
     "Partner ID",
     "Relay Token",
@@ -74,7 +74,7 @@ test("integration UI contains encrypted credentials, provider URLs, and keeps Ko
   assert.ok(integration.includes("https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback"));
   assert.ok(ui.includes("navigator.clipboard.writeText"));
   assert.doesNotMatch(integration, /SwitchLine label="(?:Wajib|Tidak Wajib).*nickname/i);
-  assert.doesNotMatch(integration, /KOKINPAY_GAME_CODES|checkKokinpay|\/check-nickname|value="\/check-pln"/);
+  assert.doesNotMatch(integration, /KOKINPAY_GAME_CODES|checkKokinpay|value="\/check-nick-game"|value="\/check-region-mlbb"|value="\/check-nick-pln"/);
   assert.match(integration, /Pemeriksaan operasional berada di menu Validasi Akun/);
   assert.match(integration, /Periksa Konfigurasi Relay/);
   assert.doesNotMatch(integration, /Tes Relay Sekarang/);
