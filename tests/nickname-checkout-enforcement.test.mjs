@@ -24,14 +24,23 @@ test("both checkout routes verify account server-side and never trust browser ni
   }
 });
 
-test("Kokinpay lookup sends documented game_code, id, optional server and never exposes api_key to browsers", () => {
+test("KokinPay game lookup sends documented game_code, id, optional server and never exposes api_key to browsers", () => {
   const checker = read("lib/server/nickname-check.ts");
   const publicRoute = read("app/api/nickname/route.ts");
   assert.match(checker, /https:\/\/api\.kokinpay\.com/);
   assert.match(checker, /game_code: input\.gameCode/);
   assert.match(checker, /api_key: input\.apiKey/);
-  assert.match(checker, /check-nickname/);
+  assert.match(checker, /check-nick-game/);
+  assert.doesNotMatch(checker, /\/check-nickname/);
   assert.doesNotMatch(publicRoute, /KOKINPAY_API_KEY|api_key/);
+});
+
+test("KokinPay admin tools use the three documented endpoint paths", () => {
+  const route = read("app/api/admin/nickname-tools/route.ts");
+  assert.match(route, /check-region-mlbb/);
+  assert.match(route, /check-nick-pln/);
+  assert.match(route, /lookupKokinpayNickname/);
+  assert.doesNotMatch(route, /\"check-pln\"/);
 });
 
 test("public nickname response never exposes integration identity", () => {
