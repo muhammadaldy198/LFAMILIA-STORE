@@ -6,6 +6,8 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const pricing = read("lib/server/digiflazz-pricing.ts");
+const availability = read("lib/server/availability.ts");
+const provider = read("lib/server/providers/digiflazz.ts");
 const manager = read("components/admin-product-manager.tsx");
 const workspace = read("components/admin-digiflazz-workspace.tsx");
 
@@ -33,11 +35,21 @@ test("admin product import reads the last cached pricelist instead of calling Di
   assert.match(route, /getDigiflazzPriceListCacheMeta/);
 });
 
-test("LFAMILIA max price is a guard while sale price uses current provider cost", () => {
+test("LFAMILIA selling price uses configured Digiflazz Max Price plus margin", () => {
   assert.match(pricing, /const maxPrice = Number\(item\.provider_max_price\) > 0/);
-  assert.match(pricing, /const sellingPrice = sale\(Number\(sourceItem\.price\), item\.margin_type, item\.margin_value\)/);
-  assert.doesNotMatch(pricing, /sale\(maxPrice, item\.margin_type, item\.margin_value\)/);
+  assert.match(pricing, /const sellingPrice = sale\(maxPrice, item\.margin_type, item\.margin_value\)/);
+  assert.match(pricing, /const sellingPrice = Math\.max\(1, sale\(maxPrice, input\.marginType, marginValue\)\)/);
+  assert.doesNotMatch(pricing, /sale\(Number\(sourceItem\.price\), item\.margin_type, item\.margin_value\)/);
   assert.match(pricing, /provider_max_price = COALESCE\(provider_max_price, \?\)/);
+});
+
+test("Digiflazz dashboard owns the Max Price guard, not LFAMILIA fulfillment", () => {
+  assert.doesNotMatch(provider, /max_price\s*:/);
+  assert.doesNotMatch(provider, /Max Price DigiFlazz pada order tidak valid/);
+  assert.doesNotMatch(availability, /currentPrice\s*>\s*maxPrice/);
+  assert.doesNotMatch(availability, /provider_max_price/);
+  assert.doesNotMatch(workspace, /blockedByMaxPrice/);
+  assert.match(workspace, /Guard transaksi tetap dikelola oleh Digiflazz/);
 });
 
 test("Digiflazz workspace owns LFAMILIA max price and margin controls", () => {
@@ -47,9 +59,10 @@ test("Digiflazz workspace owns LFAMILIA max price and margin controls", () => {
   assert.match(route, /updateDigiflazzPackagePricing/);
   assert.match(proxy, /digiflazzPricing\.PUT/);
   assert.match(workspace, /Price Control LFAMILIA/);
-  assert.match(workspace, /Max Price LFAMILIA/);
+  assert.match(workspace, /Max Price Digiflazz/);
   assert.match(workspace, /Harga Digiflazz/);
   assert.match(workspace, /Harga Jual/);
+  assert.match(workspace, /Rumus: Max Price \+ margin/);
   assert.match(workspace, /method: "PUT"/);
 });
 
