@@ -14,7 +14,8 @@ test("product input endpoint derives checkout fields and provider target on the 
   assert.match(route, /id: "server"/);
   assert.match(route, /needsServer \? "\{\{destination\}\}\{\{server\}\}" : "\{\{destination\}\}"/);
   assert.match(route, /requireAdminSession\(request, "admin"\)/);
-  assert.doesNotMatch(route, /nicknameRequired|nicknameOptional/);
+  assert.match(route, /nicknameGameCode/);
+  assert.match(route, /nickname_game_code/);
 });
 
 test("panel exposes product-input and editor persists real values", () => {
@@ -22,5 +23,5 @@ test("panel exposes product-input and editor persists real values", () => {
   assert.match(manager, /fetch\(`\/api\/panel\/product-input\?slug=/);
   assert.match(manager, /fetch\("\/api\/panel\/product-input", \{/);
   assert.match(manager, /method: "PATCH"/);
-  assert.match(manager, /Checkout Type dan label input berhasil disimpan ke backend/);
+  assert.match(manager, /Pengaturan input dan kode game berhasil disimpan ke backend/);
 });
