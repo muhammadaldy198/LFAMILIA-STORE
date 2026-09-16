@@ -26,8 +26,17 @@ test("nickname requirement is configured per product and legacy enabled products
   assert.match(config, /if \(completed\?\.completed_at\) return/);
   assert.match(config, /WHEN 'mobile-legends' THEN 'mobile-legends'/);
   assert.match(config, /WHEN 'wild-rift' THEN 'league-of-legends-wild-rift'/);
+  assert.match(config, /WHERE slug = 'genshin-impact'[\s\S]*nickname_game_code = 'genshin-impact'/);
+  assert.match(config, /SET needs_server = 1/);
+  assert.match(config, /target_template = '\{\{destination\}\}\{\{server\}\}'/);
+  assert.match(config, /"id":"server","label":"Server"/);
+
   assert.match(migration, /UPDATE products/);
   assert.match(migration, /WHEN 'mobile-legends' THEN 'mobile-legends'/);
+  assert.match(migration, /WHERE slug = 'genshin-impact'[\s\S]*nickname_game_code = 'genshin-impact'/);
+  assert.match(migration, /SET needs_server = 1/);
+  assert.match(migration, /target_template = '\{\{destination\}\}\{\{server\}\}'/);
+  assert.match(migration, /"id":"server","label":"Server"/);
   assert.match(migration, /kokinpay_nickname_game_code_backfill_0032/);
 });
 
