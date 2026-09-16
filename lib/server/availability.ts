@@ -7,8 +7,6 @@ import {
 
 export type DigiflazzAvailabilityRow = {
   package_id: number;
-  current_price: number | null;
-  provider_max_price: number | null;
   buyer_product_status: number;
   seller_product_status: number;
   unlimited_stock: number;
@@ -43,9 +41,6 @@ export function isCutoffActive(
 }
 
 function digiflazzRowAvailable(row: DigiflazzAvailabilityRow, date = new Date()) {
-  const maxPrice = Number(row.provider_max_price);
-  const currentPrice = Number(row.current_price);
-  if (!Number.isInteger(maxPrice) || maxPrice < 1 || !Number.isFinite(currentPrice) || currentPrice > maxPrice) return false;
   return isDigiflazzSnapshotAvailable({
     buyerProductStatus: row.buyer_product_status,
     sellerProductStatus: row.seller_product_status,
@@ -61,11 +56,10 @@ export async function readDigiflazzPackageAvailability() {
   await ensureLegacyDatabaseColumns();
   const rows = await getD1()
     .prepare(
-      `SELECT m.package_id, m.current_price, p.provider_max_price,
+      `SELECT m.package_id,
         m.buyer_product_status, m.seller_product_status,
         m.unlimited_stock, m.stock, m.start_cut_off, m.end_cut_off
-       FROM digiflazz_seller_monitor m
-       JOIN product_packages p ON p.id = m.package_id`,
+       FROM digiflazz_seller_monitor m`,
     )
     .all<DigiflazzAvailabilityRow>();
   return new Map(rows.results.map((row) => [row.package_id, digiflazzRowAvailable(row)]));
@@ -93,21 +87,15 @@ export async function isAutomaticPackageAvailable(input: {
   if (input.providerCode === "digiflazz") {
     const row = await getD1()
       .prepare(
-        `SELECT m.package_id, m.current_price, p.provider_max_price,
+        `SELECT m.package_id,
           m.buyer_product_status, m.seller_product_status,
           m.unlimited_stock, m.stock, m.start_cut_off, m.end_cut_off
          FROM digiflazz_seller_monitor m
-         JOIN product_packages p ON p.id = m.package_id
          WHERE m.package_id = ? LIMIT 1`,
       )
       .bind(input.packageId)
       .first<DigiflazzAvailabilityRow>();
-    return row
-      ? digiflazzRowAvailable({
-          ...row,
-          provider_max_price: input.maxPrice ?? row.provider_max_price,
-        })
-      : false;
+    return row ? digiflazzRowAvailable(row) : false;
   }
   if (input.providerCode === "voucher-stock") {
     if (!input.providerSku) return false;
