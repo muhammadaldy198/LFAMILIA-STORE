@@ -67,7 +67,7 @@ async function checkPln(customerNumber: string) {
     if (response.status === 401 || response.status === 403) {
       throw new NicknameServiceError(message || "API Key KokinPay tidak valid atau tidak dapat digunakan.");
     }
-    if (response.status === 400 || response.status === 404 || payload.status === false) {
+    if (response.status === 400 || response.status === 404) {
       throw new NicknameValidationError(message || "Data PLN tidak ditemukan atau tidak valid.");
     }
     throw new NicknameServiceError(message || undefined);
