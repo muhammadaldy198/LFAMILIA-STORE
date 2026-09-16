@@ -1,5 +1,5 @@
 import { getD1 } from "@/db";
-import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
+import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 type RuntimeEnv = {
@@ -13,6 +13,7 @@ type KokinpayResponse = {
     nickname?: unknown;
     username?: unknown;
     region?: unknown;
+    country?: unknown;
   };
 };
 
@@ -43,6 +44,8 @@ export class NicknameServiceError extends Error {
 
 const KOKINPAY_API_ORIGIN = "https://api.kokinpay.com";
 const KOKINPAY_GAME_NICKNAME_PATH = "/check-nick-game";
+const KOKINPAY_MLBB_REGION_PATH = "/check-region-mlbb";
+const MLBB_GAME_CODE = "mobile-legends";
 
 function nonEmptyString(values: unknown[]) {
   return values.find(
@@ -73,29 +76,20 @@ function throwKokinpayError(status: number, data: KokinpayResponse): never {
   throw new NicknameServiceError(message || undefined);
 }
 
-/** Calls KokinPay's documented /check-nick-game endpoint. Never expose api_key to browsers. */
-export async function lookupKokinpayNickname(input: {
-  apiKey: string;
-  gameCode: string;
-  userId: string;
-  server?: string | null;
-}): Promise<NicknameVerification> {
-  const body: Record<string, string> = {
-    api_key: input.apiKey,
-    id: validateUserId(input.userId),
-    game_code: input.gameCode.trim(),
-  };
-  if (input.server?.trim()) body.server = input.server.trim();
-
+async function postKokinpay(
+  apiKey: string,
+  path: typeof KOKINPAY_GAME_NICKNAME_PATH | typeof KOKINPAY_MLBB_REGION_PATH,
+  body: Record<string, string>,
+) {
   let upstream: Response;
   try {
-    upstream = await fetch(`${KOKINPAY_API_ORIGIN}${KOKINPAY_GAME_NICKNAME_PATH}`, {
+    upstream = await fetch(`${KOKINPAY_API_ORIGIN}${path}`, {
       method: "POST",
       headers: {
         accept: "application/json",
         "content-type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ api_key: apiKey, ...body }),
       signal: AbortSignal.timeout(8_000),
     });
   } catch {
@@ -109,7 +103,58 @@ export async function lookupKokinpayNickname(input: {
     throw new NicknameServiceError();
   }
   if (!upstream.ok || data.status !== true) throwKokinpayError(upstream.status, data);
+  return data;
+}
 
+/**
+ * Calls KokinPay's documented game nickname endpoint. Mobile Legends is special:
+ * it must pass both /check-nick-game and /check-region-mlbb before checkout may continue.
+ * The API key is server-only and is never exposed to browsers.
+ */
+export async function lookupKokinpayNickname(input: {
+  apiKey: string;
+  gameCode: string;
+  userId: string;
+  server?: string | null;
+}): Promise<NicknameVerification> {
+  const gameCode = input.gameCode.trim();
+  const userId = validateUserId(input.userId);
+  const server = input.server?.trim() || undefined;
+
+  if (gameCode === MLBB_GAME_CODE && !server) {
+    throw new NicknameValidationError("Server / Zone ID wajib diisi untuk Mobile Legends.");
+  }
+
+  const nicknameRequest = postKokinpay(input.apiKey, KOKINPAY_GAME_NICKNAME_PATH, {
+    id: userId,
+    game_code: gameCode,
+    ...(server ? { server } : {}),
+  });
+
+  if (gameCode === MLBB_GAME_CODE) {
+    const [nicknameData, regionData] = await Promise.all([
+      nicknameRequest,
+      postKokinpay(input.apiKey, KOKINPAY_MLBB_REGION_PATH, {
+        id: userId,
+        server: server!,
+      }),
+    ]);
+    const nickname = nonEmptyString([nicknameData.data?.nickname, nicknameData.data?.username]);
+    if (!nickname) {
+      throw new NicknameServiceError(
+        "Layanan pengecekan tidak mengembalikan nickname Mobile Legends.",
+      );
+    }
+    const region = nonEmptyString([regionData.data?.region, regionData.data?.country]);
+    if (!region) {
+      throw new NicknameServiceError(
+        "Layanan pengecekan tidak mengembalikan region Mobile Legends.",
+      );
+    }
+    return { supported: true, nickname, country: region };
+  }
+
+  const data = await nicknameRequest;
   const nickname = nonEmptyString([data.data?.nickname, data.data?.username]);
   if (!nickname) {
     throw new NicknameServiceError(
@@ -119,7 +164,7 @@ export async function lookupKokinpayNickname(input: {
   return {
     supported: true,
     nickname,
-    country: nonEmptyString([data.data?.region]) ?? null,
+    country: nonEmptyString([data.data?.region, data.data?.country]) ?? null,
   };
 }
 
@@ -128,7 +173,7 @@ export async function verifyNicknameForCheckout(input: {
   userId: string;
   server?: string | null;
 }): Promise<NicknameVerification> {
-  await ensureLegacyDatabaseColumns();
+  await ensureKokinpayNicknameGameCodeBackfill();
   const product = await getD1()
     .prepare("SELECT nickname_game_code, needs_server FROM products WHERE slug = ? AND is_active = 1 LIMIT 1")
     .bind(input.productSlug.trim())
