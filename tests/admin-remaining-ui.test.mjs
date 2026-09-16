@@ -9,13 +9,32 @@ const payment = read("admin-payment-workspace.tsx");
 const customer = read("admin-customer-workspace.tsx");
 const balance = read("admin-balance-manager.tsx");
 const integration = read("admin-integration-workspace.tsx");
+const kokinpay = read("admin-kokinpay-workspace.tsx");
 const operations = read("admin-operations-workspaces.tsx");
 const ui = read("admin-workspace-ui.tsx");
 
 test("remaining admin menus use the new desktop workspaces", () => {
-  for (const component of ["AdminPaymentWorkspace", "AdminCustomerWorkspace", "AdminPromoWorkspace", "AdminSupportWorkspace", "AdminReportsWorkspace", "AdminTeamWorkspace", "AdminIntegrationWorkspace", "AdminSettingsWorkspace"]) {
+  for (const component of ["AdminPaymentWorkspace", "AdminCustomerWorkspace", "AdminPromoWorkspace", "AdminSupportWorkspace", "AdminReportsWorkspace", "AdminTeamWorkspace", "AdminIntegrationWorkspace", "AdminSettingsWorkspace", "AdminKokinpayWorkspace"]) {
     assert.ok(dashboard.includes(`<${component}`), `dashboard does not use ${component}`);
   }
+  assert.match(dashboard, /label: "Validasi Akun"/);
+  assert.match(dashboard, /value: "account-validation"/);
+});
+
+test("KokinPay operational menu follows the shared admin workspace theme", () => {
+  for (const sharedComponent of ["WorkspaceHeader", "Panel", "TabBar", "Field", "Status"]) {
+    assert.match(kokinpay, new RegExp(sharedComponent));
+  }
+  assert.match(kokinpay, /inputClass/);
+  assert.match(kokinpay, /buttonClass/);
+  assert.match(kokinpay, /primaryButtonClass/);
+  assert.match(kokinpay, /Daftar Kode Game/);
+  assert.match(kokinpay, /check-nick-game/);
+  assert.match(kokinpay, /check-region-mlbb/);
+  assert.match(kokinpay, /check-nick-pln/);
+  assert.match(kokinpay, /api\.kokinpay\.com\/docs\/check-nick-game/);
+  assert.match(kokinpay, /api\.kokinpay\.com\/docs\/check-region-mlbb/);
+  assert.match(kokinpay, /api\.kokinpay\.com\/docs\/check-nick-pln/);
 });
 
 test("dual-gateway payment UI includes channel controls and editable gateway-neutral payment page", () => {
@@ -64,6 +83,7 @@ test("promo, support, reports, team, and settings are fully represented", () => 
 test("all remaining workspaces use real panel APIs", () => {
   assert.match(integration, /fetch\("\/api\/panel\/integrations"/);
   assert.match(integration, /fetch\("\/api\/panel\/nickname-tools"/);
+  assert.match(kokinpay, /fetch\("\/api\/panel\/nickname-tools"/);
   assert.doesNotMatch(integration, /Simulasi tes|UI sementara/);
   for (const endpoint of ["payment-methods", "payment-page", "wallet", "media"]) assert.ok(payment.includes(`/api/panel/${endpoint}`), `payment does not use ${endpoint}`);
   assert.doesNotMatch(payment, /Simulasi UI|backend dikerjakan/);
