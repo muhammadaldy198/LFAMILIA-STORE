@@ -167,7 +167,7 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
     const voucherColumns = names(vouchers);
     const flashColumns = names(flash);
 
-    if (!productColumns.has("package_tabs_enabled") || !productColumns.has("package_tabs_json")) return false;
+    if (!productColumns.has("package_tabs_enabled") || !productColumns.has("package_tabs_json") || !productColumns.has("nickname_game_code")) return false;
     if (!packageColumns.has("package_group")) return false;
     if (!settingColumns.has("support_widget_enabled")) return false;
     if (!["delivery_mode", "supplier_cost_snapshot", "doku_environment"].every((column) => orderColumns.has(column))) return false;
