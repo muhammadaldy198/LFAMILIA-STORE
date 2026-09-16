@@ -17,6 +17,15 @@ export type ManagedPaymentChannel = PaymentChannel & {
   gatewayConfig: Record<string, string>;
 };
 
+export function calculateCustomerPaymentFee(amount: number, gatewayConfig?: Record<string, string>) {
+  const feeBps = Number(gatewayConfig?.customerFeeBps ?? 0);
+  if (!Number.isInteger(amount) || amount < 0) throw new Error("Nominal pembayaran tidak valid.");
+  if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 10_000) {
+    throw new Error("Konfigurasi biaya payment gateway tidak valid.");
+  }
+  return Math.ceil((amount * feeBps) / 10_000);
+}
+
 export type PaymentGatewaySetting = {
   gateway: PaymentGatewayName;
   isActive: boolean;
