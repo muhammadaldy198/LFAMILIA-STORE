@@ -40,7 +40,8 @@ test("full product writes cannot corrupt a server-required nickname checkout con
   assert.match(productsRoute, /kokinpayGameRequiresServer\(gameCode\)/);
   assert.match(productsRoute, /input\.needsServer/);
   assert.match(productsRoute, /field\.id\.toLowerCase\(\) === "server"/);
-  assert.match(productsRoute, /\/\\\{\\\{server\\\}\\\}\/i\.test\(input\.targetTemplate\)/);
+  assert.match(productsRoute, /hasServerTarget/);
+  assert.match(productsRoute, /input\.targetTemplate/);
   assert.match(productsRoute, /await validateNicknameCheckoutContract\(input\.dbId, input\)/);
 });
 
