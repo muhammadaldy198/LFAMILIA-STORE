@@ -10,6 +10,7 @@ import { queryMidtransSnapStatus } from "@/lib/server/midtrans-snap";
 import {
   fulfillAutomaticOrder,
   getOrderById,
+  reconcileProcessingDigiflazzOrder,
   type OrderRecord,
 } from "@/lib/server/orders";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
@@ -230,6 +231,7 @@ async function recoverPaidAutomaticFulfillment(order: OrderRecord) {
   if (order.fulfillment_status === "success" || order.fulfillment_status === "failed" || order.fulfillment_status === "cancelled") return order;
 
   await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
+  await reconcileProcessingDigiflazzOrder(order.id, getPublicBaseUrl());
   await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
     console.error("Notifikasi pesanan hasil recovery fulfillment gagal:", error),
   );
