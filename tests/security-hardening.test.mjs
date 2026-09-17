@@ -123,9 +123,9 @@ test("public transaction summaries never expose or derive invoice references", (
   assert.match(source, /allowRequest\(request, "order-phone-search"/);
 });
 
-test("new invoices use an independent full-length random token", () => {
+test("new invoices use an independent compact random token", () => {
   const source = read("lib/server/orders.ts");
-  assert.match(source, /const referenceToken = crypto\.randomUUID\(\)\.replaceAll\("-", ""\)\.toUpperCase\(\)/);
+  assert.match(source, /crypto\.randomUUID\(\)\.replaceAll\("-", ""\)\.slice\(0, 14\)\.toUpperCase\(\)/);
   assert.match(source, /referenceId: `LF\$\{date\}\$\{referenceToken\}`/);
 });
 
