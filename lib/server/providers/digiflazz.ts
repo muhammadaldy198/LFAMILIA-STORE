@@ -19,6 +19,8 @@ type DigiFlazzEnv = {
 type DigiFlazzBalanceResponse = {
   data?: {
     deposit?: number;
+    message?: string;
+    rc?: string;
   };
 };
 
@@ -34,6 +36,25 @@ type DigiFlazzResponse = {
     sn?: string;
   };
 };
+
+const DIGIFLAZZ_TRANSACTION_URL = "https://api.digiflazz.com/v1/transaction";
+
+function normalizedTransactionUrl(value: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("URL transaksi DigiFlazz tidak valid.");
+  }
+  if (
+    parsed.protocol !== "https:" ||
+    parsed.hostname !== "api.digiflazz.com" ||
+    parsed.pathname.replace(/\/+$/, "") !== "/v1/transaction"
+  ) {
+    throw new Error(`URL transaksi DigiFlazz wajib ${DIGIFLAZZ_TRANSACTION_URL}.`);
+  }
+  return DIGIFLAZZ_TRANSACTION_URL;
+}
 
 function runtimeConfig() {
   const runtime = getRuntimeEnv<DigiFlazzEnv>();
@@ -54,7 +75,7 @@ function runtimeConfig() {
       ? "DIGIFLAZZ_DEVELOPMENT_API_KEY"
       : "DIGIFLAZZ_PRODUCTION_API_KEY",
   );
-  const apiUrl = requireRuntimeValue(
+  const rawApiUrl = requireRuntimeValue(
     environment === "development"
       ? runtime.DIGIFLAZZ_DEVELOPMENT_API_URL
       : runtime.DIGIFLAZZ_PRODUCTION_API_URL,
@@ -62,6 +83,7 @@ function runtimeConfig() {
       ? "DIGIFLAZZ_DEVELOPMENT_API_URL"
       : "DIGIFLAZZ_PRODUCTION_API_URL",
   );
+  const apiUrl = normalizedTransactionUrl(rawApiUrl);
   return { environment, username, apiKey, apiUrl };
 }
 
@@ -86,6 +108,15 @@ let balanceCache: { value: number; checkedAt: number } | null = null;
 
 export function clearDigiflazzBalanceCache() {
   balanceCache = null;
+}
+
+function providerErrorMessage(
+  data: { rc?: string; message?: string } | undefined,
+  fallback: string,
+) {
+  const message = data?.message?.trim() || fallback;
+  const rc = data?.rc?.trim();
+  return rc ? `[RC ${rc}] ${message}` : message;
 }
 
 export async function getDigiflazzBalance() {
@@ -114,16 +145,22 @@ export async function getDigiflazzBalance() {
   const payload = (await response.json().catch(() => null)) as DigiFlazzBalanceResponse | null;
   const deposit = Number(payload?.data?.deposit);
   if (!response.ok || !Number.isFinite(deposit)) {
-    throw new Error("Saldo DigiFlazz tidak dapat dibaca.");
+    throw new Error(providerErrorMessage(payload?.data, `Saldo DigiFlazz tidak dapat dibaca (HTTP ${response.status}).`));
   }
   balanceCache = { value: deposit, checkedAt: Date.now() };
   return { balance: deposit, cached: false as const };
 }
 
-function mapStatus(value?: string): ProviderResult["status"] {
-  const status = value?.toLowerCase();
+function mapStatus(value?: string, rc?: string): ProviderResult["status"] {
+  const status = value?.trim().toLowerCase();
   if (status === "sukses") return "success";
   if (status === "gagal") return "failed";
+  if (status === "pending") return "processing";
+
+  const code = rc?.trim();
+  if (code === "00") return "success";
+  if (code === "03" || code === "99") return "processing";
+  if (code) return "failed";
   return "processing";
 }
 
@@ -133,6 +170,8 @@ export const digiflazzAdapter: ProviderAdapter = {
   async fulfill(order, publicBaseUrl) {
     const { environment, username, apiKey, apiUrl } = runtimeConfig();
     if (isAutomatedTestRuntime() && environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
+    if (!order.providerSku?.trim()) throw new Error("SKU DigiFlazz order kosong.");
+    if (!order.customerNo?.trim()) throw new Error("Customer No DigiFlazz order kosong.");
 
     const body = {
       username,
@@ -160,7 +199,12 @@ export const digiflazzAdapter: ProviderAdapter = {
     const payload = (await response.json().catch(() => null)) as DigiFlazzResponse | null;
     const data = payload?.data;
     if (!response.ok || !data) {
-      throw new Error("DigiFlazz tidak memberikan jawaban transaksi yang valid.");
+      throw new Error(
+        providerErrorMessage(
+          data,
+          `DigiFlazz tidak memberikan jawaban transaksi yang valid (HTTP ${response.status}).`,
+        ),
+      );
     }
     if (data.ref_id !== order.referenceId) {
       throw new Error("Ref ID jawaban DigiFlazz tidak cocok dengan order LFAMILIA.");
@@ -169,11 +213,14 @@ export const digiflazzAdapter: ProviderAdapter = {
       throw new Error("SKU jawaban DigiFlazz tidak cocok dengan order LFAMILIA.");
     }
 
+    const status = mapStatus(data.status, data.rc);
     return {
       externalId: data.ref_id,
-      status: mapStatus(data.status),
-      message:
-        data.message ?? `Status DigiFlazz: ${data.status ?? "tidak diketahui"}`,
+      status,
+      message: providerErrorMessage(
+        data,
+        `Status DigiFlazz: ${data.status ?? data.rc ?? "tidak diketahui"}`,
+      ),
       serialNumber: data.sn || null,
       raw: payload,
     };
