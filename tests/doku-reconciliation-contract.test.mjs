@@ -6,7 +6,7 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("DOKU reconciliation uses documented VA and e-wallet check status APIs", () => {
+test("DOKU Direct reconciliation uses documented VA and e-wallet check status APIs", () => {
   const status = read("lib/server/doku-status.ts");
   assert.match(status, /\/orders\/v1\.0\/transfer-va\/status/);
   assert.match(status, /\/orders\/v1\.0\/debit\/status/);
@@ -18,17 +18,44 @@ test("DOKU reconciliation uses documented VA and e-wallet check status APIs", ()
   assert.doesNotMatch(status, /\/query-va|\/query-ewallet|\/payment\/status\/lookup/);
 });
 
-test("scheduled reconciliation uses stored environment, throttles checks, validates amount, and expires pending records", () => {
+test("DOKU Checkout reconciliation uses official Non-SNAP Check Status by invoice", () => {
+  const checkout = read("lib/server/doku-checkout-status.ts");
+  assert.match(checkout, /\/orders\/v1\/status\/\$\{encodeURIComponent\(input\.referenceId\)\}/);
+  assert.match(checkout, /method: "GET"/);
+  assert.match(checkout, /Request-Target:/);
+  assert.doesNotMatch(checkout, /Digest:/);
+  assert.match(checkout, /transactionStatus === "SUCCESS"/);
+  assert.match(checkout, /ORDER_EXPIRED/);
+  assert.match(checkout, /FAILED\/TIMEOUT\/REDIRECT are not final/);
+});
+
+test("scheduled reconciliation keeps DOKU Checkout and Direct mode-aware, throttled, amount-safe, and terminal-safe", () => {
   const reconciliation = read("lib/server/doku-reconciliation.ts");
   const worker = read("worker/index.ts");
 
-  assert.match(reconciliation, /doku_environment IN \('sandbox', 'production'\)/);
+  assert.match(reconciliation, /payment_gateway_mode === "checkout"/);
+  assert.match(reconciliation, /payment_gateway_mode !== "direct"/);
+  assert.match(reconciliation, /COALESCE\(payment_gateway_environment, doku_environment\) IN \('sandbox', 'production'\)/);
   assert.match(reconciliation, /created_at <= datetime\('now', '-60 seconds'\)/);
-  assert.match(reconciliation, /doku_status_checked_at <= datetime\('now', '-60 seconds'\)/);
+  assert.match(reconciliation, /COALESCE\(gateway_status_checked_at, doku_status_checked_at\)/);
   assert.match(reconciliation, /query\.amount === order\.total/);
   assert.match(reconciliation, /applyDokuWalletTopup\(/);
   assert.match(reconciliation, /applyPendingDokuPaymentStatus\(order, "expired"\)/);
   assert.match(worker, /finalizeExpiredDokuPayments\(\)/);
+});
+
+test("DOKU public polling reconciles Checkout and Direct before local expiry", () => {
+  const publicStatus = read("app/api/orders/status/route.ts");
+  assert.match(publicStatus, /queryDokuCheckoutStatus/);
+  assert.match(publicStatus, /queryDokuQrisStatus/);
+  assert.match(publicStatus, /queryDokuVaStatus/);
+  assert.match(publicStatus, /queryDokuEwalletStatus/);
+  assert.match(publicStatus, /order = await refreshDokuStatus\(order\)/);
+  assert.match(publicStatus, /order = await expirePendingInvoice\(order\)/);
+  assert.ok(
+    publicStatus.indexOf("refreshDokuStatus(order)") < publicStatus.indexOf("expirePendingInvoice(order)"),
+    "provider reconciliation must happen before local expiry",
+  );
 });
 
 test("DOKU order status transitions are atomic and terminal-safe across callback, polling, and expiry", () => {
@@ -43,5 +70,5 @@ test("DOKU order status transitions are atomic and terminal-safe across callback
   assert.match(publicStatus, /applyPendingDokuPaymentStatus\(order, "paid"\)/);
   assert.match(publicStatus, /applyPendingDokuPaymentStatus\(order, "expired"\)/);
   assert.match(reconciliation, /applyPendingDokuPaymentStatus\(order, "paid"\)/);
-  assert.match(reconciliation, /applyPendingDokuPaymentStatus\(order, "failed"\)/);
+  assert.match(reconciliation, /applyPendingDokuPaymentStatus\(order, query\.status\)/);
 });
