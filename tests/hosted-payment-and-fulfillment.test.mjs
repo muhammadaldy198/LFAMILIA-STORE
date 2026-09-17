@@ -25,8 +25,10 @@ test("hosted status polling is fast and paid fulfillment remains server-side", (
 
 test("customer invoice code is compact while preserving a database uniqueness guard", () => {
   const orders = read("lib/server/orders.ts");
+  const status = read("app/api/orders/status/route.ts");
   assert.match(orders, /slice\(0, 14\)/);
   assert.match(orders, /referenceId: `LF\$\{date\}\$\{referenceToken\}`/);
+  assert.match(status, /\[A-F0-9\]\{14\}/);
   const schema = read("db/schema.ts");
   assert.match(schema, /orders_reference_id_unique/);
 });
