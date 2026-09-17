@@ -105,9 +105,14 @@ export async function POST(request: Request) {
         : input.paymentChannel;
     const managedChannel = await getPaymentChannel(input.paymentMethod, paymentChannel, false);
     const { walletTopupGateway } = await getActivePaymentModes();
+    const topupGatewayConfig = managedChannel
+      ? managedChannel.gateway === walletTopupGateway
+        ? managedChannel.gatewayConfig
+        : { customerFeeBps: managedChannel.gatewayConfig.customerFeeBps ?? "0" }
+      : {};
     if (
       !managedChannel ||
-      !isGatewayChannelSupported(walletTopupGateway, input.paymentMethod, paymentChannel, managedChannel.gatewayConfig) ||
+      !isGatewayChannelSupported(walletTopupGateway, input.paymentMethod, paymentChannel, topupGatewayConfig) ||
       !(await isPaymentGatewayActive(walletTopupGateway))
     ) {
       throw new Error("Metode pembayaran ini belum didukung atau gateway top up sedang dinonaktifkan.");
@@ -117,12 +122,12 @@ export async function POST(request: Request) {
       gateway: walletTopupGateway,
       paymentMethod: input.paymentMethod,
       paymentChannel,
-      gatewayConfig: managedChannel.gatewayConfig,
+      gatewayConfig: topupGatewayConfig,
     });
     if (!readiness.ready) throw new Error("Gateway top up saldo yang dipilih Admin belum siap.");
 
     const paymentMethodKey = `${input.paymentMethod}:${paymentChannel}`;
-    const paymentFee = calculateCustomerPaymentFee(input.amount, managedChannel.gatewayConfig);
+    const paymentFee = calculateCustomerPaymentFee(input.amount, topupGatewayConfig);
     const paymentTotal = input.amount + paymentFee;
     requestedAmount = input.amount;
     requestedPaymentMethodKey = paymentMethodKey;
@@ -176,7 +181,7 @@ export async function POST(request: Request) {
       amount: paymentTotal,
       paymentMethod: input.paymentMethod,
       paymentChannel,
-      gatewayConfig: managedChannel.gatewayConfig,
+      gatewayConfig: topupGatewayConfig,
       buyerName: customer.name,
       buyerPhone: customer.phone,
       buyerEmail: customer.email,
