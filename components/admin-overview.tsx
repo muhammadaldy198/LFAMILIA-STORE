@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  ArrowUp,
   BarChart3,
   Boxes,
   CalendarDays,
@@ -27,29 +26,60 @@ import {
 
 type Summary = {
   canViewFinance: boolean;
-  todayMetrics: { paidRevenue: number | null; totalOrders: number; pendingPayments: number; failedOrders: number; activeProducts: number };
+  todayMetrics: {
+    paidRevenue: number | null;
+    totalOrders: number;
+    pendingPayments: number;
+    failedOrders: number;
+    activeProducts: number;
+  };
   metrics: { customers: number; fulfilledOrders: number };
   chart: Array<{ day: string; orders: number; revenue: number | null }>;
   recentActivities: Array<{ id: string; action: string; target: string; createdAt: string }>;
-  recentOrders: Array<{ id: string; referenceId: string; buyerName: string; productName: string; packageLabel: string; paymentChannel: string; paymentStatus: string; fulfillmentStatus: string; total: number | null; createdAt: string }>;
+  recentOrders: Array<{
+    id: string;
+    referenceId: string;
+    buyerName: string;
+    productName: string;
+    packageLabel: string;
+    paymentChannel: string;
+    paymentStatus: string;
+    fulfillmentStatus: string;
+    total: number | null;
+    createdAt: string;
+  }>;
   topProducts: Array<{ slug: string; name: string; fulfilledOrders: number }>;
-  integrations: { doku: { ready: boolean }; digiflazz: { ready: boolean; balance: number | null; lastSyncAt: string | null }; webhook: { ready: boolean } };
+  integrations: {
+    doku: { ready: boolean };
+    digiflazz: { ready: boolean; balance: number | null; lastSyncAt: string | null };
+    webhook: { ready: boolean };
+  };
+};
+
+type DashboardIntegration = {
+  id: string;
+  name: string;
+  ready: boolean;
+  active: boolean;
+  environment: string | null;
+  status: string;
 };
 
 type AdminRole = "super_admin" | "admin" | "staff";
 const roleRank = { staff: 0, admin: 1, super_admin: 2 } as const;
+
 const featureCards = [
   { title: "Pesanan", Icon: FileText, target: "orders", minimumRole: "staff", items: ["Kelola pesanan & invoice", "Update status pesanan", "Callback log & notifikasi", "Proses manual / refund"] },
-  { title: "Produk", Icon: Boxes, target: "products", minimumRole: "admin", items: ["Kategori game & layanan", "SKU provider (Digiflazz)", "Atur harga & margin", "Jenis pengiriman", "Kelola produk voucher"] },
+  { title: "Produk", Icon: Boxes, target: "products", minimumRole: "admin", items: ["Kategori game & layanan", "SKU provider", "Struktur nominal", "Jenis pengiriman", "Kelola produk voucher"] },
   { title: "Banner & Konten", Icon: ImageIcon, target: "content", minimumRole: "staff", items: ["Kelola banner utama", "Pop-up informasi", "Berita & pengumuman", "Ulasan pelanggan", "Halaman FAQ"] },
-  { title: "Digiflazz", Icon: Link2, target: "digiflazz", minimumRole: "admin", items: ["Sinkronisasi pricelist", "Mapping SKU produk", "Cek & kelola saldo", "Monitor gangguan layanan", "Log API & history"] },
-  { title: "Pembayaran (DOKU)", Icon: CreditCard, target: "payments", minimumRole: "admin", items: ["Terima pembayaran QRIS", "Virtual Account (VA)", "E-Wallet (DANA, ShopeePay)", "Callback otomatis", "Settlement & log transaksi"] },
+  { title: "Digiflazz", Icon: Link2, target: "digiflazz", minimumRole: "admin", items: ["Sinkronisasi pricelist", "Price Control", "Mapping SKU produk", "Monitor layanan", "Log API & history"] },
+  { title: "Pembayaran", Icon: CreditCard, target: "payments", minimumRole: "admin", items: ["DOKU Checkout / Direct", "Midtrans Snap / BI-SNAP", "QRIS / VA / E-Wallet", "Callback otomatis", "Routing metode aktif"] },
   { title: "Pelanggan", Icon: Users, target: "customers", minimumRole: "admin", items: ["Data pelanggan", "Wallet & saldo", "Riwayat transaksi", "Status akun pelanggan"] },
   { title: "Promo", Icon: Sparkles, target: "promotions", minimumRole: "admin", items: ["Kode voucher", "Diskon checkout", "Promo member", "Event promo khusus"] },
   { title: "Layanan Pelanggan", Icon: Headphones, target: "support", minimumRole: "staff", items: ["Sistem tiket", "Status tiket pelanggan", "Prioritas penanganan", "Lampiran bukti transaksi"] },
   { title: "Laporan", Icon: BarChart3, target: "reports", minimumRole: "admin", items: ["Laporan penjualan", "Laporan profit", "Produk terlaris", "Riwayat transaksi", "Filter periode lengkap"] },
   { title: "Staff & Admin Akses", Icon: UserCog, target: "team", minimumRole: "super_admin", items: ["Role Super Admin", "Role Admin & Staff", "Akses sesuai role", "Log aktivitas admin"] },
-  { title: "Pengaturan", Icon: Settings, target: "settings", minimumRole: "super_admin", items: ["Profil toko & kontak", "Logo & favicon", "Integrasi layanan", "Pengaturan keamanan", "Notifikasi sistem"] },
+  { title: "Pengaturan", Icon: Settings, target: "settings", minimumRole: "super_admin", items: ["Profil toko & kontak", "Logo & favicon", "Pengaturan keamanan", "Notifikasi sistem"] },
 ];
 
 export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigate?: (value: string) => void }) {
@@ -59,6 +89,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
   const [now, setNow] = useState<Date | null>(null);
   const [range, setRange] = useState("7d");
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [integrationItems, setIntegrationItems] = useState<DashboardIntegration[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -73,16 +104,56 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
   useEffect(() => {
     const controller = new AbortController();
     fetch(`/api/panel/summary?range=${range}`, { cache: "no-store", signal: controller.signal })
-      .then(async (response) => { const payload = await response.json() as Summary & { error?: string }; if (!response.ok) throw new Error(payload.error || "Dashboard gagal dimuat."); setSummary(payload); setError(""); })
-      .catch((reason) => { if (!(reason instanceof DOMException && reason.name === "AbortError")) setError(reason instanceof Error ? reason.message : "Dashboard gagal dimuat."); });
+      .then(async (response) => {
+        const payload = await response.json() as Summary & { error?: string };
+        if (!response.ok) throw new Error(payload.error || "Dashboard gagal dimuat.");
+        setSummary(payload);
+        setError("");
+      })
+      .catch((reason) => {
+        if (!(reason instanceof DOMException && reason.name === "AbortError")) {
+          setError(reason instanceof Error ? reason.message : "Dashboard gagal dimuat.");
+        }
+      });
     return () => controller.abort();
   }, [range]);
 
+  useEffect(() => {
+    if (isStaff) {
+      setIntegrationItems([]);
+      return;
+    }
+    const controller = new AbortController();
+    fetch("/api/panel/dashboard-integrations", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json() as { items?: DashboardIntegration[]; error?: string };
+        if (!response.ok) throw new Error(payload.error || "Status integrasi gagal dimuat.");
+        setIntegrationItems(payload.items ?? []);
+      })
+      .catch((reason) => {
+        if (!(reason instanceof DOMException && reason.name === "AbortError")) {
+          setIntegrationItems([]);
+        }
+      });
+    return () => controller.abort();
+  }, [isStaff]);
+
   const canViewFinance = summary?.canViewFinance === true;
-  const sales = summary?.chart.map((point) => ({ day: new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short" }).format(new Date(point.day)), revenue: Number(point.revenue || 0), orders: point.orders })) || [];
-  const activities = (summary?.recentActivities.length ? summary.recentActivities.map((item) => ({ tone: "purple", title: item.action, detail: item.target, time: relativeTime(item.createdAt), Icon: UserCog })) : summary?.recentOrders.map((item) => ({ tone: item.paymentStatus === "paid" ? "green" : "blue", title: item.paymentStatus === "paid" ? "Pembayaran berhasil" : "Pesanan diperbarui", detail: `${item.referenceId} - ${item.productName}`, time: relativeTime(item.createdAt), Icon: item.paymentStatus === "paid" ? CheckCircle2 : ShoppingCart })) || []).slice(0, 5);
-  const orders = summary?.recentOrders.slice(0, 4).map((item) => ({ invoice: item.referenceId, customer: item.buyerName, product: `${item.productName} ${item.packageLabel}`, payment: item.paymentChannel, total: money(item.total), status: item.fulfillmentStatus === "success" ? "Berhasil" : item.paymentStatus === "failed" || item.fulfillmentStatus === "failed" ? "Gagal" : item.paymentStatus === "paid" ? "Diproses" : "Pending" })) || [];
-  const products = summary?.topProducts.map((item) => [item.name, String(item.fulfilledOrders)] as const) || [];
+  const sales = summary?.chart.map((point) => ({
+    day: new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short" }).format(new Date(point.day)),
+    revenue: Number(point.revenue || 0),
+    orders: point.orders,
+  })) || [];
+  const activities = (summary?.recentActivities.length
+    ? summary.recentActivities.map((item) => ({ title: item.action, detail: item.target, time: relativeTime(item.createdAt) }))
+    : summary?.recentOrders.map((item) => ({
+        title: item.paymentStatus === "paid" ? "Pembayaran berhasil" : "Pesanan diperbarui",
+        detail: `${item.referenceId} - ${item.productName}`,
+        time: relativeTime(item.createdAt),
+      })) || []).slice(0, 5);
+  const orders = summary?.recentOrders.slice(0, 4) || [];
+  const products = summary?.topProducts || [];
+  const allIntegrationReady = integrationItems.length > 0 && integrationItems.filter((item) => item.active).every((item) => item.ready);
 
   return (
     <div className="admin-dashboard-reference space-y-3.5">
@@ -101,47 +172,43 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
       </section>
 
       <section className={`grid gap-3 ${isStaff ? "grid-cols-2" : canExpectFinance ? "grid-cols-5" : "grid-cols-3"}`}>
-        {canViewFinance && <MetricCard Icon={WalletCards} label="Omzet Hari Ini" value={money(summary?.todayMetrics.paidRevenue)} delta="Live" note="dari transaksi dibayar" />}
-        <MetricCard Icon={ShoppingCart} label="Pesanan Hari Ini" value={String(summary?.todayMetrics.totalOrders || 0)} delta="Live" note="pesanan tercatat" />
-        {!isStaff && <MetricCard Icon={Boxes} label="Produk Aktif" value={String(summary?.todayMetrics.activeProducts || 0)} delta="Live" note="tersedia di toko" neutral />}
-        {canViewFinance && <MetricCard Icon={CircleDollarSign} label="Saldo Digiflazz" value={money(summary?.integrations.digiflazz.balance)} delta={summary?.integrations.digiflazz.ready ? "Online" : "Periksa"} note="status provider" />}
-        <MetricCard Icon={CheckCircle2} label="Pembayaran Berhasil" value={String(summary?.metrics.fulfilledOrders || 0)} delta="Live" note="periode dipilih" success />
+        {canViewFinance && <MetricCard Icon={WalletCards} label="Omzet Hari Ini" value={money(summary?.todayMetrics.paidRevenue)} note="transaksi dibayar" />}
+        <MetricCard Icon={ShoppingCart} label="Pesanan Hari Ini" value={String(summary?.todayMetrics.totalOrders || 0)} note="pesanan tercatat" />
+        {!isStaff && <MetricCard Icon={Boxes} label="Produk Aktif" value={String(summary?.todayMetrics.activeProducts || 0)} note="tersedia di toko" />}
+        {canViewFinance && <MetricCard Icon={CircleDollarSign} label="Saldo Digiflazz" value={money(summary?.integrations.digiflazz.balance)} note={summary?.integrations.digiflazz.ready ? "provider online" : "perlu diperiksa"} />}
+        <MetricCard Icon={CheckCircle2} label="Pembayaran Berhasil" value={String(summary?.metrics.fulfilledOrders || 0)} note="periode dipilih" />
       </section>
 
       {error && <button type="button" onClick={() => setError("")} className="w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-[9px] text-red-700">{error}</button>}
 
-      <section className="grid grid-cols-[1.25fr_1fr_0.94fr] gap-3">
-        {canViewFinance && <Panel className="min-h-[282px]">
+      <section className={`grid gap-3 ${canViewFinance ? "grid-cols-[1.25fr_1fr_1fr]" : "grid-cols-[1fr_1fr]"}`}>
+        {canViewFinance && <Panel>
           <PanelHeader title="Grafik Penjualan">
-            <label className="relative"><select value={range} onChange={(event) => setRange(event.target.value)} className="h-7 appearance-none rounded-md border border-[#e0e5ec] bg-white pl-2.5 pr-7 text-[8px] font-semibold text-[#607089]"><option value="today">Hari Ini</option><option value="7d">7 Hari Terakhir</option><option value="30d">30 Hari Terakhir</option><option value="90d">90 Hari Terakhir</option></select><ChevronDown className="pointer-events-none absolute right-2 top-2 size-3" /></label>
+            <label className="relative">
+              <select value={range} onChange={(event) => setRange(event.target.value)} className="h-7 appearance-none rounded-md border border-[#e0e5ec] bg-white pl-2.5 pr-7 text-[8px] font-semibold text-[#607089]">
+                <option value="today">Hari Ini</option><option value="7d">7 Hari Terakhir</option><option value="30d">30 Hari Terakhir</option><option value="90d">90 Hari Terakhir</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-2 size-3" />
+            </label>
           </PanelHeader>
-          <div className="px-4 pt-3">
-            <div className="flex gap-5 text-[8px] text-[#607089]">
-              <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-[#1769e8]" />Omzet (Rp)</span>
-              <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-[#8cc7ff]" />Jumlah Pesanan</span>
-            </div>
-          </div>
           <SalesBars sales={sales} />
         </Panel>}
 
-        <Panel className="min-h-[282px]">
+        <Panel>
           <PanelHeader title="Aktivitas Terbaru"><button type="button" onClick={() => onNavigate?.(role === "super_admin" ? "team" : "orders")} className="text-[8px] font-bold text-[#1769e8]">Lihat Semua</button></PanelHeader>
-          <div className="relative px-4 py-2">
-            <span className="absolute bottom-5 left-[27px] top-6 w-px bg-[#dbe3ed]" />
-            {activities.map((activity) => <ActivityRow key={activity.title} {...activity} />)}
+          <div className="divide-y divide-[#edf0f4] px-4 py-2">
+            {activities.length ? activities.map((activity, index) => <div key={`${activity.title}-${index}`} className="flex items-center gap-3 py-2.5"><span className="grid size-7 place-items-center rounded-full bg-violet-50 text-violet-600"><UserCog className="size-3.5" /></span><div className="min-w-0 flex-1"><p className="truncate text-[8px] font-bold text-[#26354e]">{activity.title}</p><p className="mt-0.5 truncate text-[7px] text-[#7b899d]">{activity.detail}</p></div><span className="shrink-0 text-[7px] text-[#8794a6]">{activity.time}</span></div>) : <EmptyState text="Belum ada aktivitas." />}
           </div>
         </Panel>
 
-        {!isStaff && <Panel className="min-h-[282px]">
+        {!isStaff && <Panel>
           <PanelHeader title="Status Integrasi">{role === "super_admin" && <button type="button" onClick={() => onNavigate?.("integrations")} className="flex items-center gap-1.5 text-[8px] font-semibold text-[#1769e8]"><CheckCircle2 className="size-3" />Lihat Integrasi</button>}</PanelHeader>
-          <div className="space-y-2 px-4 py-3">
-            <IntegrationRow letter="D" name="Digiflazz API" ready={Boolean(summary?.integrations.digiflazz.ready)} />
-            <IntegrationRow letter="DO" name="DOKU Direct API" ready={Boolean(summary?.integrations.doku.ready)} red />
-            <dl className="space-y-2 border-t border-[#edf0f4] pt-2 text-[8px]">
+          <div className="max-h-[360px] space-y-1.5 overflow-y-auto px-3 py-3">
+            {integrationItems.length ? integrationItems.map((item) => <IntegrationRow key={item.id} item={item} />) : <EmptyState text="Status integrasi belum dapat dimuat." />}
+            <dl className="mt-2 space-y-2 border-t border-[#edf0f4] pt-2 text-[8px]">
               <StatusLine label="Terakhir Sinkronisasi" value={summary?.integrations.digiflazz.lastSyncAt ? relativeTime(summary.integrations.digiflazz.lastSyncAt) : "Belum ada"} />
-              <StatusLine label="Status Webhook" value={summary?.integrations.webhook.ready ? "Aktif" : "Belum siap"} dot={Boolean(summary?.integrations.webhook.ready)} />
-              <StatusLine label="Respon API" value={summary?.integrations.doku.ready && summary?.integrations.digiflazz.ready ? "Normal" : "Perlu konfigurasi"} dot={Boolean(summary?.integrations.doku.ready && summary?.integrations.digiflazz.ready)} />
-              <StatusLine label="Data" value="Live" dot />
+              <StatusLine label="Webhook" value={summary?.integrations.webhook.ready ? "Aktif" : "Belum siap"} good={Boolean(summary?.integrations.webhook.ready)} />
+              <StatusLine label="Integrasi Aktif" value={allIntegrationReady ? "Normal" : "Periksa konfigurasi"} good={allIntegrationReady} />
             </dl>
           </div>
         </Panel>}
@@ -150,32 +217,18 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
       <section className={`grid gap-3 ${isStaff ? "grid-cols-2" : "grid-cols-5"}`}>
         {visibleFeatureCards.slice(0, 5).map((item) => <FeatureCard key={item.title} {...item} onNavigate={onNavigate} />)}
       </section>
-
-      <section className="grid grid-cols-6 gap-3">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         {visibleFeatureCards.slice(5).map((item) => <FeatureCard key={item.title} {...item} onNavigate={onNavigate} />)}
       </section>
 
-      <section className="grid grid-cols-[minmax(0,2.5fr)_minmax(250px,1fr)] gap-3">
+      <section className={`grid gap-3 ${isStaff ? "grid-cols-1" : "grid-cols-[minmax(0,2.5fr)_minmax(250px,1fr)]"}`}>
         <Panel>
           <PanelHeader title="Pesanan Terbaru"><button type="button" onClick={() => onNavigate?.("orders")} className="text-[8px] font-bold text-[#1769e8]">Lihat Semua Pesanan</button></PanelHeader>
-          <div className="overflow-hidden">
-            <table className="w-full table-fixed text-left">
-              <thead className="bg-[#fafbfd] text-[7px] font-semibold text-[#75839a]">
-                <tr><th className="w-7 px-3 py-2">#</th><th className="w-[18%] px-2 py-2">Invoice</th><th className="w-[18%] px-2 py-2">Pelanggan</th><th className="px-2 py-2">Produk</th><th className="w-[15%] px-2 py-2">Pembayaran</th>{canViewFinance && <th className="w-[11%] px-2 py-2">Total</th>}<th className="w-[10%] px-2 py-2">Status</th><th className="w-[8%] px-2 py-2">Aksi</th></tr>
-              </thead>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] table-fixed text-left">
+              <thead className="bg-[#fafbfd] text-[7px] font-semibold text-[#75839a]"><tr><th className="w-7 px-3 py-2">#</th><th className="w-[18%] px-2 py-2">Invoice</th><th className="w-[18%] px-2 py-2">Pelanggan</th><th className="px-2 py-2">Produk</th><th className="w-[15%] px-2 py-2">Pembayaran</th>{canViewFinance && <th className="w-[13%] px-2 py-2">Total</th>}<th className="w-[10%] px-2 py-2">Status</th></tr></thead>
               <tbody className="divide-y divide-[#edf0f4] text-[8px] text-[#40506a]">
-                {orders.map((order, index) => (
-                  <tr key={order.invoice} className="hover:bg-[#fafcff]">
-                    <td className="px-3 py-2.5">{index + 1}</td>
-                    <td className="truncate px-2 py-2.5 font-semibold text-[#1769e8]">{order.invoice}</td>
-                    <td className="truncate px-2 py-2.5">{order.customer}</td>
-                    <td className="truncate px-2 py-2.5 font-medium text-[#25344d]">{order.product}</td>
-                    <td className="truncate px-2 py-2.5">● {order.payment}</td>
-                    {canViewFinance && <td className="px-2 py-2.5">{order.total}</td>}
-                    <td className="px-2 py-2.5"><StatusBadge value={order.status} /></td>
-                    <td className="px-2 py-2.5"><button type="button" onClick={() => onNavigate?.("orders")} className="rounded bg-[#eaf3ff] px-2 py-1 font-semibold text-[#1769e8]">Lihat</button></td>
-                  </tr>
-                ))}
+                {orders.map((order, index) => <tr key={order.id || order.referenceId}><td className="px-3 py-2.5">{index + 1}</td><td className="truncate px-2 py-2.5 font-semibold text-[#1769e8]">{order.referenceId}</td><td className="truncate px-2 py-2.5">{order.buyerName}</td><td className="truncate px-2 py-2.5">{order.productName} {order.packageLabel}</td><td className="truncate px-2 py-2.5">{order.paymentChannel}</td>{canViewFinance && <td className="px-2 py-2.5">{money(order.total)}</td>}<td className="px-2 py-2.5"><StatusBadge value={order.fulfillmentStatus === "success" ? "Berhasil" : order.paymentStatus === "failed" || order.fulfillmentStatus === "failed" ? "Gagal" : order.paymentStatus === "paid" ? "Diproses" : "Pending"} /></td></tr>)}
               </tbody>
             </table>
           </div>
@@ -184,14 +237,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
         {!isStaff && <Panel>
           <PanelHeader title="Produk Populer"><button type="button" onClick={() => onNavigate?.("products")} className="text-[8px] font-bold text-[#1769e8]">Lihat Semua</button></PanelHeader>
           <div className="divide-y divide-[#edf0f4] px-3">
-            {products.map(([name, amount], index) => (
-              <div key={name} className="flex items-center gap-2.5 py-2">
-                <span className="grid size-4 place-items-center rounded-full bg-[#f0f4f9] text-[7px] font-semibold text-[#65748a]">{index + 1}</span>
-                <span className="grid size-7 place-items-center rounded-md bg-gradient-to-br from-[#213954] to-[#0e1727] text-[7px] font-black text-white">{name.slice(0, 2).toUpperCase()}</span>
-                <div className="min-w-0 flex-1"><p className="truncate text-[8px] font-bold text-[#2b3951]">{name}</p><p className="mt-0.5 text-[7px] text-[#8996a8]">Paling banyak dibeli</p></div>
-                <span className="text-[8px] font-black text-[#26364f]">{amount}</span>
-              </div>
-            ))}
+            {products.length ? products.map((item, index) => <div key={item.slug || item.name} className="flex items-center gap-2.5 py-2.5"><span className="grid size-5 place-items-center rounded-full bg-[#f0f4f9] text-[7px] font-semibold text-[#65748a]">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-[8px] font-bold text-[#2b3951]">{item.name}</p><p className="text-[7px] text-[#8996a8]">Paling banyak dibeli</p></div><strong className="text-[8px] text-[#26364f]">{item.fulfilledOrders}</strong></div>) : <EmptyState text="Belum ada data produk." />}
           </div>
         </Panel>}
       </section>
@@ -199,22 +245,12 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
   );
 }
 
-function MetricCard({ Icon, label, value, delta, note, neutral = false, success = false }: { Icon: LucideIcon; label: string; value: string; delta: string; note: string; neutral?: boolean; success?: boolean }) {
-  return (
-    <div className="rounded-lg border border-[#e1e6ed] bg-white p-3 shadow-[0_2px_9px_rgba(15,23,42,0.035)]">
-      <div className="flex gap-3">
-        <span className={"grid size-10 shrink-0 place-items-center rounded-lg " + (success ? "bg-emerald-50 text-emerald-600" : "bg-[#edf4ff] text-[#1769e8]")}><Icon className="size-5" /></span>
-        <div className="min-w-0"><p className="truncate text-[8px] font-semibold text-[#64738b]">{label}</p><p className="mt-1 truncate text-[17px] font-black tracking-[-0.03em] text-[#0f1e38]">{value}</p></div>
-      </div>
-      <div className={"mt-3 flex items-center justify-center gap-2 text-[7px] " + (neutral ? "text-[#7c899c]" : "text-emerald-600")}>
-        {!neutral && <ArrowUp className="size-2.5" strokeWidth={3} />}<strong>{delta}</strong><span className="text-[#7c899c]">{note}</span>
-      </div>
-    </div>
-  );
+function MetricCard({ Icon, label, value, note }: { Icon: LucideIcon; label: string; value: string; note: string }) {
+  return <div className="rounded-lg border border-[#e1e6ed] bg-white p-3 shadow-[0_2px_9px_rgba(15,23,42,0.035)]"><div className="flex gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-lg bg-[#edf4ff] text-[#1769e8]"><Icon className="size-5" /></span><div className="min-w-0"><p className="truncate text-[8px] font-semibold text-[#64738b]">{label}</p><p className="mt-1 truncate text-[17px] font-black tracking-[-0.03em] text-[#0f1e38]">{value}</p></div></div><p className="mt-3 text-center text-[7px] text-[#7c899c]">{note}</p></div>;
 }
 
-function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <section className={"overflow-hidden rounded-lg border border-[#e1e6ed] bg-white shadow-[0_2px_9px_rgba(15,23,42,0.03)] " + className}>{children}</section>;
+function Panel({ children }: { children: React.ReactNode }) {
+  return <section className="overflow-hidden rounded-lg border border-[#e1e6ed] bg-white shadow-[0_2px_9px_rgba(15,23,42,0.03)]">{children}</section>;
 }
 
 function PanelHeader({ title, children }: { title: string; children?: React.ReactNode }) {
@@ -224,69 +260,43 @@ function PanelHeader({ title, children }: { title: string; children?: React.Reac
 function SalesBars({ sales }: { sales: Array<{ day: string; revenue: number; orders: number }> }) {
   const maxRevenue = Math.max(1, ...sales.map((point) => point.revenue));
   const maxOrders = Math.max(1, ...sales.map((point) => point.orders));
-  return (
-    <div className="grid h-[216px] grid-cols-[34px_1fr] gap-2 px-4 pb-3 pt-2">
-      <div className="flex flex-col justify-between pb-6 text-right text-[7px] text-[#7b899d]"><span>2M</span><span>1,5M</span><span>1M</span><span>500K</span><span>0</span></div>
-      <div className="relative border-b border-l border-[#dfe5ed]">
-        {[0, 25, 50, 75].map((top) => <span key={top} className="absolute left-0 right-0 border-t border-[#edf0f4]" style={{ top: `${top}%` }} />)}
-        <div className="absolute inset-0 flex items-end justify-around px-2 pb-6">
-          {sales.map((point) => (
-            <div key={point.day} className="flex h-full flex-1 items-end justify-center gap-1">
-              <span className="w-[12px] rounded-t-sm bg-[#1769e8]" style={{ height: `${Math.max(5, point.revenue / maxRevenue * 100)}%` }} />
-              <span className="w-[12px] rounded-t-sm bg-[#8cc7ff]" style={{ height: `${Math.max(5, point.orders / maxOrders * 100)}%` }} />
-              <span className="absolute bottom-1 text-[7px] text-[#66758b]">{point.day}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="flex h-[240px] items-end gap-2 px-4 pb-4 pt-8">{sales.map((point) => <div key={point.day} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1"><div className="flex h-[180px] w-full items-end justify-center gap-1"><span className="w-[12px] rounded-t-sm bg-[#1769e8]" style={{ height: `${Math.max(4, point.revenue / maxRevenue * 100)}%` }} /><span className="w-[12px] rounded-t-sm bg-[#8cc7ff]" style={{ height: `${Math.max(4, point.orders / maxOrders * 100)}%` }} /></div><span className="truncate text-[7px] text-[#66758b]">{point.day}</span></div>)}</div>;
 }
 
-function ActivityRow({ tone, title, detail, time, Icon }: { tone: string; title: string; detail: string; time: string; Icon: LucideIcon }) {
-  const colors: Record<string, string> = { blue: "bg-blue-50 text-blue-600", green: "bg-emerald-50 text-emerald-600", purple: "bg-violet-50 text-violet-600", orange: "bg-orange-50 text-orange-600" };
-  return (
-    <div className="relative z-10 flex items-center gap-3 py-2">
-      <span className={"grid size-7 shrink-0 place-items-center rounded-full ring-4 ring-white " + colors[tone]}><Icon className="size-3.5" /></span>
-      <div className="min-w-0 flex-1"><p className="truncate text-[8px] font-bold text-[#26354e]">{title}</p><p className="mt-0.5 truncate text-[7px] text-[#7b899d]">{detail}</p></div>
-      <span className="shrink-0 text-[7px] text-[#8794a6]">{time}</span>
-    </div>
-  );
+function IntegrationRow({ item }: { item: DashboardIntegration }) {
+  const initials = item.id === "digiflazz" ? "D" : item.id === "kokinpay" ? "K" : item.id.startsWith("doku") ? "DO" : "M";
+  const tone = item.id.startsWith("doku") ? "bg-[#e5232d]" : item.id.startsWith("midtrans") ? "bg-[#1f7ae0]" : item.id === "kokinpay" ? "bg-violet-600" : "bg-[#1769e8]";
+  return <div className="flex items-center gap-3 rounded-md border border-[#e7ebf0] bg-[#fbfcfe] px-3 py-2"><span className={`grid size-8 shrink-0 place-items-center rounded-md text-[12px] font-black text-white ${tone}`}>{initials}</span><div className="min-w-0 flex-1"><p className="truncate text-[9px] font-bold text-[#26354e]">{item.name}</p><p className={`mt-0.5 truncate text-[7px] font-semibold ${item.ready ? item.active ? "text-emerald-600" : "text-slate-500" : "text-amber-600"}`}>{item.status}</p></div><span className={`shrink-0 rounded-md px-2 py-1 text-[7px] font-semibold ${item.ready ? item.active ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-600" : "bg-amber-50 text-amber-600"}`}>{item.ready ? item.active ? "Online" : "Standby" : "Periksa"}</span></div>;
 }
 
-function IntegrationRow({ letter, name, ready, red = false }: { letter: string; name: string; ready: boolean; red?: boolean }) {
-  return (
-    <div className="flex items-center gap-3 rounded-md border border-[#e7ebf0] bg-[#fbfcfe] px-3 py-2">
-      <span className={"grid size-8 place-items-center rounded-md text-[15px] font-black text-white " + (red ? "bg-[#e5232d]" : "bg-[#1769e8]")}>{letter}</span>
-      <div className="min-w-0 flex-1"><p className="truncate text-[9px] font-bold text-[#26354e]">{name}</p><p className={`mt-0.5 text-[7px] font-semibold ${ready ? "text-emerald-600" : "text-amber-600"}`}>{ready ? "Terhubung" : "Perlu konfigurasi"}</p></div>
-      <span className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[7px] font-semibold ${ready ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}><i className={`size-1.5 rounded-full ${ready ? "bg-emerald-500" : "bg-amber-500"}`} />{ready ? "Online" : "Periksa"}</span>
-    </div>
-  );
-}
-
-function StatusLine({ label, value, dot = false }: { label: string; value: string; dot?: boolean }) {
-  return <div className="flex items-center justify-between"><dt className="text-[#78869a]">{label}</dt><dd className="flex items-center gap-1.5 font-semibold text-[#4d5c72]">{dot && <i className="size-1.5 rounded-full bg-emerald-500" />}{value}</dd></div>;
+function StatusLine({ label, value, good = false }: { label: string; value: string; good?: boolean }) {
+  return <div className="flex items-center justify-between"><dt className="text-[#78869a]">{label}</dt><dd className="flex items-center gap-1.5 font-semibold text-[#4d5c72]">{good && <i className="size-1.5 rounded-full bg-emerald-500" />}{value}</dd></div>;
 }
 
 function FeatureCard({ title, Icon, target, items, onNavigate }: { title: string; Icon: LucideIcon; target: string; items: string[]; onNavigate?: (value: string) => void }) {
-  return (
-    <button type="button" onClick={() => onNavigate?.(target)} className="min-h-[155px] rounded-lg border border-[#e1e6ed] bg-white p-3 text-left shadow-[0_2px_9px_rgba(15,23,42,0.03)] transition hover:-translate-y-0.5 hover:border-[#cdd9e8] hover:shadow-[0_8px_20px_rgba(15,23,42,0.07)]">
-      <div className="mb-2.5 flex items-center gap-2.5"><span className="grid size-7 place-items-center rounded-md bg-[#edf4ff] text-[#1769e8]"><Icon className="size-4" /></span><h3 className="min-w-0 flex-1 truncate text-[9px] font-extrabold text-[#273650]">{title}</h3><ChevronRight className="size-3.5 text-[#64758d]" /></div>
-      <ul className="space-y-1.5">
-        {items.map((item) => <li key={item} className="flex items-center gap-1.5 text-[7px] leading-3 text-[#607089]"><Check className="size-2.5 shrink-0 text-emerald-500" strokeWidth={3} />{item}</li>)}
-      </ul>
-    </button>
-  );
+  return <button type="button" onClick={() => onNavigate?.(target)} className="min-h-[155px] rounded-lg border border-[#e1e6ed] bg-white p-3 text-left shadow-[0_2px_9px_rgba(15,23,42,0.03)] transition hover:border-[#cdd9e8]"><div className="mb-2.5 flex items-center gap-2.5"><span className="grid size-7 place-items-center rounded-md bg-[#edf4ff] text-[#1769e8]"><Icon className="size-4" /></span><h3 className="min-w-0 flex-1 truncate text-[9px] font-extrabold text-[#273650]">{title}</h3><ChevronRight className="size-3.5 text-[#64758d]" /></div><ul className="space-y-1.5">{items.map((item) => <li key={item} className="flex items-center gap-1.5 text-[7px] leading-3 text-[#607089]"><Check className="size-2.5 shrink-0 text-emerald-500" strokeWidth={3} />{item}</li>)}</ul></button>;
+}
+
+function EmptyState({ text }: { text: string }) {
+  return <div className="px-3 py-6 text-center text-[8px] text-[#8794a6]">{text}</div>;
 }
 
 function StatusBadge({ value }: { value: string }) {
   const success = value === "Berhasil";
   const failed = value === "Gagal";
-  return <span className={"rounded-md px-2 py-1 text-[7px] font-semibold " + (success ? "bg-emerald-50 text-emerald-600" : failed ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600")}>{value}</span>;
+  return <span className={`rounded-md px-2 py-1 text-[7px] font-semibold ${success ? "bg-emerald-50 text-emerald-600" : failed ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"}`}>{value}</span>;
 }
 
-function money(value: number | null | undefined) { return value == null ? "-" : new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value); }
-function relativeTime(value: string) { const time = new Date(value).getTime(); if (!Number.isFinite(time)) return value || "-"; const minutes = Math.max(0, Math.floor((Date.now() - time) / 60_000)); return minutes < 1 ? "baru saja" : minutes < 60 ? `${minutes} menit lalu` : minutes < 1_440 ? `${Math.floor(minutes / 60)} jam lalu` : `${Math.floor(minutes / 1_440)} hari lalu`; }
+function money(value: number | null | undefined) {
+  return value == null ? "-" : new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
+}
+
+function relativeTime(value: string) {
+  const time = new Date(value).getTime();
+  if (!Number.isFinite(time)) return value || "-";
+  const minutes = Math.max(0, Math.floor((Date.now() - time) / 60_000));
+  return minutes < 1 ? "baru saja" : minutes < 60 ? `${minutes} menit lalu` : minutes < 1_440 ? `${Math.floor(minutes / 60)} jam lalu` : `${Math.floor(minutes / 1_440)} hari lalu`;
+}
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(date);
