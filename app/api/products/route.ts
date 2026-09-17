@@ -45,7 +45,13 @@ export async function GET() {
         packageTabsEnabled: item.packageTabsEnabled,
         packageTabs: item.packageTabs,
         notices: item.notices,
-        packages: item.packages.map((pkg) => {
+        packages: [...item.packages]
+          .sort((left, right) =>
+            left.price - right.price ||
+            left.sortOrder - right.sortOrder ||
+            left.label.localeCompare(right.label, "id-ID", { numeric: true, sensitivity: "base" }),
+          )
+          .map((pkg) => {
           const fulfillmentMode = item.fulfillmentType === "manual"
             ? "manual"
             : pkg.providerCode === "voucher-stock"
