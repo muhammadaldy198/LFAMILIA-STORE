@@ -11,8 +11,9 @@ import {
   type PaymentGatewayName,
 } from "@/lib/server/payment-channels";
 import { isAllowedMediaUrl } from "@/lib/media-url";
-import { getDokuCheckoutReadiness } from "@/lib/server/doku-checkout";
+import { isDokuChannelSupported } from "@/lib/server/doku";
 import { getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
+import { getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
 
 const gatewayConfigSchema = z.record(
   z.string().trim().min(1).max(60),
@@ -49,15 +50,23 @@ function validateChannel(input: z.infer<typeof channelSchema>) {
     throw new Error("Biaya customer harus berupa basis poin antara 0 sampai 10000.");
   }
   if (!input.isActive) return;
-  if (!isGatewayChannelSupported(input.gateway, input.method, input.channel, input.gatewayConfig)) {
-    throw new Error("Isi kode gateway resmi untuk channel custom, atau pilih channel bawaan yang didukung provider.");
+  const supported = input.gateway === "doku"
+    ? isDokuChannelSupported(input.method, input.channel)
+    : isGatewayChannelSupported(input.gateway, input.method, input.channel, input.gatewayConfig);
+  if (!supported) {
+    throw new Error(input.gateway === "doku"
+      ? "Channel ini belum didukung DOKU Direct API."
+      : "Isi kode gateway resmi untuk channel custom, atau pilih channel bawaan yang didukung provider.");
   }
 }
 
 async function gatewayReadiness() {
-  const [doku, midtrans] = await Promise.all([getDokuCheckoutReadiness(), getMidtransSnapReadiness()]);
+  const [doku, midtrans] = await Promise.all([
+    getConfiguredGatewayReadiness({ gateway: "doku", paymentMethod: "qris", paymentChannel: "qris" }),
+    getMidtransSnapReadiness(),
+  ]);
   return {
-    doku: { ...doku, mode: "checkout" as const },
+    doku: { ...doku, mode: "direct" as const },
     midtrans: { ...midtrans, mode: "snap" as const, relayReady: true },
   };
 }
