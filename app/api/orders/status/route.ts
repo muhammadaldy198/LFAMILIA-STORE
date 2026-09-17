@@ -2,17 +2,20 @@ import { z } from "zod";
 import { getD1 } from "@/db";
 import { publicPaymentLabel } from "@/lib/public-payment";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
+import { queryDokuQrisStatus } from "@/lib/server/doku";
 import { queryDokuCheckoutStatus } from "@/lib/server/doku-checkout-status";
+import { queryDokuEwalletStatus, queryDokuVaStatus } from "@/lib/server/doku-status";
 import { applyPendingExternalPaymentStatus } from "@/lib/server/payment-transition";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
 import { externalArtifactsFromOrder, recordExternalPaymentEvent } from "@/lib/server/external-payments";
 import { queryMidtransSnapStatus } from "@/lib/server/midtrans-snap";
+import { hydrateDokuDirectRuntimeEnv } from "@/lib/server/payment-mode-config";
 import {
   fulfillAutomaticOrder,
   getOrderById,
   type OrderRecord,
 } from "@/lib/server/orders";
-import { getPublicBaseUrl } from "@/lib/server/runtime-env";
+import { getPublicBaseUrl, getRuntimeEnv, setRuntimeEnv } from "@/lib/server/runtime-env";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 
@@ -24,10 +27,7 @@ const publicReference = /^LF(?:[A-F0-9]{8}|[A-F0-9]{12})$/;
 
 const schema = z.object({
   referenceId: z.string().trim().toUpperCase().refine(
-    (value) =>
-      legacyReference.test(value) ||
-      compactReference.test(value) ||
-      publicReference.test(value),
+    (value) => legacyReference.test(value) || compactReference.test(value) || publicReference.test(value),
     "Format invoice tidak valid.",
   ),
 });
@@ -45,14 +45,12 @@ async function resolveOrder(referenceId: string) {
     .bind(referenceId)
     .first<OrderRecord>();
   if (exact) return exact;
-
   if (publicReference.test(referenceId)) {
     const token = referenceId.slice(2);
     return db.prepare("SELECT * FROM orders WHERE reference_id LIKE ? LIMIT 1")
       .bind(`%-${token}`)
       .first<OrderRecord>();
   }
-
   return null;
 }
 
@@ -99,7 +97,8 @@ function shouldQueryDoku(order: OrderRecord) {
   return artifacts.gateway === "doku" &&
     order.payment_status === "pending" &&
     Boolean(metadata.environment) &&
-    artifacts.mode === "checkout" && dueForGatewayCheck(order, 3_000);
+    (artifacts.mode === "direct" || artifacts.mode === "checkout") &&
+    dueForGatewayCheck(order, 3_000);
 }
 
 function shouldQueryMidtransSnap(order: OrderRecord) {
@@ -114,8 +113,7 @@ function shouldQueryMidtransSnap(order: OrderRecord) {
 
 async function markGatewayStatusChecked(referenceId: string) {
   await getD1().prepare(
-    `UPDATE orders
-     SET gateway_status_checked_at = CURRENT_TIMESTAMP
+    `UPDATE orders SET gateway_status_checked_at = CURRENT_TIMESTAMP
      WHERE reference_id = ? AND payment_status = 'pending'`,
   ).bind(referenceId).run();
 }
@@ -134,9 +132,13 @@ async function expirePendingInvoice(order: OrderRecord) {
   if (!artifacts.expiredAt) return order;
   const expiresAt = Date.parse(artifacts.expiredAt);
   if (!Number.isFinite(expiresAt) || expiresAt > Date.now()) return order;
-
   await applyPendingExternalPaymentStatus(order, "expired");
   return (await getOrderById(order.id)) ?? order;
+}
+
+async function prepareDokuRuntime() {
+  const current = getRuntimeEnv<Record<string, unknown>>();
+  setRuntimeEnv(await hydrateDokuDirectRuntimeEnv(current));
 }
 
 async function queryDokuOrderStatus(order: OrderRecord) {
@@ -144,8 +146,33 @@ async function queryDokuOrderStatus(order: OrderRecord) {
   const { environment } = gatewayMetadata(order);
   if (!environment) return null;
 
-  if (artifacts.mode !== "checkout") return null;
-  return queryDokuCheckoutStatus({ referenceId: order.reference_id, environment });
+  if (artifacts.mode === "checkout") {
+    return queryDokuCheckoutStatus({ referenceId: order.reference_id, environment });
+  }
+  if (artifacts.mode !== "direct") return null;
+
+  await prepareDokuRuntime();
+  if (order.payment_method === "qris" && artifacts.referenceNo) {
+    return queryDokuQrisStatus({ referenceId: order.reference_id, referenceNo: artifacts.referenceNo });
+  }
+  if (order.payment_method === "va" && artifacts.paymentNo) {
+    return queryDokuVaStatus({
+      environment,
+      channel: order.payment_channel,
+      paymentNo: artifacts.paymentNo,
+      referenceId: order.reference_id,
+    });
+  }
+  if (order.payment_method === "ewallet" && artifacts.requestId) {
+    return queryDokuEwalletStatus({
+      environment,
+      referenceId: order.reference_id,
+      requestId: artifacts.requestId,
+      referenceNo: artifacts.referenceNo,
+      amount: order.total,
+    });
+  }
+  return null;
 }
 
 async function refreshDokuStatus(order: OrderRecord) {
@@ -174,8 +201,8 @@ async function refreshDokuStatus(order: OrderRecord) {
           console.error("Notifikasi pesanan DOKU hasil rekonsiliasi gagal:", error),
         );
       }
-    } else if (query.status === "expired") {
-      await applyPendingExternalPaymentStatus(order, "expired");
+    } else if (query.status === "failed" || query.status === "expired") {
+      await applyPendingExternalPaymentStatus(order, query.status);
     }
 
     return (await getOrderById(order.id)) ?? order;
@@ -188,13 +215,9 @@ async function refreshMidtransSnapStatus(order: OrderRecord) {
   if (!shouldQueryMidtransSnap(order)) return order;
   const { environment } = gatewayMetadata(order);
   if (!environment) return order;
-
   try {
     await markGatewayStatusChecked(order.reference_id);
-    const query = await queryMidtransSnapStatus({
-      orderId: order.reference_id,
-      environment,
-    });
+    const query = await queryMidtransSnapStatus({ orderId: order.reference_id, environment });
     const eventSuffix = query.transactionId || order.reference_id;
     await recordExternalPaymentEvent({
       orderId: order.id,
@@ -203,22 +226,16 @@ async function refreshMidtransSnapStatus(order: OrderRecord) {
       status: query.status,
       payload: query.raw,
     });
-
     if (query.status === "paid") {
-      if (!Number.isFinite(query.amount) || query.amount !== order.total) {
-        return (await getOrderById(order.id)) ?? order;
-      }
+      if (!Number.isFinite(query.amount) || query.amount !== order.total) return (await getOrderById(order.id)) ?? order;
       const firstPaid = await applyPendingExternalPaymentStatus(order, "paid");
       if (firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
-        await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
-          console.error("Notifikasi pesanan Midtrans hasil rekonsiliasi gagal:", error),
-        );
+        await notifyOrderFulfillmentSuccessById(order.id).catch((error) => console.error("Notifikasi pesanan Midtrans hasil rekonsiliasi gagal:", error));
       }
     } else if (query.status === "failed" || query.status === "expired") {
       await applyPendingExternalPaymentStatus(order, query.status);
     }
-
     return (await getOrderById(order.id)) ?? order;
   } catch {
     return (await getOrderById(order.id)) ?? order;
@@ -228,27 +245,20 @@ async function refreshMidtransSnapStatus(order: OrderRecord) {
 async function recoverPaidAutomaticFulfillment(order: OrderRecord) {
   if (order.payment_status !== "paid" || order.fulfillment_type !== "automatic") return order;
   if (order.fulfillment_status === "success" || order.fulfillment_status === "failed" || order.fulfillment_status === "cancelled") return order;
-
   await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
-  await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
-    console.error("Notifikasi pesanan hasil recovery fulfillment gagal:", error),
-  );
+  await notifyOrderFulfillmentSuccessById(order.id).catch((error) => console.error("Notifikasi pesanan hasil recovery fulfillment gagal:", error));
   return (await getOrderById(order.id)) ?? order;
 }
 
 export async function POST(request: Request) {
   const originBlock = rejectCrossOriginMutation(request);
   if (originBlock) return originBlock;
-  // Payment page polls every 3 seconds. Keep enough headroom for automatic polling
-  // plus manual refresh without allowing unbounded public status reads.
   const rate = await allowRequest(request, "order-status", 240, 600);
   if (!rate.allowed) return Response.json({ error: "Terlalu banyak pengecekan transaksi. Coba lagi beberapa menit." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   try {
     const { referenceId } = schema.parse(await request.json());
     let order = await resolveOrder(referenceId);
-    if (!order) {
-      return Response.json({ error: "Invoice tidak ditemukan." }, { status: 404 });
-    }
+    if (!order) return Response.json({ error: "Invoice tidak ditemukan." }, { status: 404 });
 
     order = await refreshDokuStatus(order);
     order = await refreshMidtransSnapStatus(order);
@@ -266,11 +276,7 @@ export async function POST(request: Request) {
 
     const events = [
       { source: "system", status: "created", createdAt: order.created_at },
-      ...eventsResult.results.map((event) => ({
-        source: publicEventSource(event.source),
-        status: event.status,
-        createdAt: event.created_at,
-      })),
+      ...eventsResult.results.map((event) => ({ source: publicEventSource(event.source), status: event.status, createdAt: event.created_at })),
     ];
     const artifacts = externalArtifacts(order);
     const pending = order.payment_status === "pending";
@@ -299,9 +305,7 @@ export async function POST(request: Request) {
       },
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return Response.json({ error: "Format invoice tidak valid." }, { status: 400 });
-    }
+    if (error instanceof z.ZodError) return Response.json({ error: "Format invoice tidak valid." }, { status: 400 });
     return Response.json({ error: "Status pesanan belum dapat dimuat." }, { status: 503 });
   }
 }
