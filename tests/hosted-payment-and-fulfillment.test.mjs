@@ -13,9 +13,10 @@ test("only hosted DOKU Checkout and Midtrans Snap are routable", () => {
   assert.doesNotMatch(router, /Direct|bisnap|createMidtransVirtualAccount/);
 });
 
-test("Midtrans Snap status polling is fast and paid fulfillment remains server-side", () => {
+test("hosted status polling is fast and paid fulfillment remains server-side", () => {
   const status = read("app/api/orders/status/route.ts");
   const callback = read("app/api/payments/midtrans/snap/notification/route.ts");
+  assert.match(status, /artifacts\.mode === "checkout" && dueForGatewayCheck\(order, 3_000\)/);
   assert.match(status, /dueForGatewayCheck\(order, 3_000\)/);
   assert.match(status, /fulfillAutomaticOrder\(order\.id, getPublicBaseUrl\(\)\)/);
   assert.match(callback, /applyPendingExternalPaymentStatus\(order, status\)/);
