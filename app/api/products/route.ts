@@ -45,39 +45,40 @@ export async function GET() {
         packageTabsEnabled: item.packageTabsEnabled,
         packageTabs: item.packageTabs,
         notices: item.notices,
-        packages: [...item.packages]
+        packages: item.packages
+          .slice()
           .sort((left, right) =>
             left.price - right.price ||
             left.sortOrder - right.sortOrder ||
             left.label.localeCompare(right.label, "id-ID", { numeric: true, sensitivity: "base" }),
           )
           .map((pkg) => {
-          const fulfillmentMode = item.fulfillmentType === "manual"
-            ? "manual"
-            : pkg.providerCode === "voucher-stock"
-              ? "voucher_stock"
-              : "provider";
-          const fulfillmentReady = item.fulfillmentType === "manual" || Boolean(pkg.providerCode && pkg.providerSku);
-          const fulfillmentAvailable = item.fulfillmentType === "manual"
-            ? true
-            : pkg.providerCode === "voucher-stock"
-              ? Boolean(pkg.providerSku && voucherStockKeys.has(pkg.providerSku))
-              : pkg.providerCode === "digiflazz"
-                ? Boolean(pkg.dbId != null && digiflazzAvailability.get(pkg.dbId) === true)
-                : false;
+            const fulfillmentMode = item.fulfillmentType === "manual"
+              ? "manual"
+              : pkg.providerCode === "voucher-stock"
+                ? "voucher_stock"
+                : "provider";
+            const fulfillmentReady = item.fulfillmentType === "manual" || Boolean(pkg.providerCode && pkg.providerSku);
+            const fulfillmentAvailable = item.fulfillmentType === "manual"
+              ? true
+              : pkg.providerCode === "voucher-stock"
+                ? Boolean(pkg.providerSku && voucherStockKeys.has(pkg.providerSku))
+                : pkg.providerCode === "digiflazz"
+                  ? Boolean(pkg.dbId != null && digiflazzAvailability.get(pkg.dbId) === true)
+                  : false;
 
-          return {
-            id: pkg.id,
-            label: pkg.label,
-            price: pkg.price,
-            note: pkg.note,
-            group: pkg.group,
-            imageUrl: pkg.imageUrl,
-            fulfillmentMode,
-            fulfillmentReady,
-            fulfillmentAvailable,
-          };
-        }),
+            return {
+              id: pkg.id,
+              label: pkg.label,
+              price: pkg.price,
+              note: pkg.note,
+              group: pkg.group,
+              imageUrl: pkg.imageUrl,
+              fulfillmentMode,
+              fulfillmentReady,
+              fulfillmentAvailable,
+            };
+          }),
         ...(summaries.get(item.slug) ?? { ratingAverage: 0, ratingCount: 0 }),
       }));
     return Response.json(
