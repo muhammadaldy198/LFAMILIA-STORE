@@ -1,4 +1,6 @@
 import { getD1 } from "@/db";
+import { queryDokuQrisStatus } from "@/lib/server/doku";
+import { queryDokuCheckoutStatus } from "@/lib/server/doku-checkout-status";
 import { applyPendingDokuPaymentStatus } from "@/lib/server/doku-payment-transition";
 import {
   queryDokuEwalletStatus,
@@ -17,6 +19,17 @@ import {
 } from "@/lib/server/transaction-notifications";
 import { applyDokuWalletTopup } from "@/lib/server/wallet";
 
+type ReconciliationOrder = OrderRecord & {
+  payment_gateway: string | null;
+  payment_gateway_mode: string | null;
+  payment_gateway_environment: "sandbox" | "production" | null;
+  gateway_request_id: string | null;
+  gateway_reference_no: string | null;
+  gateway_payment_no: string | null;
+  gateway_expired_at: string | null;
+  gateway_status_checked_at: string | null;
+};
+
 type PendingTopup = {
   id: string;
   reference_id: string;
@@ -28,22 +41,46 @@ type PendingTopup = {
   doku_environment: "sandbox" | "production";
 };
 
-async function queryOrderStatus(order: OrderRecord) {
-  if (!order.doku_environment || !order.doku_request_id) return null;
-  if (order.payment_method === "va" && order.doku_payment_no) {
-    return queryDokuVaStatus({
-      environment: order.doku_environment,
-      channel: order.payment_channel,
-      paymentNo: order.doku_payment_no,
+function orderEnvironment(order: ReconciliationOrder) {
+  return order.payment_gateway_environment ?? order.doku_environment;
+}
+
+async function queryOrderStatus(order: ReconciliationOrder) {
+  const environment = orderEnvironment(order);
+  if (!environment) return null;
+
+  if (order.payment_gateway_mode === "checkout") {
+    return queryDokuCheckoutStatus({
+      environment,
       referenceId: order.reference_id,
     });
   }
-  if (order.payment_method === "ewallet") {
-    return queryDokuEwalletStatus({
-      environment: order.doku_environment,
+
+  if (order.payment_gateway_mode && order.payment_gateway_mode !== "direct") return null;
+  const requestId = order.gateway_request_id ?? order.doku_request_id;
+  const referenceNo = order.gateway_reference_no ?? order.doku_reference_no;
+  const paymentNo = order.gateway_payment_no ?? order.doku_payment_no;
+
+  if (order.payment_method === "qris" && referenceNo) {
+    return queryDokuQrisStatus({
       referenceId: order.reference_id,
-      requestId: order.doku_request_id,
-      referenceNo: order.doku_reference_no,
+      referenceNo,
+    });
+  }
+  if (order.payment_method === "va" && paymentNo) {
+    return queryDokuVaStatus({
+      environment,
+      channel: order.payment_channel,
+      paymentNo,
+      referenceId: order.reference_id,
+    });
+  }
+  if (order.payment_method === "ewallet" && requestId) {
+    return queryDokuEwalletStatus({
+      environment,
+      referenceId: order.reference_id,
+      requestId,
+      referenceNo,
       amount: order.total,
     });
   }
@@ -72,11 +109,19 @@ async function queryTopupStatus(topup: PendingTopup) {
   return null;
 }
 
+async function markOrderStatusChecked(order: ReconciliationOrder) {
+  await getD1().prepare(
+    `UPDATE orders SET gateway_status_checked_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND payment_status = 'pending'`,
+  ).bind(order.id).run();
+  await markDokuStatusChecked(order.reference_id);
+}
+
 /**
- * Reconcile pending DOKU VA/e-wallet transactions only through DOKU's documented
- * SNAP Check Status endpoints, then finalize records whose stored DOKU expiry has
- * elapsed. The status API is polled no sooner than 60 seconds after creation and
- * no more often than once per minute per transaction.
+ * Reconcile pending DOKU transactions through the documented status endpoint for
+ * the exact mode used to create them: Checkout uses Non-SNAP Check Status,
+ * Direct QRIS/VA/e-wallet uses the corresponding SNAP status API. Poll no sooner
+ * than 60 seconds and no more often than once per minute per transaction.
  */
 export async function finalizeExpiredDokuPayments(limit = 100) {
   const db = getD1();
@@ -88,26 +133,28 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
   const pendingOrders = await db.prepare(
     `SELECT * FROM orders
      WHERE payment_status = 'pending'
-       AND payment_method IN ('va', 'ewallet')
-       AND doku_request_id IS NOT NULL
-       AND doku_environment IN ('sandbox', 'production')
+       AND payment_method IN ('va', 'ewallet', 'qris')
+       AND (payment_gateway = 'doku' OR (payment_gateway IS NULL AND doku_request_id IS NOT NULL))
+       AND COALESCE(payment_gateway_environment, doku_environment) IN ('sandbox', 'production')
        AND created_at <= datetime('now', '-60 seconds')
-       AND (doku_status_checked_at IS NULL OR doku_status_checked_at <= datetime('now', '-60 seconds'))
-       AND (doku_expired_at IS NULL OR datetime(doku_expired_at) > datetime('now'))
-     ORDER BY COALESCE(doku_status_checked_at, created_at) ASC
+       AND (COALESCE(gateway_status_checked_at, doku_status_checked_at) IS NULL
+         OR COALESCE(gateway_status_checked_at, doku_status_checked_at) <= datetime('now', '-60 seconds'))
+       AND (COALESCE(gateway_expired_at, doku_expired_at) IS NULL
+         OR datetime(COALESCE(gateway_expired_at, doku_expired_at)) > datetime('now'))
+     ORDER BY COALESCE(gateway_status_checked_at, doku_status_checked_at, created_at) ASC
      LIMIT ?`,
-  ).bind(safeLimit).all<OrderRecord>();
+  ).bind(safeLimit).all<ReconciliationOrder>();
 
   for (const order of pendingOrders.results) {
     try {
-      await markDokuStatusChecked(order.reference_id);
+      await markOrderStatusChecked(order);
       const query = await queryOrderStatus(order);
       if (!query) continue;
       queriedOrders += 1;
       await recordOrderEvent({
         orderId: order.id,
         source: "doku",
-        eventId: `status-query-${query.requestId}`,
+        eventId: `status-query-${query.requestId}-${query.status}`,
         status: query.status,
         payload: query.raw,
       });
@@ -123,8 +170,8 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
             console.error("Notifikasi order hasil rekonsiliasi DOKU gagal:", error),
           );
         }
-      } else if (query.status === "failed") {
-        await applyPendingDokuPaymentStatus(order, "failed");
+      } else if (query.status === "failed" || query.status === "expired") {
+        await applyPendingDokuPaymentStatus(order, query.status);
       }
     } catch (error) {
       console.error("Rekonsiliasi status order DOKU gagal:", error);
@@ -176,12 +223,12 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
     `SELECT * FROM orders
      WHERE payment_status = 'pending'
        AND payment_method <> 'wallet'
-       AND doku_request_id IS NOT NULL
-       AND doku_expired_at IS NOT NULL
-       AND datetime(doku_expired_at) <= datetime('now')
-     ORDER BY doku_expired_at ASC
+       AND (payment_gateway = 'doku' OR (payment_gateway IS NULL AND doku_request_id IS NOT NULL))
+       AND COALESCE(gateway_expired_at, doku_expired_at) IS NOT NULL
+       AND datetime(COALESCE(gateway_expired_at, doku_expired_at)) <= datetime('now')
+     ORDER BY COALESCE(gateway_expired_at, doku_expired_at) ASC
      LIMIT ?`,
-  ).bind(safeLimit).all<OrderRecord>();
+  ).bind(safeLimit).all<ReconciliationOrder>();
 
   for (const order of expiredOrders.results) {
     await applyPendingDokuPaymentStatus(order, "expired");
@@ -190,7 +237,10 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
       source: "doku",
       eventId: `local-expiry-${order.id}`,
       status: "expired",
-      payload: { expiredAt: order.doku_expired_at, reason: "stored_doku_expiry" },
+      payload: {
+        expiredAt: order.gateway_expired_at ?? order.doku_expired_at,
+        reason: "stored_doku_expiry",
+      },
     });
   }
 
