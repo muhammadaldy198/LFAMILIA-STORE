@@ -56,5 +56,11 @@ export function isHostedGatewayChannelSupported(
   channel: string,
   gatewayConfig?: Record<string, string>,
 ) {
+  if (gateway === "doku") {
+    if (method === "qris") return channel === "mpm" || channel === "qris";
+    if (method === "ewallet") return channel === "dana" || channel === "shopeepay";
+    if (method === "va") return new Set(["bca", "mandiri", "bni", "bri", "bsi", "cimb", "permata", "danamon", "btn", "bmi", "bag", "bpd_bali"]).has(channel);
+    return false;
+  }
   return Boolean(hostedPaymentType(gateway, method, channel, gatewayConfig));
 }
