@@ -220,16 +220,17 @@ export async function GET(request: Request) {
   if (access instanceof Response) return access;
   try {
     await ensureKokinpayNicknameGameCodeBackfill();
-    const products = (await readProducts(true)).map((product) => ({
+    const products = await readProducts(true);
+    const sortedProducts = products.map((product) => ({
       ...product,
-      packages: [...product.packages].sort((left, right) =>
+      packages: product.packages.slice().sort((left, right) =>
         left.price - right.price ||
         left.sortOrder - right.sortOrder ||
         left.label.localeCompare(right.label, "id-ID", { numeric: true, sensitivity: "base" }),
       ),
     }));
     const sellerMonitor = access.role === "super_admin" ? await readDigiflazzSellerMonitor() : null;
-    return Response.json({ products, databaseReady: true, adminEmail: access.email, role: access.role, sellerMonitor });
+    return Response.json({ products: sortedProducts, databaseReady: true, adminEmail: access.email, role: access.role, sellerMonitor });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Database belum siap.", databaseReady: false }, { status: 503 });
   }
