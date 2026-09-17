@@ -26,3 +26,18 @@ test("Midtrans Snap status mapping only treats settled or accepted capture as pa
   assert.match(source, /status === "expire"\) return "expired"/);
   assert.match(source, /status === "cancel" \|\| status === "deny" \|\| status === "failure"/);
 });
+
+test("pending Midtrans Snap orders reconcile against authenticated Get Status API", () => {
+  const snap = read("lib/server/midtrans-snap.ts");
+  const statusRoute = read("app/api/orders/status/route.ts");
+
+  assert.match(snap, /export async function queryMidtransSnapStatus/);
+  assert.match(snap, /\/v2\/\$\{encodeURIComponent\(input\.orderId\)\}\/status/);
+  assert.match(snap, /authorization: `Basic \$\{Buffer\.from\(`\$\{serverKey\}:`\)\.toString\("base64"\)\}`/);
+  assert.match(statusRoute, /artifacts\.gateway !== "midtrans"/);
+  assert.match(statusRoute, /artifacts\.mode !== "snap"/);
+  assert.match(statusRoute, /gateway_status_checked_at = CURRENT_TIMESTAMP/);
+  assert.match(statusRoute, /query\.amount !== order\.total/);
+  assert.match(statusRoute, /const firstPaid = await applyPaymentStatus\(order, "paid"\)/);
+  assert.match(statusRoute, /order = await refreshMidtransSnapStatus\(order\)/);
+});
