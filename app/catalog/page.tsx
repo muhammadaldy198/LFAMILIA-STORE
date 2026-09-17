@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Gamepad2, Grid3X3, Play, Search, Smartphone, Ticket, X } from "lucide-react";
+import { Gamepad2, Grid3X3, Play, Search, Smartphone, Ticket, X, Zap } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ProductCard } from "@/components/product-card";
 import { StoreLayout } from "@/components/store-layout";
 import { useStoreProducts } from "@/hooks/use-store-products";
 import { useStorefront } from "@/hooks/use-storefront";
+import { normalizeProductCategorySlug } from "@/lib/product-categories";
 import type { ProductCategory } from "@/lib/store-data";
 
 type Filter = "all" | ProductCategory;
@@ -17,7 +18,7 @@ export default function CatalogPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => products.filter((product) => {
-    const inCategory = filter === "all" || product.category === filter;
+    const inCategory = filter === "all" || normalizeProductCategorySlug(product.category) === filter;
     const term = query.trim().toLowerCase();
     return inCategory && (!term || `${product.name} ${product.publisher}`.toLowerCase().includes(term));
   }), [filter, products, query]);
@@ -36,7 +37,7 @@ export default function CatalogPage() {
               <button key={value} type="button" onClick={() => setFilter(value)} className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-4 text-xs font-bold transition ${filter === value ? "border-[#b9ff35] bg-[#b9ff35] text-[#091006]" : "border-white/10 bg-white/[0.025] text-white/50 hover:text-white"}`}><Icon className="size-4" />{label}</button>
             ))}
           </div>
-          <div className="relative w-full sm:max-w-sm"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-white/30" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari Mobile Legends, Steam..." className="h-11 rounded-xl border-white/10 bg-white/[0.035] pl-10 pr-10 text-sm text-white placeholder:text-white/25" />{query && <button type="button" onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white" aria-label="Hapus pencarian"><X className="size-4" /></button>}</div>
+          <div className="relative w-full sm:max-w-sm"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-white/30" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari game, voucher, pulsa, PLN..." className="h-11 rounded-xl border-white/10 bg-white/[0.035] pl-10 pr-10 text-sm text-white placeholder:text-white/25" />{query && <button type="button" onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white" aria-label="Hapus pencarian"><X className="size-4" /></button>}</div>
         </div>
 
         <div className="mt-8 flex items-center justify-between border-b border-white/[0.07] pb-4 text-xs"><span className="font-semibold text-white/55">{filtered.length} produk ditemukan</span><span className="text-white/28">{databaseReady ? "Katalog terbaru" : "Memuat katalog"}</span></div>
@@ -55,5 +56,6 @@ function categoryIcon(icon: string, slug: string) {
   if (icon === "ticket" || slug === "voucher") return Ticket;
   if (icon === "play" || slug === "entertainment") return Play;
   if (icon === "smartphone" || slug === "pulsa") return Smartphone;
+  if (icon === "zap" || slug === "pln") return Zap;
   return Grid3X3;
 }
