@@ -45,6 +45,9 @@ type Order = {
   status: OrderStatus;
   createdAt?: string;
   fulfillmentStatus?: string;
+  providerStatus?: string | null;
+  providerMessage?: string | null;
+  providerSerialNumber?: string | null;
   deliveryMode?: "direct" | "voucher" | "manual";
 };
 
@@ -64,6 +67,9 @@ type ApiOrder = {
   payment_status: string;
   provider_code: string | null;
   fulfillment_status: string;
+  provider_status?: string | null;
+  provider_message?: string | null;
+  provider_serial_number?: string | null;
   delivery_mode: "direct" | "voucher" | "manual";
   created_at: string;
 };
@@ -104,6 +110,9 @@ function mapApiOrder(order: ApiOrder): Order {
     status: mapOrderStatus(order),
     createdAt: order.created_at,
     fulfillmentStatus: order.fulfillment_status,
+    providerStatus: order.provider_status,
+    providerMessage: order.provider_message,
+    providerSerialNumber: order.provider_serial_number,
     deliveryMode: order.delivery_mode,
   };
 }
@@ -501,7 +510,7 @@ function OrderDetailModal({ order, onClose, onNotice, onCompleted }: { order: Or
           <DetailSection title="Informasi Pelanggan"><DetailLine label="Nama" value={order.customer} /><DetailLine label="Telepon" value={order.phone} /><DetailLine label="Tujuan" value={`${order.destination} ${order.destinationNote}`} /></DetailSection>
           <DetailSection title="Informasi Produk"><DetailLine label="Produk" value={order.product} /><DetailLine label="Nominal" value={order.packageName} /><DetailLine label="Provider" value={order.provider} /></DetailSection>
           <DetailSection title="Pembayaran"><DetailLine label="Metode" value={order.payment} /><DetailLine label="Total" value={formatRupiah(order.total)} /><div className="mt-[8px]"><StatusBadge status={order.status} /></div></DetailSection>
-          <DetailSection title="Timeline"><p className="flex items-center gap-[7px] text-[#52647b]"><CheckCircle2 className="size-[13px] text-[#12a45f]" />Pesanan dibuat oleh sistem</p><p className="mt-[8px] flex items-center gap-[7px] text-[#52647b]"><Clock3 className="size-[13px] text-[#f0a400]" />Menunggu pembaruan berikutnya</p></DetailSection>
+          <DetailSection title="Status Provider"><DetailLine label="Status" value={order.providerStatus || "Belum ada respons"} /><p className="mt-[8px] break-words text-[#52647b]">{order.providerMessage || "Belum ada catatan dari provider."}</p>{order.providerSerialNumber && <DetailLine label="Serial" value={order.providerSerialNumber} />}</DetailSection>
         </div>
         {error && <p className="mx-[20px] mb-[10px] rounded-[5px] bg-red-50 px-[10px] py-[7px] text-[8px] text-red-700">{error}</p>}
         {order.fulfillmentStatus === "manual_pending" && order.deliveryMode === "voucher" && <label className="mx-[20px] mb-[12px] block text-[8px] font-bold text-[#42536b]">Kode voucher / serial<input value={serialNumber} onChange={(event) => setSerialNumber(event.target.value)} className="mt-[5px] h-[34px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" /></label>}
