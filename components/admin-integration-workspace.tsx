@@ -38,7 +38,12 @@ export function AdminIntegrationWorkspace() {
     setDigiflazzEnvironment(payload.selections.digiflazzEnvironment);
     return payload;
   }, []);
-  useEffect(() => { load().catch((reason) => setError(reason instanceof Error ? reason.message : "Integrasi gagal dimuat.")); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void load().catch((reason) => setError(reason instanceof Error ? reason.message : "Integrasi gagal dimuat."));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   const configured = useMemo(() => new Set((overview?.profiles ?? []).filter((profile) => profile.configured && !profile.decryptionError).map((profile) => `${profile.provider}:${profile.environment}`)), [overview]);
   const isConfigured = (provider: Provider, environment: Environment) => configured.has(`${provider}:${environment}`);
