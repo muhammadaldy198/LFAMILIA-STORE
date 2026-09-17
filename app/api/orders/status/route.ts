@@ -268,10 +268,23 @@ async function refreshMidtransSnapStatus(order: OrderRecord) {
   }
 }
 
+async function recoverPaidAutomaticFulfillment(order: OrderRecord) {
+  if (order.payment_status !== "paid" || order.fulfillment_type !== "automatic") return order;
+  if (order.fulfillment_status === "success" || order.fulfillment_status === "failed" || order.fulfillment_status === "cancelled") return order;
+
+  await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
+  await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
+    console.error("Notifikasi pesanan hasil recovery fulfillment gagal:", error),
+  );
+  return (await getOrderById(order.id)) ?? order;
+}
+
 export async function POST(request: Request) {
   const originBlock = rejectCrossOriginMutation(request);
   if (originBlock) return originBlock;
-  const rate = await allowRequest(request, "order-status", 60, 600);
+  // Payment page polls every 3 seconds. Keep enough headroom for automatic polling
+  // plus manual refresh without allowing unbounded public status reads.
+  const rate = await allowRequest(request, "order-status", 240, 600);
   if (!rate.allowed) return Response.json({ error: "Terlalu banyak pengecekan transaksi. Coba lagi beberapa menit." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
   try {
     const { referenceId } = schema.parse(await request.json());
@@ -283,6 +296,7 @@ export async function POST(request: Request) {
     order = await refreshDokuStatus(order);
     order = await refreshMidtransSnapStatus(order);
     order = await expirePendingInvoice(order);
+    order = await recoverPaidAutomaticFulfillment(order);
 
     const voucherCode = order.payment_status === "paid"
       ? await getWebsiteVoucherCodeByReference(order.reference_id).catch(() => null)
