@@ -12,7 +12,7 @@ const saveModes = z.object({
   action: z.literal("save_modes"),
   dokuEnvironment: z.enum(["sandbox", "production"]),
   midtransEnvironment: z.enum(["sandbox", "production"]),
-  walletTopupGateway: z.enum(["doku", "midtrans"]),
+  walletTopupGateway: z.enum(["doku", "midtrans"]).optional(),
 });
 
 const saveProfile = z.object({
