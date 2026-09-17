@@ -100,7 +100,7 @@ function shouldQueryDoku(order: OrderRecord) {
   return artifacts.gateway === "doku" &&
     order.payment_status === "pending" &&
     Boolean(metadata.environment) &&
-    artifacts.mode === "checkout" && dueForGatewayCheck(order, 15_000);
+    artifacts.mode === "checkout" && dueForGatewayCheck(order, 3_000);
 }
 
 function shouldQueryMidtransSnap(order: OrderRecord) {
