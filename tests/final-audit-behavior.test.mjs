@@ -158,7 +158,7 @@ test("production modules are wired to the behavior-tested rules", () => {
   assert.match(admin, /hasMinimumAdminRole\(session\.role, minimumRole\)/);
   assert.match(members, /resolveMemberTierFromProgress\(progress\)/);
   assert.match(availability, /isDigiflazzSnapshotAvailable\(/);
-  assert.match(callback, /applyPendingDokuPaymentStatus\(order, status\)/);
+  assert.match(callback, /applyPendingExternalPaymentStatus\(order, notification\.status\)/);
   assert.match(externalCheckout, /isAutomaticPackageAvailable\(/);
   assert.match(walletCheckout, /isAutomaticPackageAvailable\(/);
 });
