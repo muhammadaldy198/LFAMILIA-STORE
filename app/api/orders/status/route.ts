@@ -6,6 +6,7 @@ import { queryDokuQrisStatus } from "@/lib/server/doku";
 import { applyPendingDokuPaymentStatus } from "@/lib/server/doku-payment-transition";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
 import { externalArtifactsFromOrder } from "@/lib/server/external-payments";
+import { queryMidtransSnapStatus } from "@/lib/server/midtrans-snap";
 import {
   applyPaymentStatus,
   fulfillAutomaticOrder,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/server/orders";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
+import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +63,19 @@ function externalArtifacts(order: OrderRecord) {
   return externalArtifactsFromOrder(order as unknown as Record<string, unknown>);
 }
 
+function gatewayMetadata(order: OrderRecord) {
+  const raw = order as unknown as Record<string, unknown>;
+  const environment = raw.payment_gateway_environment === "production"
+    ? "production"
+    : raw.payment_gateway_environment === "sandbox"
+      ? "sandbox"
+      : null;
+  const lastCheckedAt = typeof raw.gateway_status_checked_at === "string"
+    ? raw.gateway_status_checked_at
+    : null;
+  return { environment, lastCheckedAt } as const;
+}
+
 function maskDestination(value: string, server: string | null) {
   const trimmed = value.trim();
   const visible = trimmed.length <= 6
@@ -83,6 +98,29 @@ function shouldQueryQris(order: OrderRecord) {
     ? Date.parse(order.doku_status_checked_at)
     : 0;
   return !Number.isFinite(last) || Date.now() - last >= 60_000;
+}
+
+function shouldQueryMidtransSnap(order: OrderRecord) {
+  const artifacts = externalArtifacts(order);
+  const metadata = gatewayMetadata(order);
+  if (
+    artifacts.gateway !== "midtrans" ||
+    artifacts.mode !== "snap" ||
+    order.payment_status !== "pending" ||
+    !metadata.environment
+  ) return false;
+  const created = Date.parse(order.created_at);
+  if (Number.isFinite(created) && Date.now() - created < 15_000) return false;
+  const last = metadata.lastCheckedAt ? Date.parse(metadata.lastCheckedAt) : 0;
+  return !Number.isFinite(last) || Date.now() - last >= 15_000;
+}
+
+async function markGatewayStatusChecked(referenceId: string) {
+  await getD1().prepare(
+    `UPDATE orders
+     SET gateway_status_checked_at = CURRENT_TIMESTAMP
+     WHERE reference_id = ? AND payment_status = 'pending'`,
+  ).bind(referenceId).run();
 }
 
 function publicEventSource(source: string) {
@@ -141,6 +179,47 @@ async function refreshQrisStatus(order: OrderRecord) {
   }
 }
 
+async function refreshMidtransSnapStatus(order: OrderRecord) {
+  if (!shouldQueryMidtransSnap(order)) return order;
+  const { environment } = gatewayMetadata(order);
+  if (!environment) return order;
+
+  try {
+    await markGatewayStatusChecked(order.reference_id);
+    const query = await queryMidtransSnapStatus({
+      orderId: order.reference_id,
+      environment,
+    });
+    const eventSuffix = query.transactionId || order.reference_id;
+    await recordOrderEvent({
+      orderId: order.id,
+      source: "midtrans",
+      eventId: `snap-status-${eventSuffix}-${query.status}`,
+      status: query.status,
+      payload: query.raw,
+    });
+
+    if (query.status === "paid") {
+      if (!Number.isFinite(query.amount) || query.amount !== order.total) {
+        return (await getOrderById(order.id)) ?? order;
+      }
+      const firstPaid = await applyPaymentStatus(order, "paid");
+      if (firstPaid && order.fulfillment_type === "automatic") {
+        await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
+        await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
+          console.error("Notifikasi pesanan Midtrans hasil rekonsiliasi gagal:", error),
+        );
+      }
+    } else if (query.status === "failed" || query.status === "expired") {
+      await applyPaymentStatus(order, query.status);
+    }
+
+    return (await getOrderById(order.id)) ?? order;
+  } catch {
+    return (await getOrderById(order.id)) ?? order;
+  }
+}
+
 export async function POST(request: Request) {
   const originBlock = rejectCrossOriginMutation(request);
   if (originBlock) return originBlock;
@@ -153,6 +232,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invoice tidak ditemukan." }, { status: 404 });
     }
 
+    order = await refreshMidtransSnapStatus(order);
     order = await refreshQrisStatus(order);
     order = await expirePendingInvoice(order);
 
