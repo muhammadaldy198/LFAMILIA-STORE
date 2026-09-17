@@ -72,3 +72,29 @@ test("DigiFlazz transaction response is JSON-safe and requires exact LFAMILIA co
   assert.doesNotMatch(provider, /data\.ref_id && data\.ref_id !== order\.referenceId/);
   assert.doesNotMatch(provider, /data\.buyer_sku_code && data\.buyer_sku_code !== order\.providerSku/);
 });
+
+test("DigiFlazz dispatch uses the official endpoint and fails closed on provider response codes", () => {
+  const provider = read("lib/server/providers/digiflazz.ts");
+  assert.match(provider, /https:\/\/api\.digiflazz\.com\/v1\/transaction/);
+  assert.match(provider, /parsed\.hostname !== "api\.digiflazz\.com"/);
+  assert.match(provider, /code === "00"/);
+  assert.match(provider, /code === "03" \|\| code === "99"/);
+  assert.match(provider, /if \(code\) return "failed"/);
+  assert.match(provider, /\[RC \$\{rc\}\]/);
+  assert.match(provider, /SKU DigiFlazz order kosong/);
+  assert.match(provider, /Customer No DigiFlazz order kosong/);
+});
+
+test("automatic paid-order recovery runs frequently enough for retryable DigiFlazz dispatches", () => {
+  const wrangler = read("wrangler.jsonc");
+  const worker = read("worker/index.ts");
+  const orders = read("lib/server/orders.ts");
+  const reconciliation = read("lib/server/digiflazz-reconciliation.ts");
+
+  assert.match(wrangler, /"\*\/5 \* \* \* \*"/);
+  assert.match(worker, /recoverStaleAutomaticOrders\(publicBaseUrl\)/);
+  assert.match(worker, /reconcileStaleDigiflazzProcessing\(publicBaseUrl\)/);
+  assert.match(orders, /provider_status = 'retryable_error'/);
+  assert.match(reconciliation, /updated_at <= datetime\('now', '-2 minutes'\)/);
+  assert.match(reconciliation, /created_at >= datetime\('now', '-89 days'\)/);
+});
