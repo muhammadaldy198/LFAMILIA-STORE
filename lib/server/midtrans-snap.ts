@@ -93,6 +93,53 @@ export async function verifyMidtransSnapNotification(input: {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
+export async function queryMidtransSnapStatus(input: {
+  orderId: string;
+  environment: PaymentEnvironment;
+}) {
+  const values = await getHostedGatewayProfileForEnvironment("midtrans", "snap", input.environment);
+  const serverKey = values?.serverKey?.trim() || "";
+  if (!serverKey) throw new Error(`Server Key Midtrans Snap ${input.environment} belum tersedia.`);
+
+  const apiOrigin = input.environment === "production"
+    ? "https://api.midtrans.com"
+    : "https://api.sandbox.midtrans.com";
+  const response = await fetch(`${apiOrigin}/v2/${encodeURIComponent(input.orderId)}/status`, {
+    method: "GET",
+    headers: {
+      accept: "application/json",
+      authorization: `Basic ${Buffer.from(`${serverKey}:`).toString("base64")}`,
+    },
+    signal: AbortSignal.timeout(15_000),
+  });
+  const raw = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (!response.ok) {
+    const message = typeof raw.status_message === "string"
+      ? raw.status_message.trim()
+      : "Midtrans belum dapat mengembalikan status transaksi.";
+    throw new Error(message || "Midtrans belum dapat mengembalikan status transaksi.");
+  }
+
+  const responseOrderId = typeof raw.order_id === "string" ? raw.order_id.trim() : "";
+  if (responseOrderId && responseOrderId !== input.orderId) {
+    throw new Error("Order ID dari Midtrans tidak sesuai.");
+  }
+
+  const transactionStatus = typeof raw.transaction_status === "string" ? raw.transaction_status : "";
+  const fraudStatus = typeof raw.fraud_status === "string" ? raw.fraud_status : null;
+  const grossAmount = typeof raw.gross_amount === "string" || typeof raw.gross_amount === "number"
+    ? Number(raw.gross_amount)
+    : Number.NaN;
+  const transactionId = typeof raw.transaction_id === "string" ? raw.transaction_id.trim() : "";
+
+  return {
+    status: mapMidtransSnapStatus(transactionStatus, fraudStatus),
+    amount: grossAmount,
+    transactionId,
+    raw,
+  };
+}
+
 export function mapMidtransSnapStatus(transactionStatus: string, fraudStatus: string | null) {
   const status = transactionStatus.trim().toLowerCase();
   const fraud = (fraudStatus || "").trim().toLowerCase();
