@@ -6,7 +6,10 @@ import {
   invalidateDigiflazzOperationalCache,
   releaseDigiflazzConfigurationGuard,
 } from "@/lib/server/digiflazz-config-guard";
-import { clearDigiflazzBalanceCache } from "@/lib/server/providers/digiflazz";
+import {
+  clearDigiflazzBalanceCache,
+  getDigiflazzBalance,
+} from "@/lib/server/providers/digiflazz";
 import {
   getIntegrationOverview,
   saveIntegrationProfile,
@@ -43,11 +46,16 @@ const dokuTestInput = z.object({
   environment: z.enum(["sandbox", "production"]),
 });
 
+const digiflazzTestInput = z.object({
+  action: z.literal("test_digiflazz"),
+});
+
 const schema = z.discriminatedUnion("action", [
   profileInput,
   selectionInput,
   relayTestInput,
   dokuTestInput,
+  digiflazzTestInput,
 ]);
 
 async function withDigiflazzConfigurationGuard(action: () => Promise<void>) {
@@ -95,6 +103,14 @@ export async function PUT(request: Request) {
     if (input.action === "test_doku") {
       return Response.json(
         { ok: true, doku: await testDokuB2BConnection(input.environment) },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    if (input.action === "test_digiflazz") {
+      clearDigiflazzBalanceCache();
+      const result = await getDigiflazzBalance();
+      return Response.json(
+        { ok: true, digiflazz: { connected: true, balance: result.balance } },
         { headers: { "Cache-Control": "no-store" } },
       );
     }
