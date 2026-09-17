@@ -70,12 +70,14 @@ async function settings(db = getD1()) {
   return new Map(rows.results.map((row) => [row.setting_key, row.value]));
 }
 function env(value: string | undefined): PaymentEnvironment { return value === "production" ? "production" : "sandbox"; }
+function gateway(value: string | undefined): PaymentProvider { return value === "midtrans" ? "midtrans" : "doku"; }
 
 export async function getActivePaymentModes() {
   const current = await settings();
   return {
     dokuEnvironment: env(current.get("doku_environment")),
     midtransEnvironment: env(current.get("midtrans_environment")),
+    walletTopupGateway: gateway(current.get("wallet_topup_gateway")),
     dokuMode: "direct" as const,
     midtransMode: "snap" as const,
   };
@@ -84,12 +86,14 @@ export async function getActivePaymentModes() {
 export async function savePaymentModeSelections(input: {
   dokuEnvironment?: PaymentEnvironment;
   midtransEnvironment?: PaymentEnvironment;
+  walletTopupGateway?: PaymentProvider;
 }) {
   await ensureTables();
   const db = getD1();
   const rows: Array<[string, string | undefined]> = [
     ["doku_environment", input.dokuEnvironment],
     ["midtrans_environment", input.midtransEnvironment],
+    ["wallet_topup_gateway", input.walletTopupGateway],
   ];
   const statements = rows.flatMap(([key, value]) => value ? [db.prepare(`INSERT INTO integration_settings (setting_key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(setting_key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`).bind(key, value)] : []);
