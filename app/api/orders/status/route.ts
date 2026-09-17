@@ -3,7 +3,6 @@ import { getD1 } from "@/db";
 import { publicPaymentLabel } from "@/lib/public-payment";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { queryDokuQrisStatus } from "@/lib/server/doku";
-import { queryDokuCheckoutStatus } from "@/lib/server/doku-checkout-status";
 import { queryDokuEwalletStatus, queryDokuVaStatus } from "@/lib/server/doku-status";
 import { applyPendingExternalPaymentStatus } from "@/lib/server/payment-transition";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
@@ -97,7 +96,7 @@ function shouldQueryDoku(order: OrderRecord) {
   return artifacts.gateway === "doku" &&
     order.payment_status === "pending" &&
     Boolean(metadata.environment) &&
-    (artifacts.mode === "direct" || artifacts.mode === "checkout") &&
+    artifacts.mode === "direct" &&
     dueForGatewayCheck(order, 3_000);
 }
 
@@ -144,12 +143,7 @@ async function prepareDokuRuntime() {
 async function queryDokuOrderStatus(order: OrderRecord) {
   const artifacts = externalArtifacts(order);
   const { environment } = gatewayMetadata(order);
-  if (!environment) return null;
-
-  if (artifacts.mode === "checkout") {
-    return queryDokuCheckoutStatus({ referenceId: order.reference_id, environment });
-  }
-  if (artifacts.mode !== "direct") return null;
+  if (!environment || artifacts.mode !== "direct") return null;
 
   await prepareDokuRuntime();
   if (order.payment_method === "qris" && artifacts.referenceNo) {
