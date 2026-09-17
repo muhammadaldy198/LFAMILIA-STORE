@@ -119,10 +119,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
   }, [range]);
 
   useEffect(() => {
-    if (isStaff) {
-      setIntegrationItems([]);
-      return;
-    }
+    if (isStaff) return;
     const controller = new AbortController();
     fetch("/api/panel/dashboard-integrations", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
