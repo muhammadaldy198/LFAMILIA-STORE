@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
-import { getDokuCheckoutReadiness } from "@/lib/server/doku-checkout";
+import { getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
 import {
   listWalletTopups,
   readWalletSettings,
@@ -16,14 +16,15 @@ const settingsSchema = z.object({
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
-  const [settings, topups] = await Promise.all([
+  const [settings, topups, doku] = await Promise.all([
     readWalletSettings(),
     listWalletTopups(),
+    getConfiguredGatewayReadiness({ gateway: "doku", paymentMethod: "qris", paymentChannel: "qris" }),
   ]);
   return Response.json({
     settings,
     topups,
-    gatewayReadiness: { doku: await getDokuCheckoutReadiness() },
+    gatewayReadiness: { doku },
   });
 }
 
