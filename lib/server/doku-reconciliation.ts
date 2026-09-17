@@ -1,6 +1,5 @@
 import { getD1 } from "@/db";
 import { queryDokuQrisStatus } from "@/lib/server/doku";
-import { queryDokuCheckoutStatus } from "@/lib/server/doku-checkout-status";
 import { applyPendingDokuPaymentStatus } from "@/lib/server/doku-payment-transition";
 import {
   queryDokuEwalletStatus,
@@ -47,16 +46,8 @@ function orderEnvironment(order: ReconciliationOrder) {
 
 async function queryOrderStatus(order: ReconciliationOrder) {
   const environment = orderEnvironment(order);
-  if (!environment) return null;
+  if (!environment || order.payment_gateway_mode !== "direct") return null;
 
-  if (order.payment_gateway_mode === "checkout") {
-    return queryDokuCheckoutStatus({
-      environment,
-      referenceId: order.reference_id,
-    });
-  }
-
-  if (order.payment_gateway_mode && order.payment_gateway_mode !== "direct") return null;
   const requestId = order.gateway_request_id ?? order.doku_request_id;
   const referenceNo = order.gateway_reference_no ?? order.doku_reference_no;
   const paymentNo = order.gateway_payment_no ?? order.doku_payment_no;
@@ -118,10 +109,9 @@ async function markOrderStatusChecked(order: ReconciliationOrder) {
 }
 
 /**
- * Reconcile pending DOKU transactions through the documented status endpoint for
- * the exact mode used to create them: Checkout uses Non-SNAP Check Status,
- * Direct QRIS/VA/e-wallet uses the corresponding SNAP status API. Poll no sooner
- * than 60 seconds and no more often than once per minute per transaction.
+ * Reconcile pending DOKU Direct API transactions through the documented SNAP
+ * status endpoint for QRIS, VA, and e-wallet. Poll no sooner than 60 seconds and
+ * no more often than once per minute per transaction.
  */
 export async function finalizeExpiredDokuPayments(limit = 100) {
   const db = getD1();
@@ -134,8 +124,9 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
     `SELECT * FROM orders
      WHERE payment_status = 'pending'
        AND payment_method IN ('va', 'ewallet', 'qris')
-       AND (payment_gateway = 'doku' OR (payment_gateway IS NULL AND doku_request_id IS NOT NULL))
-       AND COALESCE(payment_gateway_environment, doku_environment) IN ('sandbox', 'production')
+       AND payment_gateway = 'doku'
+       AND payment_gateway_mode = 'direct'
+       AND payment_gateway_environment IN ('sandbox', 'production')
        AND created_at <= datetime('now', '-60 seconds')
        AND (COALESCE(gateway_status_checked_at, doku_status_checked_at) IS NULL
          OR COALESCE(gateway_status_checked_at, doku_status_checked_at) <= datetime('now', '-60 seconds'))
@@ -183,6 +174,8 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
       doku_reference_no, doku_payment_no, doku_environment
      FROM wallet_topups
      WHERE source = 'doku'
+       AND payment_gateway = 'doku'
+       AND payment_gateway_mode = 'direct'
        AND status = 'pending'
        AND (payment_method LIKE 'va:%' OR payment_method LIKE 'ewallet:%')
        AND doku_request_id IS NOT NULL
@@ -223,7 +216,8 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
     `SELECT * FROM orders
      WHERE payment_status = 'pending'
        AND payment_method <> 'wallet'
-       AND (payment_gateway = 'doku' OR (payment_gateway IS NULL AND doku_request_id IS NOT NULL))
+       AND payment_gateway = 'doku'
+       AND payment_gateway_mode = 'direct'
        AND COALESCE(gateway_expired_at, doku_expired_at) IS NOT NULL
        AND datetime(COALESCE(gateway_expired_at, doku_expired_at)) <= datetime('now')
      ORDER BY COALESCE(gateway_expired_at, doku_expired_at) ASC
@@ -248,6 +242,8 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
     `SELECT reference_id
      FROM wallet_topups
      WHERE source = 'doku'
+       AND payment_gateway = 'doku'
+       AND payment_gateway_mode = 'direct'
        AND status = 'pending'
        AND doku_request_id IS NOT NULL
        AND doku_expired_at IS NOT NULL
