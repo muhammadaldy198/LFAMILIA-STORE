@@ -161,8 +161,8 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
             console.error("Notifikasi order hasil rekonsiliasi DOKU gagal:", error),
           );
         }
-      } else if (query.status === "failed" || query.status === "expired") {
-        await applyPendingDokuPaymentStatus(order, query.status);
+      } else if (query.status === "failed") {
+        await applyPendingDokuPaymentStatus(order, "failed");
       }
     } catch (error) {
       console.error("Rekonsiliasi status order DOKU gagal:", error);
