@@ -357,6 +357,7 @@ async function directRequest<T>(input: {
   endpointPath: string;
   body: Record<string, unknown>;
   channelId?: string;
+  deviceId?: string;
 }) {
   const accessToken = await getB2BToken(input.config);
   const requestTimestamp = timestamp();
@@ -379,6 +380,7 @@ async function directRequest<T>(input: {
     "x-signature": signature,
   };
   if (input.channelId) headers["channel-id"] = input.channelId;
+  if (input.deviceId?.trim()) headers["x-device-id"] = input.deviceId.trim();
 
   const response = await fetch(
     `${input.config.apiOrigin}${input.endpointPath}`,
@@ -451,6 +453,7 @@ export async function createDokuDirectPayment(input: {
   paymentMethod: string;
   paymentChannel: string;
   finishUrl: string;
+  deviceId: string;
 }) {
   const config = activeConfig();
   if (isAutomatedTestRuntime() && config.environment === "production") {
@@ -520,6 +523,7 @@ export async function createDokuDirectPayment(input: {
     const { response, payload, requestId } = await directRequest<EwalletResponse>({
       config,
       endpointPath,
+      deviceId: input.deviceId,
       body: {
         partnerReferenceNo: input.referenceId,
         validUpTo: expiresAt,
