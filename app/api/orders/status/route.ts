@@ -5,7 +5,7 @@ import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { queryDokuQrisStatus } from "@/lib/server/doku";
 import { applyPendingDokuPaymentStatus } from "@/lib/server/doku-payment-transition";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
-import { externalArtifactsFromOrder } from "@/lib/server/external-payments";
+import { externalArtifactsFromOrder, recordExternalPaymentEvent } from "@/lib/server/external-payments";
 import { queryMidtransSnapStatus } from "@/lib/server/midtrans-snap";
 import {
   applyPaymentStatus,
@@ -191,9 +191,9 @@ async function refreshMidtransSnapStatus(order: OrderRecord) {
       environment,
     });
     const eventSuffix = query.transactionId || order.reference_id;
-    await recordOrderEvent({
+    await recordExternalPaymentEvent({
       orderId: order.id,
-      source: "midtrans",
+      gateway: "midtrans",
       eventId: `snap-status-${eventSuffix}-${query.status}`,
       status: query.status,
       payload: query.raw,
