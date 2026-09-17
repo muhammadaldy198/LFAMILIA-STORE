@@ -1,7 +1,17 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { hostedPaymentType } from "@/lib/server/hosted-payment-methods";
 import { getHostedGatewayProfileForEnvironment, getMidtransSnapConfig, type PaymentEnvironment } from "@/lib/server/payment-mode-config";
-import type { HostedPaymentResult } from "@/lib/server/doku-checkout";
+
+type HostedPaymentResult = {
+  requestId: string;
+  referenceNo: string | null;
+  paymentNo: string | null;
+  qrContent: string | null;
+  paymentUrl: string | null;
+  paymentName: string;
+  expiredAt: string | null;
+  raw: unknown;
+};
 
 function wibTimestamp(date = new Date()) {
   const shifted = new Date(date.getTime() + 7 * 60 * 60 * 1000);

@@ -12,6 +12,7 @@ const saveModes = z.object({
   action: z.literal("save_modes"),
   dokuEnvironment: z.enum(["sandbox", "production"]),
   midtransEnvironment: z.enum(["sandbox", "production"]),
+  walletTopupGateway: z.enum(["doku", "midtrans"]).optional(),
 });
 
 const saveProfile = z.object({
@@ -41,6 +42,7 @@ export async function PUT(request: Request) {
       await savePaymentModeSelections({
         dokuEnvironment: input.dokuEnvironment,
         midtransEnvironment: input.midtransEnvironment,
+        walletTopupGateway: input.walletTopupGateway,
       });
     } else {
       if ((input.provider === "doku" && input.mode !== "direct") || (input.provider === "midtrans" && input.mode !== "snap")) {

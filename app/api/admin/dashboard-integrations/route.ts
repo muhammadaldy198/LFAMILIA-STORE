@@ -1,6 +1,7 @@
 import { requireAdminSession } from "@/lib/server/admin";
 import { getIntegrationOverview } from "@/lib/server/integration-config";
 import { getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
+import { listPaymentGatewaySettings } from "@/lib/server/payment-channels";
 import { getPaymentModeOverview } from "@/lib/server/payment-mode-config";
 import { getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
 import { getDigiflazzReadiness } from "@/lib/server/providers/digiflazz";
@@ -36,13 +37,17 @@ export async function GET(request: Request) {
   if (access instanceof Response) return access;
 
   try {
-    const [integration, paymentModes, dokuDirect, midtransSnap] = await Promise.all([
+    const [integration, paymentModes, gatewaySettings, dokuDirect, midtransSnap] = await Promise.all([
       getIntegrationOverview(),
       getPaymentModeOverview(),
+      listPaymentGatewaySettings(),
       getConfiguredGatewayReadiness({ gateway: "doku", paymentMethod: "qris", paymentChannel: "qris" }),
       getMidtransSnapReadiness(),
     ]);
 
+    const activeGateway = new Map(gatewaySettings.map((item) => [item.gateway, item.isActive]));
+    const dokuActive = activeGateway.get("doku") === true;
+    const midtransActive = activeGateway.get("midtrans") === true;
     const digiflazz = getDigiflazzReadiness();
     const kokinpayReady = integration.profiles.some(
       (profile) => profile.provider === "kokinpay" && profile.mode === "service" && profile.environment === "global" && profile.configured && !profile.decryptionError,
@@ -69,17 +74,17 @@ export async function GET(request: Request) {
         id: "doku-direct",
         name: "DOKU Direct API",
         ready: dokuDirect.ready,
-        active: true,
+        active: dokuActive,
         environment: paymentModes.dokuEnvironment,
-        status: statusText({ ready: dokuDirect.ready, active: true, environment: paymentModes.dokuEnvironment }),
+        status: statusText({ ready: dokuDirect.ready, active: dokuActive, environment: paymentModes.dokuEnvironment }),
       },
       {
         id: "midtrans-snap",
         name: "Midtrans Snap",
         ready: midtransSnap.ready,
-        active: true,
+        active: midtransActive,
         environment: paymentModes.midtransEnvironment,
-        status: statusText({ ready: midtransSnap.ready, active: true, environment: paymentModes.midtransEnvironment }),
+        status: statusText({ ready: midtransSnap.ready, active: midtransActive, environment: paymentModes.midtransEnvironment }),
       },
     ];
 

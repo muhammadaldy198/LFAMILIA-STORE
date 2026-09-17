@@ -1,6 +1,5 @@
 import { getD1 } from "@/db";
 import { hashHex } from "@/lib/server/crypto";
-import { validateDokuCheckoutNotification } from "@/lib/server/doku-checkout";
 import {
   parseDokuNotification,
   validateDokuNotification,
@@ -65,7 +64,7 @@ function notificationAck(payload: Record<string, unknown>, eventId: string) {
 }
 
 function notificationResponse(
-  scheme: "snap" | "non-snap" | "checkout",
+  scheme: "snap" | "non-snap",
   payload: Record<string, unknown>,
   eventId: string,
 ) {
@@ -119,6 +118,9 @@ export async function POST(request: Request) {
           .first<{ doku_environment: DokuEnvironment | null }>();
 
     const expectedMode = orderRouting?.payment_gateway_mode ?? externalWallet?.payment_gateway_mode ?? null;
+    if (expectedMode && expectedMode !== "direct") {
+      return Response.json({ ok: true });
+    }
     const expectedEnvironment = orderRouting?.payment_gateway_environment
       ?? externalWallet?.gateway_environment
       ?? expectedOrder?.doku_environment
@@ -126,38 +128,23 @@ export async function POST(request: Request) {
       ?? null;
     const target = new URL(request.url).pathname;
 
-    let scheme: "snap" | "non-snap" | "checkout" | null = null;
-    if (expectedMode === "checkout" && expectedEnvironment) {
-      const valid = await validateDokuCheckoutNotification({
-        rawBody,
-        requestTarget: target,
-        clientId: request.headers.get("client-id"),
-        requestId: request.headers.get("request-id"),
-        requestTimestamp: request.headers.get("request-timestamp"),
-        receivedSignature: request.headers.get("signature"),
-        environment: expectedEnvironment,
-      });
-      if (valid) scheme = "checkout";
-    } else {
-      const validation = validateDokuNotification({
-        rawBody,
-        requestTarget: target,
-        partnerId: request.headers.get("x-partner-id"),
-        requestTimestamp: request.headers.get("x-timestamp"),
-        receivedSignature: request.headers.get("x-signature"),
-        authorization: request.headers.get("authorization"),
-        clientId: request.headers.get("client-id"),
-        requestId: request.headers.get("request-id"),
-        legacyTimestamp: request.headers.get("request-timestamp"),
-        legacySignature: request.headers.get("signature"),
-        expectedEnvironment,
-      });
-      if (validation.valid) scheme = validation.scheme;
-    }
-
-    if (!scheme) {
+    const validation = validateDokuNotification({
+      rawBody,
+      requestTarget: target,
+      partnerId: request.headers.get("x-partner-id"),
+      requestTimestamp: request.headers.get("x-timestamp"),
+      receivedSignature: request.headers.get("x-signature"),
+      authorization: request.headers.get("authorization"),
+      clientId: request.headers.get("client-id"),
+      requestId: request.headers.get("request-id"),
+      legacyTimestamp: request.headers.get("request-timestamp"),
+      legacySignature: request.headers.get("signature"),
+      expectedEnvironment,
+    });
+    if (!validation.valid || !validation.scheme) {
       return Response.json({ error: "Signature callback DOKU tidak valid." }, { status: 401 });
     }
+    const scheme = validation.scheme;
 
     const status = notification.status;
     const callbackAmount = notification.amount;
@@ -165,14 +152,11 @@ export async function POST(request: Request) {
     const eventId = request.headers.get("x-external-id") || request.headers.get("request-id") || `body-${hashHex("sha256", rawBody)}`;
 
     if (externalWallet) {
-      if (scheme === "checkout" && status === "failed") {
-        return notificationResponse(scheme, payload, eventId);
-      }
       const result = await applyExternalWalletTopup({
         referenceId,
         gateway: "doku",
         status,
-        originalRequestId: scheme === "checkout" ? null : originalRequestId,
+        originalRequestId,
         callbackAmount,
       });
       if (result.credited) {
@@ -201,20 +185,17 @@ export async function POST(request: Request) {
 
     const order = expectedOrder;
     if (!order) return notificationResponse(scheme, payload, eventId);
-    if (orderRouting?.payment_gateway && orderRouting.payment_gateway !== "doku") {
+    if (orderRouting?.payment_gateway !== "doku" || orderRouting.payment_gateway_mode !== "direct") {
       return notificationResponse(scheme, payload, eventId);
     }
     if (!canProcessDokuOrderCallback(order.payment_status)) {
       return notificationResponse(scheme, payload, eventId);
     }
 
-    if (scheme !== "checkout" && order.doku_request_id && originalRequestId && order.doku_request_id !== originalRequestId) {
+    if (order.doku_request_id && originalRequestId && order.doku_request_id !== originalRequestId) {
       return notificationResponse(scheme, payload, eventId);
     }
     if (status === "paid" && (!Number.isFinite(callbackAmount) || callbackAmount !== order.total)) {
-      return notificationResponse(scheme, payload, eventId);
-    }
-    if (scheme === "checkout" && status === "failed") {
       return notificationResponse(scheme, payload, eventId);
     }
 

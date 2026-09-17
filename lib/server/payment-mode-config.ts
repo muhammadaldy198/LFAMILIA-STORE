@@ -3,7 +3,7 @@ import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 export type PaymentEnvironment = "sandbox" | "production";
 export type PaymentProvider = "doku" | "midtrans";
-export type PaymentProfileMode = "direct" | "checkout" | "snap";
+export type PaymentProfileMode = "direct" | "snap";
 
 type RuntimeLike = Record<string, unknown> & {
   DB?: D1Database;
@@ -70,12 +70,14 @@ async function settings(db = getD1()) {
   return new Map(rows.results.map((row) => [row.setting_key, row.value]));
 }
 function env(value: string | undefined): PaymentEnvironment { return value === "production" ? "production" : "sandbox"; }
+function gateway(value: string | undefined): PaymentProvider { return value === "midtrans" ? "midtrans" : "doku"; }
 
 export async function getActivePaymentModes() {
   const current = await settings();
   return {
     dokuEnvironment: env(current.get("doku_environment")),
     midtransEnvironment: env(current.get("midtrans_environment")),
+    walletTopupGateway: gateway(current.get("wallet_topup_gateway")),
     dokuMode: "direct" as const,
     midtransMode: "snap" as const,
   };
@@ -84,12 +86,14 @@ export async function getActivePaymentModes() {
 export async function savePaymentModeSelections(input: {
   dokuEnvironment?: PaymentEnvironment;
   midtransEnvironment?: PaymentEnvironment;
+  walletTopupGateway?: PaymentProvider;
 }) {
   await ensureTables();
   const db = getD1();
   const rows: Array<[string, string | undefined]> = [
     ["doku_environment", input.dokuEnvironment],
     ["midtrans_environment", input.midtransEnvironment],
+    ["wallet_topup_gateway", input.walletTopupGateway],
   ];
   const statements = rows.flatMap(([key, value]) => value ? [db.prepare(`INSERT INTO integration_settings (setting_key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(setting_key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`).bind(key, value)] : []);
@@ -98,7 +102,6 @@ export async function savePaymentModeSelections(input: {
 
 const allowedFields: Record<PaymentProfileMode, readonly string[]> = {
   direct: ["clientId", "secretKey", "privateKey", "privateKeyPassphrase", "apiUrl", "qrisMerchantId", "qrisTerminalId", "qrisPostalCode", "vaConfigJson"],
-  checkout: ["clientId", "secretKey"],
   snap: ["serverKey", "clientKey"],
 };
 
@@ -137,17 +140,6 @@ export async function savePaymentGatewayProfile(input: {
   return saveProfile(input);
 }
 
-/** Legacy helper retained only so old DOKU Checkout transactions can still validate callbacks. */
-export async function saveHostedGatewayProfile(input: {
-  provider: PaymentProvider;
-  mode: "checkout" | "snap";
-  environment: PaymentEnvironment;
-  values: Record<string, string>;
-}) {
-  if ((input.provider === "doku" && input.mode !== "checkout") || (input.provider === "midtrans" && input.mode !== "snap")) throw new Error("Mode gateway tidak valid.");
-  return saveProfile(input);
-}
-
 async function profile(provider: PaymentProvider, mode: PaymentProfileMode, environment: PaymentEnvironment, db = getD1(), explicitSecret?: string) {
   await ensureTables(db);
   const row = await db.prepare("SELECT encrypted_config FROM integration_profiles WHERE provider = ? AND mode = ? AND environment = ? LIMIT 1")
@@ -156,23 +148,8 @@ async function profile(provider: PaymentProvider, mode: PaymentProfileMode, envi
   try { return explicitSecret ? await decryptWithSecret(row.encrypted_config, explicitSecret) : await decrypt(row.encrypted_config); } catch { return null; }
 }
 
-export async function getHostedGatewayProfileForEnvironment(provider: PaymentProvider, mode: "checkout" | "snap", environment: PaymentEnvironment) {
+export async function getHostedGatewayProfileForEnvironment(provider: "midtrans", mode: "snap", environment: PaymentEnvironment) {
   return profile(provider, mode, environment);
-}
-
-/** Legacy reader used only by pre-existing DOKU Checkout transactions. New DOKU payments are Direct API. */
-export async function getDokuCheckoutConfig() {
-  const { dokuEnvironment } = await getActivePaymentModes();
-  const values = await profile("doku", "checkout", dokuEnvironment);
-  if (!values?.clientId || !values.secretKey) {
-    throw new Error(`Kredensial DOKU Checkout legacy ${dokuEnvironment} belum tersedia.`);
-  }
-  return {
-    environment: dokuEnvironment,
-    clientId: values.clientId,
-    secretKey: values.secretKey,
-    apiOrigin: dokuEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com",
-  };
 }
 
 export async function getMidtransSnapConfig() {

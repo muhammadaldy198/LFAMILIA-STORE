@@ -7,6 +7,7 @@ import {
   isGatewayChannelSupported,
   isPaymentGatewayActive,
 } from "@/lib/server/payment-channels";
+import { getActivePaymentModes } from "@/lib/server/payment-mode-config";
 import { createConfiguredPayment, getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
@@ -103,24 +104,30 @@ export async function POST(request: Request) {
         ? "mpm"
         : input.paymentChannel;
     const managedChannel = await getPaymentChannel(input.paymentMethod, paymentChannel, false);
+    const { walletTopupGateway } = await getActivePaymentModes();
+    const topupGatewayConfig = managedChannel
+      ? managedChannel.gateway === walletTopupGateway
+        ? managedChannel.gatewayConfig
+        : { customerFeeBps: managedChannel.gatewayConfig.customerFeeBps ?? "0" }
+      : {};
     if (
       !managedChannel ||
-      !isGatewayChannelSupported(managedChannel.gateway, input.paymentMethod, paymentChannel) ||
-      !(await isPaymentGatewayActive(managedChannel.gateway))
+      !isGatewayChannelSupported(walletTopupGateway, input.paymentMethod, paymentChannel, topupGatewayConfig) ||
+      !(await isPaymentGatewayActive(walletTopupGateway))
     ) {
-      throw new Error("Metode pembayaran ini belum didukung atau sedang dinonaktifkan.");
+      throw new Error("Metode pembayaran ini belum didukung atau gateway top up sedang dinonaktifkan.");
     }
 
     const readiness = await getConfiguredGatewayReadiness({
-      gateway: managedChannel.gateway,
+      gateway: walletTopupGateway,
       paymentMethod: input.paymentMethod,
       paymentChannel,
-      gatewayConfig: managedChannel.gatewayConfig,
+      gatewayConfig: topupGatewayConfig,
     });
-    if (!readiness.ready) throw new Error("Metode pembayaran otomatis belum siap.");
+    if (!readiness.ready) throw new Error("Gateway top up saldo yang dipilih Admin belum siap.");
 
     const paymentMethodKey = `${input.paymentMethod}:${paymentChannel}`;
-    const paymentFee = calculateCustomerPaymentFee(input.amount, managedChannel.gatewayConfig);
+    const paymentFee = calculateCustomerPaymentFee(input.amount, topupGatewayConfig);
     const paymentTotal = input.amount + paymentFee;
     requestedAmount = input.amount;
     requestedPaymentMethodKey = paymentMethodKey;
@@ -151,7 +158,7 @@ export async function POST(request: Request) {
       paymentMethodKey,
       referenceId,
       idempotencyKey: idempotencyKey || null,
-      gateway: managedChannel.gateway,
+      gateway: walletTopupGateway,
       mode: readiness.mode,
       environment: readiness.environment,
     });
@@ -169,12 +176,12 @@ export async function POST(request: Request) {
 
     const baseUrl = getPublicBaseUrl();
     const payment = await createConfiguredPayment({
-      gateway: managedChannel.gateway,
+      gateway: walletTopupGateway,
       referenceId,
       amount: paymentTotal,
       paymentMethod: input.paymentMethod,
       paymentChannel,
-      gatewayConfig: managedChannel.gatewayConfig,
+      gatewayConfig: topupGatewayConfig,
       buyerName: customer.name,
       buyerPhone: customer.phone,
       buyerEmail: customer.email,

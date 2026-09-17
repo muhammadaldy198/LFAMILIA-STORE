@@ -5,11 +5,57 @@ import { hydrateDokuDirectRuntimeEnv } from "@/lib/server/payment-mode-config";
 import type { PaymentGatewayName } from "@/lib/server/payment-channels";
 import { getRuntimeEnv, setRuntimeEnv } from "@/lib/server/runtime-env";
 
-export type RoutedPaymentMode = "direct" | "checkout" | "snap";
+export type RoutedPaymentMode = "direct" | "snap";
 
 async function prepareDokuRuntime() {
   const current = getRuntimeEnv<Record<string, unknown>>();
   setRuntimeEnv(await hydrateDokuDirectRuntimeEnv(current));
+}
+
+function runtimeText(runtime: Record<string, unknown>, key: string) {
+  const value = runtime[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function dokuChannelConfigReason(
+  environment: "sandbox" | "production" | null,
+  method: string,
+  channel: string,
+) {
+  if (!environment) return "Environment DOKU Direct API belum siap.";
+  const runtime = getRuntimeEnv<Record<string, unknown>>();
+  const prefix = `DOKU_${environment.toUpperCase()}_`;
+
+  if (method === "qris") {
+    const merchantId = runtimeText(runtime, `${prefix}QRIS_MERCHANT_ID`);
+    const terminalId = runtimeText(runtime, `${prefix}QRIS_TERMINAL_ID`);
+    const postalCode = runtimeText(runtime, `${prefix}QRIS_POSTAL_CODE`);
+    if (!merchantId || !terminalId || !/^\d{1,5}$/.test(postalCode)) {
+      return "QRIS DOKU belum lengkap. Isi Merchant ID, Terminal ID, dan Postal Code.";
+    }
+  }
+
+  if (method === "va") {
+    const raw = runtimeText(runtime, `${prefix}VA_CONFIG_JSON`);
+    if (!raw) return `Konfigurasi Virtual Account ${channel.toUpperCase()} belum diisi.`;
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const item = parsed?.[channel];
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return `Konfigurasi Virtual Account ${channel.toUpperCase()} belum tersedia.`;
+      }
+      const values = item as Record<string, unknown>;
+      for (const key of ["partnerServiceId", "customerNo", "virtualAccountNo", "channel"] as const) {
+        if (typeof values[key] !== "string" || !values[key].trim()) {
+          return `Konfigurasi Virtual Account ${channel.toUpperCase()} belum lengkap.`;
+        }
+      }
+    } catch {
+      return "Konfigurasi Virtual Account DOKU harus berupa JSON valid.";
+    }
+  }
+
+  return null;
 }
 
 export async function getConfiguredGatewayReadiness(input: {
@@ -22,12 +68,17 @@ export async function getConfiguredGatewayReadiness(input: {
     await prepareDokuRuntime();
     const readiness = getDokuReadiness();
     const supported = isDokuChannelSupported(input.paymentMethod, input.paymentChannel);
+    const channelReason = readiness.ready && supported
+      ? dokuChannelConfigReason(readiness.environment, input.paymentMethod, input.paymentChannel)
+      : null;
     return {
-      ready: readiness.ready && supported,
+      ready: readiness.ready && supported && !channelReason,
       environment: readiness.environment,
       mode: "direct" as const,
       reason: readiness.ready
-        ? supported ? null : "Channel belum didukung DOKU Direct API."
+        ? supported
+          ? channelReason
+          : "Channel belum didukung DOKU Direct API."
         : readiness.reason,
     };
   }
