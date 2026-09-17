@@ -53,7 +53,7 @@ export function providerRelayRequest(
   const runtime = getRuntimeEnv<ProviderRelayEnv>();
   const token = runtime.PROVIDER_RELAY_TOKEN?.trim();
   const relayOrigin = configuredOrigin(runtime, route.provider);
-  if (!token || !relayOrigin) return { url, headers, relayed: false };
+  if (!token || !relayOrigin) return { url, headers, relayed: false as const };
 
   const routedUrl = routeUrl(url, relayOrigin);
   return {
@@ -63,8 +63,28 @@ export function providerRelayRequest(
       "x-lfamilia-relay-token": token,
       [`x-lfamilia-${route.provider}-environment`]: route.environment,
     },
-    relayed: true,
+    relayed: true as const,
   };
+}
+
+/**
+ * DigiFlazz requires source-IP allowlisting. Cloudflare Workers do not provide
+ * LFAMILIA with a dedicated stable egress IP, therefore every outbound
+ * DigiFlazz request must leave through the VPS relay. Never silently fall back
+ * to a direct Worker -> DigiFlazz request.
+ */
+export function requireProviderRelayRequest(
+  url: string,
+  headers: Record<string, string>,
+  route: { provider: RelayProvider; environment: string },
+) {
+  const request = providerRelayRequest(url, headers, route);
+  if (!request.relayed) {
+    throw new Error(
+      "VPS Relay DigiFlazz wajib aktif. Daftarkan IPv4 publik VPS sebagai Development/Production IP di DigiFlazz dan lengkapi Relay URL + Relay Token di Integrasi.",
+    );
+  }
+  return request;
 }
 
 export type RelayConnectionResult = {
