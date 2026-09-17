@@ -1,6 +1,7 @@
 import * as categories from "@/app/api/admin/categories/route";
 import * as balances from "@/app/api/admin/balances/route";
 import * as content from "@/app/api/admin/content/route";
+import * as dashboardIntegrations from "@/app/api/admin/dashboard-integrations/route";
 import * as digiflazzPricing from "@/app/api/admin/digiflazz-pricing/route";
 import * as digiflazzMonitor from "@/app/api/admin/digiflazz-monitor/route";
 import * as dokuDatabase from "@/app/api/admin/doku-database/route";
@@ -41,6 +42,7 @@ const routes: Record<string, RouteHandlers> = {
   balances: { GET: balances.GET, PUT: balances.PUT },
   categories: { GET: categories.GET, POST: categories.POST, DELETE: categories.DELETE },
   content: { GET: content.GET, POST: content.POST, DELETE: content.DELETE },
+  "dashboard-integrations": { GET: dashboardIntegrations.GET },
   "digiflazz-pricing": { GET: digiflazzPricing.GET, POST: digiflazzPricing.POST, PUT: digiflazzPricing.PUT },
   "digiflazz-monitor": { GET: digiflazzMonitor.GET, POST: digiflazzMonitor.POST },
   "doku-database": { GET: dokuDatabase.GET, POST: dokuDatabase.POST },
