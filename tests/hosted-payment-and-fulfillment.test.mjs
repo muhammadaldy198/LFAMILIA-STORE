@@ -6,18 +6,20 @@ import test from "node:test";
 const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("DOKU Direct API and Midtrans Snap are the active routable modes", () => {
+test("DOKU Direct API and Midtrans Snap are the only active routable modes", () => {
   const router = read("lib/server/payment-router.ts");
   assert.match(router, /createDokuDirectPayment/);
   assert.match(router, /mode: "direct" as const/);
   assert.match(router, /createMidtransSnapPayment/);
-  assert.doesNotMatch(router, /createDokuCheckoutPayment|createMidtransVirtualAccount|mode: "bisnap"/);
+  assert.match(router, /export type RoutedPaymentMode = "direct" \| "snap"/);
+  assert.doesNotMatch(router, /createDokuCheckoutPayment|mode: "checkout"|createMidtransVirtualAccount|mode: "bisnap"/);
 });
 
-test("DOKU Direct and hosted legacy status polling remain terminal-safe while fulfillment stays server-side", () => {
+test("DOKU Direct status polling remains terminal-safe while fulfillment stays server-side", () => {
   const status = read("app/api/orders/status/route.ts");
   const callback = read("app/api/payments/midtrans/snap/notification/route.ts");
-  assert.match(status, /artifacts\.mode === "direct" \|\| artifacts\.mode === "checkout"/);
+  assert.match(status, /artifacts\.mode === "direct"/);
+  assert.doesNotMatch(status, /queryDokuCheckoutStatus|artifacts\.mode === "checkout"/);
   assert.match(status, /queryDokuQrisStatus/);
   assert.match(status, /queryDokuVaStatus/);
   assert.match(status, /queryDokuEwalletStatus/);
