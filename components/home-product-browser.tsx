@@ -11,12 +11,14 @@ import {
   Smartphone,
   Ticket,
   X,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ProductCard } from "@/components/product-card";
 import { useStoreProducts } from "@/hooks/use-store-products";
 import { useStorefront } from "@/hooks/use-storefront";
+import { normalizeProductCategorySlug } from "@/lib/product-categories";
 import type { ProductCategory } from "@/lib/store-data";
 
 type Filter = "all" | ProductCategory;
@@ -32,7 +34,7 @@ export function HomeProductBrowser() {
     return products
       .filter(
         (product) =>
-          (filter === "all" || product.category === filter) &&
+          (filter === "all" || normalizeProductCategorySlug(product.category) === filter) &&
           (!term ||
             `${product.name} ${product.publisher}`.toLowerCase().includes(term)),
       )
@@ -45,10 +47,10 @@ export function HomeProductBrowser() {
         <div>
           <p className="eyebrow">Otomatis & manual</p>
           <h2 className="text-[22px] font-black leading-tight tracking-[-0.035em] sm:text-[28px]">
-            Pilih game favoritmu
+            Pilih produk favoritmu
           </h2>
           <p className="mt-[7px] max-w-2xl text-[11px] leading-[1.5] text-white/42 sm:text-xs">
-            Produk otomatis diproses sistem 24 jam; produk khusus masuk antrean admin.
+            Top up game, voucher, hiburan, pulsa, dan PLN dalam satu katalog.
           </p>
         </div>
 
@@ -58,7 +60,7 @@ export function HomeProductBrowser() {
             id="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Cari game atau voucher..."
+            placeholder="Cari game, voucher, pulsa, PLN..."
             className="h-[36px] rounded-[8px] border-white/10 bg-[#10131b] pl-[34px] pr-[34px] text-[11px] text-white placeholder:text-white/25"
           />
           {query && (
@@ -140,5 +142,6 @@ function categoryIcon(icon: string, slug: string) {
   if (icon === "ticket" || slug === "voucher") return Ticket;
   if (icon === "play" || slug === "entertainment") return Play;
   if (icon === "smartphone" || slug === "pulsa") return Smartphone;
+  if (icon === "zap" || slug === "pln") return Zap;
   return Grid3X3;
 }

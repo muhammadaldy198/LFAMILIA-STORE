@@ -25,6 +25,13 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import {
+  PRODUCT_CATEGORIES,
+  PRODUCT_CATEGORY_LABELS,
+  productCategoryLabel,
+  productCategorySlug,
+  type ProductCategoryLabel,
+} from "@/lib/product-categories";
 
 type ProductProvider = "Digiflazz" | "Manual";
 type EditorTab = "Informasi Produk" | "Nominal & Harga" | "Tabel Pemisah" | "Tampilan Produk" | "Input Customer" | "Fulfillment";
@@ -84,7 +91,7 @@ type Product = {
   name: string;
   slug: string;
   description: string;
-  category: "Mobile Games" | "PC Games" | "Game Voucher";
+  category: ProductCategoryLabel;
   provider: ProductProvider;
   nominalCount: number;
   startPrice: number;
@@ -131,13 +138,11 @@ type DigiflazzCatalogItem = {
 type DigiflazzImportItem = DigiflazzCatalogItem & { sku: string };
 
 function displayCategory(value: string): Product["category"] {
-  if (value === "voucher" || value.includes("voucher")) return "Game Voucher";
-  if (value === "pc-game" || value.includes("pc")) return "PC Games";
-  return "Mobile Games";
+  return productCategoryLabel(value);
 }
 
 function apiCategory(value: Product["category"]) {
-  return value === "Game Voucher" ? "voucher" : value === "PC Games" ? "pc-game" : "game";
+  return productCategorySlug(value);
 }
 
 function mapProduct(raw: ManagedProductPayload): Product {
@@ -220,7 +225,7 @@ export function AdminProductManager() {
     const name = String(form.get("name") || "Produk Baru");
     const slug = String(form.get("slug") || slugify(name));
     const selectedProvider = String(form.get("provider") || "Manual") as ProductProvider;
-    const category = String(form.get("category") || "Mobile Games") as Product["category"];
+    const category = String(form.get("category") || "Top Up Game") as Product["category"];
     const image = form.get("image");
     const raw: ManagedProductPayload = {
       dbId: null,
@@ -301,7 +306,7 @@ export function AdminProductManager() {
 
       <div className="mt-[15px] grid grid-cols-[1.65fr_.75fr_.78fr_.72fr_.85fr_auto] gap-[8px]">
         <label className="relative"><Search className="absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#708198]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama produk, kategori, atau slug..." className="h-[34px] w-full rounded-[5px] border border-[#dce3eb] bg-white pl-[31px] pr-[9px] text-[9px] outline-none placeholder:text-[#8290a2] focus:border-[#2680eb]" /></label>
-        <CompactSelect value={category} onChange={setCategory} options={["Semua Kategori", "Mobile Games", "PC Games", "Game Voucher"]} />
+        <CompactSelect value={category} onChange={setCategory} options={["Semua Kategori", ...PRODUCT_CATEGORY_LABELS]} />
         <CompactSelect value={provider} onChange={setProvider} options={["Semua Provider", "Digiflazz", "Manual"]} />
         <CompactSelect value={status} onChange={setStatus} options={["Semua Status", "Aktif", "Nonaktif"]} />
         <CompactSelect value={sort} onChange={setSort} options={["Urutkan: Terbaru", "Urutkan: Nama A-Z"]} />
@@ -709,7 +714,7 @@ type ProductSettingsValues = {
 function ProductSettingsPanel({ tab, product, values, onChange, uploading, onUpload, saving, onSave }: { tab: Exclude<EditorTab, "Nominal & Harga" | "Tabel Pemisah" | "Input Customer">; product: Product; values: ProductSettingsValues; onChange(key: keyof ProductSettingsValues, value: string | boolean): void; uploading: "imageUrl" | "bannerUrl" | null; onUpload(field: "imageUrl" | "bannerUrl", file?: File): void; saving: boolean; onSave(): void }) {
   return <section className="mt-[12px] rounded-[7px] border border-[#dfe6ef] bg-white p-[16px]">
     <div className="flex items-center justify-between border-b border-[#e8ecf1] pb-[11px]"><div><h2 className="text-[13px] font-extrabold">{tab}</h2><p className="mt-[2px] text-[8px] text-[#6c7d92]">Pengaturan {tab.toLowerCase()} untuk {product.name}.</p></div><button type="button" disabled={saving} onClick={onSave} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>
-    {tab === "Informasi Produk" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><ControlledField label="Nama produk" value={values.name} onChange={(value) => onChange("name", value)} /><ControlledField label="Slug" value={values.slug} onChange={(value) => onChange("slug", value)} /><ControlledField label="Publisher" value={values.publisher} onChange={(value) => onChange("publisher", value)} /><label className="text-[8px] font-bold text-[#3d4f68]">Kategori<select value={values.category} onChange={(event) => onChange("category", event.target.value)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="game">Mobile Games</option><option value="pc-game">PC Games</option><option value="voucher">Game Voucher</option></select></label><ProductMediaField label="Gambar produk (opsional, rasio 1:1)" field="imageUrl" value={values.imageUrl} onChange={(value) => onChange("imageUrl", value)} uploading={uploading === "imageUrl"} onUpload={onUpload} /><ProductMediaField label="Banner halaman produk (opsional)" field="bannerUrl" value={values.bannerUrl} onChange={(value) => onChange("bannerUrl", value)} uploading={uploading === "bannerUrl"} onUpload={onUpload} /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Deskripsi singkat<textarea value={values.description} onChange={(event) => onChange("description", event.target.value)} className="mt-[4px] h-[74px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label></div>}
+    {tab === "Informasi Produk" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><ControlledField label="Nama produk" value={values.name} onChange={(value) => onChange("name", value)} /><ControlledField label="Slug" value={values.slug} onChange={(value) => onChange("slug", value)} /><ControlledField label="Publisher" value={values.publisher} onChange={(value) => onChange("publisher", value)} /><label className="text-[8px] font-bold text-[#3d4f68]">Kategori<select value={values.category} onChange={(event) => onChange("category", event.target.value)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]">{PRODUCT_CATEGORIES.map((item) => <option key={item.slug} value={item.slug}>{item.label}</option>)}</select></label><ProductMediaField label="Gambar produk (opsional, rasio 1:1)" field="imageUrl" value={values.imageUrl} onChange={(value) => onChange("imageUrl", value)} uploading={uploading === "imageUrl"} onUpload={onUpload} /><ProductMediaField label="Banner halaman produk (opsional)" field="bannerUrl" value={values.bannerUrl} onChange={(value) => onChange("bannerUrl", value)} uploading={uploading === "bannerUrl"} onUpload={onUpload} /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Deskripsi singkat<textarea value={values.description} onChange={(event) => onChange("description", event.target.value)} className="mt-[4px] h-[74px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label></div>}
     {tab === "Tampilan Produk" && <div className="mt-[14px] grid grid-cols-3 gap-[10px]"><SettingSwitch label="Aktif" value={values.isActive} onChange={(value) => onChange("isActive", value)} /><SettingSwitch label="Ditampilkan di katalog" value={values.isActive} onChange={(value) => onChange("isActive", value)} /><SettingSwitch label="Produk populer" value={values.popular} onChange={(value) => onChange("popular", value)} /></div>}
     {tab === "Fulfillment" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><label className="text-[8px] font-bold text-[#3d4f68]">Jenis pemenuhan<select value={values.fulfillmentType} onChange={(event) => onChange("fulfillmentType", event.target.value)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="automatic">Otomatis</option><option value="manual">Manual</option></select></label><SettingSwitch label="Proses instan" value={values.instant} onChange={(value) => onChange("instant", value)} /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Instruksi pemenuhan manual<textarea value={values.manualInstructions} onChange={(event) => onChange("manualInstructions", event.target.value)} disabled={values.fulfillmentType !== "manual"} className="mt-[4px] h-[84px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px] disabled:bg-[#f3f5f8]" placeholder="Instruksi internal/admin untuk memproses pesanan" /></label></div>}
   </section>;
@@ -868,7 +873,7 @@ function ManualProductModal({ saving, onClose, onSubmit }: { saving: boolean; on
           </label>
           <Field label="Nama Produk *" name="name" placeholder="Contoh: Roblox Robux" required />
           <Field label="Slug *" name="slug" placeholder="contoh: roblox-robux" />
-          <label className="text-[8px] font-bold">Kategori *<select name="category" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Mobile Games</option><option>PC Games</option><option>Game Voucher</option></select></label>
+          <label className="text-[8px] font-bold">Kategori *<select name="category" defaultValue="Top Up Game" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]">{PRODUCT_CATEGORY_LABELS.map((label) => <option key={label} value={label}>{label}</option>)}</select></label>
           <label className="text-[8px] font-bold">Provider nominal *<select name="provider" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Digiflazz</option><option>Manual</option></select></label>
           <label className="col-span-2 text-[8px] font-bold">Deskripsi singkat<textarea name="description" placeholder="Deskripsi singkat produk..." className="mt-[4px] h-[72px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label>
           <label className="col-span-2 text-[8px] font-bold">Banner halaman produk (opsional)<input name="banner" placeholder="Boleh dikosongkan dan ditambahkan nanti" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label>
@@ -888,12 +893,12 @@ function ModalActions({ onCancel, submit }: { onCancel(): void; submit: string }
 function Field({ label, ...props }: { label: string; name: string; placeholder: string; type?: string; required?: boolean }) { return <label className="text-[8px] font-bold text-[#3d4f68]">{label}<input {...props} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] outline-none placeholder:text-[#929eae] focus:border-[#2580eb]" /></label>; }
 function ActionButton({ children, onClick }: { children: ReactNode; onClick: () => void }) { return <button type="button" onClick={onClick} className="inline-flex h-[31px] items-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white px-[11px] text-[7.5px] font-bold text-[#34506d] hover:bg-[#f6f9fc]">{children}</button>; }
 function IconButton({ children, label, danger, onClick }: { children: ReactNode; label: string; danger?: boolean; onClick: () => void }) { return <button type="button" aria-label={label} onClick={onClick} className={`grid size-[25px] place-items-center rounded-[4px] border ${danger ? "border-red-100 bg-red-50 text-red-500" : "border-[#dce3eb] bg-white text-[#52657d]"}`}>{children}</button>; }
-function CompactSelect({ value, onChange, options }: { value: string; onChange(value: string): void; options: string[] }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className="h-[34px] min-w-0 rounded-[5px] border border-[#dce3eb] bg-white px-[9px] text-[8px] font-medium text-[#40516a] outline-none">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
+function CompactSelect({ value, onChange, options }: { value: string; onChange(value: string): void; options: readonly string[] }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className="h-[34px] min-w-0 rounded-[5px] border border-[#dce3eb] bg-white px-[9px] text-[8px] font-medium text-[#40516a] outline-none">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
 function PageButton({ children, active }: { children: ReactNode; active?: boolean }) { return <span className={`grid size-[27px] place-items-center rounded-[4px] border text-[8px] font-bold ${active ? "border-[#0875ed] bg-[#0875ed] text-white" : "border-[#dde4ec] bg-white text-[#4c5e76]"}`}>{children}</span>; }
 function Box() { return <span className="block size-[13px] rounded-[3px] border border-[#cdd7e2] bg-white" />; }
 function Switch({ enabled, onToggle }: { enabled: boolean; onToggle(): void }) { return <button type="button" aria-pressed={enabled} onClick={onToggle} className={`relative h-[17px] w-[31px] rounded-full transition ${enabled ? "bg-[#0875ed]" : "bg-[#cad5e1]"}`}><span className={`absolute top-[2px] size-[13px] rounded-full bg-white shadow transition ${enabled ? "left-[16px]" : "left-[2px]"}`} /></button>; }
 function ProductImage({ product, large }: { product: Product; large?: boolean }) { const size = large ? "size-[58px] rounded-[9px]" : "size-[36px] rounded-[6px]"; return product.image ? <img src={product.image} alt="" className={`${size} object-cover shadow-sm`} /> : <span className={`grid ${size} place-items-center bg-gradient-to-br from-[#2186ef] to-[#133a85] font-black text-white`}>{product.name.slice(0, 2).toUpperCase()}</span>; }
-function CategoryBadge({ category }: { category: Product["category"] }) { const style = category === "PC Games" ? "bg-[#eee2ff] text-[#7142b3]" : category === "Game Voucher" ? "bg-[#fff0df] text-[#c46b1b]" : "bg-[#e2f1ff] text-[#1671c5]"; return <span className={`rounded-[4px] px-[7px] py-[4px] text-[6.5px] font-semibold ${style}`}>{category}</span>; }
+function CategoryBadge({ category }: { category: Product["category"] }) { const style = category === "Voucher & Gift Card" ? "bg-[#fff0df] text-[#c46b1b]" : category === "Entertainment" ? "bg-[#eee2ff] text-[#7142b3]" : category === "Pulsa" ? "bg-[#e8f7ee] text-[#168553]" : category === "PLN" ? "bg-[#fff8d9] text-[#a36d00]" : "bg-[#e2f1ff] text-[#1671c5]"; return <span className={`rounded-[4px] px-[7px] py-[4px] text-[6.5px] font-semibold ${style}`}>{category}</span>; }
 function NominalArtwork({ kind, imageUrl, large }: { kind: Nominal["imageKind"]; imageUrl?: string; large?: boolean }) { const size = large ? "mx-auto my-[7px] size-[35px] text-[16px]" : "size-[27px] text-[11px]"; if (imageUrl) return <img src={imageUrl} alt="" className={`${size} rounded-[4px] object-cover`} />; const label = kind === "diamond" ? "💎" : kind === "weekly" ? "🎟️" : kind === "double" ? "2X" : "🌙"; return <span className={`grid place-items-center rounded-[4px] bg-gradient-to-br from-[#b7efff] to-[#6d4fe8] font-black text-white ${size}`}>{label}</span>; }
 
 function moveItem<T extends { id: string }>(items: T[], id: string, direction: -1 | 1) { const index = items.findIndex((item) => item.id === id); const target = index + direction; if (index < 0 || target < 0 || target >= items.length) return items; const next = [...items]; [next[index], next[target]] = [next[target], next[index]]; return next; }
