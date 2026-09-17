@@ -2,10 +2,14 @@ import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 export type PaymentEnvironment = "sandbox" | "production";
-export type HostedProvider = "doku" | "midtrans";
-export type HostedMode = "checkout" | "snap";
+export type PaymentProvider = "doku" | "midtrans";
+export type PaymentProfileMode = "direct" | "checkout" | "snap";
 
-type RuntimeLike = { INTEGRATION_ENCRYPTION_KEY?: string; PUBLIC_BASE_URL?: string };
+type RuntimeLike = Record<string, unknown> & {
+  DB?: D1Database;
+  INTEGRATION_ENCRYPTION_KEY?: string;
+  PUBLIC_BASE_URL?: string;
+};
 type EncryptedValue = { v: 1; iv: string; data: string };
 type ProfileRow = { encrypted_config: string; updated_at: string };
 
@@ -13,14 +17,14 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 function runtime() { return getRuntimeEnv<RuntimeLike>(); }
-function secret() {
-  const value = runtime().INTEGRATION_ENCRYPTION_KEY?.trim();
+function secretFrom(source: RuntimeLike) {
+  const value = source.INTEGRATION_ENCRYPTION_KEY?.trim();
   if (!value || value.length < 32) throw new Error("INTEGRATION_ENCRYPTION_KEY belum siap.");
   return value;
 }
+function secret() { return secretFrom(runtime()); }
 
-async function ensureTables() {
-  const db = getD1();
+async function ensureTables(db = getD1()) {
   await db.prepare(`CREATE TABLE IF NOT EXISTS integration_profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     provider TEXT NOT NULL,
@@ -42,25 +46,27 @@ async function deriveKey(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
   return crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
-async function encrypt(values: Record<string, string>) {
-  const key = await deriveKey(secret());
+async function encryptWithSecret(values: Record<string, string>, secretValue: string) {
+  const key = await deriveKey(secretValue);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoder.encode(JSON.stringify(values)));
   return JSON.stringify({ v: 1, iv: Buffer.from(iv).toString("base64"), data: Buffer.from(data).toString("base64") } satisfies EncryptedValue);
 }
-async function decrypt(value: string) {
+async function decryptWithSecret(value: string, secretValue: string) {
   const payload = JSON.parse(value) as EncryptedValue;
   if (payload.v !== 1 || !payload.iv || !payload.data) throw new Error("Format kredensial tidak valid.");
-  const key = await deriveKey(secret());
+  const key = await deriveKey(secretValue);
   const raw = await crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(Buffer.from(payload.iv, "base64")) }, key, new Uint8Array(Buffer.from(payload.data, "base64")));
   const parsed = JSON.parse(decoder.decode(raw));
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Kredensial tidak valid.");
   return Object.fromEntries(Object.entries(parsed).flatMap(([key, field]) => typeof field === "string" ? [[key, field]] : [])) as Record<string, string>;
 }
+async function encrypt(values: Record<string, string>) { return encryptWithSecret(values, secret()); }
+async function decrypt(value: string) { return decryptWithSecret(value, secret()); }
 
-async function settings() {
-  await ensureTables();
-  const rows = await getD1().prepare("SELECT setting_key, value FROM integration_settings").all<{ setting_key: string; value: string }>();
+async function settings(db = getD1()) {
+  await ensureTables(db);
+  const rows = await db.prepare("SELECT setting_key, value FROM integration_settings").all<{ setting_key: string; value: string }>();
   return new Map(rows.results.map((row) => [row.setting_key, row.value]));
 }
 function env(value: string | undefined): PaymentEnvironment { return value === "production" ? "production" : "sandbox"; }
@@ -70,6 +76,8 @@ export async function getActivePaymentModes() {
   return {
     dokuEnvironment: env(current.get("doku_environment")),
     midtransEnvironment: env(current.get("midtrans_environment")),
+    dokuMode: "direct" as const,
+    midtransMode: "snap" as const,
   };
 }
 
@@ -88,18 +96,18 @@ export async function savePaymentModeSelections(input: {
   if (statements.length) await db.batch(statements);
 }
 
-const allowedFields: Record<HostedMode, readonly string[]> = {
+const allowedFields: Record<PaymentProfileMode, readonly string[]> = {
+  direct: ["clientId", "secretKey", "privateKey", "privateKeyPassphrase", "apiUrl", "qrisMerchantId", "qrisTerminalId", "qrisPostalCode", "vaConfigJson"],
   checkout: ["clientId", "secretKey"],
   snap: ["serverKey", "clientKey"],
 };
 
-export async function saveHostedGatewayProfile(input: {
-  provider: HostedProvider;
-  mode: HostedMode;
+async function saveProfile(input: {
+  provider: PaymentProvider;
+  mode: PaymentProfileMode;
   environment: PaymentEnvironment;
   values: Record<string, string>;
 }) {
-  if ((input.provider === "doku" && input.mode !== "checkout") || (input.provider === "midtrans" && input.mode !== "snap")) throw new Error("Mode gateway tidak valid.");
   await ensureTables();
   const db = getD1();
   const existing = await db.prepare("SELECT encrypted_config FROM integration_profiles WHERE provider = ? AND mode = ? AND environment = ? LIMIT 1")
@@ -117,22 +125,48 @@ export async function saveHostedGatewayProfile(input: {
     .bind(input.provider, input.mode, input.environment, encrypted).run();
 }
 
-async function profile(provider: HostedProvider, mode: HostedMode, environment: PaymentEnvironment) {
-  await ensureTables();
-  const row = await getD1().prepare("SELECT encrypted_config FROM integration_profiles WHERE provider = ? AND mode = ? AND environment = ? LIMIT 1")
-    .bind(provider, mode, environment).first<ProfileRow>();
-  if (!row?.encrypted_config) return null;
-  try { return await decrypt(row.encrypted_config); } catch { return null; }
+export async function savePaymentGatewayProfile(input: {
+  provider: PaymentProvider;
+  mode: "direct" | "snap";
+  environment: PaymentEnvironment;
+  values: Record<string, string>;
+}) {
+  if ((input.provider === "doku" && input.mode !== "direct") || (input.provider === "midtrans" && input.mode !== "snap")) {
+    throw new Error("Mode gateway tidak valid.");
+  }
+  return saveProfile(input);
 }
 
-export async function getHostedGatewayProfileForEnvironment(provider: HostedProvider, mode: HostedMode, environment: PaymentEnvironment) {
+/** Legacy helper retained only so old DOKU Checkout transactions can still validate callbacks. */
+export async function saveHostedGatewayProfile(input: {
+  provider: PaymentProvider;
+  mode: "checkout" | "snap";
+  environment: PaymentEnvironment;
+  values: Record<string, string>;
+}) {
+  if ((input.provider === "doku" && input.mode !== "checkout") || (input.provider === "midtrans" && input.mode !== "snap")) throw new Error("Mode gateway tidak valid.");
+  return saveProfile(input);
+}
+
+async function profile(provider: PaymentProvider, mode: PaymentProfileMode, environment: PaymentEnvironment, db = getD1(), explicitSecret?: string) {
+  await ensureTables(db);
+  const row = await db.prepare("SELECT encrypted_config FROM integration_profiles WHERE provider = ? AND mode = ? AND environment = ? LIMIT 1")
+    .bind(provider, mode, environment).first<ProfileRow>();
+  if (!row?.encrypted_config) return null;
+  try { return explicitSecret ? await decryptWithSecret(row.encrypted_config, explicitSecret) : await decrypt(row.encrypted_config); } catch { return null; }
+}
+
+export async function getHostedGatewayProfileForEnvironment(provider: PaymentProvider, mode: "checkout" | "snap", environment: PaymentEnvironment) {
   return profile(provider, mode, environment);
 }
 
+/** Legacy reader used only by pre-existing DOKU Checkout transactions. New DOKU payments are Direct API. */
 export async function getDokuCheckoutConfig() {
   const { dokuEnvironment } = await getActivePaymentModes();
   const values = await profile("doku", "checkout", dokuEnvironment);
-  if (!values?.clientId || !values.secretKey) throw new Error(`Kredensial DOKU Checkout ${dokuEnvironment} belum lengkap.`);
+  if (!values?.clientId || !values.secretKey) {
+    throw new Error(`Kredensial DOKU Checkout legacy ${dokuEnvironment} belum tersedia.`);
+  }
   return {
     environment: dokuEnvironment,
     clientId: values.clientId,
@@ -154,18 +188,22 @@ export async function getMidtransSnapConfig() {
   };
 }
 
+function directReady(values: Record<string, string> | null) {
+  return Boolean(values?.clientId && values.secretKey && values.privateKey && values.apiUrl);
+}
+
 export async function getPaymentModeOverview() {
   const modes = await getActivePaymentModes();
   const [dokuSandbox, dokuProduction, midtransSandbox, midtransProduction] = await Promise.all([
-    profile("doku", "checkout", "sandbox"),
-    profile("doku", "checkout", "production"),
+    profile("doku", "direct", "sandbox"),
+    profile("doku", "direct", "production"),
     profile("midtrans", "snap", "sandbox"),
     profile("midtrans", "snap", "production"),
   ]);
   const configured = {
     doku: {
-      sandbox: Boolean(dokuSandbox?.clientId && dokuSandbox.secretKey),
-      production: Boolean(dokuProduction?.clientId && dokuProduction.secretKey),
+      sandbox: directReady(dokuSandbox),
+      production: directReady(dokuProduction),
     },
     midtrans: {
       sandbox: Boolean(midtransSandbox?.serverKey && midtransSandbox.clientKey),
@@ -175,15 +213,42 @@ export async function getPaymentModeOverview() {
   const base = (() => { try { return new URL(runtime().PUBLIC_BASE_URL || "").origin; } catch { return ""; } })();
   return {
     ...modes,
-    dokuMode: "checkout" as const,
-    midtransMode: "snap" as const,
-    dokuCheckoutConfigured: configured.doku[modes.dokuEnvironment],
+    dokuDirectConfigured: configured.doku[modes.dokuEnvironment],
     midtransSnapConfigured: configured.midtrans[modes.midtransEnvironment],
-    hostedConfigured: configured,
+    configured,
     callbacks: {
       dokuNotification: `${base}/api/payments/doku/callback`,
       midtransSnapNotification: `${base}/api/payments/midtrans/snap/notification`,
       paymentReturn: `${base}/payment`,
     },
   };
+}
+
+/** Injects encrypted DOKU Direct API credentials into runtime only on the server. */
+export async function hydrateDokuDirectRuntimeEnv<T extends object>(sourceEnv: T): Promise<T> {
+  const source = sourceEnv as T & RuntimeLike;
+  const db = source.DB;
+  const encryptionSecret = source.INTEGRATION_ENCRYPTION_KEY?.trim();
+  if (!db || !encryptionSecret || encryptionSecret.length < 32) return sourceEnv;
+  try {
+    const current = await settings(db);
+    const environment = env(current.get("doku_environment"));
+    const values = await profile("doku", "direct", environment, db, encryptionSecret);
+    const target: Record<string, unknown> = { ...source, DOKU_ENV: environment };
+    if (!values) return target as T;
+    const prefix = `DOKU_${environment.toUpperCase()}_`;
+    const put = (key: string, value: string | undefined) => { if (value?.trim()) target[key] = value.trim(); };
+    put(`${prefix}CLIENT_ID`, values.clientId);
+    put(`${prefix}SECRET_KEY`, values.secretKey);
+    put(`${prefix}PRIVATE_KEY`, values.privateKey);
+    put(`${prefix}PRIVATE_KEY_PASSPHRASE`, values.privateKeyPassphrase);
+    put(`${prefix}API_URL`, values.apiUrl || (environment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
+    put(`${prefix}QRIS_MERCHANT_ID`, values.qrisMerchantId);
+    put(`${prefix}QRIS_TERMINAL_ID`, values.qrisTerminalId);
+    put(`${prefix}QRIS_POSTAL_CODE`, values.qrisPostalCode);
+    put(`${prefix}VA_CONFIG_JSON`, values.vaConfigJson);
+    return target as T;
+  } catch {
+    return sourceEnv;
+  }
 }

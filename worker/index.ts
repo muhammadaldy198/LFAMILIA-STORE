@@ -3,10 +3,12 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import handler from "vinext/server/app-router-entry";
 import { getPublicBaseUrl, setRuntimeEnv } from "../lib/server/runtime-env";
 import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
+import { hydrateDokuDirectRuntimeEnv } from "../lib/server/payment-mode-config";
 import { ensureLegacyDatabaseColumns } from "../lib/server/database-repair";
 import { recoverStaleAutomaticOrders } from "../lib/server/orders";
 import { releaseExpiredExternalPromotions } from "../lib/server/promotions";
 import { reconcileStaleDigiflazzProcessing } from "../lib/server/digiflazz-reconciliation";
+import { finalizeExpiredDokuPayments } from "../lib/server/doku-reconciliation";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 import { cleanupSecurityRateLimits } from "../lib/server/security";
 import { cleanupOrphanStoreMedia } from "../lib/server/media";
@@ -64,6 +66,14 @@ function withSecurityHeaders(response: Response, url: URL) {
     statusText: response.statusText,
     headers,
   });
+}
+
+async function hydrateRuntime(env: Env) {
+  const integrated = await hydrateIntegrationRuntimeEnv(env);
+  setRuntimeEnv(integrated);
+  const withDoku = await hydrateDokuDirectRuntimeEnv(integrated);
+  setRuntimeEnv(withDoku);
+  return withDoku;
 }
 
 const worker = {
@@ -155,7 +165,7 @@ const worker = {
       request = new Request(request, { headers });
     }
 
-    setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
+    await hydrateRuntime(env);
     if (env.DB) await ensureLegacyDatabaseColumns();
 
     if (url.pathname === "/_vinext/image") {
@@ -198,12 +208,13 @@ const worker = {
     return withSecurityHeaders(response, url);
   },
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    setRuntimeEnv(await hydrateIntegrationRuntimeEnv(env));
+    await hydrateRuntime(env);
     await ensureLegacyDatabaseColumns();
     const publicBaseUrl = getPublicBaseUrl();
     const tasks: Promise<unknown>[] = [
       cleanupSecurityRateLimits().catch(() => undefined),
       releaseExpiredExternalPromotions().catch(() => undefined),
+      finalizeExpiredDokuPayments().catch(() => undefined),
       Promise.resolve()
         .then(() => recoverStaleAutomaticOrders(publicBaseUrl))
         .catch(() => undefined),

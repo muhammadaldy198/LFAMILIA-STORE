@@ -1,9 +1,16 @@
-import { createDokuCheckoutPayment, getDokuCheckoutReadiness } from "@/lib/server/doku-checkout";
+import { createDokuDirectPayment, getDokuReadiness, isDokuChannelSupported } from "@/lib/server/doku";
 import { hostedPaymentType } from "@/lib/server/hosted-payment-methods";
 import { createMidtransSnapPayment, getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
+import { hydrateDokuDirectRuntimeEnv } from "@/lib/server/payment-mode-config";
 import type { PaymentGatewayName } from "@/lib/server/payment-channels";
+import { getRuntimeEnv, setRuntimeEnv } from "@/lib/server/runtime-env";
 
-export type RoutedPaymentMode = "checkout" | "snap";
+export type RoutedPaymentMode = "direct" | "checkout" | "snap";
+
+async function prepareDokuRuntime() {
+  const current = getRuntimeEnv<Record<string, unknown>>();
+  setRuntimeEnv(await hydrateDokuDirectRuntimeEnv(current));
+}
 
 export async function getConfiguredGatewayReadiness(input: {
   gateway: PaymentGatewayName;
@@ -12,13 +19,16 @@ export async function getConfiguredGatewayReadiness(input: {
   gatewayConfig?: Record<string, string>;
 }) {
   if (input.gateway === "doku") {
-    const readiness = await getDokuCheckoutReadiness();
-    const paymentType = hostedPaymentType("doku", input.paymentMethod, input.paymentChannel, input.gatewayConfig);
+    await prepareDokuRuntime();
+    const readiness = getDokuReadiness();
+    const supported = isDokuChannelSupported(input.paymentMethod, input.paymentChannel);
     return {
-      ready: readiness.ready && Boolean(paymentType),
+      ready: readiness.ready && supported,
       environment: readiness.environment,
-      mode: "checkout" as const,
-      reason: readiness.ready ? (paymentType ? null : "Channel belum memiliki kode DOKU Checkout.") : readiness.reason,
+      mode: "direct" as const,
+      reason: readiness.ready
+        ? supported ? null : "Channel belum didukung DOKU Direct API."
+        : readiness.reason,
     };
   }
 
@@ -55,9 +65,9 @@ export async function createConfiguredPayment(input: {
   });
   if (!readiness.ready) throw new Error(readiness.reason || "Gateway belum siap.");
 
-  if (input.gateway === "doku" && readiness.mode === "checkout") {
-    const payment = await createDokuCheckoutPayment(input);
-    return { ...payment, gateway: "doku" as const, mode: "checkout" as const, environment: readiness.environment };
+  if (input.gateway === "doku") {
+    const payment = await createDokuDirectPayment(input);
+    return { ...payment, gateway: "doku" as const, mode: "direct" as const, environment: readiness.environment };
   }
   const payment = await createMidtransSnapPayment(input);
   return { ...payment, gateway: "midtrans" as const, mode: "snap" as const, environment: readiness.environment };
