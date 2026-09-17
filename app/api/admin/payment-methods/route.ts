@@ -11,12 +11,8 @@ import {
   type PaymentGatewayName,
 } from "@/lib/server/payment-channels";
 import { isAllowedMediaUrl } from "@/lib/media-url";
-import { getDokuReadiness } from "@/lib/server/doku";
 import { getDokuCheckoutReadiness } from "@/lib/server/doku-checkout";
-import { getMidtransReadiness } from "@/lib/server/midtrans";
 import { getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
-import { getActivePaymentModes } from "@/lib/server/payment-mode-config";
-import { isProviderRelayConfigured } from "@/lib/server/provider-relay";
 
 const gatewayConfigSchema = z.record(
   z.string().trim().min(1).max(60),
@@ -59,22 +55,10 @@ function validateChannel(input: z.infer<typeof channelSchema>) {
 }
 
 async function gatewayReadiness() {
-  const modes = await getActivePaymentModes();
-  const doku = modes.dokuMode === "checkout"
-    ? await getDokuCheckoutReadiness()
-    : getDokuReadiness();
-  const midtransBase = modes.midtransMode === "snap"
-    ? await getMidtransSnapReadiness()
-    : getMidtransReadiness();
-  const relayReady = modes.midtransMode === "snap" || isProviderRelayConfigured("midtrans");
+  const [doku, midtrans] = await Promise.all([getDokuCheckoutReadiness(), getMidtransSnapReadiness()]);
   return {
-    doku: { ...doku, mode: modes.dokuMode },
-    midtrans: {
-      ...midtransBase,
-      mode: modes.midtransMode,
-      relayReady,
-      ready: Boolean(midtransBase.ready && relayReady),
-    },
+    doku: { ...doku, mode: "checkout" as const },
+    midtrans: { ...midtrans, mode: "snap" as const, relayReady: true },
   };
 }
 

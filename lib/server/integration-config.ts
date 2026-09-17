@@ -1,7 +1,7 @@
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
-export type IntegrationProvider = "doku" | "midtrans" | "digiflazz" | "kokinpay" | "resend" | "relay" | "security";
+export type IntegrationProvider = "digiflazz" | "kokinpay" | "resend" | "relay" | "security";
 export type IntegrationMode = "direct" | "service";
 export type IntegrationEnvironment = "sandbox" | "production" | "development" | "global";
 
@@ -9,8 +9,6 @@ type RuntimeLike = Record<string, unknown> & {
   DB?: D1Database;
   INTEGRATION_ENCRYPTION_KEY?: string;
   PUBLIC_BASE_URL?: string;
-  DOKU_ENV?: string;
-  MIDTRANS_ENV?: string;
   DIGIFLAZZ_ENV?: string;
   KOKINPAY_API_KEY?: string;
   RESEND_API_KEY?: string;
@@ -20,7 +18,6 @@ type RuntimeLike = Record<string, unknown> & {
   PROVIDER_RELAY_TOKEN?: string;
   PROVIDER_RELAY_HOSTS?: string;
   PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?: string;
-  PROVIDER_RELAY_MIDTRANS_ORIGIN?: string;
   VOUCHER_ENCRYPTION_KEY?: string;
 };
 
@@ -51,8 +48,6 @@ export type IntegrationOverview = {
   encryptionReady: boolean;
   encryptionHint: string;
   selections: {
-    dokuEnvironment: "sandbox" | "production";
-    midtransEnvironment: "sandbox" | "production";
     digiflazzEnvironment: "development" | "production";
   };
   profiles: IntegrationProfileSummary[];
@@ -60,12 +55,10 @@ export type IntegrationOverview = {
 };
 
 export const profileFields: Record<string, readonly string[]> = {
-  "doku:direct": ["clientId", "secretKey", "privateKey", "privateKeyPassphrase", "apiUrl", "qrisMerchantId", "qrisTerminalId", "qrisPostalCode", "vaConfigJson"],
-  "midtrans:direct": ["merchantId", "clientId", "clientSecret", "partnerId", "privateKey", "privateKeyPassphrase", "midtransPublicKey", "channelId", "apiUrl"],
   "digiflazz:direct": ["username", "apiKey", "transactionApiUrl", "priceListUrl", "webhookSecret"],
   "kokinpay:service": ["apiKey"],
   "resend:service": ["apiKey", "fromEmail", "apiUrl", "deliveryChannel"],
-  "relay:service": ["digiflazzOrigin", "midtransOrigin", "hosts", "token"],
+  "relay:service": ["digiflazzOrigin", "hosts", "token"],
   "security:service": ["voucherEncryptionKey"],
 };
 
@@ -78,7 +71,6 @@ function profileFieldKey(provider: IntegrationProvider, mode: IntegrationMode) {
 }
 
 function isProfileSupported(provider: IntegrationProvider, mode: IntegrationMode, environment: IntegrationEnvironment) {
-  if (provider === "doku" || provider === "midtrans") return mode === "direct" && (environment === "sandbox" || environment === "production");
   if (provider === "digiflazz") return mode === "direct" && (environment === "development" || environment === "production");
   return (provider === "kokinpay" || provider === "resend" || provider === "relay" || provider === "security")
     && mode === "service"
@@ -215,9 +207,6 @@ function publicBaseUrl(value: RuntimeLike) {
 function buildCallbacks(baseUrl: string) {
   const route = (path: string) => baseUrl ? `${baseUrl}${path}` : path;
   return [
-    { id: "doku", label: "DOKU Notification URL", description: "Pasang sebagai Payment Notification URL di dashboard DOKU.", kind: "notification" as const, url: route("/api/payments/doku/callback") },
-    { id: "doku-fallback", label: "DOKU Return URL", description: "Dipakai DANA/ShopeePay untuk mengembalikan pelanggan ke halaman pembayaran LFAMILIA.", kind: "fallback" as const, url: route("/payment") },
-    { id: "midtrans-va", label: "Midtrans BI-SNAP VA Notification URL", description: "Pasang sebagai notification URL Bank Transfer / Virtual Account Midtrans BI-SNAP.", kind: "notification" as const, url: route("/api/payments/midtrans/v1.0/transfer-va/payment") },
     { id: "digiflazz", label: "DigiFlazz Webhook", description: "Webhook status fulfillment DigiFlazz.", kind: "callback" as const, url: route("/api/fulfillment/digiflazz/callback") },
   ];
 }
@@ -257,8 +246,6 @@ export async function getIntegrationOverview(): Promise<IntegrationOverview> {
       ? "Kredensial disimpan terenkripsi dan tidak ditampilkan kembali setelah disimpan."
       : "Tambahkan Cloudflare Secret INTEGRATION_ENCRYPTION_KEY (minimal 32 karakter) satu kali untuk mengaktifkan penyimpanan terenkripsi.",
     selections: {
-      dokuEnvironment: valueOr(selected.get("doku_environment") || current.DOKU_ENV, ["sandbox", "production"] as const, "sandbox"),
-      midtransEnvironment: valueOr(selected.get("midtrans_environment") || current.MIDTRANS_ENV, ["sandbox", "production"] as const, "sandbox"),
       digiflazzEnvironment: valueOr(selected.get("digiflazz_environment") || current.DIGIFLAZZ_ENV, ["development", "production"] as const, "development"),
     },
     profiles: configuredProfiles,
@@ -316,13 +303,9 @@ export async function saveIntegrationProfile(input: {
 
 export async function saveIntegrationSelections(input: Partial<IntegrationOverview["selections"]>) {
   const normalized = {
-    dokuEnvironment: input.dokuEnvironment && valueOr(input.dokuEnvironment, ["sandbox", "production"] as const, "sandbox"),
-    midtransEnvironment: input.midtransEnvironment && valueOr(input.midtransEnvironment, ["sandbox", "production"] as const, "sandbox"),
     digiflazzEnvironment: input.digiflazzEnvironment && valueOr(input.digiflazzEnvironment, ["development", "production"] as const, "development"),
   };
   const values: Array<[string, string | undefined]> = [
-    ["doku_environment", normalized.dokuEnvironment],
-    ["midtrans_environment", normalized.midtransEnvironment],
     ["digiflazz_environment", normalized.digiflazzEnvironment],
   ];
   const database = getD1();
@@ -339,31 +322,6 @@ function put(target: Record<string, unknown>, key: string, value: string | undef
   if (value?.trim()) target[key] = value.trim();
 }
 
-function applyDokuConfig(target: Record<string, unknown>, environment: "sandbox" | "production", config: Record<string, string>) {
-  const prefix = `DOKU_${environment.toUpperCase()}_`;
-  put(target, `${prefix}CLIENT_ID`, config.clientId);
-  put(target, `${prefix}SECRET_KEY`, config.secretKey);
-  put(target, `${prefix}PRIVATE_KEY`, config.privateKey);
-  put(target, `${prefix}PRIVATE_KEY_PASSPHRASE`, config.privateKeyPassphrase);
-  put(target, `${prefix}API_URL`, config.apiUrl);
-  put(target, `${prefix}QRIS_MERCHANT_ID`, config.qrisMerchantId);
-  put(target, `${prefix}QRIS_TERMINAL_ID`, config.qrisTerminalId);
-  put(target, `${prefix}QRIS_POSTAL_CODE`, config.qrisPostalCode);
-  put(target, `${prefix}VA_CONFIG_JSON`, config.vaConfigJson);
-}
-
-function applyMidtransConfig(target: Record<string, unknown>, environment: "sandbox" | "production", config: Record<string, string>) {
-  const prefix = `MIDTRANS_${environment.toUpperCase()}_`;
-  put(target, `${prefix}MERCHANT_ID`, config.merchantId);
-  put(target, `${prefix}CLIENT_ID`, config.clientId);
-  put(target, `${prefix}CLIENT_SECRET`, config.clientSecret);
-  put(target, `${prefix}PARTNER_ID`, config.partnerId);
-  put(target, `${prefix}PRIVATE_KEY`, config.privateKey);
-  put(target, `${prefix}PRIVATE_KEY_PASSPHRASE`, config.privateKeyPassphrase);
-  put(target, `${prefix}PUBLIC_KEY`, config.midtransPublicKey);
-  put(target, `${prefix}CHANNEL_ID`, config.channelId);
-  put(target, `${prefix}API_URL`, config.apiUrl);
-}
 
 function applyDigiflazzConfig(target: Record<string, unknown>, environment: "development" | "production", config: Record<string, string>, active: boolean) {
   const prefix = `DIGIFLAZZ_${environment.toUpperCase()}_`;
@@ -388,7 +346,6 @@ function applyResendConfig(target: Record<string, unknown>, config: Record<strin
 }
 function applyRelayConfig(target: Record<string, unknown>, config: Record<string, string>) {
   put(target, "PROVIDER_RELAY_DIGIFLAZZ_ORIGIN", config.digiflazzOrigin);
-  put(target, "PROVIDER_RELAY_MIDTRANS_ORIGIN", config.midtransOrigin);
   put(target, "PROVIDER_RELAY_HOSTS", config.hosts);
   put(target, "PROVIDER_RELAY_TOKEN", config.token);
 }
@@ -407,11 +364,7 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
     await ensureIntegrationTables(database);
     const [profiles, settings] = await Promise.all([readStoredProfiles(database), readStoredSettings(database)]);
     const target: Record<string, unknown> = { ...systemOnly };
-    const dokuEnvironment = valueOr(settings.get("doku_environment"), ["sandbox", "production"] as const, "sandbox");
-    const midtransEnvironment = valueOr(settings.get("midtrans_environment"), ["sandbox", "production"] as const, "sandbox");
     const digiflazzEnvironment = valueOr(settings.get("digiflazz_environment"), ["development", "production"] as const, "development");
-    target.DOKU_ENV = dokuEnvironment;
-    target.MIDTRANS_ENV = midtransEnvironment;
     target.DIGIFLAZZ_ENV = digiflazzEnvironment;
 
     for (const profile of profiles) {
@@ -420,12 +373,6 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
         config = await decryptConfig(secret, profile.encrypted_config);
       } catch {
         continue;
-      }
-      if (profile.provider === "doku" && profile.mode === "direct" && (profile.environment === "sandbox" || profile.environment === "production")) {
-        applyDokuConfig(target, profile.environment, config);
-      }
-      if (profile.provider === "midtrans" && profile.mode === "direct" && (profile.environment === "sandbox" || profile.environment === "production")) {
-        applyMidtransConfig(target, profile.environment, config);
       }
       if (profile.provider === "digiflazz" && profile.mode === "direct" && (profile.environment === "development" || profile.environment === "production")) {
         applyDigiflazzConfig(target, profile.environment, config, profile.environment === digiflazzEnvironment);

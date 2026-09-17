@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
-import { dokuApiOrigin, testDokuB2BConnection } from "@/lib/server/doku-connection-test";
 import {
   acquireDigiflazzConfigurationGuard,
   invalidateDigiflazzOperationalCache,
@@ -21,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 const profileInput = z.object({
   action: z.literal("save_profile"),
-  provider: z.enum(["doku", "midtrans", "digiflazz", "kokinpay", "resend", "relay", "security"]),
+  provider: z.enum(["digiflazz", "kokinpay", "resend", "relay", "security"]),
   mode: z.enum(["direct", "service"]),
   environment: z.enum(["sandbox", "production", "development", "global"]),
   values: z.record(z.string().min(1).max(80), z.string().max(12_000)).default({}),
@@ -31,8 +30,6 @@ const profileInput = z.object({
 const selectionInput = z.object({
   action: z.literal("save_selections"),
   selections: z.object({
-    dokuEnvironment: z.enum(["sandbox", "production"]).optional(),
-    midtransEnvironment: z.enum(["sandbox", "production"]).optional(),
     digiflazzEnvironment: z.enum(["development", "production"]).optional(),
   }),
 });
@@ -41,10 +38,6 @@ const relayTestInput = z.object({
   action: z.literal("test_relay"),
 });
 
-const dokuTestInput = z.object({
-  action: z.literal("test_doku"),
-  environment: z.enum(["sandbox", "production"]),
-});
 
 const digiflazzTestInput = z.object({
   action: z.literal("test_digiflazz"),
@@ -54,7 +47,6 @@ const schema = z.discriminatedUnion("action", [
   profileInput,
   selectionInput,
   relayTestInput,
-  dokuTestInput,
   digiflazzTestInput,
 ]);
 
@@ -100,12 +92,6 @@ export async function PUT(request: Request) {
         { headers: { "Cache-Control": "no-store" } },
       );
     }
-    if (input.action === "test_doku") {
-      return Response.json(
-        { ok: true, doku: await testDokuB2BConnection(input.environment) },
-        { headers: { "Cache-Control": "no-store" } },
-      );
-    }
     if (input.action === "test_digiflazz") {
       clearDigiflazzBalanceCache();
       const result = await getDigiflazzBalance();
@@ -115,15 +101,7 @@ export async function PUT(request: Request) {
       );
     }
     if (input.action === "save_profile") {
-      if (input.provider === "doku" && (input.environment === "sandbox" || input.environment === "production")) {
-        await saveIntegrationProfile({
-          ...input,
-          values: {
-            ...input.values,
-            apiUrl: dokuApiOrigin(input.environment),
-          },
-        });
-      } else if (input.provider === "digiflazz" && (input.environment === "development" || input.environment === "production")) {
+      if (input.provider === "digiflazz" && (input.environment === "development" || input.environment === "production")) {
         const activeEnvironment = (await getIntegrationOverview()).selections.digiflazzEnvironment;
         const activeProfileChanged = input.environment === activeEnvironment &&
           (Object.values(input.values).some((value) => value.trim()) || input.clearFields.length > 0);

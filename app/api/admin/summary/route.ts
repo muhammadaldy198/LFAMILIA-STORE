@@ -1,6 +1,5 @@
 import { getD1 } from "@/db";
 import { requireAdminSession } from "@/lib/server/admin";
-import { getDokuReadiness } from "@/lib/server/doku";
 import {
   getDigiflazzBalance,
   getDigiflazzReadiness,
@@ -179,7 +178,6 @@ export async function GET(request: Request) {
       });
     }
 
-    const doku = getDokuReadiness();
     const digiflazz = getDigiflazzReadiness();
     let publicBaseUrl = "";
     try {
@@ -347,11 +345,6 @@ export async function GET(request: Request) {
         }),
         topCustomers: canViewFinance ? topCustomers : [],
         integrations: {
-          doku: {
-            ready: doku.ready,
-            environment: canViewFinance ? doku.environment : null,
-            reason: canViewFinance ? doku.reason : null,
-          },
           digiflazz: {
             ready: access.role === "staff" ? false : digiflazz.ready,
             environment: canViewFinance ? digiflazz.environment : null,

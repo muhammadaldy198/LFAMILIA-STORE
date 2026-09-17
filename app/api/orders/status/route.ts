@@ -2,18 +2,14 @@ import { z } from "zod";
 import { getD1 } from "@/db";
 import { publicPaymentLabel } from "@/lib/public-payment";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
-import { queryDokuQrisStatus } from "@/lib/server/doku";
 import { queryDokuCheckoutStatus } from "@/lib/server/doku-checkout-status";
-import { applyPendingDokuPaymentStatus } from "@/lib/server/doku-payment-transition";
-import { queryDokuEwalletStatus, queryDokuVaStatus } from "@/lib/server/doku-status";
+import { applyPendingExternalPaymentStatus } from "@/lib/server/payment-transition";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
 import { externalArtifactsFromOrder, recordExternalPaymentEvent } from "@/lib/server/external-payments";
 import { queryMidtransSnapStatus } from "@/lib/server/midtrans-snap";
 import {
-  applyPaymentStatus,
   fulfillAutomaticOrder,
   getOrderById,
-  markDokuStatusChecked,
   type OrderRecord,
 } from "@/lib/server/orders";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
@@ -70,14 +66,10 @@ function gatewayMetadata(order: OrderRecord) {
     ? "production"
     : raw.payment_gateway_environment === "sandbox"
       ? "sandbox"
-      : order.doku_environment === "production"
-        ? "production"
-        : order.doku_environment === "sandbox"
-          ? "sandbox"
-          : null;
+      : null;
   const lastCheckedAt = typeof raw.gateway_status_checked_at === "string"
     ? raw.gateway_status_checked_at
-    : order.doku_status_checked_at;
+    : null;
   return { environment, lastCheckedAt } as const;
 }
 
@@ -107,7 +99,7 @@ function shouldQueryDoku(order: OrderRecord) {
   return artifacts.gateway === "doku" &&
     order.payment_status === "pending" &&
     Boolean(metadata.environment) &&
-    dueForGatewayCheck(order, 60_000);
+    artifacts.mode === "checkout" && dueForGatewayCheck(order, 3_000);
 }
 
 function shouldQueryMidtransSnap(order: OrderRecord) {
@@ -117,16 +109,15 @@ function shouldQueryMidtransSnap(order: OrderRecord) {
     artifacts.mode === "snap" &&
     order.payment_status === "pending" &&
     Boolean(metadata.environment) &&
-    dueForGatewayCheck(order, 15_000);
+    dueForGatewayCheck(order, 3_000);
 }
 
-async function markGatewayStatusChecked(referenceId: string, mirrorDoku = false) {
+async function markGatewayStatusChecked(referenceId: string) {
   await getD1().prepare(
     `UPDATE orders
      SET gateway_status_checked_at = CURRENT_TIMESTAMP
      WHERE reference_id = ? AND payment_status = 'pending'`,
   ).bind(referenceId).run();
-  if (mirrorDoku) await markDokuStatusChecked(referenceId);
 }
 
 function publicEventSource(source: string) {
@@ -144,11 +135,7 @@ async function expirePendingInvoice(order: OrderRecord) {
   const expiresAt = Date.parse(artifacts.expiredAt);
   if (!Number.isFinite(expiresAt) || expiresAt > Date.now()) return order;
 
-  if (artifacts.gateway === "doku") {
-    await applyPendingDokuPaymentStatus(order, "expired");
-  } else if (artifacts.gateway === "midtrans") {
-    await applyPaymentStatus(order, "expired");
-  }
+  await applyPendingExternalPaymentStatus(order, "expired");
   return (await getOrderById(order.id)) ?? order;
 }
 
@@ -157,44 +144,14 @@ async function queryDokuOrderStatus(order: OrderRecord) {
   const { environment } = gatewayMetadata(order);
   if (!environment) return null;
 
-  if (artifacts.mode === "checkout") {
-    return queryDokuCheckoutStatus({
-      referenceId: order.reference_id,
-      environment,
-    });
-  }
-
-  if (artifacts.mode !== "direct") return null;
-  if (order.payment_method === "qris" && artifacts.referenceNo) {
-    return queryDokuQrisStatus({
-      referenceId: order.reference_id,
-      referenceNo: artifacts.referenceNo,
-    });
-  }
-  if (order.payment_method === "va" && artifacts.paymentNo) {
-    return queryDokuVaStatus({
-      environment,
-      channel: order.payment_channel,
-      paymentNo: artifacts.paymentNo,
-      referenceId: order.reference_id,
-    });
-  }
-  if (order.payment_method === "ewallet" && artifacts.requestId) {
-    return queryDokuEwalletStatus({
-      environment,
-      referenceId: order.reference_id,
-      requestId: artifacts.requestId,
-      referenceNo: artifacts.referenceNo,
-      amount: order.total,
-    });
-  }
-  return null;
+  if (artifacts.mode !== "checkout") return null;
+  return queryDokuCheckoutStatus({ referenceId: order.reference_id, environment });
 }
 
 async function refreshDokuStatus(order: OrderRecord) {
   if (!shouldQueryDoku(order)) return order;
   try {
-    await markGatewayStatusChecked(order.reference_id, true);
+    await markGatewayStatusChecked(order.reference_id);
     const query = await queryDokuOrderStatus(order);
     if (!query) return (await getOrderById(order.id)) ?? order;
 
@@ -210,15 +167,15 @@ async function refreshDokuStatus(order: OrderRecord) {
       if (!Number.isFinite(query.amount) || query.amount !== order.total) {
         return (await getOrderById(order.id)) ?? order;
       }
-      const firstPaid = await applyPendingDokuPaymentStatus(order, "paid");
+      const firstPaid = await applyPendingExternalPaymentStatus(order, "paid");
       if (firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
           console.error("Notifikasi pesanan DOKU hasil rekonsiliasi gagal:", error),
         );
       }
-    } else if (query.status === "failed" || query.status === "expired") {
-      await applyPendingDokuPaymentStatus(order, query.status);
+    } else if (query.status === "expired") {
+      await applyPendingExternalPaymentStatus(order, "expired");
     }
 
     return (await getOrderById(order.id)) ?? order;
@@ -251,7 +208,7 @@ async function refreshMidtransSnapStatus(order: OrderRecord) {
       if (!Number.isFinite(query.amount) || query.amount !== order.total) {
         return (await getOrderById(order.id)) ?? order;
       }
-      const firstPaid = await applyPaymentStatus(order, "paid");
+      const firstPaid = await applyPendingExternalPaymentStatus(order, "paid");
       if (firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
@@ -259,7 +216,7 @@ async function refreshMidtransSnapStatus(order: OrderRecord) {
         );
       }
     } else if (query.status === "failed" || query.status === "expired") {
-      await applyPaymentStatus(order, query.status);
+      await applyPendingExternalPaymentStatus(order, query.status);
     }
 
     return (await getOrderById(order.id)) ?? order;

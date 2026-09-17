@@ -38,7 +38,7 @@ test("pending Midtrans Snap orders reconcile against authenticated Get Status AP
   assert.match(statusRoute, /artifacts\.mode === "snap"/);
   assert.match(statusRoute, /gateway_status_checked_at = CURRENT_TIMESTAMP/);
   assert.match(statusRoute, /query\.amount !== order\.total/);
-  assert.match(statusRoute, /const firstPaid = await applyPaymentStatus\(order, "paid"\)/);
+  assert.match(statusRoute, /const firstPaid = await applyPendingExternalPaymentStatus\(order, "paid"\)/);
   assert.match(statusRoute, /await fulfillAutomaticOrder\(order\.id, getPublicBaseUrl\(\)\)/);
   assert.match(statusRoute, /order = await refreshMidtransSnapStatus\(order\)/);
 });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
-import { getDokuReadiness } from "@/lib/server/doku";
+import { getDokuCheckoutReadiness } from "@/lib/server/doku-checkout";
 import {
   listWalletTopups,
   readWalletSettings,
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   return Response.json({
     settings,
     topups,
-    gatewayReadiness: { doku: getDokuReadiness() },
+    gatewayReadiness: { doku: await getDokuCheckoutReadiness() },
   });
 }
 

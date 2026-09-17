@@ -272,7 +272,7 @@ export default function TrackPage() {
               id="order-query"
               value={query}
               onChange={(event) => { setQuery(event.target.value.replace(/\s/g, "")); setError(""); }}
-              placeholder="Contoh: LF260903ABC123 atau 081234567890"
+              placeholder="Contoh: LF260917A1B2C3D4E5F6 atau 081234567890"
               autoComplete="off"
               inputMode="text"
               className="h-11 rounded-lg border-white/10 bg-white/[0.035] font-mono text-sm text-white placeholder:font-sans placeholder:text-white/22"

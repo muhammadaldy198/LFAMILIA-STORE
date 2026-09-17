@@ -36,7 +36,7 @@ test("Staff product-content is safe and routed through the panel proxy", () => {
 });
 
 test("super-admin-only controls remain backend guarded", () => {
-  for (const file of ["balances", "doku-database", "integrations", "team", "wallet"]) {
+  for (const file of ["balances", "integrations", "team", "wallet"]) {
     assert.match(read(`app/api/admin/${file}/route.ts`), /requireAdminSession\(request, "owner"\)/);
   }
   assert.match(read("app/api/admin/members/route.ts"), /requireAdminSession\(request, "admin"\)/);

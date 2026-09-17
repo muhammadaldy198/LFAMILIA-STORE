@@ -60,10 +60,7 @@ const routingSchema = z.object({
 });
 
 function publicInvoice(referenceId: string) {
-  const clean = referenceId.trim().toUpperCase();
-  if (!clean.includes("-")) return clean;
-  const token = clean.split("-").at(-1) ?? clean.replace(/^LF/, "");
-  return `LF${token}`;
+  return referenceId.trim().toUpperCase();
 }
 
 function existingExternalResponse(order: OrderRecord) {
