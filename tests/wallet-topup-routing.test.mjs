@@ -6,12 +6,17 @@ import test from "node:test";
 const root = process.cwd();
 const route = fs.readFileSync(path.join(root, "app/api/account/topups/route.ts"), "utf8");
 const account = fs.readFileSync(path.join(root, "components/customer-account.tsx"), "utf8");
+const routing = fs.readFileSync(path.join(root, "lib/server/payment-mode-config.ts"), "utf8");
 
-test("wallet topup follows the Admin-selected gateway and mode on the server", () => {
-  assert.match(route, /getPaymentChannel\(/);
+test("wallet topup follows the dedicated Admin-selected gateway on the server", () => {
+  assert.match(routing, /wallet_topup_gateway/);
+  assert.match(routing, /walletTopupGateway/);
+  assert.match(route, /getActivePaymentModes\(/);
+  assert.match(route, /walletTopupGateway/);
+  assert.match(route, /isPaymentGatewayActive\(walletTopupGateway\)/);
   assert.match(route, /getConfiguredGatewayReadiness\(/);
+  assert.match(route, /gateway: walletTopupGateway/);
   assert.match(route, /createConfiguredPayment\(/);
-  assert.match(route, /gateway: managedChannel\.gateway/);
   assert.match(route, /mode: readiness\.mode/);
   assert.match(route, /updateExternalWalletTopup\(/);
   assert.match(route, /idempotencyKey/);
