@@ -220,7 +220,14 @@ export async function GET(request: Request) {
   if (access instanceof Response) return access;
   try {
     await ensureKokinpayNicknameGameCodeBackfill();
-    const products = await readProducts(true);
+    const products = (await readProducts(true)).map((product) => ({
+      ...product,
+      packages: [...product.packages].sort((left, right) =>
+        left.price - right.price ||
+        left.sortOrder - right.sortOrder ||
+        left.label.localeCompare(right.label, "id-ID", { numeric: true, sensitivity: "base" }),
+      ),
+    }));
     const sellerMonitor = access.role === "super_admin" ? await readDigiflazzSellerMonitor() : null;
     return Response.json({ products, databaseReady: true, adminEmail: access.email, role: access.role, sellerMonitor });
   } catch (error) {
