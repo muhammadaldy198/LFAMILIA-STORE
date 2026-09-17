@@ -770,6 +770,69 @@ async function applyProviderResult(
   });
 }
 
+/**
+ * DigiFlazz instructs prepaid buyers to query a pending transaction by sending
+ * the exact same ref_id again. The one-minute gate is both an upstream safety
+ * limit and an atomic claim, so browser polling cannot create duplicate calls.
+ */
+export async function reconcileProcessingDigiflazzOrder(
+  orderId: string,
+  publicBaseUrl: string,
+) {
+  const db = getD1();
+  const claimed = await db.prepare(
+    `UPDATE orders
+       SET updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?
+       AND payment_status = 'paid'
+       AND fulfillment_type = 'automatic'
+       AND provider_code = 'digiflazz'
+       AND provider_status = 'processing'
+       AND created_at >= datetime('now', '-89 days')
+       AND updated_at <= datetime('now', '-1 minute')`,
+  ).bind(orderId).run();
+  if (Number(claimed.meta.changes ?? 0) === 0) return false;
+
+  const order = await getOrderById(orderId);
+  if (!order || !order.provider_sku || !order.customer_no) return false;
+  const adapter = getProviderAdapter("digiflazz");
+  if (!adapter) return false;
+
+  try {
+    const result = await adapter.fulfill({
+      id: order.id,
+      referenceId: order.reference_id,
+      providerCode: "digiflazz",
+      providerSku: order.provider_sku,
+      destination: order.destination,
+      server: order.server,
+      customerNo: order.customer_no,
+      customerNotes: order.customer_notes,
+      subtotal: order.subtotal,
+      maxProviderPrice: order.provider_max_price_snapshot,
+      packageSku: order.package_sku,
+      packageLabel: order.package_label,
+      productName: order.product_name,
+      buyerName: order.buyer_name,
+      buyerEmail: order.buyer_email,
+      buyerPhone: order.buyer_phone,
+    }, publicBaseUrl);
+    await applyProviderResult(order, result, `reconcile-${order.id}-${crypto.randomUUID()}`);
+    if (result.status === "success") {
+      await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
+        console.error("Notifikasi order hasil rekonsiliasi DigiFlazz gagal:", error),
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "DigiFlazz belum dapat dihubungi saat cek ulang.";
+    await db.prepare(
+      `UPDATE orders SET provider_message = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND provider_code = 'digiflazz' AND provider_status = 'processing'`,
+    ).bind(message, order.id).run();
+  }
+  return true;
+}
+
 async function setFulfillmentError(orderId: string, message: string) {
   await getD1()
     .prepare(
