@@ -11,6 +11,13 @@ type Environment = "development" | "production" | "global";
 type Profile = { provider: Provider; environment: Environment; configured: boolean; decryptionError: boolean };
 type Callback = { id: string; label: string; description: string; url: string };
 type Overview = { encryptionReady: boolean; encryptionHint: string; selections: { digiflazzEnvironment: "development" | "production" }; profiles: Profile[]; callbacks: Callback[] };
+type RelayResult = { provider: string; label: string; connected: boolean; status: number | null; message: string };
+type IntegrationPutResult = {
+  error?: string;
+  overview?: Overview;
+  relay?: RelayResult[];
+  digiflazz?: { connected?: boolean; balance?: number };
+};
 
 const fallbackWebhook = "https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback";
 
@@ -51,7 +58,7 @@ export function AdminIntegrationWorkspace() {
 
   async function put(body: object) {
     const response = await fetch("/api/panel/integrations", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    const payload = await response.json().catch(() => ({})) as { error?: string; overview?: Overview; relay?: unknown; digiflazz?: { connected?: boolean; balance?: number } };
+    const payload = await response.json().catch(() => ({})) as IntegrationPutResult;
     if (!response.ok) throw new Error(payload.error || "Integrasi gagal disimpan.");
     if (payload.overview) setOverview(payload.overview);
     return payload;
@@ -81,8 +88,23 @@ export function AdminIntegrationWorkspace() {
   async function test() {
     setBusy(true); setMessage(""); setError("");
     try {
-      const result = tab === "Digiflazz" ? await put({ action: "test_digiflazz" }) : await put({ action: "test_relay" });
-      setMessage(tab === "Digiflazz" ? `Koneksi Digiflazz berhasil. Saldo terbaca: Rp${Number(result.digiflazz?.balance || 0).toLocaleString("id-ID")}.` : "Pemeriksaan relay selesai.");
+      if (tab === "Digiflazz") {
+        const result = await put({ action: "test_digiflazz" });
+        setMessage(`Koneksi Digiflazz berhasil. Saldo terbaca: Rp${Number(result.digiflazz?.balance || 0).toLocaleString("id-ID")}.`);
+      } else {
+        const result = await put({ action: "test_relay" });
+        const relay = result.relay ?? [];
+        if (!relay.length) throw new Error("Backend tidak mengembalikan hasil pemeriksaan relay.");
+
+        const details = relay.map((item) => {
+          const connection = item.connected ? "Terhubung" : "Gagal";
+          const http = item.status === null ? "" : ` · HTTP ${item.status}`;
+          return `${item.label}: ${connection}${http} · ${item.message}`;
+        }).join(" | ");
+
+        if (relay.every((item) => item.connected)) setMessage(details);
+        else setError(details);
+      }
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Pemeriksaan gagal."); }
     finally { setBusy(false); }
   }
