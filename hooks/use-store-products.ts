@@ -3,6 +3,16 @@
 import { useEffect, useState } from "react";
 import type { StoreProduct } from "@/lib/store-data";
 
+function sortPackagesByPrice(products: StoreProduct[]) {
+  return products.map((product) => ({
+    ...product,
+    packages: [...product.packages].sort((left, right) =>
+      left.price - right.price ||
+      left.label.localeCompare(right.label, "id-ID", { numeric: true, sensitivity: "base" }),
+    ),
+  }));
+}
+
 export function useStoreProducts() {
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [databaseReady, setDatabaseReady] = useState(false);
@@ -18,7 +28,7 @@ export function useStoreProducts() {
           databaseReady?: boolean;
         };
         if (!active) return;
-        setProducts(data.products ?? []);
+        setProducts(sortPackagesByPrice(data.products ?? []));
         setDatabaseReady(Boolean(response.ok && data.databaseReady));
       } catch {
         if (!active) return;
