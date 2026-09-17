@@ -1,8 +1,8 @@
 import { requireAdminSession } from "@/lib/server/admin";
-import { getDokuCheckoutReadiness } from "@/lib/server/doku-checkout";
 import { getIntegrationOverview } from "@/lib/server/integration-config";
 import { getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
 import { getPaymentModeOverview } from "@/lib/server/payment-mode-config";
+import { getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
 import { getDigiflazzReadiness } from "@/lib/server/providers/digiflazz";
 
 export const dynamic = "force-dynamic";
@@ -36,10 +36,10 @@ export async function GET(request: Request) {
   if (access instanceof Response) return access;
 
   try {
-    const [integration, paymentModes, dokuCheckout, midtransSnap] = await Promise.all([
+    const [integration, paymentModes, dokuDirect, midtransSnap] = await Promise.all([
       getIntegrationOverview(),
       getPaymentModeOverview(),
-      getDokuCheckoutReadiness(),
+      getConfiguredGatewayReadiness({ gateway: "doku", paymentMethod: "qris", paymentChannel: "qris" }),
       getMidtransSnapReadiness(),
     ]);
 
@@ -66,20 +66,20 @@ export async function GET(request: Request) {
         status: statusText({ ready: kokinpayReady, active: kokinpayReady }),
       },
       {
-        id: "doku-checkout",
-        name: "DOKU Checkout",
-        ready: dokuCheckout.ready,
-        active: paymentModes.dokuMode === "checkout",
+        id: "doku-direct",
+        name: "DOKU Direct API",
+        ready: dokuDirect.ready,
+        active: true,
         environment: paymentModes.dokuEnvironment,
-        status: statusText({ ready: dokuCheckout.ready, active: paymentModes.dokuMode === "checkout", environment: paymentModes.dokuEnvironment }),
+        status: statusText({ ready: dokuDirect.ready, active: true, environment: paymentModes.dokuEnvironment }),
       },
       {
         id: "midtrans-snap",
         name: "Midtrans Snap",
         ready: midtransSnap.ready,
-        active: paymentModes.midtransMode === "snap",
+        active: true,
         environment: paymentModes.midtransEnvironment,
-        status: statusText({ ready: midtransSnap.ready, active: paymentModes.midtransMode === "snap", environment: paymentModes.midtransEnvironment }),
+        status: statusText({ ready: midtransSnap.ready, active: true, environment: paymentModes.midtransEnvironment }),
       },
     ];
 
