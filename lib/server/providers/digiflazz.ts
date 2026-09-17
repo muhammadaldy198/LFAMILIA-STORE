@@ -1,7 +1,8 @@
 import { hashHex } from "@/lib/server/crypto";
 import type { ProviderAdapter, ProviderResult } from "@/lib/server/providers/types";
-import { providerRelayRequest } from "@/lib/server/provider-relay";
-import { isAutomatedTestRuntime,
+import { requireProviderRelayRequest } from "@/lib/server/provider-relay";
+import {
+  isAutomatedTestRuntime,
   getRuntimeEnv,
   requireRuntimeChoice,
   requireRuntimeValue,
@@ -127,7 +128,7 @@ export async function getDigiflazzBalance() {
   }
   const origin = new URL(apiUrl).origin;
   const balanceUrl = new URL("/v1/cek-saldo", origin).toString();
-  const relay = providerRelayRequest(
+  const relay = requireProviderRelayRequest(
     balanceUrl,
     { "content-type": "application/json", accept: "application/json" },
     { provider: "digiflazz", environment },
@@ -172,6 +173,7 @@ export const digiflazzAdapter: ProviderAdapter = {
     if (isAutomatedTestRuntime() && environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
     if (!order.providerSku?.trim()) throw new Error("SKU DigiFlazz order kosong.");
     if (!order.customerNo?.trim()) throw new Error("Customer No DigiFlazz order kosong.");
+    const maxPrice = Number(order.maxProviderPrice);
 
     const body = {
       username,
@@ -181,10 +183,11 @@ export const digiflazzAdapter: ProviderAdapter = {
       sign: hashHex("md5", `${username}${apiKey}${order.referenceId}`),
       testing: environment === "development",
       cb_url: `${publicBaseUrl}/api/fulfillment/digiflazz/callback`,
+      ...(Number.isInteger(maxPrice) && maxPrice > 0 ? { max_price: maxPrice } : {}),
       ...(order.customerNo.includes(".") ? { allow_dot: true } : {}),
     };
 
-    const relay = providerRelayRequest(
+    const relay = requireProviderRelayRequest(
       apiUrl,
       { "content-type": "application/json", accept: "application/json" },
       { provider: "digiflazz", environment },
