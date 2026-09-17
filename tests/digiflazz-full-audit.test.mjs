@@ -83,6 +83,7 @@ test("DigiFlazz dispatch uses the official endpoint and fails closed on provider
   assert.match(provider, /\[RC \$\{rc\}\]/);
   assert.match(provider, /SKU DigiFlazz order kosong/);
   assert.match(provider, /Customer No DigiFlazz order kosong/);
+  assert.match(provider, /max_price: maxPrice/);
 });
 
 test("automatic paid-order recovery runs frequently enough for retryable DigiFlazz dispatches", () => {
@@ -97,4 +98,7 @@ test("automatic paid-order recovery runs frequently enough for retryable DigiFla
   assert.match(orders, /provider_status = 'retryable_error'/);
   assert.match(reconciliation, /updated_at <= datetime\('now', '-2 minutes'\)/);
   assert.match(reconciliation, /created_at >= datetime\('now', '-89 days'\)/);
+  assert.match(orders, /reconcileProcessingDigiflazzOrder/);
+  assert.match(orders, /provider_status = 'processing'/);
+  assert.match(orders, /updated_at <= datetime\('now', '-1 minute'\)/);
 });
