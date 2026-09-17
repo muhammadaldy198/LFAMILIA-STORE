@@ -160,6 +160,21 @@ export async function getHostedGatewayProfileForEnvironment(provider: PaymentPro
   return profile(provider, mode, environment);
 }
 
+/** Legacy reader used only by pre-existing DOKU Checkout transactions. New DOKU payments are Direct API. */
+export async function getDokuCheckoutConfig() {
+  const { dokuEnvironment } = await getActivePaymentModes();
+  const values = await profile("doku", "checkout", dokuEnvironment);
+  if (!values?.clientId || !values.secretKey) {
+    throw new Error(`Kredensial DOKU Checkout legacy ${dokuEnvironment} belum tersedia.`);
+  }
+  return {
+    environment: dokuEnvironment,
+    clientId: values.clientId,
+    secretKey: values.secretKey,
+    apiOrigin: dokuEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com",
+  };
+}
+
 export async function getMidtransSnapConfig() {
   const { midtransEnvironment } = await getActivePaymentModes();
   const values = await profile("midtrans", "snap", midtransEnvironment);
