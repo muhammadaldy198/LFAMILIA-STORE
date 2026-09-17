@@ -45,8 +45,10 @@ test("LFAMILIA selling price uses configured Digiflazz Max Price plus margin", (
   assert.match(pricing, /provider_max_price = COALESCE\(provider_max_price, \?\)/);
 });
 
-test("Digiflazz dashboard owns the Max Price guard, not LFAMILIA fulfillment", () => {
-  assert.doesNotMatch(provider, /max_price\s*:/);
+test("configured Max Price is sent to DigiFlazz while upstream remains the transaction guard", () => {
+  assert.match(provider, /const maxPrice = Number\(order\.maxProviderPrice\)/);
+  assert.match(provider, /Number\.isInteger\(maxPrice\) && maxPrice > 0/);
+  assert.match(provider, /max_price: maxPrice/);
   assert.doesNotMatch(provider, /Max Price DigiFlazz pada order tidak valid/);
   assert.doesNotMatch(availability, /currentPrice\s*>\s*maxPrice/);
   assert.doesNotMatch(availability, /provider_max_price/);

@@ -17,7 +17,7 @@ const admin = fs.readFileSync(
   "utf8",
 );
 
-test("DigiFlazz Buyer request uses the required transaction fields while Max Price stays dashboard-managed", () => {
+test("DigiFlazz Buyer request uses the official transaction fields including guarded max_price", () => {
   for (const field of [
     "username",
     "buyer_sku_code",
@@ -29,7 +29,9 @@ test("DigiFlazz Buyer request uses the required transaction fields while Max Pri
   ]) {
     assert.match(provider, new RegExp(field));
   }
-  assert.doesNotMatch(provider, /max_price\s*:/);
+  assert.match(provider, /const maxPrice = Number\(order\.maxProviderPrice\)/);
+  assert.match(provider, /Number\.isInteger\(maxPrice\) && maxPrice > 0/);
+  assert.match(provider, /max_price: maxPrice/);
   assert.match(provider, /allow_dot/);
   assert.match(provider, /order\.customerNo\.includes\("\."\)/);
 });
