@@ -10,8 +10,6 @@ export const dynamic = "force-dynamic";
 
 const saveModes = z.object({
   action: z.literal("save_modes"),
-  dokuMode: z.enum(["checkout", "direct"]),
-  midtransMode: z.enum(["snap", "bisnap"]),
   dokuEnvironment: z.enum(["sandbox", "production"]),
   midtransEnvironment: z.enum(["sandbox", "production"]),
 });
@@ -41,8 +39,6 @@ export async function PUT(request: Request) {
     const input = schema.parse(await request.json());
     if (input.action === "save_modes") {
       await savePaymentModeSelections({
-        dokuMode: input.dokuMode,
-        midtransMode: input.midtransMode,
         dokuEnvironment: input.dokuEnvironment,
         midtransEnvironment: input.midtransEnvironment,
       });

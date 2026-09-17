@@ -256,7 +256,9 @@ function assertManualServiceOpen(item: PurchasableItem) {
 export function createOrderIdentity() {
   const id = crypto.randomUUID();
   const date = new Date().toISOString().slice(2, 10).replaceAll("-", "");
-  const referenceToken = crypto.randomUUID().replaceAll("-", "").toUpperCase();
+  // 56 bits of randomness keeps the customer-facing code short while making
+  // collisions impractical; reference_id remains protected by a DB unique key.
+  const referenceToken = crypto.randomUUID().replaceAll("-", "").slice(0, 14).toUpperCase();
   return {
     id,
     referenceId: `LF${date}${referenceToken}`,

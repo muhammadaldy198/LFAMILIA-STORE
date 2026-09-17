@@ -1,9 +1,7 @@
 import { requireAdminSession } from "@/lib/server/admin";
 import { getDokuCheckoutReadiness } from "@/lib/server/doku-checkout";
-import { getDokuReadiness } from "@/lib/server/doku";
 import { getIntegrationOverview } from "@/lib/server/integration-config";
 import { getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
-import { getMidtransReadiness } from "@/lib/server/midtrans";
 import { getPaymentModeOverview } from "@/lib/server/payment-mode-config";
 import { getDigiflazzReadiness } from "@/lib/server/providers/digiflazz";
 
@@ -45,8 +43,6 @@ export async function GET(request: Request) {
       getMidtransSnapReadiness(),
     ]);
 
-    const dokuDirect = getDokuReadiness();
-    const midtransBisnap = getMidtransReadiness(paymentModes.midtransEnvironment);
     const digiflazz = getDigiflazzReadiness();
     const kokinpayReady = integration.profiles.some(
       (profile) => profile.provider === "kokinpay" && profile.mode === "service" && profile.environment === "global" && profile.configured && !profile.decryptionError,
@@ -78,28 +74,12 @@ export async function GET(request: Request) {
         status: statusText({ ready: dokuCheckout.ready, active: paymentModes.dokuMode === "checkout", environment: paymentModes.dokuEnvironment }),
       },
       {
-        id: "doku-direct",
-        name: "DOKU Direct API",
-        ready: dokuDirect.ready,
-        active: paymentModes.dokuMode === "direct",
-        environment: paymentModes.dokuEnvironment,
-        status: statusText({ ready: dokuDirect.ready, active: paymentModes.dokuMode === "direct", environment: paymentModes.dokuEnvironment }),
-      },
-      {
         id: "midtrans-snap",
         name: "Midtrans Snap",
         ready: midtransSnap.ready,
         active: paymentModes.midtransMode === "snap",
         environment: paymentModes.midtransEnvironment,
         status: statusText({ ready: midtransSnap.ready, active: paymentModes.midtransMode === "snap", environment: paymentModes.midtransEnvironment }),
-      },
-      {
-        id: "midtrans-bisnap",
-        name: "Midtrans BI-SNAP",
-        ready: midtransBisnap.ready,
-        active: paymentModes.midtransMode === "bisnap",
-        environment: paymentModes.midtransEnvironment,
-        status: statusText({ ready: midtransBisnap.ready, active: paymentModes.midtransMode === "bisnap", environment: paymentModes.midtransEnvironment }),
       },
     ];
 

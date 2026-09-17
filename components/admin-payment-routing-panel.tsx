@@ -8,8 +8,8 @@ import { Field, Panel, Status, Toggle, buttonClass, inputClass, primaryButtonCla
 type Gateway = "doku" | "midtrans";
 type Environment = "sandbox" | "production";
 type RoutingOverview = {
-  dokuMode: "checkout" | "direct";
-  midtransMode: "snap" | "bisnap";
+  dokuMode: "checkout";
+  midtransMode: "snap";
   dokuEnvironment: Environment;
   midtransEnvironment: Environment;
   dokuCheckoutConfigured: boolean;
@@ -68,8 +68,6 @@ export function AdminGatewayRoutingPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "save_modes",
-          dokuMode: routing.dokuMode,
-          midtransMode: routing.midtransMode,
           dokuEnvironment: routing.dokuEnvironment,
           midtransEnvironment: routing.midtransEnvironment,
         }),
@@ -101,19 +99,17 @@ export function AdminGatewayRoutingPanel() {
 
   if (!routing) return null;
   return <div className="mb-4">
-    <Panel title="Routing Gateway" description="Tidak hardcode: pilih mode tiap gateway dan tentukan gateway untuk setiap channel. Top up saldo memakai routing channel yang sama." action={<button type="button" disabled={busy} onClick={saveAll} className={primaryButtonClass}><Save className="size-3.5" />{busy ? "Menyimpan..." : "Simpan Routing"}</button>}>
+    <Panel title="Routing Gateway" description="Tentukan gateway hosted untuk setiap channel. Top up saldo memakai routing channel yang sama." action={<button type="button" disabled={busy} onClick={saveAll} className={primaryButtonClass}><Save className="size-3.5" />{busy ? "Menyimpan..." : "Simpan Routing"}</button>}>
       {message && <div className="mb-3 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[9px] font-semibold text-emerald-700"><CheckCircle2 className="size-3.5" />{message}</div>}
       {error && <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[9px] font-semibold text-red-700">{error}</div>}
-      <div className="mb-4 grid grid-cols-4 gap-3">
-        <Field label="Mode DOKU"><select className={inputClass} value={routing.dokuMode} onChange={(event) => setRouting((current) => current ? { ...current, dokuMode: event.target.value as RoutingOverview["dokuMode"] } : current)}><option value="checkout">Checkout Biasa</option><option value="direct">Direct API</option></select></Field>
+      <div className="mb-4 grid grid-cols-2 gap-3">
         <Field label="Environment DOKU"><select className={inputClass} value={routing.dokuEnvironment} onChange={(event) => setRouting((current) => current ? { ...current, dokuEnvironment: event.target.value as Environment } : current)}><option value="sandbox">Sandbox</option><option value="production">Production</option></select></Field>
-        <Field label="Mode Midtrans"><select className={inputClass} value={routing.midtransMode} onChange={(event) => setRouting((current) => current ? { ...current, midtransMode: event.target.value as RoutingOverview["midtransMode"] } : current)}><option value="snap">Snap</option><option value="bisnap">BI-SNAP</option></select></Field>
         <Field label="Environment Midtrans"><select className={inputClass} value={routing.midtransEnvironment} onChange={(event) => setRouting((current) => current ? { ...current, midtransEnvironment: event.target.value as Environment } : current)}><option value="sandbox">Sandbox</option><option value="production">Production</option></select></Field>
       </div>
       <div className="overflow-x-auto rounded-md border border-[#e3e8ef]">
         <table className="w-full min-w-[760px] text-left"><thead className="bg-[#f6f8fb] text-[8px] uppercase text-[#718198]"><tr><th className="px-3 py-2.5">Metode</th><th>Channel</th><th>Gateway</th><th>Aktif</th><th className="pr-3">Catatan</th></tr></thead><tbody className="divide-y divide-[#edf0f4]">{channels.map((channel, index) => <tr key={`${channel.method}:${channel.channel}`} className="text-[9px] text-[#42516a]"><td className="px-3 py-2.5"><Status tone={channel.method === "qris" ? "green" : channel.method === "ewallet" ? "amber" : "blue"}>{channel.method.toUpperCase()}</Status></td><td><strong className="text-[#23334e]">{channel.name}</strong><span className="ml-2 text-[8px] text-[#8a98aa]">{channel.channel}</span></td><td><select className={`${inputClass} h-8 w-32`} value={channel.gateway} onChange={(event) => setChannels((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, gateway: event.target.value as Gateway } : item))}><option value="doku">DOKU</option><option value="midtrans">Midtrans</option></select></td><td><Toggle checked={channel.isActive} onChange={(checked) => setChannels((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, isActive: checked } : item))} /></td><td className="pr-3 text-[8px] text-[#8a98aa]">Checkout produk + top up saldo mengikuti pilihan ini.</td></tr>)}</tbody></table>
       </div>
-      <div className="mt-3 flex items-center gap-2 rounded-md bg-blue-50 px-3 py-2 text-[8px] text-blue-800"><Route className="size-3.5" />Contoh bebas: QRIS → DOKU, E-Wallet + VA → Midtrans. Nanti bisa dibalik dari panel tanpa edit repo.</div>
+      <div className="mt-3 flex items-center gap-2 rounded-md bg-blue-50 px-3 py-2 text-[8px] text-blue-800"><Route className="size-3.5" />DOKU memakai Checkout hosted, Midtrans memakai Snap hosted. Channel tetap dapat dikelola dari panel.</div>
     </Panel>
   </div>;
 }
@@ -156,7 +152,7 @@ export function AdminHostedGatewayCredentialsPanel() {
 
   if (!routing) return null;
   return <div className="mb-4">
-    <Panel title="Gateway Hosted / Sementara" description="DOKU Checkout dan Midtrans Snap. DOKU Direct API serta Midtrans BI-SNAP tetap tersimpan di bagian bawah dan bisa dipakai lagi nanti." action={<button type="button" disabled={busy} onClick={saveHosted} className={primaryButtonClass}><ShieldCheck className="size-3.5" />{busy ? "Menyimpan..." : "Simpan Kredensial"}</button>}>
+    <Panel title="Gateway Hosted" description="Simpan credential DOKU Checkout dan Midtrans Snap." action={<button type="button" disabled={busy} onClick={saveHosted} className={primaryButtonClass}><ShieldCheck className="size-3.5" />{busy ? "Menyimpan..." : "Simpan Kredensial"}</button>}>
       {message && <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[9px] font-semibold text-emerald-700">{message}</div>}
       {error && <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[9px] font-semibold text-red-700">{error}</div>}
       <div className="grid grid-cols-2 gap-4">

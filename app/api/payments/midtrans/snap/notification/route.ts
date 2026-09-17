@@ -1,7 +1,8 @@
 import { hashHex } from "@/lib/server/crypto";
 import { recordExternalPaymentEvent } from "@/lib/server/external-payments";
 import { mapMidtransSnapStatus, verifyMidtransSnapNotification } from "@/lib/server/midtrans-snap";
-import { applyPaymentStatus, fulfillAutomaticOrder, getOrderByReference } from "@/lib/server/orders";
+import { fulfillAutomaticOrder, getOrderByReference } from "@/lib/server/orders";
+import { applyPendingExternalPaymentStatus } from "@/lib/server/payment-transition";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import {
   notifyOrderFulfillmentSuccessById,
@@ -114,7 +115,7 @@ export async function POST(request: Request) {
     });
 
     if (status !== "ignore") {
-      const firstPaid = await applyPaymentStatus(order, status);
+      const firstPaid = await applyPendingExternalPaymentStatus(order, status);
       if (firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>

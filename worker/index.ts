@@ -7,7 +7,6 @@ import { ensureLegacyDatabaseColumns } from "../lib/server/database-repair";
 import { recoverStaleAutomaticOrders } from "../lib/server/orders";
 import { releaseExpiredExternalPromotions } from "../lib/server/promotions";
 import { reconcileStaleDigiflazzProcessing } from "../lib/server/digiflazz-reconciliation";
-import { finalizeExpiredDokuPayments } from "../lib/server/doku-reconciliation";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 import { cleanupSecurityRateLimits } from "../lib/server/security";
 import { cleanupOrphanStoreMedia } from "../lib/server/media";
@@ -205,7 +204,6 @@ const worker = {
     const tasks: Promise<unknown>[] = [
       cleanupSecurityRateLimits().catch(() => undefined),
       releaseExpiredExternalPromotions().catch(() => undefined),
-      finalizeExpiredDokuPayments().catch(() => undefined),
       Promise.resolve()
         .then(() => recoverStaleAutomaticOrders(publicBaseUrl))
         .catch(() => undefined),

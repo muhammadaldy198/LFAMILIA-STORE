@@ -24,6 +24,13 @@ function object(value: unknown) {
     : {};
 }
 
+function numericAmount(value: unknown) {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  const record = object(value);
+  return Number(record.value ?? Number.NaN);
+}
+
 function digest(rawBody: string) {
   return createHash("sha256").update(rawBody, "utf8").digest("base64");
 }
@@ -185,4 +192,16 @@ export async function validateDokuCheckoutNotification(input: {
   } catch {
     return false;
   }
+}
+
+export function parseDokuCheckoutNotification(payload: Record<string, unknown>) {
+  const order = object(payload.order);
+  const transaction = object(payload.transaction);
+  const referenceId = typeof order.invoice_number === "string" ? order.invoice_number.trim() : "";
+  const rawStatus = typeof transaction.status === "string" ? transaction.status.trim().toUpperCase() : "";
+  return {
+    referenceId,
+    amount: numericAmount(order.amount),
+    status: rawStatus === "SUCCESS" ? "paid" as const : rawStatus === "EXPIRED" ? "expired" as const : "pending" as const,
+  };
 }

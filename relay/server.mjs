@@ -50,18 +50,6 @@ const providerDefinitions = [
       "DIGIFLAZZ_PRODUCTION_UPSTREAM_ORIGIN",
     ),
   },
-  {
-    name: "midtrans",
-    host: optionalEnv("MIDTRANS_RELAY_HOST").toLowerCase(),
-    sandboxUpstream: normalizeOrigin(
-      optionalEnv("MIDTRANS_SANDBOX_UPSTREAM_ORIGIN"),
-      "MIDTRANS_SANDBOX_UPSTREAM_ORIGIN",
-    ),
-    productionUpstream: normalizeOrigin(
-      optionalEnv("MIDTRANS_PRODUCTION_UPSTREAM_ORIGIN"),
-      "MIDTRANS_PRODUCTION_UPSTREAM_ORIGIN",
-    ),
-  },
 ];
 
 const providers = new Map(
@@ -73,7 +61,6 @@ const providers = new Map(
 const internalHeaders = new Set([
   "x-lfamilia-relay-token",
   "x-lfamilia-digiflazz-environment",
-  "x-lfamilia-midtrans-environment",
 ]);
 
 const hopByHopHeaders = new Set([
@@ -97,10 +84,6 @@ const digiflazzAllowedPaths = new Set([
   "/v1/cek-saldo",
 ]);
 
-const midtransAllowedPaths = new Set([
-  "/v1.0/access-token/b2b",
-  "/v1.0/transfer-va/create-va",
-]);
 
 function json(res, status, payload) {
   const body = Buffer.from(JSON.stringify(payload));
@@ -199,7 +182,6 @@ function isMethodAllowed(_provider, method) {
 
 function isPathAllowed(provider, path) {
   if (provider.name === "digiflazz") return digiflazzAllowedPaths.has(path);
-  if (provider.name === "midtrans") return midtransAllowedPaths.has(path);
   return false;
 }
 
@@ -214,16 +196,6 @@ function resolveProviderUpstream(provider, req) {
     return "";
   }
 
-  if (provider.name === "midtrans") {
-    const environment = String(
-      req.headers["x-lfamilia-midtrans-environment"] || "",
-    ).toLowerCase();
-
-    if (environment === "sandbox") return provider.sandboxUpstream;
-    if (environment === "production") return provider.productionUpstream;
-    return "";
-  }
-
   return "";
 }
 
@@ -232,14 +204,6 @@ function providerConfigured(provider) {
     return Boolean(
       provider.host &&
         provider.developmentUpstream &&
-        provider.productionUpstream,
-    );
-  }
-
-  if (provider.name === "midtrans") {
-    return Boolean(
-      provider.host &&
-        provider.sandboxUpstream &&
         provider.productionUpstream,
     );
   }
