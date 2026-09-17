@@ -175,8 +175,8 @@ async function refreshDokuStatus(order: OrderRecord) {
           console.error("Notifikasi pesanan DOKU hasil rekonsiliasi gagal:", error),
         );
       }
-    } else if (query.status === "failed" || query.status === "expired") {
-      await applyPendingExternalPaymentStatus(order, query.status);
+    } else if (query.status === "expired") {
+      await applyPendingExternalPaymentStatus(order, "expired");
     }
 
     return (await getOrderById(order.id)) ?? order;
