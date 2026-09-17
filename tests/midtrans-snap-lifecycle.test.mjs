@@ -34,10 +34,11 @@ test("pending Midtrans Snap orders reconcile against authenticated Get Status AP
   assert.match(snap, /export async function queryMidtransSnapStatus/);
   assert.match(snap, /\/v2\/\$\{encodeURIComponent\(input\.orderId\)\}\/status/);
   assert.match(snap, /authorization: `Basic \$\{Buffer\.from\(`\$\{serverKey\}:`\)\.toString\("base64"\)\}`/);
-  assert.match(statusRoute, /artifacts\.gateway !== "midtrans"/);
-  assert.match(statusRoute, /artifacts\.mode !== "snap"/);
+  assert.match(statusRoute, /artifacts\.gateway === "midtrans"/);
+  assert.match(statusRoute, /artifacts\.mode === "snap"/);
   assert.match(statusRoute, /gateway_status_checked_at = CURRENT_TIMESTAMP/);
   assert.match(statusRoute, /query\.amount !== order\.total/);
   assert.match(statusRoute, /const firstPaid = await applyPaymentStatus\(order, "paid"\)/);
+  assert.match(statusRoute, /await fulfillAutomaticOrder\(order\.id, getPublicBaseUrl\(\)\)/);
   assert.match(statusRoute, /order = await refreshMidtransSnapStatus\(order\)/);
 });
