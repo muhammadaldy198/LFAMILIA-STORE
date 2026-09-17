@@ -45,8 +45,8 @@ test("Admin dashboard does not render backend-restricted finance data or integra
   assert.match(overview, /const canViewFinance = summary\?\.canViewFinance === true/);
   assert.match(overview, /\{canViewFinance && <MetricCard Icon=\{WalletCards\} label="Omzet Hari Ini"/);
   assert.match(overview, /\{canViewFinance && <MetricCard Icon=\{CircleDollarSign\} label="Saldo Digiflazz"/);
-  assert.match(overview, /\{canViewFinance && <Panel className="min-h-\[282px\]">/);
-  assert.match(overview, /\{canViewFinance && <th className="w-\[11%\] px-2 py-2">Total<\/th>\}/);
+  assert.match(overview, /\{canViewFinance && <Panel>/);
+  assert.match(overview, /\{canViewFinance && <th[^>]*>Total<\/th>\}/);
   assert.match(overview, /role === "super_admin" && <button type="button" onClick=\{\(\) => onNavigate\?\.\("integrations"\)\}/);
 });
 
