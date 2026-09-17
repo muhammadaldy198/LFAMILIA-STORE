@@ -2,7 +2,7 @@ import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import {
   getPaymentModeOverview,
-  saveHostedGatewayProfile,
+  savePaymentGatewayProfile,
   savePaymentModeSelections,
 } from "@/lib/server/payment-mode-config";
 
@@ -17,9 +17,9 @@ const saveModes = z.object({
 const saveProfile = z.object({
   action: z.literal("save_profile"),
   provider: z.enum(["doku", "midtrans"]),
-  mode: z.enum(["checkout", "snap"]),
+  mode: z.enum(["direct", "snap"]),
   environment: z.enum(["sandbox", "production"]),
-  values: z.record(z.string().min(1).max(40), z.string().max(12_000)),
+  values: z.record(z.string().min(1).max(40), z.string().max(20_000)),
 });
 
 const schema = z.discriminatedUnion("action", [saveModes, saveProfile]);
@@ -43,10 +43,10 @@ export async function PUT(request: Request) {
         midtransEnvironment: input.midtransEnvironment,
       });
     } else {
-      if ((input.provider === "doku" && input.mode !== "checkout") || (input.provider === "midtrans" && input.mode !== "snap")) {
+      if ((input.provider === "doku" && input.mode !== "direct") || (input.provider === "midtrans" && input.mode !== "snap")) {
         throw new Error("Kombinasi gateway dan mode tidak valid.");
       }
-      await saveHostedGatewayProfile(input);
+      await savePaymentGatewayProfile(input);
     }
     return Response.json({ ok: true, overview: await getPaymentModeOverview() });
   } catch (error) {
