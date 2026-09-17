@@ -296,7 +296,7 @@ export default function TrackPage() {
         {phoneOrders.length > 0 && <section className="panel mt-4 overflow-hidden">
           <div className="border-b border-white/[0.08] px-4 py-3 sm:px-5">
             <h2 className="text-sm font-black">Pesanan dari nomor WhatsApp ini</h2>
-            <p className="mt-0.5 text-[9px] text-white/35">Nomor WhatsApp hanya menampilkan ringkasan. Gunakan invoice asli untuk membuka detail transaksi.</p>
+            <p className="mt-0.5 text-[9px] text-white/35">Invoice ditampilkan agar kamu dapat membuka detail transaksi.</p>
           </div>
           <div className="divide-y divide-white/[0.06]">
             {phoneOrders.map((item, index) => <div key={`${item.createdAt}-${item.productName}-${index}`} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
@@ -308,9 +308,7 @@ export default function TrackPage() {
                 <p className="mt-1 truncate text-xs font-bold text-white/75">{item.productName} • {item.packageLabel}</p>
                 <p className="mt-1 text-[9px] text-white/35">{formatRupiah(item.total)} • {dateLabel(item.createdAt)}</p>
               </div>
-              <span className="shrink-0 rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2 text-[9px] font-bold text-white/35">
-                Invoice diperlukan
-              </span>
+              {item.referenceId ? <button type="button" onClick={() => void loadOrder(item.referenceId!)} className="shrink-0 rounded-lg border border-[#b9ff35]/30 bg-[#b9ff35]/10 px-3 py-2 text-[9px] font-bold text-[#d8ff8d]">Buka pesanan</button> : null}
             </div>)}
           </div>
         </section>}
