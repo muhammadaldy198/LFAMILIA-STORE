@@ -13,7 +13,6 @@ import {
 import { isAllowedMediaUrl } from "@/lib/media-url";
 import { getDokuCheckoutReadiness } from "@/lib/server/doku-checkout";
 import { getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
-import { getActivePaymentModes } from "@/lib/server/payment-mode-config";
 
 const gatewayConfigSchema = z.record(
   z.string().trim().min(1).max(60),
