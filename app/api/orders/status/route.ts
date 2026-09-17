@@ -8,7 +8,6 @@ import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-
 import { externalArtifactsFromOrder, recordExternalPaymentEvent } from "@/lib/server/external-payments";
 import { queryMidtransSnapStatus } from "@/lib/server/midtrans-snap";
 import {
-  applyPaymentStatus,
   fulfillAutomaticOrder,
   getOrderById,
   type OrderRecord,
