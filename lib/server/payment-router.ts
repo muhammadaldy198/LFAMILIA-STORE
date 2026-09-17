@@ -5,7 +5,7 @@ import { hydrateDokuDirectRuntimeEnv } from "@/lib/server/payment-mode-config";
 import type { PaymentGatewayName } from "@/lib/server/payment-channels";
 import { getRuntimeEnv, setRuntimeEnv } from "@/lib/server/runtime-env";
 
-export type RoutedPaymentMode = "direct" | "checkout" | "snap";
+export type RoutedPaymentMode = "direct" | "snap";
 
 async function prepareDokuRuntime() {
   const current = getRuntimeEnv<Record<string, unknown>>();
