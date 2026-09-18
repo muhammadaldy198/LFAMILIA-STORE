@@ -123,6 +123,24 @@ test("full DigiFlazz pricelist writes renew and verify the sync lease before eve
   assert.match(pricing, /writePriceListCache\(items, lock\.token\)/);
 });
 
+test("DigiFlazz profile activity is decided only after acquiring the configuration guard", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const helperStart = route.indexOf("async function withDigiflazzConfigurationGuard");
+  const acquire = route.indexOf("await acquireDigiflazzConfigurationGuard()", helperStart);
+  const decision = route.indexOf("await shouldInvalidateOperationalCache()", helperStart);
+  const profileBranch = route.indexOf('input.provider === "digiflazz"');
+  const guardedSave = route.indexOf("await withDigiflazzConfigurationGuard(", profileBranch);
+  const activeRead = route.indexOf("const activeEnvironment = (await getIntegrationOverview())", guardedSave);
+
+  assert.ok(acquire >= 0 && decision > acquire);
+  assert.ok(guardedSave >= 0 && activeRead > guardedSave);
+  assert.match(route, /return hasCredentialMutation && input\.environment === activeEnvironment/);
+  assert.doesNotMatch(
+    route.slice(profileBranch, guardedSave),
+    /const activeEnvironment = \(await getIntegrationOverview\(\)\)/,
+  );
+});
+
 test("same-value DigiFlazz environment saves cannot report success during guarded maintenance", () => {
   const route = read("app/api/admin/integrations/route.ts");
   const guard = read("lib/server/digiflazz-config-guard.ts");
