@@ -18,18 +18,23 @@ export async function GET() {
     (item) => item.gateway === modes.walletTopupGateway && item.isActive,
   );
   const candidates = settings.automaticTopupEnabled && gatewayActive
-    ? channels.filter((item) => item.gateway === modes.walletTopupGateway)
+    ? channels
     : [];
 
-  const checked = await Promise.all(candidates.map(async (item) => ({
-    item,
-    readiness: await getConfiguredGatewayReadiness({
-      gateway: item.gateway,
-      paymentMethod: item.method,
-      paymentChannel: item.channel,
-      gatewayConfig: item.gatewayConfig,
-    }),
-  })));
+  const checked = await Promise.all(candidates.map(async (item) => {
+    const gatewayConfig = item.gateway === modes.walletTopupGateway
+      ? item.gatewayConfig
+      : { customerFeeBps: item.gatewayConfig.customerFeeBps ?? "0" };
+    return {
+      item,
+      readiness: await getConfiguredGatewayReadiness({
+        gateway: modes.walletTopupGateway,
+        paymentMethod: item.method,
+        paymentChannel: item.channel,
+        gatewayConfig,
+      }),
+    };
+  }));
 
   const publicChannels = checked
     .filter(({ readiness }) => readiness.ready)
@@ -44,7 +49,7 @@ export async function GET() {
   return Response.json(
     {
       settings: {
-        enabled: settings.automaticTopupEnabled && gatewayActive,
+        enabled: settings.automaticTopupEnabled && gatewayActive && publicChannels.length > 0,
         minimumAmount: settings.minTopup,
       },
       channels: publicChannels,
