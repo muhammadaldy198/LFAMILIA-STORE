@@ -93,9 +93,12 @@ test("failed active DigiFlazz configuration changes preserve the previous cache 
   assert.match(integration, /export async function restoreIntegrationSettingSnapshot/);
   assert.match(integration, /createdAt: string \| null/);
   assert.match(integration, /updatedAt: string \| null/);
+  assert.match(integration, /RETURNING encrypted_config, created_at, updated_at/);
+  assert.match(integration, /AND updated_at = \?/);
   assert.match(integration, /maintenance_token = \?/);
   assert.match(integration, /lock_token = \?/);
-  assert.match(route, /captureCommitted/);
+  assert.doesNotMatch(route, /captureCommitted/);
+  assert.match(route, /committed = await action\(\)/);
   assert.match(route, /Rollback dibatalkan karena guard kedaluwarsa atau konfigurasi DigiFlazz sudah berubah/);
 });
 
@@ -110,6 +113,21 @@ test("targeted DigiFlazz product and package syncs cannot repopulate stale selle
   assert.match(monitor, /syncLockToken/);
   assert.match(monitor, /digiflazz_pricelist_sync_state/);
   assert.match(monitor, /digiflazz_runtime_state/);
+});
+
+test("full DigiFlazz pricelist writes renew and verify the sync lease before every cache batch", () => {
+  const pricing = read("lib/server/digiflazz-pricing.ts");
+  assert.match(pricing, /async function renewPriceListSyncLock/);
+  assert.match(pricing, /Lock sync DigiFlazz kedaluwarsa sebelum cache pricelist selesai ditulis/);
+  assert.match(pricing, /await renewPriceListSyncLock\(syncLockToken\)/);
+  assert.match(pricing, /writePriceListCache\(items, lock\.token\)/);
+});
+
+test("same-value DigiFlazz environment saves cannot report success during guarded maintenance", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const guard = read("lib/server/digiflazz-config-guard.ts");
+  assert.match(route, /await assertDigiflazzConfigurationIdle\(\)/);
+  assert.match(guard, /export async function assertDigiflazzConfigurationIdle/);
 });
 
 test("DigiFlazz transaction response is JSON-safe and requires exact LFAMILIA correlation", () => {
