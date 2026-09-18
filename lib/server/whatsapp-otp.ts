@@ -181,13 +181,14 @@ export async function createWhatsappOtpChallenge(customerId: string, phoneInput:
   const code = randomOtp();
   const saltHex = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
   const digest = await otpDigest(code, saltHex);
+  const createdAt = new Date().toISOString();
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
 
   await db.prepare(
     `INSERT INTO customer_phone_otp_challenges
-      (id, customer_id, phone, otp_hash, otp_salt, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).bind(challengeId, customerId, phone, digest, saltHex, expiresAt).run();
+      (id, customer_id, phone, otp_hash, otp_salt, expires_at, sent_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(challengeId, customerId, phone, digest, saltHex, expiresAt, createdAt, createdAt).run();
 
   try {
     await sendWhatsappOtp(phone, code);
@@ -198,11 +199,18 @@ export async function createWhatsappOtpChallenge(customerId: string, phoneInput:
     throw error;
   }
 
+  // Concurrent send requests may both pass the cooldown check. Keep the newest
+  // challenge active and only retire challenges that are strictly older, so
+  // overlapping requests can never consume each other in both directions.
   await db.prepare(
     `UPDATE customer_phone_otp_challenges
      SET consumed_at = CURRENT_TIMESTAMP
-     WHERE customer_id = ? AND id <> ? AND consumed_at IS NULL`,
-  ).bind(customerId, challengeId).run();
+     WHERE customer_id = ? AND id <> ? AND consumed_at IS NULL
+       AND (
+         datetime(created_at) < datetime(?)
+         OR (datetime(created_at) = datetime(?) AND id < ?)
+       )`,
+  ).bind(customerId, challengeId, createdAt, createdAt, challengeId).run();
 
   return {
     challengeId,
@@ -214,39 +222,64 @@ export async function createWhatsappOtpChallenge(customerId: string, phoneInput:
 
 export async function verifyWhatsappOtpChallenge(customerId: string, challengeId: string, code: string) {
   const db = getD1();
+
+  // Only the newest open challenge is valid. This makes concurrent resend
+  // requests deterministic: the newest OTP wins instead of two challenges
+  // invalidating each other.
+  const newest = await db.prepare(
+    `SELECT id FROM customer_phone_otp_challenges
+     WHERE customer_id = ? AND consumed_at IS NULL
+     ORDER BY datetime(created_at) DESC, id DESC LIMIT 1`,
+  ).bind(customerId).first<{ id: string }>();
+  if (!newest || newest.id !== challengeId) {
+    throw new Error("OTP sudah tidak berlaku. Gunakan OTP terbaru yang dikirim.");
+  }
+
+  const claimed = await db.prepare(
+    `UPDATE customer_phone_otp_challenges
+     SET attempt_count = attempt_count + 1
+     WHERE id = ? AND customer_id = ? AND consumed_at IS NULL
+       AND attempt_count < ?
+       AND datetime(expires_at) > datetime(?)`,
+  ).bind(challengeId, customerId, OTP_MAX_ATTEMPTS, new Date().toISOString()).run();
+
+  if (Number(claimed.meta.changes ?? 0) === 0) {
+    const current = await db.prepare(
+      `SELECT expires_at, attempt_count, consumed_at
+       FROM customer_phone_otp_challenges
+       WHERE id = ? AND customer_id = ? LIMIT 1`,
+    ).bind(challengeId, customerId).first<Pick<ChallengeRow, "expires_at" | "attempt_count" | "consumed_at">>();
+
+    if (!current || current.consumed_at) {
+      throw new Error("OTP sudah tidak berlaku. Kirim OTP baru.");
+    }
+    if (new Date(current.expires_at).getTime() <= Date.now()) {
+      await db.prepare(
+        "UPDATE customer_phone_otp_challenges SET consumed_at = CURRENT_TIMESTAMP WHERE id = ? AND consumed_at IS NULL",
+      ).bind(challengeId).run();
+      throw new Error("OTP sudah kedaluwarsa. Kirim OTP baru.");
+    }
+    throw new Error("Batas percobaan OTP tercapai. Kirim OTP baru.");
+  }
+
   const challenge = await db.prepare(
     `SELECT id, customer_id, phone, otp_hash, otp_salt, expires_at, attempt_count, sent_at, consumed_at
      FROM customer_phone_otp_challenges
      WHERE id = ? AND customer_id = ? LIMIT 1`,
   ).bind(challengeId, customerId).first<ChallengeRow>();
-
-  if (!challenge || challenge.consumed_at) throw new Error("OTP sudah tidak berlaku. Kirim OTP baru.");
-  if (new Date(challenge.expires_at).getTime() <= Date.now()) {
-    await db.prepare(
-      "UPDATE customer_phone_otp_challenges SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?",
-    ).bind(challengeId).run();
-    throw new Error("OTP sudah kedaluwarsa. Kirim OTP baru.");
+  if (!challenge || challenge.consumed_at) {
+    throw new Error("OTP sudah tidak berlaku. Kirim OTP baru.");
   }
-  if (challenge.attempt_count >= OTP_MAX_ATTEMPTS) {
-    throw new Error("Batas percobaan OTP tercapai. Kirim OTP baru.");
-  }
-
-  await db.prepare(
-    `UPDATE customer_phone_otp_challenges
-     SET attempt_count = attempt_count + 1
-     WHERE id = ? AND consumed_at IS NULL AND attempt_count < ?`,
-  ).bind(challengeId, OTP_MAX_ATTEMPTS).run();
 
   const digest = await otpDigest(code, challenge.otp_salt);
   if (!constantTimeEqual(digest, challenge.otp_hash)) {
-    const nextAttempts = challenge.attempt_count + 1;
-    if (nextAttempts >= OTP_MAX_ATTEMPTS) {
+    if (challenge.attempt_count >= OTP_MAX_ATTEMPTS) {
       await db.prepare(
-        "UPDATE customer_phone_otp_challenges SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE customer_phone_otp_challenges SET consumed_at = CURRENT_TIMESTAMP WHERE id = ? AND consumed_at IS NULL",
       ).bind(challengeId).run();
       throw new Error("OTP salah dan batas percobaan tercapai. Kirim OTP baru.");
     }
-    throw new Error(`OTP salah. Sisa percobaan: ${OTP_MAX_ATTEMPTS - nextAttempts}.`);
+    throw new Error(`OTP salah. Sisa percobaan: ${OTP_MAX_ATTEMPTS - challenge.attempt_count}.`);
   }
 
   try {
@@ -257,7 +290,7 @@ export async function verifyWhatsappOtpChallenge(customerId: string, challengeId
          WHERE id = ?`,
       ).bind(challenge.phone, customerId),
       db.prepare(
-        "UPDATE customer_phone_otp_challenges SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE customer_phone_otp_challenges SET consumed_at = CURRENT_TIMESTAMP WHERE id = ? AND consumed_at IS NULL",
       ).bind(challengeId),
       db.prepare(
         `UPDATE customer_phone_otp_challenges
