@@ -3,7 +3,6 @@ import { getIntegrationOverview } from "@/lib/server/integration-config";
 import { getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
 import { listPaymentGatewaySettings } from "@/lib/server/payment-channels";
 import { getPaymentModeOverview } from "@/lib/server/payment-mode-config";
-import { getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
 import { getDigiflazzReadiness } from "@/lib/server/providers/digiflazz";
 
 export const dynamic = "force-dynamic";
@@ -37,11 +36,10 @@ export async function GET(request: Request) {
   if (access instanceof Response) return access;
 
   try {
-    const [integration, paymentModes, gatewaySettings, dokuDirect, midtransSnap] = await Promise.all([
+    const [integration, paymentModes, gatewaySettings, midtransSnap] = await Promise.all([
       getIntegrationOverview(),
       getPaymentModeOverview(),
       listPaymentGatewaySettings(),
-      getConfiguredGatewayReadiness({ gateway: "doku", paymentMethod: "qris", paymentChannel: "qris" }),
       getMidtransSnapReadiness(),
     ]);
 
@@ -73,10 +71,10 @@ export async function GET(request: Request) {
       {
         id: "doku-direct",
         name: "DOKU Direct API",
-        ready: dokuDirect.ready,
+        ready: paymentModes.dokuDirectConfigured,
         active: dokuActive,
         environment: paymentModes.dokuEnvironment,
-        status: statusText({ ready: dokuDirect.ready, active: dokuActive, environment: paymentModes.dokuEnvironment }),
+        status: statusText({ ready: paymentModes.dokuDirectConfigured, active: dokuActive, environment: paymentModes.dokuEnvironment }),
       },
       {
         id: "midtrans-snap",
