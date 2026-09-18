@@ -14,6 +14,7 @@ import {
   saveIntegrationProfile,
   saveIntegrationSelections,
 } from "@/lib/server/integration-config";
+import { syncDigiflazzPrices } from "@/lib/server/digiflazz-pricing";
 import { testProviderRelayConnections } from "@/lib/server/provider-relay";
 
 export const dynamic = "force-dynamic";
@@ -53,18 +54,35 @@ const schema = z.discriminatedUnion("action", [
 async function withDigiflazzConfigurationGuard(action: () => Promise<void>) {
   const token = await acquireDigiflazzConfigurationGuard();
   let successful = false;
+  let failed = false;
+  let failure: unknown;
   try {
     // The guard blocks new DigiFlazz orders and pricelist sync while the active
-    // configuration changes. Clear every credential-dependent operational
-    // cache before committing the new active profile. If invalidation fails,
-    // the profile is left unchanged; if the save then fails, the old profile
-    // remains valid and its cache can be rebuilt safely after the guard exits.
+    // configuration changes. Invalidate credential-dependent caches before the
+    // mutation so stale provider data can never survive a successful change.
     await invalidateDigiflazzOperationalCache(token);
     clearDigiflazzBalanceCache();
     await action();
     successful = true;
+  } catch (error) {
+    failed = true;
+    failure = error;
   } finally {
     await releaseDigiflazzConfigurationGuard(token, successful);
+  }
+
+  if (failed) {
+    // The mutation did not commit, so the previous active DigiFlazz profile is
+    // still authoritative. Rebuild its operational cache immediately instead
+    // of leaving checkout unavailable until the next scheduled sync.
+    try {
+      await syncDigiflazzPrices({ force: true });
+    } catch (rebuildError) {
+      const primary = failure instanceof Error ? failure.message : String(failure);
+      const recovery = rebuildError instanceof Error ? rebuildError.message : String(rebuildError);
+      throw new Error(`${primary} Cache operasional DigiFlazz juga gagal dipulihkan: ${recovery}`);
+    }
+    throw failure;
   }
 }
 
