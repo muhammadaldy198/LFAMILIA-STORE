@@ -39,8 +39,13 @@ test("public payment APIs expose fee details without exposing gateway identity",
   for (const file of ["app/api/payment-methods/route.ts", "app/api/wallet/route.ts"]) {
     const source = read(file);
     assert.match(source, /publicCustomerPaymentFee/);
-    assert.doesNotMatch(source, /gateway:\s*item\.gateway/);
-    assert.doesNotMatch(source, /gatewayConfig:\s*item\.gatewayConfig/);
+    const publicMap = source.match(/\.map\(\(\{ item \}\) => \(\{([\s\S]*?)\}\)\);/)?.[1] ?? "";
+    assert.ok(publicMap, `public response mapping missing in ${file}`);
+    assert.match(publicMap, /method:\s*item\.method/);
+    assert.match(publicMap, /channel:\s*item\.channel/);
+    assert.match(publicMap, /publicCustomerPaymentFee\(item\.gatewayConfig\)/);
+    assert.doesNotMatch(publicMap, /gateway:\s*item\.gateway/);
+    assert.doesNotMatch(publicMap, /gatewayConfig:\s*item\.gatewayConfig/);
   }
 });
 
