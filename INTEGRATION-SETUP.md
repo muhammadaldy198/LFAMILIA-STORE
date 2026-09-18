@@ -2,7 +2,7 @@
 
 Integrasi pembayaran yang didukung hanya **DOKU Direct API** dan **Midtrans Snap** untuk checkout maupun top up saldo. DOKU Hosted Checkout tidak digunakan dan tidak memiliki jalur pembuatan pembayaran aktif.
 
-Credential pembayaran diatur dari **Super Admin → Pembayaran**. Credential DOKU Direct API disimpan terpisah untuk Sandbox dan Production dan dienkripsi di D1 menggunakan root secret `INTEGRATION_ENCRYPTION_KEY` (minimal 32 karakter).
+Credential pembayaran diatur dari **Super Admin → Integrasi → DOKU Direct API / Midtrans Snap**. Credential disimpan terpisah untuk Sandbox dan Production dan dienkripsi di D1 menggunakan root secret `INTEGRATION_ENCRYPTION_KEY` (minimal 32 karakter). Menu **Pembayaran** hanya mengatur operasional seperti gateway aktif/nonaktif, environment aktif, routing top up, channel pembayaran, tampilan pembayaran, dan transaksi.
 
 DOKU Direct API membutuhkan Client ID, Secret Key, RSA Private Key, API URL, serta konfigurasi channel yang dipakai. QRIS membutuhkan Merchant ID, Terminal ID, dan Postal Code. Virtual Account menggunakan VA Config JSON per bank. DANA dan ShopeePay memakai jalur e-wallet Direct API yang didukung backend.
 
