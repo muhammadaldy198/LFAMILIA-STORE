@@ -10,11 +10,14 @@ import {
   getDigiflazzBalance,
 } from "@/lib/server/providers/digiflazz";
 import {
+  captureIntegrationProfileSnapshot,
+  captureIntegrationSettingSnapshot,
   getIntegrationOverview,
+  restoreIntegrationProfileSnapshot,
+  restoreIntegrationSettingSnapshot,
   saveIntegrationProfile,
   saveIntegrationSelections,
 } from "@/lib/server/integration-config";
-import { syncDigiflazzPrices } from "@/lib/server/digiflazz-pricing";
 import { testProviderRelayConnections } from "@/lib/server/provider-relay";
 
 export const dynamic = "force-dynamic";
@@ -51,57 +54,41 @@ const schema = z.discriminatedUnion("action", [
   digiflazzTestInput,
 ]);
 
-const DIGIFLAZZ_CACHE_RECOVERY_ATTEMPTS = 10;
-const DIGIFLAZZ_CACHE_RECOVERY_DELAY_MS = 500;
+type DigiflazzRollback = () => Promise<void>;
 
-async function recoverDigiflazzOperationalCache() {
-  let lastResult: Awaited<ReturnType<typeof syncDigiflazzPrices>> | null = null;
-  for (let attempt = 1; attempt <= DIGIFLAZZ_CACHE_RECOVERY_ATTEMPTS; attempt += 1) {
-    const result = await syncDigiflazzPrices({ force: true });
-    lastResult = result;
-
-    if (!result.skipped || Number(result.cached ?? 0) > 0) return result;
-    if (attempt < DIGIFLAZZ_CACHE_RECOVERY_ATTEMPTS) {
-      await new Promise((resolve) => setTimeout(resolve, DIGIFLAZZ_CACHE_RECOVERY_DELAY_MS));
-    }
-  }
-
-  const reason = lastResult && "reason" in lastResult ? lastResult.reason : "unknown";
-  throw new Error(`Cache operasional DigiFlazz belum pulih setelah retry terbatas (reason: ${reason}).`);
-}
-
-async function withDigiflazzConfigurationGuard(action: () => Promise<void>) {
+async function withDigiflazzConfigurationGuard(
+  action: () => Promise<void>,
+  captureRollback: () => Promise<DigiflazzRollback>,
+) {
   const token = await acquireDigiflazzConfigurationGuard();
   let successful = false;
-  let failed = false;
-  let failure: unknown;
+  let actionCommitted = false;
+  let rollback: DigiflazzRollback | null = null;
   try {
-    // The guard blocks new DigiFlazz orders and pricelist sync while the active
-    // configuration changes. Invalidate credential-dependent caches before the
-    // mutation so stale provider data can never survive a successful change.
+    // Snapshot the small configuration record while the guard is held. The
+    // credential mutation happens before destructive cache invalidation, so a
+    // failed save leaves the old cache untouched. Cache invalidation itself is
+    // atomic; if it fails after the save, restore the previous configuration
+    // before the guard is released.
+    rollback = await captureRollback();
+    await action();
+    actionCommitted = true;
     await invalidateDigiflazzOperationalCache(token);
     clearDigiflazzBalanceCache();
-    await action();
     successful = true;
   } catch (error) {
-    failed = true;
-    failure = error;
+    if (actionCommitted && rollback) {
+      try {
+        await rollback();
+      } catch (rollbackError) {
+        const primary = error instanceof Error ? error.message : String(error);
+        const recovery = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+        throw new Error(`${primary} Konfigurasi DigiFlazz lama juga gagal dipulihkan: ${recovery}`);
+      }
+    }
+    throw error;
   } finally {
     await releaseDigiflazzConfigurationGuard(token, successful);
-  }
-
-  if (failed) {
-    // The mutation did not commit, so the previous active DigiFlazz profile is
-    // still authoritative. Rebuild its operational cache immediately instead
-    // of leaving checkout unavailable until the next scheduled sync.
-    try {
-      await recoverDigiflazzOperationalCache();
-    } catch (rebuildError) {
-      const primary = failure instanceof Error ? failure.message : String(failure);
-      const recovery = rebuildError instanceof Error ? rebuildError.message : String(rebuildError);
-      throw new Error(`${primary} Cache operasional DigiFlazz juga gagal dipulihkan: ${recovery}`);
-    }
-    throw failure;
   }
 }
 
@@ -145,7 +132,13 @@ export async function PUT(request: Request) {
         const activeProfileChanged = input.environment === activeEnvironment &&
           (Object.values(input.values).some((value) => value.trim()) || input.clearFields.length > 0);
         if (activeProfileChanged) {
-          await withDigiflazzConfigurationGuard(() => saveIntegrationProfile(input).then(() => undefined));
+          await withDigiflazzConfigurationGuard(
+            () => saveIntegrationProfile(input).then(() => undefined),
+            async () => {
+              const snapshot = await captureIntegrationProfileSnapshot(input.provider, input.mode, input.environment);
+              return () => restoreIntegrationProfileSnapshot(snapshot);
+            },
+          );
         } else {
           await saveIntegrationProfile(input);
         }
@@ -160,7 +153,13 @@ export async function PUT(request: Request) {
         input.selections.digiflazzEnvironment && before !== input.selections.digiflazzEnvironment,
       );
       if (changingDigiflazzEnvironment) {
-        await withDigiflazzConfigurationGuard(() => saveIntegrationSelections(input.selections));
+        await withDigiflazzConfigurationGuard(
+          () => saveIntegrationSelections(input.selections),
+          async () => {
+            const snapshot = await captureIntegrationSettingSnapshot("digiflazz_environment");
+            return () => restoreIntegrationSettingSnapshot(snapshot);
+          },
+        );
       } else {
         await saveIntegrationSelections(input.selections);
       }
