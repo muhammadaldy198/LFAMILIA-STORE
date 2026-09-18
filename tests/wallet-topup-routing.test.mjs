@@ -56,3 +56,20 @@ test("customer topup renders native artifacts and can follow a hosted payment UR
   assert.match(account, /window\.location\.assign\(payment\.paymentUrl\)/);
   assert.doesNotMatch(account, /hosted payment|snap\.pay|midtrans|ipaymu/i);
 });
+
+
+test("public wallet settings shape matches customer topup UI and has no dummy checkout switch", () => {
+  const publicWallet = fs.readFileSync(path.join(root, "app/api/wallet/route.ts"), "utf8");
+  const walletServer = fs.readFileSync(path.join(root, "lib/server/wallet.ts"), "utf8");
+  const adminWallet = fs.readFileSync(path.join(root, "app/api/admin/wallet/route.ts"), "utf8");
+  const settingsWorkspace = fs.readFileSync(path.join(root, "components/admin-operations-workspaces.tsx"), "utf8");
+
+  assert.match(publicWallet, /enabled: settings\.automaticTopupEnabled/);
+  assert.match(account, /settings\?\.enabled/);
+  assert.match(account, /settings\?\.minimumAmount/);
+  assert.match(walletServer, /automaticTopupEnabled/);
+  assert.doesNotMatch(walletServer, /dokuCheckoutEnabled/);
+  assert.doesNotMatch(adminWallet, /dokuCheckoutEnabled|gatewayReadiness/);
+  assert.doesNotMatch(settingsWorkspace, /tab === "Wallet"|Aktifkan checkout otomatis/);
+  assert.match(adminPayment, /automaticTopupEnabled/);
+});
