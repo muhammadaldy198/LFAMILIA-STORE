@@ -373,6 +373,10 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
     bannerUrl: false,
   });
   const mediaUploadVersion = useRef<Record<"imageUrl" | "bannerUrl", number>>({ imageUrl: 0, bannerUrl: 0 });
+  const mediaUploadActive = useRef<Record<"imageUrl" | "bannerUrl", boolean>>({
+    imageUrl: false,
+    bannerUrl: false,
+  });
   const [name, setName] = useState(product.raw.name);
   const [slug, setSlug] = useState(product.raw.slug);
   const [publisher, setPublisher] = useState(product.raw.publisher);
@@ -489,6 +493,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
       return;
     }
     const requestVersion = ++mediaUploadVersion.current[field];
+    mediaUploadActive.current[field] = true;
     setMediaUploading((current) => ({ ...current, [field]: true }));
     setError("");
     setMessage("");
@@ -505,13 +510,14 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
       setError(reason instanceof Error ? reason.message : "Gambar gagal diunggah.");
     } finally {
       if (mediaUploadVersion.current[field] === requestVersion) {
+        mediaUploadActive.current[field] = false;
         setMediaUploading((current) => ({ ...current, [field]: false }));
       }
     }
   }
 
   async function saveProductChanges(success = "Perubahan produk berhasil disimpan.") {
-    if (mediaUploading.imageUrl || mediaUploading.bannerUrl) { setError("Tunggu semua unggahan gambar selesai sebelum menyimpan."); return; }
+    if (mediaUploadActive.current.imageUrl || mediaUploadActive.current.bannerUrl) { setError("Tunggu semua unggahan gambar selesai sebelum menyimpan."); return; }
     if (!product.raw.dbId) { setError("ID produk tidak ditemukan."); return; }
     if (!name.trim() || !slugify(slug)) { setError("Nama dan slug produk wajib diisi."); return; }
     setInputSaving(true); setError(""); setMessage("");
