@@ -281,6 +281,8 @@ export async function POST(request: Request) {
         productName: order.product_name,
         packageLabel: order.package_label,
         destination: isInternalVoucherDestination ? null : maskDestination(order.destination, order.server),
+        productTotal: Math.max(0, order.total - order.admin_fee),
+        paymentFee: order.admin_fee,
         total: order.total,
         paymentMethod: order.payment_method,
         paymentChannel: order.payment_channel,
