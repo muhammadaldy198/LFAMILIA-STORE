@@ -106,8 +106,8 @@ test("wallet retries resume pending settlement and automatic fulfillment", () =>
   assert.match(route, /existing\.payment_status === "paid"[\s\S]*fulfillAutomaticOrder/);
   assert.match(route, /retryable: true[^\n]*status: 429/);
   assert.match(orders, /provider_status = 'dispatching'[\s\S]*datetime\('now', '-2 minutes'\)/);
-  assert.match(orders, /provider_code IN \('digiflazz', 'voucher-stock'\)/);
-  assert.match(orders, /provider_code NOT IN \('digiflazz', 'voucher-stock'\)/);
+  assert.match(orders, /lower\(trim\(provider_code\)\) IN \('digiflazz', 'voucher-stock'\)/);
+  assert.match(orders, /lower\(trim\(coalesce\(provider_code, ''\)\)\) NOT IN \('digiflazz', 'voucher-stock'\)/);
   assert.match(orders, /provider_status = 'retryable_error'/);
   assert.match(orders, /notifyOrderFulfillmentSuccessById\(row\.id\)/);
   assert.match(orders, /fulfillment-attempt-/);
