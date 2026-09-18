@@ -166,7 +166,11 @@ const worker = {
     }
 
     await hydrateRuntime(env);
-    if (env.DB) await ensureLegacyDatabaseColumns();
+    if (env.DB) {
+      await ensureLegacyDatabaseColumns().catch((error) => {
+        console.error("Perbaikan kompatibilitas D1 gagal; request tetap diteruskan:", error);
+      });
+    }
 
     if (url.pathname === "/_vinext/image") {
       if (!env.IMAGES) return withSecurityHeaders(new Response("Image optimization is unavailable.", { status: 404 }), url);
@@ -209,18 +213,21 @@ const worker = {
   },
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     await hydrateRuntime(env);
-    await ensureLegacyDatabaseColumns();
-    const publicBaseUrl = getPublicBaseUrl();
+    await ensureLegacyDatabaseColumns().catch((error) => {
+      console.error("Perbaikan kompatibilitas D1 pada scheduler gagal:", error);
+    });
     const tasks: Promise<unknown>[] = [
       cleanupSecurityRateLimits().catch(() => undefined),
       releaseExpiredExternalPromotions().catch(() => undefined),
       finalizeExpiredDokuPayments().catch(() => undefined),
       Promise.resolve()
-        .then(() => recoverStaleAutomaticOrders(publicBaseUrl))
-        .catch(() => undefined),
+        .then(() => getPublicBaseUrl())
+        .then((publicBaseUrl) => recoverStaleAutomaticOrders(publicBaseUrl))
+        .catch((error) => console.error("Recovery order otomatis gagal:", error)),
       Promise.resolve()
-        .then(() => reconcileStaleDigiflazzProcessing(publicBaseUrl))
-        .catch(() => undefined),
+        .then(() => getPublicBaseUrl())
+        .then((publicBaseUrl) => reconcileStaleDigiflazzProcessing(publicBaseUrl))
+        .catch((error) => console.error("Rekonsiliasi DigiFlazz scheduler gagal:", error)),
     ];
     if (event.cron === "5 * * * *") {
       tasks.push(syncDigiflazzPrices().catch(() => undefined));
