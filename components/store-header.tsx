@@ -5,11 +5,13 @@ import {
   Calculator,
   Gamepad2,
   Headphones,
+  LogIn,
   Menu,
   Newspaper,
   ReceiptText,
   TicketPercent,
   Trophy,
+  UserPlus,
   UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -101,13 +103,46 @@ export function StoreHeader() {
                 <Menu className="size-[17px]" />
               </Button>
             </SheetTrigger>
-            <SheetContent className="border-white/10 bg-[#0b0e16] text-white">
+            <SheetContent className="w-[86vw] max-w-[390px] overflow-y-auto border-white/10 bg-[#0b0e16] text-white sm:max-w-[390px]">
               <SheetHeader className="border-b border-white/[0.08]">
                 <SheetTitle className="text-left text-white">LFAMILIA STORE</SheetTitle>
                 <SheetDescription className="text-left text-white/45">
                   Top up, kalkulator game, dan bantuan.
                 </SheetDescription>
               </SheetHeader>
+
+              <div className="mx-4 mt-4 rounded-[22px] border border-white/[0.09] bg-gradient-to-br from-[#b9ff35]/[0.08] via-white/[0.025] to-transparent p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#cfff72]">
+                  Selamat datang
+                </p>
+                <h2 className="mt-2 text-[17px] font-black leading-6 text-white">
+                  Masuk untuk pengalaman lebih cepat
+                </h2>
+                <p className="mt-2 text-[12px] leading-5 text-white/45">
+                  Simpan akun top-up favorit, cek saldo, dan riwayat transaksi.
+                </p>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <SheetClose asChild>
+                    <Link
+                      href="/account"
+                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#b9ff35] px-3 text-xs font-black text-[#091006] transition hover:bg-[#c7ff58]"
+                    >
+                      <LogIn className="mr-2 size-4" />
+                      Masuk
+                    </Link>
+                  </SheetClose>
+                  <SheetClose asChild>
+                    <Link
+                      href="/account?mode=register"
+                      className="inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-3 text-xs font-bold text-white/80 transition hover:bg-white/[0.08] hover:text-white"
+                    >
+                      <UserPlus className="mr-2 size-4" />
+                      Daftar
+                    </Link>
+                  </SheetClose>
+                </div>
+              </div>
+
               <nav className="flex flex-col gap-1 px-4 py-5">
                 <SheetClose asChild>
                   <Link
