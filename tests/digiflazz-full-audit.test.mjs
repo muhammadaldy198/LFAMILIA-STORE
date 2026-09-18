@@ -70,19 +70,26 @@ test("forward migration replaces the legacy case-sensitive DigiFlazz maintenance
   assert.match(migration, /lower\(trim\(NEW\.`provider_code`\)\) = 'digiflazz'/);
 });
 
-test("failed active DigiFlazz configuration saves rebuild the previous operational cache with bounded lock-aware retry", () => {
+test("failed active DigiFlazz configuration changes preserve the previous cache and rollback on atomic invalidation failure", () => {
   const route = read("app/api/admin/integrations/route.ts");
-  const release = route.indexOf("await releaseDigiflazzConfigurationGuard(token, successful)");
-  const recover = route.indexOf("await recoverDigiflazzOperationalCache()");
-  assert.match(route, /DIGIFLAZZ_CACHE_RECOVERY_ATTEMPTS = 10/);
-  assert.match(route, /DIGIFLAZZ_CACHE_RECOVERY_DELAY_MS = 500/);
-  assert.match(route, /if \(!result\.skipped \|\| Number\(result\.cached \?\? 0\) > 0\) return result/);
-  assert.match(route, /setTimeout\(resolve, DIGIFLAZZ_CACHE_RECOVERY_DELAY_MS\)/);
-  assert.match(route, /Cache operasional DigiFlazz belum pulih setelah retry terbatas/);
-  assert.match(route, /let failed = false/);
-  assert.match(route, /failure = error/);
-  assert.ok(release >= 0 && recover > release);
-  assert.match(route, /Cache operasional DigiFlazz juga gagal dipulihkan/);
+  const guard = read("lib/server/digiflazz-config-guard.ts");
+  const integration = read("lib/server/integration-config.ts");
+  const action = route.indexOf("await action()");
+  const invalidate = route.indexOf("await invalidateDigiflazzOperationalCache(token)");
+
+  assert.ok(action >= 0 && invalidate > action);
+  assert.match(route, /captureIntegrationProfileSnapshot/);
+  assert.match(route, /restoreIntegrationProfileSnapshot/);
+  assert.match(route, /captureIntegrationSettingSnapshot/);
+  assert.match(route, /restoreIntegrationSettingSnapshot/);
+  assert.match(route, /if \(actionCommitted && rollback\)/);
+  assert.doesNotMatch(route, /syncDigiflazzPrices/);
+  assert.match(guard, /const results = await db\.batch\(statements\)/);
+  assert.match(guard, /Guard konfigurasi DigiFlazz kedaluwarsa sebelum cache dapat diinvalidasi/);
+  assert.match(integration, /export async function captureIntegrationProfileSnapshot/);
+  assert.match(integration, /export async function restoreIntegrationProfileSnapshot/);
+  assert.match(integration, /export async function captureIntegrationSettingSnapshot/);
+  assert.match(integration, /export async function restoreIntegrationSettingSnapshot/);
 });
 
 test("DigiFlazz transaction response is JSON-safe and requires exact LFAMILIA correlation", () => {
