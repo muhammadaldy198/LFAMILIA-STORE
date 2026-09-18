@@ -92,6 +92,91 @@ export async function registerCustomer(input: { email: string; name: string; pho
   return createCustomerSession(id);
 }
 
+let oauthSchemaPromise: Promise<void> | null = null;
+
+async function ensureCustomerOauthTable() {
+  if (!oauthSchemaPromise) {
+    const db = getD1();
+    oauthSchemaPromise = (async () => {
+      await db.prepare(`CREATE TABLE IF NOT EXISTS customer_oauth_accounts (
+        id TEXT PRIMARY KEY NOT NULL,
+        customer_id TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        provider_subject TEXT NOT NULL,
+        provider_email TEXT,
+        avatar_url TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (customer_id) REFERENCES customer_users(id) ON DELETE CASCADE
+      )`).run();
+      await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS customer_oauth_provider_subject_unique
+        ON customer_oauth_accounts (provider, provider_subject)`).run();
+      await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS customer_oauth_provider_customer_unique
+        ON customer_oauth_accounts (provider, customer_id)`).run();
+    })().catch((error) => {
+      oauthSchemaPromise = null;
+      throw error;
+    });
+  }
+  return oauthSchemaPromise;
+}
+
+export async function loginOrRegisterGoogleCustomer(input: {
+  subject: string;
+  email: string;
+  name: string;
+  picture?: string;
+}) {
+  await ensureCustomerOauthTable();
+  const db = getD1();
+  const email = normalizeEmail(input.email);
+  const linked = await db.prepare(`SELECT u.id
+    FROM customer_oauth_accounts oauth
+    JOIN customer_users u ON u.id = oauth.customer_id
+    WHERE oauth.provider = ? AND oauth.provider_subject = ? AND u.is_active = 1
+    LIMIT 1`)
+    .bind("google", input.subject)
+    .first<{ id: string }>();
+  if (linked?.id) {
+    await db.prepare(`UPDATE customer_oauth_accounts
+      SET provider_email = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE provider = ? AND provider_subject = ?`)
+      .bind(email, input.picture?.trim() || null, "google", input.subject).run();
+    await db.prepare("UPDATE customer_users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .bind(linked.id).run();
+    return createCustomerSession(linked.id);
+  }
+
+  const existing = await db.prepare("SELECT id, is_active FROM customer_users WHERE email = ? LIMIT 1")
+    .bind(email)
+    .first<{ id: string; is_active: number }>();
+  if (existing && !existing.is_active) throw new Error("Akun pelanggan sedang dinonaktifkan.");
+
+  const customerId = existing?.id ?? crypto.randomUUID();
+  if (!existing) {
+    const saltHex = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+    const disabledPasswordHash = bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
+    await db.prepare(`INSERT INTO customer_users
+      (id, email, name, phone, password_hash, password_salt, last_login_at)
+      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`)
+      .bind(customerId, email, input.name.trim() || "Pelanggan", "", disabledPasswordHash, saltHex)
+      .run();
+  }
+
+  await db.prepare(`INSERT INTO customer_oauth_accounts
+    (id, customer_id, provider, provider_subject, provider_email, avatar_url)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(provider, provider_subject) DO UPDATE SET
+      customer_id = excluded.customer_id,
+      provider_email = excluded.provider_email,
+      avatar_url = excluded.avatar_url,
+      updated_at = CURRENT_TIMESTAMP`)
+    .bind(crypto.randomUUID(), customerId, "google", input.subject, email, input.picture?.trim() || null)
+    .run();
+  await db.prepare("UPDATE customer_users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    .bind(customerId).run();
+  return createCustomerSession(customerId);
+}
 export async function loginCustomer(emailInput: string, password: string) {
   const db = getD1();
   const row = await db.prepare(
@@ -105,7 +190,7 @@ export async function loginCustomer(emailInput: string, password: string) {
   return createCustomerSession(row.id);
 }
 
-async function createCustomerSession(customerId: string) {
+export async function createCustomerSession(customerId: string) {
   const db = getD1();
   await db.prepare("DELETE FROM customer_sessions WHERE expires_at <= CURRENT_TIMESTAMP").run().catch(() => undefined);
   const oldSessions = await db.prepare(
@@ -122,7 +207,7 @@ async function createCustomerSession(customerId: string) {
     .bind(crypto.randomUUID(), customerId, tokenHash, expiresAt).run();
   const row = await db.prepare(
     `SELECT id, email, name, phone, password_hash, password_salt, balance, leaderboard_opt_in, is_active
-     FROM customer_users WHERE id = ? LIMIT 1`,
+     FROM customer_users WHERE id = ? AND is_active = 1 LIMIT 1`,
   ).bind(customerId).first<CustomerRow>();
   if (!row) throw new Error("Akun pelanggan tidak ditemukan.");
   return { customer: publicCustomer(row), token, expiresAt };
