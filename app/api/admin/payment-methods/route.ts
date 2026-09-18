@@ -46,9 +46,17 @@ const syncSchema = z.object({
 });
 
 function validateChannel(input: z.infer<typeof channelSchema>) {
+  const feeEnabled = input.gatewayConfig.customerFeeEnabled;
+  if (feeEnabled !== undefined && !/^(?:true|false|1|0)$/i.test(feeEnabled)) {
+    throw new Error("Status biaya customer tidak valid.");
+  }
   const feeBps = input.gatewayConfig.customerFeeBps;
-  if (feeBps !== undefined && (!/^(?:0|[1-9]\d{0,4})$/.test(feeBps) || Number(feeBps) > 10_000)) {
-    throw new Error("Biaya customer harus berupa basis poin antara 0 sampai 10000.");
+  if (feeBps !== undefined && (!/^(?:0|[1-9]\d{0,3})$/.test(feeBps) || Number(feeBps) >= 10_000)) {
+    throw new Error("Biaya persentase customer harus antara 0 sampai 99,99%.");
+  }
+  const fixedFee = input.gatewayConfig.customerFeeFixed;
+  if (fixedFee !== undefined && (!/^(?:0|[1-9]\d{0,8})$/.test(fixedFee) || Number(fixedFee) > 100_000_000)) {
+    throw new Error("Biaya tetap customer harus antara Rp0 sampai Rp100.000.000.");
   }
   if (!input.isActive) return;
   const supported = input.gateway === "doku"
