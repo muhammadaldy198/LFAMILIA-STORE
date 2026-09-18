@@ -147,7 +147,7 @@ async function queryDokuOrderStatus(order: OrderRecord) {
 
   await prepareDokuRuntime();
   if (order.payment_method === "qris" && artifacts.referenceNo) {
-    return queryDokuQrisStatus({ referenceId: order.reference_id, referenceNo: artifacts.referenceNo });
+    return queryDokuQrisStatus({ referenceId: order.reference_id, referenceNo: artifacts.referenceNo, environment });
   }
   if (order.payment_method === "va" && artifacts.paymentNo) {
     return queryDokuVaStatus({
