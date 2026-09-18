@@ -128,6 +128,9 @@ function publicEventSource(source: string) {
 async function expirePendingInvoice(order: OrderRecord) {
   if (order.payment_status !== "pending") return order;
   const artifacts = externalArtifacts(order);
+  // DOKU/Midtrans terminal state is provider-authoritative. Stored expiry is UI
+  // metadata and must not discard a payment whose provider status arrives late.
+  if (artifacts.gateway === "doku" || artifacts.gateway === "midtrans") return order;
   if (!artifacts.expiredAt) return order;
   const expiresAt = Date.parse(artifacts.expiredAt);
   if (!Number.isFinite(expiresAt) || expiresAt > Date.now()) return order;
@@ -188,7 +191,9 @@ async function refreshDokuStatus(order: OrderRecord) {
       if (!Number.isFinite(query.amount) || query.amount !== order.total) {
         return (await getOrderById(order.id)) ?? order;
       }
-      const firstPaid = await applyPendingExternalPaymentStatus(order, "paid");
+      const firstPaid = await applyPendingExternalPaymentStatus(order, "paid", {
+        authoritativePaid: true,
+      });
       if (firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
