@@ -62,6 +62,7 @@ type DigiflazzRollbackPlan<T> = {
 async function withDigiflazzConfigurationGuard<T>(
   action: () => Promise<T>,
   createRollbackPlan: () => Promise<DigiflazzRollbackPlan<T>>,
+  shouldInvalidateOperationalCache: () => Promise<boolean> = async () => true,
 ) {
   const token = await acquireDigiflazzConfigurationGuard();
   let successful = false;
@@ -69,12 +70,15 @@ async function withDigiflazzConfigurationGuard<T>(
   let committed: T | null = null;
   let rollbackPlan: DigiflazzRollbackPlan<T> | null = null;
   try {
+    const invalidateOperationalCache = await shouldInvalidateOperationalCache();
     rollbackPlan = await createRollbackPlan();
     committed = await action();
     actionCommitted = true;
-    await invalidateDigiflazzOperationalCache(token);
-    clearDigiflazzBalanceCache();
-    successful = true;
+    if (invalidateOperationalCache) {
+      await invalidateDigiflazzOperationalCache(token);
+      clearDigiflazzBalanceCache();
+      successful = true;
+    }
   } catch (error) {
     if (actionCommitted && rollbackPlan && committed !== null) {
       try {
@@ -130,23 +134,22 @@ export async function PUT(request: Request) {
     }
     if (input.action === "save_profile") {
       if (input.provider === "digiflazz" && (input.environment === "development" || input.environment === "production")) {
-        const activeEnvironment = (await getIntegrationOverview()).selections.digiflazzEnvironment;
-        const activeProfileChanged = input.environment === activeEnvironment &&
-          (Object.values(input.values).some((value) => value.trim()) || input.clearFields.length > 0);
-        if (activeProfileChanged) {
-          await withDigiflazzConfigurationGuard(
-            async () => (await saveIntegrationProfile(input)).committedSnapshot,
-            async () => {
-              const snapshot = await captureIntegrationProfileSnapshot(input.provider, input.mode, input.environment);
-              return {
-                rollback: (guardToken: string, committed: Awaited<ReturnType<typeof captureIntegrationProfileSnapshot>>) =>
-                  restoreIntegrationProfileSnapshot(snapshot, committed, guardToken),
-              };
-            },
-          );
-        } else {
-          await saveIntegrationProfile(input);
-        }
+        const hasCredentialMutation =
+          Object.values(input.values).some((value) => value.trim()) || input.clearFields.length > 0;
+        await withDigiflazzConfigurationGuard(
+          async () => (await saveIntegrationProfile(input)).committedSnapshot,
+          async () => {
+            const snapshot = await captureIntegrationProfileSnapshot(input.provider, input.mode, input.environment);
+            return {
+              rollback: (guardToken: string, committed: Awaited<ReturnType<typeof captureIntegrationProfileSnapshot>>) =>
+                restoreIntegrationProfileSnapshot(snapshot, committed, guardToken),
+            };
+          },
+          async () => {
+            const activeEnvironment = (await getIntegrationOverview()).selections.digiflazzEnvironment;
+            return hasCredentialMutation && input.environment === activeEnvironment;
+          },
+        );
       } else {
         await saveIntegrationProfile(input);
       }
