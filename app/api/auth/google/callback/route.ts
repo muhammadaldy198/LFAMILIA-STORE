@@ -1,5 +1,4 @@
 import {
-  clearCustomerSessionCookie,
   customerSessionCookie,
   loginOrRegisterGoogleCustomer,
 } from "@/lib/server/customer-auth";
@@ -74,6 +73,6 @@ export async function GET(request: Request) {
       customerSessionCookie(session.token, session.expiresAt),
     );
   } catch {
-    return redirect(request, "/account?auth=google-error", clearCustomerSessionCookie());
+    return redirect(request, "/account?auth=google-error");
   }
 }
