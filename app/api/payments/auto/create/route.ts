@@ -113,6 +113,7 @@ export async function POST(request: Request) {
   let referenceId: string | null = null;
   let checkoutKey: string | null = null;
   let orderId: string | null = null;
+  let paymentDispatchStarted = false;
   try {
     const input = routingSchema.parse(await request.json());
     checkoutKey = input.idempotencyKey;
@@ -229,6 +230,7 @@ export async function POST(request: Request) {
 
     const baseUrl = getPublicBaseUrl();
     const invoice = publicInvoice(identity.referenceId);
+    paymentDispatchStarted = true;
     const payment = await createConfiguredPayment({
       gateway: managedChannel.gateway,
       referenceId: identity.referenceId,
@@ -310,16 +312,27 @@ export async function POST(request: Request) {
       if (priorOrder) return existingExternalResponse(priorOrder);
     }
 
-    if (orderId) await releaseExternalPromotion(orderId).catch(() => undefined);
-    if (referenceId) {
-      await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
+    // Once a request has been dispatched to a gateway, a timeout/error is
+    // ambiguous: the provider may already have created a payable transaction.
+    // Keep the local invoice pending so a signed callback can still settle it.
+    // The scheduler expires unresolved attempts after the safe provider window.
+    if (!paymentDispatchStarted) {
+      if (orderId) await releaseExternalPromotion(orderId).catch(() => undefined);
+      if (referenceId) {
+        await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
+      }
     }
     const invalidInput =
       error instanceof z.ZodError ||
       error instanceof NicknameValidationError;
     const serviceUnavailable = error instanceof NicknameServiceError;
     return Response.json(
-      { error: message },
+      {
+        error: paymentDispatchStarted && !invalidInput
+          ? "Status pembuatan pembayaran belum dapat dipastikan. Jangan bayar dua kali; coba cek invoice ini beberapa saat lagi."
+          : message,
+        retryable: paymentDispatchStarted && !invalidInput,
+      },
       { status: invalidInput ? 400 : serviceUnavailable ? 503 : 503 },
     );
   }
