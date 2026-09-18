@@ -149,6 +149,7 @@ export async function expireUninitializedExternalOrders(limit = 100) {
     WHERE payment_status = 'pending'
       AND payment_method <> 'wallet'
       AND external_checkout_key IS NOT NULL
+      AND (payment_gateway IS NULL OR payment_gateway <> 'midtrans')
       AND gateway_request_id IS NULL
       AND doku_request_id IS NULL
       AND created_at <= datetime('now', '-70 minutes')
