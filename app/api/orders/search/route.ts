@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
+import { normalizeWhatsappPhone } from "@/lib/phone";
+import { getCustomerSession } from "@/lib/server/customer-auth";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
@@ -102,6 +104,16 @@ export async function POST(request: Request) {
       return Response.json({ error: "Format nomor WhatsApp tidak valid." }, { status: 400 });
     }
 
+    const session = await getCustomerSession(request);
+    let revealInvoice = false;
+    if (session?.phoneVerified && session.phone) {
+      try {
+        revealInvoice = normalizeWhatsappPhone(phone) === normalizeWhatsappPhone(session.phone);
+      } catch {
+        revealInvoice = false;
+      }
+    }
+
     const placeholders = variants.map(() => "?").join(", ");
     const result = await getD1()
       .prepare(
@@ -116,7 +128,7 @@ export async function POST(request: Request) {
       .all<OrderSummaryRow>();
 
     return Response.json(
-      { orders: result.results.map((row) => mapSummary(row, true)) },
+      { orders: result.results.map((row) => mapSummary(row, revealInvoice)) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
