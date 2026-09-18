@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CreditCard, KeyRound, LogIn, Mail, Network, Save, Server, ShieldCheck } from "lucide-react";
 import { CopyUrl, Field, Panel, Status, TabBar, WorkspaceHeader, buttonClass, inputClass, primaryButtonClass } from "@/components/admin-workspace-ui";
 
@@ -64,6 +64,7 @@ export function AdminIntegrationWorkspace() {
     resendDeliveryChannel: "email",
     dokuApiUrl: defaultDokuUrl("sandbox"),
   });
+  const initializedPaymentEnvironments = useRef(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -82,8 +83,12 @@ export function AdminIntegrationWorkspace() {
     setOverview(integrationPayload);
     setPaymentOverview(paymentPayload);
     setDigiflazzEnvironment(integrationPayload.selections.digiflazzEnvironment);
-    setDokuProfileEnvironment((current) => current || paymentPayload.dokuEnvironment);
-    setMidtransProfileEnvironment((current) => current || paymentPayload.midtransEnvironment);
+    if (!initializedPaymentEnvironments.current) {
+      setDokuProfileEnvironment(paymentPayload.dokuEnvironment);
+      setMidtransProfileEnvironment(paymentPayload.midtransEnvironment);
+      setValues((current) => ({ ...current, dokuApiUrl: defaultDokuUrl(paymentPayload.dokuEnvironment) }));
+      initializedPaymentEnvironments.current = true;
+    }
     return { integration: integrationPayload, payment: paymentPayload };
   }, []);
 
@@ -146,8 +151,8 @@ export function AdminIntegrationWorkspace() {
           qrisPostalCode: values.dokuQrisPostalCode || "",
           vaConfigJson: values.dokuVaConfigJson || "",
         };
-        const entered = Object.values(gatewayValues).some((value) => value.trim());
-        if (!dokuConfigured && !entered) throw new Error("Isi kredensial DOKU Direct API terlebih dahulu.");
+        const enteredCoreCredential = [gatewayValues.clientId, gatewayValues.secretKey, gatewayValues.privateKey].some((value) => value.trim());
+        if (!dokuConfigured && !enteredCoreCredential) throw new Error("Isi Client ID, Secret Key, dan RSA Private Key DOKU terlebih dahulu.");
         await paymentPut({
           action: "save_profile",
           provider: "doku",
