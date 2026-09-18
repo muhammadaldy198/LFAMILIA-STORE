@@ -64,7 +64,7 @@ export function AdminIntegrationWorkspace() {
     resendDeliveryChannel: "email",
     whatsappTemplateLanguage: "id",
     whatsappButtonSubtype: "url",
-    dokuApiUrl: defaultDokuUrl("sandbox"),
+    dokuApiUrl: "",
   });
   const initializedPaymentEnvironments = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -88,7 +88,7 @@ export function AdminIntegrationWorkspace() {
     if (!initializedPaymentEnvironments.current) {
       setDokuProfileEnvironment(paymentPayload.dokuEnvironment);
       setMidtransProfileEnvironment(paymentPayload.midtransEnvironment);
-      setValues((current) => ({ ...current, dokuApiUrl: defaultDokuUrl(paymentPayload.dokuEnvironment) }));
+      setValues((current) => ({ ...current, dokuApiUrl: "" }));
       initializedPaymentEnvironments.current = true;
     }
     return { integration: integrationPayload, payment: paymentPayload };
@@ -154,7 +154,7 @@ export function AdminIntegrationWorkspace() {
           secretKey: values.dokuSecretKey || "",
           privateKey: values.dokuPrivateKey || "",
           privateKeyPassphrase: values.dokuPrivateKeyPassphrase || "",
-          apiUrl: values.dokuApiUrl || defaultDokuUrl(dokuProfileEnvironment),
+          apiUrl: values.dokuApiUrl || "",
           qrisMerchantId: values.dokuQrisMerchantId || "",
           qrisTerminalId: values.dokuQrisTerminalId || "",
           qrisPostalCode: values.dokuQrisPostalCode || "",
@@ -179,7 +179,7 @@ export function AdminIntegrationWorkspace() {
           dokuQrisTerminalId: "",
           dokuQrisPostalCode: "",
           dokuVaConfigJson: "",
-          dokuApiUrl: defaultDokuUrl(dokuProfileEnvironment),
+          dokuApiUrl: "",
         }));
       } else if (tab === "Midtrans Snap") {
         const gatewayValues = {
@@ -354,11 +354,27 @@ export function AdminIntegrationWorkspace() {
 
   function changeDokuEnvironment(value: PaymentEnvironment) {
     setDokuProfileEnvironment(value);
-    setValues((current) => {
-      const currentUrl = current.dokuApiUrl || "";
-      const shouldReplace = !currentUrl || currentUrl === defaultDokuUrl("sandbox") || currentUrl === defaultDokuUrl("production");
-      return shouldReplace ? { ...current, dokuApiUrl: defaultDokuUrl(value) } : current;
-    });
+    setValues((current) => ({
+      ...current,
+      dokuApiUrl: "",
+      dokuClientId: "",
+      dokuSecretKey: "",
+      dokuPrivateKey: "",
+      dokuPrivateKeyPassphrase: "",
+      dokuQrisMerchantId: "",
+      dokuQrisTerminalId: "",
+      dokuQrisPostalCode: "",
+      dokuVaConfigJson: "",
+    }));
+  }
+
+  function changeMidtransEnvironment(value: PaymentEnvironment) {
+    setMidtransProfileEnvironment(value);
+    setValues((current) => ({
+      ...current,
+      midtransServerKey: "",
+      midtransClientKey: "",
+    }));
   }
 
   return <div>
@@ -420,7 +436,7 @@ export function AdminIntegrationWorkspace() {
       action={<Status tone={midtransConfigured ? "green" : "amber"}>{midtransConfigured ? `${midtransProfileEnvironment} siap` : `${midtransProfileEnvironment} belum lengkap`}</Status>}
     >
       <div className="grid grid-cols-2 gap-4 p-4">
-        <Select label="Credential Environment" value={midtransProfileEnvironment} onChange={(value) => setMidtransProfileEnvironment(value as PaymentEnvironment)} options={["sandbox", "production"]} />
+        <Select label="Credential Environment" value={midtransProfileEnvironment} onChange={(value) => changeMidtransEnvironment(value as PaymentEnvironment)} options={["sandbox", "production"]} />
         <div />
         <Text label="Server Key" secret value={values.midtransServerKey || ""} onChange={(value) => setValue("midtransServerKey", value)} />
         <Text label="Client Key" value={values.midtransClientKey || ""} onChange={(value) => setValue("midtransClientKey", value)} />
