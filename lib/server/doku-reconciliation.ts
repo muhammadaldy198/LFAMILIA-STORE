@@ -112,7 +112,7 @@ async function queryTopupStatus(topup: PendingTopup) {
 async function markOrderStatusChecked(order: ReconciliationOrder) {
   await getD1().prepare(
     `UPDATE orders SET gateway_status_checked_at = CURRENT_TIMESTAMP
-     WHERE id = ? AND payment_status = 'pending'`,
+     WHERE id = ? AND payment_status IN ('pending', 'expired')`,
   ).bind(order.id).run();
   await markDokuStatusChecked(order.reference_id);
 }
