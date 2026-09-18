@@ -1,5 +1,6 @@
 import { getD1 } from "@/db";
-import { queryMidtransSnapStatus, type PaymentEnvironment } from "@/lib/server/midtrans-snap";
+import { queryMidtransSnapStatus } from "@/lib/server/midtrans-snap";
+import type { PaymentEnvironment } from "@/lib/server/payment-mode-config";
 import { notifyWalletTopupSuccessById } from "@/lib/server/transaction-notifications";
 import { applyExternalWalletTopup } from "@/lib/server/wallet-external";
 
