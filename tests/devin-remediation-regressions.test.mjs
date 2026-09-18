@@ -201,6 +201,16 @@ test("DigiFlazz profile saves serialize environment selection before deciding ca
   assert.match(route, /if \(invalidateOperationalCache\)/);
 });
 
+test("inactive DigiFlazz profile saves cannot commit after their guard lease expires", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const integration = read("lib/server/integration-config.ts");
+  assert.match(route, /saveIntegrationProfile\(input, guardToken\)/);
+  assert.match(integration, /guardToken\?: string/);
+  assert.match(integration, /maintenance_token = \?/);
+  assert.match(integration, /lock_token = \?/);
+  assert.match(integration, /Guard konfigurasi DigiFlazz kedaluwarsa sebelum profile dapat disimpan/);
+});
+
 test("storefront keeps fallback categories when API response fails or omits categories", () => {
   const storefront = read("hooks/use-storefront.ts");
   assert.match(storefront, /if \(!response\.ok\) throw new Error/);
