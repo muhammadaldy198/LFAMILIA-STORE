@@ -29,18 +29,18 @@ test("Google OAuth migration creates unique provider links", () => {
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM customer_oauth_accounts").get().count, 0);
 });
 
-test("Google OAuth flow uses state, nonce, HttpOnly cookies, and verified ID tokens", () => {
-  const start = read("app/api/auth/google/route.ts");
-  const callback = read("app/api/auth/google/callback/route.ts");
+test("Google Identity backend verifies signed ID token and same-origin POST", () => {
+  const route = read("app/api/auth/google/route.ts");
   const helper = read("lib/server/google-oauth.ts");
-  assert.match(start, /state/);
-  assert.match(start, /nonce/);
-  assert.match(start, /HttpOnly/);
-  assert.match(start, /SameSite=Lax/);
-  assert.match(callback, /state !== expectedState/);
+  assert.match(route, /rejectCrossOriginMutation/);
+  assert.match(route, /allowRequest/);
+  assert.match(route, /credential/);
+  assert.match(route, /customerSessionCookie/);
   assert.match(helper, /jwtVerify/);
   assert.match(helper, /email_verified/);
   assert.match(helper, /audience: clientId/);
+  assert.match(helper, /accounts\.google\.com/);
+  assert.doesNotMatch(helper, /clientSecret|GOOGLE_TOKEN_URL|authorization code/i);
 });
 
 test("new Google customer and OAuth link are created in one D1 batch", () => {
@@ -48,19 +48,25 @@ test("new Google customer and OAuth link are created in one D1 batch", () => {
   assert.match(source, /await db\.batch\(\[customerInsert, oauthInsert\]\)/);
   assert.doesNotMatch(source, /ON CONFLICT\(provider, provider_subject\) DO UPDATE SET\s+customer_id/);
 });
-test("Google OAuth credentials stay dashboard-managed and encrypted", () => {
+
+test("Google Login integration stores only Client ID and no Client Secret", () => {
   const integration = read("lib/server/integration-config.ts");
   const admin = read("components/admin-integration-workspace.tsx");
-  assert.match(integration, /"google:service": \["clientId", "clientSecret"\]/);
-  assert.match(integration, /GOOGLE_OAUTH_CLIENT_SECRET/);
-  assert.match(integration, /encryptConfig/);
-  assert.match(admin, /Client Secret/);
-  assert.doesNotMatch(integration, /clientSecret:\s*"[A-Za-z0-9_-]{20,}"/);
+  assert.match(integration, /"google:service": \["clientId"\]/);
+  assert.match(integration, /GOOGLE_OAUTH_CLIENT_ID/);
+  assert.doesNotMatch(integration, /GOOGLE_OAUTH_CLIENT_SECRET|clientSecret/);
+  assert.match(admin, /Client ID/);
+  assert.doesNotMatch(admin, /Text label="Client Secret"/);
+  assert.doesNotMatch(admin, /CopyUrl label="Authorized Redirect URI"/);
 });
 
-test("customer auth UI exposes Google login only after backend readiness check", () => {
+test("customer auth UI uses Google Identity Services and posts credential to backend", () => {
   const form = read("components/customer-auth-form.tsx");
-  assert.match(form, /\/api\/auth\/google\/status/);
-  assert.match(form, /Masuk dengan Google/);
-  assert.match(form, /googleReady &&/);
+  const status = read("app/api/auth/google/status/route.ts");
+  assert.match(form, /https:\/\/accounts\.google\.com\/gsi\/client/);
+  assert.match(form, /google\.accounts\.id\.initialize/);
+  assert.match(form, /google\.accounts\.id\.renderButton/);
+  assert.match(form, /fetch\("\/api\/auth\/google"/);
+  assert.match(form, /credential: response\.credential/);
+  assert.match(status, /clientId/);
 });

@@ -12,7 +12,6 @@ type RuntimeLike = Record<string, unknown> & {
   DIGIFLAZZ_ENV?: string;
   KOKINPAY_API_KEY?: string;
   GOOGLE_OAUTH_CLIENT_ID?: string;
-  GOOGLE_OAUTH_CLIENT_SECRET?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   RESEND_API_URL?: string;
@@ -59,7 +58,7 @@ export type IntegrationOverview = {
 export const profileFields: Record<string, readonly string[]> = {
   "digiflazz:direct": ["username", "apiKey", "transactionApiUrl", "priceListUrl", "webhookSecret"],
   "kokinpay:service": ["apiKey"],
-  "google:service": ["clientId", "clientSecret"],
+  "google:service": ["clientId"],
   "resend:service": ["apiKey", "fromEmail", "apiUrl", "deliveryChannel"],
   "relay:service": ["digiflazzOrigin", "hosts", "token"],
   "security:service": ["voucherEncryptionKey"],
@@ -212,7 +211,6 @@ function buildCallbacks(baseUrl: string) {
   const route = (path: string) => baseUrl ? `${baseUrl}${path}` : path;
   return [
     { id: "digiflazz", label: "DigiFlazz Webhook", description: "Webhook status fulfillment DigiFlazz.", kind: "callback" as const, url: route("/api/fulfillment/digiflazz/callback") },
-    { id: "google-oauth", label: "Google OAuth Callback", description: "Authorized redirect URI untuk login pelanggan dengan Google.", kind: "callback" as const, url: route("/api/auth/google/callback") },
   ];
 }
 
@@ -344,7 +342,6 @@ function applyKokinpayConfig(target: Record<string, unknown>, config: Record<str
 }
 function applyGoogleConfig(target: Record<string, unknown>, config: Record<string, string>) {
   put(target, "GOOGLE_OAUTH_CLIENT_ID", config.clientId);
-  put(target, "GOOGLE_OAUTH_CLIENT_SECRET", config.clientSecret);
 }
 function applyResendConfig(target: Record<string, unknown>, config: Record<string, string>) {
   put(target, "RESEND_API_KEY", config.apiKey);

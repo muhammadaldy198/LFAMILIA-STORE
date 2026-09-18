@@ -1,8 +1,9 @@
-import { googleOAuthConfigured } from "@/lib/server/google-oauth";
+import { getGoogleIdentityClientId, googleIdentityConfigured } from "@/lib/server/google-oauth";
 
 export async function GET() {
+  const enabled = googleIdentityConfigured();
   return Response.json(
-    { enabled: googleOAuthConfigured() },
+    { enabled, clientId: enabled ? getGoogleIdentityClientId() : null },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

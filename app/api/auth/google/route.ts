@@ -1,56 +1,43 @@
-import { allowRequest } from "@/lib/server/security";
-import { buildGoogleAuthorizationUrl, googleOAuthConfigured } from "@/lib/server/google-oauth";
+import { z } from "zod";
+import { customerSessionCookie, loginOrRegisterGoogleCustomer } from "@/lib/server/customer-auth";
+import { verifyGoogleIdentityCredential } from "@/lib/server/google-oauth";
+import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
-const STATE_COOKIE = "lf_google_state";
-const NONCE_COOKIE = "lf_google_nonce";
-const RETURN_COOKIE = "lf_google_return";
-const OAUTH_MAX_AGE = 600;
+const inputSchema = z.object({
+  credential: z.string().min(100).max(12_000),
+});
 
-function randomValue(bytes = 24) {
-  const data = crypto.getRandomValues(new Uint8Array(bytes));
-  return btoa(String.fromCharCode(...data))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/g, "");
-}
+export async function POST(request: Request) {
+  const originBlock = rejectCrossOriginMutation(request);
+  if (originBlock) return originBlock;
 
-function safeReturnTo(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/account";
-  try {
-    const parsed = new URL(value, "https://local.invalid");
-    if (parsed.origin !== "https://local.invalid") return "/account";
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-  } catch {
-    return "/account";
-  }
-}
-
-function oauthCookie(name: string, value: string) {
-  return `${name}=${encodeURIComponent(value)}; Path=/api/auth/google; HttpOnly; Secure; SameSite=Lax; Max-Age=${OAUTH_MAX_AGE}`;
-}
-
-export async function GET(request: Request) {
-  const rate = await allowRequest(request, "customer-google-oauth-start", 20, 3600);
+  const rate = await allowRequest(request, "customer-google-identity", 30, 3600);
   if (!rate.allowed) {
     return Response.json(
-      { error: "Terlalu banyak percobaan login. Coba lagi nanti." },
+      { error: "Terlalu banyak percobaan login Google. Coba lagi nanti." },
       { status: 429, headers: { "Retry-After": String(rate.retryAfter), "Cache-Control": "no-store" } },
     );
   }
-  if (!googleOAuthConfigured()) {
-    return Response.redirect(new URL("/account?auth=google-unavailable", request.url), 303);
-  }
 
-  const url = new URL(request.url);
-  const state = randomValue();
-  const nonce = randomValue();
-  const returnTo = safeReturnTo(url.searchParams.get("returnTo"));
-  const headers = new Headers({
-    Location: buildGoogleAuthorizationUrl(state, nonce),
-    "Cache-Control": "no-store",
-  });
-  headers.append("Set-Cookie", oauthCookie(STATE_COOKIE, state));
-  headers.append("Set-Cookie", oauthCookie(NONCE_COOKIE, nonce));
-  headers.append("Set-Cookie", oauthCookie(RETURN_COOKIE, returnTo));
-  return new Response(null, { status: 303, headers });
+  try {
+    const input = inputSchema.parse(await request.json());
+    const identity = await verifyGoogleIdentityCredential(input.credential);
+    const session = await loginOrRegisterGoogleCustomer(identity);
+    return Response.json(
+      { ok: true, customer: session.customer },
+      {
+        headers: {
+          "Set-Cookie": customerSessionCookie(session.token, session.expiresAt),
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  } catch (error) {
+    const message = error instanceof z.ZodError
+      ? "Credential Google tidak valid."
+      : error instanceof Error
+        ? error.message
+        : "Login Google gagal.";
+    return Response.json({ error: message }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
 }
