@@ -233,7 +233,10 @@ export async function POST(request: Request) {
       orderId,
       voucherCode: promotion.voucherCode,
       flashSaleId: promotion.flashSaleId,
-      expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+      // Keep promo capacity reserved through the uncertain-payment recovery
+      // window. A successful provider response later replaces this with the
+      // provider's real expiry.
+      expiresAt: new Date(Date.now() + 75 * 60_000).toISOString(),
     });
 
     const baseUrl = getPublicBaseUrl();
