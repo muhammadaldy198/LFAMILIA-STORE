@@ -244,7 +244,22 @@ export async function releaseExternalPromotion(orderId: string) {
 }
 
 export async function releaseExpiredExternalPromotions() {
-  await getD1().prepare(`UPDATE promotion_reservations SET status = 'released', updated_at = CURRENT_TIMESTAMP WHERE status = 'reserved' AND datetime(expires_at) <= datetime('now')`).run();
+  // Never release capacity while its order is still payment-pending. Payment
+  // reconciliation/expiry owns the terminal transition and releases the
+  // reservation. This prevents a delayed-but-valid payment from consuming a
+  // promo after its reserved_count was already returned to the pool.
+  await getD1().prepare(`
+    UPDATE promotion_reservations
+    SET status = 'released', updated_at = CURRENT_TIMESTAMP
+    WHERE status = 'reserved'
+      AND datetime(expires_at) <= datetime('now')
+      AND NOT EXISTS (
+        SELECT 1
+        FROM orders
+        WHERE orders.id = promotion_reservations.order_id
+          AND orders.payment_status = 'pending'
+      )
+  `).run();
 }
 
 export async function consumeOrderPromotion(voucherCode: string | null, flashSaleId: number | null, orderId?: string) {
