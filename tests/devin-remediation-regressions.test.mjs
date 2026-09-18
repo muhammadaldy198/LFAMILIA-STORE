@@ -185,7 +185,9 @@ test("active DigiFlazz credential changes mutate under guard, then atomically in
   const action = route.indexOf("await action()");
   const invalidate = route.indexOf("await invalidateDigiflazzOperationalCache(token)");
   assert.ok(action >= 0 && invalidate > action);
-  assert.match(route, /if \(actionCommitted && rollback\)/);
+  assert.match(route, /if \(actionCommitted && rollbackPlan\)/);
+  assert.match(route, /rollbackPlan\.rollback\(token\)/);
+  assert.match(route, /Rollback dibatalkan karena guard kedaluwarsa atau konfigurasi DigiFlazz sudah berubah/);
   assert.match(guard, /const results = await db\.batch\(statements\)/);
 });
 
