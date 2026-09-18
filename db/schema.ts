@@ -8,6 +8,7 @@ export const customerUsers = sqliteTable(
     email: text("email").notNull(),
     name: text("name").notNull(),
     phone: text("phone").notNull(),
+    phoneVerifiedAt: text("phone_verified_at"),
     passwordHash: text("password_hash").notNull(),
     passwordSalt: text("password_salt").notNull(),
     balance: integer("balance").notNull().default(0),
@@ -38,6 +39,27 @@ export const customerSessions = sqliteTable(
   (table) => [
     uniqueIndex("customer_sessions_token_unique").on(table.tokenHash),
     index("customer_sessions_customer_expiry_idx").on(table.customerId, table.expiresAt),
+  ],
+);
+
+
+export const customerPhoneOtpChallenges = sqliteTable(
+  "customer_phone_otp_challenges",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id").notNull().references(() => customerUsers.id, { onDelete: "cascade" }),
+    phone: text("phone").notNull(),
+    otpHash: text("otp_hash").notNull(),
+    otpSalt: text("otp_salt").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    sentAt: text("sent_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    consumedAt: text("consumed_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("customer_phone_otp_customer_created_idx").on(table.customerId, table.createdAt),
+    index("customer_phone_otp_expiry_idx").on(table.expiresAt, table.consumedAt),
   ],
 );
 
@@ -367,17 +389,23 @@ export const productReviews = sqliteTable(
   "product_reviews",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    customerId: text("customer_id").notNull().references(() => customerUsers.id, { onDelete: "cascade" }),
+    customerId: text("customer_id").references(() => customerUsers.id, { onDelete: "set null" }),
+    orderId: text("order_id").references(() => orders.id, { onDelete: "set null" }),
+    reviewerName: text("reviewer_name").notNull().default("Pelanggan"),
     productSlug: text("product_slug").notNull(),
     rating: integer("rating").notNull(),
     title: text("title"),
     body: text("body").notNull(),
-    isVerifiedPurchase: integer("is_verified_purchase", { mode: "boolean" }).notNull().default(false),
+    isVerifiedPurchase: integer("is_verified_purchase", { mode: "boolean" }).notNull().default(true),
     isVisible: integer("is_visible", { mode: "boolean" }).notNull().default(true),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
-  (table) => [uniqueIndex("product_reviews_customer_product_unique").on(table.customerId, table.productSlug), index("product_reviews_product_visible_idx").on(table.productSlug, table.isVisible, table.createdAt)],
+  (table) => [
+    uniqueIndex("product_reviews_customer_product_unique").on(table.customerId, table.productSlug),
+    uniqueIndex("product_reviews_order_unique").on(table.orderId),
+    index("product_reviews_product_visible_idx").on(table.productSlug, table.isVisible, table.createdAt),
+  ],
 );
 
 export const homeBanners = sqliteTable(
