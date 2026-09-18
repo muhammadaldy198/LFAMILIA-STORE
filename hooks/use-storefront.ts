@@ -29,12 +29,24 @@ export function useStorefront() {
 
   useEffect(() => {
     let active = true;
-    void fetch("/api/storefront", { cache: "no-store" }).then((response) => response.json()).then((data: { settings?: StorefrontSettings; categories?: ProductCategoryRecord[]; faqs?: FaqRecord[] }) => {
-      if (!active) return;
-      if (data.settings) setSettings(data.settings);
-      setCategories(canonicalCategories(data.categories ?? [], true));
-      if (data.faqs?.length) setFaqs(data.faqs);
-    }).catch(() => undefined);
+    void fetch("/api/storefront", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Storefront gagal dimuat.");
+        return response.json() as Promise<{
+          settings?: StorefrontSettings;
+          categories?: ProductCategoryRecord[];
+          faqs?: FaqRecord[];
+        }>;
+      })
+      .then((data) => {
+        if (!active) return;
+        if (data.settings) setSettings(data.settings);
+        if (Array.isArray(data.categories)) {
+          setCategories(canonicalCategories(data.categories, true));
+        }
+        if (data.faqs?.length) setFaqs(data.faqs);
+      })
+      .catch(() => undefined);
     return () => { active = false; };
   }, []);
 
