@@ -127,7 +127,12 @@ export async function POST(request: Request) {
     const managedChannel = await getPaymentChannel(input.paymentMethod, paymentChannel, false);
     if (
       !managedChannel ||
-      !isGatewayChannelSupported(managedChannel.gateway, input.paymentMethod, paymentChannel)
+      !isGatewayChannelSupported(
+        managedChannel.gateway,
+        input.paymentMethod,
+        paymentChannel,
+        managedChannel.gatewayConfig,
+      )
     ) {
       return Response.json(
         { error: "Metode pembayaran belum didukung atau sedang dinonaktifkan." },
