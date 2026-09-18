@@ -111,6 +111,7 @@ export function CustomerAuthForm({
       });
       const data = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Akun gagal diproses.");
+      window.dispatchEvent(new Event("lfamilia:auth-changed"));
       await onSuccess();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Akun gagal diproses.");
@@ -255,6 +256,7 @@ function GoogleIdentityButton({
         });
         const payload = await result.json().catch(() => ({})) as { error?: string };
         if (!result.ok) throw new Error(payload.error || "Login Google gagal.");
+        window.dispatchEvent(new Event("lfamilia:auth-changed"));
         await onSuccess();
       } catch (reason) {
         if (active) setError(reason instanceof Error ? reason.message : "Login Google gagal.");
