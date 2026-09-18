@@ -1,7 +1,7 @@
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
-export type IntegrationProvider = "digiflazz" | "kokinpay" | "google" | "resend" | "relay" | "security";
+export type IntegrationProvider = "digiflazz" | "kokinpay" | "google" | "whatsapp" | "resend" | "relay" | "security";
 export type IntegrationMode = "direct" | "service";
 export type IntegrationEnvironment = "sandbox" | "production" | "development" | "global";
 
@@ -12,6 +12,12 @@ type RuntimeLike = Record<string, unknown> & {
   DIGIFLAZZ_ENV?: string;
   KOKINPAY_API_KEY?: string;
   GOOGLE_OAUTH_CLIENT_ID?: string;
+  WHATSAPP_GRAPH_API_URL?: string;
+  WHATSAPP_ACCESS_TOKEN?: string;
+  WHATSAPP_PHONE_NUMBER_ID?: string;
+  WHATSAPP_OTP_TEMPLATE_NAME?: string;
+  WHATSAPP_OTP_TEMPLATE_LANGUAGE?: string;
+  WHATSAPP_OTP_BUTTON_SUBTYPE?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   RESEND_API_URL?: string;
@@ -59,6 +65,7 @@ export const profileFields: Record<string, readonly string[]> = {
   "digiflazz:direct": ["username", "apiKey", "transactionApiUrl", "priceListUrl", "webhookSecret"],
   "kokinpay:service": ["apiKey"],
   "google:service": ["clientId"],
+  "whatsapp:service": ["graphApiUrl", "accessToken", "phoneNumberId", "templateName", "templateLanguage", "buttonSubtype"],
   "resend:service": ["apiKey", "fromEmail", "apiUrl", "deliveryChannel"],
   "relay:service": ["digiflazzOrigin", "hosts", "token"],
   "security:service": ["voucherEncryptionKey"],
@@ -74,7 +81,7 @@ function profileFieldKey(provider: IntegrationProvider, mode: IntegrationMode) {
 
 function isProfileSupported(provider: IntegrationProvider, mode: IntegrationMode, environment: IntegrationEnvironment) {
   if (provider === "digiflazz") return mode === "direct" && (environment === "development" || environment === "production");
-  return (provider === "kokinpay" || provider === "google" || provider === "resend" || provider === "relay" || provider === "security")
+  return (provider === "kokinpay" || provider === "google" || provider === "whatsapp" || provider === "resend" || provider === "relay" || provider === "security")
     && mode === "service"
     && environment === "global";
 }
@@ -97,6 +104,7 @@ function withoutDashboardManagedRuntime(source: RuntimeLike) {
     "KOKINPAY_",
     "MELOSTORE_",
     "GOOGLE_OAUTH_",
+    "WHATSAPP_",
     "RESEND_",
     "PROVIDER_RELAY_",
   ];
@@ -343,6 +351,14 @@ function applyKokinpayConfig(target: Record<string, unknown>, config: Record<str
 function applyGoogleConfig(target: Record<string, unknown>, config: Record<string, string>) {
   put(target, "GOOGLE_OAUTH_CLIENT_ID", config.clientId);
 }
+function applyWhatsappConfig(target: Record<string, unknown>, config: Record<string, string>) {
+  put(target, "WHATSAPP_GRAPH_API_URL", config.graphApiUrl);
+  put(target, "WHATSAPP_ACCESS_TOKEN", config.accessToken);
+  put(target, "WHATSAPP_PHONE_NUMBER_ID", config.phoneNumberId);
+  put(target, "WHATSAPP_OTP_TEMPLATE_NAME", config.templateName);
+  put(target, "WHATSAPP_OTP_TEMPLATE_LANGUAGE", config.templateLanguage);
+  put(target, "WHATSAPP_OTP_BUTTON_SUBTYPE", config.buttonSubtype);
+}
 function applyResendConfig(target: Record<string, unknown>, config: Record<string, string>) {
   put(target, "RESEND_API_KEY", config.apiKey);
   put(target, "RESEND_FROM_EMAIL", config.fromEmail);
@@ -385,6 +401,7 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
       }
       if (profile.provider === "kokinpay" && profile.mode === "service" && profile.environment === "global") applyKokinpayConfig(target, config);
       if (profile.provider === "google" && profile.mode === "service" && profile.environment === "global") applyGoogleConfig(target, config);
+      if (profile.provider === "whatsapp" && profile.mode === "service" && profile.environment === "global") applyWhatsappConfig(target, config);
       if (profile.provider === "resend" && profile.mode === "service" && profile.environment === "global") applyResendConfig(target, config);
       if (profile.provider === "relay" && profile.mode === "service" && profile.environment === "global") applyRelayConfig(target, config);
       if (profile.provider === "security" && profile.mode === "service" && profile.environment === "global") applySecurityConfig(target, config);

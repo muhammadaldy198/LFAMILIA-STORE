@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 const profileInput = z.object({
   action: z.literal("save_profile"),
-  provider: z.enum(["digiflazz", "kokinpay", "google", "resend", "relay", "security"]),
+  provider: z.enum(["digiflazz", "kokinpay", "google", "whatsapp", "resend", "relay", "security"]),
   mode: z.enum(["direct", "service"]),
   environment: z.enum(["sandbox", "production", "development", "global"]),
   values: z.record(z.string().min(1).max(80), z.string().max(12_000)).default({}),

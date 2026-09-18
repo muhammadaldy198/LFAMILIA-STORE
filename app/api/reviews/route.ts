@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { getCustomerSession, requireCustomerSession } from "@/lib/server/customer-auth";
-import { listFeaturedReviews, listProductReviews, saveProductReview } from "@/lib/server/reviews";
+import { getCustomerSession } from "@/lib/server/customer-auth";
+import { listFeaturedReviews, listProductReviews, saveGuestProductReview, saveProductReview } from "@/lib/server/reviews";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +22,8 @@ const schema = z.object({
   rating: z.number().int().min(1).max(5),
   title: z.string().trim().max(100).optional(),
   body: z.string().trim().min(5).max(1200),
+  referenceId: z.string().trim().max(100).optional(),
+  phone: z.string().trim().max(24).optional(),
 });
 
 export async function POST(request: Request) {
@@ -29,12 +31,36 @@ export async function POST(request: Request) {
   if (originBlock) return originBlock;
   const rate = await allowRequest(request, "customer-review", 10, 3600);
   if (!rate.allowed) return Response.json({ error: "Terlalu banyak ulasan dikirim. Coba lagi nanti." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
-  const customer = await requireCustomerSession(request);
-  if (customer instanceof Response) return customer;
   try {
     const input = schema.parse(await request.json());
-    await saveProductReview({ ...input, customerId: customer.id });
-    return Response.json({ ok: true });
+    const customer = await getCustomerSession(request);
+
+    if (customer?.phoneVerified) {
+      await saveProductReview({
+        customerId: customer.id,
+        productSlug: input.productSlug,
+        rating: input.rating,
+        title: input.title,
+        body: input.body,
+      });
+    } else {
+      if (!input.referenceId || !input.phone) {
+        return Response.json(
+          { error: "Masukkan nomor invoice dan WhatsApp yang digunakan saat checkout untuk memverifikasi pembelian." },
+          { status: 400, headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      await saveGuestProductReview({
+        referenceId: input.referenceId,
+        phone: input.phone,
+        productSlug: input.productSlug,
+        rating: input.rating,
+        title: input.title,
+        body: input.body,
+      });
+    }
+
+    return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Ulasan gagal disimpan.";
     return Response.json({ error: message }, { status: 400 });

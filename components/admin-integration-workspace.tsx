@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CreditCard, KeyRound, LogIn, Mail, Network, Save, Server, ShieldCheck } from "lucide-react";
+import { CreditCard, KeyRound, LogIn, Mail, MessageCircle, Network, Save, Server, ShieldCheck } from "lucide-react";
 import { CopyUrl, Field, Panel, Status, TabBar, WorkspaceHeader, buttonClass, inputClass, primaryButtonClass } from "@/components/admin-workspace-ui";
 
-const tabs = ["Ringkasan", "DOKU Direct API", "Midtrans Snap", "Digiflazz", "KokinPay", "Google Login", "Resend Email", "Relay & Keamanan"] as const;
+const tabs = ["Ringkasan", "DOKU Direct API", "Midtrans Snap", "Digiflazz", "KokinPay", "Google Login", "WhatsApp OTP", "Resend Email", "Relay & Keamanan"] as const;
 type Tab = (typeof tabs)[number];
-type Provider = "digiflazz" | "kokinpay" | "google" | "resend" | "relay" | "security";
+type Provider = "digiflazz" | "kokinpay" | "google" | "whatsapp" | "resend" | "relay" | "security";
 type Environment = "development" | "production" | "global";
 type PaymentEnvironment = "sandbox" | "production";
-type Profile = { provider: Provider; environment: Environment; configured: boolean; decryptionError: boolean };
+type Profile = { provider: Provider; environment: Environment; configured: boolean; configuredFields?: string[]; decryptionError: boolean };
 type Callback = { id: string; label: string; description: string; url: string };
 type Overview = {
   encryptionReady: boolean;
@@ -62,6 +62,8 @@ export function AdminIntegrationWorkspace() {
     relayOrigin: "https://digiflazz-relay.lfamiliastore.my.id",
     resendApiUrl: "https://api.resend.com/emails",
     resendDeliveryChannel: "email",
+    whatsappTemplateLanguage: "id",
+    whatsappButtonSubtype: "url",
     dokuApiUrl: defaultDokuUrl("sandbox"),
   });
   const initializedPaymentEnvironments = useRef(false);
@@ -109,6 +111,13 @@ export function AdminIntegrationWorkspace() {
   const digiflazzWebhook = overview?.callbacks.find((item) => item.id === "digiflazz")?.url || fallbackWebhook;
   const dokuConfigured = Boolean(paymentOverview?.configured.doku[dokuProfileEnvironment]);
   const midtransConfigured = Boolean(paymentOverview?.configured.midtrans[midtransProfileEnvironment]);
+  const whatsappProfile = (overview?.profiles ?? []).find((profile) => profile.provider === "whatsapp" && profile.environment === "global");
+  const whatsappRequiredFields = ["graphApiUrl", "accessToken", "phoneNumberId", "templateName"] as const;
+  const whatsappConfigured = Boolean(
+    whatsappProfile &&
+    !whatsappProfile.decryptionError &&
+    whatsappRequiredFields.every((field) => whatsappProfile.configuredFields?.includes(field)),
+  );
 
   async function put(body: object) {
     const response = await fetch("/api/panel/integrations", {
@@ -206,6 +215,29 @@ export function AdminIntegrationWorkspace() {
         await put({ action: "save_profile", provider: "kokinpay", mode: "service", environment: "global", values: { apiKey: values.kokinpayApiKey || "" } });
       } else if (tab === "Google Login") {
         await put({ action: "save_profile", provider: "google", mode: "service", environment: "global", values: { clientId: values.googleClientId || "" } });
+      } else if (tab === "WhatsApp OTP") {
+        const whatsappValues = {
+          graphApiUrl: values.whatsappGraphApiUrl || "",
+          accessToken: values.whatsappAccessToken || "",
+          phoneNumberId: values.whatsappPhoneNumberId || "",
+          templateName: values.whatsappTemplateName || "",
+          templateLanguage: values.whatsappTemplateLanguage || "id",
+          buttonSubtype: values.whatsappButtonSubtype || "",
+        };
+        const existingFields = new Set(whatsappProfile?.configuredFields ?? []);
+        const missingRequired = whatsappRequiredFields.filter((field) =>
+          !existingFields.has(field) && !whatsappValues[field].trim(),
+        );
+        if (missingRequired.length) {
+          throw new Error(`Lengkapi konfigurasi WhatsApp OTP: ${missingRequired.join(", ")}.`);
+        }
+        await put({
+          action: "save_profile",
+          provider: "whatsapp",
+          mode: "service",
+          environment: "global",
+          values: whatsappValues,
+        });
       } else if (tab === "Resend Email") {
         await put({
           action: "save_profile",
@@ -243,6 +275,7 @@ export function AdminIntegrationWorkspace() {
         apiKey: "",
         webhookSecret: "",
         kokinpayApiKey: "",
+        whatsappAccessToken: "",
         resendApiKey: "",
         relayToken: "",
         voucherEncryptionKey: "",
@@ -295,19 +328,22 @@ export function AdminIntegrationWorkspace() {
         const latest = await load();
         const mapping: Partial<Record<Tab, [Provider, Environment, string]>> = {
           "KokinPay": ["kokinpay", "global", "KokinPay"],
+          "WhatsApp OTP": ["whatsapp", "global", "WhatsApp OTP"],
           "Resend Email": ["resend", "global", "Resend Email"],
         };
         const target = mapping[tab];
         if (!target) throw new Error("Tidak ada pemeriksaan untuk menu ini.");
         const [provider, environment, label] = target;
-        const ready = latest.integration.profiles.some((profile) =>
-          profile.provider === provider &&
-          profile.environment === environment &&
-          profile.configured &&
-          !profile.decryptionError,
+        const profile = latest.integration.profiles.find((item) =>
+          item.provider === provider && item.environment === environment,
         );
-        if (!ready) throw new Error(`${label} belum dikonfigurasi atau kredensial tidak dapat dibuka.`);
-        setMessage(`${label} tersimpan dan dapat dibaca backend.`);
+        const ready = provider === "whatsapp"
+          ? Boolean(profile && !profile.decryptionError && whatsappRequiredFields.every((field) => profile.configuredFields?.includes(field)))
+          : Boolean(profile?.configured && !profile.decryptionError);
+        if (!ready) throw new Error(`${label} belum lengkap atau kredensial tidak dapat dibuka.`);
+        setMessage(provider === "whatsapp"
+          ? "WhatsApp OTP lengkap dan siap digunakan backend untuk mengirim template OTP."
+          : `${label} tersimpan dan dapat dibaca backend.`);
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Pemeriksaan gagal.");
@@ -344,6 +380,7 @@ export function AdminIntegrationWorkspace() {
       <Card icon={<Network className="size-5" />} title="Digiflazz" ready={isConfigured("digiflazz", digiflazzEnvironment)} onClick={() => setTab("Digiflazz")} />
       <Card icon={<KeyRound className="size-5" />} title="KokinPay" ready={isConfigured("kokinpay", "global")} onClick={() => setTab("KokinPay")} />
       <Card icon={<LogIn className="size-5" />} title="Google Login" ready={isConfigured("google", "global")} onClick={() => setTab("Google Login")} />
+      <Card icon={<MessageCircle className="size-5" />} title="WhatsApp OTP" ready={whatsappConfigured} onClick={() => setTab("WhatsApp OTP")} />
       <Card icon={<Mail className="size-5" />} title="Resend Email" ready={isConfigured("resend", "global")} onClick={() => setTab("Resend Email")} />
       <Card icon={<Server className="size-5" />} title="VPS Relay" ready={isConfigured("relay", "global")} onClick={() => setTab("Relay & Keamanan")} />
       <Panel title="Callback & Notification URL" description="Tempel URL berikut pada dashboard provider terkait." className="col-span-2">
@@ -415,6 +452,24 @@ export function AdminIntegrationWorkspace() {
         <Text label="Client ID" value={values.googleClientId || ""} onChange={(value) => setValue("googleClientId", value)} />
         <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-700">
           Di Google Cloud, gunakan OAuth client tipe Web application dan tambahkan domain production pada Authorized JavaScript origins. Contoh: https://lfamiliastore.my.id
+        </div>
+      </div>
+    </Panel>}
+
+    {tab === "WhatsApp OTP" && <Panel
+      title="WhatsApp OTP"
+      description="Meta WhatsApp Cloud API untuk verifikasi nomor pelanggan dengan kode OTP 6 digit."
+      action={<Status tone={whatsappConfigured ? "green" : "amber"}>{whatsappConfigured ? "Siap" : "Belum lengkap"}</Status>}
+    >
+      <div className="grid grid-cols-2 gap-4 p-4">
+        <Text label="Graph API URL" value={values.whatsappGraphApiUrl || ""} onChange={(value) => setValue("whatsappGraphApiUrl", value)} />
+        <Text label="Phone Number ID" value={values.whatsappPhoneNumberId || ""} onChange={(value) => setValue("whatsappPhoneNumberId", value)} />
+        <Text label="Access Token" secret value={values.whatsappAccessToken || ""} onChange={(value) => setValue("whatsappAccessToken", value)} />
+        <Text label="Template Name" value={values.whatsappTemplateName || ""} onChange={(value) => setValue("whatsappTemplateName", value)} />
+        <Text label="Template Language" value={values.whatsappTemplateLanguage || "id"} onChange={(value) => setValue("whatsappTemplateLanguage", value)} />
+        <Select label="OTP Button Subtype" value={values.whatsappButtonSubtype || ""} onChange={(value) => setValue("whatsappButtonSubtype", value)} options={["", "url", "quick_reply"]} />
+        <div className="col-span-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-700">
+          Gunakan template WhatsApp yang sudah disetujui Meta dan memiliki 1 variabel body untuk kode OTP. Jika template memiliki tombol OTP, pilih subtype sesuai template. Access Token disimpan terenkripsi dan tidak dikirim kembali ke browser.
         </div>
       </div>
     </Panel>}
