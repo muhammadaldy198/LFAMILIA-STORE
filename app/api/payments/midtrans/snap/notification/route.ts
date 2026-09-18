@@ -91,6 +91,7 @@ export async function POST(request: Request) {
             gateway: "midtrans",
             status,
             callbackAmount,
+            authoritativePaid: status === "paid",
           });
       if (result.credited) {
         await notifyWalletTopupSuccessById(walletTopup.id, referenceId).catch((error) =>
@@ -115,7 +116,9 @@ export async function POST(request: Request) {
     });
 
     if (status !== "ignore") {
-      const firstPaid = await applyPendingExternalPaymentStatus(order, status);
+      const firstPaid = await applyPendingExternalPaymentStatus(order, status, {
+        authoritativePaid: status === "paid",
+      });
       if (firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
