@@ -5,7 +5,6 @@ import {
   type PaymentGatewayCode,
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
-import { calculateCustomerPaymentFee } from "@/lib/payment-fees";
 import { isDokuChannelSupported } from "@/lib/server/doku";
 import { isHostedGatewayChannelSupported } from "@/lib/server/hosted-payment-methods";
 
