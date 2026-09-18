@@ -54,32 +54,34 @@ const schema = z.discriminatedUnion("action", [
   digiflazzTestInput,
 ]);
 
-type DigiflazzRollback = () => Promise<void>;
+type DigiflazzRollbackPlan = {
+  captureCommitted: () => Promise<void>;
+  rollback: (guardToken: string) => Promise<boolean>;
+};
 
 async function withDigiflazzConfigurationGuard(
   action: () => Promise<void>,
-  captureRollback: () => Promise<DigiflazzRollback>,
+  createRollbackPlan: () => Promise<DigiflazzRollbackPlan>,
 ) {
   const token = await acquireDigiflazzConfigurationGuard();
   let successful = false;
   let actionCommitted = false;
-  let rollback: DigiflazzRollback | null = null;
+  let rollbackPlan: DigiflazzRollbackPlan | null = null;
   try {
-    // Snapshot the small configuration record while the guard is held. The
-    // credential mutation happens before destructive cache invalidation, so a
-    // failed save leaves the old cache untouched. Cache invalidation itself is
-    // atomic; if it fails after the save, restore the previous configuration
-    // before the guard is released.
-    rollback = await captureRollback();
+    rollbackPlan = await createRollbackPlan();
     await action();
     actionCommitted = true;
+    await rollbackPlan.captureCommitted();
     await invalidateDigiflazzOperationalCache(token);
     clearDigiflazzBalanceCache();
     successful = true;
   } catch (error) {
-    if (actionCommitted && rollback) {
+    if (actionCommitted && rollbackPlan) {
       try {
-        await rollback();
+        const restored = await rollbackPlan.rollback(token);
+        if (!restored) {
+          throw new Error("Rollback dibatalkan karena guard kedaluwarsa atau konfigurasi DigiFlazz sudah berubah.");
+        }
       } catch (rollbackError) {
         const primary = error instanceof Error ? error.message : String(error);
         const recovery = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
@@ -136,7 +138,13 @@ export async function PUT(request: Request) {
             () => saveIntegrationProfile(input).then(() => undefined),
             async () => {
               const snapshot = await captureIntegrationProfileSnapshot(input.provider, input.mode, input.environment);
-              return () => restoreIntegrationProfileSnapshot(snapshot);
+              let committed: Awaited<ReturnType<typeof captureIntegrationProfileSnapshot>> | null = null;
+              return {
+                captureCommitted: async () => {
+                  committed = await captureIntegrationProfileSnapshot(input.provider, input.mode, input.environment);
+                },
+                rollback: (guardToken: string) => restoreIntegrationProfileSnapshot(snapshot, committed, guardToken),
+              };
             },
           );
         } else {
@@ -157,7 +165,13 @@ export async function PUT(request: Request) {
           () => saveIntegrationSelections(input.selections),
           async () => {
             const snapshot = await captureIntegrationSettingSnapshot("digiflazz_environment");
-            return () => restoreIntegrationSettingSnapshot(snapshot);
+            let committed: Awaited<ReturnType<typeof captureIntegrationSettingSnapshot>> | null = null;
+            return {
+              captureCommitted: async () => {
+                committed = await captureIntegrationSettingSnapshot("digiflazz_environment");
+              },
+              rollback: (guardToken: string) => restoreIntegrationSettingSnapshot(snapshot, committed, guardToken),
+            };
           },
         );
       } else {
