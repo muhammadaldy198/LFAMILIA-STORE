@@ -55,11 +55,13 @@ async function withDigiflazzConfigurationGuard(action: () => Promise<void>) {
   let successful = false;
   try {
     // The guard blocks new DigiFlazz orders and pricelist sync while the active
-    // configuration changes. Invalidate operational cache only after the save
-    // succeeds; a failed save must leave the still-valid old cache intact.
-    await action();
+    // configuration changes. Clear every credential-dependent operational
+    // cache before committing the new active profile. If invalidation fails,
+    // the profile is left unchanged; if the save then fails, the old profile
+    // remains valid and its cache can be rebuilt safely after the guard exits.
     await invalidateDigiflazzOperationalCache(token);
     clearDigiflazzBalanceCache();
+    await action();
     successful = true;
   } finally {
     await releaseDigiflazzConfigurationGuard(token, successful);
