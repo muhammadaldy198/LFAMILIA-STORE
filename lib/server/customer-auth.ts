@@ -153,28 +153,25 @@ export async function loginOrRegisterGoogleCustomer(input: {
   if (existing && !existing.is_active) throw new Error("Akun pelanggan sedang dinonaktifkan.");
 
   const customerId = existing?.id ?? crypto.randomUUID();
+  const oauthInsert = db.prepare(`INSERT INTO customer_oauth_accounts
+    (id, customer_id, provider, provider_subject, provider_email, avatar_url)
+    VALUES (?, ?, ?, ?, ?, ?)`)
+    .bind(crypto.randomUUID(), customerId, "google", input.subject, email, input.picture?.trim() || null);
+
   if (!existing) {
     const saltHex = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
     const disabledPasswordHash = bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
-    await db.prepare(`INSERT INTO customer_users
+    const customerInsert = db.prepare(`INSERT INTO customer_users
       (id, email, name, phone, password_hash, password_salt, last_login_at)
       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`)
-      .bind(customerId, email, input.name.trim() || "Pelanggan", "", disabledPasswordHash, saltHex)
-      .run();
+      .bind(customerId, email, input.name.trim() || "Pelanggan", "", disabledPasswordHash, saltHex);
+    // D1 batch is transactional: a failed OAuth link cannot leave an orphan customer.
+    await db.batch([customerInsert, oauthInsert]);
+  } else {
+    await oauthInsert.run();
+    await db.prepare("UPDATE customer_users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .bind(customerId).run();
   }
-
-  await db.prepare(`INSERT INTO customer_oauth_accounts
-    (id, customer_id, provider, provider_subject, provider_email, avatar_url)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(provider, provider_subject) DO UPDATE SET
-      customer_id = excluded.customer_id,
-      provider_email = excluded.provider_email,
-      avatar_url = excluded.avatar_url,
-      updated_at = CURRENT_TIMESTAMP`)
-    .bind(crypto.randomUUID(), customerId, "google", input.subject, email, input.picture?.trim() || null)
-    .run();
-  await db.prepare("UPDATE customer_users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-    .bind(customerId).run();
   return createCustomerSession(customerId);
 }
 export async function loginCustomer(emailInput: string, password: string) {
