@@ -22,11 +22,15 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CustomerSession } from "@/lib/server/customer-auth";
-import type { WalletSettings } from "@/lib/server/wallet";
 import { formatRupiah } from "@/lib/store-data";
 import { CustomerSupport } from "@/components/customer-support";
 import { CustomerGameAccounts } from "@/components/customer-game-accounts";
 import { CustomerAuthForm } from "@/components/customer-auth-form";
+
+type PublicWalletSettings = {
+  enabled: boolean;
+  minimumAmount: number;
+};
 
 type AccountData = {
   customer: CustomerSession;
@@ -76,7 +80,7 @@ export function CustomerAccount({
   initialError?: string;
 }) {
   const [account, setAccount] = useState<AccountData | null>(null);
-  const [settings, setSettings] = useState<WalletSettings | null>(null);
+  const [settings, setSettings] = useState<PublicWalletSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [error, setError] = useState(initialError);
@@ -89,7 +93,7 @@ export function CustomerAccount({
         fetch("/api/wallet", { cache: "no-store" }),
       ]);
       const walletData = await walletResponse.json().catch(() => ({})) as {
-        settings?: WalletSettings;
+        settings?: PublicWalletSettings;
       };
       setSettings(walletData.settings ?? null);
       if (accountResponse.ok) {
@@ -171,7 +175,7 @@ function Dashboard({
   onLogout,
 }: {
   data: AccountData;
-  settings: WalletSettings | null;
+  settings: PublicWalletSettings | null;
   reload(): Promise<void>;
   onLogout(): Promise<void>;
 }) {
@@ -640,7 +644,7 @@ function TopupForm({
   const [payment, setPayment] = useState<TopupPayment | null>(null);
   const [openingPayment, setOpeningPayment] = useState(false);
 
-  const automaticReady = Boolean(settings?.dokuTopupEnabled);
+  const automaticReady = Boolean(settings?.enabled);
 
   function openTopupPayment() {
     if (!payment?.paymentUrl) return;
@@ -680,7 +684,7 @@ function TopupForm({
       Pilih metode pembayaran yang ingin digunakan.
     </div>
     <div className="mt-4 grid grid-cols-3 gap-2">{(["qris","va","ewallet"] as const).map((item) => <button key={item} type="button" onClick={() => setMethod(item)} className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase ${method === item ? "border-[#b9ff35] bg-[#b9ff35] text-[#091006]" : "border-white/10 text-white/50"}`}>{item === "va" ? "Bank VA" : item}</button>)}</div>
-    <div className="mt-4"><Field label={`Nominal (min. ${formatRupiah(settings?.minTopup ?? 10_000)})`}><Input required type="number" min={settings?.minTopup ?? 10_000} value={amount} onChange={(event) => setAmount(event.target.value)} className="checkout-input" /></Field></div>
+    <div className="mt-4"><Field label={`Nominal (min. ${formatRupiah(settings?.minimumAmount ?? 10_000)})`}><Input required type="number" min={settings?.minimumAmount ?? 10_000} value={amount} onChange={(event) => setAmount(event.target.value)} className="checkout-input" /></Field></div>
     <Button disabled={saving} className="mt-4 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006]">{saving ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <ArrowUpRight className="mr-2 size-4" />}Lanjut bayar</Button>
     {payment && (
       <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/20 p-4">
