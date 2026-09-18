@@ -67,7 +67,7 @@ export function StoreHeader() {
 
   const loadAccount = useCallback(async () => {
     try {
-      const response = await fetch("/api/account", { cache: "no-store" });
+      const response = await fetch("/api/account/summary", { cache: "no-store" });
       if (!response.ok) {
         setCustomer(null);
         return;
