@@ -82,11 +82,12 @@ export function StoreHeader() {
   }, []);
 
   useEffect(() => {
-    void loadAccount();
+    const timer = window.setTimeout(() => void loadAccount(), 0);
     const refresh = () => void loadAccount();
     window.addEventListener("focus", refresh);
     window.addEventListener("lfamilia:auth-changed", refresh);
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("lfamilia:auth-changed", refresh);
     };
