@@ -43,6 +43,11 @@ test("Google OAuth flow uses state, nonce, HttpOnly cookies, and verified ID tok
   assert.match(helper, /audience: clientId/);
 });
 
+test("new Google customer and OAuth link are created in one D1 batch", () => {
+  const source = read("lib/server/customer-auth.ts");
+  assert.match(source, /await db\.batch\(\[customerInsert, oauthInsert\]\)/);
+  assert.doesNotMatch(source, /ON CONFLICT\(provider, provider_subject\) DO UPDATE SET\s+customer_id/);
+});
 test("Google OAuth credentials stay dashboard-managed and encrypted", () => {
   const integration = read("lib/server/integration-config.ts");
   const admin = read("components/admin-integration-workspace.tsx");
