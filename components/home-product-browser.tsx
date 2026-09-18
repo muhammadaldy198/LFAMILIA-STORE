@@ -24,7 +24,7 @@ import type { ProductCategory } from "@/lib/store-data";
 type Filter = "all" | ProductCategory;
 
 export function HomeProductBrowser() {
-  const { products, databaseReady } = useStoreProducts();
+  const { products, databaseReady, loading } = useStoreProducts();
   const { categories } = useStorefront();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -104,7 +104,7 @@ export function HomeProductBrowser() {
           ))}
         </div>
         <span className="hidden shrink-0 text-[9px] text-white/25 sm:block">
-          {databaseReady ? "Katalog terbaru" : "Memuat katalog"}
+          {loading ? "Memuat katalog" : databaseReady ? "Katalog terbaru" : "Katalog tidak tersedia"}
         </span>
       </div>
 
