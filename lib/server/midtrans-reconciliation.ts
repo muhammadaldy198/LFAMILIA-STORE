@@ -1,7 +1,14 @@
 import { getD1 } from "@/db";
+import { recordExternalPaymentEvent } from "@/lib/server/external-payments";
 import { queryMidtransSnapStatus } from "@/lib/server/midtrans-snap";
 import type { PaymentEnvironment } from "@/lib/server/payment-mode-config";
-import { notifyWalletTopupSuccessById } from "@/lib/server/transaction-notifications";
+import { applyPendingExternalPaymentStatus } from "@/lib/server/payment-transition";
+import { fulfillAutomaticOrder, type OrderRecord } from "@/lib/server/orders";
+import { getPublicBaseUrl } from "@/lib/server/runtime-env";
+import {
+  notifyOrderFulfillmentSuccessById,
+  notifyWalletTopupSuccessById,
+} from "@/lib/server/transaction-notifications";
 import { applyExternalWalletTopup } from "@/lib/server/wallet-external";
 
 type PendingMidtransTopup = {
@@ -11,6 +18,80 @@ type PendingMidtransTopup = {
   gateway_environment: PaymentEnvironment;
   gateway_expired_at: string | null;
 };
+
+export async function reconcilePendingMidtransOrders(limit = 100) {
+  const db = getD1();
+  const safeLimit = Math.min(Math.max(limit, 1), 500);
+  const publicBaseUrl = getPublicBaseUrl();
+  let queried = 0;
+  let settled = 0;
+
+  const pending = await db.prepare(
+    `SELECT * FROM orders
+     WHERE payment_status = 'pending'
+       AND payment_gateway = 'midtrans'
+       AND payment_gateway_mode = 'snap'
+       AND payment_gateway_environment IN ('sandbox', 'production')
+       AND created_at <= datetime('now', '-60 seconds')
+       AND (
+         gateway_status_checked_at IS NULL
+         OR gateway_status_checked_at <= datetime('now', '-60 seconds')
+       )
+       AND (
+         gateway_expired_at IS NULL
+         OR datetime(gateway_expired_at) > datetime('now')
+       )
+     ORDER BY COALESCE(gateway_status_checked_at, created_at) ASC
+     LIMIT ?`,
+  ).bind(safeLimit).all<OrderRecord>();
+
+  for (const order of pending.results) {
+    try {
+      await db.prepare(
+        `UPDATE orders
+         SET gateway_status_checked_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND payment_status = 'pending'`,
+      ).bind(order.id).run();
+
+      const environment = order.payment_gateway_environment;
+      if (environment !== "sandbox" && environment !== "production") continue;
+
+      const result = await queryMidtransSnapStatus({
+        orderId: order.reference_id,
+        environment,
+      });
+      queried += 1;
+
+      await recordExternalPaymentEvent({
+        orderId: order.id,
+        gateway: "midtrans",
+        eventId: `scheduler-snap-${result.transactionId || order.reference_id}-${result.status}`,
+        status: result.status,
+        payload: result.raw,
+      });
+
+      if (result.status === "paid") {
+        if (!Number.isFinite(result.amount) || result.amount !== order.total) continue;
+        const firstPaid = await applyPendingExternalPaymentStatus(order, "paid");
+        if (firstPaid) {
+          settled += 1;
+          if (order.fulfillment_type === "automatic") {
+            await fulfillAutomaticOrder(order.id, publicBaseUrl);
+            await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
+              console.error("Notifikasi order hasil rekonsiliasi Midtrans gagal:", error),
+            );
+          }
+        }
+      } else if (result.status === "expired" || result.status === "failed") {
+        await applyPendingExternalPaymentStatus(order, result.status);
+      }
+    } catch (error) {
+      console.error("Rekonsiliasi status order Midtrans gagal:", error);
+    }
+  }
+
+  return { queried, settled };
+}
 
 export async function reconcilePendingMidtransTopups(limit = 100) {
   const db = getD1();
