@@ -8,6 +8,8 @@ const DIGIFLAZZ_MAX_PRICE_MIGRATION = "0033_digiflazz_max_price.sql";
 const FINAL_SCHEMA_OBJECTS = [
   "promotion_reservations",
   "promotion_reservations_expiry_idx",
+  "orders_wallet_checkout_key_unique",
+  "orders_external_checkout_key_unique",
   "wallet_topups_external_checkout_key_unique",
   "promotion_reservation_voucher_guard",
   "promotion_reservation_flash_guard",
@@ -137,10 +139,11 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
     // One D1 batch keeps the normal, already-migrated request path to a single
     // round-trip instead of repeating dozens of PRAGMA/DDL/backfill calls on
     // every fresh Worker isolate.
-    const [ledger, products, packages, settings, orders, topups, vouchers, flash, objects] =
+    const [ledger, products, customers, packages, settings, orders, topups, vouchers, flash, objects] =
       await db.batch([
         db.prepare("SELECT name FROM d1_migrations WHERE name IN (?, ?)").bind(FINAL_AUDIT_MIGRATION, DIGIFLAZZ_MAX_PRICE_MIGRATION),
         db.prepare("PRAGMA table_info(products)"),
+        db.prepare("PRAGMA table_info(customer_users)"),
         db.prepare("PRAGMA table_info(product_packages)"),
         db.prepare("PRAGMA table_info(store_settings)"),
         db.prepare("PRAGMA table_info(orders)"),
@@ -164,20 +167,27 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
 
     const names = (result: { results?: unknown[] }) =>
       new Set(resultRows(result).map((row) => String(row.name ?? "")));
-    const productColumns = names(products);
-    const packageColumns = names(packages);
-    const settingColumns = names(settings);
-    const orderColumns = names(orders);
-    const topupColumns = names(topups);
-    const voucherColumns = names(vouchers);
-    const flashColumns = names(flash);
+    const tableInfo = new Map<string, { results?: unknown[] }>([
+      ["products", products],
+      ["customer_users", customers],
+      ["product_packages", packages],
+      ["store_settings", settings],
+      ["orders", orders],
+      ["wallet_topups", topups],
+      ["discount_vouchers", vouchers],
+      ["flash_sales", flash],
+    ]);
+    for (const [table, column] of columns) {
+      const info = tableInfo.get(table);
+      if (!info || !names(info).has(column)) return false;
+    }
 
-    if (!productColumns.has("package_tabs_enabled") || !productColumns.has("package_tabs_json") || !productColumns.has("nickname_game_code")) return false;
-    if (!packageColumns.has("package_group") || !packageColumns.has("provider_max_price")) return false;
-    if (!settingColumns.has("support_widget_enabled")) return false;
-    if (!["delivery_mode", "supplier_cost_snapshot", "provider_max_price_snapshot", "doku_environment"].every((column) => orderColumns.has(column))) return false;
-    if (!["doku_environment", "external_checkout_key"].every((column) => topupColumns.has(column))) return false;
-    if (!voucherColumns.has("reserved_count") || !flashColumns.has("reserved_count")) return false;
+    const hasRequiredCounter = (result: { results?: unknown[] }) => {
+      const row = resultRows(result).find((item) => item.name === "reserved_count");
+      const normalizedDefault = String(row?.dflt_value ?? "").replace(/[()'"]/g, "").trim();
+      return Boolean(row && Number(row.notnull ?? 0) === 1 && normalizedDefault === "0");
+    };
+    if (!hasRequiredCounter(vouchers) || !hasRequiredCounter(flash)) return false;
 
     const schemaObjects = new Set(resultRows(objects).map((row) => String(row.name ?? "")));
     return FINAL_SCHEMA_OBJECTS.every((name) => schemaObjects.has(name));
@@ -380,6 +390,8 @@ export async function ensureLegacyDatabaseColumns() {
             `SELECT name FROM sqlite_master WHERE name IN (
               'promotion_reservations',
               'promotion_reservations_expiry_idx',
+              'orders_wallet_checkout_key_unique',
+              'orders_external_checkout_key_unique',
               'wallet_topups_external_checkout_key_unique',
               'promotion_reservation_voucher_guard',
               'promotion_reservation_flash_guard',
@@ -388,7 +400,7 @@ export async function ensureLegacyDatabaseColumns() {
               'promotion_reservation_released'
             )`,
           ).all<{ name: string }>();
-          if (schemaObjects.results.length !== 8) complete = false;
+          if (schemaObjects.results.length !== FINAL_SCHEMA_OBJECTS.length) complete = false;
         }
 
         if (complete) {
