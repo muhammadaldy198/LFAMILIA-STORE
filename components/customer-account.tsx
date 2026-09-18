@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CustomerSession } from "@/lib/server/customer-auth";
+import { calculateCustomerPaymentFee } from "@/lib/payment-fees";
 import { formatRupiah } from "@/lib/store-data";
 import { CustomerSupport } from "@/components/customer-support";
 import { CustomerGameAccounts } from "@/components/customer-game-accounts";
@@ -38,6 +39,9 @@ type PublicWalletChannel = {
   name: string;
   description: string;
   imageUrl?: string;
+  customerFeeEnabled?: boolean;
+  customerFeeBps?: number;
+  customerFeeFixed?: number;
 };
 
 type AccountData = {
@@ -657,6 +661,8 @@ type TopupPayment = {
   paymentName?: string | null;
   paymentUrl?: string | null;
   expiredAt?: string | null;
+  fee?: number;
+  total?: number;
 };
 
 function TopupForm({
@@ -681,6 +687,12 @@ function TopupForm({
     channels.find((item) => `${item.method}:${item.channel}` === selectedChannelKey) ??
     channels[0] ??
     null;
+  const numericAmount = Number(amount) || 0;
+  const estimatedFee =
+    selectedChannel && numericAmount > 0
+      ? calculateCustomerPaymentFee(numericAmount, selectedChannel)
+      : 0;
+  const estimatedTotal = numericAmount + estimatedFee;
 
   function openTopupPayment() {
     if (!payment?.paymentUrl) return;
@@ -736,17 +748,20 @@ function TopupForm({
           >
             <strong className="block text-[10px] font-black">{item.name}</strong>
             <span className={`mt-0.5 block text-[9px] ${selected ? "text-[#091006]/65" : "text-white/35"}`}>{item.description || (item.method === "va" ? "Virtual Account" : item.method.toUpperCase())}</span>
+            {item.customerFeeEnabled !== false && ((item.customerFeeBps ?? 0) > 0 || (item.customerFeeFixed ?? 0) > 0) && <span className={`mt-1 block text-[8px] font-bold ${selected ? "text-[#091006]/75" : "text-[#d8ff8d]/70"}`}>Fee {((item.customerFeeBps ?? 0) / 100).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%{(item.customerFeeFixed ?? 0) > 0 ? ` + ${formatRupiah(item.customerFeeFixed ?? 0)}` : ""}</span>}
           </button>
         );
       })}
     </div>
     <div className="mt-4"><Field label={`Nominal (min. ${formatRupiah(settings?.minimumAmount ?? 10_000)})`}><Input required type="number" min={settings?.minimumAmount ?? 10_000} value={amount} onChange={(event) => setAmount(event.target.value)} className="checkout-input" /></Field></div>
+    {numericAmount > 0 && selectedChannel && <div className="mt-3 rounded-lg border border-white/[0.08] bg-white/[0.02] p-3 text-[10px]"><div className="flex justify-between text-white/45"><span>Saldo yang masuk</span><strong className="text-white">{formatRupiah(numericAmount)}</strong></div><div className="mt-1.5 flex justify-between text-white/45"><span>Biaya pembayaran</span><strong className="text-white">{formatRupiah(estimatedFee)}</strong></div><div className="mt-2 flex justify-between border-t border-white/10 pt-2"><span className="font-bold text-white/60">Total bayar</span><strong className="text-[#d8ff8d]">{formatRupiah(estimatedTotal)}</strong></div></div>}
     <Button disabled={saving} className="mt-4 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006]">{saving ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <ArrowUpRight className="mr-2 size-4" />}Lanjut bayar</Button>
     {payment && (
       <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/20 p-4">
         <strong className="text-xs">Pembayaran top up dibuat</strong>
         {payment.referenceId && <p className="mt-1 break-all text-[9px] text-white/40">{payment.referenceId}</p>}
         {payment.expiredAt && <p className="mt-2 text-[9px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}
+        {(payment.total != null || payment.fee != null) && <div className="mt-3 rounded-lg border border-white/[0.08] bg-white/[0.025] p-3 text-[9px]"><div className="flex justify-between text-white/40"><span>Biaya pembayaran</span><strong className="text-white">{formatRupiah(payment.fee ?? 0)}</strong></div><div className="mt-1.5 flex justify-between"><span className="font-bold text-white/55">Total bayar</span><strong className="text-[#d8ff8d]">{formatRupiah(payment.total ?? 0)}</strong></div></div>}
         {payment.qrContent && (
           <div className="mt-3 rounded-xl bg-white p-4 text-center">
             <QRCodeSVG value={payment.qrContent} size={210} level="M" className="mx-auto h-auto w-full max-w-[210px]" />
