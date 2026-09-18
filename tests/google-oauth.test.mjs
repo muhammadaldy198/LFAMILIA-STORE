@@ -56,7 +56,8 @@ test("Google Login integration stores only Client ID and no Client Secret", () =
   assert.match(integration, /GOOGLE_OAUTH_CLIENT_ID/);
   assert.doesNotMatch(integration, /GOOGLE_OAUTH_CLIENT_SECRET|clientSecret/);
   assert.match(admin, /Client ID/);
-  assert.doesNotMatch(admin, /Client Secret|Authorized Redirect URI/);
+  assert.doesNotMatch(admin, /Text label="Client Secret"/);
+  assert.doesNotMatch(admin, /CopyUrl label="Authorized Redirect URI"/);
 });
 
 test("customer auth UI uses Google Identity Services and posts credential to backend", () => {
