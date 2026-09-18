@@ -1,8 +1,25 @@
 ALTER TABLE customer_users ADD COLUMN phone_verified_at TEXT;
 --> statement-breakpoint
 UPDATE customer_users
-SET phone_verified_at = CURRENT_TIMESTAMP
+SET phone = CASE
+  WHEN REPLACE(REPLACE(REPLACE(REPLACE(TRIM(phone), ' ', ''), '-', ''), '(', ''), ')', '') LIKE '08%'
+    THEN '+62' || SUBSTR(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(phone), ' ', ''), '-', ''), '(', ''), ')', ''), 2)
+  WHEN REPLACE(REPLACE(REPLACE(REPLACE(TRIM(phone), ' ', ''), '-', ''), '(', ''), ')', '') LIKE '628%'
+    THEN '+' || REPLACE(REPLACE(REPLACE(REPLACE(TRIM(phone), ' ', ''), '-', ''), '(', ''), ')', '')
+  ELSE REPLACE(REPLACE(REPLACE(REPLACE(TRIM(phone), ' ', ''), '-', ''), '(', ''), ')', '')
+END
 WHERE TRIM(phone) <> '';
+--> statement-breakpoint
+UPDATE customer_users
+SET phone_verified_at = CURRENT_TIMESTAMP
+WHERE TRIM(phone) <> ''
+  AND phone IN (
+    SELECT phone
+    FROM customer_users
+    WHERE TRIM(phone) <> ''
+    GROUP BY phone
+    HAVING COUNT(*) = 1
+  );
 --> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS customer_users_verified_phone_unique
 ON customer_users (phone)
