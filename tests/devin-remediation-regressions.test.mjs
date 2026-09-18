@@ -34,12 +34,15 @@ test("uncertain DOKU dispatches stay out of normal status polling until initiali
   assert.match(doku, /gateway_request_id IS NOT NULL OR doku_request_id IS NOT NULL/);
 });
 
-test("Midtrans scheduler finalizes stored-expiry orders even without customer polling", () => {
+test("Midtrans scheduler queries provider status even after local expiry", () => {
   const midtrans = read("lib/server/midtrans-reconciliation.ts");
-  assert.match(midtrans, /gateway_expired_at IS NOT NULL/);
-  assert.match(midtrans, /datetime\(gateway_expired_at\) <= datetime\('now'\)/);
-  assert.match(midtrans, /applyPendingExternalPaymentStatus\(order, "expired"\)/);
-  assert.match(midtrans, /reason: "stored_midtrans_expiry"/);
+  const external = read("lib/server/external-payments.ts");
+  const walletExternal = read("lib/server/wallet-external.ts");
+  assert.match(midtrans, /reconcilePendingMidtransOrders/);
+  assert.match(midtrans, /queryMidtransSnapStatus/);
+  assert.doesNotMatch(midtrans, /reason: "stored_midtrans_expiry"/);
+  assert.match(external, /payment_gateway IS NULL OR payment_gateway <> 'midtrans'/);
+  assert.match(walletExternal, /payment_gateway IS NULL OR payment_gateway <> 'midtrans'/);
 });
 
 test("payment maintenance reconciles before ambiguous expiry and keeps pending promo reservations", () => {
