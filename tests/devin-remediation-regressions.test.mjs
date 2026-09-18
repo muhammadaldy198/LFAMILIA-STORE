@@ -147,8 +147,9 @@ test("DOKU expired-order polling updates the canonical throttle timestamp", () =
 test("stale DigiFlazz reconciliation normalizes legacy provider casing and notifies once", () => {
   const source = read("lib/server/digiflazz-reconciliation.ts");
   assert.match(source, /lower\(trim\(provider_code\)\) = 'digiflazz'/);
-  assert.match(source, /const \[, updateResult\] = await db\.batch/);
-  assert.match(source, /Number\(updateResult\?\.meta\.changes \?\? 0\) > 0/);
+  assert.match(source, /const batch = await db\.batch/);
+  assert.match(source, /const persisted = Number\(batch\[1\]\?\.meta\.changes \?\? 0\) > 0/);
+  assert.match(source, /if \(persisted && result\.status === "success"\)/);
 });
 
 test("wallet topup only uses uncertainty hold after gateway dispatch begins", () => {
