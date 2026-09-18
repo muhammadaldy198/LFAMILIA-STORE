@@ -32,6 +32,8 @@ type ReconciliationOrder = OrderRecord & {
 type PendingTopup = {
   id: string;
   reference_id: string;
+  status: string;
+  admin_notes: string | null;
   amount: number;
   payment_total: number;
   payment_method: string;
@@ -120,7 +122,9 @@ async function markOrderStatusChecked(order: ReconciliationOrder) {
 /**
  * Reconcile pending DOKU Direct API transactions through the documented SNAP
  * status endpoint for QRIS, VA, and e-wallet. Poll no sooner than 60 seconds and
- * no more often than once per minute per transaction.
+ * no more often than once per minute per transaction. Locally expired records
+ * remain eligible for authoritative late-paid recovery for at most 24 hours;
+ * provider-final failures stop being polled immediately.
  */
 export async function finalizeExpiredDokuPayments(limit = 100) {
   const db = getD1();
@@ -131,7 +135,20 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
 
   const pendingOrders = await db.prepare(
     `SELECT * FROM orders
-     WHERE payment_status IN ('pending', 'expired')
+     WHERE (
+         payment_status = 'pending'
+         OR (
+           payment_status = 'expired'
+           AND COALESCE(gateway_expired_at, doku_expired_at) IS NOT NULL
+           AND datetime(COALESCE(gateway_expired_at, doku_expired_at)) >= datetime('now', '-24 hours')
+           AND NOT EXISTS (
+             SELECT 1 FROM order_events oe
+             WHERE oe.order_id = orders.id
+               AND oe.source = 'doku'
+               AND oe.status = 'failed'
+           )
+         )
+       )
        AND payment_method IN ('va', 'ewallet', 'qris')
        AND payment_gateway = 'doku'
        AND payment_gateway_mode = 'direct'
@@ -180,7 +197,7 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
   }
 
   const pendingTopups = await db.prepare(
-    `SELECT id, reference_id, amount, payment_total, payment_method, doku_request_id,
+    `SELECT id, reference_id, status, admin_notes, amount, payment_total, payment_method, doku_request_id,
       doku_reference_no, doku_payment_no, doku_environment
      FROM wallet_topups
      WHERE source = 'doku'
@@ -188,7 +205,12 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
        AND payment_gateway_mode = 'direct'
        AND (
          status = 'pending'
-         OR (status = 'rejected' AND admin_notes IN ('Pembayaran kedaluwarsa.', 'Pembayaran DOKU kedaluwarsa.'))
+         OR (
+           status = 'rejected'
+           AND admin_notes IN ('Pembayaran kedaluwarsa.', 'Pembayaran DOKU kedaluwarsa.')
+           AND COALESCE(gateway_expired_at, doku_expired_at) IS NOT NULL
+           AND datetime(COALESCE(gateway_expired_at, doku_expired_at)) >= datetime('now', '-24 hours')
+         )
        )
        AND (payment_method LIKE 'va:%' OR payment_method LIKE 'ewallet:%' OR payment_method LIKE 'qris:%')
        AND doku_request_id IS NOT NULL
@@ -221,6 +243,14 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
         callbackAmount: query.amount,
         authoritativePaid: query.status === "paid",
       });
+      if (topup.status === "rejected" && query.status === "failed") {
+        await db.prepare(
+          `UPDATE wallet_topups
+           SET admin_notes = 'Pembayaran DOKU gagal menurut status final provider.',
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND status = 'rejected'`,
+        ).bind(topup.id).run();
+      }
       if (result.credited) {
         await notifyWalletTopupSuccessById(topup.id, topup.reference_id).catch((error) =>
           console.error("Notifikasi top up hasil rekonsiliasi DOKU gagal:", error),
