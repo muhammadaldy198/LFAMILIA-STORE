@@ -802,8 +802,9 @@ export function parseDokuNotification(payload: Record<string, unknown>) {
 export async function queryDokuQrisStatus(input: {
   referenceId: string;
   referenceNo: string;
+  environment?: DokuEnvironment;
 }) {
-  const config = activeConfig();
+  const config = input.environment ? environmentConfig(input.environment) : activeConfig();
   if (!config.qrisMerchantId) {
     throw new Error("QRIS Merchant ID DOKU belum dikonfigurasi.");
   }
