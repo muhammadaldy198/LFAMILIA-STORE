@@ -1118,8 +1118,8 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                 {quote && quote.sellingPrice < quote.basePrice && <SummaryRow label="Harga promo" value={`-${formatRupiah(quote.basePrice - quote.sellingPrice)}`} highlight />}
                 {quote && quote.discountAmount > 0 && <SummaryRow label={`Voucher ${quote.voucherCode ?? ""}`} value={`-${formatRupiah(quote.discountAmount)}`} highlight />}
                 <SummaryRow
-                  label="Biaya layanan"
-                  value={paymentMethod === "wallet" ? formatRupiah(0) : payment ? formatRupiah(payment.fee) : "Dihitung otomatis"}
+                  label="Biaya Pembayaran"
+                  value={formatRupiah(paymentMethod === "wallet" ? 0 : payment?.fee ?? estimatedPaymentFee)}
                 />
                 <SummaryRow
                   label="Proses"
@@ -1129,9 +1129,9 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
               <div className="my-3 h-px bg-white/[0.08]" />
               <div className="flex items-end justify-between gap-3">
                 <span className="text-xs font-bold">Total</span>
-                <strong className="text-lg font-black text-[#b9ff35]">{formatRupiah(payment?.total ?? subtotal)}</strong>
+                <strong className="text-lg font-black text-[#b9ff35]">{formatRupiah(payment?.total ?? estimatedPaymentTotal)}</strong>
               </div>
-              <p className="mt-2 rounded-lg bg-white/[0.035] p-2.5 text-[8px] leading-4 text-white/35">Biaya layanan, jika ada, dihitung oleh channel yang dipilih dan ditampilkan sebelum pembayaran.</p>
+              <p className="mt-2 rounded-lg bg-white/[0.035] p-2.5 text-[8px] leading-4 text-white/35">Biaya pembayaran channel yang dipilih dibebankan ke customer sesuai pengaturan Admin dan sudah termasuk dalam total di atas.</p>
               <Button form="checkout-form" disabled={submitting} type="submit" className="mt-3 hidden h-10 w-full rounded-lg bg-[#bca17d] font-black text-white hover:bg-[#d1b18b] lg:flex">
                 {submitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <LockKeyhole className="mr-2 size-4" />}
                 Pesan Sekarang
