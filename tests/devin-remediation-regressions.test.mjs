@@ -93,6 +93,38 @@ test("active promo reservations cannot be orphaned by admin edits", () => {
   assert.match(promotions, /Promo tidak dapat dihapus saat masih memiliki reservasi/);
 });
 
+test("DOKU reconciliation closes local expiry but keeps authoritative late-paid recovery", () => {
+  const doku = read("lib/server/doku-reconciliation.ts");
+  const transition = read("lib/server/doku-payment-transition.ts");
+  assert.match(doku, /payment_status IN \('pending', 'expired'\)/);
+  assert.match(doku, /expiredOrders/);
+  assert.match(doku, /expiredWalletTopups/);
+  assert.match(doku, /applyPendingDokuPaymentStatus\(order, "paid", \{/);
+  assert.match(doku, /authoritativePaid: true/);
+  assert.match(doku, /applyPendingDokuPaymentStatus\(order, "expired"\)/);
+  assert.match(doku, /status = 'rejected' AND admin_notes IN/);
+  assert.match(transition, /payment_status IN \('pending', 'expired'\)/);
+});
+
+test("product editor blocks save until every concurrent media upload completes", () => {
+  const manager = read("components/admin-product-manager.tsx");
+  assert.match(manager, /Record<"imageUrl" \| "bannerUrl", boolean>/);
+  assert.match(manager, /mediaUploadActive\.current\[field\] = true/);
+  assert.match(manager, /mediaUploadActive\.current\[field\] = false/);
+  assert.match(manager, /mediaUploadActive\.current\.imageUrl \|\| mediaUploadActive\.current\.bannerUrl/);
+  assert.match(manager, /uploading\.imageUrl/);
+  assert.match(manager, /uploading\.bannerUrl/);
+});
+
+test("checkout normalizes legacy provider code and SKU exactly like the public catalog", () => {
+  const orders = read("lib/server/orders.ts");
+  const products = read("lib/server/products.ts");
+  assert.match(orders, /providerCode: row\.provider_code\?\.trim\(\)\.toLowerCase\(\) \|\| null/);
+  assert.match(orders, /providerSku: row\.provider_sku\?\.trim\(\) \|\| null/);
+  assert.match(products, /providerCode: item\.provider_code\?\.trim\(\)\.toLowerCase\(\) \|\| undefined/);
+  assert.match(products, /providerSku: item\.provider_sku\?\.trim\(\) \|\| undefined/);
+});
+
 test("DOKU overview only reports ready for a parseable RSA key and HTTPS endpoint", () => {
   const config = read("lib/server/payment-mode-config.ts");
   assert.match(config, /createPrivateKey/);
