@@ -150,6 +150,16 @@ export async function getExternalWalletTopup(referenceId: string, gateway?: Paym
   return (gateway ? statement.bind(referenceId, gateway) : statement.bind(referenceId)).first<ExternalWalletTopup>();
 }
 
+export async function rejectExternalWalletTopupPreDispatch(referenceId: string, message: string) {
+  await getD1().prepare(`
+    UPDATE wallet_topups
+    SET status = 'rejected',
+        admin_notes = ?,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE reference_id = ? AND status = 'pending'
+  `).bind(`Pembuatan pembayaran gagal sebelum dikirim ke gateway: ${message.slice(0, 420)}`, referenceId).run();
+}
+
 export async function markExternalWalletTopupCreationFailed(referenceId: string, message: string) {
   // A provider can accept a payment while our response/persistence fails. Keep
   // the top-up pending long enough for a signed callback to settle it instead
