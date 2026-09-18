@@ -639,7 +639,7 @@ export async function fulfillAutomaticOrder(
     await applyProviderResult(order, result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Provider gagal dihubungi.";
-    if (order.provider_code === "digiflazz" || order.provider_code === "voucher-stock") {
+    if (providerCode === "digiflazz" || providerCode === "voucher-stock") {
       await setRetryableFulfillmentError(order.id, message);
     } else {
       await setFulfillmentError(order.id, message);
@@ -658,7 +658,7 @@ export async function claimAutomaticFulfillmentAttempt(
       provider_status IS NULL
       OR (
         provider_status IN ('dispatching', 'retryable_error')
-        AND provider_code IN ('digiflazz', 'voucher-stock')
+        AND lower(trim(provider_code)) IN ('digiflazz', 'voucher-stock')
         AND updated_at <= datetime('now', '-2 minutes')
       )
     )`;
@@ -675,7 +675,7 @@ export async function claimAutomaticFulfillmentAttempt(
     db.prepare(
       `UPDATE orders SET fulfillment_status = 'dispatching', provider_status = 'dispatching',
          provider_ref_id = CASE
-           WHEN provider_code = 'digiflazz' THEN COALESCE(provider_ref_id, reference_id)
+           WHEN lower(trim(provider_code)) = 'digiflazz' THEN COALESCE(provider_ref_id, reference_id)
            ELSE provider_ref_id
          END,
          updated_at = CURRENT_TIMESTAMP
@@ -722,7 +722,7 @@ export async function recoverStaleAutomaticOrders(
        updated_at = CURRENT_TIMESTAMP
      WHERE payment_status = 'paid' AND fulfillment_type = 'automatic'
        AND provider_status = 'dispatching'
-       AND provider_code NOT IN ('digiflazz', 'voucher-stock')
+       AND lower(trim(coalesce(provider_code, ''))) NOT IN ('digiflazz', 'voucher-stock')
        AND updated_at <= datetime('now', '-2 minutes')`,
   ).run();
   const result = await db.prepare(
@@ -732,12 +732,12 @@ export async function recoverStaleAutomaticOrders(
          provider_status IS NULL
          OR (
            provider_status = 'dispatching'
-           AND provider_code IN ('digiflazz', 'voucher-stock')
+           AND lower(trim(provider_code)) IN ('digiflazz', 'voucher-stock')
            AND updated_at <= datetime('now', '-2 minutes')
          )
          OR (
            provider_status = 'retryable_error'
-           AND provider_code IN ('digiflazz', 'voucher-stock')
+           AND lower(trim(provider_code)) IN ('digiflazz', 'voucher-stock')
            AND updated_at <= datetime('now', '-2 minutes')
          )
        )
@@ -779,9 +779,9 @@ async function applyProviderResult(
   await recordOrderEvent({
     orderId: order.id,
     source:
-      order.provider_code === "digiflazz"
+      order.provider_code?.trim().toLowerCase() === "digiflazz"
         ? "digiflazz"
-        : order.provider_code === "voucher-stock"
+        : order.provider_code?.trim().toLowerCase() === "voucher-stock"
           ? "voucher_stock"
           : "admin",
     eventId: eventId || `request-${order.reference_id}-${Date.now()}`,
@@ -819,7 +819,7 @@ export async function applyProviderWebhook(input: {
   const db = getD1();
   const order = await db
     .prepare(
-      `SELECT * FROM orders WHERE provider_code = ? AND (provider_ref_id = ? OR reference_id = ?) LIMIT 1`,
+      `SELECT * FROM orders WHERE lower(trim(provider_code)) = ? AND (provider_ref_id = ? OR reference_id = ?) LIMIT 1`,
     )
     .bind(input.providerCode, input.providerRefId, input.providerRefId)
     .first<OrderRecord>();
