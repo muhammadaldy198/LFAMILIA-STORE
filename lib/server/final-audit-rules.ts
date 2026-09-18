@@ -56,6 +56,10 @@ export function isDigiflazzSnapshotAvailable(input: {
   );
 }
 
-export function canProcessDokuOrderCallback(paymentStatus: string) {
-  return paymentStatus === "pending";
+export function canProcessDokuOrderCallback(
+  paymentStatus: string,
+  callbackStatus?: string,
+) {
+  return paymentStatus === "pending" ||
+    (paymentStatus === "expired" && callbackStatus === "paid");
 }
