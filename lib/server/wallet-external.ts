@@ -143,9 +143,31 @@ export async function getExternalWalletTopup(referenceId: string, gateway?: Paym
 }
 
 export async function markExternalWalletTopupCreationFailed(referenceId: string, message: string) {
-  await getD1().prepare(`UPDATE wallet_topups SET status = 'rejected', admin_notes = ?, updated_at = CURRENT_TIMESTAMP
+  // A provider can accept a payment while our response/persistence fails. Keep
+  // the top-up pending long enough for a signed callback to settle it instead
+  // of turning a potentially payable transaction into an unrecoverable reject.
+  await getD1().prepare(`UPDATE wallet_topups SET
+      admin_notes = ?,
+      gateway_expired_at = COALESCE(gateway_expired_at, datetime('now', '+70 minutes')),
+      doku_expired_at = CASE
+        WHEN payment_gateway = 'doku' THEN COALESCE(doku_expired_at, datetime('now', '+70 minutes'))
+        ELSE doku_expired_at
+      END,
+      updated_at = CURRENT_TIMESTAMP
     WHERE reference_id = ? AND status = 'pending'`)
-    .bind(message.slice(0, 500), referenceId).run();
+    .bind(`Status pembuatan pembayaran belum dapat dipastikan: ${message.slice(0, 420)}`, referenceId).run();
+}
+
+export async function expireUninitializedExternalWalletTopups() {
+  return getD1().prepare(`UPDATE wallet_topups SET
+      status = 'rejected',
+      admin_notes = COALESCE(admin_notes, 'Pembayaran tidak selesai dibuat dan sudah melewati batas aman.'),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE status = 'pending'
+      AND source IN ('doku', 'midtrans')
+      AND gateway_request_id IS NULL
+      AND gateway_expired_at IS NOT NULL
+      AND datetime(gateway_expired_at) <= datetime('now')`).run();
 }
 
 export async function applyExternalWalletTopup(input: {
