@@ -190,6 +190,46 @@ async function releasePriceListSyncLock(token: string, successful: boolean) {
   `).bind(successful ? 1 : 0, token).run();
 }
 
+async function acquireTargetedPriceListSyncLock() {
+  await ensureDigiflazzPriceListCacheTable();
+  const db = getD1();
+  const token = crypto.randomUUID();
+  const result = await db.prepare(`
+    UPDATE digiflazz_pricelist_sync_state
+       SET lock_token = ?,
+           locked_until = datetime('now', '+${DIGIFLAZZ_SYNC_LOCK_MINUTES} minutes')
+     WHERE id = 1
+       AND (lock_token IS NULL OR locked_until IS NULL OR locked_until <= CURRENT_TIMESTAMP)
+       AND NOT EXISTS (
+         SELECT 1 FROM digiflazz_runtime_state
+         WHERE id = 1
+           AND maintenance_token IS NOT NULL
+           AND maintenance_until > CURRENT_TIMESTAMP
+       )
+  `).bind(token).run();
+  if (Number(result.meta.changes ?? 0) === 0) {
+    throw new Error("Sync DigiFlazz sedang dikunci oleh perubahan konfigurasi atau sync lain.");
+  }
+  return token;
+}
+
+async function releaseTargetedPriceListSyncLock(token: string) {
+  await getD1().prepare(`
+    UPDATE digiflazz_pricelist_sync_state
+       SET lock_token = NULL, locked_until = NULL
+     WHERE id = 1 AND lock_token = ?
+  `).bind(token).run();
+}
+
+async function withTargetedPriceListSyncLock<T>(action: (token: string) => Promise<T>) {
+  const token = await acquireTargetedPriceListSyncLock();
+  try {
+    return await action(token);
+  } finally {
+    await releaseTargetedPriceListSyncLock(token).catch(() => undefined);
+  }
+}
+
 async function fetchPriceListItems(): Promise<DigiflazzPriceListItem[]> {
   const env = getRuntimeEnv<Env>();
   const environment = requireRuntimeChoice(env.DIGIFLAZZ_ENV, "DIGIFLAZZ_ENV", ["development", "production"] as const);
@@ -377,7 +417,11 @@ type SyncRow = {
   previous_baseline_price: number | null;
 };
 
-async function syncRows(target?: { productId: number; providerSku?: string }, sourceItems?: DigiflazzPriceListItem[]) {
+async function syncRows(
+  target?: { productId: number; providerSku?: string },
+  sourceItems?: DigiflazzPriceListItem[],
+  syncLockToken?: string,
+) {
   await ensureLegacyDatabaseColumns();
   await ensureDigiflazzSellerMonitorTable();
   const items = sourceItems ?? await listDigiflazzPriceList();
@@ -425,12 +469,22 @@ async function syncRows(target?: { productId: number; providerSku?: string }, so
             provider_max_price = COALESCE(provider_max_price, ?),
             price = ?,
             supplier_synced_at = CURRENT_TIMESTAMP
-        WHERE id = ?`)
+        WHERE id = ?
+          ${syncLockToken ? `
+          AND EXISTS (
+            SELECT 1 FROM digiflazz_pricelist_sync_state
+            WHERE id = 1 AND lock_token = ? AND locked_until > CURRENT_TIMESTAMP
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM digiflazz_runtime_state
+            WHERE id = 1 AND maintenance_token IS NOT NULL AND maintenance_until > CURRENT_TIMESTAMP
+          )` : ""}`)
         .bind(
           sourceItem.price,
           maxPrice,
           sellingPrice,
           item.id,
+          ...(syncLockToken ? [syncLockToken] : []),
         ),
       buildDigiflazzSellerMonitorStatement({
         packageId: item.id,
@@ -446,10 +500,32 @@ async function syncRows(target?: { productId: number; providerSku?: string }, so
         startCutOff: sourceItem.start_cut_off || "00:00",
         endCutOff: sourceItem.end_cut_off || "00:00",
         description: sourceItem.desc?.trim() || "",
-      }),
+      }, syncLockToken),
     ];
   });
-  if (statements.length) await getD1().batch(statements);
+  if (statements.length) {
+    if (syncLockToken) {
+      const ownership = getD1().prepare(`
+        UPDATE digiflazz_pricelist_sync_state
+           SET lock_token = lock_token
+         WHERE id = 1
+           AND lock_token = ?
+           AND locked_until > CURRENT_TIMESTAMP
+           AND NOT EXISTS (
+             SELECT 1 FROM digiflazz_runtime_state
+             WHERE id = 1
+               AND maintenance_token IS NOT NULL
+               AND maintenance_until > CURRENT_TIMESTAMP
+           )
+      `).bind(syncLockToken);
+      const results = await getD1().batch([ownership, ...statements]);
+      if (Number(results[0]?.meta.changes ?? 0) === 0) {
+        throw new Error("Lock sync DigiFlazz kedaluwarsa sebelum snapshot seller dapat disimpan.");
+      }
+    } else {
+      await getD1().batch(statements);
+    }
+  }
   if (target && updated === 0) {
     throw new Error(target.providerSku
       ? "SKU nominal tidak ditemukan pada cache pricelist DigiFlazz."
@@ -527,7 +603,7 @@ export async function syncDigiflazzPrices(options: { force?: boolean } = {}) {
   try {
     const items = await fetchPriceListItems();
     const lastSyncedAt = await writePriceListCache(items);
-    const result = await syncRows(undefined, items);
+    const result = await syncRows(undefined, items, lock.token);
     successful = true;
     return { ...result, cached: items.length, lastSyncedAt, reason: null };
   } finally {
@@ -536,9 +612,9 @@ export async function syncDigiflazzPrices(options: { force?: boolean } = {}) {
 }
 
 export async function syncDigiflazzProduct(productId: number) {
-  return syncRows({ productId });
+  return withTargetedPriceListSyncLock((token) => syncRows({ productId }, undefined, token));
 }
 
 export async function syncDigiflazzPackage(productId: number, providerSku: string) {
-  return syncRows({ productId, providerSku });
+  return withTargetedPriceListSyncLock((token) => syncRows({ productId, providerSku }, undefined, token));
 }
