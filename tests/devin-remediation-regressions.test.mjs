@@ -125,6 +125,23 @@ test("checkout normalizes legacy provider code and SKU exactly like the public c
   assert.match(products, /providerSku: item\.provider_sku\?\.trim\(\) \|\| undefined/);
 });
 
+test("historical provider casing is normalized through fulfillment and reconciliation", () => {
+  const orders = read("lib/server/orders.ts");
+  const digiflazz = read("lib/server/digiflazz-reconciliation.ts");
+  const products = read("lib/server/products.ts");
+  assert.match(orders, /const providerCode = order\.provider_code\?\.trim\(\)\.toLowerCase\(\) \|\| null/);
+  assert.match(orders, /const providerSku = order\.provider_sku\?\.trim\(\) \|\| null/);
+  assert.match(digiflazz, /lower\(trim\(provider_code\)\) = 'digiflazz'/);
+  assert.match(products, /const normalizedProviderCode = item\.providerCode\?\.trim\(\)\.toLowerCase\(\) \|\| null/);
+  assert.match(products, /const normalizedProviderSku = item\.providerSku\?\.trim\(\) \|\| null/);
+});
+
+test("DOKU expired-order polling updates the canonical throttle timestamp", () => {
+  const doku = read("lib/server/doku-reconciliation.ts");
+  assert.match(doku, /payment_status IN \('pending', 'expired'\)/);
+  assert.match(doku, /gateway_status_checked_at = CURRENT_TIMESTAMP/);
+});
+
 test("DOKU overview only reports ready for a parseable RSA key and HTTPS endpoint", () => {
   const config = read("lib/server/payment-mode-config.ts");
   assert.match(config, /createPrivateKey/);
