@@ -13,7 +13,7 @@ import type { ProductCategory } from "@/lib/store-data";
 type Filter = "all" | ProductCategory;
 
 export default function CatalogPage() {
-  const { products, databaseReady } = useStoreProducts();
+  const { products, databaseReady, loading } = useStoreProducts();
   const { categories } = useStorefront();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -40,7 +40,7 @@ export default function CatalogPage() {
           <div className="relative w-full sm:max-w-sm"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-white/30" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari game, voucher, pulsa, PLN..." className="h-11 rounded-xl border-white/10 bg-white/[0.035] pl-10 pr-10 text-sm text-white placeholder:text-white/25" />{query && <button type="button" onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white" aria-label="Hapus pencarian"><X className="size-4" /></button>}</div>
         </div>
 
-        <div className="mt-8 flex items-center justify-between border-b border-white/[0.07] pb-4 text-xs"><span className="font-semibold text-white/55">{filtered.length} produk ditemukan</span><span className="text-white/28">{databaseReady ? "Katalog terbaru" : "Memuat katalog"}</span></div>
+        <div className="mt-8 flex items-center justify-between border-b border-white/[0.07] pb-4 text-xs"><span className="font-semibold text-white/55">{filtered.length} produk ditemukan</span><span className="text-white/28">{loading ? "Memuat katalog" : databaseReady ? "Katalog terbaru" : "Katalog tidak tersedia"}</span></div>
         {filtered.length ? (
           <div className="mt-6 grid grid-cols-3 gap-x-2.5 gap-y-5 sm:grid-cols-4 sm:gap-4 lg:grid-cols-6">{filtered.map((product) => <ProductCard key={product.slug} product={product} />)}</div>
         ) : (
