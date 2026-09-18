@@ -51,6 +51,25 @@ const schema = z.discriminatedUnion("action", [
   digiflazzTestInput,
 ]);
 
+const DIGIFLAZZ_CACHE_RECOVERY_ATTEMPTS = 10;
+const DIGIFLAZZ_CACHE_RECOVERY_DELAY_MS = 500;
+
+async function recoverDigiflazzOperationalCache() {
+  let lastResult: Awaited<ReturnType<typeof syncDigiflazzPrices>> | null = null;
+  for (let attempt = 1; attempt <= DIGIFLAZZ_CACHE_RECOVERY_ATTEMPTS; attempt += 1) {
+    const result = await syncDigiflazzPrices({ force: true });
+    lastResult = result;
+
+    if (!result.skipped || Number(result.cached ?? 0) > 0) return result;
+    if (attempt < DIGIFLAZZ_CACHE_RECOVERY_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, DIGIFLAZZ_CACHE_RECOVERY_DELAY_MS));
+    }
+  }
+
+  const reason = lastResult && "reason" in lastResult ? lastResult.reason : "unknown";
+  throw new Error(`Cache operasional DigiFlazz belum pulih setelah retry terbatas (reason: ${reason}).`);
+}
+
 async function withDigiflazzConfigurationGuard(action: () => Promise<void>) {
   const token = await acquireDigiflazzConfigurationGuard();
   let successful = false;
@@ -76,7 +95,7 @@ async function withDigiflazzConfigurationGuard(action: () => Promise<void>) {
     // still authoritative. Rebuild its operational cache immediately instead
     // of leaving checkout unavailable until the next scheduled sync.
     try {
-      await syncDigiflazzPrices({ force: true });
+      await recoverDigiflazzOperationalCache();
     } catch (rebuildError) {
       const primary = failure instanceof Error ? failure.message : String(failure);
       const recovery = rebuildError instanceof Error ? rebuildError.message : String(rebuildError);
