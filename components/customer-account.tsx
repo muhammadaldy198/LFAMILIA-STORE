@@ -70,14 +70,16 @@ type AccountData = {
 
 export function CustomerAccount({
   initialMode = "login",
+  initialError = "",
 }: {
   initialMode?: "login" | "register";
+  initialError?: string;
 }) {
   const [account, setAccount] = useState<AccountData | null>(null);
   const [settings, setSettings] = useState<WalletSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"login" | "register">(initialMode);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
 
   const load = useCallback(async () => {
     setLoading(true);
