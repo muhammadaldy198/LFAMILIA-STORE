@@ -572,30 +572,32 @@ export async function fulfillAutomaticOrder(
     order.fulfillment_type !== "automatic"
   )
     return;
-  if (!order.provider_code || !order.provider_sku || !order.customer_no) {
+  const providerCode = order.provider_code?.trim().toLowerCase() || null;
+  const providerSku = order.provider_sku?.trim() || null;
+  if (!providerCode || !providerSku || !order.customer_no) {
     await setFulfillmentError(
       order.id,
       "Provider, SKU, atau format tujuan belum lengkap.",
     );
     return;
   }
-  const adapter = getProviderAdapter(order.provider_code);
+  const adapter = getProviderAdapter(providerCode);
   if (!adapter) {
     await setFulfillmentError(
       order.id,
-      `Adapter ${order.provider_code} belum tersedia.`,
+      `Adapter ${providerCode} belum tersedia.`,
     );
     return;
   }
   const currentItem = await resolvePurchasableItem(order.product_slug, order.package_sku);
   if (
     !currentItem ||
-    currentItem.providerCode !== order.provider_code ||
-    currentItem.providerSku !== order.provider_sku ||
+    currentItem.providerCode !== providerCode ||
+    currentItem.providerSku !== providerSku ||
     !await isAutomaticPackageAvailable({
       packageId: currentItem?.packageId ?? 0,
-      providerCode: order.provider_code,
-      providerSku: order.provider_sku,
+      providerCode,
+      providerSku,
       maxPrice: order.provider_max_price_snapshot,
     })
   ) {
@@ -608,7 +610,7 @@ export async function fulfillAutomaticOrder(
 
   const claimed = await claimAutomaticFulfillmentAttempt(
     order.id,
-    order.provider_code,
+    providerCode,
   );
   if (!claimed) return;
 
@@ -617,8 +619,8 @@ export async function fulfillAutomaticOrder(
       {
         id: order.id,
         referenceId: order.reference_id,
-        providerCode: order.provider_code,
-        providerSku: order.provider_sku,
+        providerCode,
+        providerSku,
         destination: order.destination,
         server: order.server,
         customerNo: order.customer_no,
