@@ -28,13 +28,22 @@ import { StoreSearch } from "@/components/store-search";
 import { StoreBrand } from "@/components/store-brand";
 import { useStorefront } from "@/hooks/use-storefront";
 
-const navItems = [
+const desktopNavItems = [
   { href: "/catalog", label: "Top Up", icon: Gamepad2 },
   { href: "/promo", label: "Voucher", icon: TicketPercent },
   { href: "/news", label: "Berita", icon: Newspaper },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/tools", label: "Kalkulator", icon: Calculator },
   { href: "/track", label: "Transaksi", icon: ReceiptText },
+];
+
+const mobileNavItems = [
+  { href: "/track", label: "Cek Pesanan", icon: ReceiptText },
+  { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
+  { href: "/tools", label: "Kalkulator", icon: Calculator },
+  { href: "/contact", label: "Hubungi Kami", icon: Headphones },
+  { href: "/news", label: "Berita", icon: Newspaper },
+  { href: "/account", label: "Akun Saya", icon: UserRound },
 ];
 
 export function StoreHeader() {
@@ -56,7 +65,7 @@ export function StoreHeader() {
         </div>
 
         <nav className="hidden items-center gap-0.5 xl:flex" aria-label="Navigasi utama">
-          {navItems.map((item) => (
+          {desktopNavItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -103,94 +112,72 @@ export function StoreHeader() {
                 <Menu className="size-[17px]" />
               </Button>
             </SheetTrigger>
-            <SheetContent className="w-[86vw] max-w-[390px] overflow-y-auto border-white/10 bg-[#0b0e16] text-white sm:max-w-[390px]">
-              <SheetHeader className="border-b border-white/[0.08]">
-                <SheetTitle className="text-left text-white">LFAMILIA STORE</SheetTitle>
-                <SheetDescription className="text-left text-white/45">
+
+            <SheetContent className="w-[80vw] max-w-[330px] overflow-y-auto border-white/10 bg-[#0b0e16] text-white sm:max-w-[330px]">
+              <SheetHeader className="border-b border-white/[0.08] px-4 py-3">
+                <SheetTitle className="text-left text-sm font-black text-white">
+                  LFAMILIA STORE
+                </SheetTitle>
+                <SheetDescription className="text-left text-[10px] leading-4 text-white/40">
                   Top up, kalkulator game, dan bantuan.
                 </SheetDescription>
               </SheetHeader>
 
-              <div className="mx-4 mt-4 rounded-[22px] border border-white/[0.09] bg-gradient-to-br from-[#b9ff35]/[0.08] via-white/[0.025] to-transparent p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#cfff72]">
+              <div className="mx-3 mt-3 rounded-[16px] border border-white/[0.08] bg-gradient-to-br from-[#b9ff35]/[0.06] via-white/[0.02] to-transparent p-3">
+                <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#cfff72]">
                   Selamat datang
                 </p>
-                <h2 className="mt-2 text-[17px] font-black leading-6 text-white">
+                <h2 className="mt-1.5 text-[13px] font-black leading-[18px] text-white">
                   Masuk untuk pengalaman lebih cepat
                 </h2>
-                <p className="mt-2 text-[12px] leading-5 text-white/45">
+                <p className="mt-1 text-[10px] leading-4 text-white/42">
                   Simpan akun top-up favorit, cek saldo, dan riwayat transaksi.
                 </p>
-                <div className="mt-4 grid grid-cols-2 gap-2">
+
+                <div className="mt-2.5 grid grid-cols-2 gap-2">
                   <SheetClose asChild>
                     <Link
                       href="/account"
-                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#b9ff35] px-3 text-xs font-black text-[#091006] transition hover:bg-[#c7ff58]"
+                      className="inline-flex h-8 items-center justify-center rounded-[10px] bg-[#b9ff35] px-2.5 text-[10px] font-black text-[#091006] transition hover:bg-[#c7ff58]"
                     >
-                      <LogIn className="mr-2 size-4" />
+                      <LogIn className="mr-1.5 size-3.5" />
                       Masuk
                     </Link>
                   </SheetClose>
+
                   <SheetClose asChild>
                     <Link
                       href="/account?mode=register"
-                      className="inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-3 text-xs font-bold text-white/80 transition hover:bg-white/[0.08] hover:text-white"
+                      className="inline-flex h-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/[0.03] px-2.5 text-[10px] font-bold text-white/75 transition hover:bg-white/[0.08] hover:text-white"
                     >
-                      <UserPlus className="mr-2 size-4" />
+                      <UserPlus className="mr-1.5 size-3.5" />
                       Daftar
                     </Link>
                   </SheetClose>
                 </div>
               </div>
 
-              <nav className="flex flex-col gap-1 px-4 py-5">
+              <nav className="flex flex-col gap-0 px-3 py-3">
                 <SheetClose asChild>
                   <Link
                     href="/"
-                    className="rounded-xl px-4 py-3.5 text-sm font-semibold text-white/70 hover:bg-white/[0.06]"
+                    className="rounded-[10px] px-3 py-2.5 text-[13px] font-semibold text-white/70 transition hover:bg-white/[0.05] hover:text-white"
                   >
                     Beranda
                   </Link>
                 </SheetClose>
-                {navItems.map(({ href, label, icon: Icon }) => (
-                  <SheetClose asChild key={href}>
+
+                {mobileNavItems.map(({ href, label, icon: Icon }) => (
+                  <SheetClose asChild key={label}>
                     <Link
                       href={href}
-                      className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-semibold text-white/70 hover:bg-white/[0.06] hover:text-white"
+                      className="flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-[13px] font-semibold text-white/65 transition hover:bg-white/[0.05] hover:text-white"
                     >
-                      <Icon className="size-4 text-[#b9ff35]" />
+                      <Icon className="size-[15px] shrink-0 text-[#b9ff35]/85" />
                       {label}
                     </Link>
                   </SheetClose>
                 ))}
-                <SheetClose asChild>
-                  <Link
-                    href="/contact"
-                    className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-semibold text-white/70 hover:bg-white/[0.06]"
-                  >
-                    <Headphones className="size-4 text-[#b9ff35]" />
-                    Hubungi Kami
-                  </Link>
-                </SheetClose>
-                <SheetClose asChild>
-                  <Link
-                    href="/account"
-                    className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-semibold text-white/70 hover:bg-white/[0.06]"
-                  >
-                    <UserRound className="size-4 text-[#b9ff35]" />
-                    Akun Saya
-                  </Link>
-                </SheetClose>
-                <div className="my-3 h-px bg-white/[0.08]" />
-                <SheetClose asChild>
-                  <Link
-                    href="/track"
-                    className="flex items-center gap-3 rounded-xl bg-[#b9ff35] px-4 py-3.5 text-sm font-bold text-[#091006]"
-                  >
-                    <ReceiptText className="size-4" />
-                    Cek pesanan
-                  </Link>
-                </SheetClose>
               </nav>
             </SheetContent>
           </Sheet>
