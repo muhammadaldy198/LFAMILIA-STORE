@@ -31,7 +31,10 @@ export async function GET() {
           customerFeeFixed: item.gatewayConfig.customerFeeFixed ?? "0",
         };
     return {
-      item,
+      item: {
+        ...item,
+        publicFee: publicCustomerPaymentFee(item.gatewayConfig),
+      },
       readiness: await getConfiguredGatewayReadiness({
         gateway: modes.walletTopupGateway,
         paymentMethod: item.method,
@@ -48,7 +51,7 @@ export async function GET() {
       channel: item.channel,
       name: item.name,
       description: item.description,
-      ...publicCustomerPaymentFee(item.gatewayConfig),
+      ...item.publicFee,
       ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
     }));
 
