@@ -16,6 +16,7 @@ test("uncertain external payment dispatch stays pending and recoverable", () => 
   assert.match(route, /paymentGatewayMode: readiness\.mode/);
   assert.match(route, /paymentGatewayEnvironment: readiness\.environment/);
   assert.match(orders, /payment_gateway, payment_gateway_mode, payment_gateway_environment, doku_environment/);
+  assert.match(route, /75 \* 60_000/);
   assert.match(route, /paymentDispatchStarted = true/);
   assert.match(route, /if \(!paymentDispatchStarted\)/);
   assert.match(route, /Jangan bayar dua kali/);
@@ -26,6 +27,19 @@ test("uncertain external payment dispatch stays pending and recoverable", () => 
   assert.match(recovery, /created_at <= datetime\('now', '-70 minutes'\)/);
   assert.match(worker, /reconcilePendingMidtransOrders\(\)/);
   assert.match(worker, /expireUninitializedExternalOrders\(\)/);
+});
+
+test("payment maintenance reconciles before ambiguous expiry and keeps pending promo reservations", () => {
+  const worker = read("worker/index.ts");
+  const promotions = read("lib/server/promotions.ts");
+  assert.match(worker, /const paymentRecovery = Promise\.all\(/);
+  assert.match(worker, /reconcilePendingMidtransOrders\(\)/);
+  assert.match(worker, /reconcilePendingMidtransTopups\(\)/);
+  assert.match(worker, /finalizeExpiredDokuPayments\(\)/);
+  assert.match(worker, /\.then\(async \(\) => \{/);
+  assert.match(worker, /expireUninitializedExternalOrders\(\)/);
+  assert.match(worker, /releaseExpiredExternalPromotions\(\)/);
+  assert.match(promotions, /NOT EXISTS \([\s\S]*orders\.id = promotion_reservations\.order_id[\s\S]*orders\.payment_status = 'pending'/);
 });
 
 test("active promo reservations cannot be orphaned by admin edits", () => {
