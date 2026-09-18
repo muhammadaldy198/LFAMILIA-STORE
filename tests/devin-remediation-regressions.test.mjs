@@ -6,15 +6,25 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("uncertain external payment dispatch stays pending for callback recovery", () => {
+test("uncertain external payment dispatch stays pending and recoverable", () => {
   const route = read("app/api/payments/auto/create/route.ts");
+  const orders = read("lib/server/orders.ts");
   const recovery = read("lib/server/external-payments.ts");
+  const midtrans = read("lib/server/midtrans-reconciliation.ts");
   const worker = read("worker/index.ts");
+  assert.match(route, /paymentGateway: managedChannel\.gateway/);
+  assert.match(route, /paymentGatewayMode: readiness\.mode/);
+  assert.match(route, /paymentGatewayEnvironment: readiness\.environment/);
+  assert.match(orders, /payment_gateway, payment_gateway_mode, payment_gateway_environment, doku_environment/);
   assert.match(route, /paymentDispatchStarted = true/);
   assert.match(route, /if \(!paymentDispatchStarted\)/);
   assert.match(route, /Jangan bayar dua kali/);
+  assert.match(midtrans, /reconcilePendingMidtransOrders/);
+  assert.match(midtrans, /queryMidtransSnapStatus/);
+  assert.match(midtrans, /orderId: order\.reference_id/);
   assert.match(recovery, /expireUninitializedExternalOrders/);
   assert.match(recovery, /created_at <= datetime\('now', '-70 minutes'\)/);
+  assert.match(worker, /reconcilePendingMidtransOrders\(\)/);
   assert.match(worker, /expireUninitializedExternalOrders\(\)/);
 });
 
