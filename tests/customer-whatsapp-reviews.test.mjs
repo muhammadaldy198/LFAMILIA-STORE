@@ -120,7 +120,7 @@ test("customer session exposes phone verification and protected account routes r
 test("sidebar switches from guest CTA to signed-in balance card", () => {
   const header = read("components/store-header.tsx");
   const authForm = read("components/customer-auth-form.tsx");
-  assert.match(header, /fetch\("\/api\/account"/);
+  assert.match(header, /fetch\("\/api\/account\/summary"/);
   assert.match(header, /formatRupiah\(customer\.balance\)/);
   assert.match(header, /WhatsApp terverifikasi/);
   assert.match(header, /lfamilia:auth-changed/);
