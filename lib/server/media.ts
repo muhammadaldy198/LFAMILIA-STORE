@@ -82,6 +82,7 @@ async function collectReferencedMediaKeys(database: MediaDatabase) {
     "SELECT cover_url AS a, NULL AS b FROM news_articles",
     "SELECT logo_url AS a, banner_image_url AS b FROM store_settings",
     "SELECT proof_url AS a, NULL AS b FROM wallet_topups",
+    "SELECT image_url AS a, NULL AS b FROM payment_channels",
   ];
   for (const query of queries) {
     try {
@@ -96,6 +97,39 @@ async function collectReferencedMediaKeys(database: MediaDatabase) {
       // Older databases can legitimately miss optional tables/columns.
     }
   }
+
+  // Payment-page assets are stored inside config_json instead of dedicated
+  // columns. Walk every string so cleanup cannot delete a logo/header that is
+  // still referenced by the active payment-page configuration.
+  try {
+    const rows = await database.prepare(
+      "SELECT config_json FROM payment_page_settings",
+    ).all<{ config_json: string }>();
+    const collect = (value: unknown) => {
+      if (typeof value === "string") {
+        const key = mediaKeyFromValue(value);
+        if (key) referenced.add(key);
+        return;
+      }
+      if (Array.isArray(value)) {
+        for (const item of value) collect(item);
+        return;
+      }
+      if (value && typeof value === "object") {
+        for (const item of Object.values(value as Record<string, unknown>)) collect(item);
+      }
+    };
+    for (const row of rows.results) {
+      try {
+        collect(JSON.parse(row.config_json));
+      } catch {
+        // Ignore malformed legacy JSON; valid references from other tables stay protected.
+      }
+    }
+  } catch {
+    // Older databases may not have payment_page_settings yet.
+  }
+
   return referenced;
 }
 
