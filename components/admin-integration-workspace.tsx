@@ -111,6 +111,13 @@ export function AdminIntegrationWorkspace() {
   const digiflazzWebhook = overview?.callbacks.find((item) => item.id === "digiflazz")?.url || fallbackWebhook;
   const dokuConfigured = Boolean(paymentOverview?.configured.doku[dokuProfileEnvironment]);
   const midtransConfigured = Boolean(paymentOverview?.configured.midtrans[midtransProfileEnvironment]);
+  const whatsappProfile = (overview?.profiles ?? []).find((profile) => profile.provider === "whatsapp" && profile.environment === "global");
+  const whatsappRequiredFields = ["graphApiUrl", "accessToken", "phoneNumberId", "templateName"] as const;
+  const whatsappConfigured = Boolean(
+    whatsappProfile &&
+    !whatsappProfile.decryptionError &&
+    whatsappRequiredFields.every((field) => whatsappProfile.configuredFields?.includes(field)),
+  );
 
   async function put(body: object) {
     const response = await fetch("/api/panel/integrations", {
@@ -209,19 +216,27 @@ export function AdminIntegrationWorkspace() {
       } else if (tab === "Google Login") {
         await put({ action: "save_profile", provider: "google", mode: "service", environment: "global", values: { clientId: values.googleClientId || "" } });
       } else if (tab === "WhatsApp OTP") {
+        const whatsappValues = {
+          graphApiUrl: values.whatsappGraphApiUrl || "",
+          accessToken: values.whatsappAccessToken || "",
+          phoneNumberId: values.whatsappPhoneNumberId || "",
+          templateName: values.whatsappTemplateName || "",
+          templateLanguage: values.whatsappTemplateLanguage || "id",
+          buttonSubtype: values.whatsappButtonSubtype || "",
+        };
+        const existingFields = new Set(whatsappProfile?.configuredFields ?? []);
+        const missingRequired = whatsappRequiredFields.filter((field) =>
+          !existingFields.has(field) && !whatsappValues[field].trim(),
+        );
+        if (missingRequired.length) {
+          throw new Error(`Lengkapi konfigurasi WhatsApp OTP: ${missingRequired.join(", ")}.`);
+        }
         await put({
           action: "save_profile",
           provider: "whatsapp",
           mode: "service",
           environment: "global",
-          values: {
-            graphApiUrl: values.whatsappGraphApiUrl || "",
-            accessToken: values.whatsappAccessToken || "",
-            phoneNumberId: values.whatsappPhoneNumberId || "",
-            templateName: values.whatsappTemplateName || "",
-            templateLanguage: values.whatsappTemplateLanguage || "id",
-            buttonSubtype: values.whatsappButtonSubtype || "",
-          },
+          values: whatsappValues,
         });
       } else if (tab === "Resend Email") {
         await put({
@@ -319,14 +334,16 @@ export function AdminIntegrationWorkspace() {
         const target = mapping[tab];
         if (!target) throw new Error("Tidak ada pemeriksaan untuk menu ini.");
         const [provider, environment, label] = target;
-        const ready = latest.integration.profiles.some((profile) =>
-          profile.provider === provider &&
-          profile.environment === environment &&
-          profile.configured &&
-          !profile.decryptionError,
+        const profile = latest.integration.profiles.find((item) =>
+          item.provider === provider && item.environment === environment,
         );
-        if (!ready) throw new Error(`${label} belum dikonfigurasi atau kredensial tidak dapat dibuka.`);
-        setMessage(`${label} tersimpan dan dapat dibaca backend.`);
+        const ready = provider === "whatsapp"
+          ? Boolean(profile && !profile.decryptionError && whatsappRequiredFields.every((field) => profile.configuredFields?.includes(field)))
+          : Boolean(profile?.configured && !profile.decryptionError);
+        if (!ready) throw new Error(`${label} belum lengkap atau kredensial tidak dapat dibuka.`);
+        setMessage(provider === "whatsapp"
+          ? "WhatsApp OTP lengkap dan siap digunakan backend untuk mengirim template OTP."
+          : `${label} tersimpan dan dapat dibaca backend.`);
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Pemeriksaan gagal.");
@@ -363,7 +380,7 @@ export function AdminIntegrationWorkspace() {
       <Card icon={<Network className="size-5" />} title="Digiflazz" ready={isConfigured("digiflazz", digiflazzEnvironment)} onClick={() => setTab("Digiflazz")} />
       <Card icon={<KeyRound className="size-5" />} title="KokinPay" ready={isConfigured("kokinpay", "global")} onClick={() => setTab("KokinPay")} />
       <Card icon={<LogIn className="size-5" />} title="Google Login" ready={isConfigured("google", "global")} onClick={() => setTab("Google Login")} />
-      <Card icon={<MessageCircle className="size-5" />} title="WhatsApp OTP" ready={isConfigured("whatsapp", "global")} onClick={() => setTab("WhatsApp OTP")} />
+      <Card icon={<MessageCircle className="size-5" />} title="WhatsApp OTP" ready={whatsappConfigured} onClick={() => setTab("WhatsApp OTP")} />
       <Card icon={<Mail className="size-5" />} title="Resend Email" ready={isConfigured("resend", "global")} onClick={() => setTab("Resend Email")} />
       <Card icon={<Server className="size-5" />} title="VPS Relay" ready={isConfigured("relay", "global")} onClick={() => setTab("Relay & Keamanan")} />
       <Panel title="Callback & Notification URL" description="Tempel URL berikut pada dashboard provider terkait." className="col-span-2">
@@ -439,7 +456,11 @@ export function AdminIntegrationWorkspace() {
       </div>
     </Panel>}
 
-    {tab === "WhatsApp OTP" && <Panel title="WhatsApp OTP" description="Meta WhatsApp Cloud API untuk verifikasi nomor pelanggan dengan kode OTP 6 digit.">
+    {tab === "WhatsApp OTP" && <Panel
+      title="WhatsApp OTP"
+      description="Meta WhatsApp Cloud API untuk verifikasi nomor pelanggan dengan kode OTP 6 digit."
+      action={<Status tone={whatsappConfigured ? "green" : "amber"}>{whatsappConfigured ? "Siap" : "Belum lengkap"}</Status>}
+    >
       <div className="grid grid-cols-2 gap-4 p-4">
         <Text label="Graph API URL" value={values.whatsappGraphApiUrl || ""} onChange={(value) => setValue("whatsappGraphApiUrl", value)} />
         <Text label="Phone Number ID" value={values.whatsappPhoneNumberId || ""} onChange={(value) => setValue("whatsappPhoneNumberId", value)} />
