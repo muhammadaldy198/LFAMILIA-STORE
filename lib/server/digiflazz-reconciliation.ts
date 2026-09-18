@@ -14,7 +14,7 @@ export async function reconcileStaleDigiflazzProcessing(
      FROM orders
      WHERE payment_status = 'paid'
        AND fulfillment_type = 'automatic'
-       AND provider_code = 'digiflazz'
+       AND lower(trim(provider_code)) = 'digiflazz'
        AND provider_status = 'processing'
        AND updated_at <= datetime('now', '-2 minutes')
        AND created_at >= datetime('now', '-89 days')
@@ -44,8 +44,8 @@ export async function reconcileStaleDigiflazzProcessing(
       const result = await digiflazzAdapter.fulfill({
         id: order.id,
         referenceId: order.reference_id,
-        providerCode: order.provider_code,
-        providerSku: order.provider_sku,
+        providerCode: order.provider_code.trim().toLowerCase(),
+        providerSku: order.provider_sku.trim(),
         destination: order.destination,
         server: order.server,
         customerNo: order.customer_no,
