@@ -32,6 +32,14 @@ type PublicWalletSettings = {
   minimumAmount: number;
 };
 
+type PublicWalletChannel = {
+  method: "qris" | "va" | "ewallet";
+  channel: string;
+  name: string;
+  description: string;
+  imageUrl?: string;
+};
+
 type AccountData = {
   customer: CustomerSession;
   topups: Array<{
@@ -81,6 +89,7 @@ export function CustomerAccount({
 }) {
   const [account, setAccount] = useState<AccountData | null>(null);
   const [settings, setSettings] = useState<PublicWalletSettings | null>(null);
+  const [topupChannels, setTopupChannels] = useState<PublicWalletChannel[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [error, setError] = useState(initialError);
@@ -94,8 +103,10 @@ export function CustomerAccount({
       ]);
       const walletData = await walletResponse.json().catch(() => ({})) as {
         settings?: PublicWalletSettings;
+        channels?: PublicWalletChannel[];
       };
       setSettings(walletData.settings ?? null);
+      setTopupChannels(walletData.channels ?? []);
       if (accountResponse.ok) {
         const accountData = await accountResponse.json().catch(() => null) as AccountData | null;
         setAccount(accountData);
@@ -105,6 +116,7 @@ export function CustomerAccount({
     } catch {
       setAccount(null);
       setSettings(null);
+      setTopupChannels([]);
     } finally {
       setLoading(false);
     }
@@ -136,6 +148,7 @@ export function CustomerAccount({
     <Dashboard
       data={account}
       settings={settings}
+      topupChannels={topupChannels}
       reload={load}
       onLogout={async () => {
         await fetch("/api/auth/logout", { method: "POST" });
@@ -171,11 +184,13 @@ function AuthPanel({
 function Dashboard({
   data,
   settings,
+  topupChannels,
   reload,
   onLogout,
 }: {
   data: AccountData;
   settings: PublicWalletSettings | null;
+  topupChannels: PublicWalletChannel[];
   reload(): Promise<void>;
   onLogout(): Promise<void>;
 }) {
@@ -337,6 +352,7 @@ function Dashboard({
             <div className="grid gap-5 lg:grid-cols-[.9fr_1.1fr]">
               <TopupForm
                 settings={settings}
+                channels={topupChannels}
                 onDone={async () => {
                   setMessage(
                     "Pembayaran top up berhasil dibuat. Selesaikan pembayaran agar saldo masuk otomatis.",
