@@ -113,29 +113,16 @@ export function CustomerAuthForm({
 
       <form onSubmit={submit} className="mt-6 space-y-4">
         {mode === "register" && (
-          <>
-            <AuthField label="Nama lengkap" icon={<UserRound className="size-[18px]" />}>
-              <input
-                required
-                autoComplete="name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Nama lengkap"
-                className="h-12 w-full bg-transparent pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/24"
-              />
-            </AuthField>
-            <AuthField label="Nomor WhatsApp" icon={<Phone className="size-[18px]" />}>
-              <input
-                required
-                inputMode="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                placeholder="081234567890"
-                className="h-12 w-full bg-transparent pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/24"
-              />
-            </AuthField>
-          </>
+          <AuthField label="Nama lengkap" icon={<UserRound className="size-[18px]" />}>
+            <input
+              required
+              autoComplete="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Nama lengkap"
+              className="h-12 w-full bg-transparent pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/24"
+            />
+          </AuthField>
         )}
 
         <AuthField label="Email" icon={<Mail className="size-[18px]" />}>
@@ -149,6 +136,20 @@ export function CustomerAuthForm({
             className="h-12 w-full bg-transparent pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/24"
           />
         </AuthField>
+
+        {mode === "register" && (
+          <AuthField label="Nomor WhatsApp" icon={<Phone className="size-[18px]" />}>
+            <input
+              required
+              inputMode="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              placeholder="081234567890"
+              className="h-12 w-full bg-transparent pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/24"
+            />
+          </AuthField>
+        )}
 
         <AuthField label="Password" icon={<LockKeyhole className="size-[18px]" />}>
           <input
@@ -217,9 +218,7 @@ export function CustomerAuthForm({
           </p>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.015] p-2">
-          <TurnstileWidget key={turnstileReset} onToken={setTurnstileToken} />
-        </div>
+        <TurnstileWidget key={turnstileReset} onToken={setTurnstileToken} />
 
         <Button
           disabled={saving}
