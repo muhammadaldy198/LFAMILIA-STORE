@@ -326,7 +326,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     : displayChannels.find(
         (item) => item.method === paymentMethod && item.channel === paymentChannel,
       ) ?? null;
-  const estimatedPaymentFee = selectedExternalChannel
+  const estimatedPaymentFee = selectedExternalChannel && subtotal > 0
     ? calculateCustomerPaymentFee(subtotal, selectedExternalChannel)
     : 0;
   const estimatedPaymentTotal = subtotal + estimatedPaymentFee;
