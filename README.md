@@ -9,11 +9,11 @@ Toko top up digital berbasis Cloudflare Workers dan D1. Aplikasi mencakup katalo
 - Produk otomatis eksternal memakai DigiFlazz. Stok Kode LFAMILIA diproses internal; produk manual masuk antrean admin setelah pembayaran terverifikasi.
 - Checkout hanya memakai gateway yang didukung: **DOKU Direct API** atau **Midtrans Snap**. Setiap gateway mempunyai toggle aktif/nonaktif terpisah dari status kesiapan credential.
 - Saldo pelanggan dapat di-top-up otomatis. Super Admin memilih gateway top up secara terpisah antara **DOKU Direct API** dan **Midtrans Snap**, serta dapat mematikan top up otomatis dengan master toggle.
-- Account pelanggan, membership BASIC/GOLD/DIAMOND/PLATINUM, leaderboard, ulasan, bantuan/refund, berita, FAQ, banner Home, dan pop-up informasi produk.
+- Account pelanggan dengan login email/password atau Google OAuth, membership BASIC/GOLD/DIAMOND/PLATINUM, leaderboard, ulasan, bantuan/refund, berita, FAQ, banner Home, dan pop-up informasi produk.
 - Voucher diskon, promo terjadwal, minimum transaksi, kuota, dan batas potongan.
 - Stok kode digital disimpan terenkripsi dan dapat ditampilkan di website serta dikirim melalui kanal notifikasi yang dikonfigurasi.
 - Panel memakai sesi Pemilik/Staff berbasis ID admin + password. Akses pemulihan Pemilik tetap dapat dilindungi dengan Cloudflare Access.
-- Secret DOKU/Midtrans/DigiFlazz tidak disimpan di repository. Credential operasional disimpan terenkripsi melalui Integration Manager.
+- Secret DOKU/Midtrans/DigiFlazz maupun Google OAuth tidak disimpan di repository. Credential operasional disimpan terenkripsi melalui Integration Manager.
 
 ## Menjalankan proyek
 
