@@ -93,8 +93,19 @@ export async function listFlashSales(includeInactive = false) {
 
 export async function saveDiscountVoucher(input: Omit<DiscountVoucher, "id" | "usedCount"> & { usedCount?: number }, id?: number) {
   const db = getD1();
-  const values = [input.code.toUpperCase(), input.name, input.description, input.discountType, input.discountValue, input.minPurchase, input.maxDiscount, input.usageLimit, input.startsAt, input.endsAt, input.isActive ? 1 : 0];
+  const normalizedCode = input.code.toUpperCase();
+  const values = [normalizedCode, input.name, input.description, input.discountType, input.discountValue, input.minPurchase, input.maxDiscount, input.usageLimit, input.startsAt, input.endsAt, input.isActive ? 1 : 0];
   if (id) {
+    const current = await db.prepare(
+      "SELECT code, used_count, reserved_count FROM discount_vouchers WHERE id = ? LIMIT 1",
+    ).bind(id).first<{ code: string; used_count: number; reserved_count: number }>();
+    if (!current) throw new Error("Voucher diskon tidak ditemukan.");
+    if (current.code !== normalizedCode && current.reserved_count > 0) {
+      throw new Error("Kode voucher tidak dapat diubah saat masih memiliki reservasi pembayaran aktif.");
+    }
+    if (input.usageLimit !== null && input.usageLimit < current.used_count + current.reserved_count) {
+      throw new Error("Batas penggunaan tidak boleh lebih kecil dari penggunaan + reservasi aktif.");
+    }
     await db.prepare(`UPDATE discount_vouchers SET code = ?, name = ?, description = ?, discount_type = ?, discount_value = ?, min_purchase = ?, max_discount = ?, usage_limit = ?, starts_at = ?, ends_at = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(...values, id).run();
     return id;
   }
@@ -110,6 +121,19 @@ export async function saveFlashSale(input: Omit<FlashSale, "id" | "productName" 
   if (input.salePrice >= packageRow.price) throw new Error("Harga flash sale harus lebih rendah dari harga normal.");
   const values = [input.productSlug, input.packageSku, input.salePrice, input.badge, input.startsAt, input.endsAt, input.stockLimit, input.isActive ? 1 : 0];
   if (id) {
+    const current = await db.prepare(
+      "SELECT product_slug, package_sku, sold_count, reserved_count FROM flash_sales WHERE id = ? LIMIT 1",
+    ).bind(id).first<{ product_slug: string; package_sku: string; sold_count: number; reserved_count: number }>();
+    if (!current) throw new Error("Flash sale tidak ditemukan.");
+    if (
+      current.reserved_count > 0 &&
+      (current.product_slug !== input.productSlug || current.package_sku !== input.packageSku)
+    ) {
+      throw new Error("Produk/nominal flash sale tidak dapat diganti saat masih memiliki reservasi pembayaran aktif.");
+    }
+    if (input.stockLimit !== null && input.stockLimit < current.sold_count + current.reserved_count) {
+      throw new Error("Batas stok tidak boleh lebih kecil dari terjual + reservasi aktif.");
+    }
     await db.prepare(`UPDATE flash_sales SET product_slug = ?, package_sku = ?, sale_price = ?, badge = ?, starts_at = ?, ends_at = ?, stock_limit = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(...values, id).run();
     return id;
   }
@@ -119,7 +143,16 @@ export async function saveFlashSale(input: Omit<FlashSale, "id" | "productName" 
 }
 
 export async function deletePromotion(kind: "voucher" | "flash", id: number) {
-  await getD1().prepare(`DELETE FROM ${kind === "voucher" ? "discount_vouchers" : "flash_sales"} WHERE id = ?`).bind(id).run();
+  const db = getD1();
+  const table = kind === "voucher" ? "discount_vouchers" : "flash_sales";
+  const current = await db.prepare(`SELECT reserved_count FROM ${table} WHERE id = ? LIMIT 1`)
+    .bind(id)
+    .first<{ reserved_count: number }>();
+  if (!current) return;
+  if (current.reserved_count > 0) {
+    throw new Error("Promo tidak dapat dihapus saat masih memiliki reservasi pembayaran aktif.");
+  }
+  await db.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(id).run();
 }
 
 export type PromotionQuote = {
