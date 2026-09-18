@@ -269,12 +269,28 @@ export type IntegrationProfileSnapshot = {
   mode: IntegrationMode;
   environment: IntegrationEnvironment;
   encryptedConfig: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
 };
 
 export type IntegrationSettingSnapshot = {
   settingKey: "digiflazz_environment";
   value: string | null;
+  updatedAt: string | null;
 };
+
+function guardedOwnershipClause() {
+  return `EXISTS (
+    SELECT 1 FROM digiflazz_runtime_state
+    WHERE id = 1
+      AND maintenance_token = ?
+      AND maintenance_until > CURRENT_TIMESTAMP
+      AND EXISTS (
+        SELECT 1 FROM digiflazz_pricelist_sync_state
+        WHERE id = 1 AND lock_token = ? AND locked_until > CURRENT_TIMESTAMP
+      )
+  )`;
+}
 
 export async function captureIntegrationProfileSnapshot(
   provider: IntegrationProvider,
@@ -284,31 +300,74 @@ export async function captureIntegrationProfileSnapshot(
   const database = getD1();
   await ensureIntegrationTables(database);
   const row = await database.prepare(`
-    SELECT encrypted_config
+    SELECT encrypted_config, created_at, updated_at
     FROM integration_profiles
     WHERE provider = ? AND mode = ? AND environment = ?
     LIMIT 1
-  `).bind(provider, mode, environment).first<{ encrypted_config: string }>();
-  return { provider, mode, environment, encryptedConfig: row?.encrypted_config ?? null };
+  `).bind(provider, mode, environment).first<{
+    encrypted_config: string;
+    created_at: string;
+    updated_at: string;
+  }>();
+  return {
+    provider,
+    mode,
+    environment,
+    encryptedConfig: row?.encrypted_config ?? null,
+    createdAt: row?.created_at ?? null,
+    updatedAt: row?.updated_at ?? null,
+  };
 }
 
-export async function restoreIntegrationProfileSnapshot(snapshot: IntegrationProfileSnapshot) {
+export async function restoreIntegrationProfileSnapshot(
+  snapshot: IntegrationProfileSnapshot,
+  expectedCurrent: IntegrationProfileSnapshot | null,
+  guardToken: string,
+) {
   const database = getD1();
   await ensureIntegrationTables(database);
+  const ownership = guardedOwnershipClause();
+  const expectedConfig = expectedCurrent?.encryptedConfig ?? null;
+
   if (snapshot.encryptedConfig === null) {
-    await database.prepare(`
+    if (!expectedConfig) return false;
+    const result = await database.prepare(`
       DELETE FROM integration_profiles
       WHERE provider = ? AND mode = ? AND environment = ?
-    `).bind(snapshot.provider, snapshot.mode, snapshot.environment).run();
-    return;
+        AND encrypted_config = ?
+        AND ${ownership}
+    `).bind(
+      snapshot.provider,
+      snapshot.mode,
+      snapshot.environment,
+      expectedConfig,
+      guardToken,
+      guardToken,
+    ).run();
+    return Number(result.meta.changes ?? 0) > 0;
   }
-  await database.prepare(`
-    INSERT INTO integration_profiles (provider, mode, environment, encrypted_config, updated_at)
-    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(provider, mode, environment) DO UPDATE SET
-      encrypted_config = excluded.encrypted_config,
-      updated_at = CURRENT_TIMESTAMP
-  `).bind(snapshot.provider, snapshot.mode, snapshot.environment, snapshot.encryptedConfig).run();
+
+  if (!snapshot.createdAt || !snapshot.updatedAt) return false;
+  const expectedPredicate = expectedConfig ? "AND encrypted_config = ?" : "";
+  const statement = database.prepare(`
+    UPDATE integration_profiles
+       SET encrypted_config = ?, created_at = ?, updated_at = ?
+     WHERE provider = ? AND mode = ? AND environment = ?
+       ${expectedPredicate}
+       AND ${ownership}
+  `);
+  const args: unknown[] = [
+    snapshot.encryptedConfig,
+    snapshot.createdAt,
+    snapshot.updatedAt,
+    snapshot.provider,
+    snapshot.mode,
+    snapshot.environment,
+  ];
+  if (expectedConfig) args.push(expectedConfig);
+  args.push(guardToken, guardToken);
+  const result = await statement.bind(...args).run();
+  return Number(result.meta.changes ?? 0) > 0;
 }
 
 export async function captureIntegrationSettingSnapshot(
@@ -317,25 +376,44 @@ export async function captureIntegrationSettingSnapshot(
   const database = getD1();
   await ensureIntegrationTables(database);
   const row = await database.prepare(
-    "SELECT value FROM integration_settings WHERE setting_key = ? LIMIT 1",
-  ).bind(settingKey).first<{ value: string }>();
-  return { settingKey, value: row?.value ?? null };
+    "SELECT value, updated_at FROM integration_settings WHERE setting_key = ? LIMIT 1",
+  ).bind(settingKey).first<{ value: string; updated_at: string }>();
+  return { settingKey, value: row?.value ?? null, updatedAt: row?.updated_at ?? null };
 }
 
-export async function restoreIntegrationSettingSnapshot(snapshot: IntegrationSettingSnapshot) {
+export async function restoreIntegrationSettingSnapshot(
+  snapshot: IntegrationSettingSnapshot,
+  expectedCurrent: IntegrationSettingSnapshot | null,
+  guardToken: string,
+) {
   const database = getD1();
   await ensureIntegrationTables(database);
+  const ownership = guardedOwnershipClause();
+  const expectedValue = expectedCurrent?.value ?? null;
+
   if (snapshot.value === null) {
-    await database.prepare("DELETE FROM integration_settings WHERE setting_key = ?")
-      .bind(snapshot.settingKey)
-      .run();
-    return;
+    if (!expectedValue) return false;
+    const result = await database.prepare(`
+      DELETE FROM integration_settings
+      WHERE setting_key = ? AND value = ? AND ${ownership}
+    `).bind(snapshot.settingKey, expectedValue, guardToken, guardToken).run();
+    return Number(result.meta.changes ?? 0) > 0;
   }
-  await database.prepare(`
-    INSERT INTO integration_settings (setting_key, value, updated_at)
-    VALUES (?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(setting_key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
-  `).bind(snapshot.settingKey, snapshot.value).run();
+
+  if (!snapshot.updatedAt) return false;
+  const expectedPredicate = expectedValue ? "AND value = ?" : "";
+  const statement = database.prepare(`
+    UPDATE integration_settings
+       SET value = ?, updated_at = ?
+     WHERE setting_key = ?
+       ${expectedPredicate}
+       AND ${ownership}
+  `);
+  const args: unknown[] = [snapshot.value, snapshot.updatedAt, snapshot.settingKey];
+  if (expectedValue) args.push(expectedValue);
+  args.push(guardToken, guardToken);
+  const result = await statement.bind(...args).run();
+  return Number(result.meta.changes ?? 0) > 0;
 }
 
 export async function saveIntegrationProfile(input: {
