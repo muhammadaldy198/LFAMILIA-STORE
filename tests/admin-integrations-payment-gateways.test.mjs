@@ -62,3 +62,11 @@ test("Admin payment readiness is evaluated per channel, not by QRIS as a global 
   assert.match(workspace, /channel\.readiness/);
   assert.match(workspace, /Simpan untuk cek/);
 });
+
+
+test("Dashboard DOKU status uses core Direct API readiness, not QRIS-specific readiness", () => {
+  const route = read("app/api/admin/dashboard-integrations/route.ts");
+  assert.match(route, /paymentModes\.dokuDirectConfigured/);
+  assert.doesNotMatch(route, /paymentMethod: "qris"/);
+  assert.doesNotMatch(route, /getConfiguredGatewayReadiness/);
+});
