@@ -173,6 +173,7 @@ export async function expireUninitializedExternalWalletTopups() {
       updated_at = CURRENT_TIMESTAMP
     WHERE status = 'pending'
       AND source IN ('doku', 'midtrans')
+      AND (payment_gateway IS NULL OR payment_gateway <> 'midtrans')
       AND gateway_request_id IS NULL
       AND gateway_expired_at IS NOT NULL
       AND datetime(gateway_expired_at) <= datetime('now')`).run();
