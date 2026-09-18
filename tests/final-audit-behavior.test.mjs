@@ -114,7 +114,7 @@ test("product availability behavior fails closed for seller, buyer, stock, cutof
   db.close();
 });
 
-test("DOKU callback behavior is replay-idempotent and cannot revive a finalized order", () => {
+test("DOKU callback behavior is replay-idempotent and verified paid may recover local expiry", () => {
   const db = database();
   db.exec(`
     CREATE TABLE orders (id TEXT PRIMARY KEY, payment_status TEXT NOT NULL);
@@ -131,18 +131,18 @@ test("DOKU callback behavior is replay-idempotent and cannot revive a finalized 
 
   const applySignedPaid = (orderId, eventId) => {
     const order = db.prepare("SELECT payment_status FROM orders WHERE id=?").get(orderId);
-    if (!canProcessDokuOrderCallback(order.payment_status)) return false;
+    if (!canProcessDokuOrderCallback(order.payment_status, "paid")) return false;
     const inserted = db.prepare("INSERT OR IGNORE INTO order_events (order_id,source,event_id,status) VALUES (?,'doku',?,'paid')").run(orderId, eventId);
     if (Number(inserted.changes) === 0) return false;
-    db.prepare("UPDATE orders SET payment_status='paid' WHERE id=? AND payment_status='pending'").run(orderId);
+    db.prepare("UPDATE orders SET payment_status='paid' WHERE id=? AND payment_status IN ('pending','expired')").run(orderId);
     return true;
   };
 
   assert.equal(applySignedPaid("pending", "evt-1"), true);
   assert.equal(applySignedPaid("pending", "evt-1"), false);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM order_events WHERE event_id='evt-1'").get().count, 1);
-  assert.equal(applySignedPaid("expired", "evt-late"), false);
-  assert.equal(db.prepare("SELECT payment_status FROM orders WHERE id='expired'").get().payment_status, "expired");
+  assert.equal(applySignedPaid("expired", "evt-late"), true);
+  assert.equal(db.prepare("SELECT payment_status FROM orders WHERE id='expired'").get().payment_status, "paid");
   assert.equal(applySignedPaid("paid", "evt-downgrade"), false);
   db.close();
 });
@@ -158,7 +158,9 @@ test("production modules are wired to the behavior-tested rules", () => {
   assert.match(admin, /hasMinimumAdminRole\(session\.role, minimumRole\)/);
   assert.match(members, /resolveMemberTierFromProgress\(progress\)/);
   assert.match(availability, /isDigiflazzSnapshotAvailable\(/);
-  assert.match(callback, /applyPendingExternalPaymentStatus\(order, notification\.status\)/);
+  assert.match(callback, /canProcessDokuOrderCallback\(order\.payment_status, status\)/);
+  assert.match(callback, /applyPendingExternalPaymentStatus\(order, notification\.status, \{/);
+  assert.match(callback, /authoritativePaid: notification\.status === "paid"/);
   assert.match(externalCheckout, /isAutomaticPackageAvailable\(/);
   assert.match(walletCheckout, /isAutomaticPackageAvailable\(/);
 });
