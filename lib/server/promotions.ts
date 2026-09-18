@@ -244,11 +244,26 @@ export async function releaseExternalPromotion(orderId: string) {
 }
 
 export async function releaseExpiredExternalPromotions() {
-  // Never release capacity while its order is still payment-pending. Payment
-  // reconciliation/expiry owns the terminal transition and releases the
-  // reservation. This prevents a delayed-but-valid payment from consuming a
-  // promo after its reserved_count was already returned to the pool.
-  await getD1().prepare(`
+  const db = getD1();
+  // Heal the narrow window where an order reached paid but reservation
+  // consumption failed or was delayed. The existing reservation trigger moves
+  // reserved_count -> used_count exactly once.
+  await db.prepare(`
+    UPDATE promotion_reservations
+    SET status = 'consumed', updated_at = CURRENT_TIMESTAMP
+    WHERE status = 'reserved'
+      AND EXISTS (
+        SELECT 1
+        FROM orders
+        WHERE orders.id = promotion_reservations.order_id
+          AND orders.payment_status = 'paid'
+      )
+  `).run();
+
+  // Never release capacity while its order is pending or already paid. Payment
+  // reconciliation/expiry owns pending orders; paid reservations are consumed
+  // above. Only terminal non-paid/orphaned reservations may be returned.
+  await db.prepare(`
     UPDATE promotion_reservations
     SET status = 'released', updated_at = CURRENT_TIMESTAMP
     WHERE status = 'reserved'
@@ -257,7 +272,7 @@ export async function releaseExpiredExternalPromotions() {
         SELECT 1
         FROM orders
         WHERE orders.id = promotion_reservations.order_id
-          AND orders.payment_status = 'pending'
+          AND orders.payment_status IN ('pending', 'paid')
       )
   `).run();
 }
