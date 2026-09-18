@@ -222,14 +222,35 @@ const worker = {
     await ensureLegacyDatabaseColumns().catch((error) => {
       console.error("Perbaikan kompatibilitas D1 pada scheduler gagal:", error);
     });
+    const paymentRecovery = Promise.all([
+      finalizeExpiredDokuPayments().catch((error) => {
+        console.error("Rekonsiliasi DOKU scheduler gagal:", error);
+      }),
+      reconcilePendingMidtransOrders().catch((error) => {
+        console.error("Rekonsiliasi order Midtrans scheduler gagal:", error);
+      }),
+      reconcilePendingMidtransTopups().catch((error) => {
+        console.error("Rekonsiliasi top up Midtrans scheduler gagal:", error);
+      }),
+    ]).then(async () => {
+      // Only expire ambiguous/uninitialized attempts after every available
+      // provider reconciliation path has had a chance to settle them.
+      await Promise.all([
+        expireUninitializedExternalWalletTopups().catch((error) => {
+          console.error("Expiry top up eksternal belum terinisialisasi gagal:", error);
+        }),
+        expireUninitializedExternalOrders().catch((error) => {
+          console.error("Expiry order eksternal belum terinisialisasi gagal:", error);
+        }),
+      ]);
+      await releaseExpiredExternalPromotions().catch((error) => {
+        console.error("Pelepasan reservasi promo kedaluwarsa gagal:", error);
+      });
+    });
+
     const tasks: Promise<unknown>[] = [
       cleanupSecurityRateLimits().catch(() => undefined),
-      releaseExpiredExternalPromotions().catch(() => undefined),
-      finalizeExpiredDokuPayments().catch(() => undefined),
-      reconcilePendingMidtransOrders().catch(() => undefined),
-      reconcilePendingMidtransTopups().catch(() => undefined),
-      expireUninitializedExternalWalletTopups().catch(() => undefined),
-      expireUninitializedExternalOrders().catch(() => undefined),
+      paymentRecovery,
       Promise.resolve()
         .then(() => getPublicBaseUrl())
         .then((publicBaseUrl) => recoverStaleAutomaticOrders(publicBaseUrl))
