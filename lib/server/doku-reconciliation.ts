@@ -136,6 +136,7 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
        AND payment_gateway = 'doku'
        AND payment_gateway_mode = 'direct'
        AND payment_gateway_environment IN ('sandbox', 'production')
+       AND (gateway_request_id IS NOT NULL OR doku_request_id IS NOT NULL)
        AND created_at <= datetime('now', '-60 seconds')
        AND (COALESCE(gateway_status_checked_at, doku_status_checked_at) IS NULL
          OR COALESCE(gateway_status_checked_at, doku_status_checked_at) <= datetime('now', '-60 seconds'))
