@@ -73,7 +73,7 @@ export function AdminIntegrationWorkspace() {
       } else if (tab === "KokinPay") {
         await put({ action: "save_profile", provider: "kokinpay", mode: "service", environment: "global", values: { apiKey: values.kokinpayApiKey || "" } });
       } else if (tab === "Google Login") {
-        await put({ action: "save_profile", provider: "google", mode: "service", environment: "global", values: { clientId: values.googleClientId || "" }, clearFields: ["clientSecret"] });
+        await put({ action: "save_profile", provider: "google", mode: "service", environment: "global", values: { clientId: values.googleClientId || "" } });
       } else if (tab === "Resend Email") {
         await put({ action: "save_profile", provider: "resend", mode: "service", environment: "global", values: { apiKey: values.resendApiKey || "", fromEmail: values.resendFromEmail || "", apiUrl: values.resendApiUrl || "", deliveryChannel: values.resendDeliveryChannel || "email" } });
       } else if (tab === "Relay & Keamanan") {
