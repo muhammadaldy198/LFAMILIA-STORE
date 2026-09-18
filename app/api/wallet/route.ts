@@ -1,3 +1,4 @@
+import { publicCustomerPaymentFee } from "@/lib/payment-fees";
 import {
   listPaymentChannels,
   listPaymentGatewaySettings,
@@ -24,7 +25,11 @@ export async function GET() {
   const checked = await Promise.all(candidates.map(async (item) => {
     const gatewayConfig = item.gateway === modes.walletTopupGateway
       ? item.gatewayConfig
-      : { customerFeeBps: item.gatewayConfig.customerFeeBps ?? "0" };
+      : {
+          customerFeeEnabled: item.gatewayConfig.customerFeeEnabled ?? "true",
+          customerFeeBps: item.gatewayConfig.customerFeeBps ?? "0",
+          customerFeeFixed: item.gatewayConfig.customerFeeFixed ?? "0",
+        };
     return {
       item,
       readiness: await getConfiguredGatewayReadiness({
@@ -43,6 +48,7 @@ export async function GET() {
       channel: item.channel,
       name: item.name,
       description: item.description,
+      ...publicCustomerPaymentFee(item.gatewayConfig),
       ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
     }));
 
