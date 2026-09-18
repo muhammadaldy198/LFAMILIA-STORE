@@ -157,8 +157,8 @@ test("wallet topup only uses uncertainty hold after gateway dispatch begins", ()
   assert.match(route, /let paymentDispatchStarted = false/);
   assert.match(route, /paymentDispatchStarted = true;[\s\S]*createConfiguredPayment/);
   assert.match(route, /if \(paymentDispatchStarted\)/);
-  assert.match(route, /rejectExternalWalletTopupCreation/);
-  assert.match(wallet, /export async function rejectExternalWalletTopupCreation/);
+  assert.match(route, /rejectExternalWalletTopupPreDispatch/);
+  assert.match(wallet, /export async function rejectExternalWalletTopupPreDispatch/);
   assert.match(wallet, /SET status = 'rejected'/);
 });
 
