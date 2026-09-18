@@ -392,7 +392,9 @@ export async function saveProduct(input: ProductWrite, id?: number) {
     .run();
 
   const packageStatements = input.packages.map((item, index) => {
-    const maxPrice = item.providerCode === "digiflazz" ? Number(item.providerMaxPrice) : null;
+    const normalizedProviderCode = item.providerCode?.trim().toLowerCase() || null;
+    const normalizedProviderSku = item.providerSku?.trim() || null;
+    const maxPrice = normalizedProviderCode === "digiflazz" ? Number(item.providerMaxPrice) : null;
     const margin = Math.max(0, Number(item.marginValue ?? 0));
     const sellingPrice = maxPrice && maxPrice > 0
       ? item.marginType === "percent"
@@ -407,7 +409,7 @@ export async function saveProduct(input: ProductWrite, id?: number) {
        image_url = excluded.image_url, provider_code = excluded.provider_code, provider_sku = excluded.provider_sku,
        supplier_price = excluded.supplier_price, provider_max_price = excluded.provider_max_price, pricing_mode = excluded.pricing_mode, margin_type = excluded.margin_type,
        margin_value = excluded.margin_value, is_active = excluded.is_active, sort_order = excluded.sort_order`,
-  ).bind(productRow.id, item.id, item.label, sellingPrice, item.note ?? null, item.group?.trim() || null, item.imageUrl ?? null, item.providerCode?.trim().toLowerCase() || null, item.providerSku?.trim() || null, item.supplierPrice ?? null, item.providerMaxPrice ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index);
+  ).bind(productRow.id, item.id, item.label, sellingPrice, item.note ?? null, item.group?.trim() || null, item.imageUrl ?? null, normalizedProviderCode, normalizedProviderSku, item.supplierPrice ?? null, item.providerMaxPrice ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index);
   });
   if (input.packages.length) {
     const placeholders = input.packages.map(() => "?").join(", ");
