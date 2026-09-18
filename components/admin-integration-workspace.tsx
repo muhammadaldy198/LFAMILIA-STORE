@@ -55,7 +55,7 @@ export function AdminIntegrationWorkspace() {
   const configured = useMemo(() => new Set((overview?.profiles ?? []).filter((profile) => profile.configured && !profile.decryptionError).map((profile) => `${profile.provider}:${profile.environment}`)), [overview]);
   const isConfigured = (provider: Provider, environment: Environment) => configured.has(`${provider}:${environment}`);
   const digiflazzWebhook = overview?.callbacks.find((item) => item.id === "digiflazz")?.url || fallbackWebhook;
-  const googleCallback = overview?.callbacks.find((item) => item.id === "google-oauth")?.url || "https://lfamiliastore.my.id/api/auth/google/callback";
+  const googleCallback = overview?.callbacks.find((item) => item.id === "google-oauth")?.url || "/api/auth/google/callback";
 
   async function put(body: object) {
     const response = await fetch("/api/panel/integrations", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
