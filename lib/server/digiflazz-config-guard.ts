@@ -27,7 +27,7 @@ async function ensureDigiflazzConfigurationGuard() {
   await db.prepare(`
     CREATE TRIGGER IF NOT EXISTS digiflazz_order_maintenance_guard
     BEFORE INSERT ON orders
-    WHEN NEW.provider_code = 'digiflazz'
+    WHEN lower(trim(NEW.provider_code)) = 'digiflazz'
       AND EXISTS (
         SELECT 1 FROM digiflazz_runtime_state
         WHERE id = 1
@@ -75,7 +75,7 @@ export async function acquireDigiflazzConfigurationGuard() {
          )
          AND NOT EXISTS (
            SELECT 1 FROM orders
-           WHERE provider_code = 'digiflazz'
+           WHERE lower(trim(provider_code)) = 'digiflazz'
              AND (
                payment_status = 'pending'
                OR (
@@ -109,7 +109,7 @@ export async function acquireDigiflazzConfigurationGuard() {
   const [orders, runtime, sync] = await db.batch([
     db.prepare(`
       SELECT COUNT(*) AS count FROM orders
-      WHERE provider_code = 'digiflazz'
+      WHERE lower(trim(provider_code)) = 'digiflazz'
         AND (
           payment_status = 'pending'
           OR (
