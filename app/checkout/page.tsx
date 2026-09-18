@@ -41,6 +41,7 @@ import {
   type PaymentChannel,
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
+import { normalizeProductCategorySlug } from "@/lib/product-categories";
 import { formatRupiah, type StoreProduct } from "@/lib/store-data";
 import type { CustomerSession } from "@/lib/server/customer-auth";
 
@@ -254,8 +255,9 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     ],
     [product.inputFields, product.inputLabel, product.inputPlaceholder, product.needsServer],
   );
-  const isVoucherProduct = product.category.trim().toLowerCase() === "voucher";
-  const isGameProduct = product.category.trim().toLowerCase() === "game";
+  const normalizedCategory = normalizeProductCategorySlug(product.category);
+  const isVoucherProduct = normalizedCategory === "voucher";
+  const isGameProduct = normalizedCategory === "game";
   const destination = isVoucherProduct
     ? INTERNAL_VOUCHER_DESTINATION
     : productInputFields[0]
@@ -272,6 +274,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const isManual = fulfillmentMode === "manual";
   const isVoucherStock = fulfillmentMode === "voucher_stock";
   const providerReady = Boolean(selectedPackage?.fulfillmentReady);
+  const fulfillmentAvailable = isManual || Boolean(selectedPackage?.fulfillmentAvailable);
   const nicknameRequired =
     !isVoucherProduct && Boolean(product.nicknameRequired);
   const canCheckNickname = nicknameRequired;
@@ -617,6 +620,10 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       setError("Produk otomatis ini belum siap dijual. Hubungi admin.");
       return;
     }
+    if (!fulfillmentAvailable) {
+      setError("Nominal ini sedang tidak tersedia. Pilih nominal lain atau coba lagi nanti.");
+      return;
+    }
     setError("");
     setConfirmationOpen(true);
   }
@@ -649,6 +656,10 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     }
     if (!providerReady) {
       setError("Produk otomatis ini belum siap dijual. Hubungi admin.");
+      return;
+    }
+    if (!fulfillmentAvailable) {
+      setError("Nominal ini sedang tidak tersedia. Pilih nominal lain atau coba lagi nanti.");
       return;
     }
     setSubmitting(true);
