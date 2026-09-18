@@ -4,6 +4,7 @@ import handler from "vinext/server/app-router-entry";
 import { getPublicBaseUrl, setRuntimeEnv } from "../lib/server/runtime-env";
 import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
 import { hydrateDokuDirectRuntimeEnv } from "../lib/server/payment-mode-config";
+import { expireUninitializedExternalOrders } from "../lib/server/external-payments";
 import { ensureLegacyDatabaseColumns } from "../lib/server/database-repair";
 import { recoverStaleAutomaticOrders } from "../lib/server/orders";
 import { releaseExpiredExternalPromotions } from "../lib/server/promotions";
@@ -224,6 +225,7 @@ const worker = {
       finalizeExpiredDokuPayments().catch(() => undefined),
       reconcilePendingMidtransTopups().catch(() => undefined),
       expireUninitializedExternalWalletTopups().catch(() => undefined),
+      expireUninitializedExternalOrders().catch(() => undefined),
       Promise.resolve()
         .then(() => getPublicBaseUrl())
         .then((publicBaseUrl) => recoverStaleAutomaticOrders(publicBaseUrl))
