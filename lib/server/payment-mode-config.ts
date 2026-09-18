@@ -137,6 +137,20 @@ export async function savePaymentGatewayProfile(input: {
   if ((input.provider === "doku" && input.mode !== "direct") || (input.provider === "midtrans" && input.mode !== "snap")) {
     throw new Error("Mode gateway tidak valid.");
   }
+  if (input.provider === "doku") {
+    const existing = await profile("doku", "direct", input.environment);
+    if (!input.values.apiUrl?.trim() && !existing?.apiUrl?.trim()) {
+      input = {
+        ...input,
+        values: {
+          ...input.values,
+          apiUrl: input.environment === "production"
+            ? "https://api.doku.com"
+            : "https://api-sandbox.doku.com",
+        },
+      };
+    }
+  }
   return saveProfile(input);
 }
 
