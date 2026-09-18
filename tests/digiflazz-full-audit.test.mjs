@@ -70,13 +70,18 @@ test("forward migration replaces the legacy case-sensitive DigiFlazz maintenance
   assert.match(migration, /lower\(trim\(NEW\.`provider_code`\)\) = 'digiflazz'/);
 });
 
-test("failed active DigiFlazz configuration saves rebuild the previous operational cache immediately", () => {
+test("failed active DigiFlazz configuration saves rebuild the previous operational cache with bounded lock-aware retry", () => {
   const route = read("app/api/admin/integrations/route.ts");
   const release = route.indexOf("await releaseDigiflazzConfigurationGuard(token, successful)");
-  const rebuild = route.indexOf("await syncDigiflazzPrices({ force: true })");
+  const recover = route.indexOf("await recoverDigiflazzOperationalCache()");
+  assert.match(route, /DIGIFLAZZ_CACHE_RECOVERY_ATTEMPTS = 10/);
+  assert.match(route, /DIGIFLAZZ_CACHE_RECOVERY_DELAY_MS = 500/);
+  assert.match(route, /if \(!result\.skipped \|\| Number\(result\.cached \?\? 0\) > 0\) return result/);
+  assert.match(route, /setTimeout\(resolve, DIGIFLAZZ_CACHE_RECOVERY_DELAY_MS\)/);
+  assert.match(route, /Cache operasional DigiFlazz belum pulih setelah retry terbatas/);
   assert.match(route, /let failed = false/);
   assert.match(route, /failure = error/);
-  assert.ok(release >= 0 && rebuild > release);
+  assert.ok(release >= 0 && recover > release);
   assert.match(route, /Cache operasional DigiFlazz juga gagal dipulihkan/);
 });
 
