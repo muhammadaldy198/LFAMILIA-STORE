@@ -37,10 +37,6 @@ export async function reconcilePendingMidtransOrders(limit = 100) {
          gateway_status_checked_at IS NULL
          OR gateway_status_checked_at <= datetime('now', '-60 seconds')
        )
-       AND (
-         gateway_expired_at IS NULL
-         OR datetime(gateway_expired_at) > datetime('now')
-       )
      ORDER BY COALESCE(gateway_status_checked_at, created_at) ASC
      LIMIT ?`,
   ).bind(safeLimit).all<OrderRecord>();
@@ -90,35 +86,7 @@ export async function reconcilePendingMidtransOrders(limit = 100) {
     }
   }
 
-  const expiredOrders = await db.prepare(
-    `SELECT * FROM orders
-     WHERE payment_status = 'pending'
-       AND payment_gateway = 'midtrans'
-       AND payment_gateway_mode = 'snap'
-       AND payment_gateway_environment IN ('sandbox', 'production')
-       AND gateway_expired_at IS NOT NULL
-       AND datetime(gateway_expired_at) <= datetime('now')
-     ORDER BY gateway_expired_at ASC
-     LIMIT ?`,
-  ).bind(safeLimit).all<OrderRecord>();
-
-  let expired = 0;
-  for (const order of expiredOrders.results) {
-    await applyPendingExternalPaymentStatus(order, "expired");
-    expired += 1;
-    await recordExternalPaymentEvent({
-      orderId: order.id,
-      gateway: "midtrans",
-      eventId: `local-expiry-${order.id}`,
-      status: "expired",
-      payload: {
-        expiredAt: order.gateway_expired_at,
-        reason: "stored_midtrans_expiry",
-      },
-    });
-  }
-
-  return { queried, settled, expired };
+  return { queried, settled };
 }
 
 export async function reconcilePendingMidtransTopups(limit = 100) {
@@ -135,13 +103,19 @@ export async function reconcilePendingMidtransTopups(limit = 100) {
        AND status = 'pending'
        AND gateway_environment IN ('sandbox', 'production')
        AND created_at <= datetime('now', '-60 seconds')
-       AND (gateway_expired_at IS NULL OR datetime(gateway_expired_at) > datetime('now'))
-     ORDER BY created_at ASC
+       AND updated_at <= datetime('now', '-60 seconds')
+     ORDER BY updated_at ASC, created_at ASC
      LIMIT ?`,
   ).bind(safeLimit).all<PendingMidtransTopup>();
 
   for (const topup of pending.results) {
     try {
+      await db.prepare(
+        `UPDATE wallet_topups
+         SET updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND status = 'pending'`,
+      ).bind(topup.id).run();
+
       const result = await queryMidtransSnapStatus({
         orderId: topup.reference_id,
         environment: topup.gateway_environment,
@@ -175,28 +149,5 @@ export async function reconcilePendingMidtransTopups(limit = 100) {
     }
   }
 
-  const expired = await db.prepare(
-    `SELECT reference_id
-     FROM wallet_topups
-     WHERE source = 'midtrans'
-       AND payment_gateway = 'midtrans'
-       AND payment_gateway_mode = 'snap'
-       AND status = 'pending'
-       AND gateway_expired_at IS NOT NULL
-       AND datetime(gateway_expired_at) <= datetime('now')
-     ORDER BY gateway_expired_at ASC
-     LIMIT ?`,
-  ).bind(safeLimit).all<{ reference_id: string }>();
-
-  for (const topup of expired.results) {
-    await applyExternalWalletTopup({
-      referenceId: topup.reference_id,
-      gateway: "midtrans",
-      status: "expired",
-      originalRequestId: null,
-      callbackAmount: 0,
-    });
-  }
-
-  return { queried, expired: expired.results.length };
+  return { queried };
 }
