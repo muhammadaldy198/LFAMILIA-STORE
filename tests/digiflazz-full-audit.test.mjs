@@ -141,6 +141,19 @@ test("DigiFlazz profile activity is decided only after acquiring the configurati
   );
 });
 
+test("guarded DigiFlazz mutations commit only while the configuration lease is still owned", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const integration = read("lib/server/integration-config.ts");
+  assert.match(route, /action: \(guardToken: string\) => Promise<T>/);
+  assert.match(route, /committed = await action\(token\)/);
+  assert.match(route, /saveIntegrationProfile\(input, guardToken\)/);
+  assert.match(route, /saveIntegrationSelections\(input\.selections, guardToken\)/);
+  assert.match(integration, /Guard konfigurasi DigiFlazz kedaluwarsa sebelum profile dapat disimpan/);
+  assert.match(integration, /Guard konfigurasi DigiFlazz kedaluwarsa sebelum environment dapat disimpan/);
+  assert.match(integration, /SELECT \?, \?, \?, \?, strftime/);
+  assert.match(integration, /WHERE \$\{ownership\}/);
+});
+
 test("same-value DigiFlazz environment saves cannot report success during guarded maintenance", () => {
   const route = read("app/api/admin/integrations/route.ts");
   const guard = read("lib/server/digiflazz-config-guard.ts");
