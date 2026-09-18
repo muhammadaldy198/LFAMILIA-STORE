@@ -12,8 +12,8 @@ async function expirePendingOrderIfDue(order: OrderRecord) {
     `UPDATE orders
      SET payment_status = 'expired', updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND payment_status = 'pending'
-       AND doku_expired_at IS NOT NULL
-       AND datetime(doku_expired_at) <= datetime('now')`,
+       AND COALESCE(gateway_expired_at, doku_expired_at) IS NOT NULL
+       AND datetime(COALESCE(gateway_expired_at, doku_expired_at)) <= datetime('now')`,
   ).bind(order.id).run();
   const changed = Number(result.meta.changes ?? 0) > 0;
   if (changed) await releaseExternalPromotion(order.id);
