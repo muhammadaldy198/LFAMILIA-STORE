@@ -17,6 +17,7 @@ import {
   findMatchingExternalTopup,
   insertExternalWalletTopup,
   markExternalWalletTopupCreationFailed,
+  rejectExternalWalletTopupPreDispatch,
   updateExternalWalletTopup,
   type ExternalWalletTopup,
 } from "@/lib/server/wallet-external";
@@ -84,6 +85,7 @@ export async function POST(request: Request) {
   let idempotencyKey = "";
   let requestedAmount: number | null = null;
   let requestedPaymentMethodKey = "";
+  let paymentDispatchStarted = false;
   try {
     if (!request.headers.get("content-type")?.includes("application/json")) {
       throw new Error("Top up saldo hanya tersedia melalui pembayaran otomatis.");
@@ -179,6 +181,7 @@ export async function POST(request: Request) {
     }
 
     const baseUrl = getPublicBaseUrl();
+    paymentDispatchStarted = true;
     const payment = await createConfiguredPayment({
       gateway: walletTopupGateway,
       referenceId,
@@ -251,7 +254,11 @@ export async function POST(request: Request) {
           : "Permintaan top up gagal.";
 
     if (referenceId) {
-      await markExternalWalletTopupCreationFailed(referenceId, message).catch(() => undefined);
+      if (paymentDispatchStarted) {
+        await markExternalWalletTopupCreationFailed(referenceId, message).catch(() => undefined);
+      } else {
+        await rejectExternalWalletTopupPreDispatch(referenceId, message).catch(() => undefined);
+      }
     }
     return Response.json(
       { error: message },
