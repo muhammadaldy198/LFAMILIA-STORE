@@ -1,6 +1,12 @@
 import { getD1 } from "@/db";
-import { recordExternalPaymentEvent } from "@/lib/server/external-payments";
-import { queryMidtransSnapStatus } from "@/lib/server/midtrans-snap";
+import {
+  expireConfirmedMissingMidtransOrder,
+  recordExternalPaymentEvent,
+} from "@/lib/server/external-payments";
+import {
+  MidtransTransactionNotFoundError,
+  queryMidtransSnapStatus,
+} from "@/lib/server/midtrans-snap";
 import type { PaymentEnvironment } from "@/lib/server/payment-mode-config";
 import { applyPendingExternalPaymentStatus } from "@/lib/server/payment-transition";
 import { fulfillAutomaticOrder, type OrderRecord } from "@/lib/server/orders";
@@ -9,7 +15,10 @@ import {
   notifyOrderFulfillmentSuccessById,
   notifyWalletTopupSuccessById,
 } from "@/lib/server/transaction-notifications";
-import { applyExternalWalletTopup } from "@/lib/server/wallet-external";
+import {
+  applyExternalWalletTopup,
+  expireConfirmedMissingMidtransTopup,
+} from "@/lib/server/wallet-external";
 
 type PendingMidtransTopup = {
   id: string;
@@ -68,7 +77,9 @@ export async function reconcilePendingMidtransOrders(limit = 100) {
 
       if (result.status === "paid") {
         if (!Number.isFinite(result.amount) || result.amount !== order.total) continue;
-        const firstPaid = await applyPendingExternalPaymentStatus(order, "paid");
+        const firstPaid = await applyPendingExternalPaymentStatus(order, "paid", {
+          authoritativePaid: true,
+        });
         if (firstPaid) {
           settled += 1;
           if (order.fulfillment_type === "automatic") {
@@ -82,6 +93,19 @@ export async function reconcilePendingMidtransOrders(limit = 100) {
         await applyPendingExternalPaymentStatus(order, result.status);
       }
     } catch (error) {
+      if (error instanceof MidtransTransactionNotFoundError) {
+        const expired = await expireConfirmedMissingMidtransOrder(order.id);
+        if (expired) {
+          await recordExternalPaymentEvent({
+            orderId: order.id,
+            gateway: "midtrans",
+            eventId: `confirmed-missing-${order.id}`,
+            status: "expired",
+            payload: { reason: "midtrans_transaction_not_found_after_safe_window" },
+          });
+        }
+        continue;
+      }
       console.error("Rekonsiliasi status order Midtrans gagal:", error);
     }
   }
@@ -129,6 +153,7 @@ export async function reconcilePendingMidtransTopups(limit = 100) {
           status: "paid",
           originalRequestId: null,
           callbackAmount: result.amount,
+          authoritativePaid: true,
         });
         if (applied.credited) {
           await notifyWalletTopupSuccessById(topup.id, topup.reference_id).catch((error) =>
@@ -145,6 +170,10 @@ export async function reconcilePendingMidtransTopups(limit = 100) {
         });
       }
     } catch (error) {
+      if (error instanceof MidtransTransactionNotFoundError) {
+        await expireConfirmedMissingMidtransTopup(topup.reference_id);
+        continue;
+      }
       console.error("Rekonsiliasi status top up Midtrans gagal:", error);
     }
   }
