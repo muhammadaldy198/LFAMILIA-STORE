@@ -140,6 +140,24 @@ export function externalArtifactsFromOrder(order: Record<string, unknown>) {
 }
 
 
+export async function expireConfirmedMissingMidtransOrder(orderId: string) {
+  const db = getD1();
+  const result = await db.prepare(`
+    UPDATE orders
+    SET payment_status = 'expired',
+        provider_message = COALESCE(provider_message, 'Transaksi tidak ditemukan di Midtrans setelah batas verifikasi.'),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+      AND payment_status = 'pending'
+      AND payment_gateway = 'midtrans'
+      AND gateway_request_id IS NULL
+      AND created_at <= datetime('now', '-70 minutes')
+  `).bind(orderId).run();
+  const changed = Number(result.meta.changes ?? 0) > 0;
+  if (changed) await releaseExternalPromotion(orderId);
+  return changed;
+}
+
 export async function expireUninitializedExternalOrders(limit = 100) {
   const db = getD1();
   const safeLimit = Math.min(Math.max(limit, 1), 500);
