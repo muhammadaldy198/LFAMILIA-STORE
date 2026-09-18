@@ -12,6 +12,7 @@ import { finalizeExpiredDokuPayments } from "../lib/server/doku-reconciliation";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 import { cleanupSecurityRateLimits } from "../lib/server/security";
 import { cleanupOrphanStoreMedia } from "../lib/server/media";
+import { expireUninitializedExternalWalletTopups } from "../lib/server/wallet-external";
 import {
   diagnoseCloudflareAccessRequest,
   getCloudflareAccessAssertion,
@@ -220,6 +221,7 @@ const worker = {
       cleanupSecurityRateLimits().catch(() => undefined),
       releaseExpiredExternalPromotions().catch(() => undefined),
       finalizeExpiredDokuPayments().catch(() => undefined),
+      expireUninitializedExternalWalletTopups().catch(() => undefined),
       Promise.resolve()
         .then(() => getPublicBaseUrl())
         .then((publicBaseUrl) => recoverStaleAutomaticOrders(publicBaseUrl))
