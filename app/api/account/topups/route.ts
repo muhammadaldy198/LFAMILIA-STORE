@@ -108,7 +108,11 @@ export async function POST(request: Request) {
     const topupGatewayConfig = managedChannel
       ? managedChannel.gateway === walletTopupGateway
         ? managedChannel.gatewayConfig
-        : { customerFeeBps: managedChannel.gatewayConfig.customerFeeBps ?? "0" }
+        : {
+            customerFeeEnabled: managedChannel.gatewayConfig.customerFeeEnabled ?? "true",
+            customerFeeBps: managedChannel.gatewayConfig.customerFeeBps ?? "0",
+            customerFeeFixed: managedChannel.gatewayConfig.customerFeeFixed ?? "0",
+          }
       : {};
     if (
       !managedChannel ||
