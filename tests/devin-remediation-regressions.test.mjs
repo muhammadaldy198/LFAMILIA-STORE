@@ -191,6 +191,16 @@ test("active DigiFlazz credential changes mutate under guard, then atomically in
   assert.match(guard, /const results = await db\.batch\(statements\)/);
 });
 
+test("DigiFlazz profile saves serialize environment selection before deciding cache invalidation", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const profileBranch = route.indexOf('input.provider === "digiflazz"');
+  const guardedSave = route.indexOf("await withDigiflazzConfigurationGuard(", profileBranch);
+  const activeRead = route.indexOf("const activeEnvironment = (await getIntegrationOverview())", guardedSave);
+  assert.ok(profileBranch >= 0 && guardedSave > profileBranch && activeRead > guardedSave);
+  assert.match(route, /shouldInvalidateOperationalCache/);
+  assert.match(route, /if \(invalidateOperationalCache\)/);
+});
+
 test("storefront keeps fallback categories when API response fails or omits categories", () => {
   const storefront = read("hooks/use-storefront.ts");
   assert.match(storefront, /if \(!response\.ok\) throw new Error/);
