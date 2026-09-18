@@ -16,25 +16,33 @@ const GOOGLE_AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
 
-function runtimeConfig() {
+function runtimeCredentials() {
   const runtime = getRuntimeEnv<GoogleRuntime>();
-  const clientId = runtime.GOOGLE_OAUTH_CLIENT_ID?.trim() ?? "";
-  const clientSecret = runtime.GOOGLE_OAUTH_CLIENT_SECRET?.trim() ?? "";
-  const redirectUri = `${getPublicBaseUrl()}/api/auth/google/callback`;
-  return { clientId, clientSecret, redirectUri };
+  return {
+    clientId: runtime.GOOGLE_OAUTH_CLIENT_ID?.trim() ?? "",
+    clientSecret: runtime.GOOGLE_OAUTH_CLIENT_SECRET?.trim() ?? "",
+  };
 }
 
 export function googleOAuthConfigured() {
-  const { clientId, clientSecret } = runtimeConfig();
-  return Boolean(clientId && clientSecret);
+  const { clientId, clientSecret } = runtimeCredentials();
+  if (!clientId || !clientSecret) return false;
+  try {
+    return Boolean(getPublicBaseUrl());
+  } catch {
+    return false;
+  }
 }
 
 export function requireGoogleOAuthConfig() {
-  const config = runtimeConfig();
-  if (!config.clientId || !config.clientSecret) {
+  const credentials = runtimeCredentials();
+  if (!credentials.clientId || !credentials.clientSecret) {
     throw new Error("Login Google belum dikonfigurasi.");
   }
-  return config;
+  return {
+    ...credentials,
+    redirectUri: `${getPublicBaseUrl()}/api/auth/google/callback`,
+  };
 }
 
 export function buildGoogleAuthorizationUrl(state: string, nonce: string) {
