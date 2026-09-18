@@ -40,3 +40,11 @@ test("payment credential backend keeps DOKU and Midtrans values encrypted", () =
   assert.match(config, /direct: \["clientId", "secretKey", "privateKey"/);
   assert.match(config, /snap: \["serverKey", "clientKey"\]/);
 });
+
+
+test("obsolete duplicate payment credential panel is removed and dashboard says Direct API", () => {
+  assert.equal(fs.existsSync(path.join(root, "components/admin-payment-routing-panel.tsx")), false);
+  const overview = read("components/admin-overview.tsx");
+  assert.match(overview, /DOKU Direct API/);
+  assert.doesNotMatch(overview, /DOKU Checkout/);
+});
