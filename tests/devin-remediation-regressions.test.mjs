@@ -52,7 +52,9 @@ test("payment maintenance reconciles before ambiguous expiry and keeps pending p
   assert.match(worker, /\.then\(async \(\) => \{/);
   assert.match(worker, /expireUninitializedExternalOrders\(\)/);
   assert.match(worker, /releaseExpiredExternalPromotions\(\)/);
-  assert.match(promotions, /NOT EXISTS \([\s\S]*orders\.id = promotion_reservations\.order_id[\s\S]*orders\.payment_status = 'pending'/);
+  assert.match(promotions, /orders\.payment_status = 'paid'/);
+  assert.match(promotions, /SET status = 'consumed'/);
+  assert.match(promotions, /orders\.payment_status IN \('pending', 'paid'\)/);
 });
 
 test("active promo reservations cannot be orphaned by admin edits", () => {
