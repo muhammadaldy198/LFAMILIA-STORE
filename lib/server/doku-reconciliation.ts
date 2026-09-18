@@ -155,20 +155,6 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
        AND payment_gateway_environment IN ('sandbox', 'production')
        AND (gateway_request_id IS NOT NULL OR doku_request_id IS NOT NULL)
        AND created_at <= datetime('now', '-60 seconds')
-       AND (
-         payment_status = 'pending'
-         OR (
-           payment_status = 'expired'
-           AND COALESCE(gateway_expired_at, doku_expired_at) IS NOT NULL
-           AND datetime(COALESCE(gateway_expired_at, doku_expired_at)) >= datetime('now', '-7 days')
-           AND NOT EXISTS (
-             SELECT 1 FROM order_events oe
-             WHERE oe.order_id = orders.id
-               AND oe.source = 'doku'
-               AND oe.status IN ('failed', 'expired')
-           )
-         )
-       )
        AND (COALESCE(gateway_status_checked_at, doku_status_checked_at) IS NULL
          OR COALESCE(gateway_status_checked_at, doku_status_checked_at) <= datetime('now', '-60 seconds'))
      ORDER BY COALESCE(gateway_status_checked_at, doku_status_checked_at, created_at) ASC
@@ -230,15 +216,6 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
        AND doku_request_id IS NOT NULL
        AND doku_environment IN ('sandbox', 'production')
        AND created_at <= datetime('now', '-60 seconds')
-       AND (
-         status = 'pending'
-         OR (
-           status = 'rejected'
-           AND admin_notes IN ('Pembayaran kedaluwarsa.', 'Pembayaran DOKU kedaluwarsa.')
-           AND COALESCE(gateway_expired_at, doku_expired_at) IS NOT NULL
-           AND datetime(COALESCE(gateway_expired_at, doku_expired_at)) >= datetime('now', '-7 days')
-         )
-       )
        AND (doku_status_checked_at IS NULL OR doku_status_checked_at <= datetime('now', '-60 seconds'))
      ORDER BY COALESCE(doku_status_checked_at, created_at) ASC
      LIMIT ?`,
@@ -266,14 +243,6 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
         callbackAmount: query.amount,
         authoritativePaid: query.status === "paid",
       });
-      if (topup.status === "rejected" && query.status === "failed") {
-        await db.prepare(
-          `UPDATE wallet_topups
-           SET admin_notes = 'Pembayaran DOKU gagal menurut status final provider.',
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = ? AND status = 'rejected'`,
-        ).bind(topup.id).run();
-      }
       if (result.credited) {
         await notifyWalletTopupSuccessById(topup.id, topup.reference_id).catch((error) =>
           console.error("Notifikasi top up hasil rekonsiliasi DOKU gagal:", error),
