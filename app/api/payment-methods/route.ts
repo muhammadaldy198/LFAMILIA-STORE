@@ -1,3 +1,4 @@
+import { publicCustomerPaymentFee } from "@/lib/payment-fees";
 import {
   listPaymentChannels,
   listPaymentGatewaySettings,
@@ -34,6 +35,7 @@ export async function GET() {
       channel: item.channel,
       name: item.name,
       description: item.description,
+      ...publicCustomerPaymentFee(item.gatewayConfig),
       ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
     }));
 
