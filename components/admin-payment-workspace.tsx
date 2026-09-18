@@ -20,6 +20,7 @@ type Channel = {
   sortOrder: number;
   gateway: Gateway;
   gatewayConfig: Record<string, string>;
+  readiness?: { ready?: boolean; reason?: string | null };
 };
 type GatewaySetting = { gateway: Gateway; isActive: boolean };
 type GatewayReadiness = {
@@ -84,7 +85,7 @@ export function AdminPaymentWorkspace() {
       fetch("/api/panel/payment-routing", { cache: "no-store" }).catch(() => null),
     ]);
     const [channelPayload, pagePayload, walletPayload, orderPayload] = await Promise.all([channelResponse.json(), pageResponse.json(), walletResponse.json(), orderResponse.json()]) as [
-      { error?: string; channels?: Array<{ id: number | null; method: Channel["method"]; channel: string; name: string; description: string; imageUrl?: string; isActive: boolean; sortOrder: number; gateway: Gateway; gatewayConfig?: Record<string, string> }>; gatewaySettings?: GatewaySetting[]; gatewayReadiness?: GatewayReadiness },
+      { error?: string; channels?: Array<{ id: number | null; method: Channel["method"]; channel: string; name: string; description: string; imageUrl?: string; isActive: boolean; sortOrder: number; gateway: Gateway; gatewayConfig?: Record<string, string>; readiness?: { ready?: boolean; reason?: string | null } }>; gatewaySettings?: GatewaySetting[]; gatewayReadiness?: GatewayReadiness },
       { error?: string; settings?: PaymentPageSettings },
       { error?: string; settings?: typeof walletSettings },
       { error?: string; orders?: PaymentOrder[] },
@@ -106,6 +107,7 @@ export function AdminPaymentWorkspace() {
       sortOrder: item.sortOrder,
       gateway: item.gateway,
       gatewayConfig: item.gatewayConfig || {},
+      readiness: item.readiness,
     })));
     if (channelPayload.gatewaySettings) setGatewaySettings(channelPayload.gatewaySettings);
     if (channelPayload.gatewayReadiness) setGatewayReadiness(channelPayload.gatewayReadiness);
@@ -160,6 +162,7 @@ export function AdminPaymentWorkspace() {
       sortOrder: channels.length ? Math.max(...channels.map((item) => item.sortOrder)) + 1 : 0,
       gateway: "midtrans",
       gatewayConfig: { customerFeeBps: "0" },
+      readiness: undefined,
     });
   }
 
@@ -282,7 +285,7 @@ export function AdminPaymentWorkspace() {
       <Panel title="Metode Pembayaran" description="Tambah, hapus, aktif/nonaktifkan, dan tentukan gateway tiap metode dari sini." action={<div className="flex items-center gap-2"><button type="button" onClick={openCreateChannel} disabled={busy} className={primaryButtonClass}><Plus className="size-3.5" />Tambah Metode</button><button type="button" onClick={syncChannels} disabled={busy} className={buttonClass}><RefreshCw className="size-3.5" />Sinkron Provider</button></div>}>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left"><thead className="bg-[#f6f8fb] text-[8px] uppercase text-[#718198]"><tr><th className="px-4 py-2.5">Channel</th><th>Jenis</th><th>Gateway</th><th>Kesiapan</th><th>Status</th><th className="pr-4 text-right">Aksi</th></tr></thead>
-            <tbody className="divide-y divide-[#edf0f4]">{channels.map((channel) => <tr key={`${channel.dbId ?? "new"}:${channel.method}:${channel.id}`} className="text-[9px] text-[#42516a]"><td className="px-4 py-2.5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded bg-blue-50 text-[#0769e9]">{channel.group === "QRIS" ? <QrCode className="size-3.5" /> : channel.group === "VA Bank" ? <Landmark className="size-3.5" /> : <Smartphone className="size-3.5" />}</span><div><strong className="block text-[#23334e]">{channel.name}</strong><span className="text-[8px] text-[#8a98aa]">{channel.description || channel.id}</span></div></div></td><td>{channel.group}</td><td><select className={`${inputClass} h-8 w-32`} value={channel.gateway} onChange={(event) => setChannels((current) => current.map((item) => item.dbId === channel.dbId ? { ...item, gateway: event.target.value as Gateway } : item))}><option value="doku">DOKU Direct</option><option value="midtrans">Midtrans</option></select></td><td><Status tone={gatewayReadiness[channel.gateway]?.ready ? "green" : "amber"}>{gatewayReadiness[channel.gateway]?.ready ? "Siap" : "Belum siap"}</Status></td><td><Toggle checked={channel.enabled} onChange={(checked) => setChannels((current) => current.map((item) => item.dbId === channel.dbId ? { ...item, enabled: checked } : item))} /></td><td className="pr-4 text-right"><div className="flex justify-end gap-1.5"><button type="button" onClick={() => { setIsCreatingChannel(false); setEditChannel(channel); }} className={buttonClass}>Edit</button><button type="button" onClick={() => deleteChannel(channel)} className={`${buttonClass} text-rose-600`}><Trash2 className="size-3.5" />Hapus</button></div></td></tr>)}</tbody>
+            <tbody className="divide-y divide-[#edf0f4]">{channels.map((channel) => <tr key={`${channel.dbId ?? "new"}:${channel.method}:${channel.id}`} className="text-[9px] text-[#42516a]"><td className="px-4 py-2.5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded bg-blue-50 text-[#0769e9]">{channel.group === "QRIS" ? <QrCode className="size-3.5" /> : channel.group === "VA Bank" ? <Landmark className="size-3.5" /> : <Smartphone className="size-3.5" />}</span><div><strong className="block text-[#23334e]">{channel.name}</strong><span className="text-[8px] text-[#8a98aa]">{channel.description || channel.id}</span></div></div></td><td>{channel.group}</td><td><select className={`${inputClass} h-8 w-32`} value={channel.gateway} onChange={(event) => setChannels((current) => current.map((item) => item.dbId === channel.dbId ? { ...item, gateway: event.target.value as Gateway, readiness: undefined } : item))}><option value="doku">DOKU Direct</option><option value="midtrans">Midtrans</option></select></td><td><Status tone={channel.readiness?.ready ? "green" : channel.readiness ? "amber" : "blue"}>{channel.readiness ? (channel.readiness.ready ? "Siap" : "Belum siap") : "Simpan untuk cek"}</Status>{channel.readiness?.reason && <span className="mt-1 block max-w-[180px] text-[7px] leading-3 text-[#8a98aa]">{channel.readiness.reason}</span>}</td><td><Toggle checked={channel.enabled} onChange={(checked) => setChannels((current) => current.map((item) => item.dbId === channel.dbId ? { ...item, enabled: checked } : item))} /></td><td className="pr-4 text-right"><div className="flex justify-end gap-1.5"><button type="button" onClick={() => { setIsCreatingChannel(false); setEditChannel(channel); }} className={buttonClass}>Edit</button><button type="button" onClick={() => deleteChannel(channel)} className={`${buttonClass} text-rose-600`}><Trash2 className="size-3.5" />Hapus</button></div></td></tr>)}</tbody>
           </table>
           {!channels.length && <div className="p-8 text-center text-[10px] text-[#8190a5]">Belum ada metode pembayaran. Klik <strong>Tambah Metode</strong> atau <strong>Sinkron Provider</strong>.</div>}
         </div>

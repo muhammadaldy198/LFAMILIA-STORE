@@ -13,6 +13,7 @@ import {
 import { isAllowedMediaUrl } from "@/lib/media-url";
 import { isDokuChannelSupported } from "@/lib/server/doku";
 import { getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
+import { getPaymentModeOverview } from "@/lib/server/payment-mode-config";
 import { getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
 
 const gatewayConfigSchema = z.record(
@@ -61,12 +62,17 @@ function validateChannel(input: z.infer<typeof channelSchema>) {
 }
 
 async function gatewayReadiness() {
-  const [doku, midtrans] = await Promise.all([
-    getConfiguredGatewayReadiness({ gateway: "doku", paymentMethod: "qris", paymentChannel: "qris" }),
+  const [modes, midtrans] = await Promise.all([
+    getPaymentModeOverview(),
     getMidtransSnapReadiness(),
   ]);
   return {
-    doku: { ...doku, mode: "direct" as const },
+    doku: {
+      ready: modes.dokuDirectConfigured,
+      environment: modes.dokuEnvironment,
+      mode: "direct" as const,
+      reason: modes.dokuDirectConfigured ? null : `Kredensial DOKU Direct API ${modes.dokuEnvironment} belum lengkap.`,
+    },
     midtrans: { ...midtrans, mode: "snap" as const, relayReady: true },
   };
 }
@@ -75,8 +81,18 @@ export async function GET(request: Request) {
   const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   const gatewaySettings = await listPaymentGatewaySettings();
+  const channels = await listPaymentChannels(true);
+  const channelsWithReadiness = await Promise.all(channels.map(async (item) => ({
+    ...item,
+    readiness: await getConfiguredGatewayReadiness({
+      gateway: item.gateway,
+      paymentMethod: item.method,
+      paymentChannel: item.channel,
+      gatewayConfig: item.gatewayConfig,
+    }),
+  })));
   return Response.json({
-    channels: await listPaymentChannels(true),
+    channels: channelsWithReadiness,
     gatewaySettings,
     gateways: gatewaySettings.filter((item) => item.isActive).map((item) => item.gateway),
     gatewayReadiness: await gatewayReadiness(),

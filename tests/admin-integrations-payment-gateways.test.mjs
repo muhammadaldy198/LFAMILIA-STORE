@@ -40,3 +40,33 @@ test("payment credential backend keeps DOKU and Midtrans values encrypted", () =
   assert.match(config, /direct: \["clientId", "secretKey", "privateKey"/);
   assert.match(config, /snap: \["serverKey", "clientKey"\]/);
 });
+
+
+test("obsolete duplicate payment credential panel is removed and dashboard says Direct API", () => {
+  assert.equal(fs.existsSync(path.join(root, "components/admin-payment-routing-panel.tsx")), false);
+  const overview = read("components/admin-overview.tsx");
+  assert.match(overview, /DOKU Direct API/);
+  assert.doesNotMatch(overview, /DOKU Checkout/);
+});
+
+
+test("Admin payment readiness is evaluated per channel, not by QRIS as a global proxy", () => {
+  const route = read("app/api/admin/payment-methods/route.ts");
+  const workspace = read("components/admin-payment-workspace.tsx");
+  assert.match(route, /channelsWithReadiness/);
+  assert.match(route, /paymentMethod: item\.method/);
+  assert.match(route, /paymentChannel: item\.channel/);
+  assert.match(route, /gatewayConfig: item\.gatewayConfig/);
+  assert.match(route, /dokuDirectConfigured/);
+  assert.doesNotMatch(route, /gateway: "doku", paymentMethod: "qris", paymentChannel: "qris"/);
+  assert.match(workspace, /channel\.readiness/);
+  assert.match(workspace, /Simpan untuk cek/);
+});
+
+
+test("Dashboard DOKU status uses core Direct API readiness, not QRIS-specific readiness", () => {
+  const route = read("app/api/admin/dashboard-integrations/route.ts");
+  assert.match(route, /paymentModes\.dokuDirectConfigured/);
+  assert.doesNotMatch(route, /paymentMethod: "qris"/);
+  assert.doesNotMatch(route, /getConfiguredGatewayReadiness/);
+});

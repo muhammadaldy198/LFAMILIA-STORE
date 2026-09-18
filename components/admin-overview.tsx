@@ -73,7 +73,7 @@ const featureCards = [
   { title: "Produk", Icon: Boxes, target: "products", minimumRole: "admin", items: ["Kategori game & layanan", "SKU provider", "Struktur nominal", "Jenis pengiriman", "Kelola produk voucher"] },
   { title: "Banner & Konten", Icon: ImageIcon, target: "content", minimumRole: "staff", items: ["Kelola banner utama", "Pop-up informasi", "Berita & pengumuman", "Ulasan pelanggan", "Halaman FAQ"] },
   { title: "Digiflazz", Icon: Link2, target: "digiflazz", minimumRole: "admin", items: ["Sinkronisasi pricelist", "Price Control", "Mapping SKU produk", "Monitor layanan", "Log API & history"] },
-  { title: "Pembayaran", Icon: CreditCard, target: "payments", minimumRole: "admin", items: ["DOKU Checkout", "Midtrans Snap", "QRIS / VA / E-Wallet", "Callback otomatis", "Routing metode aktif"] },
+  { title: "Pembayaran", Icon: CreditCard, target: "payments", minimumRole: "admin", items: ["DOKU Direct API", "Midtrans Snap", "QRIS / VA / E-Wallet", "Callback otomatis", "Routing metode aktif"] },
   { title: "Pelanggan", Icon: Users, target: "customers", minimumRole: "admin", items: ["Data pelanggan", "Wallet & saldo", "Riwayat transaksi", "Status akun pelanggan"] },
   { title: "Promo", Icon: Sparkles, target: "promotions", minimumRole: "admin", items: ["Kode voucher", "Diskon checkout", "Promo member", "Event promo khusus"] },
   { title: "Layanan Pelanggan", Icon: Headphones, target: "support", minimumRole: "staff", items: ["Sistem tiket", "Status tiket pelanggan", "Prioritas penanganan", "Lampiran bukti transaksi"] },

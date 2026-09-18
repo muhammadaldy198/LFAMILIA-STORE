@@ -2,7 +2,7 @@
 
 Gateway pembayaran yang didukung dikelola dari Admin Panel: **DOKU Direct API** dan **Midtrans Snap**. Keduanya dapat dipakai untuk checkout dan top up saldo, serta dapat diaktifkan/dinonaktifkan dengan toggle tanpa menghapus credential.
 
-Credential DOKU Direct API Sandbox/Production disimpan terenkripsi di D1 menggunakan `INTEGRATION_ENCRYPTION_KEY`. Backend mendukung QRIS, Virtual Account yang dikonfigurasi, serta DANA/ShopeePay Direct API. Callback DOKU memakai `https://lfamiliastore.my.id/api/payments/doku/callback`.
+Credential DOKU Direct API dan Midtrans Snap diisi dari **Super Admin → Integrasi**. Profile Sandbox/Production disimpan terenkripsi di D1 menggunakan `INTEGRATION_ENCRYPTION_KEY`. Backend mendukung QRIS, Virtual Account yang dikonfigurasi, serta DANA/ShopeePay Direct API. Callback DOKU memakai `https://lfamiliastore.my.id/api/payments/doku/callback`.
 
 Top up saldo mempunyai gateway pilihan sendiri di **Super Admin → Pembayaran**: **DOKU Direct API** atau **Midtrans Snap**. Pilihan top up tidak mengikuti routing checkout. Gateway pilihan harus berstatus siap dan toggle gateway harus ON; jika OFF atau belum siap, backend menolak pembuatan top up dan tidak melakukan fallback otomatis.
 
