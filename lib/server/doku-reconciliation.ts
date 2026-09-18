@@ -188,8 +188,8 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
             console.error("Notifikasi order hasil rekonsiliasi DOKU gagal:", error),
           );
         }
-      } else if (query.status === "failed" || query.status === "expired") {
-        await applyPendingDokuPaymentStatus(order, query.status);
+      } else if (query.status === "failed") {
+        await applyPendingDokuPaymentStatus(order, "failed");
       }
     } catch (error) {
       console.error("Rekonsiliasi status order DOKU gagal:", error);
@@ -247,17 +247,14 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
         await notifyWalletTopupSuccessById(topup.id, topup.reference_id).catch((error) =>
           console.error("Notifikasi top up hasil rekonsiliasi DOKU gagal:", error),
         );
-      } else if (query.status === "failed" || query.status === "expired") {
+      } else if (query.status === "failed") {
         await db.prepare(
           `UPDATE wallet_topups
-           SET admin_notes = ?, updated_at = CURRENT_TIMESTAMP
+           SET admin_notes = 'Pembayaran DOKU gagal terkonfirmasi.', updated_at = CURRENT_TIMESTAMP
            WHERE id = ?
              AND status = 'rejected'
              AND admin_notes IN ('Pembayaran kedaluwarsa.', 'Pembayaran DOKU kedaluwarsa.')`,
-        ).bind(
-          query.status === "expired" ? "Pembayaran DOKU kedaluwarsa terkonfirmasi." : "Pembayaran DOKU gagal terkonfirmasi.",
-          topup.id,
-        ).run();
+        ).bind(topup.id).run();
       }
     } catch (error) {
       console.error("Rekonsiliasi status top up DOKU gagal:", error);
