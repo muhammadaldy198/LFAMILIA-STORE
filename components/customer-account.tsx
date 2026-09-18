@@ -8,13 +8,11 @@ import {
   ExternalLink,
   Copy,
   LoaderCircle,
-  LogIn,
   LogOut,
   Menu,
   PackageCheck,
   ReceiptText,
   ShieldCheck,
-  UserPlus,
   UserRound,
   WalletCards,
   X,
@@ -28,7 +26,7 @@ import type { WalletSettings } from "@/lib/server/wallet";
 import { formatRupiah } from "@/lib/store-data";
 import { CustomerSupport } from "@/components/customer-support";
 import { CustomerGameAccounts } from "@/components/customer-game-accounts";
-import { TurnstileWidget } from "@/components/turnstile-widget";
+import { CustomerAuthForm } from "@/components/customer-auth-form";
 
 type AccountData = {
   customer: CustomerSession;
@@ -154,162 +152,16 @@ function AuthPanel({
   setError(value: string): void;
   onSuccess(): Promise<void>;
 }) {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmation, setConfirmation] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const [turnstileReset, setTurnstileReset] = useState(0);
-  const [saving, setSaving] = useState(false);
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setError("");
-    if (mode === "register" && password !== confirmation) {
-      setError("Konfirmasi password tidak sama.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const response = await fetch(`/api/auth/${mode}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          mode === "register"
-            ? { name, phone: phone.replace(/[\s()-]/g, ""), email, password, turnstileToken }
-            : { email, password, turnstileToken },
-        ),
-      });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Akun gagal diproses.");
-      await onSuccess();
-    } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Akun gagal diproses.",
-      );
-      setTurnstileToken("");
-      setTurnstileReset((value) => value + 1);
-    } finally {
-      setSaving(false);
-    }
-  }
   return (
-    <div className="mx-auto max-w-md rounded-[28px] border border-white/[0.09] bg-[#10131b] p-6 sm:p-8">
-      <div className="text-center">
-        <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#b9ff35]/10 text-[#cfff72]">
-          {mode === "login" ? (
-            <LogIn className="size-6" />
-          ) : (
-            <UserPlus className="size-6" />
-          )}
-        </span>
-        <h1 className="mt-4 text-2xl font-black">
-          {mode === "login" ? "Masuk ke akun" : "Buat akun LFAMILIA"}
-        </h1>
-        <p className="mt-2 text-xs leading-5 text-white/38">
-          Simpan saldo, riwayat pembelian, dan berikan ulasan terverifikasi.
-        </p>
-      </div>
-      <div className="mt-6 grid grid-cols-2 rounded-xl border border-white/10 bg-black/20 p-1">
-        <button
-          type="button"
-          onClick={() => {
-            setMode("login");
-            setError("");
-          }}
-          className={`rounded-lg py-2.5 text-xs font-bold ${mode === "login" ? "bg-[#b9ff35] text-[#091006]" : "text-white/45"}`}
-        >
-          Masuk
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMode("register");
-            setError("");
-          }}
-          className={`rounded-lg py-2.5 text-xs font-bold ${mode === "register" ? "bg-[#b9ff35] text-[#091006]" : "text-white/45"}`}
-        >
-          Daftar
-        </button>
-      </div>
-      <form onSubmit={submit} className="mt-5 space-y-4">
-        {mode === "register" && (
-          <>
-            <Field label="Nama lengkap">
-              <Input
-                required
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                className="checkout-input"
-              />
-            </Field>
-            <Field label="Nomor WhatsApp">
-              <Input
-                required
-                inputMode="tel"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                className="checkout-input"
-                placeholder="081234567890"
-              />
-            </Field>
-          </>
-        )}
-        <Field label="Email">
-          <Input
-            required
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="checkout-input"
-            placeholder="nama@email.com"
-          />
-        </Field>
-        <Field label="Password">
-          <Input
-            required
-            minLength={8}
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="checkout-input"
-            placeholder="Minimal 8 karakter"
-          />
-        </Field>
-        {mode === "register" && (
-          <Field label="Ulangi password">
-            <Input
-              required
-              minLength={8}
-              type="password"
-              value={confirmation}
-              onChange={(event) => setConfirmation(event.target.value)}
-              className="checkout-input"
-            />
-          </Field>
-        )}
-        {error && (
-          <p className="rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-xs leading-5 text-red-200">
-            {error}
-          </p>
-        )}
-        <TurnstileWidget key={turnstileReset} onToken={setTurnstileToken} />
-        <Button
-          disabled={saving}
-          className="h-12 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006]"
-        >
-          {saving && <LoaderCircle className="mr-2 size-4 animate-spin" />}
-          {mode === "login" ? "Masuk" : "Buat akun"}
-        </Button>
-      </form>
-      <p className="mt-5 flex items-start gap-2 text-[10px] leading-5 text-white/30">
-        <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-[#b9ff35]" />
-        Password diacak dan tidak pernah ditampilkan kepada admin.
-      </p>
-    </div>
+    <CustomerAuthForm
+      mode={mode}
+      setMode={setMode}
+      error={error}
+      setError={setError}
+      onSuccess={onSuccess}
+    />
   );
 }
-
 function Dashboard({
   data,
   settings,
