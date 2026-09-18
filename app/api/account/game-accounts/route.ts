@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getD1 } from "@/db";
+import { normalizeProductCategorySlug } from "@/lib/product-categories";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
@@ -59,7 +60,7 @@ async function readProduct(slug: string) {
   const row = await getD1().prepare(
     "SELECT slug, name, category, input_fields_json, input_label, needs_server FROM products WHERE slug = ? AND is_active = 1 LIMIT 1",
   ).bind(slug).first<ProductRow>();
-  if (!row || row.category.trim().toLowerCase() !== "game") throw new Error("Produk game tidak ditemukan.");
+  if (!row || normalizeProductCategorySlug(row.category) !== "game") throw new Error("Produk game tidak ditemukan.");
   return { row, fields: parseFields(row) };
 }
 
