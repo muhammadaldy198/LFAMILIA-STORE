@@ -58,7 +58,7 @@ export async function PATCH(request: Request) {
   try {
     const input = retrySchema.parse(await request.json());
     const order = await getOrderById(input.orderId);
-    if (!order || order.provider_code !== "voucher-stock" || order.payment_status !== "paid") {
+    if (!order || order.provider_code?.trim().toLowerCase() !== "voucher-stock" || order.payment_status !== "paid") {
       return Response.json({ error: "Pesanan stok kode yang lunas tidak ditemukan." }, { status: 404 });
     }
     const baseUrl = new URL(request.url).origin;
