@@ -153,6 +153,8 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
         db.prepare(`SELECT name FROM sqlite_master WHERE name IN (
           'promotion_reservations',
           'promotion_reservations_expiry_idx',
+          'orders_wallet_checkout_key_unique',
+          'orders_external_checkout_key_unique',
           'wallet_topups_external_checkout_key_unique',
           'promotion_reservation_voucher_guard',
           'promotion_reservation_flash_guard',
