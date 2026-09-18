@@ -85,18 +85,20 @@ test("payment maintenance reconciles before ambiguous expiry and keeps pending p
   assert.match(promotions, /orders\.payment_status IN \('pending', 'paid'\)/);
 });
 
-test("active promo reservations cannot be orphaned by admin edits", () => {
+test("active promo reservations cannot race admin edits", () => {
   const promotions = read("lib/server/promotions.ts");
-  assert.match(promotions, /Kode voucher tidak dapat diubah saat masih memiliki reservasi/);
-  assert.match(promotions, /Batas penggunaan tidak boleh lebih kecil dari penggunaan \+ reservasi aktif/);
-  assert.match(promotions, /Produk\/nominal flash sale tidak dapat diganti saat masih memiliki reservasi/);
-  assert.match(promotions, /Promo tidak dapat dihapus saat masih memiliki reservasi/);
+  assert.match(promotions, /AND \(code = \? OR reserved_count = 0\)/);
+  assert.match(promotions, /AND \(\? IS NULL OR \? >= used_count \+ reserved_count\)/);
+  assert.match(promotions, /AND \(\(product_slug = \? AND package_sku = \?\) OR reserved_count = 0\)/);
+  assert.match(promotions, /AND \(\? IS NULL OR \? >= sold_count \+ reserved_count\)/);
+  assert.match(promotions, /DELETE FROM \$\{table\} WHERE id = \? AND reserved_count = 0/);
 });
 
 test("DOKU reconciliation closes local expiry but keeps authoritative late-paid recovery", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
   const transition = read("lib/server/doku-payment-transition.ts");
-  assert.match(doku, /payment_status IN \('pending', 'expired'\)/);
+  assert.match(doku, /payment_status = 'expired'/);
+  assert.match(doku, /datetime\('now', '-24 hours'\)/);
   assert.match(doku, /expiredOrders/);
   assert.match(doku, /expiredWalletTopups/);
   assert.match(doku, /applyPendingDokuPaymentStatus\(order, "paid", \{/);
@@ -140,6 +142,31 @@ test("DOKU expired-order polling updates the canonical throttle timestamp", () =
   const doku = read("lib/server/doku-reconciliation.ts");
   assert.match(doku, /payment_status IN \('pending', 'expired'\)/);
   assert.match(doku, /gateway_status_checked_at = CURRENT_TIMESTAMP/);
+});
+
+test("stale DigiFlazz reconciliation normalizes legacy provider casing and notifies once", () => {
+  const source = read("lib/server/digiflazz-reconciliation.ts");
+  assert.match(source, /lower\(trim\(provider_code\)\) = 'digiflazz'/);
+  assert.match(source, /const \[, updateResult\] = await db\.batch/);
+  assert.match(source, /Number\(updateResult\?\.meta\.changes \?\? 0\) > 0/);
+});
+
+test("wallet topup only uses uncertainty hold after gateway dispatch begins", () => {
+  const route = read("app/api/account/topups/route.ts");
+  const wallet = read("lib/server/wallet-external.ts");
+  assert.match(route, /let paymentDispatchStarted = false/);
+  assert.match(route, /paymentDispatchStarted = true;[\s\S]*createConfiguredPayment/);
+  assert.match(route, /if \(paymentDispatchStarted\)/);
+  assert.match(route, /rejectExternalWalletTopupCreation/);
+  assert.match(wallet, /export async function rejectExternalWalletTopupCreation/);
+  assert.match(wallet, /SET status = 'rejected'/);
+});
+
+test("expired DOKU recovery is bounded and terminal provider failure retires history", () => {
+  const doku = read("lib/server/doku-reconciliation.ts");
+  assert.match(doku, /datetime\('now', '-24 hours'\)/);
+  assert.match(doku, /NOT EXISTS \([\s\S]*oe\.source = 'doku'[\s\S]*oe\.status = 'failed'/);
+  assert.match(doku, /Pembayaran DOKU gagal terkonfirmasi\./);
 });
 
 test("DOKU overview only reports ready for a parseable RSA key and HTTPS endpoint", () => {
