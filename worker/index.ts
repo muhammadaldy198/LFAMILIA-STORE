@@ -10,7 +10,10 @@ import { recoverStaleAutomaticOrders } from "../lib/server/orders";
 import { releaseExpiredExternalPromotions } from "../lib/server/promotions";
 import { reconcileStaleDigiflazzProcessing } from "../lib/server/digiflazz-reconciliation";
 import { finalizeExpiredDokuPayments } from "../lib/server/doku-reconciliation";
-import { reconcilePendingMidtransTopups } from "../lib/server/midtrans-reconciliation";
+import {
+  reconcilePendingMidtransOrders,
+  reconcilePendingMidtransTopups,
+} from "../lib/server/midtrans-reconciliation";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 import { cleanupSecurityRateLimits } from "../lib/server/security";
 import { cleanupOrphanStoreMedia } from "../lib/server/media";
@@ -223,6 +226,7 @@ const worker = {
       cleanupSecurityRateLimits().catch(() => undefined),
       releaseExpiredExternalPromotions().catch(() => undefined),
       finalizeExpiredDokuPayments().catch(() => undefined),
+      reconcilePendingMidtransOrders().catch(() => undefined),
       reconcilePendingMidtransTopups().catch(() => undefined),
       expireUninitializedExternalWalletTopups().catch(() => undefined),
       expireUninitializedExternalOrders().catch(() => undefined),
