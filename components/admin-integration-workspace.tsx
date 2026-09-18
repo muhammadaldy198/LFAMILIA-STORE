@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { KeyRound, Mail, Network, Save, Server, ShieldCheck } from "lucide-react";
+import { KeyRound, LogIn, Mail, Network, Save, Server, ShieldCheck } from "lucide-react";
 import { CopyUrl, Field, Panel, Status, TabBar, WorkspaceHeader, buttonClass, inputClass, primaryButtonClass } from "@/components/admin-workspace-ui";
 
-const tabs = ["Ringkasan", "Digiflazz", "KokinPay", "Resend Email", "Relay & Keamanan"] as const;
+const tabs = ["Ringkasan", "Digiflazz", "KokinPay", "Google Login", "Resend Email", "Relay & Keamanan"] as const;
 type Tab = (typeof tabs)[number];
-type Provider = "digiflazz" | "kokinpay" | "resend" | "relay" | "security";
+type Provider = "digiflazz" | "kokinpay" | "google" | "resend" | "relay" | "security";
 type Environment = "development" | "production" | "global";
 type Profile = { provider: Provider; environment: Environment; configured: boolean; decryptionError: boolean };
 type Callback = { id: string; label: string; description: string; url: string };
@@ -55,6 +55,7 @@ export function AdminIntegrationWorkspace() {
   const configured = useMemo(() => new Set((overview?.profiles ?? []).filter((profile) => profile.configured && !profile.decryptionError).map((profile) => `${profile.provider}:${profile.environment}`)), [overview]);
   const isConfigured = (provider: Provider, environment: Environment) => configured.has(`${provider}:${environment}`);
   const digiflazzWebhook = overview?.callbacks.find((item) => item.id === "digiflazz")?.url || fallbackWebhook;
+  const googleCallback = overview?.callbacks.find((item) => item.id === "google-oauth")?.url || "/api/auth/google/callback";
 
   async function put(body: object) {
     const response = await fetch("/api/panel/integrations", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -72,6 +73,8 @@ export function AdminIntegrationWorkspace() {
         await put({ action: "save_selections", selections: { digiflazzEnvironment } });
       } else if (tab === "KokinPay") {
         await put({ action: "save_profile", provider: "kokinpay", mode: "service", environment: "global", values: { apiKey: values.kokinpayApiKey || "" } });
+      } else if (tab === "Google Login") {
+        await put({ action: "save_profile", provider: "google", mode: "service", environment: "global", values: { clientId: values.googleClientId || "", clientSecret: values.googleClientSecret || "" } });
       } else if (tab === "Resend Email") {
         await put({ action: "save_profile", provider: "resend", mode: "service", environment: "global", values: { apiKey: values.resendApiKey || "", fromEmail: values.resendFromEmail || "", apiUrl: values.resendApiUrl || "", deliveryChannel: values.resendDeliveryChannel || "email" } });
       } else if (tab === "Relay & Keamanan") {
@@ -79,7 +82,7 @@ export function AdminIntegrationWorkspace() {
         if (values.voucherEncryptionKey?.trim()) await put({ action: "save_profile", provider: "security", mode: "service", environment: "global", values: { voucherEncryptionKey: values.voucherEncryptionKey } });
       }
       await load();
-      setValues((current) => ({ ...current, apiKey: "", webhookSecret: "", kokinpayApiKey: "", resendApiKey: "", relayToken: "", voucherEncryptionKey: "" }));
+      setValues((current) => ({ ...current, apiKey: "", webhookSecret: "", kokinpayApiKey: "", googleClientSecret: "", resendApiKey: "", relayToken: "", voucherEncryptionKey: "" }));
       setMessage("Konfigurasi tersimpan aman di backend.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Integrasi gagal disimpan."); }
     finally { setBusy(false); }
@@ -114,9 +117,10 @@ export function AdminIntegrationWorkspace() {
     {message && <p className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[9px] text-emerald-700">{message}</p>}
     {error && <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[9px] text-red-700">{error}</p>}
     <TabBar tabs={[...tabs]} active={tab} onChange={(value) => setTab(value as Tab)} />
-    {tab === "Ringkasan" && <div className="grid grid-cols-2 gap-4"><Card icon={<Network className="size-5" />} title="Digiflazz" ready={isConfigured("digiflazz", digiflazzEnvironment)} onClick={() => setTab("Digiflazz")} /><Card icon={<KeyRound className="size-5" />} title="KokinPay" ready={isConfigured("kokinpay", "global")} onClick={() => setTab("KokinPay")} /><Card icon={<Mail className="size-5" />} title="Resend Email" ready={isConfigured("resend", "global")} onClick={() => setTab("Resend Email")} /><Card icon={<Server className="size-5" />} title="VPS Relay" ready={isConfigured("relay", "global")} onClick={() => setTab("Relay & Keamanan")} /><Panel title="Callback Digiflazz" description="Tempel URL ini pada pengaturan webhook Digiflazz." className="col-span-2"><div className="p-4"><CopyUrl label="Webhook URL" value={digiflazzWebhook} /></div></Panel></div>}
+    {tab === "Ringkasan" && <div className="grid grid-cols-2 gap-4"><Card icon={<Network className="size-5" />} title="Digiflazz" ready={isConfigured("digiflazz", digiflazzEnvironment)} onClick={() => setTab("Digiflazz")} /><Card icon={<KeyRound className="size-5" />} title="KokinPay" ready={isConfigured("kokinpay", "global")} onClick={() => setTab("KokinPay")} /><Card icon={<LogIn className="size-5" />} title="Google Login" ready={isConfigured("google", "global")} onClick={() => setTab("Google Login")} /><Card icon={<Mail className="size-5" />} title="Resend Email" ready={isConfigured("resend", "global")} onClick={() => setTab("Resend Email")} /><Card icon={<Server className="size-5" />} title="VPS Relay" ready={isConfigured("relay", "global")} onClick={() => setTab("Relay & Keamanan")} /><Panel title="Callback & Redirect URL" description="Gunakan URL ini pada dashboard provider terkait." className="col-span-2"><div className="grid gap-3 p-4"><CopyUrl label="Digiflazz Webhook URL" value={digiflazzWebhook} /><CopyUrl label="Google Authorized Redirect URI" value={googleCallback} /></div></Panel></div>}
     {tab === "Digiflazz" && <Panel title="Digiflazz" description="Dipanggil backend hanya setelah pembayaran benar-benar berhasil."><div className="grid grid-cols-2 gap-4 p-4"><Select label="Environment" value={digiflazzEnvironment} onChange={(value) => setDigiflazzEnvironment(value as "development" | "production")} options={["development", "production"]} /><Text label="Username" value={values.username || ""} onChange={(value) => setValue("username", value)} /><Text label="API Key" secret value={values.apiKey || ""} onChange={(value) => setValue("apiKey", value)} /><Text label="Webhook Secret" secret value={values.webhookSecret || ""} onChange={(value) => setValue("webhookSecret", value)} /><Text label="Transaction URL" value={values.transactionApiUrl || ""} onChange={(value) => setValue("transactionApiUrl", value)} /><Text label="Pricelist URL" value={values.priceListUrl || ""} onChange={(value) => setValue("priceListUrl", value)} /></div></Panel>}
     {tab === "KokinPay" && <Panel title="KokinPay" description="Credential untuk validasi nickname."><div className="grid grid-cols-2 gap-4 p-4"><Text label="API Key" secret value={values.kokinpayApiKey || ""} onChange={(value) => setValue("kokinpayApiKey", value)} /></div></Panel>}
+    {tab === "Google Login" && <Panel title="Google Login" description="OAuth pelanggan. Client Secret disimpan terenkripsi dan tidak pernah dikirim kembali ke browser."><div className="grid grid-cols-2 gap-4 p-4"><Text label="Client ID" value={values.googleClientId || ""} onChange={(value) => setValue("googleClientId", value)} /><Text label="Client Secret" secret value={values.googleClientSecret || ""} onChange={(value) => setValue("googleClientSecret", value)} /><div className="col-span-2"><CopyUrl label="Authorized Redirect URI" value={googleCallback} /></div></div></Panel>}
     {tab === "Resend Email" && <Panel title="Resend Email" description="Pengiriman notifikasi transaksi."><div className="grid grid-cols-2 gap-4 p-4"><Text label="API Key" secret value={values.resendApiKey || ""} onChange={(value) => setValue("resendApiKey", value)} /><Text label="From Email" value={values.resendFromEmail || ""} onChange={(value) => setValue("resendFromEmail", value)} /><Text label="API URL" value={values.resendApiUrl || ""} onChange={(value) => setValue("resendApiUrl", value)} /><Select label="Channel" value={values.resendDeliveryChannel || "email"} onChange={(value) => setValue("resendDeliveryChannel", value)} options={["email", "website"]} /></div></Panel>}
     {tab === "Relay & Keamanan" && <div className="grid grid-cols-2 gap-4"><Panel title="VPS Relay" description="Hanya untuk request Digiflazz."><div className="grid gap-4 p-4"><Text label="Relay URL" value={values.relayOrigin || ""} onChange={(value) => setValue("relayOrigin", value)} /><Text label="Host diizinkan" value={values.relayHosts || ""} onChange={(value) => setValue("relayHosts", value)} /><Text label="Relay Token" secret value={values.relayToken || ""} onChange={(value) => setValue("relayToken", value)} /></div></Panel><Panel title="Keamanan"><div className="grid gap-4 p-4"><Text label="Voucher Encryption Key" secret value={values.voucherEncryptionKey || ""} onChange={(value) => setValue("voucherEncryptionKey", value)} /><p className="text-[9px] text-[#718198]"><ShieldCheck className="mr-1 inline size-3.5 text-emerald-600" />Credential tidak dikirim kembali ke browser.</p></div></Panel></div>}
   </div>;

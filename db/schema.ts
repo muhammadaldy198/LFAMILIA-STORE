@@ -41,6 +41,23 @@ export const customerSessions = sqliteTable(
   ],
 );
 
+export const customerOauthAccounts = sqliteTable(
+  "customer_oauth_accounts",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id").notNull().references(() => customerUsers.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    providerSubject: text("provider_subject").notNull(),
+    providerEmail: text("provider_email"),
+    avatarUrl: text("avatar_url"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("customer_oauth_provider_subject_unique").on(table.provider, table.providerSubject),
+    uniqueIndex("customer_oauth_provider_customer_unique").on(table.provider, table.customerId),
+  ],
+);
 export const customerGameAccounts = sqliteTable(
   "customer_game_accounts",
   {
