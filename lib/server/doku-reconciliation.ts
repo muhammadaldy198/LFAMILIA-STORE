@@ -16,7 +16,7 @@ import {
   notifyOrderFulfillmentSuccessById,
   notifyWalletTopupSuccessById,
 } from "@/lib/server/transaction-notifications";
-import { applyDokuWalletTopup } from "@/lib/server/wallet";
+import { applyExternalWalletTopup } from "@/lib/server/wallet-external";
 
 type ReconciliationOrder = OrderRecord & {
   payment_gateway: string | null;
@@ -33,6 +33,7 @@ type PendingTopup = {
   id: string;
   reference_id: string;
   amount: number;
+  payment_total: number;
   payment_method: string;
   doku_request_id: string;
   doku_reference_no: string | null;
@@ -56,6 +57,7 @@ async function queryOrderStatus(order: ReconciliationOrder) {
     return queryDokuQrisStatus({
       referenceId: order.reference_id,
       referenceNo,
+      environment,
     });
   }
   if (order.payment_method === "va" && paymentNo) {
@@ -80,6 +82,13 @@ async function queryOrderStatus(order: ReconciliationOrder) {
 
 async function queryTopupStatus(topup: PendingTopup) {
   const [method = "", channel = ""] = topup.payment_method.split(":", 2);
+  if (method === "qris" && topup.doku_reference_no) {
+    return queryDokuQrisStatus({
+      referenceId: topup.reference_id,
+      referenceNo: topup.doku_reference_no,
+      environment: topup.doku_environment,
+    });
+  }
   if (method === "va" && channel && topup.doku_payment_no) {
     return queryDokuVaStatus({
       environment: topup.doku_environment,
@@ -94,7 +103,7 @@ async function queryTopupStatus(topup: PendingTopup) {
       referenceId: topup.reference_id,
       requestId: topup.doku_request_id,
       referenceNo: topup.doku_reference_no,
-      amount: topup.amount,
+      amount: topup.payment_total || topup.amount,
     });
   }
   return null;
@@ -170,14 +179,14 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
   }
 
   const pendingTopups = await db.prepare(
-    `SELECT id, reference_id, amount, payment_method, doku_request_id,
+    `SELECT id, reference_id, amount, payment_total, payment_method, doku_request_id,
       doku_reference_no, doku_payment_no, doku_environment
      FROM wallet_topups
      WHERE source = 'doku'
        AND payment_gateway = 'doku'
        AND payment_gateway_mode = 'direct'
        AND status = 'pending'
-       AND (payment_method LIKE 'va:%' OR payment_method LIKE 'ewallet:%')
+       AND (payment_method LIKE 'va:%' OR payment_method LIKE 'ewallet:%' OR payment_method LIKE 'qris:%')
        AND doku_request_id IS NOT NULL
        AND doku_environment IN ('sandbox', 'production')
        AND created_at <= datetime('now', '-60 seconds')
@@ -196,8 +205,9 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
       const query = await queryTopupStatus(topup);
       if (!query) continue;
       queriedWalletTopups += 1;
-      const result = await applyDokuWalletTopup({
+      const result = await applyExternalWalletTopup({
         referenceId: topup.reference_id,
+        gateway: "doku",
         status: query.status,
         originalRequestId: topup.doku_request_id,
         callbackAmount: query.amount,
@@ -253,8 +263,9 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
   ).bind(safeLimit).all<{ reference_id: string }>();
 
   for (const topup of expiredTopups.results) {
-    await applyDokuWalletTopup({
+    await applyExternalWalletTopup({
       referenceId: topup.reference_id,
+      gateway: "doku",
       status: "expired",
       originalRequestId: null,
       callbackAmount: 0,
