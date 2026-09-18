@@ -351,7 +351,15 @@ export async function ensureLegacyDatabaseColumns() {
           ORDER BY pp.id DESC
           LIMIT 1
         )
-        WHERE provider_max_price_snapshot IS NULL`);
+        WHERE provider_max_price_snapshot IS NULL
+          AND EXISTS (
+            SELECT 1
+            FROM product_packages pp
+            JOIN products p ON p.id = pp.product_id
+            WHERE p.slug = orders.product_slug
+              AND pp.sku = orders.package_sku
+              AND pp.provider_max_price IS NOT NULL
+          )`);
       await runSchemaStatement(`UPDATE orders
         SET supplier_cost_snapshot = (
           SELECT pp.supplier_price
@@ -363,7 +371,15 @@ export async function ensureLegacyDatabaseColumns() {
           ORDER BY pp.id DESC
           LIMIT 1
         )
-        WHERE supplier_cost_snapshot IS NULL`);
+        WHERE supplier_cost_snapshot IS NULL
+          AND EXISTS (
+            SELECT 1
+            FROM product_packages pp
+            JOIN products p ON p.id = pp.product_id
+            WHERE p.slug = orders.product_slug
+              AND pp.sku = orders.package_sku
+              AND pp.supplier_price IS NOT NULL
+          )`);
 
       // If Wrangler's migration ledger already exists, record 0029 only after the
       // complete target schema is present. This prevents a later Wrangler apply
