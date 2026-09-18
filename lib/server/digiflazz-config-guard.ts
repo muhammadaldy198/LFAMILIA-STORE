@@ -197,6 +197,21 @@ export async function invalidateDigiflazzOperationalCache(token: string) {
   }
 }
 
+export async function assertDigiflazzConfigurationIdle() {
+  await ensureDigiflazzConfigurationGuard();
+  const row = await getD1().prepare(`
+    SELECT maintenance_token, maintenance_until
+    FROM digiflazz_runtime_state
+    WHERE id = 1
+      AND maintenance_token IS NOT NULL
+      AND maintenance_until > CURRENT_TIMESTAMP
+    LIMIT 1
+  `).first<{ maintenance_token: string; maintenance_until: string }>();
+  if (row?.maintenance_token) {
+    throw new Error("Perubahan konfigurasi DigiFlazz lain sedang berjalan. Coba lagi beberapa saat.");
+  }
+}
+
 export async function releaseDigiflazzConfigurationGuard(token: string, successful: boolean) {
   const db = getD1();
   await db.batch([
