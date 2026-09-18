@@ -179,12 +179,28 @@ export async function expireUninitializedExternalWalletTopups() {
       AND datetime(gateway_expired_at) <= datetime('now')`).run();
 }
 
+export async function expireConfirmedMissingMidtransTopup(referenceId: string) {
+  const result = await getD1().prepare(`
+    UPDATE wallet_topups
+    SET status = 'rejected',
+        admin_notes = 'Transaksi tidak ditemukan di Midtrans setelah batas verifikasi.',
+        updated_at = CURRENT_TIMESTAMP
+    WHERE reference_id = ?
+      AND status = 'pending'
+      AND payment_gateway = 'midtrans'
+      AND gateway_request_id IS NULL
+      AND created_at <= datetime('now', '-70 minutes')
+  `).bind(referenceId).run();
+  return Number(result.meta.changes ?? 0) > 0;
+}
+
 export async function applyExternalWalletTopup(input: {
   referenceId: string;
   gateway: PaymentGatewayName;
   status: "paid" | "pending" | "expired" | "failed";
   originalRequestId?: string | null;
   callbackAmount: number;
+  authoritativePaid?: boolean;
 }) {
   const topup = await getExternalWalletTopup(input.referenceId, input.gateway);
   if (!topup) return { found: false, credited: false };
@@ -198,18 +214,33 @@ export async function applyExternalWalletTopup(input: {
   const db = getD1();
   if (input.status === "paid") {
     const reference = `topup:${topup.id}`;
+    const allowedStatus = input.authoritativePaid
+      ? "t.status IN ('pending', 'rejected')"
+      : "t.status = 'pending'";
+    const expiryGuard = input.authoritativePaid
+      ? ""
+      : "AND (t.gateway_expired_at IS NULL OR datetime(t.gateway_expired_at) > datetime('now'))";
+    const approvalStatus = input.authoritativePaid
+      ? "status IN ('pending', 'rejected')"
+      : "status = 'pending'";
+
     const results = await db.batch([
-      db.prepare(`INSERT INTO wallet_transactions (id, customer_id, direction, amount, balance_before, balance_after, reference, description)
+      db.prepare(`INSERT OR IGNORE INTO wallet_transactions (id, customer_id, direction, amount, balance_before, balance_after, reference, description)
         SELECT ?, t.customer_id, 'credit', t.amount, ledger.balance, ledger.balance + t.amount, ?, ?
         FROM wallet_topups t CROSS JOIN (
           SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0) AS balance
           FROM wallet_transactions WHERE customer_id = ?
         ) ledger
-        WHERE t.id = ? AND t.status = 'pending'
-          AND (t.gateway_expired_at IS NULL OR datetime(t.gateway_expired_at) > datetime('now'))`)
+        WHERE t.id = ? AND ${allowedStatus} ${expiryGuard}`)
         .bind(crypto.randomUUID(), reference, `Top up otomatis ${input.gateway.toUpperCase()} ${topup.id.slice(0, 8).toUpperCase()}`, topup.customer_id, topup.id),
-      db.prepare(`UPDATE wallet_topups SET status = 'approved', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ? AND status = 'pending' AND EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?)`)
+      db.prepare(`UPDATE wallet_topups SET
+          status = 'approved',
+          admin_notes = NULL,
+          reviewed_by = ?,
+          reviewed_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND ${approvalStatus}
+          AND EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?)`)
         .bind(`${input.gateway}-callback`, topup.id, reference),
       db.prepare(`UPDATE customer_users SET balance = (
           SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END), 0)
@@ -218,12 +249,20 @@ export async function applyExternalWalletTopup(input: {
         WHERE id = ? AND EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?)`)
         .bind(topup.customer_id, topup.customer_id, reference),
     ]);
-    const credited = Number(results[0]?.meta.changes ?? 0) > 0 && Number(results[1]?.meta.changes ?? 0) > 0;
+
+    const credited =
+      Number(results[0]?.meta.changes ?? 0) > 0 &&
+      Number(results[1]?.meta.changes ?? 0) > 0;
     if (credited) return { found: true, credited: true };
-    const expired = await db.prepare(`UPDATE wallet_topups SET status = 'rejected', admin_notes = 'Pembayaran kedaluwarsa.', updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND status = 'pending' AND gateway_expired_at IS NOT NULL AND datetime(gateway_expired_at) <= datetime('now')`)
-      .bind(topup.id).run();
-    return { found: true, credited: false, ignored: Number(expired.meta.changes ?? 0) > 0 ? "expired" : undefined };
+
+    if (!input.authoritativePaid) {
+      const expired = await db.prepare(`UPDATE wallet_topups SET status = 'rejected', admin_notes = 'Pembayaran kedaluwarsa.', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND status = 'pending' AND gateway_expired_at IS NOT NULL AND datetime(gateway_expired_at) <= datetime('now')`)
+        .bind(topup.id).run();
+      return { found: true, credited: false, ignored: Number(expired.meta.changes ?? 0) > 0 ? "expired" : undefined };
+    }
+
+    return { found: true, credited: false };
   }
 
   if (input.status === "expired" || input.status === "failed") {
