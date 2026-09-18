@@ -90,6 +90,25 @@ test("failed active DigiFlazz configuration changes preserve the previous cache 
   assert.match(integration, /export async function restoreIntegrationProfileSnapshot/);
   assert.match(integration, /export async function captureIntegrationSettingSnapshot/);
   assert.match(integration, /export async function restoreIntegrationSettingSnapshot/);
+  assert.match(integration, /createdAt: string \| null/);
+  assert.match(integration, /updatedAt: string \| null/);
+  assert.match(integration, /maintenance_token = \?/);
+  assert.match(integration, /lock_token = \?/);
+  assert.match(route, /captureCommitted/);
+  assert.match(route, /Rollback dibatalkan karena guard kedaluwarsa atau konfigurasi DigiFlazz sudah berubah/);
+});
+
+test("targeted DigiFlazz product and package syncs cannot repopulate stale seller availability", () => {
+  const pricing = read("lib/server/digiflazz-pricing.ts");
+  const monitor = read("lib/server/digiflazz-monitor.ts");
+  assert.match(pricing, /acquireTargetedPriceListSyncLock/);
+  assert.match(pricing, /withTargetedPriceListSyncLock/);
+  assert.match(pricing, /syncDigiflazzProduct[\s\S]*withTargetedPriceListSyncLock/);
+  assert.match(pricing, /syncDigiflazzPackage[\s\S]*withTargetedPriceListSyncLock/);
+  assert.match(pricing, /Lock sync DigiFlazz kedaluwarsa sebelum snapshot seller dapat disimpan/);
+  assert.match(monitor, /syncLockToken/);
+  assert.match(monitor, /digiflazz_pricelist_sync_state/);
+  assert.match(monitor, /digiflazz_runtime_state/);
 });
 
 test("DigiFlazz transaction response is JSON-safe and requires exact LFAMILIA correlation", () => {
