@@ -647,20 +647,39 @@ type TopupPayment = {
 
 function TopupForm({
   settings,
+  channels,
   onDone,
   onError,
 }: {
-  settings: WalletSettings | null;
+  settings: PublicWalletSettings | null;
+  channels: PublicWalletChannel[];
   onDone(): Promise<void>;
   onError(value: string): void;
 }) {
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<"qris" | "va" | "ewallet">("qris");
+  const [selectedChannelKey, setSelectedChannelKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [payment, setPayment] = useState<TopupPayment | null>(null);
   const [openingPayment, setOpeningPayment] = useState(false);
 
   const automaticReady = Boolean(settings?.enabled);
+  const selectedChannel =
+    channels.find((item) => `${item.method}:${item.channel}` === selectedChannelKey) ??
+    channels[0] ??
+    null;
+
+  useEffect(() => {
+    if (!channels.length) {
+      setSelectedChannelKey("");
+      return;
+    }
+    const selectedStillExists = channels.some(
+      (item) => `${item.method}:${item.channel}` === selectedChannelKey,
+    );
+    if (!selectedStillExists) {
+      setSelectedChannelKey(`${channels[0].method}:${channels[0].channel}`);
+    }
+  }, [channels, selectedChannelKey]);
 
   function openTopupPayment() {
     if (!payment?.paymentUrl) return;
@@ -673,11 +692,15 @@ function TopupForm({
     onError("");
     setSaving(true);
     try {
-      const channel = method === "qris" ? "mpm" : method === "va" ? "bca" : "dana";
+      if (!selectedChannel) throw new Error("Metode top up saldo belum tersedia.");
       const response = await fetch("/api/account/topups", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ amount: Number(amount), paymentMethod: method, paymentChannel: channel }),
+        body: JSON.stringify({
+          amount: Number(amount),
+          paymentMethod: selectedChannel.method,
+          paymentChannel: selectedChannel.channel,
+        }),
       });
       const data = await response.json() as TopupPayment & { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Pembayaran gagal dibuat.");
@@ -699,7 +722,23 @@ function TopupForm({
     <div className="mt-4 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-[10px] leading-4 text-white/42">
       Pilih metode pembayaran yang ingin digunakan.
     </div>
-    <div className="mt-4 grid grid-cols-3 gap-2">{(["qris","va","ewallet"] as const).map((item) => <button key={item} type="button" onClick={() => setMethod(item)} className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase ${method === item ? "border-[#b9ff35] bg-[#b9ff35] text-[#091006]" : "border-white/10 text-white/50"}`}>{item === "va" ? "Bank VA" : item}</button>)}</div>
+    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      {channels.map((item) => {
+        const key = `${item.method}:${item.channel}`;
+        const selected = selectedChannel ? `${selectedChannel.method}:${selectedChannel.channel}` === key : false;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setSelectedChannelKey(key)}
+            className={`rounded-lg border px-3 py-2.5 text-left transition ${selected ? "border-[#b9ff35] bg-[#b9ff35] text-[#091006]" : "border-white/10 bg-white/[0.02] text-white/65"}`}
+          >
+            <strong className="block text-[10px] font-black">{item.name}</strong>
+            <span className={`mt-0.5 block text-[9px] ${selected ? "text-[#091006]/65" : "text-white/35"}`}>{item.description || (item.method === "va" ? "Virtual Account" : item.method.toUpperCase())}</span>
+          </button>
+        );
+      })}
+    </div>
     <div className="mt-4"><Field label={`Nominal (min. ${formatRupiah(settings?.minimumAmount ?? 10_000)})`}><Input required type="number" min={settings?.minimumAmount ?? 10_000} value={amount} onChange={(event) => setAmount(event.target.value)} className="checkout-input" /></Field></div>
     <Button disabled={saving} className="mt-4 w-full rounded-xl bg-[#b9ff35] font-black text-[#091006]">{saving ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <ArrowUpRight className="mr-2 size-4" />}Lanjut bayar</Button>
     {payment && (
