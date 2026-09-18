@@ -17,10 +17,15 @@ async function expireIfDue(order: OrderRecord) {
 }
 
 /**
- * A hosted payment may only settle a locally pending invoice which has not
- * expired. This keeps notification, polling, and expiry races terminal.
+ * Normal local transitions respect stored expiry. A cryptographically verified
+ * or authenticated provider status may opt into authoritativePaid so a delayed
+ * observation of a genuine payment is not discarded by local clock expiry.
  */
-export async function applyPendingExternalPaymentStatus(order: OrderRecord, status: ExternalPaymentStatus) {
+export async function applyPendingExternalPaymentStatus(
+  order: OrderRecord,
+  status: ExternalPaymentStatus,
+  options: { authoritativePaid?: boolean } = {},
+) {
   if (status === "pending") return false;
   if (status === "expired") {
     await expireIfDue(order);
@@ -30,15 +35,23 @@ export async function applyPendingExternalPaymentStatus(order: OrderRecord, stat
   const db = getD1();
   if (status === "paid") {
     const nextFulfillment = order.fulfillment_type === "manual" ? "manual_pending" : "processing";
-    const result = await db.prepare(
-      `UPDATE orders SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND payment_status = 'pending'
-         AND (COALESCE(gateway_expired_at, doku_expired_at) IS NULL
-           OR datetime(COALESCE(gateway_expired_at, doku_expired_at)) > datetime('now'))`,
-    ).bind(nextFulfillment, order.id).run();
+    const result = options.authoritativePaid
+      ? await db.prepare(
+          `UPDATE orders SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND payment_status IN ('pending', 'expired')`,
+        ).bind(nextFulfillment, order.id).run()
+      : await db.prepare(
+          `UPDATE orders SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND payment_status = 'pending'
+             AND (COALESCE(gateway_expired_at, doku_expired_at) IS NULL
+               OR datetime(COALESCE(gateway_expired_at, doku_expired_at)) > datetime('now'))`,
+        ).bind(nextFulfillment, order.id).run();
     const changed = Number(result.meta.changes ?? 0) > 0;
-    if (changed) await consumeOrderPromotion(order.voucher_code, order.flash_sale_id, order.id);
-    else await expireIfDue(order);
+    if (changed) {
+      await consumeOrderPromotion(order.voucher_code, order.flash_sale_id, order.id);
+    } else if (!options.authoritativePaid) {
+      await expireIfDue(order);
+    }
     return changed;
   }
 
