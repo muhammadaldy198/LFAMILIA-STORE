@@ -45,6 +45,31 @@ test("Midtrans scheduler queries provider status even after local expiry", () =>
   assert.match(walletExternal, /payment_gateway IS NULL OR payment_gateway <> 'midtrans'/);
 });
 
+test("verified provider paid status can settle after local expiry without reopening arbitrary failures", () => {
+  const transition = read("lib/server/payment-transition.ts");
+  const wallet = read("lib/server/wallet-external.ts");
+  const midtrans = read("lib/server/midtrans-reconciliation.ts");
+  assert.match(transition, /authoritativePaid/);
+  assert.match(transition, /payment_status IN \('pending', 'expired'\)/);
+  assert.match(midtrans, /authoritativePaid: true/);
+  assert.match(wallet, /authoritativePaid/);
+  assert.match(wallet, /admin_notes IN \('Pembayaran kedaluwarsa\.', 'Pembayaran DOKU kedaluwarsa\.'\)/);
+});
+
+test("definitive Midtrans absence expires only after the uncertainty window", () => {
+  const snap = read("lib/server/midtrans-snap.ts");
+  const midtrans = read("lib/server/midtrans-reconciliation.ts");
+  const external = read("lib/server/external-payments.ts");
+  const wallet = read("lib/server/wallet-external.ts");
+  assert.match(snap, /class MidtransTransactionNotFoundError/);
+  assert.match(snap, /response\.status === 404/);
+  assert.match(midtrans, /instanceof MidtransTransactionNotFoundError/);
+  assert.match(midtrans, /expireConfirmedMissingMidtransOrder/);
+  assert.match(midtrans, /expireConfirmedMissingMidtransTopup/);
+  assert.match(external, /created_at <= datetime\('now', '-70 minutes'\)/);
+  assert.match(wallet, /created_at <= datetime\('now', '-70 minutes'\)/);
+});
+
 test("payment maintenance reconciles before ambiguous expiry and keeps pending promo reservations", () => {
   const worker = read("worker/index.ts");
   const promotions = read("lib/server/promotions.ts");
