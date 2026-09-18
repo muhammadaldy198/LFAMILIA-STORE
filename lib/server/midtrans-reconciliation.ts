@@ -90,7 +90,35 @@ export async function reconcilePendingMidtransOrders(limit = 100) {
     }
   }
 
-  return { queried, settled };
+  const expiredOrders = await db.prepare(
+    `SELECT * FROM orders
+     WHERE payment_status = 'pending'
+       AND payment_gateway = 'midtrans'
+       AND payment_gateway_mode = 'snap'
+       AND payment_gateway_environment IN ('sandbox', 'production')
+       AND gateway_expired_at IS NOT NULL
+       AND datetime(gateway_expired_at) <= datetime('now')
+     ORDER BY gateway_expired_at ASC
+     LIMIT ?`,
+  ).bind(safeLimit).all<OrderRecord>();
+
+  let expired = 0;
+  for (const order of expiredOrders.results) {
+    await applyPendingExternalPaymentStatus(order, "expired");
+    expired += 1;
+    await recordExternalPaymentEvent({
+      orderId: order.id,
+      gateway: "midtrans",
+      eventId: `local-expiry-${order.id}`,
+      status: "expired",
+      payload: {
+        expiredAt: order.gateway_expired_at,
+        reason: "stored_midtrans_expiry",
+      },
+    });
+  }
+
+  return { queried, settled, expired };
 }
 
 export async function reconcilePendingMidtransTopups(limit = 100) {
