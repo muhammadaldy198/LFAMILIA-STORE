@@ -143,7 +143,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const pending = await findMatchingExternalTopup(customer.id, input.amount, paymentMethodKey);
+    const pending = await findMatchingExternalTopup(customer.id, input.amount, paymentMethodKey, walletTopupGateway);
     if (pending) return existingResponse(pending);
 
     referenceId = `WLT-${crypto.randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
@@ -166,7 +166,7 @@ export async function POST(request: Request) {
     if (Number(inserted.meta.changes ?? 0) === 0) {
       const winner = idempotencyKey
         ? await findExternalTopupByKey(customer.id, idempotencyKey)
-        : await findMatchingExternalTopup(customer.id, input.amount, paymentMethodKey);
+        : await findMatchingExternalTopup(customer.id, input.amount, paymentMethodKey, walletTopupGateway);
       if (winner) return existingResponse(winner);
       return Response.json(
         { error: "Permintaan top up yang sama sedang dibuat. Coba lagi beberapa detik." },
