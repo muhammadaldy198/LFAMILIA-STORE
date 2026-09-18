@@ -12,8 +12,8 @@ async function expirePendingOrderIfDue(order: OrderRecord) {
     `UPDATE orders
      SET payment_status = 'expired', updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND payment_status = 'pending'
-       AND doku_expired_at IS NOT NULL
-       AND datetime(doku_expired_at) <= datetime('now')`,
+       AND COALESCE(gateway_expired_at, doku_expired_at) IS NOT NULL
+       AND datetime(COALESCE(gateway_expired_at, doku_expired_at)) <= datetime('now')`,
   ).bind(order.id).run();
   const changed = Number(result.meta.changes ?? 0) > 0;
   if (changed) await releaseExternalPromotion(order.id);
@@ -21,14 +21,14 @@ async function expirePendingOrderIfDue(order: OrderRecord) {
 }
 
 /**
- * DOKU may send or return delayed status updates. Only a locally pending and
- * not-yet-expired order may become paid. The database deadline check is part of
- * the conditional UPDATE so a late paid callback cannot race the expiry job and
- * revive an invoice whose stored DOKU validity has already elapsed.
+ * Local transitions respect stored expiry. A verified DOKU callback/status may
+ * opt into authoritativePaid so a genuine payment observed after local clock
+ * expiry is not discarded.
  */
 export async function applyPendingDokuPaymentStatus(
   order: OrderRecord,
   status: DokuTerminalStatus,
+  options: { authoritativePaid?: boolean } = {},
 ) {
   const db = getD1();
   if (status === "pending") return false;
@@ -36,19 +36,25 @@ export async function applyPendingDokuPaymentStatus(
   if (status === "paid") {
     const nextFulfillment =
       order.fulfillment_type === "manual" ? "manual_pending" : "processing";
-    const result = await db.prepare(
-      `UPDATE orders
-       SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND payment_status = 'pending'
-         AND (doku_expired_at IS NULL OR datetime(doku_expired_at) > datetime('now'))`,
-    ).bind(nextFulfillment, order.id).run();
+    const result = options.authoritativePaid
+      ? await db.prepare(
+          `UPDATE orders
+           SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND payment_status IN ('pending', 'expired')`,
+        ).bind(nextFulfillment, order.id).run()
+      : await db.prepare(
+          `UPDATE orders
+           SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND payment_status = 'pending'
+             AND (doku_expired_at IS NULL OR datetime(doku_expired_at) > datetime('now'))`,
+        ).bind(nextFulfillment, order.id).run();
     const changed = Number(result.meta.changes ?? 0) > 0;
     if (changed) {
       await consumeOrderPromotion(order.voucher_code, order.flash_sale_id, order.id);
       return true;
     }
 
-    await expirePendingOrderIfDue(order);
+    if (!options.authoritativePaid) await expirePendingOrderIfDue(order);
     return false;
   }
 

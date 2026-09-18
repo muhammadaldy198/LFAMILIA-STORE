@@ -51,6 +51,16 @@ export type OrderRecord = {
   supplier_cost_snapshot: number | null;
   provider_max_price_snapshot: number | null;
   doku_environment: "sandbox" | "production" | null;
+  payment_gateway?: "doku" | "midtrans" | null;
+  payment_gateway_mode?: "direct" | "snap" | null;
+  payment_gateway_environment?: "sandbox" | "production" | null;
+  gateway_request_id?: string | null;
+  gateway_reference_no?: string | null;
+  gateway_payment_no?: string | null;
+  gateway_qr_content?: string | null;
+  gateway_payment_url?: string | null;
+  gateway_expired_at?: string | null;
+  gateway_status_checked_at?: string | null;
   target_template: string;
   destination: string;
   server: string | null;
@@ -200,8 +210,8 @@ export async function resolvePurchasableItem(
       packageSku: row.package_sku,
       packageLabel: row.package_label,
       price: row.price,
-      providerCode: row.provider_code,
-      providerSku: row.provider_sku,
+      providerCode: row.provider_code?.trim().toLowerCase() || null,
+      providerSku: row.provider_sku?.trim() || null,
       packageId: row.package_id,
       supplierCost: row.supplier_price,
       providerMaxPrice: row.provider_max_price,
@@ -294,6 +304,9 @@ export async function insertPendingOrder(input: {
   customerInputs: CustomerInputValue[];
   paymentMethod: string;
   paymentChannel: string;
+  paymentGateway?: "doku" | "midtrans" | null;
+  paymentGatewayMode?: "direct" | "snap" | null;
+  paymentGatewayEnvironment?: "sandbox" | "production" | null;
   customerId?: string | null;
   walletCheckoutKey?: string | null;
   externalCheckoutKey?: string | null;
@@ -326,8 +339,9 @@ export async function insertPendingOrder(input: {
       provider_code, provider_sku, fulfillment_type, delivery_mode, supplier_cost_snapshot, provider_max_price_snapshot, target_template, destination, server,
       nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json,
       base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
-      admin_fee, total, payment_method, payment_channel
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      admin_fee, total, payment_method, payment_channel,
+      payment_gateway, payment_gateway_mode, payment_gateway_environment, doku_environment
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       input.id,
@@ -364,6 +378,10 @@ export async function insertPendingOrder(input: {
       input.promotion.finalPrice + (input.adminFee ?? 0),
       input.paymentMethod,
       input.paymentChannel,
+      input.paymentGateway ?? null,
+      input.paymentGatewayMode ?? null,
+      input.paymentGatewayEnvironment ?? null,
+      input.paymentGateway === "doku" ? input.paymentGatewayEnvironment ?? null : null,
     )
     .run();
 }
@@ -554,30 +572,32 @@ export async function fulfillAutomaticOrder(
     order.fulfillment_type !== "automatic"
   )
     return;
-  if (!order.provider_code || !order.provider_sku || !order.customer_no) {
+  const providerCode = order.provider_code?.trim().toLowerCase() || null;
+  const providerSku = order.provider_sku?.trim() || null;
+  if (!providerCode || !providerSku || !order.customer_no) {
     await setFulfillmentError(
       order.id,
       "Provider, SKU, atau format tujuan belum lengkap.",
     );
     return;
   }
-  const adapter = getProviderAdapter(order.provider_code);
+  const adapter = getProviderAdapter(providerCode);
   if (!adapter) {
     await setFulfillmentError(
       order.id,
-      `Adapter ${order.provider_code} belum tersedia.`,
+      `Adapter ${providerCode} belum tersedia.`,
     );
     return;
   }
   const currentItem = await resolvePurchasableItem(order.product_slug, order.package_sku);
   if (
     !currentItem ||
-    currentItem.providerCode !== order.provider_code ||
-    currentItem.providerSku !== order.provider_sku ||
+    currentItem.providerCode !== providerCode ||
+    currentItem.providerSku !== providerSku ||
     !await isAutomaticPackageAvailable({
       packageId: currentItem?.packageId ?? 0,
-      providerCode: order.provider_code,
-      providerSku: order.provider_sku,
+      providerCode,
+      providerSku,
       maxPrice: order.provider_max_price_snapshot,
     })
   ) {
@@ -590,7 +610,7 @@ export async function fulfillAutomaticOrder(
 
   const claimed = await claimAutomaticFulfillmentAttempt(
     order.id,
-    order.provider_code,
+    providerCode,
   );
   if (!claimed) return;
 
@@ -599,8 +619,8 @@ export async function fulfillAutomaticOrder(
       {
         id: order.id,
         referenceId: order.reference_id,
-        providerCode: order.provider_code,
-        providerSku: order.provider_sku,
+        providerCode,
+        providerSku,
         destination: order.destination,
         server: order.server,
         customerNo: order.customer_no,
@@ -619,7 +639,7 @@ export async function fulfillAutomaticOrder(
     await applyProviderResult(order, result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Provider gagal dihubungi.";
-    if (order.provider_code === "digiflazz" || order.provider_code === "voucher-stock") {
+    if (providerCode === "digiflazz" || providerCode === "voucher-stock") {
       await setRetryableFulfillmentError(order.id, message);
     } else {
       await setFulfillmentError(order.id, message);
@@ -638,7 +658,7 @@ export async function claimAutomaticFulfillmentAttempt(
       provider_status IS NULL
       OR (
         provider_status IN ('dispatching', 'retryable_error')
-        AND provider_code IN ('digiflazz', 'voucher-stock')
+        AND lower(trim(provider_code)) IN ('digiflazz', 'voucher-stock')
         AND updated_at <= datetime('now', '-2 minutes')
       )
     )`;
@@ -655,7 +675,7 @@ export async function claimAutomaticFulfillmentAttempt(
     db.prepare(
       `UPDATE orders SET fulfillment_status = 'dispatching', provider_status = 'dispatching',
          provider_ref_id = CASE
-           WHEN provider_code = 'digiflazz' THEN COALESCE(provider_ref_id, reference_id)
+           WHEN lower(trim(provider_code)) = 'digiflazz' THEN COALESCE(provider_ref_id, reference_id)
            ELSE provider_ref_id
          END,
          updated_at = CURRENT_TIMESTAMP
@@ -702,7 +722,7 @@ export async function recoverStaleAutomaticOrders(
        updated_at = CURRENT_TIMESTAMP
      WHERE payment_status = 'paid' AND fulfillment_type = 'automatic'
        AND provider_status = 'dispatching'
-       AND provider_code NOT IN ('digiflazz', 'voucher-stock')
+       AND lower(trim(coalesce(provider_code, ''))) NOT IN ('digiflazz', 'voucher-stock')
        AND updated_at <= datetime('now', '-2 minutes')`,
   ).run();
   const result = await db.prepare(
@@ -712,12 +732,12 @@ export async function recoverStaleAutomaticOrders(
          provider_status IS NULL
          OR (
            provider_status = 'dispatching'
-           AND provider_code IN ('digiflazz', 'voucher-stock')
+           AND lower(trim(provider_code)) IN ('digiflazz', 'voucher-stock')
            AND updated_at <= datetime('now', '-2 minutes')
          )
          OR (
            provider_status = 'retryable_error'
-           AND provider_code IN ('digiflazz', 'voucher-stock')
+           AND lower(trim(provider_code)) IN ('digiflazz', 'voucher-stock')
            AND updated_at <= datetime('now', '-2 minutes')
          )
        )
@@ -759,9 +779,9 @@ async function applyProviderResult(
   await recordOrderEvent({
     orderId: order.id,
     source:
-      order.provider_code === "digiflazz"
+      order.provider_code?.trim().toLowerCase() === "digiflazz"
         ? "digiflazz"
-        : order.provider_code === "voucher-stock"
+        : order.provider_code?.trim().toLowerCase() === "voucher-stock"
           ? "voucher_stock"
           : "admin",
     eventId: eventId || `request-${order.reference_id}-${Date.now()}`,
@@ -799,7 +819,7 @@ export async function applyProviderWebhook(input: {
   const db = getD1();
   const order = await db
     .prepare(
-      `SELECT * FROM orders WHERE provider_code = ? AND (provider_ref_id = ? OR reference_id = ?) LIMIT 1`,
+      `SELECT * FROM orders WHERE lower(trim(provider_code)) = ? AND (provider_ref_id = ? OR reference_id = ?) LIMIT 1`,
     )
     .bind(input.providerCode, input.providerRefId, input.providerRefId)
     .first<OrderRecord>();

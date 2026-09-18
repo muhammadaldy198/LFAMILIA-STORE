@@ -116,14 +116,16 @@ test("customer login and registration support Cloudflare Turnstile", () => {
 });
 
 
-test("public feed masks invoices while exact WhatsApp lookup can recover them", () => {
+test("public and phone-only order search keep invoices masked", () => {
   const source = read("app/api/orders/search/route.ts");
   const getStart = source.indexOf("export async function GET");
   const postStart = source.indexOf("export async function POST");
   const publicFeed = source.slice(getStart, postStart);
   assert.match(publicFeed, /SELECT reference_id, product_name/);
   assert.match(source, /const referenceId = revealInvoice \? row\.reference_id \?\? null : null/);
-  assert.match(source, /mapSummary\(row, true\)/);
+  assert.match(source, /session\?\.phoneVerified/);
+  assert.match(source, /normalizeWhatsappPhone\(phone\) === normalizeWhatsappPhone\(session\.phone\)/);
+  assert.doesNotMatch(source, /mapSummary\(row, true\)/);
   assert.match(source, /maskedReferenceId: referenceId \|\| maskedInvoice\(row\.reference_id\)/);
   assert.match(source, /allowRequest\(request, "order-phone-search", 5, 600\)/);
 });

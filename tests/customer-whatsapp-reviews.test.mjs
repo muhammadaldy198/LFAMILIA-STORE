@@ -99,6 +99,12 @@ test("WhatsApp OTP backend hashes codes, expires challenges, and calls WhatsApp 
   assert.match(source, /messaging_product:\s*"whatsapp"/);
   assert.match(source, /type:\s*"template"/);
   assert.match(source, /otp_hash/);
+  assert.match(source, /ORDER BY datetime\(created_at\) DESC, id DESC/);
+  assert.match(source, /SET attempt_count = attempt_count \+ 1/);
+  assert.match(source, /Number\(claimed\.meta\.changes \?\? 0\) === 0/);
+  assert.match(source, /datetime\(created_at\) < datetime\(\?\)/);
+  assert.match(source, /datetime\(created_at\) = datetime\(\?\) AND id < \?/);
+  assert.match(source, /\.bind\(customerId, challengeId, createdAt, createdAt, challengeId\)/);
   assert.doesNotMatch(source, /INSERT INTO customer_phone_otp_challenges[\s\S]{0,300}\botp\b\s*,/i);
 });
 
@@ -134,6 +140,9 @@ test("guest buyers can review a paid order using invoice and checkout WhatsApp",
   assert.match(route, /saveGuestProductReview/);
   assert.doesNotMatch(route, /requireCustomerSession/);
   assert.match(reviews, /payment_status\s*=\s*'paid'/);
+  assert.match(reviews, /\^LF\[A-F0-9\]\{8,12\}\$/);
+  assert.match(reviews, /UPPER\(reference_id\) = \?/);
+  assert.doesNotMatch(reviews, /replace\(\/\^LF\//);
   assert.match(reviews, /buyer_phone/);
   assert.match(reviews, /product_reviews WHERE order_id/);
   assert.match(ui, /Nomor invoice/);

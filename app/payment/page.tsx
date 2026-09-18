@@ -29,6 +29,8 @@ type PaymentOrder = {
   referenceId: string;
   productName: string;
   packageLabel: string;
+  productTotal: number;
+  paymentFee: number;
   total: number;
   paymentMethod: string;
   paymentChannel: string;
@@ -322,6 +324,8 @@ function PaymentContent() {
                   )}
                 />
                 <div className="h-px bg-white/[0.08]" />
+                <Row label="Harga setelah promo" value={formatRupiah(order.productTotal)} />
+                <Row label="Biaya pembayaran" value={formatRupiah(order.paymentFee)} />
                 <Row
                   label="Total pembayaran"
                   value={formatRupiah(order.total)}

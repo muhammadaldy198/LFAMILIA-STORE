@@ -158,6 +158,7 @@ export async function POST(request: Request) {
         status,
         originalRequestId,
         callbackAmount,
+        authoritativePaid: status === "paid",
       });
       if (result.credited) {
         await notifyWalletTopupSuccessById(externalWallet.id, referenceId).catch((error) =>
@@ -188,7 +189,7 @@ export async function POST(request: Request) {
     if (orderRouting?.payment_gateway !== "doku" || orderRouting.payment_gateway_mode !== "direct") {
       return notificationResponse(scheme, payload, eventId);
     }
-    if (!canProcessDokuOrderCallback(order.payment_status)) {
+    if (!canProcessDokuOrderCallback(order.payment_status, status)) {
       return notificationResponse(scheme, payload, eventId);
     }
 
@@ -207,7 +208,9 @@ export async function POST(request: Request) {
       payload,
     });
 
-    const firstPaid = await applyPendingExternalPaymentStatus(order, notification.status);
+    const firstPaid = await applyPendingExternalPaymentStatus(order, notification.status, {
+      authoritativePaid: notification.status === "paid",
+    });
     if (firstPaid && order.fulfillment_type === "automatic") {
       await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
       await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>

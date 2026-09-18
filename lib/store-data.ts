@@ -15,6 +15,7 @@ export type ProductPackage = {
   providerSku?: string;
   providerConfigured?: boolean;
   fulfillmentReady?: boolean;
+  fulfillmentAvailable?: boolean;
   fulfillmentMode?: PublicFulfillmentMode;
 };
 

@@ -1,5 +1,6 @@
 import { getD1 } from "@/db";
 import type { PaymentGatewayName } from "@/lib/server/payment-channels";
+import { releaseExternalPromotion } from "@/lib/server/promotions";
 import type { RoutedPaymentMode } from "@/lib/server/payment-router";
 
 export type ExternalPaymentArtifacts = {
@@ -136,4 +137,59 @@ export function externalArtifactsFromOrder(order: Record<string, unknown>) {
     paymentUrl: String(order.gateway_payment_url || order.doku_payment_url || "") || null,
     expiredAt: String(order.gateway_expired_at || order.doku_expired_at || "") || null,
   };
+}
+
+
+export async function expireConfirmedMissingMidtransOrder(orderId: string) {
+  const db = getD1();
+  const result = await db.prepare(`
+    UPDATE orders
+    SET payment_status = 'expired',
+        provider_message = COALESCE(provider_message, 'Transaksi tidak ditemukan di Midtrans setelah batas verifikasi.'),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+      AND payment_status = 'pending'
+      AND payment_gateway = 'midtrans'
+      AND gateway_request_id IS NULL
+      AND created_at <= datetime('now', '-70 minutes')
+  `).bind(orderId).run();
+  const changed = Number(result.meta.changes ?? 0) > 0;
+  if (changed) await releaseExternalPromotion(orderId);
+  return changed;
+}
+
+export async function expireUninitializedExternalOrders(limit = 100) {
+  const db = getD1();
+  const safeLimit = Math.min(Math.max(limit, 1), 500);
+  const rows = await db.prepare(`
+    SELECT id
+    FROM orders
+    WHERE payment_status = 'pending'
+      AND payment_method <> 'wallet'
+      AND external_checkout_key IS NOT NULL
+      AND (payment_gateway IS NULL OR payment_gateway <> 'midtrans')
+      AND gateway_request_id IS NULL
+      AND doku_request_id IS NULL
+      AND created_at <= datetime('now', '-70 minutes')
+    ORDER BY created_at ASC
+    LIMIT ?
+  `).bind(safeLimit).all<{ id: string }>();
+
+  let expired = 0;
+  for (const row of rows.results) {
+    const result = await db.prepare(`
+      UPDATE orders
+      SET payment_status = 'expired',
+          provider_message = COALESCE(provider_message, 'Pembuatan pembayaran tidak dapat dipastikan dan melewati batas aman.'),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND payment_status = 'pending'
+        AND gateway_request_id IS NULL
+        AND doku_request_id IS NULL
+    `).bind(row.id).run();
+    if (Number(result.meta.changes ?? 0) > 0) {
+      expired += 1;
+      await releaseExternalPromotion(row.id);
+    }
+  }
+  return { expired };
 }

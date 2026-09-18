@@ -54,12 +54,14 @@ async function withDigiflazzConfigurationGuard(action: () => Promise<void>) {
   const token = await acquireDigiflazzConfigurationGuard();
   let successful = false;
   try {
-    // Fail closed: remove data created with the old environment/credentials
-    // before mutating the active configuration. The shared sync lock prevents
-    // an old-environment pricelist request from repopulating the cache.
+    // The guard blocks new DigiFlazz orders and pricelist sync while the active
+    // configuration changes. Clear every credential-dependent operational
+    // cache before committing the new active profile. If invalidation fails,
+    // the profile is left unchanged; if the save then fails, the old profile
+    // remains valid and its cache can be rebuilt safely after the guard exits.
     await invalidateDigiflazzOperationalCache(token);
-    await action();
     clearDigiflazzBalanceCache();
+    await action();
     successful = true;
   } finally {
     await releaseDigiflazzConfigurationGuard(token, successful);

@@ -113,6 +113,7 @@ export async function POST(request: Request) {
   let referenceId: string | null = null;
   let checkoutKey: string | null = null;
   let orderId: string | null = null;
+  let paymentDispatchStarted = false;
   try {
     const input = routingSchema.parse(await request.json());
     checkoutKey = input.idempotencyKey;
@@ -126,7 +127,12 @@ export async function POST(request: Request) {
     const managedChannel = await getPaymentChannel(input.paymentMethod, paymentChannel, false);
     if (
       !managedChannel ||
-      !isGatewayChannelSupported(managedChannel.gateway, input.paymentMethod, paymentChannel)
+      !isGatewayChannelSupported(
+        managedChannel.gateway,
+        input.paymentMethod,
+        paymentChannel,
+        managedChannel.gatewayConfig,
+      )
     ) {
       return Response.json(
         { error: "Metode pembayaran belum didukung atau sedang dinonaktifkan." },
@@ -213,6 +219,9 @@ export async function POST(request: Request) {
       customerInputs: customerData.values,
       paymentMethod: input.paymentMethod,
       paymentChannel,
+      paymentGateway: managedChannel.gateway,
+      paymentGatewayMode: readiness.mode,
+      paymentGatewayEnvironment: readiness.environment,
       customerId: customer?.id ?? null,
       externalCheckoutKey: input.idempotencyKey,
       promotion,
@@ -224,11 +233,15 @@ export async function POST(request: Request) {
       orderId,
       voucherCode: promotion.voucherCode,
       flashSaleId: promotion.flashSaleId,
-      expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+      // Keep promo capacity reserved through the uncertain-payment recovery
+      // window. A successful provider response later replaces this with the
+      // provider's real expiry.
+      expiresAt: new Date(Date.now() + 75 * 60_000).toISOString(),
     });
 
     const baseUrl = getPublicBaseUrl();
     const invoice = publicInvoice(identity.referenceId);
+    paymentDispatchStarted = true;
     const payment = await createConfiguredPayment({
       gateway: managedChannel.gateway,
       referenceId: identity.referenceId,
@@ -310,16 +323,27 @@ export async function POST(request: Request) {
       if (priorOrder) return existingExternalResponse(priorOrder);
     }
 
-    if (orderId) await releaseExternalPromotion(orderId).catch(() => undefined);
-    if (referenceId) {
-      await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
+    // Once a request has been dispatched to a gateway, a timeout/error is
+    // ambiguous: the provider may already have created a payable transaction.
+    // Keep the local invoice pending so a signed callback can still settle it.
+    // The scheduler expires unresolved attempts after the safe provider window.
+    if (!paymentDispatchStarted) {
+      if (orderId) await releaseExternalPromotion(orderId).catch(() => undefined);
+      if (referenceId) {
+        await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
+      }
     }
     const invalidInput =
       error instanceof z.ZodError ||
       error instanceof NicknameValidationError;
     const serviceUnavailable = error instanceof NicknameServiceError;
     return Response.json(
-      { error: message },
+      {
+        error: paymentDispatchStarted && !invalidInput
+          ? "Status pembuatan pembayaran belum dapat dipastikan. Jangan bayar dua kali; coba cek invoice ini beberapa saat lagi."
+          : message,
+        retryable: paymentDispatchStarted && !invalidInput,
+      },
       { status: invalidInput ? 400 : serviceUnavailable ? 503 : 503 },
     );
   }

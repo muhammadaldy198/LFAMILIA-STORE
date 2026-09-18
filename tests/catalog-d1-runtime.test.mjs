@@ -55,6 +55,8 @@ test("checkout only accepts products and packages that exist in D1", () => {
   assert.doesNotMatch(resolveSection, /getFallbackProducts/);
   assert.doesNotMatch(resolveSection, /fallback/);
   assert.match(resolveSection, /if \(row\)/);
+  assert.match(resolveSection, /providerCode: row\.provider_code\?\.trim\(\)\.toLowerCase\(\) \|\| null/);
+  assert.match(resolveSection, /providerSku: row\.provider_sku\?\.trim\(\) \|\| null/);
   assert.match(resolveSection, /return null;/);
 });
 

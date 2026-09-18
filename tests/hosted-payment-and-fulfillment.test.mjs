@@ -25,7 +25,8 @@ test("DOKU Direct status polling remains terminal-safe while fulfillment stays s
   assert.match(status, /queryDokuEwalletStatus/);
   assert.match(status, /dueForGatewayCheck\(order, 3_000\)/);
   assert.match(status, /fulfillAutomaticOrder\(order\.id, getPublicBaseUrl\(\)\)/);
-  assert.match(callback, /applyPendingExternalPaymentStatus\(order, status\)/);
+  assert.match(callback, /applyPendingExternalPaymentStatus\(order, status, \{/);
+  assert.match(callback, /authoritativePaid: status === "paid"/);
   assert.match(callback, /fulfillAutomaticOrder\(order\.id, getPublicBaseUrl\(\)\)/);
 });
 

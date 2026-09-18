@@ -11,7 +11,8 @@ test("voucher checkout is handled directly by React", () => {
   const layout = read("app/checkout/layout.tsx");
 
   assert.match(checkout, /const INTERNAL_VOUCHER_DESTINATION = "00000000"/);
-  assert.match(checkout, /const isVoucherProduct = product\.category\.trim\(\)\.toLowerCase\(\) === "voucher"/);
+  assert.match(checkout, /const normalizedCategory = normalizeProductCategorySlug\(product\.category\)/);
+  assert.match(checkout, /const isVoucherProduct = normalizedCategory === "voucher"/);
   assert.match(checkout, /!isVoucherProduct && \(/);
   assert.match(checkout, /number=\{isVoucherProduct \? "1" : "2"\}/);
   assert.match(checkout, /isVoucherProduct && index === 0/);

@@ -17,6 +17,7 @@ import {
   findMatchingExternalTopup,
   insertExternalWalletTopup,
   markExternalWalletTopupCreationFailed,
+  rejectExternalWalletTopupPreDispatch,
   updateExternalWalletTopup,
   type ExternalWalletTopup,
 } from "@/lib/server/wallet-external";
@@ -84,6 +85,7 @@ export async function POST(request: Request) {
   let idempotencyKey = "";
   let requestedAmount: number | null = null;
   let requestedPaymentMethodKey = "";
+  let paymentDispatchStarted = false;
   try {
     if (!request.headers.get("content-type")?.includes("application/json")) {
       throw new Error("Top up saldo hanya tersedia melalui pembayaran otomatis.");
@@ -108,7 +110,11 @@ export async function POST(request: Request) {
     const topupGatewayConfig = managedChannel
       ? managedChannel.gateway === walletTopupGateway
         ? managedChannel.gatewayConfig
-        : { customerFeeBps: managedChannel.gatewayConfig.customerFeeBps ?? "0" }
+        : {
+            customerFeeEnabled: managedChannel.gatewayConfig.customerFeeEnabled ?? "true",
+            customerFeeBps: managedChannel.gatewayConfig.customerFeeBps ?? "0",
+            customerFeeFixed: managedChannel.gatewayConfig.customerFeeFixed ?? "0",
+          }
       : {};
     if (
       !managedChannel ||
@@ -143,7 +149,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const pending = await findMatchingExternalTopup(customer.id, input.amount, paymentMethodKey);
+    const pending = await findMatchingExternalTopup(customer.id, input.amount, paymentMethodKey, walletTopupGateway);
     if (pending) return existingResponse(pending);
 
     referenceId = `WLT-${crypto.randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
@@ -166,7 +172,7 @@ export async function POST(request: Request) {
     if (Number(inserted.meta.changes ?? 0) === 0) {
       const winner = idempotencyKey
         ? await findExternalTopupByKey(customer.id, idempotencyKey)
-        : await findMatchingExternalTopup(customer.id, input.amount, paymentMethodKey);
+        : await findMatchingExternalTopup(customer.id, input.amount, paymentMethodKey, walletTopupGateway);
       if (winner) return existingResponse(winner);
       return Response.json(
         { error: "Permintaan top up yang sama sedang dibuat. Coba lagi beberapa detik." },
@@ -175,6 +181,7 @@ export async function POST(request: Request) {
     }
 
     const baseUrl = getPublicBaseUrl();
+    paymentDispatchStarted = true;
     const payment = await createConfiguredPayment({
       gateway: walletTopupGateway,
       referenceId,
@@ -247,7 +254,11 @@ export async function POST(request: Request) {
           : "Permintaan top up gagal.";
 
     if (referenceId) {
-      await markExternalWalletTopupCreationFailed(referenceId, message).catch(() => undefined);
+      if (paymentDispatchStarted) {
+        await markExternalWalletTopupCreationFailed(referenceId, message).catch(() => undefined);
+      } else {
+        await rejectExternalWalletTopupPreDispatch(referenceId, message).catch(() => undefined);
+      }
     }
     return Response.json(
       { error: message },

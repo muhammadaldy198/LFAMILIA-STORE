@@ -5,7 +5,10 @@ import { PRODUCT_CATEGORIES, normalizeProductCategorySlug } from "@/lib/product-
 import { defaultStorefrontSettings, faqs as fallbackFaqs, type StorefrontSettings } from "@/lib/store-data";
 import type { FaqRecord, ProductCategoryRecord } from "@/lib/server/storefront";
 
-function canonicalCategories(source: ProductCategoryRecord[] = []): ProductCategoryRecord[] {
+function canonicalCategories(
+  source: ProductCategoryRecord[] = [],
+  authoritative = false,
+): ProductCategoryRecord[] {
   return PRODUCT_CATEGORIES.map((category, index) => {
     const stored = source.find((item) => normalizeProductCategorySlug(item.slug) === category.slug);
     return {
@@ -13,7 +16,7 @@ function canonicalCategories(source: ProductCategoryRecord[] = []): ProductCateg
       slug: category.slug,
       name: category.label,
       icon: category.icon,
-      isActive: stored?.isActive ?? true,
+      isActive: stored?.isActive ?? !authoritative,
       sortOrder: index,
     };
   });
@@ -26,12 +29,24 @@ export function useStorefront() {
 
   useEffect(() => {
     let active = true;
-    void fetch("/api/storefront", { cache: "no-store" }).then((response) => response.json()).then((data: { settings?: StorefrontSettings; categories?: ProductCategoryRecord[]; faqs?: FaqRecord[] }) => {
-      if (!active) return;
-      if (data.settings) setSettings(data.settings);
-      setCategories(canonicalCategories(data.categories));
-      if (data.faqs?.length) setFaqs(data.faqs);
-    }).catch(() => undefined);
+    void fetch("/api/storefront", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Storefront gagal dimuat.");
+        return response.json() as Promise<{
+          settings?: StorefrontSettings;
+          categories?: ProductCategoryRecord[];
+          faqs?: FaqRecord[];
+        }>;
+      })
+      .then((data) => {
+        if (!active) return;
+        if (data.settings) setSettings(data.settings);
+        if (Array.isArray(data.categories)) {
+          setCategories(canonicalCategories(data.categories, true));
+        }
+        if (data.faqs?.length) setFaqs(data.faqs);
+      })
+      .catch(() => undefined);
     return () => { active = false; };
   }, []);
 

@@ -143,22 +143,41 @@ export async function saveGuestProductReview(input: {
 }) {
   const db = getD1();
   const cleanReference = input.referenceId.trim().toUpperCase();
-  const token = (cleanReference.split("-").at(-1) || cleanReference).replace(/^LF/, "");
-  if (!token) throw new Error("Nomor invoice tidak valid.");
+  const exactReference =
+    /^LF-\d{8}-[A-F0-9]{8,12}$/.test(cleanReference) ||
+    /^LF\d{6}(?:[A-F0-9]{12}|[A-F0-9]{14}|[A-F0-9]{32})$/.test(cleanReference);
+  const legacyAlias = /^LF[A-F0-9]{8,12}$/.test(cleanReference)
+    ? cleanReference.slice(2)
+    : null;
+  if (!exactReference && !legacyAlias) throw new Error("Nomor invoice tidak valid.");
 
-  const order = await db.prepare(
-    `SELECT id, reference_id, product_slug, buyer_name, buyer_phone
-     FROM orders
-     WHERE product_slug = ? AND payment_status = 'paid'
-       AND (UPPER(reference_id) = ? OR UPPER(reference_id) LIKE ?)
-     ORDER BY created_at DESC LIMIT 1`,
-  ).bind(input.productSlug, cleanReference, `%-${token}`).first<{
-    id: string;
-    reference_id: string;
-    product_slug: string;
-    buyer_name: string;
-    buyer_phone: string;
-  }>();
+  const order = legacyAlias
+    ? await db.prepare(
+        `SELECT id, reference_id, product_slug, buyer_name, buyer_phone
+         FROM orders
+         WHERE product_slug = ? AND payment_status = 'paid'
+           AND UPPER(reference_id) LIKE ?
+         ORDER BY created_at DESC LIMIT 1`,
+      ).bind(input.productSlug, `%-${legacyAlias}`).first<{
+        id: string;
+        reference_id: string;
+        product_slug: string;
+        buyer_name: string;
+        buyer_phone: string;
+      }>()
+    : await db.prepare(
+        `SELECT id, reference_id, product_slug, buyer_name, buyer_phone
+         FROM orders
+         WHERE product_slug = ? AND payment_status = 'paid'
+           AND UPPER(reference_id) = ?
+         LIMIT 1`,
+      ).bind(input.productSlug, cleanReference).first<{
+        id: string;
+        reference_id: string;
+        product_slug: string;
+        buyer_name: string;
+        buyer_phone: string;
+      }>();
   if (!order) throw new Error("Invoice lunas untuk produk ini tidak ditemukan.");
 
   let orderPhone: string;

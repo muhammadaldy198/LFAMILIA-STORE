@@ -4,14 +4,20 @@ import handler from "vinext/server/app-router-entry";
 import { getPublicBaseUrl, setRuntimeEnv } from "../lib/server/runtime-env";
 import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
 import { hydrateDokuDirectRuntimeEnv } from "../lib/server/payment-mode-config";
+import { expireUninitializedExternalOrders } from "../lib/server/external-payments";
 import { ensureLegacyDatabaseColumns } from "../lib/server/database-repair";
 import { recoverStaleAutomaticOrders } from "../lib/server/orders";
 import { releaseExpiredExternalPromotions } from "../lib/server/promotions";
 import { reconcileStaleDigiflazzProcessing } from "../lib/server/digiflazz-reconciliation";
 import { finalizeExpiredDokuPayments } from "../lib/server/doku-reconciliation";
+import {
+  reconcilePendingMidtransOrders,
+  reconcilePendingMidtransTopups,
+} from "../lib/server/midtrans-reconciliation";
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 import { cleanupSecurityRateLimits } from "../lib/server/security";
 import { cleanupOrphanStoreMedia } from "../lib/server/media";
+import { expireUninitializedExternalWalletTopups } from "../lib/server/wallet-external";
 import {
   diagnoseCloudflareAccessRequest,
   getCloudflareAccessAssertion,
@@ -166,7 +172,11 @@ const worker = {
     }
 
     await hydrateRuntime(env);
-    if (env.DB) await ensureLegacyDatabaseColumns();
+    if (env.DB) {
+      await ensureLegacyDatabaseColumns().catch((error) => {
+        console.error("Perbaikan kompatibilitas D1 gagal; request tetap diteruskan:", error);
+      });
+    }
 
     if (url.pathname === "/_vinext/image") {
       if (!env.IMAGES) return withSecurityHeaders(new Response("Image optimization is unavailable.", { status: 404 }), url);
@@ -209,18 +219,46 @@ const worker = {
   },
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     await hydrateRuntime(env);
-    await ensureLegacyDatabaseColumns();
-    const publicBaseUrl = getPublicBaseUrl();
+    await ensureLegacyDatabaseColumns().catch((error) => {
+      console.error("Perbaikan kompatibilitas D1 pada scheduler gagal:", error);
+    });
+    const paymentRecovery = Promise.all([
+      finalizeExpiredDokuPayments().catch((error) => {
+        console.error("Rekonsiliasi DOKU scheduler gagal:", error);
+      }),
+      reconcilePendingMidtransOrders().catch((error) => {
+        console.error("Rekonsiliasi order Midtrans scheduler gagal:", error);
+      }),
+      reconcilePendingMidtransTopups().catch((error) => {
+        console.error("Rekonsiliasi top up Midtrans scheduler gagal:", error);
+      }),
+    ]).then(async () => {
+      // Only expire ambiguous/uninitialized attempts after every available
+      // provider reconciliation path has had a chance to settle them.
+      await Promise.all([
+        expireUninitializedExternalWalletTopups().catch((error) => {
+          console.error("Expiry top up eksternal belum terinisialisasi gagal:", error);
+        }),
+        expireUninitializedExternalOrders().catch((error) => {
+          console.error("Expiry order eksternal belum terinisialisasi gagal:", error);
+        }),
+      ]);
+      await releaseExpiredExternalPromotions().catch((error) => {
+        console.error("Pelepasan reservasi promo kedaluwarsa gagal:", error);
+      });
+    });
+
     const tasks: Promise<unknown>[] = [
       cleanupSecurityRateLimits().catch(() => undefined),
-      releaseExpiredExternalPromotions().catch(() => undefined),
-      finalizeExpiredDokuPayments().catch(() => undefined),
+      paymentRecovery,
       Promise.resolve()
-        .then(() => recoverStaleAutomaticOrders(publicBaseUrl))
-        .catch(() => undefined),
+        .then(() => getPublicBaseUrl())
+        .then((publicBaseUrl) => recoverStaleAutomaticOrders(publicBaseUrl))
+        .catch((error) => console.error("Recovery order otomatis gagal:", error)),
       Promise.resolve()
-        .then(() => reconcileStaleDigiflazzProcessing(publicBaseUrl))
-        .catch(() => undefined),
+        .then(() => getPublicBaseUrl())
+        .then((publicBaseUrl) => reconcileStaleDigiflazzProcessing(publicBaseUrl))
+        .catch((error) => console.error("Rekonsiliasi DigiFlazz scheduler gagal:", error)),
     ];
     if (event.cron === "5 * * * *") {
       tasks.push(syncDigiflazzPrices().catch(() => undefined));

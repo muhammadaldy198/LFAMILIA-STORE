@@ -245,26 +245,8 @@ async function applyOneTimeCatalogRepopulation() {
   ).bind(oneTimeCatalogRepopulationKey).run();
 }
 
-async function reconcileAutomaticProviderProducts() {
-  const db = getD1();
-  await db.prepare(
-    `UPDATE products
-     SET fulfillment_type = 'automatic', updated_at = CURRENT_TIMESTAMP
-     WHERE fulfillment_type = 'manual'
-       AND EXISTS (
-         SELECT 1
-         FROM product_packages package
-         WHERE package.product_id = products.id
-           AND package.is_active = 1
-           AND lower(trim(coalesce(package.provider_code, ''))) = 'digiflazz'
-           AND trim(coalesce(package.provider_sku, '')) <> ''
-       )`,
-  ).run();
-}
-
 export async function readProducts(includeInactive = false): Promise<ManagedProduct[]> {
   await ensureLegacyDatabaseColumns();
-  await reconcileAutomaticProviderProducts();
   const db = getD1();
   const productSql = includeInactive
     ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json, nickname_game_code,
@@ -337,8 +319,8 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
       note: item.note ?? undefined,
       group: item.package_group ?? undefined,
       imageUrl: item.image_url ?? undefined,
-      providerCode: item.provider_code ?? undefined,
-      providerSku: item.provider_sku ?? undefined,
+      providerCode: item.provider_code?.trim().toLowerCase() || undefined,
+      providerSku: item.provider_sku?.trim() || undefined,
       supplierPrice: item.supplier_price,
       providerMaxPrice: item.provider_max_price,
       pricingMode: item.pricing_mode ?? "auto",
@@ -410,7 +392,9 @@ export async function saveProduct(input: ProductWrite, id?: number) {
     .run();
 
   const packageStatements = input.packages.map((item, index) => {
-    const maxPrice = item.providerCode === "digiflazz" ? Number(item.providerMaxPrice) : null;
+    const normalizedProviderCode = item.providerCode?.trim().toLowerCase() || null;
+    const normalizedProviderSku = item.providerSku?.trim() || null;
+    const maxPrice = normalizedProviderCode === "digiflazz" ? Number(item.providerMaxPrice) : null;
     const margin = Math.max(0, Number(item.marginValue ?? 0));
     const sellingPrice = maxPrice && maxPrice > 0
       ? item.marginType === "percent"
@@ -425,7 +409,7 @@ export async function saveProduct(input: ProductWrite, id?: number) {
        image_url = excluded.image_url, provider_code = excluded.provider_code, provider_sku = excluded.provider_sku,
        supplier_price = excluded.supplier_price, provider_max_price = excluded.provider_max_price, pricing_mode = excluded.pricing_mode, margin_type = excluded.margin_type,
        margin_value = excluded.margin_value, is_active = excluded.is_active, sort_order = excluded.sort_order`,
-  ).bind(productRow.id, item.id, item.label, sellingPrice, item.note ?? null, item.group?.trim() || null, item.imageUrl ?? null, item.providerCode ?? null, item.providerSku ?? null, item.supplierPrice ?? null, item.providerMaxPrice ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index);
+  ).bind(productRow.id, item.id, item.label, sellingPrice, item.note ?? null, item.group?.trim() || null, item.imageUrl ?? null, normalizedProviderCode, normalizedProviderSku, item.supplierPrice ?? null, item.providerMaxPrice ?? null, item.pricingMode ?? "auto", item.marginType ?? "fixed", item.marginValue ?? 0, item.isActive ? 1 : 0, index);
   });
   if (input.packages.length) {
     const placeholders = input.packages.map(() => "?").join(", ");
@@ -487,7 +471,9 @@ export async function updateProductPackageProvider(input: {
   providerMaxPrice: number | null;
 }) {
   const db = getD1();
-  const maxPrice = input.providerCode === "digiflazz" ? Number(input.providerMaxPrice) : null;
+  const normalizedProviderCode = input.providerCode?.trim().toLowerCase() || null;
+  const normalizedProviderSku = input.providerSku?.trim() || null;
+  const maxPrice = normalizedProviderCode === "digiflazz" ? Number(input.providerMaxPrice) : null;
   const sellingPrice = maxPrice && maxPrice > 0
     ? input.marginType === "percent"
       ? Math.ceil((maxPrice * (100 + input.marginValue)) / 100)
@@ -504,8 +490,8 @@ export async function updateProductPackageProvider(input: {
          price = COALESCE(?, price)
      WHERE id = ?`,
   ).bind(
-    input.providerCode,
-    input.providerSku,
+    normalizedProviderCode,
+    normalizedProviderSku,
     input.pricingMode,
     input.marginType,
     input.marginValue,

@@ -1,3 +1,4 @@
+import { normalizeProductCategorySlug } from "@/lib/product-categories";
 import { readProducts } from "@/lib/server/products";
 import { readReviewSummaries } from "@/lib/server/reviews";
 import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
@@ -24,7 +25,7 @@ export async function GET() {
         slug: item.slug,
         name: item.name,
         publisher: item.publisher,
-        category: item.category,
+        category: normalizeProductCategorySlug(item.category),
         imageUrl: item.imageUrl,
         bannerUrl: item.bannerUrl,
         description: item.description,

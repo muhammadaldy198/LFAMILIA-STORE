@@ -100,7 +100,7 @@ export async function getWebsiteVoucherCodeByReference(referenceId: string) {
 
   if (!order || order.payment_status !== "paid") return null;
 
-  if (order.provider_code === "voucher-stock") {
+  if (order.provider_code?.trim().toLowerCase() === "voucher-stock") {
     const voucher = await revealVoucherCode(order.id).catch(() => null);
     return voucher?.code ?? null;
   }

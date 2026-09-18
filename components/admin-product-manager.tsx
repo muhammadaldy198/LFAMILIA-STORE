@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element, react-hooks/set-state-in-effect */
 
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowLeft,
@@ -368,7 +368,15 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
   const [nicknameGameCode, setNicknameGameCode] = useState("");
   const [inputLoading, setInputLoading] = useState(true);
   const [inputSaving, setInputSaving] = useState(false);
-  const [mediaUploading, setMediaUploading] = useState<"imageUrl" | "bannerUrl" | null>(null);
+  const [mediaUploading, setMediaUploading] = useState<Record<"imageUrl" | "bannerUrl", boolean>>({
+    imageUrl: false,
+    bannerUrl: false,
+  });
+  const mediaUploadVersion = useRef<Record<"imageUrl" | "bannerUrl", number>>({ imageUrl: 0, bannerUrl: 0 });
+  const mediaUploadActive = useRef<Record<"imageUrl" | "bannerUrl", boolean>>({
+    imageUrl: false,
+    bannerUrl: false,
+  });
   const [name, setName] = useState(product.raw.name);
   const [slug, setSlug] = useState(product.raw.slug);
   const [publisher, setPublisher] = useState(product.raw.publisher);
@@ -484,24 +492,32 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
       setError("Ukuran gambar maksimal 6 MB.");
       return;
     }
-    setMediaUploading(field);
+    const requestVersion = ++mediaUploadVersion.current[field];
+    mediaUploadActive.current[field] = true;
+    setMediaUploading((current) => ({ ...current, [field]: true }));
     setError("");
     setMessage("");
     try {
       const form = new FormData();
       form.set("file", file);
       const uploaded = await readJson<{ url: string }>(await fetch("/api/panel/media", { method: "POST", body: form }));
+      if (mediaUploadVersion.current[field] !== requestVersion) return;
       if (field === "imageUrl") setImageUrl(uploaded.url);
       else setBannerUrl(uploaded.url);
       setMessage(field === "imageUrl" ? "Gambar produk berhasil diunggah. Klik Simpan Perubahan untuk menerapkan." : "Banner produk berhasil diunggah. Klik Simpan Perubahan untuk menerapkan.");
     } catch (reason) {
+      if (mediaUploadVersion.current[field] !== requestVersion) return;
       setError(reason instanceof Error ? reason.message : "Gambar gagal diunggah.");
     } finally {
-      setMediaUploading(null);
+      if (mediaUploadVersion.current[field] === requestVersion) {
+        mediaUploadActive.current[field] = false;
+        setMediaUploading((current) => ({ ...current, [field]: false }));
+      }
     }
   }
 
   async function saveProductChanges(success = "Perubahan produk berhasil disimpan.") {
+    if (mediaUploadActive.current.imageUrl || mediaUploadActive.current.bannerUrl) { setError("Tunggu semua unggahan gambar selesai sebelum menyimpan."); return; }
     if (!product.raw.dbId) { setError("ID produk tidak ditemukan."); return; }
     if (!name.trim() || !slugify(slug)) { setError("Nama dan slug produk wajib diisi."); return; }
     setInputSaving(true); setError(""); setMessage("");
@@ -624,7 +640,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
           <StorePreview product={product} nominals={nominals} sections={sections} mode={previewMode} onMode={setPreviewMode} />
         </div>
       ) : (
-        tab === "Input Customer" ? <EditorTabPanel tab={tab} product={product} targetTemplate={targetTemplate} checkoutType={checkoutType} labelId={labelId} labelServer={labelServer} nicknameGameCode={nicknameGameCode} onCheckoutType={setCheckoutType} onLabelId={setLabelId} onLabelServer={setLabelServer} onNicknameGameCode={setNicknameGameCode} inputLoading={inputLoading} saving={inputSaving} onSave={saveInputSettings} /> : <ProductSettingsPanel tab={tab} product={product} values={{ name, slug, publisher, description, imageUrl, bannerUrl, category, isActive, popular, instant, fulfillmentType, manualInstructions }} onChange={(key, value) => { if (key === "name") setName(String(value)); else if (key === "slug") setSlug(String(value)); else if (key === "publisher") setPublisher(String(value)); else if (key === "description") setDescription(String(value)); else if (key === "imageUrl") setImageUrl(String(value)); else if (key === "bannerUrl") setBannerUrl(String(value)); else if (key === "category") setCategory(String(value)); else if (key === "isActive") setIsActive(Boolean(value)); else if (key === "popular") setPopular(Boolean(value)); else if (key === "instant") setInstant(Boolean(value)); else if (key === "fulfillmentType") setFulfillmentType(value as "automatic" | "manual"); else if (key === "manualInstructions") setManualInstructions(String(value)); }} uploading={mediaUploading} onUpload={(field, file) => void uploadProductImage(field, file)} saving={inputSaving} onSave={() => void saveProductChanges()} />
+        tab === "Input Customer" ? <EditorTabPanel tab={tab} product={product} targetTemplate={targetTemplate} checkoutType={checkoutType} labelId={labelId} labelServer={labelServer} nicknameGameCode={nicknameGameCode} onCheckoutType={setCheckoutType} onLabelId={setLabelId} onLabelServer={setLabelServer} onNicknameGameCode={setNicknameGameCode} inputLoading={inputLoading} saving={inputSaving} onSave={saveInputSettings} /> : <ProductSettingsPanel tab={tab} product={product} values={{ name, slug, publisher, description, imageUrl, bannerUrl, category, isActive, popular, instant, fulfillmentType, manualInstructions }} onChange={(key, value) => { if (key === "name") setName(String(value)); else if (key === "slug") setSlug(String(value)); else if (key === "publisher") setPublisher(String(value)); else if (key === "description") setDescription(String(value)); else if (key === "imageUrl") setImageUrl(String(value)); else if (key === "bannerUrl") setBannerUrl(String(value)); else if (key === "category") setCategory(String(value)); else if (key === "isActive") setIsActive(Boolean(value)); else if (key === "popular") setPopular(Boolean(value)); else if (key === "instant") setInstant(Boolean(value)); else if (key === "fulfillmentType") setFulfillmentType(value as "automatic" | "manual"); else if (key === "manualInstructions") setManualInstructions(String(value)); }} uploading={mediaUploading} onUpload={(field, file) => void uploadProductImage(field, file)} saving={inputSaving || mediaUploading.imageUrl || mediaUploading.bannerUrl} onSave={() => void saveProductChanges()} />
       )}
 
       {importOpen && <ImportNominalModal existing={nominals} onClose={() => setImportOpen(false)} onImport={(added) => { setNominals((current) => [...current, ...added]); setImportOpen(false); setMessage(`${added.length} nominal Digiflazz berhasil ditambahkan.`); }} />}
@@ -711,10 +727,10 @@ type ProductSettingsValues = {
   manualInstructions: string;
 };
 
-function ProductSettingsPanel({ tab, product, values, onChange, uploading, onUpload, saving, onSave }: { tab: Exclude<EditorTab, "Nominal & Harga" | "Tabel Pemisah" | "Input Customer">; product: Product; values: ProductSettingsValues; onChange(key: keyof ProductSettingsValues, value: string | boolean): void; uploading: "imageUrl" | "bannerUrl" | null; onUpload(field: "imageUrl" | "bannerUrl", file?: File): void; saving: boolean; onSave(): void }) {
+function ProductSettingsPanel({ tab, product, values, onChange, uploading, onUpload, saving, onSave }: { tab: Exclude<EditorTab, "Nominal & Harga" | "Tabel Pemisah" | "Input Customer">; product: Product; values: ProductSettingsValues; onChange(key: keyof ProductSettingsValues, value: string | boolean): void; uploading: Record<"imageUrl" | "bannerUrl", boolean>; onUpload(field: "imageUrl" | "bannerUrl", file?: File): void; saving: boolean; onSave(): void }) {
   return <section className="mt-[12px] rounded-[7px] border border-[#dfe6ef] bg-white p-[16px]">
     <div className="flex items-center justify-between border-b border-[#e8ecf1] pb-[11px]"><div><h2 className="text-[13px] font-extrabold">{tab}</h2><p className="mt-[2px] text-[8px] text-[#6c7d92]">Pengaturan {tab.toLowerCase()} untuk {product.name}.</p></div><button type="button" disabled={saving} onClick={onSave} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>
-    {tab === "Informasi Produk" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><ControlledField label="Nama produk" value={values.name} onChange={(value) => onChange("name", value)} /><ControlledField label="Slug" value={values.slug} onChange={(value) => onChange("slug", value)} /><ControlledField label="Publisher" value={values.publisher} onChange={(value) => onChange("publisher", value)} /><label className="text-[8px] font-bold text-[#3d4f68]">Kategori<select value={values.category} onChange={(event) => onChange("category", event.target.value)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]">{PRODUCT_CATEGORIES.map((item) => <option key={item.slug} value={item.slug}>{item.label}</option>)}</select></label><ProductMediaField label="Gambar produk (opsional, rasio 1:1)" field="imageUrl" value={values.imageUrl} onChange={(value) => onChange("imageUrl", value)} uploading={uploading === "imageUrl"} onUpload={onUpload} /><ProductMediaField label="Banner halaman produk (opsional)" field="bannerUrl" value={values.bannerUrl} onChange={(value) => onChange("bannerUrl", value)} uploading={uploading === "bannerUrl"} onUpload={onUpload} /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Deskripsi singkat<textarea value={values.description} onChange={(event) => onChange("description", event.target.value)} className="mt-[4px] h-[74px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label></div>}
+    {tab === "Informasi Produk" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><ControlledField label="Nama produk" value={values.name} onChange={(value) => onChange("name", value)} /><ControlledField label="Slug" value={values.slug} onChange={(value) => onChange("slug", value)} /><ControlledField label="Publisher" value={values.publisher} onChange={(value) => onChange("publisher", value)} /><label className="text-[8px] font-bold text-[#3d4f68]">Kategori<select value={values.category} onChange={(event) => onChange("category", event.target.value)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]">{PRODUCT_CATEGORIES.map((item) => <option key={item.slug} value={item.slug}>{item.label}</option>)}</select></label><ProductMediaField label="Gambar produk (opsional, rasio 1:1)" field="imageUrl" value={values.imageUrl} onChange={(value) => onChange("imageUrl", value)} uploading={uploading.imageUrl} onUpload={onUpload} /><ProductMediaField label="Banner halaman produk (opsional)" field="bannerUrl" value={values.bannerUrl} onChange={(value) => onChange("bannerUrl", value)} uploading={uploading.bannerUrl} onUpload={onUpload} /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Deskripsi singkat<textarea value={values.description} onChange={(event) => onChange("description", event.target.value)} className="mt-[4px] h-[74px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label></div>}
     {tab === "Tampilan Produk" && <div className="mt-[14px] grid grid-cols-3 gap-[10px]"><SettingSwitch label="Aktif" value={values.isActive} onChange={(value) => onChange("isActive", value)} /><SettingSwitch label="Ditampilkan di katalog" value={values.isActive} onChange={(value) => onChange("isActive", value)} /><SettingSwitch label="Produk populer" value={values.popular} onChange={(value) => onChange("popular", value)} /></div>}
     {tab === "Fulfillment" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><label className="text-[8px] font-bold text-[#3d4f68]">Jenis pemenuhan<select value={values.fulfillmentType} onChange={(event) => onChange("fulfillmentType", event.target.value)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="automatic">Otomatis</option><option value="manual">Manual</option></select></label><SettingSwitch label="Proses instan" value={values.instant} onChange={(value) => onChange("instant", value)} /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Instruksi pemenuhan manual<textarea value={values.manualInstructions} onChange={(event) => onChange("manualInstructions", event.target.value)} disabled={values.fulfillmentType !== "manual"} className="mt-[4px] h-[84px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px] disabled:bg-[#f3f5f8]" placeholder="Instruksi internal/admin untuk memproses pesanan" /></label></div>}
   </section>;
@@ -722,7 +738,7 @@ function ProductSettingsPanel({ tab, product, values, onChange, uploading, onUpl
 
 function ProductMediaField({ label, field, value, onChange, uploading, onUpload }: { label: string; field: "imageUrl" | "bannerUrl"; value: string; onChange(value: string): void; uploading: boolean; onUpload(field: "imageUrl" | "bannerUrl", file?: File): void }) {
   const inputId = `product-${field}-upload`;
-  return <div className="text-[8px] font-bold text-[#3d4f68]"><label>{label}<input value={value} onChange={(event) => onChange(event.target.value)} placeholder="URL gambar (opsional)" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] outline-none placeholder:text-[#929eae] focus:border-[#2580eb]" /></label><label htmlFor={inputId} className="mt-[6px] inline-flex h-[30px] cursor-pointer items-center gap-[6px] rounded-[4px] border border-[#cfd9e5] bg-[#f8fbff] px-[10px] text-[8px] font-bold text-[#0875ed]"><Upload className="size-[11px]" />{uploading ? "Mengunggah..." : "Pilih & Unggah Foto"}<input id={inputId} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" disabled={uploading} onChange={(event) => onUpload(field, event.target.files?.[0])} /></label><small className="mt-[4px] block font-normal text-[#718198]">JPG, PNG, WEBP, GIF · Maks. 6MB</small></div>;
+  return <div className="text-[8px] font-bold text-[#3d4f68]"><label>{label}<input value={value} onChange={(event) => onChange(event.target.value)} placeholder="URL gambar (opsional)" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] outline-none placeholder:text-[#929eae] focus:border-[#2580eb]" /></label><label htmlFor={inputId} className="mt-[6px] inline-flex h-[30px] cursor-pointer items-center gap-[6px] rounded-[4px] border border-[#cfd9e5] bg-[#f8fbff] px-[10px] text-[8px] font-bold text-[#0875ed]"><Upload className="size-[11px]" />{uploading ? "Mengunggah..." : "Pilih & Unggah Foto"}<input id={inputId} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" disabled={uploading} onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; onUpload(field, file); }} /></label><small className="mt-[4px] block font-normal text-[#718198]">JPG, PNG, WEBP, GIF · Maks. 6MB</small></div>;
 }
 
 function ControlledField({ label, value, onChange, placeholder }: { label: string; value: string; onChange(value: string): void; placeholder?: string }) {

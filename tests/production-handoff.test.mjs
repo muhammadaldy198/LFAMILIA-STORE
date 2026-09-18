@@ -13,7 +13,7 @@ test("runtime records healed 0029 only through an existing Wrangler migration le
   assert.match(repair, new RegExp(migrationName.replaceAll(".", "\\.")));
   assert.match(repair, /tableColumns\("d1_migrations"\)/);
   assert.match(repair, /INSERT OR IGNORE INTO d1_migrations \(name\) VALUES \(\?\)/);
-  assert.match(repair, /schemaObjects\.results\.length !== 8/);
+  assert.match(repair, /schemaObjects\.results\.length !== FINAL_SCHEMA_OBJECTS\.length/);
   assert.match(repair, /unsupportedRequiredColumn/);
   assert.doesNotMatch(repair, /CREATE TABLE IF NOT EXISTS d1_migrations/);
 });

@@ -14,7 +14,7 @@ export async function reconcileStaleDigiflazzProcessing(
      FROM orders
      WHERE payment_status = 'paid'
        AND fulfillment_type = 'automatic'
-       AND provider_code = 'digiflazz'
+       AND lower(trim(provider_code)) = 'digiflazz'
        AND provider_status = 'processing'
        AND updated_at <= datetime('now', '-2 minutes')
        AND created_at >= datetime('now', '-89 days')
@@ -44,8 +44,8 @@ export async function reconcileStaleDigiflazzProcessing(
       const result = await digiflazzAdapter.fulfill({
         id: order.id,
         referenceId: order.reference_id,
-        providerCode: order.provider_code,
-        providerSku: order.provider_sku,
+        providerCode: order.provider_code.trim().toLowerCase(),
+        providerSku: order.provider_sku.trim(),
         destination: order.destination,
         server: order.server,
         customerNo: order.customer_no,
@@ -61,7 +61,7 @@ export async function reconcileStaleDigiflazzProcessing(
       }, publicBaseUrl);
 
       const eventId = `reconcile-${order.id}-${crypto.randomUUID()}`;
-      await db.batch([
+      const batch = await db.batch([
         db.prepare(
           `INSERT OR IGNORE INTO order_events
            (order_id, source, event_id, status, payload_json)
@@ -76,7 +76,7 @@ export async function reconcileStaleDigiflazzProcessing(
              fulfillment_status = ?,
              updated_at = CURRENT_TIMESTAMP
            WHERE id = ? AND payment_status = 'paid'
-             AND provider_code = 'digiflazz'
+             AND lower(trim(provider_code)) = 'digiflazz'
              AND provider_status = 'processing'`,
         ).bind(
           result.externalId,
@@ -88,7 +88,8 @@ export async function reconcileStaleDigiflazzProcessing(
         ),
       ]);
 
-      if (result.status === "success") {
+      const persisted = Number(batch[1]?.meta.changes ?? 0) > 0;
+      if (persisted && result.status === "success") {
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
           console.error("Notifikasi order hasil rekonsiliasi DigiFlazz gagal:", error),
         );

@@ -1,3 +1,4 @@
+import { createPrivateKey } from "node:crypto";
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
@@ -137,6 +138,20 @@ export async function savePaymentGatewayProfile(input: {
   if ((input.provider === "doku" && input.mode !== "direct") || (input.provider === "midtrans" && input.mode !== "snap")) {
     throw new Error("Mode gateway tidak valid.");
   }
+  if (input.provider === "doku") {
+    const existing = await profile("doku", "direct", input.environment);
+    if (!input.values.apiUrl?.trim() && !existing?.apiUrl?.trim()) {
+      input = {
+        ...input,
+        values: {
+          ...input.values,
+          apiUrl: input.environment === "production"
+            ? "https://api.doku.com"
+            : "https://api-sandbox.doku.com",
+        },
+      };
+    }
+  }
   return saveProfile(input);
 }
 
@@ -166,7 +181,19 @@ export async function getMidtransSnapConfig() {
 }
 
 function directReady(values: Record<string, string> | null) {
-  return Boolean(values?.clientId && values.secretKey && values.privateKey && values.apiUrl);
+  if (!values?.clientId || !values.secretKey || !values.privateKey || !values.apiUrl) return false;
+  try {
+    const apiUrl = new URL(values.apiUrl);
+    if (apiUrl.protocol !== "https:") return false;
+    createPrivateKey({
+      key: values.privateKey,
+      format: "pem",
+      passphrase: values.privateKeyPassphrase?.trim() || undefined,
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function getPaymentModeOverview() {
@@ -210,20 +237,32 @@ export async function hydrateDokuDirectRuntimeEnv<T extends object>(sourceEnv: T
   try {
     const current = await settings(db);
     const environment = env(current.get("doku_environment"));
-    const values = await profile("doku", "direct", environment, db, encryptionSecret);
+    const [sandboxValues, productionValues] = await Promise.all([
+      profile("doku", "direct", "sandbox", db, encryptionSecret),
+      profile("doku", "direct", "production", db, encryptionSecret),
+    ]);
     const target: Record<string, unknown> = { ...source, DOKU_ENV: environment };
-    if (!values) return target as T;
-    const prefix = `DOKU_${environment.toUpperCase()}_`;
     const put = (key: string, value: string | undefined) => { if (value?.trim()) target[key] = value.trim(); };
-    put(`${prefix}CLIENT_ID`, values.clientId);
-    put(`${prefix}SECRET_KEY`, values.secretKey);
-    put(`${prefix}PRIVATE_KEY`, values.privateKey);
-    put(`${prefix}PRIVATE_KEY_PASSPHRASE`, values.privateKeyPassphrase);
-    put(`${prefix}API_URL`, values.apiUrl || (environment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
-    put(`${prefix}QRIS_MERCHANT_ID`, values.qrisMerchantId);
-    put(`${prefix}QRIS_TERMINAL_ID`, values.qrisTerminalId);
-    put(`${prefix}QRIS_POSTAL_CODE`, values.qrisPostalCode);
-    put(`${prefix}VA_CONFIG_JSON`, values.vaConfigJson);
+    const applyProfile = (
+      profileEnvironment: PaymentEnvironment,
+      values: Record<string, string> | null,
+    ) => {
+      if (!values) return;
+      const prefix = `DOKU_${profileEnvironment.toUpperCase()}_`;
+      put(`${prefix}CLIENT_ID`, values.clientId);
+      put(`${prefix}SECRET_KEY`, values.secretKey);
+      put(`${prefix}PRIVATE_KEY`, values.privateKey);
+      put(`${prefix}PRIVATE_KEY_PASSPHRASE`, values.privateKeyPassphrase);
+      put(`${prefix}API_URL`, values.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
+      put(`${prefix}QRIS_MERCHANT_ID`, values.qrisMerchantId);
+      put(`${prefix}QRIS_TERMINAL_ID`, values.qrisTerminalId);
+      put(`${prefix}QRIS_POSTAL_CODE`, values.qrisPostalCode);
+      put(`${prefix}VA_CONFIG_JSON`, values.vaConfigJson);
+    };
+    // Keep both profiles hydrated so callbacks/reconciliation for an older
+    // environment remain verifiable after Admin switches the active one.
+    applyProfile("sandbox", sandboxValues);
+    applyProfile("production", productionValues);
     return target as T;
   } catch {
     return sourceEnv;

@@ -21,7 +21,7 @@ import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-noti
 export const dynamic = "force-dynamic";
 
 const legacyReference = /^LF-\d{8}-[A-F0-9]{8,12}$/;
-const compactReference = /^LF\d{6}(?:[A-F0-9]{14}|[A-F0-9]{32})$/;
+const compactReference = /^LF\d{6}(?:[A-F0-9]{12}|[A-F0-9]{14}|[A-F0-9]{32})$/;
 const publicReference = /^LF(?:[A-F0-9]{8}|[A-F0-9]{12})$/;
 
 const schema = z.object({
@@ -128,6 +128,9 @@ function publicEventSource(source: string) {
 async function expirePendingInvoice(order: OrderRecord) {
   if (order.payment_status !== "pending") return order;
   const artifacts = externalArtifacts(order);
+  // DOKU/Midtrans terminal state is provider-authoritative. Stored expiry is UI
+  // metadata and must not discard a payment whose provider status arrives late.
+  if (artifacts.gateway === "doku" || artifacts.gateway === "midtrans") return order;
   if (!artifacts.expiredAt) return order;
   const expiresAt = Date.parse(artifacts.expiredAt);
   if (!Number.isFinite(expiresAt) || expiresAt > Date.now()) return order;
@@ -147,7 +150,7 @@ async function queryDokuOrderStatus(order: OrderRecord) {
 
   await prepareDokuRuntime();
   if (order.payment_method === "qris" && artifacts.referenceNo) {
-    return queryDokuQrisStatus({ referenceId: order.reference_id, referenceNo: artifacts.referenceNo });
+    return queryDokuQrisStatus({ referenceId: order.reference_id, referenceNo: artifacts.referenceNo, environment });
   }
   if (order.payment_method === "va" && artifacts.paymentNo) {
     return queryDokuVaStatus({
@@ -188,7 +191,9 @@ async function refreshDokuStatus(order: OrderRecord) {
       if (!Number.isFinite(query.amount) || query.amount !== order.total) {
         return (await getOrderById(order.id)) ?? order;
       }
-      const firstPaid = await applyPendingExternalPaymentStatus(order, "paid");
+      const firstPaid = await applyPendingExternalPaymentStatus(order, "paid", {
+        authoritativePaid: true,
+      });
       if (firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
@@ -281,6 +286,8 @@ export async function POST(request: Request) {
         productName: order.product_name,
         packageLabel: order.package_label,
         destination: isInternalVoucherDestination ? null : maskDestination(order.destination, order.server),
+        productTotal: Math.max(0, order.total - order.admin_fee),
+        paymentFee: order.admin_fee,
         total: order.total,
         paymentMethod: order.payment_method,
         paymentChannel: order.payment_channel,
