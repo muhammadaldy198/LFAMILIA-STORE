@@ -24,7 +24,13 @@ export async function GET() {
           paymentChannel: item.channel,
           gatewayConfig: item.gatewayConfig,
         });
-        return { item, ready: readiness.ready };
+        return {
+          item: {
+            ...item,
+            publicFee: publicCustomerPaymentFee(item.gatewayConfig),
+          },
+          ready: readiness.ready,
+        };
       }),
   );
 
@@ -35,7 +41,7 @@ export async function GET() {
       channel: item.channel,
       name: item.name,
       description: item.description,
-      ...publicCustomerPaymentFee(item.gatewayConfig),
+      ...item.publicFee,
       ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
     }));
 
