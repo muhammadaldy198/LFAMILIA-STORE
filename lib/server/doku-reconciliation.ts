@@ -245,16 +245,21 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
 
   for (const order of expiredOrders.results) {
     await applyPendingDokuPaymentStatus(order, "expired");
-    await recordOrderEvent({
-      orderId: order.id,
-      source: "doku",
-      eventId: `local-expiry-${order.id}`,
-      status: "expired",
-      payload: {
-        expiredAt: order.gateway_expired_at ?? order.doku_expired_at,
-        reason: "stored_doku_expiry",
-      },
-    });
+    const current = await db.prepare(
+      "SELECT payment_status FROM orders WHERE id = ? LIMIT 1",
+    ).bind(order.id).first<{ payment_status: string }>();
+    if (current?.payment_status === "expired") {
+      await recordOrderEvent({
+        orderId: order.id,
+        source: "doku",
+        eventId: `local-expiry-${order.id}`,
+        status: "expired",
+        payload: {
+          expiredAt: order.gateway_expired_at ?? order.doku_expired_at,
+          reason: "stored_doku_expiry",
+        },
+      });
+    }
   }
 
   const expiredTopups = await db.prepare(
