@@ -190,6 +190,25 @@ async function releasePriceListSyncLock(token: string, successful: boolean) {
   `).bind(successful ? 1 : 0, token).run();
 }
 
+async function renewPriceListSyncLock(token: string) {
+  const result = await getD1().prepare(`
+    UPDATE digiflazz_pricelist_sync_state
+       SET locked_until = datetime('now', '+${DIGIFLAZZ_SYNC_LOCK_MINUTES} minutes')
+     WHERE id = 1
+       AND lock_token = ?
+       AND locked_until > CURRENT_TIMESTAMP
+       AND NOT EXISTS (
+         SELECT 1 FROM digiflazz_runtime_state
+         WHERE id = 1
+           AND maintenance_token IS NOT NULL
+           AND maintenance_until > CURRENT_TIMESTAMP
+       )
+  `).bind(token).run();
+  if (Number(result.meta.changes ?? 0) === 0) {
+    throw new Error("Lock sync DigiFlazz kedaluwarsa sebelum cache pricelist selesai ditulis.");
+  }
+}
+
 async function acquireTargetedPriceListSyncLock() {
   await ensureDigiflazzPriceListCacheTable();
   const db = getD1();
@@ -289,7 +308,7 @@ async function fetchPriceListItems(): Promise<DigiflazzPriceListItem[]> {
   return items;
 }
 
-async function writePriceListCache(items: DigiflazzPriceListItem[]) {
+async function writePriceListCache(items: DigiflazzPriceListItem[], syncLockToken: string) {
   await ensureDigiflazzPriceListCacheTable();
   const db = getD1();
   const syncedAt = new Date().toISOString();
@@ -334,8 +353,10 @@ async function writePriceListCache(items: DigiflazzPriceListItem[]) {
     syncedAt,
   ));
   for (let index = 0; index < statements.length; index += 100) {
+    await renewPriceListSyncLock(syncLockToken);
     await db.batch(statements.slice(index, index + 100));
   }
+  await renewPriceListSyncLock(syncLockToken);
   await db.prepare("DELETE FROM digiflazz_pricelist_cache WHERE synced_at <> ?").bind(syncedAt).run();
   return syncedAt;
 }
@@ -602,7 +623,7 @@ export async function syncDigiflazzPrices(options: { force?: boolean } = {}) {
   let successful = false;
   try {
     const items = await fetchPriceListItems();
-    const lastSyncedAt = await writePriceListCache(items);
+    const lastSyncedAt = await writePriceListCache(items, lock.token);
     const result = await syncRows(undefined, items, lock.token);
     successful = true;
     return { ...result, cached: items.length, lastSyncedAt, reason: null };
