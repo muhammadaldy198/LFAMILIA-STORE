@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element, react-hooks/set-state-in-effect */
 
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowLeft,
@@ -369,6 +369,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
   const [inputLoading, setInputLoading] = useState(true);
   const [inputSaving, setInputSaving] = useState(false);
   const [mediaUploading, setMediaUploading] = useState<"imageUrl" | "bannerUrl" | null>(null);
+  const mediaUploadVersion = useRef<Record<"imageUrl" | "bannerUrl", number>>({ imageUrl: 0, bannerUrl: 0 });
   const [name, setName] = useState(product.raw.name);
   const [slug, setSlug] = useState(product.raw.slug);
   const [publisher, setPublisher] = useState(product.raw.publisher);
@@ -484,6 +485,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
       setError("Ukuran gambar maksimal 6 MB.");
       return;
     }
+    const requestVersion = ++mediaUploadVersion.current[field];
     setMediaUploading(field);
     setError("");
     setMessage("");
@@ -491,17 +493,22 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
       const form = new FormData();
       form.set("file", file);
       const uploaded = await readJson<{ url: string }>(await fetch("/api/panel/media", { method: "POST", body: form }));
+      if (mediaUploadVersion.current[field] !== requestVersion) return;
       if (field === "imageUrl") setImageUrl(uploaded.url);
       else setBannerUrl(uploaded.url);
       setMessage(field === "imageUrl" ? "Gambar produk berhasil diunggah. Klik Simpan Perubahan untuk menerapkan." : "Banner produk berhasil diunggah. Klik Simpan Perubahan untuk menerapkan.");
     } catch (reason) {
+      if (mediaUploadVersion.current[field] !== requestVersion) return;
       setError(reason instanceof Error ? reason.message : "Gambar gagal diunggah.");
     } finally {
-      setMediaUploading(null);
+      if (mediaUploadVersion.current[field] === requestVersion) {
+        setMediaUploading((current) => current === field ? null : current);
+      }
     }
   }
 
   async function saveProductChanges(success = "Perubahan produk berhasil disimpan.") {
+    if (mediaUploading) { setError("Tunggu unggahan gambar selesai sebelum menyimpan."); return; }
     if (!product.raw.dbId) { setError("ID produk tidak ditemukan."); return; }
     if (!name.trim() || !slugify(slug)) { setError("Nama dan slug produk wajib diisi."); return; }
     setInputSaving(true); setError(""); setMessage("");
@@ -624,7 +631,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
           <StorePreview product={product} nominals={nominals} sections={sections} mode={previewMode} onMode={setPreviewMode} />
         </div>
       ) : (
-        tab === "Input Customer" ? <EditorTabPanel tab={tab} product={product} targetTemplate={targetTemplate} checkoutType={checkoutType} labelId={labelId} labelServer={labelServer} nicknameGameCode={nicknameGameCode} onCheckoutType={setCheckoutType} onLabelId={setLabelId} onLabelServer={setLabelServer} onNicknameGameCode={setNicknameGameCode} inputLoading={inputLoading} saving={inputSaving} onSave={saveInputSettings} /> : <ProductSettingsPanel tab={tab} product={product} values={{ name, slug, publisher, description, imageUrl, bannerUrl, category, isActive, popular, instant, fulfillmentType, manualInstructions }} onChange={(key, value) => { if (key === "name") setName(String(value)); else if (key === "slug") setSlug(String(value)); else if (key === "publisher") setPublisher(String(value)); else if (key === "description") setDescription(String(value)); else if (key === "imageUrl") setImageUrl(String(value)); else if (key === "bannerUrl") setBannerUrl(String(value)); else if (key === "category") setCategory(String(value)); else if (key === "isActive") setIsActive(Boolean(value)); else if (key === "popular") setPopular(Boolean(value)); else if (key === "instant") setInstant(Boolean(value)); else if (key === "fulfillmentType") setFulfillmentType(value as "automatic" | "manual"); else if (key === "manualInstructions") setManualInstructions(String(value)); }} uploading={mediaUploading} onUpload={(field, file) => void uploadProductImage(field, file)} saving={inputSaving} onSave={() => void saveProductChanges()} />
+        tab === "Input Customer" ? <EditorTabPanel tab={tab} product={product} targetTemplate={targetTemplate} checkoutType={checkoutType} labelId={labelId} labelServer={labelServer} nicknameGameCode={nicknameGameCode} onCheckoutType={setCheckoutType} onLabelId={setLabelId} onLabelServer={setLabelServer} onNicknameGameCode={setNicknameGameCode} inputLoading={inputLoading} saving={inputSaving} onSave={saveInputSettings} /> : <ProductSettingsPanel tab={tab} product={product} values={{ name, slug, publisher, description, imageUrl, bannerUrl, category, isActive, popular, instant, fulfillmentType, manualInstructions }} onChange={(key, value) => { if (key === "name") setName(String(value)); else if (key === "slug") setSlug(String(value)); else if (key === "publisher") setPublisher(String(value)); else if (key === "description") setDescription(String(value)); else if (key === "imageUrl") setImageUrl(String(value)); else if (key === "bannerUrl") setBannerUrl(String(value)); else if (key === "category") setCategory(String(value)); else if (key === "isActive") setIsActive(Boolean(value)); else if (key === "popular") setPopular(Boolean(value)); else if (key === "instant") setInstant(Boolean(value)); else if (key === "fulfillmentType") setFulfillmentType(value as "automatic" | "manual"); else if (key === "manualInstructions") setManualInstructions(String(value)); }} uploading={mediaUploading} onUpload={(field, file) => void uploadProductImage(field, file)} saving={inputSaving || Boolean(mediaUploading)} onSave={() => void saveProductChanges()} />
       )}
 
       {importOpen && <ImportNominalModal existing={nominals} onClose={() => setImportOpen(false)} onImport={(added) => { setNominals((current) => [...current, ...added]); setImportOpen(false); setMessage(`${added.length} nominal Digiflazz berhasil ditambahkan.`); }} />}
@@ -722,7 +729,7 @@ function ProductSettingsPanel({ tab, product, values, onChange, uploading, onUpl
 
 function ProductMediaField({ label, field, value, onChange, uploading, onUpload }: { label: string; field: "imageUrl" | "bannerUrl"; value: string; onChange(value: string): void; uploading: boolean; onUpload(field: "imageUrl" | "bannerUrl", file?: File): void }) {
   const inputId = `product-${field}-upload`;
-  return <div className="text-[8px] font-bold text-[#3d4f68]"><label>{label}<input value={value} onChange={(event) => onChange(event.target.value)} placeholder="URL gambar (opsional)" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] outline-none placeholder:text-[#929eae] focus:border-[#2580eb]" /></label><label htmlFor={inputId} className="mt-[6px] inline-flex h-[30px] cursor-pointer items-center gap-[6px] rounded-[4px] border border-[#cfd9e5] bg-[#f8fbff] px-[10px] text-[8px] font-bold text-[#0875ed]"><Upload className="size-[11px]" />{uploading ? "Mengunggah..." : "Pilih & Unggah Foto"}<input id={inputId} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" disabled={uploading} onChange={(event) => onUpload(field, event.target.files?.[0])} /></label><small className="mt-[4px] block font-normal text-[#718198]">JPG, PNG, WEBP, GIF · Maks. 6MB</small></div>;
+  return <div className="text-[8px] font-bold text-[#3d4f68]"><label>{label}<input value={value} onChange={(event) => onChange(event.target.value)} placeholder="URL gambar (opsional)" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] outline-none placeholder:text-[#929eae] focus:border-[#2580eb]" /></label><label htmlFor={inputId} className="mt-[6px] inline-flex h-[30px] cursor-pointer items-center gap-[6px] rounded-[4px] border border-[#cfd9e5] bg-[#f8fbff] px-[10px] text-[8px] font-bold text-[#0875ed]"><Upload className="size-[11px]" />{uploading ? "Mengunggah..." : "Pilih & Unggah Foto"}<input id={inputId} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" disabled={uploading} onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; onUpload(field, file); }} /></label><small className="mt-[4px] block font-normal text-[#718198]">JPG, PNG, WEBP, GIF · Maks. 6MB</small></div>;
 }
 
 function ControlledField({ label, value, onChange, placeholder }: { label: string; value: string; onChange(value: string): void; placeholder?: string }) {
