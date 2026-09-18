@@ -103,6 +103,13 @@ export async function verifyMidtransSnapNotification(input: {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
+export class MidtransTransactionNotFoundError extends Error {
+  constructor(message = "Transaksi Midtrans tidak ditemukan.") {
+    super(message);
+    this.name = "MidtransTransactionNotFoundError";
+  }
+}
+
 export async function queryMidtransSnapStatus(input: {
   orderId: string;
   environment: PaymentEnvironment;
@@ -127,6 +134,9 @@ export async function queryMidtransSnapStatus(input: {
     const message = typeof raw.status_message === "string"
       ? raw.status_message.trim()
       : "Midtrans belum dapat mengembalikan status transaksi.";
+    if (response.status === 404) {
+      throw new MidtransTransactionNotFoundError(message || "Transaksi Midtrans tidak ditemukan.");
+    }
     throw new Error(message || "Midtrans belum dapat mengembalikan status transaksi.");
   }
 
