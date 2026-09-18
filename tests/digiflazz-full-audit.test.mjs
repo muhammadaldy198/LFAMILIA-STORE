@@ -63,6 +63,23 @@ test("active DigiFlazz configuration changes are serialized against sync and che
   assert.doesNotMatch(route, /lock_token = NULL, locked_until = NULL, last_success_at = NULL/);
 });
 
+test("forward migration replaces the legacy case-sensitive DigiFlazz maintenance trigger", () => {
+  const migration = read("drizzle/0038_digiflazz_normalize_maintenance_guard.sql");
+  assert.match(migration, /DROP TRIGGER IF EXISTS `digiflazz_order_maintenance_guard`/);
+  assert.match(migration, /CREATE TRIGGER `digiflazz_order_maintenance_guard`/);
+  assert.match(migration, /lower\(trim\(NEW\.`provider_code`\)\) = 'digiflazz'/);
+});
+
+test("failed active DigiFlazz configuration saves rebuild the previous operational cache immediately", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const release = route.indexOf("await releaseDigiflazzConfigurationGuard(token, successful)");
+  const rebuild = route.indexOf("await syncDigiflazzPrices({ force: true })");
+  assert.match(route, /let failed = false/);
+  assert.match(route, /failure = error/);
+  assert.ok(release >= 0 && rebuild > release);
+  assert.match(route, /Cache operasional DigiFlazz juga gagal dipulihkan/);
+});
+
 test("DigiFlazz transaction response is JSON-safe and requires exact LFAMILIA correlation", () => {
   const provider = read("lib/server/providers/digiflazz.ts");
   assert.match(provider, /response\.json\(\)\.catch\(\(\) => null\)/);
