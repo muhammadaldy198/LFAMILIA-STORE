@@ -27,15 +27,23 @@ DOKU Direct API berjalan langsung dari Worker LFAMILIA dan tidak memakai VPS rel
 
 ## Google Login pelanggan
 
-Google OAuth untuk pelanggan dikonfigurasi dari **Super Admin → Integrasi → Google Login**. `Client ID` dan `Client Secret` disimpan terenkripsi di D1 menggunakan `INTEGRATION_ENCRYPTION_KEY`; credential Google tidak disimpan di repository dan tidak perlu dijadikan Cloudflare Variable/Secret terpisah.
+Google Login pelanggan memakai **Google Identity Services (GIS)** dan hanya membutuhkan **OAuth Client ID**. Tidak ada Client Secret, authorization-code exchange, atau Authorized Redirect URI untuk flow ini.
 
-Di Google Cloud Console buat **OAuth 2.0 Client ID** bertipe **Web application**, lalu tambahkan Authorized Redirect URI yang ditampilkan oleh panel Integrasi. Dengan `PUBLIC_BASE_URL=https://lfamiliastore.my.id`, URI production adalah:
+Di Google Cloud Console:
+
+1. Buat OAuth client bertipe **Web application**.
+2. Pada **Authorized JavaScript origins**, tambahkan origin website production:
 
 ```text
-https://lfamiliastore.my.id/api/auth/google/callback
+https://lfamiliastore.my.id
 ```
 
-Flow backend memakai authorization code, `state`, `nonce`, cookie HttpOnly/Secure/SameSite=Lax, verifikasi signature ID token Google melalui JWKS, verifikasi audience, issuer, nonce, serta hanya menerima email yang sudah terverifikasi. Jika email Google sama dengan akun LFAMILIA yang sudah ada dan aktif, akun OAuth ditautkan ke akun tersebut; jika belum ada, akun pelanggan baru dibuat otomatis.
+3. **Authorized redirect URIs boleh dikosongkan** untuk flow GIS popup/button ini.
+4. Salin Client ID lalu simpan dari **Super Admin → Integrasi → Google Login**.
+
+Client ID tidak di-hardcode di repository. Nilainya dikelola dari panel Integrasi dan disimpan di konfigurasi terenkripsi D1 menggunakan `INTEGRATION_ENCRYPTION_KEY`. Backend hanya menerima ID token Google dari browser, lalu memverifikasi signature melalui JWKS Google, issuer, audience (`Client ID`), masa berlaku token, dan `email_verified` sebelum membuat sesi pelanggan.
+
+Jika email Google sama dengan akun LFAMILIA yang sudah aktif, akun Google ditautkan ke akun tersebut. Jika belum ada, akun pelanggan baru dibuat otomatis. Relasi Google memakai claim `sub` sebagai identitas provider yang unik.
 
 Migration schema terkait:
 
