@@ -12,7 +12,6 @@ import {
   Menu,
   PackageCheck,
   ReceiptText,
-  ShieldCheck,
   UserRound,
   WalletCards,
   X,
@@ -667,19 +666,6 @@ function TopupForm({
     channels.find((item) => `${item.method}:${item.channel}` === selectedChannelKey) ??
     channels[0] ??
     null;
-
-  useEffect(() => {
-    if (!channels.length) {
-      setSelectedChannelKey("");
-      return;
-    }
-    const selectedStillExists = channels.some(
-      (item) => `${item.method}:${item.channel}` === selectedChannelKey,
-    );
-    if (!selectedStillExists) {
-      setSelectedChannelKey(`${channels[0].method}:${channels[0].channel}`);
-    }
-  }, [channels, selectedChannelKey]);
 
   function openTopupPayment() {
     if (!payment?.paymentUrl) return;
