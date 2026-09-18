@@ -170,6 +170,29 @@ test("expired DOKU recovery is bounded and terminal provider failure retires his
   assert.match(doku, /Pembayaran DOKU gagal terkonfirmasi\./);
 });
 
+test("legacy provider casing remains retryable across automatic fulfillment recovery", () => {
+  const orders = read("lib/server/orders.ts");
+  const guard = read("lib/server/digiflazz-config-guard.ts");
+  assert.match(orders, /if \(providerCode === "digiflazz" \|\| providerCode === "voucher-stock"\)/);
+  assert.match(orders, /lower\(trim\(provider_code\)\) IN \('digiflazz', 'voucher-stock'\)/);
+  assert.match(orders, /lower\(trim\(coalesce\(provider_code, ''\)\)\) NOT IN \('digiflazz', 'voucher-stock'\)/);
+  assert.match(guard, /lower\(trim\(provider_code\)\) = 'digiflazz'/);
+});
+
+test("active DigiFlazz credential changes invalidate dependent cache before profile mutation", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const invalidate = route.indexOf("await invalidateDigiflazzOperationalCache(token)");
+  const action = route.indexOf("await action()");
+  assert.ok(invalidate >= 0 && action > invalidate);
+});
+
+test("storefront keeps fallback categories when API response fails or omits categories", () => {
+  const storefront = read("hooks/use-storefront.ts");
+  assert.match(storefront, /if \(!response\.ok\) throw new Error/);
+  assert.match(storefront, /if \(Array\.isArray\(data\.categories\)\)/);
+  assert.doesNotMatch(storefront, /canonicalCategories\(data\.categories \?\? \[\], true\)/);
+});
+
 test("DOKU overview only reports ready for a parseable RSA key and HTTPS endpoint", () => {
   const config = read("lib/server/payment-mode-config.ts");
   assert.match(config, /createPrivateKey/);
