@@ -34,12 +34,18 @@ export async function findExternalTopupByKey(customerId: string, idempotencyKey:
     .bind(customerId, idempotencyKey).first<ExternalWalletTopup>();
 }
 
-export async function findMatchingExternalTopup(customerId: string, amount: number, paymentMethod: string) {
+export async function findMatchingExternalTopup(
+  customerId: string,
+  amount: number,
+  paymentMethod: string,
+  gateway: PaymentGatewayName,
+) {
   return getD1().prepare(`SELECT ${columns} FROM wallet_topups
     WHERE customer_id = ? AND amount = ? AND payment_method = ?
+      AND payment_gateway = ?
       AND source IN ('doku','midtrans') AND status = 'pending'
     ORDER BY created_at DESC LIMIT 1`)
-    .bind(customerId, amount, paymentMethod).first<ExternalWalletTopup>();
+    .bind(customerId, amount, paymentMethod, gateway).first<ExternalWalletTopup>();
 }
 
 export async function insertExternalWalletTopup(input: {
@@ -66,6 +72,7 @@ export async function insertExternalWalletTopup(input: {
     WHERE NOT EXISTS (
       SELECT 1 FROM wallet_topups
       WHERE customer_id = ? AND amount = ? AND payment_method = ?
+        AND payment_gateway = ?
         AND source IN ('doku','midtrans') AND status = 'pending'
     )`)
     .bind(
@@ -86,6 +93,7 @@ export async function insertExternalWalletTopup(input: {
       input.customerId,
       input.amount,
       input.paymentMethodKey,
+      input.gateway,
     ).run();
 }
 
