@@ -215,13 +215,13 @@ export async function applyExternalWalletTopup(input: {
   if (input.status === "paid") {
     const reference = `topup:${topup.id}`;
     const allowedStatus = input.authoritativePaid
-      ? "t.status IN ('pending', 'rejected')"
+      ? "(t.status = 'pending' OR (t.status = 'rejected' AND t.admin_notes IN ('Pembayaran kedaluwarsa.', 'Pembayaran DOKU kedaluwarsa.')))"
       : "t.status = 'pending'";
     const expiryGuard = input.authoritativePaid
       ? ""
       : "AND (t.gateway_expired_at IS NULL OR datetime(t.gateway_expired_at) > datetime('now'))";
     const approvalStatus = input.authoritativePaid
-      ? "status IN ('pending', 'rejected')"
+      ? "(status = 'pending' OR (status = 'rejected' AND admin_notes IN ('Pembayaran kedaluwarsa.', 'Pembayaran DOKU kedaluwarsa.')))"
       : "status = 'pending'";
 
     const results = await db.batch([
