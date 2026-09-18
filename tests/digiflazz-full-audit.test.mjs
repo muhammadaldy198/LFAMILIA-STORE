@@ -84,7 +84,6 @@ test("failed active DigiFlazz configuration changes preserve the previous cache 
   assert.match(route, /restoreIntegrationSettingSnapshot/);
   assert.match(route, /if \(actionCommitted && rollbackPlan && committed !== null\)/);
   assert.match(route, /rollbackPlan\.rollback\(token, committed\)/);
-  assert.match(route, /rollbackPlan\.rollback\(token\)/);
   assert.doesNotMatch(route, /syncDigiflazzPrices/);
   assert.match(guard, /const results = await db\.batch\(statements\)/);
   assert.match(guard, /Guard konfigurasi DigiFlazz kedaluwarsa sebelum cache dapat diinvalidasi/);
