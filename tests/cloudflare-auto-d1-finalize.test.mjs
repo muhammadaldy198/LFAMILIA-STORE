@@ -46,14 +46,14 @@ test("Cloudflare runtime repair owns the final 0029 indexes, reservation table, 
 test("Cloudflare request and scheduled entry points repair D1 before application or maintenance work", () => {
   assert.match(worker, /import \{ ensureLegacyDatabaseColumns \} from "\.\.\/lib\/server\/database-repair"/);
   assert.equal(
-    (worker.match(/await ensureLegacyDatabaseColumns\(\);/g) ?? []).length,
+    (worker.match(/await ensureLegacyDatabaseColumns\(\)\.catch/g) ?? []).length,
     2,
   );
-  const fetchRepair = worker.indexOf("await ensureLegacyDatabaseColumns();");
+  const fetchRepair = worker.indexOf("await ensureLegacyDatabaseColumns().catch");
   const appFetch = worker.indexOf("handler.fetch(request, env, ctx)");
   assert.ok(fetchRepair >= 0 && fetchRepair < appFetch);
   const scheduled = worker.indexOf("async scheduled(");
-  const scheduledRepair = worker.indexOf("await ensureLegacyDatabaseColumns();", scheduled);
+  const scheduledRepair = worker.indexOf("await ensureLegacyDatabaseColumns().catch", scheduled);
   const maintenance = worker.indexOf("releaseExpiredExternalPromotions()", scheduled);
   assert.ok(scheduledRepair > scheduled && scheduledRepair < maintenance);
 });
