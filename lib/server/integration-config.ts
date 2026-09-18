@@ -264,6 +264,80 @@ export async function getIntegrationOverview(): Promise<IntegrationOverview> {
   };
 }
 
+export type IntegrationProfileSnapshot = {
+  provider: IntegrationProvider;
+  mode: IntegrationMode;
+  environment: IntegrationEnvironment;
+  encryptedConfig: string | null;
+};
+
+export type IntegrationSettingSnapshot = {
+  settingKey: "digiflazz_environment";
+  value: string | null;
+};
+
+export async function captureIntegrationProfileSnapshot(
+  provider: IntegrationProvider,
+  mode: IntegrationMode,
+  environment: IntegrationEnvironment,
+): Promise<IntegrationProfileSnapshot> {
+  const database = getD1();
+  await ensureIntegrationTables(database);
+  const row = await database.prepare(`
+    SELECT encrypted_config
+    FROM integration_profiles
+    WHERE provider = ? AND mode = ? AND environment = ?
+    LIMIT 1
+  `).bind(provider, mode, environment).first<{ encrypted_config: string }>();
+  return { provider, mode, environment, encryptedConfig: row?.encrypted_config ?? null };
+}
+
+export async function restoreIntegrationProfileSnapshot(snapshot: IntegrationProfileSnapshot) {
+  const database = getD1();
+  await ensureIntegrationTables(database);
+  if (snapshot.encryptedConfig === null) {
+    await database.prepare(`
+      DELETE FROM integration_profiles
+      WHERE provider = ? AND mode = ? AND environment = ?
+    `).bind(snapshot.provider, snapshot.mode, snapshot.environment).run();
+    return;
+  }
+  await database.prepare(`
+    INSERT INTO integration_profiles (provider, mode, environment, encrypted_config, updated_at)
+    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(provider, mode, environment) DO UPDATE SET
+      encrypted_config = excluded.encrypted_config,
+      updated_at = CURRENT_TIMESTAMP
+  `).bind(snapshot.provider, snapshot.mode, snapshot.environment, snapshot.encryptedConfig).run();
+}
+
+export async function captureIntegrationSettingSnapshot(
+  settingKey: IntegrationSettingSnapshot["settingKey"],
+): Promise<IntegrationSettingSnapshot> {
+  const database = getD1();
+  await ensureIntegrationTables(database);
+  const row = await database.prepare(
+    "SELECT value FROM integration_settings WHERE setting_key = ? LIMIT 1",
+  ).bind(settingKey).first<{ value: string }>();
+  return { settingKey, value: row?.value ?? null };
+}
+
+export async function restoreIntegrationSettingSnapshot(snapshot: IntegrationSettingSnapshot) {
+  const database = getD1();
+  await ensureIntegrationTables(database);
+  if (snapshot.value === null) {
+    await database.prepare("DELETE FROM integration_settings WHERE setting_key = ?")
+      .bind(snapshot.settingKey)
+      .run();
+    return;
+  }
+  await database.prepare(`
+    INSERT INTO integration_settings (setting_key, value, updated_at)
+    VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(setting_key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+  `).bind(snapshot.settingKey, snapshot.value).run();
+}
+
 export async function saveIntegrationProfile(input: {
   provider: IntegrationProvider;
   mode: IntegrationMode;
