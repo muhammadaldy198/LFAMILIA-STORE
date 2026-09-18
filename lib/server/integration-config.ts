@@ -264,6 +264,170 @@ export async function getIntegrationOverview(): Promise<IntegrationOverview> {
   };
 }
 
+export type IntegrationProfileSnapshot = {
+  provider: IntegrationProvider;
+  mode: IntegrationMode;
+  environment: IntegrationEnvironment;
+  encryptedConfig: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type IntegrationSettingSnapshot = {
+  settingKey: "digiflazz_environment";
+  value: string | null;
+  updatedAt: string | null;
+};
+
+function guardedOwnershipClause() {
+  return `EXISTS (
+    SELECT 1 FROM digiflazz_runtime_state
+    WHERE id = 1
+      AND maintenance_token = ?
+      AND maintenance_until > CURRENT_TIMESTAMP
+      AND EXISTS (
+        SELECT 1 FROM digiflazz_pricelist_sync_state
+        WHERE id = 1 AND lock_token = ? AND locked_until > CURRENT_TIMESTAMP
+      )
+  )`;
+}
+
+export async function captureIntegrationProfileSnapshot(
+  provider: IntegrationProvider,
+  mode: IntegrationMode,
+  environment: IntegrationEnvironment,
+): Promise<IntegrationProfileSnapshot> {
+  const database = getD1();
+  await ensureIntegrationTables(database);
+  const row = await database.prepare(`
+    SELECT encrypted_config, created_at, updated_at
+    FROM integration_profiles
+    WHERE provider = ? AND mode = ? AND environment = ?
+    LIMIT 1
+  `).bind(provider, mode, environment).first<{
+    encrypted_config: string;
+    created_at: string;
+    updated_at: string;
+  }>();
+  return {
+    provider,
+    mode,
+    environment,
+    encryptedConfig: row?.encrypted_config ?? null,
+    createdAt: row?.created_at ?? null,
+    updatedAt: row?.updated_at ?? null,
+  };
+}
+
+export async function restoreIntegrationProfileSnapshot(
+  snapshot: IntegrationProfileSnapshot,
+  expectedCurrent: IntegrationProfileSnapshot | null,
+  guardToken: string,
+) {
+  const database = getD1();
+  await ensureIntegrationTables(database);
+  const ownership = guardedOwnershipClause();
+  const expectedConfig = expectedCurrent?.encryptedConfig ?? null;
+  const expectedUpdatedAt = expectedCurrent?.updatedAt ?? null;
+
+  if (snapshot.encryptedConfig === null) {
+    if (!expectedConfig || !expectedUpdatedAt) return false;
+    const result = await database.prepare(`
+      DELETE FROM integration_profiles
+      WHERE provider = ? AND mode = ? AND environment = ?
+        AND encrypted_config = ?
+        AND updated_at = ?
+        AND ${ownership}
+    `).bind(
+      snapshot.provider,
+      snapshot.mode,
+      snapshot.environment,
+      expectedConfig,
+      expectedUpdatedAt,
+      guardToken,
+      guardToken,
+    ).run();
+    return Number(result.meta.changes ?? 0) > 0;
+  }
+
+  if (!snapshot.createdAt || !snapshot.updatedAt) return false;
+  if (!expectedConfig || !expectedUpdatedAt) return false;
+  const expectedPredicate = "AND encrypted_config = ? AND updated_at = ?";
+  const statement = database.prepare(`
+    UPDATE integration_profiles
+       SET encrypted_config = ?, created_at = ?, updated_at = ?
+     WHERE provider = ? AND mode = ? AND environment = ?
+       ${expectedPredicate}
+       AND ${ownership}
+  `);
+  const args: unknown[] = [
+    snapshot.encryptedConfig,
+    snapshot.createdAt,
+    snapshot.updatedAt,
+    snapshot.provider,
+    snapshot.mode,
+    snapshot.environment,
+  ];
+  args.push(expectedConfig, expectedUpdatedAt);
+  args.push(guardToken, guardToken);
+  const result = await statement.bind(...args).run();
+  return Number(result.meta.changes ?? 0) > 0;
+}
+
+export async function captureIntegrationSettingSnapshot(
+  settingKey: IntegrationSettingSnapshot["settingKey"],
+): Promise<IntegrationSettingSnapshot> {
+  const database = getD1();
+  await ensureIntegrationTables(database);
+  const row = await database.prepare(
+    "SELECT value, updated_at FROM integration_settings WHERE setting_key = ? LIMIT 1",
+  ).bind(settingKey).first<{ value: string; updated_at: string }>();
+  return { settingKey, value: row?.value ?? null, updatedAt: row?.updated_at ?? null };
+}
+
+export async function restoreIntegrationSettingSnapshot(
+  snapshot: IntegrationSettingSnapshot,
+  expectedCurrent: IntegrationSettingSnapshot | null,
+  guardToken: string,
+) {
+  const database = getD1();
+  await ensureIntegrationTables(database);
+  const ownership = guardedOwnershipClause();
+  const expectedValue = expectedCurrent?.value ?? null;
+  const expectedUpdatedAt = expectedCurrent?.updatedAt ?? null;
+
+  if (snapshot.value === null) {
+    if (!expectedValue || !expectedUpdatedAt) return false;
+    const result = await database.prepare(`
+      DELETE FROM integration_settings
+      WHERE setting_key = ? AND value = ? AND updated_at = ? AND ${ownership}
+    `).bind(snapshot.settingKey, expectedValue, expectedUpdatedAt, guardToken, guardToken).run();
+    return Number(result.meta.changes ?? 0) > 0;
+  }
+
+  if (!snapshot.updatedAt) return false;
+  if (!expectedValue || !expectedUpdatedAt) return false;
+  const statement = database.prepare(`
+    UPDATE integration_settings
+       SET value = ?, updated_at = ?
+     WHERE setting_key = ?
+       AND value = ?
+       AND updated_at = ?
+       AND ${ownership}
+  `);
+  const args: unknown[] = [
+    snapshot.value,
+    snapshot.updatedAt,
+    snapshot.settingKey,
+    expectedValue,
+    expectedUpdatedAt,
+    guardToken,
+    guardToken,
+  ];
+  const result = await statement.bind(...args).run();
+  return Number(result.meta.changes ?? 0) > 0;
+}
+
 export async function saveIntegrationProfile(input: {
   provider: IntegrationProvider;
   mode: IntegrationMode;
@@ -302,31 +466,52 @@ export async function saveIntegrationProfile(input: {
     delete merged[key];
   }
   const encrypted = await encryptConfig(secret, merged);
-  await database.prepare(`INSERT INTO integration_profiles (provider, mode, environment, encrypted_config, updated_at)
-    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+  const committed = await database.prepare(`INSERT INTO integration_profiles (provider, mode, environment, encrypted_config, updated_at)
+    VALUES (?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))
     ON CONFLICT(provider, mode, environment) DO UPDATE SET
       encrypted_config = excluded.encrypted_config,
-      updated_at = CURRENT_TIMESTAMP`)
+      updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
+    RETURNING encrypted_config, created_at, updated_at`)
     .bind(input.provider, input.mode, input.environment, encrypted)
-    .run();
-  return { configuredFields: Object.keys(merged).sort() };
+    .first<{ encrypted_config: string; created_at: string; updated_at: string }>();
+  if (!committed) throw new Error("Konfigurasi integrasi gagal dikonfirmasi setelah disimpan.");
+  return {
+    configuredFields: Object.keys(merged).sort(),
+    committedSnapshot: {
+      provider: input.provider,
+      mode: input.mode,
+      environment: input.environment,
+      encryptedConfig: committed.encrypted_config,
+      createdAt: committed.created_at,
+      updatedAt: committed.updated_at,
+    } satisfies IntegrationProfileSnapshot,
+  };
 }
 
 export async function saveIntegrationSelections(input: Partial<IntegrationOverview["selections"]>) {
-  const normalized = {
-    digiflazzEnvironment: input.digiflazzEnvironment && valueOr(input.digiflazzEnvironment, ["development", "production"] as const, "development"),
-  };
-  const values: Array<[string, string | undefined]> = [
-    ["digiflazz_environment", normalized.digiflazzEnvironment],
-  ];
+  const normalized = input.digiflazzEnvironment
+    ? valueOr(input.digiflazzEnvironment, ["development", "production"] as const, "development")
+    : null;
+  if (!normalized) return { committedSnapshot: null };
+
   const database = getD1();
   await ensureIntegrationTables(database);
-  const statements = values.flatMap(([key, value]) => value
-    ? [database.prepare(`INSERT INTO integration_settings (setting_key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(setting_key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`).bind(key, value)]
-    : [],
-  );
-  if (statements.length) await database.batch(statements);
+  const committed = await database.prepare(`
+    INSERT INTO integration_settings (setting_key, value, updated_at)
+    VALUES ('digiflazz_environment', ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))
+    ON CONFLICT(setting_key) DO UPDATE SET
+      value = excluded.value,
+      updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
+    RETURNING value, updated_at
+  `).bind(normalized).first<{ value: string; updated_at: string }>();
+  if (!committed) throw new Error("Pilihan environment DigiFlazz gagal dikonfirmasi setelah disimpan.");
+  return {
+    committedSnapshot: {
+      settingKey: "digiflazz_environment",
+      value: committed.value,
+      updatedAt: committed.updated_at,
+    } satisfies IntegrationSettingSnapshot,
+  };
 }
 
 function put(target: Record<string, unknown>, key: string, value: string | undefined) {

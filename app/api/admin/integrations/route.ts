@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import {
   acquireDigiflazzConfigurationGuard,
+  assertDigiflazzConfigurationIdle,
   invalidateDigiflazzOperationalCache,
   releaseDigiflazzConfigurationGuard,
 } from "@/lib/server/digiflazz-config-guard";
@@ -10,11 +11,14 @@ import {
   getDigiflazzBalance,
 } from "@/lib/server/providers/digiflazz";
 import {
+  captureIntegrationProfileSnapshot,
+  captureIntegrationSettingSnapshot,
   getIntegrationOverview,
+  restoreIntegrationProfileSnapshot,
+  restoreIntegrationSettingSnapshot,
   saveIntegrationProfile,
   saveIntegrationSelections,
 } from "@/lib/server/integration-config";
-import { syncDigiflazzPrices } from "@/lib/server/digiflazz-pricing";
 import { testProviderRelayConnections } from "@/lib/server/provider-relay";
 
 export const dynamic = "force-dynamic";
@@ -51,38 +55,42 @@ const schema = z.discriminatedUnion("action", [
   digiflazzTestInput,
 ]);
 
-async function withDigiflazzConfigurationGuard(action: () => Promise<void>) {
+type DigiflazzRollbackPlan<T> = {
+  rollback: (guardToken: string, committed: T) => Promise<boolean>;
+};
+
+async function withDigiflazzConfigurationGuard<T>(
+  action: () => Promise<T>,
+  createRollbackPlan: () => Promise<DigiflazzRollbackPlan<T>>,
+) {
   const token = await acquireDigiflazzConfigurationGuard();
   let successful = false;
-  let failed = false;
-  let failure: unknown;
+  let actionCommitted = false;
+  let committed: T | null = null;
+  let rollbackPlan: DigiflazzRollbackPlan<T> | null = null;
   try {
-    // The guard blocks new DigiFlazz orders and pricelist sync while the active
-    // configuration changes. Invalidate credential-dependent caches before the
-    // mutation so stale provider data can never survive a successful change.
+    rollbackPlan = await createRollbackPlan();
+    committed = await action();
+    actionCommitted = true;
     await invalidateDigiflazzOperationalCache(token);
     clearDigiflazzBalanceCache();
-    await action();
     successful = true;
   } catch (error) {
-    failed = true;
-    failure = error;
+    if (actionCommitted && rollbackPlan && committed !== null) {
+      try {
+        const restored = await rollbackPlan.rollback(token, committed);
+        if (!restored) {
+          throw new Error("Rollback dibatalkan karena guard kedaluwarsa atau konfigurasi DigiFlazz sudah berubah.");
+        }
+      } catch (rollbackError) {
+        const primary = error instanceof Error ? error.message : String(error);
+        const recovery = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+        throw new Error(`${primary} Konfigurasi DigiFlazz lama juga gagal dipulihkan: ${recovery}`);
+      }
+    }
+    throw error;
   } finally {
     await releaseDigiflazzConfigurationGuard(token, successful);
-  }
-
-  if (failed) {
-    // The mutation did not commit, so the previous active DigiFlazz profile is
-    // still authoritative. Rebuild its operational cache immediately instead
-    // of leaving checkout unavailable until the next scheduled sync.
-    try {
-      await syncDigiflazzPrices({ force: true });
-    } catch (rebuildError) {
-      const primary = failure instanceof Error ? failure.message : String(failure);
-      const recovery = rebuildError instanceof Error ? rebuildError.message : String(rebuildError);
-      throw new Error(`${primary} Cache operasional DigiFlazz juga gagal dipulihkan: ${recovery}`);
-    }
-    throw failure;
   }
 }
 
@@ -126,7 +134,16 @@ export async function PUT(request: Request) {
         const activeProfileChanged = input.environment === activeEnvironment &&
           (Object.values(input.values).some((value) => value.trim()) || input.clearFields.length > 0);
         if (activeProfileChanged) {
-          await withDigiflazzConfigurationGuard(() => saveIntegrationProfile(input).then(() => undefined));
+          await withDigiflazzConfigurationGuard(
+            async () => (await saveIntegrationProfile(input)).committedSnapshot,
+            async () => {
+              const snapshot = await captureIntegrationProfileSnapshot(input.provider, input.mode, input.environment);
+              return {
+                rollback: (guardToken: string, committed: Awaited<ReturnType<typeof captureIntegrationProfileSnapshot>>) =>
+                  restoreIntegrationProfileSnapshot(snapshot, committed, guardToken),
+              };
+            },
+          );
         } else {
           await saveIntegrationProfile(input);
         }
@@ -141,7 +158,22 @@ export async function PUT(request: Request) {
         input.selections.digiflazzEnvironment && before !== input.selections.digiflazzEnvironment,
       );
       if (changingDigiflazzEnvironment) {
-        await withDigiflazzConfigurationGuard(() => saveIntegrationSelections(input.selections));
+        await withDigiflazzConfigurationGuard(
+          async () => {
+            const result = await saveIntegrationSelections(input.selections);
+            if (!result.committedSnapshot) throw new Error("Pilihan environment DigiFlazz tidak tersimpan.");
+            return result.committedSnapshot;
+          },
+          async () => {
+            const snapshot = await captureIntegrationSettingSnapshot("digiflazz_environment");
+            return {
+              rollback: (guardToken: string, committed: Awaited<ReturnType<typeof captureIntegrationSettingSnapshot>>) =>
+                restoreIntegrationSettingSnapshot(snapshot, committed, guardToken),
+            };
+          },
+        );
+      } else if (input.selections.digiflazzEnvironment) {
+        await assertDigiflazzConfigurationIdle();
       } else {
         await saveIntegrationSelections(input.selections);
       }

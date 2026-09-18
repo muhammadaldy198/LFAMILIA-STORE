@@ -145,23 +145,71 @@ export async function acquireDigiflazzConfigurationGuard() {
 
 export async function invalidateDigiflazzOperationalCache(token: string) {
   const db = getD1();
+  const tableRows = await db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('digiflazz_pricelist_cache', 'digiflazz_seller_monitor')",
+  ).all<{ name: string }>();
+  const existingTables = new Set(tableRows.results.map((row) => row.name));
   const ownsGuard = `EXISTS (
     SELECT 1 FROM digiflazz_runtime_state
-    WHERE id = 1 AND maintenance_token = ? AND maintenance_until > CURRENT_TIMESTAMP
+    WHERE id = 1
+      AND maintenance_token = ?
+      AND maintenance_until > CURRENT_TIMESTAMP
+      AND EXISTS (
+        SELECT 1 FROM digiflazz_pricelist_sync_state
+        WHERE id = 1 AND lock_token = ? AND locked_until > CURRENT_TIMESTAMP
+      )
   )`;
+
+  const statements = [
+    db.prepare(`
+      UPDATE digiflazz_runtime_state
+         SET maintenance_token = maintenance_token
+       WHERE id = 1
+         AND maintenance_token = ?
+         AND maintenance_until > CURRENT_TIMESTAMP
+         AND EXISTS (
+           SELECT 1 FROM digiflazz_pricelist_sync_state
+           WHERE id = 1 AND lock_token = ? AND locked_until > CURRENT_TIMESTAMP
+         )
+    `).bind(token, token),
+  ];
+
   for (const table of ["digiflazz_pricelist_cache", "digiflazz_seller_monitor"] as const) {
-    try {
-      await db.prepare(`DELETE FROM ${table} WHERE ${ownsGuard}`).bind(token).run();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!/no such table/i.test(message)) throw error;
+    if (existingTables.has(table)) {
+      statements.push(db.prepare(`DELETE FROM ${table} WHERE ${ownsGuard}`).bind(token, token));
     }
   }
-  await db.prepare(`
+
+  statements.push(db.prepare(`
     UPDATE digiflazz_pricelist_sync_state
        SET last_started_at = NULL, last_success_at = NULL
-     WHERE id = 1 AND lock_token = ?
-  `).bind(token).run();
+     WHERE id = 1
+       AND lock_token = ?
+       AND EXISTS (
+         SELECT 1 FROM digiflazz_runtime_state
+         WHERE id = 1 AND maintenance_token = ? AND maintenance_until > CURRENT_TIMESTAMP
+       )
+  `).bind(token, token));
+
+  const results = await db.batch(statements);
+  if (Number(results[0]?.meta.changes ?? 0) === 0) {
+    throw new Error("Guard konfigurasi DigiFlazz kedaluwarsa sebelum cache dapat diinvalidasi.");
+  }
+}
+
+export async function assertDigiflazzConfigurationIdle() {
+  await ensureDigiflazzConfigurationGuard();
+  const row = await getD1().prepare(`
+    SELECT maintenance_token, maintenance_until
+    FROM digiflazz_runtime_state
+    WHERE id = 1
+      AND maintenance_token IS NOT NULL
+      AND maintenance_until > CURRENT_TIMESTAMP
+    LIMIT 1
+  `).first<{ maintenance_token: string; maintenance_until: string }>();
+  if (row?.maintenance_token) {
+    throw new Error("Perubahan konfigurasi DigiFlazz lain sedang berjalan. Coba lagi beberapa saat.");
+  }
 }
 
 export async function releaseDigiflazzConfigurationGuard(token: string, successful: boolean) {

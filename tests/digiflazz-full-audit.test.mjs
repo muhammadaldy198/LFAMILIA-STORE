@@ -70,14 +70,64 @@ test("forward migration replaces the legacy case-sensitive DigiFlazz maintenance
   assert.match(migration, /lower\(trim\(NEW\.`provider_code`\)\) = 'digiflazz'/);
 });
 
-test("failed active DigiFlazz configuration saves rebuild the previous operational cache immediately", () => {
+test("failed active DigiFlazz configuration changes preserve the previous cache and rollback on atomic invalidation failure", () => {
   const route = read("app/api/admin/integrations/route.ts");
-  const release = route.indexOf("await releaseDigiflazzConfigurationGuard(token, successful)");
-  const rebuild = route.indexOf("await syncDigiflazzPrices({ force: true })");
-  assert.match(route, /let failed = false/);
-  assert.match(route, /failure = error/);
-  assert.ok(release >= 0 && rebuild > release);
-  assert.match(route, /Cache operasional DigiFlazz juga gagal dipulihkan/);
+  const guard = read("lib/server/digiflazz-config-guard.ts");
+  const integration = read("lib/server/integration-config.ts");
+  const action = route.indexOf("await action()");
+  const invalidate = route.indexOf("await invalidateDigiflazzOperationalCache(token)");
+
+  assert.ok(action >= 0 && invalidate > action);
+  assert.match(route, /captureIntegrationProfileSnapshot/);
+  assert.match(route, /restoreIntegrationProfileSnapshot/);
+  assert.match(route, /captureIntegrationSettingSnapshot/);
+  assert.match(route, /restoreIntegrationSettingSnapshot/);
+  assert.match(route, /if \(actionCommitted && rollbackPlan && committed !== null\)/);
+  assert.match(route, /rollbackPlan\.rollback\(token, committed\)/);
+  assert.doesNotMatch(route, /syncDigiflazzPrices/);
+  assert.match(guard, /const results = await db\.batch\(statements\)/);
+  assert.match(guard, /Guard konfigurasi DigiFlazz kedaluwarsa sebelum cache dapat diinvalidasi/);
+  assert.match(integration, /export async function captureIntegrationProfileSnapshot/);
+  assert.match(integration, /export async function restoreIntegrationProfileSnapshot/);
+  assert.match(integration, /export async function captureIntegrationSettingSnapshot/);
+  assert.match(integration, /export async function restoreIntegrationSettingSnapshot/);
+  assert.match(integration, /createdAt: string \| null/);
+  assert.match(integration, /updatedAt: string \| null/);
+  assert.match(integration, /RETURNING encrypted_config, created_at, updated_at/);
+  assert.match(integration, /AND updated_at = \?/);
+  assert.match(integration, /maintenance_token = \?/);
+  assert.match(integration, /lock_token = \?/);
+  assert.doesNotMatch(route, /captureCommitted/);
+  assert.match(route, /committed = await action\(\)/);
+  assert.match(route, /Rollback dibatalkan karena guard kedaluwarsa atau konfigurasi DigiFlazz sudah berubah/);
+});
+
+test("targeted DigiFlazz product and package syncs cannot repopulate stale seller availability", () => {
+  const pricing = read("lib/server/digiflazz-pricing.ts");
+  const monitor = read("lib/server/digiflazz-monitor.ts");
+  assert.match(pricing, /acquireTargetedPriceListSyncLock/);
+  assert.match(pricing, /withTargetedPriceListSyncLock/);
+  assert.match(pricing, /syncDigiflazzProduct[\s\S]*withTargetedPriceListSyncLock/);
+  assert.match(pricing, /syncDigiflazzPackage[\s\S]*withTargetedPriceListSyncLock/);
+  assert.match(pricing, /Lock sync DigiFlazz kedaluwarsa sebelum snapshot seller dapat disimpan/);
+  assert.match(monitor, /syncLockToken/);
+  assert.match(monitor, /digiflazz_pricelist_sync_state/);
+  assert.match(monitor, /digiflazz_runtime_state/);
+});
+
+test("full DigiFlazz pricelist writes renew and verify the sync lease before every cache batch", () => {
+  const pricing = read("lib/server/digiflazz-pricing.ts");
+  assert.match(pricing, /async function renewPriceListSyncLock/);
+  assert.match(pricing, /Lock sync DigiFlazz kedaluwarsa sebelum cache pricelist selesai ditulis/);
+  assert.match(pricing, /await renewPriceListSyncLock\(syncLockToken\)/);
+  assert.match(pricing, /writePriceListCache\(items, lock\.token\)/);
+});
+
+test("same-value DigiFlazz environment saves cannot report success during guarded maintenance", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const guard = read("lib/server/digiflazz-config-guard.ts");
+  assert.match(route, /await assertDigiflazzConfigurationIdle\(\)/);
+  assert.match(guard, /export async function assertDigiflazzConfigurationIdle/);
 });
 
 test("DigiFlazz transaction response is JSON-safe and requires exact LFAMILIA correlation", () => {

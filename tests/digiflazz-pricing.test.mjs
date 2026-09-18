@@ -32,7 +32,7 @@ test("admin product import reads the last cached pricelist instead of calling Di
   const route = read("app/api/admin/digiflazz-pricing/route.ts");
   assert.match(pricing, /CREATE TABLE IF NOT EXISTS digiflazz_pricelist_cache/);
   assert.match(pricing, /FROM digiflazz_pricelist_cache/);
-  assert.match(pricing, /writePriceListCache\(items\)/);
+  assert.match(pricing, /writePriceListCache\(items, lock\.token\)/);
   assert.match(route, /listDigiflazzPriceList/);
   assert.match(route, /getDigiflazzPriceListCacheMeta/);
 });

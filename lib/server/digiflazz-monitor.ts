@@ -119,15 +119,29 @@ export function evaluateDigiflazzSellerSnapshot(input: DigiflazzSellerSnapshotIn
   return { baselinePrice, health, alertReason: [...critical, ...warnings].join(" ") || null };
 }
 
-export function buildDigiflazzSellerMonitorStatement(input: DigiflazzSellerSnapshotInput) {
+export function buildDigiflazzSellerMonitorStatement(
+  input: DigiflazzSellerSnapshotInput,
+  syncLockToken?: string,
+) {
   const result = evaluateDigiflazzSellerSnapshot(input);
+  const guardedInsert = syncLockToken
+    ? `SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
+       WHERE EXISTS (
+         SELECT 1 FROM digiflazz_pricelist_sync_state
+         WHERE id = 1 AND lock_token = ? AND locked_until > CURRENT_TIMESTAMP
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM digiflazz_runtime_state
+         WHERE id = 1 AND maintenance_token IS NOT NULL AND maintenance_until > CURRENT_TIMESTAMP
+       )`
+    : "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
   return getD1().prepare(`
     INSERT INTO digiflazz_seller_monitor (
       package_id, seller_name, current_price, baseline_price,
       buyer_product_status, seller_product_status, unlimited_stock, stock, multi,
       start_cut_off, end_cut_off, description, health, alert_reason, last_checked_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ${guardedInsert}
     ON CONFLICT(package_id) DO UPDATE SET
       seller_name = excluded.seller_name,
       current_price = excluded.current_price,
@@ -158,6 +172,7 @@ export function buildDigiflazzSellerMonitorStatement(input: DigiflazzSellerSnaps
     input.description,
     result.health,
     result.alertReason,
+    ...(syncLockToken ? [syncLockToken] : []),
   );
 }
 
