@@ -1,3 +1,4 @@
+import { createPrivateKey } from "node:crypto";
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
@@ -180,7 +181,19 @@ export async function getMidtransSnapConfig() {
 }
 
 function directReady(values: Record<string, string> | null) {
-  return Boolean(values?.clientId && values.secretKey && values.privateKey && values.apiUrl);
+  if (!values?.clientId || !values.secretKey || !values.privateKey || !values.apiUrl) return false;
+  try {
+    const apiUrl = new URL(values.apiUrl);
+    if (apiUrl.protocol !== "https:") return false;
+    createPrivateKey({
+      key: values.privateKey,
+      format: "pem",
+      passphrase: values.privateKeyPassphrase?.trim() || undefined,
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function getPaymentModeOverview() {
