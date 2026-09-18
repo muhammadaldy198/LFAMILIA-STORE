@@ -41,6 +41,7 @@ import {
   type PaymentChannel,
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
+import { calculateCustomerPaymentFee } from "@/lib/payment-fees";
 import { normalizeProductCategorySlug } from "@/lib/product-categories";
 import { formatRupiah, type StoreProduct } from "@/lib/store-data";
 import type { CustomerSession } from "@/lib/server/customer-auth";
@@ -99,7 +100,12 @@ type PromotionQuote = {
 };
 
 type CheckoutPaymentMethod = PaymentMethodCode | "wallet";
-type DisplayPaymentChannel = PaymentChannel & { imageUrl?: string };
+type DisplayPaymentChannel = Pick<PaymentChannel, "method" | "channel" | "name" | "description"> & {
+  imageUrl?: string;
+  customerFeeEnabled?: boolean;
+  customerFeeBps?: number;
+  customerFeeFixed?: number;
+};
 type CheckoutPaymentConfig = {
   channels?: DisplayPaymentChannel[];
 };
@@ -315,6 +321,15 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     ...gatewayPaymentGroups,
   ], [gatewayPaymentGroups]);
   const hasExternalPaymentOption = gatewayPaymentGroups.length > 0;
+  const selectedExternalChannel = paymentMethod === "wallet"
+    ? null
+    : displayChannels.find(
+        (item) => item.method === paymentMethod && item.channel === paymentChannel,
+      ) ?? null;
+  const estimatedPaymentFee = selectedExternalChannel
+    ? calculateCustomerPaymentFee(subtotal, selectedExternalChannel)
+    : 0;
+  const estimatedPaymentTotal = subtotal + estimatedPaymentFee;
   const unavailablePaymentMessage = "Pilih metode pembayaran yang tersedia.";
 
   const chooseMethod = useCallback((method: CheckoutPaymentMethod) => {
@@ -1004,7 +1019,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                                   ) : (
                                     <span className="grid size-7 place-items-center rounded-md bg-white/[0.07] text-[7px] font-black text-white/80">{channel.name.slice(0, 3)}</span>
                                   )}
-                                  <span className="truncate">{channel.name}</span>
+                                  <span className="min-w-0"><span className="block truncate">{channel.name}</span>{channel.customerFeeEnabled !== false && ((channel.customerFeeBps ?? 0) > 0 || (channel.customerFeeFixed ?? 0) > 0) && <span className="mt-0.5 block text-[7px] font-semibold opacity-70">Fee {((channel.customerFeeBps ?? 0) / 100).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%{(channel.customerFeeFixed ?? 0) > 0 ? ` + ${formatRupiah(channel.customerFeeFixed ?? 0)}` : ""}</span>}</span>
                                 </button>
                               ))}
                           </div>
@@ -1159,8 +1174,8 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                 <dl className="space-y-2 border-t border-white/10 px-3 py-2.5 text-[10px]">
                   <SummaryRow label="Harga" value={formatRupiah(subtotal)} />
                   <SummaryRow label="Jumlah" value="1" />
-                  <SummaryRow label="Biaya" value={payment ? formatRupiah(payment.fee) : "Dihitung otomatis"} />
-                  <SummaryRow label="Total Pembayaran" value={formatRupiah(payment?.total ?? subtotal)} highlight />
+                  <SummaryRow label="Biaya Pembayaran" value={formatRupiah(payment?.fee ?? estimatedPaymentFee)} />
+                  <SummaryRow label="Total Pembayaran" value={formatRupiah(payment?.total ?? estimatedPaymentTotal)} highlight />
                 </dl>
               </div>
             ) : (
@@ -1192,7 +1207,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
         <DialogContent className="max-w-md border-white/10 bg-[#191b20] text-white" showCloseButton={false}>
           <DialogHeader><div className="mx-auto grid size-14 place-items-center rounded-full bg-[#b9ff35]/15"><CheckCircle2 className="size-8 text-[#b9ff35]" /></div><DialogTitle className="pt-3 text-center text-lg font-black">Buat Pesanan</DialogTitle><DialogDescription className="text-center text-xs leading-5 text-white/55">{isVoucherProduct ? "Pastikan produk, nominal, dan pembayaran yang kamu pilih sudah sesuai." : "Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai."}</DialogDescription></DialogHeader>
-          <dl className="rounded-xl bg-black/15 p-4 text-xs">{!isVoucherProduct && visibleNickname.nickname && <SummaryRow label="Username" value={visibleNickname.nickname} />}{!isVoucherProduct && productInputFields.map((field) => <SummaryRow key={field.id} label={field.label} value={(customerInputValues[field.id] ?? "").trim() || "-"} />)}<SummaryRow label="Item" value={selectedPackage?.label ?? "-"} /><SummaryRow label="Produk" value={product.name} /><SummaryRow label="Payment" value={checkoutGroups.find((item) => item.code === paymentMethod)?.name ?? "-"} /></dl>
+          <dl className="rounded-xl bg-black/15 p-4 text-xs">{!isVoucherProduct && visibleNickname.nickname && <SummaryRow label="Username" value={visibleNickname.nickname} />}{!isVoucherProduct && productInputFields.map((field) => <SummaryRow key={field.id} label={field.label} value={(customerInputValues[field.id] ?? "").trim() || "-"} />)}<SummaryRow label="Item" value={selectedPackage?.label ?? "-"} /><SummaryRow label="Produk" value={product.name} /><SummaryRow label="Payment" value={checkoutGroups.find((item) => item.code === paymentMethod)?.name ?? "-"} /><SummaryRow label="Biaya Pembayaran" value={formatRupiah(estimatedPaymentFee)} /><SummaryRow label="Total Bayar" value={formatRupiah(estimatedPaymentTotal)} /></dl>
           <label className="flex cursor-pointer items-start gap-3 text-xs leading-5 text-white/60"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-0.5 size-4 accent-[#b9ff35]" />Dengan melanjutkan, saya menyetujui syarat & ketentuan yang berlaku.</label>
           <div className="grid grid-cols-2 gap-3"><Button type="button" onClick={() => { setConfirmationOpen(false); void submitOrder(); }} disabled={!agreed || submitting} className="bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">{submitting ? "Memproses..." : "Pesan Sekarang"}</Button><Button type="button" variant="outline" onClick={() => setConfirmationOpen(false)} className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">Batalkan</Button></div>
         </DialogContent>
