@@ -29,6 +29,19 @@ test("uncertain external payment dispatch stays pending and recoverable", () => 
   assert.match(worker, /expireUninitializedExternalOrders\(\)/);
 });
 
+test("uncertain DOKU dispatches stay out of normal status polling until initialized", () => {
+  const doku = read("lib/server/doku-reconciliation.ts");
+  assert.match(doku, /gateway_request_id IS NOT NULL OR doku_request_id IS NOT NULL/);
+});
+
+test("Midtrans scheduler finalizes stored-expiry orders even without customer polling", () => {
+  const midtrans = read("lib/server/midtrans-reconciliation.ts");
+  assert.match(midtrans, /gateway_expired_at IS NOT NULL/);
+  assert.match(midtrans, /datetime\(gateway_expired_at\) <= datetime\('now'\)/);
+  assert.match(midtrans, /applyPendingExternalPaymentStatus\(order, "expired"\)/);
+  assert.match(midtrans, /reason: "stored_midtrans_expiry"/);
+});
+
 test("payment maintenance reconciles before ambiguous expiry and keeps pending promo reservations", () => {
   const worker = read("worker/index.ts");
   const promotions = read("lib/server/promotions.ts");
