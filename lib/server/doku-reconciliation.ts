@@ -131,7 +131,7 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
 
   const pendingOrders = await db.prepare(
     `SELECT * FROM orders
-     WHERE payment_status = 'pending'
+     WHERE payment_status IN ('pending', 'expired')
        AND payment_method IN ('va', 'ewallet', 'qris')
        AND payment_gateway = 'doku'
        AND payment_gateway_mode = 'direct'
@@ -186,7 +186,10 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
      WHERE source = 'doku'
        AND payment_gateway = 'doku'
        AND payment_gateway_mode = 'direct'
-       AND status = 'pending'
+       AND (
+         status = 'pending'
+         OR (status = 'rejected' AND admin_notes IN ('Pembayaran kedaluwarsa.', 'Pembayaran DOKU kedaluwarsa.'))
+       )
        AND (payment_method LIKE 'va:%' OR payment_method LIKE 'ewallet:%' OR payment_method LIKE 'qris:%')
        AND doku_request_id IS NOT NULL
        AND doku_environment IN ('sandbox', 'production')
@@ -200,7 +203,12 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
     try {
       await db.prepare(
         `UPDATE wallet_topups SET doku_status_checked_at = CURRENT_TIMESTAMP,
-          updated_at = updated_at WHERE id = ? AND status = 'pending'`,
+          updated_at = updated_at
+          WHERE id = ?
+            AND (
+              status = 'pending'
+              OR (status = 'rejected' AND admin_notes IN ('Pembayaran kedaluwarsa.', 'Pembayaran DOKU kedaluwarsa.'))
+            )`,
       ).bind(topup.id).run();
       const query = await queryTopupStatus(topup);
       if (!query) continue;
@@ -223,8 +231,60 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
     }
   }
 
+  const expiredOrders = await db.prepare(
+    `SELECT * FROM orders
+     WHERE payment_status = 'pending'
+       AND payment_method <> 'wallet'
+       AND payment_gateway = 'doku'
+       AND payment_gateway_mode = 'direct'
+       AND COALESCE(gateway_expired_at, doku_expired_at) IS NOT NULL
+       AND datetime(COALESCE(gateway_expired_at, doku_expired_at)) <= datetime('now')
+     ORDER BY COALESCE(gateway_expired_at, doku_expired_at) ASC
+     LIMIT ?`,
+  ).bind(safeLimit).all<ReconciliationOrder>();
+
+  for (const order of expiredOrders.results) {
+    await applyPendingDokuPaymentStatus(order, "expired");
+    await recordOrderEvent({
+      orderId: order.id,
+      source: "doku",
+      eventId: `local-expiry-${order.id}`,
+      status: "expired",
+      payload: {
+        expiredAt: order.gateway_expired_at ?? order.doku_expired_at,
+        reason: "stored_doku_expiry",
+      },
+    });
+  }
+
+  const expiredTopups = await db.prepare(
+    `SELECT reference_id
+     FROM wallet_topups
+     WHERE source = 'doku'
+       AND payment_gateway = 'doku'
+       AND payment_gateway_mode = 'direct'
+       AND status = 'pending'
+       AND doku_request_id IS NOT NULL
+       AND COALESCE(gateway_expired_at, doku_expired_at) IS NOT NULL
+       AND datetime(COALESCE(gateway_expired_at, doku_expired_at)) <= datetime('now')
+     ORDER BY COALESCE(gateway_expired_at, doku_expired_at) ASC
+     LIMIT ?`,
+  ).bind(safeLimit).all<{ reference_id: string }>();
+
+  for (const topup of expiredTopups.results) {
+    await applyExternalWalletTopup({
+      referenceId: topup.reference_id,
+      gateway: "doku",
+      status: "expired",
+      originalRequestId: null,
+      callbackAmount: 0,
+    });
+  }
+
   return {
     queriedOrders,
     queriedWalletTopups,
+    expiredOrders: expiredOrders.results.length,
+    expiredWalletTopups: expiredTopups.results.length,
   };
 }
