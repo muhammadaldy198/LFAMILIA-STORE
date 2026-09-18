@@ -286,24 +286,38 @@ function GoogleIdentityButton({
       });
     };
 
+    const stale = document.querySelector<HTMLScriptElement>('script[data-lf-google-identity="true"][data-lf-google-state="failed"]');
+    stale?.remove();
     const existing = document.querySelector<HTMLScriptElement>('script[data-lf-google-identity="true"]');
+    const onScriptError = () => {
+      const script = document.querySelector<HTMLScriptElement>('script[data-lf-google-identity="true"]');
+      if (script) script.dataset.lfGoogleState = "failed";
+      if (active) setError("Google Login gagal dimuat. Coba lagi.");
+    };
     if (window.google?.accounts.id) {
       render();
     } else if (existing) {
       existing.addEventListener("load", render, { once: true });
+      existing.addEventListener("error", onScriptError, { once: true });
     } else {
       const script = document.createElement("script");
       script.src = "https://accounts.google.com/gsi/client";
       script.async = true;
       script.defer = true;
       script.dataset.lfGoogleIdentity = "true";
-      script.addEventListener("load", render, { once: true });
+      script.dataset.lfGoogleState = "loading";
+      script.addEventListener("load", () => {
+        script.dataset.lfGoogleState = "loaded";
+        render();
+      }, { once: true });
+      script.addEventListener("error", onScriptError, { once: true });
       document.head.appendChild(script);
     }
 
     return () => {
       active = false;
       existing?.removeEventListener("load", render);
+      existing?.removeEventListener("error", onScriptError);
       container.replaceChildren();
     };
   }, [clientId, onSuccess, setError]);
