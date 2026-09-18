@@ -58,7 +58,7 @@ export function AdminPaymentWorkspace() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [canManageWallet, setCanManageWallet] = useState(false);
-  const [walletSettings, setWalletSettings] = useState({ minTopup: 10_000, dokuTopupEnabled: true, dokuCheckoutEnabled: false });
+  const [walletSettings, setWalletSettings] = useState({ minTopup: 10_000, automaticTopupEnabled: false });
   const [pageSettings, setPageSettings] = useState<PaymentPageSettings>(defaultPaymentPageSettings);
   const [heroImage, setHeroImage] = useState("");
   const [heroFile, setHeroFile] = useState<File | null>(null);
@@ -299,7 +299,7 @@ export function AdminPaymentWorkspace() {
           <Field label="Gateway top up saldo"><select className={inputClass} value={walletTopupGateway} onChange={(event) => setRouting((current) => current ? { ...current, walletTopupGateway: event.target.value as Gateway } : current)}><option value="doku">DOKU Direct API</option><option value="midtrans">Midtrans Snap</option></select></Field>
           <div className="flex items-center justify-between rounded-md border border-[#e3e8ef] p-3"><div><strong className="block text-[9px] text-[#34445f]">Status gateway pilihan</strong><span className="text-[8px] text-[#8a98aa]">Harus siap dan gateway global harus ON agar top up dapat dibuat.</span></div><Status tone={walletTopupGatewayReady && walletTopupGatewayActive ? "green" : "amber"}>{walletTopupGatewayReady ? (walletTopupGatewayActive ? "Siap & Aktif" : "Siap · OFF") : "Belum siap"}</Status></div>
           <Field label="Minimum top up saldo"><input className={inputClass} inputMode="numeric" value={walletSettings.minTopup} onChange={(event) => setWalletSettings((current) => ({ ...current, minTopup: Number(event.target.value.replace(/\D/g, "")) || 0 }))} /></Field>
-          <div className="flex items-center justify-between rounded-md border border-[#e3e8ef] p-3"><div><strong className="block text-[9px] text-[#34445f]">Aktifkan top up saldo otomatis</strong><span className="text-[8px] text-[#8a98aa]">Master toggle top up saldo. OFF menolak semua permintaan top up otomatis.</span></div><Toggle checked={walletSettings.dokuTopupEnabled} onChange={(value) => setWalletSettings((current) => ({ ...current, dokuTopupEnabled: value }))} /></div>
+          <div className="flex items-center justify-between rounded-md border border-[#e3e8ef] p-3"><div><strong className="block text-[9px] text-[#34445f]">Aktifkan top up saldo otomatis</strong><span className="text-[8px] text-[#8a98aa]">Master toggle top up saldo. OFF menolak semua permintaan top up otomatis.</span></div><Toggle checked={walletSettings.automaticTopupEnabled} onChange={(value) => setWalletSettings((current) => ({ ...current, automaticTopupEnabled: value }))} /></div>
         </div></Panel>}
         <Panel title="Callback Publik" description="URL untuk dashboard gateway."><div className="space-y-2 p-4"><CopyUrl label="DOKU Direct API Notification" value="https://lfamiliastore.my.id/api/payments/doku/callback" /><CopyUrl label="Midtrans Snap Notification" value="https://lfamiliastore.my.id/api/payments/midtrans/snap/notification" /></div></Panel>
       </div>

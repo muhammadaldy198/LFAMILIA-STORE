@@ -3,32 +3,28 @@ import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 
 export type WalletSettings = {
   minTopup: number;
-  dokuTopupEnabled: boolean;
-  dokuCheckoutEnabled: boolean;
+  automaticTopupEnabled: boolean;
 };
 
 const fallbackSettings: WalletSettings = {
   minTopup: 10_000,
-  dokuTopupEnabled: false,
-  dokuCheckoutEnabled: false,
+  automaticTopupEnabled: false,
 };
 
 export async function readWalletSettings(): Promise<WalletSettings> {
   try {
     await ensureLegacyDatabaseColumns();
     const row = await getD1()
-      .prepare(`SELECT min_topup, doku_topup_enabled, doku_checkout_enabled
+      .prepare(`SELECT min_topup, doku_topup_enabled
         FROM wallet_settings WHERE id = 1`)
       .first<{
         min_topup: number;
         doku_topup_enabled: number;
-        doku_checkout_enabled: number;
       }>();
     if (!row) return fallbackSettings;
     return {
       minTopup: row.min_topup,
-      dokuTopupEnabled: Boolean(row.doku_topup_enabled),
-      dokuCheckoutEnabled: Boolean(row.doku_checkout_enabled),
+      automaticTopupEnabled: Boolean(row.doku_topup_enabled),
     };
   } catch {
     return fallbackSettings;
@@ -39,18 +35,16 @@ export async function saveWalletSettings(input: WalletSettings) {
   await ensureLegacyDatabaseColumns();
   await getD1()
     .prepare(
-      `INSERT INTO wallet_settings (id, min_topup, doku_topup_enabled, doku_checkout_enabled, updated_at)
-       VALUES (1, ?, ?, ?, CURRENT_TIMESTAMP)
+      `INSERT INTO wallet_settings (id, min_topup, doku_topup_enabled, updated_at)
+       VALUES (1, ?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(id) DO UPDATE SET
          min_topup = excluded.min_topup,
          doku_topup_enabled = excluded.doku_topup_enabled,
-         doku_checkout_enabled = excluded.doku_checkout_enabled,
          updated_at = CURRENT_TIMESTAMP`,
     )
     .bind(
       input.minTopup,
-      input.dokuTopupEnabled ? 1 : 0,
-      input.dokuCheckoutEnabled ? 1 : 0,
+      input.automaticTopupEnabled ? 1 : 0,
     )
     .run();
 }

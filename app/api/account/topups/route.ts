@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     }
 
     const settings = await readWalletSettings();
-    if (!settings.dokuTopupEnabled) {
+    if (!settings.automaticTopupEnabled) {
       throw new Error("Top up saldo otomatis sedang dinonaktifkan.");
     }
 
