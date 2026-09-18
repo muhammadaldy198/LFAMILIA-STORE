@@ -51,6 +51,16 @@ export type OrderRecord = {
   supplier_cost_snapshot: number | null;
   provider_max_price_snapshot: number | null;
   doku_environment: "sandbox" | "production" | null;
+  payment_gateway?: "doku" | "midtrans" | null;
+  payment_gateway_mode?: "direct" | "snap" | null;
+  payment_gateway_environment?: "sandbox" | "production" | null;
+  gateway_request_id?: string | null;
+  gateway_reference_no?: string | null;
+  gateway_payment_no?: string | null;
+  gateway_qr_content?: string | null;
+  gateway_payment_url?: string | null;
+  gateway_expired_at?: string | null;
+  gateway_status_checked_at?: string | null;
   target_template: string;
   destination: string;
   server: string | null;
@@ -294,6 +304,9 @@ export async function insertPendingOrder(input: {
   customerInputs: CustomerInputValue[];
   paymentMethod: string;
   paymentChannel: string;
+  paymentGateway?: "doku" | "midtrans" | null;
+  paymentGatewayMode?: "direct" | "snap" | null;
+  paymentGatewayEnvironment?: "sandbox" | "production" | null;
   customerId?: string | null;
   walletCheckoutKey?: string | null;
   externalCheckoutKey?: string | null;
@@ -326,8 +339,9 @@ export async function insertPendingOrder(input: {
       provider_code, provider_sku, fulfillment_type, delivery_mode, supplier_cost_snapshot, provider_max_price_snapshot, target_template, destination, server,
       nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json,
       base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
-      admin_fee, total, payment_method, payment_channel
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      admin_fee, total, payment_method, payment_channel,
+      payment_gateway, payment_gateway_mode, payment_gateway_environment, doku_environment
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       input.id,
@@ -364,6 +378,10 @@ export async function insertPendingOrder(input: {
       input.promotion.finalPrice + (input.adminFee ?? 0),
       input.paymentMethod,
       input.paymentChannel,
+      input.paymentGateway ?? null,
+      input.paymentGatewayMode ?? null,
+      input.paymentGatewayEnvironment ?? null,
+      input.paymentGateway === "doku" ? input.paymentGatewayEnvironment ?? null : null,
     )
     .run();
 }
