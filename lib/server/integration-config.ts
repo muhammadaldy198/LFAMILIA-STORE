@@ -434,6 +434,7 @@ export async function saveIntegrationProfile(input: {
   environment: IntegrationEnvironment;
   values: Record<string, string>;
   clearFields?: string[];
+  guardToken?: string;
 }) {
   if (!isProfileSupported(input.provider, input.mode, input.environment)) throw new Error("Kombinasi provider, mode, dan environment tidak didukung.");
   const allowed = profileFields[profileFieldKey(input.provider, input.mode)] ?? [];
@@ -466,15 +467,32 @@ export async function saveIntegrationProfile(input: {
     delete merged[key];
   }
   const encrypted = await encryptConfig(secret, merged);
-  const committed = await database.prepare(`INSERT INTO integration_profiles (provider, mode, environment, encrypted_config, updated_at)
-    VALUES (?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))
-    ON CONFLICT(provider, mode, environment) DO UPDATE SET
-      encrypted_config = excluded.encrypted_config,
-      updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
-    RETURNING encrypted_config, created_at, updated_at`)
-    .bind(input.provider, input.mode, input.environment, encrypted)
+  const guardToken = input.guardToken?.trim() || null;
+  const writeSql = guardToken
+    ? `INSERT INTO integration_profiles (provider, mode, environment, encrypted_config, updated_at)
+       SELECT ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now')
+       WHERE ${guardedOwnershipClause()}
+       ON CONFLICT(provider, mode, environment) DO UPDATE SET
+         encrypted_config = excluded.encrypted_config,
+         updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
+       RETURNING encrypted_config, created_at, updated_at`
+    : `INSERT INTO integration_profiles (provider, mode, environment, encrypted_config, updated_at)
+       VALUES (?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))
+       ON CONFLICT(provider, mode, environment) DO UPDATE SET
+         encrypted_config = excluded.encrypted_config,
+         updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
+       RETURNING encrypted_config, created_at, updated_at`;
+  const bindArgs: unknown[] = [input.provider, input.mode, input.environment, encrypted];
+  if (guardToken) bindArgs.push(guardToken, guardToken);
+  const committed = await database.prepare(writeSql)
+    .bind(...bindArgs)
     .first<{ encrypted_config: string; created_at: string; updated_at: string }>();
-  if (!committed) throw new Error("Konfigurasi integrasi gagal dikonfirmasi setelah disimpan.");
+  if (!committed) {
+    if (guardToken) {
+      throw new Error("Guard konfigurasi DigiFlazz kedaluwarsa sebelum profile dapat disimpan.");
+    }
+    throw new Error("Konfigurasi integrasi gagal dikonfirmasi setelah disimpan.");
+  }
   return {
     configuredFields: Object.keys(merged).sort(),
     committedSnapshot: {
