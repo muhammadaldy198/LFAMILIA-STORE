@@ -9,23 +9,32 @@ import type { NewsRecord } from "@/lib/server/content";
 async function readNews() {
   const response = await fetch("/api/news", { cache: "no-store" });
   const raw = await response.text();
-  if (!response.ok || !raw) return [];
+  if (!response.ok || !raw) throw new Error("Berita gagal dimuat.");
   try {
     const data = JSON.parse(raw) as { articles?: NewsRecord[] };
     return data.articles ?? [];
   } catch {
-    return [];
+    throw new Error("Respons berita tidak valid.");
   }
 }
 
 export function HomeNewsPreview() {
   const [articles, setArticles] = useState<NewsRecord[]>([]);
+  const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    void readNews().then(setArticles);
-  }, []);
+    let active = true;
+    void readNews()
+      .then((items) => { if (active) { setArticles(items); setLoadError(""); } })
+      .catch((reason) => { if (active) setLoadError(reason instanceof Error ? reason.message : "Berita gagal dimuat."); });
+    return () => { active = false; };
+  }, [reloadKey]);
 
-  if (!articles.length) return null;
+  if (!articles.length) {
+    if (!loadError) return null;
+    return <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8"><div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.025] px-4 py-3 text-[10px] text-white/40"><span>{loadError}</span><button type="button" onClick={() => setReloadKey((value) => value + 1)} className="font-bold text-[#d8ff8d]">Muat ulang</button></div></section>;
+  }
   const shown = articles.slice(0, 3);
 
   return (
