@@ -390,7 +390,7 @@ export function AdminIntegrationWorkspace() {
     {error && <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[9px] text-red-700">{error}</p>}
     <TabBar tabs={[...tabs]} active={tab} onChange={(value) => setTab(value as Tab)} />
 
-    {tab === "Ringkasan" && <div className="grid grid-cols-2 gap-4">
+    {tab === "Ringkasan" && <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <Card icon={<CreditCard className="size-5" />} title="DOKU Direct API" ready={Boolean(paymentOverview?.dokuDirectConfigured)} onClick={() => { setDokuProfileEnvironment(paymentOverview?.dokuEnvironment || "sandbox"); setTab("DOKU Direct API"); }} />
       <Card icon={<CreditCard className="size-5" />} title="Midtrans Snap" ready={Boolean(paymentOverview?.midtransSnapConfigured)} onClick={() => { setMidtransProfileEnvironment(paymentOverview?.midtransEnvironment || "sandbox"); setTab("Midtrans Snap"); }} />
       <Card icon={<Network className="size-5" />} title="Digiflazz" ready={isConfigured("digiflazz", digiflazzEnvironment)} onClick={() => setTab("Digiflazz")} />
@@ -399,7 +399,7 @@ export function AdminIntegrationWorkspace() {
       <Card icon={<MessageCircle className="size-5" />} title="WhatsApp OTP" ready={whatsappConfigured} onClick={() => setTab("WhatsApp OTP")} />
       <Card icon={<Mail className="size-5" />} title="Resend Email" ready={isConfigured("resend", "global")} onClick={() => setTab("Resend Email")} />
       <Card icon={<Server className="size-5" />} title="VPS Relay" ready={isConfigured("relay", "global")} onClick={() => setTab("Relay & Keamanan")} />
-      <Panel title="Callback & Notification URL" description="Tempel URL berikut pada dashboard provider terkait." className="col-span-2">
+      <Panel title="Callback & Notification URL" description="Tempel URL berikut pada dashboard provider terkait." className="sm:col-span-2">
         <div className="grid gap-3 p-4">
           <CopyUrl label="DOKU Direct API Notification" value={paymentOverview?.callbacks.dokuNotification || "/api/payments/doku/callback"} />
           <CopyUrl label="Midtrans Snap Notification" value={paymentOverview?.callbacks.midtransSnapNotification || "/api/payments/midtrans/snap/notification"} />
@@ -413,7 +413,7 @@ export function AdminIntegrationWorkspace() {
       description="Credential disimpan terenkripsi per environment. DOKU Hosted Checkout tidak digunakan."
       action={<Status tone={dokuConfigured ? "green" : "amber"}>{dokuConfigured ? `${dokuProfileEnvironment} siap` : `${dokuProfileEnvironment} belum lengkap`}</Status>}
     >
-      <div className="grid grid-cols-2 gap-4 p-4">
+      <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
         <Select label="Credential Environment" value={dokuProfileEnvironment} onChange={(value) => changeDokuEnvironment(value as PaymentEnvironment)} options={["sandbox", "production"]} />
         <Text label="API URL" value={values.dokuApiUrl || defaultDokuUrl(dokuProfileEnvironment)} onChange={(value) => setValue("dokuApiUrl", value)} />
         <Text label="Client ID" value={values.dokuClientId || ""} onChange={(value) => setValue("dokuClientId", value)} />
@@ -424,7 +424,7 @@ export function AdminIntegrationWorkspace() {
         <Text label="QRIS Terminal ID" value={values.dokuQrisTerminalId || ""} onChange={(value) => setValue("dokuQrisTerminalId", value)} />
         <Text label="QRIS Postal Code" value={values.dokuQrisPostalCode || ""} onChange={(value) => setValue("dokuQrisPostalCode", value)} />
         <TextArea label="VA Config JSON" value={values.dokuVaConfigJson || ""} onChange={(value) => setValue("dokuVaConfigJson", value)} placeholder='{"BCA": {...}}' wide />
-        <div className="col-span-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-700">
+        <div className="sm:col-span-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-700">
           Field sensitif tidak pernah dikirim kembali ke browser setelah disimpan. Kosongkan field yang tidak ingin diubah; backend akan mempertahankan nilai lama.
         </div>
       </div>
@@ -435,19 +435,19 @@ export function AdminIntegrationWorkspace() {
       description="Credential Snap disimpan terenkripsi terpisah untuk Sandbox dan Production."
       action={<Status tone={midtransConfigured ? "green" : "amber"}>{midtransConfigured ? `${midtransProfileEnvironment} siap` : `${midtransProfileEnvironment} belum lengkap`}</Status>}
     >
-      <div className="grid grid-cols-2 gap-4 p-4">
+      <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
         <Select label="Credential Environment" value={midtransProfileEnvironment} onChange={(value) => changeMidtransEnvironment(value as PaymentEnvironment)} options={["sandbox", "production"]} />
         <div />
         <Text label="Server Key" secret value={values.midtransServerKey || ""} onChange={(value) => setValue("midtransServerKey", value)} />
         <Text label="Client Key" value={values.midtransClientKey || ""} onChange={(value) => setValue("midtransClientKey", value)} />
-        <div className="col-span-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-700">
+        <div className="sm:col-span-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-700">
           Server Key tidak pernah ditampilkan kembali setelah disimpan. Environment aktif untuk checkout/top up tetap dipilih dari menu Pembayaran.
         </div>
       </div>
     </Panel>}
 
     {tab === "Digiflazz" && <Panel title="Digiflazz" description="Dipanggil backend hanya setelah pembayaran benar-benar berhasil.">
-      <div className="grid grid-cols-2 gap-4 p-4">
+      <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
         <Select label="Environment" value={digiflazzEnvironment} onChange={(value) => setDigiflazzEnvironment(value as "development" | "production")} options={["development", "production"]} />
         <Text label="Username" value={values.username || ""} onChange={(value) => setValue("username", value)} />
         <Text label="API Key" secret value={values.apiKey || ""} onChange={(value) => setValue("apiKey", value)} />
@@ -458,7 +458,7 @@ export function AdminIntegrationWorkspace() {
     </Panel>}
 
     {tab === "KokinPay" && <Panel title="KokinPay" description="Credential untuk validasi nickname.">
-      <div className="grid grid-cols-2 gap-4 p-4">
+      <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
         <Text label="API Key" secret value={values.kokinpayApiKey || ""} onChange={(value) => setValue("kokinpayApiKey", value)} />
       </div>
     </Panel>}
@@ -477,21 +477,21 @@ export function AdminIntegrationWorkspace() {
       description="Meta WhatsApp Cloud API untuk verifikasi nomor pelanggan dengan kode OTP 6 digit."
       action={<Status tone={whatsappConfigured ? "green" : "amber"}>{whatsappConfigured ? "Siap" : "Belum lengkap"}</Status>}
     >
-      <div className="grid grid-cols-2 gap-4 p-4">
+      <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
         <Text label="Graph API URL" value={values.whatsappGraphApiUrl || ""} onChange={(value) => setValue("whatsappGraphApiUrl", value)} />
         <Text label="Phone Number ID" value={values.whatsappPhoneNumberId || ""} onChange={(value) => setValue("whatsappPhoneNumberId", value)} />
         <Text label="Access Token" secret value={values.whatsappAccessToken || ""} onChange={(value) => setValue("whatsappAccessToken", value)} />
         <Text label="Template Name" value={values.whatsappTemplateName || ""} onChange={(value) => setValue("whatsappTemplateName", value)} />
         <Text label="Template Language" value={values.whatsappTemplateLanguage || "id"} onChange={(value) => setValue("whatsappTemplateLanguage", value)} />
         <Select label="OTP Button Subtype" value={values.whatsappButtonSubtype || ""} onChange={(value) => setValue("whatsappButtonSubtype", value)} options={["", "url", "quick_reply"]} />
-        <div className="col-span-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-700">
+        <div className="sm:col-span-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-700">
           Gunakan template WhatsApp yang sudah disetujui Meta dan memiliki 1 variabel body untuk kode OTP. Jika template memiliki tombol OTP, pilih subtype sesuai template. Access Token disimpan terenkripsi dan tidak dikirim kembali ke browser.
         </div>
       </div>
     </Panel>}
 
     {tab === "Resend Email" && <Panel title="Resend Email" description="Pengiriman notifikasi transaksi.">
-      <div className="grid grid-cols-2 gap-4 p-4">
+      <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
         <Text label="API Key" secret value={values.resendApiKey || ""} onChange={(value) => setValue("resendApiKey", value)} />
         <Text label="From Email" value={values.resendFromEmail || ""} onChange={(value) => setValue("resendFromEmail", value)} />
         <Text label="API URL" value={values.resendApiUrl || ""} onChange={(value) => setValue("resendApiUrl", value)} />
@@ -499,7 +499,7 @@ export function AdminIntegrationWorkspace() {
       </div>
     </Panel>}
 
-    {tab === "Relay & Keamanan" && <div className="grid grid-cols-2 gap-4">
+    {tab === "Relay & Keamanan" && <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <Panel title="VPS Relay" description="Hanya untuk request Digiflazz.">
         <div className="grid gap-4 p-4">
           <Text label="Relay URL" value={values.relayOrigin || ""} onChange={(value) => setValue("relayOrigin", value)} />
