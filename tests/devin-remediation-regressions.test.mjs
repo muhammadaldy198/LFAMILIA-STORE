@@ -209,6 +209,13 @@ test("guarded DigiFlazz profile writes fail closed when their lease is no longer
   assert.match(integration, /if \(guardToken\) args\.push\(guardToken, guardToken\)/);
 });
 
+test("guarded DigiFlazz environment writes fail closed when their lease is no longer owned", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const integration = read("lib/server/integration-config.ts");
+  assert.match(route, /saveIntegrationSelections\(input\.selections, guardToken\)/);
+  assert.match(integration, /INSERT INTO integration_settings[\s\S]*SELECT 'digiflazz_environment'/);
+});
+
 test("storefront keeps fallback categories when API response fails or omits categories", () => {
   const storefront = read("hooks/use-storefront.ts");
   assert.match(storefront, /if \(!response\.ok\) throw new Error/);
