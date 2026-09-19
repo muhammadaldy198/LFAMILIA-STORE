@@ -506,7 +506,10 @@ export async function saveIntegrationProfile(input: {
   };
 }
 
-export async function saveIntegrationSelections(input: Partial<IntegrationOverview["selections"]>) {
+export async function saveIntegrationSelections(
+  input: Partial<IntegrationOverview["selections"]>,
+  guardToken?: string,
+) {
   const normalized = input.digiflazzEnvironment
     ? valueOr(input.digiflazzEnvironment, ["development", "production"] as const, "development")
     : null;
@@ -514,15 +517,32 @@ export async function saveIntegrationSelections(input: Partial<IntegrationOvervi
 
   const database = getD1();
   await ensureIntegrationTables(database);
-  const committed = await database.prepare(`
-    INSERT INTO integration_settings (setting_key, value, updated_at)
-    VALUES ('digiflazz_environment', ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))
-    ON CONFLICT(setting_key) DO UPDATE SET
-      value = excluded.value,
-      updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
-    RETURNING value, updated_at
-  `).bind(normalized).first<{ value: string; updated_at: string }>();
-  if (!committed) throw new Error("Pilihan environment DigiFlazz gagal dikonfirmasi setelah disimpan.");
+  const normalizedGuardToken = guardToken?.trim() || null;
+  const writeSql = normalizedGuardToken
+    ? `INSERT INTO integration_settings (setting_key, value, updated_at)
+       SELECT 'digiflazz_environment', ?, strftime('%Y-%m-%d %H:%M:%f', 'now')
+       WHERE ${guardedOwnershipClause()}
+       ON CONFLICT(setting_key) DO UPDATE SET
+         value = excluded.value,
+         updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
+       RETURNING value, updated_at`
+    : `INSERT INTO integration_settings (setting_key, value, updated_at)
+       VALUES ('digiflazz_environment', ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))
+       ON CONFLICT(setting_key) DO UPDATE SET
+         value = excluded.value,
+         updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
+       RETURNING value, updated_at`;
+  const bindArgs: unknown[] = [normalized];
+  if (normalizedGuardToken) bindArgs.push(normalizedGuardToken, normalizedGuardToken);
+  const committed = await database.prepare(writeSql)
+    .bind(...bindArgs)
+    .first<{ value: string; updated_at: string }>();
+  if (!committed) {
+    if (normalizedGuardToken) {
+      throw new Error("Guard konfigurasi DigiFlazz kedaluwarsa sebelum environment dapat disimpan.");
+    }
+    throw new Error("Pilihan environment DigiFlazz gagal dikonfirmasi setelah disimpan.");
+  }
   return {
     committedSnapshot: {
       settingKey: "digiflazz_environment",
