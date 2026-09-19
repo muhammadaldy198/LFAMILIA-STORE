@@ -224,7 +224,7 @@ test("provider fulfillment transitions cannot downgrade success and webhook repl
   db.close();
 });
 
-test("DigiFlazz reconciliation lease allows only one active claimant and recovers stale leases", () => {
+test("DigiFlazz reconciliation lease is token-owned across stale reclaim", () => {
   const db = database();
   db.exec(`
     CREATE TABLE orders (
@@ -241,9 +241,9 @@ test("DigiFlazz reconciliation lease allows only one active claimant and recover
     );
   `);
 
-  const claim = () => db.prepare(`
+  const claim = (leaseStatus) => db.prepare(`
     UPDATE orders
-    SET provider_status='reconciling', updated_at=CURRENT_TIMESTAMP
+    SET provider_status=?, updated_at=CURRENT_TIMESTAMP
     WHERE id='o1'
       AND payment_status='paid'
       AND fulfillment_type='automatic'
@@ -252,14 +252,21 @@ test("DigiFlazz reconciliation lease allows only one active claimant and recover
       AND (
         (provider_status='processing' AND updated_at <= datetime('now','-2 minutes'))
         OR
-        (provider_status='reconciling' AND updated_at <= datetime('now','-5 minutes'))
+        (provider_status LIKE 'reconciling:%' AND updated_at <= datetime('now','-5 minutes'))
       )
-  `).run();
+  `).run(leaseStatus);
 
-  assert.equal(Number(claim().changes), 1);
-  assert.equal(Number(claim().changes), 0);
+  assert.equal(Number(claim("reconciling:A").changes), 1);
+  assert.equal(Number(claim("reconciling:B").changes), 0);
   db.prepare("UPDATE orders SET updated_at=datetime('now','-6 minutes') WHERE id='o1'").run();
-  assert.equal(Number(claim().changes), 1);
+  assert.equal(Number(claim("reconciling:B").changes), 1);
+
+  const staleRelease = db.prepare(`
+    UPDATE orders SET provider_status='processing'
+    WHERE id='o1' AND provider_status=?
+  `).run("reconciling:A");
+  assert.equal(Number(staleRelease.changes), 0);
+  assert.equal(db.prepare("SELECT provider_status FROM orders WHERE id='o1'").get().provider_status, "reconciling:B");
   db.close();
 });
 
@@ -275,11 +282,14 @@ test("production backend wires atomic payment events, stable callback identity, 
   assert.match(paymentTransition, /NOT EXISTS \(\s*SELECT 1 FROM order_events/);
   assert.match(orders, /providerTransitionGuard/);
   assert.match(orders, /AND NOT EXISTS \(\s*SELECT 1 FROM order_events WHERE source = \? AND event_id = \?/);
-  assert.match(reconciliation, /provider_status = 'reconciling'/);
+  assert.match(reconciliation, /reconciling:\\${crypto\.randomUUID\(\)}/);
+  assert.match(reconciliation, /provider_status LIKE 'reconciling:%'/);
   assert.match(reconciliation, /claimDigiflazzReconciliation\(order\.id\)/);
-  assert.match(callback, /digiflazz-hook-/);
+  assert.match(callback, /digiflazz-event-/);
+  assert.doesNotMatch(callback, /digiflazz-hook-/);
   assert.match(callback, /semanticEvent/);
   assert.match(doku, /applyExternalPaymentEvent/);
   assert.match(midtrans, /applyExternalPaymentEvent/);
+  assert.match(midtrans, /snap-\\${transactionId}-\\${status}/);
 });
 
