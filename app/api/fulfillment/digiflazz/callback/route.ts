@@ -13,9 +13,9 @@ type Payload = {
   hook?: Record<string, unknown>;
 };
 
-function mapStatus(status?: string) {
-  if (status?.toLowerCase() === "sukses") return "success" as const;
-  if (status?.toLowerCase() === "gagal") return "failed" as const;
+function mapStatus(normalizedStatus: string) {
+  if (normalizedStatus === "sukses") return "success" as const;
+  if (normalizedStatus === "gagal") return "failed" as const;
   return "processing" as const;
 }
 
@@ -44,12 +44,13 @@ export async function POST(request: Request) {
 
   const data = payload.data;
   if (!data?.ref_id) return Response.json({ error: "Ref ID DigiFlazz tidak ada." }, { status: 400 });
-  const status = mapStatus(data.status);
+  const normalizedStatus = data.status?.trim().toLowerCase() ?? "";
+  const status = mapStatus(normalizedStatus);
   // hook_id identifies the webhook configuration and is reused across orders.
-  // Build idempotency from transaction semantics so each ref/status event is isolated.
+  // Build idempotency from the same normalized transaction semantics used for state mapping.
   const semanticEvent = JSON.stringify({
     refId: data.ref_id,
-    status: data.status?.trim().toLowerCase() ?? "",
+    status: normalizedStatus,
     message: data.message?.trim() ?? "",
     serialNumber: data.sn?.trim() ?? "",
   });
