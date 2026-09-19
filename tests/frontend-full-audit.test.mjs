@@ -12,7 +12,10 @@ test("checkout rejects invalid product slugs and renders live storefront FAQs", 
   assert.doesNotMatch(checkout, /products\.find\(\(item\) => item\.slug === requestedProduct\) \?\? products\[0\]/);
   assert.match(checkout, /Produk tidak ditemukan/);
   assert.match(checkout, /useStorefront\(\)/);
+  const storefront = read("hooks/use-storefront.ts");
   assert.match(checkout, /faqs\.filter/);
+  assert.match(checkout, /faqs\.some/);
+  assert.match(storefront, /Array\.isArray\(data\.faqs\)\) setFaqs\(data\.faqs\)/);
   assert.doesNotMatch(checkout, /\["Bagaimana cara top up\?"/);
 });
 
@@ -32,6 +35,9 @@ test("admin global search queries real order product and customer records", () =
   assert.match(dashboard, /fetch\("\/api\/panel\/products"/);
   assert.match(dashboard, /fetch\("\/api\/panel\/members"/);
   assert.match(dashboard, /globalResults\.map/);
+  assert.match(dashboard, /!responses\[index\]\.ok/);
+  assert.match(dashboard, /globalSearchRequestRef\.current !== requestId/);
+  assert.match(dashboard, /globalSearchRequestRef\.current \+= 1/);
   assert.match(dashboard, /Tidak ada hasil/);
 });
 
@@ -77,10 +83,12 @@ test("home content failures expose retry paths and product cards tolerate empty 
   const reviews = read("components/home-reviews-preview.tsx");
   const promotions = read("components/promotion-showcase.tsx");
   const product = read("components/product-card.tsx");
+  const popup = read("components/global-home-popup.tsx");
   assert.match(banner, /Coba lagi/);
   assert.match(news, /Muat ulang/);
   assert.match(reviews, /Muat ulang/);
   assert.match(promotions, /Muat ulang/);
+  assert.match(popup, /if \(!response\.ok\) throw new Error/);
   assert.match(product, /product\.packages\.length \? Math\.min/);
   assert.match(product, /Belum tersedia/);
 });
