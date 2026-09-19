@@ -16,7 +16,8 @@ async function claimDigiflazzReconciliation(orderId: string) {
        AND (
          (provider_status = 'processing' AND updated_at <= datetime('now', '-2 minutes'))
          OR
-         (provider_status LIKE 'reconciling:%' AND updated_at <= datetime('now', '-5 minutes'))
+         ((provider_status = 'reconciling' OR provider_status LIKE 'reconciling:%')
+           AND updated_at <= datetime('now', '-5 minutes'))
        )`,
   ).bind(leaseStatus, orderId).run();
   return Number(result.meta.changes ?? 0) > 0 ? leaseStatus : null;
@@ -62,7 +63,8 @@ export async function reconcileStaleDigiflazzProcessing(
        AND (
          (provider_status = 'processing' AND updated_at <= datetime('now', '-2 minutes'))
          OR
-         (provider_status LIKE 'reconciling:%' AND updated_at <= datetime('now', '-5 minutes'))
+         ((provider_status = 'reconciling' OR provider_status LIKE 'reconciling:%')
+           AND updated_at <= datetime('now', '-5 minutes'))
        )
        AND created_at >= datetime('now', '-89 days')
      ORDER BY updated_at ASC
