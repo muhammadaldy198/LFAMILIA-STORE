@@ -141,6 +141,7 @@ test("DigiFlazz profile activity is decided only after acquiring the configurati
   );
 });
 
+// Guarded profile writes must prove lease ownership at the SQL mutation boundary.
 test("inactive DigiFlazz profile saves fail closed when the configuration lease expires", () => {
   const route = read("app/api/admin/integrations/route.ts");
   const integration = read("lib/server/integration-config.ts");
