@@ -97,6 +97,7 @@ export function CustomerAccount({
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [error, setError] = useState(initialError);
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,22 +106,30 @@ export function CustomerAccount({
         fetch("/api/account", { cache: "no-store" }),
         fetch("/api/wallet", { cache: "no-store" }),
       ]);
-      const walletData = await walletResponse.json().catch(() => ({})) as {
-        settings?: PublicWalletSettings;
-        channels?: PublicWalletChannel[];
-      };
-      setSettings(walletData.settings ?? null);
-      setTopupChannels(walletData.channels ?? []);
-      if (accountResponse.ok) {
-        const accountData = await accountResponse.json().catch(() => null) as AccountData | null;
-        setAccount(accountData);
+      if (walletResponse.ok) {
+        const walletData = await walletResponse.json().catch(() => ({})) as {
+          settings?: PublicWalletSettings;
+          channels?: PublicWalletChannel[];
+        };
+        setSettings(walletData.settings ?? null);
+        setTopupChannels(walletData.channels ?? []);
       } else {
-        setAccount(null);
+        setSettings(null);
+        setTopupChannels([]);
       }
-    } catch {
-      setAccount(null);
-      setSettings(null);
-      setTopupChannels([]);
+      if (accountResponse.status === 401) {
+        setAccount(null);
+        setLoadError("");
+        return;
+      }
+      const accountData = await accountResponse.json().catch(() => null) as (AccountData & { error?: string }) | null;
+      if (!accountResponse.ok || !accountData?.customer) {
+        throw new Error(accountData?.error || "Akun tidak dapat dimuat saat ini.");
+      }
+      setAccount(accountData);
+      setLoadError("");
+    } catch (reason) {
+      setLoadError(reason instanceof Error ? reason.message : "Akun tidak dapat dimuat saat ini.");
     } finally {
       setLoading(false);
     }
@@ -136,6 +145,16 @@ export function CustomerAccount({
       <div className="flex min-h-[55vh] items-center justify-center text-xs text-white/40">
         <LoaderCircle className="mr-2 size-4 animate-spin" />
         Memuat akun…
+      </div>
+    );
+  if (!account && loadError)
+    return (
+      <div className="mx-auto max-w-xl rounded-2xl border border-red-400/20 bg-red-400/[0.05] p-5 text-center">
+        <h2 className="font-black text-white">Akun sementara tidak dapat dimuat</h2>
+        <p className="mt-2 text-xs leading-5 text-white/45">{loadError}</p>
+        <Button type="button" onClick={() => void load()} className="mt-4 rounded-xl bg-[#b9ff35] font-black text-[#091006]">
+          Coba lagi
+        </Button>
       </div>
     );
   if (!account)
@@ -586,6 +605,7 @@ function VoucherCodes({ items }: { items: AccountData["vouchers"] }) {
                   onClick={() => {
                     void navigator.clipboard.writeText(item.code);
                     setCopied(item.id);
+                    window.setTimeout(() => setCopied((current) => current === item.id ? null : current), 1600);
                   }}
                   className="inline-flex items-center rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-white"
                 >
@@ -760,7 +780,7 @@ function TopupForm({
       <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/20 p-4">
         <strong className="text-xs">Pembayaran top up dibuat</strong>
         {payment.referenceId && <p className="mt-1 break-all text-[9px] text-white/40">{payment.referenceId}</p>}
-        {payment.expiredAt && <p className="mt-2 text-[9px] text-white/35">Berlaku sampai {payment.expiredAt}</p>}
+        {payment.expiredAt && <p className="mt-2 text-[9px] text-white/35">Berlaku sampai {formatAccountDateTime(payment.expiredAt)}</p>}
         {(payment.total != null || payment.fee != null) && <div className="mt-3 rounded-lg border border-white/[0.08] bg-white/[0.025] p-3 text-[9px]"><div className="flex justify-between text-white/40"><span>Biaya pembayaran</span><strong className="text-white">{formatRupiah(payment.fee ?? 0)}</strong></div><div className="mt-1.5 flex justify-between"><span className="font-bold text-white/55">Total bayar</span><strong className="text-[#d8ff8d]">{formatRupiah(payment.total ?? 0)}</strong></div></div>}
         {payment.qrContent && (
           <div className="mt-3 rounded-xl bg-white p-4 text-center">
@@ -961,6 +981,15 @@ function Field({
       {children}
     </label>
   );
+}
+function formatAccountDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Jakarta",
+  }).format(date) + " WIB";
 }
 function statusLabel(status: string) {
   return status === "approved"
