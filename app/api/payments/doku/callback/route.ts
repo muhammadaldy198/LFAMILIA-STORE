@@ -9,10 +9,9 @@ import { canProcessDokuOrderCallback } from "@/lib/server/final-audit-rules";
 import {
   fulfillAutomaticOrder,
   getOrderByReference,
-  recordOrderEvent,
 } from "@/lib/server/orders";
 import { hydrateDokuDirectRuntimeEnv } from "@/lib/server/payment-mode-config";
-import { applyPendingExternalPaymentStatus } from "@/lib/server/payment-transition";
+import { applyExternalPaymentEvent } from "@/lib/server/payment-transition";
 import { getPublicBaseUrl, getRuntimeEnv, setRuntimeEnv } from "@/lib/server/runtime-env";
 import {
   notifyOrderFulfillmentSuccessById,
@@ -200,18 +199,15 @@ export async function POST(request: Request) {
       return notificationResponse(scheme, payload, eventId);
     }
 
-    await recordOrderEvent({
-      orderId: order.id,
+    const transition = await applyExternalPaymentEvent({
+      order,
       source: "doku",
       eventId,
-      status,
+      status: notification.status,
       payload,
-    });
-
-    const firstPaid = await applyPendingExternalPaymentStatus(order, notification.status, {
       authoritativePaid: notification.status === "paid",
     });
-    if (firstPaid && order.fulfillment_type === "automatic") {
+    if (transition.firstPaid && order.fulfillment_type === "automatic") {
       await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
       await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
         console.error("Notifikasi pesanan selesai DOKU gagal:", error),

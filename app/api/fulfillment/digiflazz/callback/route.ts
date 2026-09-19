@@ -45,10 +45,21 @@ export async function POST(request: Request) {
   const data = payload.data;
   if (!data?.ref_id) return Response.json({ error: "Ref ID DigiFlazz tidak ada." }, { status: 400 });
   const status = mapStatus(data.status);
+  const hookId = payload.hook_id == null ? "" : String(payload.hook_id).trim();
+  const semanticEvent = JSON.stringify({
+    refId: data.ref_id,
+    status: data.status?.trim().toLowerCase() ?? "",
+    message: data.message?.trim() ?? "",
+    serialNumber: data.sn?.trim() ?? "",
+  });
+  const eventId = hookId
+    ? `digiflazz-hook-${hookId}`
+    : `digiflazz-event-${hashHex("sha256", semanticEvent)}`;
+
   await applyProviderWebhook({
     providerCode: "digiflazz",
     providerRefId: data.ref_id,
-    eventId: `digiflazz-${hashHex("sha256", rawBody)}`,
+    eventId,
     result: {
       externalId: data.ref_id,
       status,
