@@ -60,7 +60,7 @@ type DigiflazzRollbackPlan<T> = {
 };
 
 async function withDigiflazzConfigurationGuard<T>(
-  action: () => Promise<T>,
+  action: (guardToken: string) => Promise<T>,
   createRollbackPlan: () => Promise<DigiflazzRollbackPlan<T>>,
   shouldInvalidateOperationalCache: () => Promise<boolean> = async () => true,
 ) {
@@ -72,7 +72,7 @@ async function withDigiflazzConfigurationGuard<T>(
   try {
     const invalidateOperationalCache = await shouldInvalidateOperationalCache();
     rollbackPlan = await createRollbackPlan();
-    committed = await action();
+    committed = await action(token);
     actionCommitted = true;
     if (invalidateOperationalCache) {
       await invalidateDigiflazzOperationalCache(token);
@@ -137,7 +137,7 @@ export async function PUT(request: Request) {
         const hasCredentialMutation =
           Object.values(input.values).some((value) => value.trim()) || input.clearFields.length > 0;
         await withDigiflazzConfigurationGuard(
-          async () => (await saveIntegrationProfile(input)).committedSnapshot,
+          async (guardToken) => (await saveIntegrationProfile(input, guardToken)).committedSnapshot,
           async () => {
             const snapshot = await captureIntegrationProfileSnapshot(input.provider, input.mode, input.environment);
             return {
