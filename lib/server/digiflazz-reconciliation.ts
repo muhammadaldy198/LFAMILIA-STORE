@@ -1,6 +1,48 @@
 import { getD1 } from "@/db";
+import { hashHex } from "@/lib/server/crypto";
 import { digiflazzAdapter } from "@/lib/server/providers/digiflazz";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
+
+async function claimDigiflazzReconciliation(orderId: string) {
+  const result = await getD1().prepare(
+    `UPDATE orders
+     SET provider_status = 'reconciling', updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?
+       AND payment_status = 'paid'
+       AND fulfillment_type = 'automatic'
+       AND lower(trim(provider_code)) = 'digiflazz'
+       AND fulfillment_status NOT IN ('success', 'failed', 'cancelled')
+       AND (
+         (provider_status = 'processing' AND updated_at <= datetime('now', '-2 minutes'))
+         OR
+         (provider_status = 'reconciling' AND updated_at <= datetime('now', '-5 minutes'))
+       )`,
+  ).bind(orderId).run();
+  return Number(result.meta.changes ?? 0) > 0;
+}
+
+async function releaseDigiflazzReconciliation(
+  orderId: string,
+  message: string,
+) {
+  await getD1().prepare(
+    `UPDATE orders
+     SET provider_status = 'processing', fulfillment_status = 'processing',
+         provider_message = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND provider_status = 'reconciling'
+       AND fulfillment_status NOT IN ('success', 'failed', 'cancelled')`,
+  ).bind(message.slice(0, 500), orderId).run();
+}
+
+function reconciliationTransitionGuard(status: "success" | "failed" | "processing") {
+  if (status === "success") {
+    return "fulfillment_status NOT IN ('success', 'cancelled')";
+  }
+  if (status === "failed") {
+    return "fulfillment_status NOT IN ('success', 'failed', 'cancelled')";
+  }
+  return "fulfillment_status NOT IN ('success', 'failed', 'cancelled')";
+}
 
 export async function reconcileStaleDigiflazzProcessing(
   publicBaseUrl: string,
@@ -15,8 +57,11 @@ export async function reconcileStaleDigiflazzProcessing(
      WHERE payment_status = 'paid'
        AND fulfillment_type = 'automatic'
        AND lower(trim(provider_code)) = 'digiflazz'
-       AND provider_status = 'processing'
-       AND updated_at <= datetime('now', '-2 minutes')
+       AND (
+         (provider_status = 'processing' AND updated_at <= datetime('now', '-2 minutes'))
+         OR
+         (provider_status = 'reconciling' AND updated_at <= datetime('now', '-5 minutes'))
+       )
        AND created_at >= datetime('now', '-89 days')
      ORDER BY updated_at ASC
      LIMIT ?`,
@@ -41,6 +86,9 @@ export async function reconcileStaleDigiflazzProcessing(
 
   for (const order of rows.results) {
     try {
+      const claimed = await claimDigiflazzReconciliation(order.id);
+      if (!claimed) continue;
+
       const result = await digiflazzAdapter.fulfill({
         id: order.id,
         referenceId: order.reference_id,
@@ -60,13 +108,17 @@ export async function reconcileStaleDigiflazzProcessing(
         buyerPhone: order.buyer_phone,
       }, publicBaseUrl);
 
-      const eventId = `reconcile-${order.id}-${crypto.randomUUID()}`;
+      const eventId = `reconcile-${hashHex(
+        "sha256",
+        JSON.stringify([
+          order.reference_id,
+          result.externalId ?? "",
+          result.status,
+          result.serialNumber ?? "",
+          result.message ?? "",
+        ]),
+      )}`;
       const batch = await db.batch([
-        db.prepare(
-          `INSERT OR IGNORE INTO order_events
-           (order_id, source, event_id, status, payload_json)
-           VALUES (?, 'digiflazz', ?, ?, ?)`,
-        ).bind(order.id, eventId, result.status, JSON.stringify(result.raw)),
         db.prepare(
           `UPDATE orders SET
              provider_ref_id = COALESCE(?, provider_ref_id),
@@ -77,7 +129,8 @@ export async function reconcileStaleDigiflazzProcessing(
              updated_at = CURRENT_TIMESTAMP
            WHERE id = ? AND payment_status = 'paid'
              AND lower(trim(provider_code)) = 'digiflazz'
-             AND provider_status = 'processing'`,
+             AND provider_status = 'reconciling'
+             AND ${reconciliationTransitionGuard(result.status)}`,
         ).bind(
           result.externalId,
           result.status,
@@ -86,16 +139,28 @@ export async function reconcileStaleDigiflazzProcessing(
           result.status,
           order.id,
         ),
+        db.prepare(
+          `INSERT OR IGNORE INTO order_events
+           (order_id, source, event_id, status, payload_json)
+           VALUES (?, 'digiflazz', ?, ?, ?)`,
+        ).bind(order.id, eventId, result.status, JSON.stringify(result.raw)),
       ]);
 
-      const persisted = Number(batch[1]?.meta.changes ?? 0) > 0;
+      const persisted = Number(batch[0]?.meta.changes ?? 0) > 0;
       if (persisted && result.status === "success") {
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
           console.error("Notifikasi order hasil rekonsiliasi DigiFlazz gagal:", error),
         );
       }
     } catch (error) {
-      console.error("Rekonsiliasi transaksi pending DigiFlazz gagal:", error);
+      const message = error instanceof Error ? error.message : "Rekonsiliasi DigiFlazz gagal.";
+      await releaseDigiflazzReconciliation(order.id, message).catch(() => undefined);
+      console.error(JSON.stringify({
+        event: "digiflazz_reconciliation_failure",
+        orderId: order.id,
+        referenceId: order.reference_id,
+        message,
+      }));
     }
   }
 }
