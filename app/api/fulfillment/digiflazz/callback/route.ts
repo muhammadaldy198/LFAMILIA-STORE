@@ -45,16 +45,15 @@ export async function POST(request: Request) {
   const data = payload.data;
   if (!data?.ref_id) return Response.json({ error: "Ref ID DigiFlazz tidak ada." }, { status: 400 });
   const status = mapStatus(data.status);
-  const hookId = payload.hook_id == null ? "" : String(payload.hook_id).trim();
+  // hook_id identifies the webhook configuration and is reused across orders.
+  // Build idempotency from transaction semantics so each ref/status event is isolated.
   const semanticEvent = JSON.stringify({
     refId: data.ref_id,
     status: data.status?.trim().toLowerCase() ?? "",
     message: data.message?.trim() ?? "",
     serialNumber: data.sn?.trim() ?? "",
   });
-  const eventId = hookId
-    ? `digiflazz-hook-${hookId}`
-    : `digiflazz-event-${hashHex("sha256", semanticEvent)}`;
+  const eventId = `digiflazz-event-${hashHex("sha256", semanticEvent)}`;
 
   await applyProviderWebhook({
     providerCode: "digiflazz",
