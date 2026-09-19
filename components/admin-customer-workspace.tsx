@@ -172,7 +172,7 @@ export function AdminCustomerWorkspace() {
     {notice && <button type="button" onClick={() => setNotice("")} className="mb-3 w-full rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-left text-[9px] font-semibold text-emerald-700">{notice}</button>}
     {error && <button type="button" onClick={() => setError("")} className="mb-3 w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-[9px] font-semibold text-red-700">{error}</button>}
 
-    <div className="mb-4 grid grid-cols-5 gap-3">
+    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <MetricCard icon={Users} label="Total Pelanggan" value={members.length.toLocaleString("id-ID")} detail="Akun customer" />
       <MetricCard icon={ShieldCheck} label="BASIC" value={String(members.filter((item) => item.tier === "basic").length)} detail="Tier awal" />
       <MetricCard icon={ShieldCheck} label="GOLD" value={String(members.filter((item) => item.tier === "gold").length)} detail="Member Gold" tone="amber" />
@@ -181,7 +181,7 @@ export function AdminCustomerWorkspace() {
     </div>
 
     <Panel title="Pengaturan Membership" description="Diskon dan benefit tier dipakai backend saat menghitung promo member." action={<button type="button" disabled={busy || settings.length !== 4} onClick={() => void saveTierSettings()} className={primaryButtonClass}>{busy ? "Menyimpan..." : "Simpan Membership"}</button>}>
-      <div className="grid grid-cols-4 gap-3 p-4">
+      <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
         {tierOrder.map((key) => {
           const item = settings.find((entry) => entry.tier === key);
           if (!item) return <div key={key} className="h-28 rounded-md border border-dashed border-[#dfe5ed]" />;
@@ -198,7 +198,7 @@ export function AdminCustomerWorkspace() {
       title="Daftar Pelanggan"
       description="Tier otomatis mengikuti total belanja; Super Admin dapat memberi override manual bila diperlukan."
       className="mt-4"
-      action={<div className="flex gap-2"><div className="relative"><Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#8190a5]" /><input value={query} onChange={(event) => setQuery(event.target.value)} className={`${inputClass} w-60 pl-8`} placeholder="Nama, email, atau nomor HP..." /></div><select className={`${inputClass} w-36`} value={tier} onChange={(event) => setTier(event.target.value as "all" | Tier)}><option value="all">Semua Tier</option><option value="basic">BASIC</option><option value="gold">GOLD</option><option value="diamond">DIAMOND</option><option value="platinum">PLATINUM</option></select></div>}
+      action={<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"><div className="relative"><Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#8190a5]" /><input value={query} onChange={(event) => setQuery(event.target.value)} className={`${inputClass} w-full pl-8 sm:w-60`} placeholder="Nama, email, atau nomor HP..." /></div><select className={`${inputClass} w-full sm:w-36`} value={tier} onChange={(event) => setTier(event.target.value as "all" | Tier)}><option value="all">Semua Tier</option><option value="basic">BASIC</option><option value="gold">GOLD</option><option value="diamond">DIAMOND</option><option value="platinum">PLATINUM</option></select></div>}
     >
       <div className="overflow-x-auto">
         <table className="w-full min-w-[980px] text-left">
@@ -225,7 +225,7 @@ export function AdminCustomerWorkspace() {
 
     <Modal open={Boolean(editing)} title={`Kelola Member — ${editing?.name ?? ""}`} description="Atur tier otomatis/manual dan tambah saldo pelanggan." onClose={() => setEditing(null)} footer={null}>
       {editing && <form onSubmit={saveMember}>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Role membership"><select name="role" defaultValue={editing.tierMode === "manual" ? editing.tierOverride ?? editing.tier : "automatic"} className={inputClass}><option value="automatic">Otomatis sesuai total belanja</option><option value="basic">BASIC</option><option value="gold">GOLD</option><option value="diamond">DIAMOND</option><option value="platinum">PLATINUM</option></select></Field>
           <Field label="Saldo saat ini"><input disabled value={rupiah(editing.balance)} className={inputClass} /></Field>
           <Field label="Tambah saldo"><input name="addBalance" type="number" min="0" max="100000000" defaultValue="0" className={inputClass} /></Field>
