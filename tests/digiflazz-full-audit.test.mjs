@@ -98,7 +98,7 @@ test("failed active DigiFlazz configuration changes preserve the previous cache 
   assert.match(integration, /maintenance_token = \?/);
   assert.match(integration, /lock_token = \?/);
   assert.doesNotMatch(route, /captureCommitted/);
-  assert.match(route, /committed = await action\(\)/);
+  assert.match(route, /committed = await action\(token\)/);
   assert.match(route, /Rollback dibatalkan karena guard kedaluwarsa atau konfigurasi DigiFlazz sudah berubah/);
 });
 
