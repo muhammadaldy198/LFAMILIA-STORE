@@ -164,3 +164,122 @@ test("production modules are wired to the behavior-tested rules", () => {
   assert.match(externalCheckout, /isAutomaticPackageAvailable\(/);
   assert.match(walletCheckout, /isAutomaticPackageAvailable\(/);
 });
+
+test("provider fulfillment transitions cannot downgrade success and webhook replay is inert", () => {
+  const db = database();
+  db.exec(`
+    CREATE TABLE orders (
+      id TEXT PRIMARY KEY,
+      payment_status TEXT NOT NULL,
+      fulfillment_type TEXT NOT NULL,
+      fulfillment_status TEXT NOT NULL,
+      provider_status TEXT,
+      provider_message TEXT,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE order_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id TEXT NOT NULL,
+      source TEXT NOT NULL,
+      event_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      payload_json TEXT,
+      UNIQUE(source,event_id)
+    );
+    INSERT INTO orders (id,payment_status,fulfillment_type,fulfillment_status,provider_status)
+    VALUES ('o1','paid','automatic','processing','processing');
+  `);
+
+  const applyWebhook = (status, eventId) => {
+    db.exec("BEGIN");
+    try {
+      db.prepare(`
+        UPDATE orders
+        SET fulfillment_status = ?, provider_status = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = 'o1'
+          AND payment_status = 'paid'
+          AND fulfillment_type = 'automatic'
+          AND fulfillment_status NOT IN ('success','failed','cancelled')
+          AND NOT EXISTS (
+            SELECT 1 FROM order_events WHERE source = 'digiflazz' AND event_id = ?
+          )
+      `).run(status, status, eventId);
+      db.prepare(`
+        INSERT OR IGNORE INTO order_events (order_id,source,event_id,status,payload_json)
+        VALUES ('o1','digiflazz',?,?, '{}')
+      `).run(eventId, status);
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  };
+
+  applyWebhook("success", "evt-success");
+  applyWebhook("processing", "evt-stale-processing");
+  applyWebhook("success", "evt-success");
+
+  assert.equal(db.prepare("SELECT fulfillment_status FROM orders WHERE id='o1'").get().fulfillment_status, "success");
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM order_events WHERE event_id='evt-success'").get().count, 1);
+  db.close();
+});
+
+test("DigiFlazz reconciliation lease allows only one active claimant and recovers stale leases", () => {
+  const db = database();
+  db.exec(`
+    CREATE TABLE orders (
+      id TEXT PRIMARY KEY,
+      payment_status TEXT NOT NULL,
+      fulfillment_type TEXT NOT NULL,
+      fulfillment_status TEXT NOT NULL,
+      provider_code TEXT NOT NULL,
+      provider_status TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    INSERT INTO orders VALUES (
+      'o1','paid','automatic','processing','digiflazz','processing',datetime('now','-3 minutes')
+    );
+  `);
+
+  const claim = () => db.prepare(`
+    UPDATE orders
+    SET provider_status='reconciling', updated_at=CURRENT_TIMESTAMP
+    WHERE id='o1'
+      AND payment_status='paid'
+      AND fulfillment_type='automatic'
+      AND lower(trim(provider_code))='digiflazz'
+      AND fulfillment_status NOT IN ('success','failed','cancelled')
+      AND (
+        (provider_status='processing' AND updated_at <= datetime('now','-2 minutes'))
+        OR
+        (provider_status='reconciling' AND updated_at <= datetime('now','-5 minutes'))
+      )
+  `).run();
+
+  assert.equal(Number(claim().changes), 1);
+  assert.equal(Number(claim().changes), 0);
+  db.prepare("UPDATE orders SET updated_at=datetime('now','-6 minutes') WHERE id='o1'").run();
+  assert.equal(Number(claim().changes), 1);
+  db.close();
+});
+
+test("production backend wires atomic payment events, stable callback identity, and reconciliation lease", () => {
+  const paymentTransition = fs.readFileSync(path.join(root, "lib/server/payment-transition.ts"), "utf8");
+  const orders = fs.readFileSync(path.join(root, "lib/server/orders.ts"), "utf8");
+  const reconciliation = fs.readFileSync(path.join(root, "lib/server/digiflazz-reconciliation.ts"), "utf8");
+  const callback = fs.readFileSync(path.join(root, "app/api/fulfillment/digiflazz/callback/route.ts"), "utf8");
+  const doku = fs.readFileSync(path.join(root, "app/api/payments/doku/callback/route.ts"), "utf8");
+  const midtrans = fs.readFileSync(path.join(root, "app/api/payments/midtrans/snap/notification/route.ts"), "utf8");
+
+  assert.match(paymentTransition, /applyExternalPaymentEvent/);
+  assert.match(paymentTransition, /NOT EXISTS \(\s*SELECT 1 FROM order_events/);
+  assert.match(orders, /providerTransitionGuard/);
+  assert.match(orders, /AND NOT EXISTS \(\s*SELECT 1 FROM order_events WHERE source = \? AND event_id = \?/);
+  assert.match(reconciliation, /provider_status = 'reconciling'/);
+  assert.match(reconciliation, /claimDigiflazzReconciliation\(order\.id\)/);
+  assert.match(callback, /digiflazz-hook-/);
+  assert.match(callback, /semanticEvent/);
+  assert.match(doku, /applyExternalPaymentEvent/);
+  assert.match(midtrans, /applyExternalPaymentEvent/);
+});
+
