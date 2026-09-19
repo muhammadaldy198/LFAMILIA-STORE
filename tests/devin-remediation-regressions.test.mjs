@@ -148,7 +148,7 @@ test("stale DigiFlazz reconciliation normalizes legacy provider casing and notif
   const source = read("lib/server/digiflazz-reconciliation.ts");
   assert.match(source, /lower\(trim\(provider_code\)\) = 'digiflazz'/);
   assert.match(source, /const batch = await db\.batch/);
-  assert.match(source, /const persisted = Number\(batch\[1\]\?\.meta\.changes \?\? 0\) > 0/);
+  assert.match(source, /const persisted = Number\(batch\[0\]\?\.meta\.changes \?\? 0\) > 0/);
   assert.match(source, /if \(persisted && result\.status === "success"\)/);
 });
 
