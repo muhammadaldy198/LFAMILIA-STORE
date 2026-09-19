@@ -5,7 +5,7 @@ import { formatRupiah } from "@/lib/store-data";
 import { ProductArtwork } from "@/components/product-artwork";
 
 export function ProductCard({ product }: { product: StoreProduct }) {
-  const lowest = Math.min(...product.packages.map((item) => item.price));
+  const lowest = product.packages.length ? Math.min(...product.packages.map((item) => item.price)) : null;
 
   return (
     <Link
@@ -32,7 +32,7 @@ export function ProductCard({ product }: { product: StoreProduct }) {
           {product.publisher}
         </p>
         <strong className="mt-[4px] block truncate text-[10px] font-black leading-none text-[#d8ff8d] sm:text-[11px]">
-          {formatRupiah(lowest)}
+          {lowest == null ? "Belum tersedia" : formatRupiah(lowest)}
         </strong>
         <div className="mt-[5px] flex min-w-0 items-center gap-1 text-[8px] text-white/32 sm:text-[9px]">
           <Star
