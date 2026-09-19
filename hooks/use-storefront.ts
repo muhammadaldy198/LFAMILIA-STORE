@@ -44,7 +44,7 @@ export function useStorefront() {
         if (Array.isArray(data.categories)) {
           setCategories(canonicalCategories(data.categories, true));
         }
-        if (data.faqs?.length) setFaqs(data.faqs);
+        if (Array.isArray(data.faqs)) setFaqs(data.faqs);
       })
       .catch(() => undefined);
     return () => { active = false; };

@@ -93,6 +93,7 @@ export function AdminDashboard({
   const [globalSearchError, setGlobalSearchError] = useState("");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const globalSearchRequestRef = useRef(0);
   const isOwner = initialSession.role === "super_admin";
   const isAdmin = initialSession.role === "admin";
   const visibleNavigation = navigation.filter((item) => roleRank[initialSession.role] >= roleRank[item.minimumRole]);
@@ -114,12 +115,14 @@ export function AdminDashboard({
     const rawQuery = globalSearch.trim();
     const query = rawQuery.toLowerCase();
     if (!query) return;
+    const requestId = ++globalSearchRequestRef.current;
 
     const target = visibleNavigation.find((item) => item.label.toLowerCase().includes(query));
     if (target) {
       setActiveTab(target.value);
       setGlobalResults([]);
       setGlobalSearchError("");
+      setGlobalSearchBusy(false);
       setMobileNavigationOpen(false);
       return;
     }
@@ -137,6 +140,14 @@ export function AdminDashboard({
       }
       const responses = await Promise.all(requests);
       const payloads = await Promise.all(responses.map((response) => response.json().catch(() => ({}))));
+      const sources = canSearchBackoffice ? ["pesanan", "produk", "pelanggan"] : ["pesanan"];
+      for (let index = 0; index < responses.length; index += 1) {
+        if (!responses[index].ok) {
+          const payload = payloads[index] as { error?: string };
+          throw new Error(payload.error || `Pencarian ${sources[index]} gagal dimuat.`);
+        }
+      }
+      if (globalSearchRequestRef.current !== requestId) return;
       const results: GlobalSearchResult[] = [];
 
       const orders = (payloads[0] as { orders?: Array<{ id?: string | number; reference_id?: string; buyer_name?: string; buyer_email?: string; product_name?: string; package_label?: string; destination?: string }> }).orders ?? [];
@@ -181,13 +192,15 @@ export function AdminDashboard({
         }
       }
 
+      if (globalSearchRequestRef.current !== requestId) return;
       setGlobalResults(results.slice(0, 12));
       if (!results.length) setGlobalSearchError(`Tidak ada hasil untuk “${rawQuery}”.`);
     } catch (reason) {
+      if (globalSearchRequestRef.current !== requestId) return;
       setGlobalResults([]);
       setGlobalSearchError(reason instanceof Error ? reason.message : "Pencarian global gagal.");
     } finally {
-      setGlobalSearchBusy(false);
+      if (globalSearchRequestRef.current === requestId) setGlobalSearchBusy(false);
     }
   }
 
@@ -233,7 +246,7 @@ export function AdminDashboard({
             <Input
               ref={searchRef}
               value={globalSearch}
-              onChange={(event) => { setGlobalSearch(event.target.value); setGlobalResults([]); setGlobalSearchError(""); }}
+              onChange={(event) => { globalSearchRequestRef.current += 1; setGlobalSearchBusy(false); setGlobalSearch(event.target.value); setGlobalResults([]); setGlobalSearchError(""); }}
               placeholder="Cari menu, produk, pesanan, atau pelanggan..."
               className="h-9 rounded-md border-[#dfe5ed] bg-[#f8fafc] pl-9 pr-20 text-[11px] text-[#26364f] shadow-none placeholder:text-[#98a5b8] focus-visible:ring-[#1769e8]/30"
             />

@@ -1155,7 +1155,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
           <section className="mt-3 space-y-3">
             <article className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4"><h2 className="text-base font-black">Deskripsi {product.name}</h2><p className="mt-2 whitespace-pre-line text-xs leading-6 text-white/60">{(product as { description?: string }).description || `Top up ${product.name} cepat, aman, dan diproses otomatis setelah pembayaran berhasil.`}</p></article>
             <ProductReviews productSlug={product.slug} />
-            <article className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4"><h2 className="text-base font-black">Pertanyaan umum</h2><div className="mt-3 space-y-2">{faqs.filter((faq) => faq.isActive !== false).slice(0, 4).map((faq, index) => <details key={faq.id ?? `${faq.question}-${index}`} className="rounded-lg bg-white/[0.04] p-3"><summary className="cursor-pointer text-xs font-bold">{faq.question}</summary><p className="pt-2 whitespace-pre-line text-xs leading-5 text-white/55">{faq.answer}</p></details>)}</div></article>
+            {faqs.some((faq) => faq.isActive !== false) && <article className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4"><h2 className="text-base font-black">Pertanyaan umum</h2><div className="mt-3 space-y-2">{faqs.filter((faq) => faq.isActive !== false).slice(0, 4).map((faq, index) => <details key={faq.id ?? `${faq.question}-${index}`} className="rounded-lg bg-white/[0.04] p-3"><summary className="cursor-pointer text-xs font-bold">{faq.question}</summary><p className="pt-2 whitespace-pre-line text-xs leading-5 text-white/55">{faq.answer}</p></details>)}</div></article>}
           </section>
         )}
       </main>
