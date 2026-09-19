@@ -74,7 +74,7 @@ test("failed active DigiFlazz configuration changes preserve the previous cache 
   const route = read("app/api/admin/integrations/route.ts");
   const guard = read("lib/server/digiflazz-config-guard.ts");
   const integration = read("lib/server/integration-config.ts");
-  const action = route.indexOf("await action()");
+  const action = route.indexOf("await action(token)");
   const invalidate = route.indexOf("await invalidateDigiflazzOperationalCache(token)");
 
   assert.ok(action >= 0 && invalidate > action);
@@ -98,7 +98,7 @@ test("failed active DigiFlazz configuration changes preserve the previous cache 
   assert.match(integration, /maintenance_token = \?/);
   assert.match(integration, /lock_token = \?/);
   assert.doesNotMatch(route, /captureCommitted/);
-  assert.match(route, /committed = await action\(\)/);
+  assert.match(route, /committed = await action\(token\)/);
   assert.match(route, /Rollback dibatalkan karena guard kedaluwarsa atau konfigurasi DigiFlazz sudah berubah/);
 });
 
@@ -139,6 +139,26 @@ test("DigiFlazz profile activity is decided only after acquiring the configurati
     route.slice(profileBranch, guardedSave),
     /const activeEnvironment = \(await getIntegrationOverview\(\)\)/,
   );
+});
+
+test("inactive DigiFlazz profile saves cannot commit after configuration lease expiry", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const integration = read("lib/server/integration-config.ts");
+  assert.match(route, /action: \(guardToken: string\) => Promise<T>/);
+  assert.match(route, /committed = await action\(token\)/);
+  assert.match(route, /saveIntegrationProfile\(input, guardToken\)/);
+  assert.match(integration, /guardToken\?: string/);
+  assert.match(integration, /SELECT \?, \?, \?, \?, strftime/);
+  assert.match(integration, /guardToken \? `WHERE \$\{guardedOwnershipClause\(\)\}` : ""/);
+  assert.match(integration, /Guard konfigurasi DigiFlazz kedaluwarsa sebelum profile dapat disimpan/);
+});
+
+test("DigiFlazz environment selection cannot commit after configuration lease expiry", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const integration = read("lib/server/integration-config.ts");
+  assert.match(route, /saveIntegrationSelections\(input\.selections, guardToken\)/);
+  assert.match(integration, /Guard konfigurasi DigiFlazz kedaluwarsa sebelum environment dapat disimpan/);
+  assert.match(integration, /SELECT 'digiflazz_environment', \?, strftime/);
 });
 
 test("same-value DigiFlazz environment saves cannot report success during guarded maintenance", () => {

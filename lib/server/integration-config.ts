@@ -434,7 +434,7 @@ export async function saveIntegrationProfile(input: {
   environment: IntegrationEnvironment;
   values: Record<string, string>;
   clearFields?: string[];
-}) {
+}, guardToken?: string) {
   if (!isProfileSupported(input.provider, input.mode, input.environment)) throw new Error("Kombinasi provider, mode, dan environment tidak didukung.");
   const allowed = profileFields[profileFieldKey(input.provider, input.mode)] ?? [];
   const secret = secretFrom(runtime());
@@ -466,15 +466,25 @@ export async function saveIntegrationProfile(input: {
     delete merged[key];
   }
   const encrypted = await encryptConfig(secret, merged);
-  const committed = await database.prepare(`INSERT INTO integration_profiles (provider, mode, environment, encrypted_config, updated_at)
-    VALUES (?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))
+  const ownership = guardToken ? `WHERE ${guardedOwnershipClause()}` : "";
+  const statement = database.prepare(`INSERT INTO integration_profiles (provider, mode, environment, encrypted_config, updated_at)
+    SELECT ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now')
+    ${ownership}
     ON CONFLICT(provider, mode, environment) DO UPDATE SET
       encrypted_config = excluded.encrypted_config,
       updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
-    RETURNING encrypted_config, created_at, updated_at`)
-    .bind(input.provider, input.mode, input.environment, encrypted)
+    RETURNING encrypted_config, created_at, updated_at`);
+  const args: unknown[] = [input.provider, input.mode, input.environment, encrypted];
+  if (guardToken) args.push(guardToken, guardToken);
+  const committed = await statement
+    .bind(...args)
     .first<{ encrypted_config: string; created_at: string; updated_at: string }>();
-  if (!committed) throw new Error("Konfigurasi integrasi gagal dikonfirmasi setelah disimpan.");
+  if (!committed) {
+    if (guardToken) {
+      throw new Error("Guard konfigurasi DigiFlazz kedaluwarsa sebelum profile dapat disimpan.");
+    }
+    throw new Error("Konfigurasi integrasi gagal dikonfirmasi setelah disimpan.");
+  }
   return {
     configuredFields: Object.keys(merged).sort(),
     committedSnapshot: {
@@ -488,7 +498,10 @@ export async function saveIntegrationProfile(input: {
   };
 }
 
-export async function saveIntegrationSelections(input: Partial<IntegrationOverview["selections"]>) {
+export async function saveIntegrationSelections(
+  input: Partial<IntegrationOverview["selections"]>,
+  guardToken?: string,
+) {
   const normalized = input.digiflazzEnvironment
     ? valueOr(input.digiflazzEnvironment, ["development", "production"] as const, "development")
     : null;
@@ -496,15 +509,25 @@ export async function saveIntegrationSelections(input: Partial<IntegrationOvervi
 
   const database = getD1();
   await ensureIntegrationTables(database);
-  const committed = await database.prepare(`
+  const ownership = guardToken ? `WHERE ${guardedOwnershipClause()}` : "";
+  const statement = database.prepare(`
     INSERT INTO integration_settings (setting_key, value, updated_at)
-    VALUES ('digiflazz_environment', ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))
+    SELECT 'digiflazz_environment', ?, strftime('%Y-%m-%d %H:%M:%f', 'now')
+    ${ownership}
     ON CONFLICT(setting_key) DO UPDATE SET
       value = excluded.value,
       updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
     RETURNING value, updated_at
-  `).bind(normalized).first<{ value: string; updated_at: string }>();
-  if (!committed) throw new Error("Pilihan environment DigiFlazz gagal dikonfirmasi setelah disimpan.");
+  `);
+  const args: unknown[] = [normalized];
+  if (guardToken) args.push(guardToken, guardToken);
+  const committed = await statement.bind(...args).first<{ value: string; updated_at: string }>();
+  if (!committed) {
+    if (guardToken) {
+      throw new Error("Guard konfigurasi DigiFlazz kedaluwarsa sebelum environment dapat disimpan.");
+    }
+    throw new Error("Pilihan environment DigiFlazz gagal dikonfirmasi setelah disimpan.");
+  }
   return {
     committedSnapshot: {
       settingKey: "digiflazz_environment",

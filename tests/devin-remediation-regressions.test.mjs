@@ -182,7 +182,7 @@ test("legacy provider casing remains retryable across automatic fulfillment reco
 test("active DigiFlazz credential changes mutate under guard, then atomically invalidate cache with rollback support", () => {
   const route = read("app/api/admin/integrations/route.ts");
   const guard = read("lib/server/digiflazz-config-guard.ts");
-  const action = route.indexOf("await action()");
+  const action = route.indexOf("await action(token)");
   const invalidate = route.indexOf("await invalidateDigiflazzOperationalCache(token)");
   assert.ok(action >= 0 && invalidate > action);
   assert.match(route, /if \(actionCommitted && rollbackPlan && committed !== null\)/);
@@ -199,6 +199,21 @@ test("DigiFlazz profile saves serialize environment selection before deciding ca
   assert.ok(profileBranch >= 0 && guardedSave > profileBranch && activeRead > guardedSave);
   assert.match(route, /shouldInvalidateOperationalCache/);
   assert.match(route, /if \(invalidateOperationalCache\)/);
+});
+
+test("guarded DigiFlazz profile writes fail closed when their lease is no longer owned", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const integration = read("lib/server/integration-config.ts");
+  assert.match(route, /saveIntegrationProfile\(input, guardToken\)/);
+  assert.match(integration, /const ownership = guardToken \? `WHERE \$\{guardedOwnershipClause\(\)\}` : ""/);
+  assert.match(integration, /if \(guardToken\) args\.push\(guardToken, guardToken\)/);
+});
+
+test("guarded DigiFlazz environment writes fail closed when their lease is no longer owned", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const integration = read("lib/server/integration-config.ts");
+  assert.match(route, /saveIntegrationSelections\(input\.selections, guardToken\)/);
+  assert.match(integration, /INSERT INTO integration_settings[\s\S]*SELECT 'digiflazz_environment'/);
 });
 
 test("storefront keeps fallback categories when API response fails or omits categories", () => {
