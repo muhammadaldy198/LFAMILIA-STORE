@@ -201,6 +201,15 @@ test("DigiFlazz profile saves serialize environment selection before deciding ca
   assert.match(route, /if \(invalidateOperationalCache\)/);
 });
 
+test("guarded DigiFlazz profile mutation validates lease ownership inside the SQL write", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const integration = read("lib/server/integration-config.ts");
+  assert.match(route, /saveIntegrationProfile\(\{ \.\.\.input, guardToken \}\)/);
+  assert.match(integration, /const guardToken = input\.guardToken\?\.trim\(\) \|\| null/);
+  assert.match(integration, /guardedOwnershipClause\(\)/);
+  assert.match(integration, /bindArgs\.push\(guardToken, guardToken\)/);
+});
+
 test("storefront keeps fallback categories when API response fails or omits categories", () => {
   const storefront = read("hooks/use-storefront.ts");
   assert.match(storefront, /if \(!response\.ok\) throw new Error/);
