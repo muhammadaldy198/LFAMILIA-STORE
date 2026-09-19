@@ -269,13 +269,13 @@ export function AdminOrderManager() {
 
   return (
     <div className="admin-orders-reference min-w-0 text-[#14213a]">
-      <header className="flex items-start justify-between gap-[16px]">
+      <header className="flex flex-col items-start justify-between gap-[12px] lg:flex-row lg:gap-[16px]">
         <div>
           <h1 className="text-[23px] font-black leading-[1.15] tracking-[-0.04em] text-[#0b1834]">Pesanan</h1>
           <p className="mt-[4px] text-[10px] leading-[1.4] text-[#677892]">Kelola seluruh transaksi top up game, monitor status pembayaran dan proses pengiriman.</p>
         </div>
-        <div className="flex shrink-0 items-center gap-[8px]">
-          <div className="mr-[3px] flex items-center gap-[8px] text-[8px] text-[#61728b]">
+        <div className="flex w-full flex-wrap items-center gap-[8px] lg:w-auto lg:shrink-0 lg:justify-end">
+          <div className="mr-[3px] flex w-full flex-wrap items-center gap-[8px] text-[8px] text-[#61728b] sm:w-auto">
             <span>Terakhir update {lastUpdated}</span>
             <button type="button" onClick={() => setAutoRefresh((value) => !value)} className={`inline-flex h-[26px] items-center gap-[5px] rounded-[5px] px-[9px] font-bold ${autoRefresh ? "bg-[#e8f9ef] text-[#139657]" : "bg-slate-100 text-slate-500"}`}>
               <Check className="size-[11px]" /> {autoRefresh ? "Auto Refresh Aktif" : "Auto Refresh Nonaktif"}
@@ -296,13 +296,13 @@ export function AdminOrderManager() {
       )}
       {error && <button type="button" onClick={() => setError("")} className="mt-[10px] w-full rounded-[6px] border border-red-200 bg-red-50 px-[12px] py-[8px] text-left text-[9px] text-red-700">{error}</button>}
 
-      <section className="mt-[12px] grid grid-cols-6 gap-[10px]">
+      <section className="mt-[12px] grid grid-cols-2 gap-[10px] sm:grid-cols-3 xl:grid-cols-6">
         {liveMetrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}
       </section>
 
-      <div className="mt-[12px] grid grid-cols-[minmax(0,1fr)_270px] gap-[12px]">
+      <div className="mt-[12px] grid grid-cols-1 gap-[12px] xl:grid-cols-[minmax(0,1fr)_270px]">
         <section className="min-w-0 overflow-hidden rounded-[8px] border border-[#dfe6ef] bg-white shadow-[0_1px_4px_rgba(20,33,58,0.04)]">
-          <div className="grid grid-cols-[1.55fr_.82fr_.86fr_1fr_1.05fr_.54fr] gap-[8px] border-b border-[#e5eaf0] bg-[#fbfcfe] p-[10px]">
+          <div className="grid grid-cols-1 gap-[8px] border-b border-[#e5eaf0] bg-[#fbfcfe] p-[10px] sm:grid-cols-2 xl:grid-cols-[1.55fr_.82fr_.86fr_1fr_1.05fr_.54fr]">
             <label className="relative">
               <span className="sr-only">Cari pesanan</span>
               <Search className="absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#71829a]" />
@@ -326,15 +326,15 @@ export function AdminOrderManager() {
 
           <DesktopOrderTable orders={pagedOrders} selected={selected} onSelect={setSelected} onOpen={setDetailOrder} />
 
-          <footer className="flex min-h-[46px] items-center justify-between border-t border-[#e5eaf0] px-[11px] py-[7px]">
-            <div className="flex items-center gap-[8px]">
+          <footer className="flex min-h-[46px] flex-col items-stretch justify-between gap-2 border-t border-[#e5eaf0] px-[11px] py-[7px] lg:flex-row lg:items-center">
+            <div className="flex flex-wrap items-center gap-[8px]">
               <label className="flex items-center gap-[7px] text-[8px] text-[#4f6078]"><Checkbox checked={allSelected} onChange={toggleAll} />Pilih semua</label>
               <select value={bulkAction} onChange={(event) => setBulkAction(event.target.value)} className="h-[30px] w-[142px] rounded-[5px] border border-[#dce3eb] bg-white px-[9px] text-[8px] text-[#42536a] outline-none">
                 <option>Aksi massal</option><option>Export terpilih</option>
               </select>
               <button type="button" onClick={applyBulkAction} className="h-[30px] rounded-[5px] bg-[#e8eef6] px-[13px] text-[8px] font-semibold text-[#61718a] hover:bg-[#dce6f1]">Terapkan</button>
             </div>
-            <div className="flex items-center gap-[8px] text-[8px] text-[#52627a]">
+            <div className="flex flex-wrap items-center gap-[8px] text-[8px] text-[#52627a]">
               <span>Baris per halaman</span>
               <select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} className="h-[29px] rounded-[5px] border border-[#dce3eb] bg-white px-[8px] outline-none"><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
               <Pagination page={activePage} pages={pageCount} onChange={setPage} />
