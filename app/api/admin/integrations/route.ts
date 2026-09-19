@@ -162,8 +162,8 @@ export async function PUT(request: Request) {
       );
       if (changingDigiflazzEnvironment) {
         await withDigiflazzConfigurationGuard(
-          async () => {
-            const result = await saveIntegrationSelections(input.selections);
+          async (guardToken) => {
+            const result = await saveIntegrationSelections(input.selections, guardToken);
             if (!result.committedSnapshot) throw new Error("Pilihan environment DigiFlazz tidak tersimpan.");
             return result.committedSnapshot;
           },
