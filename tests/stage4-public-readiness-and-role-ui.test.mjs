@@ -31,7 +31,12 @@ test("dashboard search and Staff stay inside their permitted workspace", () => {
   const overview = read("components/admin-overview.tsx");
 
   assert.match(dashboard, /const visibleNavigation = navigation\.filter/);
-  assert.match(dashboard, /visibleNavigation\.find\(\(item\) => item\.value === preferred\)/);
+  assert.match(dashboard, /const canSearchBackoffice = isOwner \|\| isAdmin/);
+  assert.match(dashboard, /fetch\("\/api\/panel\/orders"/);
+  assert.match(dashboard, /if \(canSearchBackoffice\)/);
+  assert.match(dashboard, /fetch\("\/api\/panel\/products"/);
+  assert.match(dashboard, /fetch\("\/api\/panel\/members"/);
+  assert.match(dashboard, /setActiveTab\(result\.tab\)/);
   assert.doesNotMatch(dashboard, /setActiveTab\("products"\)/);
   assert.match(overview, /const visibleFeatureCards = featureCards\.filter/);
   assert.match(overview, /minimumRole: "admin"/);
