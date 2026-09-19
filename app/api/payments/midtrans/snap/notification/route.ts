@@ -106,7 +106,10 @@ export async function POST(request: Request) {
       return Response.json({ error: "Nominal Midtrans tidak sesuai." }, { status: 400 });
     }
 
-    const eventId = clean(body.transaction_id) || `snap-${hashHex("sha256", rawBody)}`;
+    const transactionId = clean(body.transaction_id);
+    const eventId = transactionId
+      ? `snap-${transactionId}-${status}`
+      : `snap-${hashHex("sha256", rawBody)}`;
 
     if (status === "ignore") {
       await recordExternalPaymentEvent({

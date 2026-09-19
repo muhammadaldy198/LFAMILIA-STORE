@@ -4,9 +4,10 @@ import { digiflazzAdapter } from "@/lib/server/providers/digiflazz";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 
 async function claimDigiflazzReconciliation(orderId: string) {
+  const leaseStatus = `reconciling:${crypto.randomUUID()}`;
   const result = await getD1().prepare(
     `UPDATE orders
-     SET provider_status = 'reconciling', updated_at = CURRENT_TIMESTAMP
+     SET provider_status = ?, updated_at = CURRENT_TIMESTAMP
      WHERE id = ?
        AND payment_status = 'paid'
        AND fulfillment_type = 'automatic'
@@ -15,23 +16,25 @@ async function claimDigiflazzReconciliation(orderId: string) {
        AND (
          (provider_status = 'processing' AND updated_at <= datetime('now', '-2 minutes'))
          OR
-         (provider_status = 'reconciling' AND updated_at <= datetime('now', '-5 minutes'))
+         ((provider_status = 'reconciling' OR provider_status LIKE 'reconciling:%')
+           AND updated_at <= datetime('now', '-5 minutes'))
        )`,
-  ).bind(orderId).run();
-  return Number(result.meta.changes ?? 0) > 0;
+  ).bind(leaseStatus, orderId).run();
+  return Number(result.meta.changes ?? 0) > 0 ? leaseStatus : null;
 }
 
 async function releaseDigiflazzReconciliation(
   orderId: string,
+  leaseStatus: string,
   message: string,
 ) {
   await getD1().prepare(
     `UPDATE orders
      SET provider_status = 'processing', fulfillment_status = 'processing',
          provider_message = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE id = ? AND provider_status = 'reconciling'
+     WHERE id = ? AND provider_status = ?
        AND fulfillment_status NOT IN ('success', 'failed', 'cancelled')`,
-  ).bind(message.slice(0, 500), orderId).run();
+  ).bind(message.slice(0, 500), orderId, leaseStatus).run();
 }
 
 function reconciliationTransitionGuard(status: "success" | "failed" | "processing") {
@@ -60,7 +63,8 @@ export async function reconcileStaleDigiflazzProcessing(
        AND (
          (provider_status = 'processing' AND updated_at <= datetime('now', '-2 minutes'))
          OR
-         (provider_status = 'reconciling' AND updated_at <= datetime('now', '-5 minutes'))
+         ((provider_status = 'reconciling' OR provider_status LIKE 'reconciling:%')
+           AND updated_at <= datetime('now', '-5 minutes'))
        )
        AND created_at >= datetime('now', '-89 days')
      ORDER BY updated_at ASC
@@ -85,9 +89,10 @@ export async function reconcileStaleDigiflazzProcessing(
   }>();
 
   for (const order of rows.results) {
+    let leaseStatus: string | null = null;
     try {
-      const claimed = await claimDigiflazzReconciliation(order.id);
-      if (!claimed) continue;
+      leaseStatus = await claimDigiflazzReconciliation(order.id);
+      if (!leaseStatus) continue;
 
       const result = await digiflazzAdapter.fulfill({
         id: order.id,
@@ -129,7 +134,7 @@ export async function reconcileStaleDigiflazzProcessing(
              updated_at = CURRENT_TIMESTAMP
            WHERE id = ? AND payment_status = 'paid'
              AND lower(trim(provider_code)) = 'digiflazz'
-             AND provider_status = 'reconciling'
+             AND provider_status = ?
              AND ${reconciliationTransitionGuard(result.status)}`,
         ).bind(
           result.externalId,
@@ -138,6 +143,7 @@ export async function reconcileStaleDigiflazzProcessing(
           result.serialNumber,
           result.status,
           order.id,
+          leaseStatus,
         ),
         db.prepare(
           `INSERT OR IGNORE INTO order_events
@@ -154,7 +160,9 @@ export async function reconcileStaleDigiflazzProcessing(
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Rekonsiliasi DigiFlazz gagal.";
-      await releaseDigiflazzReconciliation(order.id, message).catch(() => undefined);
+      if (leaseStatus) {
+        await releaseDigiflazzReconciliation(order.id, leaseStatus, message).catch(() => undefined);
+      }
       console.error(JSON.stringify({
         event: "digiflazz_reconciliation_failure",
         orderId: order.id,
