@@ -755,17 +755,28 @@ export async function recoverStaleAutomaticOrders(
   }
 }
 
+function providerTransitionGuard(status: ProviderResult["status"]) {
+  if (status === "success") {
+    return "payment_status = 'paid' AND fulfillment_type = 'automatic' AND fulfillment_status NOT IN ('success', 'cancelled')";
+  }
+  if (status === "failed") {
+    return "payment_status = 'paid' AND fulfillment_type = 'automatic' AND fulfillment_status NOT IN ('success', 'failed', 'cancelled')";
+  }
+  return "payment_status = 'paid' AND fulfillment_type = 'automatic' AND fulfillment_status NOT IN ('success', 'failed', 'cancelled') AND COALESCE(provider_status, '') NOT IN ('success', 'failed')";
+}
+
 async function applyProviderResult(
   order: OrderRecord,
   result: ProviderResult,
   eventId?: string,
 ) {
   const db = getD1();
-  await db
+  const updated = await db
     .prepare(
       `UPDATE orders SET provider_ref_id = COALESCE(?, provider_ref_id), provider_status = ?,
      provider_message = ?, provider_serial_number = COALESCE(?, provider_serial_number),
-     fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+     fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND ${providerTransitionGuard(result.status)}`,
     )
     .bind(
       result.externalId,
@@ -776,6 +787,10 @@ async function applyProviderResult(
       order.id,
     )
     .run();
+
+  const changed = Number(updated.meta.changes ?? 0) > 0;
+  if (!changed) return false;
+
   await recordOrderEvent({
     orderId: order.id,
     source:
@@ -788,6 +803,7 @@ async function applyProviderResult(
     status: result.status,
     payload: result.raw,
   });
+  return true;
 }
 
 async function setFulfillmentError(orderId: string, message: string) {
@@ -826,20 +842,46 @@ export async function applyProviderWebhook(input: {
   // A provider may only report a transaction this store has already paid for.
   if (!order || order.payment_status !== "paid") return false;
 
-  const recorded = await recordOrderEvent({
-    orderId: order.id,
-    source: input.providerCode === "digiflazz" ? "digiflazz" : "admin",
-    eventId: input.eventId,
-    status: input.result.status,
-    payload: input.result.raw,
-  });
-  // (source, event_id) is unique, so a signed callback replay becomes a no-op.
-  if (Number(recorded.meta.changes ?? 0) === 0) return true;
+  const source = input.providerCode === "digiflazz" ? "digiflazz" : "admin";
+  const guard = providerTransitionGuard(input.result.status);
 
-  // Provider callbacks can arrive out of order. A completed order is never downgraded.
-  if (order.fulfillment_status === "success" && input.result.status !== "success") return true;
-  await applyProviderResult(order, input.result, `applied-${input.eventId}`);
-  return true;
+  // Update first only when the signed event has never been consumed, then
+  // persist the event in the same D1 transaction. Replays therefore cannot
+  // refresh or downgrade fulfillment state.
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE orders SET provider_ref_id = COALESCE(?, provider_ref_id), provider_status = ?,
+       provider_message = ?, provider_serial_number = COALESCE(?, provider_serial_number),
+       fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND ${guard}
+         AND NOT EXISTS (
+           SELECT 1 FROM order_events WHERE source = ? AND event_id = ?
+         )`,
+    ).bind(
+      input.result.externalId,
+      input.result.status,
+      input.result.message,
+      input.result.serialNumber,
+      input.result.status,
+      order.id,
+      source,
+      input.eventId,
+    ),
+    db.prepare(
+      `INSERT OR IGNORE INTO order_events (order_id, source, event_id, status, payload_json)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).bind(
+      order.id,
+      source,
+      input.eventId,
+      input.result.status,
+      JSON.stringify(input.result.raw),
+    ),
+  ]);
+
+  const changed = Number(results[0]?.meta.changes ?? 0) > 0;
+  const inserted = Number(results[1]?.meta.changes ?? 0) > 0;
+  return changed || inserted;
 }
 
 export async function listOrders(limit = 200) {
