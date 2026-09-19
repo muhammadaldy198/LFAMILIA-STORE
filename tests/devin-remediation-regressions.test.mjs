@@ -182,7 +182,7 @@ test("legacy provider casing remains retryable across automatic fulfillment reco
 test("active DigiFlazz credential changes mutate under guard, then atomically invalidate cache with rollback support", () => {
   const route = read("app/api/admin/integrations/route.ts");
   const guard = read("lib/server/digiflazz-config-guard.ts");
-  const action = route.indexOf("await action()");
+  const action = route.indexOf("await action(token)");
   const invalidate = route.indexOf("await invalidateDigiflazzOperationalCache(token)");
   assert.ok(action >= 0 && invalidate > action);
   assert.match(route, /if \(actionCommitted && rollbackPlan && committed !== null\)/);
