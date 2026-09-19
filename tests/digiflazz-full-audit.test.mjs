@@ -74,7 +74,7 @@ test("failed active DigiFlazz configuration changes preserve the previous cache 
   const route = read("app/api/admin/integrations/route.ts");
   const guard = read("lib/server/digiflazz-config-guard.ts");
   const integration = read("lib/server/integration-config.ts");
-  const action = route.indexOf("await action()");
+  const action = route.indexOf("await action(token)");
   const invalidate = route.indexOf("await invalidateDigiflazzOperationalCache(token)");
 
   assert.ok(action >= 0 && invalidate > action);
