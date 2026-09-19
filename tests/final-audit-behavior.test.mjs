@@ -283,10 +283,12 @@ test("production backend wires atomic payment events, stable callback identity, 
   assert.match(orders, /providerTransitionGuard/);
   assert.match(orders, /AND NOT EXISTS \(\s*SELECT 1 FROM order_events WHERE source = \? AND event_id = \?/);
   assert.match(reconciliation, /reconciling:\$\{crypto\.randomUUID\(\)\}/);
-  assert.match(reconciliation, /provider_status LIKE 'reconciling:%'/);
+  assert.match(reconciliation, /provider_status = 'reconciling' OR provider_status LIKE 'reconciling:%'/);
   assert.match(reconciliation, /claimDigiflazzReconciliation\(order\.id\)/);
   assert.match(callback, /digiflazz-event-/);
   assert.doesNotMatch(callback, /digiflazz-hook-/);
+  assert.match(callback, /const normalizedStatus = data\.status\?\.trim\(\)\.toLowerCase\(\) \?\? ""/);
+  assert.match(callback, /mapStatus\(normalizedStatus\)/);
   assert.match(callback, /semanticEvent/);
   assert.match(doku, /applyExternalPaymentEvent/);
   assert.match(midtrans, /applyExternalPaymentEvent/);
