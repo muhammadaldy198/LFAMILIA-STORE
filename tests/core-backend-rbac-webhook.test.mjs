@@ -17,8 +17,9 @@ test("panel authorization supports Super Admin, Admin, and Staff", () => {
 test("Digiflazz callbacks are paid-order-only, replay-safe, and monotonic", () => {
   const callback = read("lib/server/orders.ts").slice(read("lib/server/orders.ts").indexOf("export async function applyProviderWebhook"));
   assert.match(callback, /order\.payment_status !== "paid"/);
-  assert.match(callback, /Number\(recorded\.meta\.changes \?\? 0\) === 0/);
-  assert.match(callback, /order\.fulfillment_status === "success"/);
+  assert.match(callback, /AND NOT EXISTS \(/);
+  assert.match(callback, /const inserted = Number\(results\[1\]\?\.meta\.changes \?\? 0\) > 0/);
+  assert.match(callback, /providerTransitionGuard\(input\.result\.status\)/);
 });
 
 test("rate-limit identity only trusts Cloudflare connecting IP", () => {
