@@ -210,6 +210,14 @@ test("guarded DigiFlazz profile mutation validates lease ownership inside the SQ
   assert.match(integration, /bindArgs\.push\(guardToken, guardToken\)/);
 });
 
+test("guarded DigiFlazz environment mutation validates lease ownership inside the SQL write", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const integration = read("lib/server/integration-config.ts");
+  assert.match(route, /saveIntegrationSelections\(input\.selections, guardToken\)/);
+  assert.match(integration, /const normalizedGuardToken = guardToken\?\.trim\(\) \|\| null/);
+  assert.match(integration, /bindArgs\.push\(normalizedGuardToken, normalizedGuardToken\)/);
+});
+
 test("storefront keeps fallback categories when API response fails or omits categories", () => {
   const storefront = read("hooks/use-storefront.ts");
   assert.match(storefront, /if \(!response\.ok\) throw new Error/);
