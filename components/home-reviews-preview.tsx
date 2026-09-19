@@ -11,19 +11,32 @@ function productTitle(slug: string) {
 
 export function HomeReviewsPreview() {
   const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
     void fetch("/api/reviews?featured=1", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data: { reviews?: ProductReview[] }) => {
-        if (active) setReviews(data.reviews ?? []);
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({})) as { reviews?: ProductReview[]; error?: string };
+        if (!response.ok) throw new Error(data.error || "Ulasan gagal dimuat.");
+        return data;
       })
-      .catch(() => undefined);
+      .then((data) => {
+        if (!active) return;
+        setReviews(data.reviews ?? []);
+        setLoadError("");
+      })
+      .catch((reason) => {
+        if (active) setLoadError(reason instanceof Error ? reason.message : "Ulasan gagal dimuat.");
+      });
     return () => { active = false; };
-  }, []);
+  }, [reloadKey]);
 
-  if (!reviews.length) return null;
+  if (!reviews.length) {
+    if (!loadError) return null;
+    return <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8"><div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.025] px-4 py-3 text-[10px] text-white/40"><span>{loadError}</span><button type="button" onClick={() => setReloadKey((value) => value + 1)} className="font-bold text-[#d8ff8d]">Muat ulang</button></div></section>;
+  }
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-[34px] sm:px-6 sm:py-[44px] lg:px-8">
