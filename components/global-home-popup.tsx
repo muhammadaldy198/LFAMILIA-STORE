@@ -15,7 +15,11 @@ export function GlobalHomePopup() {
 
   useEffect(() => {
     let mounted = true;
-    void fetch("/api/home-content", { cache: "no-store" }).then((response) => response.json()).then((data: { popups?: SitePopupRecord[] }) => {
+    void fetch("/api/home-content", { cache: "no-store" }).then(async (response) => {
+      const data = await response.json().catch(() => ({})) as { popups?: SitePopupRecord[]; error?: string };
+      if (!response.ok) throw new Error(data.error || "Pop-up gagal dimuat.");
+      return data;
+    }).then((data) => {
       if (!mounted) return;
       const visible = (data.popups ?? []).filter((item) => Number(window.localStorage.getItem(popupKey(item)) || 0) < Date.now());
       setItems(visible);
