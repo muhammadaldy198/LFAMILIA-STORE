@@ -49,13 +49,14 @@ export function CustomerMembershipSummary() {
 
   useEffect(() => {
     const initial = window.setTimeout(() => void load(), 0);
-    const interval = window.setInterval(() => void load(), 10_000);
     const onFocus = () => void load();
+    const onAccountChanged = () => void load();
     window.addEventListener("focus", onFocus);
+    window.addEventListener("lfamilia:auth-changed", onAccountChanged);
     return () => {
       window.clearTimeout(initial);
-      window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("lfamilia:auth-changed", onAccountChanged);
     };
   }, [load]);
 

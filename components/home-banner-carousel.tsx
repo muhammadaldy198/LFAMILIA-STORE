@@ -9,19 +9,29 @@ export function HomeBannerCarousel() {
   const [banners, setBanners] = useState<HomeBannerRecord[]>([]);
   const [active, setActive] = useState(0);
   const [mobile, setMobile] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let mounted = true;
     void fetch("/api/home-content", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data: { banners?: HomeBannerRecord[] }) => {
-        if (mounted) setBanners(data.banners ?? []);
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({})) as { banners?: HomeBannerRecord[]; error?: string };
+        if (!response.ok) throw new Error(data.error || "Banner gagal dimuat.");
+        return data;
       })
-      .catch(() => undefined);
+      .then((data) => {
+        if (!mounted) return;
+        setBanners(data.banners ?? []);
+        setLoadError("");
+      })
+      .catch((reason) => {
+        if (mounted) setLoadError(reason instanceof Error ? reason.message : "Banner gagal dimuat.");
+      });
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 639px)");
@@ -44,7 +54,10 @@ export function HomeBannerCarousel() {
     return () => window.clearInterval(timer);
   }, [visibleBanners.length]);
 
-  if (!visibleBanners.length) return null;
+  if (!visibleBanners.length) {
+    if (!loadError) return null;
+    return <section className="mx-auto max-w-7xl px-4 pt-3 sm:px-6 lg:px-8"><div className="flex items-center justify-between gap-3 rounded-xl border border-amber-300/15 bg-amber-300/[0.04] px-4 py-3 text-[10px] text-white/45"><span>{loadError}</span><button type="button" onClick={() => setReloadKey((value) => value + 1)} className="shrink-0 font-bold text-[#d8ff8d]">Coba lagi</button></div></section>;
+  }
 
   const banner = visibleBanners[Math.min(active, visibleBanners.length - 1)];
   const mobileImageUrl = banner.mobileImageUrl || mobileFallback(banner.imageUrl);

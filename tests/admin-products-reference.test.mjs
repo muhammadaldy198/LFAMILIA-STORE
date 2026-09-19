@@ -9,7 +9,7 @@ test("products page matches the supplied desktop list reference", () => {
   for (const label of [
     "Kelola semua produk top up, voucher, dan layanan digital.",
     "Tambah Produk Manual",
-    "Import Nominal Digiflazz",
+    "Kelola Nominal",
     "Semua Kategori",
     "Semua Provider",
     "Semua Status",

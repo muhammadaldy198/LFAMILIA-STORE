@@ -11,6 +11,7 @@ export function GlobalHomePopup() {
   const [index, setIndex] = useState(0);
   const [open, setOpen] = useState(false);
   const [hideAgain, setHideAgain] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -19,9 +20,14 @@ export function GlobalHomePopup() {
       const visible = (data.popups ?? []).filter((item) => Number(window.localStorage.getItem(popupKey(item)) || 0) < Date.now());
       setItems(visible);
       setOpen(visible.length > 0);
-    }).catch(() => undefined);
+    }).catch(() => {
+      if (!mounted || retryKey >= 1) return;
+      window.setTimeout(() => {
+        if (mounted) setRetryKey((value) => value + 1);
+      }, 1500);
+    });
     return () => { mounted = false; };
-  }, []);
+  }, [retryKey]);
 
   function close() {
     if (hideAgain) {

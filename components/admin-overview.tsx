@@ -168,7 +168,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
         </div>
       </section>
 
-      <section className={`grid gap-3 ${isStaff ? "grid-cols-2" : canExpectFinance ? "grid-cols-5" : "grid-cols-3"}`}>
+      <section className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${isStaff ? "xl:grid-cols-2" : canExpectFinance ? "xl:grid-cols-5" : "xl:grid-cols-3"}`}>
         {canViewFinance && <MetricCard Icon={WalletCards} label="Omzet Hari Ini" value={money(summary?.todayMetrics.paidRevenue)} note="transaksi dibayar" />}
         <MetricCard Icon={ShoppingCart} label="Pesanan Hari Ini" value={String(summary?.todayMetrics.totalOrders || 0)} note="pesanan tercatat" />
         {!isStaff && <MetricCard Icon={Boxes} label="Produk Aktif" value={String(summary?.todayMetrics.activeProducts || 0)} note="tersedia di toko" />}
@@ -211,7 +211,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
         </Panel>}
       </section>
 
-      <section className={`grid gap-3 ${isStaff ? "grid-cols-2" : "grid-cols-5"}`}>
+      <section className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${isStaff ? "xl:grid-cols-2" : "xl:grid-cols-5"}`}>
         {visibleFeatureCards.slice(0, 5).map((item) => <FeatureCard key={item.title} {...item} onNavigate={onNavigate} />)}
       </section>
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-6">

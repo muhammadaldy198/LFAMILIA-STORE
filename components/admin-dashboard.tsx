@@ -46,6 +46,13 @@ type Session = {
   role: "super_admin" | "admin" | "staff";
 };
 
+type GlobalSearchResult = {
+  id: string;
+  tab: string;
+  title: string;
+  detail: string;
+};
+
 type NavigationItem = {
   value: string;
   label: string;
@@ -81,6 +88,9 @@ export function AdminDashboard({
 }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [globalSearch, setGlobalSearch] = useState("");
+  const [globalResults, setGlobalResults] = useState<GlobalSearchResult[]>([]);
+  const [globalSearchBusy, setGlobalSearchBusy] = useState(false);
+  const [globalSearchError, setGlobalSearchError] = useState("");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const isOwner = initialSession.role === "super_admin";
@@ -99,19 +109,86 @@ export function AdminDashboard({
     return () => window.removeEventListener("keydown", handleShortcut);
   }, []);
 
-  function submitGlobalSearch(event: FormEvent) {
+  async function submitGlobalSearch(event: FormEvent) {
     event.preventDefault();
-    const query = globalSearch.trim().toLowerCase();
+    const rawQuery = globalSearch.trim();
+    const query = rawQuery.toLowerCase();
     if (!query) return;
+
     const target = visibleNavigation.find((item) => item.label.toLowerCase().includes(query));
-    const preferred = query.includes("sku") || query.includes("produk")
-      ? "products"
-      : query.includes("pelanggan")
-        ? "customers"
-        : "orders";
-    const allowed = target ?? visibleNavigation.find((item) => item.value === preferred) ?? visibleNavigation.find((item) => item.value === "orders") ?? visibleNavigation[0];
-    if (allowed) setActiveTab(allowed.value);
-    setMobileNavigationOpen(false);
+    if (target) {
+      setActiveTab(target.value);
+      setGlobalResults([]);
+      setGlobalSearchError("");
+      setMobileNavigationOpen(false);
+      return;
+    }
+
+    setGlobalSearchBusy(true);
+    setGlobalSearchError("");
+    try {
+      const requests: Array<Promise<Response>> = [
+        fetch("/api/panel/orders", { cache: "no-store" }),
+      ];
+      const canSearchBackoffice = isOwner || isAdmin;
+      if (canSearchBackoffice) {
+        requests.push(fetch("/api/panel/products", { cache: "no-store" }));
+        requests.push(fetch("/api/panel/members", { cache: "no-store" }));
+      }
+      const responses = await Promise.all(requests);
+      const payloads = await Promise.all(responses.map((response) => response.json().catch(() => ({}))));
+      const results: GlobalSearchResult[] = [];
+
+      const orders = (payloads[0] as { orders?: Array<{ id?: string | number; reference_id?: string; buyer_name?: string; buyer_email?: string; product_name?: string; package_label?: string; destination?: string }> }).orders ?? [];
+      for (const order of orders) {
+        const haystack = [order.reference_id, order.buyer_name, order.buyer_email, order.product_name, order.package_label, order.destination].filter(Boolean).join(" ").toLowerCase();
+        if (haystack.includes(query)) {
+          results.push({
+            id: `order:${order.id ?? order.reference_id}`,
+            tab: "orders",
+            title: order.reference_id || "Pesanan",
+            detail: [order.buyer_name, order.product_name, order.package_label].filter(Boolean).join(" · "),
+          });
+        }
+      }
+
+      if (canSearchBackoffice) {
+        const products = (payloads[1] as { products?: Array<{ dbId?: number | null; slug?: string; name?: string; category?: string; packages?: Array<{ id?: string; label?: string; providerSku?: string }> }> }).products ?? [];
+        for (const product of products) {
+          const packageText = (product.packages ?? []).flatMap((item) => [item.id, item.label, item.providerSku]).filter(Boolean).join(" ");
+          const haystack = [product.name, product.slug, product.category, packageText].filter(Boolean).join(" ").toLowerCase();
+          if (haystack.includes(query)) {
+            results.push({
+              id: `product:${product.dbId ?? product.slug}`,
+              tab: "products",
+              title: product.name || product.slug || "Produk",
+              detail: [product.category, product.slug].filter(Boolean).join(" · "),
+            });
+          }
+        }
+
+        const members = (payloads[2] as { members?: Array<{ id?: string; name?: string; email?: string; phone?: string }> }).members ?? [];
+        for (const member of members) {
+          const haystack = [member.name, member.email, member.phone].filter(Boolean).join(" ").toLowerCase();
+          if (haystack.includes(query)) {
+            results.push({
+              id: `customer:${member.id ?? member.email}`,
+              tab: "customers",
+              title: member.name || member.email || "Pelanggan",
+              detail: [member.email, member.phone].filter(Boolean).join(" · "),
+            });
+          }
+        }
+      }
+
+      setGlobalResults(results.slice(0, 12));
+      if (!results.length) setGlobalSearchError(`Tidak ada hasil untuk “${rawQuery}”.`);
+    } catch (reason) {
+      setGlobalResults([]);
+      setGlobalSearchError(reason instanceof Error ? reason.message : "Pencarian global gagal.");
+    } finally {
+      setGlobalSearchBusy(false);
+    }
   }
 
   return (
@@ -156,13 +233,33 @@ export function AdminDashboard({
             <Input
               ref={searchRef}
               value={globalSearch}
-              onChange={(event) => setGlobalSearch(event.target.value)}
+              onChange={(event) => { setGlobalSearch(event.target.value); setGlobalResults([]); setGlobalSearchError(""); }}
               placeholder="Cari menu, produk, pesanan, atau pelanggan..."
-              className="h-9 rounded-md border-[#dfe5ed] bg-[#f8fafc] pl-9 pr-14 text-[11px] text-[#26364f] shadow-none placeholder:text-[#98a5b8] focus-visible:ring-[#1769e8]/30"
+              className="h-9 rounded-md border-[#dfe5ed] bg-[#f8fafc] pl-9 pr-20 text-[11px] text-[#26364f] shadow-none placeholder:text-[#98a5b8] focus-visible:ring-[#1769e8]/30"
             />
             <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-[#dfe5ed] bg-white px-1.5 py-0.5 text-[9px] font-semibold text-[#8b98aa] sm:block">
-              Ctrl K
+              {globalSearchBusy ? "..." : "Ctrl K"}
             </kbd>
+            {(globalResults.length > 0 || globalSearchError) && (
+              <div className="absolute left-0 right-0 top-[42px] z-50 overflow-hidden rounded-md border border-[#dfe5ed] bg-white shadow-xl">
+                {globalSearchError && <p className="px-3 py-3 text-[10px] text-[#8a3b3b]">{globalSearchError}</p>}
+                {globalResults.map((result) => (
+                  <button
+                    key={result.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(result.tab);
+                      setGlobalResults([]);
+                      setMobileNavigationOpen(false);
+                    }}
+                    className="block w-full border-t border-[#eef1f5] px-3 py-2.5 text-left first:border-0 hover:bg-[#f7f9fc]"
+                  >
+                    <strong className="block text-[10px] text-[#20324c]">{result.title}</strong>
+                    <span className="mt-0.5 block truncate text-[9px] text-[#7c8a9d]">{result.detail}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </form>
 
           <div className="ml-auto flex shrink-0 items-center gap-2 lg:gap-3">
