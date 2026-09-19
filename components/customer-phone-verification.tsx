@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, LoaderCircle, LogOut, MessageCircle, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,15 @@ export function CustomerPhoneVerification({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = window.setInterval(() => {
+      setResendIn((value) => Math.max(0, value - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendIn]);
 
   const destination = useMemo(() => challenge?.phone || "nomor WhatsApp kamu", [challenge]);
 
@@ -45,6 +54,7 @@ export function CustomerPhoneVerification({
       const payload = await response.json().catch(() => ({})) as Challenge & { error?: string };
       if (!response.ok) throw new Error(payload.error || "OTP WhatsApp gagal dikirim.");
       setChallenge(payload);
+      setResendIn(Math.max(0, Number(payload.resendAfterSeconds || 0)));
       setCode("");
       setMessage(`Kode 6 digit sudah dikirim ke ${payload.phone}.`);
     } catch (reason) {
@@ -151,13 +161,14 @@ export function CustomerPhoneVerification({
                 setCode("");
                 setError("");
                 setMessage("");
+                setResendIn(0);
               }}
               className="text-[11px] font-semibold text-white/50 hover:text-white"
             >
               Ganti nomor
             </button>
-            <button type="button" disabled={busy} onClick={() => void sendOtp()} className="text-[11px] font-bold text-[#cfff72] hover:underline">
-              Kirim ulang OTP
+            <button type="button" disabled={busy || resendIn > 0} onClick={() => void sendOtp()} className="text-[11px] font-bold text-[#cfff72] hover:underline disabled:cursor-not-allowed disabled:text-white/25 disabled:no-underline">
+              {resendIn > 0 ? `Kirim ulang dalam ${resendIn} detik` : "Kirim ulang OTP"}
             </button>
           </div>
         </form>
