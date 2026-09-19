@@ -36,6 +36,7 @@ import { StoreLayout } from "@/components/store-layout";
 import { ProductArtwork } from "@/components/product-artwork";
 import { ProductReviews } from "@/components/product-reviews";
 import { useStoreProducts } from "@/hooks/use-store-products";
+import { useStorefront } from "@/hooks/use-storefront";
 import {
   paymentGroups,
   type PaymentChannel,
@@ -151,10 +152,12 @@ function CheckoutRoute() {
   const { products, databaseReady, loading } = useStoreProducts();
   const requestedProduct = searchParams.get("product");
   const product = useMemo(
-    () =>
-      products.find((item) => item.slug === requestedProduct) ?? products[0],
+    () => requestedProduct
+      ? products.find((item) => item.slug === requestedProduct)
+      : products[0],
     [products, requestedProduct],
   );
+  const invalidRequestedProduct = Boolean(requestedProduct && products.length > 0 && !product);
 
   if (loading) {
     return (
@@ -171,14 +174,18 @@ function CheckoutRoute() {
       <StoreLayout>
         <main className="mx-auto min-h-[70vh] max-w-3xl px-4 py-14 sm:px-6 lg:px-8">
           <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.05] p-5">
-            <h1 className="text-lg font-black text-white">Katalog belum tersedia</h1>
+            <h1 className="text-lg font-black text-white">
+              {invalidRequestedProduct ? "Produk tidak ditemukan" : "Katalog belum tersedia"}
+            </h1>
             <p className="mt-2 text-xs leading-5 text-white/45">
-              {databaseReady
-                ? "Belum ada produk aktif di database LFAMILIA."
-                : "Katalog tidak dapat dibaca dari database. Checkout dinonaktifkan agar harga lama tidak digunakan."}
+              {invalidRequestedProduct
+                ? "Produk dari tautan ini sudah tidak tersedia atau alamat produknya tidak valid. Pilih produk langsung dari katalog agar tidak memesan item yang salah."
+                : databaseReady
+                  ? "Belum ada produk aktif di database LFAMILIA."
+                  : "Katalog tidak dapat dibaca dari database. Checkout dinonaktifkan agar harga lama tidak digunakan."}
             </p>
             <Button asChild variant="outline" className="mt-4 border-white/10 bg-white/[0.03] text-white">
-              <Link href="/catalog">Kembali ke katalog</Link>
+              <Link href="/catalog">Buka katalog</Link>
             </Button>
           </div>
         </main>
@@ -195,6 +202,7 @@ function CheckoutRoute() {
 }
 
 function CheckoutContent({ product }: { product: StoreProduct }) {
+  const { faqs } = useStorefront();
   const checkoutAttemptRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const searchParams = useSearchParams();
   const requestedPackage = searchParams.get("package");
@@ -1147,7 +1155,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
           <section className="mt-3 space-y-3">
             <article className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4"><h2 className="text-base font-black">Deskripsi {product.name}</h2><p className="mt-2 whitespace-pre-line text-xs leading-6 text-white/60">{(product as { description?: string }).description || `Top up ${product.name} cepat, aman, dan diproses otomatis setelah pembayaran berhasil.`}</p></article>
             <ProductReviews productSlug={product.slug} />
-            <article className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4"><h2 className="text-base font-black">Pertanyaan umum</h2><div className="mt-3 space-y-2">{["Bagaimana cara top up?","Metode pembayaran apa saja yang tersedia?","Berapa lama proses pesanan?","Apakah transaksi aman?"].map((question) => <details key={question} className="rounded-lg bg-white/[0.04] p-3"><summary className="cursor-pointer text-xs font-bold">{question}</summary><p className="pt-2 text-xs leading-5 text-white/55">Lengkapi data akun, pilih nominal dan metode pembayaran, lalu konfirmasi pesanan. Status transaksi dapat diperiksa setelah pembayaran dibuat.</p></details>)}</div></article>
+            <article className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4"><h2 className="text-base font-black">Pertanyaan umum</h2><div className="mt-3 space-y-2">{faqs.filter((faq) => faq.isActive !== false).slice(0, 4).map((faq, index) => <details key={faq.id ?? `${faq.question}-${index}`} className="rounded-lg bg-white/[0.04] p-3"><summary className="cursor-pointer text-xs font-bold">{faq.question}</summary><p className="pt-2 whitespace-pre-line text-xs leading-5 text-white/55">{faq.answer}</p></details>)}</div></article>
           </section>
         )}
       </main>
