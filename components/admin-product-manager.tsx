@@ -12,7 +12,6 @@ import {
   ImageIcon,
   Info,
   Monitor,
-  MoreVertical,
   Pencil,
   Plus,
   RefreshCw,
@@ -177,6 +176,8 @@ export function AdminProductManager() {
   const [provider, setProvider] = useState("Semua Provider");
   const [status, setStatus] = useState("Semua Status");
   const [sort, setSort] = useState("Urutkan: Terbaru");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [editorProduct, setEditorProduct] = useState<Product | null>(null);
   const [manualProductOpen, setManualProductOpen] = useState(false);
   const [notice, setNotice] = useState("");
@@ -214,9 +215,16 @@ export function AdminProductManager() {
     );
     return sort === "Urutkan: Nama A-Z" ? [...filtered].sort((a, b) => a.name.localeCompare(b.name)) : filtered;
   }, [category, products, provider, query, sort, status]);
+  const pageCount = Math.max(1, Math.ceil(visibleProducts.length / pageSize));
+  const activePage = Math.min(page, pageCount);
+  const pagedProducts = visibleProducts.slice((activePage - 1) * pageSize, activePage * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [category, provider, query, sort, status, pageSize]);
 
   function resetFilters() {
-    setQuery(""); setCategory("Semua Kategori"); setProvider("Semua Provider"); setStatus("Semua Status"); setSort("Urutkan: Terbaru");
+    setQuery(""); setCategory("Semua Kategori"); setProvider("Semua Provider"); setStatus("Semua Status"); setSort("Urutkan: Terbaru"); setPage(1);
   }
 
   async function addProduct(event: FormEvent<HTMLFormElement>) {
@@ -293,18 +301,18 @@ export function AdminProductManager() {
 
   return (
     <div className="admin-products-reference min-w-0 text-[#14213a]">
-      <div className="flex items-start justify-between gap-[16px]">
+      <div className="flex flex-col items-start justify-between gap-[12px] sm:flex-row sm:gap-[16px]">
         <div><h1 className="text-[23px] font-black tracking-[-0.04em] text-[#0b1834]">Produk</h1><p className="mt-[3px] text-[10px] text-[#64758c]">Kelola semua produk top up, voucher, dan layanan digital.</p></div>
-        <div className="flex items-center gap-[8px]">
-          <button type="button" onClick={() => setNotice("Pilih produk lalu klik Edit untuk mengimpor nominal Digiflazz.")} className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] border border-[#dce3eb] bg-white px-[13px] text-[9px] font-bold text-[#34465f] hover:bg-[#f8fafc]"><SlidersHorizontal className="size-[13px]" />Import Nominal Digiflazz</button>
-          <button type="button" onClick={() => setManualProductOpen(true)} className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] bg-[#0875ed] px-[15px] text-[9px] font-bold text-white shadow-[0_5px_14px_rgba(8,117,237,.2)] hover:bg-[#0668d5]"><Plus className="size-[14px]" />Tambah Produk Manual</button>
+        <div className="flex w-full flex-wrap items-center gap-[8px] sm:w-auto sm:justify-end">
+          <button type="button" onClick={() => setNotice("Gunakan tombol Nominal pada baris produk untuk membuka editor nominal dan import Digiflazz.")} className="inline-flex h-[34px] flex-1 items-center justify-center gap-[7px] rounded-[5px] border border-[#dce3eb] bg-white px-[13px] text-[9px] font-bold text-[#34465f] hover:bg-[#f8fafc] sm:flex-none"><SlidersHorizontal className="size-[13px]" />Kelola Nominal</button>
+          <button type="button" onClick={() => setManualProductOpen(true)} className="inline-flex h-[34px] flex-1 items-center justify-center gap-[7px] rounded-[5px] bg-[#0875ed] px-[15px] text-[9px] font-bold text-white shadow-[0_5px_14px_rgba(8,117,237,.2)] hover:bg-[#0668d5] sm:flex-none"><Plus className="size-[14px]" />Tambah Produk</button>
         </div>
       </div>
 
       {notice && <button type="button" onClick={() => setNotice("")} className="mt-[10px] flex w-full items-center justify-between rounded-[6px] border border-[#b9dfca] bg-[#edf9f2] px-[12px] py-[8px] text-left text-[9px] font-semibold text-[#168553]"><span>{notice}</span><X className="size-[12px]" /></button>}
       {error && <button type="button" onClick={() => setError("")} className="mt-[10px] w-full rounded-[6px] border border-red-200 bg-red-50 px-[12px] py-[8px] text-left text-[9px] text-red-700">{error}</button>}
 
-      <div className="mt-[15px] grid grid-cols-[1.65fr_.75fr_.78fr_.72fr_.85fr_auto] gap-[8px]">
+      <div className="mt-[15px] grid grid-cols-1 gap-[8px] sm:grid-cols-2 xl:grid-cols-[1.65fr_.75fr_.78fr_.72fr_.85fr_auto]">
         <label className="relative"><Search className="absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#708198]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama produk, kategori, atau slug..." className="h-[34px] w-full rounded-[5px] border border-[#dce3eb] bg-white pl-[31px] pr-[9px] text-[9px] outline-none placeholder:text-[#8290a2] focus:border-[#2680eb]" /></label>
         <CompactSelect value={category} onChange={setCategory} options={["Semua Kategori", ...PRODUCT_CATEGORY_LABELS]} />
         <CompactSelect value={provider} onChange={setProvider} options={["Semua Provider", "Digiflazz", "Manual"]} />
@@ -314,8 +322,18 @@ export function AdminProductManager() {
       </div>
 
       <section className="mt-[10px] overflow-hidden rounded-[8px] border border-[#dfe6ef] bg-white shadow-[0_1px_4px_rgba(20,33,58,.04)]">
-        {loading ? <div className="grid h-[190px] place-items-center text-[9px] text-[#64758c]">Memuat produk dari database...</div> : <ProductTable products={visibleProducts} onEdit={setEditorProduct} onToggle={(id) => void toggleProduct(id)} />}
-        <div className="flex h-[48px] items-center justify-between border-t border-[#e4e9ef] px-[12px] text-[8px] text-[#586980]"><span>Menampilkan 1–{visibleProducts.length} dari {products.length} produk</span><div className="flex items-center gap-[5px]"><PageButton active>1</PageButton></div><span className="rounded-[5px] border border-[#dce3eb] bg-white px-[10px] py-[7px]">50 per halaman</span></div>
+        {loading ? <div className="grid h-[190px] place-items-center text-[9px] text-[#64758c]">Memuat produk dari database...</div> : <ProductTable products={pagedProducts} startIndex={(activePage - 1) * pageSize} onEdit={setEditorProduct} onToggle={(id) => void toggleProduct(id)} />}
+        <div className="flex min-h-[48px] flex-wrap items-center justify-between gap-2 border-t border-[#e4e9ef] px-[12px] py-2 text-[8px] text-[#586980]">
+          <span>Menampilkan {visibleProducts.length ? (activePage - 1) * pageSize + 1 : 0}–{Math.min(activePage * pageSize, visibleProducts.length)} dari {visibleProducts.length} produk</span>
+          <div className="flex items-center gap-[5px]">
+            <button type="button" disabled={activePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="h-[27px] rounded-[4px] border border-[#dde4ec] bg-white px-2 font-bold disabled:opacity-40">‹</button>
+            <PageButton active>{activePage}/{pageCount}</PageButton>
+            <button type="button" disabled={activePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))} className="h-[27px] rounded-[4px] border border-[#dde4ec] bg-white px-2 font-bold disabled:opacity-40">›</button>
+          </div>
+          <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="h-[29px] rounded-[5px] border border-[#dce3eb] bg-white px-[8px]">
+            <option value={25}>25 / halaman</option><option value={50}>50 / halaman</option><option value={100}>100 / halaman</option>
+          </select>
+        </div>
       </section>
 
       {manualProductOpen && <ManualProductModal saving={saving} onClose={() => setManualProductOpen(false)} onSubmit={addProduct} />}
@@ -323,11 +341,11 @@ export function AdminProductManager() {
   );
 }
 
-function ProductTable({ products, onEdit, onToggle }: { products: Product[]; onEdit(product: Product): void; onToggle(id: number): void }) {
+function ProductTable({ products, startIndex, onEdit, onToggle }: { products: Product[]; startIndex: number; onEdit(product: Product): void; onToggle(id: number): void }) {
   return (
     <div className="overflow-x-auto"><table className="w-full min-w-[960px] table-fixed text-left">
       <thead className="bg-[#f3f6fa] text-[7px] font-bold text-[#52637b]"><tr><th className="w-[35px] px-[12px] py-[10px]"><Box /></th><th className="w-[28px] py-[10px]">#</th><th className="w-[62px] py-[10px]">Gambar</th><th className="w-[170px] py-[10px]">Nama Produk</th><th className="w-[108px] py-[10px]">Kategori</th><th className="w-[86px] py-[10px]">Provider</th><th className="w-[90px] py-[10px]">Total Nominal</th><th className="w-[88px] py-[10px]">Harga Mulai</th><th className="w-[73px] py-[10px]">Status</th><th className="w-[78px] py-[10px]">Ditampilkan</th><th className="w-[112px] py-[10px]">Terakhir Update</th><th className="w-[112px] py-[10px]">Aksi</th></tr></thead>
-      <tbody>{products.map((product, index) => <tr key={product.id} className="border-t border-[#e4e9ef] text-[7.5px] text-[#34465e] hover:bg-[#fafbfd]"><td className="px-[12px] py-[7px]"><Box /></td><td>{index + 1}</td><td className="py-[5px]"><ProductImage product={product} /></td><td className="pr-[8px]"><strong className="block truncate text-[8px] text-[#21344e]">{product.name}</strong><span className="block truncate text-[6.5px] text-[#718198]">{product.description}</span></td><td><CategoryBadge category={product.category} /></td><td>{product.provider}</td><td>{product.nominalCount}</td><td>{formatRupiah(product.startPrice)}</td><td><span className={`rounded-[4px] px-[7px] py-[4px] font-bold ${product.active ? "bg-[#dff8e9] text-[#15965b]" : "bg-[#eef1f5] text-[#6f7f92]"}`}>{product.active ? "Aktif" : "Nonaktif"}</span></td><td><Switch enabled={product.visible} onToggle={() => onToggle(product.id)} /></td><td>{product.updated}</td><td><div className="flex items-center gap-[7px]"><button type="button" onClick={() => onEdit(product)} className="inline-flex h-[29px] items-center gap-[5px] rounded-[4px] border border-[#dbe2eb] bg-white px-[12px] font-bold text-[#40516a] hover:bg-[#f5f8fb]"><Pencil className="size-[10px]" />Edit</button><button type="button" onClick={() => onEdit(product)} aria-label={`Menu ${product.name}`}><MoreVertical className="size-[13px]" /></button></div></td></tr>)}</tbody>
+      <tbody>{products.map((product, index) => <tr key={product.id} className="border-t border-[#e4e9ef] text-[7.5px] text-[#34465e] hover:bg-[#fafbfd]"><td className="px-[12px] py-[7px]"><Box /></td><td>{startIndex + index + 1}</td><td className="py-[5px]"><ProductImage product={product} /></td><td className="pr-[8px]"><strong className="block truncate text-[8px] text-[#21344e]">{product.name}</strong><span className="block truncate text-[6.5px] text-[#718198]">{product.description}</span></td><td><CategoryBadge category={product.category} /></td><td>{product.provider}</td><td>{product.nominalCount}</td><td>{formatRupiah(product.startPrice)}</td><td><span className={`rounded-[4px] px-[7px] py-[4px] font-bold ${product.active ? "bg-[#dff8e9] text-[#15965b]" : "bg-[#eef1f5] text-[#6f7f92]"}`}>{product.active ? "Aktif" : "Nonaktif"}</span></td><td><Switch enabled={product.visible} onToggle={() => onToggle(product.id)} /></td><td>{product.updated}</td><td><div className="flex items-center gap-[5px]"><button type="button" onClick={() => onEdit(product)} className="inline-flex h-[29px] items-center gap-[5px] rounded-[4px] border border-[#dbe2eb] bg-white px-[10px] font-bold text-[#40516a] hover:bg-[#f5f8fb]"><Pencil className="size-[10px]" />Edit</button><button type="button" onClick={() => onEdit(product)} className="inline-flex h-[29px] items-center rounded-[4px] border border-[#dbe2eb] bg-white px-[8px] font-bold text-[#0875ed] hover:bg-[#f5f8fb]">Nominal</button></div></td></tr>)}</tbody>
     </table></div>
   );
 }
