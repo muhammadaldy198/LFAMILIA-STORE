@@ -153,6 +153,15 @@ test("inactive DigiFlazz profile saves fail closed when the configuration lease 
   assert.match(integration, /Guard konfigurasi DigiFlazz kedaluwarsa sebelum profile dapat disimpan/);
 });
 
+test("DigiFlazz environment selection rejects writes after the configuration lease expires", () => {
+  const route = read("app/api/admin/integrations/route.ts");
+  const integration = read("lib/server/integration-config.ts");
+  assert.match(route, /async \(guardToken\) => \{[\s\S]*saveIntegrationSelections\(input\.selections, guardToken\)/);
+  assert.match(integration, /normalizedGuardToken = guardToken\?\.trim\(\) \|\| null/);
+  assert.match(integration, /SELECT 'digiflazz_environment', \?, strftime/);
+  assert.match(integration, /Guard konfigurasi DigiFlazz kedaluwarsa sebelum environment dapat disimpan/);
+});
+
 test("same-value DigiFlazz environment saves cannot report success during guarded maintenance", () => {
   const route = read("app/api/admin/integrations/route.ts");
   const guard = read("lib/server/digiflazz-config-guard.ts");
