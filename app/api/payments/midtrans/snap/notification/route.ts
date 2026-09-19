@@ -2,7 +2,7 @@ import { hashHex } from "@/lib/server/crypto";
 import { recordExternalPaymentEvent } from "@/lib/server/external-payments";
 import { mapMidtransSnapStatus, verifyMidtransSnapNotification } from "@/lib/server/midtrans-snap";
 import { fulfillAutomaticOrder, getOrderByReference } from "@/lib/server/orders";
-import { applyPendingExternalPaymentStatus } from "@/lib/server/payment-transition";
+import { applyExternalPaymentEvent } from "@/lib/server/payment-transition";
 import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 import {
   notifyOrderFulfillmentSuccessById,
@@ -107,19 +107,25 @@ export async function POST(request: Request) {
     }
 
     const eventId = clean(body.transaction_id) || `snap-${hashHex("sha256", rawBody)}`;
-    await recordExternalPaymentEvent({
-      orderId: order.id,
-      gateway: "midtrans",
-      eventId,
-      status,
-      payload: body,
-    });
 
-    if (status !== "ignore") {
-      const firstPaid = await applyPendingExternalPaymentStatus(order, status, {
+    if (status === "ignore") {
+      await recordExternalPaymentEvent({
+        orderId: order.id,
+        gateway: "midtrans",
+        eventId,
+        status,
+        payload: body,
+      });
+    } else {
+      const transition = await applyExternalPaymentEvent({
+        order,
+        source: "midtrans",
+        eventId,
+        status,
+        payload: body,
         authoritativePaid: status === "paid",
       });
-      if (firstPaid && order.fulfillment_type === "automatic") {
+      if (transition.firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
           console.error("Notifikasi pesanan Midtrans Snap gagal:", error),
