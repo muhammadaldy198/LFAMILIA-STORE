@@ -95,7 +95,7 @@ test("promo history cannot race destructive admin edits", () => {
   assert.match(promotions, /Kode voucher tidak dapat diubah setelah dipakai atau direservasi/);
   assert.match(promotions, /promotion_reservations WHERE voucher_code = \? LIMIT 1/);
   assert.match(promotions, /AND \(\? IS NULL OR \? >= used_count \+ reserved_count\)/);
-  assert.match(promotions, /AND \(\(product_slug = \? AND package_sku = \?\) OR reserved_count = 0\)/);
+  assert.match(promotions, /AND \(\(product_slug = \? AND package_sku = \?\) OR \(reserved_count = 0 AND sold_count = 0\)\)/);
   assert.match(promotions, /AND \(\? IS NULL OR \? >= sold_count \+ reserved_count\)/);
   assert.match(promotions, /Voucher memiliki riwayat transaksi/);
   assert.match(promotions, /Flash sale memiliki riwayat transaksi/);
