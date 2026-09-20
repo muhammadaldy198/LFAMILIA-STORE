@@ -31,6 +31,28 @@ test("DOKU Checkout status polling remains terminal-safe while fulfillment stays
   assert.match(doku, /\/orders\/v1\/status\//);
 });
 
+
+test("legacy DOKU Direct invoices keep callback and reconciliation drain paths", () => {
+  const callback = read("app/api/payments/doku/callback/route.ts");
+  const reconciliation = read("lib/server/doku-reconciliation.ts");
+  const config = read("lib/server/payment-mode-config.ts");
+  assert.match(callback, /expectedMode === "direct"/);
+  assert.match(callback, /validateDokuNotification/);
+  assert.match(reconciliation, /payment_gateway_mode IN \('checkout', 'direct'\)/);
+  assert.match(reconciliation, /queryDokuQrisStatus/);
+  assert.match(reconciliation, /queryDokuVaStatus/);
+  assert.match(reconciliation, /queryDokuEwalletStatus/);
+  assert.match(config, /PRIVATE_KEY/);
+  assert.match(config, /VA_CONFIG_JSON/);
+});
+
+test("DOKU Checkout always persists a usable local expiry", () => {
+  const doku = read("lib/server/doku-checkout.ts");
+  assert.match(doku, /const paymentDueMinutes = 60/);
+  assert.match(doku, /checkoutExpiry\(payload\.response\?\.payment\?\.expired_date\)/);
+  assert.match(doku, /new Date\(Date\.now\(\) \+ paymentDueMinutes \* 60_000\)\.toISOString\(\)/);
+});
+
 test("customer invoice code is compact while preserving a database uniqueness guard", () => {
   const orders = read("lib/server/orders.ts");
   const status = read("app/api/orders/status/route.ts");
