@@ -133,7 +133,6 @@ export async function expireUninitializedExternalOrders(limit = 100) {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND payment_status = 'pending'
         AND gateway_request_id IS NULL
-        AND doku_request_id IS NULL
     `).bind(row.id).run();
     if (Number(result.meta.changes ?? 0) > 0) {
       expired += 1;
