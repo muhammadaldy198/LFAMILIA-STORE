@@ -12,6 +12,7 @@ type RuntimeLike = Record<string, unknown> & {
 };
 type EncryptedValue = { v: 1; iv: string; data: string };
 type ProfileRow = { encrypted_config: string; updated_at: string };
+type LegacyDokuProfileRow = { environment: string; encrypted_config: string };
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -105,6 +106,56 @@ const allowedFields: Record<PaymentProfileMode, readonly string[]> = {
   snap: ["serverKey", "clientKey"],
 };
 
+function allowedProfileValues(mode: PaymentProfileMode, values: Record<string, string>) {
+  const allowed = new Set(allowedFields[mode]);
+  return Object.fromEntries(
+    Object.entries(values).filter(([key, value]) => allowed.has(key) && value.trim()),
+  );
+}
+
+async function migrateObsoleteDokuProfiles(db = getD1(), explicitSecret?: string) {
+  await ensureTables(db);
+  const secretValue = explicitSecret ?? secret();
+  const legacy = await db.prepare(
+    "SELECT environment, encrypted_config FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct'",
+  ).all<LegacyDokuProfileRow>();
+
+  for (const row of legacy.results) {
+    if (row.environment !== "sandbox" && row.environment !== "production") continue;
+    const environment = row.environment as PaymentEnvironment;
+    const existing = await db.prepare(
+      "SELECT encrypted_config FROM integration_profiles WHERE provider = 'doku' AND mode = 'checkout' AND environment = ? LIMIT 1",
+    ).bind(environment).first<ProfileRow>();
+
+    if (!existing?.encrypted_config) {
+      let decoded: Record<string, string>;
+      try {
+        decoded = await decryptWithSecret(row.encrypted_config, secretValue);
+      } catch {
+        continue;
+      }
+      const clean = allowedProfileValues("checkout", decoded);
+      if (!clean.clientId || !clean.secretKey) continue;
+      if (!clean.apiUrl) {
+        clean.apiUrl = environment === "production"
+          ? "https://api.doku.com"
+          : "https://api-sandbox.doku.com";
+      }
+      const encrypted = await encryptWithSecret(clean, secretValue);
+      await db.prepare(`INSERT INTO integration_profiles (
+          provider, mode, environment, encrypted_config, updated_at
+        ) VALUES ('doku', 'checkout', ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(provider, mode, environment) DO NOTHING`)
+        .bind(environment, encrypted)
+        .run();
+    }
+
+    await db.prepare(
+      "DELETE FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct' AND environment = ?",
+    ).bind(environment).run();
+  }
+}
+
 async function saveProfile(input: {
   provider: PaymentProvider;
   mode: PaymentProfileMode;
@@ -116,7 +167,9 @@ async function saveProfile(input: {
   const existing = await db.prepare("SELECT encrypted_config FROM integration_profiles WHERE provider = ? AND mode = ? AND environment = ? LIMIT 1")
     .bind(input.provider, input.mode, input.environment).first<ProfileRow>();
   let merged: Record<string, string> = {};
-  if (existing?.encrypted_config) merged = await decrypt(existing.encrypted_config);
+  if (existing?.encrypted_config) {
+    merged = allowedProfileValues(input.mode, await decrypt(existing.encrypted_config));
+  }
   for (const [key, value] of Object.entries(input.values)) {
     if (!allowedFields[input.mode].includes(key)) throw new Error(`Field ${key} tidak diizinkan.`);
     if (value.trim()) merged[key] = value.trim();
@@ -151,7 +204,12 @@ export async function savePaymentGatewayProfile(input: {
       };
     }
   }
-  return saveProfile(input);
+  await saveProfile(input);
+  if (input.provider === "doku") {
+    await getD1().prepare(
+      "DELETE FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct' AND environment = ?",
+    ).bind(input.environment).run();
+  }
 }
 
 async function profile(provider: PaymentProvider, mode: PaymentProfileMode, environment: PaymentEnvironment, db = getD1(), explicitSecret?: string) {
@@ -189,6 +247,7 @@ function checkoutReady(values: Record<string, string> | null) {
 }
 
 export async function getPaymentModeOverview() {
+  await migrateObsoleteDokuProfiles();
   const modes = await getActivePaymentModes();
   const [dokuSandbox, dokuProduction, midtransSandbox, midtransProduction] = await Promise.all([
     profile("doku", "checkout", "sandbox"),
@@ -227,6 +286,7 @@ export async function hydrateDokuCheckoutRuntimeEnv<T extends object>(sourceEnv:
   const encryptionSecret = source.INTEGRATION_ENCRYPTION_KEY?.trim();
   if (!db || !encryptionSecret || encryptionSecret.length < 32) return sourceEnv;
   try {
+    await migrateObsoleteDokuProfiles(db, encryptionSecret);
     const current = await settings(db);
     const environment = env(current.get("doku_environment"));
     const [sandboxCheckout, productionCheckout] = await Promise.all([
