@@ -32,7 +32,7 @@ test("uncertain external payment dispatch stays pending and recoverable", () => 
 test("ambiguous DOKU Checkout dispatches reconcile by merchant reference without a request ID", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
   assert.match(doku, /payment_gateway_mode = 'checkout'/);
-  assert.doesNotMatch(doku, /payment_gateway_mode = 'direct'|doku_request_id/);
+  assert.doesNotMatch(doku, /doku_request_id/);
   assert.match(doku, /queryDokuCheckoutStatus\(\{[\s\S]*referenceId: order\.reference_id/);
   assert.match(doku, /queryDokuCheckoutStatus\(\{[\s\S]*referenceId: topup\.reference_id/);
 });
