@@ -290,7 +290,7 @@ test("Drizzle schema includes generic hosted gateway artifacts", () => {
 test("obsolete DOKU credential migration never deletes the only usable profile", () => {
   const config = read("lib/server/payment-mode-config.ts");
   assert.match(config, /let checkoutReady = false/);
-  assert.match(config, /checkoutReady = Boolean\(cleanExisting\.clientId && cleanExisting\.secretKey && cleanExisting\.apiUrl\)/);
+  assert.match(config, /checkoutReady = checkoutReadyProfile\(cleanExisting\)/);
   assert.match(config, /ON CONFLICT\(provider, mode, environment\) DO UPDATE SET/);
   assert.match(config, /if \(checkoutReady\) \{[\s\S]*DELETE FROM integration_profiles/);
 });
@@ -298,7 +298,14 @@ test("obsolete DOKU credential migration never deletes the only usable profile",
 test("legacy DOKU credentials are deleted only after Checkout becomes ready", () => {
   const config = read("lib/server/payment-mode-config.ts");
   assert.match(config, /const saved = await profile\("doku", "checkout", input\.environment\)/);
-  assert.match(config, /if \(checkoutReady\(saved\)\) \{[\s\S]*DELETE FROM integration_profiles/);
+  assert.match(config, /if \(checkoutReadyProfile\(saved\)\) \{[\s\S]*DELETE FROM integration_profiles/);
+});
+
+test("legacy DOKU credential migration requires an HTTPS Checkout endpoint", () => {
+  const config = read("lib/server/payment-mode-config.ts");
+  assert.match(config, /function checkoutReadyProfile\(/);
+  assert.match(config, /new URL\(values\.apiUrl\)\.protocol === "https:"/);
+  assert.match(config, /if \(!checkoutReadyProfile\(clean\)\) continue/);
 });
 
 test("partial DOKU Checkout saves preserve a stored custom API URL", () => {
