@@ -131,7 +131,7 @@ export async function saveDiscountVoucher(input: Omit<DiscountVoucher, "id" | "u
            is_active = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND code = ?
          AND (? IS NULL OR ? >= used_count + reserved_count)
-         ${renaming ? "AND reserved_count = 0" : ""}`,
+         ${renaming ? "AND used_count = 0 AND reserved_count = 0" : ""}`,
     ).bind(
       ...values,
       id,
@@ -221,7 +221,7 @@ export async function deletePromotion(kind: "voucher" | "flash", id: number) {
     if (historical) {
       throw new Error("Voucher memiliki riwayat transaksi. Nonaktifkan voucher agar pembayaran terlambat tetap dapat direkonsiliasi.");
     }
-    await db.prepare("DELETE FROM discount_vouchers WHERE id = ? AND reserved_count = 0").bind(id).run();
+    await db.prepare("DELETE FROM discount_vouchers WHERE id = ? AND used_count = 0 AND reserved_count = 0").bind(id).run();
     return;
   }
 
@@ -241,7 +241,7 @@ export async function deletePromotion(kind: "voucher" | "flash", id: number) {
   if (historical) {
     throw new Error("Flash sale memiliki riwayat transaksi. Nonaktifkan promo agar pembayaran terlambat tetap dapat direkonsiliasi.");
   }
-  await db.prepare("DELETE FROM flash_sales WHERE id = ? AND reserved_count = 0").bind(id).run();
+  await db.prepare("DELETE FROM flash_sales WHERE id = ? AND sold_count = 0 AND reserved_count = 0").bind(id).run();
 }
 
 export type PromotionQuote = {
