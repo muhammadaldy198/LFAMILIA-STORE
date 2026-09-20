@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { hostedPaymentType } from "@/lib/server/hosted-payment-methods";
+import { mapMidtransSnapStatus } from "@/lib/server/midtrans-status.mjs";
 import { getHostedGatewayProfileForEnvironment, getMidtransSnapConfig, type PaymentEnvironment } from "@/lib/server/payment-mode-config";
 
 type HostedPaymentResult = {
@@ -160,13 +161,4 @@ export async function queryMidtransSnapStatus(input: {
   };
 }
 
-export function mapMidtransSnapStatus(transactionStatus: string, fraudStatus: string | null) {
-  const status = transactionStatus.trim().toLowerCase();
-  const fraud = (fraudStatus || "").trim().toLowerCase();
-  if (status === "settlement") return "paid" as const;
-  if (status === "capture") return fraud === "deny" ? "failed" as const : "paid" as const;
-  if (status === "pending" || status === "authorize") return "pending" as const;
-  if (status === "expire") return "expired" as const;
-  if (status === "cancel" || status === "deny" || status === "failure") return "failed" as const;
-  return "ignore" as const;
-}
+export { mapMidtransSnapStatus };
