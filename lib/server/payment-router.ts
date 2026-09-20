@@ -17,7 +17,7 @@ async function prepareDokuRuntime() {
   setRuntimeEnv(await hydrateDokuCheckoutRuntimeEnv(current));
 }
 
-async function hasOutstandingDokuLegacyPayments() {
+async function hasOutstandingDokuLegacyPayments(environment: "sandbox" | "production") {
   const db = getD1();
   const [order, topup] = await Promise.all([
     db.prepare(`SELECT 1 AS found
@@ -25,13 +25,21 @@ async function hasOutstandingDokuLegacyPayments() {
       WHERE payment_gateway = 'doku'
         AND payment_gateway_mode = 'direct'
         AND payment_status = 'pending'
-      LIMIT 1`).first<{ found: number }>(),
+        AND (
+          COALESCE(payment_gateway_environment, doku_environment) = ?
+          OR COALESCE(payment_gateway_environment, doku_environment) IS NULL
+        )
+      LIMIT 1`).bind(environment).first<{ found: number }>(),
     db.prepare(`SELECT 1 AS found
       FROM wallet_topups
       WHERE payment_gateway = 'doku'
         AND payment_gateway_mode = 'direct'
         AND status = 'pending'
-      LIMIT 1`).first<{ found: number }>(),
+        AND (
+          COALESCE(gateway_environment, doku_environment) = ?
+          OR COALESCE(gateway_environment, doku_environment) IS NULL
+        )
+      LIMIT 1`).bind(environment).first<{ found: number }>(),
   ]);
   return Boolean(order || topup);
 }
@@ -50,8 +58,8 @@ export async function getConfiguredGatewayReadiness(input: {
       input.paymentChannel,
       input.gatewayConfig,
     );
-    const hasLegacyPending = readiness.ready
-      ? await hasOutstandingDokuLegacyPayments()
+    const hasLegacyPending = readiness.ready && readiness.environment
+      ? await hasOutstandingDokuLegacyPayments(readiness.environment)
       : false;
     return {
       ready: readiness.ready && supported && !hasLegacyPending,
