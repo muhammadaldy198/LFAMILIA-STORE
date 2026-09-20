@@ -250,6 +250,16 @@ test("storefront keeps fallback categories when API response fails or omits cate
   assert.doesNotMatch(storefront, /canonicalCategories\(data\.categories \?\? \[\], true\)/);
 });
 
+test("DOKU Checkout refuses new payments while unresolved legacy DOKU transactions exist", () => {
+  const router = read("lib/server/payment-router.ts");
+  assert.match(router, /hasOutstandingDokuLegacyPayments/);
+  assert.match(router, /payment_gateway_mode = 'direct'/);
+  assert.match(router, /payment_status = 'pending'/);
+  assert.match(router, /wallet_topups[\s\S]*status = 'pending'/);
+  assert.match(router, /ready: readiness\.ready && supported && !hasLegacyPending/);
+  assert.match(router, /Gateway dinonaktifkan sementara/);
+});
+
 test("DOKU Checkout is the only active DOKU payment runtime", () => {
   const config = read("lib/server/payment-mode-config.ts");
   const checkout = read("lib/server/doku-checkout.ts");
