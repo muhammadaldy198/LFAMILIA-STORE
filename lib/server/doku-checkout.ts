@@ -153,16 +153,6 @@ function status(
   return "pending";
 }
 
-export function dokuCheckoutPaymentType(
-  method: string,
-  channel: string,
-  gatewayConfig?: Record<string, string>,
-) {
-  const custom = gatewayConfig?.paymentType?.trim();
-  if (custom) return canonicalDokuCheckoutPaymentType(method, custom);
-  return DOKU_CHECKOUT_TYPES[`${method}:${channel}`] || null;
-}
-
 export function isDokuCheckoutChannelSupported(
   method: string,
   channel: string,
