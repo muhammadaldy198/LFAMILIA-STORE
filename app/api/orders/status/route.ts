@@ -183,7 +183,7 @@ async function refreshDokuStatus(order: OrderRecord) {
         );
       }
     } else if (query.status === "expired") {
-      await applyPendingExternalPaymentStatus(order, "expired");
+      await applyPendingExternalPaymentStatus(order, "expired", { authoritativeExpired: true });
     }
 
     return (await getOrderById(order.id)) ?? order;
