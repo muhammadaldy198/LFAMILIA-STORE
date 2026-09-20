@@ -217,7 +217,9 @@ async function refreshMidtransSnapStatus(order: OrderRecord) {
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) => console.error("Notifikasi pesanan Midtrans hasil rekonsiliasi gagal:", error));
       }
     } else if (query.status === "failed" || query.status === "expired") {
-      await applyPendingExternalPaymentStatus(order, query.status);
+      await applyPendingExternalPaymentStatus(order, query.status, {
+        authoritativeExpired: query.status === "expired",
+      });
     }
     return (await getOrderById(order.id)) ?? order;
   } catch {
