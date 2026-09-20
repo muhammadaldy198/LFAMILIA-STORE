@@ -68,7 +68,6 @@ export async function POST(request: Request) {
     const expectedEnvironment = orderRouting?.payment_gateway_environment
       ?? externalWallet?.gateway_environment
       ?? expectedOrder?.doku_environment
-      ?? externalWallet?.doku_environment
       ?? null;
 
     const validation = validateDokuCheckoutNotification({
