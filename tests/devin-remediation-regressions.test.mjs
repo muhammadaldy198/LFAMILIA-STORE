@@ -154,10 +154,10 @@ test("DOKU reconciliation uses only columns that exist for each payment table", 
 test("DOKU polling records one stable event per normalized status", () => {
   const scheduler = read("lib/server/doku-reconciliation.ts");
   const publicStatus = read("app/api/orders/status/route.ts");
-  assert.match(scheduler, /eventId: `checkout-status-${order\.reference_id}-${query\.status}`/);
-  assert.match(publicStatus, /eventId: `checkout-status-${order\.reference_id}-${query\.status}`/);
-  assert.doesNotMatch(scheduler, /eventId: `checkout-status-${query\.requestId}/);
-  assert.doesNotMatch(publicStatus, /eventId: `status-query-${query\.requestId}/);
+  assert.ok(scheduler.includes('eventId: `checkout-status-${order.reference_id}-${query.status}`'));
+  assert.ok(publicStatus.includes('eventId: `checkout-status-${order.reference_id}-${query.status}`'));
+  assert.equal(scheduler.includes('eventId: `checkout-status-${query.requestId}'), false);
+  assert.equal(publicStatus.includes('eventId: `status-query-${query.requestId}'), false);
 });
 
 test("DOKU expired-order polling updates the canonical throttle timestamp", () => {
