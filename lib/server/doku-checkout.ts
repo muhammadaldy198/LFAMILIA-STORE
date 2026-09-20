@@ -60,20 +60,56 @@ export type DokuCheckoutPaymentResult = {
 };
 
 const DOKU_CHECKOUT_TYPES: Record<string, string> = {
+  // Verified against DOKU's maintained Checkout plugins.
+  "va:doku": "VIRTUAL_ACCOUNT_DOKU",
   "va:bca": "VIRTUAL_ACCOUNT_BCA",
   "va:mandiri": "VIRTUAL_ACCOUNT_BANK_MANDIRI",
-  "va:bni": "VIRTUAL_ACCOUNT_BNI",
   "va:bri": "VIRTUAL_ACCOUNT_BRI",
-  "va:cimb": "VIRTUAL_ACCOUNT_BANK_CIMB",
+  "va:bni": "VIRTUAL_ACCOUNT_BNI",
   "va:permata": "VIRTUAL_ACCOUNT_BANK_PERMATA",
+  "va:cimb": "VIRTUAL_ACCOUNT_BANK_CIMB",
   "va:danamon": "VIRTUAL_ACCOUNT_BANK_DANAMON",
-  "va:btn": "VIRTUAL_ACCOUNT_BTN",
+  "va:bsi": "VIRTUAL_ACCOUNT_BSI",
+  "va:maybank": "VIRTUAL_ACCOUNT_MAYBANK",
   "ewallet:ovo": "EMONEY_OVO",
-  "ewallet:dana": "EMONEY_DANA",
   "ewallet:shopeepay": "EMONEY_SHOPEE_PAY",
+  "ewallet:dana": "EMONEY_DANA",
+  "ewallet:doku": "EMONEY_DOKU",
+  "ewallet:linkaja": "EMONEY_LINKAJA",
   "qris:mpm": "QRIS",
   "qris:qris": "QRIS",
 };
+
+const DOKU_CHECKOUT_TYPES_BY_METHOD = {
+  va: new Set([
+    "VIRTUAL_ACCOUNT_DOKU",
+    "VIRTUAL_ACCOUNT_BCA",
+    "VIRTUAL_ACCOUNT_BANK_MANDIRI",
+    "VIRTUAL_ACCOUNT_BRI",
+    "VIRTUAL_ACCOUNT_BNI",
+    "VIRTUAL_ACCOUNT_BANK_PERMATA",
+    "VIRTUAL_ACCOUNT_BANK_CIMB",
+    "VIRTUAL_ACCOUNT_BANK_DANAMON",
+    "VIRTUAL_ACCOUNT_BSI",
+    "VIRTUAL_ACCOUNT_MAYBANK",
+  ]),
+  ewallet: new Set([
+    "EMONEY_OVO",
+    "EMONEY_SHOPEE_PAY",
+    "EMONEY_DANA",
+    "EMONEY_DOKU",
+    "EMONEY_LINKAJA",
+  ]),
+  qris: new Set(["QRIS"]),
+} as const;
+
+export function isDokuCheckoutPaymentTypeCompatible(method: string, paymentType: string) {
+  const normalized = paymentType.trim().toUpperCase();
+  if (method === "va") return DOKU_CHECKOUT_TYPES_BY_METHOD.va.has(normalized);
+  if (method === "ewallet") return DOKU_CHECKOUT_TYPES_BY_METHOD.ewallet.has(normalized);
+  if (method === "qris") return DOKU_CHECKOUT_TYPES_BY_METHOD.qris.has(normalized);
+  return false;
+}
 
 function runtime() {
   return getRuntimeEnv<Runtime>();
@@ -154,9 +190,8 @@ function checkoutExpiry(value: string | undefined) {
 function status(value: unknown): "paid" | "pending" | "expired" | "failed" {
   const normalized = typeof value === "string" ? value.trim().toUpperCase() : "";
   if (normalized === "SUCCESS") return "paid";
+  if (normalized === "FAILED") return "failed";
   if (normalized === "EXPIRED") return "expired";
-  // DOKU Checkout allows the customer to retry/change payment method after a
-  // failed attempt, so FAILED must not finalize the merchant order.
   return "pending";
 }
 
@@ -165,8 +200,10 @@ export function dokuCheckoutPaymentType(
   channel: string,
   gatewayConfig?: Record<string, string>,
 ) {
-  const custom = gatewayConfig?.paymentType?.trim();
-  if (custom) return custom;
+  const custom = gatewayConfig?.paymentType?.trim().toUpperCase();
+  if (custom) {
+    return isDokuCheckoutPaymentTypeCompatible(method, custom) ? custom : null;
+  }
   return DOKU_CHECKOUT_TYPES[`${method}:${channel}`] || null;
 }
 
