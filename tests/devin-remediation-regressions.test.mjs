@@ -239,11 +239,15 @@ test("DOKU Checkout is the only active DOKU payment runtime", () => {
   assert.equal(fs.existsSync(path.join(root, "lib/server/doku-status.ts")), false);
 });
 
-test("Checkout-only cleanup sanitizes credentials in application code and normalizes stored modes", () => {
+test("Checkout-only cleanup retires old Direct sessions instead of relabeling them", () => {
   const migration = read("drizzle/0039_doku_checkout_only.sql");
   const config = read("lib/server/payment-mode-config.ts");
-  assert.match(migration, /payment_gateway = 'doku' AND payment_gateway_mode = 'direct'/);
-  assert.match(migration, /payment_gateway = 'midtrans' AND payment_gateway_mode = 'bisnap'/);
+  assert.match(migration, /UPDATE promotion_reservations[\s\S]*status = 'released'/);
+  assert.match(migration, /payment_status = 'expired'/);
+  assert.match(migration, /wallet_topups[\s\S]*status = 'rejected'/);
+  assert.match(migration, /SET payment_gateway_mode = NULL[\s\S]*payment_gateway = 'doku'/);
+  assert.doesNotMatch(migration, /SET payment_gateway_mode = 'checkout'[\s\S]*payment_gateway = 'doku'/);
+  assert.match(migration, /payment_gateway = 'midtrans'[\s\S]*payment_gateway_mode = 'bisnap'/);
   assert.doesNotMatch(migration, /INSERT OR IGNORE INTO integration_profiles|ALTER TABLE wallet_topups/);
   assert.match(config, /migrateObsoleteDokuProfiles/);
   assert.match(config, /allowedProfileValues\("checkout", decoded\)/);
