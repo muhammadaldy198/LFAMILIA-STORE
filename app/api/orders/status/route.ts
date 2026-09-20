@@ -133,7 +133,7 @@ async function expirePendingInvoice(order: OrderRecord) {
   if (!artifacts.expiredAt) return order;
   const expiresAt = Date.parse(artifacts.expiredAt);
   if (!Number.isFinite(expiresAt) || expiresAt > Date.now()) return order;
-  await applyPendingExternalPaymentStatus(order, "expired");
+  await applyPendingExternalPaymentStatus(order, "expired", { authoritativeExpired: true });
   return (await getOrderById(order.id)) ?? order;
 }
 
