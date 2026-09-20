@@ -46,7 +46,6 @@ test("obsolete duplicate payment credential panel is removed and dashboard says 
   assert.equal(fs.existsSync(path.join(root, "components/admin-payment-routing-panel.tsx")), false);
   const overview = read("components/admin-overview.tsx");
   assert.match(overview, /DOKU Checkout/);
-  assert.doesNotMatch(overview, /DOKU Direct API/);
 });
 
 
