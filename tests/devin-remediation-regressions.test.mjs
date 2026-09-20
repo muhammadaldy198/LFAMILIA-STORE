@@ -251,17 +251,12 @@ test("storefront keeps fallback categories when API response fails or omits cate
   assert.doesNotMatch(storefront, /canonicalCategories\(data\.categories \?\? \[\], true\)/);
 });
 
-test("DOKU Checkout refuses new payments while unresolved legacy DOKU transactions exist", () => {
+test("historical DOKU Direct rows cannot disable hosted Checkout readiness", () => {
   const router = read("lib/server/payment-router.ts");
-  assert.match(router, /hasOutstandingDokuLegacyPayments/);
-  assert.match(router, /payment_gateway_mode = 'direct'/);
-  assert.match(router, /payment_status = 'pending'/);
-  assert.match(router, /wallet_topups[\s\S]*status = 'pending'/);
-  assert.match(router, /COALESCE\(payment_gateway_environment, doku_environment\) = \?/);
-  assert.match(router, /COALESCE\(gateway_environment, doku_environment\) = \?/);
-  assert.match(router, /hasOutstandingDokuLegacyPayments\(readiness\.environment\)/);
-  assert.match(router, /ready: readiness\.ready && supported && !hasLegacyPending/);
-  assert.match(router, /Gateway dinonaktifkan sementara/);
+  const migration = read("drizzle/0039_doku_checkout_only.sql");
+  assert.doesNotMatch(router, /hasOutstandingDokuLegacyPayments|payment_gateway_mode = 'direct'/);
+  assert.match(router, /ready: readiness\.ready && supported/);
+  assert.doesNotMatch(migration, /payment_gateway = 'doku'/);
 });
 
 test("DOKU Checkout is the only active DOKU payment runtime", () => {
