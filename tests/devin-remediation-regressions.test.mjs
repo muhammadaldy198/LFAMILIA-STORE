@@ -256,6 +256,9 @@ test("DOKU Checkout refuses new payments while unresolved legacy DOKU transactio
   assert.match(router, /payment_gateway_mode = 'direct'/);
   assert.match(router, /payment_status = 'pending'/);
   assert.match(router, /wallet_topups[\s\S]*status = 'pending'/);
+  assert.match(router, /COALESCE\(payment_gateway_environment, doku_environment\) = \?/);
+  assert.match(router, /COALESCE\(gateway_environment, doku_environment\) = \?/);
+  assert.match(router, /hasOutstandingDokuLegacyPayments\(readiness\.environment\)/);
   assert.match(router, /ready: readiness\.ready && supported && !hasLegacyPending/);
   assert.match(router, /Gateway dinonaktifkan sementara/);
 });
