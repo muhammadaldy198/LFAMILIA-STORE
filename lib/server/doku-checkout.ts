@@ -294,7 +294,11 @@ export async function createDokuCheckoutPayment(input: {
     paymentNo: null,
     qrContent: null,
     paymentUrl,
-    paymentName: "DOKU Checkout",
+    paymentName: input.paymentMethod === "qris"
+      ? "QRIS"
+      : input.paymentMethod === "va"
+        ? `Virtual Account ${input.paymentChannel.toUpperCase()}`
+        : input.paymentChannel.toUpperCase(),
     expiredAt: checkoutExpiry(payload.response?.payment?.expired_date),
     raw: payload,
   } satisfies DokuCheckoutPaymentResult;
