@@ -342,12 +342,20 @@ test("verified provider expiry is not blocked by a later local expiry timestamp"
   assert.match(transition, /authoritativeExpired/);
 });
 
-test("public Midtrans status refresh treats authenticated paid inquiry as authoritative", () => {
+test("public gateway status refresh treats authenticated provider states as authoritative", () => {
   const route = fs.readFileSync(path.join(root, "app/api/orders/status/route.ts"), "utf8");
+  const dokuRefresh =
+    route.match(/async function refreshDokuStatus[\\s\\S]*?async function refreshMidtransSnapStatus/)?.[0] || "";
+  assert.match(
+    dokuRefresh,
+    /applyPendingExternalPaymentStatus\\(order, "expired", \\{ authoritativeExpired: true \\}\\)/,
+  );
+
   const midtransRefresh =
     route.match(/async function refreshMidtransSnapStatus[\\s\\S]*?async function recoverPaidAutomaticFulfillment/)?.[0] || "";
   assert.match(midtransRefresh, /applyPendingExternalPaymentStatus\\(order, "paid", \\{/);
   assert.match(midtransRefresh, /authoritativePaid: true/);
+  assert.match(midtransRefresh, /authoritativeExpired: query\\.status === "expired"/);
 });
 
 test("DigiFlazz reconciliation lease is token-owned across stale reclaim", () => {
