@@ -4,6 +4,7 @@ import { isAutomaticPackageAvailable } from "@/lib/server/availability";
 import { getCustomerSession } from "@/lib/server/customer-auth";
 import {
   externalArtifactsFromOrder,
+  markExternalOrderCreationUncertain,
   recordExternalPaymentEvent,
   updateExternalPayment,
 } from "@/lib/server/external-payments";
@@ -327,7 +328,11 @@ export async function POST(request: Request) {
     // ambiguous: the provider may already have created a payable transaction.
     // Keep the local invoice pending so a signed callback can still settle it.
     // The scheduler expires unresolved attempts after the safe provider window.
-    if (!paymentDispatchStarted) {
+    if (paymentDispatchStarted) {
+      if (referenceId) {
+        await markExternalOrderCreationUncertain(referenceId, message).catch(() => undefined);
+      }
+    } else {
       if (orderId) await releaseExternalPromotion(orderId).catch(() => undefined);
       if (referenceId) {
         await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
