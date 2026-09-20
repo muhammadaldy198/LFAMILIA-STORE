@@ -6,28 +6,29 @@ import test from "node:test";
 const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("DOKU Direct API and Midtrans Snap are the only active routable modes", () => {
+test("DOKU Checkout and Midtrans Snap are the active hosted payment modes", () => {
   const router = read("lib/server/payment-router.ts");
-  assert.match(router, /createDokuDirectPayment/);
-  assert.match(router, /mode: "direct" as const/);
+  assert.match(router, /createDokuCheckoutPayment/);
+  assert.match(router, /mode: "checkout" as const/);
   assert.match(router, /createMidtransSnapPayment/);
-  assert.match(router, /export type RoutedPaymentMode = "direct" \| "snap"/);
-  assert.doesNotMatch(router, /createDokuCheckoutPayment|mode: "checkout"|createMidtransVirtualAccount|mode: "bisnap"/);
+  assert.match(router, /export type RoutedPaymentMode = "checkout" \| "snap"/);
+  assert.doesNotMatch(router, /createDokuDirectPayment|mode: "direct"/);
 });
 
-test("DOKU Direct status polling remains terminal-safe while fulfillment stays server-side", () => {
+test("DOKU Checkout status polling remains terminal-safe while fulfillment stays server-side", () => {
   const status = read("app/api/orders/status/route.ts");
-  const callback = read("app/api/payments/midtrans/snap/notification/route.ts");
-  assert.match(status, /artifacts\.mode === "direct"/);
-  assert.doesNotMatch(status, /queryDokuCheckoutStatus|artifacts\.mode === "checkout"/);
-  assert.match(status, /queryDokuQrisStatus/);
-  assert.match(status, /queryDokuVaStatus/);
-  assert.match(status, /queryDokuEwalletStatus/);
+  const callback = read("app/api/payments/doku/callback/route.ts");
+  const doku = read("lib/server/doku-checkout.ts");
+  assert.match(status, /artifacts\.mode === "checkout"/);
+  assert.match(status, /queryDokuCheckoutStatus/);
+  assert.doesNotMatch(status, /queryDokuQrisStatus|queryDokuVaStatus|queryDokuEwalletStatus/);
   assert.match(status, /dueForGatewayCheck\(order, 3_000\)/);
   assert.match(status, /fulfillAutomaticOrder\(order\.id, getPublicBaseUrl\(\)\)/);
-  assert.match(callback, /applyExternalPaymentEvent\(\{/);
-  assert.match(callback, /authoritativePaid: status === "paid"/);
+  assert.match(callback, /validateDokuCheckoutNotification/);
+  assert.match(callback, /authoritativePaid: notification\.status === "paid"/);
   assert.match(callback, /fulfillAutomaticOrder\(order\.id, getPublicBaseUrl\(\)\)/);
+  assert.match(doku, /\/checkout\/v1\/payment/);
+  assert.match(doku, /\/orders\/v1\/status\//);
 });
 
 test("customer invoice code is compact while preserving a database uniqueness guard", () => {
