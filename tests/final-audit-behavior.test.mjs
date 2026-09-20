@@ -270,7 +270,7 @@ test("Midtrans fraud challenge never becomes paid before FDS acceptance", () => 
   assert.equal(mapMidtransSnapStatus("settlement", null), "paid");
 });
 
-test("voucher rename preserves released reservation identity for authoritative late payment", () => {
+test("voucher code stays immutable after reservation history so late payment targets the same voucher", () => {
   const db = database();
   db.exec(`
     CREATE TABLE discount_vouchers (
@@ -282,43 +282,28 @@ test("voucher rename preserves released reservation identity for authoritative l
     CREATE TABLE promotion_reservations (
       order_id TEXT PRIMARY KEY,
       voucher_code TEXT,
-      status TEXT NOT NULL,
-      updated_at TEXT
+      status TEXT NOT NULL
     );
-    INSERT INTO discount_vouchers VALUES (1,'OLD',0,0);
-    INSERT INTO promotion_reservations VALUES ('late-order','OLD','released',CURRENT_TIMESTAMP);
+    INSERT INTO discount_vouchers VALUES (1,'STABLE',0,0);
+    INSERT INTO promotion_reservations VALUES ('late-order','STABLE','released');
   `);
 
-  db.exec("BEGIN");
-  try {
-    db.prepare("UPDATE discount_vouchers SET code='NEW' WHERE id=1 AND code='OLD' AND reserved_count=0").run();
-    db.prepare(`
-      UPDATE promotion_reservations SET voucher_code='NEW'
-      WHERE voucher_code='OLD'
-        AND EXISTS (SELECT 1 FROM discount_vouchers WHERE id=1 AND code='NEW')
-    `).run();
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
+  const history = db.prepare(
+    "SELECT 1 AS found FROM promotion_reservations WHERE voucher_code=? LIMIT 1",
+  ).get("STABLE");
+  assert.equal(Boolean(history), true);
 
-  const reservation = db.prepare(
-    "SELECT voucher_code,status FROM promotion_reservations WHERE order_id='late-order'",
-  ).get();
-  assert.deepEqual(reservation, { voucher_code: "NEW", status: "released" });
-
+  // Production rejects a code rename when history exists; the late payment
+  // therefore increments the same voucher identity instead of a reused code.
   db.prepare(
     "UPDATE promotion_reservations SET status='consumed' WHERE order_id='late-order' AND status='released'",
   ).run();
-  db.prepare(
-    "UPDATE discount_vouchers SET used_count=used_count+1 WHERE code=?",
-  ).run(reservation.voucher_code);
+  db.prepare("UPDATE discount_vouchers SET used_count=used_count+1 WHERE code=?").run("STABLE");
   assert.equal(db.prepare("SELECT used_count FROM discount_vouchers WHERE id=1").get().used_count, 1);
   db.close();
 
   const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
-  assert.match(promotions, /UPDATE promotion_reservations[\\s\\S]*SET voucher_code = \\?/);
+  assert.match(promotions, /Kode voucher tidak dapat diubah setelah dipakai atau direservasi/);
 });
 
 test("historical promo references block destructive voucher reuse and deletion", () => {
