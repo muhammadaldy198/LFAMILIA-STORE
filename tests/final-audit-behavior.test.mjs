@@ -9,6 +9,7 @@ import {
   isDigiflazzSnapshotAvailable,
   resolveMemberTierFromProgress,
 } from "../lib/server/final-audit-rules.ts";
+import { FULFILLMENT_ERROR_TRANSITION_GUARD_SQL } from "../lib/server/fulfillment-transition-guard.mjs";
 
 const root = process.cwd();
 
@@ -222,6 +223,48 @@ test("provider fulfillment transitions cannot downgrade success and webhook repl
   assert.equal(db.prepare("SELECT fulfillment_status FROM orders WHERE id='o1'").get().fulfillment_status, "success");
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM order_events WHERE event_id='evt-success'").get().count, 1);
   db.close();
+});
+
+test("stale fulfillment error paths cannot downgrade terminal provider results", () => {
+  const db = database();
+  db.exec(`
+    CREATE TABLE orders (
+      id TEXT PRIMARY KEY,
+      payment_status TEXT NOT NULL,
+      fulfillment_type TEXT NOT NULL,
+      fulfillment_status TEXT NOT NULL,
+      provider_status TEXT,
+      provider_message TEXT
+    );
+    INSERT INTO orders VALUES
+      ('success','paid','automatic','success','success','delivered'),
+      ('failed','paid','automatic','failed','failed','provider failed'),
+      ('active','paid','automatic','dispatching','dispatching',NULL);
+  `);
+
+  const applyRetryableError = (id) => db.prepare(`
+    UPDATE orders
+    SET fulfillment_status='processing', provider_status='retryable_error', provider_message='timeout'
+    WHERE id=? AND ${FULFILLMENT_ERROR_TRANSITION_GUARD_SQL}
+  `).run(id);
+
+  assert.equal(Number(applyRetryableError("success").changes), 0);
+  assert.equal(Number(applyRetryableError("failed").changes), 0);
+  assert.equal(Number(applyRetryableError("active").changes), 1);
+  assert.deepEqual(
+    db.prepare("SELECT fulfillment_status,provider_status,provider_message FROM orders WHERE id='success'").get(),
+    { fulfillment_status: "success", provider_status: "success", provider_message: "delivered" },
+  );
+  assert.equal(db.prepare("SELECT provider_status FROM orders WHERE id='active'").get().provider_status, "retryable_error");
+  db.close();
+});
+
+test("public Midtrans status refresh treats authenticated paid inquiry as authoritative", () => {
+  const route = fs.readFileSync(path.join(root, "app/api/orders/status/route.ts"), "utf8");
+  const midtransRefresh =
+    route.match(/async function refreshMidtransSnapStatus[\\s\\S]*?async function recoverPaidAutomaticFulfillment/)?.[0] || "";
+  assert.match(midtransRefresh, /applyPendingExternalPaymentStatus\\(order, "paid", \\{/);
+  assert.match(midtransRefresh, /authoritativePaid: true/);
 });
 
 test("DigiFlazz reconciliation lease is token-owned across stale reclaim", () => {
