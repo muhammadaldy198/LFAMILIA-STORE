@@ -298,6 +298,24 @@ export async function releaseExpiredExternalPromotions() {
       )
   `).run();
 
+  // DOKU Direct is no longer an active payment runtime. Historical Direct
+  // orders remain immutable audit data, but their expired reservations must not
+  // hold voucher/flash-sale capacity forever.
+  await db.prepare(`
+    UPDATE promotion_reservations
+    SET status = 'released', updated_at = CURRENT_TIMESTAMP
+    WHERE status = 'reserved'
+      AND datetime(expires_at) <= datetime('now')
+      AND EXISTS (
+        SELECT 1
+        FROM orders
+        WHERE orders.id = promotion_reservations.order_id
+          AND orders.payment_gateway = 'doku'
+          AND orders.payment_gateway_mode = 'direct'
+          AND orders.payment_status = 'pending'
+      )
+  `).run();
+
   // Never release capacity while its order is pending or already paid. Payment
   // reconciliation/expiry owns pending orders; paid reservations are consumed
   // above. Only terminal non-paid/orphaned reservations may be returned.
