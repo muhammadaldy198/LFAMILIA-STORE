@@ -1,27 +1,79 @@
--- Final payment-routing cleanup.
--- DOKU Direct is not an active runtime mode. Historical Direct rows are kept
--- untouched as audit data: this migration does not relabel, expire, reject, or
--- erase provider artifacts for transactions created by another protocol.
--- Only transactions created through DOKU Checkout may use mode = 'checkout'.
---
+-- Final pre-production routing cleanup.
+-- The store has not launched DOKU Direct in production. Historical Direct
+-- sandbox/dev sessions are retired; they are never relabeled as Checkout.
 -- DOKU credential profiles are migrated/sanitized by payment-mode-config.ts
 -- because encrypted_config cannot be safely field-filtered in SQL.
 
--- Historical Direct payment rows stay untouched, but an expired promotion
--- reservation is inventory state rather than payment-provider state.
 UPDATE promotion_reservations
 SET status = 'released',
     updated_at = CURRENT_TIMESTAMP
 WHERE status = 'reserved'
-  AND datetime(expires_at) <= datetime('now')
-  AND EXISTS (
-    SELECT 1
+  AND order_id IN (
+    SELECT id
     FROM orders
-    WHERE orders.id = promotion_reservations.order_id
-      AND orders.payment_gateway = 'doku'
-      AND orders.payment_gateway_mode = 'direct'
-      AND orders.payment_status = 'pending'
+    WHERE payment_gateway = 'doku'
+      AND payment_gateway_mode = 'direct'
+      AND payment_status = 'pending'
   );
+--> statement-breakpoint
+
+UPDATE orders
+SET payment_status = 'expired',
+    provider_message = COALESCE(provider_message, 'Pembayaran sandbox lama dibatalkan saat migrasi DOKU Checkout.'),
+    gateway_request_id = NULL,
+    gateway_reference_no = NULL,
+    gateway_payment_no = NULL,
+    gateway_qr_content = NULL,
+    gateway_payment_url = NULL,
+    gateway_expired_at = CURRENT_TIMESTAMP,
+    doku_request_id = NULL,
+    doku_token_id = NULL,
+    doku_reference_no = NULL,
+    doku_payment_no = NULL,
+    doku_qr_content = NULL,
+    doku_payment_name = NULL,
+    doku_payment_url = NULL,
+    doku_expired_at = CURRENT_TIMESTAMP,
+    updated_at = CURRENT_TIMESTAMP
+WHERE payment_gateway = 'doku'
+  AND payment_gateway_mode = 'direct'
+  AND payment_status = 'pending';
+--> statement-breakpoint
+
+UPDATE wallet_topups
+SET status = 'rejected',
+    admin_notes = COALESCE(admin_notes, 'Pembayaran sandbox lama dibatalkan saat migrasi DOKU Checkout.'),
+    gateway_request_id = NULL,
+    gateway_reference_no = NULL,
+    gateway_payment_no = NULL,
+    gateway_qr_content = NULL,
+    gateway_payment_name = NULL,
+    gateway_payment_url = NULL,
+    gateway_expired_at = CURRENT_TIMESTAMP,
+    doku_request_id = NULL,
+    doku_token_id = NULL,
+    doku_reference_no = NULL,
+    doku_payment_no = NULL,
+    doku_qr_content = NULL,
+    doku_payment_name = NULL,
+    doku_payment_url = NULL,
+    doku_expired_at = CURRENT_TIMESTAMP,
+    updated_at = CURRENT_TIMESTAMP
+WHERE payment_gateway = 'doku'
+  AND payment_gateway_mode = 'direct'
+  AND status = 'pending';
+--> statement-breakpoint
+
+UPDATE orders
+SET payment_gateway_mode = NULL
+WHERE payment_gateway = 'doku'
+  AND payment_gateway_mode = 'direct';
+--> statement-breakpoint
+
+UPDATE wallet_topups
+SET payment_gateway_mode = NULL
+WHERE payment_gateway = 'doku'
+  AND payment_gateway_mode = 'direct';
 --> statement-breakpoint
 
 UPDATE orders
