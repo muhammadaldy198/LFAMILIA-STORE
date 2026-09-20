@@ -59,6 +59,16 @@ export async function updateExternalPayment(input: {
     ).run();
 }
 
+export async function markExternalOrderCreationUncertain(referenceId: string, message: string) {
+  await getD1().prepare(`UPDATE orders SET
+      provider_message = ?,
+      gateway_expired_at = COALESCE(gateway_expired_at, datetime('now', '+75 minutes')),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE reference_id = ? AND payment_status = 'pending'`)
+    .bind(`Status pembuatan pembayaran belum dapat dipastikan: ${message.slice(0, 420)}`, referenceId)
+    .run();
+}
+
 export async function recordExternalPaymentEvent(input: {
   orderId: string;
   gateway: PaymentGatewayName;
