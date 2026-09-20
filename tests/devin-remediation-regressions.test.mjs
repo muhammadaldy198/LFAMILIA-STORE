@@ -29,9 +29,12 @@ test("uncertain external payment dispatch stays pending and recoverable", () => 
   assert.match(worker, /expireUninitializedExternalOrders\(\)/);
 });
 
-test("uncertain DOKU dispatches stay out of normal status polling until initialized", () => {
+test("ambiguous DOKU Checkout dispatches reconcile by merchant reference while Direct still requires artifacts", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
-  assert.match(doku, /gateway_request_id IS NOT NULL OR doku_request_id IS NOT NULL/);
+  assert.match(doku, /payment_gateway_mode = 'checkout'/);
+  assert.match(doku, /payment_gateway_mode = 'direct'[\s\S]*gateway_request_id IS NOT NULL OR doku_request_id IS NOT NULL/);
+  assert.match(doku, /queryDokuCheckoutStatus\(\{[\s\S]*referenceId: order\.reference_id/);
+  assert.match(doku, /queryDokuCheckoutStatus\(\{[\s\S]*referenceId: topup\.reference_id/);
 });
 
 test("Midtrans scheduler queries provider status even after local expiry", () => {
@@ -223,6 +226,18 @@ test("storefront keeps fallback categories when API response fails or omits cate
   assert.match(storefront, /if \(!response\.ok\) throw new Error/);
   assert.match(storefront, /if \(Array\.isArray\(data\.categories\)\)/);
   assert.doesNotMatch(storefront, /canonicalCategories\(data\.categories \?\? \[\], true\)/);
+});
+
+test("Checkout and legacy Direct DOKU credentials use separate runtime namespaces", () => {
+  const config = read("lib/server/payment-mode-config.ts");
+  const checkout = read("lib/server/doku-checkout.ts");
+  const direct = read("lib/server/doku.ts");
+  assert.match(config, /DOKU_CHECKOUT_\$\{environmentName\}_/);
+  assert.match(config, /const directPrefix = `DOKU_\$\{environmentName\}_`/);
+  assert.match(checkout, /DOKU_CHECKOUT_SANDBOX_CLIENT_ID/);
+  assert.match(checkout, /DOKU_CHECKOUT_PRODUCTION_SECRET_KEY/);
+  assert.match(direct, /DOKU_SANDBOX_CLIENT_ID/);
+  assert.doesNotMatch(direct, /DOKU_CHECKOUT_SANDBOX_CLIENT_ID/);
 });
 
 test("DOKU Checkout overview only reports ready with Client ID, Secret Key, and HTTPS endpoint", () => {
