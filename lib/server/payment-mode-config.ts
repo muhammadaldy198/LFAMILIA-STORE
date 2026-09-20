@@ -233,26 +233,41 @@ export async function hydrateDokuCheckoutRuntimeEnv<T extends object>(sourceEnv:
   try {
     const current = await settings(db);
     const environment = env(current.get("doku_environment"));
-    const [sandboxValues, productionValues] = await Promise.all([
-      profile("doku", "checkout", "sandbox", db, encryptionSecret).then(async (value) => value ?? profile("doku", "direct", "sandbox", db, encryptionSecret)),
-      profile("doku", "checkout", "production", db, encryptionSecret).then(async (value) => value ?? profile("doku", "direct", "production", db, encryptionSecret)),
+    const [sandboxCheckout, productionCheckout, sandboxDirect, productionDirect] = await Promise.all([
+      profile("doku", "checkout", "sandbox", db, encryptionSecret),
+      profile("doku", "checkout", "production", db, encryptionSecret),
+      profile("doku", "direct", "sandbox", db, encryptionSecret),
+      profile("doku", "direct", "production", db, encryptionSecret),
     ]);
     const target: Record<string, unknown> = { ...source, DOKU_ENV: environment };
     const put = (key: string, value: string | undefined) => { if (value?.trim()) target[key] = value.trim(); };
     const applyProfile = (
       profileEnvironment: PaymentEnvironment,
-      values: Record<string, string> | null,
+      checkoutValues: Record<string, string> | null,
+      directValues: Record<string, string> | null,
     ) => {
-      if (!values) return;
+      const values = { ...(directValues ?? {}), ...(checkoutValues ?? {}) };
+      if (!Object.keys(values).length) return;
       const prefix = `DOKU_${profileEnvironment.toUpperCase()}_`;
       put(`${prefix}CLIENT_ID`, values.clientId);
       put(`${prefix}SECRET_KEY`, values.secretKey);
       put(`${prefix}API_URL`, values.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
+
+      // Legacy Direct fields stay server-only so already-issued Direct invoices
+      // remain verifiable/reconcilable until they naturally drain.
+      if (directValues) {
+        put(`${prefix}PRIVATE_KEY`, directValues.privateKey);
+        put(`${prefix}PRIVATE_KEY_PASSPHRASE`, directValues.privateKeyPassphrase);
+        put(`${prefix}QRIS_MERCHANT_ID`, directValues.qrisMerchantId);
+        put(`${prefix}QRIS_TERMINAL_ID`, directValues.qrisTerminalId);
+        put(`${prefix}QRIS_POSTAL_CODE`, directValues.qrisPostalCode);
+        put(`${prefix}VA_CONFIG_JSON`, directValues.vaConfigJson);
+      }
     };
-    // Keep both profiles hydrated so callbacks/reconciliation for an older
-    // environment remain verifiable after Admin switches the active one.
-    applyProfile("sandbox", sandboxValues);
-    applyProfile("production", productionValues);
+    // Hydrate Checkout credentials for new payments and keep legacy Direct
+    // material available only for stored outstanding Direct transactions.
+    applyProfile("sandbox", sandboxCheckout, sandboxDirect);
+    applyProfile("production", productionCheckout, productionDirect);
     return target as T;
   } catch {
     return sourceEnv;
