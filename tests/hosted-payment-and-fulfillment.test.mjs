@@ -16,6 +16,7 @@ test("DOKU Checkout and Midtrans Snap are the active hosted payment modes", () =
 
 test("DOKU Checkout status polling remains terminal-safe while fulfillment stays server-side", () => {
   const status = read("app/api/orders/status/route.ts");
+  const callback = read("app/api/payments/doku/callback/route.ts");
   const doku = read("lib/server/doku-checkout.ts");
   assert.match(status, /artifacts\.mode === "checkout"/);
   assert.match(status, /queryDokuCheckoutStatus/);
