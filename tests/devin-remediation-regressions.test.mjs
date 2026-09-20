@@ -269,6 +269,14 @@ test("Drizzle schema includes generic hosted gateway artifacts", () => {
   assert.match(schema, /"doku", "midtrans", "wallet"/);
 });
 
+test("obsolete DOKU credential migration never deletes the only usable profile", () => {
+  const config = read("lib/server/payment-mode-config.ts");
+  assert.match(config, /let checkoutReady = false/);
+  assert.match(config, /checkoutReady = Boolean\(cleanExisting\.clientId && cleanExisting\.secretKey && cleanExisting\.apiUrl\)/);
+  assert.match(config, /ON CONFLICT\(provider, mode, environment\) DO UPDATE SET/);
+  assert.match(config, /if \(checkoutReady\) \{[\s\S]*DELETE FROM integration_profiles/);
+});
+
 test("partial DOKU Checkout saves preserve a stored custom API URL", () => {
   const config = read("lib/server/payment-mode-config.ts");
   assert.match(config, /const existing = await profile\("doku", "checkout", input\.environment\)/);
