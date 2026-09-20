@@ -28,7 +28,7 @@ type GatewayReadiness = {
   midtrans?: { ready?: boolean; reason?: string | null; missing?: string[]; environment?: string | null; relayReady?: boolean; mode?: string };
 };
 type RoutingOverview = {
-  dokuMode: "direct";
+  dokuMode: "checkout";
   midtransMode: "snap";
   dokuEnvironment: Environment;
   midtransEnvironment: Environment;
@@ -249,7 +249,7 @@ export function AdminPaymentWorkspace() {
     setMessage(""); setError(""); setBusy(true);
     try {
       const readiness = await load();
-      const doku = readiness?.doku?.ready ? "DOKU Direct API siap" : "DOKU Direct API belum siap";
+      const doku = readiness?.doku?.ready ? "DOKU Checkout siap" : "DOKU Checkout belum siap";
       const midtrans = readiness?.midtrans?.ready ? "Midtrans siap" : "Midtrans belum siap";
       setMessage(`${doku} · ${midtrans}.`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Pemeriksaan gateway gagal."); }
@@ -292,16 +292,16 @@ export function AdminPaymentWorkspace() {
       </Panel>
       <div className="space-y-4">
         <Panel title="Gateway & Environment" description="Status siap dan status aktif dipisahkan. Gateway yang valid tetap bisa dimatikan dengan toggle."><div className="space-y-3 p-4">
-          <GatewayControl gateway="doku" title="DOKU Direct API" ready={Boolean(gatewayReadiness.doku?.ready)} enabled={gatewayActive("doku")} environment={routing?.dokuEnvironment || "sandbox"} onEnabled={(value) => setGatewaySettings((current) => current.map((item) => item.gateway === "doku" ? { ...item, isActive: value } : item))} onEnvironment={(value) => setRouting((current) => current ? { ...current, dokuEnvironment: value } : current)} />
+          <GatewayControl gateway="doku" title="DOKU Checkout" ready={Boolean(gatewayReadiness.doku?.ready)} enabled={gatewayActive("doku")} environment={routing?.dokuEnvironment || "sandbox"} onEnabled={(value) => setGatewaySettings((current) => current.map((item) => item.gateway === "doku" ? { ...item, isActive: value } : item))} onEnvironment={(value) => setRouting((current) => current ? { ...current, dokuEnvironment: value } : current)} />
           <GatewayControl gateway="midtrans" title="Midtrans Snap" ready={Boolean(gatewayReadiness.midtrans?.ready)} enabled={gatewayActive("midtrans")} environment={routing?.midtransEnvironment || "sandbox"} onEnabled={(value) => setGatewaySettings((current) => current.map((item) => item.gateway === "midtrans" ? { ...item, isActive: value } : item))} onEnvironment={(value) => setRouting((current) => current ? { ...current, midtransEnvironment: value } : current)} />
         </div></Panel>
         {canManageWallet && <Panel title="Top Up Saldo" description="Pilih gateway khusus untuk top up saldo. Pilihan ini terpisah dari routing checkout."><div className="grid gap-3 p-4">
-          <Field label="Gateway top up saldo"><select className={inputClass} value={walletTopupGateway} onChange={(event) => setRouting((current) => current ? { ...current, walletTopupGateway: event.target.value as Gateway } : current)}><option value="doku">DOKU Direct API</option><option value="midtrans">Midtrans Snap</option></select></Field>
+          <Field label="Gateway top up saldo"><select className={inputClass} value={walletTopupGateway} onChange={(event) => setRouting((current) => current ? { ...current, walletTopupGateway: event.target.value as Gateway } : current)}><option value="doku">DOKU Checkout</option><option value="midtrans">Midtrans Snap</option></select></Field>
           <div className="flex items-center justify-between rounded-md border border-[#e3e8ef] p-3"><div><strong className="block text-[9px] text-[#34445f]">Status gateway pilihan</strong><span className="text-[8px] text-[#8a98aa]">Harus siap dan gateway global harus ON agar top up dapat dibuat.</span></div><Status tone={walletTopupGatewayReady && walletTopupGatewayActive ? "green" : "amber"}>{walletTopupGatewayReady ? (walletTopupGatewayActive ? "Siap & Aktif" : "Siap · OFF") : "Belum siap"}</Status></div>
           <Field label="Minimum top up saldo"><input className={inputClass} inputMode="numeric" value={walletSettings.minTopup} onChange={(event) => setWalletSettings((current) => ({ ...current, minTopup: Number(event.target.value.replace(/\D/g, "")) || 0 }))} /></Field>
           <div className="flex items-center justify-between rounded-md border border-[#e3e8ef] p-3"><div><strong className="block text-[9px] text-[#34445f]">Aktifkan top up saldo otomatis</strong><span className="text-[8px] text-[#8a98aa]">Master toggle top up saldo. OFF menolak semua permintaan top up otomatis.</span></div><Toggle checked={walletSettings.automaticTopupEnabled} onChange={(value) => setWalletSettings((current) => ({ ...current, automaticTopupEnabled: value }))} /></div>
         </div></Panel>}
-        <Panel title="Callback Publik" description="URL untuk dashboard gateway."><div className="space-y-2 p-4"><CopyUrl label="DOKU Direct API Notification" value="https://lfamiliastore.my.id/api/payments/doku/callback" /><CopyUrl label="Midtrans Snap Notification" value="https://lfamiliastore.my.id/api/payments/midtrans/snap/notification" /></div></Panel>
+        <Panel title="Callback Publik" description="URL untuk dashboard gateway."><div className="space-y-2 p-4"><CopyUrl label="DOKU Checkout Notification" value="https://lfamiliastore.my.id/api/payments/doku/callback" /><CopyUrl label="Midtrans Snap Notification" value="https://lfamiliastore.my.id/api/payments/midtrans/snap/notification" /></div></Panel>
       </div>
     </div>}
 
@@ -335,7 +335,7 @@ export function AdminPaymentWorkspace() {
       <Field label="Nama tampilan"><input className={inputClass} value={editChannel?.name || ""} onChange={(event) => setEditChannel((current) => current ? { ...current, name: event.target.value } : current)} /></Field>
       <Field label="Kode channel"><input className={inputClass} value={editChannel?.id || ""} onChange={(event) => setEditChannel((current) => current ? { ...current, id: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "") } : current)} placeholder="contoh: bca, dana, qris" /></Field>
       <Field label="Jenis"><select className={inputClass} value={editChannel?.method || "va"} onChange={(event) => setEditChannel((current) => current ? { ...current, method: event.target.value as Channel["method"], group: groupForMethod(event.target.value as Channel["method"]) } : current)}><option value="va">VA Bank</option><option value="ewallet">E-Wallet</option><option value="qris">QRIS</option></select></Field>
-      <Field label="Gateway"><select className={inputClass} value={editChannel?.gateway || "midtrans"} onChange={(event) => setEditChannel((current) => current ? { ...current, gateway: event.target.value as Gateway } : current)}><option value="doku">DOKU Direct API</option><option value="midtrans">Midtrans</option></select></Field>
+      <Field label="Gateway"><select className={inputClass} value={editChannel?.gateway || "midtrans"} onChange={(event) => setEditChannel((current) => current ? { ...current, gateway: event.target.value as Gateway } : current)}><option value="doku">DOKU Checkout</option><option value="midtrans">Midtrans</option></select></Field>
       <Field label="Urutan"><input className={inputClass} type="number" value={editChannel?.sortOrder ?? 0} onChange={(event) => setEditChannel((current) => current ? { ...current, sortOrder: Number(event.target.value) || 0 } : current)} /></Field>
       <Field label="Kode gateway (opsional)" help="Isi payment type resmi provider jika channel custom belum ada pada mapping bawaan."><input className={`${inputClass} font-mono`} value={editChannel?.gatewayConfig.paymentType || ""} onChange={(event) => setEditChannel((current) => current ? { ...current, gatewayConfig: { ...current.gatewayConfig, paymentType: event.target.value.trim() } } : current)} placeholder="contoh: bca_va" /></Field>
       <div className="col-span-2 flex items-center justify-between rounded-md border border-[#e3e8ef] bg-[#f8fafc] p-3"><div><strong className="block text-[9px] text-[#34445f]">Bebankan biaya gateway ke customer</strong><span className="mt-0.5 block text-[8px] text-[#8a98aa]">ON: biaya persen + biaya tetap ditambahkan ke total pembayaran customer. Persentase dihitung gross-up agar merchant tidak menanggung potongannya.</span></div><Toggle checked={editChannel?.gatewayConfig.customerFeeEnabled !== "false"} onChange={(checked) => setEditChannel((current) => current ? { ...current, gatewayConfig: { ...current.gatewayConfig, customerFeeEnabled: checked ? "true" : "false" } } : current)} /></div>
