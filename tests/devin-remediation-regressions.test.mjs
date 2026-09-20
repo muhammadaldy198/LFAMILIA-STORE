@@ -195,7 +195,9 @@ test("DOKU Checkout keeps non-final FAILED TIMEOUT REDIRECT pending", () => {
   assert.doesNotMatch(checkout, /normalized === "FAILED"\) return "failed"/);
   assert.match(checkout, /FAILED, TIMEOUT, and REDIRECT as non-final/);
   assert.doesNotMatch(doku, /query\.status === "failed"/);
-  assert.doesNotMatch(publicStatus, /query\.status === "failed"/);
+  const dokuRefresh = publicStatus.match(/async function refreshDokuStatus[\s\S]*?async function refreshMidtransSnapStatus/)?.[0] || "";
+  assert.match(dokuRefresh, /query\.status === "expired"/);
+  assert.doesNotMatch(dokuRefresh, /query\.status === "failed"/);
 });
 
 test("legacy provider casing remains retryable across automatic fulfillment recovery", () => {
