@@ -18,7 +18,7 @@ const saveModes = z.object({
 const saveProfile = z.object({
   action: z.literal("save_profile"),
   provider: z.enum(["doku", "midtrans"]),
-  mode: z.enum(["direct", "snap"]),
+  mode: z.enum(["checkout", "snap"]),
   environment: z.enum(["sandbox", "production"]),
   values: z.record(z.string().min(1).max(40), z.string().max(20_000)),
 });
@@ -45,7 +45,7 @@ export async function PUT(request: Request) {
         walletTopupGateway: input.walletTopupGateway,
       });
     } else {
-      if ((input.provider === "doku" && input.mode !== "direct") || (input.provider === "midtrans" && input.mode !== "snap")) {
+      if ((input.provider === "doku" && input.mode !== "checkout") || (input.provider === "midtrans" && input.mode !== "snap")) {
         throw new Error("Kombinasi gateway dan mode tidak valid.");
       }
       await savePaymentGatewayProfile(input);
