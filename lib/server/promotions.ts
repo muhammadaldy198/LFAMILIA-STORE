@@ -1,5 +1,6 @@
 import { getD1 } from "@/db";
 import type { MemberTier } from "@/lib/server/member-tiers";
+import { deletePromotionMutation, saveDiscountVoucherMutation } from "@/lib/server/promotion-mutations.mjs";
 
 export type DiscountVoucher = {
   id: number;
@@ -91,69 +92,8 @@ export async function listFlashSales(includeInactive = false) {
   return result.results.map(flashFromRow);
 }
 
-export async function saveDiscountVoucher(input: Omit<DiscountVoucher, "id" | "usedCount"> & { usedCount?: number }, id?: number) {
-  const db = getD1();
-  const normalizedCode = input.code.toUpperCase();
-  const values = [normalizedCode, input.name, input.description, input.discountType, input.discountValue, input.minPurchase, input.maxDiscount, input.usageLimit, input.startsAt, input.endsAt, input.isActive ? 1 : 0];
-  if (id) {
-    const current = await db.prepare(
-      "SELECT code, used_count, reserved_count FROM discount_vouchers WHERE id = ? LIMIT 1",
-    ).bind(id).first<{ code: string; used_count: number; reserved_count: number }>();
-    if (!current) throw new Error("Voucher diskon tidak ditemukan.");
-    const renaming = current.code !== normalizedCode;
-    if (renaming) {
-      if (current.used_count > 0) {
-        throw new Error("Kode voucher tidak dapat diubah setelah pernah digunakan. Ubah nama/deskripsi, atau buat voucher baru.");
-      }
-      const [currentHistory, targetHistory] = await Promise.all([
-        db.prepare(
-          "SELECT 1 AS found FROM promotion_reservations WHERE voucher_code = ? LIMIT 1",
-        ).bind(current.code).first<{ found: number }>(),
-        db.prepare(
-          "SELECT 1 AS found FROM promotion_reservations WHERE voucher_code = ? LIMIT 1",
-        ).bind(normalizedCode).first<{ found: number }>(),
-      ]);
-      if (current.reserved_count > 0 || currentHistory) {
-        throw new Error("Kode voucher tidak dapat diubah setelah dipakai atau direservasi. Ubah nama/deskripsi, atau buat voucher baru.");
-      }
-      if (targetHistory) {
-        throw new Error("Kode voucher pernah dipakai oleh transaksi lain. Gunakan kode baru agar riwayat promo tidak tertukar.");
-      }
-    }
-    if (input.usageLimit !== null && input.usageLimit < current.used_count + current.reserved_count) {
-      throw new Error("Batas penggunaan tidak boleh lebih kecil dari penggunaan + reservasi aktif.");
-    }
-
-    const result = await db.prepare(
-      `UPDATE discount_vouchers
-       SET code = ?, name = ?, description = ?, discount_type = ?, discount_value = ?,
-           min_purchase = ?, max_discount = ?, usage_limit = ?, starts_at = ?, ends_at = ?,
-           is_active = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND code = ?
-         AND (? IS NULL OR ? >= used_count + reserved_count)
-         ${renaming ? "AND used_count = 0 AND reserved_count = 0" : ""}`,
-    ).bind(
-      ...values,
-      id,
-      current.code,
-      input.usageLimit,
-      input.usageLimit,
-    ).run();
-
-    if (Number(result.meta.changes ?? 0) === 0) {
-      throw new Error("Voucher diskon berubah bersamaan dengan checkout. Muat ulang lalu coba lagi.");
-    }
-    return id;
-  }
-  const historicalCode = await db.prepare(
-    "SELECT 1 AS found FROM promotion_reservations WHERE voucher_code = ? LIMIT 1",
-  ).bind(normalizedCode).first<{ found: number }>();
-  if (historicalCode) {
-    throw new Error("Kode voucher pernah dipakai oleh transaksi lama. Gunakan kode lain agar riwayat promo tetap konsisten.");
-  }
-  const row = await db.prepare(`INSERT INTO discount_vouchers (code, name, description, discount_type, discount_value, min_purchase, max_discount, usage_limit, starts_at, ends_at, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`).bind(...values).first<{ id: number }>();
-  if (!row) throw new Error("Voucher diskon gagal disimpan.");
-  return row.id;
+export async function saveDiscountVoucher(input: Omit<DiscountVoucher, "id" | "usedCount"> & {
+  return saveDiscountVoucherMutation(getD1(), input, id);
 }
 
 export async function saveFlashSale(input: Omit<FlashSale, "id" | "productName" | "packageLabel" | "imageUrl" | "accent" | "initials" | "basePrice" | "soldCount"> & { soldCount?: number }, id?: number) {
@@ -203,74 +143,7 @@ export async function saveFlashSale(input: Omit<FlashSale, "id" | "productName" 
 }
 
 export async function deletePromotion(kind: "voucher" | "flash", id: number) {
-  const db = getD1();
-  if (kind === "voucher") {
-    const current = await db.prepare(
-      "SELECT code, used_count, reserved_count FROM discount_vouchers WHERE id = ? LIMIT 1",
-    ).bind(id).first<{ code: string; used_count: number; reserved_count: number }>();
-    if (!current) return;
-    if (current.reserved_count > 0) {
-      throw new Error("Promo tidak dapat dihapus saat masih memiliki reservasi pembayaran aktif.");
-    }
-    if (current.used_count > 0) {
-      throw new Error("Voucher pernah digunakan. Nonaktifkan voucher agar riwayat transaksi tetap mengacu ke voucher yang sama.");
-    }
-    const historical = await db.prepare(
-      "SELECT 1 AS found FROM promotion_reservations WHERE voucher_code = ? LIMIT 1",
-    ).bind(current.code).first<{ found: number }>();
-    if (historical) {
-      throw new Error("Voucher memiliki riwayat transaksi. Nonaktifkan voucher agar pembayaran terlambat tetap dapat direkonsiliasi.");
-    }
-    const deleted = await db.prepare(
-      "DELETE FROM discount_vouchers WHERE id = ? AND used_count = 0 AND reserved_count = 0",
-    ).bind(id).run();
-    if (Number(deleted.meta.changes ?? 0) > 0) return;
-
-    const latest = await db.prepare(
-      "SELECT used_count, reserved_count FROM discount_vouchers WHERE id = ? LIMIT 1",
-    ).bind(id).first<{ used_count: number; reserved_count: number }>();
-    if (!latest) return;
-    if (latest.used_count > 0) {
-      throw new Error("Voucher baru saja digunakan. Nonaktifkan voucher agar riwayat transaksi tetap konsisten.");
-    }
-    if (latest.reserved_count > 0) {
-      throw new Error("Voucher baru saja direservasi oleh checkout aktif. Nonaktifkan atau coba lagi setelah transaksi selesai.");
-    }
-    throw new Error("Voucher berubah bersamaan dengan penghapusan. Muat ulang lalu coba lagi.");
-  }
-
-  const current = await db.prepare(
-    "SELECT sold_count, reserved_count FROM flash_sales WHERE id = ? LIMIT 1",
-  ).bind(id).first<{ sold_count: number; reserved_count: number }>();
-  if (!current) return;
-  if (current.reserved_count > 0) {
-    throw new Error("Promo tidak dapat dihapus saat masih memiliki reservasi pembayaran aktif.");
-  }
-  if (current.sold_count > 0) {
-    throw new Error("Flash sale pernah digunakan. Nonaktifkan promo agar riwayat transaksi tetap mengacu ke promo yang sama.");
-  }
-  const historical = await db.prepare(
-    "SELECT 1 AS found FROM promotion_reservations WHERE flash_sale_id = ? LIMIT 1",
-  ).bind(id).first<{ found: number }>();
-  if (historical) {
-    throw new Error("Flash sale memiliki riwayat transaksi. Nonaktifkan promo agar pembayaran terlambat tetap dapat direkonsiliasi.");
-  }
-  const deleted = await db.prepare(
-    "DELETE FROM flash_sales WHERE id = ? AND sold_count = 0 AND reserved_count = 0",
-  ).bind(id).run();
-  if (Number(deleted.meta.changes ?? 0) > 0) return;
-
-  const latest = await db.prepare(
-    "SELECT sold_count, reserved_count FROM flash_sales WHERE id = ? LIMIT 1",
-  ).bind(id).first<{ sold_count: number; reserved_count: number }>();
-  if (!latest) return;
-  if (latest.sold_count > 0) {
-    throw new Error("Flash sale baru saja digunakan. Nonaktifkan promo agar riwayat transaksi tetap konsisten.");
-  }
-  if (latest.reserved_count > 0) {
-    throw new Error("Flash sale baru saja direservasi oleh checkout aktif. Nonaktifkan atau coba lagi setelah transaksi selesai.");
-  }
-  throw new Error("Flash sale berubah bersamaan dengan penghapusan. Muat ulang lalu coba lagi.");
+  return deletePromotionMutation(getD1(), kind, id);
 }
 
 export type PromotionQuote = {
