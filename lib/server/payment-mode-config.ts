@@ -143,14 +143,14 @@ export async function savePaymentGatewayProfile(input: {
   if (input.provider === "doku") {
     const current = await profile("doku", "checkout", input.environment);
     const legacy = await profile("doku", "direct", input.environment);
-    const inherited = current ?? legacy;
+    const inherited = { ...(legacy ?? {}), ...(current ?? {}) };
     input = {
       ...input,
       values: {
-        clientId: input.values.clientId?.trim() || inherited?.clientId || "",
-        secretKey: input.values.secretKey?.trim() || inherited?.secretKey || "",
+        clientId: input.values.clientId?.trim() || inherited.clientId || "",
+        secretKey: input.values.secretKey?.trim() || inherited.secretKey || "",
         apiUrl: input.values.apiUrl?.trim()
-          || inherited?.apiUrl
+          || inherited.apiUrl
           || (input.environment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"),
       },
     };
