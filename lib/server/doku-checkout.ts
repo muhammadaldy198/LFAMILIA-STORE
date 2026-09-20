@@ -60,55 +60,72 @@ export type DokuCheckoutPaymentResult = {
 };
 
 const DOKU_CHECKOUT_TYPES: Record<string, string> = {
-  // Verified against DOKU's maintained Checkout plugins.
+  // Canonical values from DOKU Checkout Supported Payment Methods.
   "va:doku": "VIRTUAL_ACCOUNT_DOKU",
   "va:bca": "VIRTUAL_ACCOUNT_BCA",
   "va:mandiri": "VIRTUAL_ACCOUNT_BANK_MANDIRI",
+  "va:bsi": "VIRTUAL_ACCOUNT_BANK_SYARIAH_MANDIRI",
   "va:bri": "VIRTUAL_ACCOUNT_BRI",
   "va:bni": "VIRTUAL_ACCOUNT_BNI",
   "va:permata": "VIRTUAL_ACCOUNT_BANK_PERMATA",
   "va:cimb": "VIRTUAL_ACCOUNT_BANK_CIMB",
   "va:danamon": "VIRTUAL_ACCOUNT_BANK_DANAMON",
-  "va:bsi": "VIRTUAL_ACCOUNT_BSI",
-  "va:maybank": "VIRTUAL_ACCOUNT_MAYBANK",
+  "va:btn": "VIRTUAL_ACCOUNT_BTN",
+  "va:bnc": "VIRTUAL_ACCOUNT_BNC",
+  "va:bss": "VIRTUAL_ACCOUNT_BSS",
+  "va:bjb": "VIRTUAL_ACCOUNT_BJB",
+  "va:sinarmas": "VIRTUAL_ACCOUNT_Sinarmas",
   "ewallet:ovo": "EMONEY_OVO",
   "ewallet:shopeepay": "EMONEY_SHOPEE_PAY",
-  "ewallet:dana": "EMONEY_DANA",
   "ewallet:doku": "EMONEY_DOKU",
   "ewallet:linkaja": "EMONEY_LINKAJA",
+  "ewallet:dana": "EMONEY_DANA",
   "qris:mpm": "QRIS",
   "qris:qris": "QRIS",
 };
 
 const DOKU_CHECKOUT_TYPES_BY_METHOD = {
-  va: new Set([
+  va: [
     "VIRTUAL_ACCOUNT_DOKU",
     "VIRTUAL_ACCOUNT_BCA",
     "VIRTUAL_ACCOUNT_BANK_MANDIRI",
+    "VIRTUAL_ACCOUNT_BANK_SYARIAH_MANDIRI",
     "VIRTUAL_ACCOUNT_BRI",
     "VIRTUAL_ACCOUNT_BNI",
     "VIRTUAL_ACCOUNT_BANK_PERMATA",
     "VIRTUAL_ACCOUNT_BANK_CIMB",
     "VIRTUAL_ACCOUNT_BANK_DANAMON",
-    "VIRTUAL_ACCOUNT_BSI",
-    "VIRTUAL_ACCOUNT_MAYBANK",
-  ]),
-  ewallet: new Set([
+    "VIRTUAL_ACCOUNT_BTN",
+    "VIRTUAL_ACCOUNT_BNC",
+    "VIRTUAL_ACCOUNT_BSS",
+    "VIRTUAL_ACCOUNT_BJB",
+    "VIRTUAL_ACCOUNT_Sinarmas",
+  ],
+  ewallet: [
     "EMONEY_OVO",
     "EMONEY_SHOPEE_PAY",
-    "EMONEY_DANA",
     "EMONEY_DOKU",
     "EMONEY_LINKAJA",
-  ]),
-  qris: new Set(["QRIS"]),
+    "EMONEY_DANA",
+  ],
+  qris: ["QRIS"],
 } as const;
 
+function canonicalDokuCheckoutPaymentType(method: string, paymentType: string) {
+  const candidates =
+    method === "va"
+      ? DOKU_CHECKOUT_TYPES_BY_METHOD.va
+      : method === "ewallet"
+        ? DOKU_CHECKOUT_TYPES_BY_METHOD.ewallet
+        : method === "qris"
+          ? DOKU_CHECKOUT_TYPES_BY_METHOD.qris
+          : [];
+  const normalized = paymentType.trim().toLowerCase();
+  return candidates.find((value) => value.toLowerCase() === normalized) ?? null;
+}
+
 export function isDokuCheckoutPaymentTypeCompatible(method: string, paymentType: string) {
-  const normalized = paymentType.trim().toUpperCase();
-  if (method === "va") return DOKU_CHECKOUT_TYPES_BY_METHOD.va.has(normalized);
-  if (method === "ewallet") return DOKU_CHECKOUT_TYPES_BY_METHOD.ewallet.has(normalized);
-  if (method === "qris") return DOKU_CHECKOUT_TYPES_BY_METHOD.qris.has(normalized);
-  return false;
+  return Boolean(canonicalDokuCheckoutPaymentType(method, paymentType));
 }
 
 function runtime() {
@@ -190,8 +207,9 @@ function checkoutExpiry(value: string | undefined) {
 function status(value: unknown): "paid" | "pending" | "expired" | "failed" {
   const normalized = typeof value === "string" ? value.trim().toUpperCase() : "";
   if (normalized === "SUCCESS") return "paid";
-  if (normalized === "FAILED") return "failed";
   if (normalized === "EXPIRED") return "expired";
+  // DOKU marks FAILED, TIMEOUT, and REDIRECT as non-final. Keep them pending
+  // until a final SUCCESS/EXPIRED notification or a later status inquiry.
   return "pending";
 }
 
@@ -200,10 +218,8 @@ export function dokuCheckoutPaymentType(
   channel: string,
   gatewayConfig?: Record<string, string>,
 ) {
-  const custom = gatewayConfig?.paymentType?.trim().toUpperCase();
-  if (custom) {
-    return isDokuCheckoutPaymentTypeCompatible(method, custom) ? custom : null;
-  }
+  const custom = gatewayConfig?.paymentType?.trim();
+  if (custom) return canonicalDokuCheckoutPaymentType(method, custom);
   return DOKU_CHECKOUT_TYPES[`${method}:${channel}`] || null;
 }
 
