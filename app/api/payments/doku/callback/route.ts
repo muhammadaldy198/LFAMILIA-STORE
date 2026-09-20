@@ -26,6 +26,13 @@ async function prepareDokuRuntime() {
   setRuntimeEnv(await hydrateDokuCheckoutRuntimeEnv(current));
 }
 
+function acknowledge() {
+  return new Response("OK", {
+    status: 200,
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
+}
+
 export async function GET() {
   return Response.json(
     { ok: true, service: "doku-checkout-notification", method: "POST" },
@@ -64,7 +71,7 @@ export async function POST(request: Request) {
     const externalWallet = expectedOrder ? null : await getExternalWalletTopup(referenceId, "doku");
 
     const expectedMode = orderRouting?.payment_gateway_mode ?? externalWallet?.payment_gateway_mode ?? null;
-    if (expectedMode !== "checkout") return Response.json({ ok: true });
+    if (expectedMode !== "checkout") return acknowledge();
 
     const expectedEnvironment = orderRouting?.payment_gateway_environment
       ?? externalWallet?.gateway_environment
@@ -99,31 +106,31 @@ export async function POST(request: Request) {
           console.error("Notifikasi top up DOKU gagal:", error),
         );
       }
-      return Response.json({ ok: true });
+      return acknowledge();
     }
 
     const order = expectedOrder;
-    if (!order) return Response.json({ ok: true });
+    if (!order) return acknowledge();
     if (orderRouting?.payment_gateway !== "doku" || orderRouting.payment_gateway_mode !== "checkout") {
-      return Response.json({ ok: true });
+      return acknowledge();
     }
 
     const status = notification.status;
     if (!canProcessDokuOrderCallback(order.payment_status, status)) {
-      return Response.json({ ok: true });
+      return acknowledge();
     }
     if (
       order.gateway_request_id &&
       notification.originalRequestId &&
       order.gateway_request_id !== notification.originalRequestId
     ) {
-      return Response.json({ ok: true });
+      return acknowledge();
     }
     if (
       status === "paid" &&
       (!Number.isFinite(notification.amount) || notification.amount !== order.total)
     ) {
-      return Response.json({ ok: true });
+      return acknowledge();
     }
 
     const transition = await applyExternalPaymentEvent({
@@ -141,7 +148,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return Response.json({ ok: true });
+    return acknowledge();
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Callback DOKU gagal diproses." },
