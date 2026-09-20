@@ -164,7 +164,7 @@ async function refreshDokuStatus(order: OrderRecord) {
     await recordExternalPaymentEvent({
       orderId: order.id,
       gateway: "doku",
-      eventId: `status-query-${query.requestId}-${query.status}`,
+      eventId: `checkout-status-${order.reference_id}-${query.status}`,
       status: query.status,
       payload: query.raw,
     });
