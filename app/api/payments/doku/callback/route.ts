@@ -112,12 +112,18 @@ export async function POST(request: Request) {
       : null;
     const externalWallet = expectedOrder ? null : await getExternalWalletTopup(referenceId, "doku");
     const legacyWallet = expectedOrder || externalWallet ? null : await getDokuWalletTopup(referenceId);
+    const legacyWalletRouting = expectedOrder || externalWallet || !legacyWallet
+      ? null
+      : await getD1().prepare(`SELECT doku_environment FROM wallet_topups
+          WHERE reference_id = ? AND source = 'doku' LIMIT 1`)
+          .bind(referenceId)
+          .first<{ doku_environment: DokuEnvironment | null }>();
 
     const expectedMode = orderRouting?.payment_gateway_mode ?? externalWallet?.payment_gateway_mode ?? null;
     const expectedEnvironment = orderRouting?.payment_gateway_environment
       ?? externalWallet?.gateway_environment
       ?? expectedOrder?.doku_environment
-      ?? legacyWallet?.doku_environment
+      ?? legacyWalletRouting?.doku_environment
       ?? null;
     const target = new URL(request.url).pathname;
 
