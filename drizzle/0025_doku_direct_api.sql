@@ -1,4 +1,4 @@
--- Legacy DOKU payment artifact columns kept for migration-history compatibility.
+-- DOKU Direct API payment artifacts. Existing Hosted Checkout columns remain for backward compatibility.
 ALTER TABLE orders ADD COLUMN doku_reference_no TEXT;
 ALTER TABLE orders ADD COLUMN doku_payment_no TEXT;
 ALTER TABLE orders ADD COLUMN doku_qr_content TEXT;
