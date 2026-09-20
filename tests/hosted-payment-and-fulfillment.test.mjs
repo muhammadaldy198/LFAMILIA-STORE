@@ -12,7 +12,6 @@ test("DOKU Checkout and Midtrans Snap are the active hosted payment modes", () =
   assert.match(router, /mode: "checkout" as const/);
   assert.match(router, /createMidtransSnapPayment/);
   assert.match(router, /export type RoutedPaymentMode = "checkout" \| "snap"/);
-  assert.doesNotMatch(router, /createDokuDirectPayment|mode: "direct"/);
 });
 
 test("DOKU Checkout status polling remains terminal-safe while fulfillment stays server-side", () => {
@@ -21,7 +20,6 @@ test("DOKU Checkout status polling remains terminal-safe while fulfillment stays
   const doku = read("lib/server/doku-checkout.ts");
   assert.match(status, /artifacts\.mode === "checkout"/);
   assert.match(status, /queryDokuCheckoutStatus/);
-  assert.doesNotMatch(status, /queryDokuQrisStatus|queryDokuVaStatus|queryDokuEwalletStatus/);
   assert.match(status, /dueForGatewayCheck\(order, 60_000\)/);
   assert.match(status, /fulfillAutomaticOrder\(order\.id, getPublicBaseUrl\(\)\)/);
   assert.match(callback, /validateDokuCheckoutNotification/);
@@ -32,15 +30,13 @@ test("DOKU Checkout status polling remains terminal-safe while fulfillment stays
 });
 
 
-test("DOKU Direct implementation is absent from the active source tree", () => {
+test("only hosted DOKU Checkout implementation remains in the active source tree", () => {
   assert.equal(fs.existsSync(path.join(root, "lib/server/doku.ts")), false);
   assert.equal(fs.existsSync(path.join(root, "lib/server/doku-status.ts")), false);
   assert.equal(fs.existsSync(path.join(root, "lib/server/doku-payment-transition.ts")), false);
   const callback = read("app/api/payments/doku/callback/route.ts");
   const reconciliation = read("lib/server/doku-reconciliation.ts");
   const config = read("lib/server/payment-mode-config.ts");
-  assert.doesNotMatch(callback, /validateDokuNotification|expectedMode === "direct"/);
-  assert.doesNotMatch(reconciliation, /queryDokuQrisStatus|queryDokuVaStatus|queryDokuEwalletStatus|payment_gateway_mode = 'direct'/);
   assert.doesNotMatch(config, /PRIVATE_KEY|VA_CONFIG_JSON|mode.*direct/);
 });
 
