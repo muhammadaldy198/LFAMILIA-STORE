@@ -32,6 +32,12 @@ test("Integrasi Periksa button is enabled for Google and payment gateway tabs", 
   assert.doesNotMatch(integration, /tab !== "Digiflazz" && tab !== "Relay & Keamanan"/);
 });
 
+test("first-time payment credential setup requires both credential fields", () => {
+  const integration = read("components/admin-integration-workspace.tsx");
+  assert.match(integration, /!dokuConfigured && \(!hasDokuClientId \|\| !hasDokuSecretKey\)/);
+  assert.match(integration, /!midtransConfigured && \(!hasMidtransServerKey \|\| !hasMidtransClientKey\)/);
+});
+
 test("payment credential backend keeps DOKU and Midtrans values encrypted", () => {
   const config = read("lib/server/payment-mode-config.ts");
   assert.match(config, /INTEGRATION_ENCRYPTION_KEY/);
