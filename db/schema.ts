@@ -250,6 +250,7 @@ export const orders = sqliteTable(
     uniqueIndex("orders_external_checkout_key_unique").on(table.externalCheckoutKey),
     uniqueIndex("orders_provider_ref_id_unique").on(table.providerCode, table.providerRefId),
     index("orders_payment_fulfillment_idx").on(table.paymentStatus, table.fulfillmentStatus),
+    index("orders_payment_gateway_status_idx").on(table.paymentGateway, table.paymentStatus, table.createdAt),
     index("orders_created_at_idx").on(table.createdAt),
     index("orders_customer_created_idx").on(table.customerId, table.createdAt),
   ],
@@ -387,7 +388,12 @@ export const walletTopups = sqliteTable(
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
-  (table) => [index("wallet_topups_customer_created_idx").on(table.customerId, table.createdAt), index("wallet_topups_status_created_idx").on(table.status, table.createdAt)],
+  (table) => [
+    index("wallet_topups_customer_created_idx").on(table.customerId, table.createdAt),
+    index("wallet_topups_status_created_idx").on(table.status, table.createdAt),
+    index("wallet_topups_gateway_status_idx").on(table.paymentGateway, table.status, table.createdAt),
+    uniqueIndex("wallet_topups_external_checkout_key_unique").on(table.customerId, table.externalCheckoutKey),
+  ],
 );
 
 export const walletTransactions = sqliteTable(
