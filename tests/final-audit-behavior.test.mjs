@@ -321,6 +321,49 @@ test("voucher rename preserves released reservation identity for authoritative l
   assert.match(promotions, /UPDATE promotion_reservations[\\s\\S]*SET voucher_code = \\?/);
 });
 
+test("historical promo references block destructive voucher reuse and deletion", () => {
+  const db = database();
+  db.exec(`
+    CREATE TABLE discount_vouchers (
+      id INTEGER PRIMARY KEY,
+      code TEXT UNIQUE NOT NULL,
+      reserved_count INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE TABLE flash_sales (
+      id INTEGER PRIMARY KEY,
+      reserved_count INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE TABLE promotion_reservations (
+      order_id TEXT PRIMARY KEY,
+      voucher_code TEXT,
+      flash_sale_id INTEGER,
+      status TEXT NOT NULL
+    );
+    INSERT INTO discount_vouchers VALUES (1,'HISTORY',0,0);
+    INSERT INTO flash_sales VALUES (7,0,0);
+    INSERT INTO promotion_reservations VALUES ('o1','HISTORY',7,'released');
+  `);
+
+  assert.ok(db.prepare(
+    "SELECT 1 FROM promotion_reservations WHERE voucher_code='HISTORY' LIMIT 1",
+  ).get());
+  assert.ok(db.prepare(
+    "SELECT 1 FROM promotion_reservations WHERE flash_sale_id=7 LIMIT 1",
+  ).get());
+  // The production delete path checks these references before destructive DELETE.
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM discount_vouchers WHERE id=1").get().count, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM flash_sales WHERE id=7").get().count, 1);
+  db.close();
+
+  const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
+  assert.match(promotions, /promotion_reservations WHERE voucher_code = \\?/);
+  assert.match(promotions, /promotion_reservations WHERE flash_sale_id = \\?/);
+  assert.match(promotions, /Voucher memiliki riwayat transaksi/);
+  assert.match(promotions, /Kode voucher pernah dipakai/);
+});
+
 test("verified provider expiry is not blocked by a later local expiry timestamp", () => {
   const db = database();
   db.exec(`
