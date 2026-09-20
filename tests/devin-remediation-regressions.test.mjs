@@ -18,7 +18,9 @@ test("uncertain external payment dispatch stays pending and recoverable", () => 
   assert.match(orders, /payment_gateway, payment_gateway_mode, payment_gateway_environment/);
   assert.match(route, /75 \* 60_000/);
   assert.match(route, /paymentDispatchStarted = true/);
-  assert.match(route, /if \(!paymentDispatchStarted\)/);
+  assert.match(route, /if \(paymentDispatchStarted\)/);
+  assert.match(route, /markExternalOrderCreationUncertain\(referenceId, message\)/);
+  assert.match(recovery, /gateway_expired_at = COALESCE\(gateway_expired_at, datetime\('now', '\+75 minutes'\)\)/);
   assert.match(route, /Jangan bayar dua kali/);
   assert.match(midtrans, /reconcilePendingMidtransOrders/);
   assert.match(midtrans, /queryMidtransSnapStatus/);
