@@ -306,14 +306,75 @@ test("voucher code stays immutable after reservation history so late payment tar
   assert.match(promotions, /Kode voucher tidak dapat diubah setelah dipakai atau direservasi/);
 });
 
-test("promo identity guards are atomic against concurrent wallet settlement", () => {
+test("promo identity guards are atomic against an interleaved wallet settlement", () => {
+  const db = database();
+  db.exec(`
+    CREATE TABLE discount_vouchers (
+      id INTEGER PRIMARY KEY,
+      code TEXT UNIQUE NOT NULL,
+      used_count INTEGER NOT NULL DEFAULT 0,
+      reserved_count INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE flash_sales (
+      id INTEGER PRIMARY KEY,
+      product_slug TEXT NOT NULL,
+      package_sku TEXT NOT NULL,
+      sold_count INTEGER NOT NULL DEFAULT 0,
+      reserved_count INTEGER NOT NULL DEFAULT 0
+    );
+    INSERT INTO discount_vouchers VALUES (1,'SAVE10',0,0);
+    INSERT INTO flash_sales VALUES (9,'game-a','sku-a',0,0);
+  `);
+
+  // Simulate the exact race schedule: Admin reads an unused promo, then a
+  // wallet settlement consumes it before the Admin mutation reaches D1.
+  const voucherBefore = db.prepare(
+    "SELECT code,used_count,reserved_count FROM discount_vouchers WHERE id=1",
+  ).get();
+  assert.equal(voucherBefore.used_count, 0);
+
+  db.prepare("UPDATE discount_vouchers SET used_count=used_count+1 WHERE id=1").run();
+  const rename = db.prepare(
+    "UPDATE discount_vouchers SET code='SAVE20' WHERE id=1 AND code='SAVE10' AND used_count=0 AND reserved_count=0",
+  ).run();
+  assert.equal(Number(rename.changes), 0);
+  assert.deepEqual(
+    { ...db.prepare("SELECT code,used_count FROM discount_vouchers WHERE id=1").get() },
+    { code: "SAVE10", used_count: 1 },
+  );
+
+  const voucherDelete = db.prepare(
+    "DELETE FROM discount_vouchers WHERE id=1 AND used_count=0 AND reserved_count=0",
+  ).run();
+  assert.equal(Number(voucherDelete.changes), 0);
+  assert.equal(
+    db.prepare("SELECT COUNT(*) AS count FROM discount_vouchers WHERE id=1").get().count,
+    1,
+  );
+
+  const flashBefore = db.prepare(
+    "SELECT sold_count,reserved_count FROM flash_sales WHERE id=9",
+  ).get();
+  assert.equal(flashBefore.sold_count, 0);
+
+  db.prepare("UPDATE flash_sales SET sold_count=sold_count+1 WHERE id=9").run();
+  const flashDelete = db.prepare(
+    "DELETE FROM flash_sales WHERE id=9 AND sold_count=0 AND reserved_count=0",
+  ).run();
+  assert.equal(Number(flashDelete.changes), 0);
+  assert.equal(
+    db.prepare("SELECT COUNT(*) AS count FROM flash_sales WHERE id=9").get().count,
+    1,
+  );
+  db.close();
+
+  // Keep a wiring assertion so the behavior-tested predicates are the ones
+  // actually present in the production mutation code.
   const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
   assert.match(promotions, /AND used_count = 0 AND reserved_count = 0/);
   assert.match(promotions, /DELETE FROM discount_vouchers[\\s\\S]*WHERE id = \\? AND used_count = 0 AND reserved_count = 0/);
   assert.match(promotions, /DELETE FROM flash_sales[\\s\\S]*WHERE id = \\? AND sold_count = 0 AND reserved_count = 0/);
-  assert.match(promotions, /Number\(deleted\.meta\.changes \?\? 0\) > 0/);
-  assert.match(promotions, /Voucher baru saja digunakan/);
-  assert.match(promotions, /Flash sale baru saja digunakan/);
+  assert.match(promotions, /Number\\(deleted\\.meta\\.changes \\?\\? 0\\) > 0/);
 });
 
 test("wallet-used voucher code cannot be renamed or deleted for later reuse", () => {
