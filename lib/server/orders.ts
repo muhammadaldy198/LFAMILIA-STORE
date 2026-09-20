@@ -305,7 +305,7 @@ export async function insertPendingOrder(input: {
   paymentMethod: string;
   paymentChannel: string;
   paymentGateway?: "doku" | "midtrans" | null;
-  paymentGatewayMode?: "direct" | "snap" | null;
+  paymentGatewayMode?: "checkout" | "direct" | "snap" | null;
   paymentGatewayEnvironment?: "sandbox" | "production" | null;
   customerId?: string | null;
   walletCheckoutKey?: string | null;
