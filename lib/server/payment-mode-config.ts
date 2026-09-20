@@ -1,10 +1,9 @@
-import { createPrivateKey } from "node:crypto";
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 export type PaymentEnvironment = "sandbox" | "production";
 export type PaymentProvider = "doku" | "midtrans";
-export type PaymentProfileMode = "direct" | "snap";
+export type PaymentProfileMode = "checkout" | "direct" | "snap";
 
 type RuntimeLike = Record<string, unknown> & {
   DB?: D1Database;
@@ -79,7 +78,7 @@ export async function getActivePaymentModes() {
     dokuEnvironment: env(current.get("doku_environment")),
     midtransEnvironment: env(current.get("midtrans_environment")),
     walletTopupGateway: gateway(current.get("wallet_topup_gateway")),
-    dokuMode: "direct" as const,
+    dokuMode: "checkout" as const,
     midtransMode: "snap" as const,
   };
 }
@@ -102,6 +101,9 @@ export async function savePaymentModeSelections(input: {
 }
 
 const allowedFields: Record<PaymentProfileMode, readonly string[]> = {
+  checkout: ["clientId", "secretKey", "apiUrl"],
+  // Legacy Direct profiles remain readable only so an existing Client ID /
+  // Secret Key can be carried over without asking the owner to re-enter them.
   direct: ["clientId", "secretKey", "privateKey", "privateKeyPassphrase", "apiUrl", "qrisMerchantId", "qrisTerminalId", "qrisPostalCode", "vaConfigJson"],
   snap: ["serverKey", "clientKey"],
 };
@@ -131,15 +133,15 @@ async function saveProfile(input: {
 
 export async function savePaymentGatewayProfile(input: {
   provider: PaymentProvider;
-  mode: "direct" | "snap";
+  mode: "checkout" | "snap";
   environment: PaymentEnvironment;
   values: Record<string, string>;
 }) {
-  if ((input.provider === "doku" && input.mode !== "direct") || (input.provider === "midtrans" && input.mode !== "snap")) {
+  if ((input.provider === "doku" && input.mode !== "checkout") || (input.provider === "midtrans" && input.mode !== "snap")) {
     throw new Error("Mode gateway tidak valid.");
   }
   if (input.provider === "doku") {
-    const existing = await profile("doku", "direct", input.environment);
+    const existing = await profile("doku", "checkout", input.environment) ?? await profile("doku", "direct", input.environment);
     if (!input.values.apiUrl?.trim() && !existing?.apiUrl?.trim()) {
       input = {
         ...input,
@@ -180,17 +182,10 @@ export async function getMidtransSnapConfig() {
   };
 }
 
-function directReady(values: Record<string, string> | null) {
-  if (!values?.clientId || !values.secretKey || !values.privateKey || !values.apiUrl) return false;
+function checkoutReady(values: Record<string, string> | null) {
+  if (!values?.clientId || !values.secretKey || !values.apiUrl) return false;
   try {
-    const apiUrl = new URL(values.apiUrl);
-    if (apiUrl.protocol !== "https:") return false;
-    createPrivateKey({
-      key: values.privateKey,
-      format: "pem",
-      passphrase: values.privateKeyPassphrase?.trim() || undefined,
-    });
-    return true;
+    return new URL(values.apiUrl).protocol === "https:";
   } catch {
     return false;
   }
@@ -199,15 +194,15 @@ function directReady(values: Record<string, string> | null) {
 export async function getPaymentModeOverview() {
   const modes = await getActivePaymentModes();
   const [dokuSandbox, dokuProduction, midtransSandbox, midtransProduction] = await Promise.all([
-    profile("doku", "direct", "sandbox"),
-    profile("doku", "direct", "production"),
+    profile("doku", "checkout", "sandbox").then(async (value) => value ?? profile("doku", "direct", "sandbox")),
+    profile("doku", "checkout", "production").then(async (value) => value ?? profile("doku", "direct", "production")),
     profile("midtrans", "snap", "sandbox"),
     profile("midtrans", "snap", "production"),
   ]);
   const configured = {
     doku: {
-      sandbox: directReady(dokuSandbox),
-      production: directReady(dokuProduction),
+      sandbox: checkoutReady(dokuSandbox),
+      production: checkoutReady(dokuProduction),
     },
     midtrans: {
       sandbox: Boolean(midtransSandbox?.serverKey && midtransSandbox.clientKey),
@@ -217,7 +212,7 @@ export async function getPaymentModeOverview() {
   const base = (() => { try { return new URL(runtime().PUBLIC_BASE_URL || "").origin; } catch { return ""; } })();
   return {
     ...modes,
-    dokuDirectConfigured: configured.doku[modes.dokuEnvironment],
+    dokuCheckoutConfigured: configured.doku[modes.dokuEnvironment],
     midtransSnapConfigured: configured.midtrans[modes.midtransEnvironment],
     configured,
     callbacks: {
@@ -228,8 +223,8 @@ export async function getPaymentModeOverview() {
   };
 }
 
-/** Injects encrypted DOKU Direct API credentials into runtime only on the server. */
-export async function hydrateDokuDirectRuntimeEnv<T extends object>(sourceEnv: T): Promise<T> {
+/** Injects encrypted DOKU Checkout credentials into runtime only on the server. */
+export async function hydrateDokuCheckoutRuntimeEnv<T extends object>(sourceEnv: T): Promise<T> {
   const source = sourceEnv as T & RuntimeLike;
   const db = source.DB;
   const encryptionSecret = source.INTEGRATION_ENCRYPTION_KEY?.trim();
@@ -238,8 +233,8 @@ export async function hydrateDokuDirectRuntimeEnv<T extends object>(sourceEnv: T
     const current = await settings(db);
     const environment = env(current.get("doku_environment"));
     const [sandboxValues, productionValues] = await Promise.all([
-      profile("doku", "direct", "sandbox", db, encryptionSecret),
-      profile("doku", "direct", "production", db, encryptionSecret),
+      profile("doku", "checkout", "sandbox", db, encryptionSecret).then(async (value) => value ?? profile("doku", "direct", "sandbox", db, encryptionSecret)),
+      profile("doku", "checkout", "production", db, encryptionSecret).then(async (value) => value ?? profile("doku", "direct", "production", db, encryptionSecret)),
     ]);
     const target: Record<string, unknown> = { ...source, DOKU_ENV: environment };
     const put = (key: string, value: string | undefined) => { if (value?.trim()) target[key] = value.trim(); };
@@ -251,13 +246,7 @@ export async function hydrateDokuDirectRuntimeEnv<T extends object>(sourceEnv: T
       const prefix = `DOKU_${profileEnvironment.toUpperCase()}_`;
       put(`${prefix}CLIENT_ID`, values.clientId);
       put(`${prefix}SECRET_KEY`, values.secretKey);
-      put(`${prefix}PRIVATE_KEY`, values.privateKey);
-      put(`${prefix}PRIVATE_KEY_PASSPHRASE`, values.privateKeyPassphrase);
       put(`${prefix}API_URL`, values.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
-      put(`${prefix}QRIS_MERCHANT_ID`, values.qrisMerchantId);
-      put(`${prefix}QRIS_TERMINAL_ID`, values.qrisTerminalId);
-      put(`${prefix}QRIS_POSTAL_CODE`, values.qrisPostalCode);
-      put(`${prefix}VA_CONFIG_JSON`, values.vaConfigJson);
     };
     // Keep both profiles hydrated so callbacks/reconciliation for an older
     // environment remain verifiable after Admin switches the active one.
