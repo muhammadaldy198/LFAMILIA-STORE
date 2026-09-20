@@ -64,7 +64,7 @@ function validateChannel(input: z.infer<typeof channelSchema>) {
     : isGatewayChannelSupported(input.gateway, input.method, input.channel, input.gatewayConfig);
   if (!supported) {
     throw new Error(input.gateway === "doku"
-      ? "Channel ini belum didukung DOKU Direct API."
+      ? "Channel ini belum didukung DOKU Checkout."
       : "Isi kode gateway resmi untuk channel custom, atau pilih channel bawaan yang didukung provider.");
   }
 }
@@ -76,10 +76,10 @@ async function gatewayReadiness() {
   ]);
   return {
     doku: {
-      ready: modes.dokuDirectConfigured,
+      ready: modes.dokuCheckoutConfigured,
       environment: modes.dokuEnvironment,
-      mode: "direct" as const,
-      reason: modes.dokuDirectConfigured ? null : `Kredensial DOKU Direct API ${modes.dokuEnvironment} belum lengkap.`,
+      mode: "checkout" as const,
+      reason: modes.dokuCheckoutConfigured ? null : `Kredensial DOKU Checkout ${modes.dokuEnvironment} belum lengkap.`,
     },
     midtrans: { ...midtrans, mode: "snap" as const, relayReady: true },
   };
