@@ -229,9 +229,12 @@ export async function savePaymentGatewayProfile(input: {
   }
   await saveProfile(input);
   if (input.provider === "doku") {
-    await getD1().prepare(
-      "DELETE FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct' AND environment = ?",
-    ).bind(input.environment).run();
+    const saved = await profile("doku", "checkout", input.environment);
+    if (checkoutReady(saved)) {
+      await getD1().prepare(
+        "DELETE FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct' AND environment = ?",
+      ).bind(input.environment).run();
+    }
   }
 }
 
