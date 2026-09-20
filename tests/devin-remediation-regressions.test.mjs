@@ -15,7 +15,7 @@ test("uncertain external payment dispatch stays pending and recoverable", () => 
   assert.match(route, /paymentGateway: managedChannel\.gateway/);
   assert.match(route, /paymentGatewayMode: readiness\.mode/);
   assert.match(route, /paymentGatewayEnvironment: readiness\.environment/);
-  assert.match(orders, /payment_gateway, payment_gateway_mode, payment_gateway_environment, doku_environment/);
+  assert.match(orders, /payment_gateway, payment_gateway_mode, payment_gateway_environment/);
   assert.match(route, /75 \* 60_000/);
   assert.match(route, /paymentDispatchStarted = true/);
   assert.match(route, /if \(!paymentDispatchStarted\)/);
@@ -29,10 +29,10 @@ test("uncertain external payment dispatch stays pending and recoverable", () => 
   assert.match(worker, /expireUninitializedExternalOrders\(\)/);
 });
 
-test("ambiguous DOKU Checkout dispatches reconcile by merchant reference while Direct still requires artifacts", () => {
+test("ambiguous DOKU Checkout dispatches reconcile by merchant reference without a request ID", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
   assert.match(doku, /payment_gateway_mode = 'checkout'/);
-  assert.match(doku, /payment_gateway_mode = 'direct'[\s\S]*gateway_request_id IS NOT NULL OR doku_request_id IS NOT NULL/);
+  assert.doesNotMatch(doku, /payment_gateway_mode = 'direct'|doku_request_id/);
   assert.match(doku, /queryDokuCheckoutStatus\(\{[\s\S]*referenceId: order\.reference_id/);
   assert.match(doku, /queryDokuCheckoutStatus\(\{[\s\S]*referenceId: topup\.reference_id/);
 });
@@ -97,17 +97,16 @@ test("active promo reservations cannot race admin edits", () => {
   assert.match(promotions, /DELETE FROM \$\{table\} WHERE id = \? AND reserved_count = 0/);
 });
 
-test("DOKU reconciliation closes local expiry but keeps authoritative late-paid recovery", () => {
+test("DOKU Checkout reconciliation closes local expiry but keeps authoritative late-paid recovery", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
-  const transition = read("lib/server/doku-payment-transition.ts");
+  const transition = read("lib/server/payment-transition.ts");
   assert.match(doku, /payment_status = 'expired'/);
   assert.match(doku, /datetime\('now', '-24 hours'\)/);
   assert.match(doku, /expiredOrders/);
   assert.match(doku, /expiredWalletTopups/);
-  assert.match(doku, /applyPendingDokuPaymentStatus\(order, "paid", \{/);
+  assert.match(doku, /applyPendingExternalPaymentStatus\(order, "paid", \{/);
   assert.match(doku, /authoritativePaid: true/);
-  assert.match(doku, /applyPendingDokuPaymentStatus\(order, "expired"\)/);
-  assert.match(doku, /status = 'rejected' AND admin_notes IN/);
+  assert.match(doku, /applyPendingExternalPaymentStatus\(order, "expired"\)/);
   assert.match(transition, /payment_status IN \('pending', 'expired'\)/);
 });
 
@@ -228,16 +227,14 @@ test("storefront keeps fallback categories when API response fails or omits cate
   assert.doesNotMatch(storefront, /canonicalCategories\(data\.categories \?\? \[\], true\)/);
 });
 
-test("Checkout and legacy Direct DOKU credentials use separate runtime namespaces", () => {
+test("DOKU Checkout is the only DOKU credential runtime", () => {
   const config = read("lib/server/payment-mode-config.ts");
   const checkout = read("lib/server/doku-checkout.ts");
-  const direct = read("lib/server/doku.ts");
-  assert.match(config, /DOKU_CHECKOUT_\$\{environmentName\}_/);
-  assert.match(config, /const directPrefix = `DOKU_\$\{environmentName\}_`/);
+  assert.match(config, /DOKU_CHECKOUT_\$\{profileEnvironment\.toUpperCase\(\)\}_/);
   assert.match(checkout, /DOKU_CHECKOUT_SANDBOX_CLIENT_ID/);
   assert.match(checkout, /DOKU_CHECKOUT_PRODUCTION_SECRET_KEY/);
-  assert.match(direct, /DOKU_SANDBOX_CLIENT_ID/);
-  assert.doesNotMatch(direct, /DOKU_CHECKOUT_SANDBOX_CLIENT_ID/);
+  assert.doesNotMatch(config, /PRIVATE_KEY|VA_CONFIG_JSON|profile\("doku", "direct"/);
+  assert.equal(fs.existsSync(path.join(root, "lib/server/doku.ts")), false);
 });
 
 test("DOKU Checkout overview only reports ready with Client ID, Secret Key, and HTTPS endpoint", () => {
