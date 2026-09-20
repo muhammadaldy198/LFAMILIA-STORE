@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { dokuCheckoutPaymentType, isDokuCheckoutPaymentTypeCompatible } from "../lib/server/doku-checkout-payment-types.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -38,12 +39,22 @@ test("only hosted DOKU Checkout implementation remains in the active source tree
   assert.doesNotMatch(config, /PRIVATE_KEY|VA_CONFIG_JSON/);
 });
 
-test("DOKU custom payment types cannot cross payment-method families", () => {
-  const doku = read("lib/server/doku-checkout.ts");
-  assert.match(doku, /const DOKU_CHECKOUT_TYPES_BY_METHOD/);
-  assert.match(doku, /canonicalDokuCheckoutPaymentType\(method, custom\)/);
-  assert.match(doku, /qris: \["QRIS"\]/);
-  assert.match(doku, /value\.toLowerCase\(\) === normalized/);
+test("DOKU custom payment types normalize safely and cannot cross payment-method families", () => {
+  assert.equal(dokuCheckoutPaymentType("va", "bca"), "VIRTUAL_ACCOUNT_BCA");
+  assert.equal(dokuCheckoutPaymentType("qris", "qris"), "QRIS");
+  assert.equal(
+    dokuCheckoutPaymentType("ewallet", "custom", { paymentType: "EMONEY_SHOPEEPAY" }),
+    "EMONEY_SHOPEE_PAY",
+  );
+  assert.equal(
+    dokuCheckoutPaymentType("va", "custom", { paymentType: "VIRTUAL_ACCOUNT_SINARMAS" }),
+    "VIRTUAL_ACCOUNT_Sinarmas",
+  );
+  assert.equal(dokuCheckoutPaymentType("va", "custom", { paymentType: "EMONEY_DANA" }), null);
+  assert.equal(dokuCheckoutPaymentType("ewallet", "custom", { paymentType: "constructor" }), null);
+  assert.equal(dokuCheckoutPaymentType("ewallet", "custom", { paymentType: "__proto__" }), null);
+  assert.equal(isDokuCheckoutPaymentTypeCompatible("ewallet", "EMONEY_DANA"), true);
+  assert.equal(isDokuCheckoutPaymentTypeCompatible("va", "EMONEY_DANA"), false);
 });
 
 test("DOKU Checkout status parser handles Checkout-level ORDER_EXPIRED", () => {
