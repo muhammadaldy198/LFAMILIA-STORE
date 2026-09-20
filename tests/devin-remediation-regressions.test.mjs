@@ -320,6 +320,40 @@ test("DOKU Checkout uses the supported-methods ShopeePay token", () => {
   assert.match(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEE_PAY"/);
 });
 
+test("DOKU Checkout payment tokens stay aligned with the official supported-methods catalog", () => {
+  const checkout = read("lib/server/doku-checkout.ts");
+  const admin = read("components/admin-payment-workspace.tsx");
+  assert.match(checkout, /developers\.doku\.com\/accept-payments\/doku-checkout\/configuration\/supported-payment-methods/);
+  for (const token of [
+    "VIRTUAL_ACCOUNT_DOKU",
+    "VIRTUAL_ACCOUNT_BCA",
+    "VIRTUAL_ACCOUNT_BANK_MANDIRI",
+    "VIRTUAL_ACCOUNT_BANK_SYARIAH_MANDIRI",
+    "VIRTUAL_ACCOUNT_BRI",
+    "VIRTUAL_ACCOUNT_BNI",
+    "VIRTUAL_ACCOUNT_BANK_PERMATA",
+    "VIRTUAL_ACCOUNT_BANK_CIMB",
+    "VIRTUAL_ACCOUNT_BANK_DANAMON",
+    "VIRTUAL_ACCOUNT_BTN",
+    "VIRTUAL_ACCOUNT_BNC",
+    "VIRTUAL_ACCOUNT_BSS",
+    "VIRTUAL_ACCOUNT_BJB",
+    "VIRTUAL_ACCOUNT_Sinarmas",
+    "EMONEY_OVO",
+    "EMONEY_SHOPEE_PAY",
+    "EMONEY_DOKU",
+    "EMONEY_LINKAJA",
+    "EMONEY_DANA",
+    "QRIS",
+  ]) {
+    assert.ok(checkout.includes(token), `missing documented DOKU Checkout token: ${token}`);
+  }
+  assert.match(checkout, /EMONEY_SHOPEEPAY: "EMONEY_SHOPEE_PAY"/);
+  assert.match(checkout, /VIRTUAL_ACCOUNT_SINARMAS: "VIRTUAL_ACCOUNT_Sinarmas"/);
+  assert.match(checkout, /DOKU_CHECKOUT_PAYMENT_TYPE_ALIASES\[raw\.toUpperCase\(\)\]/);
+  assert.match(admin, /placeholder="contoh: VIRTUAL_ACCOUNT_BCA"/);
+});
+
 test("Drizzle schema includes generic hosted gateway artifacts", () => {
   const schema = read("db/schema.ts");
   assert.match(schema, /paymentGateway: text\("payment_gateway"\)/);
