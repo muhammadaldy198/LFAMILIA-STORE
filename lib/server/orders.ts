@@ -52,7 +52,7 @@ export type OrderRecord = {
   provider_max_price_snapshot: number | null;
   doku_environment: "sandbox" | "production" | null;
   payment_gateway?: "doku" | "midtrans" | null;
-  payment_gateway_mode?: "direct" | "snap" | null;
+  payment_gateway_mode?: "checkout" | "direct" | "snap" | null;
   payment_gateway_environment?: "sandbox" | "production" | null;
   gateway_request_id?: string | null;
   gateway_reference_no?: string | null;
