@@ -92,7 +92,6 @@ export async function POST(request: Request) {
             status,
             callbackAmount,
             authoritativePaid: status === "paid",
-        authoritativeExpired: status === "expired",
           });
       if (result.credited) {
         await notifyWalletTopupSuccessById(walletTopup.id, referenceId).catch((error) =>
@@ -128,6 +127,7 @@ export async function POST(request: Request) {
         status,
         payload: body,
         authoritativePaid: status === "paid",
+        authoritativeExpired: status === "expired",
       });
       if (transition.firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
