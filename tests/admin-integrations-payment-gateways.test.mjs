@@ -63,6 +63,14 @@ test("Admin payment readiness is evaluated per channel, not by QRIS as a global 
 });
 
 
+test("Admin payment UI has no stale DOKU Direct label or hardcoded production callback host", () => {
+  const workspace = read("components/admin-payment-workspace.tsx");
+  assert.doesNotMatch(workspace, /DOKU Direct/);
+  assert.match(workspace, /routing\?\.callbacks\?\.dokuNotification/);
+  assert.match(workspace, /routing\?\.callbacks\?\.midtransSnapNotification/);
+  assert.doesNotMatch(workspace, /https:\/\/lfamiliastore\.my\.id\/api\/payments/);
+});
+
 test("Dashboard DOKU status uses core Checkout readiness, not QRIS-specific readiness", () => {
   const route = read("app/api/admin/dashboard-integrations/route.ts");
   assert.match(route, /paymentModes\.dokuCheckoutConfigured/);
