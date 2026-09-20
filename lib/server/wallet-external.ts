@@ -113,7 +113,6 @@ export async function updateExternalWalletTopup(input: {
     payment_gateway = ?, payment_gateway_mode = ?, gateway_environment = ?,
     gateway_request_id = ?, gateway_reference_no = ?, gateway_payment_no = ?,
     gateway_qr_content = ?, gateway_payment_name = ?, gateway_payment_url = ?, gateway_expired_at = ?,
-    gateway_status_checked_at = NULL,
     payment_total = ?, updated_at = CURRENT_TIMESTAMP
     WHERE reference_id = ? AND source = ?`)
     .bind(
