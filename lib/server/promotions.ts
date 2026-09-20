@@ -102,6 +102,9 @@ export async function saveDiscountVoucher(input: Omit<DiscountVoucher, "id" | "u
     if (!current) throw new Error("Voucher diskon tidak ditemukan.");
     const renaming = current.code !== normalizedCode;
     if (renaming) {
+      if (current.used_count > 0) {
+        throw new Error("Kode voucher tidak dapat diubah setelah pernah digunakan. Ubah nama/deskripsi, atau buat voucher baru.");
+      }
       const [currentHistory, targetHistory] = await Promise.all([
         db.prepare(
           "SELECT 1 AS found FROM promotion_reservations WHERE voucher_code = ? LIMIT 1",
@@ -203,11 +206,14 @@ export async function deletePromotion(kind: "voucher" | "flash", id: number) {
   const db = getD1();
   if (kind === "voucher") {
     const current = await db.prepare(
-      "SELECT code, reserved_count FROM discount_vouchers WHERE id = ? LIMIT 1",
-    ).bind(id).first<{ code: string; reserved_count: number }>();
+      "SELECT code, used_count, reserved_count FROM discount_vouchers WHERE id = ? LIMIT 1",
+    ).bind(id).first<{ code: string; used_count: number; reserved_count: number }>();
     if (!current) return;
     if (current.reserved_count > 0) {
       throw new Error("Promo tidak dapat dihapus saat masih memiliki reservasi pembayaran aktif.");
+    }
+    if (current.used_count > 0) {
+      throw new Error("Voucher pernah digunakan. Nonaktifkan voucher agar riwayat transaksi tetap mengacu ke voucher yang sama.");
     }
     const historical = await db.prepare(
       "SELECT 1 AS found FROM promotion_reservations WHERE voucher_code = ? LIMIT 1",
