@@ -227,24 +227,42 @@ test("storefront keeps fallback categories when API response fails or omits cate
   assert.doesNotMatch(storefront, /canonicalCategories\(data\.categories \?\? \[\], true\)/);
 });
 
-test("DOKU Checkout is the only DOKU credential runtime", () => {
+test("DOKU Checkout is the only active DOKU payment runtime", () => {
   const config = read("lib/server/payment-mode-config.ts");
   const checkout = read("lib/server/doku-checkout.ts");
+  assert.match(config, /export type PaymentProfileMode = "checkout" \| "snap"/);
   assert.match(config, /DOKU_CHECKOUT_\$\{profileEnvironment\.toUpperCase\(\)\}_/);
   assert.match(checkout, /DOKU_CHECKOUT_SANDBOX_CLIENT_ID/);
   assert.match(checkout, /DOKU_CHECKOUT_PRODUCTION_SECRET_KEY/);
-  assert.doesNotMatch(config, /PRIVATE_KEY|VA_CONFIG_JSON|profile\("doku", "direct"/);
+  assert.doesNotMatch(config, /PRIVATE_KEY|VA_CONFIG_JSON/);
   assert.equal(fs.existsSync(path.join(root, "lib/server/doku.ts")), false);
+  assert.equal(fs.existsSync(path.join(root, "lib/server/doku-status.ts")), false);
 });
 
-test("Checkout-only migration preserves credentials and topup polling schema", () => {
+test("Checkout-only cleanup sanitizes credentials in application code and normalizes stored modes", () => {
   const migration = read("drizzle/0039_doku_checkout_only.sql");
-  const repair = read("lib/server/database-repair.ts");
-  assert.match(migration, /INSERT OR IGNORE INTO integration_profiles/);
-  assert.match(migration, /SELECT provider, 'checkout', environment, encrypted_config/);
-  assert.match(migration, /DELETE FROM integration_profiles/);
-  assert.match(migration, /ALTER TABLE wallet_topups ADD COLUMN gateway_status_checked_at TEXT/);
-  assert.match(repair, /gateway_status_checked_at TEXT/);
+  const config = read("lib/server/payment-mode-config.ts");
+  assert.match(migration, /payment_gateway = 'doku' AND payment_gateway_mode = 'direct'/);
+  assert.match(migration, /payment_gateway = 'midtrans' AND payment_gateway_mode = 'bisnap'/);
+  assert.doesNotMatch(migration, /INSERT OR IGNORE INTO integration_profiles|ALTER TABLE wallet_topups/);
+  assert.match(config, /migrateObsoleteDokuProfiles/);
+  assert.match(config, /allowedProfileValues\("checkout", decoded\)/);
+  assert.match(config, /DELETE FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct'/);
+});
+
+test("DOKU Checkout uses the official ShopeePay request token", () => {
+  const checkout = read("lib/server/doku-checkout.ts");
+  assert.match(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEEPAY"/);
+  assert.doesNotMatch(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEE_PAY"/);
+});
+
+test("Drizzle schema includes generic hosted gateway artifacts", () => {
+  const schema = read("db/schema.ts");
+  assert.match(schema, /paymentGateway: text\("payment_gateway"\)/);
+  assert.match(schema, /paymentGatewayMode: text\("payment_gateway_mode"\)/);
+  assert.match(schema, /gatewayRequestId: text\("gateway_request_id"\)/);
+  assert.match(schema, /source: text\("source", \{ enum: \["manual", "doku", "midtrans"\] \}\)/);
+  assert.match(schema, /"doku", "midtrans", "wallet"/);
 });
 
 test("partial DOKU Checkout saves preserve a stored custom API URL", () => {
