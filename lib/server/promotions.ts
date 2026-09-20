@@ -1,6 +1,6 @@
 import { getD1 } from "@/db";
 import type { MemberTier } from "@/lib/server/member-tiers";
-import { deletePromotionMutation, saveDiscountVoucherMutation } from "@/lib/server/promotion-mutations.mjs";
+import { deletePromotionMutation, saveDiscountVoucherMutation, saveFlashSaleMutation } from "@/lib/server/promotion-mutations.mjs";
 
 export type DiscountVoucher = {
   id: number;
@@ -97,49 +97,7 @@ export async function saveDiscountVoucher(input: Omit<DiscountVoucher, "id" | "u
 }
 
 export async function saveFlashSale(input: Omit<FlashSale, "id" | "productName" | "packageLabel" | "imageUrl" | "accent" | "initials" | "basePrice" | "soldCount"> & { soldCount?: number }, id?: number) {
-  const db = getD1();
-  const packageRow = await db.prepare(`SELECT pp.price FROM products p JOIN product_packages pp ON pp.product_id = p.id WHERE p.slug = ? AND pp.sku = ?`).bind(input.productSlug, input.packageSku).first<{ price: number }>();
-  if (!packageRow) throw new Error("Produk atau nominal flash sale tidak ditemukan.");
-  if (input.salePrice >= packageRow.price) throw new Error("Harga flash sale harus lebih rendah dari harga normal.");
-  const values = [input.productSlug, input.packageSku, input.salePrice, input.badge, input.startsAt, input.endsAt, input.stockLimit, input.isActive ? 1 : 0];
-  if (id) {
-    const result = await db.prepare(
-      `UPDATE flash_sales
-       SET product_slug = ?, package_sku = ?, sale_price = ?, badge = ?, starts_at = ?,
-           ends_at = ?, stock_limit = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?
-         AND ((product_slug = ? AND package_sku = ?) OR (reserved_count = 0 AND sold_count = 0))
-         AND (? IS NULL OR ? >= sold_count + reserved_count)`,
-    ).bind(
-      ...values,
-      id,
-      input.productSlug,
-      input.packageSku,
-      input.stockLimit,
-      input.stockLimit,
-    ).run();
-
-    if (Number(result.meta.changes ?? 0) === 0) {
-      const current = await db.prepare(
-        "SELECT product_slug, package_sku, sold_count, reserved_count FROM flash_sales WHERE id = ? LIMIT 1",
-      ).bind(id).first<{ product_slug: string; package_sku: string; sold_count: number; reserved_count: number }>();
-      if (!current) throw new Error("Flash sale tidak ditemukan.");
-      if (
-        (current.reserved_count > 0 || current.sold_count > 0) &&
-        (current.product_slug !== input.productSlug || current.package_sku !== input.packageSku)
-      ) {
-        throw new Error("Produk/nominal flash sale tidak dapat diganti setelah promo pernah digunakan atau masih memiliki reservasi aktif.");
-      }
-      if (input.stockLimit !== null && input.stockLimit < current.sold_count + current.reserved_count) {
-        throw new Error("Batas stok tidak boleh lebih kecil dari terjual + reservasi aktif.");
-      }
-      throw new Error("Flash sale berubah bersamaan dengan checkout. Muat ulang lalu coba lagi.");
-    }
-    return id;
-  }
-  const row = await db.prepare(`INSERT INTO flash_sales (product_slug, package_sku, sale_price, badge, starts_at, ends_at, stock_limit, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`).bind(...values).first<{ id: number }>();
-  if (!row) throw new Error("Flash sale gagal disimpan.");
-  return row.id;
+  return saveFlashSaleMutation(getD1(), input, id);
 }
 
 export async function deletePromotion(kind: "voucher" | "flash", id: number) {
