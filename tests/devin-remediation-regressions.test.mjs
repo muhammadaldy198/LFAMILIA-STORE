@@ -274,8 +274,8 @@ test("Checkout-only cleanup retires old Direct sessions instead of relabeling th
 
 test("DOKU Checkout uses the official ShopeePay request token", () => {
   const checkout = read("lib/server/doku-checkout.ts");
-  assert.match(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEEPAY"/);
-  assert.doesNotMatch(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEE_PAY"/);
+  assert.match(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEE_PAY"/);
+  assert.doesNotMatch(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEEPAY"/);
 });
 
 test("Drizzle schema includes generic hosted gateway artifacts", () => {
