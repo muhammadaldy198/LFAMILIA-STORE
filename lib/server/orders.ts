@@ -5,6 +5,7 @@ import type { ProductInputField } from "@/lib/store-data";
 import { getProviderAdapter } from "@/lib/server/providers";
 import type { ProviderResult } from "@/lib/server/providers/types";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
+import { FULFILLMENT_ERROR_TRANSITION_GUARD_SQL } from "@/lib/server/fulfillment-transition-guard.mjs";
 import {
   consumeOrderPromotion,
   releaseExternalPromotion,
@@ -743,7 +744,8 @@ async function setFulfillmentError(orderId: string, message: string) {
   await getD1()
     .prepare(
       `UPDATE orders SET fulfillment_status = 'needs_review', provider_status = 'error',
-     provider_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+       provider_message = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND ${FULFILLMENT_ERROR_TRANSITION_GUARD_SQL}`,
     )
     .bind(message, orderId)
     .run();
@@ -753,7 +755,8 @@ async function setRetryableFulfillmentError(orderId: string, message: string) {
   await getD1()
     .prepare(
       `UPDATE orders SET fulfillment_status = 'processing', provider_status = 'retryable_error',
-       provider_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+       provider_message = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND ${FULFILLMENT_ERROR_TRANSITION_GUARD_SQL}`,
     )
     .bind(message, orderId)
     .run();
