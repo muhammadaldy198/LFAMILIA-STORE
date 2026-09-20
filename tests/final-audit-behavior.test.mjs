@@ -253,7 +253,7 @@ test("stale fulfillment error paths cannot downgrade terminal provider results",
   assert.equal(Number(applyRetryableError("failed").changes), 0);
   assert.equal(Number(applyRetryableError("active").changes), 1);
   assert.deepEqual(
-    db.prepare("SELECT fulfillment_status,provider_status,provider_message FROM orders WHERE id='success'").get(),
+    { ...db.prepare("SELECT fulfillment_status,provider_status,provider_message FROM orders WHERE id='success'").get() },
     { fulfillment_status: "success", provider_status: "success", provider_message: "delivered" },
   );
   assert.equal(db.prepare("SELECT provider_status FROM orders WHERE id='active'").get().provider_status, "retryable_error");
