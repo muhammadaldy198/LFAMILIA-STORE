@@ -168,7 +168,7 @@ export async function saveFlashSale(input: Omit<FlashSale, "id" | "productName" 
        SET product_slug = ?, package_sku = ?, sale_price = ?, badge = ?, starts_at = ?,
            ends_at = ?, stock_limit = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?
-         AND ((product_slug = ? AND package_sku = ?) OR reserved_count = 0)
+         AND ((product_slug = ? AND package_sku = ?) OR (reserved_count = 0 AND sold_count = 0))
          AND (? IS NULL OR ? >= sold_count + reserved_count)`,
     ).bind(
       ...values,
@@ -185,10 +185,10 @@ export async function saveFlashSale(input: Omit<FlashSale, "id" | "productName" 
       ).bind(id).first<{ product_slug: string; package_sku: string; sold_count: number; reserved_count: number }>();
       if (!current) throw new Error("Flash sale tidak ditemukan.");
       if (
-        current.reserved_count > 0 &&
+        (current.reserved_count > 0 || current.sold_count > 0) &&
         (current.product_slug !== input.productSlug || current.package_sku !== input.packageSku)
       ) {
-        throw new Error("Produk/nominal flash sale tidak dapat diganti saat masih memiliki reservasi pembayaran aktif.");
+        throw new Error("Produk/nominal flash sale tidak dapat diganti setelah promo pernah digunakan atau masih memiliki reservasi aktif.");
       }
       if (input.stockLimit !== null && input.stockLimit < current.sold_count + current.reserved_count) {
         throw new Error("Batas stok tidak boleh lebih kecil dari terjual + reservasi aktif.");
@@ -226,11 +226,14 @@ export async function deletePromotion(kind: "voucher" | "flash", id: number) {
   }
 
   const current = await db.prepare(
-    "SELECT reserved_count FROM flash_sales WHERE id = ? LIMIT 1",
-  ).bind(id).first<{ reserved_count: number }>();
+    "SELECT sold_count, reserved_count FROM flash_sales WHERE id = ? LIMIT 1",
+  ).bind(id).first<{ sold_count: number; reserved_count: number }>();
   if (!current) return;
   if (current.reserved_count > 0) {
     throw new Error("Promo tidak dapat dihapus saat masih memiliki reservasi pembayaran aktif.");
+  }
+  if (current.sold_count > 0) {
+    throw new Error("Flash sale pernah digunakan. Nonaktifkan promo agar riwayat transaksi tetap mengacu ke promo yang sama.");
   }
   const historical = await db.prepare(
     "SELECT 1 AS found FROM promotion_reservations WHERE flash_sale_id = ? LIMIT 1",
