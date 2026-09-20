@@ -115,7 +115,12 @@ function allowedProfileValues(mode: PaymentProfileMode, values: Record<string, s
 
 async function migrateObsoleteDokuProfiles(db = getD1(), explicitSecret?: string) {
   await ensureTables(db);
-  const secretValue = explicitSecret ?? secret();
+  let secretValue: string;
+  try {
+    secretValue = explicitSecret ?? secret();
+  } catch {
+    return;
+  }
   const legacy = await db.prepare(
     "SELECT environment, encrypted_config FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct'",
   ).all<LegacyDokuProfileRow>();
