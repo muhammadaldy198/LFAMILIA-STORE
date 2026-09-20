@@ -42,7 +42,7 @@ test("payment credential backend keeps DOKU and Midtrans values encrypted", () =
 });
 
 
-test("obsolete duplicate payment credential panel is removed and dashboard says Direct API", () => {
+test("obsolete duplicate payment credential panel is removed and dashboard says DOKU Checkout", () => {
   assert.equal(fs.existsSync(path.join(root, "components/admin-payment-routing-panel.tsx")), false);
   const overview = read("components/admin-overview.tsx");
   assert.match(overview, /DOKU Checkout/);
@@ -64,7 +64,7 @@ test("Admin payment readiness is evaluated per channel, not by QRIS as a global 
 });
 
 
-test("Dashboard DOKU status uses core Direct API readiness, not QRIS-specific readiness", () => {
+test("Dashboard DOKU status uses core Checkout readiness, not QRIS-specific readiness", () => {
   const route = read("app/api/admin/dashboard-integrations/route.ts");
   assert.match(route, /paymentModes\.dokuCheckoutConfigured/);
   assert.doesNotMatch(route, /paymentMethod: "qris"/);
