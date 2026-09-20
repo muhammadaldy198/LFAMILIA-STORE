@@ -507,20 +507,6 @@ function Text({ label, value, onChange, secret = false }: { label: string; value
   </Field>;
 }
 
-function TextArea({ label, value, onChange, secret = false, placeholder = "", wide = false }: { label: string; value: string; onChange(value: string): void; secret?: boolean; placeholder?: string; wide?: boolean }) {
-  return <Field label={label} wide={wide}>
-    <textarea
-      className={`${inputClass} min-h-24 py-2 font-mono`}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      placeholder={placeholder}
-      autoComplete="new-password"
-      spellCheck={false}
-      style={secret ? { WebkitTextSecurity: "disc" } as React.CSSProperties : undefined}
-    />
-  </Field>;
-}
-
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange(value: string): void; options: string[] }) {
   return <Field label={label}>
     <select className={inputClass} value={value} onChange={(event) => onChange(event.target.value)}>
