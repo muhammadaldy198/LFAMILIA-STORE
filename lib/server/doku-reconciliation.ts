@@ -18,7 +18,6 @@ type ReconciliationOrder = OrderRecord & {
   payment_gateway_mode: string | null;
   payment_gateway_environment: "sandbox" | "production" | null;
   gateway_expired_at: string | null;
-  gateway_status_checked_at: string | null;
 };
 
 type PendingTopup = {
@@ -43,8 +42,7 @@ async function markOrderStatusChecked(orderId: string) {
 
 async function markTopupStatusChecked(topupId: string) {
   await getD1().prepare(
-    `UPDATE wallet_topups SET gateway_status_checked_at = CURRENT_TIMESTAMP,
-       updated_at = updated_at
+    `UPDATE wallet_topups SET updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND status IN ('pending', 'rejected')`,
   ).bind(topupId).run();
 }
@@ -75,9 +73,8 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
        AND payment_gateway_mode = 'checkout'
        AND payment_gateway_environment IN ('sandbox', 'production')
        AND created_at <= datetime('now', '-60 seconds')
-       AND (gateway_status_checked_at IS NULL
-         OR gateway_status_checked_at <= datetime('now', '-60 seconds'))
-     ORDER BY COALESCE(gateway_status_checked_at, created_at) ASC
+       AND updated_at <= datetime('now', '-60 seconds')
+     ORDER BY updated_at ASC, created_at ASC
      LIMIT ?`,
   ).bind(safeLimit).all<ReconciliationOrder>();
 
@@ -122,7 +119,7 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
 
   const pendingTopups = await db.prepare(
     `SELECT id, reference_id, status, admin_notes, amount, payment_total,
-      payment_gateway_mode, gateway_environment, gateway_expired_at, gateway_status_checked_at
+      payment_gateway_mode, gateway_environment, gateway_expired_at
      FROM wallet_topups
      WHERE source = 'doku'
        AND payment_gateway = 'doku'
