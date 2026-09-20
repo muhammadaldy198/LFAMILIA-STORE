@@ -3,7 +3,7 @@ import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 export type PaymentEnvironment = "sandbox" | "production";
 export type PaymentProvider = "doku" | "midtrans";
-export type PaymentProfileMode = "checkout" | "direct" | "snap";
+export type PaymentProfileMode = "checkout" | "snap";
 
 type RuntimeLike = Record<string, unknown> & {
   DB?: D1Database;
@@ -102,9 +102,6 @@ export async function savePaymentModeSelections(input: {
 
 const allowedFields: Record<PaymentProfileMode, readonly string[]> = {
   checkout: ["clientId", "secretKey", "apiUrl"],
-  // Legacy Direct profiles remain readable only so an existing Client ID /
-  // Secret Key can be carried over without asking the owner to re-enter them.
-  direct: ["clientId", "secretKey", "privateKey", "privateKeyPassphrase", "apiUrl", "qrisMerchantId", "qrisTerminalId", "qrisPostalCode", "vaConfigJson"],
   snap: ["serverKey", "clientKey"],
 };
 
@@ -140,18 +137,14 @@ export async function savePaymentGatewayProfile(input: {
   if ((input.provider === "doku" && input.mode !== "checkout") || (input.provider === "midtrans" && input.mode !== "snap")) {
     throw new Error("Mode gateway tidak valid.");
   }
-  if (input.provider === "doku") {
-    const current = await profile("doku", "checkout", input.environment);
-    const legacy = await profile("doku", "direct", input.environment);
-    const inherited = { ...(legacy ?? {}), ...(current ?? {}) };
+  if (input.provider === "doku" && !input.values.apiUrl?.trim()) {
     input = {
       ...input,
       values: {
-        clientId: input.values.clientId?.trim() || inherited.clientId || "",
-        secretKey: input.values.secretKey?.trim() || inherited.secretKey || "",
-        apiUrl: input.values.apiUrl?.trim()
-          || inherited.apiUrl
-          || (input.environment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"),
+        ...input.values,
+        apiUrl: input.environment === "production"
+          ? "https://api.doku.com"
+          : "https://api-sandbox.doku.com",
       },
     };
   }
@@ -195,8 +188,8 @@ function checkoutReady(values: Record<string, string> | null) {
 export async function getPaymentModeOverview() {
   const modes = await getActivePaymentModes();
   const [dokuSandbox, dokuProduction, midtransSandbox, midtransProduction] = await Promise.all([
-    profile("doku", "checkout", "sandbox").then(async (value) => value ?? profile("doku", "direct", "sandbox")),
-    profile("doku", "checkout", "production").then(async (value) => value ?? profile("doku", "direct", "production")),
+    profile("doku", "checkout", "sandbox"),
+    profile("doku", "checkout", "production"),
     profile("midtrans", "snap", "sandbox"),
     profile("midtrans", "snap", "production"),
   ]);
@@ -233,47 +226,24 @@ export async function hydrateDokuCheckoutRuntimeEnv<T extends object>(sourceEnv:
   try {
     const current = await settings(db);
     const environment = env(current.get("doku_environment"));
-    const [sandboxCheckout, productionCheckout, sandboxDirect, productionDirect] = await Promise.all([
+    const [sandboxCheckout, productionCheckout] = await Promise.all([
       profile("doku", "checkout", "sandbox", db, encryptionSecret),
       profile("doku", "checkout", "production", db, encryptionSecret),
-      profile("doku", "direct", "sandbox", db, encryptionSecret),
-      profile("doku", "direct", "production", db, encryptionSecret),
     ]);
     const target: Record<string, unknown> = { ...source, DOKU_ENV: environment };
     const put = (key: string, value: string | undefined) => { if (value?.trim()) target[key] = value.trim(); };
     const applyProfile = (
       profileEnvironment: PaymentEnvironment,
-      checkoutValues: Record<string, string> | null,
-      directValues: Record<string, string> | null,
+      checkout: Record<string, string> | null,
     ) => {
-      const environmentName = profileEnvironment.toUpperCase();
-      const checkout = checkoutValues ?? directValues;
-      if (checkout) {
-        const checkoutPrefix = `DOKU_CHECKOUT_${environmentName}_`;
-        put(`${checkoutPrefix}CLIENT_ID`, checkout.clientId);
-        put(`${checkoutPrefix}SECRET_KEY`, checkout.secretKey);
-        put(`${checkoutPrefix}API_URL`, checkout.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
-      }
-
-      // Legacy Direct credentials keep their own identity. Never combine a
-      // Checkout Client ID/Secret Key with a legacy Direct private key.
-      if (directValues) {
-        const directPrefix = `DOKU_${environmentName}_`;
-        put(`${directPrefix}CLIENT_ID`, directValues.clientId);
-        put(`${directPrefix}SECRET_KEY`, directValues.secretKey);
-        put(`${directPrefix}API_URL`, directValues.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
-        put(`${directPrefix}PRIVATE_KEY`, directValues.privateKey);
-        put(`${directPrefix}PRIVATE_KEY_PASSPHRASE`, directValues.privateKeyPassphrase);
-        put(`${directPrefix}QRIS_MERCHANT_ID`, directValues.qrisMerchantId);
-        put(`${directPrefix}QRIS_TERMINAL_ID`, directValues.qrisTerminalId);
-        put(`${directPrefix}QRIS_POSTAL_CODE`, directValues.qrisPostalCode);
-        put(`${directPrefix}VA_CONFIG_JSON`, directValues.vaConfigJson);
-      }
+      if (!checkout) return;
+      const checkoutPrefix = `DOKU_CHECKOUT_${profileEnvironment.toUpperCase()}_`;
+      put(`${checkoutPrefix}CLIENT_ID`, checkout.clientId);
+      put(`${checkoutPrefix}SECRET_KEY`, checkout.secretKey);
+      put(`${checkoutPrefix}API_URL`, checkout.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
     };
-    // New hosted Checkout and legacy Direct recovery use separate credential
-    // namespaces. Direct stays available only to drain historical invoices.
-    applyProfile("sandbox", sandboxCheckout, sandboxDirect);
-    applyProfile("production", productionCheckout, productionDirect);
+    applyProfile("sandbox", sandboxCheckout);
+    applyProfile("production", productionCheckout);
     return target as T;
   } catch {
     return sourceEnv;
