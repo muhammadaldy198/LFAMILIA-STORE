@@ -237,6 +237,22 @@ test("DOKU Checkout is the only DOKU credential runtime", () => {
   assert.equal(fs.existsSync(path.join(root, "lib/server/doku.ts")), false);
 });
 
+test("Checkout-only migration preserves credentials and topup polling schema", () => {
+  const migration = read("drizzle/0039_doku_checkout_only.sql");
+  const repair = read("lib/server/database-repair.ts");
+  assert.match(migration, /INSERT OR IGNORE INTO integration_profiles/);
+  assert.match(migration, /SELECT provider, 'checkout', environment, encrypted_config/);
+  assert.match(migration, /DELETE FROM integration_profiles/);
+  assert.match(migration, /ALTER TABLE wallet_topups ADD COLUMN gateway_status_checked_at TEXT/);
+  assert.match(repair, /gateway_status_checked_at TEXT/);
+});
+
+test("partial DOKU Checkout saves preserve a stored custom API URL", () => {
+  const config = read("lib/server/payment-mode-config.ts");
+  assert.match(config, /const existing = await profile\("doku", "checkout", input\.environment\)/);
+  assert.match(config, /if \(!existing\?\.apiUrl\?\.trim\(\)\)/);
+});
+
 test("DOKU Checkout overview only reports ready with Client ID, Secret Key, and HTTPS endpoint", () => {
   const config = read("lib/server/payment-mode-config.ts");
   assert.match(config, /values\?\.clientId/);
