@@ -270,6 +270,27 @@ test("Midtrans fraud challenge never becomes paid before FDS acceptance", () => 
   assert.equal(mapMidtransSnapStatus("settlement", null), "paid");
 });
 
+test("verified provider expiry is not blocked by a later local expiry timestamp", () => {
+  const db = database();
+  db.exec(`
+    CREATE TABLE orders (
+      id TEXT PRIMARY KEY,
+      payment_status TEXT NOT NULL,
+      gateway_expired_at TEXT
+    );
+    INSERT INTO orders VALUES ('o1','pending',datetime('now','+2 hours'));
+  `);
+  const result = db.prepare(
+    "UPDATE orders SET payment_status='expired' WHERE id=? AND payment_status='pending'",
+  ).run("o1");
+  assert.equal(Number(result.changes), 1);
+  assert.equal(db.prepare("SELECT payment_status FROM orders WHERE id='o1'").get().payment_status, "expired");
+  db.close();
+
+  const transition = fs.readFileSync(path.join(root, "lib/server/payment-transition.ts"), "utf8");
+  assert.match(transition, /authoritativeExpired/);
+});
+
 test("public Midtrans status refresh treats authenticated paid inquiry as authoritative", () => {
   const route = fs.readFileSync(path.join(root, "app/api/orders/status/route.ts"), "utf8");
   const midtransRefresh =
