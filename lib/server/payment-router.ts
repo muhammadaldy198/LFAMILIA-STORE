@@ -20,18 +20,18 @@ async function prepareDokuRuntime() {
 async function hasOutstandingDokuLegacyPayments() {
   const db = getD1();
   const [order, topup] = await Promise.all([
-    db.prepare(`SELECT 1
+    db.prepare(`SELECT 1 AS found
       FROM orders
       WHERE payment_gateway = 'doku'
         AND payment_gateway_mode = 'direct'
         AND payment_status = 'pending'
-      LIMIT 1`).first<{ 1: number }>(),
-    db.prepare(`SELECT 1
+      LIMIT 1`).first<{ found: number }>(),
+    db.prepare(`SELECT 1 AS found
       FROM wallet_topups
       WHERE payment_gateway = 'doku'
         AND payment_gateway_mode = 'direct'
         AND status = 'pending'
-      LIMIT 1`).first<{ 1: number }>(),
+      LIMIT 1`).first<{ found: number }>(),
   ]);
   return Boolean(order || topup);
 }
