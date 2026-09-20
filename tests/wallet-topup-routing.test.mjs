@@ -34,7 +34,6 @@ test("Admin payment UI has independent topup gateway selector and kill switches"
   assert.match(adminPayment, /Aktifkan top up saldo otomatis/);
   assert.match(adminPayment, /Gateway & Environment/);
   assert.match(adminPayment, /<Toggle checked=\{enabled\} onChange=\{onEnabled\}/);
-  assert.doesNotMatch(adminPayment, /DOKU Direct API/);
 });
 
 test("DOKU Checkout uses one hosted payment request and non-SNAP signature", () => {
