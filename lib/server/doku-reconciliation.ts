@@ -18,6 +18,7 @@ type ReconciliationOrder = OrderRecord & {
   payment_gateway_mode: string | null;
   payment_gateway_environment: "sandbox" | "production" | null;
   gateway_expired_at: string | null;
+  gateway_status_checked_at: string | null;
 };
 
 type PendingTopup = {
@@ -30,7 +31,6 @@ type PendingTopup = {
   payment_gateway_mode: string | null;
   gateway_environment: "sandbox" | "production" | null;
   gateway_expired_at: string | null;
-  gateway_status_checked_at: string | null;
 };
 
 async function markOrderStatusChecked(orderId: string) {
@@ -73,8 +73,11 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
        AND payment_gateway_mode = 'checkout'
        AND payment_gateway_environment IN ('sandbox', 'production')
        AND created_at <= datetime('now', '-60 seconds')
-       AND updated_at <= datetime('now', '-60 seconds')
-     ORDER BY updated_at ASC, created_at ASC
+       AND (
+         gateway_status_checked_at IS NULL
+         OR gateway_status_checked_at <= datetime('now', '-60 seconds')
+       )
+     ORDER BY COALESCE(gateway_status_checked_at, created_at) ASC
      LIMIT ?`,
   ).bind(safeLimit).all<ReconciliationOrder>();
 
@@ -135,9 +138,8 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
        )
        AND gateway_environment IN ('sandbox', 'production')
        AND created_at <= datetime('now', '-60 seconds')
-       AND (gateway_status_checked_at IS NULL
-         OR gateway_status_checked_at <= datetime('now', '-60 seconds'))
-     ORDER BY COALESCE(gateway_status_checked_at, created_at) ASC
+       AND updated_at <= datetime('now', '-60 seconds')
+     ORDER BY updated_at ASC, created_at ASC
      LIMIT ?`,
   ).bind(safeLimit).all<PendingTopup>();
 
