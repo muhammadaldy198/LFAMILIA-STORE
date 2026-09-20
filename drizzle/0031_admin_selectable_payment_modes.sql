@@ -23,14 +23,14 @@ ALTER TABLE `wallet_topups` ADD COLUMN `gateway_expired_at` text;
 UPDATE `orders`
 SET `payment_gateway_mode` = CASE
   WHEN `payment_gateway` = 'midtrans' THEN 'bisnap'
-  WHEN `payment_gateway` = 'doku' THEN 'checkout'
+  WHEN `payment_gateway` = 'doku' THEN 'direct'
   ELSE `payment_gateway_mode`
 END
 WHERE `payment_gateway_mode` IS NULL AND `payment_gateway` IN ('doku', 'midtrans');
 --> statement-breakpoint
 UPDATE `wallet_topups`
 SET `payment_gateway` = 'doku',
-    `payment_gateway_mode` = 'checkout',
+    `payment_gateway_mode` = 'direct',
     `gateway_environment` = `doku_environment`,
     `gateway_request_id` = `doku_request_id`,
     `gateway_reference_no` = `doku_reference_no`,
