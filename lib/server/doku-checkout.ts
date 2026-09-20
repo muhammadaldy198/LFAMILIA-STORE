@@ -263,10 +263,12 @@ export async function createDokuCheckoutPayment(input: {
   const payload = await response.json().catch(() => ({})) as CheckoutResponse;
   const paymentUrl = payload.response?.payment?.url?.trim() || "";
   if (!response.ok || !paymentUrl) {
-    const message = payload.error_messages?.join("; ")
-      || payload.message?.join("; ")
-      || "DOKU gagal membuat Checkout.";
-    throw new Error(message);
+    const messages = Array.isArray(payload.error_messages)
+      ? payload.error_messages
+      : Array.isArray(payload.message)
+        ? payload.message
+        : [];
+    throw new Error(messages.filter(Boolean).join("; ") || "DOKU gagal membuat Checkout.");
   }
 
   return {
