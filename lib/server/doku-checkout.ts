@@ -216,6 +216,7 @@ export async function createDokuCheckoutPayment(input: {
   }
 
   const endpointPath = "/checkout/v1/payment";
+  const paymentDueMinutes = 60;
   const requestId = crypto.randomUUID();
   const requestTimestamp = new Date().toISOString();
   const returnUrl = new URL(input.finishUrl);
@@ -231,7 +232,7 @@ export async function createDokuCheckoutPayment(input: {
       auto_redirect: true,
     },
     payment: {
-      payment_due_date: 60,
+      payment_due_date: paymentDueMinutes,
       payment_method_types: [paymentType],
     },
     additional_info: {
@@ -282,7 +283,8 @@ export async function createDokuCheckoutPayment(input: {
       : input.paymentMethod === "va"
         ? `Virtual Account ${input.paymentChannel.toUpperCase()}`
         : input.paymentChannel.toUpperCase(),
-    expiredAt: checkoutExpiry(payload.response?.payment?.expired_date),
+    expiredAt: checkoutExpiry(payload.response?.payment?.expired_date)
+      ?? new Date(Date.now() + paymentDueMinutes * 60_000).toISOString(),
     raw: payload,
   } satisfies DokuCheckoutPaymentResult;
 }
