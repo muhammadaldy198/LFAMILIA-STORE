@@ -140,6 +140,15 @@ test("historical provider casing is normalized through fulfillment and reconcili
   assert.match(products, /const normalizedProviderSku = item\.providerSku\?\.trim\(\) \|\| null/);
 });
 
+test("DOKU reconciliation uses only columns that exist for each payment table", () => {
+  const doku = read("lib/server/doku-reconciliation.ts");
+  const topupQuery = doku.match(/const pendingTopups =[\s\S]*?\.all<PendingTopup>\(\);/)?.[0] || "";
+  assert.match(doku, /orders SET gateway_status_checked_at = CURRENT_TIMESTAMP/);
+  assert.match(doku, /gateway_status_checked_at IS NULL/);
+  assert.match(topupQuery, /updated_at <= datetime\('now', '-60 seconds'\)/);
+  assert.doesNotMatch(topupQuery, /gateway_status_checked_at/);
+});
+
 test("DOKU expired-order polling updates the canonical throttle timestamp", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
   assert.match(doku, /payment_status IN \('pending', 'expired'\)/);
