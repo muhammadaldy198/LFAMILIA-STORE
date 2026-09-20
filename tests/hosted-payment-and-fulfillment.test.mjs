@@ -34,7 +34,6 @@ test("only hosted DOKU Checkout implementation remains in the active source tree
   assert.equal(fs.existsSync(path.join(root, "lib/server/doku.ts")), false);
   assert.equal(fs.existsSync(path.join(root, "lib/server/doku-status.ts")), false);
   assert.equal(fs.existsSync(path.join(root, "lib/server/doku-payment-transition.ts")), false);
-  const callback = read("app/api/payments/doku/callback/route.ts");
   const config = read("lib/server/payment-mode-config.ts");
   assert.doesNotMatch(config, /PRIVATE_KEY|VA_CONFIG_JSON/);
 });
