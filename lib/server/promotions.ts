@@ -92,7 +92,7 @@ export async function listFlashSales(includeInactive = false) {
   return result.results.map(flashFromRow);
 }
 
-export async function saveDiscountVoucher(input: Omit<DiscountVoucher, "id" | "usedCount"> & {
+export async function saveDiscountVoucher(input: Omit<DiscountVoucher, "id" | "usedCount"> & { usedCount?: number }, id?: number) {
   return saveDiscountVoucherMutation(getD1(), input, id);
 }
 
