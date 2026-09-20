@@ -16,7 +16,6 @@ test("DOKU Checkout and Midtrans Snap are the active hosted payment modes", () =
 
 test("DOKU Checkout status polling remains terminal-safe while fulfillment stays server-side", () => {
   const status = read("app/api/orders/status/route.ts");
-  const callback = read("app/api/payments/doku/callback/route.ts");
   const doku = read("lib/server/doku-checkout.ts");
   assert.match(status, /artifacts\.mode === "checkout"/);
   assert.match(status, /queryDokuCheckoutStatus/);
@@ -35,7 +34,6 @@ test("only hosted DOKU Checkout implementation remains in the active source tree
   assert.equal(fs.existsSync(path.join(root, "lib/server/doku-status.ts")), false);
   assert.equal(fs.existsSync(path.join(root, "lib/server/doku-payment-transition.ts")), false);
   const callback = read("app/api/payments/doku/callback/route.ts");
-  const reconciliation = read("lib/server/doku-reconciliation.ts");
   const config = read("lib/server/payment-mode-config.ts");
   assert.doesNotMatch(config, /PRIVATE_KEY|VA_CONFIG_JSON/);
 });
