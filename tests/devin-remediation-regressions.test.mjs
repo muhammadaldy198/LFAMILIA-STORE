@@ -15,10 +15,12 @@ test("uncertain external payment dispatch stays pending and recoverable", () => 
   assert.match(route, /paymentGateway: managedChannel\.gateway/);
   assert.match(route, /paymentGatewayMode: readiness\.mode/);
   assert.match(route, /paymentGatewayEnvironment: readiness\.environment/);
-  assert.match(orders, /payment_gateway, payment_gateway_mode, payment_gateway_environment, doku_environment/);
+  assert.match(orders, /payment_gateway, payment_gateway_mode, payment_gateway_environment/);
   assert.match(route, /75 \* 60_000/);
   assert.match(route, /paymentDispatchStarted = true/);
-  assert.match(route, /if \(!paymentDispatchStarted\)/);
+  assert.match(route, /if \(paymentDispatchStarted\)/);
+  assert.match(route, /markExternalOrderCreationUncertain\(referenceId, message\)/);
+  assert.match(recovery, /gateway_expired_at = COALESCE\(gateway_expired_at, datetime\('now', '\+75 minutes'\)\)/);
   assert.match(route, /Jangan bayar dua kali/);
   assert.match(midtrans, /reconcilePendingMidtransOrders/);
   assert.match(midtrans, /queryMidtransSnapStatus/);
@@ -29,9 +31,12 @@ test("uncertain external payment dispatch stays pending and recoverable", () => 
   assert.match(worker, /expireUninitializedExternalOrders\(\)/);
 });
 
-test("uncertain DOKU dispatches stay out of normal status polling until initialized", () => {
+test("ambiguous DOKU Checkout dispatches reconcile by merchant reference without a request ID", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
-  assert.match(doku, /gateway_request_id IS NOT NULL OR doku_request_id IS NOT NULL/);
+  assert.match(doku, /payment_gateway_mode = 'checkout'/);
+  assert.doesNotMatch(doku, /doku_request_id/);
+  assert.match(doku, /queryDokuCheckoutStatus\(\{[\s\S]*referenceId: order\.reference_id/);
+  assert.match(doku, /queryDokuCheckoutStatus\(\{[\s\S]*referenceId: topup\.reference_id/);
 });
 
 test("Midtrans scheduler queries provider status even after local expiry", () => {
@@ -94,17 +99,16 @@ test("active promo reservations cannot race admin edits", () => {
   assert.match(promotions, /DELETE FROM \$\{table\} WHERE id = \? AND reserved_count = 0/);
 });
 
-test("DOKU reconciliation closes local expiry but keeps authoritative late-paid recovery", () => {
+test("DOKU Checkout reconciliation closes local expiry but keeps authoritative late-paid recovery", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
-  const transition = read("lib/server/doku-payment-transition.ts");
+  const transition = read("lib/server/payment-transition.ts");
   assert.match(doku, /payment_status = 'expired'/);
   assert.match(doku, /datetime\('now', '-24 hours'\)/);
   assert.match(doku, /expiredOrders/);
   assert.match(doku, /expiredWalletTopups/);
-  assert.match(doku, /applyPendingDokuPaymentStatus\(order, "paid", \{/);
+  assert.match(doku, /applyPendingExternalPaymentStatus\(order, "paid", \{/);
   assert.match(doku, /authoritativePaid: true/);
-  assert.match(doku, /applyPendingDokuPaymentStatus\(order, "expired"\)/);
-  assert.match(doku, /status = 'rejected' AND admin_notes IN/);
+  assert.match(doku, /applyPendingExternalPaymentStatus\(order, "expired"\)/);
   assert.match(transition, /payment_status IN \('pending', 'expired'\)/);
 });
 
@@ -138,6 +142,24 @@ test("historical provider casing is normalized through fulfillment and reconcili
   assert.match(products, /const normalizedProviderSku = item\.providerSku\?\.trim\(\) \|\| null/);
 });
 
+test("DOKU reconciliation uses only columns that exist for each payment table", () => {
+  const doku = read("lib/server/doku-reconciliation.ts");
+  const topupQuery = doku.match(/const pendingTopups =[\s\S]*?\.all<PendingTopup>\(\);/)?.[0] || "";
+  assert.match(doku, /orders SET gateway_status_checked_at = CURRENT_TIMESTAMP/);
+  assert.match(doku, /gateway_status_checked_at IS NULL/);
+  assert.match(topupQuery, /updated_at <= datetime\('now', '-60 seconds'\)/);
+  assert.doesNotMatch(topupQuery, /gateway_status_checked_at/);
+});
+
+test("DOKU polling records one stable event per normalized status", () => {
+  const scheduler = read("lib/server/doku-reconciliation.ts");
+  const publicStatus = read("app/api/orders/status/route.ts");
+  assert.ok(scheduler.includes('eventId: `checkout-status-${order.reference_id}-${query.status}`'));
+  assert.ok(publicStatus.includes('eventId: `checkout-status-${order.reference_id}-${query.status}`'));
+  assert.equal(scheduler.includes('eventId: `checkout-status-${query.requestId}'), false);
+  assert.equal(publicStatus.includes('eventId: `status-query-${query.requestId}'), false);
+});
+
 test("DOKU expired-order polling updates the canonical throttle timestamp", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
   assert.match(doku, /payment_status IN \('pending', 'expired'\)/);
@@ -163,11 +185,13 @@ test("wallet topup only uses uncertainty hold after gateway dispatch begins", ()
   assert.match(wallet, /SET status = 'rejected'/);
 });
 
-test("expired DOKU recovery is bounded and terminal provider failure retires history", () => {
+test("expired DOKU Checkout recovery is bounded while retryable FAILED stays non-terminal", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
+  const checkout = read("lib/server/doku-checkout.ts");
   assert.match(doku, /datetime\('now', '-24 hours'\)/);
-  assert.match(doku, /NOT EXISTS \([\s\S]*oe\.source = 'doku'[\s\S]*oe\.status = 'failed'/);
-  assert.match(doku, /Pembayaran DOKU gagal terkonfirmasi\./);
+  assert.match(checkout, /FAILED must not finalize the merchant order/);
+  assert.match(checkout, /return "pending"/);
+  assert.doesNotMatch(doku, /Pembayaran DOKU gagal terkonfirmasi\./);
 });
 
 test("legacy provider casing remains retryable across automatic fulfillment recovery", () => {
@@ -223,9 +247,79 @@ test("storefront keeps fallback categories when API response fails or omits cate
   assert.doesNotMatch(storefront, /canonicalCategories\(data\.categories \?\? \[\], true\)/);
 });
 
-test("DOKU overview only reports ready for a parseable RSA key and HTTPS endpoint", () => {
+test("DOKU Checkout is the only active DOKU payment runtime", () => {
   const config = read("lib/server/payment-mode-config.ts");
-  assert.match(config, /createPrivateKey/);
-  assert.match(config, /apiUrl\.protocol !== "https:"/);
-  assert.match(config, /privateKeyPassphrase/);
+  const checkout = read("lib/server/doku-checkout.ts");
+  assert.match(config, /export type PaymentProfileMode = "checkout" \| "snap"/);
+  assert.match(config, /DOKU_CHECKOUT_\$\{profileEnvironment\.toUpperCase\(\)\}_/);
+  assert.match(checkout, /DOKU_CHECKOUT_SANDBOX_CLIENT_ID/);
+  assert.match(checkout, /DOKU_CHECKOUT_PRODUCTION_SECRET_KEY/);
+  assert.doesNotMatch(config, /PRIVATE_KEY|VA_CONFIG_JSON/);
+  assert.equal(fs.existsSync(path.join(root, "lib/server/doku.ts")), false);
+  assert.equal(fs.existsSync(path.join(root, "lib/server/doku-status.ts")), false);
+});
+
+test("Checkout-only cleanup retires old Direct sessions instead of relabeling them", () => {
+  const migration = read("drizzle/0039_doku_checkout_only.sql");
+  const config = read("lib/server/payment-mode-config.ts");
+  assert.match(migration, /UPDATE promotion_reservations[\s\S]*status = 'released'/);
+  assert.match(migration, /payment_status = 'expired'/);
+  assert.match(migration, /wallet_topups[\s\S]*status = 'rejected'/);
+  assert.match(migration, /SET payment_gateway_mode = NULL[\s\S]*payment_gateway = 'doku'/);
+  assert.doesNotMatch(migration, /SET payment_gateway_mode = 'checkout'[\s\S]*payment_gateway = 'doku'/);
+  assert.match(migration, /payment_gateway = 'midtrans'[\s\S]*payment_gateway_mode = 'bisnap'/);
+  assert.doesNotMatch(migration, /INSERT OR IGNORE INTO integration_profiles|ALTER TABLE wallet_topups/);
+  assert.match(config, /migrateObsoleteDokuProfiles/);
+  assert.match(config, /allowedProfileValues\("checkout", decoded\)/);
+  assert.match(config, /DELETE FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct'/);
+});
+
+test("DOKU Checkout uses the official ShopeePay request token", () => {
+  const checkout = read("lib/server/doku-checkout.ts");
+  assert.match(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEE_PAY"/);
+  assert.doesNotMatch(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEEPAY"/);
+});
+
+test("Drizzle schema includes generic hosted gateway artifacts", () => {
+  const schema = read("db/schema.ts");
+  assert.match(schema, /paymentGateway: text\("payment_gateway"\)/);
+  assert.match(schema, /paymentGatewayMode: text\("payment_gateway_mode"\)/);
+  assert.match(schema, /gatewayRequestId: text\("gateway_request_id"\)/);
+  assert.match(schema, /source: text\("source", \{ enum: \["manual", "doku", "midtrans"\] \}\)/);
+  assert.match(schema, /"doku", "midtrans", "wallet"/);
+});
+
+test("obsolete DOKU credential migration never deletes the only usable profile", () => {
+  const config = read("lib/server/payment-mode-config.ts");
+  assert.match(config, /let checkoutReady = false/);
+  assert.match(config, /checkoutReady = checkoutReadyProfile\(cleanExisting\)/);
+  assert.match(config, /ON CONFLICT\(provider, mode, environment\) DO UPDATE SET/);
+  assert.match(config, /if \(checkoutReady\) \{[\s\S]*DELETE FROM integration_profiles/);
+});
+
+test("legacy DOKU credentials are deleted only after Checkout becomes ready", () => {
+  const config = read("lib/server/payment-mode-config.ts");
+  assert.match(config, /const saved = await profile\("doku", "checkout", input\.environment\)/);
+  assert.match(config, /if \(checkoutReadyProfile\(saved\)\) \{[\s\S]*DELETE FROM integration_profiles/);
+});
+
+test("legacy DOKU credential migration requires an HTTPS Checkout endpoint", () => {
+  const config = read("lib/server/payment-mode-config.ts");
+  assert.match(config, /function checkoutReadyProfile\(/);
+  assert.match(config, /new URL\(values\.apiUrl\)\.protocol === "https:"/);
+  assert.match(config, /if \(!checkoutReadyProfile\(clean\)\) continue/);
+});
+
+test("partial DOKU Checkout saves preserve a stored custom API URL", () => {
+  const config = read("lib/server/payment-mode-config.ts");
+  assert.match(config, /const existing = await profile\("doku", "checkout", input\.environment\)/);
+  assert.match(config, /if \(!existing\?\.apiUrl\?\.trim\(\)\)/);
+});
+
+test("DOKU Checkout overview only reports ready with Client ID, Secret Key, and HTTPS endpoint", () => {
+  const config = read("lib/server/payment-mode-config.ts");
+  assert.match(config, /values\?\.clientId/);
+  assert.match(config, /values\.secretKey/);
+  assert.match(config, /new URL\(values\.apiUrl\)\.protocol === "https:"/);
+  assert.doesNotMatch(config, /createPrivateKey/);
 });

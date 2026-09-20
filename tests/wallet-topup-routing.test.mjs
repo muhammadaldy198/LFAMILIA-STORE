@@ -8,7 +8,7 @@ const route = fs.readFileSync(path.join(root, "app/api/account/topups/route.ts")
 const account = fs.readFileSync(path.join(root, "components/customer-account.tsx"), "utf8");
 const routing = fs.readFileSync(path.join(root, "lib/server/payment-mode-config.ts"), "utf8");
 const adminPayment = fs.readFileSync(path.join(root, "components/admin-payment-workspace.tsx"), "utf8");
-const doku = fs.readFileSync(path.join(root, "lib/server/doku.ts"), "utf8");
+const doku = fs.readFileSync(path.join(root, "lib/server/doku-checkout.ts"), "utf8");
 
 test("wallet topup follows the dedicated Admin-selected gateway on the server", () => {
   assert.match(routing, /wallet_topup_gateway/);
@@ -29,19 +29,19 @@ test("wallet topup follows the dedicated Admin-selected gateway on the server", 
 test("Admin payment UI has independent topup gateway selector and kill switches", () => {
   assert.match(adminPayment, /Gateway top up saldo/);
   assert.match(adminPayment, /walletTopupGateway/);
-  assert.match(adminPayment, /DOKU Direct API/);
+  assert.match(adminPayment, /DOKU Checkout/);
   assert.match(adminPayment, /Midtrans Snap/);
   assert.match(adminPayment, /Aktifkan top up saldo otomatis/);
   assert.match(adminPayment, /Gateway & Environment/);
   assert.match(adminPayment, /<Toggle checked=\{enabled\} onChange=\{onEnabled\}/);
-  assert.doesNotMatch(adminPayment, /title="DOKU Checkout"/);
 });
 
-test("DOKU Direct e-wallet request sends the device ID header", () => {
-  assert.match(doku, /deviceId: string/);
-  assert.match(doku, /headers\["x-device-id"\] = input\.deviceId\.trim\(\)/);
-  assert.match(doku, /deviceId: input\.deviceId/);
-  assert.match(doku, /payment-host-to-host/);
+test("DOKU Checkout uses one hosted payment request and non-SNAP signature", () => {
+  assert.match(doku, /\/checkout\/v1\/payment/);
+  assert.match(doku, /HMACSHA256=/);
+  assert.match(doku, /payment_method_types/);
+  assert.match(doku, /paymentUrl/);
+  assert.doesNotMatch(doku, /payment-host-to-host|RSA Private Key/);
 });
 
 test("customer topup UI does not ask which gateway to use", () => {

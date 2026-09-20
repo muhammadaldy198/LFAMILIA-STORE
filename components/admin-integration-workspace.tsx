@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CreditCard, KeyRound, LogIn, Mail, MessageCircle, Network, Save, Server, ShieldCheck } from "lucide-react";
 import { CopyUrl, Field, Panel, Status, TabBar, WorkspaceHeader, buttonClass, inputClass, primaryButtonClass } from "@/components/admin-workspace-ui";
 
-const tabs = ["Ringkasan", "DOKU Direct API", "Midtrans Snap", "Digiflazz", "KokinPay", "Google Login", "WhatsApp OTP", "Resend Email", "Relay & Keamanan"] as const;
+const tabs = ["Ringkasan", "DOKU Checkout", "Midtrans Snap", "Digiflazz", "KokinPay", "Google Login", "WhatsApp OTP", "Resend Email", "Relay & Keamanan"] as const;
 type Tab = (typeof tabs)[number];
 type Provider = "digiflazz" | "kokinpay" | "google" | "whatsapp" | "resend" | "relay" | "security";
 type Environment = "development" | "production" | "global";
@@ -29,9 +29,9 @@ type PaymentOverview = {
   dokuEnvironment: PaymentEnvironment;
   midtransEnvironment: PaymentEnvironment;
   walletTopupGateway: "doku" | "midtrans";
-  dokuMode: "direct";
+  dokuMode: "checkout";
   midtransMode: "snap";
-  dokuDirectConfigured: boolean;
+  dokuCheckoutConfigured: boolean;
   midtransSnapConfigured: boolean;
   configured: {
     doku: Record<PaymentEnvironment, boolean>;
@@ -148,24 +148,21 @@ export function AdminIntegrationWorkspace() {
     setMessage("");
     setError("");
     try {
-      if (tab === "DOKU Direct API") {
+      if (tab === "DOKU Checkout") {
         const gatewayValues = {
           clientId: values.dokuClientId || "",
           secretKey: values.dokuSecretKey || "",
-          privateKey: values.dokuPrivateKey || "",
-          privateKeyPassphrase: values.dokuPrivateKeyPassphrase || "",
           apiUrl: values.dokuApiUrl || "",
-          qrisMerchantId: values.dokuQrisMerchantId || "",
-          qrisTerminalId: values.dokuQrisTerminalId || "",
-          qrisPostalCode: values.dokuQrisPostalCode || "",
-          vaConfigJson: values.dokuVaConfigJson || "",
         };
-        const enteredCoreCredential = [gatewayValues.clientId, gatewayValues.secretKey, gatewayValues.privateKey].some((value) => value.trim());
-        if (!dokuConfigured && !enteredCoreCredential) throw new Error("Isi Client ID, Secret Key, dan RSA Private Key DOKU terlebih dahulu.");
+        const hasDokuClientId = Boolean(gatewayValues.clientId.trim());
+        const hasDokuSecretKey = Boolean(gatewayValues.secretKey.trim());
+        if (!dokuConfigured && (!hasDokuClientId || !hasDokuSecretKey)) {
+          throw new Error("Isi Client ID dan Secret Key DOKU terlebih dahulu.");
+        }
         await paymentPut({
           action: "save_profile",
           provider: "doku",
-          mode: "direct",
+          mode: "checkout",
           environment: dokuProfileEnvironment,
           values: gatewayValues,
         });
@@ -173,12 +170,6 @@ export function AdminIntegrationWorkspace() {
           ...current,
           dokuClientId: "",
           dokuSecretKey: "",
-          dokuPrivateKey: "",
-          dokuPrivateKeyPassphrase: "",
-          dokuQrisMerchantId: "",
-          dokuQrisTerminalId: "",
-          dokuQrisPostalCode: "",
-          dokuVaConfigJson: "",
           dokuApiUrl: "",
         }));
       } else if (tab === "Midtrans Snap") {
@@ -186,8 +177,11 @@ export function AdminIntegrationWorkspace() {
           serverKey: values.midtransServerKey || "",
           clientKey: values.midtransClientKey || "",
         };
-        const entered = Object.values(gatewayValues).some((value) => value.trim());
-        if (!midtransConfigured && !entered) throw new Error("Isi Server Key dan Client Key Midtrans terlebih dahulu.");
+        const hasMidtransServerKey = Boolean(gatewayValues.serverKey.trim());
+        const hasMidtransClientKey = Boolean(gatewayValues.clientKey.trim());
+        if (!midtransConfigured && (!hasMidtransServerKey || !hasMidtransClientKey)) {
+          throw new Error("Isi Server Key dan Client Key Midtrans terlebih dahulu.");
+        }
         await paymentPut({
           action: "save_profile",
           provider: "midtrans",
@@ -307,14 +301,14 @@ export function AdminIntegrationWorkspace() {
         }).join(" | ");
         if (relay.every((item) => item.connected)) setMessage(details);
         else setError(details);
-      } else if (tab === "DOKU Direct API" || tab === "Midtrans Snap") {
+      } else if (tab === "DOKU Checkout" || tab === "Midtrans Snap") {
         const response = await fetch("/api/panel/payment-routing", { cache: "no-store" });
         const payload = await response.json().catch(() => ({})) as PaymentOverview & { error?: string };
         if (!response.ok) throw new Error(payload.error || "Status payment gateway gagal dimuat.");
         setPaymentOverview(payload);
-        if (tab === "DOKU Direct API") {
-          if (!payload.configured.doku[dokuProfileEnvironment]) throw new Error(`Kredensial DOKU Direct API ${dokuProfileEnvironment} belum lengkap.`);
-          setMessage(`Konfigurasi DOKU Direct API ${dokuProfileEnvironment} lengkap dan dapat dibaca backend.`);
+        if (tab === "DOKU Checkout") {
+          if (!payload.configured.doku[dokuProfileEnvironment]) throw new Error(`Kredensial DOKU Checkout ${dokuProfileEnvironment} belum lengkap.`);
+          setMessage(`Konfigurasi DOKU Checkout ${dokuProfileEnvironment} lengkap dan dapat dibaca backend.`);
         } else {
           if (!payload.configured.midtrans[midtransProfileEnvironment]) throw new Error(`Kredensial Midtrans Snap ${midtransProfileEnvironment} belum lengkap.`);
           setMessage(`Konfigurasi Midtrans Snap ${midtransProfileEnvironment} lengkap dan dapat dibaca backend.`);
@@ -359,12 +353,6 @@ export function AdminIntegrationWorkspace() {
       dokuApiUrl: "",
       dokuClientId: "",
       dokuSecretKey: "",
-      dokuPrivateKey: "",
-      dokuPrivateKeyPassphrase: "",
-      dokuQrisMerchantId: "",
-      dokuQrisTerminalId: "",
-      dokuQrisPostalCode: "",
-      dokuVaConfigJson: "",
     }));
   }
 
@@ -391,7 +379,7 @@ export function AdminIntegrationWorkspace() {
     <TabBar tabs={[...tabs]} active={tab} onChange={(value) => setTab(value as Tab)} />
 
     {tab === "Ringkasan" && <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <Card icon={<CreditCard className="size-5" />} title="DOKU Direct API" ready={Boolean(paymentOverview?.dokuDirectConfigured)} onClick={() => { setDokuProfileEnvironment(paymentOverview?.dokuEnvironment || "sandbox"); setTab("DOKU Direct API"); }} />
+      <Card icon={<CreditCard className="size-5" />} title="DOKU Checkout" ready={Boolean(paymentOverview?.dokuCheckoutConfigured)} onClick={() => { setDokuProfileEnvironment(paymentOverview?.dokuEnvironment || "sandbox"); setTab("DOKU Checkout"); }} />
       <Card icon={<CreditCard className="size-5" />} title="Midtrans Snap" ready={Boolean(paymentOverview?.midtransSnapConfigured)} onClick={() => { setMidtransProfileEnvironment(paymentOverview?.midtransEnvironment || "sandbox"); setTab("Midtrans Snap"); }} />
       <Card icon={<Network className="size-5" />} title="Digiflazz" ready={isConfigured("digiflazz", digiflazzEnvironment)} onClick={() => setTab("Digiflazz")} />
       <Card icon={<KeyRound className="size-5" />} title="KokinPay" ready={isConfigured("kokinpay", "global")} onClick={() => setTab("KokinPay")} />
@@ -401,16 +389,16 @@ export function AdminIntegrationWorkspace() {
       <Card icon={<Server className="size-5" />} title="VPS Relay" ready={isConfigured("relay", "global")} onClick={() => setTab("Relay & Keamanan")} />
       <Panel title="Callback & Notification URL" description="Tempel URL berikut pada dashboard provider terkait." className="sm:col-span-2">
         <div className="grid gap-3 p-4">
-          <CopyUrl label="DOKU Direct API Notification" value={paymentOverview?.callbacks.dokuNotification || "/api/payments/doku/callback"} />
+          <CopyUrl label="DOKU Checkout Notification" value={paymentOverview?.callbacks.dokuNotification || "/api/payments/doku/callback"} />
           <CopyUrl label="Midtrans Snap Notification" value={paymentOverview?.callbacks.midtransSnapNotification || "/api/payments/midtrans/snap/notification"} />
           <CopyUrl label="Digiflazz Webhook URL" value={digiflazzWebhook} />
         </div>
       </Panel>
     </div>}
 
-    {tab === "DOKU Direct API" && <Panel
-      title="DOKU Direct API"
-      description="Credential disimpan terenkripsi per environment. DOKU Hosted Checkout tidak digunakan."
+    {tab === "DOKU Checkout" && <Panel
+      title="DOKU Checkout"
+      description="Credential disimpan terenkripsi per environment. Customer diarahkan ke halaman pembayaran resmi DOKU Checkout."
       action={<Status tone={dokuConfigured ? "green" : "amber"}>{dokuConfigured ? `${dokuProfileEnvironment} siap` : `${dokuProfileEnvironment} belum lengkap`}</Status>}
     >
       <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
@@ -418,12 +406,6 @@ export function AdminIntegrationWorkspace() {
         <Text label="API URL" value={values.dokuApiUrl || defaultDokuUrl(dokuProfileEnvironment)} onChange={(value) => setValue("dokuApiUrl", value)} />
         <Text label="Client ID" value={values.dokuClientId || ""} onChange={(value) => setValue("dokuClientId", value)} />
         <Text label="Secret Key" secret value={values.dokuSecretKey || ""} onChange={(value) => setValue("dokuSecretKey", value)} />
-        <TextArea label="RSA Private Key" secret value={values.dokuPrivateKey || ""} onChange={(value) => setValue("dokuPrivateKey", value)} placeholder="-----BEGIN PRIVATE KEY-----" wide />
-        <Text label="Private Key Passphrase (opsional)" secret value={values.dokuPrivateKeyPassphrase || ""} onChange={(value) => setValue("dokuPrivateKeyPassphrase", value)} />
-        <Text label="QRIS Merchant ID" value={values.dokuQrisMerchantId || ""} onChange={(value) => setValue("dokuQrisMerchantId", value)} />
-        <Text label="QRIS Terminal ID" value={values.dokuQrisTerminalId || ""} onChange={(value) => setValue("dokuQrisTerminalId", value)} />
-        <Text label="QRIS Postal Code" value={values.dokuQrisPostalCode || ""} onChange={(value) => setValue("dokuQrisPostalCode", value)} />
-        <TextArea label="VA Config JSON" value={values.dokuVaConfigJson || ""} onChange={(value) => setValue("dokuVaConfigJson", value)} placeholder='{"BCA": {...}}' wide />
         <div className="sm:col-span-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-700">
           Field sensitif tidak pernah dikirim kembali ke browser setelah disimpan. Kosongkan field yang tidak ingin diubah; backend akan mempertahankan nilai lama.
         </div>
@@ -528,20 +510,6 @@ function Card({ icon, title, ready, onClick }: { icon: React.ReactNode; title: s
 function Text({ label, value, onChange, secret = false }: { label: string; value: string; onChange(value: string): void; secret?: boolean }) {
   return <Field label={label}>
     <input type={secret ? "password" : "text"} className={inputClass} value={value} onChange={(event) => onChange(event.target.value)} autoComplete="new-password" />
-  </Field>;
-}
-
-function TextArea({ label, value, onChange, secret = false, placeholder = "", wide = false }: { label: string; value: string; onChange(value: string): void; secret?: boolean; placeholder?: string; wide?: boolean }) {
-  return <Field label={label} wide={wide}>
-    <textarea
-      className={`${inputClass} min-h-24 py-2 font-mono`}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      placeholder={placeholder}
-      autoComplete="new-password"
-      spellCheck={false}
-      style={secret ? { WebkitTextSecurity: "disc" } as React.CSSProperties : undefined}
-    />
   </Field>;
 }
 

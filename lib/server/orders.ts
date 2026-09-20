@@ -50,9 +50,8 @@ export type OrderRecord = {
   delivery_mode: "direct" | "voucher" | "manual" | null;
   supplier_cost_snapshot: number | null;
   provider_max_price_snapshot: number | null;
-  doku_environment: "sandbox" | "production" | null;
   payment_gateway?: "doku" | "midtrans" | null;
-  payment_gateway_mode?: "direct" | "snap" | null;
+  payment_gateway_mode?: "checkout" | "snap" | null;
   payment_gateway_environment?: "sandbox" | "production" | null;
   gateway_request_id?: string | null;
   gateway_reference_no?: string | null;
@@ -82,15 +81,6 @@ export type OrderRecord = {
   payment_channel: string;
   payment_status: string;
   fulfillment_status: string;
-  doku_request_id: string | null;
-  doku_token_id: string | null;
-  doku_reference_no: string | null;
-  doku_payment_no: string | null;
-  doku_qr_content: string | null;
-  doku_payment_name: string | null;
-  doku_payment_url: string | null;
-  doku_expired_at: string | null;
-  doku_status_checked_at: string | null;
   provider_ref_id: string | null;
   provider_status: string | null;
   provider_message: string | null;
@@ -305,7 +295,7 @@ export async function insertPendingOrder(input: {
   paymentMethod: string;
   paymentChannel: string;
   paymentGateway?: "doku" | "midtrans" | null;
-  paymentGatewayMode?: "direct" | "snap" | null;
+  paymentGatewayMode?: "checkout" | "snap" | null;
   paymentGatewayEnvironment?: "sandbox" | "production" | null;
   customerId?: string | null;
   walletCheckoutKey?: string | null;
@@ -340,8 +330,8 @@ export async function insertPendingOrder(input: {
       nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json,
       base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
       admin_fee, total, payment_method, payment_channel,
-      payment_gateway, payment_gateway_mode, payment_gateway_environment, doku_environment
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      payment_gateway, payment_gateway_mode, payment_gateway_environment
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       input.id,
@@ -381,7 +371,6 @@ export async function insertPendingOrder(input: {
       input.paymentGateway ?? null,
       input.paymentGatewayMode ?? null,
       input.paymentGatewayEnvironment ?? null,
-      input.paymentGateway === "doku" ? input.paymentGatewayEnvironment ?? null : null,
     )
     .run();
 }
@@ -425,62 +414,6 @@ export async function getOrderById(id: string) {
     .first<OrderRecord>();
 }
 
-export async function updateDokuPayment(input: {
-  referenceId: string;
-  requestId: string;
-  referenceNo: string | null;
-  paymentNo: string | null;
-  qrContent: string | null;
-  paymentName: string;
-  paymentUrl: string | null;
-  expiredAt: string | null;
-  total: number;
-  environment?: "sandbox" | "production" | null;
-}) {
-  await ensureLegacyDatabaseColumns();
-  await getD1()
-    .prepare(
-      `UPDATE orders SET
-       doku_request_id = ?,
-       doku_token_id = NULL,
-       doku_reference_no = ?,
-       doku_payment_no = ?,
-       doku_qr_content = ?,
-       doku_payment_name = ?,
-       doku_payment_url = ?,
-       doku_expired_at = ?,
-       doku_environment = ?,
-       doku_status_checked_at = NULL,
-       admin_fee = 0,
-       total = ?,
-       updated_at = CURRENT_TIMESTAMP
-       WHERE reference_id = ?`,
-    )
-    .bind(
-      input.requestId,
-      input.referenceNo,
-      input.paymentNo,
-      input.qrContent,
-      input.paymentName,
-      input.paymentUrl,
-      input.expiredAt,
-      input.environment ?? null,
-      input.total,
-      input.referenceId,
-    )
-    .run();
-}
-
-export async function markDokuStatusChecked(referenceId: string) {
-  await ensureLegacyDatabaseColumns();
-  await getD1()
-    .prepare(
-      `UPDATE orders SET doku_status_checked_at = CURRENT_TIMESTAMP,
-       updated_at = updated_at WHERE reference_id = ?`,
-    )
-    .bind(referenceId)
-    .run();
-}
 export async function markPaymentCreationFailed(
   referenceId: string,
   message: string,

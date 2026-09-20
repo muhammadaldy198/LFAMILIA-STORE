@@ -2,13 +2,12 @@ import { z } from "zod";
 import { getD1 } from "@/db";
 import { publicPaymentLabel } from "@/lib/public-payment";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
-import { queryDokuQrisStatus } from "@/lib/server/doku";
-import { queryDokuEwalletStatus, queryDokuVaStatus } from "@/lib/server/doku-status";
+import { queryDokuCheckoutStatus } from "@/lib/server/doku-checkout";
 import { applyPendingExternalPaymentStatus } from "@/lib/server/payment-transition";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
 import { externalArtifactsFromOrder, recordExternalPaymentEvent } from "@/lib/server/external-payments";
 import { queryMidtransSnapStatus } from "@/lib/server/midtrans-snap";
-import { hydrateDokuDirectRuntimeEnv } from "@/lib/server/payment-mode-config";
+import { hydrateDokuCheckoutRuntimeEnv } from "@/lib/server/payment-mode-config";
 import {
   fulfillAutomaticOrder,
   getOrderById,
@@ -96,8 +95,8 @@ function shouldQueryDoku(order: OrderRecord) {
   return artifacts.gateway === "doku" &&
     order.payment_status === "pending" &&
     Boolean(metadata.environment) &&
-    artifacts.mode === "direct" &&
-    dueForGatewayCheck(order, 3_000);
+    artifacts.mode === "checkout" &&
+    dueForGatewayCheck(order, 60_000);
 }
 
 function shouldQueryMidtransSnap(order: OrderRecord) {
@@ -140,36 +139,19 @@ async function expirePendingInvoice(order: OrderRecord) {
 
 async function prepareDokuRuntime() {
   const current = getRuntimeEnv<Record<string, unknown>>();
-  setRuntimeEnv(await hydrateDokuDirectRuntimeEnv(current));
+  setRuntimeEnv(await hydrateDokuCheckoutRuntimeEnv(current));
 }
 
 async function queryDokuOrderStatus(order: OrderRecord) {
   const artifacts = externalArtifacts(order);
   const { environment } = gatewayMetadata(order);
-  if (!environment || artifacts.mode !== "direct") return null;
+  if (!environment || artifacts.mode !== "checkout") return null;
 
   await prepareDokuRuntime();
-  if (order.payment_method === "qris" && artifacts.referenceNo) {
-    return queryDokuQrisStatus({ referenceId: order.reference_id, referenceNo: artifacts.referenceNo, environment });
-  }
-  if (order.payment_method === "va" && artifacts.paymentNo) {
-    return queryDokuVaStatus({
-      environment,
-      channel: order.payment_channel,
-      paymentNo: artifacts.paymentNo,
-      referenceId: order.reference_id,
-    });
-  }
-  if (order.payment_method === "ewallet" && artifacts.requestId) {
-    return queryDokuEwalletStatus({
-      environment,
-      referenceId: order.reference_id,
-      requestId: artifacts.requestId,
-      referenceNo: artifacts.referenceNo,
-      amount: order.total,
-    });
-  }
-  return null;
+  return queryDokuCheckoutStatus({
+    referenceId: order.reference_id,
+    environment,
+  });
 }
 
 async function refreshDokuStatus(order: OrderRecord) {
@@ -182,7 +164,7 @@ async function refreshDokuStatus(order: OrderRecord) {
     await recordExternalPaymentEvent({
       orderId: order.id,
       gateway: "doku",
-      eventId: `status-query-${query.requestId}-${query.status}`,
+      eventId: `checkout-status-${order.reference_id}-${query.status}`,
       status: query.status,
       payload: query.raw,
     });
@@ -200,8 +182,8 @@ async function refreshDokuStatus(order: OrderRecord) {
           console.error("Notifikasi pesanan DOKU hasil rekonsiliasi gagal:", error),
         );
       }
-    } else if (query.status === "failed") {
-      await applyPendingExternalPaymentStatus(order, "failed");
+    } else if (query.status === "expired") {
+      await applyPendingExternalPaymentStatus(order, "expired");
     }
 
     return (await getOrderById(order.id)) ?? order;

@@ -1,10 +1,9 @@
-import { createPrivateKey } from "node:crypto";
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 
 export type PaymentEnvironment = "sandbox" | "production";
 export type PaymentProvider = "doku" | "midtrans";
-export type PaymentProfileMode = "direct" | "snap";
+export type PaymentProfileMode = "checkout" | "snap";
 
 type RuntimeLike = Record<string, unknown> & {
   DB?: D1Database;
@@ -13,6 +12,7 @@ type RuntimeLike = Record<string, unknown> & {
 };
 type EncryptedValue = { v: 1; iv: string; data: string };
 type ProfileRow = { encrypted_config: string; updated_at: string };
+type LegacyDokuProfileRow = { environment: string; encrypted_config: string };
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -79,7 +79,7 @@ export async function getActivePaymentModes() {
     dokuEnvironment: env(current.get("doku_environment")),
     midtransEnvironment: env(current.get("midtrans_environment")),
     walletTopupGateway: gateway(current.get("wallet_topup_gateway")),
-    dokuMode: "direct" as const,
+    dokuMode: "checkout" as const,
     midtransMode: "snap" as const,
   };
 }
@@ -102,9 +102,83 @@ export async function savePaymentModeSelections(input: {
 }
 
 const allowedFields: Record<PaymentProfileMode, readonly string[]> = {
-  direct: ["clientId", "secretKey", "privateKey", "privateKeyPassphrase", "apiUrl", "qrisMerchantId", "qrisTerminalId", "qrisPostalCode", "vaConfigJson"],
+  checkout: ["clientId", "secretKey", "apiUrl"],
   snap: ["serverKey", "clientKey"],
 };
+
+function allowedProfileValues(mode: PaymentProfileMode, values: Record<string, string>) {
+  const allowed = new Set(allowedFields[mode]);
+  return Object.fromEntries(
+    Object.entries(values).filter(([key, value]) => allowed.has(key) && value.trim()),
+  );
+}
+
+async function migrateObsoleteDokuProfiles(db = getD1(), explicitSecret?: string) {
+  await ensureTables(db);
+  let secretValue: string;
+  try {
+    secretValue = explicitSecret ?? secret();
+  } catch {
+    return;
+  }
+  const legacy = await db.prepare(
+    "SELECT environment, encrypted_config FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct'",
+  ).all<LegacyDokuProfileRow>();
+
+  for (const row of legacy.results) {
+    if (row.environment !== "sandbox" && row.environment !== "production") continue;
+    const environment = row.environment as PaymentEnvironment;
+    const existing = await db.prepare(
+      "SELECT encrypted_config FROM integration_profiles WHERE provider = 'doku' AND mode = 'checkout' AND environment = ? LIMIT 1",
+    ).bind(environment).first<ProfileRow>();
+
+    let checkoutReady = false;
+    if (existing?.encrypted_config) {
+      try {
+        const cleanExisting = allowedProfileValues(
+          "checkout",
+          await decryptWithSecret(existing.encrypted_config, secretValue),
+        );
+        checkoutReady = checkoutReadyProfile(cleanExisting);
+      } catch {
+        checkoutReady = false;
+      }
+    }
+
+    if (!checkoutReady) {
+      let decoded: Record<string, string>;
+      try {
+        decoded = await decryptWithSecret(row.encrypted_config, secretValue);
+      } catch {
+        continue;
+      }
+      const clean = allowedProfileValues("checkout", decoded);
+      if (!clean.clientId || !clean.secretKey) continue;
+      if (!clean.apiUrl) {
+        clean.apiUrl = environment === "production"
+          ? "https://api.doku.com"
+          : "https://api-sandbox.doku.com";
+      }
+      if (!checkoutReadyProfile(clean)) continue;
+      const encrypted = await encryptWithSecret(clean, secretValue);
+      await db.prepare(`INSERT INTO integration_profiles (
+          provider, mode, environment, encrypted_config, updated_at
+        ) VALUES ('doku', 'checkout', ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(provider, mode, environment) DO UPDATE SET
+          encrypted_config = excluded.encrypted_config,
+          updated_at = CURRENT_TIMESTAMP`)
+        .bind(environment, encrypted)
+        .run();
+      checkoutReady = true;
+    }
+
+    if (checkoutReady) {
+      await db.prepare(
+        "DELETE FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct' AND environment = ?",
+      ).bind(environment).run();
+    }
+  }
+}
 
 async function saveProfile(input: {
   provider: PaymentProvider;
@@ -117,7 +191,9 @@ async function saveProfile(input: {
   const existing = await db.prepare("SELECT encrypted_config FROM integration_profiles WHERE provider = ? AND mode = ? AND environment = ? LIMIT 1")
     .bind(input.provider, input.mode, input.environment).first<ProfileRow>();
   let merged: Record<string, string> = {};
-  if (existing?.encrypted_config) merged = await decrypt(existing.encrypted_config);
+  if (existing?.encrypted_config) {
+    merged = allowedProfileValues(input.mode, await decrypt(existing.encrypted_config));
+  }
   for (const [key, value] of Object.entries(input.values)) {
     if (!allowedFields[input.mode].includes(key)) throw new Error(`Field ${key} tidak diizinkan.`);
     if (value.trim()) merged[key] = value.trim();
@@ -131,16 +207,16 @@ async function saveProfile(input: {
 
 export async function savePaymentGatewayProfile(input: {
   provider: PaymentProvider;
-  mode: "direct" | "snap";
+  mode: "checkout" | "snap";
   environment: PaymentEnvironment;
   values: Record<string, string>;
 }) {
-  if ((input.provider === "doku" && input.mode !== "direct") || (input.provider === "midtrans" && input.mode !== "snap")) {
+  if ((input.provider === "doku" && input.mode !== "checkout") || (input.provider === "midtrans" && input.mode !== "snap")) {
     throw new Error("Mode gateway tidak valid.");
   }
-  if (input.provider === "doku") {
-    const existing = await profile("doku", "direct", input.environment);
-    if (!input.values.apiUrl?.trim() && !existing?.apiUrl?.trim()) {
+  if (input.provider === "doku" && !input.values.apiUrl?.trim()) {
+    const existing = await profile("doku", "checkout", input.environment);
+    if (!existing?.apiUrl?.trim()) {
       input = {
         ...input,
         values: {
@@ -152,7 +228,15 @@ export async function savePaymentGatewayProfile(input: {
       };
     }
   }
-  return saveProfile(input);
+  await saveProfile(input);
+  if (input.provider === "doku") {
+    const saved = await profile("doku", "checkout", input.environment);
+    if (checkoutReadyProfile(saved)) {
+      await getD1().prepare(
+        "DELETE FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct' AND environment = ?",
+      ).bind(input.environment).run();
+    }
+  }
 }
 
 async function profile(provider: PaymentProvider, mode: PaymentProfileMode, environment: PaymentEnvironment, db = getD1(), explicitSecret?: string) {
@@ -180,34 +264,28 @@ export async function getMidtransSnapConfig() {
   };
 }
 
-function directReady(values: Record<string, string> | null) {
-  if (!values?.clientId || !values.secretKey || !values.privateKey || !values.apiUrl) return false;
+function checkoutReadyProfile(values: Record<string, string> | null) {
+  if (!values?.clientId || !values.secretKey || !values.apiUrl) return false;
   try {
-    const apiUrl = new URL(values.apiUrl);
-    if (apiUrl.protocol !== "https:") return false;
-    createPrivateKey({
-      key: values.privateKey,
-      format: "pem",
-      passphrase: values.privateKeyPassphrase?.trim() || undefined,
-    });
-    return true;
+    return new URL(values.apiUrl).protocol === "https:";
   } catch {
     return false;
   }
 }
 
 export async function getPaymentModeOverview() {
+  await migrateObsoleteDokuProfiles();
   const modes = await getActivePaymentModes();
   const [dokuSandbox, dokuProduction, midtransSandbox, midtransProduction] = await Promise.all([
-    profile("doku", "direct", "sandbox"),
-    profile("doku", "direct", "production"),
+    profile("doku", "checkout", "sandbox"),
+    profile("doku", "checkout", "production"),
     profile("midtrans", "snap", "sandbox"),
     profile("midtrans", "snap", "production"),
   ]);
   const configured = {
     doku: {
-      sandbox: directReady(dokuSandbox),
-      production: directReady(dokuProduction),
+      sandbox: checkoutReadyProfile(dokuSandbox),
+      production: checkoutReadyProfile(dokuProduction),
     },
     midtrans: {
       sandbox: Boolean(midtransSandbox?.serverKey && midtransSandbox.clientKey),
@@ -217,7 +295,7 @@ export async function getPaymentModeOverview() {
   const base = (() => { try { return new URL(runtime().PUBLIC_BASE_URL || "").origin; } catch { return ""; } })();
   return {
     ...modes,
-    dokuDirectConfigured: configured.doku[modes.dokuEnvironment],
+    dokuCheckoutConfigured: configured.doku[modes.dokuEnvironment],
     midtransSnapConfigured: configured.midtrans[modes.midtransEnvironment],
     configured,
     callbacks: {
@@ -228,41 +306,34 @@ export async function getPaymentModeOverview() {
   };
 }
 
-/** Injects encrypted DOKU Direct API credentials into runtime only on the server. */
-export async function hydrateDokuDirectRuntimeEnv<T extends object>(sourceEnv: T): Promise<T> {
+/** Injects encrypted DOKU Checkout credentials into runtime only on the server. */
+export async function hydrateDokuCheckoutRuntimeEnv<T extends object>(sourceEnv: T): Promise<T> {
   const source = sourceEnv as T & RuntimeLike;
   const db = source.DB;
   const encryptionSecret = source.INTEGRATION_ENCRYPTION_KEY?.trim();
   if (!db || !encryptionSecret || encryptionSecret.length < 32) return sourceEnv;
   try {
+    await migrateObsoleteDokuProfiles(db, encryptionSecret);
     const current = await settings(db);
     const environment = env(current.get("doku_environment"));
-    const [sandboxValues, productionValues] = await Promise.all([
-      profile("doku", "direct", "sandbox", db, encryptionSecret),
-      profile("doku", "direct", "production", db, encryptionSecret),
+    const [sandboxCheckout, productionCheckout] = await Promise.all([
+      profile("doku", "checkout", "sandbox", db, encryptionSecret),
+      profile("doku", "checkout", "production", db, encryptionSecret),
     ]);
     const target: Record<string, unknown> = { ...source, DOKU_ENV: environment };
     const put = (key: string, value: string | undefined) => { if (value?.trim()) target[key] = value.trim(); };
     const applyProfile = (
       profileEnvironment: PaymentEnvironment,
-      values: Record<string, string> | null,
+      checkout: Record<string, string> | null,
     ) => {
-      if (!values) return;
-      const prefix = `DOKU_${profileEnvironment.toUpperCase()}_`;
-      put(`${prefix}CLIENT_ID`, values.clientId);
-      put(`${prefix}SECRET_KEY`, values.secretKey);
-      put(`${prefix}PRIVATE_KEY`, values.privateKey);
-      put(`${prefix}PRIVATE_KEY_PASSPHRASE`, values.privateKeyPassphrase);
-      put(`${prefix}API_URL`, values.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
-      put(`${prefix}QRIS_MERCHANT_ID`, values.qrisMerchantId);
-      put(`${prefix}QRIS_TERMINAL_ID`, values.qrisTerminalId);
-      put(`${prefix}QRIS_POSTAL_CODE`, values.qrisPostalCode);
-      put(`${prefix}VA_CONFIG_JSON`, values.vaConfigJson);
+      if (!checkout) return;
+      const checkoutPrefix = `DOKU_CHECKOUT_${profileEnvironment.toUpperCase()}_`;
+      put(`${checkoutPrefix}CLIENT_ID`, checkout.clientId);
+      put(`${checkoutPrefix}SECRET_KEY`, checkout.secretKey);
+      put(`${checkoutPrefix}API_URL`, checkout.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
     };
-    // Keep both profiles hydrated so callbacks/reconciliation for an older
-    // environment remain verifiable after Admin switches the active one.
-    applyProfile("sandbox", sandboxValues);
-    applyProfile("production", productionValues);
+    applyProfile("sandbox", sandboxCheckout);
+    applyProfile("production", productionCheckout);
     return target as T;
   } catch {
     return sourceEnv;

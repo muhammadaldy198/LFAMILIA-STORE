@@ -1,14 +1,14 @@
 # LFAMILIA STORE
 
-Toko top up digital berbasis Cloudflare Workers dan D1. Aplikasi mencakup katalog, checkout melalui DOKU Direct API atau Midtrans Snap, saldo pelanggan, pemenuhan otomatis melalui provider, antrean manual, voucher diskon, stok kode terenkripsi, pelacakan transaksi, membership, serta panel Pemilik/Staff.
+Toko top up digital berbasis Cloudflare Workers dan D1. Aplikasi mencakup katalog, checkout melalui DOKU Checkout atau Midtrans Snap, saldo pelanggan, pemenuhan otomatis melalui provider, antrean manual, voucher diskon, stok kode terenkripsi, pelacakan transaksi, membership, serta panel Pemilik/Staff.
 
 ## Fitur utama
 
 - Katalog dinamis dengan gambar, banner produk, kategori, urutan, status, tab pemisah nominal, dan harga yang dikelola dari panel.
 - Nominal produk memakai provider per nominal, SKU provider, margin Rupiah/Persen, harga modal supplier, dan sinkron harga DigiFlazz per nominal maupun otomatis.
 - Produk otomatis eksternal memakai DigiFlazz. Stok Kode LFAMILIA diproses internal; produk manual masuk antrean admin setelah pembayaran terverifikasi.
-- Checkout hanya memakai gateway yang didukung: **DOKU Direct API** atau **Midtrans Snap**. Setiap gateway mempunyai toggle aktif/nonaktif terpisah dari status kesiapan credential.
-- Saldo pelanggan dapat di-top-up otomatis. Super Admin memilih gateway top up secara terpisah antara **DOKU Direct API** dan **Midtrans Snap**, serta dapat mematikan top up otomatis dengan master toggle.
+- Checkout hanya memakai gateway yang didukung: **DOKU Checkout** atau **Midtrans Snap**. Setiap gateway mempunyai toggle aktif/nonaktif terpisah dari status kesiapan credential.
+- Saldo pelanggan dapat di-top-up otomatis. Super Admin memilih gateway top up secara terpisah antara **DOKU Checkout** dan **Midtrans Snap**, serta dapat mematikan top up otomatis dengan master toggle.
 - Account pelanggan dengan login email/password atau Google Identity Services (Client ID only), membership BASIC/GOLD/DIAMOND/PLATINUM, leaderboard, ulasan, bantuan/refund, berita, FAQ, banner Home, dan pop-up informasi produk.
 - Voucher diskon, promo terjadwal, minimum transaksi, kuota, dan batas potongan.
 - Stok kode digital disimpan terenkripsi dan dapat ditampilkan di website serta dikirim melalui kanal notifikasi yang dikonfigurasi.

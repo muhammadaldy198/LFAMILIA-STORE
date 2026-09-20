@@ -11,7 +11,7 @@ import {
   type PaymentGatewayName,
 } from "@/lib/server/payment-channels";
 import { isAllowedMediaUrl } from "@/lib/media-url";
-import { isDokuChannelSupported } from "@/lib/server/doku";
+import { isDokuCheckoutChannelSupported } from "@/lib/server/doku-checkout";
 import { getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
 import { getPaymentModeOverview } from "@/lib/server/payment-mode-config";
 import { getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
@@ -60,11 +60,11 @@ function validateChannel(input: z.infer<typeof channelSchema>) {
   }
   if (!input.isActive) return;
   const supported = input.gateway === "doku"
-    ? isDokuChannelSupported(input.method, input.channel)
+    ? isDokuCheckoutChannelSupported(input.method, input.channel, input.gatewayConfig)
     : isGatewayChannelSupported(input.gateway, input.method, input.channel, input.gatewayConfig);
   if (!supported) {
     throw new Error(input.gateway === "doku"
-      ? "Channel ini belum didukung DOKU Direct API."
+      ? "Channel ini belum didukung DOKU Checkout."
       : "Isi kode gateway resmi untuk channel custom, atau pilih channel bawaan yang didukung provider.");
   }
 }
@@ -76,10 +76,10 @@ async function gatewayReadiness() {
   ]);
   return {
     doku: {
-      ready: modes.dokuDirectConfigured,
+      ready: modes.dokuCheckoutConfigured,
       environment: modes.dokuEnvironment,
-      mode: "direct" as const,
-      reason: modes.dokuDirectConfigured ? null : `Kredensial DOKU Direct API ${modes.dokuEnvironment} belum lengkap.`,
+      mode: "checkout" as const,
+      reason: modes.dokuCheckoutConfigured ? null : `Kredensial DOKU Checkout ${modes.dokuEnvironment} belum lengkap.`,
     },
     midtrans: { ...midtrans, mode: "snap" as const, relayReady: true },
   };

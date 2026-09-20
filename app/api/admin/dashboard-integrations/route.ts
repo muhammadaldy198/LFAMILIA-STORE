@@ -69,12 +69,12 @@ export async function GET(request: Request) {
         status: statusText({ ready: kokinpayReady, active: kokinpayReady }),
       },
       {
-        id: "doku-direct",
-        name: "DOKU Direct API",
-        ready: paymentModes.dokuDirectConfigured,
+        id: "doku-checkout",
+        name: "DOKU Checkout",
+        ready: paymentModes.dokuCheckoutConfigured,
         active: dokuActive,
         environment: paymentModes.dokuEnvironment,
-        status: statusText({ ready: paymentModes.dokuDirectConfigured, active: dokuActive, environment: paymentModes.dokuEnvironment }),
+        status: statusText({ ready: paymentModes.dokuCheckoutConfigured, active: dokuActive, environment: paymentModes.dokuEnvironment }),
       },
       {
         id: "midtrans-snap",

@@ -134,7 +134,6 @@ function BannerImage({
   return (
     <picture className="block">
       <source media="(max-width: 639px)" srcSet={mobileImageUrl} />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={desktopImageUrl}
         alt={alt}

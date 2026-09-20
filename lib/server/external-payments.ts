@@ -30,57 +30,8 @@ export async function updateExternalPayment(input: {
   total: number;
   paymentName?: string | null;
 }) {
-  const db = getD1();
-  if (input.gateway === "doku") {
-    await db.prepare(`UPDATE orders SET
-      payment_gateway = 'doku',
-      payment_gateway_mode = ?,
-      payment_gateway_environment = ?,
-      gateway_request_id = ?,
-      gateway_reference_no = ?,
-      gateway_payment_no = ?,
-      gateway_qr_content = ?,
-      gateway_payment_url = ?,
-      gateway_expired_at = ?,
-      gateway_status_checked_at = NULL,
-      doku_environment = ?,
-      doku_request_id = ?,
-      doku_token_id = NULL,
-      doku_reference_no = ?,
-      doku_payment_no = ?,
-      doku_qr_content = ?,
-      doku_payment_name = ?,
-      doku_payment_url = ?,
-      doku_expired_at = ?,
-      doku_status_checked_at = NULL,
-      total = ?,
-      updated_at = CURRENT_TIMESTAMP
-      WHERE reference_id = ?`)
-      .bind(
-        input.mode,
-        input.environment,
-        input.requestId,
-        input.referenceNo,
-        input.paymentNo,
-        input.qrContent,
-        input.paymentUrl,
-        input.expiredAt,
-        input.environment,
-        input.requestId,
-        input.referenceNo,
-        input.paymentNo,
-        input.qrContent,
-        input.paymentName ?? null,
-        input.paymentUrl,
-        input.expiredAt,
-        input.total,
-        input.referenceId,
-      ).run();
-    return;
-  }
-
-  await db.prepare(`UPDATE orders SET
-    payment_gateway = 'midtrans',
+  await getD1().prepare(`UPDATE orders SET
+    payment_gateway = ?,
     payment_gateway_mode = ?,
     payment_gateway_environment = ?,
     gateway_request_id = ?,
@@ -94,6 +45,7 @@ export async function updateExternalPayment(input: {
     updated_at = CURRENT_TIMESTAMP
     WHERE reference_id = ?`)
     .bind(
+      input.gateway,
       input.mode,
       input.environment,
       input.requestId,
@@ -105,6 +57,16 @@ export async function updateExternalPayment(input: {
       input.total,
       input.referenceId,
     ).run();
+}
+
+export async function markExternalOrderCreationUncertain(referenceId: string, message: string) {
+  await getD1().prepare(`UPDATE orders SET
+      provider_message = ?,
+      gateway_expired_at = COALESCE(gateway_expired_at, datetime('now', '+75 minutes')),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE reference_id = ? AND payment_status = 'pending'`)
+    .bind(`Status pembuatan pembayaran belum dapat dipastikan: ${message.slice(0, 420)}`, referenceId)
+    .run();
 }
 
 export async function recordExternalPaymentEvent(input: {
@@ -123,19 +85,17 @@ export async function recordExternalPaymentEvent(input: {
 export function externalArtifactsFromOrder(order: Record<string, unknown>) {
   const gateway = order.payment_gateway === "midtrans" || order.payment_gateway === "doku"
     ? order.payment_gateway
-    : order.doku_request_id
-      ? "doku"
-      : null;
+    : null;
   const mode = typeof order.payment_gateway_mode === "string" ? order.payment_gateway_mode : null;
   return {
     gateway,
     mode,
-    requestId: String(order.gateway_request_id || order.doku_request_id || ""),
-    referenceNo: String(order.gateway_reference_no || order.doku_reference_no || "") || null,
-    paymentNo: String(order.gateway_payment_no || order.doku_payment_no || "") || null,
-    qrContent: String(order.gateway_qr_content || order.doku_qr_content || "") || null,
-    paymentUrl: String(order.gateway_payment_url || order.doku_payment_url || "") || null,
-    expiredAt: String(order.gateway_expired_at || order.doku_expired_at || "") || null,
+    requestId: String(order.gateway_request_id || ""),
+    referenceNo: String(order.gateway_reference_no || "") || null,
+    paymentNo: String(order.gateway_payment_no || "") || null,
+    qrContent: String(order.gateway_qr_content || "") || null,
+    paymentUrl: String(order.gateway_payment_url || "") || null,
+    expiredAt: String(order.gateway_expired_at || "") || null,
   };
 }
 
@@ -169,7 +129,6 @@ export async function expireUninitializedExternalOrders(limit = 100) {
       AND external_checkout_key IS NOT NULL
       AND (payment_gateway IS NULL OR payment_gateway <> 'midtrans')
       AND gateway_request_id IS NULL
-      AND doku_request_id IS NULL
       AND created_at <= datetime('now', '-70 minutes')
     ORDER BY created_at ASC
     LIMIT ?
@@ -184,7 +143,6 @@ export async function expireUninitializedExternalOrders(limit = 100) {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND payment_status = 'pending'
         AND gateway_request_id IS NULL
-        AND doku_request_id IS NULL
     `).bind(row.id).run();
     if (Number(result.meta.changes ?? 0) > 0) {
       expired += 1;

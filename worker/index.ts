@@ -3,7 +3,7 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import handler from "vinext/server/app-router-entry";
 import { getPublicBaseUrl, setRuntimeEnv } from "../lib/server/runtime-env";
 import { hydrateIntegrationRuntimeEnv } from "../lib/server/integration-config";
-import { hydrateDokuDirectRuntimeEnv } from "../lib/server/payment-mode-config";
+import { hydrateDokuCheckoutRuntimeEnv } from "../lib/server/payment-mode-config";
 import { expireUninitializedExternalOrders } from "../lib/server/external-payments";
 import { ensureLegacyDatabaseColumns } from "../lib/server/database-repair";
 import { recoverStaleAutomaticOrders } from "../lib/server/orders";
@@ -77,7 +77,7 @@ function withSecurityHeaders(response: Response, url: URL) {
 async function hydrateRuntime(env: Env) {
   const integrated = await hydrateIntegrationRuntimeEnv(env);
   setRuntimeEnv(integrated);
-  const withDoku = await hydrateDokuDirectRuntimeEnv(integrated);
+  const withDoku = await hydrateDokuCheckoutRuntimeEnv(integrated);
   setRuntimeEnv(withDoku);
   return withDoku;
 }
