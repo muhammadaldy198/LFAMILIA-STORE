@@ -46,6 +46,6 @@ test("nickname verification follows the product configuration and blocks checkou
 test("customer checkout remains gateway-neutral under dual routing", () => {
   const checkout = read("app/checkout/page.tsx");
   assert.doesNotMatch(checkout, /code: "doku"|code: "midtrans"/i);
-  assert.doesNotMatch(checkout, /"DOKU Direct API"|"Midtrans BI-SNAP"|Pesanan diteruskan otomatis ke provider|Pembayaran melalui gateway/);
+  assert.doesNotMatch(checkout, /"DOKU Direct API"|"DOKU Checkout"|"Midtrans BI-SNAP"|Pesanan diteruskan otomatis ke provider|Pembayaran melalui gateway/);
   assert.doesNotMatch(checkout, /Pilih gateway pembayaran/);
 });
