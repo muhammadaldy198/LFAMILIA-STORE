@@ -32,18 +32,16 @@ test("DOKU Checkout status polling remains terminal-safe while fulfillment stays
 });
 
 
-test("legacy DOKU Direct invoices keep callback and reconciliation drain paths", () => {
+test("DOKU Direct implementation is absent from the active source tree", () => {
+  assert.equal(fs.existsSync(path.join(root, "lib/server/doku.ts")), false);
+  assert.equal(fs.existsSync(path.join(root, "lib/server/doku-status.ts")), false);
+  assert.equal(fs.existsSync(path.join(root, "lib/server/doku-payment-transition.ts")), false);
   const callback = read("app/api/payments/doku/callback/route.ts");
   const reconciliation = read("lib/server/doku-reconciliation.ts");
   const config = read("lib/server/payment-mode-config.ts");
-  assert.match(callback, /expectedMode === "direct"/);
-  assert.match(callback, /validateDokuNotification/);
-  assert.match(reconciliation, /payment_gateway_mode IN \('checkout', 'direct'\)/);
-  assert.match(reconciliation, /queryDokuQrisStatus/);
-  assert.match(reconciliation, /queryDokuVaStatus/);
-  assert.match(reconciliation, /queryDokuEwalletStatus/);
-  assert.match(config, /PRIVATE_KEY/);
-  assert.match(config, /VA_CONFIG_JSON/);
+  assert.doesNotMatch(callback, /validateDokuNotification|expectedMode === "direct"/);
+  assert.doesNotMatch(reconciliation, /queryDokuQrisStatus|queryDokuVaStatus|queryDokuEwalletStatus|payment_gateway_mode = 'direct'/);
+  assert.doesNotMatch(config, /PRIVATE_KEY|VA_CONFIG_JSON|mode.*direct/);
 });
 
 test("DOKU Checkout always persists a usable local expiry", () => {
