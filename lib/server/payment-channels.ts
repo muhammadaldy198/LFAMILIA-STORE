@@ -5,7 +5,7 @@ import {
   type PaymentGatewayCode,
   type PaymentMethodCode,
 } from "@/lib/payment-methods";
-import { isDokuChannelSupported } from "@/lib/server/doku";
+import { isDokuCheckoutChannelSupported } from "@/lib/server/doku-checkout";
 import { isHostedGatewayChannelSupported } from "@/lib/server/hosted-payment-methods";
 
 export type PaymentGatewayName = PaymentGatewayCode;
@@ -53,7 +53,7 @@ export function isGatewayChannelSupported(
   channel: string,
   gatewayConfig?: Record<string, string>,
 ) {
-  if (gateway === "doku") return isDokuChannelSupported(method, channel);
+  if (gateway === "doku") return isDokuCheckoutChannelSupported(method, channel, gatewayConfig);
   return isHostedGatewayChannelSupported("midtrans", method, channel, gatewayConfig);
 }
 
