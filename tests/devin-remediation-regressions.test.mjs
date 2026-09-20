@@ -163,11 +163,13 @@ test("wallet topup only uses uncertainty hold after gateway dispatch begins", ()
   assert.match(wallet, /SET status = 'rejected'/);
 });
 
-test("expired DOKU recovery is bounded and terminal provider failure retires history", () => {
+test("expired DOKU Checkout recovery is bounded while retryable FAILED stays non-terminal", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
+  const checkout = read("lib/server/doku-checkout.ts");
   assert.match(doku, /datetime\('now', '-24 hours'\)/);
-  assert.match(doku, /NOT EXISTS \([\s\S]*oe\.source = 'doku'[\s\S]*oe\.status = 'failed'/);
-  assert.match(doku, /Pembayaran DOKU gagal terkonfirmasi\./);
+  assert.match(checkout, /FAILED must not finalize the merchant order/);
+  assert.match(checkout, /return "pending"/);
+  assert.doesNotMatch(doku, /Pembayaran DOKU gagal terkonfirmasi\./);
 });
 
 test("legacy provider casing remains retryable across automatic fulfillment recovery", () => {
@@ -223,9 +225,10 @@ test("storefront keeps fallback categories when API response fails or omits cate
   assert.doesNotMatch(storefront, /canonicalCategories\(data\.categories \?\? \[\], true\)/);
 });
 
-test("DOKU overview only reports ready for a parseable RSA key and HTTPS endpoint", () => {
+test("DOKU Checkout overview only reports ready with Client ID, Secret Key, and HTTPS endpoint", () => {
   const config = read("lib/server/payment-mode-config.ts");
-  assert.match(config, /createPrivateKey/);
-  assert.match(config, /apiUrl\.protocol !== "https:"/);
-  assert.match(config, /privateKeyPassphrase/);
+  assert.match(config, /values\?\.clientId/);
+  assert.match(config, /values\.secretKey/);
+  assert.match(config, /new URL\(values\.apiUrl\)\.protocol === "https:"/);
+  assert.doesNotMatch(config, /createPrivateKey/);
 });
