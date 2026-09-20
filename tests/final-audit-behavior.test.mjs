@@ -160,7 +160,7 @@ test("production modules are wired to the behavior-tested rules", () => {
   assert.match(availability, /isDigiflazzSnapshotAvailable\(/);
   assert.match(callback, /canProcessDokuOrderCallback\(order\.payment_status, status\)/);
   assert.match(callback, /applyExternalPaymentEvent\(\{/);
-  assert.match(callback, /authoritativePaid: notification\.status === "paid"/);
+  assert.match(callback, /authoritativePaid: status === "paid"/);
   assert.match(externalCheckout, /isAutomaticPackageAvailable\(/);
   assert.match(walletCheckout, /isAutomaticPackageAvailable\(/);
 });
