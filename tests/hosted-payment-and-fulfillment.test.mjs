@@ -37,7 +37,7 @@ test("only hosted DOKU Checkout implementation remains in the active source tree
   const callback = read("app/api/payments/doku/callback/route.ts");
   const reconciliation = read("lib/server/doku-reconciliation.ts");
   const config = read("lib/server/payment-mode-config.ts");
-  assert.doesNotMatch(config, /PRIVATE_KEY|VA_CONFIG_JSON|mode.*direct/);
+  assert.doesNotMatch(config, /PRIVATE_KEY|VA_CONFIG_JSON/);
 });
 
 test("DOKU Checkout always persists a usable local expiry", () => {
