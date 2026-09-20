@@ -255,10 +255,20 @@ test("storefront keeps fallback categories when API response fails or omits cate
 
 test("historical DOKU Direct rows cannot disable hosted Checkout readiness", () => {
   const router = read("lib/server/payment-router.ts");
-  const migration = read("drizzle/0039_doku_checkout_only.sql");
   assert.doesNotMatch(router, /hasOutstandingDokuLegacyPayments|payment_gateway_mode = 'direct'/);
   assert.match(router, /ready: readiness\.ready && supported/);
-  assert.doesNotMatch(migration, /payment_gateway = 'doku'/);
+});
+
+test("expired historical Direct reservations release capacity without mutating payment rows", () => {
+  const migration = read("drizzle/0039_doku_checkout_only.sql");
+  const promotions = read("lib/server/promotions.ts");
+  assert.match(migration, /UPDATE promotion_reservations[\s\S]*status = 'released'/);
+  assert.match(migration, /datetime\(expires_at\) <= datetime\('now'\)/);
+  assert.match(migration, /payment_gateway_mode = 'direct'/);
+  assert.doesNotMatch(migration, /UPDATE orders[\s\S]*payment_gateway = 'doku'/);
+  assert.doesNotMatch(migration, /UPDATE wallet_topups[\s\S]*payment_gateway = 'doku'/);
+  assert.match(promotions, /payment_gateway_mode = 'direct'/);
+  assert.match(promotions, /datetime\(expires_at\) <= datetime\('now'\)/);
 });
 
 test("DOKU Checkout is the only active DOKU payment runtime", () => {
@@ -276,8 +286,8 @@ test("DOKU Checkout is the only active DOKU payment runtime", () => {
 test("Checkout-only cleanup never mutates historical Direct transaction state", () => {
   const migration = read("drizzle/0039_doku_checkout_only.sql");
   const config = read("lib/server/payment-mode-config.ts");
-  assert.doesNotMatch(migration, /payment_gateway = 'doku'/);
-  assert.doesNotMatch(migration, /payment_status = 'expired'|status = 'rejected'|promotion_reservations/);
+  assert.doesNotMatch(migration, /SET payment_status = 'expired'|SET status = 'rejected'/);
+  assert.match(migration, /UPDATE promotion_reservations/);
   assert.match(migration, /payment_gateway = 'midtrans'[\s\S]*payment_gateway_mode = 'bisnap'/);
   assert.doesNotMatch(migration, /INSERT OR IGNORE INTO integration_profiles|ALTER TABLE wallet_topups/);
   assert.match(config, /migrateObsoleteDokuProfiles/);
