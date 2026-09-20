@@ -325,8 +325,8 @@ test("voucher code stays immutable after reservation history so late payment tar
   assert.equal(db.prepare("SELECT used_count FROM discount_vouchers WHERE id=1").get().used_count, 1);
   db.close();
 
-  const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
-  assert.match(promotions, /Kode voucher tidak dapat diubah setelah dipakai atau direservasi/);
+  const mutations = fs.readFileSync(path.join(root, "lib/server/promotion-mutations.mjs"), "utf8");
+  assert.match(mutations, /Kode voucher tidak dapat diubah setelah dipakai atau direservasi/);
 });
 
 test("production promo mutations reject wallet races atomically", async () => {
@@ -525,6 +525,74 @@ test("wallet-used voucher code cannot be renamed or deleted for later reuse", as
   assert.deepEqual(
     { ...sqlite.prepare("SELECT code,used_count FROM discount_vouchers WHERE id=1").get() },
     { code: "SAVE10", used_count: 1 },
+  );
+  sqlite.close();
+});
+
+test("released flash-sale reservation keeps its original product identity", async () => {
+  const sqlite = database();
+  sqlite.exec(`
+    CREATE TABLE products (
+      id INTEGER PRIMARY KEY,
+      slug TEXT UNIQUE NOT NULL
+    );
+    CREATE TABLE product_packages (
+      id INTEGER PRIMARY KEY,
+      product_id INTEGER NOT NULL,
+      sku TEXT NOT NULL,
+      price INTEGER NOT NULL
+    );
+    CREATE TABLE flash_sales (
+      id INTEGER PRIMARY KEY,
+      product_slug TEXT NOT NULL,
+      package_sku TEXT NOT NULL,
+      sale_price INTEGER NOT NULL,
+      badge TEXT NOT NULL,
+      starts_at TEXT NOT NULL,
+      ends_at TEXT NOT NULL,
+      stock_limit INTEGER,
+      sold_count INTEGER NOT NULL DEFAULT 0,
+      reserved_count INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE promotion_reservations (
+      order_id TEXT PRIMARY KEY,
+      voucher_code TEXT,
+      flash_sale_id INTEGER,
+      status TEXT NOT NULL
+    );
+    INSERT INTO products VALUES (1,'game-a'),(2,'game-b');
+    INSERT INTO product_packages VALUES
+      (1,1,'sku-a',10000),
+      (2,2,'sku-b',10000);
+    INSERT INTO flash_sales (
+      id,product_slug,package_sku,sale_price,badge,starts_at,ends_at,stock_limit,
+      sold_count,reserved_count,is_active
+    ) VALUES (
+      9,'game-a','sku-a',9000,'SALE','2026-01-01','2027-01-01',10,0,0,1
+    );
+    INSERT INTO promotion_reservations VALUES ('late-order',NULL,9,'released');
+  `);
+  const db = sqliteD1Adapter(sqlite);
+  const input = {
+    productSlug: "game-b",
+    packageSku: "sku-b",
+    salePrice: 9000,
+    badge: "SALE",
+    startsAt: "2026-01-01",
+    endsAt: "2027-01-01",
+    stockLimit: 10,
+    isActive: true,
+  };
+
+  await assert.rejects(
+    () => saveFlashSaleMutation(db, input, 9),
+    /memiliki riwayat transaksi/,
+  );
+  assert.deepEqual(
+    { ...sqlite.prepare("SELECT product_slug,package_sku FROM flash_sales WHERE id=9").get() },
+    { product_slug: "game-a", package_sku: "sku-a" },
   );
   sqlite.close();
 });
