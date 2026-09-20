@@ -296,7 +296,7 @@ test("Checkout-only cleanup retires old Direct sessions instead of relabeling th
 });
 
 test("DOKU Checkout payment type catalog matches supported method families", () => {
-  const checkout = read("lib/server/doku-checkout.ts");
+  const checkout = read("lib/server/doku-checkout-payment-types.mjs");
   assert.match(checkout, /"va:bca": "VIRTUAL_ACCOUNT_BCA"/);
   assert.match(checkout, /"va:mandiri": "VIRTUAL_ACCOUNT_BANK_MANDIRI"/);
   assert.match(checkout, /"va:bsi": "VIRTUAL_ACCOUNT_BANK_SYARIAH_MANDIRI"/);
@@ -316,12 +316,12 @@ test("DOKU Checkout payment type catalog matches supported method families", () 
 });
 
 test("DOKU Checkout uses the supported-methods ShopeePay token", () => {
-  const checkout = read("lib/server/doku-checkout.ts");
+  const checkout = read("lib/server/doku-checkout-payment-types.mjs");
   assert.match(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEE_PAY"/);
 });
 
 test("DOKU Checkout payment tokens stay aligned with the official supported-methods catalog", () => {
-  const checkout = read("lib/server/doku-checkout.ts");
+  const checkout = read("lib/server/doku-checkout-payment-types.mjs");
   const admin = read("components/admin-payment-workspace.tsx");
   assert.match(checkout, /developers\.doku\.com\/accept-payments\/doku-checkout\/configuration\/supported-payment-methods/);
   for (const token of [
@@ -348,9 +348,9 @@ test("DOKU Checkout payment tokens stay aligned with the official supported-meth
   ]) {
     assert.ok(checkout.includes(token), `missing documented DOKU Checkout token: ${token}`);
   }
-  assert.match(checkout, /EMONEY_SHOPEEPAY: "EMONEY_SHOPEE_PAY"/);
-  assert.match(checkout, /VIRTUAL_ACCOUNT_SINARMAS: "VIRTUAL_ACCOUNT_Sinarmas"/);
-  assert.match(checkout, /DOKU_CHECKOUT_PAYMENT_TYPE_ALIASES\[raw\.toUpperCase\(\)\]/);
+  assert.match(checkout, /\["EMONEY_SHOPEEPAY", "EMONEY_SHOPEE_PAY"\]/);
+  assert.match(checkout, /\["VIRTUAL_ACCOUNT_SINARMAS", "VIRTUAL_ACCOUNT_Sinarmas"\]/);
+  assert.match(checkout, /DOKU_CHECKOUT_PAYMENT_TYPE_ALIASES\.get\(raw\.toUpperCase\(\)\)/);
   assert.match(admin, /placeholder="contoh: VIRTUAL_ACCOUNT_BCA"/);
 });
 
