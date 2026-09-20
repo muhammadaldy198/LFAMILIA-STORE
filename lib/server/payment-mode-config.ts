@@ -141,18 +141,19 @@ export async function savePaymentGatewayProfile(input: {
     throw new Error("Mode gateway tidak valid.");
   }
   if (input.provider === "doku") {
-    const existing = await profile("doku", "checkout", input.environment) ?? await profile("doku", "direct", input.environment);
-    if (!input.values.apiUrl?.trim() && !existing?.apiUrl?.trim()) {
-      input = {
-        ...input,
-        values: {
-          ...input.values,
-          apiUrl: input.environment === "production"
-            ? "https://api.doku.com"
-            : "https://api-sandbox.doku.com",
-        },
-      };
-    }
+    const current = await profile("doku", "checkout", input.environment);
+    const legacy = await profile("doku", "direct", input.environment);
+    const inherited = current ?? legacy;
+    input = {
+      ...input,
+      values: {
+        clientId: input.values.clientId?.trim() || inherited?.clientId || "",
+        secretKey: input.values.secretKey?.trim() || inherited?.secretKey || "",
+        apiUrl: input.values.apiUrl?.trim()
+          || inherited?.apiUrl
+          || (input.environment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"),
+      },
+    };
   }
   return saveProfile(input);
 }
