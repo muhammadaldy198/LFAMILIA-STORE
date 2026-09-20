@@ -65,10 +65,9 @@ export async function insertExternalWalletTopup(input: {
   return getD1().prepare(`INSERT INTO wallet_topups (
       id, customer_id, amount, payment_fee, payment_total, sender_name, payment_method, proof_url,
       source, reference_id, external_checkout_key,
-      payment_gateway, payment_gateway_mode, gateway_environment,
-      doku_environment
+      payment_gateway, payment_gateway_mode, gateway_environment
     )
-    SELECT ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?
+    SELECT ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?
     WHERE NOT EXISTS (
       SELECT 1 FROM wallet_topups
       WHERE customer_id = ? AND amount = ? AND payment_method = ?
@@ -89,7 +88,6 @@ export async function insertExternalWalletTopup(input: {
       input.gateway,
       input.mode,
       input.environment,
-      input.gateway === "doku" ? input.environment : null,
       input.customerId,
       input.amount,
       input.paymentMethodKey,
@@ -111,36 +109,17 @@ export async function updateExternalWalletTopup(input: {
   expiredAt: string | null;
   total: number;
 }) {
-  const db = getD1();
-  if (input.gateway === "doku") {
-    await db.prepare(`UPDATE wallet_topups SET
-      payment_gateway = 'doku', payment_gateway_mode = ?, gateway_environment = ?,
-      gateway_request_id = ?, gateway_reference_no = ?, gateway_payment_no = ?,
-      gateway_qr_content = ?, gateway_payment_name = ?, gateway_payment_url = ?, gateway_expired_at = ?,
-      doku_environment = ?, doku_request_id = ?, doku_token_id = NULL,
-      doku_reference_no = ?, doku_payment_no = ?, doku_qr_content = ?, doku_payment_name = ?,
-      doku_payment_url = ?, doku_expired_at = ?, doku_status_checked_at = NULL,
-      payment_total = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE reference_id = ? AND source = 'doku'`)
-      .bind(
-        input.mode, input.environment, input.requestId, input.referenceNo, input.paymentNo,
-        input.qrContent, input.paymentName, input.paymentUrl, input.expiredAt,
-        input.environment, input.requestId, input.referenceNo, input.paymentNo,
-        input.qrContent, input.paymentName, input.paymentUrl, input.expiredAt,
-        input.total, input.referenceId,
-      ).run();
-    return;
-  }
-  await db.prepare(`UPDATE wallet_topups SET
-    payment_gateway = 'midtrans', payment_gateway_mode = ?, gateway_environment = ?,
+  await getD1().prepare(`UPDATE wallet_topups SET
+    payment_gateway = ?, payment_gateway_mode = ?, gateway_environment = ?,
     gateway_request_id = ?, gateway_reference_no = ?, gateway_payment_no = ?,
     gateway_qr_content = ?, gateway_payment_name = ?, gateway_payment_url = ?, gateway_expired_at = ?,
+    gateway_status_checked_at = NULL,
     payment_total = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE reference_id = ? AND source = 'midtrans'`)
+    WHERE reference_id = ? AND source = ?`)
     .bind(
-      input.mode, input.environment, input.requestId, input.referenceNo, input.paymentNo,
-      input.qrContent, input.paymentName, input.paymentUrl, input.expiredAt,
-      input.total, input.referenceId,
+      input.gateway, input.mode, input.environment, input.requestId, input.referenceNo,
+      input.paymentNo, input.qrContent, input.paymentName, input.paymentUrl, input.expiredAt,
+      input.total, input.referenceId, input.gateway,
     ).run();
 }
 
@@ -167,10 +146,6 @@ export async function markExternalWalletTopupCreationFailed(referenceId: string,
   await getD1().prepare(`UPDATE wallet_topups SET
       admin_notes = ?,
       gateway_expired_at = COALESCE(gateway_expired_at, datetime('now', '+70 minutes')),
-      doku_expired_at = CASE
-        WHEN payment_gateway = 'doku' THEN COALESCE(doku_expired_at, datetime('now', '+70 minutes'))
-        ELSE doku_expired_at
-      END,
       updated_at = CURRENT_TIMESTAMP
     WHERE reference_id = ? AND status = 'pending'`)
     .bind(`Status pembuatan pembayaran belum dapat dipastikan: ${message.slice(0, 420)}`, referenceId).run();
