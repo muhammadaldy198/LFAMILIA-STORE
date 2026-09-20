@@ -306,6 +306,34 @@ test("voucher code stays immutable after reservation history so late payment tar
   assert.match(promotions, /Kode voucher tidak dapat diubah setelah dipakai atau direservasi/);
 });
 
+test("wallet-used voucher code cannot be renamed or deleted for later reuse", () => {
+  const db = database();
+  db.exec(`
+    CREATE TABLE discount_vouchers (
+      id INTEGER PRIMARY KEY,
+      code TEXT UNIQUE NOT NULL,
+      used_count INTEGER NOT NULL DEFAULT 0,
+      reserved_count INTEGER NOT NULL DEFAULT 0
+    );
+    INSERT INTO discount_vouchers VALUES (1,'SAVE10',1,0);
+  `);
+
+  const current = db.prepare(
+    "SELECT code,used_count,reserved_count FROM discount_vouchers WHERE id=1",
+  ).get();
+  assert.equal(current.used_count, 1);
+  assert.equal(current.reserved_count, 0);
+
+  // Production rejects both destructive operations when used_count > 0.
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM discount_vouchers WHERE code='SAVE10'").get().count, 1);
+  db.close();
+
+  const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
+  assert.match(promotions, /current\.used_count > 0/);
+  assert.match(promotions, /Kode voucher tidak dapat diubah setelah pernah digunakan/);
+  assert.match(promotions, /Voucher pernah digunakan\. Nonaktifkan voucher/);
+});
+
 test("historical promo references block destructive voucher reuse and deletion", () => {
   const db = database();
   db.exec(`
