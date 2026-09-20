@@ -92,6 +92,7 @@ export async function POST(request: Request) {
             status,
             callbackAmount,
             authoritativePaid: status === "paid",
+        authoritativeExpired: status === "expired",
           });
       if (result.credited) {
         await notifyWalletTopupSuccessById(walletTopup.id, referenceId).catch((error) =>
