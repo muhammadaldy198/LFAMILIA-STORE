@@ -132,7 +132,20 @@ async function migrateObsoleteDokuProfiles(db = getD1(), explicitSecret?: string
       "SELECT encrypted_config FROM integration_profiles WHERE provider = 'doku' AND mode = 'checkout' AND environment = ? LIMIT 1",
     ).bind(environment).first<ProfileRow>();
 
-    if (!existing?.encrypted_config) {
+    let checkoutReady = false;
+    if (existing?.encrypted_config) {
+      try {
+        const cleanExisting = allowedProfileValues(
+          "checkout",
+          await decryptWithSecret(existing.encrypted_config, secretValue),
+        );
+        checkoutReady = Boolean(cleanExisting.clientId && cleanExisting.secretKey && cleanExisting.apiUrl);
+      } catch {
+        checkoutReady = false;
+      }
+    }
+
+    if (!checkoutReady) {
       let decoded: Record<string, string>;
       try {
         decoded = await decryptWithSecret(row.encrypted_config, secretValue);
@@ -150,14 +163,19 @@ async function migrateObsoleteDokuProfiles(db = getD1(), explicitSecret?: string
       await db.prepare(`INSERT INTO integration_profiles (
           provider, mode, environment, encrypted_config, updated_at
         ) VALUES ('doku', 'checkout', ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(provider, mode, environment) DO NOTHING`)
+        ON CONFLICT(provider, mode, environment) DO UPDATE SET
+          encrypted_config = excluded.encrypted_config,
+          updated_at = CURRENT_TIMESTAMP`)
         .bind(environment, encrypted)
         .run();
+      checkoutReady = true;
     }
 
-    await db.prepare(
-      "DELETE FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct' AND environment = ?",
-    ).bind(environment).run();
+    if (checkoutReady) {
+      await db.prepare(
+        "DELETE FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct' AND environment = ?",
+      ).bind(environment).run();
+    }
   }
 }
 
