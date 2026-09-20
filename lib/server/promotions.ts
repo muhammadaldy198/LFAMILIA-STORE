@@ -221,8 +221,22 @@ export async function deletePromotion(kind: "voucher" | "flash", id: number) {
     if (historical) {
       throw new Error("Voucher memiliki riwayat transaksi. Nonaktifkan voucher agar pembayaran terlambat tetap dapat direkonsiliasi.");
     }
-    await db.prepare("DELETE FROM discount_vouchers WHERE id = ? AND used_count = 0 AND reserved_count = 0").bind(id).run();
-    return;
+    const deleted = await db.prepare(
+      "DELETE FROM discount_vouchers WHERE id = ? AND used_count = 0 AND reserved_count = 0",
+    ).bind(id).run();
+    if (Number(deleted.meta.changes ?? 0) > 0) return;
+
+    const latest = await db.prepare(
+      "SELECT used_count, reserved_count FROM discount_vouchers WHERE id = ? LIMIT 1",
+    ).bind(id).first<{ used_count: number; reserved_count: number }>();
+    if (!latest) return;
+    if (latest.used_count > 0) {
+      throw new Error("Voucher baru saja digunakan. Nonaktifkan voucher agar riwayat transaksi tetap konsisten.");
+    }
+    if (latest.reserved_count > 0) {
+      throw new Error("Voucher baru saja direservasi oleh checkout aktif. Nonaktifkan atau coba lagi setelah transaksi selesai.");
+    }
+    throw new Error("Voucher berubah bersamaan dengan penghapusan. Muat ulang lalu coba lagi.");
   }
 
   const current = await db.prepare(
@@ -241,7 +255,22 @@ export async function deletePromotion(kind: "voucher" | "flash", id: number) {
   if (historical) {
     throw new Error("Flash sale memiliki riwayat transaksi. Nonaktifkan promo agar pembayaran terlambat tetap dapat direkonsiliasi.");
   }
-  await db.prepare("DELETE FROM flash_sales WHERE id = ? AND sold_count = 0 AND reserved_count = 0").bind(id).run();
+  const deleted = await db.prepare(
+    "DELETE FROM flash_sales WHERE id = ? AND sold_count = 0 AND reserved_count = 0",
+  ).bind(id).run();
+  if (Number(deleted.meta.changes ?? 0) > 0) return;
+
+  const latest = await db.prepare(
+    "SELECT sold_count, reserved_count FROM flash_sales WHERE id = ? LIMIT 1",
+  ).bind(id).first<{ sold_count: number; reserved_count: number }>();
+  if (!latest) return;
+  if (latest.sold_count > 0) {
+    throw new Error("Flash sale baru saja digunakan. Nonaktifkan promo agar riwayat transaksi tetap konsisten.");
+  }
+  if (latest.reserved_count > 0) {
+    throw new Error("Flash sale baru saja direservasi oleh checkout aktif. Nonaktifkan atau coba lagi setelah transaksi selesai.");
+  }
+  throw new Error("Flash sale berubah bersamaan dengan penghapusan. Muat ulang lalu coba lagi.");
 }
 
 export type PromotionQuote = {
