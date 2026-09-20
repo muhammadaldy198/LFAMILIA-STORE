@@ -93,7 +93,7 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
       await recordOrderEvent({
         orderId: order.id,
         source: "doku",
-        eventId: `checkout-status-${query.requestId}-${query.status}`,
+        eventId: `checkout-status-${order.reference_id}-${query.status}`,
         status: query.status,
         payload: query.raw,
       });
