@@ -38,6 +38,21 @@ test("only hosted DOKU Checkout implementation remains in the active source tree
   assert.doesNotMatch(config, /PRIVATE_KEY|VA_CONFIG_JSON/);
 });
 
+test("DOKU custom payment types cannot cross payment-method families", () => {
+  const doku = read("lib/server/doku-checkout.ts");
+  assert.match(doku, /const DOKU_CHECKOUT_TYPES_BY_METHOD/);
+  assert.match(doku, /canonicalDokuCheckoutPaymentType\(method, custom\)/);
+  assert.match(doku, /qris: \["QRIS"\]/);
+  assert.match(doku, /value\.toLowerCase\(\) === normalized/);
+});
+
+test("DOKU Checkout status parser handles Checkout-level ORDER_EXPIRED", () => {
+  const doku = read("lib/server/doku-checkout.ts");
+  assert.match(doku, /status\?: string/);
+  assert.match(doku, /normalizedOrder === "ORDER_EXPIRED"/);
+  assert.match(doku, /status\(payload\.transaction\?\.status, payload\.order\?\.status\)/);
+});
+
 test("DOKU Checkout always persists a usable local expiry", () => {
   const doku = read("lib/server/doku-checkout.ts");
   assert.match(doku, /const paymentDueMinutes = 60/);

@@ -40,6 +40,7 @@ type StatusPayload = {
   order?: {
     invoice_number?: string;
     amount?: number | string;
+    status?: string;
   };
   transaction?: {
     status?: string;
@@ -60,20 +61,73 @@ export type DokuCheckoutPaymentResult = {
 };
 
 const DOKU_CHECKOUT_TYPES: Record<string, string> = {
+  // Canonical values from DOKU Checkout Supported Payment Methods.
+  "va:doku": "VIRTUAL_ACCOUNT_DOKU",
   "va:bca": "VIRTUAL_ACCOUNT_BCA",
   "va:mandiri": "VIRTUAL_ACCOUNT_BANK_MANDIRI",
-  "va:bni": "VIRTUAL_ACCOUNT_BNI",
+  "va:bsi": "VIRTUAL_ACCOUNT_BANK_SYARIAH_MANDIRI",
   "va:bri": "VIRTUAL_ACCOUNT_BRI",
-  "va:cimb": "VIRTUAL_ACCOUNT_BANK_CIMB",
+  "va:bni": "VIRTUAL_ACCOUNT_BNI",
   "va:permata": "VIRTUAL_ACCOUNT_BANK_PERMATA",
+  "va:cimb": "VIRTUAL_ACCOUNT_BANK_CIMB",
   "va:danamon": "VIRTUAL_ACCOUNT_BANK_DANAMON",
   "va:btn": "VIRTUAL_ACCOUNT_BTN",
+  "va:bnc": "VIRTUAL_ACCOUNT_BNC",
+  "va:bss": "VIRTUAL_ACCOUNT_BSS",
+  "va:bjb": "VIRTUAL_ACCOUNT_BJB",
+  "va:sinarmas": "VIRTUAL_ACCOUNT_Sinarmas",
   "ewallet:ovo": "EMONEY_OVO",
-  "ewallet:dana": "EMONEY_DANA",
   "ewallet:shopeepay": "EMONEY_SHOPEE_PAY",
+  "ewallet:doku": "EMONEY_DOKU",
+  "ewallet:linkaja": "EMONEY_LINKAJA",
+  "ewallet:dana": "EMONEY_DANA",
   "qris:mpm": "QRIS",
   "qris:qris": "QRIS",
 };
+
+const DOKU_CHECKOUT_TYPES_BY_METHOD = {
+  va: [
+    "VIRTUAL_ACCOUNT_DOKU",
+    "VIRTUAL_ACCOUNT_BCA",
+    "VIRTUAL_ACCOUNT_BANK_MANDIRI",
+    "VIRTUAL_ACCOUNT_BANK_SYARIAH_MANDIRI",
+    "VIRTUAL_ACCOUNT_BRI",
+    "VIRTUAL_ACCOUNT_BNI",
+    "VIRTUAL_ACCOUNT_BANK_PERMATA",
+    "VIRTUAL_ACCOUNT_BANK_CIMB",
+    "VIRTUAL_ACCOUNT_BANK_DANAMON",
+    "VIRTUAL_ACCOUNT_BTN",
+    "VIRTUAL_ACCOUNT_BNC",
+    "VIRTUAL_ACCOUNT_BSS",
+    "VIRTUAL_ACCOUNT_BJB",
+    "VIRTUAL_ACCOUNT_Sinarmas",
+  ],
+  ewallet: [
+    "EMONEY_OVO",
+    "EMONEY_SHOPEE_PAY",
+    "EMONEY_DOKU",
+    "EMONEY_LINKAJA",
+    "EMONEY_DANA",
+  ],
+  qris: ["QRIS"],
+} as const;
+
+function canonicalDokuCheckoutPaymentType(method: string, paymentType: string) {
+  const candidates =
+    method === "va"
+      ? DOKU_CHECKOUT_TYPES_BY_METHOD.va
+      : method === "ewallet"
+        ? DOKU_CHECKOUT_TYPES_BY_METHOD.ewallet
+        : method === "qris"
+          ? DOKU_CHECKOUT_TYPES_BY_METHOD.qris
+          : [];
+  const normalized = paymentType.trim().toLowerCase();
+  return candidates.find((value) => value.toLowerCase() === normalized) ?? null;
+}
+
+export function isDokuCheckoutPaymentTypeCompatible(method: string, paymentType: string) {
+  return Boolean(canonicalDokuCheckoutPaymentType(method, paymentType));
+}
 
 function runtime() {
   return getRuntimeEnv<Runtime>();
@@ -151,12 +205,17 @@ function checkoutExpiry(value: string | undefined) {
   return Number.isFinite(time) ? new Date(time).toISOString() : null;
 }
 
-function status(value: unknown): "paid" | "pending" | "expired" | "failed" {
+function status(
+  value: unknown,
+  orderStatus?: unknown,
+): "paid" | "pending" | "expired" | "failed" {
   const normalized = typeof value === "string" ? value.trim().toUpperCase() : "";
+  const normalizedOrder = typeof orderStatus === "string" ? orderStatus.trim().toUpperCase() : "";
   if (normalized === "SUCCESS") return "paid";
-  if (normalized === "EXPIRED") return "expired";
-  // DOKU Checkout allows the customer to retry/change payment method after a
-  // failed attempt, so FAILED must not finalize the merchant order.
+  if (normalized === "EXPIRED" || normalizedOrder === "ORDER_EXPIRED") return "expired";
+  // For DOKU Checkout, DOKU explicitly instructs merchants to ignore a
+  // transaction.status FAILED because the customer may retry or change the
+  // payment method. TIMEOUT and REDIRECT are also non-final.
   return "pending";
 }
 
@@ -166,7 +225,7 @@ export function dokuCheckoutPaymentType(
   gatewayConfig?: Record<string, string>,
 ) {
   const custom = gatewayConfig?.paymentType?.trim();
-  if (custom) return custom;
+  if (custom) return canonicalDokuCheckoutPaymentType(method, custom);
   return DOKU_CHECKOUT_TYPES[`${method}:${channel}`] || null;
 }
 
@@ -319,7 +378,7 @@ export async function queryDokuCheckoutStatus(input: {
   const amount = Number(payload.order?.amount);
   return {
     requestId,
-    status: status(payload.transaction?.status),
+    status: status(payload.transaction?.status, payload.order?.status),
     amount: Number.isFinite(amount) ? amount : 0,
     originalRequestId: payload.transaction?.original_request_id?.trim() || null,
     raw: payload,
@@ -340,7 +399,7 @@ export function parseDokuCheckoutNotification(payload: Record<string, unknown>) 
     originalRequestId: typeof transaction.original_request_id === "string"
       ? transaction.original_request_id.trim()
       : null,
-    status: status(transaction.status),
+    status: status(transaction.status, order.status),
   };
 }
 

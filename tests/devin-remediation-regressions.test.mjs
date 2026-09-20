@@ -185,13 +185,21 @@ test("wallet topup only uses uncertainty hold after gateway dispatch begins", ()
   assert.match(wallet, /SET status = 'rejected'/);
 });
 
-test("expired DOKU Checkout recovery is bounded while retryable FAILED stays non-terminal", () => {
+test("DOKU Checkout ignores FAILED attempts and honors Checkout order expiry", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
+  const publicStatus = read("app/api/orders/status/route.ts");
   const checkout = read("lib/server/doku-checkout.ts");
   assert.match(doku, /datetime\('now', '-24 hours'\)/);
-  assert.match(checkout, /FAILED must not finalize the merchant order/);
-  assert.match(checkout, /return "pending"/);
-  assert.doesNotMatch(doku, /Pembayaran DOKU gagal terkonfirmasi\./);
+  assert.match(checkout, /normalized === "SUCCESS"\) return "paid"/);
+  assert.match(checkout, /normalized === "EXPIRED" \|\| normalizedOrder === "ORDER_EXPIRED"/);
+  assert.doesNotMatch(checkout, /normalized === "FAILED"\) return "failed"/);
+  assert.match(checkout, /DOKU explicitly instructs merchants to ignore/);
+  assert.match(checkout, /status\(payload\.transaction\?\.status, payload\.order\?\.status\)/);
+  assert.match(checkout, /status\(transaction\.status, order\.status\)/);
+  assert.doesNotMatch(doku, /query\.status === "failed"/);
+  const dokuRefresh = publicStatus.match(/async function refreshDokuStatus[\s\S]*?async function refreshMidtransSnapStatus/)?.[0] || "";
+  assert.match(dokuRefresh, /query\.status === "expired"/);
+  assert.doesNotMatch(dokuRefresh, /query\.status === "failed"/);
 });
 
 test("legacy provider casing remains retryable across automatic fulfillment recovery", () => {
@@ -247,6 +255,20 @@ test("storefront keeps fallback categories when API response fails or omits cate
   assert.doesNotMatch(storefront, /canonicalCategories\(data\.categories \?\? \[\], true\)/);
 });
 
+test("historical DOKU Direct rows cannot disable hosted Checkout readiness", () => {
+  const router = read("lib/server/payment-router.ts");
+  assert.doesNotMatch(router, /hasOutstandingDokuLegacyPayments|payment_gateway_mode = 'direct'/);
+  assert.match(router, /ready: readiness\.ready && supported/);
+});
+
+test("merged DOKU cleanup migration releases legacy promo reservations before retiring Direct sessions", () => {
+  const migration = read("drizzle/0039_doku_checkout_only.sql");
+  assert.match(migration, /UPDATE promotion_reservations[\s\S]*status = 'released'/);
+  assert.match(migration, /payment_gateway_mode = 'direct'/);
+  assert.match(migration, /payment_status = 'expired'/);
+  assert.match(migration, /wallet_topups[\s\S]*status = 'rejected'/);
+});
+
 test("DOKU Checkout is the only active DOKU payment runtime", () => {
   const config = read("lib/server/payment-mode-config.ts");
   const checkout = read("lib/server/doku-checkout.ts");
@@ -271,13 +293,31 @@ test("Checkout-only cleanup retires old Direct sessions instead of relabeling th
   assert.doesNotMatch(migration, /INSERT OR IGNORE INTO integration_profiles|ALTER TABLE wallet_topups/);
   assert.match(config, /migrateObsoleteDokuProfiles/);
   assert.match(config, /allowedProfileValues\("checkout", decoded\)/);
-  assert.match(config, /DELETE FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct'/);
 });
 
-test("DOKU Checkout uses the official ShopeePay request token", () => {
+test("DOKU Checkout payment type catalog matches supported method families", () => {
+  const checkout = read("lib/server/doku-checkout.ts");
+  assert.match(checkout, /"va:bca": "VIRTUAL_ACCOUNT_BCA"/);
+  assert.match(checkout, /"va:mandiri": "VIRTUAL_ACCOUNT_BANK_MANDIRI"/);
+  assert.match(checkout, /"va:bsi": "VIRTUAL_ACCOUNT_BANK_SYARIAH_MANDIRI"/);
+  assert.match(checkout, /"va:btn": "VIRTUAL_ACCOUNT_BTN"/);
+  assert.match(checkout, /"va:bnc": "VIRTUAL_ACCOUNT_BNC"/);
+  assert.match(checkout, /"va:bss": "VIRTUAL_ACCOUNT_BSS"/);
+  assert.match(checkout, /"va:bjb": "VIRTUAL_ACCOUNT_BJB"/);
+  assert.match(checkout, /"va:sinarmas": "VIRTUAL_ACCOUNT_Sinarmas"/);
+  assert.match(checkout, /"ewallet:ovo": "EMONEY_OVO"/);
+  assert.match(checkout, /"ewallet:dana": "EMONEY_DANA"/);
+  assert.match(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEE_PAY"/);
+  assert.match(checkout, /"qris:qris": "QRIS"/);
+  assert.match(checkout, /isDokuCheckoutPaymentTypeCompatible/);
+  assert.match(checkout, /canonicalDokuCheckoutPaymentType/);
+  assert.match(checkout, /return candidates\.find/);
+  assert.match(checkout, /if \(custom\) return canonicalDokuCheckoutPaymentType\(method, custom\)/);
+});
+
+test("DOKU Checkout uses the supported-methods ShopeePay token", () => {
   const checkout = read("lib/server/doku-checkout.ts");
   assert.match(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEE_PAY"/);
-  assert.doesNotMatch(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEEPAY"/);
 });
 
 test("Drizzle schema includes generic hosted gateway artifacts", () => {
