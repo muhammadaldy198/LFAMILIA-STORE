@@ -246,26 +246,32 @@ export async function hydrateDokuCheckoutRuntimeEnv<T extends object>(sourceEnv:
       checkoutValues: Record<string, string> | null,
       directValues: Record<string, string> | null,
     ) => {
-      const values = { ...(directValues ?? {}), ...(checkoutValues ?? {}) };
-      if (!Object.keys(values).length) return;
-      const prefix = `DOKU_${profileEnvironment.toUpperCase()}_`;
-      put(`${prefix}CLIENT_ID`, values.clientId);
-      put(`${prefix}SECRET_KEY`, values.secretKey);
-      put(`${prefix}API_URL`, values.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
+      const environmentName = profileEnvironment.toUpperCase();
+      const checkout = checkoutValues ?? directValues;
+      if (checkout) {
+        const checkoutPrefix = `DOKU_CHECKOUT_${environmentName}_`;
+        put(`${checkoutPrefix}CLIENT_ID`, checkout.clientId);
+        put(`${checkoutPrefix}SECRET_KEY`, checkout.secretKey);
+        put(`${checkoutPrefix}API_URL`, checkout.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
+      }
 
-      // Legacy Direct fields stay server-only so already-issued Direct invoices
-      // remain verifiable/reconcilable until they naturally drain.
+      // Legacy Direct credentials keep their own identity. Never combine a
+      // Checkout Client ID/Secret Key with a legacy Direct private key.
       if (directValues) {
-        put(`${prefix}PRIVATE_KEY`, directValues.privateKey);
-        put(`${prefix}PRIVATE_KEY_PASSPHRASE`, directValues.privateKeyPassphrase);
-        put(`${prefix}QRIS_MERCHANT_ID`, directValues.qrisMerchantId);
-        put(`${prefix}QRIS_TERMINAL_ID`, directValues.qrisTerminalId);
-        put(`${prefix}QRIS_POSTAL_CODE`, directValues.qrisPostalCode);
-        put(`${prefix}VA_CONFIG_JSON`, directValues.vaConfigJson);
+        const directPrefix = `DOKU_${environmentName}_`;
+        put(`${directPrefix}CLIENT_ID`, directValues.clientId);
+        put(`${directPrefix}SECRET_KEY`, directValues.secretKey);
+        put(`${directPrefix}API_URL`, directValues.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
+        put(`${directPrefix}PRIVATE_KEY`, directValues.privateKey);
+        put(`${directPrefix}PRIVATE_KEY_PASSPHRASE`, directValues.privateKeyPassphrase);
+        put(`${directPrefix}QRIS_MERCHANT_ID`, directValues.qrisMerchantId);
+        put(`${directPrefix}QRIS_TERMINAL_ID`, directValues.qrisTerminalId);
+        put(`${directPrefix}QRIS_POSTAL_CODE`, directValues.qrisPostalCode);
+        put(`${directPrefix}VA_CONFIG_JSON`, directValues.vaConfigJson);
       }
     };
-    // Hydrate Checkout credentials for new payments and keep legacy Direct
-    // material available only for stored outstanding Direct transactions.
+    // New hosted Checkout and legacy Direct recovery use separate credential
+    // namespaces. Direct stays available only to drain historical invoices.
     applyProfile("sandbox", sandboxCheckout, sandboxDirect);
     applyProfile("production", productionCheckout, productionDirect);
     return target as T;
