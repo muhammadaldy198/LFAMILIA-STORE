@@ -139,7 +139,7 @@ async function migrateObsoleteDokuProfiles(db = getD1(), explicitSecret?: string
           "checkout",
           await decryptWithSecret(existing.encrypted_config, secretValue),
         );
-        checkoutReady = Boolean(cleanExisting.clientId && cleanExisting.secretKey && cleanExisting.apiUrl);
+        checkoutReady = checkoutReadyProfile(cleanExisting);
       } catch {
         checkoutReady = false;
       }
@@ -159,6 +159,7 @@ async function migrateObsoleteDokuProfiles(db = getD1(), explicitSecret?: string
           ? "https://api.doku.com"
           : "https://api-sandbox.doku.com";
       }
+      if (!checkoutReadyProfile(clean)) continue;
       const encrypted = await encryptWithSecret(clean, secretValue);
       await db.prepare(`INSERT INTO integration_profiles (
           provider, mode, environment, encrypted_config, updated_at
@@ -230,7 +231,7 @@ export async function savePaymentGatewayProfile(input: {
   await saveProfile(input);
   if (input.provider === "doku") {
     const saved = await profile("doku", "checkout", input.environment);
-    if (checkoutReady(saved)) {
+    if (checkoutReadyProfile(saved)) {
       await getD1().prepare(
         "DELETE FROM integration_profiles WHERE provider = 'doku' AND mode = 'direct' AND environment = ?",
       ).bind(input.environment).run();
@@ -263,7 +264,7 @@ export async function getMidtransSnapConfig() {
   };
 }
 
-function checkoutReady(values: Record<string, string> | null) {
+function checkoutReadyProfile(values: Record<string, string> | null) {
   if (!values?.clientId || !values.secretKey || !values.apiUrl) return false;
   try {
     return new URL(values.apiUrl).protocol === "https:";
@@ -283,8 +284,8 @@ export async function getPaymentModeOverview() {
   ]);
   const configured = {
     doku: {
-      sandbox: checkoutReady(dokuSandbox),
-      production: checkoutReady(dokuProduction),
+      sandbox: checkoutReadyProfile(dokuSandbox),
+      production: checkoutReadyProfile(dokuProduction),
     },
     midtrans: {
       sandbox: Boolean(midtransSandbox?.serverKey && midtransSandbox.clientKey),
