@@ -149,6 +149,15 @@ test("DOKU reconciliation uses only columns that exist for each payment table", 
   assert.doesNotMatch(topupQuery, /gateway_status_checked_at/);
 });
 
+test("DOKU polling records one stable event per normalized status", () => {
+  const scheduler = read("lib/server/doku-reconciliation.ts");
+  const publicStatus = read("app/api/orders/status/route.ts");
+  assert.match(scheduler, /eventId: `checkout-status-${order\.reference_id}-${query\.status}`/);
+  assert.match(publicStatus, /eventId: `checkout-status-${order\.reference_id}-${query\.status}`/);
+  assert.doesNotMatch(scheduler, /eventId: `checkout-status-${query\.requestId}/);
+  assert.doesNotMatch(publicStatus, /eventId: `status-query-${query\.requestId}/);
+});
+
 test("DOKU expired-order polling updates the canonical throttle timestamp", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
   assert.match(doku, /payment_status IN \('pending', 'expired'\)/);
