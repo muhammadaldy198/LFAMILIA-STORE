@@ -61,7 +61,10 @@ export type DokuCheckoutPaymentResult = {
 };
 
 const DOKU_CHECKOUT_TYPES: Record<string, string> = {
-  // Canonical values from DOKU Checkout Supported Payment Methods.
+  // Canonical request values from DOKU Checkout Supported Payment Methods:
+  // https://developers.doku.com/accept-payments/doku-checkout/configuration/supported-payment-methods
+  // Keep the exact provider spellings here. Documentation/sample aliases are
+  // accepted separately below but are always normalized back to these values.
   "va:doku": "VIRTUAL_ACCOUNT_DOKU",
   "va:bca": "VIRTUAL_ACCOUNT_BCA",
   "va:mandiri": "VIRTUAL_ACCOUNT_BANK_MANDIRI",
@@ -83,6 +86,15 @@ const DOKU_CHECKOUT_TYPES: Record<string, string> = {
   "ewallet:dana": "EMONEY_DANA",
   "qris:mpm": "QRIS",
   "qris:qris": "QRIS",
+};
+
+const DOKU_CHECKOUT_PAYMENT_TYPE_ALIASES: Record<string, string> = {
+  // DOKU's Backend Integration request example still shows EMONEY_SHOPEEPAY,
+  // while Supported Payment Methods and Checkout responses use EMONEY_SHOPEE_PAY.
+  EMONEY_SHOPEEPAY: "EMONEY_SHOPEE_PAY",
+  // Checkout responses may use all-caps SINARMAS while the supported-methods
+  // request table currently publishes VIRTUAL_ACCOUNT_Sinarmas.
+  VIRTUAL_ACCOUNT_SINARMAS: "VIRTUAL_ACCOUNT_Sinarmas",
 };
 
 const DOKU_CHECKOUT_TYPES_BY_METHOD = {
@@ -121,8 +133,9 @@ function canonicalDokuCheckoutPaymentType(method: string, paymentType: string) {
         : method === "qris"
           ? DOKU_CHECKOUT_TYPES_BY_METHOD.qris
           : [];
-  const normalized = paymentType.trim().toLowerCase();
-  return candidates.find((value) => value.toLowerCase() === normalized) ?? null;
+  const raw = paymentType.trim();
+  const alias = DOKU_CHECKOUT_PAYMENT_TYPE_ALIASES[raw.toUpperCase()] ?? raw;
+  return candidates.find((value) => value.toUpperCase() === alias.toUpperCase()) ?? null;
 }
 
 export function isDokuCheckoutPaymentTypeCompatible(method: string, paymentType: string) {
