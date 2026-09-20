@@ -96,33 +96,65 @@ export async function saveDiscountVoucher(input: Omit<DiscountVoucher, "id" | "u
   const normalizedCode = input.code.toUpperCase();
   const values = [normalizedCode, input.name, input.description, input.discountType, input.discountValue, input.minPurchase, input.maxDiscount, input.usageLimit, input.startsAt, input.endsAt, input.isActive ? 1 : 0];
   if (id) {
-    const result = await db.prepare(
+    const current = await db.prepare(
+      "SELECT code, used_count, reserved_count FROM discount_vouchers WHERE id = ? LIMIT 1",
+    ).bind(id).first<{ code: string; used_count: number; reserved_count: number }>();
+    if (!current) throw new Error("Voucher diskon tidak ditemukan.");
+    const renaming = current.code !== normalizedCode;
+    if (renaming && current.reserved_count > 0) {
+      throw new Error("Kode voucher tidak dapat diubah saat masih memiliki reservasi pembayaran aktif.");
+    }
+    if (input.usageLimit !== null && input.usageLimit < current.used_count + current.reserved_count) {
+      throw new Error("Batas penggunaan tidak boleh lebih kecil dari penggunaan + reservasi aktif.");
+    }
+
+    const updateVoucher = db.prepare(
       `UPDATE discount_vouchers
        SET code = ?, name = ?, description = ?, discount_type = ?, discount_value = ?,
            min_purchase = ?, max_discount = ?, usage_limit = ?, starts_at = ?, ends_at = ?,
            is_active = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?
-         AND (code = ? OR reserved_count = 0)
-         AND (? IS NULL OR ? >= used_count + reserved_count)`,
+       WHERE id = ? AND code = ?
+         AND (? IS NULL OR ? >= used_count + reserved_count)
+         ${renaming ? "AND reserved_count = 0" : ""}`,
     ).bind(
       ...values,
       id,
-      normalizedCode,
+      current.code,
       input.usageLimit,
       input.usageLimit,
-    ).run();
+    );
 
-    if (Number(result.meta.changes ?? 0) === 0) {
-      const current = await db.prepare(
+    const statements = [updateVoucher];
+    if (renaming) {
+      // Released reservations can still be consumed by an authoritative late
+      // payment. Keep their voucher reference attached to the same immutable
+      // voucher row when the display code changes.
+      statements.push(
+        db.prepare(
+          `UPDATE promotion_reservations
+           SET voucher_code = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE voucher_code = ?
+             AND EXISTS (
+               SELECT 1 FROM discount_vouchers
+               WHERE id = ? AND code = ?
+             )`,
+        ).bind(normalizedCode, current.code, id, normalizedCode),
+      );
+    }
+
+    const results = await db.batch(statements);
+    if (Number(results[0]?.meta.changes ?? 0) === 0) {
+      const latest = await db.prepare(
         "SELECT code, used_count, reserved_count FROM discount_vouchers WHERE id = ? LIMIT 1",
       ).bind(id).first<{ code: string; used_count: number; reserved_count: number }>();
-      if (!current) throw new Error("Voucher diskon tidak ditemukan.");
-      if (current.code !== normalizedCode && current.reserved_count > 0) {
+      if (!latest) throw new Error("Voucher diskon tidak ditemukan.");
+      if (latest.code !== normalizedCode && latest.reserved_count > 0) {
         throw new Error("Kode voucher tidak dapat diubah saat masih memiliki reservasi pembayaran aktif.");
       }
-      if (input.usageLimit !== null && input.usageLimit < current.used_count + current.reserved_count) {
+      if (input.usageLimit !== null && input.usageLimit < latest.used_count + latest.reserved_count) {
         throw new Error("Batas penggunaan tidak boleh lebih kecil dari penggunaan + reservasi aktif.");
       }
+      if (latest.code === normalizedCode) return id;
       throw new Error("Voucher diskon berubah bersamaan dengan checkout. Muat ulang lalu coba lagi.");
     }
     return id;
