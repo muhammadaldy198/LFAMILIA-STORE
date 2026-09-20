@@ -6,12 +6,12 @@ export type DokuEnvironment = "sandbox" | "production";
 
 type Runtime = {
   DOKU_ENV?: string;
-  DOKU_SANDBOX_CLIENT_ID?: string;
-  DOKU_SANDBOX_SECRET_KEY?: string;
-  DOKU_SANDBOX_API_URL?: string;
-  DOKU_PRODUCTION_CLIENT_ID?: string;
-  DOKU_PRODUCTION_SECRET_KEY?: string;
-  DOKU_PRODUCTION_API_URL?: string;
+  DOKU_CHECKOUT_SANDBOX_CLIENT_ID?: string;
+  DOKU_CHECKOUT_SANDBOX_SECRET_KEY?: string;
+  DOKU_CHECKOUT_SANDBOX_API_URL?: string;
+  DOKU_CHECKOUT_PRODUCTION_CLIENT_ID?: string;
+  DOKU_CHECKOUT_PRODUCTION_SECRET_KEY?: string;
+  DOKU_CHECKOUT_PRODUCTION_API_URL?: string;
 };
 
 type CheckoutConfig = {
@@ -88,19 +88,19 @@ function normalizeOrigin(value: string | undefined, fallback: string) {
 function environmentConfig(environment: DokuEnvironment): CheckoutConfig {
   const current = runtime();
   const sandbox = environment === "sandbox";
-  const prefix = sandbox ? "DOKU_SANDBOX" : "DOKU_PRODUCTION";
+  const prefix = sandbox ? "DOKU_CHECKOUT_SANDBOX" : "DOKU_CHECKOUT_PRODUCTION";
   return {
     environment,
     clientId: requireRuntimeValue(
-      sandbox ? current.DOKU_SANDBOX_CLIENT_ID : current.DOKU_PRODUCTION_CLIENT_ID,
+      sandbox ? current.DOKU_CHECKOUT_SANDBOX_CLIENT_ID : current.DOKU_CHECKOUT_PRODUCTION_CLIENT_ID,
       `${prefix}_CLIENT_ID`,
     ),
     secretKey: requireRuntimeValue(
-      sandbox ? current.DOKU_SANDBOX_SECRET_KEY : current.DOKU_PRODUCTION_SECRET_KEY,
+      sandbox ? current.DOKU_CHECKOUT_SANDBOX_SECRET_KEY : current.DOKU_CHECKOUT_PRODUCTION_SECRET_KEY,
       `${prefix}_SECRET_KEY`,
     ),
     apiOrigin: normalizeOrigin(
-      sandbox ? current.DOKU_SANDBOX_API_URL : current.DOKU_PRODUCTION_API_URL,
+      sandbox ? current.DOKU_CHECKOUT_SANDBOX_API_URL : current.DOKU_CHECKOUT_PRODUCTION_API_URL,
       sandbox ? "https://api-sandbox.doku.com" : "https://api.doku.com",
     ),
   };
