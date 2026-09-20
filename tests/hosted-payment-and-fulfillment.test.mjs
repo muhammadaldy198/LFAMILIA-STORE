@@ -22,7 +22,7 @@ test("DOKU Checkout status polling remains terminal-safe while fulfillment stays
   assert.match(status, /artifacts\.mode === "checkout"/);
   assert.match(status, /queryDokuCheckoutStatus/);
   assert.doesNotMatch(status, /queryDokuQrisStatus|queryDokuVaStatus|queryDokuEwalletStatus/);
-  assert.match(status, /dueForGatewayCheck\(order, 3_000\)/);
+  assert.match(status, /dueForGatewayCheck\(order, 60_000\)/);
   assert.match(status, /fulfillAutomaticOrder\(order\.id, getPublicBaseUrl\(\)\)/);
   assert.match(callback, /validateDokuCheckoutNotification/);
   assert.match(callback, /authoritativePaid: notification\.status === "paid"/);
