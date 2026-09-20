@@ -11,12 +11,34 @@ import {
 } from "../lib/server/final-audit-rules.ts";
 import { FULFILLMENT_ERROR_TRANSITION_GUARD_SQL } from "../lib/server/fulfillment-transition-guard.mjs";
 import { mapMidtransSnapStatus } from "../lib/server/midtrans-status.mjs";
-import { deletePromotionMutation, saveDiscountVoucherMutation } from "../lib/server/promotion-mutations.mjs";
+import { deletePromotionMutation, saveDiscountVoucherMutation, saveFlashSaleMutation } from "../lib/server/promotion-mutations.mjs";
 
 const root = process.cwd();
 
 function database() {
   return new DatabaseSync(":memory:");
+}
+
+function sqliteD1Adapter(sqlite, beforeRun) {
+  return {
+    prepare(sql) {
+      let values = [];
+      return {
+        bind(...next) {
+          values = next;
+          return this;
+        },
+        async first() {
+          return sqlite.prepare(sql).get(...values) ?? null;
+        },
+        async run() {
+          beforeRun?.(sql, sqlite);
+          const result = sqlite.prepare(sql).run(...values);
+          return { meta: { changes: Number(result.changes) } };
+        },
+      };
+    },
+  };
 }
 
 test("RBAC behavior enforces the Super Admin, Admin, and Staff hierarchy from stored roles", () => {
@@ -308,26 +330,6 @@ test("voucher code stays immutable after reservation history so late payment tar
 });
 
 test("production promo mutations reject wallet races atomically", async () => {
-  const makeAdapter = (sqlite, beforeRun) => ({
-    prepare(sql) {
-      let values = [];
-      return {
-        bind(...next) {
-          values = next;
-          return this;
-        },
-        async first() {
-          return sqlite.prepare(sql).get(...values) ?? null;
-        },
-        async run() {
-          beforeRun?.(sql, sqlite);
-          const result = sqlite.prepare(sql).run(...values);
-          return { meta: { changes: Number(result.changes) } };
-        },
-      };
-    },
-  });
-
   const createVoucherDb = () => {
     const db = database();
     db.exec(`
@@ -382,7 +384,7 @@ test("production promo mutations reject wallet races atomically", async () => {
   {
     const sqlite = createVoucherDb();
     let injected = false;
-    const db = makeAdapter(sqlite, (sql, raw) => {
+    const db = sqliteD1Adapter(sqlite, (sql, raw) => {
       if (!injected && /UPDATE discount_vouchers/.test(sql)) {
         injected = true;
         raw.prepare("UPDATE discount_vouchers SET used_count=used_count+1 WHERE id=1").run();
@@ -403,7 +405,7 @@ test("production promo mutations reject wallet races atomically", async () => {
   {
     const sqlite = createVoucherDb();
     let injected = false;
-    const db = makeAdapter(sqlite, (sql, raw) => {
+    const db = sqliteD1Adapter(sqlite, (sql, raw) => {
       if (!injected && /DELETE FROM discount_vouchers/.test(sql)) {
         injected = true;
         raw.prepare("UPDATE discount_vouchers SET used_count=used_count+1 WHERE id=1").run();
@@ -440,7 +442,7 @@ test("production promo mutations reject wallet races atomically", async () => {
       INSERT INTO flash_sales VALUES (9,'game-a','sku-a',0,0);
     `);
     let injected = false;
-    const db = makeAdapter(sqlite, (sql, raw) => {
+    const db = sqliteD1Adapter(sqlite, (sql, raw) => {
       if (!injected && /DELETE FROM flash_sales/.test(sql)) {
         injected = true;
         raw.prepare("UPDATE flash_sales SET sold_count=sold_count+1 WHERE id=9").run();
@@ -463,70 +465,154 @@ test("production promo mutations reject wallet races atomically", async () => {
   assert.match(promotions, /deletePromotionMutation\(getD1\(\), kind, id\)/);
 });
 
-test("wallet-used voucher code cannot be renamed or deleted for later reuse", () => {
-  const db = database();
-  db.exec(`
+test("wallet-used voucher code cannot be renamed or deleted for later reuse", async () => {
+  const sqlite = database();
+  sqlite.exec(`
+    CREATE TABLE discount_vouchers (
+      id INTEGER PRIMARY KEY,
+      code TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      discount_type TEXT NOT NULL,
+      discount_value INTEGER NOT NULL,
+      min_purchase INTEGER NOT NULL,
+      max_discount INTEGER,
+      usage_limit INTEGER,
+      used_count INTEGER NOT NULL DEFAULT 0,
+      reserved_count INTEGER NOT NULL DEFAULT 0,
+      starts_at TEXT NOT NULL,
+      ends_at TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE promotion_reservations (
+      order_id TEXT PRIMARY KEY,
+      voucher_code TEXT,
+      flash_sale_id INTEGER,
+      status TEXT NOT NULL
+    );
+    INSERT INTO discount_vouchers (
+      id,code,name,description,discount_type,discount_value,min_purchase,max_discount,
+      usage_limit,used_count,reserved_count,starts_at,ends_at,is_active
+    ) VALUES (
+      1,'SAVE10','Save 10','used','fixed',1000,0,NULL,
+      10,1,0,'2026-01-01','2027-01-01',1
+    );
+  `);
+  const db = sqliteD1Adapter(sqlite);
+  const input = {
+    code: "SAVE20",
+    name: "Save 20",
+    description: "renamed",
+    discountType: "fixed",
+    discountValue: 1000,
+    minPurchase: 0,
+    maxDiscount: null,
+    usageLimit: 10,
+    startsAt: "2026-01-01",
+    endsAt: "2027-01-01",
+    isActive: true,
+  };
+
+  await assert.rejects(
+    () => saveDiscountVoucherMutation(db, input, 1),
+    /Kode voucher tidak dapat diubah setelah pernah digunakan/,
+  );
+  await assert.rejects(
+    () => deletePromotionMutation(db, "voucher", 1),
+    /Voucher pernah digunakan/,
+  );
+  assert.deepEqual(
+    { ...sqlite.prepare("SELECT code,used_count FROM discount_vouchers WHERE id=1").get() },
+    { code: "SAVE10", used_count: 1 },
+  );
+  sqlite.close();
+});
+
+test("wallet-used flash-sale identity cannot be repointed or deleted", async () => {
+  const sqlite = database();
+  sqlite.exec(`
+    CREATE TABLE products (
+      id INTEGER PRIMARY KEY,
+      slug TEXT UNIQUE NOT NULL
+    );
+    CREATE TABLE product_packages (
+      id INTEGER PRIMARY KEY,
+      product_id INTEGER NOT NULL,
+      sku TEXT NOT NULL,
+      price INTEGER NOT NULL
+    );
+    CREATE TABLE flash_sales (
+      id INTEGER PRIMARY KEY,
+      product_slug TEXT NOT NULL,
+      package_sku TEXT NOT NULL,
+      sale_price INTEGER NOT NULL,
+      badge TEXT NOT NULL,
+      starts_at TEXT NOT NULL,
+      ends_at TEXT NOT NULL,
+      stock_limit INTEGER,
+      sold_count INTEGER NOT NULL DEFAULT 0,
+      reserved_count INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE promotion_reservations (
+      order_id TEXT PRIMARY KEY,
+      voucher_code TEXT,
+      flash_sale_id INTEGER,
+      status TEXT NOT NULL
+    );
+    INSERT INTO products VALUES (1,'game-a'),(2,'game-b');
+    INSERT INTO product_packages VALUES
+      (1,1,'sku-a',10000),
+      (2,2,'sku-b',10000);
+    INSERT INTO flash_sales (
+      id,product_slug,package_sku,sale_price,badge,starts_at,ends_at,stock_limit,
+      sold_count,reserved_count,is_active
+    ) VALUES (
+      9,'game-a','sku-a',9000,'SALE','2026-01-01','2027-01-01',10,1,0,1
+    );
+  `);
+  const db = sqliteD1Adapter(sqlite);
+  const input = {
+    productSlug: "game-b",
+    packageSku: "sku-b",
+    salePrice: 9000,
+    badge: "SALE",
+    startsAt: "2026-01-01",
+    endsAt: "2027-01-01",
+    stockLimit: 10,
+    isActive: true,
+  };
+
+  await assert.rejects(
+    () => saveFlashSaleMutation(db, input, 9),
+    /Produk\/nominal flash sale tidak dapat diganti setelah promo pernah digunakan/,
+  );
+  await assert.rejects(
+    () => deletePromotionMutation(db, "flash", 9),
+    /Flash sale pernah digunakan/,
+  );
+  assert.deepEqual(
+    { ...sqlite.prepare("SELECT product_slug,package_sku,sold_count FROM flash_sales WHERE id=9").get() },
+    { product_slug: "game-a", package_sku: "sku-a", sold_count: 1 },
+  );
+  sqlite.close();
+});
+
+test("historical promo references block destructive voucher reuse and deletion", async () => {
+  const sqlite = database();
+  sqlite.exec(`
     CREATE TABLE discount_vouchers (
       id INTEGER PRIMARY KEY,
       code TEXT UNIQUE NOT NULL,
       used_count INTEGER NOT NULL DEFAULT 0,
       reserved_count INTEGER NOT NULL DEFAULT 0
     );
-    INSERT INTO discount_vouchers VALUES (1,'SAVE10',1,0);
-  `);
-
-  const current = db.prepare(
-    "SELECT code,used_count,reserved_count FROM discount_vouchers WHERE id=1",
-  ).get();
-  assert.equal(current.used_count, 1);
-  assert.equal(current.reserved_count, 0);
-
-  // Production rejects both destructive operations when used_count > 0.
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM discount_vouchers WHERE code='SAVE10'").get().count, 1);
-  db.close();
-
-  const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
-  assert.match(promotions, /current\.used_count > 0/);
-  assert.match(promotions, /Kode voucher tidak dapat diubah setelah pernah digunakan/);
-  assert.match(promotions, /Voucher pernah digunakan\. Nonaktifkan voucher/);
-});
-
-test("wallet-used flash-sale identity cannot be repointed or deleted", () => {
-  const db = database();
-  db.exec(`
     CREATE TABLE flash_sales (
       id INTEGER PRIMARY KEY,
-      product_slug TEXT NOT NULL,
-      package_sku TEXT NOT NULL,
       sold_count INTEGER NOT NULL DEFAULT 0,
       reserved_count INTEGER NOT NULL DEFAULT 0
-    );
-    INSERT INTO flash_sales VALUES (9,'game-a','sku-a',1,0);
-  `);
-  const row = db.prepare("SELECT * FROM flash_sales WHERE id=9").get();
-  assert.equal(row.sold_count, 1);
-  assert.equal(row.reserved_count, 0);
-  db.close();
-
-  const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
-  assert.match(promotions, /reserved_count = 0 AND sold_count = 0/);
-  assert.match(promotions, /current\.sold_count > 0/);
-  assert.match(promotions, /Flash sale pernah digunakan\. Nonaktifkan promo/);
-});
-
-test("historical promo references block destructive voucher reuse and deletion", () => {
-  const db = database();
-  db.exec(`
-    CREATE TABLE discount_vouchers (
-      id INTEGER PRIMARY KEY,
-      code TEXT UNIQUE NOT NULL,
-      reserved_count INTEGER NOT NULL DEFAULT 0,
-      is_active INTEGER NOT NULL DEFAULT 1
-    );
-    CREATE TABLE flash_sales (
-      id INTEGER PRIMARY KEY,
-      reserved_count INTEGER NOT NULL DEFAULT 0,
-      is_active INTEGER NOT NULL DEFAULT 1
     );
     CREATE TABLE promotion_reservations (
       order_id TEXT PRIMARY KEY,
@@ -538,23 +624,36 @@ test("historical promo references block destructive voucher reuse and deletion",
     INSERT INTO flash_sales VALUES (7,0,0);
     INSERT INTO promotion_reservations VALUES ('o1','HISTORY',7,'released');
   `);
+  const db = sqliteD1Adapter(sqlite);
+  const createInput = {
+    code: "HISTORY",
+    name: "History",
+    description: "history",
+    discountType: "fixed",
+    discountValue: 1000,
+    minPurchase: 0,
+    maxDiscount: null,
+    usageLimit: 10,
+    startsAt: "2026-01-01",
+    endsAt: "2027-01-01",
+    isActive: true,
+  };
 
-  assert.ok(db.prepare(
-    "SELECT 1 FROM promotion_reservations WHERE voucher_code='HISTORY' LIMIT 1",
-  ).get());
-  assert.ok(db.prepare(
-    "SELECT 1 FROM promotion_reservations WHERE flash_sale_id=7 LIMIT 1",
-  ).get());
-  // The production delete path checks these references before destructive DELETE.
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM discount_vouchers WHERE id=1").get().count, 1);
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM flash_sales WHERE id=7").get().count, 1);
-  db.close();
-
-  const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
-  assert.match(promotions, /promotion_reservations WHERE voucher_code = \\?/);
-  assert.match(promotions, /promotion_reservations WHERE flash_sale_id = \\?/);
-  assert.match(promotions, /Voucher memiliki riwayat transaksi/);
-  assert.match(promotions, /Kode voucher pernah dipakai/);
+  await assert.rejects(
+    () => saveDiscountVoucherMutation(db, createInput),
+    /Kode voucher pernah dipakai oleh transaksi lama/,
+  );
+  await assert.rejects(
+    () => deletePromotionMutation(db, "voucher", 1),
+    /Voucher memiliki riwayat transaksi/,
+  );
+  await assert.rejects(
+    () => deletePromotionMutation(db, "flash", 7),
+    /Flash sale memiliki riwayat transaksi/,
+  );
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM discount_vouchers WHERE id=1").get().count, 1);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM flash_sales WHERE id=7").get().count, 1);
+  sqlite.close();
 });
 
 test("verified provider expiry is not blocked by a later local expiry timestamp", () => {
