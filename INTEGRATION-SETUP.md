@@ -1,10 +1,10 @@
 # Konfigurasi Integrasi LFAMILIA STORE
 
-Integrasi pembayaran yang didukung hanya **DOKU Direct API** dan **Midtrans Snap** untuk checkout maupun top up saldo. DOKU Hosted Checkout tidak digunakan dan tidak memiliki jalur pembuatan pembayaran aktif.
+Integrasi pembayaran yang didukung hanya **DOKU Checkout** dan **Midtrans Snap** untuk checkout maupun top up saldo. DOKU Checkout hosted digunakan sebagai jalur pembayaran DOKU.
 
-Credential pembayaran diatur dari **Super Admin → Integrasi → DOKU Direct API / Midtrans Snap**. Credential disimpan terpisah untuk Sandbox dan Production dan dienkripsi di D1 menggunakan root secret `INTEGRATION_ENCRYPTION_KEY` (minimal 32 karakter). Menu **Pembayaran** hanya mengatur operasional seperti gateway aktif/nonaktif, environment aktif, routing top up, channel pembayaran, tampilan pembayaran, dan transaksi.
+Credential pembayaran diatur dari **Super Admin → Integrasi → DOKU Checkout / Midtrans Snap**. Credential disimpan terpisah untuk Sandbox dan Production dan dienkripsi di D1 menggunakan root secret `INTEGRATION_ENCRYPTION_KEY` (minimal 32 karakter). Menu **Pembayaran** hanya mengatur operasional seperti gateway aktif/nonaktif, environment aktif, routing top up, channel pembayaran, tampilan pembayaran, dan transaksi.
 
-DOKU Direct API membutuhkan Client ID, Secret Key, RSA Private Key, API URL, serta konfigurasi channel yang dipakai. QRIS membutuhkan Merchant ID, Terminal ID, dan Postal Code. Virtual Account menggunakan VA Config JSON per bank. DANA dan ShopeePay memakai jalur e-wallet Direct API yang didukung backend.
+DOKU Checkout hanya membutuhkan Client ID, Secret Key, dan API URL per environment. QRIS, VA, dan e-wallet yang aktif di DOKU dipilih melalui hosted checkout tanpa RSA Private Key, Merchant ID/Terminal ID QRIS, atau VA Config JSON di LFAMILIA.
 
 Base URL default DOKU:
 
@@ -21,9 +21,9 @@ https://lfamiliastore.my.id/api/payments/midtrans/snap/notification
 https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback
 ```
 
-Di **Super Admin → Pembayaran**, DOKU Direct API dan Midtrans memiliki toggle aktif/nonaktif yang terpisah dari status kesiapan credential. Top up saldo juga mempunyai pilihan gateway sendiri (`DOKU Direct API` atau `Midtrans Snap`) dan master toggle top up otomatis. Gateway top up yang dipilih harus berstatus siap dan aktif; backend tidak melakukan fallback diam-diam ke gateway lain.
+Di **Super Admin → Pembayaran**, DOKU Checkout dan Midtrans memiliki toggle aktif/nonaktif yang terpisah dari status kesiapan credential. Top up saldo juga mempunyai pilihan gateway sendiri (`DOKU Checkout` atau `Midtrans Snap`) dan master toggle top up otomatis. Gateway top up yang dipilih harus berstatus siap dan aktif; backend tidak melakukan fallback diam-diam ke gateway lain.
 
-DOKU Direct API berjalan langsung dari Worker LFAMILIA dan tidak memakai VPS relay. VPS relay tetap khusus Digiflazz. Redirect halaman pembayaran tidak pernah dianggap sebagai bukti pembayaran; backend hanya mengubah order menjadi `paid` setelah callback/status gateway tervalidasi. Digiflazz baru dipanggil setelah status pembayaran benar-benar `paid`.
+DOKU Checkout berjalan langsung dari Worker LFAMILIA dan tidak memakai VPS relay. VPS relay tetap khusus Digiflazz. Redirect halaman pembayaran tidak pernah dianggap sebagai bukti pembayaran; backend hanya mengubah order menjadi `paid` setelah callback/status gateway tervalidasi. Digiflazz baru dipanggil setelah status pembayaran benar-benar `paid`.
 
 ## Google Login pelanggan
 
