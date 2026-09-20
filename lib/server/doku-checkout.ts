@@ -143,12 +143,6 @@ function equalSignature(left: string | null, right: string) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-function normalizePhone(value: string) {
-  const digits = value.replace(/\D/g, "");
-  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
-  return digits;
-}
-
 function checkoutExpiry(value: string | undefined) {
   const raw = value?.trim() || "";
   if (!/^\d{14}$/.test(raw)) return null;
