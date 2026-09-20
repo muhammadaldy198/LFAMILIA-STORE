@@ -133,7 +133,7 @@ async function expirePendingInvoice(order: OrderRecord) {
   if (!artifacts.expiredAt) return order;
   const expiresAt = Date.parse(artifacts.expiredAt);
   if (!Number.isFinite(expiresAt) || expiresAt > Date.now()) return order;
-  await applyPendingExternalPaymentStatus(order, "expired");
+  await applyPendingExternalPaymentStatus(order, "expired", { authoritativeExpired: true });
   return (await getOrderById(order.id)) ?? order;
 }
 
@@ -183,7 +183,7 @@ async function refreshDokuStatus(order: OrderRecord) {
         );
       }
     } else if (query.status === "expired") {
-      await applyPendingExternalPaymentStatus(order, "expired");
+      await applyPendingExternalPaymentStatus(order, "expired", { authoritativeExpired: true });
     }
 
     return (await getOrderById(order.id)) ?? order;
@@ -209,13 +209,17 @@ async function refreshMidtransSnapStatus(order: OrderRecord) {
     });
     if (query.status === "paid") {
       if (!Number.isFinite(query.amount) || query.amount !== order.total) return (await getOrderById(order.id)) ?? order;
-      const firstPaid = await applyPendingExternalPaymentStatus(order, "paid");
+      const firstPaid = await applyPendingExternalPaymentStatus(order, "paid", {
+        authoritativePaid: true,
+      });
       if (firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) => console.error("Notifikasi pesanan Midtrans hasil rekonsiliasi gagal:", error));
       }
     } else if (query.status === "failed" || query.status === "expired") {
-      await applyPendingExternalPaymentStatus(order, query.status);
+      await applyPendingExternalPaymentStatus(order, query.status, {
+        authoritativeExpired: query.status === "expired",
+      });
     }
     return (await getOrderById(order.id)) ?? order;
   } catch {

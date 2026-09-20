@@ -113,7 +113,7 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
           );
         }
       } else if (query.status === "expired") {
-        await applyPendingExternalPaymentStatus(order, "expired");
+        await applyPendingExternalPaymentStatus(order, "expired", { authoritativeExpired: true });
       }
     } catch (error) {
       console.error("Rekonsiliasi status order DOKU Checkout gagal:", error);

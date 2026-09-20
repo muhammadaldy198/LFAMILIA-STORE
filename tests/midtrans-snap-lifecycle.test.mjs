@@ -18,10 +18,12 @@ test("late Midtrans callbacks cannot reopen or fulfil terminal invoices", () => 
   assert.doesNotMatch(applyPaymentStatus, /payment_status <> 'paid'/);
 });
 
-test("Midtrans Snap status mapping only treats settled or accepted capture as paid", () => {
-  const source = read("lib/server/midtrans-snap.ts");
-  assert.match(source, /status === "settlement"\) return "paid"/);
-  assert.match(source, /status === "capture"\) return fraud === "deny" \? "failed"[^\n]+: "paid"/);
+test("Midtrans Snap status mapping treats fraud challenge as pending until accepted", () => {
+  const source = read("lib/server/midtrans-status.mjs");
+  assert.match(source, /status === "settlement" \|\| status === "capture"/);
+  assert.match(source, /fraud === "deny"\) return "failed"/);
+  assert.match(source, /fraud && fraud !== "accept"\) return "pending"/);
+  assert.match(source, /return "paid"/);
   assert.match(source, /status === "pending" \|\| status === "authorize"/);
   assert.match(source, /status === "expire"\) return "expired"/);
   assert.match(source, /status === "cancel" \|\| status === "deny" \|\| status === "failure"/);
@@ -38,7 +40,8 @@ test("pending Midtrans Snap orders reconcile against authenticated Get Status AP
   assert.match(statusRoute, /artifacts\.mode === "snap"/);
   assert.match(statusRoute, /gateway_status_checked_at = CURRENT_TIMESTAMP/);
   assert.match(statusRoute, /query\.amount !== order\.total/);
-  assert.match(statusRoute, /const firstPaid = await applyPendingExternalPaymentStatus\(order, "paid"\)/);
+  assert.match(statusRoute, /const firstPaid = await applyPendingExternalPaymentStatus\(order, "paid", \{/);
+  assert.match(statusRoute, /authoritativePaid: true/);
   assert.match(statusRoute, /await fulfillAutomaticOrder\(order\.id, getPublicBaseUrl\(\)\)/);
   assert.match(statusRoute, /order = await refreshMidtransSnapStatus\(order\)/);
 });

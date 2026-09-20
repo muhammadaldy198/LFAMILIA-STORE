@@ -127,6 +127,7 @@ export async function POST(request: Request) {
         status,
         payload: body,
         authoritativePaid: status === "paid",
+        authoritativeExpired: status === "expired",
       });
       if (transition.firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());

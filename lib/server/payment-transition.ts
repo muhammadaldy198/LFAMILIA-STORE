@@ -24,11 +24,19 @@ async function expireIfDue(order: OrderRecord) {
 export async function applyPendingExternalPaymentStatus(
   order: OrderRecord,
   status: ExternalPaymentStatus,
-  options: { authoritativePaid?: boolean } = {},
+  options: { authoritativePaid?: boolean; authoritativeExpired?: boolean } = {},
 ) {
   if (status === "pending") return false;
   if (status === "expired") {
-    await expireIfDue(order);
+    if (options.authoritativeExpired) {
+      const result = await getD1().prepare(
+        `UPDATE orders SET payment_status = 'expired', updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND payment_status = 'pending'`,
+      ).bind(order.id).run();
+      if (Number(result.meta.changes ?? 0) > 0) await releaseExternalPromotion(order.id);
+    } else {
+      await expireIfDue(order);
+    }
     return false;
   }
 
@@ -70,6 +78,7 @@ export async function applyExternalPaymentEvent(input: {
   status: ExternalPaymentStatus;
   payload: unknown;
   authoritativePaid?: boolean;
+  authoritativeExpired?: boolean;
 }) {
   const db = getD1();
   const eventInsert = db.prepare(
@@ -126,18 +135,29 @@ export async function applyExternalPaymentEvent(input: {
           input.eventId,
         )
     : input.status === "expired"
-      ? db.prepare(
-          `UPDATE orders
-           SET payment_status = 'expired', updated_at = CURRENT_TIMESTAMP
-           WHERE id = ? AND payment_status = 'pending'
-             AND gateway_expired_at IS NOT NULL
-             AND datetime(gateway_expired_at) <= datetime('now')
-             AND ${eventMissing}`,
-        ).bind(
-          input.order.id,
-          input.source,
-          input.eventId,
-        )
+      ? input.authoritativeExpired
+        ? db.prepare(
+            `UPDATE orders
+             SET payment_status = 'expired', updated_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND payment_status = 'pending'
+               AND ${eventMissing}`,
+          ).bind(
+            input.order.id,
+            input.source,
+            input.eventId,
+          )
+        : db.prepare(
+            `UPDATE orders
+             SET payment_status = 'expired', updated_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND payment_status = 'pending'
+               AND gateway_expired_at IS NOT NULL
+               AND datetime(gateway_expired_at) <= datetime('now')
+               AND ${eventMissing}`,
+          ).bind(
+            input.order.id,
+            input.source,
+            input.eventId,
+          )
       : db.prepare(
           `UPDATE orders
            SET payment_status = 'failed', updated_at = CURRENT_TIMESTAMP

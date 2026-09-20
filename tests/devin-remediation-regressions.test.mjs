@@ -90,13 +90,15 @@ test("payment maintenance reconciles before ambiguous expiry and keeps pending p
   assert.match(promotions, /orders\.payment_status IN \('pending', 'paid'\)/);
 });
 
-test("active promo reservations cannot race admin edits", () => {
-  const promotions = read("lib/server/promotions.ts");
-  assert.match(promotions, /AND \(code = \? OR reserved_count = 0\)/);
-  assert.match(promotions, /AND \(\? IS NULL OR \? >= used_count \+ reserved_count\)/);
-  assert.match(promotions, /AND \(\(product_slug = \? AND package_sku = \?\) OR reserved_count = 0\)/);
-  assert.match(promotions, /AND \(\? IS NULL OR \? >= sold_count \+ reserved_count\)/);
-  assert.match(promotions, /DELETE FROM \$\{table\} WHERE id = \? AND reserved_count = 0/);
+test("promo history cannot race destructive admin edits", () => {
+  const mutations = read("lib/server/promotion-mutations.mjs");
+  assert.match(mutations, /Kode voucher tidak dapat diubah setelah dipakai atau direservasi/);
+  assert.match(mutations, /promotion_reservations WHERE voucher_code = \? LIMIT 1/);
+  assert.match(mutations, /AND \(\? IS NULL OR \? >= used_count \+ reserved_count\)/);
+  assert.match(mutations, /NOT EXISTS \([\s\S]*history\.flash_sale_id = flash_sales\.id/);
+  assert.match(mutations, /AND \(\? IS NULL OR \? >= sold_count \+ reserved_count\)/);
+  assert.match(mutations, /Voucher memiliki riwayat transaksi/);
+  assert.match(mutations, /Flash sale memiliki riwayat transaksi/);
 });
 
 test("DOKU Checkout reconciliation closes local expiry but keeps authoritative late-paid recovery", () => {

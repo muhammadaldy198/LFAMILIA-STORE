@@ -90,7 +90,9 @@ export async function reconcilePendingMidtransOrders(limit = 100) {
           }
         }
       } else if (result.status === "expired" || result.status === "failed") {
-        await applyPendingExternalPaymentStatus(order, result.status);
+        await applyPendingExternalPaymentStatus(order, result.status, {
+          authoritativeExpired: result.status === "expired",
+        });
       }
     } catch (error) {
       if (error instanceof MidtransTransactionNotFoundError) {
