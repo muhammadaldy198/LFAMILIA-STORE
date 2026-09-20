@@ -138,15 +138,18 @@ export async function savePaymentGatewayProfile(input: {
     throw new Error("Mode gateway tidak valid.");
   }
   if (input.provider === "doku" && !input.values.apiUrl?.trim()) {
-    input = {
-      ...input,
-      values: {
-        ...input.values,
-        apiUrl: input.environment === "production"
-          ? "https://api.doku.com"
-          : "https://api-sandbox.doku.com",
-      },
-    };
+    const existing = await profile("doku", "checkout", input.environment);
+    if (!existing?.apiUrl?.trim()) {
+      input = {
+        ...input,
+        values: {
+          ...input.values,
+          apiUrl: input.environment === "production"
+            ? "https://api.doku.com"
+            : "https://api-sandbox.doku.com",
+        },
+      };
+    }
   }
   return saveProfile(input);
 }
