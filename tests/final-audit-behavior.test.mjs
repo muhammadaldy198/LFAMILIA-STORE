@@ -334,6 +334,29 @@ test("wallet-used voucher code cannot be renamed or deleted for later reuse", ()
   assert.match(promotions, /Voucher pernah digunakan\. Nonaktifkan voucher/);
 });
 
+test("wallet-used flash-sale identity cannot be repointed or deleted", () => {
+  const db = database();
+  db.exec(`
+    CREATE TABLE flash_sales (
+      id INTEGER PRIMARY KEY,
+      product_slug TEXT NOT NULL,
+      package_sku TEXT NOT NULL,
+      sold_count INTEGER NOT NULL DEFAULT 0,
+      reserved_count INTEGER NOT NULL DEFAULT 0
+    );
+    INSERT INTO flash_sales VALUES (9,'game-a','sku-a',1,0);
+  `);
+  const row = db.prepare("SELECT * FROM flash_sales WHERE id=9").get();
+  assert.equal(row.sold_count, 1);
+  assert.equal(row.reserved_count, 0);
+  db.close();
+
+  const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
+  assert.match(promotions, /reserved_count = 0 AND sold_count = 0/);
+  assert.match(promotions, /current\.sold_count > 0/);
+  assert.match(promotions, /Flash sale pernah digunakan\. Nonaktifkan promo/);
+});
+
 test("historical promo references block destructive voucher reuse and deletion", () => {
   const db = database();
   db.exec(`
