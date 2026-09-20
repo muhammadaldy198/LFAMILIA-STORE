@@ -306,6 +306,13 @@ test("voucher code stays immutable after reservation history so late payment tar
   assert.match(promotions, /Kode voucher tidak dapat diubah setelah dipakai atau direservasi/);
 });
 
+test("promo identity guards are atomic against concurrent wallet settlement", () => {
+  const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
+  assert.match(promotions, /AND used_count = 0 AND reserved_count = 0/);
+  assert.match(promotions, /DELETE FROM discount_vouchers WHERE id = \\? AND used_count = 0 AND reserved_count = 0/);
+  assert.match(promotions, /DELETE FROM flash_sales WHERE id = \\? AND sold_count = 0 AND reserved_count = 0/);
+});
+
 test("wallet-used voucher code cannot be renamed or deleted for later reuse", () => {
   const db = database();
   db.exec(`
