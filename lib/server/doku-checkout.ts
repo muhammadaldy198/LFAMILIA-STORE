@@ -70,7 +70,7 @@ const DOKU_CHECKOUT_TYPES: Record<string, string> = {
   "va:btn": "VIRTUAL_ACCOUNT_BTN",
   "ewallet:ovo": "EMONEY_OVO",
   "ewallet:dana": "EMONEY_DANA",
-  "ewallet:shopeepay": "EMONEY_SHOPEEPAY",
+  "ewallet:shopeepay": "EMONEY_SHOPEE_PAY",
   "qris:mpm": "QRIS",
   "qris:qris": "QRIS",
 };
@@ -235,23 +235,10 @@ export async function createDokuCheckoutPayment(input: {
       callback_url_result: input.finishUrl,
       language: "ID",
       auto_redirect: true,
-      line_items: [{
-        id: input.referenceId.slice(0, 50),
-        name: input.productName.slice(0, 255),
-        quantity: 1,
-        price: input.amount,
-      }],
     },
     payment: {
       payment_due_date: 60,
       payment_method_types: [paymentType],
-    },
-    customer: {
-      id: input.referenceId.slice(0, 50),
-      name: input.buyerName.slice(0, 255),
-      phone: normalizePhone(input.buyerPhone),
-      email: input.buyerEmail,
-      country: "ID",
     },
     additional_info: {
       override_notification_url: notificationUrl,
