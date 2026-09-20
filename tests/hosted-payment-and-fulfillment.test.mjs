@@ -25,7 +25,7 @@ test("DOKU Checkout status polling remains terminal-safe while fulfillment stays
   assert.match(status, /dueForGatewayCheck\(order, 60_000\)/);
   assert.match(status, /fulfillAutomaticOrder\(order\.id, getPublicBaseUrl\(\)\)/);
   assert.match(callback, /validateDokuCheckoutNotification/);
-  assert.match(callback, /authoritativePaid: notification\.status === "paid"/);
+  assert.match(callback, /authoritativePaid: status === "paid"/);
   assert.match(callback, /fulfillAutomaticOrder\(order\.id, getPublicBaseUrl\(\)\)/);
   assert.match(doku, /\/checkout\/v1\/payment/);
   assert.match(doku, /\/orders\/v1\/status\//);
