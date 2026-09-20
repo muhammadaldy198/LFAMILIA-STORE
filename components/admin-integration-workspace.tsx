@@ -154,8 +154,11 @@ export function AdminIntegrationWorkspace() {
           secretKey: values.dokuSecretKey || "",
           apiUrl: values.dokuApiUrl || "",
         };
-        const enteredCoreCredential = [gatewayValues.clientId, gatewayValues.secretKey].some((value) => value.trim());
-        if (!dokuConfigured && !enteredCoreCredential) throw new Error("Isi Client ID dan Secret Key DOKU terlebih dahulu.");
+        const hasDokuClientId = Boolean(gatewayValues.clientId.trim());
+        const hasDokuSecretKey = Boolean(gatewayValues.secretKey.trim());
+        if (!dokuConfigured && (!hasDokuClientId || !hasDokuSecretKey)) {
+          throw new Error("Isi Client ID dan Secret Key DOKU terlebih dahulu.");
+        }
         await paymentPut({
           action: "save_profile",
           provider: "doku",
@@ -174,8 +177,11 @@ export function AdminIntegrationWorkspace() {
           serverKey: values.midtransServerKey || "",
           clientKey: values.midtransClientKey || "",
         };
-        const entered = Object.values(gatewayValues).some((value) => value.trim());
-        if (!midtransConfigured && !entered) throw new Error("Isi Server Key dan Client Key Midtrans terlebih dahulu.");
+        const hasMidtransServerKey = Boolean(gatewayValues.serverKey.trim());
+        const hasMidtransClientKey = Boolean(gatewayValues.clientKey.trim());
+        if (!midtransConfigured && (!hasMidtransServerKey || !hasMidtransClientKey)) {
+          throw new Error("Isi Server Key dan Client Key Midtrans terlebih dahulu.");
+        }
         await paymentPut({
           action: "save_profile",
           provider: "midtrans",
