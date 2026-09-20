@@ -70,7 +70,7 @@ const DOKU_CHECKOUT_TYPES: Record<string, string> = {
   "va:btn": "VIRTUAL_ACCOUNT_BTN",
   "ewallet:ovo": "EMONEY_OVO",
   "ewallet:dana": "EMONEY_DANA",
-  "ewallet:shopeepay": "EMONEY_SHOPEEPAY",
+  "ewallet:shopeepay": "EMONEY_SHOPEE_PAY",
   "qris:mpm": "QRIS",
   "qris:qris": "QRIS",
 };
