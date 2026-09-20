@@ -295,6 +295,12 @@ test("obsolete DOKU credential migration never deletes the only usable profile",
   assert.match(config, /if \(checkoutReady\) \{[\s\S]*DELETE FROM integration_profiles/);
 });
 
+test("legacy DOKU credentials are deleted only after Checkout becomes ready", () => {
+  const config = read("lib/server/payment-mode-config.ts");
+  assert.match(config, /const saved = await profile\("doku", "checkout", input\.environment\)/);
+  assert.match(config, /if \(checkoutReady\(saved\)\) \{[\s\S]*DELETE FROM integration_profiles/);
+});
+
 test("partial DOKU Checkout saves preserve a stored custom API URL", () => {
   const config = read("lib/server/payment-mode-config.ts");
   assert.match(config, /const existing = await profile\("doku", "checkout", input\.environment\)/);
