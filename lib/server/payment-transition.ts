@@ -8,8 +8,8 @@ async function expireIfDue(order: OrderRecord) {
   const result = await getD1().prepare(
     `UPDATE orders SET payment_status = 'expired', updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND payment_status = 'pending'
-       AND COALESCE(gateway_expired_at, doku_expired_at) IS NOT NULL
-       AND datetime(COALESCE(gateway_expired_at, doku_expired_at)) <= datetime('now')`,
+       AND gateway_expired_at IS NOT NULL
+       AND datetime(gateway_expired_at) <= datetime('now')`,
   ).bind(order.id).run();
   const changed = Number(result.meta.changes ?? 0) > 0;
   if (changed) await releaseExternalPromotion(order.id);
@@ -43,8 +43,8 @@ export async function applyPendingExternalPaymentStatus(
       : await db.prepare(
           `UPDATE orders SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
            WHERE id = ? AND payment_status = 'pending'
-             AND (COALESCE(gateway_expired_at, doku_expired_at) IS NULL
-               OR datetime(COALESCE(gateway_expired_at, doku_expired_at)) > datetime('now'))`,
+             AND (gateway_expired_at IS NULL
+               OR datetime(gateway_expired_at) > datetime('now'))`,
         ).bind(nextFulfillment, order.id).run();
     const changed = Number(result.meta.changes ?? 0) > 0;
     if (changed) {
@@ -116,8 +116,8 @@ export async function applyExternalPaymentEvent(input: {
           `UPDATE orders
            SET payment_status = 'paid', fulfillment_status = ?, updated_at = CURRENT_TIMESTAMP
            WHERE id = ? AND payment_status = 'pending'
-             AND (COALESCE(gateway_expired_at, doku_expired_at) IS NULL
-               OR datetime(COALESCE(gateway_expired_at, doku_expired_at)) > datetime('now'))
+             AND (gateway_expired_at IS NULL
+               OR datetime(gateway_expired_at) > datetime('now'))
              AND ${eventMissing}`,
         ).bind(
           nextFulfillment,
@@ -130,8 +130,8 @@ export async function applyExternalPaymentEvent(input: {
           `UPDATE orders
            SET payment_status = 'expired', updated_at = CURRENT_TIMESTAMP
            WHERE id = ? AND payment_status = 'pending'
-             AND COALESCE(gateway_expired_at, doku_expired_at) IS NOT NULL
-             AND datetime(COALESCE(gateway_expired_at, doku_expired_at)) <= datetime('now')
+             AND gateway_expired_at IS NOT NULL
+             AND datetime(gateway_expired_at) <= datetime('now')
              AND ${eventMissing}`,
         ).bind(
           input.order.id,
