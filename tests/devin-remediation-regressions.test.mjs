@@ -185,15 +185,17 @@ test("wallet topup only uses uncertainty hold after gateway dispatch begins", ()
   assert.match(wallet, /SET status = 'rejected'/);
 });
 
-test("DOKU Checkout keeps non-final FAILED TIMEOUT REDIRECT pending", () => {
+test("DOKU Checkout ignores FAILED attempts and honors Checkout order expiry", () => {
   const doku = read("lib/server/doku-reconciliation.ts");
   const publicStatus = read("app/api/orders/status/route.ts");
   const checkout = read("lib/server/doku-checkout.ts");
   assert.match(doku, /datetime\('now', '-24 hours'\)/);
   assert.match(checkout, /normalized === "SUCCESS"\) return "paid"/);
-  assert.match(checkout, /normalized === "EXPIRED"\) return "expired"/);
+  assert.match(checkout, /normalized === "EXPIRED" \|\| normalizedOrder === "ORDER_EXPIRED"/);
   assert.doesNotMatch(checkout, /normalized === "FAILED"\) return "failed"/);
-  assert.match(checkout, /FAILED, TIMEOUT, and REDIRECT as non-final/);
+  assert.match(checkout, /DOKU explicitly instructs merchants to ignore/);
+  assert.match(checkout, /status\(payload\.transaction\?\.status, payload\.order\?\.status\)/);
+  assert.match(checkout, /status\(transaction\.status, order\.status\)/);
   assert.doesNotMatch(doku, /query\.status === "failed"/);
   const dokuRefresh = publicStatus.match(/async function refreshDokuStatus[\s\S]*?async function refreshMidtransSnapStatus/)?.[0] || "";
   assert.match(dokuRefresh, /query\.status === "expired"/);
@@ -259,16 +261,12 @@ test("historical DOKU Direct rows cannot disable hosted Checkout readiness", () 
   assert.match(router, /ready: readiness\.ready && supported/);
 });
 
-test("expired historical Direct reservations release capacity without mutating payment rows", () => {
+test("merged DOKU cleanup migration releases legacy promo reservations before retiring Direct sessions", () => {
   const migration = read("drizzle/0039_doku_checkout_only.sql");
-  const promotions = read("lib/server/promotions.ts");
   assert.match(migration, /UPDATE promotion_reservations[\s\S]*status = 'released'/);
-  assert.match(migration, /datetime\(expires_at\) <= datetime\('now'\)/);
   assert.match(migration, /payment_gateway_mode = 'direct'/);
-  assert.doesNotMatch(migration, /UPDATE orders[\s\S]*payment_gateway = 'doku'/);
-  assert.doesNotMatch(migration, /UPDATE wallet_topups[\s\S]*payment_gateway = 'doku'/);
-  assert.match(promotions, /payment_gateway_mode = 'direct'/);
-  assert.match(promotions, /datetime\(expires_at\) <= datetime\('now'\)/);
+  assert.match(migration, /payment_status = 'expired'/);
+  assert.match(migration, /wallet_topups[\s\S]*status = 'rejected'/);
 });
 
 test("DOKU Checkout is the only active DOKU payment runtime", () => {
@@ -283,11 +281,14 @@ test("DOKU Checkout is the only active DOKU payment runtime", () => {
   assert.equal(fs.existsSync(path.join(root, "lib/server/doku-status.ts")), false);
 });
 
-test("Checkout-only cleanup never mutates historical Direct transaction state", () => {
+test("Checkout-only cleanup retires old Direct sessions instead of relabeling them", () => {
   const migration = read("drizzle/0039_doku_checkout_only.sql");
   const config = read("lib/server/payment-mode-config.ts");
-  assert.doesNotMatch(migration, /SET payment_status = 'expired'|SET status = 'rejected'/);
-  assert.match(migration, /UPDATE promotion_reservations/);
+  assert.match(migration, /UPDATE promotion_reservations[\s\S]*status = 'released'/);
+  assert.match(migration, /payment_status = 'expired'/);
+  assert.match(migration, /wallet_topups[\s\S]*status = 'rejected'/);
+  assert.match(migration, /SET payment_gateway_mode = NULL[\s\S]*payment_gateway = 'doku'/);
+  assert.doesNotMatch(migration, /SET payment_gateway_mode = 'checkout'[\s\S]*payment_gateway = 'doku'/);
   assert.match(migration, /payment_gateway = 'midtrans'[\s\S]*payment_gateway_mode = 'bisnap'/);
   assert.doesNotMatch(migration, /INSERT OR IGNORE INTO integration_profiles|ALTER TABLE wallet_topups/);
   assert.match(config, /migrateObsoleteDokuProfiles/);
@@ -301,6 +302,9 @@ test("DOKU Checkout payment type catalog matches supported method families", () 
   assert.match(checkout, /"va:bsi": "VIRTUAL_ACCOUNT_BANK_SYARIAH_MANDIRI"/);
   assert.match(checkout, /"va:btn": "VIRTUAL_ACCOUNT_BTN"/);
   assert.match(checkout, /"va:bnc": "VIRTUAL_ACCOUNT_BNC"/);
+  assert.match(checkout, /"va:bss": "VIRTUAL_ACCOUNT_BSS"/);
+  assert.match(checkout, /"va:bjb": "VIRTUAL_ACCOUNT_BJB"/);
+  assert.match(checkout, /"va:sinarmas": "VIRTUAL_ACCOUNT_Sinarmas"/);
   assert.match(checkout, /"ewallet:ovo": "EMONEY_OVO"/);
   assert.match(checkout, /"ewallet:dana": "EMONEY_DANA"/);
   assert.match(checkout, /"ewallet:shopeepay": "EMONEY_SHOPEE_PAY"/);
