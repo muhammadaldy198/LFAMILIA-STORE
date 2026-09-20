@@ -1,61 +1,19 @@
-import { createDokuDirectPayment, getDokuReadiness, isDokuChannelSupported } from "@/lib/server/doku";
+import {
+  createDokuCheckoutPayment,
+  getDokuCheckoutReadiness,
+  isDokuCheckoutChannelSupported,
+} from "@/lib/server/doku-checkout";
 import { hostedPaymentType } from "@/lib/server/hosted-payment-methods";
 import { createMidtransSnapPayment, getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
-import { hydrateDokuDirectRuntimeEnv } from "@/lib/server/payment-mode-config";
+import { hydrateDokuCheckoutRuntimeEnv } from "@/lib/server/payment-mode-config";
 import type { PaymentGatewayName } from "@/lib/server/payment-channels";
 import { getRuntimeEnv, setRuntimeEnv } from "@/lib/server/runtime-env";
 
-export type RoutedPaymentMode = "direct" | "snap";
+export type RoutedPaymentMode = "checkout" | "snap";
 
 async function prepareDokuRuntime() {
   const current = getRuntimeEnv<Record<string, unknown>>();
-  setRuntimeEnv(await hydrateDokuDirectRuntimeEnv(current));
-}
-
-function runtimeText(runtime: Record<string, unknown>, key: string) {
-  const value = runtime[key];
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function dokuChannelConfigReason(
-  environment: "sandbox" | "production" | null,
-  method: string,
-  channel: string,
-) {
-  if (!environment) return "Environment DOKU Direct API belum siap.";
-  const runtime = getRuntimeEnv<Record<string, unknown>>();
-  const prefix = `DOKU_${environment.toUpperCase()}_`;
-
-  if (method === "qris") {
-    const merchantId = runtimeText(runtime, `${prefix}QRIS_MERCHANT_ID`);
-    const terminalId = runtimeText(runtime, `${prefix}QRIS_TERMINAL_ID`);
-    const postalCode = runtimeText(runtime, `${prefix}QRIS_POSTAL_CODE`);
-    if (!merchantId || !terminalId || !/^\d{1,5}$/.test(postalCode)) {
-      return "QRIS DOKU belum lengkap. Isi Merchant ID, Terminal ID, dan Postal Code.";
-    }
-  }
-
-  if (method === "va") {
-    const raw = runtimeText(runtime, `${prefix}VA_CONFIG_JSON`);
-    if (!raw) return `Konfigurasi Virtual Account ${channel.toUpperCase()} belum diisi.`;
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const item = parsed?.[channel];
-      if (!item || typeof item !== "object" || Array.isArray(item)) {
-        return `Konfigurasi Virtual Account ${channel.toUpperCase()} belum tersedia.`;
-      }
-      const values = item as Record<string, unknown>;
-      for (const key of ["partnerServiceId", "customerNo", "virtualAccountNo", "channel"] as const) {
-        if (typeof values[key] !== "string" || !values[key].trim()) {
-          return `Konfigurasi Virtual Account ${channel.toUpperCase()} belum lengkap.`;
-        }
-      }
-    } catch {
-      return "Konfigurasi Virtual Account DOKU harus berupa JSON valid.";
-    }
-  }
-
-  return null;
+  setRuntimeEnv(await hydrateDokuCheckoutRuntimeEnv(current));
 }
 
 export async function getConfiguredGatewayReadiness(input: {
@@ -66,19 +24,20 @@ export async function getConfiguredGatewayReadiness(input: {
 }) {
   if (input.gateway === "doku") {
     await prepareDokuRuntime();
-    const readiness = getDokuReadiness();
-    const supported = isDokuChannelSupported(input.paymentMethod, input.paymentChannel);
-    const channelReason = readiness.ready && supported
-      ? dokuChannelConfigReason(readiness.environment, input.paymentMethod, input.paymentChannel)
-      : null;
+    const readiness = getDokuCheckoutReadiness();
+    const supported = isDokuCheckoutChannelSupported(
+      input.paymentMethod,
+      input.paymentChannel,
+      input.gatewayConfig,
+    );
     return {
-      ready: readiness.ready && supported && !channelReason,
+      ready: readiness.ready && supported,
       environment: readiness.environment,
-      mode: "direct" as const,
+      mode: "checkout" as const,
       reason: readiness.ready
         ? supported
-          ? channelReason
-          : "Channel belum didukung DOKU Direct API."
+          ? null
+          : "Channel belum didukung DOKU Checkout."
         : readiness.reason,
     };
   }
@@ -117,9 +76,20 @@ export async function createConfiguredPayment(input: {
   if (!readiness.ready) throw new Error(readiness.reason || "Gateway belum siap.");
 
   if (input.gateway === "doku") {
-    const payment = await createDokuDirectPayment(input);
-    return { ...payment, gateway: "doku" as const, mode: "direct" as const, environment: readiness.environment };
+    const payment = await createDokuCheckoutPayment(input);
+    return {
+      ...payment,
+      gateway: "doku" as const,
+      mode: "checkout" as const,
+      environment: readiness.environment,
+    };
   }
+
   const payment = await createMidtransSnapPayment(input);
-  return { ...payment, gateway: "midtrans" as const, mode: "snap" as const, environment: readiness.environment };
+  return {
+    ...payment,
+    gateway: "midtrans" as const,
+    mode: "snap" as const,
+    environment: readiness.environment,
+  };
 }
