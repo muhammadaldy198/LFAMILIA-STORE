@@ -10,6 +10,7 @@ import {
   resolveMemberTierFromProgress,
 } from "../lib/server/final-audit-rules.ts";
 import { FULFILLMENT_ERROR_TRANSITION_GUARD_SQL } from "../lib/server/fulfillment-transition-guard.mjs";
+import { mapMidtransSnapStatus } from "../lib/server/midtrans-status.mjs";
 
 const root = process.cwd();
 
@@ -257,6 +258,16 @@ test("stale fulfillment error paths cannot downgrade terminal provider results",
   );
   assert.equal(db.prepare("SELECT provider_status FROM orders WHERE id='active'").get().provider_status, "retryable_error");
   db.close();
+});
+
+test("Midtrans fraud challenge never becomes paid before FDS acceptance", () => {
+  assert.equal(mapMidtransSnapStatus("capture", "accept"), "paid");
+  assert.equal(mapMidtransSnapStatus("capture", null), "paid");
+  assert.equal(mapMidtransSnapStatus("capture", "challenge"), "pending");
+  assert.equal(mapMidtransSnapStatus("capture", "deny"), "failed");
+  assert.equal(mapMidtransSnapStatus("settlement", "accept"), "paid");
+  assert.equal(mapMidtransSnapStatus("settlement", "challenge"), "pending");
+  assert.equal(mapMidtransSnapStatus("settlement", null), "paid");
 });
 
 test("public Midtrans status refresh treats authenticated paid inquiry as authoritative", () => {
