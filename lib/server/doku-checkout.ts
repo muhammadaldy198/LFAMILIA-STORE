@@ -40,6 +40,7 @@ type StatusPayload = {
   order?: {
     invoice_number?: string;
     amount?: number | string;
+    status?: string;
   };
   transaction?: {
     status?: string;
@@ -204,12 +205,17 @@ function checkoutExpiry(value: string | undefined) {
   return Number.isFinite(time) ? new Date(time).toISOString() : null;
 }
 
-function status(value: unknown): "paid" | "pending" | "expired" | "failed" {
+function status(
+  value: unknown,
+  orderStatus?: unknown,
+): "paid" | "pending" | "expired" | "failed" {
   const normalized = typeof value === "string" ? value.trim().toUpperCase() : "";
+  const normalizedOrder = typeof orderStatus === "string" ? orderStatus.trim().toUpperCase() : "";
   if (normalized === "SUCCESS") return "paid";
-  if (normalized === "EXPIRED") return "expired";
-  // DOKU marks FAILED, TIMEOUT, and REDIRECT as non-final. Keep them pending
-  // until a final SUCCESS/EXPIRED notification or a later status inquiry.
+  if (normalized === "EXPIRED" || normalizedOrder === "ORDER_EXPIRED") return "expired";
+  // For DOKU Checkout, DOKU explicitly instructs merchants to ignore a
+  // transaction.status FAILED because the customer may retry or change the
+  // payment method. TIMEOUT and REDIRECT are also non-final.
   return "pending";
 }
 
@@ -372,7 +378,7 @@ export async function queryDokuCheckoutStatus(input: {
   const amount = Number(payload.order?.amount);
   return {
     requestId,
-    status: status(payload.transaction?.status),
+    status: status(payload.transaction?.status, payload.order?.status),
     amount: Number.isFinite(amount) ? amount : 0,
     originalRequestId: payload.transaction?.original_request_id?.trim() || null,
     raw: payload,
@@ -393,7 +399,7 @@ export function parseDokuCheckoutNotification(payload: Record<string, unknown>) 
     originalRequestId: typeof transaction.original_request_id === "string"
       ? transaction.original_request_id.trim()
       : null,
-    status: status(transaction.status),
+    status: status(transaction.status, order.status),
   };
 }
 
