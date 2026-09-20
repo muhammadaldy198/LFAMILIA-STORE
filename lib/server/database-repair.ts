@@ -104,7 +104,6 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["wallet_topups", "doku_status_checked_at", "doku_status_checked_at TEXT"],
   ["wallet_topups", "doku_environment", "doku_environment TEXT"],
   ["wallet_topups", "external_checkout_key", "external_checkout_key TEXT"],
-  ["wallet_topups", "gateway_status_checked_at", "gateway_status_checked_at TEXT"],
 
   ["wallet_topups", "payment_fee", "payment_fee INTEGER DEFAULT 0 NOT NULL"],
   [
