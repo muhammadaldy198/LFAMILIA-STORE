@@ -309,8 +309,8 @@ test("voucher code stays immutable after reservation history so late payment tar
 test("promo identity guards are atomic against concurrent wallet settlement", () => {
   const promotions = fs.readFileSync(path.join(root, "lib/server/promotions.ts"), "utf8");
   assert.match(promotions, /AND used_count = 0 AND reserved_count = 0/);
-  assert.match(promotions, /DELETE FROM discount_vouchers WHERE id = \\? AND used_count = 0 AND reserved_count = 0/);
-  assert.match(promotions, /DELETE FROM flash_sales WHERE id = \\? AND sold_count = 0 AND reserved_count = 0/);
+  assert.match(promotions, /DELETE FROM discount_vouchers[\\s\\S]*WHERE id = \\? AND used_count = 0 AND reserved_count = 0/);
+  assert.match(promotions, /DELETE FROM flash_sales[\\s\\S]*WHERE id = \\? AND sold_count = 0 AND reserved_count = 0/);
   assert.match(promotions, /Number\(deleted\.meta\.changes \?\? 0\) > 0/);
   assert.match(promotions, /Voucher baru saja digunakan/);
   assert.match(promotions, /Flash sale baru saja digunakan/);
