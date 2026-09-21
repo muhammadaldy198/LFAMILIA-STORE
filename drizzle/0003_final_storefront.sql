@@ -74,7 +74,8 @@ INSERT INTO `product_categories` (`slug`, `name`, `icon`, `sort_order`) VALUES
   ('game', 'Top Up Game', 'gamepad', 0),
   ('voucher', 'Voucher & Gift Card', 'ticket', 1),
   ('entertainment', 'Entertainment', 'play', 2),
-  ('pulsa', 'Pulsa & Data', 'smartphone', 3);
+  ('pulsa', 'Pulsa & Data', 'smartphone', 3),
+  ('pln', 'PLN', 'zap', 4);
 --> statement-breakpoint
 CREATE TABLE `discount_vouchers` (
   `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,

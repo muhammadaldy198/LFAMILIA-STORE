@@ -116,6 +116,7 @@ export async function readCategories(includeInactive = false): Promise<ProductCa
       { id: null, slug: "voucher", name: "Voucher & Gift Card", icon: "ticket", isActive: true, sortOrder: 1 },
       { id: null, slug: "entertainment", name: "Entertainment", icon: "play", isActive: true, sortOrder: 2 },
       { id: null, slug: "pulsa", name: "Pulsa & Data", icon: "smartphone", isActive: true, sortOrder: 3 },
+      { id: null, slug: "pln", name: "PLN", icon: "zap", isActive: true, sortOrder: 4 },
     ];
   }
 }

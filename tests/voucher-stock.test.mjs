@@ -85,7 +85,12 @@ test("final storefront migration creates editable content, promotions, and admin
   }
   const owners = db.prepare("SELECT email, role, is_active FROM admin_users WHERE role = 'owner'").all();
   assert.equal(owners.length, 0, "fresh databases must create the owner through the protected setup flow");
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM product_categories").get().count, 4);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM product_categories").get().count, 5);
+  const pln = db.prepare("SELECT name, icon, is_active, sort_order FROM product_categories WHERE slug = \'pln\'").get();
+  assert.equal(pln?.name, "PLN");
+  assert.equal(pln?.icon, "zap");
+  assert.equal(pln?.is_active, 1);
+  assert.equal(pln?.sort_order, 4);
 });
 
 test("product notices cascade and flash sales can be scheduled repeatedly", () => {
