@@ -178,7 +178,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const digiflazz = getDigiflazzReadiness();
+    const digiflazz = await getDigiflazzReadiness();
     let publicBaseUrl = "";
     try {
       publicBaseUrl = getPublicBaseUrl();

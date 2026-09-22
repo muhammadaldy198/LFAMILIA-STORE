@@ -8,7 +8,7 @@ import { useStorefront } from "@/hooks/use-storefront";
 const groups = [
   { title: "Layanan", items: [["Top Up Game", "/catalog"], ["Promo", "/promo"], ["Cek Transaksi", "/track"], ["Hubungi Kami", "/contact"]] },
   { title: "Kalkulator", items: [["Win Rate", "/tools/win-rate"], ["Zodiac", "/tools/zodiac"], ["Magic Wheel", "/tools/magic-wheel"], ["Semua Alat", "/tools"]] },
-  { title: "Informasi", items: [["Pertanyaan umum", "/faq"], ["Syarat & ketentuan", "/terms"], ["Kebijakan pengembalian dana", "/refund"], ["Kebijakan privasi", "/privacy"]] },
+  { title: "Informasi", items: [["Status layanan", "/status"], ["Pertanyaan umum", "/faq"], ["Syarat & ketentuan", "/terms"], ["Kebijakan pengembalian dana", "/refund"], ["Kebijakan privasi", "/privacy"]] },
 ];
 
 function WhatsAppIcon({ className }: { className?: string }) {

@@ -34,6 +34,7 @@ function publicStatus(paymentStatus: string, fulfillmentStatus: string) {
 }
 
 type OrderSummaryRow = {
+  reference_id?: string;
   product_name: string;
   package_label: string;
   total: number;
@@ -42,10 +43,18 @@ type OrderSummaryRow = {
   created_at: string;
 };
 
-function mapSummary(row: OrderSummaryRow) {
+function maskedInvoice(referenceId: string | undefined) {
+  const value = referenceId?.trim().toUpperCase() ?? "";
+  if (!value) return "-";
+  if (value.length <= 8) return `${value.slice(0, 2)}***${value.slice(-2)}`;
+  return `${value.slice(0, 4)}${"*".repeat(Math.min(value.length - 7, 10))}${value.slice(-3)}`;
+}
+
+function mapSummary(row: OrderSummaryRow, revealInvoice = false) {
+  const referenceId = revealInvoice ? row.reference_id ?? null : null;
   return {
-    referenceId: null,
-    maskedReferenceId: "Dirahasiakan",
+    referenceId,
+    maskedReferenceId: referenceId || maskedInvoice(row.reference_id),
     productName: row.product_name,
     packageLabel: row.package_label,
     total: row.total,
@@ -58,7 +67,7 @@ export async function GET() {
   try {
     const result = await getD1()
       .prepare(
-        `SELECT product_name, package_label, total,
+        `SELECT reference_id, product_name, package_label, total,
          payment_status, fulfillment_status, created_at
          FROM orders
          ORDER BY created_at DESC
@@ -81,7 +90,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const originBlock = rejectCrossOriginMutation(request);
   if (originBlock) return originBlock;
-  const rate = await allowRequest(request, "order-phone-search", 20, 600);
+  const rate = await allowRequest(request, "order-phone-search", 5, 600);
   if (!rate.allowed) return Response.json(
     { error: "Terlalu banyak pencarian transaksi. Coba lagi beberapa menit." },
     { status: 429, headers: { "Retry-After": String(rate.retryAfter) } },
@@ -96,7 +105,7 @@ export async function POST(request: Request) {
     const placeholders = variants.map(() => "?").join(", ");
     const result = await getD1()
       .prepare(
-        `SELECT product_name, package_label, total,
+        `SELECT reference_id, product_name, package_label, total,
          payment_status, fulfillment_status, created_at
          FROM orders
          WHERE buyer_phone IN (${placeholders})
@@ -107,7 +116,7 @@ export async function POST(request: Request) {
       .all<OrderSummaryRow>();
 
     return Response.json(
-      { orders: result.results.map((row) => mapSummary(row)) },
+      { orders: result.results.map((row) => mapSummary(row, true)) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

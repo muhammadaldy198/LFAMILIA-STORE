@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   const [topups, transactions, orders, membership] = await Promise.all([
     db.prepare("SELECT id, amount, sender_name, payment_method, proof_url, status, admin_notes, created_at FROM wallet_topups WHERE customer_id = ? ORDER BY created_at DESC LIMIT 40").bind(customer.id).all(),
     db.prepare("SELECT id, direction, amount, balance_before, balance_after, reference, description, created_at FROM wallet_transactions WHERE customer_id = ? ORDER BY created_at DESC LIMIT 60").bind(customer.id).all(),
-    db.prepare("SELECT id, reference_id, product_name, package_label, total, payment_status, fulfillment_status, created_at FROM orders WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50").bind(customer.id).all<{ id: string; reference_id: string; product_name: string; package_label: string; total: number; payment_status: string; fulfillment_status: string; created_at: string }>(),
+    db.prepare("SELECT id, reference_id, product_slug, product_name, package_sku, package_label, total, payment_status, fulfillment_status, created_at FROM orders WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50").bind(customer.id).all<{ id: string; reference_id: string; product_slug: string; product_name: string; package_sku: string; package_label: string; total: number; payment_status: string; fulfillment_status: string; created_at: string }>(),
     getMemberTierProfile(customer.id),
   ]);
   const vouchers = await listCustomerWebsiteVoucherCodes(customer.id).catch(() => []);

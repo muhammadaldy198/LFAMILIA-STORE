@@ -67,6 +67,9 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["customer_users", "tier_progress_bonus", "tier_progress_bonus INTEGER DEFAULT 0 NOT NULL"],
   ["store_settings", "discord_url", "discord_url TEXT"],
   ["store_settings", "support_widget_enabled", "support_widget_enabled INTEGER DEFAULT 1 NOT NULL"],
+  ["store_settings", "merchant_legal_name", "merchant_legal_name TEXT"],
+  ["store_settings", "merchant_registration_id", "merchant_registration_id TEXT"],
+  ["store_settings", "merchant_address", "merchant_address TEXT"],
   ["product_packages", "package_group", "package_group TEXT"],
   ["product_packages", "image_url", "image_url TEXT"],
   ["product_packages", "provider_code", "provider_code TEXT"],
@@ -174,7 +177,7 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
 
     if (!productColumns.has("package_tabs_enabled") || !productColumns.has("package_tabs_json") || !productColumns.has("nickname_game_code")) return false;
     if (!packageColumns.has("package_group") || !packageColumns.has("provider_max_price")) return false;
-    if (!settingColumns.has("support_widget_enabled")) return false;
+    if (!["support_widget_enabled", "merchant_legal_name", "merchant_registration_id", "merchant_address"].every((column) => settingColumns.has(column))) return false;
     if (!["delivery_mode", "supplier_cost_snapshot", "provider_max_price_snapshot", "doku_environment"].every((column) => orderColumns.has(column))) return false;
     if (!["doku_environment", "external_checkout_key"].every((column) => topupColumns.has(column))) return false;
     if (!voucherColumns.has("reserved_count") || !flashColumns.has("reserved_count")) return false;

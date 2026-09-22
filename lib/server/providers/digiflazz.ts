@@ -1,4 +1,5 @@
 import { hashHex } from "@/lib/server/crypto";
+import { hydrateIntegrationRuntimeEnv } from "@/lib/server/integration-config";
 import type { ProviderAdapter, ProviderResult } from "@/lib/server/providers/types";
 import { providerRelayRequest } from "@/lib/server/provider-relay";
 import { isAutomatedTestRuntime,
@@ -56,8 +57,8 @@ function normalizedTransactionUrl(value: string) {
   return DIGIFLAZZ_TRANSACTION_URL;
 }
 
-function runtimeConfig() {
-  const runtime = getRuntimeEnv<DigiFlazzEnv>();
+async function runtimeConfig() {
+  const runtime = await hydrateIntegrationRuntimeEnv(getRuntimeEnv<DigiFlazzEnv>());
   const environment = requireRuntimeChoice(
     runtime.DIGIFLAZZ_ENV,
     "DIGIFLAZZ_ENV",
@@ -87,9 +88,9 @@ function runtimeConfig() {
   return { environment, username, apiKey, apiUrl };
 }
 
-export function getDigiflazzReadiness() {
+export async function getDigiflazzReadiness() {
   try {
-    const config = runtimeConfig();
+    const config = await runtimeConfig();
     return {
       ready: true as const,
       environment: config.environment,
@@ -120,8 +121,9 @@ function providerErrorMessage(
 }
 
 export async function getDigiflazzBalance() {
-  if (isAutomatedTestRuntime() && runtimeConfig().environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
-  const { environment, username, apiKey, apiUrl } = runtimeConfig();
+  const config = await runtimeConfig();
+  if (isAutomatedTestRuntime() && config.environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
+  const { environment, username, apiKey, apiUrl } = config;
   if (balanceCache && Date.now() - balanceCache.checkedAt < 60_000) {
     return { balance: balanceCache.value, cached: true as const };
   }
@@ -168,7 +170,7 @@ export const digiflazzAdapter: ProviderAdapter = {
   code: "digiflazz",
   name: "DigiFlazz",
   async fulfill(order, publicBaseUrl) {
-    const { environment, username, apiKey, apiUrl } = runtimeConfig();
+    const { environment, username, apiKey, apiUrl } = await runtimeConfig();
     if (isAutomatedTestRuntime() && environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
     if (!order.providerSku?.trim()) throw new Error("SKU DigiFlazz order kosong.");
     if (!order.customerNo?.trim()) throw new Error("Customer No DigiFlazz order kosong.");

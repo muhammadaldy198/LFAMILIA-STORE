@@ -1,6 +1,7 @@
 import { getD1 } from "@/db";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { hashHex } from "@/lib/server/crypto";
+import { hydrateIntegrationRuntimeEnv } from "@/lib/server/integration-config";
 import { providerRelayRequest } from "@/lib/server/provider-relay";
 import { buildDigiflazzSellerMonitorStatement, ensureDigiflazzSellerMonitorTable } from "@/lib/server/digiflazz-monitor";
 import {
@@ -191,7 +192,7 @@ async function releasePriceListSyncLock(token: string, successful: boolean) {
 }
 
 async function fetchPriceListItems(): Promise<DigiflazzPriceListItem[]> {
-  const env = getRuntimeEnv<Env>();
+  const env = await hydrateIntegrationRuntimeEnv(getRuntimeEnv<Env>());
   const environment = requireRuntimeChoice(env.DIGIFLAZZ_ENV, "DIGIFLAZZ_ENV", ["development", "production"] as const);
   const username = requireRuntimeValue(env.DIGIFLAZZ_USERNAME, "DIGIFLAZZ_USERNAME");
   const key = requireRuntimeValue(

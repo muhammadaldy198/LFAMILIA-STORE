@@ -1,4 +1,5 @@
 import { hashHex, hmacHex, safeEqual } from "@/lib/server/crypto";
+import { hydrateIntegrationRuntimeEnv } from "@/lib/server/integration-config";
 import { applyProviderWebhook } from "@/lib/server/orders";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
 import { notifyOrderFulfillmentSuccessByProviderRef } from "@/lib/server/transaction-notifications";
@@ -20,7 +21,8 @@ function mapStatus(status?: string) {
 }
 
 export async function POST(request: Request) {
-  const secret = getRuntimeEnv<RuntimeEnv>().DIGIFLAZZ_WEBHOOK_SECRET?.trim();
+  const runtime = await hydrateIntegrationRuntimeEnv(getRuntimeEnv<RuntimeEnv>());
+  const secret = runtime.DIGIFLAZZ_WEBHOOK_SECRET?.trim();
   if (!secret) return Response.json({ error: "Secret webhook DigiFlazz belum dikonfigurasi." }, { status: 503 });
 
   const rawBody = await request.text();

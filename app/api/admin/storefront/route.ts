@@ -29,6 +29,9 @@ const schema = z.object({
   discordUrl: optionalUrl,
   supportHours: z.string().trim().min(3).max(120),
   supportWidgetEnabled: z.boolean(),
+  merchantLegalName: z.string().trim().max(160).optional().or(z.literal("")),
+  merchantRegistrationId: z.string().trim().max(100).optional().or(z.literal("")),
+  merchantAddress: z.string().trim().max(300).optional().or(z.literal("")),
 });
 
 export async function GET(request: Request) {
@@ -53,6 +56,9 @@ export async function PUT(request: Request) {
       supportEmail: current.supportEmail,
       instagramUrl: current.instagramUrl,
       discordUrl: current.discordUrl,
+      merchantLegalName: current.merchantLegalName,
+      merchantRegistrationId: current.merchantRegistrationId,
+      merchantAddress: current.merchantAddress,
     } : input);
     return Response.json({ ok: true });
   } catch (error) {

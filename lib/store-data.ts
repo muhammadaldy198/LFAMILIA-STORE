@@ -368,6 +368,9 @@ export type StorefrontSettings = {
   discordUrl?: string;
   supportHours: string;
   supportWidgetEnabled: boolean;
+  merchantLegalName?: string;
+  merchantRegistrationId?: string;
+  merchantAddress?: string;
 };
 
 export const defaultStorefrontSettings: StorefrontSettings = {
@@ -386,6 +389,9 @@ export const defaultStorefrontSettings: StorefrontSettings = {
   bannerCtaHref: "#produk",
   supportHours: "Setiap hari, 09.00–23.00 WIB",
   supportWidgetEnabled: true,
+  merchantLegalName: "",
+  merchantRegistrationId: "",
+  merchantAddress: "",
 };
 
 export const faqs = [

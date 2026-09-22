@@ -13,6 +13,7 @@ import {
 import { isAllowedMediaUrl } from "@/lib/media-url";
 import { getDokuCheckoutReadiness } from "@/lib/server/doku-checkout";
 import { getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
+import { getPaymentModeOverview } from "@/lib/server/payment-mode-config";
 
 const gatewayConfigSchema = z.record(
   z.string().trim().min(1).max(60),
@@ -55,10 +56,25 @@ function validateChannel(input: z.infer<typeof channelSchema>) {
 }
 
 async function gatewayReadiness() {
-  const [doku, midtrans] = await Promise.all([getDokuCheckoutReadiness(), getMidtransSnapReadiness()]);
+  const [doku, midtrans, paymentModes] = await Promise.all([
+    getDokuCheckoutReadiness(),
+    getMidtransSnapReadiness(),
+    getPaymentModeOverview(),
+  ]);
   return {
-    doku: { ...doku, mode: "checkout" as const },
-    midtrans: { ...midtrans, mode: "snap" as const, relayReady: true },
+    doku: {
+      ...doku,
+      configured: paymentModes.dokuCheckoutConfigured,
+      environment: doku.environment ?? paymentModes.dokuEnvironment,
+      mode: "checkout" as const,
+    },
+    midtrans: {
+      ...midtrans,
+      configured: paymentModes.midtransSnapConfigured,
+      environment: midtrans.environment ?? paymentModes.midtransEnvironment,
+      mode: "snap" as const,
+      relayReady: true,
+    },
   };
 }
 

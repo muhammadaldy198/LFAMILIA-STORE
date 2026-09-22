@@ -60,6 +60,7 @@ type DashboardIntegration = {
   id: string;
   name: string;
   ready: boolean;
+  configured?: boolean;
   active: boolean;
   environment: string | null;
   status: string;
@@ -150,7 +151,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
       })) || []).slice(0, 5);
   const orders = summary?.recentOrders.slice(0, 4) || [];
   const products = summary?.topProducts || [];
-  const allIntegrationReady = integrationItems.length > 0 && integrationItems.filter((item) => item.active).every((item) => item.ready);
+  const allIntegrationReady = integrationItems.length > 0 && integrationItems.filter((item) => item.active).every((item) => item.ready || item.configured);
 
   return (
     <div className="admin-dashboard-reference space-y-3.5">
@@ -263,7 +264,8 @@ function SalesBars({ sales }: { sales: Array<{ day: string; revenue: number; ord
 function IntegrationRow({ item }: { item: DashboardIntegration }) {
   const initials = item.id === "digiflazz" ? "D" : item.id === "kokinpay" ? "K" : item.id.startsWith("doku") ? "DO" : "M";
   const tone = item.id.startsWith("doku") ? "bg-[#e5232d]" : item.id.startsWith("midtrans") ? "bg-[#1f7ae0]" : item.id === "kokinpay" ? "bg-violet-600" : "bg-[#1769e8]";
-  return <div className="flex items-center gap-3 rounded-md border border-[#e7ebf0] bg-[#fbfcfe] px-3 py-2"><span className={`grid size-8 shrink-0 place-items-center rounded-md text-[12px] font-black text-white ${tone}`}>{initials}</span><div className="min-w-0 flex-1"><p className="truncate text-[9px] font-bold text-[#26354e]">{item.name}</p><p className={`mt-0.5 truncate text-[7px] font-semibold ${item.ready ? item.active ? "text-emerald-600" : "text-slate-500" : "text-amber-600"}`}>{item.status}</p></div><span className={`shrink-0 rounded-md px-2 py-1 text-[7px] font-semibold ${item.ready ? item.active ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-600" : "bg-amber-50 text-amber-600"}`}>{item.ready ? item.active ? "Online" : "Standby" : "Periksa"}</span></div>;
+  const configured = item.ready || item.configured;
+  return <div className="flex items-center gap-3 rounded-md border border-[#e7ebf0] bg-[#fbfcfe] px-3 py-2"><span className={`grid size-8 shrink-0 place-items-center rounded-md text-[12px] font-black text-white ${tone}`}>{initials}</span><div className="min-w-0 flex-1"><p className="truncate text-[9px] font-bold text-[#26354e]">{item.name}</p><p className={`mt-0.5 truncate text-[7px] font-semibold ${configured ? item.active ? "text-emerald-600" : "text-slate-500" : "text-amber-600"}`}>{item.status}</p></div><span className={`shrink-0 rounded-md px-2 py-1 text-[7px] font-semibold ${configured ? item.active ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-600" : "bg-amber-50 text-amber-600"}`}>{item.ready ? item.active ? "Online" : "Standby" : item.configured ? "Tersimpan" : "Periksa"}</span></div>;
 }
 
 function StatusLine({ label, value, good = false }: { label: string; value: string; good?: boolean }) {

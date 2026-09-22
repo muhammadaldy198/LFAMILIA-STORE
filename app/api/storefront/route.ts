@@ -46,6 +46,9 @@ function neutralizeStorefrontSettings(settings: PublicStorefrontSettings): Publi
     bannerDescription: neutralizePublicCopy(settings.bannerDescription),
     bannerCtaLabel: neutralizePublicCopy(settings.bannerCtaLabel),
     supportHours: neutralizePublicCopy(settings.supportHours),
+    merchantLegalName: settings.merchantLegalName ? neutralizePublicCopy(settings.merchantLegalName) : "",
+    merchantRegistrationId: settings.merchantRegistrationId ? neutralizePublicCopy(settings.merchantRegistrationId) : "",
+    merchantAddress: settings.merchantAddress ? neutralizePublicCopy(settings.merchantAddress) : "",
   };
 }
 

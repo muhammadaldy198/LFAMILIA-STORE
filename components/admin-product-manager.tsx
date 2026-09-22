@@ -173,6 +173,8 @@ export function AdminProductManager() {
   const [status, setStatus] = useState("Semua Status");
   const [sort, setSort] = useState("Urutkan: Terbaru");
   const [editorProduct, setEditorProduct] = useState<Product | null>(null);
+  const [importTarget, setImportTarget] = useState<Product | null>(null);
+  const [importTargetPickerOpen, setImportTargetPickerOpen] = useState(false);
   const [manualProductOpen, setManualProductOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -282,8 +284,9 @@ export function AdminProductManager() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Status produk gagal diperbarui."); }
   }
 
-  if (editorProduct) {
-    return <ProductEditor product={editorProduct} onBack={() => { setEditorProduct(null); void loadProducts(); }} onNotice={setNotice} />;
+  const activeEditorProduct = importTarget || editorProduct;
+  if (activeEditorProduct) {
+    return <ProductEditor product={activeEditorProduct} openDigiflazzImport={Boolean(importTarget)} onBack={() => { setEditorProduct(null); setImportTarget(null); void loadProducts(); }} onNotice={setNotice} />;
   }
 
   return (
@@ -291,7 +294,7 @@ export function AdminProductManager() {
       <div className="flex items-start justify-between gap-[16px]">
         <div><h1 className="text-[23px] font-black tracking-[-0.04em] text-[#0b1834]">Produk</h1><p className="mt-[3px] text-[10px] text-[#64758c]">Kelola semua produk top up, voucher, dan layanan digital.</p></div>
         <div className="flex items-center gap-[8px]">
-          <button type="button" onClick={() => setNotice("Pilih produk lalu klik Edit untuk mengimpor nominal Digiflazz.")} className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] border border-[#dce3eb] bg-white px-[13px] text-[9px] font-bold text-[#34465f] hover:bg-[#f8fafc]"><SlidersHorizontal className="size-[13px]" />Import Nominal Digiflazz</button>
+          <button type="button" onClick={() => products.length ? setImportTargetPickerOpen(true) : setError("Belum ada produk untuk diimpor nominalnya.")} className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] border border-[#dce3eb] bg-white px-[13px] text-[9px] font-bold text-[#34465f] hover:bg-[#f8fafc]"><SlidersHorizontal className="size-[13px]" />Import Nominal Digiflazz</button>
           <button type="button" onClick={() => setManualProductOpen(true)} className="inline-flex h-[34px] items-center gap-[7px] rounded-[5px] bg-[#0875ed] px-[15px] text-[9px] font-bold text-white shadow-[0_5px_14px_rgba(8,117,237,.2)] hover:bg-[#0668d5]"><Plus className="size-[14px]" />Tambah Produk Manual</button>
         </div>
       </div>
@@ -314,6 +317,11 @@ export function AdminProductManager() {
       </section>
 
       {manualProductOpen && <ManualProductModal saving={saving} onClose={() => setManualProductOpen(false)} onSubmit={addProduct} />}
+      {importTargetPickerOpen && <SimpleModal title="Pilih Produk" description="Pilih produk yang akan menerima nominal dari katalog Digiflazz." onClose={() => setImportTargetPickerOpen(false)}>
+        <div className="grid max-h-[55vh] gap-[7px] overflow-y-auto pr-[2px]">
+          {products.map((product) => <button key={product.id} type="button" onClick={() => { setImportTargetPickerOpen(false); setImportTarget(product); }} className="flex items-center justify-between rounded-[5px] border border-[#dce3eb] px-[11px] py-[9px] text-left text-[9px] hover:border-[#78b5f4] hover:bg-[#f5f9ff]"><span><strong className="block text-[#21344e]">{product.name}</strong><span className="text-[7.5px] text-[#718198]">{product.category} · {product.nominalCount} nominal saat ini</span></span><span className="text-[#0875ed]">Pilih</span></button>)}
+        </div>
+      </SimpleModal>}
     </div>
   );
 }
@@ -327,7 +335,7 @@ function ProductTable({ products, onEdit, onToggle }: { products: Product[]; onE
   );
 }
 
-function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack(): void; onNotice(message: string): void }) {
+function ProductEditor({ product, openDigiflazzImport = false, onBack, onNotice }: { product: Product; openDigiflazzImport?: boolean; onBack(): void; onNotice(message: string): void }) {
   const [tab, setTab] = useState<EditorTab>("Nominal & Harga");
   const [nominals, setNominals] = useState<Nominal[]>(() => product.raw.packages.map((item) => ({
     id: item.id,
@@ -347,7 +355,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
     const names = product.raw.packageTabs.length ? product.raw.packageTabs : Array.from(new Set(product.raw.packages.map((item) => item.group).filter((item): item is string => Boolean(item))));
     return names.map((name, index) => ({ id: `section-${index}-${slugify(name)}`, name, description: "", position: "Di atas", active: true }));
   });
-  const [importOpen, setImportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(openDigiflazzImport);
   const [manualOpen, setManualOpen] = useState(false);
   const [sectionOpen, setSectionOpen] = useState(false);
   const [nominalEditor, setNominalEditor] = useState<Nominal | null>(null);

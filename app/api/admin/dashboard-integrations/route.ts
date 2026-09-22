@@ -11,13 +11,14 @@ type DashboardIntegrationStatus = {
   id: string;
   name: string;
   ready: boolean;
+  configured?: boolean;
   active: boolean;
   environment: string | null;
   status: string;
 };
 
-function statusText(input: { ready: boolean; active: boolean; environment?: string | null }) {
-  if (!input.ready) return "Perlu konfigurasi";
+function statusText(input: { ready: boolean; configured?: boolean; active: boolean; environment?: string | null }) {
+  if (!input.ready && !input.configured) return "Perlu konfigurasi";
   const environment = input.environment
     ? input.environment === "production"
       ? "Production"
@@ -27,7 +28,7 @@ function statusText(input: { ready: boolean; active: boolean; environment?: stri
           ? "Development"
           : input.environment
     : null;
-  const state = input.active ? "Aktif" : "Standby";
+  const state = input.ready ? (input.active ? "Aktif" : "Standby") : "Tersimpan";
   return environment ? `${state} · ${environment}` : state;
 }
 
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
       getMidtransSnapReadiness(),
     ]);
 
-    const digiflazz = getDigiflazzReadiness();
+    const digiflazz = await getDigiflazzReadiness();
     const kokinpayReady = integration.profiles.some(
       (profile) => profile.provider === "kokinpay" && profile.mode === "service" && profile.environment === "global" && profile.configured && !profile.decryptionError,
     );
@@ -77,9 +78,10 @@ export async function GET(request: Request) {
         id: "midtrans-snap",
         name: "Midtrans Snap",
         ready: midtransSnap.ready,
+        configured: paymentModes.midtransSnapConfigured,
         active: paymentModes.midtransMode === "snap",
         environment: paymentModes.midtransEnvironment,
-        status: statusText({ ready: midtransSnap.ready, active: paymentModes.midtransMode === "snap", environment: paymentModes.midtransEnvironment }),
+        status: statusText({ ready: midtransSnap.ready, configured: paymentModes.midtransSnapConfigured, active: paymentModes.midtransMode === "snap", environment: paymentModes.midtransEnvironment }),
       },
     ];
 

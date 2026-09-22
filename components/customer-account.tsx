@@ -13,6 +13,7 @@ import {
   Menu,
   PackageCheck,
   ReceiptText,
+  RotateCcw,
   ShieldCheck,
   UserPlus,
   UserRound,
@@ -53,7 +54,9 @@ type AccountData = {
   orders: Array<{
     id: string;
     reference_id: string;
+    product_slug: string;
     product_name: string;
+    package_sku: string;
     package_label: string;
     total: number;
     payment_status: string;
@@ -526,18 +529,24 @@ function Dashboard({
               empty="Belum ada pesanan yang terhubung dengan akun ini."
             >
               {data.orders.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/track?invoice=${item.reference_id}`}
-                  className="block"
-                >
-                  <HistoryRow
-                    title={`${item.product_name} • ${item.package_label}`}
-                    detail={`${item.reference_id} • ${item.fulfillment_status}`}
-                    value={formatRupiah(item.total)}
-                    tone={item.payment_status === "paid" ? "good" : "warn"}
-                  />
-                </Link>
+                <div key={item.id} className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-1.5">
+                  <Link href={`/track?invoice=${item.reference_id}`} className="block">
+                    <HistoryRow
+                      title={`${item.product_name} • ${item.package_label}`}
+                      detail={`${item.reference_id} • ${item.fulfillment_status}`}
+                      value={formatRupiah(item.total)}
+                      tone={item.payment_status === "paid" ? "good" : "warn"}
+                    />
+                  </Link>
+                  {item.product_slug && item.package_sku && (
+                    <Link
+                      href={`/checkout?product=${encodeURIComponent(item.product_slug)}&package=${encodeURIComponent(item.package_sku)}`}
+                      className="mt-1 inline-flex h-8 items-center rounded-lg px-2.5 text-[10px] font-bold text-[#d8ff8d] hover:bg-[#b9ff35]/10"
+                    >
+                      <RotateCcw className="mr-1.5 size-3.5" />Beli lagi
+                    </Link>
+                  )}
+                </div>
               ))}
             </History>
           </TabsContent>

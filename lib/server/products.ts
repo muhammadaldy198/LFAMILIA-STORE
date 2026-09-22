@@ -245,12 +245,13 @@ async function applyOneTimeCatalogRepopulation() {
   ).bind(oneTimeCatalogRepopulationKey).run();
 }
 
-async function reconcileAutomaticProviderProducts() {
+async function reconcileAutomaticProviderProducts(productId?: number) {
   const db = getD1();
   await db.prepare(
     `UPDATE products
      SET fulfillment_type = 'automatic', updated_at = CURRENT_TIMESTAMP
      WHERE fulfillment_type = 'manual'
+       ${productId ? "AND id = ?" : ""}
        AND EXISTS (
          SELECT 1
          FROM product_packages package
@@ -259,12 +260,11 @@ async function reconcileAutomaticProviderProducts() {
            AND lower(trim(coalesce(package.provider_code, ''))) = 'digiflazz'
            AND trim(coalesce(package.provider_sku, '')) <> ''
        )`,
-  ).run();
+  ).bind(...(productId ? [productId] : [])).run();
 }
 
 export async function readProducts(includeInactive = false): Promise<ManagedProduct[]> {
   await ensureLegacyDatabaseColumns();
-  await reconcileAutomaticProviderProducts();
   const db = getD1();
   const productSql = includeInactive
     ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json, nickname_game_code,
@@ -291,6 +291,18 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
   ]);
   const packageRows = packageResult.results as PackageRow[];
   const noticeRows = noticeResult.results as NoticeRow[];
+  const packagesByProduct = new Map<number, PackageRow[]>();
+  const noticesByProduct = new Map<number, NoticeRow[]>();
+  for (const item of packageRows) {
+    const items = packagesByProduct.get(item.product_id) ?? [];
+    items.push(item);
+    packagesByProduct.set(item.product_id, items);
+  }
+  for (const item of noticeRows) {
+    const items = noticesByProduct.get(item.product_id) ?? [];
+    items.push(item);
+    noticesByProduct.set(item.product_id, items);
+  }
 
   return (productResult.results as ProductRow[]).map((row) => {
     const bundled = bundledProductBySlug.get(row.slug);
@@ -322,14 +334,14 @@ export async function readProducts(includeInactive = false): Promise<ManagedProd
     packageTabs: parsePackageTabs(row.package_tabs_json),
     isActive: Boolean(row.is_active),
     sortOrder: row.sort_order,
-    notices: noticeRows.filter((item) => item.product_id === row.id).map((item) => ({
+    notices: (noticesByProduct.get(row.id) ?? []).map((item) => ({
       id: item.id,
       title: item.title,
       body: item.body,
       isActive: Boolean(item.is_active),
       sortOrder: item.sort_order,
     })),
-    packages: packageRows.filter((item) => item.product_id === row.id).map((item) => ({
+    packages: (packagesByProduct.get(row.id) ?? []).map((item) => ({
       dbId: item.id,
       id: item.sku,
       label: item.label,
@@ -434,6 +446,7 @@ export async function saveProduct(input: ProductWrite, id?: number) {
     packageStatements.push(db.prepare("DELETE FROM product_packages WHERE product_id = ?").bind(productRow.id));
   }
   await db.batch(packageStatements);
+  await reconcileAutomaticProviderProducts(productRow.id);
   const noticeStatements = [
     db.prepare("DELETE FROM product_notices WHERE product_id = ?").bind(productRow.id),
     ...input.notices.map((item, index) => db.prepare(
@@ -515,6 +528,8 @@ export async function updateProductPackageProvider(input: {
   ).run();
 
   if (!result.meta.changes) throw new Error("Nominal tidak ditemukan.");
+  const product = await db.prepare("SELECT product_id FROM product_packages WHERE id = ?").bind(input.packageId).first<{ product_id: number }>();
+  if (product) await reconcileAutomaticProviderProducts(product.product_id);
 }
 
 export async function updateProductPackageStatus(packageId: number, isActive: boolean) {

@@ -10,7 +10,7 @@ async function readDashboard(role: AdminRole) {
   // current provider price. Ensure the cache table exists before that join.
   const cache = await getDigiflazzPriceListCacheMeta();
   const monitor = await readDigiflazzSellerMonitor();
-  const readiness = getDigiflazzReadiness();
+  const readiness = await getDigiflazzReadiness();
   let balance: number | null = null;
   let reason = readiness.reason;
   if (role === "super_admin" && readiness.ready) {

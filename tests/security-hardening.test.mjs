@@ -116,11 +116,16 @@ test("customer login and registration support Cloudflare Turnstile", () => {
 });
 
 
-test("public transaction summaries never expose or derive invoice references", () => {
+test("public feed masks invoices while exact WhatsApp lookup can recover them", () => {
   const source = read("app/api/orders/search/route.ts");
-  assert.doesNotMatch(source, /reference_id|maskInvoice|publicReferenceId/);
-  assert.match(source, /maskedReferenceId: "Dirahasiakan"/);
-  assert.match(source, /allowRequest\(request, "order-phone-search"/);
+  const getStart = source.indexOf("export async function GET");
+  const postStart = source.indexOf("export async function POST");
+  const publicFeed = source.slice(getStart, postStart);
+  assert.match(publicFeed, /SELECT reference_id, product_name/);
+  assert.match(source, /const referenceId = revealInvoice \? row\.reference_id \?\? null : null/);
+  assert.match(source, /mapSummary\(row, true\)/);
+  assert.match(source, /maskedReferenceId: referenceId \|\| maskedInvoice\(row\.reference_id\)/);
+  assert.match(source, /allowRequest\(request, "order-phone-search", 5, 600\)/);
 });
 
 test("new invoices use an independent compact random token", () => {
