@@ -15,6 +15,8 @@ test("public product contract exposes neutral delivery mode and readiness", () =
   assert.match(route, /fulfillmentAvailable/);
   assert.match(route, /voucherStockKeys\.has\(pkg\.providerSku\)/);
   assert.match(route, /digiflazzAvailability\.get\(pkg\.dbId\) === true/);
+  assert.match(route, /\.filter\(\(pkg\) => pkg\.fulfillmentAvailable\)/);
+  assert.match(route, /\.filter\(\(item\) => item\.packages\.length > 0\)/);
   assert.match(availability, /start_cut_off/);
   assert.match(availability, /end_cut_off/);
   assert.match(availability, /isDigiflazzSnapshotAvailable\(/);

@@ -43,7 +43,11 @@ test("public catalog strips supplier pricing and provider SKU metadata", () => {
   assert.doesNotMatch(checkout, /selectedPackage\?\.providerSku/);
   assert.doesNotMatch(checkout, /selectedPackage\?\.providerCode/);
   assert.doesNotMatch(checkout, /item\.provider(Code|Sku)/);
-  assert.match(route, /Cache-Control\": \"no-store\"/);
+  assert.match(route, /public, max-age=10, s-maxage=10, stale-while-revalidate=20/);
+  assert.match(route, /readProducts\(false, \{ repairSchema: false \}\)/);
+  assert.match(route, /readDigiflazzPackageAvailability\(\{ repairSchema: false \}\)/);
+  assert.match(route, /\.filter\(\(pkg\) => pkg\.fulfillmentAvailable\)/);
+  assert.match(route, /\.filter\(\(item\) => item\.packages\.length > 0\)/);
 });
 
 test("checkout only accepts products and packages that exist in D1", () => {

@@ -52,8 +52,10 @@ function digiflazzRowAvailable(row: DigiflazzAvailabilityRow, date = new Date())
   });
 }
 
-export async function readDigiflazzPackageAvailability() {
-  await ensureLegacyDatabaseColumns();
+export async function readDigiflazzPackageAvailability(
+  options: { repairSchema?: boolean } = {},
+) {
+  if (options.repairSchema !== false) await ensureLegacyDatabaseColumns();
   const rows = await getD1()
     .prepare(
       `SELECT m.package_id,

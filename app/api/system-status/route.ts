@@ -12,7 +12,7 @@ type ServiceState = "operational" | "degraded";
 
 export async function GET() {
   const [settings, paymentModes, doku, midtrans, digiflazz, activeProducts] = await Promise.all([
-    readStorefrontSettings(),
+    readStorefrontSettings({ repairSchema: false }),
     getPaymentModeOverview({ migrateObsoleteProfiles: false }),
     getDokuCheckoutReadiness(),
     getMidtransSnapReadiness(),
@@ -33,5 +33,8 @@ export async function GET() {
     registrationId: settings.merchantRegistrationId ? neutralizePublicCopy(settings.merchantRegistrationId) : "",
     address: settings.merchantAddress ? neutralizePublicCopy(settings.merchantAddress) : "",
   };
-  return Response.json({ services, merchant, updatedAt: new Date().toISOString() }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json(
+    { services, merchant, updatedAt: new Date().toISOString() },
+    { headers: { "Cache-Control": "public, max-age=15, s-maxage=15, stale-while-revalidate=30" } },
+  );
 }

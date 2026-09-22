@@ -51,7 +51,7 @@ function neutralizeStorefrontSettings(settings: PublicStorefrontSettings): Publi
 
 export async function GET() {
   const [settings, categories, faqs] = await Promise.all([
-    readStorefrontSettings(),
+    readStorefrontSettings({ repairSchema: false }),
     readCategories(false),
     readPublicFaqs(),
   ]);

@@ -42,9 +42,11 @@ export type FaqRecord = {
   sortOrder: number;
 };
 
-export async function readStorefrontSettings(): Promise<StorefrontSettings> {
+export async function readStorefrontSettings(
+  options: { repairSchema?: boolean } = {},
+): Promise<StorefrontSettings> {
   try {
-    await ensureLegacyDatabaseColumns();
+    if (options.repairSchema !== false) await ensureLegacyDatabaseColumns();
     const row = await getD1().prepare("SELECT * FROM store_settings WHERE id = 1").first<SettingsRow>();
     if (!row) return defaultStorefrontSettings;
     return {

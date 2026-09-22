@@ -19,7 +19,7 @@ test("nickname requirement is configured per product and legacy repairs have ind
   assert.match(checker, /SELECT nickname_game_code, needs_server, category FROM products/);
   assert.match(checker, /if \(!gameCode\) return \{ supported: false/);
   assert.match(checker, /ensureKokinpayNicknameGameCodeBackfill/);
-  assert.match(publicProducts, /ensureKokinpayNicknameGameCodeBackfill/);
+  assert.doesNotMatch(publicProducts, /ensureKokinpayNicknameGameCodeBackfill/);
 
   assert.match(config, /GAME_CODE_BACKFILL_OPERATION_KEY = "kokinpay_nickname_game_code_backfill_0032"/);
   assert.match(config, /GENSHIN_SERVER_REPAIR_OPERATION_KEY = "kokinpay_genshin_server_input_repair_0032_v5_case_insensitive_target"/);

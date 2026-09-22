@@ -13,7 +13,7 @@ export function ServiceStatus() {
   async function load() {
     setLoading(true);
     try {
-      const response = await fetch("/api/system-status", { cache: "no-store" });
+      const response = await fetch("/api/system-status");
       if (!response.ok) throw new Error("Status layanan belum dapat diperbarui.");
       setData(await response.json() as StatusPayload);
       setError("");
