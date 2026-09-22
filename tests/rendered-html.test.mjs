@@ -28,7 +28,7 @@ test("renders LFAMILIA STORE metadata", async () => {
   );
   const html = await response.text();
   assert.match(html, /<title>Top Up Game Cepat (?:&amp;|&) Aman \| LFAMILIA STORE<\/title>/i);
-  assert.match(html, /<meta(?=[^>]*\bname=["']description["'])(?=[^>]*\bcontent=["'][^"']*Top up Mobile Legends)[^>]*>/i);
-  assert.match(html, /<link(?=[^>]*\brel=["\']canonical["\'])(?=[^>]*\bhref=["\']https:\/\/lfamiliastore\.my\.id\/["\'])[^>]*>/i);
-  assert.match(html, /<meta(?=[^>]*property=["\']og:site_name["\'])(?=[^>]*content=["\']LFAMILIA STORE["\'])[^>]*>/i);
+  assert.match(html, /<meta(?=[^>]*\bname=["']description["'])(?=[^>]*\bcontent=["'][^"']*Top up game dan voucher digital)[^>]*>/i);
+  assert.match(html, /<link(?=[^>]*\brel=["']canonical["'])(?=[^>]*\bhref=["']https:\/\/lfamiliastore\.my\.id\/["'])[^>]*>/i);
+  assert.match(html, /<meta(?=[^>]*property=["']og:site_name["'])(?=[^>]*content=["']LFAMILIA STORE["'])[^>]*>/i);
 });
