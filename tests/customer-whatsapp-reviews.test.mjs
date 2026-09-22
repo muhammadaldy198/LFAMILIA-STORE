@@ -7,8 +7,9 @@ import { DatabaseSync } from "node:sqlite";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const exists = (file) => fs.existsSync(path.join(root, file));
 
-test("0037 adds secure phone-verification and guest-review schema without losing legacy reviews", () => {
+test("0037 legacy phone/review schema remains compatible with production data", () => {
   const db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys = ON");
   db.exec(`
@@ -63,21 +64,6 @@ test("0037 adds secure phone-verification and guest-review schema without losing
   const phoneColumns = new Set(db.prepare("PRAGMA table_info(customer_users)").all().map((row) => row.name));
   assert.ok(phoneColumns.has("phone_verified_at"));
 
-  const otpColumns = new Set(db.prepare("PRAGMA table_info(customer_phone_otp_challenges)").all().map((row) => row.name));
-  for (const column of ["otp_hash", "otp_salt", "expires_at", "attempt_count", "consumed_at"]) {
-    assert.ok(otpColumns.has(column), `${column} should exist`);
-  }
-
-  const duplicateRows = db.prepare("SELECT phone, phone_verified_at FROM customer_users WHERE id IN ('customer-a','customer-b') ORDER BY id").all();
-  assert.equal(duplicateRows[0].phone, "+6281234567890");
-  assert.equal(duplicateRows[1].phone, "+6281234567890");
-  assert.equal(duplicateRows[0].phone_verified_at, null);
-  assert.equal(duplicateRows[1].phone_verified_at, null);
-
-  const uniqueRow = db.prepare("SELECT phone, phone_verified_at FROM customer_users WHERE id = 'customer-c'").get();
-  assert.equal(uniqueRow.phone, "+6281355566677");
-  assert.ok(uniqueRow.phone_verified_at);
-
   const reviewColumns = new Map(db.prepare("PRAGMA table_info(product_reviews)").all().map((row) => [row.name, row]));
   assert.ok(reviewColumns.has("order_id"));
   assert.ok(reviewColumns.has("reviewer_name"));
@@ -89,74 +75,65 @@ test("0037 adds secure phone-verification and guest-review schema without losing
   assert.equal(legacy.rating, 5);
 });
 
-test("WhatsApp OTP backend hashes codes, expires challenges, and calls WhatsApp template API", () => {
-  const source = read("lib/server/whatsapp-otp.ts");
-  assert.match(source, /PBKDF2/);
-  assert.match(source, /OTP_PBKDF2_ITERATIONS\s*=\s*120_000/);
-  assert.match(source, /OTP_TTL_MS\s*=\s*5\s*\*\s*60\s*\*\s*1000/);
-  assert.match(source, /OTP_MAX_ATTEMPTS\s*=\s*5/);
-  assert.match(source, /WHATSAPP_ACCESS_TOKEN/);
-  assert.match(source, /messaging_product:\s*"whatsapp"/);
-  assert.match(source, /type:\s*"template"/);
-  assert.match(source, /otp_hash/);
-  assert.match(source, /ORDER BY datetime\(created_at\) DESC, id DESC/);
-  assert.match(source, /SET attempt_count = attempt_count \+ 1/);
-  assert.match(source, /Number\(claimed\.meta\.changes \?\? 0\) === 0/);
-  assert.match(source, /datetime\(created_at\) < datetime\(\?\)/);
-  assert.match(source, /datetime\(created_at\) = datetime\(\?\) AND id < \?/);
-  assert.match(source, /\.bind\(customerId, challengeId, createdAt, createdAt, challengeId\)/);
-  assert.doesNotMatch(source, /INSERT INTO customer_phone_otp_challenges[\s\S]{0,300}\botp\b\s*,/i);
-});
+test("WhatsApp OTP runtime and endpoints are removed", () => {
+  assert.equal(exists("lib/server/whatsapp-otp.ts"), false);
+  assert.equal(exists("components/customer-phone-verification.tsx"), false);
+  assert.equal(exists("app/api/account/phone/send-otp/route.ts"), false);
+  assert.equal(exists("app/api/account/phone/verify-otp/route.ts"), false);
 
-test("customer session exposes phone verification and protected account routes require it", () => {
   const auth = read("lib/server/customer-auth.ts");
-  const account = read("app/api/account/route.ts");
-  const send = read("app/api/account/phone/send-otp/route.ts");
-  const verify = read("app/api/account/phone/verify-otp/route.ts");
-  assert.match(auth, /phoneVerified:\s*boolean/);
-  assert.match(auth, /requiresPhoneVerification:\s*true/);
-  assert.match(auth, /allowUnverifiedPhone/);
-  assert.match(account, /allowUnverifiedPhone:\s*true/);
-  assert.match(send, /createWhatsappOtpChallenge/);
-  assert.match(verify, /verifyWhatsappOtpChallenge/);
-  assert.match(send, /allowRequest/);
-  assert.match(verify, /allowRequest/);
+  const account = read("components/customer-account.tsx");
+  assert.doesNotMatch(auth, /requiresPhoneVerification|allowUnverifiedPhone/);
+  assert.doesNotMatch(account, /CustomerPhoneVerification|phoneVerified\)\s*\{/);
+  assert.match(account, /LFAMILIA tidak mengirim OTP WhatsApp/);
 });
 
-test("sidebar switches from guest CTA to signed-in balance card", () => {
+test("customer profile can update its contact number without OTP", () => {
+  const route = read("app/api/account/route.ts");
+  const account = read("components/customer-account.tsx");
+  assert.match(route, /SET name = \?, phone = \?, phone_verified_at = NULL/);
+  assert.match(account, /Field label="Nomor kontak"/);
+  assert.match(account, /onChange=\{\(event\) => setPhone\(event\.target\.value\)\}/);
+});
+
+test("sidebar switches from guest CTA to signed-in balance card without WhatsApp verification state", () => {
   const header = read("components/store-header.tsx");
   const authForm = read("components/customer-auth-form.tsx");
   assert.match(header, /fetch\("\/api\/account\/summary"/);
   assert.match(header, /formatRupiah\(customer\.balance\)/);
-  assert.match(header, /WhatsApp terverifikasi/);
+  assert.match(header, /Akun & Saldo/);
+  assert.doesNotMatch(header, /WhatsApp terverifikasi|WhatsApp belum diverifikasi|Verifikasi WhatsApp/);
   assert.match(header, /lfamilia:auth-changed/);
   assert.match(authForm, /lfamilia:auth-changed/);
 });
 
-test("guest buyers can review a paid order using invoice and checkout WhatsApp", () => {
+test("logged-in reviews use account identity while guest buyers use invoice and checkout contact", () => {
   const route = read("app/api/reviews/route.ts");
   const reviews = read("lib/server/reviews.ts");
   const ui = read("components/product-reviews.tsx");
+  assert.match(route, /if \(customer\) \{/);
   assert.match(route, /saveGuestProductReview/);
-  assert.doesNotMatch(route, /requireCustomerSession/);
+  assert.doesNotMatch(route, /customer\?\.phoneVerified/);
   assert.match(reviews, /payment_status\s*=\s*'paid'/);
-  assert.match(reviews, /\^LF\[A-F0-9\]\{8,12\}\$/);
-  assert.match(reviews, /UPPER\(reference_id\) = \?/);
-  assert.doesNotMatch(reviews, /replace\(\/\^LF\//);
   assert.match(reviews, /buyer_phone/);
   assert.match(reviews, /product_reviews WHERE order_id/);
   assert.match(ui, /Nomor invoice/);
-  assert.match(ui, /Nomor WhatsApp saat checkout/);
+  assert.match(ui, /Nomor kontak saat checkout/);
   assert.match(ui, /Satu invoice hanya bisa memberi satu ulasan/);
 });
 
-test("WhatsApp OTP credentials are dashboard-managed and never hardcoded", () => {
+test("automatic customer messaging is website and email only", () => {
   const integration = read("lib/server/integration-config.ts");
   const admin = read("components/admin-integration-workspace.tsx");
-  assert.match(integration, /"whatsapp:service"/);
-  assert.match(integration, /WHATSAPP_ACCESS_TOKEN/);
-  assert.match(integration, /applyWhatsappConfig/);
-  assert.match(admin, /WhatsApp OTP/);
-  assert.match(admin, /Access Token/);
-  assert.match(admin, /whatsappRequiredFields/);
+  const vouchers = read("lib/server/vouchers.ts");
+  const notifications = read("lib/server/transaction-notifications.ts");
+
+  assert.doesNotMatch(integration, /"whatsapp:service"|WHATSAPP_ACCESS_TOKEN|applyWhatsappConfig/);
+  assert.doesNotMatch(admin, /WhatsApp OTP|whatsappRequiredFields|whatsappAccessToken/);
+  assert.match(admin, /Resend Email/);
+  assert.match(vouchers, /if \(normalized === "website"\) return \[\]/);
+  assert.match(vouchers, /if \(normalized === "email"\) return \["email"\]/);
+  assert.doesNotMatch(vouchers, /normalized === "whatsapp"|email\+whatsapp|whatsapp\+email/);
+  assert.match(notifications, /RESEND_API_KEY/);
+  assert.doesNotMatch(notifications, /WHATSAPP_|messaging_product/);
 });
