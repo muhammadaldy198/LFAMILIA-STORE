@@ -184,10 +184,10 @@ export async function saveGuestProductReview(input: {
   try {
     orderPhone = normalizeWhatsappPhone(order.buyer_phone || "");
   } catch {
-    throw new Error("Pesanan ini tidak memiliki nomor WhatsApp yang dapat diverifikasi.");
+    throw new Error("Pesanan ini tidak memiliki nomor kontak yang dapat diverifikasi.");
   }
   const suppliedPhone = normalizeWhatsappPhone(input.phone);
-  if (orderPhone !== suppliedPhone) throw new Error("Nomor WhatsApp tidak cocok dengan invoice.");
+  if (orderPhone !== suppliedPhone) throw new Error("Nomor kontak tidak cocok dengan invoice.");
 
   const existing = await db.prepare("SELECT id FROM product_reviews WHERE order_id = ? LIMIT 1")
     .bind(order.id)
