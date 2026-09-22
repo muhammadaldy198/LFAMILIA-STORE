@@ -16,6 +16,13 @@ import { HomeBannerCarousel } from "@/components/home-banner-carousel";
 import { PopularNow } from "@/components/popular-now";
 import { HomeNewsPreview } from "@/components/home-news-preview";
 import { HomeReviewsPreview } from "@/components/home-reviews-preview";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata = pageMetadata({
+  title: "Top Up Game Cepat & Aman",
+  description: "Top up game dan voucher digital di LFAMILIA STORE dengan pilihan produk lengkap, pembayaran praktis, dan status transaksi yang mudah dipantau.",
+  path: "/",
+});
 
 const steps = [
   {

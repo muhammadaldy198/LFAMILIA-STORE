@@ -1,3 +1,7 @@
+import { noIndexMetadata } from "@/lib/seo";
+
+export const metadata = noIndexMetadata("Checkout");
+
 export default function CheckoutLayout({ children }: { children: React.ReactNode }) {
   return (
     <>

@@ -559,7 +559,8 @@ body {
   }
 
   .mobile-account-drawer,
-  .admin-mobile-drawer {
+  .admin-mobile-drawer,
+  .mobile-store-menu {
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
 
@@ -574,7 +575,8 @@ body {
 
 @supports (height: 100dvh) {
   .mobile-account-drawer,
-  .admin-mobile-drawer {
+  .admin-mobile-drawer,
+  .mobile-store-menu {
     height: 100dvh;
   }
 }

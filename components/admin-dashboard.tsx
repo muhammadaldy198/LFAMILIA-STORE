@@ -211,7 +211,7 @@ export function AdminDashboard({
       className="admin-reference min-h-screen bg-[#f4f7fb] text-[#0f1f3d] lg:grid lg:grid-cols-[230px_minmax(0,1fr)]"
     >
       {mobileNavigationOpen && <button type="button" aria-label="Tutup menu" onClick={() => setMobileNavigationOpen(false)} className="fixed inset-0 z-40 bg-[#071426]/55 lg:hidden" />}
-      <aside className={`fixed inset-y-0 left-0 z-50 admin-mobile-drawer flex h-dvh w-[280px] flex-col overflow-hidden bg-[#112842] text-white shadow-[6px_0_24px_rgba(15,37,64,0.22)] transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:w-auto lg:translate-x-0 lg:shadow-[6px_0_24px_rgba(15,37,64,0.12)] ${mobileNavigationOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 admin-mobile-drawer flex h-dvh w-[min(280px,88vw)] flex-col overflow-hidden bg-[#112842] text-white shadow-[6px_0_24px_rgba(15,37,64,0.22)] transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:w-auto lg:translate-x-0 lg:shadow-[6px_0_24px_rgba(15,37,64,0.12)] ${mobileNavigationOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <Brand onClick={() => { setActiveTab("overview"); setMobileNavigationOpen(false); }} onClose={() => setMobileNavigationOpen(false)} />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3 scrollbar-none">

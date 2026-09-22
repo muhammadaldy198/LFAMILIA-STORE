@@ -162,7 +162,7 @@ export function StoreHeader() {
               </Button>
             </SheetTrigger>
 
-            <SheetContent className="w-[80vw] max-w-[330px] overflow-y-auto border-white/10 bg-[#0b0e16] text-white sm:max-w-[330px]">
+            <SheetContent className="mobile-store-menu h-dvh w-[86vw] max-w-[330px] overflow-y-auto border-white/10 bg-[#0b0e16] text-white sm:max-w-[330px]">
               <SheetHeader className="border-b border-white/[0.08] px-4 py-3">
                 <SheetTitle className="text-left text-sm font-black text-white">
                   LFAMILIA STORE
