@@ -44,7 +44,7 @@ export function PasswordRecovery({ mode }: { mode: "request" | "reset" }) {
           body: JSON.stringify(
             mode === "request"
               ? { email, turnstileToken }
-              : { token, password, turnstileToken },
+              : { token: resetToken, password, turnstileToken },
           ),
         },
       );
