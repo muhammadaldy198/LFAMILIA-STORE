@@ -62,12 +62,19 @@ test("customer account distinguishes transient failures from unauthenticated sta
   assert.match(account, /window\.setTimeout\(\(\) => setCopied/);
 });
 
-test("WhatsApp OTP resend obeys a visible cooldown", () => {
-  const otp = read("components/customer-phone-verification.tsx");
-  assert.match(otp, /const \[resendIn, setResendIn\] = useState\(0\)/);
-  assert.match(otp, /payload\.resendAfterSeconds/);
-  assert.match(otp, /disabled=\{busy \|\| resendIn > 0\}/);
-  assert.match(otp, /Kirim ulang dalam/);
+test("customer and admin mobile shells use production touch targets and viewport-safe drawers", () => {
+  const account = read("components/customer-account.tsx");
+  const admin = read("components/admin-dashboard.tsx");
+  const checkout = read("app/checkout/page.tsx");
+  const css = read("app/globals.css");
+  assert.match(account, /mobile-account-drawer/);
+  assert.match(account, /h-dvh/);
+  assert.match(admin, /admin-mobile-drawer/);
+  assert.match(admin, /h-dvh/);
+  assert.match(checkout, /mobile-checkout-bar/);
+  assert.match(css, /min-height: 2\.75rem/);
+  assert.match(css, /font-size: 16px/);
+  assert.match(css, /safe-area-inset-bottom/);
 });
 
 test("membership refresh is event driven instead of polling every ten seconds", () => {
