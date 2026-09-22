@@ -50,6 +50,13 @@ async function passwordDigest(password: string, saltHex: string) {
   return bytesToHex(new Uint8Array(bits));
 }
 
+export async function createCustomerPasswordCredentials(password: string) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltHex = bytesToHex(salt);
+  const passwordHash = await passwordDigest(password, saltHex);
+  return { passwordHash, saltHex };
+}
+
 function constantTimeEqual(left: string, right: string) {
   if (left.length !== right.length) return false;
   let mismatch = 0;
@@ -82,9 +89,7 @@ export async function registerCustomer(input: { email: string; name: string; pho
   const email = normalizeEmail(input.email);
   const existing = await db.prepare("SELECT id FROM customer_users WHERE email = ? LIMIT 1").bind(email).first<{ id: string }>();
   if (existing) throw new Error("Email sudah terdaftar. Silakan masuk.");
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const saltHex = bytesToHex(salt);
-  const passwordHash = await passwordDigest(input.password, saltHex);
+  const { passwordHash, saltHex } = await createCustomerPasswordCredentials(input.password);
   const id = crypto.randomUUID();
   const phone = normalizeWhatsappPhone(input.phone);
   await db.prepare(
