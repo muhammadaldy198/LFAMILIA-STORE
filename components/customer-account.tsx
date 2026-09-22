@@ -249,9 +249,9 @@ function Dashboard({
             type="button"
             onClick={() => setMenuOpen(true)}
             variant="outline"
-            className="border-white/10 bg-white/[0.03] text-white lg:hidden"
+            className="min-w-24 border-white/10 bg-white/[0.03] text-white lg:hidden"
           >
-            <Menu className="size-4" />
+            <Menu className="mr-2 size-4" />Menu
           </Button>
           <Button
             onClick={() => void onLogout()}
@@ -305,7 +305,7 @@ function Dashboard({
               className="fixed inset-0 z-40 bg-black/70 lg:hidden"
               aria-label="Tutup menu"
             />
-            <aside className="fixed inset-y-0 left-0 z-50 w-[82vw] max-w-72 overflow-y-auto border-r border-white/[0.1] bg-[#0d1019] p-3 shadow-2xl lg:hidden">
+            <aside className="mobile-account-drawer fixed inset-y-0 left-0 z-50 h-dvh w-[86vw] max-w-80 overflow-y-auto border-r border-white/[0.1] bg-[#0d1019] p-3 shadow-2xl lg:hidden">
               <div className="mb-4 flex items-center justify-between px-2 pt-1">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c9ff70]">
                   Menu akun
