@@ -36,6 +36,7 @@ test("public catalog strips supplier pricing and provider SKU metadata", () => {
   assert.doesNotMatch(route, /providerSku: pkg\./);
   assert.doesNotMatch(route, /\.\.\.item/);
   assert.match(checkout, /selectedPackage\?\.fulfillmentReady/);
+  assert.match(checkout, /selectedPackage\?\.fulfillmentAvailable === true/);
   assert.match(checkout, /selectedPackage\?\.fulfillmentMode/);
   assert.match(checkout, /isVoucherStock = fulfillmentMode === "voucher_stock"/);
   assert.match(checkout, /item\.fulfillmentReady/);
@@ -80,4 +81,6 @@ test("unconfigured automatic products stay automatic and checkout blocks them in
   assert.doesNotMatch(hook, /fulfillmentType:\s*"manual"/);
   assert.match(checkout, /if \(!providerReady\)/);
   assert.match(checkout, /Produk otomatis ini belum siap dijual\. Hubungi admin\./);
+  assert.match(checkout, /Nominal ini sedang cut-off otomatis/);
+  assert.match(checkout, /disabled=\{!available\}/);
 });
