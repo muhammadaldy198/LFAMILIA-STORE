@@ -51,54 +51,21 @@ Migration schema terkait:
 drizzle/0036_customer_google_oauth.sql
 ```
 
+## Notifikasi pelanggan
 
-## WhatsApp OTP pelanggan
+LFAMILIA **tidak memakai WhatsApp Cloud API dan tidak memakai OTP WhatsApp**.
 
-Nomor WhatsApp pelanggan diverifikasi melalui **Meta WhatsApp Cloud API**. Credential tidak ditulis di source code atau Cloudflare Variables biasa; simpan dari **Super Admin → Integrasi → WhatsApp OTP** agar terenkripsi menggunakan `INTEGRATION_ENCRYPTION_KEY`.
+Notifikasi transaksi otomatis hanya memakai:
 
-Field wajib:
+- **Website** sebagai sumber status utama: invoice, status pembayaran, status fulfillment, riwayat pesanan, dan kode voucher/serial bila tersedia.
+- **Email** melalui **Resend Email** untuk notifikasi transaksi dan pengiriman kode yang memang dikonfigurasi melalui email.
 
-```text
-Graph API URL       contoh: https://graph.facebook.com/vXX.X
-Phone Number ID     ID nomor WhatsApp Business pengirim
-Access Token        token yang mempunyai izin mengirim pesan WhatsApp
-Template Name       nama template OTP/authentication yang sudah disetujui
-Template Language   contoh: id
-OTP Button Subtype  kosong, url, atau quick_reply sesuai template
-```
+Menu **Super Admin → Integrasi → Resend Email** menyimpan API key, alamat pengirim, API URL, dan channel voucher. Channel voucher hanya boleh `website` atau `email`.
 
-Template harus mempunyai satu variabel body untuk kode OTP 6 digit. Bila template memakai tombol OTP, pilih subtype yang sesuai dengan template yang disetujui Meta. Tombol **Periksa** di panel hanya menyatakan konfigurasi wajib lengkap dan dapat dibaca backend; pengiriman nyata tetap harus diuji dengan nomor WhatsApp yang dapat menerima template.
+Nomor kontak pelanggan tetap dapat disimpan untuk kebutuhan transaksi/bantuan, tetapi tidak diverifikasi menggunakan OTP. Tombol WhatsApp bantuan yang membuka `wa.me` boleh tetap digunakan sebagai **kanal CS manual** dan tidak terhubung ke WhatsApp Cloud API atau pengiriman pesan otomatis.
 
-Flow akun:
-
-```text
-Google / daftar email
-        ↓
-session dibuat
-        ↓
-phone_verified_at ada?
-   ├─ ya  → dashboard customer
-   └─ tidak
-        ↓
-masukkan nomor WhatsApp
-        ↓
-OTP WhatsApp 6 digit
-        ↓
-verifikasi sukses
-        ↓
-dashboard customer
-```
-
-OTP berlaku 5 menit, resend memiliki cooldown, percobaan kode dibatasi, dan database hanya menyimpan hash OTP beserta salt. Nomor disimpan dalam format internasional `+62...`. Nomor terverifikasi tidak dapat diganti langsung dari form profil; perubahan nomor harus melewati verifikasi OTP kembali.
-
-Migration terkait:
-
-```text
-drizzle/0037_customer_phone_whatsapp_reviews.sql
-```
-
-**Urutan deploy production:** jalankan migration 0037 di D1 terlebih dahulu, deploy code, lalu isi/cek WhatsApp OTP dari menu Integrasi. Jangan deploy code yang membaca `phone_verified_at` sebelum schema 0037 tersedia di database production.
+Schema lama `phone_verified_at` dan tabel challenge OTP yang sudah pernah masuk ke production boleh tetap berada di D1 untuk kompatibilitas historis; runtime aplikasi tidak lagi menggunakan OTP WhatsApp.
 
 ## Ulasan pembeli guest
 
-Akun tidak lagi menjadi syarat mutlak untuk memberi ulasan. Pembeli guest dapat mengirim ulasan bila backend berhasil mencocokkan **invoice yang sudah paid**, produk, dan nomor WhatsApp checkout. Satu order hanya dapat dipakai untuk satu ulasan. Nama reviewer disamarkan di frontend dan data sensitif seperti nomor WhatsApp atau invoice lengkap tidak ditampilkan bersama ulasan.
+Akun tidak lagi menjadi syarat mutlak untuk memberi ulasan. Pelanggan yang sedang login diverifikasi melalui akun dan riwayat order. Pembeli guest dapat mengirim ulasan bila backend berhasil mencocokkan **invoice yang sudah paid**, produk, dan nomor kontak checkout. Satu order hanya dapat dipakai untuk satu ulasan. Nama reviewer disamarkan di frontend dan data sensitif seperti nomor kontak atau invoice lengkap tidak ditampilkan bersama ulasan.
