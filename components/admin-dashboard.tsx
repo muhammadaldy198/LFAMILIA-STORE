@@ -211,7 +211,7 @@ export function AdminDashboard({
       className="admin-reference min-h-screen bg-[#f4f7fb] text-[#0f1f3d] lg:grid lg:grid-cols-[230px_minmax(0,1fr)]"
     >
       {mobileNavigationOpen && <button type="button" aria-label="Tutup menu" onClick={() => setMobileNavigationOpen(false)} className="fixed inset-0 z-40 bg-[#071426]/55 lg:hidden" />}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[280px] flex-col overflow-hidden bg-[#112842] text-white shadow-[6px_0_24px_rgba(15,37,64,0.22)] transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:w-auto lg:translate-x-0 lg:shadow-[6px_0_24px_rgba(15,37,64,0.12)] ${mobileNavigationOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 admin-mobile-drawer flex h-dvh w-[280px] flex-col overflow-hidden bg-[#112842] text-white shadow-[6px_0_24px_rgba(15,37,64,0.22)] transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:w-auto lg:translate-x-0 lg:shadow-[6px_0_24px_rgba(15,37,64,0.12)] ${mobileNavigationOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <Brand onClick={() => { setActiveTab("overview"); setMobileNavigationOpen(false); }} onClose={() => setMobileNavigationOpen(false)} />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3 scrollbar-none">
@@ -241,14 +241,14 @@ export function AdminDashboard({
       <div className="min-w-0 lg:col-start-2">
         <header className="sticky top-0 z-30 flex h-[56px] items-center gap-2 border-b border-[#e5eaf1] bg-white px-3 shadow-[0_1px_2px_rgba(15,23,42,0.02)] lg:h-[58px] lg:px-5">
           <button type="button" onClick={() => setMobileNavigationOpen(true)} aria-label="Buka menu admin" className="grid size-10 shrink-0 place-items-center rounded-md border border-[#dfe5ed] bg-[#f8fafc] text-[#183451] lg:hidden"><Menu className="size-5" /></button>
-          <form onSubmit={submitGlobalSearch} className="relative w-full max-w-[550px]">
+          <form onSubmit={submitGlobalSearch} className="relative min-w-0 flex-1 max-w-[550px]">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#7d8ba3]" />
             <Input
               ref={searchRef}
               value={globalSearch}
               onChange={(event) => { globalSearchRequestRef.current += 1; setGlobalSearchBusy(false); setGlobalSearch(event.target.value); setGlobalResults([]); setGlobalSearchError(""); }}
-              placeholder="Cari menu, produk, pesanan, atau pelanggan..."
-              className="h-9 rounded-md border-[#dfe5ed] bg-[#f8fafc] pl-9 pr-20 text-[11px] text-[#26364f] shadow-none placeholder:text-[#98a5b8] focus-visible:ring-[#1769e8]/30"
+              placeholder="Cari..."
+              className="h-9 rounded-md border-[#dfe5ed] bg-[#f8fafc] pl-9 pr-3 sm:pr-20 text-[11px] text-[#26364f] shadow-none placeholder:text-[#98a5b8] focus-visible:ring-[#1769e8]/30"
             />
             <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-[#dfe5ed] bg-white px-1.5 py-0.5 text-[9px] font-semibold text-[#8b98aa] sm:block">
               {globalSearchBusy ? "..." : "Ctrl K"}
