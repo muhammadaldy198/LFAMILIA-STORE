@@ -22,7 +22,7 @@ export function useStoreProducts() {
     let active = true;
     async function load() {
       try {
-        const response = await fetch("/api/products", { cache: "no-store" });
+        const response = await fetch("/api/products");
         const data = await response.json().catch(() => ({})) as {
           products?: StoreProduct[];
           databaseReady?: boolean;
