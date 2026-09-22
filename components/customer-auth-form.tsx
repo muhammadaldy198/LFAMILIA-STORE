@@ -152,7 +152,7 @@ export function CustomerAuthForm({
         </AuthField>
 
         {mode === "register" && (
-          <AuthField label="Nomor WhatsApp" icon={<Phone className="size-[18px]" />}>
+          <AuthField label="Nomor kontak" icon={<Phone className="size-[18px]" />}>
             <input required inputMode="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="081234567890" className="h-12 w-full bg-transparent pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/24" />
           </AuthField>
         )}
