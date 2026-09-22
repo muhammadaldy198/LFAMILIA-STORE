@@ -116,6 +116,15 @@ jobs:
           const html = await read("/", false);
           if (!/LFAMILIA STORE/i.test(html)) throw new Error("Homepage production tidak memuat metadata LFAMILIA STORE.");
 
+          const forgot = await read("/forgot-password", false);
+          if (!/Lupa password|reset password/i.test(forgot)) throw new Error("Halaman lupa password production tidak valid.");
+
+          const robots = await read("/robots.txt", false);
+          if (!/sitemap\.xml/i.test(robots) || !/\/api\//i.test(robots)) throw new Error("robots.txt production tidak sesuai.");
+
+          const sitemap = await read("/sitemap.xml", false);
+          if (!/lfamiliastore\.my\.id/i.test(sitemap)) throw new Error("sitemap.xml production tidak valid.");
+
           const products = await read("/api/products", true);
           const storefront = await read("/api/storefront", true);
           if (!products || typeof products !== "object") throw new Error("Response /api/products bukan JSON object valid.");

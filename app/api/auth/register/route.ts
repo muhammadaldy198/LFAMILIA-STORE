@@ -6,7 +6,7 @@ import { verifyTurnstile } from "@/lib/server/turnstile";
 const schema = z.object({
   name: z.string().trim().min(2, "Nama minimal 2 karakter.").max(80),
   email: z.string().trim().email("Email tidak valid.").max(150),
-  phone: z.string().trim().regex(/^\+?[0-9]{8,16}$/, "Nomor WhatsApp tidak valid."),
+  phone: z.string().trim().regex(/^\+?[0-9]{8,16}$/, "Nomor kontak tidak valid."),
   password: z.string().min(8, "Password minimal 8 karakter.").max(72),
   turnstileToken: z.string().max(2048).optional(),
 });

@@ -1,5 +1,5 @@
 import { getD1 } from "@/db";
-import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { getPublicBaseUrl, getRuntimeEnv } from "@/lib/server/runtime-env";
 
 const RESET_TTL_MINUTES = 15;
 const PASSWORD_ITERATIONS = 100_000;
@@ -66,7 +66,7 @@ async function sendResetEmail(input: { email: string; name: string; resetUrl: st
   if (!response.ok) throw new Error(payload.message || "Email reset password gagal dikirim.");
 }
 
-export async function requestPasswordReset(emailInput: string, origin: string) {
+export async function requestPasswordReset(emailInput: string) {
   const db = getD1();
   const email = normalizeEmail(emailInput);
   const customer = await db.prepare(
@@ -88,7 +88,7 @@ export async function requestPasswordReset(emailInput: string, origin: string) {
     "INSERT INTO customer_password_reset_tokens (id, customer_id, token_hash, expires_at) VALUES (?, ?, ?, ?)",
   ).bind(id, customer.id, tokenHash, expiresAt).run();
 
-  const resetUrl = new URL("/reset-password", origin);
+  const resetUrl = new URL("/reset-password", getPublicBaseUrl());
   resetUrl.searchParams.set("token", token);
   try {
     await sendResetEmail({
@@ -106,11 +106,13 @@ export async function requestPasswordReset(emailInput: string, origin: string) {
 export async function resetPassword(token: string, password: string) {
   const db = getD1();
   const tokenHash = await sha256(token);
-  const record = await db.prepare(
-    `SELECT id, customer_id FROM customer_password_reset_tokens
-     WHERE token_hash = ? AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP LIMIT 1`,
-  ).bind(tokenHash).first<{ id: string; customer_id: string }>();
-  if (!record) throw new Error("Link reset password tidak valid atau sudah kedaluwarsa.");
+  const claimed = await db.prepare(
+    `UPDATE customer_password_reset_tokens
+     SET used_at = CURRENT_TIMESTAMP
+     WHERE token_hash = ? AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+     RETURNING customer_id`,
+  ).bind(tokenHash).first<{ customer_id: string }>();
+  if (!claimed) throw new Error("Link reset password tidak valid atau sudah kedaluwarsa.");
 
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const saltHex = bytesToHex(salt);
@@ -119,10 +121,10 @@ export async function resetPassword(token: string, password: string) {
   await db.batch([
     db.prepare(
       "UPDATE customer_users SET password_hash = ?, password_salt = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-    ).bind(passwordHash, saltHex, record.customer_id),
+    ).bind(passwordHash, saltHex, claimed.customer_id),
     db.prepare(
       "UPDATE customer_password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE customer_id = ? AND used_at IS NULL",
-    ).bind(record.customer_id),
-    db.prepare("DELETE FROM customer_sessions WHERE customer_id = ?").bind(record.customer_id),
+    ).bind(claimed.customer_id),
+    db.prepare("DELETE FROM customer_sessions WHERE customer_id = ?").bind(claimed.customer_id),
   ]);
 }
