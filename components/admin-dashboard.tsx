@@ -247,7 +247,7 @@ export function AdminDashboard({
               ref={searchRef}
               value={globalSearch}
               onChange={(event) => { globalSearchRequestRef.current += 1; setGlobalSearchBusy(false); setGlobalSearch(event.target.value); setGlobalResults([]); setGlobalSearchError(""); }}
-              placeholder="Cari..."
+              placeholder="Cari menu, produk, pesanan, atau pelanggan..."
               className="h-9 rounded-md border-[#dfe5ed] bg-[#f8fafc] pl-9 pr-3 sm:pr-20 text-[11px] text-[#26364f] shadow-none placeholder:text-[#98a5b8] focus-visible:ring-[#1769e8]/30"
             />
             <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-[#dfe5ed] bg-white px-1.5 py-0.5 text-[9px] font-semibold text-[#8b98aa] sm:block">
