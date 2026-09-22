@@ -63,6 +63,9 @@ export function passwordResetEmailConfigured() {
 export async function createPasswordResetRequest(emailInput: string): Promise<ResetRequest | null> {
   const db = getD1();
   const email = normalizeEmail(emailInput);
+  await db.prepare(
+    "DELETE FROM customer_password_reset_tokens WHERE consumed_at IS NOT NULL OR expires_at <= CURRENT_TIMESTAMP",
+  ).run().catch(() => undefined);
   const customer = await db.prepare(
     "SELECT id, email, name FROM customer_users WHERE email = ? AND is_active = 1 LIMIT 1",
   ).bind(email).first<{ id: string; email: string; name: string }>();
