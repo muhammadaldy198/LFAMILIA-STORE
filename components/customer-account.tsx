@@ -26,7 +26,6 @@ import { formatRupiah } from "@/lib/store-data";
 import { CustomerSupport } from "@/components/customer-support";
 import { CustomerGameAccounts } from "@/components/customer-game-accounts";
 import { CustomerAuthForm } from "@/components/customer-auth-form";
-import { CustomerPhoneVerification } from "@/components/customer-phone-verification";
 
 type PublicWalletSettings = {
   enabled: boolean;
@@ -173,16 +172,6 @@ export function CustomerAccount({
     setAccount(null);
     window.dispatchEvent(new Event("lfamilia:auth-changed"));
   };
-
-  if (!account.customer.phoneVerified) {
-    return (
-      <CustomerPhoneVerification
-        customer={account.customer}
-        onVerified={load}
-        onLogout={logout}
-      />
-    );
-  }
 
   return (
     <Dashboard
@@ -825,6 +814,7 @@ function ProfileForm({
   onError(value: string): void;
 }) {
   const [name, setName] = useState(customer.name);
+  const [phone, setPhone] = useState(customer.phone);
   const [leaderboard, setLeaderboard] = useState(customer.leaderboardOptIn);
   const [saving, setSaving] = useState(false);
   async function submit(event: FormEvent) {
@@ -837,7 +827,7 @@ function ProfileForm({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name,
-          phone: customer.phone,
+          phone,
           leaderboardOptIn: leaderboard,
         }),
       });
@@ -867,15 +857,17 @@ function ProfileForm({
             className="checkout-input"
           />
         </Field>
-        <Field label="Nomor WhatsApp">
+        <Field label="Nomor kontak">
           <Input
             required
-            value={customer.phone}
-            readOnly
-            className="checkout-input cursor-not-allowed opacity-70"
+            inputMode="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            className="checkout-input"
           />
           <p className="mt-1.5 text-[9px] leading-4 text-white/30">
-            Nomor ini sudah terverifikasi. Perubahan nomor wajib melalui verifikasi OTP WhatsApp.
+            Digunakan sebagai data kontak transaksi dan bantuan. LFAMILIA tidak mengirim OTP WhatsApp.
           </p>
         </Field>
         <label className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.08] p-4">
