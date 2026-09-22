@@ -62,8 +62,6 @@ export function AdminIntegrationWorkspace() {
     relayOrigin: "https://digiflazz-relay.lfamiliastore.my.id",
     resendApiUrl: "https://api.resend.com/emails",
     resendDeliveryChannel: "email",
-    whatsappTemplateLanguage: "id",
-    whatsappButtonSubtype: "url",
     dokuApiUrl: "",
   });
   const initializedPaymentEnvironments = useRef(false);
@@ -238,7 +236,6 @@ export function AdminIntegrationWorkspace() {
         apiKey: "",
         webhookSecret: "",
         kokinpayApiKey: "",
-        whatsappAccessToken: "",
         resendApiKey: "",
         relayToken: "",
         voucherEncryptionKey: "",
@@ -291,7 +288,6 @@ export function AdminIntegrationWorkspace() {
         const latest = await load();
         const mapping: Partial<Record<Tab, [Provider, Environment, string]>> = {
           "KokinPay": ["kokinpay", "global", "KokinPay"],
-          "WhatsApp OTP": ["whatsapp", "global", "WhatsApp OTP"],
           "Resend Email": ["resend", "global", "Resend Email"],
         };
         const target = mapping[tab];
@@ -300,13 +296,9 @@ export function AdminIntegrationWorkspace() {
         const profile = latest.integration.profiles.find((item) =>
           item.provider === provider && item.environment === environment,
         );
-        const ready = provider === "whatsapp"
-          ? Boolean(profile && !profile.decryptionError && whatsappRequiredFields.every((field) => profile.configuredFields?.includes(field)))
-          : Boolean(profile?.configured && !profile.decryptionError);
+        const ready = Boolean(profile?.configured && !profile.decryptionError);
         if (!ready) throw new Error(`${label} belum lengkap atau kredensial tidak dapat dibuka.`);
-        setMessage(provider === "whatsapp"
-          ? "WhatsApp OTP lengkap dan siap digunakan backend untuk mengirim template OTP."
-          : `${label} tersimpan dan dapat dibaca backend.`);
+        setMessage(`${label} tersimpan dan dapat dibaca backend.`);
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Pemeriksaan gagal.");
