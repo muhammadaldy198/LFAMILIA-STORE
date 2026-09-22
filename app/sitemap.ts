@@ -1,5 +1,8 @@
 import type { MetadataRoute } from "next";
 import { absoluteUrl } from "@/lib/seo";
+import { listNews } from "@/lib/server/content";
+
+export const dynamic = "force-dynamic";
 
 const publicRoutes = [
   { path: "/", priority: 1, changeFrequency: "daily" as const },
@@ -19,10 +22,20 @@ const publicRoutes = [
   { path: "/refund", priority: 0.35, changeFrequency: "yearly" as const },
 ];
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  return publicRoutes.map((route) => ({
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const base = publicRoutes.map((route) => ({
     url: absoluteUrl(route.path),
     priority: route.priority,
     changeFrequency: route.changeFrequency,
   }));
+  const articles = await listNews(false).catch(() => []);
+  return [
+    ...base,
+    ...articles.map((article) => ({
+      url: absoluteUrl(`/news/${article.slug}`),
+      lastModified: article.publishedAt ? new Date(article.publishedAt) : undefined,
+      changeFrequency: "monthly" as const,
+      priority: 0.58,
+    })),
+  ];
 }
