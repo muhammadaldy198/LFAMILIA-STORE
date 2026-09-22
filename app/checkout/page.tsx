@@ -288,7 +288,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const isManual = fulfillmentMode === "manual";
   const isVoucherStock = fulfillmentMode === "voucher_stock";
   const providerReady = Boolean(selectedPackage?.fulfillmentReady);
-  const fulfillmentAvailable = isManual || Boolean(selectedPackage?.fulfillmentAvailable);
+  const fulfillmentAvailable = isManual || selectedPackage?.fulfillmentAvailable === true;
   const nicknameRequired =
     !isVoucherProduct && Boolean(product.nicknameRequired);
   const canCheckNickname = nicknameRequired;
@@ -425,13 +425,13 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   }, [account?.id, isGameProduct, isVoucherProduct, product.slug]);
 
   useEffect(() => {
-    if (!selectedPackage) return;
+    if (!selectedPackage || !fulfillmentAvailable) return;
     const controller = new AbortController();
     void requestQuote(product.slug, selectedPackage.id, "", controller.signal)
       .then(setQuote)
       .catch(() => undefined);
     return () => controller.abort();
-  }, [product.slug, selectedPackage]);
+  }, [fulfillmentAvailable, product.slug, selectedPackage]);
 
   useEffect(() => {
     const cleanId = destination.trim();
@@ -547,6 +547,11 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   ]);
 
   function choosePackage(id: string) {
+    const item = product.packages.find((candidate) => candidate.id === id);
+    if (!item || (product.fulfillmentType === "automatic" && item.fulfillmentAvailable !== true)) {
+      setError("Nominal ini sedang cut-off otomatis. Pilih nominal lain atau coba lagi setelah layanan kembali tersedia.");
+      return;
+    }
     setPackageId(id);
     setPayment(null);
     setVoucherCode("");
@@ -644,7 +649,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       return;
     }
     if (!fulfillmentAvailable) {
-      setError("Nominal ini sedang tidak tersedia. Pilih nominal lain atau coba lagi nanti.");
+      setError("Nominal ini sedang cut-off otomatis. Pilih nominal lain atau coba lagi setelah layanan kembali tersedia.");
       return;
     }
     setError("");
@@ -682,7 +687,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       return;
     }
     if (!fulfillmentAvailable) {
-      setError("Nominal ini sedang tidak tersedia. Pilih nominal lain atau coba lagi nanti.");
+      setError("Nominal ini sedang cut-off otomatis. Pilih nominal lain atau coba lagi setelah layanan kembali tersedia.");
       return;
     }
     setSubmitting(true);
@@ -913,12 +918,14 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                         {section.packages.map((item) => {
                           const ready = Boolean(item.fulfillmentReady);
+                          const available = product.fulfillmentType === "manual" || item.fulfillmentAvailable === true;
                           return (
                             <button
                               key={item.id}
                               type="button"
+                              disabled={!available}
                               onClick={() => choosePackage(item.id)}
-                              className={`relative min-h-[86px] overflow-hidden rounded-lg border px-3 py-2.5 text-left transition ${packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.18)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}
+                              className={`relative min-h-[86px] overflow-hidden rounded-lg border px-3 py-2.5 text-left transition ${!available ? "cursor-not-allowed border-amber-300/10 bg-black/20 opacity-45" : packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.18)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
@@ -931,6 +938,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                               </div>
                               <span className="mt-2 block text-[10px] font-black text-[#cfff72] sm:text-[11px]">{formatRupiah(item.price)}</span>
                               {!ready && <span className="mt-1 block text-[8px] font-semibold text-amber-300/70">SKU belum diatur</span>}
+                              {ready && !available && <span className="mt-1 block text-[8px] font-semibold text-amber-300/80">Sementara cut-off</span>}
                             </button>
                           );
                         })}
