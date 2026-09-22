@@ -1,7 +1,6 @@
 import { normalizeProductCategorySlug } from "@/lib/product-categories";
 import { readProducts } from "@/lib/server/products";
 import { readReviewSummaries } from "@/lib/server/reviews";
-import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
 import {
   readAvailableVoucherStockKeys,
   readDigiflazzPackageAvailability,
@@ -11,16 +10,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    await ensureKokinpayNicknameGameCodeBackfill();
     const [stored, summaries, digiflazzAvailability, voucherStockKeys] = await Promise.all([
-      readProducts(false),
+      readProducts(false, { repairSchema: false }),
       readReviewSummaries().catch(() => new Map<string, { ratingAverage: number; ratingCount: number }>()),
-      readDigiflazzPackageAvailability().catch(() => new Map<number, boolean>()),
+      readDigiflazzPackageAvailability({ repairSchema: false }).catch(() => new Map<number, boolean>()),
       readAvailableVoucherStockKeys().catch(() => new Set<string>()),
     ]);
 
     const products = stored
-      .filter((item) => item.packages.length > 0)
       .map((item) => ({
         slug: item.slug,
         name: item.name,
@@ -79,12 +76,14 @@ export async function GET() {
               fulfillmentReady,
               fulfillmentAvailable,
             };
-          }),
+          })
+          .filter((pkg) => pkg.fulfillmentAvailable),
         ...(summaries.get(item.slug) ?? { ratingAverage: 0, ratingCount: 0 }),
-      }));
+      }))
+      .filter((item) => item.packages.length > 0);
     return Response.json(
       { products, databaseReady: true },
-      { headers: { "Cache-Control": "no-store" } },
+      { headers: { "Cache-Control": "public, max-age=10, s-maxage=10, stale-while-revalidate=20" } },
     );
   } catch {
     return Response.json(
