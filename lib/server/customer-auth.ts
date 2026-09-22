@@ -238,21 +238,12 @@ export async function getCustomerSession(request: Request): Promise<CustomerSess
   return row ? publicCustomer(row) : null;
 }
 
-export async function requireCustomerSession(
-  request: Request,
-  options: { allowUnverifiedPhone?: boolean } = {},
-) {
+export async function requireCustomerSession(request: Request) {
   const customer = await getCustomerSession(request);
   if (!customer) {
     return Response.json(
       { error: "Silakan masuk ke akun terlebih dahulu." },
       { status: 401, headers: { "Cache-Control": "no-store" } },
-    );
-  }
-  if (!options.allowUnverifiedPhone && !customer.phoneVerified) {
-    return Response.json(
-      { error: "Verifikasi nomor WhatsApp terlebih dahulu.", requiresPhoneVerification: true },
-      { status: 403, headers: { "Cache-Control": "no-store" } },
     );
   }
   return customer;

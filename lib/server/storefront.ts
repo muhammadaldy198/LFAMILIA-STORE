@@ -19,6 +19,9 @@ type SettingsRow = {
   banner_cta_href: string;
   support_whatsapp: string | null;
   support_email: string | null;
+  merchant_legal_name: string | null;
+  merchant_registration_id: string | null;
+  merchant_address: string | null;
   instagram_url: string | null;
   discord_url: string | null;
   support_hours: string;
@@ -63,6 +66,9 @@ export async function readStorefrontSettings(): Promise<StorefrontSettings> {
       bannerCtaHref: safeNavigationUrl(row.banner_cta_href, "/catalog"),
       supportWhatsapp: row.support_whatsapp ?? undefined,
       supportEmail: row.support_email ?? undefined,
+      merchantLegalName: row.merchant_legal_name ?? undefined,
+      merchantRegistrationId: row.merchant_registration_id ?? undefined,
+      merchantAddress: row.merchant_address ?? undefined,
       instagramUrl: safeHttpUrl(row.instagram_url) || undefined,
       discordUrl: safeHttpUrl(row.discord_url) || undefined,
       supportHours: row.support_hours,

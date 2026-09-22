@@ -62,12 +62,12 @@ test("customer account distinguishes transient failures from unauthenticated sta
   assert.match(account, /window\.setTimeout\(\(\) => setCopied/);
 });
 
-test("WhatsApp OTP resend obeys a visible cooldown", () => {
-  const otp = read("components/customer-phone-verification.tsx");
-  assert.match(otp, /const \[resendIn, setResendIn\] = useState\(0\)/);
-  assert.match(otp, /payload\.resendAfterSeconds/);
-  assert.match(otp, /disabled=\{busy \|\| resendIn > 0\}/);
-  assert.match(otp, /Kirim ulang dalam/);
+test("customer account no longer blocks dashboard behind WhatsApp OTP", () => {
+  const account = read("components/customer-account.tsx");
+  assert.doesNotMatch(account, /CustomerPhoneVerification/);
+  assert.doesNotMatch(account, /if \(!account\.customer\.phoneVerified\)/);
+  assert.match(account, /Field label="Nomor kontak"/);
+  assert.match(account, /LFAMILIA tidak mengirim OTP WhatsApp/);
 });
 
 test("membership refresh is event driven instead of polling every ten seconds", () => {

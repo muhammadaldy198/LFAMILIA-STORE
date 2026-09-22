@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     const input = schema.parse(await request.json());
     const customer = await getCustomerSession(request);
 
-    if (customer?.phoneVerified) {
+    if (customer) {
       await saveProductReview({
         customerId: customer.id,
         productSlug: input.productSlug,

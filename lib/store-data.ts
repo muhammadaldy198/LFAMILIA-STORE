@@ -365,6 +365,9 @@ export type StorefrontSettings = {
   bannerCtaHref: string;
   supportWhatsapp?: string;
   supportEmail?: string;
+  merchantLegalName?: string;
+  merchantRegistrationId?: string;
+  merchantAddress?: string;
   instagramUrl?: string;
   discordUrl?: string;
   supportHours: string;
