@@ -84,7 +84,7 @@ export async function resetCustomerPassword(token: string, password: string) {
   const tokenHash = await sha256(token);
   const row = await db.prepare(
     `SELECT id, customer_id FROM customer_password_reset_tokens
-     WHERE token_hash = ? AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP LIMIT 1`,
+     WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > CURRENT_TIMESTAMP LIMIT 1`,
   ).bind(tokenHash).first<{ id: string; customer_id: string }>();
   if (!row) throw new Error("Link reset password tidak valid atau sudah kedaluwarsa.");
 
@@ -94,7 +94,7 @@ export async function resetCustomerPassword(token: string, password: string) {
       "UPDATE customer_users SET password_hash = ?, password_salt = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_active = 1",
     ).bind(record.passwordHash, record.passwordSalt, row.customer_id),
     db.prepare(
-      "UPDATE customer_password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ? AND used_at IS NULL",
+      "UPDATE customer_password_reset_tokens SET consumed_at = CURRENT_TIMESTAMP WHERE id = ? AND consumed_at IS NULL",
     ).bind(row.id),
     db.prepare("DELETE FROM customer_sessions WHERE customer_id = ?").bind(row.customer_id),
   ]);
