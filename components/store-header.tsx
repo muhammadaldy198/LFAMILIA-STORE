@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
-  BadgeCheck,
   Calculator,
   Gamepad2,
   Headphones,
@@ -38,7 +37,6 @@ type SidebarCustomer = {
   email: string;
   name: string;
   phone: string;
-  phoneVerified: boolean;
   balance: number;
 };
 
@@ -189,12 +187,8 @@ export function StoreHeader() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <strong className="truncate text-[12px] font-black text-white">{customer.name}</strong>
-                        {customer.phoneVerified && <BadgeCheck className="size-3.5 shrink-0 text-[#b9ff35]" aria-label="WhatsApp terverifikasi" />}
                       </div>
                       <p className="mt-0.5 truncate text-[9px] text-white/38">{customer.email}</p>
-                      <p className={`mt-1 text-[8px] font-bold ${customer.phoneVerified ? "text-[#cfff72]" : "text-amber-300"}`}>
-                        {customer.phoneVerified ? "WhatsApp terverifikasi" : "WhatsApp belum diverifikasi"}
-                      </p>
                     </div>
                   </div>
 
@@ -214,7 +208,7 @@ export function StoreHeader() {
                         href="/account"
                         className="inline-flex h-8 items-center justify-center rounded-[10px] bg-[#b9ff35] px-2.5 text-[10px] font-black text-[#091006] transition hover:bg-[#c7ff58]"
                       >
-                        {customer.phoneVerified ? "Akun & Saldo" : "Verifikasi WhatsApp"}
+                        Akun & Saldo
                       </Link>
                     </SheetClose>
                     <button
