@@ -63,6 +63,8 @@ export function CustomerAuthForm({
   const [turnstileReset, setTurnstileReset] = useState(0);
   const [saving, setSaving] = useState(false);
   const [googleClientId, setGoogleClientId] = useState("");
+  const [forgotPassword, setForgotPassword] = useState(false);
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +87,8 @@ export function CustomerAuthForm({
     setAgreed(false);
     setShowPassword(false);
     setShowConfirmation(false);
+    setForgotPassword(false);
+    setNotice("");
   }
 
   async function submit(event: FormEvent) {
@@ -120,6 +124,46 @@ export function CustomerAuthForm({
     } finally {
       setSaving(false);
     }
+  }
+
+  async function submitForgotPassword(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    setSaving(true);
+    try {
+      const response = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, turnstileToken }),
+      });
+      const data = await response.json().catch(() => ({})) as { error?: string; message?: string };
+      if (!response.ok) throw new Error(data.error || "Permintaan reset password gagal.");
+      setNotice(data.message || "Jika email terdaftar, link reset password telah dikirim.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Permintaan reset password gagal.");
+      setTurnstileToken("");
+      setTurnstileReset((value) => value + 1);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (forgotPassword) {
+    return (
+      <section className="mx-auto w-full max-w-[560px] rounded-[24px] border border-white/[0.09] bg-[#090c14]/95 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.36)] sm:p-7">
+        <h1 className="text-[24px] font-black text-white">Lupa password</h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/45">Masukkan email akun. Link reset berlaku 15 menit dan hanya dapat digunakan satu kali.</p>
+        <form onSubmit={submitForgotPassword} className="mt-6 space-y-4">
+          <AuthField label="Email" icon={<Mail className="size-[18px]" />}><input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Masukkan alamat email Anda" className="h-12 w-full bg-transparent pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/24" /></AuthField>
+          {error && <p className="rounded-xl border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-[11px] leading-5 text-red-200">{error}</p>}
+          {notice && <p className="rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.06] px-3 py-2.5 text-[11px] leading-5 text-[#d9ff91]">{notice}</p>}
+          <TurnstileWidget key={turnstileReset} onToken={setTurnstileToken} />
+          <Button disabled={saving} className="h-12 w-full rounded-xl bg-[#b9ff35] text-sm font-black text-[#091006] hover:bg-[#c7ff58]">{saving && <LoaderCircle className="mr-2 size-4 animate-spin" />}Kirim link reset</Button>
+        </form>
+        <button type="button" onClick={() => { setForgotPassword(false); setError(""); setNotice(""); }} className="mt-5 w-full text-center text-[11px] font-black text-[#cfff72] hover:underline">Kembali ke masuk</button>
+      </section>
+    );
   }
 
   return (
@@ -163,6 +207,8 @@ export function CustomerAuthForm({
             {showPassword ? <EyeOff className="size-[17px]" /> : <Eye className="size-[17px]" />}
           </button>
         </AuthField>
+
+        {mode === "login" && <div className="-mt-2 text-right"><button type="button" onClick={() => { setForgotPassword(true); setError(""); }} className="text-[11px] font-bold text-[#cfff72] hover:underline">Lupa password?</button></div>}
 
         {mode === "register" && (
           <AuthField label="Konfirmasi Kata Sandi" icon={<LockKeyhole className="size-[18px]" />}>

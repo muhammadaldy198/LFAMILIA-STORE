@@ -50,6 +50,13 @@ async function passwordDigest(password: string, saltHex: string) {
   return bytesToHex(new Uint8Array(bits));
 }
 
+export async function createPasswordRecord(password: string) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const passwordSalt = bytesToHex(salt);
+  const passwordHash = await passwordDigest(password, passwordSalt);
+  return { passwordHash, passwordSalt };
+}
+
 function constantTimeEqual(left: string, right: string) {
   if (left.length !== right.length) return false;
   let mismatch = 0;
