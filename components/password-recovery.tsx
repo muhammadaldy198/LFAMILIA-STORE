@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 
 export function PasswordRecovery({ mode }: { mode: "request" | "reset" }) {
   const [email, setEmail] = useState("");
-  const [token, setToken] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -17,11 +16,6 @@ export function PasswordRecovery({ mode }: { mode: "request" | "reset" }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    if (mode !== "reset") return;
-    setToken(new URLSearchParams(window.location.search).get("token")?.trim() ?? "");
-  }, [mode]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -32,7 +26,10 @@ export function PasswordRecovery({ mode }: { mode: "request" | "reset" }) {
       setError("Konfirmasi password tidak sama.");
       return;
     }
-    if (mode === "reset" && !token) {
+    const resetToken = mode === "reset"
+      ? new URLSearchParams(window.location.search).get("token")?.trim() ?? ""
+      : "";
+    if (mode === "reset" && !resetToken) {
       setError("Link reset password tidak valid atau sudah kedaluwarsa.");
       return;
     }
