@@ -526,3 +526,55 @@ body {
 .admin-dashboard-reference [class~="gap-2"] { gap: 0.5rem !important; }
 .admin-dashboard-reference [class~="gap-3"] { gap: 0.75rem !important; }
 .admin-dashboard-reference [class~="mt-3"] { margin-top: 0.75rem !important; }
+
+
+/* Production mobile ergonomics: touch targets, viewport safety, and scroll containment. */
+@media (max-width: 767px) {
+  body main [data-slot="button"][data-size="default"],
+  body main [data-slot="button"][data-size="lg"],
+  body main .checkout-input,
+  body main .admin-input,
+  body main .admin-select,
+  body main [data-slot="input"],
+  body main select {
+    min-height: 2.75rem !important;
+  }
+
+  body main .checkout-input,
+  body main .admin-input,
+  body main .admin-select,
+  body main [data-slot="input"],
+  body main [data-slot="textarea"],
+  body main select,
+  body main textarea {
+    font-size: 16px !important;
+  }
+
+  body main [data-slot="tabs-trigger"] {
+    min-height: 2.5rem !important;
+  }
+
+  .mobile-checkout-bar {
+    padding-bottom: max(0.625rem, env(safe-area-inset-bottom));
+  }
+
+  .mobile-account-drawer,
+  .admin-mobile-drawer {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .admin-v3-content :where(table) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .admin-v3-content :where(.overflow-x-auto) {
+    touch-action: pan-x pan-y;
+  }
+}
+
+@supports (height: 100dvh) {
+  .mobile-account-drawer,
+  .admin-mobile-drawer {
+    height: 100dvh;
+  }
+}
