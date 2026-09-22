@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -16,6 +17,11 @@ import { HomeBannerCarousel } from "@/components/home-banner-carousel";
 import { PopularNow } from "@/components/popular-now";
 import { HomeNewsPreview } from "@/components/home-news-preview";
 import { HomeReviewsPreview } from "@/components/home-reviews-preview";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+  openGraph: { url: "https://lfamiliastore.my.id" },
+};
 
 const steps = [
   {
