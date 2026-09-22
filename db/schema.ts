@@ -43,6 +43,24 @@ export const customerSessions = sqliteTable(
 );
 
 
+export const customerPasswordResetTokens = sqliteTable(
+  "customer_password_reset_tokens",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id").notNull().references(() => customerUsers.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    consumedAt: text("consumed_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("customer_password_reset_token_unique").on(table.tokenHash),
+    index("customer_password_reset_customer_created_idx").on(table.customerId, table.createdAt),
+    index("customer_password_reset_expiry_idx").on(table.expiresAt, table.consumedAt),
+  ],
+);
+
+
 export const customerPhoneOtpChallenges = sqliteTable(
   "customer_phone_otp_challenges",
   {
