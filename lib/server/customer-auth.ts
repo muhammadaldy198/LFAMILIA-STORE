@@ -10,7 +10,6 @@ export type CustomerSession = {
   email: string;
   name: string;
   phone: string;
-  phoneVerified: boolean;
   balance: number;
   leaderboardOptIn: boolean;
 };
@@ -20,7 +19,6 @@ type CustomerRow = {
   email: string;
   name: string;
   phone: string;
-  phone_verified_at: string | null;
   password_hash: string;
   password_salt: string;
   balance: number;
@@ -74,7 +72,6 @@ function publicCustomer(row: CustomerRow): CustomerSession {
     email: row.email,
     name: row.name,
     phone: row.phone,
-    phoneVerified: Boolean(row.phone_verified_at),
     balance: Number(row.balance || 0),
     leaderboardOptIn: Boolean(row.leaderboard_opt_in),
   };
@@ -182,7 +179,7 @@ export async function loginOrRegisterGoogleCustomer(input: {
 export async function loginCustomer(emailInput: string, password: string) {
   const db = getD1();
   const row = await db.prepare(
-    `SELECT id, email, name, phone, phone_verified_at, password_hash, password_salt, balance, leaderboard_opt_in, is_active
+    `SELECT id, email, name, phone, password_hash, password_salt, balance, leaderboard_opt_in, is_active
      FROM customer_users WHERE email = ? LIMIT 1`,
   ).bind(normalizeEmail(emailInput)).first<CustomerRow>();
   if (!row || !row.is_active) throw new Error("Email atau password salah.");
@@ -208,7 +205,7 @@ export async function createCustomerSession(customerId: string) {
   await db.prepare("INSERT INTO customer_sessions (id, customer_id, token_hash, expires_at) VALUES (?, ?, ?, ?)")
     .bind(crypto.randomUUID(), customerId, tokenHash, expiresAt).run();
   const row = await db.prepare(
-    `SELECT id, email, name, phone, phone_verified_at, password_hash, password_salt, balance, leaderboard_opt_in, is_active
+    `SELECT id, email, name, phone, password_hash, password_salt, balance, leaderboard_opt_in, is_active
      FROM customer_users WHERE id = ? AND is_active = 1 LIMIT 1`,
   ).bind(customerId).first<CustomerRow>();
   if (!row) throw new Error("Akun pelanggan tidak ditemukan.");
@@ -228,7 +225,7 @@ export async function getCustomerSession(request: Request): Promise<CustomerSess
   if (!token) return null;
   const tokenHash = await sha256(token);
   const row = await getD1().prepare(
-    `SELECT u.id, u.email, u.name, u.phone, u.phone_verified_at, u.password_hash, u.password_salt,
+    `SELECT u.id, u.email, u.name, u.phone, u.password_hash, u.password_salt,
       u.balance, u.leaderboard_opt_in, u.is_active
      FROM customer_sessions s
      JOIN customer_users u ON u.id = s.customer_id
@@ -238,21 +235,12 @@ export async function getCustomerSession(request: Request): Promise<CustomerSess
   return row ? publicCustomer(row) : null;
 }
 
-export async function requireCustomerSession(
-  request: Request,
-  options: { allowUnverifiedPhone?: boolean } = {},
-) {
+export async function requireCustomerSession(request: Request) {
   const customer = await getCustomerSession(request);
   if (!customer) {
     return Response.json(
       { error: "Silakan masuk ke akun terlebih dahulu." },
       { status: 401, headers: { "Cache-Control": "no-store" } },
-    );
-  }
-  if (!options.allowUnverifiedPhone && !customer.phoneVerified) {
-    return Response.json(
-      { error: "Verifikasi nomor WhatsApp terlebih dahulu.", requiresPhoneVerification: true },
-      { status: 403, headers: { "Cache-Control": "no-store" } },
     );
   }
   return customer;

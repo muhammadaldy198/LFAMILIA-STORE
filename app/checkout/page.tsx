@@ -1169,7 +1169,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       </main>
 
       {activeTab === "transaction" && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#101217]/95 px-3 py-2.5 backdrop-blur lg:hidden">
+        <div className="mobile-checkout-bar fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#101217]/95 px-3 py-2.5 backdrop-blur lg:hidden">
           <div className="mx-auto max-w-xl">
             {summaryOpen ? (
               <div className="mb-2 rounded-lg border border-white/[0.12] bg-[#191b20] shadow-2xl">

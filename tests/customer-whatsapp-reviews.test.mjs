@@ -89,74 +89,52 @@ test("0037 adds secure phone-verification and guest-review schema without losing
   assert.equal(legacy.rating, 5);
 });
 
-test("WhatsApp OTP backend hashes codes, expires challenges, and calls WhatsApp template API", () => {
-  const source = read("lib/server/whatsapp-otp.ts");
-  assert.match(source, /PBKDF2/);
-  assert.match(source, /OTP_PBKDF2_ITERATIONS\s*=\s*120_000/);
-  assert.match(source, /OTP_TTL_MS\s*=\s*5\s*\*\s*60\s*\*\s*1000/);
-  assert.match(source, /OTP_MAX_ATTEMPTS\s*=\s*5/);
-  assert.match(source, /WHATSAPP_ACCESS_TOKEN/);
-  assert.match(source, /messaging_product:\s*"whatsapp"/);
-  assert.match(source, /type:\s*"template"/);
-  assert.match(source, /otp_hash/);
-  assert.match(source, /ORDER BY datetime\(created_at\) DESC, id DESC/);
-  assert.match(source, /SET attempt_count = attempt_count \+ 1/);
-  assert.match(source, /Number\(claimed\.meta\.changes \?\? 0\) === 0/);
-  assert.match(source, /datetime\(created_at\) < datetime\(\?\)/);
-  assert.match(source, /datetime\(created_at\) = datetime\(\?\) AND id < \?/);
-  assert.match(source, /\.bind\(customerId, challengeId, createdAt, createdAt, challengeId\)/);
-  assert.doesNotMatch(source, /INSERT INTO customer_phone_otp_challenges[\s\S]{0,300}\botp\b\s*,/i);
+
+test("WhatsApp OTP runtime is removed while legacy migration data remains harmless", () => {
+  assert.equal(fs.existsSync(path.join(root, "lib/server/whatsapp-otp.ts")), false);
+  assert.equal(fs.existsSync(path.join(root, "components/customer-phone-verification.tsx")), false);
+  assert.equal(fs.existsSync(path.join(root, "app/api/account/phone/send-otp/route.ts")), false);
+  assert.equal(fs.existsSync(path.join(root, "app/api/account/phone/verify-otp/route.ts")), false);
+
+  const integration = read("lib/server/integration-config.ts");
+  const admin = read("components/admin-integration-workspace.tsx");
+  const route = read("app/api/admin/integrations/route.ts");
+  assert.doesNotMatch(integration, /WHATSAPP_ACCESS_TOKEN|whatsapp:service|applyWhatsappConfig/);
+  assert.doesNotMatch(admin, /WhatsApp OTP|whatsappRequiredFields|whatsappGraphApiUrl/);
+  assert.doesNotMatch(route, /"whatsapp"/);
 });
 
-test("customer session exposes phone verification and protected account routes require it", () => {
+test("customer sessions no longer require phone verification", () => {
   const auth = read("lib/server/customer-auth.ts");
   const account = read("app/api/account/route.ts");
-  const send = read("app/api/account/phone/send-otp/route.ts");
-  const verify = read("app/api/account/phone/verify-otp/route.ts");
-  assert.match(auth, /phoneVerified:\s*boolean/);
-  assert.match(auth, /requiresPhoneVerification:\s*true/);
-  assert.match(auth, /allowUnverifiedPhone/);
-  assert.match(account, /allowUnverifiedPhone:\s*true/);
-  assert.match(send, /createWhatsappOtpChallenge/);
-  assert.match(verify, /verifyWhatsappOtpChallenge/);
-  assert.match(send, /allowRequest/);
-  assert.match(verify, /allowRequest/);
+  assert.doesNotMatch(auth, /phoneVerified|requiresPhoneVerification|allowUnverifiedPhone/);
+  assert.match(auth, /export async function requireCustomerSession\(request: Request\)/);
+  assert.match(account, /UPDATE customer_users SET name = \?, phone = \?/);
+  assert.doesNotMatch(account, /verifikasi OTP|allowUnverifiedPhone/);
 });
 
-test("sidebar switches from guest CTA to signed-in balance card", () => {
+test("sidebar switches from guest CTA to signed-in balance card without WhatsApp verification badges", () => {
   const header = read("components/store-header.tsx");
   const authForm = read("components/customer-auth-form.tsx");
   assert.match(header, /fetch\("\/api\/account\/summary"/);
   assert.match(header, /formatRupiah\(customer\.balance\)/);
-  assert.match(header, /WhatsApp terverifikasi/);
+  assert.match(header, /Akun aktif/);
+  assert.doesNotMatch(header, /WhatsApp terverifikasi|phoneVerified|BadgeCheck/);
   assert.match(header, /lfamilia:auth-changed/);
   assert.match(authForm, /lfamilia:auth-changed/);
 });
 
-test("guest buyers can review a paid order using invoice and checkout WhatsApp", () => {
+test("guest buyers can review a paid order using invoice and checkout contact number", () => {
   const route = read("app/api/reviews/route.ts");
   const reviews = read("lib/server/reviews.ts");
   const ui = read("components/product-reviews.tsx");
+  assert.match(route, /if \(customer\)/);
   assert.match(route, /saveGuestProductReview/);
-  assert.doesNotMatch(route, /requireCustomerSession/);
+  assert.doesNotMatch(route, /phoneVerified/);
   assert.match(reviews, /payment_status\s*=\s*'paid'/);
-  assert.match(reviews, /\^LF\[A-F0-9\]\{8,12\}\$/);
-  assert.match(reviews, /UPPER\(reference_id\) = \?/);
-  assert.doesNotMatch(reviews, /replace\(\/\^LF\//);
   assert.match(reviews, /buyer_phone/);
   assert.match(reviews, /product_reviews WHERE order_id/);
   assert.match(ui, /Nomor invoice/);
-  assert.match(ui, /Nomor WhatsApp saat checkout/);
+  assert.match(ui, /Nomor kontak saat checkout/);
   assert.match(ui, /Satu invoice hanya bisa memberi satu ulasan/);
-});
-
-test("WhatsApp OTP credentials are dashboard-managed and never hardcoded", () => {
-  const integration = read("lib/server/integration-config.ts");
-  const admin = read("components/admin-integration-workspace.tsx");
-  assert.match(integration, /"whatsapp:service"/);
-  assert.match(integration, /WHATSAPP_ACCESS_TOKEN/);
-  assert.match(integration, /applyWhatsappConfig/);
-  assert.match(admin, /WhatsApp OTP/);
-  assert.match(admin, /Access Token/);
-  assert.match(admin, /whatsappRequiredFields/);
 });

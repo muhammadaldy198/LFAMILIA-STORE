@@ -26,7 +26,6 @@ import { formatRupiah } from "@/lib/store-data";
 import { CustomerSupport } from "@/components/customer-support";
 import { CustomerGameAccounts } from "@/components/customer-game-accounts";
 import { CustomerAuthForm } from "@/components/customer-auth-form";
-import { CustomerPhoneVerification } from "@/components/customer-phone-verification";
 
 type PublicWalletSettings = {
   enabled: boolean;
@@ -174,16 +173,6 @@ export function CustomerAccount({
     window.dispatchEvent(new Event("lfamilia:auth-changed"));
   };
 
-  if (!account.customer.phoneVerified) {
-    return (
-      <CustomerPhoneVerification
-        customer={account.customer}
-        onVerified={load}
-        onLogout={logout}
-      />
-    );
-  }
-
   return (
     <Dashboard
       data={account}
@@ -260,9 +249,9 @@ function Dashboard({
             type="button"
             onClick={() => setMenuOpen(true)}
             variant="outline"
-            className="border-white/10 bg-white/[0.03] text-white lg:hidden"
+            className="min-w-24 border-white/10 bg-white/[0.03] text-white lg:hidden"
           >
-            <Menu className="size-4" />
+            <Menu className="mr-2 size-4" />Menu
           </Button>
           <Button
             onClick={() => void onLogout()}
@@ -316,7 +305,7 @@ function Dashboard({
               className="fixed inset-0 z-40 bg-black/70 lg:hidden"
               aria-label="Tutup menu"
             />
-            <aside className="fixed inset-y-0 left-0 z-50 w-[82vw] max-w-72 overflow-y-auto border-r border-white/[0.1] bg-[#0d1019] p-3 shadow-2xl lg:hidden">
+            <aside className="mobile-account-drawer fixed inset-y-0 left-0 z-50 h-dvh w-[86vw] max-w-80 overflow-y-auto border-r border-white/[0.1] bg-[#0d1019] p-3 shadow-2xl lg:hidden">
               <div className="mb-4 flex items-center justify-between px-2 pt-1">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c9ff70]">
                   Menu akun
@@ -825,6 +814,7 @@ function ProfileForm({
   onError(value: string): void;
 }) {
   const [name, setName] = useState(customer.name);
+  const [phone, setPhone] = useState(customer.phone);
   const [leaderboard, setLeaderboard] = useState(customer.leaderboardOptIn);
   const [saving, setSaving] = useState(false);
   async function submit(event: FormEvent) {
@@ -837,7 +827,7 @@ function ProfileForm({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name,
-          phone: customer.phone,
+          phone,
           leaderboardOptIn: leaderboard,
         }),
       });
@@ -867,15 +857,17 @@ function ProfileForm({
             className="checkout-input"
           />
         </Field>
-        <Field label="Nomor WhatsApp">
+        <Field label="Nomor kontak">
           <Input
             required
-            value={customer.phone}
-            readOnly
-            className="checkout-input cursor-not-allowed opacity-70"
+            inputMode="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            className="checkout-input"
           />
           <p className="mt-1.5 text-[9px] leading-4 text-white/30">
-            Nomor ini sudah terverifikasi. Perubahan nomor wajib melalui verifikasi OTP WhatsApp.
+            Digunakan sebagai data kontak transaksi. LFAMILIA tidak menggunakan OTP WhatsApp.
           </p>
         </Field>
         <label className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.08] p-4">

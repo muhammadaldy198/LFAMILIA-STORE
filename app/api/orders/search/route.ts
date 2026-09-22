@@ -101,12 +101,12 @@ export async function POST(request: Request) {
     const { phone } = schema.parse(await request.json());
     const variants = normalizePhoneVariants(phone);
     if (!variants.length) {
-      return Response.json({ error: "Format nomor WhatsApp tidak valid." }, { status: 400 });
+      return Response.json({ error: "Format nomor kontak tidak valid." }, { status: 400 });
     }
 
     const session = await getCustomerSession(request);
     let revealInvoice = false;
-    if (session?.phoneVerified && session.phone) {
+    if (session?.phone) {
       try {
         revealInvoice = normalizeWhatsappPhone(phone) === normalizeWhatsappPhone(session.phone);
       } catch {
@@ -133,10 +133,10 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return Response.json({ error: "Format nomor WhatsApp tidak valid." }, { status: 400 });
+      return Response.json({ error: "Format nomor kontak tidak valid." }, { status: 400 });
     }
     return Response.json(
-      { error: "Pesanan untuk nomor WhatsApp tersebut belum dapat dimuat." },
+      { error: "Pesanan untuk nomor kontak tersebut belum dapat dimuat." },
       { status: 503 },
     );
   }

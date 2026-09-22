@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     const input = schema.parse(await request.json());
     const customer = await getCustomerSession(request);
 
-    if (customer?.phoneVerified) {
+    if (customer) {
       await saveProductReview({
         customerId: customer.id,
         productSlug: input.productSlug,
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     } else {
       if (!input.referenceId || !input.phone) {
         return Response.json(
-          { error: "Masukkan nomor invoice dan WhatsApp yang digunakan saat checkout untuk memverifikasi pembelian." },
+          { error: "Masukkan nomor invoice dan nomor kontak yang digunakan saat checkout untuk memverifikasi pembelian." },
           { status: 400, headers: { "Cache-Control": "no-store" } },
         );
       }

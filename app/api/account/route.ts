@@ -16,7 +16,7 @@ function publicReferenceId(value: string) {
 }
 
 export async function GET(request: Request) {
-  const customer = await requireCustomerSession(request, { allowUnverifiedPhone: true });
+  const customer = await requireCustomerSession(request);
   if (customer instanceof Response) return customer;
   const db = getD1();
   const [topups, transactions, orders, membership] = await Promise.all([
@@ -50,14 +50,8 @@ export async function PATCH(request: Request) {
   try {
     const input = profileSchema.parse(await request.json());
     const normalizedPhone = normalizeWhatsappPhone(input.phone);
-    if (normalizedPhone !== customer.phone) {
-      return Response.json(
-        { error: "Perubahan nomor WhatsApp wajib melalui verifikasi OTP." },
-        { status: 400, headers: { "Cache-Control": "no-store" } },
-      );
-    }
-    await getD1().prepare("UPDATE customer_users SET name = ?, leaderboard_opt_in = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .bind(input.name, input.leaderboardOptIn ? 1 : 0, customer.id).run();
+    await getD1().prepare("UPDATE customer_users SET name = ?, phone = ?, leaderboard_opt_in = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .bind(input.name, normalizedPhone, input.leaderboardOptIn ? 1 : 0, customer.id).run();
     return Response.json({ ok: true });
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message : "Profil gagal diperbarui.";

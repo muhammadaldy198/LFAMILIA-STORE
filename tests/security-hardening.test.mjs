@@ -123,7 +123,8 @@ test("public and phone-only order search keep invoices masked", () => {
   const publicFeed = source.slice(getStart, postStart);
   assert.match(publicFeed, /SELECT reference_id, product_name/);
   assert.match(source, /const referenceId = revealInvoice \? row\.reference_id \?\? null : null/);
-  assert.match(source, /session\?\.phoneVerified/);
+  assert.match(source, /if \(session\?\.phone\)/);
+  assert.doesNotMatch(source, /phoneVerified/);
   assert.match(source, /normalizeWhatsappPhone\(phone\) === normalizeWhatsappPhone\(session\.phone\)/);
   assert.doesNotMatch(source, /mapSummary\(row, true\)/);
   assert.match(source, /maskedReferenceId: referenceId \|\| maskedInvoice\(row\.reference_id\)/);
