@@ -157,6 +157,8 @@ export function CustomerAuthForm({
           </AuthField>
         )}
 
+        {mode === "login" && <div className="-mb-2 flex justify-end"><Link href="/forgot-password" className="text-[11px] font-bold text-[#cfff72] hover:underline">Lupa password?</Link></div>}
+
         <AuthField label="Password" icon={<LockKeyhole className="size-[18px]" />}>
           <input required minLength={8} type={showPassword ? "text" : "password"} autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "login" ? "Masukkan kata sandi Anda" : "Minimal 8 karakter"} className="h-12 w-full bg-transparent pl-11 pr-12 text-sm text-white outline-none placeholder:text-white/24" />
           <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"} className="absolute bottom-0 right-0 grid h-12 w-12 place-items-center text-white/40 transition hover:text-white/75">

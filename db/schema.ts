@@ -316,6 +316,23 @@ export const voucherDeliveries = sqliteTable(
   ],
 );
 
+export const customerPasswordResetTokens = sqliteTable(
+  "customer_password_reset_tokens",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id").notNull().references(() => customerUsers.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    usedAt: text("used_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("customer_password_reset_token_hash_unique").on(table.tokenHash),
+    index("customer_password_reset_customer_created_idx").on(table.customerId, table.createdAt),
+    index("customer_password_reset_expiry_idx").on(table.expiresAt, table.usedAt),
+  ],
+);
+
 export const storeSettings = sqliteTable("store_settings", {
   id: integer("id").primaryKey(),
   storeName: text("store_name").notNull(),
