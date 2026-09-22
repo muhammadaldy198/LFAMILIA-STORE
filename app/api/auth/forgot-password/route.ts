@@ -44,12 +44,9 @@ export async function POST(request: Request) {
     if (reset) {
       try {
         await sendPasswordResetEmail(reset, request.url);
-      } catch {
+      } catch (error) {
         await revokePasswordResetRequest(reset.tokenHash).catch(() => undefined);
-        return Response.json(
-          { error: "Email reset password belum dapat dikirim. Coba lagi beberapa saat." },
-          { status: 503, headers: { "Cache-Control": "no-store" } },
-        );
+        console.error("Pengiriman email reset password gagal:", error);
       }
     }
 
