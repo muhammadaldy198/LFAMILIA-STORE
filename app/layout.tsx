@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     default: "LFAMILIA STORE — Top Up Game Cepat & Aman",
     template: "%s | LFAMILIA STORE",
   },
-  description: "Top up game dan produk digital di LFAMILIA STORE dengan pembayaran praktis dan proses yang jelas.",
+  description: "Top up Mobile Legends, Free Fire, PUBG Mobile, dan produk digital di LFAMILIA STORE dengan pembayaran praktis dan proses yang jelas.",
   applicationName: "LFAMILIA STORE",
   openGraph: {
     type: "website",
