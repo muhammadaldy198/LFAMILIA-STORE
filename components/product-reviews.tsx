@@ -46,7 +46,7 @@ export function ProductReviews({ productSlug }: { productSlug: string }) {
           rating,
           title,
           body,
-          ...(customer?.phoneVerified ? {} : { referenceId, phone }),
+          ...(customer ? {} : { referenceId, phone }),
         }),
       });
       const data = await response.json().catch(() => ({})) as { error?: string };
@@ -69,14 +69,14 @@ export function ProductReviews({ productSlug }: { productSlug: string }) {
               <div>
                 <h3 className="text-sm font-bold">Bagikan pengalamanmu</h3>
                 <p className="mt-1 text-[10px] leading-4 text-white/35">
-                  {customer?.phoneVerified
+                  {customer
                     ? "Pembelian dari akunmu akan diverifikasi otomatis."
-                    : "Tidak punya akun? Verifikasi pembelian dengan invoice dan nomor WhatsApp checkout."}
+                    : "Tidak punya akun? Verifikasi pembelian dengan invoice dan nomor kontak checkout."}
                 </p>
               </div>
             </div>
 
-            {!customer?.phoneVerified && (
+            {!customer && (
               <div className="mt-4 grid gap-3">
                 <Input
                   required
@@ -91,11 +91,11 @@ export function ProductReviews({ productSlug }: { productSlug: string }) {
                   autoComplete="tel"
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
-                  placeholder="Nomor WhatsApp saat checkout"
+                  placeholder="Nomor kontak saat checkout"
                   className="checkout-input"
                 />
                 <p className="text-[9px] leading-4 text-white/28">
-                  Invoice harus sudah lunas dan nomor WhatsApp harus sama dengan data transaksi. Satu invoice hanya bisa memberi satu ulasan.
+                  Invoice harus sudah lunas dan nomor kontak harus sama dengan data transaksi. Satu invoice hanya bisa memberi satu ulasan.
                 </p>
               </div>
             )}
