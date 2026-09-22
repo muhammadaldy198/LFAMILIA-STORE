@@ -13,7 +13,7 @@ test("password reset is tokenized, expiring, single-use, and enumeration-safe", 
   const migration = read("drizzle/0041_customer_password_reset.sql");
   assert.match(service, /sha256\(token\)/);
   assert.match(service, /\+15 minutes/);
-  assert.match(service, /used_at IS NULL/);
+  assert.match(service, /consumed_at IS NULL/);
   assert.match(service, /DELETE FROM customer_sessions/);
   assert.match(service, /RESEND_API_KEY/);
   assert.match(forgot, /Jika email terdaftar, link reset password telah dikirim/);
