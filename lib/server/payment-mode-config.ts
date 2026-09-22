@@ -273,8 +273,15 @@ function checkoutReadyProfile(values: Record<string, string> | null) {
   }
 }
 
-export async function getPaymentModeOverview() {
-  await migrateObsoleteDokuProfiles();
+/**
+ * Reads the active payment routing and credential readiness.
+ *
+ * Admin/runtime callers keep the legacy-profile repair on by default. Public
+ * read-only endpoints can opt out so a status check never performs database
+ * writes or waits behind a migration lock.
+ */
+export async function getPaymentModeOverview(options: { migrateObsoleteProfiles?: boolean } = {}) {
+  if (options.migrateObsoleteProfiles !== false) await migrateObsoleteDokuProfiles();
   const modes = await getActivePaymentModes();
   const [dokuSandbox, dokuProduction, midtransSandbox, midtransProduction] = await Promise.all([
     profile("doku", "checkout", "sandbox"),

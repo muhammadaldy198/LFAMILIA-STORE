@@ -15,6 +15,8 @@ export type ProductPackage = {
   providerSku?: string;
   providerConfigured?: boolean;
   fulfillmentReady?: boolean;
+  // Public, provider-neutral availability signal. Automatic packages are
+  // temporarily cut off when their supplier snapshot is not sellable.
   fulfillmentAvailable?: boolean;
   fulfillmentMode?: PublicFulfillmentMode;
 };
@@ -369,6 +371,9 @@ export type StorefrontSettings = {
   discordUrl?: string;
   supportHours: string;
   supportWidgetEnabled: boolean;
+  merchantLegalName?: string;
+  merchantRegistrationId?: string;
+  merchantAddress?: string;
 };
 
 export const defaultStorefrontSettings: StorefrontSettings = {
