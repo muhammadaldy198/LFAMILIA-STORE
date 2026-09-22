@@ -371,6 +371,9 @@ export type StorefrontSettings = {
   discordUrl?: string;
   supportHours: string;
   supportWidgetEnabled: boolean;
+  merchantLegalName?: string;
+  merchantRegistrationId?: string;
+  merchantAddress?: string;
 };
 
 export const defaultStorefrontSettings: StorefrontSettings = {
