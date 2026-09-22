@@ -164,6 +164,14 @@ export function CustomerAuthForm({
           </button>
         </AuthField>
 
+        {mode === "login" && (
+          <div className="-mt-1 text-right">
+            <Link href="/forgot-password" className="text-[11px] font-bold text-[#cfff72] hover:underline">
+              Lupa password?
+            </Link>
+          </div>
+        )}
+
         {mode === "register" && (
           <AuthField label="Konfirmasi Kata Sandi" icon={<LockKeyhole className="size-[18px]" />}>
             <input required minLength={8} type={showConfirmation ? "text" : "password"} autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="Ulangi kata sandi" className="h-12 w-full bg-transparent pl-11 pr-12 text-sm text-white outline-none placeholder:text-white/24" />
