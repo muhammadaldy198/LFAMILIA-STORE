@@ -62,7 +62,6 @@ type DeliveryDashboardRow = {
   buyer_email: string;
   buyer_phone: string;
   email_status: string | null;
-  whatsapp_status: string | null;
   reserved_at: string | null;
   delivered_at: string | null;
 };
@@ -171,7 +170,6 @@ export async function listVoucherDashboard() {
       `SELECT vc.id AS code_id, vc.stock_key, vc.status AS code_status, vc.order_id,
        o.reference_id, o.product_name, o.package_label, o.buyer_name, o.buyer_email, o.buyer_phone,
        MAX(CASE WHEN vd.channel = 'email' THEN vd.status END) AS email_status,
-       MAX(CASE WHEN vd.channel = 'whatsapp' THEN vd.status END) AS whatsapp_status,
        vc.reserved_at, vc.delivered_at
        FROM voucher_codes vc
        JOIN orders o ON o.id = vc.order_id
@@ -245,8 +243,8 @@ async function reserveCode(orderId: string, stockKeyInput: string) {
 
 function parseDeliveryChannels(value: string): DeliveryChannel[] {
   const normalized = value.trim().toLowerCase();
-  if (normalized === "website" || normalized === "whatsapp") return [];
-  if (normalized === "email" || normalized === "both" || normalized === "email+whatsapp" || normalized === "whatsapp+email") return ["email"];
+  if (normalized === "website") return [];
+  if (normalized === "email") return ["email"];
   throw new Error("VOUCHER_DELIVERY_CHANNEL harus website atau email.");
 }
 
