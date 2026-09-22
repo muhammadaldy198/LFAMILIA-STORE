@@ -11,7 +11,6 @@ export const metadata: Metadata = {
   },
   description: "Top up game dan produk digital di LFAMILIA STORE dengan pembayaran praktis dan proses otomatis.",
   applicationName: "LFAMILIA STORE",
-  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     locale: "id_ID",
