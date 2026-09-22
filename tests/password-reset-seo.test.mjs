@@ -22,7 +22,9 @@ test("forgot-password flow is enumeration-safe, rate limited, Turnstile protecte
 test("password reset is one-time and revokes old customer sessions", () => {
   const service = read("lib/server/password-reset.ts");
   const route = read("app/api/auth/reset-password/route.ts");
-  assert.match(service, /used_at IS NULL AND expires_at > CURRENT_TIMESTAMP/);\n  assert.match(service, /RETURNING customer_id/);\n  assert.match(service, /getPublicBaseUrl/);
+  assert.match(service, /used_at IS NULL AND expires_at > CURRENT_TIMESTAMP/);
+  assert.match(service, /RETURNING customer_id/);
+  assert.match(service, /getPublicBaseUrl/);
   assert.match(service, /UPDATE customer_password_reset_tokens SET used_at = CURRENT_TIMESTAMP/);
   assert.match(service, /DELETE FROM customer_sessions WHERE customer_id = \?/);
   assert.match(route, /customer-reset-password/);
