@@ -245,8 +245,11 @@ async function applyOneTimeCatalogRepopulation() {
   ).bind(oneTimeCatalogRepopulationKey).run();
 }
 
-export async function readProducts(includeInactive = false): Promise<ManagedProduct[]> {
-  await ensureLegacyDatabaseColumns();
+export async function readProducts(
+  includeInactive = false,
+  options: { repairSchema?: boolean } = {},
+): Promise<ManagedProduct[]> {
+  if (options.repairSchema !== false) await ensureLegacyDatabaseColumns();
   const db = getD1();
   const productSql = includeInactive
     ? `SELECT id, slug, name, publisher, category, image_url, banner_url, description, initials, accent, input_label, input_placeholder, input_fields_json, nickname_game_code,
