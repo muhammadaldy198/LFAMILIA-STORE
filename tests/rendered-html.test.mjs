@@ -27,6 +27,6 @@ test("renders LFAMILIA STORE metadata", async () => {
     /^text\/html\b/i,
   );
   const html = await response.text();
-  assert.match(html, /<title>LFAMILIA STORE\b/i);
+  assert.match(html, /<title>Top Up Game Cepat (?:&amp;|&) Aman \| LFAMILIA STORE<\/title>/i);
   assert.match(html, /<meta(?=[^>]*\bname=["']description["'])(?=[^>]*\bcontent=["'][^"']*Top up Mobile Legends)[^>]*>/i);
 });
