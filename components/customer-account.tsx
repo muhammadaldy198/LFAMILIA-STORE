@@ -814,6 +814,7 @@ function ProfileForm({
   onError(value: string): void;
 }) {
   const [name, setName] = useState(customer.name);
+  const [phone, setPhone] = useState(customer.phone);
   const [leaderboard, setLeaderboard] = useState(customer.leaderboardOptIn);
   const [saving, setSaving] = useState(false);
   async function submit(event: FormEvent) {
@@ -826,7 +827,7 @@ function ProfileForm({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name,
-          phone: customer.phone,
+          phone,
           leaderboardOptIn: leaderboard,
         }),
       });
