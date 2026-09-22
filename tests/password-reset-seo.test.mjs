@@ -49,7 +49,10 @@ test("forgot password route is enumeration-safe and abuse protected", () => {
   assert.match(forgot, /verifyTurnstile/);
   assert.match(forgot, /Jika email tersebut terdaftar/);
   assert.match(forgot, /passwordResetEmailConfigured/);
+  assert.match(forgot, /revokePasswordResetRequest/);
+  assert.match(forgot, /console\.error\("Pengiriman email reset password gagal:/);
   assert.doesNotMatch(forgot, /Email tidak ditemukan|akun tidak ditemukan/i);
+  assert.doesNotMatch(forgot, /Email reset password belum dapat dikirim/);
   assert.match(reset, /customer-reset-password/);
   assert.match(reset, /verifyTurnstile/);
   assert.match(reset, /consumePasswordResetToken/);
