@@ -209,7 +209,7 @@ export function StoreHeader() {
                         href="/account"
                         className="inline-flex h-8 items-center justify-center rounded-[10px] bg-[#b9ff35] px-2.5 text-[10px] font-black text-[#091006] transition hover:bg-[#c7ff58]"
                       >
-                        {customer.phoneVerified ? "Akun & Saldo" : "Verifikasi WhatsApp"}
+                        Akun & Saldo
                       </Link>
                     </SheetClose>
                     <button
