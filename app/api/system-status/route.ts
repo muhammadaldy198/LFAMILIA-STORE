@@ -13,7 +13,7 @@ type ServiceState = "operational" | "degraded";
 export async function GET() {
   const [settings, paymentModes, doku, midtrans, digiflazz, activeProducts] = await Promise.all([
     readStorefrontSettings(),
-    getPaymentModeOverview(),
+    getPaymentModeOverview({ migrateObsoleteProfiles: false }),
     getDokuCheckoutReadiness(),
     getMidtransSnapReadiness(),
     getDigiflazzReadiness(),
