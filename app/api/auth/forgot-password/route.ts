@@ -21,8 +21,7 @@ export async function POST(request: Request) {
     if (!await verifyTurnstile(request, input.turnstileToken)) {
       return Response.json({ error: "Verifikasi keamanan gagal. Coba lagi." }, { status: 403, headers: { "Cache-Control": "no-store" } });
     }
-    const url = new URL(request.url);
-    await requestPasswordReset(input.email, url.origin);
+    await requestPasswordReset(input.email);
     return Response.json({ message: genericMessage }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof z.ZodError) return Response.json({ error: "Email tidak valid." }, { status: 400, headers: { "Cache-Control": "no-store" } });
