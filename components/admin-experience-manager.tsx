@@ -260,7 +260,7 @@ function EditorPanel({ editor, banners, popups, news, reviews, faqs, canDelete, 
     } catch (reason) { onError(reason instanceof Error ? reason.message : "Gambar gagal diunggah."); }
   }
   return (
-    <aside id="admin-content-editor" className="sticky top-[70px] self-start overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white shadow-[0_8px_24px_rgba(18,35,60,.08)]">
+    <aside id="admin-content-editor" className="self-start overflow-hidden lg:sticky lg:top-[70px] rounded-[7px] border border-[#dfe6ef] bg-white shadow-[0_8px_24px_rgba(18,35,60,.08)]">
       <header className="flex h-[47px] items-center justify-between border-b border-[#e5eaf0] px-[13px]">
         <h2 className="text-[12px] font-extrabold">{title}</h2>
         <button type="button" onClick={onAdd} className="inline-flex h-[29px] items-center gap-[5px] rounded-[4px] bg-[#0875ed] px-[10px] text-[7.5px] font-bold text-white"><Plus className="size-[11px]" />Tambah {labelKind(editor.kind)}</button>
