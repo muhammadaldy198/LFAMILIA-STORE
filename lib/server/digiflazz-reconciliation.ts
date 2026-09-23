@@ -40,7 +40,7 @@ async function getDigiflazzReconciliationOrder(orderId: string) {
   ).bind(orderId).first<DigiflazzReconciliationOrder>();
 }
 
-async function claimDigiflazzReconciliation(orderId: string, force: boolean) {
+async function claimDigiflazzReconciliation(orderId: string, force = false) {
   const leaseStatus = `reconciling:${crypto.randomUUID()}`;
   const eligibility = force
     ? `(
@@ -111,7 +111,9 @@ export async function reconcileDigiflazzOrder(
 
   let leaseStatus: string | null = null;
   try {
-    leaseStatus = await claimDigiflazzReconciliation(order.id, options.force === true);
+    leaseStatus = options.force === true
+      ? await claimDigiflazzReconciliation(order.id, true)
+      : await claimDigiflazzReconciliation(order.id);
     if (!leaseStatus) return false;
 
     // DigiFlazz reconciliation intentionally reuses the original reference ID.
