@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Edit3, RefreshCw, Search, ShieldCheck, Users, WalletCards } from "lucide-react";
+import { Clock3, Edit3, RefreshCw, Search, ShieldCheck, Trash2, Users, WalletCards } from "lucide-react";
 import { AdminBalanceManager } from "@/components/admin-balance-manager";
 import {
   Field,
@@ -47,6 +47,13 @@ type MemberPayload = {
   error?: string;
 };
 
+type CleanupSettings = {
+  enabled: boolean;
+  inactivityDays: number;
+  lastRunAt: string | null;
+  lastDeletedCount: number;
+};
+
 const tierOrder: Tier[] = ["basic", "gold", "diamond", "platinum"];
 const tierTone: Record<Tier, "gray" | "amber" | "blue" | "violet"> = {
   basic: "gray",
@@ -75,21 +82,36 @@ export function AdminCustomerWorkspace() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [cleanupSettings, setCleanupSettings] = useState<CleanupSettings>({
+    enabled: true,
+    inactivityDays: 30,
+    lastRunAt: null,
+    lastDeletedCount: 0,
+  });
+  const [cleanupBusy, setCleanupBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const payload = await requestJson<MemberPayload>("/api/panel/members", { cache: "no-store" });
+    const [payload, cleanup] = await Promise.all([
+      requestJson<MemberPayload>("/api/panel/members", { cache: "no-store" }),
+      requestJson<{ settings: CleanupSettings }>("/api/panel/customer-cleanup", { cache: "no-store" }),
+    ]);
     setSettings(payload.settings ?? []);
     setMembers(payload.members ?? []);
+    setCleanupSettings(cleanup.settings);
     setError("");
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    void requestJson<MemberPayload>("/api/panel/members", { cache: "no-store" })
-      .then((payload) => {
+    void Promise.all([
+      requestJson<MemberPayload>("/api/panel/members", { cache: "no-store" }),
+      requestJson<{ settings: CleanupSettings }>("/api/panel/customer-cleanup", { cache: "no-store" }),
+    ])
+      .then(([payload, cleanup]) => {
         if (cancelled) return;
         setSettings(payload.settings ?? []);
         setMembers(payload.members ?? []);
+        setCleanupSettings(cleanup.settings);
         setError("");
       })
       .catch((reason) => {
@@ -163,6 +185,53 @@ export function AdminCustomerWorkspace() {
     setSettings((current) => current.map((item) => item.tier === key ? { ...item, ...patch } : item));
   }
 
+  async function saveCleanupSettings() {
+    setCleanupBusy(true); setError(""); setNotice("");
+    try {
+      const payload = await requestJson<{ settings: CleanupSettings }>("/api/panel/customer-cleanup", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: cleanupSettings.enabled,
+          inactivityDays: cleanupSettings.inactivityDays,
+        }),
+      });
+      setCleanupSettings(payload.settings);
+      setNotice("Pengaturan pembersihan akun berhasil disimpan.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Pengaturan pembersihan akun gagal disimpan.");
+    } finally { setCleanupBusy(false); }
+  }
+
+  async function runCleanupNow() {
+    if (!window.confirm("Jalankan pembersihan sekarang? Hanya akun saldo Rp0, tanpa riwayat transaksi, dan tidak login sesuai batas hari yang akan dihapus.")) return;
+    setCleanupBusy(true); setError(""); setNotice("");
+    try {
+      const payload = await requestJson<{ deleted: number; settings: CleanupSettings }>("/api/panel/customer-cleanup", { method: "POST" });
+      setCleanupSettings(payload.settings);
+      await load();
+      setNotice(`Pembersihan selesai. ${payload.deleted} akun kosong dihapus permanen.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Pembersihan akun gagal dijalankan.");
+    } finally { setCleanupBusy(false); }
+  }
+
+  async function deleteMember(member: Member) {
+    const confirmation = window.prompt(
+      `Hapus permanen akun ${member.email}?\n\nHanya bisa jika saldo Rp0 dan belum pernah punya pesanan/top up/transaksi saldo.\nKetik HAPUS untuk melanjutkan.`,
+    );
+    if (confirmation !== "HAPUS") return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const payload = await requestJson<{ members: Member[] }>(`/api/panel/members?id=${encodeURIComponent(member.id)}`, { method: "DELETE" });
+      setMembers(payload.members);
+      if (editing?.id === member.id) setEditing(null);
+      setNotice("Akun pelanggan kosong berhasil dihapus permanen.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Akun pelanggan gagal dihapus.");
+    } finally { setBusy(false); }
+  }
+
   return <div>
     <WorkspaceHeader
       title="Pelanggan"
@@ -195,6 +264,28 @@ export function AdminCustomerWorkspace() {
     </Panel>
 
     <Panel
+      title="Pembersihan Akun Kosong"
+      description="Akun tanpa transaksi tidak akan menumpuk. Scheduler harian hanya menghapus akun saldo Rp0, tanpa pesanan/top up/transaksi saldo, dan tidak login selama batas waktu."
+      className="mt-4"
+      action={<div className="flex gap-2"><button type="button" disabled={cleanupBusy} onClick={() => void runCleanupNow()} className={buttonClass}><Trash2 className="size-3.5" />Jalankan Sekarang</button><button type="button" disabled={cleanupBusy} onClick={() => void saveCleanupSettings()} className={primaryButtonClass}>{cleanupBusy ? "Memproses..." : "Simpan"}</button></div>}
+    >
+      <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-[1fr_220px_1fr]">
+        <label className="flex items-center justify-between rounded-md border border-[#e3e8ef] px-3 py-3 text-[9px] font-semibold text-[#42516a]">
+          <span><strong className="block text-[10px] text-[#14213a]">Hapus otomatis</strong><span className="mt-1 block text-[8px] text-[#8190a5]">Aktif untuk akun customer kosong.</span></span>
+          <input type="checkbox" checked={cleanupSettings.enabled} onChange={(event) => setCleanupSettings((current) => ({ ...current, enabled: event.target.checked }))} className="size-4" />
+        </label>
+        <Field label="Tidak login selama">
+          <div className="relative"><input type="number" min="7" max="365" value={cleanupSettings.inactivityDays} onChange={(event) => setCleanupSettings((current) => ({ ...current, inactivityDays: Math.min(365, Math.max(7, Number(event.target.value) || 30)) }))} className={inputClass} /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[8px] text-[#8190a5]">hari</span></div>
+        </Field>
+        <div className="flex items-center gap-3 rounded-md border border-[#e3e8ef] px-3 py-3">
+          <Clock3 className="size-4 text-[#64748b]" />
+          <div><strong className="block text-[9px] text-[#14213a]">Pembersihan terakhir</strong><span className="text-[8px] text-[#8190a5]">{cleanupSettings.lastRunAt ? new Date(cleanupSettings.lastRunAt).toLocaleString("id-ID") : "Belum pernah"} · {cleanupSettings.lastDeletedCount} akun dihapus</span></div>
+        </div>
+      </div>
+      <div className="border-t border-[#edf0f4] px-4 py-3 text-[8px] text-[#718198]">Akun Admin/Staff/Super Admin selalu dikecualikan. Akun dengan riwayat transaksi tidak pernah dihapus otomatis.</div>
+    </Panel>
+
+    <Panel
       title="Daftar Pelanggan"
       description="Tier otomatis mengikuti total belanja; Super Admin dapat memberi override manual bila diperlukan."
       className="mt-4"
@@ -213,7 +304,7 @@ export function AdminCustomerWorkspace() {
               <td className="px-3">{member.paidOrders}</td>
               <td className="px-3">{rupiah(member.lifetimeSpend)}</td>
               <td className="px-3"><Status tone={member.isActive ? "green" : "red"}>{member.isActive ? "Aktif" : "Suspend"}</Status></td>
-              <td className="px-3"><button type="button" className={buttonClass} onClick={() => setEditing(member)}><Edit3 className="size-3.5" />Kelola</button></td>
+              <td className="px-3"><div className="flex gap-1"><button type="button" className={buttonClass} onClick={() => setEditing(member)}><Edit3 className="size-3.5" />Kelola</button><button type="button" title="Hapus permanen akun kosong" className={`${buttonClass} px-2 text-rose-500`} onClick={() => void deleteMember(member)}><Trash2 className="size-3.5" /></button></div></td>
             </tr>)}
           </tbody>
         </table>

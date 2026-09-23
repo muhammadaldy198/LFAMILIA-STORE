@@ -17,6 +17,7 @@ import {
 import { syncDigiflazzPrices } from "../lib/server/digiflazz-pricing";
 import { cleanupSecurityRateLimits } from "../lib/server/security";
 import { cleanupOrphanStoreMedia } from "../lib/server/media";
+import { cleanupDormantCustomerAccounts } from "../lib/server/customer-cleanup";
 import { expireUninitializedExternalWalletTopups } from "../lib/server/wallet-external";
 import {
   diagnoseCloudflareAccessRequest,
@@ -265,6 +266,11 @@ const worker = {
     }
     if (event.cron === "15 2 * * *") {
       tasks.push(cleanupOrphanStoreMedia().catch(() => undefined));
+      tasks.push(
+        cleanupDormantCustomerAccounts().catch((error) => {
+          console.error("Pembersihan akun pelanggan kosong gagal:", error);
+        }),
+      );
     }
     ctx.waitUntil(Promise.all(tasks));
   },
