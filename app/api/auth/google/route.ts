@@ -5,6 +5,7 @@ import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
 
 const inputSchema = z.object({
   credential: z.string().min(100).max(12_000),
+  phone: z.string().trim().regex(/^\+?[0-9]{8,16}$/, "Nomor kontak tidak valid.").optional(),
 });
 
 export async function POST(request: Request) {
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   try {
     const input = inputSchema.parse(await request.json());
     const identity = await verifyGoogleIdentityCredential(input.credential);
-    const session = await loginOrRegisterGoogleCustomer(identity);
+    const session = await loginOrRegisterGoogleCustomer({ ...identity, phone: input.phone });
     return Response.json(
       { ok: true, customer: session.customer },
       {
@@ -33,8 +34,14 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
+    if (error instanceof Error && error.message === "PHONE_REQUIRED") {
+      return Response.json(
+        { error: "Nomor kontak wajib dilengkapi untuk menggunakan akun LFAMILIA.", code: "PHONE_REQUIRED" },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
     const message = error instanceof z.ZodError
-      ? "Credential Google tidak valid."
+      ? error.issues[0]?.message || "Credential Google tidak valid."
       : error instanceof Error
         ? error.message
         : "Login Google gagal.";
