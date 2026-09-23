@@ -240,6 +240,32 @@ function GoogleIdentityButton({
   const [pendingCredential, setPendingCredential] = useState("");
   const [requiredPhone, setRequiredPhone] = useState("");
 
+  async function completeRequiredPhone() {
+    if (!pendingCredential) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          credential: pendingCredential,
+          phone: requiredPhone.replace(/[\s()-]/g, ""),
+        }),
+      });
+      const payload = await result.json().catch(() => ({})) as { error?: string; code?: string };
+      if (!result.ok) throw new Error(payload.error || "Nomor kontak gagal disimpan.");
+      setPendingCredential("");
+      setRequiredPhone("");
+      window.dispatchEvent(new Event("lfamilia:auth-changed"));
+      await onSuccess();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Nomor kontak gagal disimpan.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -365,7 +391,7 @@ function GoogleIdentityButton({
         <Button
           type="button"
           disabled={busy || requiredPhone.replace(/[\s()-]/g, "").length < 8}
-          onClick={() => { void submitGoogleCredential(pendingCredential, requiredPhone); }}
+          onClick={() => { void completeRequiredPhone(); }}
           className="h-11 w-full rounded-xl bg-[#b9ff35] text-sm font-black text-[#091006] hover:bg-[#c7ff58]"
         >
           {busy && <LoaderCircle className="mr-2 size-4 animate-spin" />}
