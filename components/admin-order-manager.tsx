@@ -43,8 +43,12 @@ type Order = {
   provider: string;
   total: number | null;
   status: OrderStatus;
+  paymentStatus?: string;
   createdAt?: string;
   fulfillmentStatus?: string;
+  providerStatus?: string | null;
+  providerMessage?: string | null;
+  providerSerialNumber?: string | null;
   deliveryMode?: "direct" | "voucher" | "manual";
 };
 
@@ -64,7 +68,17 @@ type ApiOrder = {
   payment_status: string;
   provider_code: string | null;
   fulfillment_status: string;
+  provider_status?: string | null;
+  provider_message?: string | null;
+  provider_serial_number?: string | null;
   delivery_mode: "direct" | "voucher" | "manual";
+  created_at: string;
+};
+
+type ApiOrderEvent = {
+  id: number;
+  source: string;
+  status: string;
   created_at: string;
 };
 
@@ -102,8 +116,12 @@ function mapApiOrder(order: ApiOrder): Order {
     provider: order.provider_code === "digiflazz" ? "Digiflazz" : order.provider_code === "voucher-stock" ? "Stok Voucher" : order.provider_code ? "Provider" : "-",
     total: order.total,
     status: mapOrderStatus(order),
+    paymentStatus: order.payment_status,
     createdAt: order.created_at,
     fulfillmentStatus: order.fulfillment_status,
+    providerStatus: order.provider_status,
+    providerMessage: order.provider_message,
+    providerSerialNumber: order.provider_serial_number,
     deliveryMode: order.delivery_mode,
   };
 }
@@ -154,6 +172,8 @@ export function AdminOrderManager() {
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkAction, setBulkAction] = useState("Aksi massal");
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
+  const [detailEvents, setDetailEvents] = useState<ApiOrderEvent[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [lastUpdated, setLastUpdated] = useState("Belum dimuat");
@@ -252,6 +272,57 @@ export function AdminOrderManager() {
     setSelected([]);
   }
 
+  async function fetchOrderDetail(order: Order) {
+    if (!order.dbId) return;
+    setDetailLoading(true);
+    try {
+      const response = await fetch(`/api/panel/orders?id=${encodeURIComponent(order.dbId)}`, { cache: "no-store" });
+      const payload = await response.json().catch(() => ({})) as { order?: ApiOrder; events?: ApiOrderEvent[]; error?: string };
+      if (!response.ok || !payload.order) throw new Error(payload.error || "Detail pesanan gagal dimuat.");
+      setDetailOrder(mapApiOrder(payload.order));
+      setDetailEvents(payload.events || []);
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  async function openOrderDetail(order: Order) {
+    setDetailOrder(order);
+    setDetailEvents([]);
+    try {
+      await fetchOrderDetail(order);
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "Detail pesanan gagal dimuat.");
+    }
+  }
+
+  async function refreshPaymentStatus(order: Order) {
+    const response = await fetch("/api/orders/status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ referenceId: order.id }),
+    });
+    const payload = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) throw new Error(payload.error || "Status pembayaran gagal diperiksa.");
+    await loadOrders();
+    await fetchOrderDetail(order);
+    setNotice(`Status pembayaran ${order.id} sudah diperiksa ke gateway.`);
+  }
+
+  async function refreshFulfillmentStatus(order: Order) {
+    if (!order.dbId) throw new Error("ID pesanan tidak tersedia.");
+    const response = await fetch("/api/panel/orders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: order.dbId, action: "refresh_fulfillment" }),
+    });
+    const payload = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) throw new Error(payload.error || "Status provider gagal diperiksa.");
+    await loadOrders();
+    await fetchOrderDetail(order);
+    setNotice(`Status provider ${order.id} sudah diperiksa dengan reference yang sama.`);
+  }
+
   async function addManualOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -324,7 +395,7 @@ export function AdminOrderManager() {
             <span title={activePage === 1 ? `Menampilkan 1–${Math.min(pageSize, visibleOrders.length)} dari ${visibleOrders.length} pesanan` : undefined} className="text-[8px] text-[#657690]">{loading ? "Memuat pesanan..." : `Menampilkan ${visibleOrders.length ? (activePage - 1) * pageSize + 1 : 0}–${Math.min(activePage * pageSize, visibleOrders.length)} dari ${visibleOrders.length} pesanan`}</span>
           </div>
 
-          <DesktopOrderTable orders={pagedOrders} selected={selected} onSelect={setSelected} onOpen={setDetailOrder} />
+          <DesktopOrderTable orders={pagedOrders} selected={selected} onSelect={setSelected} onOpen={(order) => void openOrderDetail(order)} />
 
           <footer className="flex min-h-[46px] flex-col items-stretch justify-between gap-2 border-t border-[#e5eaf0] px-[11px] py-[7px] lg:flex-row lg:items-center">
             <div className="flex flex-wrap items-center gap-[8px]">
@@ -345,7 +416,7 @@ export function AdminOrderManager() {
         <ActivityPanel activities={liveActivities} />
       </div>
 
-      {detailOrder && <OrderDetailModal order={detailOrder} onClose={() => setDetailOrder(null)} onNotice={setNotice} onCompleted={() => void loadOrders()} />}
+      {detailOrder && <OrderDetailModal order={detailOrder} events={detailEvents} loading={detailLoading} onClose={() => { setDetailOrder(null); setDetailEvents([]); }} onNotice={setNotice} onRefreshPayment={() => refreshPaymentStatus(detailOrder)} onRefreshFulfillment={() => refreshFulfillmentStatus(detailOrder)} onCompleted={() => void loadOrders()} />}
       {manualOpen && <ManualOrderModal saving={saving} onClose={() => setManualOpen(false)} onSubmit={addManualOrder} />}
     </div>
   );
@@ -472,14 +543,81 @@ function ActivityItem({ activity }: { activity: Activity }) {
   );
 }
 
-function OrderDetailModal({ order, onClose, onNotice, onCompleted }: { order: Order; onClose(): void; onNotice(message: string): void; onCompleted(): void }) {
+function eventLabel(status: string) {
+  const labels: Record<string, string> = {
+    created: "Pesanan dibuat",
+    pending: "Menunggu pembayaran",
+    paid: "Pembayaran tervalidasi",
+    processing: "Sedang diproses provider",
+    dispatching: "Permintaan dikirim ke provider",
+    success: "Pesanan berhasil",
+    failed: "Transaksi gagal",
+    expired: "Pembayaran kedaluwarsa",
+    cancelled: "Transaksi dibatalkan",
+    manual_pending: "Menunggu diproses admin",
+    needs_review: "Perlu pemeriksaan admin",
+    retry_exhausted: "Batas percobaan otomatis tercapai",
+    refresh_requested: "Admin meminta pengecekan ulang",
+  };
+  return labels[status] || status.replaceAll("_", " ");
+}
+
+function eventSource(source: string) {
+  if (source === "digiflazz") return "DigiFlazz";
+  if (source === "midtrans") return "Midtrans";
+  if (source === "doku") return "DOKU";
+  if (source === "wallet") return "Saldo";
+  if (source === "admin") return "Admin";
+  if (source === "voucher_stock") return "Stok Voucher";
+  return "Sistem";
+}
+
+function OrderDetailModal({
+  order,
+  events,
+  loading,
+  onClose,
+  onNotice,
+  onRefreshPayment,
+  onRefreshFulfillment,
+  onCompleted,
+}: {
+  order: Order;
+  events: ApiOrderEvent[];
+  loading: boolean;
+  onClose(): void;
+  onNotice(message: string): void;
+  onRefreshPayment(): Promise<void>;
+  onRefreshFulfillment(): Promise<void>;
+  onCompleted(): void;
+}) {
   const [serialNumber, setSerialNumber] = useState("");
   const [saving, setSaving] = useState(false);
+  const [actionBusy, setActionBusy] = useState<"payment" | "provider" | null>(null);
   const [error, setError] = useState("");
+
   async function copyInvoice() {
-    try { await navigator.clipboard.writeText(order.id); onNotice("Nomor invoice berhasil disalin."); } catch { onNotice(`Invoice: ${order.id}`); }
-    onClose();
+    try {
+      await navigator.clipboard.writeText(order.id);
+      onNotice("Nomor invoice berhasil disalin.");
+    } catch {
+      onNotice(`Invoice: ${order.id}`);
+    }
   }
+
+  async function runRefresh(kind: "payment" | "provider") {
+    setActionBusy(kind);
+    setError("");
+    try {
+      if (kind === "payment") await onRefreshPayment();
+      else await onRefreshFulfillment();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Status pesanan gagal diperiksa.");
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   async function completeManual() {
     if (!order.dbId) return;
     if (order.deliveryMode === "voucher" && !serialNumber.trim()) { setError("Kode voucher / serial wajib diisi."); return; }
@@ -493,26 +631,58 @@ function OrderDetailModal({ order, onClose, onNotice, onCompleted }: { order: Or
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Pesanan gagal diselesaikan."); }
     finally { setSaving(false); }
   }
+
+  const terminalFulfillment = ["success", "failed", "cancelled"].includes(order.fulfillmentStatus || "");
+  const canRefreshPayment = order.paymentStatus === "pending";
+  const canRefreshProvider =
+    order.paymentStatus === "paid" &&
+    !terminalFulfillment &&
+    order.provider === "Digiflazz" &&
+    order.deliveryMode === "direct";
+  const timeline = [
+    ...(order.createdAt ? [{ id: -1, source: "system", status: "created", created_at: order.createdAt }] : []),
+    ...events.filter((event) => event.status !== "created"),
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[#071426]/55 p-[24px]" role="dialog" aria-modal="true" aria-label="Detail Pesanan">
-      <div className="w-full max-w-[620px] overflow-hidden rounded-[10px] bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b border-[#e4e9ef] px-[20px] py-[16px]"><div><h2 className="text-[16px] font-black text-[#101c34]">Detail Pesanan</h2><p className="mt-[3px] text-[9px] text-[#718198]">{order.id}</p></div><button type="button" onClick={onClose} className="grid size-[30px] place-items-center rounded-[5px] text-[#63758b] hover:bg-[#f2f5f8]"><X className="size-[16px]" /></button></div>
-        <div className="grid grid-cols-2 gap-[20px] p-[20px] text-[9px]">
-          <DetailSection title="Informasi Pelanggan"><DetailLine label="Nama" value={order.customer} /><DetailLine label="Telepon" value={order.phone} /><DetailLine label="Tujuan" value={`${order.destination} ${order.destinationNote}`} /></DetailSection>
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#071426]/55 p-[12px] sm:p-[24px]" role="dialog" aria-modal="true" aria-label="Detail Pesanan">
+      <div className="my-auto w-full max-w-[700px] overflow-hidden rounded-[10px] bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-[#e4e9ef] px-[16px] py-[14px] sm:px-[20px] sm:py-[16px]"><div><h2 className="text-[16px] font-black text-[#101c34]">Detail Pesanan</h2><p className="mt-[3px] break-all text-[9px] text-[#718198]">{order.id}</p></div><button type="button" onClick={onClose} className="grid size-[30px] place-items-center rounded-[5px] text-[#63758b] hover:bg-[#f2f5f8]"><X className="size-[16px]" /></button></div>
+        <div className="grid grid-cols-1 gap-[12px] p-[14px] text-[9px] sm:grid-cols-2 sm:gap-[16px] sm:p-[20px]">
+          <DetailSection title="Informasi Pelanggan"><DetailLine label="Nama" value={order.customer} /><DetailLine label="Telepon" value={order.phone} /><DetailLine label="Tujuan" value={`${order.destination} ${order.destinationNote}`.trim()} /></DetailSection>
           <DetailSection title="Informasi Produk"><DetailLine label="Produk" value={order.product} /><DetailLine label="Nominal" value={order.packageName} /><DetailLine label="Provider" value={order.provider} /></DetailSection>
-          <DetailSection title="Pembayaran"><DetailLine label="Metode" value={order.payment} /><DetailLine label="Total" value={formatRupiah(order.total)} /><div className="mt-[8px]"><StatusBadge status={order.status} /></div></DetailSection>
-          <DetailSection title="Timeline"><p className="flex items-center gap-[7px] text-[#52647b]"><CheckCircle2 className="size-[13px] text-[#12a45f]" />Pesanan dibuat oleh sistem</p><p className="mt-[8px] flex items-center gap-[7px] text-[#52647b]"><Clock3 className="size-[13px] text-[#f0a400]" />Menunggu pembaruan berikutnya</p></DetailSection>
+          <DetailSection title="Pembayaran"><DetailLine label="Metode" value={order.payment} /><DetailLine label="Total" value={formatRupiah(order.total)} /><DetailLine label="Status gateway" value={order.paymentStatus || "-"} /><div className="mt-[8px]"><StatusBadge status={order.status} /></div></DetailSection>
+          <DetailSection title="Status Provider"><DetailLine label="Status" value={order.providerStatus || (order.paymentStatus === "paid" ? "Belum ada respons" : "Menunggu pembayaran")} />{order.providerMessage && <p className="mt-[8px] break-words rounded-[5px] bg-[#f6f8fb] px-[8px] py-[7px] text-[#52647b]">{order.providerMessage}</p>}{order.providerSerialNumber && <DetailLine label="Serial" value={order.providerSerialNumber} />}</DetailSection>
+          <DetailSection title="Timeline" wide>
+            {loading && !events.length ? <p className="flex items-center gap-[7px] text-[#65758c]"><RefreshCw className="size-[12px] animate-spin" />Memuat riwayat pesanan...</p> : (
+              <div className="max-h-[220px] space-y-[9px] overflow-y-auto pr-[3px]">
+                {timeline.map((event) => (
+                  <div key={`${event.id}-${event.status}-${event.created_at}`} className="flex items-start gap-[8px]">
+                    <span className="mt-[2px] grid size-[18px] shrink-0 place-items-center rounded-full bg-[#edf5ff] text-[#0875ed]"><CheckCircle2 className="size-[10px]" /></span>
+                    <div className="min-w-0 flex-1"><strong className="block text-[8px] text-[#33465f]">{eventLabel(event.status)}</strong><span className="text-[7px] text-[#718198]">{eventSource(event.source)} · {shortDate(event.created_at)}</span></div>
+                  </div>
+                ))}
+                {!timeline.length && <p className="text-[#718198]">Belum ada event tersimpan.</p>}
+              </div>
+            )}
+          </DetailSection>
         </div>
-        {error && <p className="mx-[20px] mb-[10px] rounded-[5px] bg-red-50 px-[10px] py-[7px] text-[8px] text-red-700">{error}</p>}
-        {order.fulfillmentStatus === "manual_pending" && order.deliveryMode === "voucher" && <label className="mx-[20px] mb-[12px] block text-[8px] font-bold text-[#42536b]">Kode voucher / serial<input value={serialNumber} onChange={(event) => setSerialNumber(event.target.value)} className="mt-[5px] h-[34px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" /></label>}
-        <div className="flex items-center justify-between border-t border-[#e4e9ef] bg-[#fafbfd] px-[20px] py-[12px]"><span className="text-[9px] font-bold text-[#2e4058]">Aksi Admin</span><div className="flex gap-[8px]"><button type="button" onClick={copyInvoice} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] border border-[#dce3eb] bg-white px-[12px] text-[8px] font-bold text-[#40516a]"><Copy className="size-[12px]" />Copy Invoice</button>{order.fulfillmentStatus === "manual_pending" && <button type="button" disabled={saving} onClick={() => void completeManual()} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] bg-emerald-600 px-[13px] text-[8px] font-bold text-white disabled:opacity-50"><CheckCircle2 className="size-[12px]" />{saving ? "Menyimpan..." : "Selesaikan Pesanan"}</button>}<button type="button" onClick={onClose} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] bg-[#0875ed] px-[13px] text-[8px] font-bold text-white"><Eye className="size-[12px]" />Tutup</button></div></div>
+        {error && <p className="mx-[14px] mb-[10px] rounded-[5px] bg-red-50 px-[10px] py-[7px] text-[8px] text-red-700 sm:mx-[20px]">{error}</p>}
+        {order.fulfillmentStatus === "manual_pending" && order.deliveryMode === "voucher" && <label className="mx-[14px] mb-[12px] block text-[8px] font-bold text-[#42536b] sm:mx-[20px]">Kode voucher / serial<input value={serialNumber} onChange={(event) => setSerialNumber(event.target.value)} className="mt-[5px] h-[34px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" /></label>}
+        <div className="flex flex-col gap-[9px] border-t border-[#e4e9ef] bg-[#fafbfd] px-[14px] py-[12px] sm:flex-row sm:items-center sm:justify-between sm:px-[20px]"><span className="text-[9px] font-bold text-[#2e4058]">Aksi Admin</span><div className="flex flex-wrap gap-[7px]">
+          <button type="button" onClick={copyInvoice} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] border border-[#dce3eb] bg-white px-[10px] text-[8px] font-bold text-[#40516a]"><Copy className="size-[12px]" />Copy Invoice</button>
+          {canRefreshPayment && <button type="button" disabled={actionBusy !== null || saving} onClick={() => void runRefresh("payment")} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] bg-[#0875ed] px-[11px] text-[8px] font-bold text-white disabled:opacity-50"><RefreshCw className={`size-[12px] ${actionBusy === "payment" ? "animate-spin" : ""}`} />{actionBusy === "payment" ? "Memeriksa..." : "Cek Status Pembayaran"}</button>}
+          {canRefreshProvider && <button type="button" disabled={actionBusy !== null || saving} onClick={() => void runRefresh("provider")} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] bg-amber-500 px-[11px] text-[8px] font-bold text-white disabled:opacity-50"><RefreshCw className={`size-[12px] ${actionBusy === "provider" ? "animate-spin" : ""}`} />{actionBusy === "provider" ? "Memeriksa..." : "Cek Ulang DigiFlazz"}</button>}
+          {order.fulfillmentStatus === "manual_pending" && <button type="button" disabled={saving || actionBusy !== null} onClick={() => void completeManual()} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] bg-emerald-600 px-[11px] text-[8px] font-bold text-white disabled:opacity-50"><CheckCircle2 className="size-[12px]" />{saving ? "Menyimpan..." : "Selesaikan Pesanan"}</button>}
+          <button type="button" onClick={onClose} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] border border-[#dce3eb] bg-white px-[10px] text-[8px] font-bold text-[#40516a]"><X className="size-[12px]" />Tutup</button>
+        </div></div>
       </div>
     </div>
   );
 }
 
-function DetailSection({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="rounded-[7px] border border-[#e2e8ef] p-[12px]"><h3 className="mb-[9px] text-[10px] font-extrabold text-[#17253d]">{title}</h3>{children}</section>;
+function DetailSection({ title, children, wide = false }: { title: string; children: ReactNode; wide?: boolean }) {
+  return <section className={`rounded-[7px] border border-[#e2e8ef] p-[12px] ${wide ? "sm:col-span-2" : ""}`}><h3 className="mb-[9px] text-[10px] font-extrabold text-[#17253d]">{title}</h3>{children}</section>;
 }
 
 function DetailLine({ label, value }: { label: string; value: string }) {
