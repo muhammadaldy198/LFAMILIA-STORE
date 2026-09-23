@@ -27,6 +27,15 @@ export const customerUsers = sqliteTable(
   ],
 );
 
+export const customerCleanupSettings = sqliteTable("customer_cleanup_settings", {
+  id: integer("id").primaryKey(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  inactivityDays: integer("inactivity_days").notNull().default(30),
+  lastRunAt: text("last_run_at"),
+  lastDeletedCount: integer("last_deleted_count").notNull().default(0),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 export const customerSessions = sqliteTable(
   "customer_sessions",
   {
