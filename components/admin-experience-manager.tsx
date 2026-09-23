@@ -23,6 +23,45 @@ type ReviewPayload = { id: number; customerName: string; body: string; rating: n
 type Banner = { id: number; title: string; href: string; devices: string; order: number; active: boolean; tone: string; raw?: BannerPayload };
 type MiniItem = { id: number; title: string; detail: string; active: boolean; raw?: PopupPayload | NewsPayload | FaqPayload | ReviewPayload };
 
+const CONTENT_MEDIA_MAX_BYTES = 6 * 1024 * 1024;
+const CONTENT_MEDIA_TARGET_BYTES = 1_500_000;
+const CONTENT_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+async function prepareContentImage(file: File) {
+  if (!CONTENT_MEDIA_TYPES.has(file.type)) throw new Error("Format gambar harus JPG, PNG, WEBP, atau GIF.");
+  if (file.size < 1) throw new Error("File gambar kosong.");
+  if (file.size > CONTENT_MEDIA_MAX_BYTES) throw new Error("Ukuran gambar maksimal 6 MB.");
+  if (file.type === "image/gif" || file.size <= CONTENT_MEDIA_TARGET_BYTES) return file;
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    // Browser lama boleh mengunggah file asli; backend tetap memvalidasi format dan ukuran.
+    return file;
+  }
+
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext("2d");
+    if (!context) return file;
+    context.drawImage(bitmap, 0, 0);
+
+    for (const quality of [0.9, 0.82, 0.74, 0.66, 0.58]) {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+      if (!blob) continue;
+      if (blob.size <= CONTENT_MEDIA_TARGET_BYTES || quality === 0.58) {
+        return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.webp`, { type: "image/webp" });
+      }
+    }
+    return file;
+  } finally {
+    bitmap.close();
+  }
+}
+
 const tabs: Array<{ value: ContentKind; label: string }> = [
   { value: "banner", label: "Banner" },
   { value: "popup", label: "Pop-up" },
@@ -251,13 +290,28 @@ function EditorPanel({ editor, banners, popups, news, reviews, faqs, canDelete, 
   const review = editor.kind === "review" ? item?.raw as ReviewPayload | undefined : undefined;
   async function uploadImage(file?: File, target: "desktop" | "mobile" | "cover" = "desktop") {
     if (!file || !["banner", "news"].includes(editor.kind)) return;
-    const form = new FormData(); form.set("file", file);
     try {
+      const preparedFile = await prepareContentImage(file);
+      const form = new FormData();
+      form.set("file", preparedFile);
+
       const response = await fetch("/api/panel/media", { method: "POST", body: form });
-      const payload = await response.json().catch(() => ({})) as { url?: string; error?: string };
-      if (!response.ok || !payload.url) throw new Error(payload.error || "Gambar gagal diunggah.");
+      const raw = await response.text();
+      let payload: { url?: string; error?: string } = {};
+      try {
+        payload = raw ? JSON.parse(raw) as { url?: string; error?: string } : {};
+      } catch {
+        // Cloudflare/Worker dapat mengembalikan halaman error non-JSON. Tampilkan status aslinya.
+      }
+
+      if (!response.ok || !payload.url) {
+        const plainDetail = raw && !raw.trim().startsWith("<") ? raw.trim().slice(0, 180) : "";
+        throw new Error(payload.error || plainDetail || `Upload gagal (HTTP ${response.status}).`);
+      }
       onImage(editor.kind, editor.id, payload.url, editor.kind === "news" ? "cover" : target);
-    } catch (reason) { onError(reason instanceof Error ? reason.message : "Gambar gagal diunggah."); }
+    } catch (reason) {
+      onError(reason instanceof Error ? reason.message : "Gambar gagal diunggah.");
+    }
   }
   return (
     <aside id="admin-content-editor" className="self-start overflow-hidden lg:sticky lg:top-[70px] rounded-[7px] border border-[#dfe6ef] bg-white shadow-[0_8px_24px_rgba(18,35,60,.08)]">
@@ -326,7 +380,7 @@ function EditorPanel({ editor, banners, popups, news, reviews, faqs, canDelete, 
   );
 }
 
-function BannerImageUpload({ label, value, hint, onUpload }: { label: string; value: string; hint: string; onUpload(file?: File): void }) { return <label className="text-[8px] font-bold">{label}<div className="mt-[5px] grid h-[90px] place-items-center overflow-hidden rounded-[5px] border border-[#dce3eb] bg-[#f8fafc]">{value ? <img src={value} alt="" className="size-full object-cover" /> : <span className="text-center text-[#718198]"><ImageIcon className="mx-auto size-[22px]" /><small className="mt-[4px] block">Belum ada gambar</small></span>}</div><span className="mt-[6px] inline-flex h-[30px] w-full cursor-pointer items-center justify-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white text-[8px] font-bold"><Upload className="size-[11px]" />{value ? "Ganti Gambar" : "Unggah Gambar"}<input type="file" accept="image/*" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; onUpload(file); }} /></span><small className="mt-[4px] block font-normal text-[#718198]">{hint} · Maks. 2MB</small></label>; }
+function BannerImageUpload({ label, value, hint, onUpload }: { label: string; value: string; hint: string; onUpload(file?: File): void }) { return <label className="text-[8px] font-bold">{label}<div className="mt-[5px] grid h-[90px] place-items-center overflow-hidden rounded-[5px] border border-[#dce3eb] bg-[#f8fafc]">{value ? <img src={value} alt="" className="size-full object-cover" /> : <span className="text-center text-[#718198]"><ImageIcon className="mx-auto size-[22px]" /><small className="mt-[4px] block">Belum ada gambar</small></span>}</div><span className="mt-[6px] inline-flex h-[30px] w-full cursor-pointer items-center justify-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white text-[8px] font-bold"><Upload className="size-[11px]" />{value ? "Ganti Gambar" : "Unggah Gambar"}<input type="file" accept="image/*" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; onUpload(file); }} /></span><small className="mt-[4px] block font-normal text-[#718198]">{hint} · JPG/PNG/WebP/GIF · maks. 6MB · otomatis dikompres</small></label>; }
 
 function EditorField({ label, name, defaultValue, type = "text", readOnly = false }: { label: string; name: string; defaultValue: string; type?: string; readOnly?: boolean }) { return <label className="mt-[11px] block text-[8px] font-bold">{label}<input key={defaultValue} name={name} type={type} defaultValue={defaultValue} readOnly={readOnly} className="mt-[5px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] font-medium outline-none focus:border-[#2781ed] read-only:bg-[#f5f7fa]" /></label>; }
 function EditorTextArea({ label, name, defaultValue, rows = 4 }: { label: string; name: string; defaultValue: string; rows?: number }) { return <label className="mt-[11px] block text-[8px] font-bold">{label}<textarea key={defaultValue} name={name} defaultValue={defaultValue} rows={rows} className="mt-[5px] w-full resize-y rounded-[4px] border border-[#dce3eb] px-[9px] py-[8px] text-[8px] font-medium outline-none focus:border-[#2781ed]" /></label>; }
