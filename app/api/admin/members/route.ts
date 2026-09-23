@@ -7,6 +7,7 @@ import {
   saveMemberTierSettings,
   setMemberRole,
 } from "@/lib/server/member-tiers";
+import { permanentlyDeleteEmptyCustomer } from "@/lib/server/customer-cleanup";
 
 export const dynamic = "force-dynamic";
 
@@ -87,5 +88,45 @@ export async function PATCH(request: Request) {
       ? error.issues[0]?.message || "Perubahan member tidak valid."
       : error instanceof Error ? error.message : "Member gagal diperbarui.";
     return Response.json({ error: message }, { status: 400 });
+  }
+}
+
+
+export async function DELETE(request: Request) {
+  const access = await requireAdminSession(request, "owner");
+  if (access instanceof Response) return access;
+  try {
+    const customerId = new URL(request.url).searchParams.get("id")?.trim() || "";
+    if (!z.string().uuid().safeParse(customerId).success) {
+      return Response.json({ error: "ID pelanggan tidak valid." }, { status: 400 });
+    }
+
+    const result = await permanentlyDeleteEmptyCustomer(customerId);
+    if (result.deleted) {
+      return Response.json({ ok: true, members: await listMembersWithTiers() });
+    }
+    if (result.reason === "not_found") {
+      return Response.json({ error: "Pelanggan tidak ditemukan." }, { status: 404 });
+    }
+
+    const eligibility = result.eligibility;
+    const reasons = [
+      Number(eligibility?.balance ?? 0) !== 0 ? "saldo belum Rp0" : "",
+      Number(eligibility?.orderCount ?? 0) > 0 ? "sudah memiliki pesanan" : "",
+      Number(eligibility?.topupCount ?? 0) > 0 ? "sudah memiliki riwayat top up" : "",
+      Number(eligibility?.walletTransactionCount ?? 0) > 0 ? "sudah memiliki riwayat saldo" : "",
+    ].filter(Boolean);
+    return Response.json(
+      {
+        error: `Akun tidak boleh dihapus permanen karena ${reasons.join(", ") || "status akun berubah"}. Nonaktifkan akun bila akses pelanggan perlu ditutup.`,
+        eligibility,
+      },
+      { status: 409 },
+    );
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Akun pelanggan gagal dihapus." },
+      { status: 400 },
+    );
   }
 }
