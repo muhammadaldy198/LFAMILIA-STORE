@@ -67,7 +67,7 @@ test("customer auth UI uses Google Identity Services and posts credential to bac
   assert.match(form, /google\.accounts\.id\.initialize/);
   assert.match(form, /google\.accounts\.id\.renderButton/);
   assert.match(form, /fetch\("\/api\/auth\/google"/);
-  assert.match(form, /credential: response\.credential/);
+  assert.match(form, /submitGoogleCredential\(response\.credential\)/);
   assert.match(status, /clientId/);
 });
 
