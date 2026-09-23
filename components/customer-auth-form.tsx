@@ -237,27 +237,37 @@ function GoogleIdentityButton({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingCredential, setPendingCredential] = useState("");
+  const [requiredPhone, setRequiredPhone] = useState("");
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     let active = true;
 
-    const handleCredential = async (response: GoogleCredentialResponse) => {
-      if (!active || !response.credential) {
-        if (active) setError("Google tidak mengembalikan credential login.");
-        return;
-      }
+    const submitGoogleCredential = async (credential: string, phone?: string) => {
       setBusy(true);
       setError("");
       try {
         const result = await fetch("/api/auth/google", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ credential: response.credential }),
+          body: JSON.stringify({
+            credential,
+            ...(phone ? { phone: phone.replace(/[\s()-]/g, "") } : {}),
+          }),
         });
-        const payload = await result.json().catch(() => ({})) as { error?: string };
-        if (!result.ok) throw new Error(payload.error || "Login Google gagal.");
+        const payload = await result.json().catch(() => ({})) as { error?: string; code?: string };
+        if (!result.ok) {
+          if (payload.code === "PHONE_REQUIRED") {
+            setPendingCredential(credential);
+            setError("");
+            return;
+          }
+          throw new Error(payload.error || "Login Google gagal.");
+        }
+        setPendingCredential("");
+        setRequiredPhone("");
         window.dispatchEvent(new Event("lfamilia:auth-changed"));
         await onSuccess();
       } catch (reason) {
@@ -265,6 +275,14 @@ function GoogleIdentityButton({
       } finally {
         if (active) setBusy(false);
       }
+    };
+
+    const handleCredential = async (response: GoogleCredentialResponse) => {
+      if (!active || !response.credential) {
+        if (active) setError("Google tidak mengembalikan credential login.");
+        return;
+      }
+      await submitGoogleCredential(response.credential);
     };
 
     const render = () => {
@@ -323,6 +341,46 @@ function GoogleIdentityButton({
       container.replaceChildren();
     };
   }, [clientId, onSuccess, setError]);
+
+  if (pendingCredential) {
+    return (
+      <div className="space-y-3 rounded-xl border border-[#b9ff35]/20 bg-[#b9ff35]/[0.04] p-3">
+        <div>
+          <p className="text-[11px] font-black text-white">Nomor kontak wajib</p>
+          <p className="mt-1 text-[10px] leading-4 text-white/40">
+            Google tidak memberikan nomor telepon ke LFAMILIA. Tambahkan nomor kontak sebelum akun dibuat atau digunakan.
+          </p>
+        </div>
+        <AuthField label="Nomor kontak" icon={<Phone className="size-[18px]" />}>
+          <input
+            required
+            inputMode="tel"
+            autoComplete="tel"
+            value={requiredPhone}
+            onChange={(event) => setRequiredPhone(event.target.value)}
+            placeholder="081234567890"
+            className="h-12 w-full bg-transparent pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/24"
+          />
+        </AuthField>
+        <Button
+          type="button"
+          disabled={busy || requiredPhone.replace(/[\s()-]/g, "").length < 8}
+          onClick={() => { void submitGoogleCredential(pendingCredential, requiredPhone); }}
+          className="h-11 w-full rounded-xl bg-[#b9ff35] text-sm font-black text-[#091006] hover:bg-[#c7ff58]"
+        >
+          {busy && <LoaderCircle className="mr-2 size-4 animate-spin" />}
+          Simpan nomor & lanjutkan
+        </Button>
+        <button
+          type="button"
+          onClick={() => { setPendingCredential(""); setRequiredPhone(""); setError(""); }}
+          className="w-full text-center text-[10px] font-semibold text-white/40 hover:text-white/65"
+        >
+          Batal
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex min-h-11 w-full items-center justify-center overflow-hidden rounded-xl">
