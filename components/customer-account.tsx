@@ -224,6 +224,7 @@ function Dashboard({
   const [error, setError] = useState("");
   const [tab, setTab] = useState("overview");
   const [menuOpen, setMenuOpen] = useState(false);
+  const sidebarTabClass = "h-10 w-full justify-start rounded-none border-l-2 border-transparent px-3 text-left text-[12px] font-semibold text-white/45 shadow-none transition hover:bg-white/[0.03] hover:text-white/75 data-[state=active]:border-[#b9ff35] data-[state=active]:bg-[#b9ff35]/[0.055] data-[state=active]:text-[#d8ff8d] data-[state=active]:shadow-none";
   const tabs = [
     ["overview", "Ringkasan"],
     ["wallet", "Saldo"],
@@ -295,7 +296,7 @@ function Dashboard({
       <Tabs
         value={tab}
         onValueChange={setTab}
-        className="mt-6 grid items-start gap-5 lg:grid-cols-[220px_1fr]"
+        className="mt-6 grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]"
       >
         {menuOpen && (
           <>
@@ -338,32 +339,32 @@ function Dashboard({
             </aside>
           </>
         )}
-        <TabsList className="hidden h-auto w-full gap-1 rounded-2xl border border-white/[0.08] bg-[#0d1019] p-2 lg:sticky lg:top-28 lg:!flex lg:!w-full lg:!flex-col lg:!items-stretch">
-          <TabsTrigger value="overview" className="rounded-xl px-4 text-xs">
+        <TabsList className="hidden h-auto w-full gap-0 border-0 border-r border-white/[0.08] bg-transparent p-0 pr-4 shadow-none lg:sticky lg:top-24 lg:!flex lg:!w-full lg:!flex-col lg:!items-stretch">
+          <TabsTrigger value="overview" className={sidebarTabClass}>
             Ringkasan
           </TabsTrigger>
-          <TabsTrigger value="wallet" className="rounded-xl px-4 text-xs">
+          <TabsTrigger value="wallet" className={sidebarTabClass}>
             Saldo
           </TabsTrigger>
-          <TabsTrigger value="orders" className="rounded-xl px-4 text-xs">
+          <TabsTrigger value="orders" className={sidebarTabClass}>
             Pesanan
           </TabsTrigger>
-          <TabsTrigger value="vouchers" className="rounded-xl px-4 text-xs">
+          <TabsTrigger value="vouchers" className={sidebarTabClass}>
             Kode
           </TabsTrigger>
-          <TabsTrigger value="game-accounts" className="rounded-xl px-4 text-xs">
+          <TabsTrigger value="game-accounts" className={sidebarTabClass}>
             Akun Game
           </TabsTrigger>
           <TabsTrigger
             value="notifications"
-            className="rounded-xl px-4 text-xs"
+            className={sidebarTabClass}
           >
             Notifikasi
           </TabsTrigger>
-          <TabsTrigger value="support" className="rounded-xl px-4 text-xs">
+          <TabsTrigger value="support" className={sidebarTabClass}>
             Bantuan
           </TabsTrigger>
-          <TabsTrigger value="profile" className="rounded-xl px-4 text-xs">
+          <TabsTrigger value="profile" className={sidebarTabClass}>
             Profil
           </TabsTrigger>
         </TabsList>
