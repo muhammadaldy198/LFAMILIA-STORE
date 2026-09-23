@@ -1,6 +1,7 @@
 import * as categories from "@/app/api/admin/categories/route";
 import * as balances from "@/app/api/admin/balances/route";
 import * as content from "@/app/api/admin/content/route";
+import * as customerCleanup from "@/app/api/admin/customer-cleanup/route";
 import * as dashboardIntegrations from "@/app/api/admin/dashboard-integrations/route";
 import * as digiflazzPricing from "@/app/api/admin/digiflazz-pricing/route";
 import * as digiflazzMonitor from "@/app/api/admin/digiflazz-monitor/route";
@@ -41,13 +42,14 @@ const routes: Record<string, RouteHandlers> = {
   balances: { GET: balances.GET, PUT: balances.PUT },
   categories: { GET: categories.GET, POST: categories.POST, DELETE: categories.DELETE },
   content: { GET: content.GET, POST: content.POST, DELETE: content.DELETE },
+  "customer-cleanup": { GET: customerCleanup.GET, PUT: customerCleanup.PUT, POST: customerCleanup.POST },
   "dashboard-integrations": { GET: dashboardIntegrations.GET },
   "digiflazz-pricing": { GET: digiflazzPricing.GET, POST: digiflazzPricing.POST, PUT: digiflazzPricing.PUT },
   "digiflazz-monitor": { GET: digiflazzMonitor.GET, POST: digiflazzMonitor.POST },
   integrations: { GET: integrations.GET, PUT: integrations.PUT },
   faqs: { GET: faqs.GET, POST: faqs.POST, DELETE: faqs.DELETE },
   media: { POST: media.POST },
-  members: { GET: members.GET, PUT: members.PUT, PATCH: members.PATCH },
+  members: { GET: members.GET, PUT: members.PUT, PATCH: members.PATCH, DELETE: members.DELETE },
   "payment-methods": { GET: paymentMethods.GET, POST: paymentMethods.POST, DELETE: paymentMethods.DELETE },
   "payment-page": { GET: paymentPage.GET, PUT: paymentPage.PUT },
   "payment-routing": { GET: paymentRouting.GET, PUT: paymentRouting.PUT },
