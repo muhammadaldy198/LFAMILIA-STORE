@@ -4,12 +4,15 @@ import { requireAdminSession, type AdminRole } from "@/lib/server/admin";
 import {
   completeManualOrder,
   createOrderIdentity,
+  fulfillAutomaticOrder,
   getOrderById,
   listOrders,
   recordOrderEvent,
   type OrderRecord,
 } from "@/lib/server/orders";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
+import { reconcileDigiflazzOrder } from "@/lib/server/digiflazz-reconciliation";
+import { getPublicBaseUrl } from "@/lib/server/runtime-env";
 
 export const dynamic = "force-dynamic";
 
@@ -146,11 +149,17 @@ export async function POST(request: Request) {
   }
 }
 
-const actionSchema = z.object({
-  id: z.string().uuid(),
-  action: z.literal("complete_manual"),
-  serialNumber: z.string().trim().min(1).max(500).optional(),
-});
+const actionSchema = z.discriminatedUnion("action", [
+  z.object({
+    id: z.string().uuid(),
+    action: z.literal("complete_manual"),
+    serialNumber: z.string().trim().min(1).max(500).optional(),
+  }),
+  z.object({
+    id: z.string().uuid(),
+    action: z.literal("refresh_fulfillment"),
+  }),
+]);
 
 async function completeManualVoucher(id: string, serialNumber: string | undefined, adminEmail: string) {
   const order = await getOrderById(id);
@@ -198,11 +207,59 @@ export async function PATCH(request: Request) {
   if (access instanceof Response) return access;
   try {
     const input = actionSchema.parse(await request.json());
-    await completeManualVoucher(input.id, input.serialNumber, access.email);
-    await notifyOrderFulfillmentSuccessById(input.id).catch((error) =>
-      console.error("Notifikasi pesanan selesai manual gagal:", error),
-    );
-    return Response.json({ ok: true });
+
+    if (input.action === "complete_manual") {
+      await completeManualVoucher(input.id, input.serialNumber, access.email);
+      await notifyOrderFulfillmentSuccessById(input.id).catch((error) =>
+        console.error("Notifikasi pesanan selesai manual gagal:", error),
+      );
+      return Response.json({ ok: true });
+    }
+
+    const order = await getOrderById(input.id);
+    if (!order) return Response.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
+    if (order.payment_status !== "paid") {
+      return Response.json(
+        { error: "Fulfillment hanya boleh dicek ulang setelah pembayaran tervalidasi lunas." },
+        { status: 409 },
+      );
+    }
+    if (order.fulfillment_type !== "automatic") {
+      return Response.json(
+        { error: "Pesanan manual harus diselesaikan melalui aksi pesanan manual." },
+        { status: 409 },
+      );
+    }
+    if (["success", "failed", "cancelled"].includes(order.fulfillment_status)) {
+      return Response.json({ ok: true, refreshed: false, terminal: true });
+    }
+
+    await recordOrderEvent({
+      orderId: order.id,
+      source: "admin",
+      eventId: `admin-refresh-${order.id}-${crypto.randomUUID()}`,
+      status: "refresh_requested",
+      payload: {
+        adminEmail: access.email,
+        providerCode: order.provider_code?.trim().toLowerCase() || null,
+      },
+    });
+
+    const providerCode = order.provider_code?.trim().toLowerCase() || "";
+    let refreshed = false;
+    if (providerCode === "digiflazz") {
+      refreshed = await reconcileDigiflazzOrder(order.id, getPublicBaseUrl(), { force: true });
+    } else {
+      await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
+      refreshed = true;
+    }
+
+    const updated = await getOrderById(order.id);
+    return Response.json({
+      ok: true,
+      refreshed,
+      order: updated ? visibleOrder(updated, access.role) : null,
+    });
   } catch (error) {
     const message =
       error instanceof z.ZodError
