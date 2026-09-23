@@ -118,7 +118,7 @@ export async function DELETE(request: Request) {
     ].filter(Boolean);
     return Response.json(
       {
-        error: `Akun tidak boleh dihapus permanen karena ${reasons.join(", ") || "status akun berubah"}. Nonaktifkan akun bila akses pelanggan perlu ditutup.`,
+        error: `Akun tidak boleh dihapus permanen karena ${reasons.join(", ") || "status akun berubah"}. Riwayat transaksi harus tetap dipertahankan.`,
         eligibility,
       },
       { status: 409 },
