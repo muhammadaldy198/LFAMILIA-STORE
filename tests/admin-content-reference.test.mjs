@@ -51,6 +51,16 @@ test("content controls persist through the admin APIs", () => {
   assert.doesNotMatch(source, /frontend-only|backend nanti|simulasi/i);
 });
 
+test("banner and news uploads compress large images without changing canvas dimensions and surface real HTTP errors", () => {
+  assert.match(source, /prepareContentImage\(file\)/);
+  assert.match(source, /canvas\.width = bitmap\.width/);
+  assert.match(source, /canvas\.height = bitmap\.height/);
+  assert.match(source, /CONTENT_MEDIA_MAX_BYTES = 6 \* 1024 \* 1024/);
+  assert.match(source, /response\.text\(\)/);
+  assert.match(source, /Upload gagal \(HTTP \$\{response\.status\}\)\./);
+  assert.match(source, /maks\. 6MB · otomatis dikompres/);
+});
+
 test("each content type exposes its own saved customer-facing settings", () => {
   for (const label of [
     "URL gambar desktop",
