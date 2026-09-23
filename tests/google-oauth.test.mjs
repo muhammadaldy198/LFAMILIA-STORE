@@ -67,6 +67,21 @@ test("customer auth UI uses Google Identity Services and posts credential to bac
   assert.match(form, /google\.accounts\.id\.initialize/);
   assert.match(form, /google\.accounts\.id\.renderButton/);
   assert.match(form, /fetch\("\/api\/auth\/google"/);
-  assert.match(form, /credential: response\.credential/);
+  assert.match(form, /submitGoogleCredential\(response\.credential\)/);
   assert.match(status, /clientId/);
+});
+
+
+test("Google customer cannot be created or continue with an empty contact number", () => {
+  const auth = read("lib/server/customer-auth.ts");
+  const route = read("app/api/auth/google/route.ts");
+  const form = read("components/customer-auth-form.tsx");
+  assert.match(auth, /phone\?: string/);
+  assert.match(auth, /PHONE_REQUIRED/);
+  assert.match(auth, /normalizeWhatsappPhone\(input\.phone\)/);
+  assert.match(route, /code: "PHONE_REQUIRED"/);
+  assert.match(route, /phone: z\.string\(\)\.trim\(\)/);
+  assert.match(form, /Nomor kontak wajib/);
+  assert.match(form, /Simpan nomor & lanjutkan/);
+  assert.match(form, /payload\.code === "PHONE_REQUIRED"/);
 });

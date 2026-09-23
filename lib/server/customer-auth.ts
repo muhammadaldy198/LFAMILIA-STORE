@@ -128,31 +128,52 @@ export async function loginOrRegisterGoogleCustomer(input: {
   email: string;
   name: string;
   picture?: string;
+  phone?: string;
 }) {
   await ensureCustomerOauthTable();
   const db = getD1();
   const email = normalizeEmail(input.email);
-  const linked = await db.prepare(`SELECT u.id
+  const linked = await db.prepare(`SELECT u.id, u.phone
     FROM customer_oauth_accounts oauth
     JOIN customer_users u ON u.id = oauth.customer_id
     WHERE oauth.provider = ? AND oauth.provider_subject = ? AND u.is_active = 1
     LIMIT 1`)
     .bind("google", input.subject)
-    .first<{ id: string }>();
+    .first<{ id: string; phone: string }>();
   if (linked?.id) {
-    await db.prepare(`UPDATE customer_oauth_accounts
+    const storedPhone = linked.phone?.trim() || "";
+    const normalizedPhone = storedPhone
+      ? storedPhone
+      : input.phone?.trim()
+        ? normalizeWhatsappPhone(input.phone)
+        : "";
+    if (!normalizedPhone) throw new Error("PHONE_REQUIRED");
+
+    const accountUpdate = db.prepare(`UPDATE customer_oauth_accounts
       SET provider_email = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP
       WHERE provider = ? AND provider_subject = ?`)
-      .bind(email, input.picture?.trim() || null, "google", input.subject).run();
-    await db.prepare("UPDATE customer_users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .bind(linked.id).run();
+      .bind(email, input.picture?.trim() || null, "google", input.subject);
+    const customerUpdate = storedPhone
+      ? db.prepare("UPDATE customer_users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+          .bind(linked.id)
+      : db.prepare("UPDATE customer_users SET phone = ?, last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+          .bind(normalizedPhone, linked.id);
+    await db.batch([accountUpdate, customerUpdate]);
     return createCustomerSession(linked.id);
   }
 
-  const existing = await db.prepare("SELECT id, is_active FROM customer_users WHERE email = ? LIMIT 1")
+  const existing = await db.prepare("SELECT id, phone, is_active FROM customer_users WHERE email = ? LIMIT 1")
     .bind(email)
-    .first<{ id: string; is_active: number }>();
+    .first<{ id: string; phone: string; is_active: number }>();
   if (existing && !existing.is_active) throw new Error("Akun pelanggan sedang dinonaktifkan.");
+
+  const storedPhone = existing?.phone?.trim() || "";
+  const normalizedPhone = storedPhone
+    ? storedPhone
+    : input.phone?.trim()
+      ? normalizeWhatsappPhone(input.phone)
+      : "";
+  if (!normalizedPhone) throw new Error("PHONE_REQUIRED");
 
   const customerId = existing?.id ?? crypto.randomUUID();
   const oauthInsert = db.prepare(`INSERT INTO customer_oauth_accounts
@@ -166,13 +187,24 @@ export async function loginOrRegisterGoogleCustomer(input: {
     const customerInsert = db.prepare(`INSERT INTO customer_users
       (id, email, name, phone, password_hash, password_salt, last_login_at)
       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`)
-      .bind(customerId, email, input.name.trim() || "Pelanggan", "", disabledPasswordHash, saltHex);
+      .bind(customerId, email, input.name.trim() || "Pelanggan", normalizedPhone, disabledPasswordHash, saltHex);
     // D1 batch is transactional: a failed OAuth link cannot leave an orphan customer.
     await db.batch([customerInsert, oauthInsert]);
   } else {
-    await oauthInsert.run();
-    await db.prepare("UPDATE customer_users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .bind(customerId).run();
+    const statements = [];
+    if (!storedPhone) {
+      statements.push(
+        db.prepare("UPDATE customer_users SET phone = ?, last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+          .bind(normalizedPhone, customerId),
+      );
+    } else {
+      statements.push(
+        db.prepare("UPDATE customer_users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+          .bind(customerId),
+      );
+    }
+    statements.push(oauthInsert);
+    await db.batch(statements);
   }
   return createCustomerSession(customerId);
 }
