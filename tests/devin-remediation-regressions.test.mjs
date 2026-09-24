@@ -382,7 +382,7 @@ test("legacy DOKU credentials are deleted only after Checkout becomes ready", ()
 test("legacy DOKU credential migration requires an HTTPS Checkout endpoint", () => {
   const config = read("lib/server/payment-mode-config.ts");
   assert.match(config, /function checkoutReadyProfile\(/);
-  assert.match(config, /new URL\(values\.apiUrl\)\.protocol === "https:"/);
+  assert.match(config, /safeHttpsOrigin\(values\.apiUrl, "URL API DOKU Checkout"\)/);
   assert.match(config, /if \(!checkoutReadyProfile\(clean\)\) continue/);
 });
 
@@ -396,6 +396,6 @@ test("DOKU Checkout overview only reports ready with Client ID, Secret Key, and 
   const config = read("lib/server/payment-mode-config.ts");
   assert.match(config, /values\?\.clientId/);
   assert.match(config, /values\.secretKey/);
-  assert.match(config, /new URL\(values\.apiUrl\)\.protocol === "https:"/);
+  assert.match(config, /safeHttpsOrigin\(values\.apiUrl, "URL API DOKU Checkout"\)/);
   assert.doesNotMatch(config, /createPrivateKey/);
 });
