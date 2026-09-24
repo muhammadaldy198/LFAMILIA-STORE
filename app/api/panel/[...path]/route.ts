@@ -75,7 +75,9 @@ const routes: Record<string, RouteHandlers> = {
 async function dispatch(request: Request, context: RouteContext, method: Method) {
   const originBlock = rejectCrossOriginMutation(request);
   if (originBlock) return originBlock;
-  await ensureLegacyDatabaseColumns();
+  if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+    await ensureLegacyDatabaseColumns();
+  }
   const { path } = await context.params;
   const handlers = routes[path.join("/")];
   if (!handlers) return Response.json({ error: "Endpoint panel tidak ditemukan." }, { status: 404 });
