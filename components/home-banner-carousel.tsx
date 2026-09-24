@@ -14,7 +14,7 @@ export function HomeBannerCarousel() {
 
   useEffect(() => {
     let mounted = true;
-    void fetch("/api/home-content", { cache: "no-store" })
+    void fetch("/api/home-content")
       .then(async (response) => {
         const data = await response.json().catch(() => ({})) as { banners?: HomeBannerRecord[]; error?: string };
         if (!response.ok) throw new Error(data.error || "Banner gagal dimuat.");
