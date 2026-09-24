@@ -7,7 +7,7 @@ const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 function publicPaymentMap(source) {
-  const start = source.indexOf(".map(({ item }) => ({");
+  const start = source.indexOf(".map((item) => ({");
   const end = source.indexOf("}));", start);
   assert.ok(start >= 0 && end > start);
   return source.slice(start, end);
