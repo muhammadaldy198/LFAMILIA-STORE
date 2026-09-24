@@ -231,10 +231,12 @@ const worker = {
     // Most page/catalog reads do not need provider credentials. Keep the raw
     // runtime available immediately, then warm the encrypted integration
     // snapshot off the critical path. Provider/payment routes still await it.
-    setRuntimeEnv(env);
     if (requestNeedsHydratedRuntime(request, url)) {
       await hydrateRuntime(env);
     } else {
+      // Never overwrite an already-hydrated isolate with the raw environment:
+      // a concurrent payment/provider request may be reading that snapshot.
+      if (!runtimeHydrationCache) setRuntimeEnv(env);
       ctx.waitUntil(
         hydrateRuntime(env).catch((error) => {
           logServerError("Pemanasan konfigurasi runtime gagal:", error);
