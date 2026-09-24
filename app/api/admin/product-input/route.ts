@@ -54,7 +54,7 @@ export async function GET(request: Request) {
   if (access instanceof Response) return access;
   try {
     const slug = slugSchema.parse(new URL(request.url).searchParams.get("slug"));
-    await ensureKokinpayNicknameGameCodeBackfill();
+    await ensureKokinpayNicknameGameCodeBackfill({ repairSchema: false });
     const row = await getD1().prepare(`SELECT slug, category, input_label, input_placeholder, input_fields_json, needs_server, target_template, nickname_game_code
       FROM products WHERE slug = ? LIMIT 1`).bind(slug).first<InputRow>();
     if (!row) return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
