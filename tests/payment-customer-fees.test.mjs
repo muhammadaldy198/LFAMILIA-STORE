@@ -21,6 +21,18 @@ test("customer payment fee supports fixed fee and percentage gross-up", () => {
   assert.equal(grossUp(100_000, 150, 2_000), 3_554);
 });
 
+test("payment channel fees are database-configured and never hardcode QRIS 0.7 percent", () => {
+  const server = read("lib/server/payment-channels.ts");
+  const admin = read("components/admin-payment-workspace.tsx");
+
+  assert.match(server, /customerFeeBps: "0"/);
+  assert.doesNotMatch(server, /item\.method === "qris"\s*\?\s*"70"/);
+  assert.doesNotMatch(admin, /channel\.method === "qris"\s*\?\s*"70"/);
+  assert.doesNotMatch(admin, /editChannel\?\.method === "qris"\s*\?\s*70/);
+  assert.match(admin, /channel\.gatewayConfig\.customerFeeBps \|\| "0"/);
+  assert.match(admin, /editChannel\?\.gatewayConfig\.customerFeeBps \?\? 0/);
+});
+
 test("checkout and wallet topup both charge only the customer-facing final total", () => {
   const checkout = read("app/api/payments/auto/create/route.ts");
   const topup = read("app/api/account/topups/route.ts");

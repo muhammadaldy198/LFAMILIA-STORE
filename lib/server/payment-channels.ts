@@ -110,7 +110,7 @@ export async function listPaymentChannels(includeInactive = false): Promise<Mana
         gateway: item.gateway,
         gatewayConfig: {
           customerFeeEnabled: "true",
-          customerFeeBps: item.method === "qris" ? "70" : "0",
+          customerFeeBps: "0",
           customerFeeFixed: "0",
           ...parseGatewayConfig(item.gateway_config_json),
         },
