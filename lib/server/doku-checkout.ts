@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { hmacBase64 } from "@/lib/server/crypto";
 import { dokuCheckoutPaymentType, isDokuCheckoutPaymentTypeCompatible } from "@/lib/server/doku-checkout-payment-types.mjs";
 import { getRuntimeEnv, requireRuntimeChoice, requireRuntimeValue } from "@/lib/server/runtime-env";
+import { safeHttpsOrigin } from "@/lib/server/outbound-url";
 
 export type DokuEnvironment = "sandbox" | "production";
 
@@ -68,9 +69,7 @@ function runtime() {
 }
 
 function normalizeOrigin(value: string | undefined, fallback: string) {
-  const url = new URL(value?.trim() || fallback);
-  if (url.protocol !== "https:") throw new Error("DOKU Checkout wajib HTTPS.");
-  return url.origin;
+  return safeHttpsOrigin(value?.trim() || fallback, "URL API DOKU Checkout");
 }
 
 function environmentConfig(environment: DokuEnvironment): CheckoutConfig {
