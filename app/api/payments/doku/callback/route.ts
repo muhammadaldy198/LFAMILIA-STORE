@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server/safe-log";
 import { getD1 } from "@/db";
 import { hashHex } from "@/lib/server/crypto";
 import {
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
       });
       if (result.credited) {
         await notifyWalletTopupSuccessById(externalWallet.id, referenceId).catch((error) =>
-          console.error("Notifikasi top up DOKU gagal:", error),
+          logServerError("Notifikasi top up DOKU gagal:", error),
         );
       }
       return acknowledge();
