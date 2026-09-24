@@ -45,6 +45,8 @@ test("storefront and dashboard reads use bounded cache and provider latency", ()
   assert.match(storefrontRoute, /public, max-age=30, s-maxage=60, stale-while-revalidate=120/);
   assert.match(digiflazz, /getDigiflazzBalance\(options: \{ timeoutMs\?: number \} = \{\}\)/);
   assert.match(summary, /getDigiflazzBalance\(\{ timeoutMs: 1_500 \}\)/);
+  assert.match(summary, /const commonPromise = db\.batch\(/);
+  assert.match(summary, /const \[common, finance, attentionRows, synced, activities, balance\] = await Promise\.all/);
 });
 
 test("public storefront content reuses short browser caches instead of forcing reloads", () => {
