@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server/safe-log";
 import { z } from "zod";
 import { getD1 } from "@/db";
 import { requireAdminSession, type AdminRole } from "@/lib/server/admin";
@@ -211,7 +212,7 @@ export async function PATCH(request: Request) {
     if (input.action === "complete_manual") {
       await completeManualVoucher(input.id, input.serialNumber, access.email);
       await notifyOrderFulfillmentSuccessById(input.id).catch((error) =>
-        console.error("Notifikasi pesanan selesai manual gagal:", error),
+        logServerError("Notifikasi pesanan selesai manual gagal:", error),
       );
       return Response.json({ ok: true });
     }

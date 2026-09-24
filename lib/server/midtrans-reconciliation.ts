@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server/safe-log";
 import { getD1 } from "@/db";
 import {
   expireConfirmedMissingMidtransOrder,
@@ -85,7 +86,7 @@ export async function reconcilePendingMidtransOrders(limit = 100) {
           if (order.fulfillment_type === "automatic") {
             await fulfillAutomaticOrder(order.id, publicBaseUrl);
             await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
-              console.error("Notifikasi order hasil rekonsiliasi Midtrans gagal:", error),
+              logServerError("Notifikasi order hasil rekonsiliasi Midtrans gagal:", error),
             );
           }
         }
@@ -108,7 +109,7 @@ export async function reconcilePendingMidtransOrders(limit = 100) {
         }
         continue;
       }
-      console.error("Rekonsiliasi status order Midtrans gagal:", error);
+      logServerError("Rekonsiliasi status order Midtrans gagal:", error);
     }
   }
 
@@ -159,7 +160,7 @@ export async function reconcilePendingMidtransTopups(limit = 100) {
         });
         if (applied.credited) {
           await notifyWalletTopupSuccessById(topup.id, topup.reference_id).catch((error) =>
-            console.error("Notifikasi top up hasil rekonsiliasi Midtrans gagal:", error),
+            logServerError("Notifikasi top up hasil rekonsiliasi Midtrans gagal:", error),
           );
         }
       } else if (result.status === "expired" || result.status === "failed") {
@@ -176,7 +177,7 @@ export async function reconcilePendingMidtransTopups(limit = 100) {
         await expireConfirmedMissingMidtransTopup(topup.reference_id);
         continue;
       }
-      console.error("Rekonsiliasi status top up Midtrans gagal:", error);
+      logServerError("Rekonsiliasi status top up Midtrans gagal:", error);
     }
   }
 

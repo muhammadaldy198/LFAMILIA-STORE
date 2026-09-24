@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server/safe-log";
 import { hashHex, hmacHex, safeEqual } from "@/lib/server/crypto";
 import { applyProviderWebhook } from "@/lib/server/orders";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
   });
   if (status === "success") {
     await notifyOrderFulfillmentSuccessByProviderRef("digiflazz", data.ref_id).catch(
-      (error) => console.error("Notifikasi pesanan selesai DigiFlazz gagal:", error),
+      (error) => logServerError("Notifikasi pesanan selesai DigiFlazz gagal:", error),
     );
   }
   return Response.json({ ok: true });

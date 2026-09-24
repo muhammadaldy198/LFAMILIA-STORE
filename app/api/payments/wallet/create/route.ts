@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server/safe-log";
 import { z } from "zod";
 import { isAutomaticPackageAvailable } from "@/lib/server/availability";
 import { requireCustomerSession } from "@/lib/server/customer-auth";
@@ -89,10 +90,10 @@ async function existingWalletResponse(customerId: string, checkoutKey: string) {
     if (!settled) throw new Error("Pesanan wallet tidak ditemukan setelah dipulihkan.");
     if (settled.fulfillment_type === "automatic") {
       await fulfillAutomaticOrder(settled.id, getPublicBaseUrl()).catch((error) =>
-        console.error("Pemulihan fulfillment wallet gagal:", error),
+        logServerError("Pemulihan fulfillment wallet gagal:", error),
       );
       await notifyOrderFulfillmentSuccessById(settled.id).catch((error) =>
-        console.error("Notifikasi pemulihan wallet gagal:", error),
+        logServerError("Notifikasi pemulihan wallet gagal:", error),
       );
     }
     const balanceAfter = await getWalletOrderBalance(settled.id);
@@ -102,10 +103,10 @@ async function existingWalletResponse(customerId: string, checkoutKey: string) {
   if (existing.payment_status === "paid") {
     if (existing.fulfillment_type === "automatic") {
       await fulfillAutomaticOrder(existing.id, getPublicBaseUrl()).catch((error) =>
-        console.error("Pemulihan fulfillment wallet gagal:", error),
+        logServerError("Pemulihan fulfillment wallet gagal:", error),
       );
       await notifyOrderFulfillmentSuccessById(existing.id).catch((error) =>
-        console.error("Notifikasi pemulihan wallet gagal:", error),
+        logServerError("Notifikasi pemulihan wallet gagal:", error),
       );
     }
     const balanceAfter = await getWalletOrderBalance(existing.id);
@@ -165,10 +166,10 @@ export async function POST(request: Request) {
     if (!order) throw new Error("Pesanan tidak ditemukan setelah dibuat.");
     if (item.fulfillmentType === "automatic") {
       await fulfillAutomaticOrder(identity.id, getPublicBaseUrl()).catch((error) =>
-        console.error("Pemenuhan otomatis setelah pembayaran saldo gagal:", error),
+        logServerError("Pemenuhan otomatis setelah pembayaran saldo gagal:", error),
       );
       await notifyOrderFulfillmentSuccessById(identity.id).catch((error) =>
-        console.error("Notifikasi pesanan selesai saldo gagal:", error),
+        logServerError("Notifikasi pesanan selesai saldo gagal:", error),
       );
     }
     return Response.json(walletSuccessResponse(order, balanceAfter), { status: 201 });
@@ -185,7 +186,7 @@ export async function POST(request: Request) {
       error instanceof PromotionQuoteError;
     const rejected = clientInputRejected || error instanceof WalletSettlementError;
     if (referenceId && rejected) await markPaymentCreationFailed(referenceId, message).catch(() => undefined);
-    if (!rejected) console.error("Checkout wallet belum dapat dipastikan:", error);
+    if (!rejected) logServerError("Checkout wallet belum dapat dipastikan:", error);
     return Response.json(
       { error: rejected || error instanceof NicknameServiceError ? message : "Pembayaran saldo belum dapat dipastikan. Coba lagi dengan data yang sama.", retryable: !rejected },
       { status: clientInputRejected ? 400 : error instanceof WalletSettlementError ? 409 : 503 },

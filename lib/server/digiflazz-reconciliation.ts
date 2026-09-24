@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server/safe-log";
 import { getD1 } from "@/db";
 import { hashHex } from "@/lib/server/crypto";
 import { digiflazzAdapter } from "@/lib/server/providers/digiflazz";
@@ -181,7 +182,7 @@ export async function reconcileDigiflazzOrder(
     const persisted = Number(batch[0]?.meta.changes ?? 0) > 0;
     if (persisted && result.status === "success") {
       await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
-        console.error("Notifikasi order hasil rekonsiliasi DigiFlazz gagal:", error),
+        logServerError("Notifikasi order hasil rekonsiliasi DigiFlazz gagal", error),
       );
     }
     return persisted;
@@ -196,12 +197,10 @@ export async function reconcileDigiflazzOrder(
         order.fulfillment_status,
       ).catch(() => undefined);
     }
-    console.error(JSON.stringify({
-      event: "digiflazz_reconciliation_failure",
+    logServerError("digiflazz_reconciliation_failure", error, {
       orderId: order.id,
       referenceId: order.reference_id,
-      message,
-    }));
+    });
     throw error;
   }
 }

@@ -1,4 +1,5 @@
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { assertSafeHttpsUrl } from "@/lib/server/outbound-url";
 
 type ProviderRelayEnv = {
   PROVIDER_RELAY_TOKEN?: string;
@@ -29,8 +30,7 @@ function configuredOrigin(runtime: ProviderRelayEnv, provider: RelayProvider) {
 
 function routeUrl(originalUrl: string, relayOrigin: string) {
   const source = new URL(originalUrl);
-  const relay = new URL(relayOrigin);
-  if (relay.protocol !== "https:") throw new Error("URL VPS Relay wajib menggunakan HTTPS.");
+  const relay = assertSafeHttpsUrl(relayOrigin, "URL VPS Relay");
   relay.pathname = source.pathname;
   relay.search = source.search;
   relay.hash = "";
@@ -92,8 +92,7 @@ export async function testRelayConnection(
 
   let parsed: URL;
   try {
-    parsed = new URL(origin);
-    if (parsed.protocol !== "https:") throw new Error("HTTPS required");
+    parsed = assertSafeHttpsUrl(origin, "URL VPS Relay");
   } catch {
     return { provider, label, connected: false, status: null, message: "URL relay tidak valid atau bukan HTTPS." };
   }

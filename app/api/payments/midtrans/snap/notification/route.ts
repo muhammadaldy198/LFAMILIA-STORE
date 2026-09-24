@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server/safe-log";
 import { hashHex } from "@/lib/server/crypto";
 import { recordExternalPaymentEvent } from "@/lib/server/external-payments";
 import { mapMidtransSnapStatus, verifyMidtransSnapNotification } from "@/lib/server/midtrans-snap";
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
           });
       if (result.credited) {
         await notifyWalletTopupSuccessById(walletTopup.id, referenceId).catch((error) =>
-          console.error("Notifikasi top up Midtrans gagal:", error),
+          logServerError("Notifikasi top up Midtrans gagal:", error),
         );
       }
       return Response.json({ ok: true });
@@ -132,14 +133,14 @@ export async function POST(request: Request) {
       if (transition.firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
-          console.error("Notifikasi pesanan Midtrans Snap gagal:", error),
+          logServerError("Notifikasi pesanan Midtrans Snap gagal:", error),
         );
       }
     }
 
     return Response.json({ ok: true });
   } catch (error) {
-    console.error("Callback Midtrans Snap gagal:", error);
+    logServerError("Callback Midtrans Snap gagal:", error);
     return Response.json(
       { error: error instanceof Error ? error.message : "Callback Midtrans Snap gagal diproses." },
       { status: 500 },

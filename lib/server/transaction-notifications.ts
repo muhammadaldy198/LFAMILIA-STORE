@@ -1,3 +1,5 @@
+import { logServerError } from "@/lib/server/safe-log";
+import { assertSafeHttpsUrl } from "@/lib/server/outbound-url";
 import { getD1 } from "@/db";
 import { getWebsiteVoucherCodeByReference } from "@/lib/server/customer-voucher-codes";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
@@ -46,7 +48,7 @@ function emailReady(input: NotificationInput, config: NotificationRuntimeEnv) {
 async function sendEmail(input: NotificationInput, config: NotificationRuntimeEnv) {
   const apiKey = config.RESEND_API_KEY!.trim();
   const from = config.RESEND_FROM_EMAIL!.trim();
-  const apiUrl = config.RESEND_API_URL!.trim();
+  const apiUrl = assertSafeHttpsUrl(config.RESEND_API_URL!.trim(), "URL API email").toString();
   const typeLabel = input.kind === "wallet_topup" ? "Top up saldo berhasil" : "Pesanan selesai";
   const response = await fetch(apiUrl, {
     method: "POST",
@@ -75,7 +77,7 @@ async function notify(input: NotificationInput) {
   const results = await Promise.allSettled(tasks);
   for (const result of results) {
     if (result.status === "rejected") {
-      console.error("Notifikasi transaksi LFAMILIA gagal:", result.reason);
+      logServerError("Notifikasi transaksi LFAMILIA gagal", result.reason);
     }
   }
 }
@@ -143,7 +145,7 @@ export async function notifyOrderFulfillmentSuccessById(orderId: string) {
       await sendEmail(input, config);
     } catch (error) {
       await releaseOrderChannel(order.reference_id, "email");
-      console.error("Email pesanan selesai gagal:", error);
+      logServerError("Email pesanan selesai gagal", error);
     }
   }
 

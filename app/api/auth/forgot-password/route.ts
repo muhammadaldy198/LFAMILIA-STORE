@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server/safe-log";
 import { z } from "zod";
 import { requestPasswordReset } from "@/lib/server/password-reset";
 import { allowRequest, rejectCrossOriginMutation } from "@/lib/server/security";
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
     return Response.json({ message: genericMessage }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof z.ZodError) return Response.json({ error: "Email tidak valid." }, { status: 400, headers: { "Cache-Control": "no-store" } });
-    console.error("Password reset request failed:", error);
+    logServerError("Password reset request failed:", error);
     // Do not disclose whether an account exists or whether delivery failed.
     return Response.json({ message: genericMessage }, { headers: { "Cache-Control": "no-store" } });
   }

@@ -1,5 +1,6 @@
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { assertSafeHttpsUrl, safeHttpsOrigin } from "@/lib/server/outbound-url";
 
 export type IntegrationProvider = "digiflazz" | "kokinpay" | "google" | "resend" | "relay" | "security";
 export type IntegrationMode = "direct" | "service";
@@ -205,6 +206,23 @@ function publicBaseUrl(value: RuntimeLike) {
     return new URL(String(value.PUBLIC_BASE_URL || "")).origin;
   } catch {
     return "";
+  }
+}
+
+function validateProfileUrls(
+  provider: IntegrationProvider,
+  mode: IntegrationMode,
+  values: Record<string, string>,
+) {
+  if (provider === "digiflazz" && mode === "direct") {
+    if (values.transactionApiUrl) assertSafeHttpsUrl(values.transactionApiUrl, "URL transaksi DigiFlazz");
+    if (values.priceListUrl) assertSafeHttpsUrl(values.priceListUrl, "URL daftar harga DigiFlazz");
+  }
+  if (provider === "resend" && mode === "service" && values.apiUrl) {
+    assertSafeHttpsUrl(values.apiUrl, "URL API email");
+  }
+  if (provider === "relay" && mode === "service" && values.digiflazzOrigin) {
+    values.digiflazzOrigin = safeHttpsOrigin(values.digiflazzOrigin, "URL VPS Relay");
   }
 }
 
@@ -458,6 +476,7 @@ export async function saveIntegrationProfile(input: {
     if (!allowed.includes(key)) throw new Error(`Field ${key} tidak diizinkan untuk konfigurasi ini.`);
     delete merged[key];
   }
+  validateProfileUrls(input.provider, input.mode, merged);
   const encrypted = await encryptConfig(secret, merged);
   const ownership = guardToken ? `WHERE ${guardedOwnershipClause()}` : "";
   const statement = database.prepare(`INSERT INTO integration_profiles (provider, mode, environment, encrypted_config, updated_at)

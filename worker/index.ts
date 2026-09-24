@@ -1,3 +1,4 @@
+import { logServerError } from "../lib/server/safe-log";
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
@@ -175,7 +176,7 @@ const worker = {
     await hydrateRuntime(env);
     if (env.DB) {
       await ensureLegacyDatabaseColumns().catch((error) => {
-        console.error("Perbaikan kompatibilitas D1 gagal; request tetap diteruskan:", error);
+        logServerError("Perbaikan kompatibilitas D1 gagal; request tetap diteruskan:", error);
       });
     }
 
@@ -221,31 +222,31 @@ const worker = {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     await hydrateRuntime(env);
     await ensureLegacyDatabaseColumns().catch((error) => {
-      console.error("Perbaikan kompatibilitas D1 pada scheduler gagal:", error);
+      logServerError("Perbaikan kompatibilitas D1 pada scheduler gagal:", error);
     });
     const paymentRecovery = Promise.all([
       finalizeExpiredDokuPayments().catch((error) => {
-        console.error("Rekonsiliasi DOKU scheduler gagal:", error);
+        logServerError("Rekonsiliasi DOKU scheduler gagal:", error);
       }),
       reconcilePendingMidtransOrders().catch((error) => {
-        console.error("Rekonsiliasi order Midtrans scheduler gagal:", error);
+        logServerError("Rekonsiliasi order Midtrans scheduler gagal:", error);
       }),
       reconcilePendingMidtransTopups().catch((error) => {
-        console.error("Rekonsiliasi top up Midtrans scheduler gagal:", error);
+        logServerError("Rekonsiliasi top up Midtrans scheduler gagal:", error);
       }),
     ]).then(async () => {
       // Only expire ambiguous/uninitialized attempts after every available
       // provider reconciliation path has had a chance to settle them.
       await Promise.all([
         expireUninitializedExternalWalletTopups().catch((error) => {
-          console.error("Expiry top up eksternal belum terinisialisasi gagal:", error);
+          logServerError("Expiry top up eksternal belum terinisialisasi gagal:", error);
         }),
         expireUninitializedExternalOrders().catch((error) => {
-          console.error("Expiry order eksternal belum terinisialisasi gagal:", error);
+          logServerError("Expiry order eksternal belum terinisialisasi gagal:", error);
         }),
       ]);
       await releaseExpiredExternalPromotions().catch((error) => {
-        console.error("Pelepasan reservasi promo kedaluwarsa gagal:", error);
+        logServerError("Pelepasan reservasi promo kedaluwarsa gagal:", error);
       });
     });
 
@@ -255,11 +256,11 @@ const worker = {
       Promise.resolve()
         .then(() => getPublicBaseUrl())
         .then((publicBaseUrl) => recoverStaleAutomaticOrders(publicBaseUrl))
-        .catch((error) => console.error("Recovery order otomatis gagal:", error)),
+        .catch((error) => logServerError("Recovery order otomatis gagal:", error)),
       Promise.resolve()
         .then(() => getPublicBaseUrl())
         .then((publicBaseUrl) => reconcileStaleDigiflazzProcessing(publicBaseUrl))
-        .catch((error) => console.error("Rekonsiliasi DigiFlazz scheduler gagal:", error)),
+        .catch((error) => logServerError("Rekonsiliasi DigiFlazz scheduler gagal:", error)),
     ];
     if (event.cron === "5 * * * *") {
       tasks.push(syncDigiflazzPrices().catch(() => undefined));
@@ -268,7 +269,7 @@ const worker = {
       tasks.push(cleanupOrphanStoreMedia().catch(() => undefined));
       tasks.push(
         cleanupDormantCustomerAccounts().catch((error) => {
-          console.error("Pembersihan akun pelanggan kosong gagal:", error);
+          logServerError("Pembersihan akun pelanggan kosong gagal:", error);
         }),
       );
     }

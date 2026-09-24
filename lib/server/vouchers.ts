@@ -1,3 +1,4 @@
+import { assertSafeHttpsUrl } from "@/lib/server/outbound-url";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { getD1 } from "@/db";
 import { hmacHex } from "@/lib/server/crypto";
@@ -291,7 +292,7 @@ async function sendEmail(order: ProviderOrder, code: string): Promise<DeliveryOu
   const config = runtime();
   const apiKey = requireRuntimeValue(config.RESEND_API_KEY, "RESEND_API_KEY");
   const from = requireRuntimeValue(config.RESEND_FROM_EMAIL, "RESEND_FROM_EMAIL");
-  const apiUrl = requireRuntimeValue(config.RESEND_API_URL, "RESEND_API_URL");
+  const apiUrl = assertSafeHttpsUrl(requireRuntimeValue(config.RESEND_API_URL, "RESEND_API_URL"), "URL API email").toString();
 
   const response = await fetch(apiUrl, {
     method: "POST",

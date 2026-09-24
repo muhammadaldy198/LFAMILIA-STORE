@@ -113,6 +113,21 @@ jobs:
             throw lastError;
           }
 
+          async function securityRequest(path, init = {}) {
+            const url = new URL(path, base);
+            url.searchParams.set("security-smoke", sha.slice(0, 12));
+            return fetch(url, {
+              ...init,
+              redirect: "manual",
+              headers: {
+                "cache-control": "no-cache",
+                "user-agent": "lfamilia-production-security-smoke",
+                ...(init.headers || {}),
+              },
+              signal: AbortSignal.timeout(20_000),
+            });
+          }
+
           const html = await read("/", false);
           if (!/LFAMILIA STORE/i.test(html)) throw new Error("Homepage production tidak memuat metadata LFAMILIA STORE.");
 
@@ -143,5 +158,50 @@ jobs:
             }
           }
           assertPublic(products);
-          console.log("Production smoke SUCCESS: homepage, products, storefront, dan public provider-metadata boundary sehat.");
+          const securityHome = await securityRequest("/");
+          if (!securityHome.ok) throw new Error(`Security header probe HTTP ${securityHome.status}`);
+          const requiredHeaders = [
+            ["x-content-type-options", "nosniff"],
+            ["x-frame-options", "DENY"],
+            ["strict-transport-security", "max-age="],
+            ["content-security-policy", "frame-ancestors 'none'"],
+            ["referrer-policy", "strict-origin-when-cross-origin"],
+          ];
+          for (const [name, expected] of requiredHeaders) {
+            const value = securityHome.headers.get(name) || "";
+            if (!value.toLowerCase().includes(expected.toLowerCase())) {
+              throw new Error(`Security header ${name} tidak valid: ${value || "missing"}`);
+            }
+          }
+
+          const crossSite = await securityRequest("/api/auth/login", {
+            method: "POST",
+            headers: {
+              origin: "https://security-smoke.invalid",
+              "sec-fetch-site": "cross-site",
+              "content-type": "application/json",
+            },
+            body: "{}",
+          });
+          if (crossSite.status !== 403) {
+            throw new Error(`Cross-site mutation tidak ditolak, HTTP ${crossSite.status}`);
+          }
+
+          const corsProbe = await securityRequest("/api/products", {
+            method: "OPTIONS",
+            headers: {
+              origin: "https://security-smoke.invalid",
+              "access-control-request-method": "GET",
+            },
+          });
+          if (corsProbe.headers.get("access-control-allow-origin") === "*") {
+            throw new Error("CORS wildcard terdeteksi di production.");
+          }
+
+          const adminProbe = await securityRequest("/api/admin/dashboard-integrations");
+          if (![301, 302, 303, 307, 308, 401, 403].includes(adminProbe.status)) {
+            throw new Error(`Admin API tidak tertutup untuk request anonim, HTTP ${adminProbe.status}`);
+          }
+
+          console.log("Production smoke SUCCESS: storefront, provider boundary, security headers, CSRF/CORS, dan admin boundary sehat.");
           NODE

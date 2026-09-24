@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server/safe-log";
 import { getD1 } from "@/db";
 
 let repairPromise: Promise<void> | null = null;
@@ -446,7 +447,7 @@ export async function ensureLegacyDatabaseColumns() {
       } catch (error) {
         const message = messageOf(error);
         if (!/no such table.*d1_migrations/i.test(message)) {
-          console.error("D1 migration ledger marker gagal:", error);
+          logServerError("D1 migration ledger marker gagal:", error);
         }
       }
     })().catch((error) => {

@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server/safe-log";
 import { getD1 } from "@/db";
 import { queryDokuCheckoutStatus } from "@/lib/server/doku-checkout";
 import { applyPendingExternalPaymentStatus } from "@/lib/server/payment-transition";
@@ -109,14 +110,14 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
         if (firstPaid && order.fulfillment_type === "automatic") {
           await fulfillAutomaticOrder(order.id, publicBaseUrl);
           await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
-            console.error("Notifikasi order hasil rekonsiliasi DOKU gagal:", error),
+            logServerError("Notifikasi order hasil rekonsiliasi DOKU gagal:", error),
           );
         }
       } else if (query.status === "expired") {
         await applyPendingExternalPaymentStatus(order, "expired", { authoritativeExpired: true });
       }
     } catch (error) {
-      console.error("Rekonsiliasi status order DOKU Checkout gagal:", error);
+      logServerError("Rekonsiliasi status order DOKU Checkout gagal:", error);
     }
   }
 
@@ -163,11 +164,11 @@ export async function finalizeExpiredDokuPayments(limit = 100) {
       });
       if (result.credited) {
         await notifyWalletTopupSuccessById(topup.id, topup.reference_id).catch((error) =>
-          console.error("Notifikasi top up hasil rekonsiliasi DOKU gagal:", error),
+          logServerError("Notifikasi top up hasil rekonsiliasi DOKU gagal:", error),
         );
       }
     } catch (error) {
-      console.error("Rekonsiliasi status top up DOKU Checkout gagal:", error);
+      logServerError("Rekonsiliasi status top up DOKU Checkout gagal:", error);
     }
   }
 
