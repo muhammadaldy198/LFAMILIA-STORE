@@ -57,6 +57,6 @@ export async function GET() {
   ]);
   return Response.json(
     { settings: neutralizeStorefrontSettings(settings), categories, faqs },
-    { headers: { "Cache-Control": "public, max-age=60" } },
+    { headers: { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=120" } },
   );
 }
