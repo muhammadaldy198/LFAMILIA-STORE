@@ -146,7 +146,7 @@ export async function POST(request: Request) {
     if (transition.firstPaid && order.fulfillment_type === "automatic") {
       await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
       await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
-        console.error("Notifikasi pesanan selesai DOKU gagal:", error),
+        logServerError("Notifikasi pesanan selesai DOKU gagal:", error),
       );
     }
 
