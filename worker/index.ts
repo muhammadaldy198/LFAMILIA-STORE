@@ -1,3 +1,4 @@
+import { logServerError } from "../lib/server/safe-log";
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
@@ -255,7 +256,7 @@ const worker = {
       Promise.resolve()
         .then(() => getPublicBaseUrl())
         .then((publicBaseUrl) => recoverStaleAutomaticOrders(publicBaseUrl))
-        .catch((error) => console.error("Recovery order otomatis gagal:", error)),
+        .catch((error) => logServerError("Recovery order otomatis gagal:", error)),
       Promise.resolve()
         .then(() => getPublicBaseUrl())
         .then((publicBaseUrl) => reconcileStaleDigiflazzProcessing(publicBaseUrl))
