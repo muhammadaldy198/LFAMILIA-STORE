@@ -10,16 +10,16 @@ const channelsSource = fs.readFileSync(path.join(root, "lib/server/payment-chann
 
 test("checkout methods use mode-aware gateway readiness without exposing gateway identity", () => {
   assert.match(methodsRoute, /listPaymentGatewaySettings/);
-  assert.match(methodsRoute, /getConfiguredGatewayReadiness/);
-  assert.match(methodsRoute, /paymentMethod: item\.method/);
-  assert.match(methodsRoute, /paymentChannel: item\.channel/);
-  assert.match(methodsRoute, /gatewayConfig: item\.gatewayConfig/);
+  assert.match(methodsRoute, /getConfiguredGatewayBaseReadiness/);
+  assert.match(methodsRoute, /isGatewayChannelSupported\(item\.gateway, item\.method, item\.channel, item\.gatewayConfig\)/);
+  assert.match(methodsRoute, /readinessByGateway/);
+  assert.doesNotMatch(methodsRoute, /activeGatewayNames\.map\(async[\s\S]*paymentMethod: item\.method/);
   assert.doesNotMatch(methodsRoute, /getDokuReadiness/);
   assert.doesNotMatch(methodsRoute, /getMidtransReadiness/);
   assert.doesNotMatch(methodsRoute, /isProviderRelayConfigured/);
   assert.doesNotMatch(methodsRoute, /partnerServiceId\?\.length === 8/);
 
-  const publicMapStart = methodsRoute.indexOf(".map(({ item }) => ({");
+  const publicMapStart = methodsRoute.indexOf(".map((item) => ({");
   const publicMapEnd = methodsRoute.indexOf("}));", publicMapStart);
   const publicMapSource = methodsRoute.slice(publicMapStart, publicMapEnd);
   assert.ok(publicMapStart >= 0 && publicMapEnd > publicMapStart);
