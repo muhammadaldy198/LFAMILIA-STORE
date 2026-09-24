@@ -25,7 +25,9 @@ test("checkout methods use mode-aware gateway readiness without exposing gateway
   const publicMapSource = methodsRoute.slice(publicMapStart, publicMapEnd);
   assert.ok(activeChannelsStart >= 0 && publicMapStart >= 0 && publicMapEnd > publicMapStart);
   assert.doesNotMatch(publicMapSource, /gateway:/);
-  assert.doesNotMatch(publicMapSource, /gatewayConfig/);
+  assert.doesNotMatch(publicMapSource, /gatewayConfig\s*:/);
+  assert.doesNotMatch(publicMapSource, /\.\.\.item\.gatewayConfig/);
+  assert.match(publicMapSource, /publicCustomerPaymentFee\(item\.gatewayConfig\)/);
   assert.match(source, /displayChannels/);
 });
 
