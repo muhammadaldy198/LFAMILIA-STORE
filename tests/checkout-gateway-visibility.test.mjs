@@ -37,5 +37,7 @@ test("public method response strips gateway identity and private gateway config"
   assert.match(responseMap, /name: item\.name/);
   assert.match(responseMap, /description: item\.description/);
   assert.doesNotMatch(responseMap, /gateway:/);
-  assert.doesNotMatch(responseMap, /gatewayConfig/);
+  assert.doesNotMatch(responseMap, /gatewayConfig\s*:/);
+  assert.doesNotMatch(responseMap, /\.\.\.item\.gatewayConfig/);
+  assert.match(responseMap, /publicCustomerPaymentFee\(item\.gatewayConfig\)/);
 });
