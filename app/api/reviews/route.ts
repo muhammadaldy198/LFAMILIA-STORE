@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   if (params.get("featured") === "1") {
-    return Response.json({ reviews: await listFeaturedReviews(6) }, { headers: { "Cache-Control": "public, max-age=60" } });
+    return Response.json({ reviews: await listFeaturedReviews(6) }, { headers: { "Cache-Control": "public, max-age=60, s-maxage=120, stale-while-revalidate=180" } });
   }
   const productSlug = params.get("product")?.trim() ?? "";
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(productSlug)) return Response.json({ error: "Produk tidak valid." }, { status: 400 });
