@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server/safe-log";
 import { z } from "zod";
 import { getD1 } from "@/db";
 import { publicPaymentLabel } from "@/lib/public-payment";
@@ -179,7 +180,7 @@ async function refreshDokuStatus(order: OrderRecord) {
       if (firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
         await notifyOrderFulfillmentSuccessById(order.id).catch((error) =>
-          console.error("Notifikasi pesanan DOKU hasil rekonsiliasi gagal:", error),
+          logServerError("Notifikasi pesanan DOKU hasil rekonsiliasi gagal:", error),
         );
       }
     } else if (query.status === "expired") {
@@ -214,7 +215,7 @@ async function refreshMidtransSnapStatus(order: OrderRecord) {
       });
       if (firstPaid && order.fulfillment_type === "automatic") {
         await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
-        await notifyOrderFulfillmentSuccessById(order.id).catch((error) => console.error("Notifikasi pesanan Midtrans hasil rekonsiliasi gagal:", error));
+        await notifyOrderFulfillmentSuccessById(order.id).catch((error) => logServerError("Notifikasi pesanan Midtrans hasil rekonsiliasi gagal:", error));
       }
     } else if (query.status === "failed" || query.status === "expired") {
       await applyPendingExternalPaymentStatus(order, query.status, {
@@ -231,7 +232,7 @@ async function recoverPaidAutomaticFulfillment(order: OrderRecord) {
   if (order.payment_status !== "paid" || order.fulfillment_type !== "automatic") return order;
   if (order.fulfillment_status === "success" || order.fulfillment_status === "failed" || order.fulfillment_status === "cancelled") return order;
   await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
-  await notifyOrderFulfillmentSuccessById(order.id).catch((error) => console.error("Notifikasi pesanan hasil recovery fulfillment gagal:", error));
+  await notifyOrderFulfillmentSuccessById(order.id).catch((error) => logServerError("Notifikasi pesanan hasil recovery fulfillment gagal:", error));
   return (await getOrderById(order.id)) ?? order;
 }
 
