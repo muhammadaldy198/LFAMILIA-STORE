@@ -189,7 +189,7 @@ export async function GET(request: Request) {
     let digiflazzBalance: number | null = null;
     if (canViewFinance && digiflazz.ready) {
       try {
-        digiflazzBalance = (await getDigiflazzBalance()).balance;
+        digiflazzBalance = (await getDigiflazzBalance({ timeoutMs: 1_500 })).balance;
       } catch {
         digiflazzBalance = null;
       }
