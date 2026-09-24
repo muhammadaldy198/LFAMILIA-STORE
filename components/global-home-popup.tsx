@@ -15,7 +15,7 @@ export function GlobalHomePopup() {
 
   useEffect(() => {
     let mounted = true;
-    void fetch("/api/home-content", { cache: "no-store" }).then(async (response) => {
+    void fetch("/api/home-content").then(async (response) => {
       const data = await response.json().catch(() => ({})) as { popups?: SitePopupRecord[]; error?: string };
       if (!response.ok) throw new Error(data.error || "Pop-up gagal dimuat.");
       return data;
