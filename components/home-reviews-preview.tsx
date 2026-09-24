@@ -16,7 +16,7 @@ export function HomeReviewsPreview() {
 
   useEffect(() => {
     let active = true;
-    void fetch("/api/reviews?featured=1", { cache: "no-store" })
+    void fetch("/api/reviews?featured=1")
       .then(async (response) => {
         const data = await response.json().catch(() => ({})) as { reviews?: ProductReview[]; error?: string };
         if (!response.ok) throw new Error(data.error || "Ulasan gagal dimuat.");
