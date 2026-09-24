@@ -9,7 +9,7 @@ const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/
 const publicMethods = fs.readFileSync(path.join(root, "app/api/payment-methods/route.ts"), "utf8");
 
 function publicPaymentMap(source) {
-  const start = source.indexOf(".map(({ item }) => ({");
+  const start = source.indexOf(".map((item) => ({");
   const end = source.indexOf("}));", start);
   assert.ok(start >= 0 && end > start);
   return source.slice(start, end);
