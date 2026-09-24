@@ -1,5 +1,6 @@
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
+import { safeHttpsOrigin } from "@/lib/server/outbound-url";
 
 export type PaymentEnvironment = "sandbox" | "production";
 export type PaymentProvider = "doku" | "midtrans";
@@ -198,6 +199,9 @@ async function saveProfile(input: {
     if (!allowedFields[input.mode].includes(key)) throw new Error(`Field ${key} tidak diizinkan.`);
     if (value.trim()) merged[key] = value.trim();
   }
+  if (input.provider === "doku" && input.mode === "checkout" && merged.apiUrl) {
+    merged.apiUrl = safeHttpsOrigin(merged.apiUrl, "URL API DOKU Checkout");
+  }
   const encrypted = await encrypt(merged);
   await db.prepare(`INSERT INTO integration_profiles (provider, mode, environment, encrypted_config, updated_at)
     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -267,7 +271,8 @@ export async function getMidtransSnapConfig() {
 function checkoutReadyProfile(values: Record<string, string> | null) {
   if (!values?.clientId || !values.secretKey || !values.apiUrl) return false;
   try {
-    return new URL(values.apiUrl).protocol === "https:";
+    safeHttpsOrigin(values.apiUrl, "URL API DOKU Checkout");
+    return true;
   } catch {
     return false;
   }
@@ -333,11 +338,11 @@ export async function hydrateDokuCheckoutRuntimeEnv<T extends object>(sourceEnv:
       profileEnvironment: PaymentEnvironment,
       checkout: Record<string, string> | null,
     ) => {
-      if (!checkout) return;
+      if (!checkout || !checkoutReadyProfile(checkout)) return;
       const checkoutPrefix = `DOKU_CHECKOUT_${profileEnvironment.toUpperCase()}_`;
       put(`${checkoutPrefix}CLIENT_ID`, checkout.clientId);
       put(`${checkoutPrefix}SECRET_KEY`, checkout.secretKey);
-      put(`${checkoutPrefix}API_URL`, checkout.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"));
+      put(`${checkoutPrefix}API_URL`, safeHttpsOrigin(checkout.apiUrl || (profileEnvironment === "production" ? "https://api.doku.com" : "https://api-sandbox.doku.com"), "URL API DOKU Checkout"));
     };
     applyProfile("sandbox", sandboxCheckout);
     applyProfile("production", productionCheckout);
