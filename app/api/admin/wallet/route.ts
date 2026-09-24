@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
   const [settings, topups] = await Promise.all([
-    readWalletSettings(),
+    readWalletSettings({ repairSchema: false }),
     listWalletTopups(),
   ]);
   return Response.json({ settings, topups });
