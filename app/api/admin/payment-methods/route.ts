@@ -14,7 +14,6 @@ import { isAllowedMediaUrl } from "@/lib/media-url";
 import { isDokuCheckoutChannelSupported } from "@/lib/server/doku-checkout";
 import { getMidtransSnapReadiness } from "@/lib/server/midtrans-snap";
 import { getPaymentModeOverview } from "@/lib/server/payment-mode-config";
-import { getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
 
 const gatewayConfigSchema = z.record(
   z.string().trim().min(1).max(60),
@@ -88,22 +87,34 @@ async function gatewayReadiness() {
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
-  const gatewaySettings = await listPaymentGatewaySettings();
-  const channels = await listPaymentChannels(true);
-  const channelsWithReadiness = await Promise.all(channels.map(async (item) => ({
-    ...item,
-    readiness: await getConfiguredGatewayReadiness({
-      gateway: item.gateway,
-      paymentMethod: item.method,
-      paymentChannel: item.channel,
-      gatewayConfig: item.gatewayConfig,
-    }),
-  })));
+  const [gatewaySettings, channels, gatewayState] = await Promise.all([
+    listPaymentGatewaySettings(),
+    listPaymentChannels(true),
+    gatewayReadiness(),
+  ]);
+  const channelsWithReadiness = channels.map((item) => {
+    const base = gatewayState[item.gateway];
+    const supported = isGatewayChannelSupported(item.gateway, item.method, item.channel, item.gatewayConfig);
+    return {
+      ...item,
+      readiness: {
+        ...base,
+        ready: base.ready && supported,
+        reason: base.ready
+          ? supported
+            ? null
+            : item.gateway === "doku"
+              ? "Channel belum didukung DOKU Checkout."
+              : "Channel belum memiliki kode Midtrans Snap."
+          : base.reason,
+      },
+    };
+  });
   return Response.json({
     channels: channelsWithReadiness,
     gatewaySettings,
     gateways: gatewaySettings.filter((item) => item.isActive).map((item) => item.gateway),
-    gatewayReadiness: await gatewayReadiness(),
+    gatewayReadiness: gatewayState,
   });
 }
 
