@@ -145,7 +145,7 @@ export async function notifyOrderFulfillmentSuccessById(orderId: string) {
       await sendEmail(input, config);
     } catch (error) {
       await releaseOrderChannel(order.reference_id, "email");
-      console.error("Email pesanan selesai gagal:", error);
+      logServerError("Email pesanan selesai gagal", error);
     }
   }
 
