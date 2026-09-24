@@ -1,3 +1,4 @@
+import { assertSafeHttpsUrl } from "@/lib/server/outbound-url";
 import { getD1 } from "@/db";
 import { getPublicBaseUrl, getRuntimeEnv } from "@/lib/server/runtime-env";
 
@@ -44,8 +45,9 @@ async function sendResetEmail(input: { email: string; name: string; resetUrl: st
   const config = getRuntimeEnv<ResendEnv>();
   const apiKey = config.RESEND_API_KEY?.trim();
   const from = config.RESEND_FROM_EMAIL?.trim();
-  const apiUrl = config.RESEND_API_URL?.trim();
-  if (!apiKey || !from || !apiUrl) throw new Error("Layanan email reset password belum dikonfigurasi.");
+  const configuredApiUrl = config.RESEND_API_URL?.trim();
+  if (!apiKey || !from || !configuredApiUrl) throw new Error("Layanan email reset password belum dikonfigurasi.");
+  const apiUrl = assertSafeHttpsUrl(configuredApiUrl, "URL API email").toString();
 
   const response = await fetch(apiUrl, {
     method: "POST",
