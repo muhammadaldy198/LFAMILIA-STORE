@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server/safe-log";
 import { getD1 } from "@/db";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { isAutomaticPackageAvailable } from "@/lib/server/availability";
@@ -684,7 +685,7 @@ export async function recoverStaleAutomaticOrders(
   for (const row of result.results) {
     await fulfillAutomaticOrder(row.id, publicBaseUrl);
     await notifyOrderFulfillmentSuccessById(row.id).catch((error) =>
-      console.error("Notifikasi order hasil recovery gagal:", error),
+      logServerError("Notifikasi order hasil recovery gagal:", error),
     );
   }
 }
