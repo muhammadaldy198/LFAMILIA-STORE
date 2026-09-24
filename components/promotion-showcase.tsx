@@ -13,7 +13,7 @@ export function PromotionShowcase({ full = false }: { full?: boolean }) {
   const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     let active = true;
-    void fetch("/api/promotions", { cache: "no-store" })
+    void fetch("/api/promotions")
       .then(async (response) => {
         const data = await response.json().catch(() => ({})) as { vouchers?: DiscountVoucher[]; error?: string };
         if (!response.ok) throw new Error(data.error || "Promo gagal dimuat.");
