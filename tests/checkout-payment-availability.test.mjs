@@ -19,10 +19,11 @@ test("checkout methods use mode-aware gateway readiness without exposing gateway
   assert.doesNotMatch(methodsRoute, /isProviderRelayConfigured/);
   assert.doesNotMatch(methodsRoute, /partnerServiceId\?\.length === 8/);
 
-  const publicMapStart = methodsRoute.indexOf(".map((item) => ({");
+  const activeChannelsStart = methodsRoute.indexOf("const activeChannels = channels");
+  const publicMapStart = methodsRoute.indexOf(".map((item) => ({", activeChannelsStart);
   const publicMapEnd = methodsRoute.indexOf("}));", publicMapStart);
   const publicMapSource = methodsRoute.slice(publicMapStart, publicMapEnd);
-  assert.ok(publicMapStart >= 0 && publicMapEnd > publicMapStart);
+  assert.ok(activeChannelsStart >= 0 && publicMapStart >= 0 && publicMapEnd > publicMapStart);
   assert.doesNotMatch(publicMapSource, /gateway:/);
   assert.doesNotMatch(publicMapSource, /gatewayConfig/);
   assert.match(source, /displayChannels/);
