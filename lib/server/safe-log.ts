@@ -35,14 +35,18 @@ export function safeErrorForLog(error: unknown) {
 }
 
 function safeDetails(details: Record<string, string | number | boolean | null | undefined>) {
-  return Object.fromEntries(
-    Object.entries(details).flatMap(([key, value]) => {
-      if (value === undefined) return [];
-      if (SENSITIVE_KEY.test(key)) return [[key, "[REDACTED]"]];
-      if (typeof value === "string") return [[key, redactLogText(value).slice(0, 300)]];
-      return [[key, value]];
-    }),
-  );
+  const output: Record<string, string | number | boolean | null> = {};
+  for (const [key, value] of Object.entries(details)) {
+    if (value === undefined) continue;
+    if (SENSITIVE_KEY.test(key)) {
+      output[key] = "[REDACTED]";
+    } else if (typeof value === "string") {
+      output[key] = redactLogText(value).slice(0, 300);
+    } else {
+      output[key] = value;
+    }
+  }
+  return output;
 }
 
 export function logServerError(
