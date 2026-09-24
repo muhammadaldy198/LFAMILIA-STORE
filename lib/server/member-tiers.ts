@@ -1,5 +1,4 @@
 import { getD1 } from "@/db";
-import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { resolveMemberTierFromProgress } from "@/lib/server/final-audit-rules";
 
 export type MemberTier = "basic" | "gold" | "diamond" | "platinum";
@@ -40,17 +39,19 @@ let ensurePromise: Promise<void> | null = null;
 async function ensureMemberTierSettings() {
   if (!ensurePromise) {
     ensurePromise = (async () => {
-      await ensureLegacyDatabaseColumns();
       const db = getD1();
-      await db.prepare(`CREATE TABLE IF NOT EXISTS member_tier_settings (
-        tier TEXT PRIMARY KEY,
-        discount_percent REAL NOT NULL DEFAULT 0,
-        benefits TEXT NOT NULL DEFAULT '',
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )`).run();
-      for (const definition of MEMBER_TIER_DEFINITIONS) {
-        await db.prepare(`INSERT OR IGNORE INTO member_tier_settings (tier, discount_percent, benefits) VALUES (?, 0, '')`).bind(definition.tier).run();
-      }
+      await db.batch([
+        db.prepare(`CREATE TABLE IF NOT EXISTS member_tier_settings (
+          tier TEXT PRIMARY KEY,
+          discount_percent REAL NOT NULL DEFAULT 0,
+          benefits TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )`),
+        ...MEMBER_TIER_DEFINITIONS.map((definition) =>
+          db.prepare(`INSERT OR IGNORE INTO member_tier_settings (tier, discount_percent, benefits) VALUES (?, 0, '')`)
+            .bind(definition.tier)
+        ),
+      ]);
     })().catch((error) => { ensurePromise = null; throw error; });
   }
   return ensurePromise;
