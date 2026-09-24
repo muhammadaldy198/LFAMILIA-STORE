@@ -119,7 +119,7 @@ function providerErrorMessage(
   return rc ? `[RC ${rc}] ${message}` : message;
 }
 
-export async function getDigiflazzBalance() {
+export async function getDigiflazzBalance(options: { timeoutMs?: number } = {}) {
   if (isAutomatedTestRuntime() && runtimeConfig().environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
   const { environment, username, apiKey, apiUrl } = runtimeConfig();
   if (balanceCache && Date.now() - balanceCache.checkedAt < 60_000) {
@@ -140,7 +140,7 @@ export async function getDigiflazzBalance() {
       username,
       sign: hashHex("md5", `${username}${apiKey}depo`),
     }),
-    signal: AbortSignal.timeout(12_000),
+    signal: AbortSignal.timeout(Math.max(250, Math.min(12_000, options.timeoutMs ?? 12_000))),
   });
   const payload = (await response.json().catch(() => null)) as DigiFlazzBalanceResponse | null;
   const deposit = Number(payload?.data?.deposit);
