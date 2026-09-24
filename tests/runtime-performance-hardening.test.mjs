@@ -46,3 +46,59 @@ test("storefront and dashboard reads use bounded cache and provider latency", ()
   assert.match(digiflazz, /getDigiflazzBalance\(options: \{ timeoutMs\?: number \} = \{\}\)/);
   assert.match(summary, /getDigiflazzBalance\(\{ timeoutMs: 1_500 \}\)/);
 });
+
+test("public storefront content reuses short browser caches instead of forcing reloads", () => {
+  const publicClients = [
+    ["components/home-banner-carousel.tsx", "/api/home-content"],
+    ["components/global-home-popup.tsx", "/api/home-content"],
+    ["components/home-news-preview.tsx", "/api/news"],
+    ["components/news-browser.tsx", "/api/news"],
+    ["components/home-reviews-preview.tsx", "/api/reviews?featured=1"],
+    ["components/promotion-showcase.tsx", "/api/promotions"],
+    ["app/checkout/page.tsx", "/api/payment-methods"],
+    ["components/customer-account.tsx", "/api/wallet"],
+    ["app/payment/page.tsx", "/api/payment-page-settings"],
+  ];
+
+  for (const [file, endpoint] of publicClients) {
+    const source = read(file);
+    assert.ok(source.includes('fetch("' + endpoint + '"'), file);
+    assert.ok(!source.includes('fetch("' + endpoint + '", { cache: "no-store" })'), file);
+  }
+
+  assert.match(read("app/api/payment-page-settings/route.ts"), /public, max-age=30, s-maxage=60, stale-while-revalidate=120/);
+  assert.match(read("app/api/news/route.ts"), /s-maxage=120, stale-while-revalidate=180/);
+  assert.match(read("app/api/promotions/route.ts"), /s-maxage=60, stale-while-revalidate=120/);
+  assert.match(read("app/api/reviews/route.ts"), /s-maxage=120, stale-while-revalidate=180/);
+});
+
+test("Admin overview and notification bell share one short-lived summary request", () => {
+  const helper = read("lib/client/admin-summary.ts");
+  const overview = read("components/admin-overview.tsx");
+  const notifications = read("components/admin-notifications.tsx");
+
+  assert.match(helper, /SUMMARY_CACHE_TTL_MS = 5_000/);
+  assert.match(helper, /summaries\.get\(key\)/);
+  assert.match(helper, /api\/panel\/summary\?range=/);
+  assert.match(overview, /fetchAdminSummary<Summary>\(range\)/);
+  assert.match(notifications, /fetchAdminSummary<Summary>\("7d", \{ force \}\)/);
+  assert.ok(!overview.includes('fetch(`/api/panel/summary'));
+  assert.ok(!notifications.includes('fetch("/api/panel/summary'));
+});
+
+test("wallet and compatibility helpers keep read paths lightweight", () => {
+  const wallet = read("lib/server/wallet.ts");
+  const publicWallet = read("app/api/wallet/route.ts");
+  const nickname = read("lib/server/nickname-config.ts");
+  const members = read("lib/server/member-tiers.ts");
+  const monitor = read("lib/server/digiflazz-monitor.ts");
+
+  assert.match(wallet, /options: \{ repairSchema\?: boolean \} = \{\}/);
+  assert.match(publicWallet, /readWalletSettings\(\{ repairSchema: false \}\)/);
+  assert.match(publicWallet, /getConfiguredGatewayBaseReadiness/);
+  assert.doesNotMatch(publicWallet, /candidates\.map\(async/);
+  assert.match(nickname, /options: \{ repairSchema\?: boolean \} = \{\}/);
+  assert.doesNotMatch(members, /ensureLegacyDatabaseColumns/);
+  assert.match(members, /await db\.batch\(/);
+  assert.match(monitor, /monitorSchemaPromise/);
+});
