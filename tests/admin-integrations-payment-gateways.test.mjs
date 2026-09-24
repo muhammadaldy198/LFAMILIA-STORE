@@ -55,14 +55,15 @@ test("obsolete duplicate payment credential panel is removed and dashboard says 
 });
 
 
-test("Admin payment readiness is evaluated per channel, not by QRIS as a global proxy", () => {
+test("Admin payment readiness reuses gateway readiness while validating each channel", () => {
   const route = read("app/api/admin/payment-methods/route.ts");
   const workspace = read("components/admin-payment-workspace.tsx");
   assert.match(route, /channelsWithReadiness/);
-  assert.match(route, /paymentMethod: item\.method/);
-  assert.match(route, /paymentChannel: item\.channel/);
-  assert.match(route, /gatewayConfig: item\.gatewayConfig/);
+  assert.match(route, /const base = gatewayState\[item\.gateway\]/);
+  assert.match(route, /isGatewayChannelSupported\(item\.gateway, item\.method, item\.channel, item\.gatewayConfig\)/);
+  assert.match(route, /gatewayReadiness: gatewayState/);
   assert.match(route, /dokuCheckoutConfigured/);
+  assert.doesNotMatch(route, /channels\.map\(async/);
   assert.doesNotMatch(route, /gateway: "doku", paymentMethod: "qris", paymentChannel: "qris"/);
   assert.match(workspace, /channel\.readiness/);
   assert.match(workspace, /Simpan untuk cek/);

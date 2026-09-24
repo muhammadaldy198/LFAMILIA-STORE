@@ -46,9 +46,12 @@ test("full product writes cannot corrupt a server-required nickname checkout con
   assert.match(productsRoute, /await validateNicknameCheckoutContract\(input\.dbId!?, input\)/);
 });
 
-test("all admin product read paths apply nickname compatibility repair first", () => {
-  assert.match(productsRoute, /await ensureKokinpayNicknameGameCodeBackfill\(\);[\s\S]*const products = await readProducts\(true\)/);
-  assert.match(productContentRoute, /await ensureKokinpayNicknameGameCodeBackfill\(\);[\s\S]*const products = await readProducts\(true\)/);
+test("admin product reads avoid global compatibility repair while writes keep nickname validation", () => {
+  assert.match(productsRoute, /const products = await readProducts\(true, \{ repairSchema: false \}\)/);
+  assert.match(productContentRoute, /const products = await readProducts\(true, \{ repairSchema: false \}\)/);
+  assert.match(productsRoute, /validateNicknameCheckoutContract/);
+  assert.match(route, /ensureKokinpayNicknameGameCodeBackfill\(\{ repairSchema: false \}\)/);
+  assert.match(route, /export async function PATCH[\s\S]*ensureKokinpayNicknameGameCodeBackfill\(\);/);
 });
 
 test("panel exposes product-input and editor persists real values", () => {

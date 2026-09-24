@@ -103,7 +103,7 @@ export function CustomerAccount({
     try {
       const [accountResponse, walletResponse] = await Promise.all([
         fetch("/api/account", { cache: "no-store" }),
-        fetch("/api/wallet", { cache: "no-store" }),
+        fetch("/api/wallet"),
       ]);
       if (walletResponse.ok) {
         const walletData = await walletResponse.json().catch(() => ({})) as {

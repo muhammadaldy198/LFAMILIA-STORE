@@ -11,9 +11,11 @@ const fallbackSettings: WalletSettings = {
   automaticTopupEnabled: false,
 };
 
-export async function readWalletSettings(): Promise<WalletSettings> {
+export async function readWalletSettings(
+  options: { repairSchema?: boolean } = {},
+): Promise<WalletSettings> {
   try {
-    await ensureLegacyDatabaseColumns();
+    if (options.repairSchema !== false) await ensureLegacyDatabaseColumns();
     const row = await getD1()
       .prepare(`SELECT min_topup, doku_topup_enabled
         FROM wallet_settings WHERE id = 1`)

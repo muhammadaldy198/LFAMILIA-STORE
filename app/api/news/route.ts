@@ -9,7 +9,7 @@ export async function GET(request: Request) {
       const article = await getNewsBySlug(slug);
       return article ? Response.json({ article }) : Response.json({ error: "Berita tidak ditemukan." }, { status: 404 });
     }
-    return Response.json({ articles: await listNews(false) }, { headers: { "Cache-Control": "public, max-age=60" } });
+    return Response.json({ articles: await listNews(false) }, { headers: { "Cache-Control": "public, max-age=60, s-maxage=120, stale-while-revalidate=180" } });
   } catch {
     return Response.json({ articles: [] });
   }

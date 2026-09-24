@@ -54,7 +54,7 @@ export async function GET(request: Request) {
   const canViewFinance = access.role === "super_admin";
 
   try {
-    const common = await db.batch([
+    const commonPromise = db.batch([
       db.prepare(
         `SELECT
           COUNT(*) AS total_orders,
@@ -142,6 +142,69 @@ export async function GET(request: Request) {
       ),
     ]);
 
+    const financePromise = canViewFinance
+      ? db.batch([
+          db.prepare(
+            `SELECT COALESCE(SUM(amount), 0) AS total
+             FROM wallet_topups
+             WHERE status = 'approved' AND ${topupPeriod}`,
+          ),
+          db.prepare(
+            `SELECT buyer_name AS name, buyer_email AS email, COUNT(*) AS orders,
+               COALESCE(SUM(total), 0) AS total
+             FROM orders o
+             WHERE o.payment_status = 'paid' AND ${orderPeriod}
+             GROUP BY lower(o.buyer_email), o.buyer_name
+             ORDER BY total DESC, orders DESC
+             LIMIT 5`,
+          ),
+        ])
+      : Promise.resolve(null);
+
+    const attentionPromise = db.batch([
+      db.prepare("SELECT COUNT(*) AS count FROM digiflazz_seller_monitor WHERE seller_product_status = 0"),
+      db.prepare("SELECT COUNT(*) AS count FROM digiflazz_seller_monitor WHERE unlimited_stock = 0 AND stock <= 0"),
+      db.prepare("SELECT COUNT(*) AS count FROM digiflazz_seller_monitor WHERE baseline_price IS NOT NULL AND current_price IS NOT NULL AND current_price <> baseline_price"),
+      db.prepare("SELECT COUNT(*) AS count FROM orders WHERE provider_code = 'digiflazz' AND payment_status = 'paid' AND fulfillment_status IN ('processing', 'dispatching', 'pending')"),
+      db.prepare("SELECT COUNT(*) AS count FROM orders WHERE payment_method <> 'wallet' AND payment_status = 'failed'"),
+      db.prepare("SELECT COUNT(*) AS count FROM orders WHERE fulfillment_type = 'manual' AND payment_status = 'paid' AND fulfillment_status IN ('manual_pending', 'processing')"),
+    ]).catch(() => null);
+
+    const syncPromise = db.prepare(
+      "SELECT MAX(supplier_synced_at) AS synced_at FROM product_packages WHERE provider_code = 'digiflazz'",
+    ).first<{ synced_at?: string | null }>().catch(() => null);
+
+    const activitiesPromise = db.prepare(
+      "SELECT id, admin_name, admin_role, action, target, created_at FROM admin_activity_logs ORDER BY created_at DESC LIMIT 8",
+    ).all<{
+      id: string;
+      admin_name: string;
+      admin_role: string;
+      action: string;
+      target: string;
+      created_at: string;
+    }>().catch(() => null);
+
+    const digiflazz = getDigiflazzReadiness();
+    let publicBaseUrl = "";
+    try {
+      publicBaseUrl = getPublicBaseUrl();
+    } catch {
+      publicBaseUrl = "";
+    }
+    const balancePromise = canViewFinance && digiflazz.ready
+      ? getDigiflazzBalance({ timeoutMs: 1_500 }).catch(() => null)
+      : Promise.resolve(null);
+
+    const [common, finance, attentionRows, synced, activities, balance] = await Promise.all([
+      commonPromise,
+      financePromise,
+      attentionPromise,
+      syncPromise,
+      activitiesPromise,
+      balancePromise,
+    ]);
+
     const metricRow = common[0].results[0] as Record<string, number> | undefined;
     const todayRow = common[1].results[0] as Record<string, number> | undefined;
     const productRow = common[2].results[0] as { count?: number } | undefined;
@@ -149,23 +212,7 @@ export async function GET(request: Request) {
 
     let approvedTopups = 0;
     let topCustomers: Array<{ name: string; email: string; orders: number; total: number }> = [];
-    if (canViewFinance) {
-      const finance = await db.batch([
-        db.prepare(
-          `SELECT COALESCE(SUM(amount), 0) AS total
-           FROM wallet_topups
-           WHERE status = 'approved' AND ${topupPeriod}`,
-        ),
-        db.prepare(
-          `SELECT buyer_name AS name, buyer_email AS email, COUNT(*) AS orders,
-             COALESCE(SUM(total), 0) AS total
-           FROM orders o
-           WHERE o.payment_status = 'paid' AND ${orderPeriod}
-           GROUP BY lower(o.buyer_email), o.buyer_name
-           ORDER BY total DESC, orders DESC
-           LIMIT 5`,
-        ),
-      ]);
+    if (finance) {
       approvedTopups = Number((finance[0].results[0] as { total?: number } | undefined)?.total || 0);
       topCustomers = finance[1].results.map((row) => {
         const item = row as { name?: string; email?: string; orders?: number; total?: number };
@@ -178,23 +225,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const digiflazz = getDigiflazzReadiness();
-    let publicBaseUrl = "";
-    try {
-      publicBaseUrl = getPublicBaseUrl();
-    } catch {
-      publicBaseUrl = "";
-    }
-
-    let digiflazzBalance: number | null = null;
-    if (canViewFinance && digiflazz.ready) {
-      try {
-        digiflazzBalance = (await getDigiflazzBalance()).balance;
-      } catch {
-        digiflazzBalance = null;
-      }
-    }
-
+    const digiflazzBalance = balance?.balance ?? null;
     const attention = {
       sellerOff: 0,
       outOfStock: 0,
@@ -203,66 +234,24 @@ export async function GET(request: Request) {
       paymentCallbackFailed: 0,
       manualPending: 0,
     };
-    let lastDigiflazzSync: string | null = null;
-    let recentActivities: Array<{
-      id: string;
-      adminName: string;
-      adminRole: string;
-      action: string;
-      target: string;
-      createdAt: string;
-    }> = [];
-
-    try {
-      const attentionRows = await db.batch([
-        db.prepare("SELECT COUNT(*) AS count FROM digiflazz_seller_monitor WHERE seller_product_status = 0"),
-        db.prepare("SELECT COUNT(*) AS count FROM digiflazz_seller_monitor WHERE unlimited_stock = 0 AND stock <= 0"),
-        db.prepare("SELECT COUNT(*) AS count FROM digiflazz_seller_monitor WHERE baseline_price IS NOT NULL AND current_price IS NOT NULL AND current_price <> baseline_price"),
-        db.prepare("SELECT COUNT(*) AS count FROM orders WHERE provider_code = 'digiflazz' AND payment_status = 'paid' AND fulfillment_status IN ('processing', 'dispatching', 'pending')"),
-        db.prepare("SELECT COUNT(*) AS count FROM orders WHERE payment_method <> 'wallet' AND payment_status = 'failed'"),
-        db.prepare("SELECT COUNT(*) AS count FROM orders WHERE fulfillment_type = 'manual' AND payment_status = 'paid' AND fulfillment_status IN ('manual_pending', 'processing')"),
-      ]);
+    if (attentionRows) {
       attention.sellerOff = Number((attentionRows[0].results[0] as { count?: number } | undefined)?.count || 0);
       attention.outOfStock = Number((attentionRows[1].results[0] as { count?: number } | undefined)?.count || 0);
       attention.priceChanged = Number((attentionRows[2].results[0] as { count?: number } | undefined)?.count || 0);
       attention.digiflazzPending = Number((attentionRows[3].results[0] as { count?: number } | undefined)?.count || 0);
       attention.paymentCallbackFailed = Number((attentionRows[4].results[0] as { count?: number } | undefined)?.count || 0);
       attention.manualPending = Number((attentionRows[5].results[0] as { count?: number } | undefined)?.count || 0);
-    } catch {
-      // Monitoring tables may not exist yet on a legacy deployment.
     }
 
-    try {
-      const synced = await db.prepare(
-        "SELECT MAX(supplier_synced_at) AS synced_at FROM product_packages WHERE provider_code = 'digiflazz'",
-      ).first<{ synced_at?: string | null }>();
-      lastDigiflazzSync = synced?.synced_at || null;
-    } catch {
-      lastDigiflazzSync = null;
-    }
-
-    try {
-      const activities = await db.prepare(
-        "SELECT id, admin_name, admin_role, action, target, created_at FROM admin_activity_logs ORDER BY created_at DESC LIMIT 8",
-      ).all<{
-        id: string;
-        admin_name: string;
-        admin_role: string;
-        action: string;
-        target: string;
-        created_at: string;
-      }>();
-      recentActivities = activities.results.map((item) => ({
-        id: item.id,
-        adminName: item.admin_name,
-        adminRole: item.admin_role,
-        action: item.action,
-        target: item.target,
-        createdAt: item.created_at,
-      }));
-    } catch {
-      recentActivities = [];
-    }
+    const lastDigiflazzSync = synced?.synced_at || null;
+    const recentActivities = (activities?.results ?? []).map((item) => ({
+      id: item.id,
+      adminName: item.admin_name,
+      adminRole: item.admin_role,
+      action: item.action,
+      target: item.target,
+      createdAt: item.created_at,
+    }));
 
     return Response.json(
       {

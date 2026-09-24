@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { fetchAdminSummary } from "@/lib/client/admin-summary";
 import {
   Bell,
   CheckCheck,
@@ -72,11 +73,9 @@ export function AdminNotifications({
   const containerRef = useRef<HTMLDivElement>(null);
   const storageKey = `lfamilia:admin-notifications:read:${sessionId}`;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     try {
-      const response = await fetch("/api/panel/summary?range=7d", { cache: "no-store" });
-      const payload = (await response.json().catch(() => ({}))) as Summary & { error?: string };
-      if (!response.ok) throw new Error(payload.error || "Notifikasi gagal dimuat.");
+      const payload = await fetchAdminSummary<Summary>("7d", { force });
       setSummary(payload);
       setError("");
     } catch (reason) {
@@ -178,7 +177,7 @@ export function AdminNotifications({
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => void load()}
+                onClick={() => void load(true)}
                 className="grid size-7 place-items-center rounded-md text-[#64748b] hover:bg-[#f1f5f9]"
                 aria-label="Muat ulang notifikasi"
               >

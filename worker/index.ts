@@ -76,12 +76,67 @@ function withSecurityHeaders(response: Response, url: URL) {
   });
 }
 
+const RUNTIME_HYDRATION_TTL_MS = 15_000;
+let runtimeHydrationCache: { expiresAt: number; promise: Promise<Env> } | null = null;
+let requestRepairPrimed = false;
+
+function isReadOnlyRequest(request: Request) {
+  return request.method === "GET" || request.method === "HEAD" || request.method === "OPTIONS";
+}
+
+function requestNeedsHydratedRuntime(request: Request, url: URL) {
+  if (!isReadOnlyRequest(request)) return true;
+
+  const path = url.pathname;
+  if (
+    path.startsWith("/api/payments/") ||
+    path.startsWith("/api/fulfillment/") ||
+    path.startsWith("/api/auth/google") ||
+    path === "/api/nickname" ||
+    path === "/api/orders/status" ||
+    path === "/api/payment-methods" ||
+    path === "/api/wallet" ||
+    path === "/api/system-status" ||
+    path.startsWith("/api/admin/")
+  ) {
+    return true;
+  }
+
+  if (!path.startsWith("/api/panel/")) return false;
+  const panelPath = path.slice("/api/panel/".length);
+  return [
+    "summary",
+    "dashboard-integrations",
+    "integrations",
+    "payment-methods",
+    "payment-routing",
+    "wallet",
+    "digiflazz-pricing",
+    "digiflazz-monitor",
+    "nickname-tools",
+  ].some((prefix) => panelPath === prefix || panelPath.startsWith(`${prefix}/`));
+}
+
 async function hydrateRuntime(env: Env) {
-  const integrated = await hydrateIntegrationRuntimeEnv(env);
-  setRuntimeEnv(integrated);
-  const withDoku = await hydrateDokuCheckoutRuntimeEnv(integrated);
-  setRuntimeEnv(withDoku);
-  return withDoku;
+  const now = Date.now();
+  if (!runtimeHydrationCache || runtimeHydrationCache.expiresAt <= now) {
+    const promise = (async () => {
+      const integrated = await hydrateIntegrationRuntimeEnv(env);
+      const withDoku = await hydrateDokuCheckoutRuntimeEnv(integrated);
+      return withDoku as Env;
+    })();
+    runtimeHydrationCache = {
+      expiresAt: now + RUNTIME_HYDRATION_TTL_MS,
+      promise,
+    };
+    promise.catch(() => {
+      if (runtimeHydrationCache?.promise === promise) runtimeHydrationCache = null;
+    });
+  }
+
+  const hydrated = await runtimeHydrationCache.promise;
+  setRuntimeEnv(hydrated);
+  return hydrated;
 }
 
 const worker = {
@@ -173,11 +228,38 @@ const worker = {
       request = new Request(request, { headers });
     }
 
-    await hydrateRuntime(env);
+    // Most page/catalog reads do not need provider credentials. Keep the raw
+    // runtime available immediately, then warm the encrypted integration
+    // snapshot off the critical path. Provider/payment routes still await it.
+    if (requestNeedsHydratedRuntime(request, url)) {
+      await hydrateRuntime(env);
+    } else {
+      // Never overwrite an already-hydrated isolate with the raw environment:
+      // a concurrent payment/provider request may be reading that snapshot.
+      if (!runtimeHydrationCache) setRuntimeEnv(env);
+      ctx.waitUntil(
+        hydrateRuntime(env).catch((error) => {
+          logServerError("Pemanasan konfigurasi runtime gagal:", error);
+        }),
+      );
+    }
+
     if (env.DB) {
-      await ensureLegacyDatabaseColumns().catch((error) => {
-        logServerError("Perbaikan kompatibilitas D1 gagal; request tetap diteruskan:", error);
-      });
+      if (isReadOnlyRequest(request)) {
+        if (!requestRepairPrimed) {
+          requestRepairPrimed = true;
+          ctx.waitUntil(
+            ensureLegacyDatabaseColumns().catch((error) => {
+              requestRepairPrimed = false;
+              logServerError("Perbaikan kompatibilitas D1 background gagal:", error);
+            }),
+          );
+        }
+      } else {
+        await ensureLegacyDatabaseColumns().catch((error) => {
+          logServerError("Perbaikan kompatibilitas D1 gagal; request tetap diteruskan:", error);
+        });
+      }
     }
 
     if (url.pathname === "/_vinext/image") {

@@ -6,10 +6,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const [storedBanners, popups, settings] = await Promise.all([listHomeBanners(false), listSitePopups(false), readStorefrontSettings()]);
+    const [storedBanners, popups, settings] = await Promise.all([listHomeBanners(false), listSitePopups(false), readStorefrontSettings({ repairSchema: false })]);
     const banners = settings.bannerEnabled ? storedBanners : [];
     const visiblePopups = popups;
-    return Response.json({ banners, popups: visiblePopups }, { headers: { "Cache-Control": "public, max-age=30" } });
+    return Response.json({ banners, popups: visiblePopups }, { headers: { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=120" } });
   } catch {
     return Response.json({ banners: fallbackBanners(defaultStorefrontSettings), popups: fallbackPopups }, { headers: { "Cache-Control": "public, max-age=15" } });
   }

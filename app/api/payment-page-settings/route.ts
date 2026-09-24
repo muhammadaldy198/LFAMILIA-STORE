@@ -25,6 +25,6 @@ export async function GET() {
         supportText: neutralizePublicCopy(settings.supportText),
       },
     },
-    { headers: { "Cache-Control": "no-store" } },
+    { headers: { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=120" } },
   );
 }

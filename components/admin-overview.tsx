@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fetchAdminSummary } from "@/lib/client/admin-summary";
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
@@ -102,20 +103,17 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch(`/api/panel/summary?range=${range}`, { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        const payload = await response.json() as Summary & { error?: string };
-        if (!response.ok) throw new Error(payload.error || "Dashboard gagal dimuat.");
+    let active = true;
+    void fetchAdminSummary<Summary>(range)
+      .then((payload) => {
+        if (!active) return;
         setSummary(payload);
         setError("");
       })
       .catch((reason) => {
-        if (!(reason instanceof DOMException && reason.name === "AbortError")) {
-          setError(reason instanceof Error ? reason.message : "Dashboard gagal dimuat.");
-        }
+        if (active) setError(reason instanceof Error ? reason.message : "Dashboard gagal dimuat.");
       });
-    return () => controller.abort();
+    return () => { active = false; };
   }, [range]);
 
   useEffect(() => {

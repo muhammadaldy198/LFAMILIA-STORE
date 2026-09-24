@@ -1,15 +1,16 @@
 import { publicCustomerPaymentFee } from "@/lib/payment-fees";
 import {
+  isGatewayChannelSupported,
   listPaymentChannels,
   listPaymentGatewaySettings,
 } from "@/lib/server/payment-channels";
 import { getActivePaymentModes } from "@/lib/server/payment-mode-config";
-import { getConfiguredGatewayReadiness } from "@/lib/server/payment-router";
+import { getConfiguredGatewayBaseReadiness } from "@/lib/server/payment-router";
 import { readWalletSettings } from "@/lib/server/wallet";
 
 export async function GET() {
   const [settings, modes, channels, gatewaySettings] = await Promise.all([
-    readWalletSettings(),
+    readWalletSettings({ repairSchema: false }),
     getActivePaymentModes(),
     listPaymentChannels(false),
     listPaymentGatewaySettings(),
@@ -22,36 +23,33 @@ export async function GET() {
     ? channels
     : [];
 
-  const checked = await Promise.all(candidates.map(async (item) => {
-    const gatewayConfig = item.gateway === modes.walletTopupGateway
-      ? item.gatewayConfig
-      : {
-          customerFeeEnabled: item.gatewayConfig.customerFeeEnabled ?? "true",
-          customerFeeBps: item.gatewayConfig.customerFeeBps ?? "0",
-          customerFeeFixed: item.gatewayConfig.customerFeeFixed ?? "0",
-        };
-    return {
-      item: {
-        ...item,
-        publicFee: publicCustomerPaymentFee(item.gatewayConfig),
-      },
-      readiness: await getConfiguredGatewayReadiness({
-        gateway: modes.walletTopupGateway,
-        paymentMethod: item.method,
-        paymentChannel: item.channel,
-        gatewayConfig,
-      }),
-    };
-  }));
+  const gatewayReadiness = candidates.length
+    ? await getConfiguredGatewayBaseReadiness(modes.walletTopupGateway)
+    : null;
 
-  const publicChannels = checked
-    .filter(({ readiness }) => readiness.ready)
-    .map(({ item }) => ({
+  const publicChannels = candidates
+    .filter((item) => {
+      if (!gatewayReadiness?.ready) return false;
+      const gatewayConfig = item.gateway === modes.walletTopupGateway
+        ? item.gatewayConfig
+        : {
+            customerFeeEnabled: item.gatewayConfig.customerFeeEnabled ?? "true",
+            customerFeeBps: item.gatewayConfig.customerFeeBps ?? "0",
+            customerFeeFixed: item.gatewayConfig.customerFeeFixed ?? "0",
+          };
+      return isGatewayChannelSupported(
+        modes.walletTopupGateway,
+        item.method,
+        item.channel,
+        gatewayConfig,
+      );
+    })
+    .map((item) => ({
       method: item.method,
       channel: item.channel,
       name: item.name,
       description: item.description,
-      ...item.publicFee,
+      ...publicCustomerPaymentFee(item.gatewayConfig),
       ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
     }));
 
@@ -63,6 +61,6 @@ export async function GET() {
       },
       channels: publicChannels,
     },
-    { headers: { "Cache-Control": "no-store" } },
+    { headers: { "Cache-Control": "public, max-age=10, s-maxage=10, stale-while-revalidate=20" } },
   );
 }

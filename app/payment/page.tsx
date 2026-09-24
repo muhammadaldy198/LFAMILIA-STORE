@@ -116,7 +116,7 @@ function PaymentContent() {
   }, [load]);
 
   useEffect(() => {
-    void fetch("/api/payment-page-settings", { cache: "no-store" })
+    void fetch("/api/payment-page-settings")
       .then(async (response) => {
         if (!response.ok) return;
         const data = (await response.json()) as {

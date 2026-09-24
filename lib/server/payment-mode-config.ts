@@ -26,22 +26,32 @@ function secretFrom(source: RuntimeLike) {
 }
 function secret() { return secretFrom(runtime()); }
 
+let schemaPromise: Promise<void> | null = null;
+
 async function ensureTables(db = getD1()) {
-  await db.prepare(`CREATE TABLE IF NOT EXISTS integration_profiles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    provider TEXT NOT NULL,
-    mode TEXT NOT NULL,
-    environment TEXT NOT NULL,
-    encrypted_config TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(provider, mode, environment)
-  )`).run();
-  await db.prepare(`CREATE TABLE IF NOT EXISTS integration_settings (
-    setting_key TEXT PRIMARY KEY NOT NULL,
-    value TEXT NOT NULL,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  )`).run();
+  if (!schemaPromise) {
+    schemaPromise = db.batch([
+      db.prepare(`CREATE TABLE IF NOT EXISTS integration_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        environment TEXT NOT NULL,
+        encrypted_config TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(provider, mode, environment)
+      )`),
+      db.prepare(`CREATE TABLE IF NOT EXISTS integration_settings (
+        setting_key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`),
+    ]).then(() => undefined).catch((error) => {
+      schemaPromise = null;
+      throw error;
+    });
+  }
+  return schemaPromise;
 }
 
 async function deriveKey(value: string) {

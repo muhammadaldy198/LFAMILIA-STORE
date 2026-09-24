@@ -358,7 +358,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const noticeSignature = noticeVersion(notices);
 
   useEffect(() => {
-    void fetch("/api/payment-methods", { cache: "no-store" })
+    void fetch("/api/payment-methods")
       .then(async (response) => {
         if (!response.ok) {
           setAvailablePaymentChannels([]);

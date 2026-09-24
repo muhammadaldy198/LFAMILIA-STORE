@@ -29,7 +29,7 @@ export function useStorefront() {
 
   useEffect(() => {
     let active = true;
-    void fetch("/api/storefront", { cache: "no-store" })
+    void fetch("/api/storefront")
       .then(async (response) => {
         if (!response.ok) throw new Error("Storefront gagal dimuat.");
         return response.json() as Promise<{

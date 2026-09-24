@@ -26,8 +26,7 @@ export async function GET(request: Request) {
   const access = await requireAdminSession(request, "staff");
   if (access instanceof Response) return access;
   try {
-    await ensureKokinpayNicknameGameCodeBackfill();
-    const products = await readProducts(true);
+    const products = await readProducts(true, { repairSchema: false });
     return Response.json({
       products: products.map((product) => ({
         dbId: product.dbId,

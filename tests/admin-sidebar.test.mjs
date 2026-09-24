@@ -5,6 +5,7 @@ import test from "node:test";
 
 const source = fs.readFileSync(path.join(process.cwd(), "components/admin-dashboard.tsx"), "utf8");
 const overview = fs.readFileSync(path.join(process.cwd(), "components/admin-overview.tsx"), "utf8");
+const summaryClient = fs.readFileSync(path.join(process.cwd(), "lib/client/admin-summary.ts"), "utf8");
 
 test("admin reference uses the approved dark desktop shell", () => {
   assert.match(source, /grid-cols-\[230px_minmax\(0,1fr\)\]/);
@@ -37,7 +38,8 @@ test("admin reference exposes the approved desktop information architecture", ()
 });
 
 test("dashboard keeps the approved reference while using live summary data", () => {
-  assert.match(overview, /fetch\(`\/api\/panel\/summary\?range=\$\{range\}`/);
+  assert.match(overview, /fetchAdminSummary<Summary>\(range\)/);
+  assert.match(summaryClient, /\/api\/panel\/summary\?range=/);
   assert.match(overview, /summary\?\.recentOrders/);
   assert.match(overview, /summary\?\.topProducts/);
   for (const label of [

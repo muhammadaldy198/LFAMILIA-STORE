@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import type { NewsRecord } from "@/lib/server/content";
 
 async function readNews() {
-  const response = await fetch("/api/news", { cache: "no-store" });
+  const response = await fetch("/api/news");
   const raw = await response.text();
   if (!response.ok || !raw) throw new Error("Berita gagal dimuat.");
   try {

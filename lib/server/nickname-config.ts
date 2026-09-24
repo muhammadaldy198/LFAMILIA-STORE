@@ -31,17 +31,18 @@ type OperationRow = { completed_at: string };
  * that completed an earlier version of 0032 still receive the compatibility
  * repair without re-enabling a game code an Admin intentionally cleared.
  */
-export async function ensureKokinpayNicknameGameCodeBackfill() {
+export async function ensureKokinpayNicknameGameCodeBackfill(
+  options: { repairSchema?: boolean } = {},
+) {
   if (!backfillPromise) {
     backfillPromise = (async () => {
-      await ensureLegacyDatabaseColumns();
+      if (options.repairSchema !== false) await ensureLegacyDatabaseColumns();
       const db = getD1();
-      await db.prepare(`CREATE TABLE IF NOT EXISTS one_time_operations (
-        operation_key TEXT PRIMARY KEY NOT NULL,
-        completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )`).run();
-
-      const [gameBackfillResult, genshinRepairResult] = await db.batch([
+      const [, gameBackfillResult, genshinRepairResult] = await db.batch([
+        db.prepare(`CREATE TABLE IF NOT EXISTS one_time_operations (
+          operation_key TEXT PRIMARY KEY NOT NULL,
+          completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )`),
         db.prepare(
           "SELECT completed_at FROM one_time_operations WHERE operation_key = ? LIMIT 1",
         ).bind(GAME_CODE_BACKFILL_OPERATION_KEY),

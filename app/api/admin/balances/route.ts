@@ -36,7 +36,6 @@ export async function GET(request: Request) {
   const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
   try {
-    await ensureLegacyDatabaseColumns();
     return Response.json(await readOverview(), { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Data saldo gagal dimuat." }, { status: 503 });

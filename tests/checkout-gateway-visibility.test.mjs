@@ -9,9 +9,10 @@ const autoRoute = fs.readFileSync(path.join(root, "app/api/payments/auto/create/
 const publicMethods = fs.readFileSync(path.join(root, "app/api/payment-methods/route.ts"), "utf8");
 
 function publicPaymentMap(source) {
-  const start = source.indexOf(".map(({ item }) => ({");
+  const activeChannels = source.indexOf("const activeChannels = channels");
+  const start = source.indexOf(".map((item) => ({", activeChannels);
   const end = source.indexOf("}));", start);
-  assert.ok(start >= 0 && end > start);
+  assert.ok(activeChannels >= 0 && start >= 0 && end > start);
   return source.slice(start, end);
 }
 
@@ -36,5 +37,7 @@ test("public method response strips gateway identity and private gateway config"
   assert.match(responseMap, /name: item\.name/);
   assert.match(responseMap, /description: item\.description/);
   assert.doesNotMatch(responseMap, /gateway:/);
-  assert.doesNotMatch(responseMap, /gatewayConfig/);
+  assert.doesNotMatch(responseMap, /gatewayConfig\s*:/);
+  assert.doesNotMatch(responseMap, /\.\.\.item\.gatewayConfig/);
+  assert.match(responseMap, /publicCustomerPaymentFee\(item\.gatewayConfig\)/);
 });

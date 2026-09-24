@@ -219,8 +219,7 @@ export async function GET(request: Request) {
   const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
-    await ensureKokinpayNicknameGameCodeBackfill();
-    const products = await readProducts(true);
+    const products = await readProducts(true, { repairSchema: false });
     const sortedProducts = products.map((product) => ({
       ...product,
       packages: product.packages.slice().sort((left, right) =>
