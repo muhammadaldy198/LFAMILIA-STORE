@@ -34,7 +34,7 @@ const schema = z.object({
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "staff");
   if (access instanceof Response) return access;
-  return Response.json({ settings: await readStorefrontSettings() });
+  return Response.json({ settings: await readStorefrontSettings({ repairSchema: false }) });
 }
 
 export async function PUT(request: Request) {
