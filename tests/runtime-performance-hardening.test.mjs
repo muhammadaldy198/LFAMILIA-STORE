@@ -12,6 +12,7 @@ test("public reads warm runtime and schema repair outside the critical response 
 
   assert.match(worker, /RUNTIME_HYDRATION_TTL_MS = 15_000/);
   assert.match(worker, /requestNeedsHydratedRuntime/);
+  assert.match(worker, /if \(!runtimeHydrationCache\) setRuntimeEnv\(env\)/);
   assert.match(worker, /ctx\.waitUntil\(\s*hydrateRuntime\(env\)\.catch/);
   assert.match(worker, /if \(isReadOnlyRequest\(request\)\)[\s\S]*ctx\.waitUntil\([\s\S]*ensureLegacyDatabaseColumns/);
   assert.match(worker, /else \{\s*await ensureLegacyDatabaseColumns\(\)\.catch/);
