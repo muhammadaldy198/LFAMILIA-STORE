@@ -16,24 +16,44 @@ async function prepareDokuRuntime() {
   setRuntimeEnv(await hydrateDokuCheckoutRuntimeEnv(current));
 }
 
+export async function getConfiguredGatewayBaseReadiness(gateway: PaymentGatewayName) {
+  if (gateway === "doku") {
+    await prepareDokuRuntime();
+    const readiness = getDokuCheckoutReadiness();
+    return {
+      ready: readiness.ready,
+      environment: readiness.environment,
+      mode: "checkout" as const,
+      reason: readiness.reason,
+    };
+  }
+
+  const readiness = await getMidtransSnapReadiness();
+  return {
+    ready: readiness.ready,
+    environment: readiness.environment,
+    mode: "snap" as const,
+    reason: readiness.reason,
+  };
+}
+
 export async function getConfiguredGatewayReadiness(input: {
   gateway: PaymentGatewayName;
   paymentMethod: string;
   paymentChannel: string;
   gatewayConfig?: Record<string, string>;
 }) {
+  const readiness = await getConfiguredGatewayBaseReadiness(input.gateway);
+
   if (input.gateway === "doku") {
-    await prepareDokuRuntime();
-    const readiness = getDokuCheckoutReadiness();
     const supported = isDokuCheckoutChannelSupported(
       input.paymentMethod,
       input.paymentChannel,
       input.gatewayConfig,
     );
     return {
+      ...readiness,
       ready: readiness.ready && supported,
-      environment: readiness.environment,
-      mode: "checkout" as const,
       reason: readiness.ready
         ? supported
           ? null
@@ -42,12 +62,10 @@ export async function getConfiguredGatewayReadiness(input: {
     };
   }
 
-  const readiness = await getMidtransSnapReadiness();
   const paymentType = hostedPaymentType("midtrans", input.paymentMethod, input.paymentChannel, input.gatewayConfig);
   return {
+    ...readiness,
     ready: readiness.ready && Boolean(paymentType),
-    environment: readiness.environment,
-    mode: "snap" as const,
     reason: readiness.ready ? (paymentType ? null : "Channel belum memiliki kode Midtrans Snap.") : readiness.reason,
   };
 }
