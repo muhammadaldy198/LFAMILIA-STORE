@@ -7,7 +7,7 @@ const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 test("homepage categories are managed by staff or higher", () => {
-  const route = read("app/api/panel/categories/route.ts");
+  const route = read("app/api/admin/categories/route.ts");
   assert.equal((route.match(/requireAdminSession\(request, "staff"\)/g) || []).length, 3);
   assert.match(route, /deleteCategory/);
   assert.match(route, /saveCategory/);
@@ -36,7 +36,7 @@ test("custom category slugs survive public products and admin product editing", 
 
   assert.match(categories, /return normalized\.replace/);
   assert.match(publicProducts, /category: normalizeProductCategorySlug\(item\.category\)/);
-  assert.match(products, /fetch\("\/api\/admin\/categories"/);
+  assert.match(products, /fetch\("\/api\/panel\/categories"/);
   assert.match(products, /categoryOptions\.map/);
   assert.match(products, /name="category"/);
 });
