@@ -41,7 +41,7 @@ type SidebarCustomer = {
 };
 
 const desktopNavItems = [
-  { href: "/catalog", label: "Top Up", icon: Gamepad2 },
+  { href: "/#produk", label: "Top Up", icon: Gamepad2 },
   { href: "/promo", label: "Voucher", icon: TicketPercent },
   { href: "/news", label: "Berita", icon: Newspaper },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
