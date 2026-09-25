@@ -614,3 +614,14 @@ body {
     border-radius: 15px !important;
   }
 }
+
+/* Homepage product tiles are image-only and intentionally keep softer corners. */
+.customer-theme main .home-product-tile {
+  border-radius: 14px !important;
+}
+
+@media (min-width: 640px) {
+  .customer-theme main .home-product-tile {
+    border-radius: 16px !important;
+  }
+}
