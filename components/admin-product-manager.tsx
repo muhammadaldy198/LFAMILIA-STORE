@@ -139,7 +139,7 @@ function displayCategory(value: string, categories: ManagedCategoryOption[]): Pr
   return categories.find((item) => item.slug === value)?.name ?? productCategoryLabel(value);
 }
 
-function mapProduct(raw: ManagedProductPayload, categories: ManagedCategoryOption[]): Product {
+function mapProductRecord(raw: ManagedProductPayload, categories: ManagedCategoryOption[]): Product {
   const activePackages = raw.packages.filter((item) => item.isActive);
   return {
     id: raw.dbId ?? raw.sortOrder + 1,
@@ -189,14 +189,16 @@ export function AdminProductManager() {
     try {
       const [productPayload, categoryPayload] = await Promise.all([
         readJson<{ products: ManagedProductPayload[] }>(await fetch("/api/panel/products", { cache: "no-store", signal })),
-        readJson<{ categories: ManagedCategoryOption[] }>(await fetch("/api/admin/categories", { cache: "no-store", signal })),
+        readJson<{ categories: ManagedCategoryOption[] }>(await fetch("/api/panel/categories", { cache: "no-store", signal })),
       ]);
       const nextCategories = (categoryPayload.categories || [])
         .slice()
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
       const usableCategories = nextCategories.length ? nextCategories : categoryOptions;
       setCategoryOptions(usableCategories);
-      setProducts(productPayload.products.map((item) => mapProduct(item, usableCategories)));
+      const payload = productPayload;
+      const mapProduct = (item: ManagedProductPayload) => mapProductRecord(item, usableCategories);
+      setProducts(payload.products.map(mapProduct));
     } catch (reason) {
       if (reason instanceof DOMException && reason.name === "AbortError") return;
       setError(reason instanceof Error ? reason.message : "Daftar produk gagal dimuat.");
@@ -279,7 +281,7 @@ export function AdminProductManager() {
         raw.imageUrl = uploaded.url;
       }
       const result = await readJson<{ id: number }>(await fetch("/api/panel/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(raw) }));
-      const next = mapProduct({ ...raw, dbId: result.id }, categoryOptions);
+      const next = mapProductRecord({ ...raw, dbId: result.id }, categoryOptions);
       setProducts((current) => [...current, next]);
       setManualProductOpen(false);
       setEditorProduct(next);
@@ -296,7 +298,7 @@ export function AdminProductManager() {
     setError("");
     try {
       await readJson(await fetch("/api/panel/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nextRaw) }));
-      setProducts((current) => current.map((item) => item.id === id ? mapProduct(nextRaw, categoryOptions) : item));
+      setProducts((current) => current.map((item) => item.id === id ? mapProductRecord(nextRaw, categoryOptions) : item));
       setNotice(`${product.name} ${nextRaw.isActive ? "ditampilkan" : "disembunyikan"} dari katalog.`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Status produk gagal diperbarui."); }
   }
