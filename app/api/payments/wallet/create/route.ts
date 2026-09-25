@@ -41,6 +41,7 @@ const schema = z.object({
   buyerPhone: z.string().trim().regex(/^\+?[0-9]{8,16}$/),
   customerNotes: z.string().trim().max(500).optional(),
   voucherCode: z.string().trim().max(40).optional(),
+  quantity: z.number().int().min(1).max(5).default(1),
   idempotencyKey: z.string().uuid(),
 });
 
@@ -151,6 +152,7 @@ export async function POST(request: Request) {
       item.price,
       input.voucherCode,
       { tier: membership.tier, discountPercent: membership.setting.discountPercent },
+      input.quantity,
     );
     const customerData = normalizeCustomerInputs(item, input.customerInputs, input.destination, input.server || null);
     const verifiedAccount = await verifyNicknameForCheckout({
@@ -160,8 +162,8 @@ export async function POST(request: Request) {
     });
     const identity = createOrderIdentity();
     referenceId = identity.referenceId;
-    await insertPendingOrder({ ...identity, item, destination: customerData.destination, server: customerData.server, nickname: verifiedAccount.nickname, buyerName: input.buyerName, buyerEmail: input.buyerEmail, buyerPhone: input.buyerPhone, customerNotes: input.customerNotes || null, customerInputs: customerData.values, paymentMethod: "wallet", paymentChannel: "lfamilia-balance", customerId: customer.id, walletCheckoutKey: input.idempotencyKey, promotion });
-    const balanceAfter = await settleWalletOrder({ customerId: customer.id, orderId: identity.id, amount: promotion.finalPrice, description: `${item.productName} • ${item.packageLabel}`, fulfillmentType: item.fulfillmentType, voucherCode: promotion.voucherCode, flashSaleId: promotion.flashSaleId });
+    await insertPendingOrder({ ...identity, item, destination: customerData.destination, server: customerData.server, nickname: verifiedAccount.nickname, buyerName: input.buyerName, buyerEmail: input.buyerEmail, buyerPhone: input.buyerPhone, customerNotes: input.customerNotes || null, customerInputs: customerData.values, paymentMethod: "wallet", paymentChannel: "lfamilia-balance", customerId: customer.id, walletCheckoutKey: input.idempotencyKey, promotion, quantity: input.quantity });
+    const balanceAfter = await settleWalletOrder({ customerId: customer.id, orderId: identity.id, amount: promotion.finalPrice, description: `${item.productName} • ${item.packageLabel} × ${input.quantity}`, fulfillmentType: item.fulfillmentType, voucherCode: promotion.voucherCode, flashSaleId: promotion.flashSaleId });
     const order = await getOrderById(identity.id);
     if (!order) throw new Error("Pesanan tidak ditemukan setelah dibuat.");
     if (item.fulfillmentType === "automatic") {
