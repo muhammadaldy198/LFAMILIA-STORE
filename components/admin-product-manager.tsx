@@ -782,15 +782,25 @@ function EditorTabPanel({ tab, product, targetTemplate, checkoutType, labelId, l
 function digiflazzNominalLabel(productName: string, brand: string) {
   const value = productName.trim();
   const separated = value
-    .split(/\\s+(?:-|–|—|\\|)\\s+|:\\s+/)
+    .split(/\s+(?:-|–|—|\|)\s+|:\s+/)
     .map((part) => part.trim())
     .filter(Boolean);
   const tail = separated.at(-1) || value;
-  if (separated.length > 1 && /\\d/.test(tail)) return tail;
+  if (separated.length > 1 && /\d/.test(tail)) return tail;
 
-  const brandWords = brand.trim().split(/\\s+/).filter(Boolean);
+  const brandWords = brand.trim().split(/\s+/).filter(Boolean);
   if (brandWords.length) {
-    const escapedBrand = brandWords.map((word) => word.replace(/[.*+?^$()|[\\]\\\\]/g, "\\\\function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal[]; onClose(): void; onImport(items: Nominal[]): void }) {")).join("[\\\\s._-]*");
+    const escapedBrand = brandWords
+      .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("[\\s._-]*");
+    const withoutBrand = value.replace(new RegExp(`^${escapedBrand}[\\s._:-]*`, "i"), "").trim();
+    if (withoutBrand && /\d/.test(withoutBrand)) return withoutBrand;
+  }
+
+  const numericTail = value.match(/(?:^|\s)(\d[\d.,]*\s+.+)$/);
+  return numericTail?.[1]?.trim() || value;
+}
+function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal[]; onClose(): void; onImport(items: Nominal[]): void }) {")).join("[\\\\s._-]*");
     const withoutBrand = value.replace(new RegExp(`^${escapedBrand}[\\\\s._:-]*`, "i"), "").trim();
     if (withoutBrand && /\\d/.test(withoutBrand)) return withoutBrand;
   }
