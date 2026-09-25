@@ -59,3 +59,11 @@ test("checkout desktop banner bleeds edge to edge across the viewport", () => {
   assert.match(layout, /margin-left: calc\(50% - 50vw\) !important/);
   assert.match(layout, /margin-right: calc\(50% - 50vw\) !important/);
 });
+
+test("checkout nominal labels strip a direct product-name prefix", () => {
+  const checkout = read("app/checkout/page.tsx");
+  assert.match(checkout, /lowerLabel\\.startsWith\\(lowerProductName\\)/);
+  assert.match(checkout, /const boundary = cleanLabel\\.slice/);
+  assert.match(checkout, /const directLabel = cleanLabel/);
+  assert.match(checkout, /replace\\(\\/\\^\\(\\?:-\\|–\\|—\\|\\\\\\|\\|:\\)/);
+});
