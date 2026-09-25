@@ -547,6 +547,15 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     chooseMethod,
   ]);
 
+  function changeQuantity(next: number) {
+    const normalized = Math.max(1, Math.min(isVoucherStock ? 1 : 5, Math.trunc(next)));
+    setQuantity(normalized);
+    setPayment(null);
+    setVoucherCode("");
+    setVoucherMessage("");
+    setQuote(null);
+  }
+
   function choosePackage(id: string) {
     const item = product.packages.find((candidate) => candidate.id === id);
     if (!item || (product.fulfillmentType === "automatic" && item.fulfillmentAvailable !== true)) {
@@ -965,7 +974,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                   <button
                     type="button"
                     disabled={quantity <= 1 || isVoucherStock}
-                    onClick={() => setQuantity((value) => Math.max(1, value - 1))}
+                    onClick={() => changeQuantity(quantity - 1)}
                     className="grid size-10 shrink-0 place-items-center rounded-lg border border-white/[0.10] bg-white/[0.04] text-xl text-white/70 disabled:cursor-not-allowed disabled:opacity-30"
                     aria-label="Kurangi jumlah"
                   >
@@ -974,7 +983,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                   <button
                     type="button"
                     disabled={quantity >= 5 || isVoucherStock}
-                    onClick={() => setQuantity((value) => Math.min(5, value + 1))}
+                    onClick={() => changeQuantity(quantity + 1)}
                     className="grid size-10 shrink-0 place-items-center rounded-lg border border-white/[0.10] bg-white/[0.04] text-xl text-white/70 disabled:cursor-not-allowed disabled:opacity-30"
                     aria-label="Tambah jumlah"
                   >
