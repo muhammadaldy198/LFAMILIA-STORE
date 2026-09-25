@@ -296,7 +296,8 @@ function Dashboard({
       <Tabs
         value={tab}
         onValueChange={setTab}
-        className="mt-6 grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]"
+        orientation="vertical"
+        className="customer-account-tabs mt-6 grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]"
       >
         {menuOpen && (
           <>
@@ -339,7 +340,7 @@ function Dashboard({
             </aside>
           </>
         )}
-        <TabsList className="hidden h-auto w-full gap-0 border-0 border-r border-white/[0.08] bg-transparent p-0 pr-4 shadow-none lg:sticky lg:top-24 lg:!flex lg:!w-full lg:!flex-col lg:!items-stretch">
+        <TabsList className="customer-account-sidebar hidden h-auto w-full gap-0 border-0 border-r border-white/[0.08] bg-transparent p-0 pr-4 shadow-none lg:sticky lg:top-24 lg:!flex lg:!w-full lg:!flex-col lg:!items-stretch">
           <TabsTrigger value="overview" className={sidebarTabClass}>
             Ringkasan
           </TabsTrigger>

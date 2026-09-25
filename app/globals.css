@@ -332,6 +332,28 @@ body main [data-slot="tabs-trigger"] {
   padding: 0.25rem 0.5rem !important;
 }
 
+/* Keep the customer account menu in its own full-height grid column. */
+body main .customer-account-tabs {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1024px) {
+  body main .customer-account-tabs {
+    grid-template-columns: 15rem minmax(0, 1fr);
+  }
+  body main .customer-account-sidebar {
+    display: flex !important;
+    height: auto !important;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  body main .customer-account-sidebar [data-slot="tabs-trigger"] {
+    height: 2.5rem !important;
+    flex: none;
+    width: 100%;
+  }
+}
+
 .checkout-input {
   height: 2rem !important;
   padding-top: 0.25rem !important;
