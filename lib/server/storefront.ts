@@ -62,7 +62,7 @@ export async function readStorefrontSettings(
       bannerDescription: row.banner_description,
       bannerImageUrl: row.banner_image_url ?? defaultStorefrontSettings.bannerImageUrl,
       bannerCtaLabel: row.banner_cta_label,
-      bannerCtaHref: safeNavigationUrl(row.banner_cta_href, "/catalog"),
+      bannerCtaHref: safeNavigationUrl(row.banner_cta_href, "/#produk"),
       supportWhatsapp: row.support_whatsapp ?? undefined,
       supportEmail: row.support_email ?? undefined,
       instagramUrl: safeHttpUrl(row.instagram_url) || undefined,

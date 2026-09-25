@@ -46,7 +46,7 @@ export function HomeReviewsPreview() {
           <h2 className="text-[22px] font-black tracking-[-0.035em] sm:text-[28px]">Ulasan transaksi terbaru</h2>
           <p className="mt-[7px] max-w-2xl text-[11px] leading-[1.55] text-white/42 sm:text-xs">Ulasan hanya berasal dari pelanggan yang telah menyelesaikan pembelian.</p>
         </div>
-        <Link href="/catalog" className="hidden text-[10px] font-bold text-[#d8ff8d] sm:inline">Lihat produk</Link>
+        <Link href="/#produk" className="hidden text-[10px] font-bold text-[#d8ff8d] sm:inline">Lihat produk</Link>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {reviews.map((review) => (

@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowRight,
   Gamepad2,
   Grid3X3,
   Play,
@@ -15,7 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ProductCard } from "@/components/product-card";
+import { ProductArtwork } from "@/components/product-artwork";
 import { useStoreProducts } from "@/hooks/use-store-products";
 import { useStorefront } from "@/hooks/use-storefront";
 import { normalizeProductCategorySlug } from "@/lib/product-categories";
@@ -23,23 +22,37 @@ import type { ProductCategory } from "@/lib/store-data";
 
 type Filter = "all" | ProductCategory;
 
+const INITIAL_PRODUCT_COUNT = 12;
+const PRODUCT_PAGE_SIZE = 12;
+
 export function HomeProductBrowser() {
   const { products, databaseReady, loading } = useStoreProducts();
   const { categories } = useStorefront();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(INITIAL_PRODUCT_COUNT);
 
-  const visible = useMemo(() => {
+  const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return products
-      .filter(
-        (product) =>
-          (filter === "all" || normalizeProductCategorySlug(product.category) === filter) &&
-          (!term ||
-            `${product.name} ${product.publisher}`.toLowerCase().includes(term)),
-      )
-      .slice(0, 12);
+    return products.filter(
+      (product) =>
+        (filter === "all" || normalizeProductCategorySlug(product.category) === filter) &&
+        (!term || `${product.name} ${product.publisher}`.toLowerCase().includes(term)),
+    );
   }, [filter, products, query]);
+
+  const visible = filtered.slice(0, visibleCount);
+  const hasMore = visible.length < filtered.length;
+
+  function chooseFilter(value: Filter) {
+    setFilter(value);
+    setVisibleCount(INITIAL_PRODUCT_COUNT);
+  }
+
+  function changeQuery(value: string) {
+    setQuery(value);
+    setVisibleCount(INITIAL_PRODUCT_COUNT);
+  }
 
   return (
     <section id="produk" className="mx-auto max-w-7xl px-4 pb-[34px] pt-[12px] sm:px-6 sm:pb-[44px] sm:pt-[16px] lg:px-8">
@@ -50,7 +63,7 @@ export function HomeProductBrowser() {
             Pilih produk favoritmu
           </h2>
           <p className="mt-[7px] max-w-2xl text-[11px] leading-[1.5] text-white/42 sm:text-xs">
-            Top up game, voucher, hiburan, pulsa, dan PLN dalam satu katalog.
+            Top up game, voucher, hiburan, pulsa, dan PLN langsung dari halaman utama.
           </p>
         </div>
 
@@ -59,14 +72,14 @@ export function HomeProductBrowser() {
           <Input
             id="search"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => changeQuery(event.target.value)}
             placeholder="Cari game, voucher, pulsa, PLN..."
             className="h-[36px] rounded-[8px] border-white/10 bg-[#10131b] pl-[34px] pr-[34px] text-[11px] text-white placeholder:text-white/25"
           />
           {query && (
             <button
               type="button"
-              onClick={() => setQuery("")}
+              onClick={() => changeQuery("")}
               className="absolute right-[10px] top-1/2 -translate-y-1/2 text-white/35 hover:text-white"
               aria-label="Hapus pencarian"
             >
@@ -91,7 +104,7 @@ export function HomeProductBrowser() {
             <button
               key={value}
               type="button"
-              onClick={() => setFilter(value)}
+              onClick={() => chooseFilter(value)}
               className={`inline-flex h-[30px] shrink-0 items-center gap-[5px] rounded-[7px] border px-[10px] text-[10px] font-bold transition ${
                 filter === value
                   ? "border-[#b9ff35] bg-[#b9ff35] text-[#091006]"
@@ -104,14 +117,21 @@ export function HomeProductBrowser() {
           ))}
         </div>
         <span className="hidden shrink-0 text-[9px] text-white/25 sm:block">
-          {loading ? "Memuat katalog" : databaseReady ? "Katalog terbaru" : "Katalog tidak tersedia"}
+          {loading ? "Memuat produk" : databaseReady ? `${filtered.length} produk` : "Produk tidak tersedia"}
         </span>
       </div>
 
       {visible.length ? (
-        <div className="mt-[16px] grid grid-cols-3 gap-x-[10px] gap-y-[18px] sm:grid-cols-4 sm:gap-x-[14px] sm:gap-y-[20px] lg:grid-cols-6">
+        <div className="mt-[16px] grid grid-cols-3 gap-x-[10px] gap-y-[12px] sm:grid-cols-4 sm:gap-[14px] lg:grid-cols-6">
           {visible.map((product) => (
-            <ProductCard key={product.slug} product={product} />
+            <Link
+              key={product.slug}
+              href={`/checkout?product=${encodeURIComponent(product.slug)}`}
+              aria-label={`Pilih ${product.name}`}
+              className="home-product-tile group relative block aspect-[2/3] min-w-0 overflow-hidden border border-white/[0.10] bg-[#0d1019] shadow-[0_10px_24px_-18px_rgba(0,0,0,0.9)] transition duration-200 hover:-translate-y-0.5 hover:border-[#b9ff35]/40"
+            >
+              <ProductArtwork product={product} />
+            </Link>
           ))}
         </div>
       ) : (
@@ -121,18 +141,18 @@ export function HomeProductBrowser() {
         </div>
       )}
 
-      <div className="mt-[22px] flex justify-center">
-        <Button
-          asChild
-          variant="outline"
-          className="h-[34px] rounded-[8px] border-white/10 bg-white/[0.03] px-[14px] text-[10px] font-bold text-white hover:bg-white/[0.08] hover:text-white"
-        >
-          <Link href="/catalog">
-            Lihat semua produk
-            <ArrowRight className="ml-1.5 size-[13px]" />
-          </Link>
-        </Button>
-      </div>
+      {hasMore && (
+        <div className="mt-[22px] flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setVisibleCount((current) => current + PRODUCT_PAGE_SIZE)}
+            className="h-[34px] rounded-[8px] border-white/10 bg-white/[0.03] px-[14px] text-[10px] font-bold text-white hover:bg-white/[0.08] hover:text-white"
+          >
+            Tampilkan Lainnya...
+          </Button>
+        </div>
+      )}
     </section>
   );
 }

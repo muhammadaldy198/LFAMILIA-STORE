@@ -5,7 +5,7 @@ const origin = "https://lfamiliastore.my.id";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
-    ["", 1, "daily"], ["/catalog", 0.9, "daily"], ["/news", 0.7, "daily"], ["/promo", 0.7, "daily"],
+    ["", 1, "daily"], ["/news", 0.7, "daily"], ["/promo", 0.7, "daily"],
     ["/faq", 0.6, "monthly"], ["/contact", 0.5, "monthly"], ["/leaderboard", 0.5, "daily"],
     ["/privacy", 0.3, "yearly"], ["/terms", 0.3, "yearly"], ["/refund", 0.3, "yearly"],
   ].map(([path, priority, changeFrequency]) => ({

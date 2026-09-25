@@ -46,7 +46,7 @@ export async function listHomeBanners(includeInactive = false): Promise<HomeBann
      FROM home_banners ${includeInactive ? "" : "WHERE is_active = 1"}
      ORDER BY sort_order ASC, id ASC`,
   ).all<{ id: number; title: string; subtitle: string; image_url: string; cta_label: string; cta_href: string; is_active: number; sort_order: number }>();
-  return result.results.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, ...decodeBannerImages(row.image_url), ctaLabel: row.cta_label, ctaHref: safeNavigationUrl(row.cta_href, "/catalog"), isActive: Boolean(row.is_active), sortOrder: row.sort_order }));
+  return result.results.map((row) => ({ id: row.id, title: row.title, subtitle: row.subtitle, ...decodeBannerImages(row.image_url), ctaLabel: row.cta_label, ctaHref: safeNavigationUrl(row.cta_href, "/#produk"), isActive: Boolean(row.is_active), sortOrder: row.sort_order }));
 }
 
 export async function saveHomeBanner(input: Omit<HomeBannerRecord, "id">, id?: number) {
