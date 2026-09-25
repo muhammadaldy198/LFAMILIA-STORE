@@ -36,17 +36,18 @@ export function StoreFooter({ showBrandBanner = true }: { showBrandBanner?: bool
     <footer className="bg-[#05070b]">
       {showBrandBanner && (
         <div
-          className="relative left-1/2 h-[72px] w-screen -translate-x-1/2 overflow-hidden bg-[#05070b] sm:h-[82px] md:h-[92px] lg:h-[104px]"
+          className="relative left-1/2 flex h-[72px] w-screen -translate-x-1/2 items-center justify-center overflow-hidden border-y border-[#b9ff35]/15 bg-[radial-gradient(circle_at_center,rgba(185,255,53,0.14),transparent_34%),linear-gradient(90deg,#020407_0%,#07110a_24%,#0b170d_50%,#07110a_76%,#020407_100%)] sm:h-[82px] md:h-[92px] lg:h-[104px]"
           data-sitewide-footer-banner
           aria-label="LFAMILIA STORE"
         >
-          <img
-            src="/brand/lfamilia-footer-banner.webp?v=20260925c"
-            alt="LFAMILIA STORE"
-            className="block size-full max-w-none object-cover object-center"
-            loading="eager"
-            decoding="async"
-          />
+          <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(185,255,53,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(185,255,53,0.08)_1px,transparent_1px)] [background-size:34px_34px]" />
+          <div className="relative flex items-center gap-3 px-4 sm:gap-4">
+            <img src="/icon-192.png" alt="" aria-hidden="true" className="size-12 object-cover sm:size-14 md:size-16" />
+            <div className="leading-none">
+              <strong className="block text-xl font-black tracking-[0.08em] text-white sm:text-2xl md:text-3xl">LFAMILIA</strong>
+              <span className="mt-1 block text-[9px] font-bold tracking-[0.42em] text-[#b9ff35] sm:text-[10px] md:text-xs">STORE</span>
+            </div>
+          </div>
         </div>
       )}
       <div className="border-t border-white/[0.08]">
