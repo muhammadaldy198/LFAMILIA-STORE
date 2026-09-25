@@ -86,6 +86,9 @@ test("public wallet settings shape matches customer topup UI and has no dummy ch
 test("Admin and Super Admin can manage topup routing, but credentials stay Super Admin only", () => {
   assert.match(routingRoute, /requireAdminSession\(request, "admin"\)/);
   assert.match(routingRoute, /const ownerAccess = await requireAdminSession\(request, "owner"\)/);
-  assert.match(adminWalletRoute, /requireAdminSession\(request, "admin"\)/);
+  assert.match(adminWalletRoute, /requireAdminSession\(request, "owner"\)/);
+  assert.match(routingRoute, /action: z\.literal\("save_wallet_topup_gateway"\)/);
   assert.match(routingRoute, /walletTopupGateway: z\.enum\(\["doku", "midtrans"\]\)/);
+  assert.match(adminPayment, /action: "save_wallet_topup_gateway"/);
+  assert.match(adminPayment, /role === "super_admin"/);
 });
