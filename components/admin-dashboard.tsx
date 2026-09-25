@@ -28,6 +28,7 @@ import { AdminAccountMenu } from "@/components/admin-account-menu";
 import { AdminNotifications } from "@/components/admin-notifications";
 import { AdminDigiflazzWorkspace } from "@/components/admin-digiflazz-workspace";
 import { AdminExperienceManager } from "@/components/admin-experience-manager";
+import { AdminHomepageCategoryManager } from "@/components/admin-homepage-category-manager";
 import { AdminIntegrationWorkspace } from "@/components/admin-integration-workspace";
 import { AdminKokinpayWorkspace } from "@/components/admin-kokinpay-workspace";
 import { AdminOrderManager } from "@/components/admin-order-manager";
@@ -287,7 +288,7 @@ export function AdminDashboard({
             <TabsContent value="overview" className="mt-0"><AdminOverview role={initialSession.role} onNavigate={setActiveTab} /></TabsContent>
             <TabsContent value="orders" className="mt-0"><AdminOrderManager /></TabsContent>
             {(isOwner || isAdmin) && <TabsContent value="products" className="mt-0"><AdminProductManager /></TabsContent>}
-            <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} />{initialSession.role === "staff" && <StaffProductContentWorkspace />}</TabsContent>
+            <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} /><AdminHomepageCategoryManager />{initialSession.role === "staff" && <StaffProductContentWorkspace />}</TabsContent>
 
             {(isOwner || isAdmin) && <TabsContent value="digiflazz" className="mt-0"><AdminDigiflazzWorkspace /></TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="account-validation" className="mt-0"><AdminKokinpayWorkspace /></TabsContent>}

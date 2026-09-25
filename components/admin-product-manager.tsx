@@ -26,10 +26,7 @@ import {
 } from "lucide-react";
 import {
   PRODUCT_CATEGORIES,
-  PRODUCT_CATEGORY_LABELS,
   productCategoryLabel,
-  productCategorySlug,
-  type ProductCategoryLabel,
 } from "@/lib/product-categories";
 
 type ProductProvider = "Digiflazz" | "Manual";
@@ -90,7 +87,7 @@ type Product = {
   name: string;
   slug: string;
   description: string;
-  category: ProductCategoryLabel;
+  category: string;
   provider: ProductProvider;
   nominalCount: number;
   startPrice: number;
@@ -136,22 +133,20 @@ type DigiflazzCatalogItem = {
 
 type DigiflazzImportItem = DigiflazzCatalogItem & { sku: string };
 
-function displayCategory(value: string): Product["category"] {
-  return productCategoryLabel(value);
+type ManagedCategoryOption = { slug: string; name: string; isActive?: boolean; sortOrder?: number };
+
+function displayCategory(value: string, categories: ManagedCategoryOption[]): Product["category"] {
+  return categories.find((item) => item.slug === value)?.name ?? productCategoryLabel(value);
 }
 
-function apiCategory(value: Product["category"]) {
-  return productCategorySlug(value);
-}
-
-function mapProduct(raw: ManagedProductPayload): Product {
+function mapProductRecord(raw: ManagedProductPayload, categories: ManagedCategoryOption[]): Product {
   const activePackages = raw.packages.filter((item) => item.isActive);
   return {
     id: raw.dbId ?? raw.sortOrder + 1,
     name: raw.name,
     slug: raw.slug,
     description: raw.description || raw.publisher || "Produk digital LFAMILIA",
-    category: displayCategory(raw.category),
+    category: displayCategory(raw.category, categories),
     provider: raw.packages.some((item) => item.providerCode === "digiflazz") || raw.fulfillmentType === "automatic" ? "Digiflazz" : "Manual",
     nominalCount: raw.packages.length,
     startPrice: activePackages.length ? Math.min(...activePackages.map((item) => item.price)) : 0,
@@ -171,6 +166,9 @@ async function readJson<T>(response: Response): Promise<T> {
 
 export function AdminProductManager() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<ManagedCategoryOption[]>(
+    () => PRODUCT_CATEGORIES.map((item, index) => ({ slug: item.slug, name: item.label, isActive: true, sortOrder: index })),
+  );
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Semua Kategori");
   const [provider, setProvider] = useState("Semua Provider");
@@ -189,7 +187,17 @@ export function AdminProductManager() {
     setLoading(true);
     setError("");
     try {
-      const payload = await readJson<{ products: ManagedProductPayload[] }>(await fetch("/api/panel/products", { cache: "no-store", signal }));
+      const [productPayload, categoryPayload] = await Promise.all([
+        readJson<{ products: ManagedProductPayload[] }>(await fetch("/api/panel/products", { cache: "no-store", signal })),
+        readJson<{ categories: ManagedCategoryOption[] }>(await fetch("/api/panel/categories", { cache: "no-store", signal })),
+      ]);
+      const nextCategories = (categoryPayload.categories || [])
+        .slice()
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
+      const usableCategories = nextCategories.length ? nextCategories : categoryOptions;
+      setCategoryOptions(usableCategories);
+      const payload = productPayload;
+      const mapProduct = (item: ManagedProductPayload) => mapProductRecord(item, usableCategories);
       setProducts(payload.products.map(mapProduct));
     } catch (reason) {
       if (reason instanceof DOMException && reason.name === "AbortError") return;
@@ -233,14 +241,14 @@ export function AdminProductManager() {
     const name = String(form.get("name") || "Produk Baru");
     const slug = String(form.get("slug") || slugify(name));
     const selectedProvider = String(form.get("provider") || "Manual") as ProductProvider;
-    const category = String(form.get("category") || "Top Up Game") as Product["category"];
+    const category = String(form.get("category") || categoryOptions[0]?.slug || "game");
     const image = form.get("image");
     const raw: ManagedProductPayload = {
       dbId: null,
       name,
       slug,
       publisher: "",
-      category: apiCategory(category),
+      category,
       imageUrl: "",
       bannerUrl: String(form.get("banner") || ""),
       description: String(form.get("description") || "Produk digital LFAMILIA"),
@@ -273,7 +281,7 @@ export function AdminProductManager() {
         raw.imageUrl = uploaded.url;
       }
       const result = await readJson<{ id: number }>(await fetch("/api/panel/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(raw) }));
-      const next = mapProduct({ ...raw, dbId: result.id });
+      const next = mapProductRecord({ ...raw, dbId: result.id }, categoryOptions);
       setProducts((current) => [...current, next]);
       setManualProductOpen(false);
       setEditorProduct(next);
@@ -290,13 +298,13 @@ export function AdminProductManager() {
     setError("");
     try {
       await readJson(await fetch("/api/panel/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nextRaw) }));
-      setProducts((current) => current.map((item) => item.id === id ? mapProduct(nextRaw) : item));
+      setProducts((current) => current.map((item) => item.id === id ? mapProductRecord(nextRaw, categoryOptions) : item));
       setNotice(`${product.name} ${nextRaw.isActive ? "ditampilkan" : "disembunyikan"} dari katalog.`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Status produk gagal diperbarui."); }
   }
 
   if (editorProduct) {
-    return <ProductEditor product={editorProduct} onBack={() => { setEditorProduct(null); void loadProducts(); }} onNotice={setNotice} />;
+    return <ProductEditor product={editorProduct} categoryOptions={categoryOptions} onBack={() => { setEditorProduct(null); void loadProducts(); }} onNotice={setNotice} />;
   }
 
   return (
@@ -314,7 +322,7 @@ export function AdminProductManager() {
 
       <div className="mt-[15px] grid grid-cols-1 gap-[8px] sm:grid-cols-2 xl:grid-cols-[1.65fr_.75fr_.78fr_.72fr_.85fr_auto]">
         <label className="relative"><Search className="absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#708198]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama produk, kategori, atau slug..." className="h-[34px] w-full rounded-[5px] border border-[#dce3eb] bg-white pl-[31px] pr-[9px] text-[9px] outline-none placeholder:text-[#8290a2] focus:border-[#2680eb]" /></label>
-        <CompactSelect value={category} onChange={setCategory} options={["Semua Kategori", ...PRODUCT_CATEGORY_LABELS]} />
+        <CompactSelect value={category} onChange={setCategory} options={["Semua Kategori", ...categoryOptions.map((item) => item.name)]} />
         <CompactSelect value={provider} onChange={setProvider} options={["Semua Provider", "Digiflazz", "Manual"]} />
         <CompactSelect value={status} onChange={setStatus} options={["Semua Status", "Aktif", "Nonaktif"]} />
         <CompactSelect value={sort} onChange={setSort} options={["Urutkan: Terbaru", "Urutkan: Nama A-Z"]} />
@@ -336,7 +344,7 @@ export function AdminProductManager() {
         </div>
       </section>
 
-      {manualProductOpen && <ManualProductModal saving={saving} onClose={() => setManualProductOpen(false)} onSubmit={addProduct} />}
+      {manualProductOpen && <ManualProductModal categoryOptions={categoryOptions.filter((item) => item.isActive !== false)} saving={saving} onClose={() => setManualProductOpen(false)} onSubmit={addProduct} />}
     </div>
   );
 }
@@ -350,7 +358,7 @@ function ProductTable({ products, startIndex, onEdit, onToggle }: { products: Pr
   );
 }
 
-function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack(): void; onNotice(message: string): void }) {
+function ProductEditor({ product, categoryOptions, onBack, onNotice }: { product: Product; categoryOptions: ManagedCategoryOption[]; onBack(): void; onNotice(message: string): void }) {
   const [tab, setTab] = useState<EditorTab>("Nominal & Harga");
   const [nominals, setNominals] = useState<Nominal[]>(() => product.raw.packages.map((item) => ({
     id: item.id,
@@ -658,7 +666,7 @@ function ProductEditor({ product, onBack, onNotice }: { product: Product; onBack
           <StorePreview product={product} nominals={nominals} sections={sections} mode={previewMode} onMode={setPreviewMode} />
         </div>
       ) : (
-        tab === "Input Customer" ? <EditorTabPanel tab={tab} product={product} targetTemplate={targetTemplate} checkoutType={checkoutType} labelId={labelId} labelServer={labelServer} nicknameGameCode={nicknameGameCode} onCheckoutType={setCheckoutType} onLabelId={setLabelId} onLabelServer={setLabelServer} onNicknameGameCode={setNicknameGameCode} inputLoading={inputLoading} saving={inputSaving} onSave={saveInputSettings} /> : <ProductSettingsPanel tab={tab} product={product} values={{ name, slug, publisher, description, imageUrl, bannerUrl, category, isActive, popular, instant, fulfillmentType, manualInstructions }} onChange={(key, value) => { if (key === "name") setName(String(value)); else if (key === "slug") setSlug(String(value)); else if (key === "publisher") setPublisher(String(value)); else if (key === "description") setDescription(String(value)); else if (key === "imageUrl") setImageUrl(String(value)); else if (key === "bannerUrl") setBannerUrl(String(value)); else if (key === "category") setCategory(String(value)); else if (key === "isActive") setIsActive(Boolean(value)); else if (key === "popular") setPopular(Boolean(value)); else if (key === "instant") setInstant(Boolean(value)); else if (key === "fulfillmentType") setFulfillmentType(value as "automatic" | "manual"); else if (key === "manualInstructions") setManualInstructions(String(value)); }} uploading={mediaUploading} onUpload={(field, file) => void uploadProductImage(field, file)} saving={inputSaving || mediaUploading.imageUrl || mediaUploading.bannerUrl} onSave={() => void saveProductChanges()} />
+        tab === "Input Customer" ? <EditorTabPanel tab={tab} product={product} targetTemplate={targetTemplate} checkoutType={checkoutType} labelId={labelId} labelServer={labelServer} nicknameGameCode={nicknameGameCode} onCheckoutType={setCheckoutType} onLabelId={setLabelId} onLabelServer={setLabelServer} onNicknameGameCode={setNicknameGameCode} inputLoading={inputLoading} saving={inputSaving} onSave={saveInputSettings} /> : <ProductSettingsPanel tab={tab} product={product} categoryOptions={categoryOptions.filter((item) => item.isActive !== false)} values={{ name, slug, publisher, description, imageUrl, bannerUrl, category, isActive, popular, instant, fulfillmentType, manualInstructions }} onChange={(key, value) => { if (key === "name") setName(String(value)); else if (key === "slug") setSlug(String(value)); else if (key === "publisher") setPublisher(String(value)); else if (key === "description") setDescription(String(value)); else if (key === "imageUrl") setImageUrl(String(value)); else if (key === "bannerUrl") setBannerUrl(String(value)); else if (key === "category") setCategory(String(value)); else if (key === "isActive") setIsActive(Boolean(value)); else if (key === "popular") setPopular(Boolean(value)); else if (key === "instant") setInstant(Boolean(value)); else if (key === "fulfillmentType") setFulfillmentType(value as "automatic" | "manual"); else if (key === "manualInstructions") setManualInstructions(String(value)); }} uploading={mediaUploading} onUpload={(field, file) => void uploadProductImage(field, file)} saving={inputSaving || mediaUploading.imageUrl || mediaUploading.bannerUrl} onSave={() => void saveProductChanges()} />
       )}
 
       {importOpen && <ImportNominalModal existing={nominals} onClose={() => setImportOpen(false)} onImport={(added) => { setNominals((current) => [...current, ...added]); setImportOpen(false); setMessage(`${added.length} nominal Digiflazz berhasil ditambahkan.`); }} />}
@@ -745,10 +753,10 @@ type ProductSettingsValues = {
   manualInstructions: string;
 };
 
-function ProductSettingsPanel({ tab, product, values, onChange, uploading, onUpload, saving, onSave }: { tab: Exclude<EditorTab, "Nominal & Harga" | "Tabel Pemisah" | "Input Customer">; product: Product; values: ProductSettingsValues; onChange(key: keyof ProductSettingsValues, value: string | boolean): void; uploading: Record<"imageUrl" | "bannerUrl", boolean>; onUpload(field: "imageUrl" | "bannerUrl", file?: File): void; saving: boolean; onSave(): void }) {
+function ProductSettingsPanel({ tab, product, categoryOptions, values, onChange, uploading, onUpload, saving, onSave }: { tab: Exclude<EditorTab, "Nominal & Harga" | "Tabel Pemisah" | "Input Customer">; product: Product; categoryOptions: ManagedCategoryOption[]; values: ProductSettingsValues; onChange(key: keyof ProductSettingsValues, value: string | boolean): void; uploading: Record<"imageUrl" | "bannerUrl", boolean>; onUpload(field: "imageUrl" | "bannerUrl", file?: File): void; saving: boolean; onSave(): void }) {
   return <section className="mt-[12px] rounded-[7px] border border-[#dfe6ef] bg-white p-[16px]">
     <div className="flex items-center justify-between border-b border-[#e8ecf1] pb-[11px]"><div><h2 className="text-[13px] font-extrabold">{tab}</h2><p className="mt-[2px] text-[8px] text-[#6c7d92]">Pengaturan {tab.toLowerCase()} untuk {product.name}.</p></div><button type="button" disabled={saving} onClick={onSave} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>
-    {tab === "Informasi Produk" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><ControlledField label="Nama produk" value={values.name} onChange={(value) => onChange("name", value)} /><ControlledField label="Slug" value={values.slug} onChange={(value) => onChange("slug", value)} /><ControlledField label="Publisher" value={values.publisher} onChange={(value) => onChange("publisher", value)} /><label className="text-[8px] font-bold text-[#3d4f68]">Kategori<select value={values.category} onChange={(event) => onChange("category", event.target.value)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]">{PRODUCT_CATEGORIES.map((item) => <option key={item.slug} value={item.slug}>{item.label}</option>)}</select></label><ProductMediaField label="Gambar produk (opsional, rasio 1:1)" field="imageUrl" value={values.imageUrl} onChange={(value) => onChange("imageUrl", value)} uploading={uploading.imageUrl} onUpload={onUpload} /><ProductMediaField label="Banner halaman produk (opsional)" field="bannerUrl" value={values.bannerUrl} onChange={(value) => onChange("bannerUrl", value)} uploading={uploading.bannerUrl} onUpload={onUpload} /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Deskripsi singkat<textarea value={values.description} onChange={(event) => onChange("description", event.target.value)} className="mt-[4px] h-[74px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label></div>}
+    {tab === "Informasi Produk" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><ControlledField label="Nama produk" value={values.name} onChange={(value) => onChange("name", value)} /><ControlledField label="Slug" value={values.slug} onChange={(value) => onChange("slug", value)} /><ControlledField label="Publisher" value={values.publisher} onChange={(value) => onChange("publisher", value)} /><label className="text-[8px] font-bold text-[#3d4f68]">Kategori<select value={values.category} onChange={(event) => onChange("category", event.target.value)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]">{categoryOptions.map((item) => <option key={item.slug} value={item.slug}>{item.name}</option>)}</select></label><ProductMediaField label="Gambar produk (opsional, rasio 1:1)" field="imageUrl" value={values.imageUrl} onChange={(value) => onChange("imageUrl", value)} uploading={uploading.imageUrl} onUpload={onUpload} /><ProductMediaField label="Banner halaman produk (opsional)" field="bannerUrl" value={values.bannerUrl} onChange={(value) => onChange("bannerUrl", value)} uploading={uploading.bannerUrl} onUpload={onUpload} /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Deskripsi singkat<textarea value={values.description} onChange={(event) => onChange("description", event.target.value)} className="mt-[4px] h-[74px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label></div>}
     {tab === "Tampilan Produk" && <div className="mt-[14px] grid grid-cols-3 gap-[10px]"><SettingSwitch label="Aktif" value={values.isActive} onChange={(value) => onChange("isActive", value)} /><SettingSwitch label="Ditampilkan di katalog" value={values.isActive} onChange={(value) => onChange("isActive", value)} /><SettingSwitch label="Produk populer" value={values.popular} onChange={(value) => onChange("popular", value)} /></div>}
     {tab === "Fulfillment" && <div className="mt-[14px] grid grid-cols-2 gap-[12px]"><label className="text-[8px] font-bold text-[#3d4f68]">Jenis pemenuhan<select value={values.fulfillmentType} onChange={(event) => onChange("fulfillmentType", event.target.value)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="automatic">Otomatis</option><option value="manual">Manual</option></select></label><SettingSwitch label="Proses instan" value={values.instant} onChange={(value) => onChange("instant", value)} /><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Instruksi pemenuhan manual<textarea value={values.manualInstructions} onChange={(event) => onChange("manualInstructions", event.target.value)} disabled={values.fulfillmentType !== "manual"} className="mt-[4px] h-[84px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px] disabled:bg-[#f3f5f8]" placeholder="Instruksi internal/admin untuk memproses pesanan" /></label></div>}
   </section>;
@@ -889,7 +897,7 @@ function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal
   );
 }
 
-function ManualProductModal({ saving, onClose, onSubmit }: { saving: boolean; onClose(): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
+function ManualProductModal({ categoryOptions, saving, onClose, onSubmit }: { categoryOptions: ManagedCategoryOption[]; saving: boolean; onClose(): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
   return (
     <SimpleModal title="Tambah Produk Manual" description="Semua produk dibuat sendiri. Nominal dapat ditambahkan setelah produk tersimpan." onClose={onClose} wide>
       <form onSubmit={onSubmit}>
@@ -907,7 +915,7 @@ function ManualProductModal({ saving, onClose, onSubmit }: { saving: boolean; on
           </label>
           <Field label="Nama Produk *" name="name" placeholder="Contoh: Roblox Robux" required />
           <Field label="Slug *" name="slug" placeholder="contoh: roblox-robux" />
-          <label className="text-[8px] font-bold">Kategori *<select name="category" defaultValue="Top Up Game" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]">{PRODUCT_CATEGORY_LABELS.map((label) => <option key={label} value={label}>{label}</option>)}</select></label>
+          <label className="text-[8px] font-bold">Kategori *<select name="category" defaultValue={categoryOptions[0]?.slug || "game"} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]">{categoryOptions.map((item) => <option key={item.slug} value={item.slug}>{item.name}</option>)}</select></label>
           <label className="text-[8px] font-bold">Provider nominal *<select name="provider" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option>Digiflazz</option><option>Manual</option></select></label>
           <label className="col-span-2 text-[8px] font-bold">Deskripsi singkat<textarea name="description" placeholder="Deskripsi singkat produk..." className="mt-[4px] h-[72px] w-full resize-none rounded-[4px] border border-[#dce3eb] p-[9px] text-[8px]" /></label>
           <label className="col-span-2 text-[8px] font-bold">Banner halaman produk (opsional)<input name="banner" placeholder="Boleh dikosongkan dan ditambahkan nanti" className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label>
