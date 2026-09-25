@@ -9,7 +9,7 @@ const schema = z.object({
   productSlug: z.string().trim().min(2).max(80),
   packageSku: z.string().trim().min(2).max(100),
   voucherCode: z.string().trim().max(40).optional(),
-  quantity: z.number().int().min(1).max(10).default(1),
+  quantity: z.number().int().min(1).max(5).default(1),
 });
 
 export async function POST(request: Request) {
