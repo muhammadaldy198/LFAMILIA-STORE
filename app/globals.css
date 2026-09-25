@@ -346,7 +346,7 @@ body main [data-slot="tabs-trigger"] {
 .admin-select,
 .admin-readonly {
   width: 100%;
-  min-height: 2rem;
+  min-height: 2.125rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0.4rem;
   background: rgba(255, 255, 255, 0.035);
@@ -629,25 +629,25 @@ body {
 /* Checkout mobile density: keep customer controls compact without affecting admin or desktop. */
 @media (max-width: 639px) {
   [data-lf-checkout-form="true"] .checkout-input {
-    height: 1.75rem !important;
-    min-height: 1.75rem !important;
-    padding: 0.15rem 0.55rem !important;
+    height: 1.9rem !important;
+    min-height: 1.9rem !important;
+    padding: 0.2rem 0.6rem !important;
     border-radius: 0.35rem !important;
-    font-size: 0.72rem !important;
+    font-size: 0.76rem !important;
     line-height: 1rem !important;
   }
 
   [data-lf-checkout-form="true"] .field-label {
-    margin-bottom: 0.2rem;
-    font-size: 0.64rem;
-    line-height: 0.9rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.68rem;
+    line-height: 0.95rem;
   }
 
   [data-lf-checkout-form="true"] [data-slot="button"][data-size="sm"] {
-    height: 1.75rem !important;
-    min-height: 1.75rem !important;
-    padding-left: 0.55rem !important;
-    padding-right: 0.55rem !important;
+    height: 1.9rem !important;
+    min-height: 1.9rem !important;
+    padding-left: 0.65rem !important;
+    padding-right: 0.65rem !important;
   }
 
   [data-lf-mobile-checkout="true"] [data-slot="button"] {
