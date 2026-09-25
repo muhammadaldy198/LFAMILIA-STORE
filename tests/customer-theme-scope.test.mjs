@@ -52,3 +52,21 @@ test("popular section stays compact and close to the product browser", () => {
   assert.match(popular, /pb-\[10px\] pt-\[22px\]/);
   assert.match(browser, /pb-\[34px\] pt-\[12px\]/);
 });
+
+
+test("homepage owns the full customer product catalog without visible names or prices", () => {
+  const browser = read("components/home-product-browser.tsx");
+  const catalog = read("app/catalog/page.tsx");
+  const sitemap = read("app/sitemap.ts");
+
+  assert.match(browser, /const INITIAL_PRODUCT_COUNT = 12/);
+  assert.match(browser, /const PRODUCT_PAGE_SIZE = 12/);
+  assert.match(browser, /const visible = filtered\.slice\(0, visibleCount\)/);
+  assert.match(browser, /Tampilkan Lainnya\.\.\./);
+  assert.match(browser, /home-product-tile/);
+  assert.match(browser, /<ProductArtwork product=\{product\} \/>/);
+  assert.doesNotMatch(browser, /<ProductCard/);
+  assert.doesNotMatch(browser, /formatRupiah/);
+  assert.match(catalog, /permanentRedirect\("\/#produk"\)/);
+  assert.doesNotMatch(sitemap, /"\/catalog"/);
+});
