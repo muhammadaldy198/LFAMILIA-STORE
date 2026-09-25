@@ -27,3 +27,13 @@ test("customer footer brand banner is full viewport width on every breakpoint", 
   assert.match(footer, /className="block h-auto w-full max-w-none object-cover"/);
   assert.match(layout, /<StoreFooter showBrandBanner=\{customerTheme\} \/>/);
 });
+
+
+test("LFAMILIA banner is the first visual block inside the footer", () => {
+  const footerStart = source.indexOf('<footer className="bg-[#05070b]">');
+  const banner = source.indexOf('data-sitewide-footer-banner');
+  const footerBody = source.indexOf('border-t border-white/[0.08]');
+  assert.ok(footerStart >= 0);
+  assert.ok(banner > footerStart);
+  assert.ok(footerBody > banner);
+});
