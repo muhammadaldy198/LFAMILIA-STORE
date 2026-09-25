@@ -292,7 +292,7 @@ export function AdminDashboard({
 
             {(isOwner || isAdmin) && <TabsContent value="digiflazz" className="mt-0"><AdminDigiflazzWorkspace /></TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="account-validation" className="mt-0"><AdminKokinpayWorkspace /></TabsContent>}
-            {(isOwner || isAdmin) && <TabsContent value="payments" className="mt-0"><AdminPaymentWorkspace /></TabsContent>}
+            {(isOwner || isAdmin) && <TabsContent value="payments" className="mt-0"><AdminPaymentWorkspace role={initialSession.role} /></TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="customers" className="mt-0">{isOwner ? <AdminCustomerWorkspace /> : <AdminCustomerDirectory />}</TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="promotions" className="mt-0"><AdminPromoWorkspace /></TabsContent>}
             <TabsContent value="support" className="mt-0"><AdminSupportWorkspace /></TabsContent>
