@@ -32,7 +32,7 @@ type RoutingOverview = {
   midtransMode: "snap";
   dokuEnvironment: Environment;
   midtransEnvironment: Environment;
-  walletTopupGateway: Gateway;
+  walletTopupGateway: Gateway | null;
   callbacks?: {
     dokuNotification?: string;
     midtransSnapNotification?: string;
@@ -47,7 +47,7 @@ function groupForMethod(method: Channel["method"]) {
   return method === "qris" ? "QRIS" : method === "va" ? "VA Bank" : "E-Wallet";
 }
 
-export function AdminPaymentWorkspace() {
+export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" | "staff" }) {
   const [tab, setTab] = useState("Metode Pembayaran");
   const [channels, setChannels] = useState<Channel[]>([]);
   const [gatewaySettings, setGatewaySettings] = useState<GatewaySetting[]>([
@@ -207,11 +207,23 @@ export function AdminPaymentWorkspace() {
     try {
       if (tab === "Metode Pembayaran") {
         if (routing) {
+          if (!routing.walletTopupGateway) throw new Error("Pilih gateway top up saldo sebelum menyimpan.");
           await request("/api/panel/payment-routing", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "save_modes", ...routing }),
+            body: JSON.stringify({ action: "save_wallet_topup_gateway", walletTopupGateway: routing.walletTopupGateway }),
           });
+          if (role === "super_admin") {
+            await request("/api/panel/payment-routing", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "save_modes",
+                dokuEnvironment: routing.dokuEnvironment,
+                midtransEnvironment: routing.midtransEnvironment,
+              }),
+            });
+          }
         }
         for (const gateway of gatewaySettings) {
           await request("/api/panel/payment-methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "gateway_status", gateway: gateway.gateway, enabled: gateway.isActive }) });
@@ -266,9 +278,9 @@ export function AdminPaymentWorkspace() {
   const successful = paymentOrders.filter((order) => order.payment_status === "paid");
   const failed = paymentOrders.filter((order) => ["failed", "expired", "cancelled"].includes(order.payment_status));
   const gatewayActive = (gateway: Gateway) => gatewaySettings.find((item) => item.gateway === gateway)?.isActive ?? false;
-  const walletTopupGateway = routing?.walletTopupGateway || "doku";
-  const walletTopupGatewayReady = Boolean(gatewayReadiness[walletTopupGateway]?.ready);
-  const walletTopupGatewayActive = gatewayActive(walletTopupGateway);
+  const walletTopupGateway = routing?.walletTopupGateway ?? null;
+  const walletTopupGatewayReady = walletTopupGateway ? Boolean(gatewayReadiness[walletTopupGateway]?.ready) : false;
+  const walletTopupGatewayActive = walletTopupGateway ? gatewayActive(walletTopupGateway) : false;
 
   return <div>
     <WorkspaceHeader title="Pembayaran" description="Kelola metode, gateway, top up saldo, tampilan halaman, dan transaksi. Customer tidak melihat nama gateway internal." actions={<><button type="button" disabled={busy} onClick={testConnection} className={buttonClass}><RefreshCw className={`size-3.5 ${busy ? "animate-spin" : ""}`} />Periksa Konfigurasi</button><button type="button" disabled={busy} onClick={save} className={primaryButtonClass}><Save className="size-3.5" />{busy ? "Memproses..." : "Simpan Perubahan"}</button></>} />
@@ -300,11 +312,13 @@ export function AdminPaymentWorkspace() {
           <GatewayControl gateway="doku" title="DOKU Checkout" ready={Boolean(gatewayReadiness.doku?.ready)} enabled={gatewayActive("doku")} environment={routing?.dokuEnvironment || "sandbox"} onEnabled={(value) => setGatewaySettings((current) => current.map((item) => item.gateway === "doku" ? { ...item, isActive: value } : item))} onEnvironment={(value) => setRouting((current) => current ? { ...current, dokuEnvironment: value } : current)} />
           <GatewayControl gateway="midtrans" title="Midtrans Snap" ready={Boolean(gatewayReadiness.midtrans?.ready)} enabled={gatewayActive("midtrans")} environment={routing?.midtransEnvironment || "sandbox"} onEnabled={(value) => setGatewaySettings((current) => current.map((item) => item.gateway === "midtrans" ? { ...item, isActive: value } : item))} onEnvironment={(value) => setRouting((current) => current ? { ...current, midtransEnvironment: value } : current)} />
         </div></Panel>
-        {canManageWallet && <Panel title="Top Up Saldo" description="Pilih gateway khusus untuk top up saldo. Pilihan ini terpisah dari routing checkout."><div className="grid gap-3 p-4">
-          <Field label="Gateway top up saldo"><select className={inputClass} value={walletTopupGateway} onChange={(event) => setRouting((current) => current ? { ...current, walletTopupGateway: event.target.value as Gateway } : current)}><option value="doku">DOKU Checkout</option><option value="midtrans">Midtrans Snap</option></select></Field>
-          <div className="flex items-center justify-between rounded-md border border-[#e3e8ef] p-3"><div><strong className="block text-[9px] text-[#34445f]">Status gateway pilihan</strong><span className="text-[8px] text-[#8a98aa]">Harus siap dan gateway global harus ON agar top up dapat dibuat.</span></div><Status tone={walletTopupGatewayReady && walletTopupGatewayActive ? "green" : "amber"}>{walletTopupGatewayReady ? (walletTopupGatewayActive ? "Siap & Aktif" : "Siap · OFF") : "Belum siap"}</Status></div>
-          <Field label="Minimum top up saldo"><input className={inputClass} inputMode="numeric" value={walletSettings.minTopup} onChange={(event) => setWalletSettings((current) => ({ ...current, minTopup: Number(event.target.value.replace(/\D/g, "")) || 0 }))} /></Field>
-          <div className="flex items-center justify-between rounded-md border border-[#e3e8ef] p-3"><div><strong className="block text-[9px] text-[#34445f]">Aktifkan top up saldo otomatis</strong><span className="text-[8px] text-[#8a98aa]">Master toggle top up saldo. OFF menolak semua permintaan top up otomatis.</span></div><Toggle checked={walletSettings.automaticTopupEnabled} onChange={(value) => setWalletSettings((current) => ({ ...current, automaticTopupEnabled: value }))} /></div>
+        {routing && <Panel title="Top Up Saldo" description="Admin/Super Admin memilih gateway top up secara eksplisit. Tidak ada fallback hardcoded."><div className="grid gap-3 p-4">
+          <Field label="Gateway top up saldo"><select className={inputClass} value={walletTopupGateway ?? ""} onChange={(event) => setRouting((current) => current ? { ...current, walletTopupGateway: event.target.value as Gateway } : current)}><option value="" disabled>Pilih gateway top up</option><option value="doku">DOKU Checkout</option><option value="midtrans">Midtrans Snap</option></select></Field>
+          <div className="flex items-center justify-between rounded-md border border-[#e3e8ef] p-3"><div><strong className="block text-[9px] text-[#34445f]">Status gateway pilihan</strong><span className="text-[8px] text-[#8a98aa]">Harus siap dan gateway global harus ON agar top up dapat dibuat.</span></div><Status tone={walletTopupGatewayReady && walletTopupGatewayActive ? "green" : "amber"}>{!walletTopupGateway ? "Belum dipilih" : walletTopupGatewayReady ? (walletTopupGatewayActive ? "Siap & Aktif" : "Siap · OFF") : "Belum siap"}</Status></div>
+          {canManageWallet && <>
+            <Field label="Minimum top up saldo"><input className={inputClass} inputMode="numeric" value={walletSettings.minTopup} onChange={(event) => setWalletSettings((current) => ({ ...current, minTopup: Number(event.target.value.replace(/\D/g, "")) || 0 }))} /></Field>
+            <div className="flex items-center justify-between rounded-md border border-[#e3e8ef] p-3"><div><strong className="block text-[9px] text-[#34445f]">Aktifkan top up saldo otomatis</strong><span className="text-[8px] text-[#8a98aa]">Master toggle top up saldo. OFF menolak semua permintaan top up otomatis.</span></div><Toggle checked={walletSettings.automaticTopupEnabled} onChange={(value) => setWalletSettings((current) => ({ ...current, automaticTopupEnabled: value }))} /></div>
+          </>}
         </div></Panel>}
         <Panel title="Callback Publik" description="URL untuk dashboard gateway."><div className="space-y-2 p-4"><CopyUrl label="DOKU Checkout Notification" value={routing?.callbacks?.dokuNotification || "/api/payments/doku/callback"} /><CopyUrl label="Midtrans Snap Notification" value={routing?.callbacks?.midtransSnapNotification || "/api/payments/midtrans/snap/notification"} /></div></Panel>
       </div>

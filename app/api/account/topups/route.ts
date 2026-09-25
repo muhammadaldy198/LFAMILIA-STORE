@@ -107,6 +107,9 @@ export async function POST(request: Request) {
         : input.paymentChannel;
     const managedChannel = await getPaymentChannel(input.paymentMethod, paymentChannel, false);
     const { walletTopupGateway } = await getActivePaymentModes();
+    if (!walletTopupGateway) {
+      throw new Error("Gateway top up saldo belum dipilih oleh Admin.");
+    }
     const topupGatewayConfig = managedChannel
       ? managedChannel.gateway === walletTopupGateway
         ? managedChannel.gatewayConfig

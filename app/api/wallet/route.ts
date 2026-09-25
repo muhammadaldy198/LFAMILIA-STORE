@@ -16,21 +16,23 @@ export async function GET() {
     listPaymentGatewaySettings(),
   ]);
 
-  const gatewayActive = gatewaySettings.some(
-    (item) => item.gateway === modes.walletTopupGateway && item.isActive,
-  );
-  const candidates = settings.automaticTopupEnabled && gatewayActive
+  const selectedGateway = modes.walletTopupGateway;
+  const gatewayActive = selectedGateway
+    ? gatewaySettings.some((item) => item.gateway === selectedGateway && item.isActive)
+    : false;
+  const candidates = settings.automaticTopupEnabled && selectedGateway && gatewayActive
     ? channels
     : [];
 
-  const gatewayReadiness = candidates.length
-    ? await getConfiguredGatewayBaseReadiness(modes.walletTopupGateway)
+  const gatewayReadiness = selectedGateway && candidates.length
+    ? await getConfiguredGatewayBaseReadiness(selectedGateway)
     : null;
 
   const publicChannels = candidates
     .filter((item) => {
       if (!gatewayReadiness?.ready) return false;
-      const gatewayConfig = item.gateway === modes.walletTopupGateway
+      if (!selectedGateway) return false;
+      const gatewayConfig = item.gateway === selectedGateway
         ? item.gatewayConfig
         : {
             customerFeeEnabled: item.gatewayConfig.customerFeeEnabled ?? "true",
@@ -38,7 +40,7 @@ export async function GET() {
             customerFeeFixed: item.gatewayConfig.customerFeeFixed ?? "0",
           };
       return isGatewayChannelSupported(
-        modes.walletTopupGateway,
+        selectedGateway,
         item.method,
         item.channel,
         gatewayConfig,
