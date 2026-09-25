@@ -248,7 +248,7 @@ export async function PATCH(request: Request) {
 
     const providerCode = order.provider_code?.trim().toLowerCase() || "";
     let refreshed = false;
-    if (providerCode === "digiflazz") {
+    if (providerCode === "digiflazz" && Math.max(1, Number(order.quantity || 1)) <= 1) {
       refreshed = await reconcileDigiflazzOrder(order.id, getPublicBaseUrl(), { force: true });
     } else {
       await fulfillAutomaticOrder(order.id, getPublicBaseUrl());
