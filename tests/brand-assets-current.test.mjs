@@ -13,7 +13,7 @@ test("LFAMILIA storefront uses the new themed logo asset", () => {
 
   assert.match(storeData, /logoUrl: "\/brand\/lfamilia-neon-logo\.webp"/);
   assert.match(storefront, /row\.logo_url === "\/brand\/lfamilia-pixel-logo\.webp"/);
-  assert.doesNotMatch(brand, /pixel-art size-full object-cover/);
+  assert.doesNotMatch(brand, /pixel-art size-full object-cover/);\n  assert.match(brand, /lfamilia-neon-logo\\.webp\\?v=20260925b/);
 });
 
 test("footer banner uses the compact full-width LFAMILIA artwork", () => {
