@@ -12,6 +12,10 @@ const saveModes = z.object({
   action: z.literal("save_modes"),
   dokuEnvironment: z.enum(["sandbox", "production"]),
   midtransEnvironment: z.enum(["sandbox", "production"]),
+});
+
+const saveWalletTopupGateway = z.object({
+  action: z.literal("save_wallet_topup_gateway"),
   walletTopupGateway: z.enum(["doku", "midtrans"]),
 });
 
@@ -23,7 +27,7 @@ const saveProfile = z.object({
   values: z.record(z.string().min(1).max(40), z.string().max(20_000)),
 });
 
-const schema = z.discriminatedUnion("action", [saveModes, saveProfile]);
+const schema = z.discriminatedUnion("action", [saveModes, saveWalletTopupGateway, saveProfile]);
 
 export async function GET(request: Request) {
   const access = await requireAdminSession(request, "admin");
@@ -38,19 +42,22 @@ export async function PUT(request: Request) {
   if (access instanceof Response) return access;
   try {
     const input = schema.parse(await request.json());
-    if (input.action === "save_modes") {
-      await savePaymentModeSelections({
-        dokuEnvironment: input.dokuEnvironment,
-        midtransEnvironment: input.midtransEnvironment,
-        walletTopupGateway: input.walletTopupGateway,
-      });
+    if (input.action === "save_wallet_topup_gateway") {
+      await savePaymentModeSelections({ walletTopupGateway: input.walletTopupGateway });
     } else {
       const ownerAccess = await requireAdminSession(request, "owner");
       if (ownerAccess instanceof Response) return ownerAccess;
-      if ((input.provider === "doku" && input.mode !== "checkout") || (input.provider === "midtrans" && input.mode !== "snap")) {
-        throw new Error("Kombinasi gateway dan mode tidak valid.");
+      if (input.action === "save_modes") {
+        await savePaymentModeSelections({
+          dokuEnvironment: input.dokuEnvironment,
+          midtransEnvironment: input.midtransEnvironment,
+        });
+      } else {
+        if ((input.provider === "doku" && input.mode !== "checkout") || (input.provider === "midtrans" && input.mode !== "snap")) {
+          throw new Error("Kombinasi gateway dan mode tidak valid.");
+        }
+        await savePaymentGatewayProfile(input);
       }
-      await savePaymentGatewayProfile(input);
     }
     return Response.json({ ok: true, overview: await getPaymentModeOverview() });
   } catch (error) {
