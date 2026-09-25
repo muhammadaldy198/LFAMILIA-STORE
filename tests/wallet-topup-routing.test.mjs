@@ -9,6 +9,8 @@ const account = fs.readFileSync(path.join(root, "components/customer-account.tsx
 const routing = fs.readFileSync(path.join(root, "lib/server/payment-mode-config.ts"), "utf8");
 const adminPayment = fs.readFileSync(path.join(root, "components/admin-payment-workspace.tsx"), "utf8");
 const doku = fs.readFileSync(path.join(root, "lib/server/doku-checkout.ts"), "utf8");
+const routingRoute = fs.readFileSync(path.join(root, "app/api/admin/payment-routing/route.ts"), "utf8");
+const adminWalletRoute = fs.readFileSync(path.join(root, "app/api/admin/wallet/route.ts"), "utf8");
 
 test("wallet topup follows the dedicated Admin-selected gateway on the server", () => {
   assert.match(routing, /wallet_topup_gateway/);
@@ -22,8 +24,11 @@ test("wallet topup follows the dedicated Admin-selected gateway on the server", 
   assert.match(route, /mode: readiness\.mode/);
   assert.match(route, /updateExternalWalletTopup\(/);
   assert.match(route, /idempotencyKey/);
+  assert.match(route, /Gateway top up saldo belum dipilih oleh Admin/);
   assert.doesNotMatch(route, /paymentGateway: "doku"/);
   assert.doesNotMatch(route, /ipaymu|fallback/i);
+  assert.doesNotMatch(routing, /return value === "midtrans" \? "midtrans" : "doku"/);
+  assert.match(routing, /value === "doku" \|\| value === "midtrans" \? value : null/);
 });
 
 test("Admin payment UI has independent topup gateway selector and kill switches", () => {
@@ -33,6 +38,9 @@ test("Admin payment UI has independent topup gateway selector and kill switches"
   assert.match(adminPayment, /Midtrans Snap/);
   assert.match(adminPayment, /Aktifkan top up saldo otomatis/);
   assert.match(adminPayment, /Gateway & Environment/);
+  assert.match(adminPayment, /Pilih gateway top up/);
+  assert.match(adminPayment, /Pilih gateway top up saldo sebelum menyimpan/);
+  assert.doesNotMatch(adminPayment, /walletTopupGateway \|\| "doku"/);
   assert.match(adminPayment, /<Toggle checked=\{enabled\} onChange=\{onEnabled\}/);
 });
 
@@ -72,4 +80,12 @@ test("public wallet settings shape matches customer topup UI and has no dummy ch
   assert.doesNotMatch(adminWallet, /dokuCheckoutEnabled|gatewayReadiness/);
   assert.doesNotMatch(settingsWorkspace, /tab === "Wallet"|Aktifkan checkout otomatis/);
   assert.match(adminPayment, /automaticTopupEnabled/);
+});
+
+
+test("Admin and Super Admin can manage topup routing, but credentials stay Super Admin only", () => {
+  assert.match(routingRoute, /requireAdminSession\(request, "admin"\)/);
+  assert.match(routingRoute, /const ownerAccess = await requireAdminSession\(request, "owner"\)/);
+  assert.match(adminWalletRoute, /requireAdminSession\(request, "admin"\)/);
+  assert.match(routingRoute, /walletTopupGateway: z\.enum\(\["doku", "midtrans"\]\)/);
 });
