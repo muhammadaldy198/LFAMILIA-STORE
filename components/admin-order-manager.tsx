@@ -36,6 +36,7 @@ type Order = {
   phone: string;
   product: string;
   packageName: string;
+  quantity: number;
   productCode: string;
   destination: string;
   destinationNote: string;
@@ -58,6 +59,7 @@ type ApiOrder = {
   product_name: string;
   package_sku: string;
   package_label: string;
+  quantity?: number;
   destination: string;
   server: string | null;
   nickname: string | null;
@@ -109,6 +111,7 @@ function mapApiOrder(order: ApiOrder): Order {
     phone: order.buyer_phone || "-",
     product: order.product_name,
     packageName: order.package_label,
+    quantity: Math.max(1, Number(order.quantity || 1)),
     productCode: order.product_name.split(/\s+/).map((part) => part[0]).join("").slice(0, 5).toUpperCase(),
     destination: order.destination,
     destinationNote: [order.server ? `Server: ${order.server}` : "", order.nickname ? `Nickname: ${order.nickname}` : ""].filter(Boolean).join(" · "),
@@ -149,7 +152,7 @@ function shortDate(value?: string) {
 
 function exportRows(rows: Order[], filename: string) {
   const headings = ["ID Pesanan", "Pelanggan", "Produk", "Tujuan", "Pembayaran", "Provider", "Total", "Status"];
-  const lines = rows.map((order) => [order.id, order.customer, `${order.product} ${order.packageName}`, order.destination, order.payment, order.provider, order.total, order.status]);
+  const lines = rows.map((order) => [order.id, order.customer, `${order.product} ${order.packageName}${order.quantity > 1 ? ` × ${order.quantity}` : ""}`, order.destination, order.payment, order.provider, order.total, order.status]);
   const csv = [headings, ...lines].map((line) => line.map(csvCell).join(",")).join("\n");
   const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }));
   const anchor = document.createElement("a");
