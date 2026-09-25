@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { StorefrontSettings } from "@/lib/store-data";
 
 export function StoreBrand({ settings, compact = false }: { settings: StorefrontSettings; compact?: boolean }) {
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);\n  const logoSrc = settings.logoUrl === "/brand/lfamilia-neon-logo.webp" ? "/brand/lfamilia-neon-logo.webp?v=20260925b" : settings.logoUrl;
   return (
     <>
       <span className={`${compact ? "size-9" : "size-10"} grid shrink-0 place-items-center overflow-hidden rounded-[4px] border-2 border-[#2584ff]/55 bg-black font-mono text-xs font-black text-[#b9ff35] shadow-[3px_3px_0_rgba(185,255,53,0.24),0_0_22px_rgba(37,132,255,0.28)]`}>
