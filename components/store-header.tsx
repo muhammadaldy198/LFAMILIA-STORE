@@ -104,8 +104,7 @@ export function StoreHeader() {
   function goHome(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
     if (pathname === "/") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      window.history.replaceState(null, "", "/");
+      window.location.assign("/");
       return;
     }
     router.push("/");
