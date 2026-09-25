@@ -779,6 +779,28 @@ function EditorTabPanel({ tab, product, targetTemplate, checkoutType, labelId, l
   return <section className="mt-[12px] rounded-[7px] border border-[#dfe6ef] bg-white p-[16px]"><div className="flex items-center justify-between border-b border-[#e8ecf1] pb-[11px]"><div><h2 className="text-[13px] font-extrabold">{tab}</h2><p className="mt-[2px] text-[8px] text-[#6c7d92]">Pengaturan {tab.toLowerCase()} untuk {product.name}.</p></div><button type="button" disabled={saving || (tab === "Input Customer" && inputLoading)} onClick={onSave} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50"><Save className="size-[12px]" />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>{tab === "Input Customer" && <div className="mt-[14px] grid max-w-[900px] grid-cols-[minmax(0,1fr)_300px] gap-[14px]"><div className="grid grid-cols-2 gap-[12px]"><label className="col-span-2 text-[8px] font-bold text-[#3d4f68]">Checkout Type<span className="mt-[3px] block font-normal text-[#718197]">Pilih data akun yang harus diisi pelanggan.</span><select disabled={inputLoading} value={checkoutType} onChange={(event) => onCheckoutType(event.target.value as "id" | "id-server")} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] bg-white px-[10px] text-[9px]"><option value="id">ID</option><option value="id-server">ID + Server</option></select></label><label className="text-[8px] font-bold text-[#3d4f68]">Label ID<span className="mt-[3px] block font-normal text-[#718197]">Nama field yang tampil di checkout customer.</span><input disabled={inputLoading} value={labelId} onChange={(event) => onLabelId(event.target.value)} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="Contoh: User ID" /></label><label className="text-[8px] font-bold text-[#3d4f68]">Kode Game Nickname<span className="mt-[3px] block font-normal text-[#718197]">Kosongkan bila produk tidak memakai cek nickname. Ambil kode dari menu Kokinpay.</span><input disabled={inputLoading} value={nicknameGameCode} onChange={(event) => onNicknameGameCode(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="mobile-legends" /></label>{checkoutType === "id-server" && <label className="text-[8px] font-bold text-[#3d4f68]">Label Server<span className="mt-[3px] block font-normal text-[#718197]">Nama field server/zone di checkout customer.</span><input disabled={inputLoading} value={labelServer} onChange={(event) => onLabelServer(event.target.value)} className="mt-[5px] h-[36px] w-full rounded-[5px] border border-[#dce3eb] px-[10px] text-[9px]" placeholder="Contoh: Zone ID" /></label>}</div><aside className="rounded-[7px] border border-[#dce6f2] bg-[#f8fbff] p-[13px]"><p className="text-[9px] font-extrabold text-[#263b58]">Preview Input Checkout</p>{inputLoading ? <p className="mt-[10px] text-[8px] text-[#718197]">Memuat pengaturan dari backend...</p> : <><label className="mt-[10px] block text-[8px] font-bold text-[#4c6078]">{labelId || "ID"}<input disabled placeholder={`Masukkan ${labelId || "ID"}`} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]" /></label>{checkoutType === "id-server" && <label className="mt-[9px] block text-[8px] font-bold text-[#4c6078]">{labelServer || "Server"}<input disabled placeholder={`Masukkan ${labelServer || "Server"}`} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]" /></label>}</>}<p className="mt-[12px] text-[8px] font-bold text-[#2f4968]">Format customer_no</p><code className="mt-[5px] block rounded-[4px] bg-white px-[9px] py-[8px] text-[8px] text-[#0875ed]">{targetTemplate}</code><p className="mt-[6px] text-[7.5px] leading-4 text-[#718197]">Backend menggabungkan data ini saat mengirim pesanan otomatis, lalu mengunci aturan verifikasi nickname. Staff hanya mengatur jenis dan label input pelanggan.</p></aside></div>}</section>;
 }
 
+function digiflazzNominalLabel(productName: string, brand: string) {
+  const value = productName.trim();
+  const separated = value
+    .split(/\s+(?:-|–|—|\|)\s+|:\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const tail = separated.at(-1) || value;
+  if (separated.length > 1 && /\d/.test(tail)) return tail;
+
+  const brandWords = brand.trim().split(/\s+/).filter(Boolean);
+  if (brandWords.length) {
+    const escapedBrand = brandWords
+      .map((word) => word.replace(/[.*+?^$\{\}()|[\]\\]/g, "\\$&"))
+      .join("[\\s._-]*");
+    const withoutBrand = value.replace(new RegExp(`^${escapedBrand}[\\s._:-]*`, "i"), "").trim();
+    if (withoutBrand && /\d/.test(withoutBrand)) return withoutBrand;
+  }
+
+  const numericTail = value.match(/(?:^|\s)(\d[\d.,]*\s+.+)$/);
+  return numericTail?.[1]?.trim() || value;
+}
+
 function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal[]; onClose(): void; onImport(items: Nominal[]): void }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [step, setStep] = useState(1);
@@ -847,7 +869,7 @@ function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal
       .filter((item) => selected.includes(item.buyerSkuCode))
       .map((item) => ({
         id: crypto.randomUUID(),
-        name: item.productName,
+        name: digiflazzNominalLabel(item.productName, item.brand),
         sku: item.sku,
         group: defaultGroup,
         cost: item.price,

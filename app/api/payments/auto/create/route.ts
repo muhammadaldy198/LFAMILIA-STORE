@@ -57,6 +57,7 @@ const routingSchema = z.object({
   paymentMethod: z.enum(["va", "ewallet", "qris"]),
   paymentChannel: z.string().trim().min(2).max(30),
   voucherCode: z.string().trim().max(40).optional(),
+  quantity: z.number().int().min(1).max(5).default(1),
   idempotencyKey: z.string().uuid(),
 });
 
@@ -83,6 +84,7 @@ function existingExternalResponse(order: OrderRecord) {
     referenceId: order.reference_id,
     publicInvoice: publicInvoice(order.reference_id),
     fulfillmentType: order.fulfillment_type,
+    quantity: Math.max(1, Number(order.quantity || 1)),
     basePrice: order.base_subtotal,
     sellingPrice: order.subtotal,
     discountAmount: order.discount_amount,
@@ -185,6 +187,7 @@ export async function POST(request: Request) {
             discountPercent: membership.setting.discountPercent,
           }
         : null,
+      input.quantity,
     );
 
     const customerData = normalizeCustomerInputs(
@@ -226,6 +229,7 @@ export async function POST(request: Request) {
       customerId: customer?.id ?? null,
       externalCheckoutKey: input.idempotencyKey,
       promotion,
+      quantity: input.quantity,
       adminFee: paymentFee,
     });
 
@@ -288,6 +292,7 @@ export async function POST(request: Request) {
         referenceId: identity.referenceId,
         publicInvoice: invoice,
         fulfillmentType: item.fulfillmentType,
+        quantity: input.quantity,
         basePrice: promotion.basePrice,
         sellingPrice: promotion.sellingPrice,
         discountAmount: promotion.discountAmount,

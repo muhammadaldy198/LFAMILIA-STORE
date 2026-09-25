@@ -123,9 +123,10 @@ export class PromotionQuoteError extends Error {}
 export async function quotePromotion(
   productSlug: string,
   packageSku: string,
-  basePrice: number,
+  unitPrice: number,
   voucherCode?: string | null,
   member?: { tier?: MemberTier | null; discountPercent?: number } | null,
+  quantity = 1,
 ): Promise<PromotionQuote> {
   const db = getD1();
   const now = new Date().toISOString();
@@ -134,7 +135,9 @@ export async function quotePromotion(
      WHERE product_slug = ? AND package_sku = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
        AND (stock_limit IS NULL OR sold_count + reserved_count < stock_limit) LIMIT 1`,
   ).bind(productSlug, packageSku, now, now).first<{ id: number; sale_price: number; ends_at: string }>();
-  const sellingPrice = flash && flash.sale_price < basePrice ? flash.sale_price : basePrice;
+  const normalizedQuantity = Math.max(1, Math.min(5, Math.trunc(Number(quantity) || 1)));
+  const basePrice = unitPrice * normalizedQuantity;
+  const sellingPrice = (flash && flash.sale_price < unitPrice ? flash.sale_price : unitPrice) * normalizedQuantity;
   let voucherDiscountAmount = 0;
   let voucher: VoucherRow | null = null;
 

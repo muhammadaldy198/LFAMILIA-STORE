@@ -32,7 +32,7 @@ function visibleOrder(order: OrderRecord, role: AdminRole) {
     product_name: order.product_name, package_sku: order.package_sku,
     package_label: order.package_label, destination: order.destination, server: order.server,
     nickname: order.nickname, buyer_name: order.buyer_name, buyer_phone: order.buyer_phone,
-    customer_inputs_json: order.customer_inputs_json, total: null,
+    customer_inputs_json: order.customer_inputs_json, quantity: Math.max(1, Number(order.quantity || 1)), total: null,
     payment_method: order.payment_method, payment_channel: order.payment_channel,
     payment_status: order.payment_status, fulfillment_type: order.fulfillment_type,
     fulfillment_status: order.fulfillment_status, delivery_mode: snapshot.delivery_mode,
@@ -248,7 +248,7 @@ export async function PATCH(request: Request) {
 
     const providerCode = order.provider_code?.trim().toLowerCase() || "";
     let refreshed = false;
-    if (providerCode === "digiflazz") {
+    if (providerCode === "digiflazz" && Math.max(1, Number(order.quantity || 1)) <= 1) {
       refreshed = await reconcileDigiflazzOrder(order.id, getPublicBaseUrl(), { force: true });
     } else {
       await fulfillAutomaticOrder(order.id, getPublicBaseUrl());

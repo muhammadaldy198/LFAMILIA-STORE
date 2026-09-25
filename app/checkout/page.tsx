@@ -232,6 +232,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const [hideNotice, setHideNotice] = useState(false);
   const [voucherCode, setVoucherCode] = useState("");
   const [voucherMessage, setVoucherMessage] = useState("");
+  const [quantity, setQuantity] = useState(1);
   const [quote, setQuote] = useState<PromotionQuote | null>(null);
   const [applyingVoucher, setApplyingVoucher] = useState(false);
   const [account, setAccount] = useState<CustomerSession | null>(null);
@@ -282,7 +283,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     : productInputFields[1]
       ? (customerInputValues[productInputFields[1].id] ?? "")
       : "";
-  const subtotal = quote?.finalPrice ?? selectedPackage?.price ?? 0;
+  const subtotal = quote?.finalPrice ?? (selectedPackage?.price ?? 0) * quantity;
   const eligiblePaymentChannels = availablePaymentChannels;
   const fulfillmentMode = selectedPackage?.fulfillmentMode ?? (product.fulfillmentType === "manual" ? "manual" : "provider");
   const isManual = fulfillmentMode === "manual";
@@ -323,8 +324,8 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   const checkoutGroups = useMemo(() => [
     {
       code: "wallet" as const,
-      name: "Koin LFAMILIA",
-      description: "Bayar langsung dari saldo akun",
+      name: "LFAMILIA Cash",
+      description: "Bayar memakai saldo LFAMILIA Cash",
     },
     ...gatewayPaymentGroups,
   ], [gatewayPaymentGroups]);
@@ -427,11 +428,11 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   useEffect(() => {
     if (!selectedPackage || !fulfillmentAvailable) return;
     const controller = new AbortController();
-    void requestQuote(product.slug, selectedPackage.id, "", controller.signal)
+    void requestQuote(product.slug, selectedPackage.id, "", quantity, controller.signal)
       .then(setQuote)
       .catch(() => undefined);
     return () => controller.abort();
-  }, [fulfillmentAvailable, product.slug, selectedPackage]);
+  }, [fulfillmentAvailable, product.slug, quantity, selectedPackage]);
 
   useEffect(() => {
     const cleanId = destination.trim();
@@ -546,6 +547,15 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     chooseMethod,
   ]);
 
+  function changeQuantity(next: number) {
+    const normalized = Math.max(1, Math.min(isVoucherStock ? 1 : 5, Math.trunc(next)));
+    setQuantity(normalized);
+    setPayment(null);
+    setVoucherCode("");
+    setVoucherMessage("");
+    setQuote(null);
+  }
+
   function choosePackage(id: string) {
     const item = product.packages.find((candidate) => candidate.id === id);
     if (!item || (product.fulfillmentType === "automatic" && item.fulfillmentAvailable !== true)) {
@@ -557,6 +567,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
     setVoucherCode("");
     setVoucherMessage("");
     setQuote(null);
+    setQuantity(1);
   }
 
   function chooseSavedGameAccount(id: string) {
@@ -600,6 +611,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
         product.slug,
         selectedPackage.id,
         voucherCode,
+        quantity,
       );
       setQuote(nextQuote);
       setVoucherCode(nextQuote.voucherCode ?? "");
@@ -718,6 +730,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
           paymentMethod,
           paymentChannel,
           voucherCode: voucherCode.trim() || undefined,
+          quantity,
       };
       const fingerprint = JSON.stringify(requestPayload);
       if (checkoutAttemptRef.current?.fingerprint !== fingerprint) {
@@ -951,6 +964,37 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
               <section className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4">
                 <StepTitle
                   number={isVoucherProduct ? "2" : "3"}
+                  title="Jumlah Pembelian"
+                  description={isVoucherStock ? "Produk kode voucher hanya dapat dibeli satu per pesanan." : "Atur jumlah pembelian untuk nominal yang dipilih."}
+                />
+                <div className="mt-3 flex items-center gap-2">
+                  <div className="flex h-10 min-w-0 flex-1 items-center rounded-lg border border-white/[0.10] bg-white/[0.035] px-3">
+                    <strong className="text-sm text-white">{quantity}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={quantity <= 1 || isVoucherStock}
+                    onClick={() => changeQuantity(quantity - 1)}
+                    className="grid size-10 shrink-0 place-items-center rounded-lg border border-white/[0.10] bg-white/[0.04] text-xl text-white/70 disabled:cursor-not-allowed disabled:opacity-30"
+                    aria-label="Kurangi jumlah"
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    disabled={quantity >= 5 || isVoucherStock}
+                    onClick={() => changeQuantity(quantity + 1)}
+                    className="grid size-10 shrink-0 place-items-center rounded-lg border border-white/[0.10] bg-white/[0.04] text-xl text-white/70 disabled:cursor-not-allowed disabled:opacity-30"
+                    aria-label="Tambah jumlah"
+                  >
+                    +
+                  </button>
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4">
+                <StepTitle
+                  number={isVoucherProduct ? "3" : "4"}
                   title="Pilih Pembayaran"
                   description="Pilih metode pembayaran yang ingin digunakan."
                 />
@@ -962,7 +1006,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                 )}
                 {paymentMethodsLoaded && !hasExternalPaymentOption && (
                   <div className="mt-3 rounded-md border border-amber-300/20 bg-amber-300/[0.05] px-3 py-2 text-[10px] leading-4 text-amber-100/75">
-                    Pembayaran otomatis belum tersedia. Kamu masih bisa memakai Koin LFAMILIA bila saldo mencukupi.
+                    Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi.
                   </div>
                 )}
                 <div className="mt-3 space-y-2">
@@ -981,9 +1025,15 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                           onClick={() => chooseMethod(group.code)}
                           className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left disabled:cursor-not-allowed disabled:opacity-45"
                         >
-                          <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${selected ? "bg-[#b9ff35] text-[#091006]" : "bg-white/[0.06] text-white/55"}`}>
-                            <Icon className="size-3.5" />
-                          </span>
+                          {group.code === "wallet" ? (
+                            <span className="size-8 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black">
+                              <img src="/payment/lfamilia-cash.webp" alt="LFAMILIA Cash" className="size-full object-cover" />
+                            </span>
+                          ) : (
+                            <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${selected ? "bg-[#b9ff35] text-[#091006]" : "bg-white/[0.06] text-white/55"}`}>
+                              <Icon className="size-3.5" />
+                            </span>
+                          )}
                           <span className="min-w-0 flex-1">
                             <strong className="block text-[11px] sm:text-xs">{group.name}</strong>
                             <span className="mt-0.5 block truncate text-[9px] text-white/40">
@@ -1054,8 +1104,8 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
 
               <section className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4">
                 <StepTitle
-                  number={isVoucherProduct ? "3" : "4"}
-                  title="Data Pembeli & Voucher"
+                  number={isVoucherProduct ? "4" : "5"}
+                  title="Data Pembeli"
                   description="Email dan WhatsApp digunakan untuk invoice serta status transaksi."
                 />
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -1075,8 +1125,18 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                     />
                   </Field>
                 </div>
-                <div className="mt-3 border-t border-white/[0.08] pt-3">
-                  <span className="field-label">Kode voucher</span>
+                <p className="mt-2.5 flex items-start gap-1.5 text-[9px] leading-4 text-white/32">
+                  <ShieldCheck className="mt-0.5 size-3 shrink-0" /> Kami hanya memakai kontak untuk invoice dan status transaksi.
+                </p>
+              </section>
+
+              <section className="rounded-lg border border-white/[0.10] bg-[#2f3338] p-3 sm:p-4">
+                <StepTitle
+                  number={isVoucherProduct ? "5" : "6"}
+                  title="Kode Promo"
+                  description="Masukkan kode promo atau voucher diskon yang tersedia."
+                />
+                <div className="mt-3">
                   <div className="flex gap-2">
                     <Input
                       id="voucher-code"
@@ -1085,24 +1145,20 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                         setVoucherCode(event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""));
                         setVoucherMessage("");
                       }}
-                      placeholder="Masukkan kode promo"
+                      placeholder="Ketik kode promo kamu"
                       className="checkout-input font-mono uppercase"
                     />
                     <Button
                       type="button"
                       onClick={() => void applyVoucher()}
                       disabled={applyingVoucher || !packageId}
-                      variant="outline"
-                      className="h-9 shrink-0 rounded-lg border-white/10 bg-white/[0.04] px-3 text-[10px] text-white hover:bg-white/[0.08] hover:text-white"
+                      className="h-9 shrink-0 rounded-lg bg-[#bca17d] px-4 text-[10px] font-black text-white hover:bg-[#d1b18b]"
                     >
                       {applyingVoucher ? <LoaderCircle className="size-4 animate-spin" /> : "Gunakan"}
                     </Button>
                   </div>
-                  {voucherMessage && <p className={`mt-1.5 text-[9px] ${quote?.voucherCode ? "text-[#cfff72]" : "text-amber-200"}`}>{voucherMessage}</p>}
+                  {voucherMessage && <p className={`mt-2 text-[9px] ${quote?.voucherCode ? "text-[#cfff72]" : "text-amber-200"}`}>{voucherMessage}</p>}
                 </div>
-                <p className="mt-2.5 flex items-start gap-1.5 text-[9px] leading-4 text-white/32">
-                  <ShieldCheck className="mt-0.5 size-3 shrink-0" /> Kami hanya memakai kontak untuk invoice dan status transaksi.
-                </p>
               </section>
 
               {error && (
@@ -1130,7 +1186,9 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                 <SummaryRow label="Produk" value={product.name} />
                 {visibleNickname.nickname && <SummaryRow label="Nickname" value={visibleNickname.nickname} highlight />}
                 <SummaryRow label="Nominal" value={selectedPackage?.label ?? "Belum dipilih"} />
-                <SummaryRow label="Harga" value={formatRupiah(subtotal)} />
+                <SummaryRow label="Harga Satuan" value={formatRupiah(selectedPackage?.price ?? 0)} />
+                <SummaryRow label="Jumlah" value={String(quantity)} />
+                <SummaryRow label="Subtotal" value={formatRupiah(subtotal)} />
                 {quote && quote.sellingPrice < quote.basePrice && <SummaryRow label="Harga promo" value={`-${formatRupiah(quote.basePrice - quote.sellingPrice)}`} highlight />}
                 {quote && quote.discountAmount > 0 && <SummaryRow label={`Voucher ${quote.voucherCode ?? ""}`} value={`-${formatRupiah(quote.discountAmount)}`} highlight />}
                 <SummaryRow
@@ -1188,8 +1246,9 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                   <ChevronDown className="size-4 shrink-0 text-white/55" />
                 </button>
                 <dl className="space-y-2 border-t border-white/10 px-3 py-2.5 text-[10px]">
-                  <SummaryRow label="Harga" value={formatRupiah(subtotal)} />
-                  <SummaryRow label="Jumlah" value="1" />
+                  <SummaryRow label="Harga Satuan" value={formatRupiah(selectedPackage?.price ?? 0)} />
+                  <SummaryRow label="Jumlah" value={String(quantity)} />
+                  <SummaryRow label="Subtotal" value={formatRupiah(subtotal)} />
                   <SummaryRow label="Biaya Pembayaran" value={formatRupiah(payment?.fee ?? estimatedPaymentFee)} />
                   <SummaryRow label="Total Pembayaran" value={formatRupiah(payment?.total ?? estimatedPaymentTotal)} highlight />
                 </dl>
@@ -1223,7 +1282,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
         <DialogContent className="max-w-md border-white/10 bg-[#191b20] text-white" showCloseButton={false}>
           <DialogHeader><div className="mx-auto grid size-14 place-items-center rounded-full bg-[#b9ff35]/15"><CheckCircle2 className="size-8 text-[#b9ff35]" /></div><DialogTitle className="pt-3 text-center text-lg font-black">Buat Pesanan</DialogTitle><DialogDescription className="text-center text-xs leading-5 text-white/55">{isVoucherProduct ? "Pastikan produk, nominal, dan pembayaran yang kamu pilih sudah sesuai." : "Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai."}</DialogDescription></DialogHeader>
-          <dl className="rounded-xl bg-black/15 p-4 text-xs">{!isVoucherProduct && visibleNickname.nickname && <SummaryRow label="Username" value={visibleNickname.nickname} />}{!isVoucherProduct && productInputFields.map((field) => <SummaryRow key={field.id} label={field.label} value={(customerInputValues[field.id] ?? "").trim() || "-"} />)}<SummaryRow label="Item" value={selectedPackage?.label ?? "-"} /><SummaryRow label="Produk" value={product.name} /><SummaryRow label="Payment" value={checkoutGroups.find((item) => item.code === paymentMethod)?.name ?? "-"} /><SummaryRow label="Biaya Pembayaran" value={formatRupiah(estimatedPaymentFee)} /><SummaryRow label="Total Bayar" value={formatRupiah(estimatedPaymentTotal)} /></dl>
+          <dl className="rounded-xl bg-black/15 p-4 text-xs">{!isVoucherProduct && visibleNickname.nickname && <SummaryRow label="Username" value={visibleNickname.nickname} />}{!isVoucherProduct && productInputFields.map((field) => <SummaryRow key={field.id} label={field.label} value={(customerInputValues[field.id] ?? "").trim() || "-"} />)}<SummaryRow label="Item" value={selectedPackage?.label ?? "-"} /><SummaryRow label="Jumlah" value={String(quantity)} /><SummaryRow label="Produk" value={product.name} /><SummaryRow label="Payment" value={checkoutGroups.find((item) => item.code === paymentMethod)?.name ?? "-"} /><SummaryRow label="Biaya Pembayaran" value={formatRupiah(estimatedPaymentFee)} /><SummaryRow label="Total Bayar" value={formatRupiah(estimatedPaymentTotal)} /></dl>
           <label className="flex cursor-pointer items-start gap-3 text-xs leading-5 text-white/60"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-0.5 size-4 accent-[#b9ff35]" />Dengan melanjutkan, saya menyetujui syarat & ketentuan yang berlaku.</label>
           <div className="grid grid-cols-2 gap-3"><Button type="button" onClick={() => { setConfirmationOpen(false); void submitOrder(); }} disabled={!agreed || submitting} className="bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">{submitting ? "Memproses..." : "Pesan Sekarang"}</Button><Button type="button" variant="outline" onClick={() => setConfirmationOpen(false)} className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">Batalkan</Button></div>
         </DialogContent>
@@ -1302,6 +1361,7 @@ async function requestQuote(
   productSlug: string,
   packageSku: string,
   voucherCode = "",
+  quantity = 1,
   signal?: AbortSignal,
 ) {
   const response = await fetch("/api/promotions/quote", {
@@ -1311,6 +1371,7 @@ async function requestQuote(
       productSlug,
       packageSku,
       voucherCode: voucherCode || undefined,
+      quantity,
     }),
     signal,
   });

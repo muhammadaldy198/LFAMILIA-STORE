@@ -9,6 +9,7 @@ const schema = z.object({
   productSlug: z.string().trim().min(2).max(80),
   packageSku: z.string().trim().min(2).max(100),
   voucherCode: z.string().trim().max(40).optional(),
+  quantity: z.number().int().min(1).max(5).default(1),
 });
 
 export async function POST(request: Request) {
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
       item.price,
       input.voucherCode,
       membership ? { tier: membership.tier, discountPercent: membership.setting.discountPercent } : null,
+      input.quantity,
     ));
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message : error instanceof Error ? error.message : "Harga promo gagal dihitung.";

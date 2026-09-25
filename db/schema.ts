@@ -216,6 +216,7 @@ export const orders = sqliteTable(
     buyerPhone: text("buyer_phone").notNull(),
     customerNotes: text("customer_notes"),
     customerInputsJson: text("customer_inputs_json").notNull().default("[]"),
+    quantity: integer("quantity").notNull().default(1),
     baseSubtotal: integer("base_subtotal").notNull().default(0),
     subtotal: integer("subtotal").notNull(),
     discountAmount: integer("discount_amount").notNull().default(0),
@@ -262,6 +263,27 @@ export const orders = sqliteTable(
     index("orders_payment_gateway_status_idx").on(table.paymentGateway, table.paymentStatus, table.createdAt),
     index("orders_created_at_idx").on(table.createdAt),
     index("orders_customer_created_idx").on(table.customerId, table.createdAt),
+  ],
+);
+
+export const orderFulfillmentUnits = sqliteTable(
+  "order_fulfillment_units",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+    unitIndex: integer("unit_index").notNull(),
+    providerRefId: text("provider_ref_id").notNull(),
+    providerStatus: text("provider_status").notNull().default("waiting"),
+    providerMessage: text("provider_message"),
+    providerSerialNumber: text("provider_serial_number"),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("order_fulfillment_units_order_index_unique").on(table.orderId, table.unitIndex),
+    uniqueIndex("order_fulfillment_units_provider_ref_unique").on(table.providerRefId),
+    index("order_fulfillment_units_order_status_idx").on(table.orderId, table.providerStatus),
   ],
 );
 

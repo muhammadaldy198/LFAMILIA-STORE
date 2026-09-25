@@ -4,7 +4,7 @@ import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { isAutomaticPackageAvailable } from "@/lib/server/availability";
 import type { ProductInputField } from "@/lib/store-data";
 import { getProviderAdapter } from "@/lib/server/providers";
-import type { ProviderResult } from "@/lib/server/providers/types";
+import type { ProviderAdapter, ProviderResult } from "@/lib/server/providers/types";
 import { notifyOrderFulfillmentSuccessById } from "@/lib/server/transaction-notifications";
 import { FULFILLMENT_ERROR_TRANSITION_GUARD_SQL } from "@/lib/server/fulfillment-transition-guard.mjs";
 import {
@@ -72,6 +72,7 @@ export type OrderRecord = {
   buyer_phone: string;
   customer_notes: string | null;
   customer_inputs_json: string;
+  quantity: number;
   base_subtotal: number;
   subtotal: number;
   discount_amount: number;
@@ -255,6 +256,18 @@ function assertManualServiceOpen(item: PurchasableItem) {
   if (!openNow) throw new CheckoutValidationError("Layanan manual sedang di luar jam operasional.");
 }
 
+export function normalizeOrderQuantity(value: unknown) {
+  const quantity = Math.trunc(Number(value) || 1);
+  if (quantity < 1 || quantity > 5) {
+    throw new CheckoutValidationError("Jumlah pembelian harus antara 1 sampai 5.");
+  }
+  return quantity;
+}
+
+function fulfillmentUnitReference(referenceId: string, unitIndex: number) {
+  return `${referenceId}-Q${String(unitIndex).padStart(2, "0")}`;
+}
+
 export function createOrderIdentity() {
   const id = crypto.randomUUID();
   const date = new Date().toISOString().slice(2, 10).replaceAll("-", "");
@@ -303,9 +316,14 @@ export async function insertPendingOrder(input: {
   walletCheckoutKey?: string | null;
   externalCheckoutKey?: string | null;
   promotion: PromotionQuote;
+  quantity?: number;
   adminFee?: number;
 }) {
   const db = getD1();
+  const quantity = normalizeOrderQuantity(input.quantity);
+  if (quantity > 1 && input.item.providerCode === "voucher-stock") {
+    throw new CheckoutValidationError("Produk kode voucher hanya dapat dibeli 1 item per pesanan.");
+  }
   await assertAutomaticAvailability(input.item);
   if (input.item.fulfillmentType === "automatic") {
     if (!input.item.providerCode || !input.item.providerSku)
@@ -324,16 +342,16 @@ export async function insertPendingOrder(input: {
     input.server,
     input.customerInputs,
   );
-  await db
+  const orderStatement = db
     .prepare(
       `INSERT INTO orders (
       id, customer_id, wallet_checkout_key, external_checkout_key, reference_id, product_slug, product_name, package_sku, package_label,
       provider_code, provider_sku, fulfillment_type, delivery_mode, supplier_cost_snapshot, provider_max_price_snapshot, target_template, destination, server,
-      nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json,
+      nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json, quantity,
       base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
       admin_fee, total, payment_method, payment_channel,
       payment_gateway, payment_gateway_mode, payment_gateway_environment
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       input.id,
@@ -349,7 +367,7 @@ export async function insertPendingOrder(input: {
       input.item.providerSku,
       input.item.fulfillmentType,
       input.item.fulfillmentType === "manual" ? "manual" : input.item.providerCode === "voucher-stock" ? "voucher" : "direct",
-      input.item.supplierCost,
+      input.item.supplierCost == null ? null : input.item.supplierCost * quantity,
       input.item.providerMaxPrice,
       input.item.targetTemplate,
       input.destination,
@@ -361,6 +379,7 @@ export async function insertPendingOrder(input: {
       input.buyerPhone,
       input.customerNotes,
       JSON.stringify(input.customerInputs),
+      quantity,
       input.promotion.basePrice,
       input.promotion.sellingPrice,
       input.promotion.discountAmount,
@@ -373,8 +392,20 @@ export async function insertPendingOrder(input: {
       input.paymentGateway ?? null,
       input.paymentGatewayMode ?? null,
       input.paymentGatewayEnvironment ?? null,
-    )
-    .run();
+    );
+
+  const statements = [orderStatement];
+  if (input.item.fulfillmentType === "automatic" && input.item.providerCode === "digiflazz" && quantity > 1) {
+    for (let unitIndex = 1; unitIndex <= quantity; unitIndex += 1) {
+      statements.push(
+        db.prepare(
+          `INSERT INTO order_fulfillment_units (order_id, unit_index, provider_ref_id, provider_status)
+           VALUES (?, ?, ?, 'waiting')`,
+        ).bind(input.id, unitIndex, fulfillmentUnitReference(input.referenceId, unitIndex)),
+      );
+    }
+  }
+  await db.batch(statements);
 }
 
 export async function getExternalOrderByCheckoutKey(checkoutKey: string) {
@@ -496,6 +527,153 @@ export async function applyPaymentStatus(
   return false;
 }
 
+type FulfillmentUnitRow = {
+  id: number;
+  order_id: string;
+  unit_index: number;
+  provider_ref_id: string;
+  provider_status: string;
+  provider_message: string | null;
+  provider_serial_number: string | null;
+  attempts: number;
+  updated_at: string;
+};
+
+async function refreshMultiUnitOrder(orderId: string) {
+  const db = getD1();
+  const rows = await db.prepare(
+    `SELECT * FROM order_fulfillment_units WHERE order_id = ? ORDER BY unit_index ASC`,
+  ).bind(orderId).all<FulfillmentUnitRow>();
+  if (!rows.results.length) return;
+
+  const total = rows.results.length;
+  const successful = rows.results.filter((unit) => unit.provider_status === "success").length;
+  const terminalFailed = rows.results.filter((unit) => ["failed", "retry_exhausted"].includes(unit.provider_status)).length;
+  const pending = total - successful - terminalFailed;
+  const serials = rows.results.map((unit) => unit.provider_serial_number).filter(Boolean).join(" | ") || null;
+
+  if (successful === total) {
+    await db.prepare(
+      `UPDATE orders SET fulfillment_status = 'success', provider_status = 'success',
+       provider_message = ?, provider_serial_number = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND payment_status = 'paid'`,
+    ).bind(`${successful}/${total} item berhasil dikirim.`, serials, orderId).run();
+    return;
+  }
+
+  if (pending === 0 && terminalFailed > 0) {
+    await db.prepare(
+      `UPDATE orders SET fulfillment_status = 'needs_review', provider_status = 'partial_failed',
+       provider_message = ?, provider_serial_number = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND payment_status = 'paid'`,
+    ).bind(`${successful}/${total} item berhasil; ${terminalFailed} item memerlukan pemeriksaan.`, serials, orderId).run();
+    return;
+  }
+
+  const retryable = rows.results.some((unit) => unit.provider_status === "retryable_error");
+  await db.prepare(
+    `UPDATE orders SET fulfillment_status = 'processing', provider_status = ?,
+     provider_message = ?, provider_serial_number = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND payment_status = 'paid'`,
+  ).bind(
+    retryable ? "retryable_error" : "dispatching",
+    `${successful}/${total} item selesai, sisanya masih diproses.`,
+    serials,
+    orderId,
+  ).run();
+}
+
+async function claimFulfillmentUnit(unit: FulfillmentUnitRow) {
+  const db = getD1();
+  const result = await db.prepare(
+    `UPDATE order_fulfillment_units
+     SET provider_status = 'dispatching', attempts = attempts + 1, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND attempts < 5
+       AND (
+         provider_status = 'waiting'
+         OR (
+           provider_status IN ('processing', 'dispatching', 'retryable_error')
+           AND updated_at <= datetime('now', '-2 minutes')
+         )
+       )`,
+  ).bind(unit.id).run();
+  if (Number(result.meta.changes ?? 0) > 0) return true;
+
+  await db.prepare(
+    `UPDATE order_fulfillment_units
+     SET provider_status = 'retry_exhausted',
+       provider_message = COALESCE(provider_message, 'Pemrosesan gagal setelah 5 percobaan.'),
+       updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND attempts >= 5
+       AND provider_status NOT IN ('success', 'failed', 'retry_exhausted')`,
+  ).bind(unit.id).run();
+  return false;
+}
+
+async function fulfillAutomaticOrderUnits(
+  order: OrderRecord,
+  adapter: ProviderAdapter,
+  providerCode: string,
+  providerSku: string,
+  publicBaseUrl: string,
+) {
+  const db = getD1();
+  const units = await db.prepare(
+    `SELECT * FROM order_fulfillment_units WHERE order_id = ? ORDER BY unit_index ASC`,
+  ).bind(order.id).all<FulfillmentUnitRow>();
+
+  for (const unit of units.results) {
+    if (["success", "failed", "retry_exhausted"].includes(unit.provider_status)) continue;
+    if (!await claimFulfillmentUnit(unit)) continue;
+
+    try {
+      const result = await adapter.fulfill(
+        {
+          id: order.id,
+          referenceId: unit.provider_ref_id,
+          providerCode,
+          providerSku,
+          destination: order.destination,
+          server: order.server,
+          customerNo: order.customer_no!,
+          customerNotes: order.customer_notes,
+          subtotal: Math.max(1, Math.ceil(order.subtotal / Math.max(1, order.quantity))),
+          maxProviderPrice: order.provider_max_price_snapshot,
+          packageSku: order.package_sku,
+          packageLabel: order.package_label,
+          productName: order.product_name,
+          buyerName: order.buyer_name,
+          buyerEmail: order.buyer_email,
+          buyerPhone: order.buyer_phone,
+        },
+        publicBaseUrl,
+      );
+      await db.prepare(
+        `UPDATE order_fulfillment_units
+         SET provider_status = ?, provider_message = ?, provider_serial_number = COALESCE(?, provider_serial_number),
+           updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND provider_status NOT IN ('success', 'failed', 'retry_exhausted')`,
+      ).bind(result.status, result.message, result.serialNumber, unit.id).run();
+      await recordOrderEvent({
+        orderId: order.id,
+        source: providerCode === "digiflazz" ? "digiflazz" : "admin",
+        eventId: `unit-request-${unit.provider_ref_id}-${unit.attempts + 1}`,
+        status: result.status,
+        payload: result.raw,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Provider gagal dihubungi.";
+      await db.prepare(
+        `UPDATE order_fulfillment_units SET provider_status = 'retryable_error',
+         provider_message = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND provider_status NOT IN ('success', 'failed', 'retry_exhausted')`,
+      ).bind(message, unit.id).run();
+    }
+  }
+
+  await refreshMultiUnitOrder(order.id);
+}
+
 export async function fulfillAutomaticOrder(
   orderId: string,
   publicBaseUrl: string,
@@ -540,6 +718,15 @@ export async function fulfillAutomaticOrder(
       order.id,
       "Nominal tidak lagi tersedia atau harga provider melebihi Max Price saat fulfillment.",
     );
+    return;
+  }
+
+  if (Math.max(1, Number(order.quantity || 1)) > 1) {
+    if (providerCode !== "digiflazz") {
+      await setFulfillmentError(order.id, "Jumlah pembelian lebih dari 1 hanya didukung untuk produk Digiflazz otomatis.");
+      return;
+    }
+    await fulfillAutomaticOrderUnits(order, adapter, providerCode, providerSku, publicBaseUrl);
     return;
   }
 
@@ -645,6 +832,7 @@ export async function recoverStaleAutomaticOrders(
        provider_message = 'Pemenuhan otomatis gagal setelah 5 percobaan; periksa sebelum mencoba ulang.',
        updated_at = CURRENT_TIMESTAMP
      WHERE payment_status = 'paid' AND fulfillment_type = 'automatic'
+       AND COALESCE(quantity, 1) <= 1
        AND provider_status IN ('dispatching', 'retryable_error')
        AND (
          SELECT COUNT(*) FROM order_events
@@ -656,6 +844,7 @@ export async function recoverStaleAutomaticOrders(
        provider_message = 'Hasil pengiriman provider belum dapat dipastikan; periksa sebelum mencoba ulang.',
        updated_at = CURRENT_TIMESTAMP
      WHERE payment_status = 'paid' AND fulfillment_type = 'automatic'
+       AND COALESCE(quantity, 1) <= 1
        AND provider_status = 'dispatching'
        AND lower(trim(coalesce(provider_code, ''))) NOT IN ('digiflazz', 'voucher-stock')
        AND updated_at <= datetime('now', '-2 minutes')`,
@@ -677,9 +866,12 @@ export async function recoverStaleAutomaticOrders(
          )
        )
        AND (
-         SELECT COUNT(*) FROM order_events
-         WHERE order_id = orders.id AND source = 'admin' AND status = 'dispatching'
-       ) < 5
+         COALESCE(quantity, 1) > 1
+         OR (
+           SELECT COUNT(*) FROM order_events
+           WHERE order_id = orders.id AND source = 'admin' AND status = 'dispatching'
+         ) < 5
+       )
      ORDER BY CASE WHEN provider_status IS NULL THEN 0 ELSE 1 END, updated_at ASC LIMIT ?`,
   ).bind(Math.min(Math.max(limit, 1), 100)).all<{ id: string }>();
   for (const row of result.results) {
@@ -769,7 +961,49 @@ export async function applyProviderWebhook(input: {
   eventId: string;
   result: ProviderResult;
 }) {
+  await ensureLegacyDatabaseColumns();
   const db = getD1();
+  const source = input.providerCode === "digiflazz" ? "digiflazz" : "admin";
+
+  const unit = await db.prepare(
+    `SELECT * FROM order_fulfillment_units WHERE provider_ref_id = ? LIMIT 1`,
+  ).bind(input.providerRefId).first<FulfillmentUnitRow>();
+  if (unit) {
+    const parent = await getOrderById(unit.order_id);
+    if (!parent || parent.payment_status !== "paid") return false;
+    const results = await db.batch([
+      db.prepare(
+        `UPDATE order_fulfillment_units
+         SET provider_status = ?, provider_message = ?,
+           provider_serial_number = COALESCE(?, provider_serial_number),
+           updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND provider_status NOT IN ('success', 'failed', 'retry_exhausted')
+           AND NOT EXISTS (
+             SELECT 1 FROM order_events WHERE source = ? AND event_id = ?
+           )`,
+      ).bind(
+        input.result.status,
+        input.result.message,
+        input.result.serialNumber,
+        unit.id,
+        source,
+        input.eventId,
+      ),
+      db.prepare(
+        `INSERT OR IGNORE INTO order_events (order_id, source, event_id, status, payload_json)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).bind(
+        parent.id,
+        source,
+        input.eventId,
+        input.result.status,
+        JSON.stringify(input.result.raw),
+      ),
+    ]);
+    await refreshMultiUnitOrder(parent.id);
+    return Number(results[0]?.meta.changes ?? 0) > 0 || Number(results[1]?.meta.changes ?? 0) > 0;
+  }
+
   const order = await db
     .prepare(
       `SELECT * FROM orders WHERE lower(trim(provider_code)) = ? AND (provider_ref_id = ? OR reference_id = ?) LIMIT 1`,
@@ -779,7 +1013,6 @@ export async function applyProviderWebhook(input: {
   // A provider may only report a transaction this store has already paid for.
   if (!order || order.payment_status !== "paid") return false;
 
-  const source = input.providerCode === "digiflazz" ? "digiflazz" : "admin";
   const guard = providerTransitionGuard(input.result.status);
 
   // Update first only when the signed event has never been consumed, then

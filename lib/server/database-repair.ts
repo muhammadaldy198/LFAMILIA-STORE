@@ -6,6 +6,7 @@ let repairPromise: Promise<void> | null = null;
 const FINAL_AUDIT_MIGRATION = "0029_final_source_audit_remediation.sql";
 const KOKINPAY_NICKNAME_MIGRATION = "0032_kokinpay_nickname_game_codes.sql";
 const DIGIFLAZZ_MAX_PRICE_MIGRATION = "0033_digiflazz_max_price.sql";
+const ORDER_QUANTITY_MIGRATION = "0039_order_quantity_fulfillment_units.sql";
 const FINAL_SCHEMA_OBJECTS = [
   "promotion_reservations",
   "promotion_reservations_expiry_idx",
@@ -17,6 +18,10 @@ const FINAL_SCHEMA_OBJECTS = [
   "promotion_reservation_insert",
   "promotion_reservation_consumed",
   "promotion_reservation_released",
+  "order_fulfillment_units",
+  "order_fulfillment_units_order_index_unique",
+  "order_fulfillment_units_provider_ref_unique",
+  "order_fulfillment_units_order_status_idx",
 ] as const;
 
 const columns: Array<[table: string, column: string, definition: string]> = [
@@ -61,6 +66,7 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["orders", "wallet_checkout_key", "wallet_checkout_key TEXT"],
   ["orders", "external_checkout_key", "external_checkout_key TEXT"],
   ["orders", "customer_inputs_json", "customer_inputs_json TEXT DEFAULT '[]' NOT NULL"],
+  ["orders", "quantity", "quantity INTEGER DEFAULT 1 NOT NULL"],
   ["orders", "delivery_mode", "delivery_mode TEXT"],
   ["orders", "supplier_cost_snapshot", "supplier_cost_snapshot INTEGER"],
   ["orders", "provider_max_price_snapshot", "provider_max_price_snapshot INTEGER"],
@@ -142,7 +148,7 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
     // every fresh Worker isolate.
     const [ledger, products, customers, packages, settings, orders, topups, vouchers, flash, objects] =
       await db.batch([
-        db.prepare("SELECT name FROM d1_migrations WHERE name IN (?, ?)").bind(FINAL_AUDIT_MIGRATION, DIGIFLAZZ_MAX_PRICE_MIGRATION),
+        db.prepare("SELECT name FROM d1_migrations WHERE name IN (?, ?, ?)").bind(FINAL_AUDIT_MIGRATION, DIGIFLAZZ_MAX_PRICE_MIGRATION, ORDER_QUANTITY_MIGRATION),
         db.prepare("PRAGMA table_info(products)"),
         db.prepare("PRAGMA table_info(customer_users)"),
         db.prepare("PRAGMA table_info(product_packages)"),
@@ -161,12 +167,17 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
           'promotion_reservation_flash_guard',
           'promotion_reservation_insert',
           'promotion_reservation_consumed',
-          'promotion_reservation_released'
+          'promotion_reservation_released',
+          'order_fulfillment_units',
+          'order_fulfillment_units_order_index_unique',
+          'order_fulfillment_units_provider_ref_unique',
+          'order_fulfillment_units_order_status_idx'
         )`),
       ]);
 
     if (!resultRows(ledger).some((row) => row.name === FINAL_AUDIT_MIGRATION)) return false;
     if (!resultRows(ledger).some((row) => row.name === DIGIFLAZZ_MAX_PRICE_MIGRATION)) return false;
+    if (!resultRows(ledger).some((row) => row.name === ORDER_QUANTITY_MIGRATION)) return false;
 
     const names = (result: { results?: unknown[] }) =>
       new Set(resultRows(result).map((row) => String(row.name ?? "")));
@@ -260,6 +271,29 @@ export async function ensureLegacyDatabaseColumns() {
       );
       await runSchemaStatement(
         "CREATE UNIQUE INDEX IF NOT EXISTS wallet_topups_external_checkout_key_unique ON wallet_topups(customer_id, external_checkout_key) WHERE external_checkout_key IS NOT NULL",
+      );
+
+      await runSchemaStatement(`CREATE TABLE IF NOT EXISTS order_fulfillment_units (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id TEXT NOT NULL,
+        unit_index INTEGER NOT NULL,
+        provider_ref_id TEXT NOT NULL,
+        provider_status TEXT NOT NULL DEFAULT 'waiting',
+        provider_message TEXT,
+        provider_serial_number TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+      )`);
+      await runSchemaStatement(
+        "CREATE UNIQUE INDEX IF NOT EXISTS order_fulfillment_units_order_index_unique ON order_fulfillment_units(order_id, unit_index)",
+      );
+      await runSchemaStatement(
+        "CREATE UNIQUE INDEX IF NOT EXISTS order_fulfillment_units_provider_ref_unique ON order_fulfillment_units(provider_ref_id)",
+      );
+      await runSchemaStatement(
+        "CREATE INDEX IF NOT EXISTS order_fulfillment_units_order_status_idx ON order_fulfillment_units(order_id, provider_status)",
       );
 
       await runSchemaStatement(`CREATE TABLE IF NOT EXISTS promotion_reservations (
@@ -389,7 +423,7 @@ export async function ensureLegacyDatabaseColumns() {
         const requiredColumns: Array<[string, string[]]> = [
           ["products", ["nickname_game_code"]],
           ["product_packages", ["provider_max_price"]],
-          ["orders", ["delivery_mode", "supplier_cost_snapshot", "provider_max_price_snapshot", "doku_environment"]],
+          ["orders", ["delivery_mode", "supplier_cost_snapshot", "provider_max_price_snapshot", "doku_environment", "quantity"]],
           ["wallet_topups", ["doku_environment", "external_checkout_key"]],
           ["discount_vouchers", ["reserved_count"]],
           ["flash_sales", ["reserved_count"]],
@@ -416,7 +450,11 @@ export async function ensureLegacyDatabaseColumns() {
               'promotion_reservation_flash_guard',
               'promotion_reservation_insert',
               'promotion_reservation_consumed',
-              'promotion_reservation_released'
+              'promotion_reservation_released',
+              'order_fulfillment_units',
+              'order_fulfillment_units_order_index_unique',
+              'order_fulfillment_units_provider_ref_unique',
+              'order_fulfillment_units_order_status_idx'
             )`,
           ).all<{ name: string }>();
           if (schemaObjects.results.length !== FINAL_SCHEMA_OBJECTS.length) complete = false;
@@ -442,6 +480,9 @@ export async function ensureLegacyDatabaseColumns() {
             await db.prepare(
               "INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)",
             ).bind(DIGIFLAZZ_MAX_PRICE_MIGRATION).run();
+            await db.prepare(
+              "INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)",
+            ).bind(ORDER_QUANTITY_MIGRATION).run();
           }
         }
       } catch (error) {
