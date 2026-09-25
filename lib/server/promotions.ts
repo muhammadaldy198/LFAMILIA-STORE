@@ -135,7 +135,7 @@ export async function quotePromotion(
      WHERE product_slug = ? AND package_sku = ? AND is_active = 1 AND starts_at <= ? AND ends_at >= ?
        AND (stock_limit IS NULL OR sold_count + reserved_count < stock_limit) LIMIT 1`,
   ).bind(productSlug, packageSku, now, now).first<{ id: number; sale_price: number; ends_at: string }>();
-  const normalizedQuantity = Math.max(1, Math.min(10, Math.trunc(Number(quantity) || 1)));
+  const normalizedQuantity = Math.max(1, Math.min(5, Math.trunc(Number(quantity) || 1)));
   const basePrice = unitPrice * normalizedQuantity;
   const sellingPrice = (flash && flash.sale_price < unitPrice ? flash.sale_price : unitPrice) * normalizedQuantity;
   let voucherDiscountAmount = 0;
