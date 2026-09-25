@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
   Calculator,
@@ -60,6 +61,8 @@ const mobileNavItems = [
 
 export function StoreHeader() {
   const { settings } = useStorefront();
+  const pathname = usePathname();
+  const router = useRouter();
   const [customer, setCustomer] = useState<SidebarCustomer | null>(null);
   const [accountChecked, setAccountChecked] = useState(false);
 
@@ -98,13 +101,24 @@ export function StoreHeader() {
     window.dispatchEvent(new Event("lfamilia:auth-changed"));
   }
 
+  function goHome(event: React.MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    if (pathname === "/") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.history.replaceState(null, "", "/");
+      return;
+    }
+    router.push("/");
+  }
+
   return (
     <header className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#07090f]/90 backdrop-blur-xl">
       <div className="mx-auto flex h-[60px] w-full max-w-7xl items-center gap-[10px] px-4 sm:h-[62px] sm:px-6 lg:px-8">
         <Link
-          className="flex items-center gap-2.5"
+          className="relative z-10 flex shrink-0 cursor-pointer items-center gap-2.5 pointer-events-auto"
           href="/"
-          aria-label="LFAMILIA STORE"
+          onClick={goHome}
+          aria-label="Kembali ke homepage LFAMILIA STORE"
         >
           <StoreBrand settings={settings} />
         </Link>
