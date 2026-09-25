@@ -185,7 +185,7 @@ function CheckoutRoute() {
                   : "Katalog tidak dapat dibaca dari database. Checkout dinonaktifkan agar harga lama tidak digunakan."}
             </p>
             <Button asChild variant="outline" className="mt-4 border-white/10 bg-white/[0.03] text-white">
-              <Link href="/catalog">Buka katalog</Link>
+              <Link href="/#produk">Pilih produk</Link>
             </Button>
           </div>
         </main>
@@ -816,7 +816,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                     </span>
                     <div className="max-w-36">
                       <strong className="block truncate text-[11px]">{product.name}</strong>
-                      <Link href="/catalog" className="mt-0.5 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link>
+                      <Link href="/#produk" className="mt-0.5 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link>
                     </div>
                   </div>
                 </div>
@@ -825,7 +825,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                     <span className="block size-9 overflow-hidden rounded-lg aspect-square"><ProductArtwork product={product} compact /></span>
                     <div className="min-w-0 flex-1">
                       <strong className="block truncate text-[11px]">{product.name}</strong>
-                      <Link href="/catalog" className="mt-0.5 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link>
+                      <Link href="/#produk" className="mt-0.5 block text-[9px] font-semibold text-[#cfff72]">Ganti produk</Link>
                     </div>
                   </div>
 
