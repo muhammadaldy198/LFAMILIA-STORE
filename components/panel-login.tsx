@@ -22,7 +22,7 @@ export function PanelLogin({ role, initialError = "" }: { role: "owner" | "staff
 
 
   return (
-    <StoreLayout>
+    <StoreLayout customerTheme={false}>
       <main className="mx-auto grid min-h-[72vh] max-w-6xl place-items-center px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#0d1017] shadow-2xl shadow-black/30 lg:grid-cols-[.85fr_1.15fr]">
           <section className="hidden bg-[radial-gradient(circle_at_top_left,rgba(185,255,53,0.15),transparent_52%),#090c11] p-9 lg:block">
