@@ -49,3 +49,13 @@ test("customer checkout remains gateway-neutral under dual routing", () => {
   assert.doesNotMatch(checkout, /"DOKU Checkout"|"Midtrans BI-SNAP"|Pesanan diteruskan otomatis ke provider|Pembayaran melalui gateway/);
   assert.doesNotMatch(checkout, /Pilih gateway pembayaran/);
 });
+
+
+test("checkout desktop banner bleeds edge to edge across the viewport", () => {
+  const layout = read("app/checkout/layout.tsx");
+
+  assert.match(layout, /@media \(min-width: 1024px\)/);
+  assert.match(layout, /\[data-lf-checkout-banner="true"\][\s\S]*width: 100vw !important/);
+  assert.match(layout, /margin-left: calc\(50% - 50vw\) !important/);
+  assert.match(layout, /margin-right: calc\(50% - 50vw\) !important/);
+});
