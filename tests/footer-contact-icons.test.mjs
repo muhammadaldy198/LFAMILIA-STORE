@@ -16,26 +16,23 @@ test("footer contact links use recognizable platform logos and configured contac
   assert.doesNotMatch(source, /Camera|Headphones|MessageCircle|MessagesSquare/);
 });
 
-
 test("customer footer brand banner is full viewport width on every breakpoint", () => {
-  const footer = source;
   const layout = fs.readFileSync(path.join(process.cwd(), "components/store-layout.tsx"), "utf8");
 
-  assert.match(footer, /data-sitewide-footer-banner/);
-  assert.match(footer, /relative left-1\/2 h-\[72px\] w-screen -translate-x-1\/2/);
-  assert.match(footer, /src="\\/brand\\/lfamilia-footer-banner\\.webp\\?v=20260925c"/);
-  assert.match(footer, /className="block size-full max-w-none object-cover object-center"/);
-  assert.match(footer, /sm:h-\[82px\]/);
-  assert.match(footer, /md:h-\[92px\]/);
-  assert.match(footer, /lg:h-\[104px\]/);
+  assert.match(source, /data-sitewide-footer-banner/);
+  assert.match(source, /relative left-1\/2 h-\[72px\] w-screen -translate-x-1\/2/);
+  assert.match(source, /src="\/brand\/lfamilia-footer-banner\.webp\?v=20260925c"/);
+  assert.match(source, /className="block size-full max-w-none object-cover object-center"/);
+  assert.match(source, /sm:h-\[82px\]/);
+  assert.match(source, /md:h-\[92px\]/);
+  assert.match(source, /lg:h-\[104px\]/);
   assert.match(layout, /<StoreFooter showBrandBanner=\{customerTheme\} \/>/);
 });
 
-
 test("LFAMILIA banner is the first visual block inside the footer", () => {
   const footerStart = source.indexOf('<footer className="bg-[#05070b]">');
-  const banner = source.indexOf('data-sitewide-footer-banner');
-  const footerBody = source.indexOf('border-t border-white/[0.08]');
+  const banner = source.indexOf("data-sitewide-footer-banner");
+  const footerBody = source.indexOf("border-t border-white/[0.08]");
   assert.ok(footerStart >= 0);
   assert.ok(banner > footerStart);
   assert.ok(footerBody > banner);
