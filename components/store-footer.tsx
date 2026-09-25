@@ -41,7 +41,7 @@ export function StoreFooter({ showBrandBanner = true }: { showBrandBanner?: bool
           aria-label="LFAMILIA STORE"
         >
           <img
-            src="/brand/lfamilia-footer-banner.webp?v=20260925b"
+            src="/brand/lfamilia-footer-banner.webp?v=20260925c"
             alt="LFAMILIA STORE"
             className="block size-full max-w-none object-cover object-center"
             loading="eager"
