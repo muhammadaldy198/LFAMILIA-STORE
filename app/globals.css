@@ -615,6 +615,20 @@ body:has(.customer-theme) {
 
 .customer-theme .eyebrow {
   color: #fff4d6;
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.11em;
+}
+
+.customer-theme .store-brand-name {
+  letter-spacing: 0.045em;
+}
+
+.customer-theme .store-brand-subtitle {
+  letter-spacing: 0.14em;
+}
+
+.customer-theme main :where(h1, h2, h3, p) {
+  word-spacing: 0;
 }
 
 .customer-theme .panel {
