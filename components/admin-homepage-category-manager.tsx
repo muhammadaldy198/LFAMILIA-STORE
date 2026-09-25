@@ -30,7 +30,7 @@ export function AdminHomepageCategoryManager() {
 
   const load = useCallback(async () => {
     setError("");
-    const response = await fetch("/api/admin/categories", { cache: "no-store" });
+    const response = await fetch("/api/panel/categories", { cache: "no-store" });
     const payload = await response.json().catch(() => ({})) as { categories?: Category[]; error?: string };
     if (!response.ok) {
       setError(payload.error || "Kategori homepage gagal dimuat.");
@@ -76,7 +76,7 @@ export function AdminHomepageCategoryManager() {
       if (new Set(normalized.map((item) => item.slug)).size !== normalized.length) throw new Error("Slug kategori tidak boleh duplikat.");
 
       for (const item of normalized) {
-        const response = await fetch("/api/admin/categories", {
+        const response = await fetch("/api/panel/categories", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(item),
@@ -101,7 +101,7 @@ export function AdminHomepageCategoryManager() {
     if (!window.confirm(`Hapus kategori "${item.name}"? Kategori yang masih dipakai produk akan ditolak backend.`)) return;
     setBusy(true); setError(""); setMessage("");
     try {
-      const response = await fetch(`/api/admin/categories?id=${item.id}`, { method: "DELETE" });
+      const response = await fetch(`/api/panel/categories?id=${item.id}`, { method: "DELETE" });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Kategori gagal dihapus.");
       setMessage(`${item.name} dihapus.`);
