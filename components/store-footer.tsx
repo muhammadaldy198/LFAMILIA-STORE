@@ -23,7 +23,7 @@ function DiscordIcon({ className }: { className?: string }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor"><path d="M20.317 4.37a19.8 19.8 0 00-4.885-1.515.074.074 0 00-.079.037c-.211.375-.445.865-.608 1.25a15.4 15.4 0 00-5.487 0c-.164-.394-.406-.875-.618-1.25a.077.077 0 00-.078-.037A19.74 19.74 0 003.677 4.37a.07.07 0 00-.032.028C.533 9.046-.319 13.58.1 18.058a.082.082 0 00.031.056c2.053 1.507 4.041 2.422 5.993 3.029a.077.077 0 00.084-.028c.462-.63.873-1.295 1.226-1.994a.077.077 0 00-.042-.106 12.3 12.3 0 01-1.872-.892.077.077 0 01-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 01.078-.01c3.927 1.793 8.18 1.793 12.061 0a.073.073 0 01.079.01c.12.099.246.198.373.292a.077.077 0 01-.007.128c-.598.343-1.22.644-1.873.891a.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.077.077 0 00.084.029c1.961-.607 3.95-1.522 6.002-3.03a.082.082 0 00.032-.055c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.029ZM8.02 15.331c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.211 0 2.176 1.095 2.157 2.419 0 1.333-.956 2.419-2.157 2.419Zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.095 2.157 2.419 0 1.333-.946 2.419-2.157 2.419Z" /></svg>;
 }
 
-export function StoreFooter() {
+export function StoreFooter({ showBrandBanner = true }: { showBrandBanner?: boolean }) {
   const { settings } = useStorefront();
   const whatsapp = settings.supportWhatsapp?.replace(/\D/g, "").replace(/^0/, "62");
   const socialLinks = [
@@ -34,6 +34,17 @@ export function StoreFooter() {
   ];
   return (
     <footer className="border-t border-white/[0.08] bg-[#05070b]">
+      {showBrandBanner && (
+        <div className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-black" data-sitewide-footer-banner>
+          <img
+            src="/brand/lfamilia-footer-banner.webp"
+            alt="LFAMILIA STORE"
+            className="block h-auto w-full max-w-none object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      )}
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-8">
         <div>
           <Link className="inline-flex items-center gap-3" href="/"><StoreBrand settings={settings} /></Link>
