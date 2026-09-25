@@ -497,10 +497,6 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
   ]);
 
   useEffect(() => {
-    if (isVoucherStock && quantity !== 1) setQuantity(1);
-  }, [isVoucherStock, quantity]);
-
-  useEffect(() => {
     if (!paymentMethodsLoaded) return;
 
     const enabled = checkoutGroups.map((group) => group.code);
