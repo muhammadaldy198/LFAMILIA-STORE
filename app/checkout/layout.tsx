@@ -113,6 +113,15 @@ export default function CheckoutLayout({ children }: { children: React.ReactNode
             transform: translateY(-0.75rem);
           }
         }
+
+        @media (min-width: 1024px) {
+          [data-lf-checkout-banner="true"] {
+            width: 100vw !important;
+            max-width: none !important;
+            margin-left: calc(50% - 50vw) !important;
+            margin-right: calc(50% - 50vw) !important;
+          }
+        }
       `}</style>
       {children}
     </>
