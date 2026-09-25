@@ -499,6 +499,6 @@ function paymentLabel(method: string, channel: string) {
   if (method === "qris") return "QRIS";
   if (method === "va") return `Virtual Account • ${channel.toUpperCase()}`;
   if (method === "ewallet") return `E-Wallet • ${channel.toUpperCase()}`;
-  if (method === "wallet") return "Koin LFAMILIA";
+  if (method === "wallet") return "LFAMILIA Cash";
   return method.replaceAll("_", " ").toUpperCase();
 }
