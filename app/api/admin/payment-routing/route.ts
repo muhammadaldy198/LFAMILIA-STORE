@@ -12,7 +12,7 @@ const saveModes = z.object({
   action: z.literal("save_modes"),
   dokuEnvironment: z.enum(["sandbox", "production"]),
   midtransEnvironment: z.enum(["sandbox", "production"]),
-  walletTopupGateway: z.enum(["doku", "midtrans"]).optional(),
+  walletTopupGateway: z.enum(["doku", "midtrans"]),
 });
 
 const saveProfile = z.object({
@@ -26,7 +26,7 @@ const saveProfile = z.object({
 const schema = z.discriminatedUnion("action", [saveModes, saveProfile]);
 
 export async function GET(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   return Response.json(await getPaymentModeOverview(), {
     headers: { "Cache-Control": "no-store" },
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const access = await requireAdminSession(request, "owner");
+  const access = await requireAdminSession(request, "admin");
   if (access instanceof Response) return access;
   try {
     const input = schema.parse(await request.json());
@@ -45,6 +45,8 @@ export async function PUT(request: Request) {
         walletTopupGateway: input.walletTopupGateway,
       });
     } else {
+      const ownerAccess = await requireAdminSession(request, "owner");
+      if (ownerAccess instanceof Response) return ownerAccess;
       if ((input.provider === "doku" && input.mode !== "checkout") || (input.provider === "midtrans" && input.mode !== "snap")) {
         throw new Error("Kombinasi gateway dan mode tidak valid.");
       }
