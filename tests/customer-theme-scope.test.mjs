@@ -25,3 +25,13 @@ test("customer password recovery pages use the customer theme", () => {
   assert.match(read("app/forgot-password/page.tsx"), /className="customer-theme /);
   assert.match(read("app/reset-password/page.tsx"), /className="customer-theme /);
 });
+
+
+test("customer home removes quick menu and tightens display spacing", () => {
+  const home = read("app/page.tsx");
+  const css = read("app/globals.css");
+
+  assert.doesNotMatch(home, /QuickTools|Menu cepat|Semua yang kamu butuhkan/);
+  assert.match(css, /\.customer-theme \.eyebrow[\s\S]*letter-spacing: 0\.11em/);
+  assert.match(css, /\.customer-theme \.store-brand-subtitle[\s\S]*letter-spacing: 0\.14em/);
+});
