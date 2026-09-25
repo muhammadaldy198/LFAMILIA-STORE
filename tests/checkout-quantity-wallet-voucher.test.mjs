@@ -21,7 +21,8 @@ test("checkout exposes LFAMILIA Cash, quantity control, and separate promo step"
   assert.match(checkout, /name: "LFAMILIA Cash"/);
   assert.match(checkout, /\/payment\/lfamilia-cash\.webp/);
   assert.match(checkout, /title="Jumlah Pembelian"/);
-  assert.match(checkout, /function changeQuantity\(next: number\)/);\n  assert.match(checkout, /onClick=\{\(\) => changeQuantity\(quantity \+ 1\)\}/);
+  assert.match(checkout, /function changeQuantity\(next: number\)/);
+  assert.match(checkout, /onClick=\{\(\) => changeQuantity\(quantity \+ 1\)\}/);
   assert.match(checkout, /title="Data Pembeli"/);
   assert.match(checkout, /title="Kode Promo"/);
   assert.doesNotMatch(checkout, /title="Data Pembeli & Voucher"/);
