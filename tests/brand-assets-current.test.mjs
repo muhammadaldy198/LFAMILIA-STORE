@@ -2,28 +2,18 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-
-const root = process.cwd();
-const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
-
-test("LFAMILIA storefront uses the repaired themed logo asset", () => {
-  const storeData = read("lib/store-data.ts");
-  const storefront = read("lib/server/storefront.ts");
-  const brand = read("components/store-brand.tsx");
-
-  assert.match(storeData, /logoUrl: "\/brand\/lfamilia-neon-logo\.webp"/);
-  assert.match(storefront, /row\.logo_url === "\/brand\/lfamilia-pixel-logo\.webp"/);
-  assert.match(brand, /lfamilia-neon-logo\.webp\?v=20260925c/);
-  assert.doesNotMatch(brand, /pixel-art size-full object-cover/);
+const root=process.cwd();
+const read=(file)=>fs.readFileSync(path.join(root,file),"utf8");
+test("storefront brand uses the verified LF icon",()=>{
+ const brand=read("components/store-brand.tsx");
+ assert.match(brand,/src="\/icon-192\.png"/);
+ assert.doesNotMatch(brand,/lfamilia-neon-logo\.webp\?v=/);
 });
-
-test("footer banner uses the repaired compact full-width LFAMILIA artwork", () => {
-  const footer = read("components/store-footer.tsx");
-
-  assert.match(footer, /src="\/brand\/lfamilia-footer-banner\.webp\?v=20260925c"/);
-  assert.match(footer, /h-\[72px\] w-screen/);
-  assert.match(footer, /sm:h-\[82px\]/);
-  assert.match(footer, /md:h-\[92px\]/);
-  assert.match(footer, /lg:h-\[104px\]/);
-  assert.match(footer, /object-cover object-center/);
+test("footer banner is native and full viewport width",()=>{
+ const footer=read("components/store-footer.tsx");
+ assert.match(footer,/flex h-\[72px\] w-screen/);
+ assert.match(footer,/src="\/icon-192\.png"/);
+ assert.match(footer,/LFAMILIA/);
+ assert.match(footer,/STORE/);
+ assert.doesNotMatch(footer,/lfamilia-footer-banner\.webp/);
 });
