@@ -4,5 +4,5 @@ import { StoreHeader } from "@/components/store-header";
 import { FloatingLiveSupport } from "@/components/floating-live-support";
 
 export function StoreLayout({ children }: { children: React.ReactNode }) {
-  return <div className="site-shell min-h-screen bg-[#07090f] text-white"><AnnouncementBar /><StoreHeader />{children}<StoreFooter /><FloatingLiveSupport /></div>;
+  return <div className="customer-theme site-shell min-h-screen bg-background text-foreground"><AnnouncementBar /><StoreHeader />{children}<StoreFooter /><FloatingLiveSupport /></div>;
 }
