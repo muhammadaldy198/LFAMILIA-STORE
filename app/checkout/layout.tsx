@@ -32,7 +32,7 @@ export default function CheckoutLayout({ children }: { children: React.ReactNode
           [data-lf-checkout-banner="true"] {
             width: calc(100% + 2rem) !important;
             height: auto !important;
-            aspect-ratio: 16 / 9 !important;
+            aspect-ratio: 16 / 8 !important;
           }
 
           [data-lf-product-hero="true"] {
@@ -96,7 +96,7 @@ export default function CheckoutLayout({ children }: { children: React.ReactNode
 
         @media (min-width: 640px) {
           [data-lf-checkout-banner="true"] {
-            aspect-ratio: 16 / 7 !important;
+            aspect-ratio: 16 / 6.25 !important;
             height: auto !important;
           }
 
