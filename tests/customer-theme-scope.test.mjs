@@ -43,7 +43,7 @@ test("popular section stays compact and close to the product browser", () => {
   const popular = read("components/popular-now.tsx");
   const browser = read("components/home-product-browser.tsx");
 
-  assert.match(popular, /rounded-\[14px\]/);
+  assert.match(popular, /rounded-\[20px\]/);
   assert.match(popular, /size-\[54px\]/);
   assert.match(popular, /pb-\[10px\] pt-\[22px\]/);
   assert.match(browser, /pb-\[34px\] pt-\[12px\]/);
