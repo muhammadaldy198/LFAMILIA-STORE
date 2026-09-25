@@ -6,17 +6,19 @@ import assert from "node:assert/strict";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("Nordic Indigo theme is scoped to customer storefront", () => {
+test("customer storefront uses the original LFAMILIA color theme", () => {
   const layout = read("components/store-layout.tsx");
   const css = read("app/globals.css");
+  const brand = read("components/store-brand.tsx");
   const panelLogin = read("components/panel-login.tsx");
   const ownerSetup = read("app/admin/setup/page.tsx");
 
   assert.match(layout, /customerTheme = true/);
   assert.match(layout, /customer-theme site-shell/);
-  assert.match(css, /LFAMILIA customer theme — Nordic Indigo \+ Vanilla Mist/);
-  assert.match(css, /--primary: #263baa/);
-  assert.match(css, /--foreground: #fff4d6/);
+  assert.match(css, /--background: #07090f/);
+  assert.match(css, /--primary: #b9ff35/);
+  assert.doesNotMatch(css, /Nordic Indigo|#263baa|#fff4d6/);
+  assert.match(brand, /bg-black/);
   assert.match(panelLogin, /<StoreLayout customerTheme=\{false\}>/);
   assert.match(ownerSetup, /<StoreLayout customerTheme=\{false\}>/);
 });
