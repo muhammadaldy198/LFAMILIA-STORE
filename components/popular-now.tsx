@@ -30,7 +30,7 @@ export function PopularNow() {
           </p>
         </div>
         <Link
-          href="/catalog"
+          href="/#produk"
           className="hidden items-center gap-[6px] text-[10px] font-bold text-[#cfff72] sm:flex"
         >
           Semua produk
