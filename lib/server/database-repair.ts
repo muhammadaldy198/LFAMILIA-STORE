@@ -17,6 +17,10 @@ const FINAL_SCHEMA_OBJECTS = [
   "promotion_reservation_insert",
   "promotion_reservation_consumed",
   "promotion_reservation_released",
+  "order_fulfillment_units",
+  "order_fulfillment_units_order_index_unique",
+  "order_fulfillment_units_provider_ref_unique",
+  "order_fulfillment_units_order_status_idx",
 ] as const;
 
 const columns: Array<[table: string, column: string, definition: string]> = [
@@ -61,6 +65,7 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["orders", "wallet_checkout_key", "wallet_checkout_key TEXT"],
   ["orders", "external_checkout_key", "external_checkout_key TEXT"],
   ["orders", "customer_inputs_json", "customer_inputs_json TEXT DEFAULT '[]' NOT NULL"],
+  ["orders", "quantity", "quantity INTEGER DEFAULT 1 NOT NULL"],
   ["orders", "delivery_mode", "delivery_mode TEXT"],
   ["orders", "supplier_cost_snapshot", "supplier_cost_snapshot INTEGER"],
   ["orders", "provider_max_price_snapshot", "provider_max_price_snapshot INTEGER"],
@@ -161,7 +166,11 @@ async function runtimeRepairAlreadyComplete(db: D1Database) {
           'promotion_reservation_flash_guard',
           'promotion_reservation_insert',
           'promotion_reservation_consumed',
-          'promotion_reservation_released'
+          'promotion_reservation_released',
+          'order_fulfillment_units',
+          'order_fulfillment_units_order_index_unique',
+          'order_fulfillment_units_provider_ref_unique',
+          'order_fulfillment_units_order_status_idx'
         )`),
       ]);
 
@@ -260,6 +269,29 @@ export async function ensureLegacyDatabaseColumns() {
       );
       await runSchemaStatement(
         "CREATE UNIQUE INDEX IF NOT EXISTS wallet_topups_external_checkout_key_unique ON wallet_topups(customer_id, external_checkout_key) WHERE external_checkout_key IS NOT NULL",
+      );
+
+      await runSchemaStatement(`CREATE TABLE IF NOT EXISTS order_fulfillment_units (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id TEXT NOT NULL,
+        unit_index INTEGER NOT NULL,
+        provider_ref_id TEXT NOT NULL,
+        provider_status TEXT NOT NULL DEFAULT 'waiting',
+        provider_message TEXT,
+        provider_serial_number TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+      )`);
+      await runSchemaStatement(
+        "CREATE UNIQUE INDEX IF NOT EXISTS order_fulfillment_units_order_index_unique ON order_fulfillment_units(order_id, unit_index)",
+      );
+      await runSchemaStatement(
+        "CREATE UNIQUE INDEX IF NOT EXISTS order_fulfillment_units_provider_ref_unique ON order_fulfillment_units(provider_ref_id)",
+      );
+      await runSchemaStatement(
+        "CREATE INDEX IF NOT EXISTS order_fulfillment_units_order_status_idx ON order_fulfillment_units(order_id, provider_status)",
       );
 
       await runSchemaStatement(`CREATE TABLE IF NOT EXISTS promotion_reservations (
