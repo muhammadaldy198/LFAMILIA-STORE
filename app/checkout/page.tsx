@@ -659,6 +659,10 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
 
   function requestConfirmation(event: FormEvent) {
     event.preventDefault();
+    if (voucherCode.trim() && quote?.voucherCode !== voucherCode.trim()) {
+      setError("Tekan Gunakan untuk memeriksa kode voucher, atau hapus kode sebelum melanjutkan.");
+      return;
+    }
     const missingRequiredAccountData =
       !isVoucherProduct &&
       productInputFields.some(
