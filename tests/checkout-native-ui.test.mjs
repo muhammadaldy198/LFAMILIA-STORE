@@ -77,7 +77,7 @@ test("checkout mobile controls stay compact and scoped", () => {
   assert.match(checkout, /size="sm"[\s\S]*Gunakan/);
   assert.match(checkout, /size="sm"[\s\S]*Pakai Voucher Yang Tersedia/);
   assert.match(css, /Checkout mobile density/);
-  assert.match(css, /height: 1\\.9rem !important/);
+  assert.match(css, /height: 1\.9rem !important/);
   assert.match(css, /\[data-lf-checkout-form="true"\] \.field-label/);
 });
 
