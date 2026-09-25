@@ -84,6 +84,7 @@ function existingExternalResponse(order: OrderRecord) {
     referenceId: order.reference_id,
     publicInvoice: publicInvoice(order.reference_id),
     fulfillmentType: order.fulfillment_type,
+    quantity: Math.max(1, Number(order.quantity || 1)),
     basePrice: order.base_subtotal,
     sellingPrice: order.subtotal,
     discountAmount: order.discount_amount,
