@@ -77,6 +77,17 @@ test("checkout mobile controls stay compact and scoped", () => {
   assert.match(checkout, /size="sm"[\s\S]*Gunakan/);
   assert.match(checkout, /size="sm"[\s\S]*Pakai Voucher Yang Tersedia/);
   assert.match(css, /Checkout mobile density/);
-  assert.match(css, /height: 1\.75rem !important/);
+  assert.match(css, /height: 1\.9rem !important/);
   assert.match(css, /\[data-lf-checkout-form="true"\] \.field-label/);
+});
+
+test("mobile checkout medium size tuning", () => {
+  const checkout = read("app/checkout/page.tsx");
+  const css = read("app/globals.css");
+
+  assert.match(checkout, /min-h-\[78px\]/);
+  assert.match(checkout, /min-h-\[40px\]/);
+  assert.match(checkout, /size-\[26px\]/);
+  assert.match(css, /height: 1\.9rem !important/);
+  assert.match(css, /min-height: 2\.125rem/);
 });
