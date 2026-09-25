@@ -114,12 +114,27 @@ function packageGroupName(value?: string) {
 }
 
 function nominalLabel(label: string, productName: string) {
-  const match = label.trim().match(/^(.+?)\s+(?:-|–|—|\|)\s+(.+)$/);
-  if (!match) return label;
-  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/s$/, "");
-  return normalize(match[1]) === normalize(productName) ? match[2].trim() : label;
-}
+  const cleanLabel = label.trim();
+  const cleanProductName = productName.trim();
+  if (!cleanProductName) return cleanLabel;
 
+  const lowerLabel = cleanLabel.toLowerCase();
+  const lowerProductName = cleanProductName.toLowerCase();
+  const boundary = cleanLabel.slice(cleanProductName.length, cleanProductName.length + 1);
+  if (lowerLabel.startsWith(lowerProductName) && (!boundary || /\s|[-–—|:]/.test(boundary))) {
+    const directLabel = cleanLabel
+      .slice(cleanProductName.length)
+      .trimStart()
+      .replace(/^(?:-|–|—|\||:)\s*/, "")
+      .trim();
+    if (directLabel) return directLabel;
+  }
+
+  const separated = cleanLabel.match(/^(.+?)\s+(?:-|–|—|\|)\s+(.+)$/);
+  if (!separated) return cleanLabel;
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/s$/, "");
+  return normalize(separated[1]) === normalize(cleanProductName) ? separated[2].trim() : cleanLabel;
+}
 function normalizeWhatsapp(value: string) {
   const hasPlus = value.trim().startsWith("+");
   const digits = value.replace(/\D/g, "").slice(0, 16);
