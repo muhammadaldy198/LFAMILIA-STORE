@@ -37,7 +37,7 @@ export function StoreFooter({ showBrandBanner = true }: { showBrandBanner?: bool
     <footer className="bg-[#05070b]">
       {showBrandBanner && (
         <div
-          className="relative left-1/2 h-[70px] w-screen -translate-x-1/2 overflow-hidden bg-[#080f14] sm:h-[72px] lg:h-[88px] xl:h-[116px]"
+          className="relative left-1/2 h-[70px] w-screen -translate-x-1/2 overflow-hidden bg-[#080f14] min-[520px]:h-[84px] sm:h-[72px] lg:h-[88px] xl:h-[116px]"
           data-sitewide-footer-banner
         >
           <Image
