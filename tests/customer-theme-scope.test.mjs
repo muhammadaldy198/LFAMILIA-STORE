@@ -18,7 +18,9 @@ test("customer storefront uses the original LFAMILIA color theme", () => {
   assert.match(css, /--background: #07090f/);
   assert.match(css, /--primary: #b9ff35/);
   assert.doesNotMatch(css, /Nordic Indigo|#263baa|#fff4d6/);
-  assert.match(brand, /bg-black/);
+  assert.match(brand, /lfamilia-logo-transparent-v2\.png/);
+  assert.match(brand, /size-full object-contain p-1/);
+  assert.doesNotMatch(brand, /scale-\[1\.3\]|bg-black/);
   assert.match(panelLogin, /<StoreLayout customerTheme=\{false\}>/);
   assert.match(ownerSetup, /<StoreLayout customerTheme=\{false\}>/);
 });

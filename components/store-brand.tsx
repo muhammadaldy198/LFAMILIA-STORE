@@ -4,18 +4,20 @@ import Image from "next/image";
 import { useState } from "react";
 import type { StorefrontSettings } from "@/lib/store-data";
 
+const defaultLogo = "/brand/lfamilia-logo-transparent-v2.png";
+
 export function StoreBrand({ settings, compact = false }: { settings: StorefrontSettings; compact?: boolean }) {
-  const logoUrl = settings.logoUrl || "/brand/lfamilia-logo-2026.jpg";
+  const logoUrl = settings.logoUrl || defaultLogo;
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   return (
     <>
-      <span className={`${compact ? "size-9" : "size-10"} grid shrink-0 place-items-center overflow-hidden rounded-[4px] border border-[#2584ff]/55 bg-black shadow-[3px_3px_0_rgba(185,255,53,0.24),0_0_22px_rgba(37,132,255,0.28)]`}>
+      <span className={`${compact ? "size-8" : "size-9"} grid shrink-0 place-items-center`}>
         <Image
-          src={failedUrl === logoUrl ? "/brand/lfamilia-logo-2026.jpg" : logoUrl}
+          src={failedUrl === logoUrl ? defaultLogo : logoUrl}
           alt={`Logo ${settings.storeName}`}
-          width={40}
-          height={40}
-          className="size-full scale-[1.3] object-cover"
+          width={320}
+          height={320}
+          className="size-full object-contain p-1"
           unoptimized
           priority
           onError={() => setFailedUrl(logoUrl)}

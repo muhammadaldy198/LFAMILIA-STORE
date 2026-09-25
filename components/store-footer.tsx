@@ -37,16 +37,16 @@ export function StoreFooter({ showBrandBanner = true }: { showBrandBanner?: bool
     <footer className="bg-[#05070b]">
       {showBrandBanner && (
         <div
-          className="relative left-1/2 h-[96px] w-screen -translate-x-1/2 overflow-hidden border-y border-[#4bdfe3]/20 bg-[#10191e] sm:h-[112px] md:h-[146px] lg:h-[174px] xl:h-[220px]"
+          className="relative left-1/2 h-[70px] w-screen -translate-x-1/2 overflow-hidden bg-[#080f14] sm:h-[92px] md:h-[130px] lg:h-[160px] xl:h-[200px]"
           data-sitewide-footer-banner
         >
           <Image
-            src="/brand/lfamilia-footer-2026.jpg"
+            src="/brand/lfamilia-footer-compact-v2.jpg"
             alt="LFAMILIA STORE"
-            width={1536}
-            height={512}
+            width={2172}
+            height={724}
             loading="lazy"
-            className="absolute left-1/2 top-1/2 h-auto w-full min-w-[380px] max-w-[1600px] -translate-x-1/2 -translate-y-1/2"
+            className="absolute left-1/2 top-1/2 h-auto w-full min-w-[380px] max-w-[1600px] -translate-x-1/2 -translate-y-[36%]"
             unoptimized
           />
         </div>

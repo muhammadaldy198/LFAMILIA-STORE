@@ -16,19 +16,19 @@ export const metadata: Metadata = {
     siteName: "LFAMILIA STORE",
     title: "LFAMILIA STORE — Top Up Game Cepat & Aman",
     description: "Top up game dan produk digital dengan pembayaran praktis dan proses yang jelas.",
-    images: [{ url: "/brand/lfamilia-logo-2026.jpg", width: 1536, height: 1536, alt: "LFAMILIA STORE" }],
+    images: [{ url: "/brand/lfamilia-logo-transparent-v2.png", width: 320, height: 320, alt: "LFAMILIA STORE" }],
   },
   twitter: {
     card: "summary",
     title: "LFAMILIA STORE — Top Up Game Cepat & Aman",
     description: "Top up game dan produk digital dengan pembayaran praktis dan proses yang jelas.",
-    images: ["/brand/lfamilia-logo-2026.jpg"],
+    images: ["/brand/lfamilia-logo-transparent-v2.png"],
   },
   robots: { index: true, follow: true },
   icons: {
-    icon: [{ url: "/brand/lfamilia-logo-2026.jpg", type: "image/jpeg" }],
-    shortcut: "/brand/lfamilia-logo-2026.jpg",
-    apple: "/brand/lfamilia-logo-2026.jpg",
+    icon: [{ url: "/brand/lfamilia-logo-transparent-v2.png", type: "image/png" }],
+    shortcut: "/brand/lfamilia-logo-transparent-v2.png",
+    apple: "/brand/lfamilia-logo-transparent-v2.png",
   },
 };
 
@@ -54,7 +54,7 @@ export default function RootLayout({
             "@type": "Organization",
             name: "LFAMILIA STORE",
             url: "https://lfamiliastore.my.id",
-            logo: "https://lfamiliastore.my.id/brand/lfamilia-logo-2026.jpg",
+            logo: "https://lfamiliastore.my.id/brand/lfamilia-logo-transparent-v2.png",
           }) }}
         />
         <script
