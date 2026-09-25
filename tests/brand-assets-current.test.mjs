@@ -8,9 +8,11 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 test("LFAMILIA storefront uses the new themed logo asset", () => {
   const storeData = read("lib/store-data.ts");
+  const storefront = read("lib/server/storefront.ts");
   const brand = read("components/store-brand.tsx");
 
   assert.match(storeData, /logoUrl: "\/brand\/lfamilia-neon-logo\.webp"/);
+  assert.match(storefront, /row\.logo_url === "\/brand\/lfamilia-pixel-logo\.webp"/);
   assert.doesNotMatch(brand, /pixel-art size-full object-cover/);
 });
 
