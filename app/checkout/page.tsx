@@ -982,7 +982,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                               type="button"
                               disabled={!available}
                               onClick={() => choosePackage(item.id)}
-                              className={`relative min-h-[72px] overflow-hidden rounded-lg border px-2.5 py-2 text-left transition sm:min-h-[86px] sm:px-3 sm:py-2.5 ${!available ? "cursor-not-allowed border-amber-300/10 bg-black/20 opacity-45" : packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.18)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}
+                              className={`relative min-h-[78px] overflow-hidden rounded-lg border px-2.5 py-2.5 text-left transition sm:min-h-[86px] sm:px-3 sm:py-2.5 ${!available ? "cursor-not-allowed border-amber-300/10 bg-black/20 opacity-45" : packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.18)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
@@ -1113,7 +1113,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                                     setPaymentChannel(channel.channel);
                                     setPayment(null);
                                   }}
-                                  className={`flex min-h-[36px] items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-[8px] font-bold transition sm:min-h-[44px] sm:gap-2 sm:px-2.5 sm:py-2 sm:text-[9px] ${paymentChannel === channel.channel ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.10] text-[#d8ff8d]" : "border-white/[0.08] bg-white/[0.02] text-white/45 hover:text-white"}`}
+                                  className={`flex min-h-[40px] items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[9px] font-bold transition sm:min-h-[44px] sm:gap-2 sm:px-2.5 sm:py-2 sm:text-[9px] ${paymentChannel === channel.channel ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.10] text-[#d8ff8d]" : "border-white/[0.08] bg-white/[0.02] text-white/45 hover:text-white"}`}
                                 >
                                   <span className="min-w-0"><span className="block truncate">{channel.name}</span>{channel.customerFeeEnabled !== false && ((channel.customerFeeBps ?? 0) > 0 || (channel.customerFeeFixed ?? 0) > 0) && <span className="mt-0.5 block text-[7px] font-semibold opacity-70">Fee {((channel.customerFeeBps ?? 0) / 100).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%{(channel.customerFeeFixed ?? 0) > 0 ? ` + ${formatRupiah(channel.customerFeeFixed ?? 0)}` : ""}</span>}</span>
                                 </button>
@@ -1185,7 +1185,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                       onClick={() => void applyVoucher()}
                       disabled={applyingVoucher || !packageId}
                       size="sm"
-                      className="shrink-0 rounded-md bg-[#bca17d] px-2.5 text-[9px] font-black text-white hover:bg-[#d1b18b] sm:rounded-lg sm:px-4 sm:text-[10px]"
+                      className="shrink-0 rounded-md bg-[#bca17d] px-3 text-[10px] font-black text-white hover:bg-[#d1b18b] sm:rounded-lg sm:px-4"
                     >
                       {applyingVoucher ? <LoaderCircle className="size-4 animate-spin" /> : "Gunakan"}
                     </Button>
@@ -1198,7 +1198,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                       setVoucherPickerOpen(true);
                     }}
                     size="sm"
-                    className="mt-2 rounded-md bg-[#bca17d] px-2.5 text-[9px] font-black text-white hover:bg-[#d1b18b] sm:mt-3 sm:rounded-lg sm:px-3 sm:text-[10px]"
+                    className="mt-2.5 rounded-md bg-[#bca17d] px-3 text-[10px] font-black text-white hover:bg-[#d1b18b] sm:mt-3 sm:rounded-lg"
                   >
                     <TicketPercent className="mr-1 size-3.5 sm:mr-2 sm:size-4" /> Pakai Voucher Yang Tersedia
                   </Button>
@@ -1303,7 +1303,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                 type="button"
                 onClick={() => setSummaryOpen(true)}
                 aria-expanded="false"
-                className="mb-1.5 flex w-full items-center justify-between rounded-md border border-white/[0.10] bg-white/[0.04] px-2.5 py-1.5 text-left"
+                className="mb-2 flex w-full items-center justify-between rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-2 text-left"
               >
                 <span className="min-w-0">
                   <strong className="block text-[11px]">Ringkasan pesanan</strong>
@@ -1316,7 +1316,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
               </button>
             )}
 
-            <Button size="sm" form="checkout-form" type="submit" disabled={submitting} className="w-full rounded-md bg-[#bca17d] text-[12px] font-black text-white hover:bg-[#d1b18b]">
+            <Button size="sm" form="checkout-form" type="submit" disabled={submitting} className="w-full rounded-md bg-[#bca17d] text-[13px] font-black text-white hover:bg-[#d1b18b]">
               {submitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <LockKeyhole className="mr-2 size-4" />}
               Pesan Sekarang
             </Button>
@@ -1485,10 +1485,10 @@ function StepTitle({
 }) {
   return (
     <div className="flex items-start gap-2 sm:gap-2.5">
-      <span className="grid size-6 shrink-0 place-items-center rounded-md bg-[#bca17d] text-[10px] font-black text-white sm:size-7 sm:text-xs">{number}</span>
+      <span className="grid size-[26px] shrink-0 place-items-center rounded-md bg-[#bca17d] text-[11px] font-black text-white sm:size-7 sm:text-xs">{number}</span>
       <div className="min-w-0">
-        <h2 className="text-[11px] font-black leading-4 sm:text-[13px]">{title}</h2>
-        <p className="mt-0.5 text-[8px] leading-3.5 text-white/45 sm:text-[10px] sm:leading-4">{description}</p>
+        <h2 className="text-[12px] font-black leading-4 sm:text-[13px]">{title}</h2>
+        <p className="mt-0.5 text-[9px] leading-4 text-white/45 sm:text-[10px]">{description}</p>
       </div>
     </div>
   );
