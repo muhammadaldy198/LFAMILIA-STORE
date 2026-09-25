@@ -108,7 +108,7 @@ export async function notifyOrderFulfillmentSuccessById(orderId: string) {
   const order = await getD1()
     .prepare(
       `SELECT id, buyer_name, buyer_email, buyer_phone, product_name, package_label,
-       total, reference_id, fulfillment_status FROM orders WHERE id = ? LIMIT 1`,
+       quantity, total, reference_id, fulfillment_status FROM orders WHERE id = ? LIMIT 1`,
     )
     .bind(orderId)
     .first<{
@@ -118,6 +118,7 @@ export async function notifyOrderFulfillmentSuccessById(orderId: string) {
       buyer_phone: string;
       product_name: string;
       package_label: string;
+      quantity: number;
       total: number;
       reference_id: string;
       fulfillment_status: string;
@@ -125,9 +126,10 @@ export async function notifyOrderFulfillmentSuccessById(orderId: string) {
   if (!order || order.fulfillment_status !== "success") return;
 
   const voucherCode = await getWebsiteVoucherCodeByReference(order.reference_id).catch(() => null);
+  const quantityLabel = Math.max(1, Number(order.quantity || 1)) > 1 ? ` × ${order.quantity}` : "";
   const detail = voucherCode
-    ? `${order.product_name} — ${order.package_label}. Produk berhasil dikirim. Kode voucher: ${voucherCode}`
-    : `${order.product_name} — ${order.package_label}. Produk berhasil dikirim.`;
+    ? `${order.product_name} — ${order.package_label}${quantityLabel}. Produk berhasil dikirim. Kode voucher: ${voucherCode}`
+    : `${order.product_name} — ${order.package_label}${quantityLabel}. Produk berhasil dikirim.`;
 
   const input: NotificationInput = {
     kind: "order",
@@ -157,11 +159,15 @@ export async function notifyOrderFulfillmentSuccessByProviderRef(
 ) {
   const order = await getD1()
     .prepare(
-      `SELECT id FROM orders
-       WHERE provider_code = ? AND (provider_ref_id = ? OR reference_id = ?)
-       AND fulfillment_status = 'success' LIMIT 1`,
+      `SELECT DISTINCT o.id
+       FROM orders o
+       LEFT JOIN order_fulfillment_units u ON u.order_id = o.id
+       WHERE o.provider_code = ?
+         AND (o.provider_ref_id = ? OR o.reference_id = ? OR u.provider_ref_id = ?)
+         AND o.fulfillment_status = 'success'
+       LIMIT 1`,
     )
-    .bind(providerCode, providerRefId, providerRefId)
+    .bind(providerCode, providerRefId, providerRefId, providerRefId)
     .first<{ id: string }>();
   if (order) await notifyOrderFulfillmentSuccessById(order.id);
 }
