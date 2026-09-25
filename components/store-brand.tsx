@@ -13,7 +13,7 @@ export function StoreBrand({ settings, compact = false }: { settings: Storefront
           <img key={settings.logoUrl} src={settings.logoUrl} alt={`Logo ${settings.storeName}`} className="pixel-art size-full object-cover" onError={() => setFailedUrl(settings.logoUrl ?? null)} />
         ) : settings.storeShortName}
       </span>
-      <span className="leading-none"><strong className="block max-w-36 truncate text-xs tracking-[0.1em] text-white">{settings.storeName.replace(/\s+STORE$/i, "")}</strong><span className="mt-1 block text-[9px] font-semibold tracking-[0.28em] text-white/40">STORE</span></span>
+      <span className="leading-none"><strong className="store-brand-name block max-w-36 truncate text-xs tracking-[0.1em] text-white">{settings.storeName.replace(/\s+STORE$/i, "")}</strong><span className="store-brand-subtitle mt-1 block text-[9px] font-semibold tracking-[0.28em] text-white/40">STORE</span></span>
     </>
   );
 }
