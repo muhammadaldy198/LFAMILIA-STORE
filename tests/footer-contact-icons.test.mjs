@@ -23,7 +23,7 @@ test("customer footer brand banner is full viewport width on every breakpoint", 
 
   assert.match(footer, /data-sitewide-footer-banner/);
   assert.match(footer, /relative left-1\/2 h-\[72px\] w-screen -translate-x-1\/2/);
-  assert.match(footer, /src="\/brand\/lfamilia-footer-banner\.webp"/);
+  assert.match(footer, /src="\\/brand\\/lfamilia-footer-banner\\.webp\\?v=20260925c"/);
   assert.match(footer, /className="block size-full max-w-none object-cover object-center"/);
   assert.match(footer, /sm:h-\[82px\]/);
   assert.match(footer, /md:h-\[92px\]/);
