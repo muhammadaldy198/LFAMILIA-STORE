@@ -42,8 +42,12 @@ test("customer home removes quick menu and tightens display spacing", () => {
 test("popular section stays compact and close to the product browser", () => {
   const popular = read("components/popular-now.tsx");
   const browser = read("components/home-product-browser.tsx");
+  const css = read("app/globals.css");
 
-  assert.match(popular, /rounded-\[20px\]/);
+  assert.match(popular, /popular-card/);
+  assert.match(popular, /popular-card-artwork/);
+  assert.match(css, /\.customer-theme main \.popular-card \{[\s\S]*border-radius: 20px !important/);
+  assert.match(css, /@media \(min-width: 640px\)[\s\S]*\.popular-card \{[\s\S]*border-radius: 22px !important/);
   assert.match(popular, /size-\[54px\]/);
   assert.match(popular, /pb-\[10px\] pt-\[22px\]/);
   assert.match(browser, /pb-\[34px\] pt-\[12px\]/);

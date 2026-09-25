@@ -596,3 +596,21 @@ body {
 .customer-theme main :where(h1, h2, h3, p) {
   word-spacing: 0;
 }
+/* Popular cards intentionally override the global dense-radius clamp. */
+.customer-theme main .popular-card {
+  border-radius: 20px !important;
+}
+
+.customer-theme main .popular-card-artwork {
+  border-radius: 13px !important;
+}
+
+@media (min-width: 640px) {
+  .customer-theme main .popular-card {
+    border-radius: 22px !important;
+  }
+
+  .customer-theme main .popular-card-artwork {
+    border-radius: 15px !important;
+  }
+}

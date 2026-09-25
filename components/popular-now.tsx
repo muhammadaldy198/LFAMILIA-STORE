@@ -43,13 +43,13 @@ export function PopularNow() {
           <Link
             key={product.slug}
             href={`/checkout?product=${product.slug}`}
-            className={`group relative flex min-w-0 items-center gap-[8px] overflow-hidden rounded-[20px] border border-white/10 bg-gradient-to-br p-[8px] shadow-[0_12px_24px_-22px_rgba(0,0,0,0.92)] transition duration-300 hover:-translate-y-0.5 hover:border-white/30 sm:gap-[10px] sm:rounded-[22px] sm:p-[10px] ${product.accent}`}
+            className={`popular-card group relative flex min-w-0 items-center gap-[8px] overflow-hidden rounded-[20px] border border-white/10 bg-gradient-to-br p-[8px] shadow-[0_12px_24px_-22px_rgba(0,0,0,0.92)] transition duration-300 hover:-translate-y-0.5 hover:border-white/30 sm:gap-[10px] sm:rounded-[22px] sm:p-[10px] ${product.accent}`}
           >
             <span
               className="pointer-events-none absolute inset-0 bg-[linear-gradient(132deg,transparent_46%,rgba(255,255,255,0.14)_46%,transparent_72%)] opacity-80"
               aria-hidden="true"
             />
-            <span className="relative z-10 block size-[54px] shrink-0 overflow-hidden rounded-[13px] border border-white/15 bg-black/10 shadow-[0_8px_16px_-12px_rgba(0,0,0,0.9)] sm:size-[68px] sm:rounded-[15px]">
+            <span className="popular-card-artwork relative z-10 block size-[54px] shrink-0 overflow-hidden rounded-[13px] border border-white/15 bg-black/10 shadow-[0_8px_16px_-12px_rgba(0,0,0,0.9)] sm:size-[68px] sm:rounded-[15px]">
               <ProductArtwork product={product} compact />
             </span>
             <span className="relative z-10 min-w-0 pr-1">
