@@ -33,7 +33,7 @@ export function StoreFooter({ showBrandBanner = true }: { showBrandBanner?: bool
     { href: settings.discordUrl || "/contact", label: "Discord LFAMILIA", icon: DiscordIcon, tone: "hover:text-[#7289da]" },
   ];
   return (
-    <footer className="border-t border-white/[0.08] bg-[#05070b]">
+    <footer className="bg-[#05070b]">
       {showBrandBanner && (
         <div className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-black" data-sitewide-footer-banner>
           <img
@@ -45,13 +45,15 @@ export function StoreFooter({ showBrandBanner = true }: { showBrandBanner?: bool
           />
         </div>
       )}
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-8">
+      <div className="border-t border-white/[0.08]">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-8">
         <div>
           <Link className="inline-flex items-center gap-3" href="/"><StoreBrand settings={settings} /></Link>
           <p className="mt-4 max-w-sm text-sm leading-6 text-white/42">{settings.tagline}</p>
           <div className="mt-5 flex gap-2">{socialLinks.map(({ href, label, icon: Icon, tone }) => <a key={label} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noreferrer" : undefined} aria-label={label} className={`grid size-9 place-items-center rounded-lg border border-white/10 text-white/45 transition hover:border-white/25 ${tone}`}><Icon className="size-4" /></a>)}</div>
         </div>
         {groups.map((group) => <div key={group.title}><h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/75">{group.title}</h2><ul className="mt-4 space-y-3 text-sm text-white/42">{group.items.map(([label, href]) => <li key={href}><Link className="transition hover:text-[#b9ff35]" href={href}>{label}</Link></li>)}</ul></div>)}
+        </div>
       </div>
       <div className="border-t border-white/[0.06] px-4 py-5 text-center text-[11px] text-white/30 sm:px-6">© 2026 {settings.storeName}. Produk dan merek dagang adalah milik pemegang hak masing-masing.</div>
     </footer>
