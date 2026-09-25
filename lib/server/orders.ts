@@ -258,8 +258,8 @@ function assertManualServiceOpen(item: PurchasableItem) {
 
 export function normalizeOrderQuantity(value: unknown) {
   const quantity = Math.trunc(Number(value) || 1);
-  if (quantity < 1 || quantity > 10) {
-    throw new CheckoutValidationError("Jumlah pembelian harus antara 1 sampai 10.");
+  if (quantity < 1 || quantity > 5) {
+    throw new CheckoutValidationError("Jumlah pembelian harus antara 1 sampai 5.");
   }
   return quantity;
 }
