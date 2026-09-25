@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HomeProductBrowser } from "@/components/home-product-browser";
-import { QuickTools } from "@/components/quick-tools";
 import { StoreLayout } from "@/components/store-layout";
 import { GlobalHomePopup } from "@/components/global-home-popup";
 import { HomeBannerCarousel } from "@/components/home-banner-carousel";
@@ -52,15 +51,6 @@ export default function Home() {
         <PopularNow />
         <GlobalHomePopup />
 
-        <section className="mx-auto max-w-7xl px-4 pt-[28px] sm:px-6 sm:pt-[36px] lg:px-8">
-          <div className="mb-[12px]">
-            <p className="eyebrow">Menu cepat</p>
-            <h2 className="text-[20px] font-black leading-tight tracking-[-0.03em] sm:text-[24px]">
-              Semua yang kamu butuhkan
-            </h2>
-          </div>
-          <QuickTools />
-        </section>
 
         <HomeProductBrowser />
         <HomeNewsPreview />
