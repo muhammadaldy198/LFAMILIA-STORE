@@ -7,7 +7,7 @@ export function StoreBrand({ settings, compact = false }: { settings: Storefront
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   return (
     <>
-      <span className={`${compact ? "size-9" : "size-10"} grid shrink-0 place-items-center overflow-hidden rounded-[4px] border-2 border-[#2584ff]/55 bg-[#02050c] font-mono text-xs font-black text-[#b9ff35] shadow-[3px_3px_0_rgba(185,255,53,0.24),0_0_22px_rgba(37,132,255,0.28)]`}>
+      <span className={`${compact ? "size-9" : "size-10"} grid shrink-0 place-items-center overflow-hidden rounded-[4px] border-2 border-[#2584ff]/55 bg-black font-mono text-xs font-black text-[#b9ff35] shadow-[3px_3px_0_rgba(185,255,53,0.24),0_0_22px_rgba(37,132,255,0.28)]`}>
         {settings.logoUrl && failedUrl !== settings.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img key={settings.logoUrl} src={settings.logoUrl} alt={`Logo ${settings.storeName}`} className="pixel-art size-full object-cover" onError={() => setFailedUrl(settings.logoUrl ?? null)} />
