@@ -53,7 +53,9 @@ export async function readStorefrontSettings(
       storeName: row.store_name,
       storeShortName: row.store_short_name,
       tagline: row.tagline,
-      logoUrl: row.logo_url === "/brand/lfamilia-pixel-logo.webp" ? defaultStorefrontSettings.logoUrl : (row.logo_url ?? defaultStorefrontSettings.logoUrl),
+      logoUrl: ["/brand/lfamilia-pixel-logo.webp", "/brand/lfamilia-neon-logo.webp"].includes(row.logo_url ?? "")
+        ? defaultStorefrontSettings.logoUrl
+        : (row.logo_url || defaultStorefrontSettings.logoUrl),
       announcement: row.announcement ?? undefined,
       bannerEnabled: Boolean(row.banner_enabled),
       bannerEyebrow: row.banner_eyebrow,

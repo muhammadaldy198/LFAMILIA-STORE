@@ -380,7 +380,7 @@ export const defaultStorefrontSettings: StorefrontSettings = {
   storeName: "LFAMILIA STORE",
   storeShortName: "LF",
   tagline: "Top up favoritmu, sat set tanpa ribet.",
-  logoUrl: "/brand/lfamilia-neon-logo.webp",
+  logoUrl: "/brand/lfamilia-logo-2026.jpg",
   announcement: "Pemesanan tersedia 24 jam",
   bannerEnabled: true,
   bannerEyebrow: "Top up & voucher digital",
