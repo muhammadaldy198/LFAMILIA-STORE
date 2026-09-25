@@ -12,7 +12,7 @@ const settingsSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const access = await requireAdminSession(request, "admin");
+  const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
   const [settings, topups] = await Promise.all([
     readWalletSettings({ repairSchema: false }),
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const access = await requireAdminSession(request, "admin");
+  const access = await requireAdminSession(request, "owner");
   if (access instanceof Response) return access;
   try {
     await saveWalletSettings(settingsSchema.parse(await request.json()));
