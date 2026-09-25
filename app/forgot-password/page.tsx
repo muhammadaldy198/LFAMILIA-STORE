@@ -30,7 +30,7 @@ export default function ForgotPasswordPage() {
     } finally { setBusy(false); }
   }
 
-  return <main className="grid min-h-dvh place-items-center bg-[#070910] px-4 py-10 text-white">
+  return <main className="customer-theme grid min-h-dvh place-items-center bg-background px-4 py-10 text-foreground">
     <section className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0d1019] p-6 shadow-2xl sm:p-8">
       <div className="grid size-11 place-items-center rounded-xl bg-[#b9ff35]/10 text-[#cfff72]"><Mail className="size-5" /></div>
       <h1 className="mt-4 text-2xl font-black">Lupa password?</h1>
