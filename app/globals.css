@@ -625,3 +625,32 @@ body {
     border-radius: 16px !important;
   }
 }
+
+/* Checkout mobile density: keep customer controls compact without affecting admin or desktop. */
+@media (max-width: 639px) {
+  [data-lf-checkout-form="true"] .checkout-input {
+    height: 1.75rem !important;
+    min-height: 1.75rem !important;
+    padding: 0.15rem 0.55rem !important;
+    border-radius: 0.35rem !important;
+    font-size: 0.72rem !important;
+    line-height: 1rem !important;
+  }
+
+  [data-lf-checkout-form="true"] .field-label {
+    margin-bottom: 0.2rem;
+    font-size: 0.64rem;
+    line-height: 0.9rem;
+  }
+
+  [data-lf-checkout-form="true"] [data-slot="button"][data-size="sm"] {
+    height: 1.75rem !important;
+    min-height: 1.75rem !important;
+    padding-left: 0.55rem !important;
+    padding-right: 0.55rem !important;
+  }
+
+  [data-lf-mobile-checkout="true"] [data-slot="button"] {
+    min-height: 2rem;
+  }
+}
