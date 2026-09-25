@@ -28,7 +28,7 @@ type IntegrationPutResult = {
 type PaymentOverview = {
   dokuEnvironment: PaymentEnvironment;
   midtransEnvironment: PaymentEnvironment;
-  walletTopupGateway: "doku" | "midtrans";
+  walletTopupGateway: "doku" | "midtrans" | null;
   dokuMode: "checkout";
   midtransMode: "snap";
   dokuCheckoutConfigured: boolean;
