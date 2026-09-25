@@ -7,7 +7,7 @@ const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 test("homepage categories are managed by staff or higher", () => {
-  const route = read("app/api/admin/categories/route.ts");
+  const route = read("app/api/panel/categories/route.ts");
   assert.equal((route.match(/requireAdminSession\(request, "staff"\)/g) || []).length, 3);
   assert.match(route, /deleteCategory/);
   assert.match(route, /saveCategory/);
