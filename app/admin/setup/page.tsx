@@ -51,7 +51,7 @@ export default function OwnerSetupPage() {
   }
 
   return (
-    <StoreLayout>
+    <StoreLayout customerTheme={false}>
       <main className="mx-auto grid min-h-[72vh] max-w-xl place-items-center px-4 py-12 sm:px-6">
         <form onSubmit={save} className="panel w-full p-6 sm:p-9">
           <span className="grid size-12 place-items-center rounded-2xl border border-[#b9ff35]/20 bg-[#b9ff35]/10 text-[#b9ff35]">{configured ? <CheckCircle2 className="size-6" /> : <ShieldCheck className="size-6" />}</span>

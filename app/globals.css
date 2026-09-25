@@ -578,3 +578,138 @@ body {
     height: 100dvh;
   }
 }
+
+
+/* LFAMILIA customer theme — Nordic Indigo + Vanilla Mist. Scoped to StoreLayout only. */
+.customer-theme,
+body:has(.customer-theme) {
+  --background: #0b1020;
+  --foreground: #fff4d6;
+  --card: #111733;
+  --card-foreground: #fff4d6;
+  --popover: #151c3c;
+  --popover-foreground: #fff4d6;
+  --primary: #263baa;
+  --primary-foreground: #fff4d6;
+  --secondary: #1a2144;
+  --secondary-foreground: #fff4d6;
+  --muted: #1a2144;
+  --muted-foreground: #b9b39f;
+  --accent: #202957;
+  --accent-foreground: #fff4d6;
+  --border: rgba(255, 244, 214, 0.12);
+  --input: rgba(255, 244, 214, 0.14);
+  --ring: #263baa;
+}
+
+.customer-theme {
+  background-color: #0b1020;
+  color: #fff4d6;
+  background-image:
+    radial-gradient(circle at 18% 7%, rgba(38, 59, 170, 0.22), transparent 28%),
+    radial-gradient(circle at 86% 16%, rgba(255, 244, 214, 0.055), transparent 24%),
+    linear-gradient(rgba(255, 244, 214, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 244, 214, 0.018) 1px, transparent 1px);
+  background-size: auto, auto, 72px 72px, 72px 72px;
+}
+
+.customer-theme .eyebrow {
+  color: #fff4d6;
+}
+
+.customer-theme .panel {
+  border-color: rgba(255, 244, 214, 0.12);
+  background: #111733;
+}
+
+.customer-theme .field-label {
+  color: rgba(255, 244, 214, 0.72);
+}
+
+.customer-theme .checkout-input {
+  border-color: rgba(255, 244, 214, 0.14);
+  background: rgba(255, 244, 214, 0.035);
+  color: #fff4d6;
+}
+
+.customer-theme .checkout-input::placeholder {
+  color: rgba(255, 244, 214, 0.32);
+}
+
+.customer-theme ::selection {
+  background: #263baa;
+  color: #fff4d6;
+}
+
+body:has(.customer-theme) [class~="bg-[#b9ff35]"] {
+  background-color: #263baa !important;
+  color: #fff4d6 !important;
+}
+
+body:has(.customer-theme) [class*=" bg-[#b9ff35]/"],
+body:has(.customer-theme) [class^="bg-[#b9ff35]/"] {
+  background-color: rgba(38, 59, 170, 0.16) !important;
+}
+
+body:has(.customer-theme) [class~="border-[#b9ff35]"] {
+  border-color: #263baa !important;
+}
+
+body:has(.customer-theme) [class*=" border-[#b9ff35]/"],
+body:has(.customer-theme) [class^="border-[#b9ff35]/"] {
+  border-color: rgba(38, 59, 170, 0.34) !important;
+}
+
+body:has(.customer-theme) [class~="text-[#b9ff35]"],
+body:has(.customer-theme) [class~="text-[#cfff72]"],
+body:has(.customer-theme) [class~="text-[#d8ff8d]"],
+body:has(.customer-theme) [class~="text-[#dfff9d]"],
+body:has(.customer-theme) [class~="text-[#dcffa0]"] {
+  color: #fff4d6 !important;
+}
+
+body:has(.customer-theme) [class~="text-[#091006]"] {
+  color: #fff4d6 !important;
+}
+
+body:has(.customer-theme) [class*="hover:bg-[#d0ff75]"]:hover,
+body:has(.customer-theme) [class*="hover:bg-[#b9ff35]"]:hover {
+  background-color: #3048c8 !important;
+  color: #fff4d6 !important;
+}
+
+body:has(.customer-theme) [class*="hover:border-[#b9ff35]"]:hover {
+  border-color: #4056c4 !important;
+}
+
+body:has(.customer-theme) [class*="hover:text-[#b9ff35]"]:hover,
+body:has(.customer-theme) [class*="hover:text-[#cfff72]"]:hover {
+  color: #fff4d6 !important;
+}
+
+body:has(.customer-theme) .group:hover [class*="group-hover:bg-[#b9ff35]"] {
+  background-color: #263baa !important;
+  color: #fff4d6 !important;
+}
+
+body:has(.customer-theme) .group:hover [class*="group-hover:border-[#b9ff35]"] {
+  border-color: #4056c4 !important;
+}
+
+body:has(.customer-theme) .group:hover [class*="group-hover:text-[#091006]"] {
+  color: #fff4d6 !important;
+}
+
+body:has(.customer-theme) [class*="focus:border-[#b9ff35]"]:focus {
+  border-color: rgba(38, 59, 170, 0.72) !important;
+}
+
+.customer-theme .hero-glow {
+  background: radial-gradient(circle, rgba(38, 59, 170, 0.28), rgba(38, 59, 170, 0.08) 45%, transparent 70%);
+}
+
+@media (max-width: 640px) {
+  .customer-theme {
+    background-size: auto, auto, 48px 48px, 48px 48px;
+  }
+}
