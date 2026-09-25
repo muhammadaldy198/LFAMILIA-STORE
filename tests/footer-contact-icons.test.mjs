@@ -22,9 +22,12 @@ test("customer footer brand banner is full viewport width on every breakpoint", 
   const layout = fs.readFileSync(path.join(process.cwd(), "components/store-layout.tsx"), "utf8");
 
   assert.match(footer, /data-sitewide-footer-banner/);
-  assert.match(footer, /src="\/brand\/lfamilia-footer-banner\.webp"/);
   assert.match(footer, /relative left-1\/2 w-screen -translate-x-1\/2/);
-  assert.match(footer, /className="block h-auto w-full max-w-none object-cover"/);
+  assert.match(footer, /LFAMILIA/);
+  assert.match(footer, /STORE/);
+  assert.match(footer, /settings\.logoUrl/);
+  assert.match(footer, /min-h-\[118px\]/);
+  assert.doesNotMatch(footer, /lfamilia-footer-banner\.webp/);
   assert.match(layout, /<StoreFooter showBrandBanner=\{customerTheme\} \/>/);
 });
 

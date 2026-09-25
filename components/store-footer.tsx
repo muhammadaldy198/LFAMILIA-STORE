@@ -35,14 +35,33 @@ export function StoreFooter({ showBrandBanner = true }: { showBrandBanner?: bool
   return (
     <footer className="bg-[#05070b]">
       {showBrandBanner && (
-        <div className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-black" data-sitewide-footer-banner>
-          <img
-            src="/brand/lfamilia-footer-banner.webp"
-            alt="LFAMILIA STORE"
-            className="block h-auto w-full max-w-none object-cover"
-            loading="lazy"
-            decoding="async"
-          />
+        <div
+          className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden border-y border-[#b9ff35]/20 bg-[#05070b]"
+          data-sitewide-footer-banner
+          aria-label="LFAMILIA STORE"
+        >
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(185,255,53,0.20)_0%,rgba(5,7,11,0.96)_28%,rgba(5,7,11,0.98)_68%,rgba(37,132,255,0.18)_100%)]" />
+          <div className="absolute inset-y-0 left-0 w-[32%] bg-[radial-gradient(circle_at_left,rgba(185,255,53,0.28),transparent_66%)]" />
+          <div className="absolute inset-y-0 right-0 w-[34%] bg-[radial-gradient(circle_at_right,rgba(37,132,255,0.30),transparent_68%)]" />
+          <div className="absolute left-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-[#b9ff35]/70 to-transparent" />
+          <div className="relative mx-auto flex min-h-[118px] w-full items-center justify-center gap-4 px-5 py-5 sm:min-h-[132px] sm:gap-5 md:min-h-[148px] lg:min-h-[158px]">
+            <span className="grid size-[68px] shrink-0 place-items-center overflow-hidden rounded-[12px] border-2 border-[#2584ff]/70 bg-black shadow-[0_0_34px_rgba(37,132,255,0.38),5px_5px_0_rgba(185,255,53,0.20)] sm:size-[78px] md:size-[88px]">
+              {settings.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={settings.logoUrl} alt="" className="pixel-art size-full object-cover" />
+              ) : (
+                <span className="font-mono text-lg font-black text-[#b9ff35]">{settings.storeShortName}</span>
+              )}
+            </span>
+            <span className="min-w-0">
+              <strong className="block whitespace-nowrap text-[22px] font-black tracking-[0.08em] text-white drop-shadow-[0_0_16px_rgba(255,255,255,0.12)] sm:text-[28px] md:text-[34px]">
+                LFAMILIA
+              </strong>
+              <span className="mt-1 block text-[11px] font-black tracking-[0.42em] text-[#b9ff35] sm:text-[13px] md:text-[15px]">
+                STORE
+              </span>
+            </span>
+          </div>
         </div>
       )}
       <div className="border-t border-white/[0.08]">
