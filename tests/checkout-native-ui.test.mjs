@@ -67,3 +67,16 @@ test("checkout nominal labels strip a direct product-name prefix", () => {
   assert.match(checkout, /const directLabel = cleanLabel/);
   assert.match(checkout, /trimStart\(\)/);
 });
+
+test("checkout mobile controls stay compact and scoped", () => {
+  const checkout = read("app/checkout/page.tsx");
+  const css = read("app/globals.css");
+
+  assert.match(checkout, /data-lf-checkout-form="true"/);
+  assert.match(checkout, /data-lf-mobile-checkout="true"/);
+  assert.match(checkout, /size="sm"[\s\S]*Gunakan/);
+  assert.match(checkout, /size="sm"[\s\S]*Pakai Voucher Yang Tersedia/);
+  assert.match(css, /Checkout mobile density/);
+  assert.match(css, /height: 1\.75rem !important/);
+  assert.match(css, /\[data-lf-checkout-form="true"\] \.field-label/);
+});

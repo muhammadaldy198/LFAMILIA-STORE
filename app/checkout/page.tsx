@@ -858,7 +858,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
 
         {activeTab === "transaction" ? (
           <div className="mt-3 grid items-start gap-3 lg:grid-cols-[1fr_360px]">
-            <form id="checkout-form" onSubmit={requestConfirmation} className="space-y-3">
+            <form id="checkout-form" data-lf-checkout-form="true" onSubmit={requestConfirmation} className="space-y-2.5 sm:space-y-3">
               {!isVoucherProduct && (
               <section className="overflow-hidden rounded-lg border border-white/[0.10] bg-[#2f3338]">
                 <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] bg-white/[0.025] px-3 py-2.5 sm:px-4">
@@ -982,7 +982,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                               type="button"
                               disabled={!available}
                               onClick={() => choosePackage(item.id)}
-                              className={`relative min-h-[86px] overflow-hidden rounded-lg border px-3 py-2.5 text-left transition ${!available ? "cursor-not-allowed border-amber-300/10 bg-black/20 opacity-45" : packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.18)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}
+                              className={`relative min-h-[72px] overflow-hidden rounded-lg border px-2.5 py-2 text-left transition sm:min-h-[86px] sm:px-3 sm:py-2.5 ${!available ? "cursor-not-allowed border-amber-300/10 bg-black/20 opacity-45" : packageId === item.id ? "border-[#b9ff35] bg-[#b9ff35]/10 shadow-[inset_0_0_0_1px_rgba(185,255,53,.18)]" : "border-white/[0.09] bg-white/[0.025] hover:border-white/20"}`}
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
@@ -1066,7 +1066,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                           type="button"
                           disabled={disabled}
                           onClick={() => chooseMethod(group.code)}
-                          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left disabled:cursor-not-allowed disabled:opacity-45"
+                          className="flex w-full items-center gap-2 px-2.5 py-2 text-left disabled:cursor-not-allowed disabled:opacity-45 sm:gap-2.5 sm:px-3 sm:py-2.5"
                         >
                           {group.code === "wallet" ? (
                             <span className="size-8 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black">
@@ -1113,7 +1113,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                                     setPaymentChannel(channel.channel);
                                     setPayment(null);
                                   }}
-                                  className={`flex min-h-[44px] items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[9px] font-bold transition ${paymentChannel === channel.channel ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.10] text-[#d8ff8d]" : "border-white/[0.08] bg-white/[0.02] text-white/45 hover:text-white"}`}
+                                  className={`flex min-h-[36px] items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-[8px] font-bold transition sm:min-h-[44px] sm:gap-2 sm:px-2.5 sm:py-2 sm:text-[9px] ${paymentChannel === channel.channel ? "border-[#b9ff35]/60 bg-[#b9ff35]/[0.10] text-[#d8ff8d]" : "border-white/[0.08] bg-white/[0.02] text-white/45 hover:text-white"}`}
                                 >
                                   <span className="min-w-0"><span className="block truncate">{channel.name}</span>{channel.customerFeeEnabled !== false && ((channel.customerFeeBps ?? 0) > 0 || (channel.customerFeeFixed ?? 0) > 0) && <span className="mt-0.5 block text-[7px] font-semibold opacity-70">Fee {((channel.customerFeeBps ?? 0) / 100).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%{(channel.customerFeeFixed ?? 0) > 0 ? ` + ${formatRupiah(channel.customerFeeFixed ?? 0)}` : ""}</span>}</span>
                                 </button>
@@ -1138,7 +1138,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                   title="Data Pembeli"
                   description="Email dan WhatsApp digunakan untuk invoice serta status transaksi."
                 />
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="mt-2.5 grid gap-2.5 sm:mt-3 sm:grid-cols-2 sm:gap-3">
                   <Field label="Email">
                     <Input type="email" value={buyerEmail} onChange={(event) => setBuyerEmail(event.target.value)} placeholder="nama@email.com" className="checkout-input" />
                   </Field>
@@ -1166,8 +1166,8 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                   title="Kode Promo"
                   description="Masukkan kode promo atau voucher diskon yang tersedia."
                 />
-                <div className="mt-3">
-                  <div className="flex gap-2">
+                <div className="mt-2.5 sm:mt-3">
+                  <div className="flex gap-1.5 sm:gap-2">
                     <Input
                       id="voucher-code"
                       value={voucherCode}
@@ -1184,7 +1184,8 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                       type="button"
                       onClick={() => void applyVoucher()}
                       disabled={applyingVoucher || !packageId}
-                      className="h-9 shrink-0 rounded-lg bg-[#bca17d] px-4 text-[10px] font-black text-white hover:bg-[#d1b18b]"
+                      size="sm"
+                      className="shrink-0 rounded-md bg-[#bca17d] px-2.5 text-[9px] font-black text-white hover:bg-[#d1b18b] sm:rounded-lg sm:px-4 sm:text-[10px]"
                     >
                       {applyingVoucher ? <LoaderCircle className="size-4 animate-spin" /> : "Gunakan"}
                     </Button>
@@ -1196,9 +1197,10 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                       setVouchersError("");
                       setVoucherPickerOpen(true);
                     }}
-                    className="mt-3 h-9 rounded-lg bg-[#bca17d] px-3 text-[10px] font-black text-white hover:bg-[#d1b18b]"
+                    size="sm"
+                    className="mt-2 rounded-md bg-[#bca17d] px-2.5 text-[9px] font-black text-white hover:bg-[#d1b18b] sm:mt-3 sm:rounded-lg sm:px-3 sm:text-[10px]"
                   >
-                    <TicketPercent className="mr-2 size-4" /> Pakai Voucher Yang Tersedia
+                    <TicketPercent className="mr-1 size-3.5 sm:mr-2 sm:size-4" /> Pakai Voucher Yang Tersedia
                   </Button>
                   {voucherMessage && <p className={`mt-2 text-[9px] ${quote?.voucherCode ? "text-[#cfff72]" : "text-amber-200"}`}>{voucherMessage}</p>}
                 </div>
@@ -1270,7 +1272,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
       </main>
 
       {activeTab === "transaction" && (
-        <div className="mobile-checkout-bar fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#101217]/95 px-3 py-2.5 backdrop-blur lg:hidden">
+        <div data-lf-mobile-checkout="true" className="mobile-checkout-bar fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#101217]/95 px-3 py-1.5 backdrop-blur lg:hidden">
           <div className="mx-auto max-w-xl">
             {summaryOpen ? (
               <div className="mb-2 rounded-lg border border-white/[0.12] bg-[#191b20] shadow-2xl">
@@ -1278,7 +1280,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                   type="button"
                   onClick={() => setSummaryOpen(false)}
                   aria-expanded="true"
-                  className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left"
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left"
                 >
                   <span className="block size-9 shrink-0 overflow-hidden rounded-lg"><ProductArtwork product={product} compact /></span>
                   <span className="min-w-0 flex-1">
@@ -1288,7 +1290,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                   <strong className="shrink-0 text-xs text-[#cfff72]">{formatRupiah(subtotal)}</strong>
                   <ChevronDown className="size-4 shrink-0 text-white/55" />
                 </button>
-                <dl className="space-y-2 border-t border-white/10 px-3 py-2.5 text-[10px]">
+                <dl className="space-y-1.5 border-t border-white/10 px-2.5 py-1.5 text-[9px]">
                   <SummaryRow label="Harga Satuan" value={formatRupiah(selectedPackage?.price ?? 0)} />
                   <SummaryRow label="Jumlah" value={String(quantity)} />
                   <SummaryRow label="Subtotal" value={formatRupiah(subtotal)} />
@@ -1301,7 +1303,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
                 type="button"
                 onClick={() => setSummaryOpen(true)}
                 aria-expanded="false"
-                className="mb-2 flex w-full items-center justify-between rounded-lg border border-white/[0.10] bg-white/[0.04] px-3 py-2 text-left"
+                className="mb-1.5 flex w-full items-center justify-between rounded-md border border-white/[0.10] bg-white/[0.04] px-2.5 py-1.5 text-left"
               >
                 <span className="min-w-0">
                   <strong className="block text-[11px]">Ringkasan pesanan</strong>
@@ -1314,7 +1316,7 @@ function CheckoutContent({ product }: { product: StoreProduct }) {
               </button>
             )}
 
-            <Button form="checkout-form" type="submit" disabled={submitting} className="h-10 w-full rounded-lg bg-[#bca17d] font-black text-white hover:bg-[#d1b18b]">
+            <Button size="sm" form="checkout-form" type="submit" disabled={submitting} className="w-full rounded-md bg-[#bca17d] text-[12px] font-black text-white hover:bg-[#d1b18b]">
               {submitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <LockKeyhole className="mr-2 size-4" />}
               Pesan Sekarang
             </Button>
@@ -1482,11 +1484,11 @@ function StepTitle({
   description: string;
 }) {
   return (
-    <div className="flex items-start gap-2.5">
-      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-[#bca17d] text-xs font-black text-white">{number}</span>
+    <div className="flex items-start gap-2 sm:gap-2.5">
+      <span className="grid size-6 shrink-0 place-items-center rounded-md bg-[#bca17d] text-[10px] font-black text-white sm:size-7 sm:text-xs">{number}</span>
       <div className="min-w-0">
-        <h2 className="text-[12px] font-black leading-4 sm:text-[13px]">{title}</h2>
-        <p className="mt-0.5 text-[9px] leading-4 text-white/45 sm:text-[10px]">{description}</p>
+        <h2 className="text-[11px] font-black leading-4 sm:text-[13px]">{title}</h2>
+        <p className="mt-0.5 text-[8px] leading-3.5 text-white/45 sm:text-[10px] sm:leading-4">{description}</p>
       </div>
     </div>
   );
