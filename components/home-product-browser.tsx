@@ -42,7 +42,7 @@ export function HomeProductBrowser() {
   }, [filter, products, query]);
 
   return (
-    <section id="produk" className="mx-auto max-w-7xl px-4 py-[34px] sm:px-6 sm:py-[44px] lg:px-8">
+    <section id="produk" className="mx-auto max-w-7xl px-4 pb-[34px] pt-[12px] sm:px-6 sm:pb-[44px] sm:pt-[16px] lg:px-8">
       <div className="flex flex-col gap-[14px] md:flex-row md:items-end md:justify-between">
         <div>
           <p className="eyebrow">Otomatis & manual</p>

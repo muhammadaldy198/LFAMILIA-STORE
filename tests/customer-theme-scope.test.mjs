@@ -35,3 +35,14 @@ test("customer home removes quick menu and tightens display spacing", () => {
   assert.match(css, /\.customer-theme \.eyebrow[\s\S]*letter-spacing: 0\.11em/);
   assert.match(css, /\.customer-theme \.store-brand-subtitle[\s\S]*letter-spacing: 0\.14em/);
 });
+
+
+test("popular section stays compact and close to the product browser", () => {
+  const popular = read("components/popular-now.tsx");
+  const browser = read("components/home-product-browser.tsx");
+
+  assert.match(popular, /rounded-\[14px\]/);
+  assert.match(popular, /size-\[54px\]/);
+  assert.match(popular, /pb-\[10px\] pt-\[22px\]/);
+  assert.match(browser, /pb-\[34px\] pt-\[12px\]/);
+});

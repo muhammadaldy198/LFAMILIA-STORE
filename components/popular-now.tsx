@@ -18,14 +18,14 @@ export function PopularNow() {
   if (!shown.length) return null;
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-[30px] sm:px-6 sm:py-[38px] lg:px-8">
+    <section className="mx-auto max-w-7xl px-4 pb-[10px] pt-[22px] sm:px-6 sm:pb-[14px] sm:pt-[28px] lg:px-8">
       <div className="flex items-end justify-between gap-[10px]">
         <div>
           <p className="eyebrow flex items-center gap-[6px]">
             <Flame className="size-[14px] text-orange-400" />
             Populer sekarang!
           </p>
-          <p className="mt-[6px] text-[11px] text-white/55 sm:text-xs">
+          <p className="mt-[4px] text-[10px] text-white/55 sm:text-[11px]">
             Berikut adalah beberapa produk yang paling populer saat ini.
           </p>
         </div>
@@ -38,25 +38,25 @@ export function PopularNow() {
         </Link>
       </div>
 
-      <div className="mt-[16px] grid grid-cols-2 gap-[10px] sm:grid-cols-3 sm:gap-[14px] lg:grid-cols-4">
+      <div className="mt-[11px] grid grid-cols-2 gap-[8px] sm:grid-cols-3 sm:gap-[10px] lg:grid-cols-4">
         {shown.map((product) => (
           <Link
             key={product.slug}
             href={`/checkout?product=${product.slug}`}
-            className={`group relative flex min-w-0 items-center gap-[10px] overflow-hidden rounded-[18px] border border-white/10 bg-gradient-to-br p-[10px] shadow-[0_14px_28px_-22px_rgba(0,0,0,0.92)] transition duration-300 hover:-translate-y-0.5 hover:border-white/30 sm:gap-[14px] sm:rounded-[22px] sm:p-[14px] ${product.accent}`}
+            className={`group relative flex min-w-0 items-center gap-[8px] overflow-hidden rounded-[14px] border border-white/10 bg-gradient-to-br p-[8px] shadow-[0_12px_24px_-22px_rgba(0,0,0,0.92)] transition duration-300 hover:-translate-y-0.5 hover:border-white/30 sm:gap-[10px] sm:rounded-[16px] sm:p-[10px] ${product.accent}`}
           >
             <span
               className="pointer-events-none absolute inset-0 bg-[linear-gradient(132deg,transparent_46%,rgba(255,255,255,0.14)_46%,transparent_72%)] opacity-80"
               aria-hidden="true"
             />
-            <span className="relative z-10 block size-[64px] shrink-0 overflow-hidden rounded-[13px] border border-white/15 bg-black/10 shadow-[0_10px_20px_-12px_rgba(0,0,0,0.9)] sm:size-[84px] sm:rounded-[15px]">
+            <span className="relative z-10 block size-[54px] shrink-0 overflow-hidden rounded-[11px] border border-white/15 bg-black/10 shadow-[0_8px_16px_-12px_rgba(0,0,0,0.9)] sm:size-[68px] sm:rounded-[13px]">
               <ProductArtwork product={product} compact />
             </span>
             <span className="relative z-10 min-w-0 pr-1">
-              <span className="block text-[12px] font-black leading-[17px] tracking-tight text-white sm:text-[15px] sm:leading-5">
+              <span className="block text-[11px] font-black leading-[15px] tracking-tight text-white sm:text-[13px] sm:leading-[18px]">
                 {product.name}
               </span>
-              <span className="mt-[3px] block truncate text-[10px] font-medium text-white/75 sm:mt-1 sm:text-[13px]">
+              <span className="mt-[2px] block truncate text-[9px] font-medium text-white/70 sm:mt-[3px] sm:text-[11px]">
                 {product.publisher}
               </span>
             </span>
