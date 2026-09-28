@@ -104,7 +104,7 @@ export function StoreHeader() {
   function goHome(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
     if (pathname === "/") {
-      window.location.assign("/");
+      // Full reload is intentional here so clicking the brand on the homepage resets stale client state.\n      // eslint-disable-next-line @next/next/no-location-assign-relative-destination\n      window.location.assign("/");
       return;
     }
     router.push("/");
