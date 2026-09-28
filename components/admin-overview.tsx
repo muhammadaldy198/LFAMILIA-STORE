@@ -119,7 +119,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
   useEffect(() => {
     if (isStaff) return;
     const controller = new AbortController();
-    fetch("/api/panel/dashboard-integrations", { cache: "no-store", signal: controller.signal })
+    fetch("/api/admin/dashboard-integrations", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json() as { items?: DashboardIntegration[]; error?: string };
         if (!response.ok) throw new Error(payload.error || "Status integrasi gagal dimuat.");
