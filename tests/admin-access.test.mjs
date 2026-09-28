@@ -1,3 +1,5 @@
+[Reading 68 lines from start (total: 68 lines, 0 remaining)]
+
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -9,6 +11,7 @@ async function loadWorker() {
 }
 
 const env = {
+  DB: {},
   ASSETS: {
     fetch: async () => new Response("Not found", { status: 404 }),
   },
@@ -65,3 +68,5 @@ test("forged Access email and unsigned assertion are rejected", async () => {
   const payload = await response.json();
   assert.equal(payload.error, "Cloudflare Access belum memvalidasi area Admin.");
 });
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
