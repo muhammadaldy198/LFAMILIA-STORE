@@ -1,3 +1,5 @@
+[Reading 43 lines from start (total: 43 lines, 0 remaining)]
+
 "use client";
 
 type CachedSummary = {
@@ -19,7 +21,7 @@ export async function fetchAdminSummary<T>(
     return cached.promise as Promise<T>;
   }
 
-  const promise = fetch(`/api/panel/summary?range=${encodeURIComponent(key)}`, {
+  const promise = fetch(`/api/admin/summary?range=${encodeURIComponent(key)}`, {
     cache: "no-store",
   }).then(async (response) => {
     const payload = await response.json().catch(() => ({})) as T & { error?: string };
@@ -41,3 +43,5 @@ export async function fetchAdminSummary<T>(
 
   return promise;
 }
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
