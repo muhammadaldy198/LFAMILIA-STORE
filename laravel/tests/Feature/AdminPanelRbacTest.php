@@ -19,11 +19,11 @@ class AdminPanelRbacTest extends TestCase
         [$ownerToken, $ownerId] = $this->panelUser('owner', 'Owner', 'super_admin', 'owner-password-123');
         [$adminToken] = $this->panelUser('admin1', 'Admin', 'admin', 'admin-password-123');
 
-        $this->withUnencryptedCookie(AdminAuthService::COOKIE, $adminToken)
+        $this->withHeader('Cookie', AdminAuthService::COOKIE.'='.rawurlencode($adminToken))
             ->getJson('/api/admin/team')
             ->assertForbidden();
 
-        $this->withUnencryptedCookie(AdminAuthService::COOKIE, $ownerToken)
+        $this->withHeader('Cookie', AdminAuthService::COOKIE.'='.rawurlencode($ownerToken))
             ->postJson('/api/admin/team', [
                 'username' => 'staff1',
                 'name' => 'Staff Satu',
@@ -40,7 +40,7 @@ class AdminPanelRbacTest extends TestCase
             'is_active' => 1,
         ]);
 
-        $this->withUnencryptedCookie(AdminAuthService::COOKIE, $ownerToken)
+        $this->withHeader('Cookie', AdminAuthService::COOKIE.'='.rawurlencode($ownerToken))
             ->deleteJson('/api/admin/team?id='.$ownerId)
             ->assertStatus(400)
             ->assertJsonPath('error', 'Toko harus memiliki setidaknya satu Super Admin aktif.');
@@ -79,7 +79,7 @@ class AdminPanelRbacTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $this->withUnencryptedCookie(AdminAuthService::COOKIE, $staffToken)
+        $this->withHeader('Cookie', AdminAuthService::COOKIE.'='.rawurlencode($staffToken))
             ->getJson('/api/admin/summary?range=7d')
             ->assertOk()
             ->assertJsonPath('canViewFinance', false)
