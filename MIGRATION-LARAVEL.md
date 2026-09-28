@@ -71,3 +71,7 @@ The production import is intentionally guarded and cannot run accidentally:
 `php artisan lfamilia:import-d1 /absolute/path/export.sql --replace --confirm=IMPORT_D1_TO_MARIADB`
 
 Run it only on the prepared VPS after a fresh D1 export has been copied to the server. The command never reads credentials from Git; it uses the active Laravel database connection from the server environment.
+
+## Cutover hold
+
+DNS remains on the existing Cloudflare Worker until provider credentials are re-entered on the VPS and verified. Queue and scheduler services intentionally remain stopped while provider integrations are deferred. The VPS origin is otherwise prepared for cutover, including TLS for the apex and `www` hostnames, canonical `www` redirect, Cloudflare-only origin access, frontend/API smoke tests, and regression validation.
