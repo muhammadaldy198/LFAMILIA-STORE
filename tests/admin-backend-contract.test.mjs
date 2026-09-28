@@ -1,3 +1,5 @@
+[Reading 33 lines from start (total: 33 lines, 0 remaining)]
+
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -18,17 +20,18 @@ const components = [
   "admin-product-manager.tsx",
 ];
 
-test("every admin panel endpoint used by the frontend is dispatched by the secured panel adapter", () => {
-  const adapter = read("app/api/panel/[...path]/route.ts");
+test("every admin endpoint used by the VPS frontend is exposed by Laravel", () => {
+  const routes = read("laravel/routes/api.php");
   const used = new Set();
   for (const component of components) {
     const source = read(path.join("components", component));
-    for (const match of source.matchAll(/\/api\/panel\/([a-z-]+(?:\/[a-z-]+)?)/g)) used.add(match[1]);
+    for (const match of source.matchAll(/\/api\/admin\/([a-z-]+(?:\/[a-z-]+)?)/g)) used.add(match[1]);
   }
-  assert.ok(used.size > 0, "no panel endpoints found in admin components");
+  assert.ok(used.size > 0, "no Laravel admin endpoints found in admin components");
   for (const endpoint of used) {
-    const key = /[-/]/.test(endpoint) ? `"${endpoint}"` : endpoint;
-    assert.match(adapter, new RegExp(`\\n  ${key.replace("/", "\\/")}: \\{`), `missing panel adapter route: ${endpoint}`);
+    assert.ok(routes.includes("/admin/" + endpoint), "missing Laravel admin route: " + endpoint);
   }
-  assert.match(adapter, /requireAdminSession|recordAdminActivity|rejectCrossOriginMutation/);
+  assert.match(routes, /AdminSessionController/);
 });
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
