@@ -1,3 +1,5 @@
+[Reading 187 lines from start (total: 187 lines, 0 remaining)]
+
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -185,3 +187,5 @@ test("managed storefront links reject javascript and protocol-relative URLs", ()
   assert.match(storefrontRoute, /isAllowedHttpUrl/);
   assert.match(storefrontServer, /safeHttpUrl/);
 });
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
