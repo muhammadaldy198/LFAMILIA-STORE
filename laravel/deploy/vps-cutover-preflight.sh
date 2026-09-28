@@ -53,7 +53,18 @@ command -v ufw >/dev/null || fail "ufw is not installed"
 ufw status | grep -q '^Status: active' || fail "ufw is not active"
 systemctl is-active --quiet fail2ban || fail "fail2ban is not active"
 fail2ban-client status sshd >/dev/null || fail "fail2ban sshd jail is not active"
-if ss -ltnH | awk '{print $4}' | grep -Eq '^(0\\.0\\.0\\.0|\\*|\\[::\\]):(3000|3306|8080)
+
+for port in 3000 3306 8080; do
+  addr="$(ss -ltnH "sport = :$port" | awk 'NR==1{print $4}')"
+  case "$addr" in
+    "127.0.0.1:$port"|"[::1]:$port") ;;
+    *) fail "internal port $port is not loopback-only: ${addr:-not-listening}" ;;
+  esac
+done
+echo "OK firewall and SSH brute-force protection"
+echo "OK Node, MariaDB, and Laravel internal listeners are loopback-only"
+
+echo "== Database backup =="
 LATEST="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name '*.sql.gz' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
 [[ -n "$LATEST" && -f "$LATEST" ]] || fail "no MariaDB backup found"
 NOW="$(date +%s)"
