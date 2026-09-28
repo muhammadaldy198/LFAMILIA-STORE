@@ -74,4 +74,4 @@ jobs:
       - name: Run Laravel tests
         env:
           APP_URL: http://localhost
-        run: php artisan test
+        run: vendor/bin/phpunit
