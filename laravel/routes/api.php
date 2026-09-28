@@ -1,14 +1,17 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AdminContentController;
+use App\Http\Controllers\AdminCustomerController;
+use App\Http\Controllers\AdminDigiflazzController;
 use App\Http\Controllers\AdminOrdersController;
 use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\AdminProductController;
+use App\Http\Controllers\AdminPromotionController;
 use App\Http\Controllers\AdminReviewController;
-use App\Http\Controllers\AdminSupportController;
-use App\Http\Controllers\AdminContentController;
 use App\Http\Controllers\AdminSessionController;
 use App\Http\Controllers\AdminSummaryController;
+use App\Http\Controllers\AdminSupportController;
 use App\Http\Controllers\AdminTeamController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DigiflazzCallbackController;
@@ -22,8 +25,8 @@ use App\Http\Controllers\OrderStatusController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReviewController;
-use App\Http\Controllers\SupportController;
 use App\Http\Controllers\StorefrontController;
+use App\Http\Controllers\SupportController;
 use App\Http\Controllers\SystemStatusController;
 use App\Http\Controllers\TurnstileController;
 use App\Http\Controllers\WalletCheckoutController;
@@ -82,6 +85,27 @@ Route::get('/admin/products', [AdminProductController::class, 'index']);
 Route::post('/admin/products', [AdminProductController::class, 'create']);
 Route::patch('/admin/products', [AdminProductController::class, 'update']);
 Route::delete('/admin/products', [AdminProductController::class, 'destroy']);
+
+Route::get('/admin/members', [AdminCustomerController::class, 'members']);
+Route::put('/admin/members', [AdminCustomerController::class, 'saveMemberSettings']);
+Route::patch('/admin/members', [AdminCustomerController::class, 'updateMember']);
+Route::delete('/admin/members', [AdminCustomerController::class, 'deleteMember']);
+Route::get('/admin/balances', [AdminCustomerController::class, 'balances']);
+Route::put('/admin/balances', [AdminCustomerController::class, 'adjustBalance']);
+Route::get('/admin/customer-cleanup', [AdminCustomerController::class, 'cleanupSettings']);
+Route::put('/admin/customer-cleanup', [AdminCustomerController::class, 'saveCleanupSettings']);
+Route::post('/admin/customer-cleanup', [AdminCustomerController::class, 'runCleanup']);
+
+Route::get('/admin/promotions', [AdminPromotionController::class, 'index']);
+Route::post('/admin/promotions', [AdminPromotionController::class, 'save']);
+Route::delete('/admin/promotions', [AdminPromotionController::class, 'destroy']);
+
+Route::get('/admin/digiflazz-pricing', [AdminDigiflazzController::class, 'pricing']);
+Route::post('/admin/digiflazz-pricing', [AdminDigiflazzController::class, 'syncPricing']);
+Route::put('/admin/digiflazz-pricing', [AdminDigiflazzController::class, 'updatePricing']);
+Route::get('/admin/digiflazz-monitor', [AdminDigiflazzController::class, 'monitor']);
+Route::post('/admin/digiflazz-monitor', [AdminDigiflazzController::class, 'refreshMonitor']);
+
 Route::get('/admin/reviews', [AdminReviewController::class, 'index']);
 Route::patch('/admin/reviews', [AdminReviewController::class, 'update']);
 Route::get('/admin/support', [AdminSupportController::class, 'index']);
@@ -107,5 +131,5 @@ Route::get('/payments/doku/callback', [DokuCallbackController::class, 'show']);
 Route::post('/payments/doku/callback', [DokuCallbackController::class, 'handle']);
 Route::post('/fulfillment/digiflazz/callback', [DigiflazzCallbackController::class, 'handle']);
 
-// Remaining migration work is focused on background schedulers, notifications,
-// admin/customer UI parity, and the final production data cutover.
+// Remaining migration work is focused on UI parity, background scheduler/process
+// deployment, production data import, and final VPS cutover validation.

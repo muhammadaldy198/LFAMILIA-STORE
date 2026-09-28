@@ -1,6 +1,6 @@
 # LFAMILIA STORE — Laravel VPS migration
 
-Branch: `migration/laravel-vps-production`
+Branch: \`migration/laravel-vps-production\`
 
 ## Goal
 
@@ -35,7 +35,7 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Port customer support tickets/refund ownership checks and Staff replies.
 - [x] Port storefront settings, banners, popups, news, FAQ, and category CRUD with role boundaries.
 - [x] Port Admin product/package/notices CRUD while keeping DigiFlazz pricing authority server-owned.
-- [ ] Port remaining customer/promo/Digiflazz admin CRUD.
+- [x] Port customer/member balances, tier settings, safe account cleanup, promo CRUD, and DigiFlazz pricing/monitor administration.
 - [x] Port wallet checkout debit path with row locking, server-side price, idempotency, and promo capacity checks.
 - [x] Port external wallet top-up creation with Admin-selected gateway, customer fee, and idempotency.
 - [x] Port wallet top-up/provider reconciliation scheduler with safe-window handling and success notifications.
@@ -46,18 +46,18 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Port Resend password-reset delivery and Google Identity login/linking with mandatory phone collection.
 - [x] Port Resend transaction-success email notifications with idempotent order delivery.
 - [ ] Port phone OTP delivery only after the final non-WhatsApp/WhatsApp provider choice is confirmed.
-- [~] Port Admin / Staff / Super Admin APIs: session/RBAC, dashboard summary, team management, order operations, and payment routing/channel management, products, reviews, and support operations are now native Laravel; remaining operational CRUD is in progress.
+- [~] Port Admin / Staff / Super Admin APIs: session/RBAC, dashboard, team, orders, payment routing/channels, products, reviews, support, customer/member balances, account cleanup, promotions, and DigiFlazz pricing/monitor are native Laravel; remaining UI-adjacent operational endpoints are still in progress.
 - [ ] Port customer frontend and panel UI.
 - [x] Add minute-level production reconciliation scheduler with overlap protection.
 - [ ] Add final VPS Supervisor/systemd process definitions for queue worker and scheduler.
 - [ ] Deploy to VPS without DNS cutover.
 - [ ] Import the current production D1 snapshot and reconcile.
-- [ ] Cut over `lfamiliastore.my.id` only after validation.
+- [ ] Cut over \`lfamiliastore.my.id\` only after validation.
 
 ## Import safety
 
 The production import is intentionally guarded and cannot run accidentally:
 
-`php artisan lfamilia:import-d1 /absolute/path/export.sql --replace --confirm=IMPORT_D1_TO_MARIADB`
+\`php artisan lfamilia:import-d1 /absolute/path/export.sql --replace --confirm=IMPORT_D1_TO_MARIADB\`
 
 Run it only on the prepared VPS after a fresh D1 export has been copied to the server. The command never reads credentials from Git; it uses the active Laravel database connection from the server environment.
