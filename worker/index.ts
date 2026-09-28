@@ -140,7 +140,14 @@ async function hydrateRuntime(env: Env) {
 }
 
 const worker = {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env | undefined, ctx: ExecutionContext | undefined): Promise<Response> {
+    const runtimeEnv = env ?? ({} as Env);
+    const runtimeCtx: ExecutionContext = ctx ?? {
+      waitUntil(promise) {
+        void promise.catch(() => undefined);
+      },
+      passThroughOnException() {},
+    };
     const url = new URL(request.url);
     const isAccessProtectedRequest =
       url.pathname === "/admin/panel" ||
@@ -151,11 +158,11 @@ const worker = {
       url.pathname.startsWith("/api/admin/");
 
     if (isAccessProtectedRequest) {
-      const accessIdentity = await verifyCloudflareAccess(request, env);
+      const accessIdentity = await verifyCloudflareAccess(request, runtimeEnv);
       const adminEmail = accessIdentity?.email ?? null;
 
       if (!adminEmail) {
-        const accessConfig = getCloudflareAccessConfigStatus(env);
+        const accessConfig = getCloudflareAccessConfigStatus(runtimeEnv);
         const hasAssertion = Boolean(getCloudflareAccessAssertion(request));
         const reason = !accessConfig.teamDomainConfigured
           ? "TEAM_DOMAIN_INVALID"
@@ -178,7 +185,7 @@ const worker = {
           );
         }
 
-        const diagnostic = diagnoseCloudflareAccessRequest(request, env);
+        const diagnostic = diagnoseCloudflareAccessRequest(request, runtimeEnv);
         const detailedReason = diagnostic.reason;
         const explanation =
           detailedReason === "TEAM_DOMAIN_INVALID"
@@ -228,27 +235,31 @@ const worker = {
       request = new Request(request, { headers });
     }
 
-    // Most page/catalog reads do not need provider credentials. Keep the raw
-    // runtime available immediately, then warm the encrypted integration
-    // snapshot off the critical path. Provider/payment routes still await it.
-    if (requestNeedsHydratedRuntime(request, url)) {
-      await hydrateRuntime(env);
+    // Cloudflare injects D1/provider bindings. The standalone Node/VPS
+    // frontend intentionally has no D1 binding because /api/* is served by
+    // Laravel/MariaDB. Keep page rendering alive without touching legacy D1.
+    if (runtimeEnv.DB) {
+      if (requestNeedsHydratedRuntime(request, url)) {
+        await hydrateRuntime(runtimeEnv);
+      } else {
+        // Never overwrite an already-hydrated isolate with the raw environment:
+        // a concurrent payment/provider request may be reading that snapshot.
+        if (!runtimeHydrationCache) setRuntimeEnv(runtimeEnv);
+        runtimeCtx.waitUntil(
+          hydrateRuntime(runtimeEnv).catch((error) => {
+            logServerError("Pemanasan konfigurasi runtime gagal:", error);
+          }),
+        );
+      }
     } else {
-      // Never overwrite an already-hydrated isolate with the raw environment:
-      // a concurrent payment/provider request may be reading that snapshot.
-      if (!runtimeHydrationCache) setRuntimeEnv(env);
-      ctx.waitUntil(
-        hydrateRuntime(env).catch((error) => {
-          logServerError("Pemanasan konfigurasi runtime gagal:", error);
-        }),
-      );
+      setRuntimeEnv(runtimeEnv);
     }
 
-    if (env.DB) {
+    if (runtimeEnv.DB) {
       if (isReadOnlyRequest(request)) {
         if (!requestRepairPrimed) {
           requestRepairPrimed = true;
-          ctx.waitUntil(
+          runtimeCtx.waitUntil(
             ensureLegacyDatabaseColumns().catch((error) => {
               requestRepairPrimed = false;
               logServerError("Perbaikan kompatibilitas D1 background gagal:", error);
@@ -263,11 +274,11 @@ const worker = {
     }
 
     if (url.pathname === "/_vinext/image") {
-      if (!env.IMAGES) return withSecurityHeaders(new Response("Image optimization is unavailable.", { status: 404 }), url);
-      const images = env.IMAGES;
+      if (!runtimeEnv.IMAGES) return withSecurityHeaders(new Response("Image optimization is unavailable.", { status: 404 }), url);
+      const images = runtimeEnv.IMAGES;
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       return withSecurityHeaders(await handleImageOptimization(request, {
-        fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
+        fetchAsset: (path) => runtimeEnv.ASSETS.fetch(new Request(new URL(path, request.url))),
         transformImage: async (body, { width, format, quality }) => {
           const result = await images.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
           return result.response();
@@ -275,7 +286,7 @@ const worker = {
       }, allowedWidths), url);
     }
 
-    let response = await handler.fetch(request, env, ctx);
+    let response = await handler.fetch(request, runtimeEnv, runtimeCtx);
 
     const isPanelPage =
       url.pathname === "/panel" ||
