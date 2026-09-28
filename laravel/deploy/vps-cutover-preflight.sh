@@ -27,21 +27,23 @@ echo "== Production environment =="
 ENV_CHECK="$(python3 - "$ROOT/laravel/.env" <<'PY'
 from pathlib import Path
 import sys
-vals={}
+
+vals = {}
 for line in Path(sys.argv[1]).read_text().splitlines():
-    t=line.strip()
+    t = line.strip()
     if not t or t.startswith('#') or '=' not in t:
         continue
-    k,v=t.split('=',1)
-    vals[k.strip()]=v.strip().strip('"').strip("'")
-checks={
+    k, v = t.split('=', 1)
+    vals[k.strip()] = v.strip().strip('"').strip("'")
+
+checks = {
     'APP_ENV=production': vals.get('APP_ENV') == 'production',
-    'APP_DEBUG=false': vals.get('APP_DEBUG','').lower() in {'false','0','off','no'},
-    'APP_URL=https': vals.get('APP_URL','').startswith('https://'),
-    'DB local': vals.get('DB_HOST') in {'127.0.0.1','localhost'},
+    'APP_DEBUG=false': vals.get('APP_DEBUG', '').lower() in {'false', '0', 'off', 'no'},
+    'APP_URL=https': vals.get('APP_URL', '').startswith('https://'),
+    'DB local': vals.get('DB_HOST') in {'127.0.0.1', 'localhost'},
 }
-for name,ok in checks.items():
-    print(('OK ' if ok else 'FAIL ')+name)
+for name, ok in checks.items():
+    print(('OK ' if ok else 'FAIL ') + name)
 if not all(checks.values()):
     raise SystemExit(1)
 PY
@@ -61,45 +63,6 @@ for port in 3000 3306 8080; do
     *) fail "internal port $port is not loopback-only: ${addr:-not-listening}" ;;
   esac
 done
-echo "OK firewall and SSH brute-force protection"
-echo "OK Node, MariaDB, and Laravel internal listeners are loopback-only"
-
-echo "== Database backup =="
-LATEST="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name '*.sql.gz' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
-[[ -n "$LATEST" && -f "$LATEST" ]] || fail "no MariaDB backup found"
-NOW="$(date +%s)"
-MTIME="$(stat -c %Y "$LATEST")"
-AGE="$((NOW-MTIME))"
-(( AGE <= MAX_BACKUP_AGE_SECONDS )) || fail "latest backup is too old: ${AGE}s"
-gzip -t "$LATEST"
-sha256sum -c "$LATEST.sha256"
-echo "OK backup $(basename "$LATEST") age=${AGE}s"
-
-echo "== Media =="
-MEDIA_CHECK="$(as_app "cd '$ROOT/laravel' && php artisan tinker --execute='\$s=app(App\\Services\\MediaMigrationService::class); \$k=\$s->referencedKeys(); \$existing=DB::table(\"media_assets\")->whereIn(\"media_key\",\$k)->count(); echo count(\$k).\":\".\$existing;'")"
-REFS="${MEDIA_CHECK%%:*}"
-EXISTING="${MEDIA_CHECK##*:}"
-[[ "$REFS" = "$EXISTING" ]] || fail "referenced media mismatch ${REFS}/${EXISTING}"
-echo "OK media ${EXISTING}/${REFS}"
-
-echo "== Deferred services =="
-for service in lfamilia-queue lfamilia-scheduler; do
-  if systemctl is-active --quiet "$service"; then
-    fail "$service must remain stopped until provider credentials are validated"
-  fi
-  echo "OK $service is stopped"
-done
-
-echo "== Integration hold =="
-READINESS="$(as_app "cd '$ROOT/laravel' && php artisan tinker --execute='echo json_encode(app(App\\Services\\IntegrationConfigService::class)->integrationOverview()); echo PHP_EOL; echo json_encode(app(App\\Services\\IntegrationConfigService::class)->paymentOverview());'")"
-printf '%s\n' "$READINESS"
-
-echo
-echo "NON-PROVIDER CUTOVER PREFLIGHT PASSED."
-echo "HOLD: do not switch production DNS or start queue/scheduler until provider credentials are re-entered and validated."
-; then
-  fail "internal service is exposed on a public listener"
-fi
 echo "OK firewall and SSH brute-force protection"
 echo "OK Node, MariaDB, and Laravel internal listeners are loopback-only"
 
