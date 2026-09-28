@@ -79,5 +79,3 @@ test("each content type exposes its own saved customer-facing settings", () => {
   assert.match(source, /mobileImageUrl/);
   assert.match(source, /<img src=\{imageUrl\}/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
