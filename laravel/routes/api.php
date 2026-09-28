@@ -16,6 +16,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SystemStatusController;
 use App\Http\Controllers\TurnstileController;
 use App\Http\Controllers\WalletCheckoutController;
+use App\Http\Controllers\WalletTopupController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', static fn () => response()->json([
@@ -37,11 +38,13 @@ Route::post('/auth/reset-password', [PasswordResetController::class, 'reset']);
 
 Route::get('/account', [AccountController::class, 'show']);
 Route::patch('/account', [AccountController::class, 'update']);
+Route::post('/account/topups', [WalletTopupController::class, 'create']);
 
 Route::get('/products', [ProductController::class, 'index']);
 Route::post('/nickname', [NicknameController::class, 'verify']);
 Route::post('/payments/wallet/create', [WalletCheckoutController::class, 'create']);
 Route::post('/payments/auto/create', [ExternalCheckoutController::class, 'create']);
+Route::get('/wallet', [WalletTopupController::class, 'settings']);
 
 Route::get('/orders/search', [OrderSearchController::class, 'recent']);
 Route::post('/orders/search', [OrderSearchController::class, 'search']);
