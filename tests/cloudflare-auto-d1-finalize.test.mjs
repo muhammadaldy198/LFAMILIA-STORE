@@ -1,5 +1,3 @@
-[Reading 59 lines from start (total: 59 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -52,12 +50,10 @@ test("Cloudflare request and scheduled entry points repair D1 before application
     2,
   );
   const fetchRepair = worker.indexOf("await ensureLegacyDatabaseColumns().catch");
-  const appFetch = worker.indexOf("handler.fetch(request, env, ctx)");
+  const appFetch = worker.indexOf("handler.fetch(request, runtimeEnv, runtimeCtx)");
   assert.ok(fetchRepair >= 0 && fetchRepair < appFetch);
   const scheduled = worker.indexOf("async scheduled(");
   const scheduledRepair = worker.indexOf("await ensureLegacyDatabaseColumns().catch", scheduled);
   const maintenance = worker.indexOf("releaseExpiredExternalPromotions()", scheduled);
   assert.ok(scheduledRepair > scheduled && scheduledRepair < maintenance);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
