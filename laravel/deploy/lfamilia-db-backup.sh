@@ -2,7 +2,7 @@
 set -euo pipefail
 umask 077
 
-BACKUP_DIR="/var/backups/lfamilia/mariadb"
+BACKUP_DIR="${LFAMILIA_BACKUP_DIR:-/var/backups/lfamilia/mariadb}"
 DATABASE="${LFAMILIA_DB_NAME:-lfamilia_store}"
 RETENTION_DAYS="${LFAMILIA_BACKUP_RETENTION_DAYS:-7}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
