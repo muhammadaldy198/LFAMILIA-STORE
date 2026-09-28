@@ -29,5 +29,3 @@ test("every admin endpoint used by the VPS frontend is exposed by Laravel", () =
   for (const endpoint of used) assert.ok(routes.includes("/admin/" + endpoint), "missing Laravel admin route: " + endpoint);
   assert.match(routes, /AdminSessionController/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
