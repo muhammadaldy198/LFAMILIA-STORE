@@ -9,7 +9,10 @@ LATEST="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name '*.sql.gz' -printf '%T@ %
 [[ -n "$LATEST" && -f "$LATEST" ]] || { echo "No backup found" >&2; exit 1; }
 
 gzip -t "$LATEST"
-sha256sum -c "$LATEST.sha256"
+(
+  cd "$(dirname "$LATEST")"
+  sha256sum -c "$(basename "$LATEST").sha256"
+)
 mariadb -e "CREATE DATABASE $DB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 gzip -dc "$LATEST" | mariadb "$DB"
 mariadb-check --check "$DB" >/dev/null
