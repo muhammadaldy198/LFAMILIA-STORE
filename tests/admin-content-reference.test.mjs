@@ -1,3 +1,5 @@
+[Reading 81 lines from start (total: 81 lines, 0 remaining)]
+
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -40,10 +42,10 @@ test("content reference exposes add, edit, ordering, visibility and preview cont
 
 test("content controls persist through the admin APIs", () => {
   for (const endpoint of [
-    "/api/panel/content",
-    "/api/panel/faqs",
-    "/api/panel/reviews",
-    "/api/panel/media",
+    "/api/admin/content",
+    "/api/admin/faqs",
+    "/api/admin/reviews",
+    "/api/admin/media",
   ]) assert.ok(source.includes(endpoint), `missing content endpoint: ${endpoint}`);
   assert.match(source, /method: "POST"/);
   assert.match(source, /method: "PATCH"/);
@@ -79,3 +81,5 @@ test("each content type exposes its own saved customer-facing settings", () => {
   assert.match(source, /mobileImageUrl/);
   assert.match(source, /<img src=\{imageUrl\}/);
 });
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
