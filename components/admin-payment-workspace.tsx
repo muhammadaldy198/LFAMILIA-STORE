@@ -83,11 +83,11 @@ export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" 
 
   const load = useCallback(async () => {
     const [channelResponse, pageResponse, walletResponse, orderResponse, routingResponse] = await Promise.all([
-      fetch("/api/panel/payment-methods", { cache: "no-store" }),
-      fetch("/api/panel/payment-page", { cache: "no-store" }),
-      fetch("/api/panel/wallet", { cache: "no-store" }),
-      fetch("/api/panel/orders", { cache: "no-store" }),
-      fetch("/api/panel/payment-routing", { cache: "no-store" }).catch(() => null),
+      fetch("/api/admin/payment-methods", { cache: "no-store" }),
+      fetch("/api/admin/payment-page", { cache: "no-store" }),
+      fetch("/api/admin/wallet", { cache: "no-store" }),
+      fetch("/api/admin/orders", { cache: "no-store" }),
+      fetch("/api/admin/payment-routing", { cache: "no-store" }).catch(() => null),
     ]);
     const [channelPayload, pagePayload, walletPayload, orderPayload] = await Promise.all([channelResponse.json(), pageResponse.json(), walletResponse.json(), orderResponse.json()]) as [
       { error?: string; channels?: Array<{ id: number | null; method: Channel["method"]; channel: string; name: string; description: string; imageUrl?: string; isActive: boolean; sortOrder: number; gateway: Gateway; gatewayConfig?: Record<string, string>; readiness?: { ready?: boolean; reason?: string | null } }>; gatewaySettings?: GatewaySetting[]; gatewayReadiness?: GatewayReadiness },
@@ -135,7 +135,7 @@ export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" 
   }
 
   async function saveChannel(channel: Channel) {
-    await request("/api/panel/payment-methods", {
+    await request("/api/admin/payment-methods", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -178,7 +178,7 @@ export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" 
       let imageUrl = editChannel.imageUrl;
       if (channelFile) {
         const form = new FormData(); form.set("file", channelFile);
-        const uploaded = await request("/api/panel/media", { method: "POST", body: form });
+        const uploaded = await request("/api/admin/media", { method: "POST", body: form });
         imageUrl = typeof uploaded.url === "string" ? uploaded.url : "";
       }
       await saveChannel({ ...editChannel, imageUrl, group: groupForMethod(editChannel.method) });
@@ -194,7 +194,7 @@ export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" 
     setBusy(true); setError(""); setMessage("");
     try {
       if (channel.dbId) {
-        await request(`/api/panel/payment-methods?id=${channel.dbId}`, { method: "DELETE" });
+        await request(`/api/admin/payment-methods?id=${channel.dbId}`, { method: "DELETE" });
       }
       await load();
       setMessage(`${channel.name} berhasil dihapus.`);
@@ -208,13 +208,13 @@ export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" 
       if (tab === "Metode Pembayaran") {
         if (routing) {
           if (!routing.walletTopupGateway) throw new Error("Pilih gateway top up saldo sebelum menyimpan.");
-          await request("/api/panel/payment-routing", {
+          await request("/api/admin/payment-routing", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action: "save_wallet_topup_gateway", walletTopupGateway: routing.walletTopupGateway }),
           });
           if (role === "super_admin") {
-            await request("/api/panel/payment-routing", {
+            await request("/api/admin/payment-routing", {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -226,21 +226,21 @@ export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" 
           }
         }
         for (const gateway of gatewaySettings) {
-          await request("/api/panel/payment-methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "gateway_status", gateway: gateway.gateway, enabled: gateway.isActive }) });
+          await request("/api/admin/payment-methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "gateway_status", gateway: gateway.gateway, enabled: gateway.isActive }) });
         }
         for (const channel of channels) await saveChannel(channel);
         if (canManageWallet) {
-          await request("/api/panel/wallet", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(walletSettings) });
+          await request("/api/admin/wallet", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(walletSettings) });
         }
       } else if (tab === "Tampilan Halaman") {
         let headerImageUrl = pageSettings.headerImageUrl;
         if (heroFile) {
           const form = new FormData(); form.set("file", heroFile);
-          const uploaded = await request("/api/panel/media", { method: "POST", body: form });
+          const uploaded = await request("/api/admin/media", { method: "POST", body: form });
           headerImageUrl = typeof uploaded.url === "string" ? uploaded.url : "";
         }
         const next = { ...pageSettings, headerImageUrl };
-        await request("/api/panel/payment-page", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
+        await request("/api/admin/payment-page", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
         setPageSettings(next); setHeroImage(headerImageUrl); setHeroFile(null);
       } else {
         setMessage("Tidak ada pengaturan pada daftar transaksi.");
@@ -255,7 +255,7 @@ export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" 
   async function syncChannels() {
     setMessage(""); setError(""); setBusy(true);
     try {
-      await request("/api/panel/payment-methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "sync", gateways: ["midtrans", "doku"] }) });
+      await request("/api/admin/payment-methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "sync", gateways: ["midtrans", "doku"] }) });
       await load();
       setMessage("Daftar metode bawaan provider berhasil disinkronkan. Metode yang baru masuk tetap OFF sampai diaktifkan manual.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Sinkronisasi metode gagal."); }
