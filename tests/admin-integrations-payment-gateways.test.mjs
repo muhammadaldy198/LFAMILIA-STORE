@@ -1,5 +1,3 @@
-[Reading 86 lines from start (total: 86 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -13,7 +11,7 @@ test("Integrasi owns DOKU Checkout and Midtrans Snap credentials", () => {
   const integration = read("components/admin-integration-workspace.tsx");
   assert.match(integration, /DOKU Checkout/);
   assert.match(integration, /Midtrans Snap/);
-  assert.match(integration, /\/api\/panel\/payment-routing/);
+  assert.match(integration, /\/api\/admin\/payment-routing/);
   assert.match(integration, /provider: "doku"/);
   assert.match(integration, /mode: "checkout"/);
   assert.match(integration, /provider: "midtrans"/);
@@ -86,5 +84,3 @@ test("Dashboard DOKU status uses core Checkout readiness, not QRIS-specific read
   assert.doesNotMatch(route, /paymentMethod: "qris"/);
   assert.doesNotMatch(route, /getConfiguredGatewayReadiness/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
