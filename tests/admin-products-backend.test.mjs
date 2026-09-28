@@ -1,3 +1,5 @@
+[Reading 29 lines from start (total: 29 lines, 0 remaining)]
+
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -27,3 +29,5 @@ test("manual product creation uploads the selected product image before persisti
   assert.match(source, /upload\.set\("file", image\)/);
   assert.match(source, /raw\.imageUrl = uploaded\.url/);
 });
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
