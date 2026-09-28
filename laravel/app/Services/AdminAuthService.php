@@ -27,21 +27,26 @@ class AdminAuthService
     public function login(string $usernameInput, string $password, ?string $area = null): array
     {
         $username = $this->normalizeId($usernameInput);
-        $row = DB::table('admin_users as a')
-            ->join('customer_users as c', 'c.email', '=', DB::raw("CONCAT('".self::CREDENTIAL_PREFIX."', LOWER(a.email))"))
-            ->whereRaw('LOWER(a.email) = ?', [$username])
-            ->select([
-                'a.id as admin_id',
-                'a.email as username',
-                'a.name as admin_name',
-                'a.role',
-                'a.is_active as admin_active',
-                'c.id as credential_id',
-                'c.password_hash',
-                'c.password_salt',
-                'c.is_active as credential_active',
-            ])
-            ->first();
+        $admin = DB::table('admin_users')
+            ->whereRaw('LOWER(email) = ?', [$username])
+            ->first(['id', 'email', 'name', 'role', 'is_active']);
+        $credential = $admin
+            ? DB::table('customer_users')
+                ->where('email', self::CREDENTIAL_PREFIX.$this->normalizeId((string) $admin->email))
+                ->first(['id', 'password_hash', 'password_salt', 'is_active'])
+            : null;
+
+        $row = ($admin && $credential) ? (object) [
+            'admin_id' => $admin->id,
+            'username' => $admin->email,
+            'admin_name' => $admin->name,
+            'role' => $admin->role,
+            'admin_active' => $admin->is_active,
+            'credential_id' => $credential->id,
+            'password_hash' => $credential->password_hash,
+            'password_salt' => $credential->password_salt,
+            'credential_active' => $credential->is_active,
+        ] : null;
 
         $salt = $row?->password_salt ?: str_repeat('0', 32);
         $digest = $this->passwordDigest($password, $salt);
@@ -111,19 +116,23 @@ class AdminAuthService
         }
 
         $username = $this->normalizeId((string) $payload['u']);
-        $row = DB::table('admin_users as a')
-            ->join('customer_users as c', 'c.email', '=', DB::raw("CONCAT('".self::CREDENTIAL_PREFIX."', LOWER(a.email))"))
-            ->whereRaw('LOWER(a.email) = ?', [$username])
-            ->select([
-                'a.id as admin_id',
-                'a.email as username',
-                'a.name as admin_name',
-                'a.role',
-                'a.is_active as admin_active',
-                'c.is_active as credential_active',
-                'c.password_hash',
-            ])
-            ->first();
+        $admin = DB::table('admin_users')
+            ->whereRaw('LOWER(email) = ?', [$username])
+            ->first(['id', 'email', 'name', 'role', 'is_active']);
+        $credential = $admin
+            ? DB::table('customer_users')
+                ->where('email', self::CREDENTIAL_PREFIX.$this->normalizeId((string) $admin->email))
+                ->first(['is_active', 'password_hash'])
+            : null;
+        $row = ($admin && $credential) ? (object) [
+            'admin_id' => $admin->id,
+            'username' => $admin->email,
+            'admin_name' => $admin->name,
+            'role' => $admin->role,
+            'admin_active' => $admin->is_active,
+            'credential_active' => $credential->is_active,
+            'password_hash' => $credential->password_hash,
+        ] : null;
 
         if (!$row || !(bool) $row->admin_active || !(bool) $row->credential_active
             || $row->role !== ($payload['r'] ?? null)) {
@@ -146,17 +155,23 @@ class AdminAuthService
     /** @return array{token:string,expires_at:string} */
     private function createSession(string $credentialId): array
     {
-        $row = DB::table('customer_users as c')
-            ->join('admin_users as a', 'c.email', '=', DB::raw("CONCAT('".self::CREDENTIAL_PREFIX."', LOWER(a.email))"))
-            ->where('c.id', $credentialId)
-            ->select([
-                'a.email as username',
-                'a.role',
-                'a.is_active as admin_active',
-                'c.is_active as credential_active',
-                'c.password_hash',
-            ])
-            ->first();
+        $credential = DB::table('customer_users')
+            ->where('id', $credentialId)
+            ->first(['email', 'is_active', 'password_hash']);
+        $username = $credential && str_starts_with((string) $credential->email, self::CREDENTIAL_PREFIX)
+            ? substr((string) $credential->email, strlen(self::CREDENTIAL_PREFIX))
+            : '';
+        $admin = $username !== ''
+            ? DB::table('admin_users')->whereRaw('LOWER(email) = ?', [$this->normalizeId($username)])
+                ->first(['email', 'role', 'is_active'])
+            : null;
+        $row = ($admin && $credential) ? (object) [
+            'username' => $admin->email,
+            'role' => $admin->role,
+            'admin_active' => $admin->is_active,
+            'credential_active' => $credential->is_active,
+            'password_hash' => $credential->password_hash,
+        ] : null;
 
         if (!$row || !(bool) $row->admin_active || !(bool) $row->credential_active) {
             throw new RuntimeException('Akun panel tidak aktif.');
