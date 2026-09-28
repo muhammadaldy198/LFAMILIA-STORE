@@ -23,6 +23,122 @@ class AdminAuthService
         return (bool) preg_match('/^[a-z0-9._-]{3,32}$/', $this->normalizeId($value));
     }
 
+    /** @return array<string,mixed> */
+    public function require(Request $request, string $minimum = 'staff'): array
+    {
+        $session = $this->current($request);
+        if (!$session) {
+            throw new RuntimeException('Sesi panel tidak ditemukan atau sudah berakhir.');
+        }
+
+        $rank = ['staff' => 0, 'admin' => 1, 'owner' => 2];
+        $roleRank = ['staff' => 0, 'admin' => 1, 'super_admin' => 2];
+
+        if (!array_key_exists($minimum, $rank)
+            || ($roleRank[$session['role']] ?? -1) < $rank[$minimum]) {
+            throw new RuntimeException('Akses panel tidak diizinkan.');
+        }
+
+        return $session;
+    }
+
+    public function credentialEmail(string $username): string
+    {
+        return self::CREDENTIAL_PREFIX.$this->normalizeId($username);
+    }
+
+    public function createCredential(
+        string $usernameInput,
+        string $name,
+        string $password,
+        bool $isActive = true,
+    ): string {
+        $username = $this->normalizeId($usernameInput);
+        if (!$this->validId($username)) {
+            throw new RuntimeException('ID login tidak valid.');
+        }
+        if (mb_strlen($password) < 10 || mb_strlen($password) > 72) {
+            throw new RuntimeException('Password minimal 10 karakter dan maksimal 72 karakter.');
+        }
+
+        $email = $this->credentialEmail($username);
+        if (DB::table('customer_users')->where('email', $email)->exists()) {
+            throw new RuntimeException('ID login sudah digunakan.');
+        }
+
+        $salt = bin2hex(random_bytes(16));
+        $id = (string) \Illuminate\Support\Str::uuid();
+
+        DB::table('customer_users')->insert([
+            'id' => $id,
+            'email' => $email,
+            'name' => trim($name),
+            'phone' => 'admin',
+            'password_hash' => $this->passwordDigest($password, $salt),
+            'password_salt' => $salt,
+            'balance' => 0,
+            'leaderboard_opt_in' => 0,
+            'is_active' => $isActive ? 1 : 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $id;
+    }
+
+    public function updateCredential(
+        string $oldUsernameInput,
+        string $newUsernameInput,
+        string $name,
+        ?string $password,
+        bool $isActive,
+    ): string {
+        $oldUsername = $this->normalizeId($oldUsernameInput);
+        $newUsername = $this->normalizeId($newUsernameInput);
+        if (!$this->validId($newUsername)) {
+            throw new RuntimeException('ID login tidak valid.');
+        }
+
+        $row = DB::table('customer_users')
+            ->where('email', $this->credentialEmail($oldUsername))
+            ->first(['id']);
+
+        if (!$row) {
+            if (!$password) {
+                throw new RuntimeException('Isi password untuk mengaktifkan akun panel ini.');
+            }
+
+            return $this->createCredential($newUsername, $name, $password, $isActive);
+        }
+
+        $updates = [
+            'email' => $this->credentialEmail($newUsername),
+            'name' => trim($name),
+            'is_active' => $isActive ? 1 : 0,
+            'updated_at' => now(),
+        ];
+
+        if ($password !== null && $password !== '') {
+            if (mb_strlen($password) < 10 || mb_strlen($password) > 72) {
+                throw new RuntimeException('Password minimal 10 karakter dan maksimal 72 karakter.');
+            }
+            $salt = bin2hex(random_bytes(16));
+            $updates['password_hash'] = $this->passwordDigest($password, $salt);
+            $updates['password_salt'] = $salt;
+        }
+
+        DB::table('customer_users')->where('id', $row->id)->update($updates);
+
+        return (string) $row->id;
+    }
+
+    public function deleteCredential(string $usernameInput): void
+    {
+        DB::table('customer_users')
+            ->where('email', $this->credentialEmail($usernameInput))
+            ->delete();
+    }
+
     /** @return array{admin:array<string,mixed>,token:string,expires_at:string} */
     public function login(string $usernameInput, string $password, ?string $area = null): array
     {

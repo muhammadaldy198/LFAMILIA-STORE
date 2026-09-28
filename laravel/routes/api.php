@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminSessionController;
+use App\Http\Controllers\AdminSummaryController;
+use App\Http\Controllers\AdminTeamController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DigiflazzCallbackController;
 use App\Http\Controllers\DokuCallbackController;
@@ -51,6 +53,10 @@ Route::post('/orders/search', [OrderSearchController::class, 'search']);
 Route::post('/orders/status', [OrderStatusController::class, 'show']);
 
 Route::get('/admin/session', [AdminSessionController::class, 'session']);
+Route::get('/admin/summary', [AdminSummaryController::class, 'show']);
+Route::get('/admin/team', [AdminTeamController::class, 'index']);
+Route::post('/admin/team', [AdminTeamController::class, 'save']);
+Route::delete('/admin/team', [AdminTeamController::class, 'destroy']);
 
 Route::get('/payments/midtrans/snap/notification', [MidtransNotificationController::class, 'show']);
 Route::post('/payments/midtrans/snap/notification', [MidtransNotificationController::class, 'handle']);
