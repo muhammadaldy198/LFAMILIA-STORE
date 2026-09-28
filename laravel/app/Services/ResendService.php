@@ -7,11 +7,24 @@ use RuntimeException;
 
 class ResendService
 {
+    public function __construct(private readonly IntegrationConfigService $integrations)
+    {
+    }
+
+    public function configured(): bool
+    {
+        $config = $this->integrations->resendRuntime();
+        return $config['apiKey'] !== ''
+            && $config['fromEmail'] !== ''
+            && $this->validHttpsUrl($config['apiUrl']);
+    }
+
     public function send(string $to, string $subject, string $html, string $idempotencyKey): void
     {
-        $apiKey = trim((string) config('lfamilia.integrations.resend.api_key'));
-        $from = trim((string) config('lfamilia.integrations.resend.from'));
-        $apiUrl = trim((string) config('lfamilia.integrations.resend.api_url'));
+        $config = $this->integrations->resendRuntime();
+        $apiKey = $config['apiKey'];
+        $from = $config['fromEmail'];
+        $apiUrl = $config['apiUrl'];
 
         if ($apiKey === '' || $from === '' || !$this->validHttpsUrl($apiUrl)) {
             throw new RuntimeException('Layanan email belum dikonfigurasi.');
