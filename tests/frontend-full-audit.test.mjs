@@ -1,5 +1,3 @@
-[Reading 116 lines from start (total: 116 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -33,9 +31,9 @@ test("product admin uses real pagination and explicit nominal action", () => {
 
 test("admin global search queries real order product and customer records", () => {
   const dashboard = read("components/admin-dashboard.tsx");
-  assert.match(dashboard, /fetch\("\/api\/panel\/orders"/);
-  assert.match(dashboard, /fetch\("\/api\/panel\/products"/);
-  assert.match(dashboard, /fetch\("\/api\/panel\/members"/);
+  assert.match(dashboard, /fetch\("\/api\/admin\/orders"/);
+  assert.match(dashboard, /fetch\("\/api\/admin\/products"/);
+  assert.match(dashboard, /fetch\("\/api\/admin\/members"/);
   assert.match(dashboard, /globalResults\.map/);
   assert.match(dashboard, /!responses\[index\]\.ok/);
   assert.match(dashboard, /globalSearchRequestRef\.current !== requestId/);
@@ -116,5 +114,3 @@ test("admin workspaces include explicit responsive breakpoints", () => {
   assert.match(integrations, /md:grid-cols-2/);
   assert.match(operations, /xl:grid-cols-4/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
