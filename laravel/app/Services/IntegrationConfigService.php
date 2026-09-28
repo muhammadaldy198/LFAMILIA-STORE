@@ -185,6 +185,142 @@ class IntegrationConfigService
         return $this->profile($provider, $mode, $environment);
     }
 
+    /** @return array<string,mixed> */
+    public function integrationOverview(): array
+    {
+        $scopes = [
+            ['digiflazz', 'direct', 'development'],
+            ['digiflazz', 'direct', 'production'],
+            ['kokinpay', 'service', 'global'],
+            ['google', 'service', 'global'],
+            ['resend', 'service', 'global'],
+            ['relay', 'service', 'global'],
+            ['security', 'service', 'global'],
+        ];
+
+        $profiles = [];
+        foreach ($scopes as [$provider, $mode, $environment]) {
+            $configuredFields = [];
+            $decryptionError = false;
+            try {
+                $values = $this->profile($provider, $mode, $environment);
+                $configuredFields = array_values(array_keys(array_filter(
+                    $values,
+                    static fn ($value) => is_string($value) && trim($value) !== '',
+                )));
+            } catch (Throwable) {
+                $decryptionError = DB::table('integration_profiles')
+                    ->where('provider', $provider)
+                    ->where('mode', $mode)
+                    ->where('environment', $environment)
+                    ->exists();
+            }
+
+            $profiles[] = [
+                'provider' => $provider,
+                'mode' => $mode,
+                'environment' => $environment,
+                'configured' => $configuredFields !== [],
+                'configuredFields' => $configuredFields,
+                'decryptionError' => $decryptionError,
+            ];
+        }
+
+        $digiflazzEnvironment = $this->setting('digiflazz_environment')
+            ?: trim((string) config('lfamilia.integrations.digiflazz.environment'))
+            ?: 'development';
+        if (!in_array($digiflazzEnvironment, ['development', 'production'], true)) {
+            $digiflazzEnvironment = 'development';
+        }
+
+        $base = rtrim(trim((string) config('lfamilia.public_base_url')), '/');
+
+        return [
+            'encryptionReady' => strlen(trim((string) config('lfamilia.integration_encryption_key'))) >= 32,
+            'encryptionHint' => 'Kredensial sensitif disimpan terenkripsi AES-256-GCM.',
+            'selections' => ['digiflazzEnvironment' => $digiflazzEnvironment],
+            'profiles' => $profiles,
+            'callbacks' => [
+                [
+                    'id' => 'digiflazz',
+                    'label' => 'Digiflazz Webhook URL',
+                    'description' => 'Callback fulfillment DigiFlazz.',
+                    'url' => $base !== '' ? $base.'/api/fulfillment/digiflazz/callback' : null,
+                ],
+            ],
+        ];
+    }
+
+    /** @param array<string,string> $values @param list<string> $clearFields */
+    public function saveIntegrationProfile(
+        string $provider,
+        string $mode,
+        string $environment,
+        array $values,
+        array $clearFields = [],
+    ): void {
+        $allowedScopes = [
+            'digiflazz:direct:development' => ['username','apiKey','webhookSecret','transactionApiUrl','priceListUrl'],
+            'digiflazz:direct:production' => ['username','apiKey','webhookSecret','transactionApiUrl','priceListUrl'],
+            'kokinpay:service:global' => ['apiKey'],
+            'google:service:global' => ['clientId'],
+            'resend:service:global' => ['apiKey','fromEmail','apiUrl','deliveryChannel'],
+            'relay:service:global' => ['digiflazzOrigin','hosts','token'],
+            'security:service:global' => ['voucherEncryptionKey'],
+        ];
+        $scope = $provider.':'.$mode.':'.$environment;
+        $allowed = $allowedScopes[$scope] ?? null;
+        if ($allowed === null) {
+            throw new RuntimeException('Scope integrasi tidak valid.');
+        }
+
+        $existing = [];
+        try {
+            $existing = $this->profile($provider, $mode, $environment);
+        } catch (Throwable) {
+            $existing = [];
+        }
+
+        foreach ($values as $key => $value) {
+            if (!is_string($key) || !in_array($key, $allowed, true)) {
+                throw new RuntimeException('Field kredensial tidak diizinkan.');
+            }
+            $clean = trim((string) $value);
+            if ($clean !== '') {
+                $existing[$key] = $clean;
+            }
+        }
+        foreach ($clearFields as $key) {
+            if (is_string($key) && in_array($key, $allowed, true)) {
+                unset($existing[$key]);
+            }
+        }
+
+        $secret = trim((string) config('lfamilia.integration_encryption_key'));
+        if (strlen($secret) < 32) {
+            throw new RuntimeException('INTEGRATION_ENCRYPTION_KEY belum siap.');
+        }
+
+        $encrypted = $this->encrypt($existing, $secret);
+        $query = DB::table('integration_profiles')
+            ->where('provider', $provider)
+            ->where('mode', $mode)
+            ->where('environment', $environment);
+
+        if ($query->exists()) {
+            $query->update(['encrypted_config' => $encrypted, 'updated_at' => now()]);
+        } else {
+            DB::table('integration_profiles')->insert([
+                'provider' => $provider,
+                'mode' => $mode,
+                'environment' => $environment,
+                'encrypted_config' => $encrypted,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
     private function paymentProfileReady(string $provider, string $environment): bool
     {
         try {
