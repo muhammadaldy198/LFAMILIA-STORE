@@ -188,8 +188,8 @@ export function AdminProductManager() {
     setError("");
     try {
       const [productPayload, categoryPayload] = await Promise.all([
-        readJson<{ products: ManagedProductPayload[] }>(await fetch("/api/panel/products", { cache: "no-store", signal })),
-        readJson<{ categories: ManagedCategoryOption[] }>(await fetch("/api/panel/categories", { cache: "no-store", signal })),
+        readJson<{ products: ManagedProductPayload[] }>(await fetch("/api/admin/products", { cache: "no-store", signal })),
+        readJson<{ categories: ManagedCategoryOption[] }>(await fetch("/api/admin/categories", { cache: "no-store", signal })),
       ]);
       const nextCategories = (categoryPayload.categories || [])
         .slice()
@@ -277,10 +277,10 @@ export function AdminProductManager() {
         if (image.size > 2 * 1024 * 1024) throw new Error("Ukuran gambar produk maksimal 2MB.");
         const upload = new FormData();
         upload.set("file", image);
-        const uploaded = await readJson<{ url: string }>(await fetch("/api/panel/media", { method: "POST", body: upload }));
+        const uploaded = await readJson<{ url: string }>(await fetch("/api/admin/media", { method: "POST", body: upload }));
         raw.imageUrl = uploaded.url;
       }
-      const result = await readJson<{ id: number }>(await fetch("/api/panel/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(raw) }));
+      const result = await readJson<{ id: number }>(await fetch("/api/admin/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(raw) }));
       const next = mapProductRecord({ ...raw, dbId: result.id }, categoryOptions);
       setProducts((current) => [...current, next]);
       setManualProductOpen(false);
@@ -297,7 +297,7 @@ export function AdminProductManager() {
     const nextRaw = { ...product.raw, isActive: !product.raw.isActive };
     setError("");
     try {
-      await readJson(await fetch("/api/panel/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nextRaw) }));
+      await readJson(await fetch("/api/admin/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nextRaw) }));
       setProducts((current) => current.map((item) => item.id === id ? mapProductRecord(nextRaw, categoryOptions) : item));
       setNotice(`${product.name} ${nextRaw.isActive ? "ditampilkan" : "disembunyikan"} dari katalog.`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Status produk gagal diperbarui."); }
@@ -423,7 +423,7 @@ function ProductEditor({ product, categoryOptions, onBack, onNotice }: { product
   useEffect(() => {
     const controller = new AbortController();
     setInputLoading(true);
-    fetch(`/api/panel/product-input?slug=${encodeURIComponent(product.slug)}`, { cache: "no-store", signal: controller.signal })
+    fetch(`/api/admin/product-input?slug=${encodeURIComponent(product.slug)}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json().catch(() => ({})) as { error?: string; input?: { checkoutType: "id" | "id-server"; labelId: string; labelServer: string; nicknameGameCode: string } };
         if (!response.ok || !payload.input) throw new Error(payload.error || "Pengaturan input pelanggan gagal dimuat.");
@@ -448,7 +448,7 @@ function ProductEditor({ product, categoryOptions, onBack, onNotice }: { product
     }
     setInputSaving(true);
     try {
-      const response = await fetch("/api/panel/product-input", {
+      const response = await fetch("/api/admin/product-input", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: product.slug, checkoutType, labelId, labelServer, nicknameGameCode }),
@@ -526,7 +526,7 @@ function ProductEditor({ product, categoryOptions, onBack, onNotice }: { product
     try {
       const form = new FormData();
       form.set("file", file);
-      const uploaded = await readJson<{ url: string }>(await fetch("/api/panel/media", { method: "POST", body: form }));
+      const uploaded = await readJson<{ url: string }>(await fetch("/api/admin/media", { method: "POST", body: form }));
       if (mediaUploadVersion.current[field] !== requestVersion) return;
       if (field === "imageUrl") setImageUrl(uploaded.url);
       else setBannerUrl(uploaded.url);
@@ -548,7 +548,7 @@ function ProductEditor({ product, categoryOptions, onBack, onNotice }: { product
     if (!name.trim() || !slugify(slug)) { setError("Nama dan slug produk wajib diisi."); return; }
     setInputSaving(true); setError(""); setMessage("");
     try {
-      await readJson(await fetch("/api/panel/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildPayload()) }));
+      await readJson(await fetch("/api/admin/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildPayload()) }));
       setMessage(success);
       onNotice(`${name.trim()} diperbarui.`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Produk gagal disimpan."); }
@@ -560,7 +560,7 @@ function ProductEditor({ product, categoryOptions, onBack, onNotice }: { product
     setError("");
     setMessage("");
     try {
-      await readJson(await fetch("/api/panel/digiflazz-pricing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productId: product.raw.dbId }) }));
+      await readJson(await fetch("/api/admin/digiflazz-pricing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productId: product.raw.dbId }) }));
       setMessage("Harga modal dan harga jual berhasil disinkronkan dari katalog.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Sinkron harga gagal."); }
     finally { setMonitorRefreshing(false); }
@@ -620,7 +620,7 @@ function ProductEditor({ product, categoryOptions, onBack, onNotice }: { product
     setMonitorRefreshing(true);
     setError("");
     try {
-      await readJson(await fetch("/api/panel/digiflazz-pricing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productId: product.raw.dbId, packageSku: nominal.sku }) }));
+      await readJson(await fetch("/api/admin/digiflazz-pricing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productId: product.raw.dbId, packageSku: nominal.sku }) }));
       setMessage(`${nominal.name} berhasil disinkronkan. Muat ulang produk setelah perubahan tersimpan.`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sinkron nominal gagal.");
@@ -701,7 +701,7 @@ function NominalEditorModal({ nominal, sections, onClose, onSave }: { nominal: N
       if (file) {
         const form = new FormData();
         form.set("file", file);
-        const uploaded = await readJson<{ url: string }>(await fetch("/api/panel/media", { method: "POST", body: form }));
+        const uploaded = await readJson<{ url: string }>(await fetch("/api/admin/media", { method: "POST", body: form }));
         imageUrl = uploaded.url;
       }
       const cost = Math.max(0, Math.round(draft.cost));
@@ -817,7 +817,7 @@ function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal
     void (async () => {
       try {
         const payload = await readJson<{ catalog: DigiflazzCatalogItem[] }>(
-          await fetch("/api/panel/digiflazz-pricing?catalog=1", { cache: "no-store", signal: controller.signal }),
+          await fetch("/api/admin/digiflazz-pricing?catalog=1", { cache: "no-store", signal: controller.signal }),
         );
         setCatalog(payload.catalog);
         const first = payload.catalog[0];
