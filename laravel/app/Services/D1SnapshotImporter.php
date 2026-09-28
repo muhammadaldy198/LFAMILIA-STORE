@@ -213,7 +213,7 @@ class D1SnapshotImporter
         $batch = [];
 
         while ($row = $statement->fetch(PDO::FETCH_ASSOC)) {
-            $batch[] = $row;
+            $batch[] = $this->normalizeRow($row);
 
             if (count($batch) >= 250) {
                 DB::table($table)->insert($batch);
@@ -228,6 +228,35 @@ class D1SnapshotImporter
         }
 
         $progress("Imported {$table}: {$copied} rows.");
+    }
+
+    private function normalizeRow(array $row): array
+    {
+        foreach ($row as $column => $value) {
+            if (!is_string($value) || $value === '') {
+                continue;
+            }
+
+            if (!preg_match('/(?:_at|_until)$/', (string) $column)) {
+                continue;
+            }
+
+            if (!preg_match('/^\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}/', $value)) {
+                continue;
+            }
+
+            try {
+                $date = new DateTimeImmutable($value);
+                $row[$column] = $date
+                    ->setTimezone(new DateTimeZone('UTC'))
+                    ->format('Y-m-d H:i:s');
+            } catch (Throwable) {
+                // Leave non-standard legacy values untouched so reconciliation
+                // can surface an explicit target-side failure instead of hiding it.
+            }
+        }
+
+        return $row;
     }
 
     private function financialReconciliation(PDO $source, array $sourceTables): array
