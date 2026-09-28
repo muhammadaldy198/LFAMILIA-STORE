@@ -1,5 +1,3 @@
-[Reading 51 lines from start (total: 51 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -51,5 +49,3 @@ test("Digiflazz workspace uses backend operations while credentials stay in Inte
   assert.match(dashboard, /label: "Integrasi"/);
   assert.match(dashboard, /value="integrations"/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
