@@ -32,7 +32,8 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [ ] Port authentication and RBAC.
 - [ ] Port products, pricing, nickname checks, checkout, promotions, reviews.
 - [ ] Port wallet and top-up ledger.
-- [ ] Port Midtrans Snap and DOKU callbacks.
+- [x] Port Midtrans Snap and DOKU callback signature/amount/idempotency state transitions.
+- [ ] Port Midtrans/DOKU payment creation and reconciliation polling.
 - [ ] Port Digiflazz fulfillment and callback processing.
 - [ ] Port Resend email and Google OAuth.
 - [ ] Port Admin / Staff / Super Admin APIs.

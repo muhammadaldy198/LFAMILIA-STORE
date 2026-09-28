@@ -34,6 +34,10 @@ Route::post('/orders/search', [OrderSearchController::class, 'search']);
 
 Route::get('/admin/session', [AdminSessionController::class, 'session']);
 
-// Payment status, payment creation, provider callbacks, wallet mutation, and
-// fulfillment remain disabled until their state-transition invariants are
-// fully ported and covered by regression tests.
+Route::get('/payments/midtrans/snap/notification', [MidtransNotificationController::class, 'show']);
+Route::post('/payments/midtrans/snap/notification', [MidtransNotificationController::class, 'handle']);
+Route::get('/payments/doku/callback', [DokuCallbackController::class, 'show']);
+Route::post('/payments/doku/callback', [DokuCallbackController::class, 'handle']);
+
+// Payment creation, wallet checkout mutation, and provider fulfillment remain
+// disabled until their complete server-side validation and retry paths are ported.
