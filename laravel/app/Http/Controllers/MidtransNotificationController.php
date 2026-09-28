@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DigiflazzFulfillmentService;
 use App\Services\ExternalWalletSettlementService;
 use App\Services\MidtransSnapService;
 use App\Services\PaymentTransitionService;
@@ -26,6 +27,7 @@ class MidtransNotificationController extends Controller
         MidtransSnapService $midtrans,
         PaymentTransitionService $transitions,
         ExternalWalletSettlementService $wallet,
+        DigiflazzFulfillmentService $fulfillment,
     ): JsonResponse {
         $rawBody = $request->getContent();
         $body = json_decode($rawBody, true);
@@ -108,7 +110,7 @@ class MidtransNotificationController extends Controller
             if ($status === 'ignore') {
                 $transitions->recordOrderEvent($referenceId, 'midtrans', $eventId, 'ignore', $body);
             } else {
-                $transitions->applyOrderEvent(
+                $transition = $transitions->applyOrderEvent(
                     $referenceId,
                     'midtrans',
                     $eventId,
@@ -117,6 +119,9 @@ class MidtransNotificationController extends Controller
                     $status === 'paid',
                     $status === 'expired',
                 );
+                if ($transition['firstPaid'] && $order->fulfillment_type === 'automatic') {
+                    $fulfillment->fulfillOrder((string) $order->id);
+                }
             }
 
             return response()->json(['ok' => true]);

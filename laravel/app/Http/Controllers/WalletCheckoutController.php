@@ -9,6 +9,7 @@ use App\Exceptions\PromotionQuoteException;
 use App\Exceptions\WalletSettlementException;
 use App\Services\CheckoutService;
 use App\Services\CustomerAuthService;
+use App\Services\DigiflazzFulfillmentService;
 use App\Services\NicknameService;
 use App\Services\PromotionService;
 use App\Services\SecurityGuard;
@@ -30,6 +31,7 @@ class WalletCheckoutController extends Controller
         PromotionService $promotions,
         NicknameService $nicknames,
         WalletSettlementService $wallet,
+        DigiflazzFulfillmentService $fulfillment,
     ): JsonResponse {
         $security->assertSameOrigin($request);
         $rate = $security->rateLimit($request, 'wallet-checkout', 12, 600);
@@ -71,7 +73,7 @@ class WalletCheckoutController extends Controller
                 ->where('payment_method', 'wallet')
                 ->first();
             if ($existing) {
-                return $this->existingResponse($existing, $wallet);
+                return $this->existingResponse($existing, $wallet, $fulfillment);
             }
 
             $quantity = (int) ($input['quantity'] ?? 1);
@@ -128,6 +130,10 @@ class WalletCheckoutController extends Controller
 
             $balanceAfter = $wallet->settle((string) $customer['id'], $identity['id']);
             $order = DB::table('orders')->where('id', $identity['id'])->first();
+            if ($order && $order->fulfillment_type === 'automatic') {
+                $fulfillment->fulfillOrder((string) $order->id);
+                $order = DB::table('orders')->where('id', $identity['id'])->first();
+            }
 
             return response()->json($this->successPayload($order, $balanceAfter), 201);
         } catch (QueryException $error) {
@@ -177,12 +183,16 @@ class WalletCheckoutController extends Controller
         }
     }
 
-    private function existingResponse(object $order, WalletSettlementService $wallet): JsonResponse
+    private function existingResponse(object $order, WalletSettlementService $wallet, DigiflazzFulfillmentService $fulfillment): JsonResponse
     {
         if ($order->payment_status === 'pending') {
             try {
                 $balance = $wallet->settle((string) $order->customer_id, (string) $order->id);
                 $fresh = DB::table('orders')->where('id', $order->id)->first();
+                if ($fresh && $fresh->fulfillment_type === 'automatic') {
+                    $fulfillment->fulfillOrder((string) $fresh->id);
+                    $fresh = DB::table('orders')->where('id', $order->id)->first();
+                }
                 return response()->json($this->successPayload($fresh, $balance));
             } catch (WalletSettlementException $error) {
                 return response()->json(['error' => $error->getMessage(), 'retryable' => false], 409);

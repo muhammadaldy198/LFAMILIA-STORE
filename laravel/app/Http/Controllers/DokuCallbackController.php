@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DigiflazzFulfillmentService;
 use App\Services\DokuCheckoutService;
 use App\Services\ExternalWalletSettlementService;
 use App\Services\PaymentTransitionService;
@@ -26,6 +27,7 @@ class DokuCallbackController extends Controller
         DokuCheckoutService $doku,
         PaymentTransitionService $transitions,
         ExternalWalletSettlementService $wallet,
+        DigiflazzFulfillmentService $fulfillment,
     ) {
         $rawBody = $request->getContent();
         $payload = json_decode($rawBody, true);
@@ -98,7 +100,7 @@ class DokuCallbackController extends Controller
                 $eventId = 'body-'.hash('sha256', $rawBody);
             }
 
-            $transitions->applyOrderEvent(
+            $transition = $transitions->applyOrderEvent(
                 $notification['referenceId'],
                 'doku',
                 $eventId,
@@ -107,6 +109,9 @@ class DokuCallbackController extends Controller
                 $notification['status'] === 'paid',
                 $notification['status'] === 'expired',
             );
+            if ($transition['firstPaid'] && $order->fulfillment_type === 'automatic') {
+                $fulfillment->fulfillOrder((string) $order->id);
+            }
 
             return $this->acknowledge();
         } catch (Throwable) {

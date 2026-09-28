@@ -9,10 +9,15 @@ return [
             'api_key' => env('KOKINPAY_API_KEY'),
         ],
         'digiflazz' => [
+            'environment' => env('DIGIFLAZZ_ENV'),
             'username' => env('DIGIFLAZZ_USERNAME'),
-            'api_key' => env('DIGIFLAZZ_API_KEY'),
-            'base_url' => env('DIGIFLAZZ_BASE_URL'),
-            'callback_secret' => env('DIGIFLAZZ_CALLBACK_SECRET'),
+            'development_api_key' => env('DIGIFLAZZ_DEVELOPMENT_API_KEY'),
+            'production_api_key' => env('DIGIFLAZZ_PRODUCTION_API_KEY'),
+            'development_transaction_url' => env('DIGIFLAZZ_DEVELOPMENT_API_URL'),
+            'production_transaction_url' => env('DIGIFLAZZ_PRODUCTION_API_URL'),
+            'development_price_list_url' => env('DIGIFLAZZ_DEVELOPMENT_PRICE_LIST_URL'),
+            'production_price_list_url' => env('DIGIFLAZZ_PRODUCTION_PRICE_LIST_URL'),
+            'webhook_secret' => env('DIGIFLAZZ_WEBHOOK_SECRET', env('DIGIFLAZZ_CALLBACK_SECRET')),
         ],
         'midtrans' => [
             'environment' => env('MIDTRANS_ENV'),

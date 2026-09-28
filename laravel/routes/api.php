@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminSessionController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DigiflazzCallbackController;
 use App\Http\Controllers\DokuCallbackController;
 use App\Http\Controllers\ExternalCheckoutController;
 use App\Http\Controllers\MidtransNotificationController;
@@ -44,6 +45,7 @@ Route::get('/payments/midtrans/snap/notification', [MidtransNotificationControll
 Route::post('/payments/midtrans/snap/notification', [MidtransNotificationController::class, 'handle']);
 Route::get('/payments/doku/callback', [DokuCallbackController::class, 'show']);
 Route::post('/payments/doku/callback', [DokuCallbackController::class, 'handle']);
+Route::post('/fulfillment/digiflazz/callback', [DigiflazzCallbackController::class, 'handle']);
 
 // Provider fulfillment and external-payment reconciliation polling remain
 // disabled until their complete retry/state-reconciliation paths are ported.

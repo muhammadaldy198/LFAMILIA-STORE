@@ -36,7 +36,7 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Port Midtrans Snap and DOKU callback signature/amount/idempotency state transitions.
 - [x] Port Midtrans Snap / DOKU Checkout payment creation with server-side price, customer fee, idempotency, and uncertain-create handling.
 - [ ] Port external-payment reconciliation polling.
-- [ ] Port Digiflazz fulfillment and callback processing.
+- [x] Port Digiflazz paid-only fulfillment, Max Price/availability recheck, bounded retries, multi-unit handling, and signed callback processing.
 - [ ] Port Resend email and Google OAuth.
 - [ ] Port Admin / Staff / Super Admin APIs.
 - [ ] Port customer frontend and panel UI.
