@@ -1,3 +1,5 @@
+[Reading 124 lines from start (total: 124 lines, 0 remaining)]
+
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -122,3 +124,5 @@ test("panel credential rows never appear as real customers or members", () => {
   assert.match(members, /email NOT LIKE '__lfadmin__:%'/);
   assert.match(summary, /email NOT LIKE '__lfadmin__:%'/);
 });
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
