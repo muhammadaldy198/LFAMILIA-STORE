@@ -33,11 +33,11 @@ class WalletCheckoutSecurityTest extends TestCase
             'price' => 1,
         ];
 
-        $first = $this->withCookie('lfamilia_session', $token)
+        $first = $this->withUnencryptedCookie('lfamilia_session', $token)
             ->postJson('/api/payments/wallet/create', $payload);
         $first->assertCreated()->assertJsonPath('total', 12000);
 
-        $second = $this->withCookie('lfamilia_session', $token)
+        $second = $this->withUnencryptedCookie('lfamilia_session', $token)
             ->postJson('/api/payments/wallet/create', $payload);
         $second->assertOk()->assertJsonPath('total', 12000);
 
@@ -51,7 +51,7 @@ class WalletCheckoutSecurityTest extends TestCase
         [$customerId, $token] = $this->customerWithBalance(5000);
         $this->manualProduct(12000);
 
-        $this->withCookie('lfamilia_session', $token)
+        $this->withUnencryptedCookie('lfamilia_session', $token)
             ->postJson('/api/payments/wallet/create', [
                 'productSlug' => 'manual-game',
                 'packageSku' => 'MG12',
