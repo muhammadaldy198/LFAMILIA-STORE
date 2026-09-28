@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AdminCompatController;
 use App\Http\Controllers\AdminContentController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\AdminDigiflazzController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\OrderSearchController;
 use App\Http\Controllers\OrderStatusController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\PublicCompatController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\StorefrontController;
 use App\Http\Controllers\SupportController;
@@ -44,6 +46,15 @@ Route::get('/storefront', [StorefrontController::class, 'storefront']);
 Route::get('/home-content', [StorefrontController::class, 'home']);
 Route::get('/news', [StorefrontController::class, 'news']);
 Route::get('/security/turnstile', [TurnstileController::class, 'show']);
+Route::get('/account/summary', [PublicCompatController::class, 'accountSummary']);
+Route::get('/account/membership', [PublicCompatController::class, 'membership']);
+Route::match(['GET','POST','PATCH','DELETE'], '/account/game-accounts', [PublicCompatController::class, 'gameAccounts']);
+Route::get('/leaderboard', [PublicCompatController::class, 'leaderboard']);
+Route::get('/payment-methods', [PublicCompatController::class, 'paymentMethods']);
+Route::get('/payment-page-settings', [PublicCompatController::class, 'paymentPageSettings']);
+Route::get('/promotions', [PublicCompatController::class, 'promotions']);
+Route::post('/promotions/quote', [PublicCompatController::class, 'promotionQuote']);
+Route::get('/media/{key}', [PublicCompatController::class, 'media'])->where('key', 'media-[0-9a-fA-F-]{36}\\.(?:jpg|png|webp|gif)');
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -73,6 +84,17 @@ Route::post('/orders/status', [OrderStatusController::class, 'show']);
 
 Route::get('/admin/session', [AdminSessionController::class, 'session']);
 Route::get('/admin/summary', [AdminSummaryController::class, 'show']);
+Route::get('/admin/dashboard-integrations', [AdminCompatController::class, 'dashboardIntegrations']);
+Route::match(['GET','PUT'], '/admin/integrations', [AdminCompatController::class, 'integrations']);
+Route::post('/admin/media', [AdminCompatController::class, 'mediaUpload']);
+Route::post('/admin/nickname-tools', [AdminCompatController::class, 'nicknameTools']);
+Route::match(['GET','PUT'], '/admin/payment-page', [AdminCompatController::class, 'paymentPage']);
+Route::match(['GET','PUT'], '/admin/product-content', [AdminCompatController::class, 'productContent']);
+Route::match(['GET','PATCH'], '/admin/product-input', [AdminCompatController::class, 'productInput']);
+Route::patch('/admin/product-package-provider', [AdminCompatController::class, 'packageProvider']);
+Route::patch('/admin/product-package-status', [AdminCompatController::class, 'packageStatus']);
+Route::match(['GET','PUT'], '/admin/wallet', [AdminCompatController::class, 'wallet']);
+Route::get('/admin/wallet/proof', [AdminCompatController::class, 'walletProof']);
 Route::get('/admin/orders', [AdminOrdersController::class, 'index']);
 Route::post('/admin/orders', [AdminOrdersController::class, 'create']);
 Route::patch('/admin/orders', [AdminOrdersController::class, 'update']);
