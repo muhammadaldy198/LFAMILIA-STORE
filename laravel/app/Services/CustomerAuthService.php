@@ -182,7 +182,20 @@ class CustomerAuthService
     /** @return array<string,mixed>|null */
     public function current(Request $request): ?array
     {
-        $token = (string) $request->cookie(self::COOKIE, '');
+        $token = $request->cookie(self::COOKIE);
+
+        if (!$token) {
+            $cookieHeader = (string) $request->headers->get('cookie', '');
+            foreach (explode(';', $cookieHeader) as $part) {
+                [$name, $value] = array_pad(explode('=', trim($part), 2), 2, '');
+                if ($name === self::COOKIE && $value !== '') {
+                    $token = rawurldecode($value);
+                    break;
+                }
+            }
+        }
+
+        $token = is_string($token) ? $token : '';
         if ($token === '') {
             return null;
         }
