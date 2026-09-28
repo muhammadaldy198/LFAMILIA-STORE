@@ -12,7 +12,7 @@ use Throwable;
 
 class AuthController extends Controller
 {
-    public function login(Request $request, CustomerAuthService $auth, SecurityGuard $security): JsonResponse
+    public function login(Request $request, CustomerAuthService $auth, SecurityGuard $security, TurnstileService $turnstile): JsonResponse
     {
         $security->assertSameOrigin($request);
         $rate = $security->rateLimit($request, 'customer-login', 8);
@@ -28,7 +28,12 @@ class AuthController extends Controller
             $input = $request->validate([
                 'email' => ['required', 'email', 'max:150'],
                 'password' => ['required', 'string', 'min:8', 'max:72'],
+                'turnstileToken' => ['nullable', 'string', 'max:2048'],
             ]);
+
+            if (!$turnstile->verify($request, $input['turnstileToken'] ?? null)) {
+                return response()->json(['error' => 'Verifikasi keamanan gagal. Coba lagi.'], 403);
+            }
 
             $session = $auth->login($input['email'], $input['password']);
 
@@ -51,7 +56,7 @@ class AuthController extends Controller
         }
     }
 
-    public function register(Request $request, CustomerAuthService $auth, SecurityGuard $security): JsonResponse
+    public function register(Request $request, CustomerAuthService $auth, SecurityGuard $security, TurnstileService $turnstile): JsonResponse
     {
         $security->assertSameOrigin($request);
         $rate = $security->rateLimit($request, 'customer-register', 5, 3600);
@@ -69,7 +74,12 @@ class AuthController extends Controller
                 'email' => ['required', 'email', 'max:150'],
                 'phone' => ['required', 'string', 'max:20'],
                 'password' => ['required', 'string', 'min:8', 'max:72'],
+                'turnstileToken' => ['nullable', 'string', 'max:2048'],
             ]);
+
+            if (!$turnstile->verify($request, $input['turnstileToken'] ?? null)) {
+                return response()->json(['error' => 'Verifikasi keamanan gagal. Coba lagi.'], 403);
+            }
 
             $session = $auth->register($input);
 
