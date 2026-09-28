@@ -1,37 +1,48 @@
 <?php
 
 return [
-    'public_base_url' => env('PUBLIC_BASE_URL', env('APP_URL')),
+    'public_base_url' => env('PUBLIC_BASE_URL'),
 
     'integrations' => [
         'kokinpay' => [
-            'base_url' => env('KOKINPAY_BASE_URL', 'https://api.kokinpay.com'),
+            'base_url' => env('KOKINPAY_BASE_URL'),
             'api_key' => env('KOKINPAY_API_KEY'),
         ],
         'digiflazz' => [
             'username' => env('DIGIFLAZZ_USERNAME'),
             'api_key' => env('DIGIFLAZZ_API_KEY'),
-            'webhook_secret' => env('DIGIFLAZZ_WEBHOOK_SECRET'),
+            'base_url' => env('DIGIFLAZZ_BASE_URL'),
+            'callback_secret' => env('DIGIFLAZZ_CALLBACK_SECRET'),
         ],
         'midtrans' => [
-            'environment' => env('MIDTRANS_ENV', 'production'),
+            'environment' => env('MIDTRANS_ENV'),
             'server_key' => env('MIDTRANS_SERVER_KEY'),
             'client_key' => env('MIDTRANS_CLIENT_KEY'),
-            'snap_base_url' => env('MIDTRANS_SNAP_BASE_URL', 'https://app.midtrans.com'),
-            'api_base_url' => env('MIDTRANS_API_BASE_URL', 'https://api.midtrans.com'),
+            'snap_base_url' => env('MIDTRANS_SNAP_BASE_URL'),
+            'api_base_url' => env('MIDTRANS_API_BASE_URL'),
         ],
         'doku' => [
-            'environment' => env('DOKU_ENV', 'production'),
+            'environment' => env('DOKU_ENV'),
             'client_id' => env('DOKU_CLIENT_ID'),
             'secret_key' => env('DOKU_SECRET_KEY'),
-            'api_base_url' => env('DOKU_API_BASE_URL', 'https://api.doku.com'),
+            'api_base_url' => env('DOKU_API_BASE_URL'),
         ],
         'resend' => [
             'api_key' => env('RESEND_API_KEY'),
+            'from' => env('RESEND_FROM'),
+            'base_url' => env('RESEND_BASE_URL'),
+        ],
+        'google' => [
+            'client_id' => env('GOOGLE_CLIENT_ID'),
+            'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+            'redirect_uri' => env('GOOGLE_REDIRECT_URI'),
+        ],
+        'turnstile' => [
+            'site_key' => env('TURNSTILE_SITE_KEY'),
+            'secret_key' => env('TURNSTILE_SECRET_KEY'),
+            'verify_url' => env('TURNSTILE_VERIFY_URL'),
         ],
     ],
 
-    // This key is never committed with a value. It protects secrets that are
-    // stored through the Super Admin integration manager.
     'integration_encryption_key' => env('INTEGRATION_ENCRYPTION_KEY'),
 ];
