@@ -41,5 +41,3 @@ export async function fetchAdminSummary<T>(
 
   return promise;
 }
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
