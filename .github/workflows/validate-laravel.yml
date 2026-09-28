@@ -42,6 +42,8 @@ jobs:
         run: composer install --no-interaction --prefer-dist
       - name: PHP syntax check
         run: find app bootstrap config database routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Deployment shell syntax check
+        run: bash -n deploy/preflight.sh deploy/install-systemd.sh
       - name: Run schema migrations on SQLite
         env:
           APP_URL: http://localhost
