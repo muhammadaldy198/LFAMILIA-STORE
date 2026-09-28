@@ -3,6 +3,8 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminOrdersController;
 use App\Http\Controllers\AdminPaymentController;
+use App\Http\Controllers\AdminReviewController;
+use App\Http\Controllers\AdminSupportController;
 use App\Http\Controllers\AdminSessionController;
 use App\Http\Controllers\AdminSummaryController;
 use App\Http\Controllers\AdminTeamController;
@@ -17,6 +19,8 @@ use App\Http\Controllers\OrderSearchController;
 use App\Http\Controllers\OrderStatusController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\SupportController;
 use App\Http\Controllers\SystemStatusController;
 use App\Http\Controllers\TurnstileController;
 use App\Http\Controllers\WalletCheckoutController;
@@ -42,9 +46,13 @@ Route::post('/auth/reset-password', [PasswordResetController::class, 'reset']);
 
 Route::get('/account', [AccountController::class, 'show']);
 Route::patch('/account', [AccountController::class, 'update']);
+Route::get('/account/support', [SupportController::class, 'index']);
+Route::post('/account/support', [SupportController::class, 'create']);
 Route::post('/account/topups', [WalletTopupController::class, 'create']);
 
 Route::get('/products', [ProductController::class, 'index']);
+Route::get('/reviews', [ReviewController::class, 'index']);
+Route::post('/reviews', [ReviewController::class, 'create']);
 Route::post('/nickname', [NicknameController::class, 'verify']);
 Route::post('/payments/wallet/create', [WalletCheckoutController::class, 'create']);
 Route::post('/payments/auto/create', [ExternalCheckoutController::class, 'create']);
@@ -64,6 +72,10 @@ Route::put('/admin/payment-routing', [AdminPaymentController::class, 'updateRout
 Route::get('/admin/payment-methods', [AdminPaymentController::class, 'methods']);
 Route::post('/admin/payment-methods', [AdminPaymentController::class, 'saveMethod']);
 Route::delete('/admin/payment-methods', [AdminPaymentController::class, 'deleteMethod']);
+Route::get('/admin/reviews', [AdminReviewController::class, 'index']);
+Route::patch('/admin/reviews', [AdminReviewController::class, 'update']);
+Route::get('/admin/support', [AdminSupportController::class, 'index']);
+Route::patch('/admin/support', [AdminSupportController::class, 'update']);
 Route::get('/admin/team', [AdminTeamController::class, 'index']);
 Route::post('/admin/team', [AdminTeamController::class, 'save']);
 Route::delete('/admin/team', [AdminTeamController::class, 'destroy']);
