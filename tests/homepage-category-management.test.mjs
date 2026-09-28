@@ -1,5 +1,3 @@
-[Reading 42 lines from start (total: 42 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -38,9 +36,7 @@ test("custom category slugs survive public products and admin product editing", 
 
   assert.match(categories, /return normalized\.replace/);
   assert.match(publicProducts, /category: normalizeProductCategorySlug\(item\.category\)/);
-  assert.match(products, /fetch\("\/api\/panel\/categories"/);
+  assert.match(products, /fetch\("\/api\/admin\/categories"/);
   assert.match(products, /categoryOptions\.map/);
   assert.match(products, /name="category"/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
