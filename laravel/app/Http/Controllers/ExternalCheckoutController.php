@@ -240,7 +240,7 @@ class ExternalCheckoutController extends Controller
                         ->where('payment_status', 'pending')
                         ->update([
                             'provider_message' => 'Status pembuatan pembayaran belum dapat dipastikan: '.mb_substr($error->getMessage(), 0, 420),
-                            'gateway_expired_at' => DB::raw("COALESCE(gateway_expired_at, datetime('now', '+75 minutes'))"),
+                            'gateway_expired_at' => DB::raw("COALESCE(gateway_expired_at, '".now()->addMinutes(75)->format('Y-m-d H:i:s')."')"),
                             'updated_at' => now(),
                         ]);
                 }
