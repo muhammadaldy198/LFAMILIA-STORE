@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AdminOrdersController;
 use App\Http\Controllers\AdminSessionController;
 use App\Http\Controllers\AdminSummaryController;
 use App\Http\Controllers\AdminTeamController;
@@ -54,6 +55,9 @@ Route::post('/orders/status', [OrderStatusController::class, 'show']);
 
 Route::get('/admin/session', [AdminSessionController::class, 'session']);
 Route::get('/admin/summary', [AdminSummaryController::class, 'show']);
+Route::get('/admin/orders', [AdminOrdersController::class, 'index']);
+Route::post('/admin/orders', [AdminOrdersController::class, 'create']);
+Route::patch('/admin/orders', [AdminOrdersController::class, 'update']);
 Route::get('/admin/team', [AdminTeamController::class, 'index']);
 Route::post('/admin/team', [AdminTeamController::class, 'save']);
 Route::delete('/admin/team', [AdminTeamController::class, 'destroy']);
