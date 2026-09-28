@@ -1,3 +1,5 @@
+[Reading 31 lines from start (total: 31 lines, 0 remaining)]
+
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -29,3 +31,5 @@ test("Cloudflare Access protects direct admin API but not staff panel API", () =
   const guard = source.slice(source.indexOf("const isAccessProtectedRequest"), source.indexOf("if (isAccessProtectedRequest)"));
   assert.doesNotMatch(guard, /\/api\/panel/);
 });
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
