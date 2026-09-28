@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly LFAMILIA backup restore verification
+
+[Timer]
+OnCalendar=Sun *-*-* 04:10:00 UTC
+Persistent=true
+RandomizedDelaySec=10m
+Unit=lfamilia-backup-verify.service
+
+[Install]
+WantedBy=timers.target
