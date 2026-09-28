@@ -7,10 +7,14 @@ use RuntimeException;
 
 class GoogleIdentityService
 {
+    public function __construct(private readonly IntegrationConfigService $integrations)
+    {
+    }
+
     /** @return array{subject:string,email:string,name:string,picture:string} */
     public function verify(string $credential): array
     {
-        $clientId = trim((string) config('lfamilia.integrations.google.client_id'));
+        $clientId = (string) ($this->integrations->googleClientId() ?? '');
         $tokenInfoUrl = trim((string) config('lfamilia.integrations.google.tokeninfo_url'));
 
         if ($clientId === '' || !$this->validHttpsUrl($tokenInfoUrl)) {
@@ -54,7 +58,7 @@ class GoogleIdentityService
     /** @return array{enabled:bool,clientId:?string} */
     public function publicStatus(): array
     {
-        $clientId = trim((string) config('lfamilia.integrations.google.client_id'));
+        $clientId = (string) ($this->integrations->googleClientId() ?? '');
 
         return [
             'enabled' => $clientId !== '',
