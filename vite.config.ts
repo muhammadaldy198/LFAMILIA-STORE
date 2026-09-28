@@ -11,17 +11,31 @@ export default defineConfig(async () => {
   process.env.WRANGLER_LOG_PATH ??= ".wrangler/logs";
   process.env.MINIFLARE_REGISTRY_PATH ??= ".wrangler/registry";
 
+  const server = {
+    host: "0.0.0.0",
+    allowedHosts: ["terminal.local"],
+    ...(isCodexSeatbeltSandbox
+      ? { watch: { useFsEvents: false, usePolling: true } }
+      : {}),
+  };
+
+  // The production VPS is a normal Node.js/Vinext runtime. Do not load the
+  // Cloudflare Vite plugin there: its Worker entry expects bindings such as D1
+  // to be injected as the `env` argument, which does not exist under
+  // `vinext start` on Node. Public /api/* traffic is proxied to Laravel.
+  if (process.env.LFAMILIA_DEPLOY_TARGET === "node") {
+    return {
+      server,
+      plugins: [vinext()],
+    };
+  }
+
+  // Cloudflare builds keep their existing Worker/D1 runtime unchanged.
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
-    server: {
-      host: "0.0.0.0",
-      allowedHosts: ["terminal.local"],
-      ...(isCodexSeatbeltSandbox
-        ? { watch: { useFsEvents: false, usePolling: true } }
-        : {}),
-    },
+    server,
     plugins: [
       vinext(),
       cloudflare({
