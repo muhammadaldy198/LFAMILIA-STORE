@@ -23,10 +23,12 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Laravel 13 / PHP 8.3 foundation.
 - [x] MariaDB runtime configuration.
 - [x] Secrets and provider endpoints moved to environment-only configuration.
-- [x] CI installs Laravel, checks PHP syntax, migrates the full schema on SQLite, and runs tests.
-- [x] Current customer/auth, catalog, order, wallet, content, payment-config, integration, security, and Digiflazz tables translated to Laravel migrations.
-- [x] MariaDB Digiflazz maintenance guard preserved as a database trigger.
-- [ ] Build D1 SQL export -> MariaDB importer with row-count and financial reconciliation.
+- [x] Current LFAMILIA D1 schema translated to Laravel migrations.
+- [x] MariaDB Digiflazz maintenance guard preserved.
+- [x] CI validates the schema on SQLite and a real MariaDB 11.4 service.
+- [x] D1 snapshot importer accepts a D1 SQL export or SQLite snapshot.
+- [x] Import requires an explicit destructive confirmation and reconciles table row counts.
+- [x] Import reconciles paid-order totals, wallet credit/debit totals, and aggregate customer balances.
 - [ ] Port authentication and RBAC.
 - [ ] Port products, pricing, nickname checks, checkout, promotions, reviews.
 - [ ] Port wallet and top-up ledger.
@@ -37,5 +39,13 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [ ] Port customer frontend and panel UI.
 - [ ] Add production queue worker and scheduler jobs.
 - [ ] Deploy to VPS without DNS cutover.
-- [ ] Import production data and reconcile.
+- [ ] Import the current production D1 snapshot and reconcile.
 - [ ] Cut over `lfamiliastore.my.id` only after validation.
+
+## Import safety
+
+The production import is intentionally guarded and cannot run accidentally:
+
+`php artisan lfamilia:import-d1 /absolute/path/export.sql --replace --confirm=IMPORT_D1_TO_MARIADB`
+
+Run it only on the prepared VPS after a fresh D1 export has been copied to the server. The command never reads credentials from Git; it uses the active Laravel database connection from the server environment.
