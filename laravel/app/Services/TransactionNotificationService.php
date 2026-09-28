@@ -131,9 +131,7 @@ class TransactionNotificationService
 
     private function emailConfigured(): bool
     {
-        return trim((string) config('lfamilia.integrations.resend.api_key')) !== ''
-            && trim((string) config('lfamilia.integrations.resend.from')) !== ''
-            && trim((string) config('lfamilia.integrations.resend.api_url')) !== '';
+        return $this->resend->configured();
     }
 
     private function escape(string $value): string
