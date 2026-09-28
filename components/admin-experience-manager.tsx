@@ -85,12 +85,12 @@ async function panelJson(response: Response) {
 }
 
 async function saveContentItem(kind: Exclude<ContentKind, "review" | "faq"> | "faq", item: BannerPayload | PopupPayload | NewsPayload | FaqPayload) {
-  if (kind === "faq") return panelJson(await fetch("/api/panel/faqs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item) }));
-  return panelJson(await fetch("/api/panel/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, item }) }));
+  if (kind === "faq") return panelJson(await fetch("/api/admin/faqs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item) }));
+  return panelJson(await fetch("/api/admin/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, item }) }));
 }
 
 async function saveReview(item: ReviewPayload) {
-  return panelJson(await fetch("/api/panel/reviews", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: item.id, isVisible: item.isVisible }) }));
+  return panelJson(await fetch("/api/admin/reviews", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: item.id, isVisible: item.isVisible }) }));
 }
 
 function togglePayload(kind: ContentKind, raw: NonNullable<Banner["raw"]> | NonNullable<MiniItem["raw"]>) {
@@ -127,9 +127,9 @@ export function AdminExperienceManager({ role }: { role: "super_admin" | "admin"
     setError("");
     try {
       const [contentResponse, faqResponse, reviewResponse] = await Promise.all([
-        fetch("/api/panel/content", { cache: "no-store" }),
-        fetch("/api/panel/faqs", { cache: "no-store" }),
-        fetch("/api/panel/reviews", { cache: "no-store" }),
+        fetch("/api/admin/content", { cache: "no-store" }),
+        fetch("/api/admin/faqs", { cache: "no-store" }),
+        fetch("/api/admin/reviews", { cache: "no-store" }),
       ]);
       const content = await contentResponse.json().catch(() => ({})) as { banners?: BannerPayload[]; popups?: PopupPayload[]; news?: NewsPayload[]; error?: string };
       const faqData = await faqResponse.json().catch(() => ({})) as { faqs?: FaqPayload[]; error?: string };
@@ -214,7 +214,7 @@ export function AdminExperienceManager({ role }: { role: "super_admin" | "admin"
     if (editor.id < 1 || editor.kind === "review") { setError(editor.kind === "review" ? "Ulasan tidak dihapus; nonaktifkan agar riwayat pelanggan tetap tersimpan." : "Konten baru belum tersimpan."); return; }
     setSaving(true); setError("");
     try {
-      const endpoint = editor.kind === "faq" ? `/api/panel/faqs?id=${editor.id}` : `/api/panel/content?kind=${editor.kind}&id=${editor.id}`;
+      const endpoint = editor.kind === "faq" ? `/api/admin/faqs?id=${editor.id}` : `/api/admin/content?kind=${editor.kind}&id=${editor.id}`;
       await panelJson(await fetch(endpoint, { method: "DELETE" }));
       setNotice(`${labelKind(editor.kind)} berhasil dihapus.`);
       await loadContent();
@@ -295,7 +295,7 @@ function EditorPanel({ editor, banners, popups, news, reviews, faqs, canDelete, 
       const form = new FormData();
       form.set("file", preparedFile);
 
-      const response = await fetch("/api/panel/media", { method: "POST", body: form });
+      const response = await fetch("/api/admin/media", { method: "POST", body: form });
       const raw = await response.text();
       let payload: { url?: string; error?: string } = {};
       try {
