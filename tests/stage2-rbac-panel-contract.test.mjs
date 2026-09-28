@@ -1,5 +1,3 @@
-[Reading 67 lines from start (total: 67 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -67,5 +65,3 @@ test("Staff cannot read provider input templates, toggle packages, promotions, o
   assert.match(visible, /delivery_mode: deliveryMode\(order\)/);
   assert.doesNotMatch(visible, /provider_code|provider_status|provider_message|provider_serial_number/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
