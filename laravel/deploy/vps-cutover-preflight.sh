@@ -60,7 +60,7 @@ sha256sum -c "$LATEST.sha256"
 echo "OK backup $(basename "$LATEST") age=${AGE}s"
 
 echo "== Media =="
-MEDIA_CHECK="$(as_app "cd '$ROOT/laravel' && php artisan tinker --execute='\$s=app(App\\Services\\MediaMigrationService::class); \$k=\$s->referencedKeys(); \$existing=DB::table("media_assets")->whereIn("media_key",\$k)->count(); echo count(\$k).":".\$existing;'")"
+MEDIA_CHECK="$(as_app "cd '$ROOT/laravel' && php artisan tinker --execute='\$s=app(App\\Services\\MediaMigrationService::class); \$k=\$s->referencedKeys(); \$existing=DB::table(\"media_assets\")->whereIn(\"media_key\",\$k)->count(); echo count(\$k).\":\".\$existing;'")"
 REFS="${MEDIA_CHECK%%:*}"
 EXISTING="${MEDIA_CHECK##*:}"
 [[ "$REFS" = "$EXISTING" ]] || fail "referenced media mismatch ${REFS}/${EXISTING}"
