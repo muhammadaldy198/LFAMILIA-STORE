@@ -51,26 +51,27 @@ class NicknameService
             throw new NicknameValidationException('Server / Zone ID wajib diisi.');
         }
 
-        $apiKey = $this->integrations->kokinpayApiKey();
-        if (!$apiKey) {
+        $runtime = $this->integrations->kokinpayRuntime();
+        $apiKey = $runtime['apiKey'];
+        $baseUrl = $runtime['baseUrl'];
+        if ($apiKey === '' || $baseUrl === '') {
             throw new NicknameServiceException(
                 'Verifikasi akun belum terhubung dengan benar. Checkout sementara tidak dapat dilanjutkan.',
             );
         }
 
-        return $this->lookup($apiKey, $gameCode, $userId, $server !== '' ? $server : null);
+        return $this->lookup($apiKey, $baseUrl, $gameCode, $userId, $server !== '' ? $server : null);
     }
 
     /** @return array{supported:bool,nickname:?string,country:?string} */
-    private function lookup(string $apiKey, string $gameCode, string $userId, ?string $server): array
+    private function lookup(string $apiKey, string $baseUrl, string $gameCode, string $userId, ?string $server): array
     {
         $userId = trim($userId);
         if (strlen($userId) < 2) {
             throw new NicknameValidationException('ID akun belum valid.');
         }
 
-        $baseUrl = rtrim(trim((string) config('lfamilia.integrations.kokinpay.base_url')), '/');
-        if ($baseUrl === '' || !str_starts_with(strtolower($baseUrl), 'https://')) {
+        if (!str_starts_with(strtolower($baseUrl), 'https://')) {
             throw new NicknameServiceException('URL layanan verifikasi akun belum dikonfigurasi dengan benar.');
         }
 

@@ -14,10 +14,12 @@ class ExternalCheckoutSecurityTest extends TestCase
         $this->artisan('migrate:fresh');
 
         config()->set('lfamilia.public_base_url', 'https://lfamilia.example');
-        config()->set('lfamilia.integrations.midtrans.environment', 'sandbox');
-        config()->set('lfamilia.integrations.midtrans.server_key', 'midtrans-server-key');
-        config()->set('lfamilia.integrations.midtrans.client_key', 'midtrans-client-key');
         config()->set('lfamilia.integrations.midtrans.snap_base_url', 'https://snap.test.invalid');
+        $this->saveIntegrationSetting('midtrans_environment', 'sandbox');
+        $this->saveIntegrationProfile('midtrans', 'snap', 'sandbox', [
+            'serverKey' => 'midtrans-server-key',
+            'clientKey' => 'midtrans-client-key',
+        ]);
 
         DB::table('payment_gateway_settings')->insert([
             'gateway' => 'midtrans',

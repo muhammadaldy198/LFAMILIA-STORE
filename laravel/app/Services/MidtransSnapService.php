@@ -66,7 +66,7 @@ class MidtransSnapService
             throw new RuntimeException('Server Key Midtrans belum tersedia untuk environment transaksi.');
         }
 
-        $configuredEnvironment = trim((string) config('lfamilia.integrations.midtrans.environment'));
+        $configuredEnvironment = $this->integrations->setting('midtrans_environment') ?: 'sandbox';
         $apiOrigin = trim((string) config('lfamilia.integrations.midtrans.api_base_url'));
         if ($configuredEnvironment !== $environment || !$this->validHttpsOrigin($apiOrigin)) {
             throw new RuntimeException('URL API Midtrans belum dikonfigurasi untuk environment transaksi.');
@@ -130,17 +130,9 @@ class MidtransSnapService
                 return $value;
             }
         } catch (\Throwable) {
-            // Fall through to the server environment. This permits a fresh VPS
-            // to be configured before encrypted dashboard profiles are imported.
-        }
-
-        $configuredEnvironment = trim((string) config('lfamilia.integrations.midtrans.environment'));
-        if ($configuredEnvironment !== $environment) {
             return null;
         }
 
-        $value = trim((string) config('lfamilia.integrations.midtrans.server_key'));
-
-        return $value !== '' ? $value : null;
+        return null;
     }
 }

@@ -18,9 +18,12 @@ class PasswordResetAndGoogleAuthTest extends TestCase
     public function test_password_reset_email_is_generic_and_secret_is_not_stored_plaintext(): void
     {
         config()->set('lfamilia.public_base_url', 'https://lfamilia.example');
-        config()->set('lfamilia.integrations.resend.api_key', 'resend-secret');
-        config()->set('lfamilia.integrations.resend.from', 'LFAMILIA <no-reply@lfamilia.example>');
-        config()->set('lfamilia.integrations.resend.api_url', 'https://resend.test.invalid/emails');
+        $this->saveIntegrationProfile('resend', 'service', 'global', [
+            'apiKey' => 'resend-secret',
+            'fromEmail' => 'LFAMILIA <no-reply@lfamilia.example>',
+            'apiUrl' => 'https://resend.test.invalid/emails',
+            'deliveryChannel' => 'email',
+        ]);
 
         $salt = bin2hex(random_bytes(16));
         DB::table('customer_users')->insert([
@@ -59,7 +62,7 @@ class PasswordResetAndGoogleAuthTest extends TestCase
 
     public function test_google_identity_requires_phone_then_links_customer(): void
     {
-        config()->set('lfamilia.integrations.google.client_id', 'google-client-id');
+        $this->saveIntegrationProfile('google', 'service', 'global', ['clientId' => 'google-client-id']);
         config()->set('lfamilia.integrations.google.tokeninfo_url', 'https://google.test.invalid/tokeninfo');
 
         Http::fake([

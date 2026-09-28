@@ -8,7 +8,7 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 
 ## Rules
 
-1. No API keys, passwords, database credentials, encryption keys, provider secrets, provider URLs, or production-only values are committed as live configuration.
+1. No live secrets are committed to Git. Provider/payment credentials and provider runtime settings are managed from **Super Admin → Integrasi** and stored encrypted in MariaDB; only bootstrap/infrastructure secrets such as `APP_KEY`, database credentials, and `INTEGRATION_ENCRYPTION_KEY` remain server-side.
 2. Existing production remains the rollback source until Laravel passes full regression testing.
 3. Payment redirects never mark an order paid; only validated server callbacks may transition payment state.
 4. Midtrans/DOKU callbacks must remain signature-validated, amount-validated, idempotent, and monotonic.
@@ -22,7 +22,7 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Isolated migration branch.
 - [x] Laravel 13 / PHP 8.3 foundation.
 - [x] MariaDB runtime configuration.
-- [x] Secrets and provider endpoints moved to environment-only configuration.
+- [x] Provider/payment credentials moved to encrypted Admin → Integrasi profiles; provider secrets are no longer runtime-configured from `.env`.
 - [x] Current LFAMILIA D1 schema translated to Laravel migrations.
 - [x] MariaDB Digiflazz maintenance guard preserved.
 - [x] CI validates the schema on SQLite and a real MariaDB 11.4 service.
@@ -50,7 +50,8 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Port customer frontend and panel UI to the VPS runtime; browser `/api/*` traffic is served by Laravel and panel SSR validates the Laravel session internally.
 - [x] Add minute-level production reconciliation scheduler with overlap protection.
 - [x] Add final VPS systemd process definitions for queue worker and scheduler.
-- [x] Deploy to VPS without DNS cutover; Node frontend, Laravel/PHP-FPM, MariaDB, and Nginx are running with loopback-only internal services.
+- [x] Laravel/MariaDB migration runtime was validated on the VPS without DNS cutover.
+- [ ] Reinstall the VPS clean and install **CloudPanel first** before the final production deployment; the temporary hand-built Nginx/PHP/MariaDB stack is not the target architecture.
 - [x] Import the current production D1 snapshot and reconcile; the final export checksum matched the imported snapshot.
 - [ ] Re-enter/validate provider credentials on the VPS after the credential step is resumed.
 - [ ] Cut over `lfamiliastore.my.id` only after provider readiness and final validation.

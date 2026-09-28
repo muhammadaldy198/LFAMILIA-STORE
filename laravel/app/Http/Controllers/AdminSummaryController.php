@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminAuthService;
+use App\Services\IntegrationConfigService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +13,7 @@ use Throwable;
 
 class AdminSummaryController extends Controller
 {
-    public function show(Request $request, AdminAuthService $auth): JsonResponse
+    public function show(Request $request, AdminAuthService $auth, IntegrationConfigService $integrations): JsonResponse
     {
         try {
             $access = $auth->require($request, 'staff');
@@ -191,13 +192,10 @@ class AdminSummaryController extends Controller
                     ->whereIn('fulfillment_status', ['manual_pending', 'processing'])->count(),
             ];
 
-            $digiflazzReady = trim((string) config('lfamilia.integrations.digiflazz.username')) !== ''
-                && (
-                    trim((string) config('lfamilia.integrations.digiflazz.production_api_key')) !== ''
-                    || trim((string) config('lfamilia.integrations.digiflazz.development_api_key')) !== ''
-                );
-            $dokuReady = trim((string) config('lfamilia.integrations.doku.client_id')) !== ''
-                && trim((string) config('lfamilia.integrations.doku.secret_key')) !== '';
+            $digiflazzRuntime = $integrations->digiflazzRuntime();
+            $digiflazzReady = $digiflazzRuntime['username'] !== '' && $digiflazzRuntime['apiKey'] !== '';
+            $paymentOverview = $integrations->paymentOverview();
+            $dokuReady = (bool) ($paymentOverview['dokuCheckoutConfigured'] ?? false);
 
             return response()->json([
                 'range' => $range,
@@ -238,7 +236,7 @@ class AdminSummaryController extends Controller
                     'digiflazz' => [
                         'ready' => $access['role'] !== 'staff' && $digiflazzReady,
                         'environment' => $canViewFinance
-                            ? config('lfamilia.integrations.digiflazz.environment')
+                            ? $digiflazzRuntime['environment']
                             : null,
                         'reason' => null,
                         'balance' => null,

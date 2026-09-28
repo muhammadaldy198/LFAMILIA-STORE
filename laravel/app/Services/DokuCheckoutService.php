@@ -155,21 +155,9 @@ class DokuCheckoutService
                 return ['clientId' => $clientId, 'secretKey' => $secretKey, 'apiUrl' => $apiUrl];
             }
         } catch (\Throwable) {
-            // Fall through to explicit server environment configuration.
-        }
-
-        $configuredEnvironment = trim((string) config('lfamilia.integrations.doku.environment'));
-        if ($configuredEnvironment !== $environment) {
             return null;
         }
 
-        $clientId = trim((string) config('lfamilia.integrations.doku.client_id'));
-        $secretKey = trim((string) config('lfamilia.integrations.doku.secret_key'));
-
-        $apiUrl = trim((string) config('lfamilia.integrations.doku.api_base_url'));
-
-        return ($clientId !== '' && $secretKey !== '')
-            ? ['clientId' => $clientId, 'secretKey' => $secretKey, 'apiUrl' => $apiUrl]
-            : null;
+        return null;
     }
 }

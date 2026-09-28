@@ -37,7 +37,7 @@ class GatewayPaymentService
                 ];
             }
 
-            $apiUrl = trim((string) ($credentials['apiUrl'] ?? config('lfamilia.integrations.doku.api_base_url')));
+            $apiUrl = trim((string) ($credentials['apiUrl'] ?? ''));
             $ready = trim((string) ($credentials['clientId'] ?? '')) !== ''
                 && trim((string) ($credentials['secretKey'] ?? '')) !== ''
                 && $this->httpsOrigin($apiUrl) !== null;
@@ -86,10 +86,7 @@ class GatewayPaymentService
     private function credentials(string $gateway): array
     {
         $setting = $this->integrations->setting($gateway.'_environment');
-        $configured = trim((string) config('lfamilia.integrations.'.$gateway.'.environment'));
-        $environment = in_array($setting, ['sandbox', 'production'], true)
-            ? $setting
-            : (in_array($configured, ['sandbox', 'production'], true) ? $configured : 'sandbox');
+        $environment = in_array($setting, ['sandbox', 'production'], true) ? $setting : 'sandbox';
 
         try {
             $profile = $this->integrations->paymentProfile($gateway, $environment);
@@ -98,12 +95,12 @@ class GatewayPaymentService
         }
 
         if ($gateway === 'midtrans') {
-            $profile['serverKey'] = trim((string) ($profile['serverKey'] ?? config('lfamilia.integrations.midtrans.server_key')));
-            $profile['clientKey'] = trim((string) ($profile['clientKey'] ?? config('lfamilia.integrations.midtrans.client_key')));
+            $profile['serverKey'] = trim((string) ($profile['serverKey'] ?? ''));
+            $profile['clientKey'] = trim((string) ($profile['clientKey'] ?? ''));
         } else {
-            $profile['clientId'] = trim((string) ($profile['clientId'] ?? config('lfamilia.integrations.doku.client_id')));
-            $profile['secretKey'] = trim((string) ($profile['secretKey'] ?? config('lfamilia.integrations.doku.secret_key')));
-            $profile['apiUrl'] = trim((string) ($profile['apiUrl'] ?? config('lfamilia.integrations.doku.api_base_url')));
+            $profile['clientId'] = trim((string) ($profile['clientId'] ?? ''));
+            $profile['secretKey'] = trim((string) ($profile['secretKey'] ?? ''));
+            $profile['apiUrl'] = trim((string) ($profile['apiUrl'] ?? ''));
         }
 
         return [$environment, $profile];

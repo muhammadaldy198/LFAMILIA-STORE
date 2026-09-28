@@ -18,8 +18,11 @@ class ProductionReconciliationTest extends TestCase
 
     public function test_scheduler_reconciles_midtrans_paid_order_without_trusting_local_expiry(): void
     {
-        config()->set('lfamilia.integrations.midtrans.environment', 'sandbox');
-        config()->set('lfamilia.integrations.midtrans.server_key', 'server-key');
+        $this->saveIntegrationSetting('midtrans_environment', 'sandbox');
+        $this->saveIntegrationProfile('midtrans', 'snap', 'sandbox', [
+            'serverKey' => 'server-key',
+            'clientKey' => 'client-key',
+        ]);
         config()->set('lfamilia.integrations.midtrans.api_base_url', 'https://api.midtrans.scheduler.test');
 
         $id = (string) Str::uuid();
@@ -76,8 +79,11 @@ class ProductionReconciliationTest extends TestCase
 
     public function test_midtrans_not_found_is_not_expired_before_safe_window(): void
     {
-        config()->set('lfamilia.integrations.midtrans.environment', 'sandbox');
-        config()->set('lfamilia.integrations.midtrans.server_key', 'server-key');
+        $this->saveIntegrationSetting('midtrans_environment', 'sandbox');
+        $this->saveIntegrationProfile('midtrans', 'snap', 'sandbox', [
+            'serverKey' => 'server-key',
+            'clientKey' => 'client-key',
+        ]);
         config()->set('lfamilia.integrations.midtrans.api_base_url', 'https://api.midtrans.scheduler.test');
 
         $id = (string) Str::uuid();

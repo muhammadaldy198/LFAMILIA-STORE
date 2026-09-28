@@ -16,11 +16,14 @@ class DigiflazzFulfillmentSecurityTest extends TestCase
         $this->artisan('migrate:fresh');
 
         config()->set('lfamilia.public_base_url', 'https://lfamilia.example');
-        config()->set('lfamilia.integrations.digiflazz.environment', 'production');
-        config()->set('lfamilia.integrations.digiflazz.username', 'buyer-user');
-        config()->set('lfamilia.integrations.digiflazz.production_api_key', 'provider-secret');
-        config()->set('lfamilia.integrations.digiflazz.production_transaction_url', 'https://digiflazz.test.invalid/v1/transaction');
-        config()->set('lfamilia.integrations.digiflazz.webhook_secret', 'webhook-secret');
+        $this->saveIntegrationSetting('digiflazz_environment', 'production');
+        $this->saveIntegrationProfile('digiflazz', 'direct', 'production', [
+            'username' => 'buyer-user',
+            'apiKey' => 'provider-secret',
+            'transactionApiUrl' => 'https://digiflazz.test.invalid/v1/transaction',
+            'priceListUrl' => 'https://digiflazz.test.invalid/v1/price-list',
+            'webhookSecret' => 'webhook-secret',
+        ]);
     }
 
     public function test_paid_order_dispatches_with_server_owned_sku_price_guard_and_signature(): void

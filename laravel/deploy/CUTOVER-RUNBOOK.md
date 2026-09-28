@@ -4,7 +4,7 @@ This runbook covers the **final** switch from the existing Cloudflare Worker + D
 
 ## Current hold
 
-Do **not** cut over while provider credentials are deferred. Queue and scheduler must remain stopped until Midtrans/DOKU/DigiFlazz and the other required integrations have been re-entered and validated on the VPS.
+Do **not** cut over while provider credentials are deferred. The final VPS must first be rebuilt as **fresh Ubuntu 24.04 + CloudPanel**; the rehearsal Nginx/PHP/MariaDB installation is not the final production base. Queue and scheduler must remain stopped until Midtrans/DOKU/DigiFlazz and the other required integrations have been entered through **Super Admin → Integrasi** and validated on the CloudPanel-managed VPS.
 
 Before any production switch:
 

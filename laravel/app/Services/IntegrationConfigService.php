@@ -40,12 +40,8 @@ class IntegrationConfigService
     /** @return array<string,mixed> */
     public function paymentOverview(): array
     {
-        $dokuEnvironment = $this->setting('doku_environment')
-            ?: trim((string) config('lfamilia.integrations.doku.environment'))
-            ?: 'sandbox';
-        $midtransEnvironment = $this->setting('midtrans_environment')
-            ?: trim((string) config('lfamilia.integrations.midtrans.environment'))
-            ?: 'sandbox';
+        $dokuEnvironment = $this->setting('doku_environment') ?: 'sandbox';
+        $midtransEnvironment = $this->setting('midtrans_environment') ?: 'sandbox';
 
         $dokuEnvironment = in_array($dokuEnvironment, ['sandbox', 'production'], true)
             ? $dokuEnvironment : 'sandbox';
@@ -162,14 +158,24 @@ class IntegrationConfigService
         return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
-    public function kokinpayApiKey(): ?string
+    /** @return array{apiKey:string,baseUrl:string} */
+    public function kokinpayRuntime(): array
     {
-        $profile = $this->profile('kokinpay', 'service', 'global');
-        if (isset($profile['apiKey']) && trim($profile['apiKey']) !== '') {
-            return trim($profile['apiKey']);
+        try {
+            $profile = $this->profile('kokinpay', 'service', 'global');
+        } catch (Throwable) {
+            $profile = [];
         }
 
-        $value = trim((string) config('lfamilia.integrations.kokinpay.api_key'));
+        return [
+            'apiKey' => trim((string) ($profile['apiKey'] ?? '')),
+            'baseUrl' => rtrim(trim((string) ($profile['baseUrl'] ?? '')), '/'),
+        ];
+    }
+
+    public function kokinpayApiKey(): ?string
+    {
+        $value = $this->kokinpayRuntime()['apiKey'];
 
         return $value !== '' ? $value : null;
     }
@@ -188,9 +194,7 @@ class IntegrationConfigService
     /** @return array{environment:string,username:string,apiKey:string,webhookSecret:string,transactionApiUrl:string,priceListUrl:string} */
     public function digiflazzRuntime(): array
     {
-        $environment = $this->setting('digiflazz_environment')
-            ?: trim((string) config('lfamilia.integrations.digiflazz.environment'))
-            ?: 'development';
+        $environment = $this->setting('digiflazz_environment') ?: 'development';
         if (!in_array($environment, ['development', 'production'], true)) {
             $environment = 'development';
         }
@@ -202,20 +206,13 @@ class IntegrationConfigService
             $profile = [];
         }
 
-        $production = $environment === 'production';
         return [
             'environment' => $environment,
-            'username' => trim((string) ($profile['username'] ?? config('lfamilia.integrations.digiflazz.username'))),
-            'apiKey' => trim((string) ($profile['apiKey'] ?? config(
-                'lfamilia.integrations.digiflazz.'.($production ? 'production_api_key' : 'development_api_key'),
-            ))),
-            'webhookSecret' => trim((string) ($profile['webhookSecret'] ?? config('lfamilia.integrations.digiflazz.webhook_secret'))),
-            'transactionApiUrl' => trim((string) ($profile['transactionApiUrl'] ?? config(
-                'lfamilia.integrations.digiflazz.'.($production ? 'production_transaction_url' : 'development_transaction_url'),
-            ))),
-            'priceListUrl' => trim((string) ($profile['priceListUrl'] ?? config(
-                'lfamilia.integrations.digiflazz.'.($production ? 'production_price_list_url' : 'development_price_list_url'),
-            ))),
+            'username' => trim((string) ($profile['username'] ?? '')),
+            'apiKey' => trim((string) ($profile['apiKey'] ?? '')),
+            'webhookSecret' => trim((string) ($profile['webhookSecret'] ?? '')),
+            'transactionApiUrl' => trim((string) ($profile['transactionApiUrl'] ?? '')),
+            'priceListUrl' => trim((string) ($profile['priceListUrl'] ?? '')),
         ];
     }
 
@@ -230,9 +227,9 @@ class IntegrationConfigService
         }
 
         return [
-            'apiKey' => trim((string) ($profile['apiKey'] ?? config('lfamilia.integrations.resend.api_key'))),
-            'fromEmail' => trim((string) ($profile['fromEmail'] ?? config('lfamilia.integrations.resend.from'))),
-            'apiUrl' => trim((string) ($profile['apiUrl'] ?? config('lfamilia.integrations.resend.api_url'))),
+            'apiKey' => trim((string) ($profile['apiKey'] ?? '')),
+            'fromEmail' => trim((string) ($profile['fromEmail'] ?? '')),
+            'apiUrl' => trim((string) ($profile['apiUrl'] ?? '')),
             'deliveryChannel' => strtolower(trim((string) ($profile['deliveryChannel'] ?? 'website'))) ?: 'website',
         ];
     }
@@ -245,7 +242,7 @@ class IntegrationConfigService
         } catch (Throwable) {
             $profile = [];
         }
-        $value = trim((string) ($profile['clientId'] ?? config('lfamilia.integrations.google.client_id')));
+        $value = trim((string) ($profile['clientId'] ?? ''));
         return $value !== '' ? $value : null;
     }
 
@@ -257,8 +254,24 @@ class IntegrationConfigService
         } catch (Throwable) {
             $profile = [];
         }
-        $value = trim((string) ($profile['voucherEncryptionKey'] ?? config('lfamilia.integrations.voucher.encryption_key')));
+        $value = trim((string) ($profile['voucherEncryptionKey'] ?? ''));
         return strlen($value) >= 32 ? $value : null;
+    }
+
+    /** @return array{siteKey:string,secretKey:string,verifyUrl:string} */
+    public function turnstileRuntime(): array
+    {
+        try {
+            $profile = $this->profile('turnstile', 'service', 'global');
+        } catch (Throwable) {
+            $profile = [];
+        }
+
+        return [
+            'siteKey' => trim((string) ($profile['siteKey'] ?? '')),
+            'secretKey' => trim((string) ($profile['secretKey'] ?? '')),
+            'verifyUrl' => trim((string) ($profile['verifyUrl'] ?? '')),
+        ];
     }
 
     public function voucherDeliveryChannel(): string
@@ -278,6 +291,7 @@ class IntegrationConfigService
             ['kokinpay', 'service', 'global'],
             ['google', 'service', 'global'],
             ['resend', 'service', 'global'],
+            ['turnstile', 'service', 'global'],
             ['relay', 'service', 'global'],
             ['security', 'service', 'global'],
         ];
@@ -310,9 +324,7 @@ class IntegrationConfigService
             ];
         }
 
-        $digiflazzEnvironment = $this->setting('digiflazz_environment')
-            ?: trim((string) config('lfamilia.integrations.digiflazz.environment'))
-            ?: 'development';
+        $digiflazzEnvironment = $this->setting('digiflazz_environment') ?: 'development';
         if (!in_array($digiflazzEnvironment, ['development', 'production'], true)) {
             $digiflazzEnvironment = 'development';
         }
@@ -346,9 +358,10 @@ class IntegrationConfigService
         $allowedScopes = [
             'digiflazz:direct:development' => ['username','apiKey','webhookSecret','transactionApiUrl','priceListUrl'],
             'digiflazz:direct:production' => ['username','apiKey','webhookSecret','transactionApiUrl','priceListUrl'],
-            'kokinpay:service:global' => ['apiKey'],
+            'kokinpay:service:global' => ['apiKey','baseUrl'],
             'google:service:global' => ['clientId'],
             'resend:service:global' => ['apiKey','fromEmail','apiUrl','deliveryChannel'],
+            'turnstile:service:global' => ['siteKey','secretKey','verifyUrl'],
             'relay:service:global' => ['digiflazzOrigin','hosts','token'],
             'security:service:global' => ['voucherEncryptionKey'],
         ];

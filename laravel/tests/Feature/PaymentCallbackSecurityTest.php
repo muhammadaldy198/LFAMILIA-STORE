@@ -16,8 +16,11 @@ class PaymentCallbackSecurityTest extends TestCase
 
     public function test_midtrans_paid_callback_is_signature_checked_idempotent_and_pending_cannot_regress_paid(): void
     {
-        config()->set('lfamilia.integrations.midtrans.environment', 'sandbox');
-        config()->set('lfamilia.integrations.midtrans.server_key', 'test-midtrans-server-key');
+        $this->saveIntegrationSetting('midtrans_environment', 'sandbox');
+        $this->saveIntegrationProfile('midtrans', 'snap', 'sandbox', [
+            'serverKey' => 'test-midtrans-server-key',
+            'clientKey' => 'test-midtrans-client-key',
+        ]);
 
         $this->insertOrder('midtrans-ref', 'midtrans', 'snap', 'sandbox', 15000);
 
@@ -67,8 +70,11 @@ class PaymentCallbackSecurityTest extends TestCase
 
     public function test_midtrans_paid_amount_mismatch_is_rejected_before_state_change(): void
     {
-        config()->set('lfamilia.integrations.midtrans.environment', 'sandbox');
-        config()->set('lfamilia.integrations.midtrans.server_key', 'test-midtrans-server-key');
+        $this->saveIntegrationSetting('midtrans_environment', 'sandbox');
+        $this->saveIntegrationProfile('midtrans', 'snap', 'sandbox', [
+            'serverKey' => 'test-midtrans-server-key',
+            'clientKey' => 'test-midtrans-client-key',
+        ]);
 
         $this->insertOrder('amount-ref', 'midtrans', 'snap', 'sandbox', 15000);
 
@@ -93,9 +99,12 @@ class PaymentCallbackSecurityTest extends TestCase
 
     public function test_doku_signed_paid_callback_is_accepted_and_duplicate_is_safe(): void
     {
-        config()->set('lfamilia.integrations.doku.environment', 'sandbox');
-        config()->set('lfamilia.integrations.doku.client_id', 'doku-client');
-        config()->set('lfamilia.integrations.doku.secret_key', 'doku-secret');
+        $this->saveIntegrationSetting('doku_environment', 'sandbox');
+        $this->saveIntegrationProfile('doku', 'checkout', 'sandbox', [
+            'clientId' => 'doku-client',
+            'secretKey' => 'doku-secret',
+            'apiUrl' => 'https://api-sandbox.doku.com',
+        ]);
 
         $this->insertOrder('doku-ref', 'doku', 'checkout', 'sandbox', 22000, 'provider-request-1');
 
@@ -140,8 +149,11 @@ class PaymentCallbackSecurityTest extends TestCase
 
     public function test_duplicate_wallet_paid_callback_cannot_credit_twice(): void
     {
-        config()->set('lfamilia.integrations.midtrans.environment', 'sandbox');
-        config()->set('lfamilia.integrations.midtrans.server_key', 'test-midtrans-server-key');
+        $this->saveIntegrationSetting('midtrans_environment', 'sandbox');
+        $this->saveIntegrationProfile('midtrans', 'snap', 'sandbox', [
+            'serverKey' => 'test-midtrans-server-key',
+            'clientKey' => 'test-midtrans-client-key',
+        ]);
 
         $customerId = (string) Str::uuid();
         DB::table('customer_users')->insert([

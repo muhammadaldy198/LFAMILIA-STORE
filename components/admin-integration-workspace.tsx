@@ -6,7 +6,7 @@ import { CopyUrl, Field, Panel, Status, TabBar, WorkspaceHeader, buttonClass, in
 
 const tabs = ["Ringkasan", "DOKU Checkout", "Midtrans Snap", "Digiflazz", "KokinPay", "Google Login", "Resend Email", "Relay & Keamanan"] as const;
 type Tab = (typeof tabs)[number];
-type Provider = "digiflazz" | "kokinpay" | "google" | "resend" | "relay" | "security";
+type Provider = "digiflazz" | "kokinpay" | "google" | "resend" | "turnstile" | "relay" | "security";
 type Environment = "development" | "production" | "global";
 type PaymentEnvironment = "sandbox" | "production";
 type Profile = { provider: Provider; environment: Environment; configured: boolean; configuredFields?: string[]; decryptionError: boolean };
@@ -62,6 +62,8 @@ export function AdminIntegrationWorkspace() {
     relayOrigin: "https://digiflazz-relay.lfamiliastore.my.id",
     resendApiUrl: "https://api.resend.com/emails",
     resendDeliveryChannel: "email",
+    kokinpayBaseUrl: "https://api.kokinpay.com",
+    turnstileVerifyUrl: "https://challenges.cloudflare.com/turnstile/v0/siteverify",
     dokuApiUrl: "",
   });
   const initializedPaymentEnvironments = useRef(false);
@@ -196,7 +198,13 @@ export function AdminIntegrationWorkspace() {
         });
         await put({ action: "save_selections", selections: { digiflazzEnvironment } });
       } else if (tab === "KokinPay") {
-        await put({ action: "save_profile", provider: "kokinpay", mode: "service", environment: "global", values: { apiKey: values.kokinpayApiKey || "" } });
+        await put({
+          action: "save_profile",
+          provider: "kokinpay",
+          mode: "service",
+          environment: "global",
+          values: { apiKey: values.kokinpayApiKey || "", baseUrl: values.kokinpayBaseUrl || "" },
+        });
       } else if (tab === "Google Login") {
         await put({ action: "save_profile", provider: "google", mode: "service", environment: "global", values: { clientId: values.googleClientId || "" } });
       } else if (tab === "Resend Email") {
@@ -213,6 +221,17 @@ export function AdminIntegrationWorkspace() {
           },
         });
       } else if (tab === "Relay & Keamanan") {
+        await put({
+          action: "save_profile",
+          provider: "turnstile",
+          mode: "service",
+          environment: "global",
+          values: {
+            siteKey: values.turnstileSiteKey || "",
+            secretKey: values.turnstileSecretKey || "",
+            verifyUrl: values.turnstileVerifyUrl || "",
+          },
+        });
         await put({
           action: "save_profile",
           provider: "relay",
@@ -237,6 +256,7 @@ export function AdminIntegrationWorkspace() {
         webhookSecret: "",
         kokinpayApiKey: "",
         resendApiKey: "",
+        turnstileSecretKey: "",
         relayToken: "",
         voucherEncryptionKey: "",
       }));
@@ -289,6 +309,7 @@ export function AdminIntegrationWorkspace() {
         const mapping: Partial<Record<Tab, [Provider, Environment, string]>> = {
           "KokinPay": ["kokinpay", "global", "KokinPay"],
           "Resend Email": ["resend", "global", "Resend Email"],
+          "Relay & Keamanan": ["turnstile", "global", "Turnstile"],
         };
         const target = mapping[tab];
         if (!target) throw new Error("Tidak ada pemeriksaan untuk menu ini.");
@@ -402,6 +423,7 @@ export function AdminIntegrationWorkspace() {
     {tab === "KokinPay" && <Panel title="KokinPay" description="Credential untuk validasi nickname.">
       <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
         <Text label="API Key" secret value={values.kokinpayApiKey || ""} onChange={(value) => setValue("kokinpayApiKey", value)} />
+        <Text label="API URL" value={values.kokinpayBaseUrl || ""} onChange={(value) => setValue("kokinpayBaseUrl", value)} />
       </div>
     </Panel>}
 
@@ -434,6 +456,9 @@ export function AdminIntegrationWorkspace() {
       </Panel>
       <Panel title="Keamanan">
         <div className="grid gap-4 p-4">
+          <Text label="Turnstile Site Key" value={values.turnstileSiteKey || ""} onChange={(value) => setValue("turnstileSiteKey", value)} />
+          <Text label="Turnstile Secret Key" secret value={values.turnstileSecretKey || ""} onChange={(value) => setValue("turnstileSecretKey", value)} />
+          <Text label="Turnstile Verify URL" value={values.turnstileVerifyUrl || ""} onChange={(value) => setValue("turnstileVerifyUrl", value)} />
           <Text label="Voucher Encryption Key" secret value={values.voucherEncryptionKey || ""} onChange={(value) => setValue("voucherEncryptionKey", value)} />
           <p className="text-[9px] text-[#718198]"><ShieldCheck className="mr-1 inline size-3.5 text-emerald-600" />Credential tidak dikirim kembali ke browser.</p>
         </div>

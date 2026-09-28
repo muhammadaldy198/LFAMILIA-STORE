@@ -1,6 +1,6 @@
 # LFAMILIA Laravel VPS deployment
 
-Folder ini menyiapkan proses production Laravel di VPS **tanpa** menyimpan kredensial di Git dan **tanpa** memindahkan DNS lebih awal.
+Target production LFAMILIA adalah **fresh Ubuntu 24.04 → CloudPanel → Laravel/MariaDB**. Stack Nginx/PHP/MariaDB manual yang dipakai untuk rehearsal bukan arsitektur final. Folder ini menyiapkan deployment tanpa menyimpan kredensial di Git dan tanpa memindahkan DNS lebih awal.
 
 ## Prinsip cutover
 
@@ -10,7 +10,7 @@ Worker Cloudflare + D1 tetap menjadi production/rollback sampai Laravel di VPS l
 
 Gunakan PHP 8.3+ dengan extension `curl`, `mbstring`, `openssl`, `pdo_mysql`, `tokenizer`, `xml`, `ctype`, dan `fileinfo`; Composer 2; serta MariaDB. Web root harus menunjuk ke folder `laravel/public`.
 
-Salin `.env.example` menjadi `.env` di server dan isi nilainya langsung di VPS. Jangan commit `.env`. Semua key provider, URL provider, database, `INTEGRATION_ENCRYPTION_KEY`, dan `PUBLIC_BASE_URL` tetap berasal dari environment.
+Salin `.env.example` menjadi `.env` di server dan isi **hanya bootstrap/infrastructure configuration** seperti database, `APP_KEY`, `INTEGRATION_ENCRYPTION_KEY`, `PUBLIC_BASE_URL`, dan endpoint non-secret yang memang dibutuhkan bootstrap. Jangan commit `.env`. Digiflazz, Midtrans, DOKU, KokinPay, Resend, Google Login, Turnstile, relay, dan credential provider lain dikonfigurasi dari **Super Admin → Integrasi** dan disimpan terenkripsi di MariaDB.
 
 Kemudian jalankan dari folder `laravel`:
 
@@ -77,9 +77,11 @@ curl -fsS -H 'Host: lfamiliastore.my.id' http://127.0.0.1/api/health
 
 Lanjutkan smoke test auth, katalog, checkout tanpa pembayaran nyata, panel RBAC, callback signature rejection, scheduler, dan koneksi provider sesuai environment yang dipilih. DNS baru boleh dipindahkan setelah data production di MariaDB direkonsiliasi dan semua smoke test lolos.
 
-## CloudPanel
+## CloudPanel — wajib untuk target production
 
-Jika VPS memakai CloudPanel, gunakan **PHP Site** dan arahkan document root ke `laravel/public`. Site user CloudPanel dapat dipakai sebagai `LFAMILIA_RUN_USER`/`LFAMILIA_RUN_GROUP`; jangan gunakan user root untuk worker aplikasi. Email tetap dikelola terpisah (misalnya Resend/DNS email), bukan oleh CloudPanel.
+CloudPanel dipasang **lebih dulu pada server yang bersih**. Setelah itu buat site LFAMILIA melalui CloudPanel, gunakan site user CloudPanel untuk aplikasi, dan biarkan CloudPanel mengelola Nginx/PHP-FPM/MariaDB/TLS pada host. Repository kemudian dideploy ke site directory dan Laravel `public` menjadi web root untuk jalur backend. Jangan memasang CloudPanel di atas rehearsal stack manual yang sudah berisi Nginx/PHP/MariaDB.
+
+Queue/scheduler LFAMILIA tetap boleh memakai unit systemd milik aplikasi dengan site user CloudPanel; jangan menjalankannya sebagai root. Email tetap dikelola terpisah melalui Resend/DNS email, bukan oleh CloudPanel.
 
 
 ## 6. Reproduce Nginx, PHP-FPM, backup, dan runtime check

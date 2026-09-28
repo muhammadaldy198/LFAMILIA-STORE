@@ -8,6 +8,10 @@ use RuntimeException;
 
 class TurnstileService
 {
+    public function __construct(private readonly IntegrationConfigService $integrations)
+    {
+    }
+
     /** @return array{enabled:bool,siteKey:?string} */
     public function publicConfig(): array
     {
@@ -59,9 +63,10 @@ class TurnstileService
     /** @return array{0:bool,1:string,2:string,3:string} */
     private function config(): array
     {
-        $siteKey = trim((string) config('lfamilia.integrations.turnstile.site_key'));
-        $secretKey = trim((string) config('lfamilia.integrations.turnstile.secret_key'));
-        $verifyUrl = trim((string) config('lfamilia.integrations.turnstile.verify_url'));
+        $runtime = $this->integrations->turnstileRuntime();
+        $siteKey = $runtime['siteKey'];
+        $secretKey = $runtime['secretKey'];
+        $verifyUrl = $runtime['verifyUrl'];
 
         if (($siteKey === '') !== ($secretKey === '')) {
             throw new RuntimeException('Konfigurasi Turnstile belum lengkap. Isi Site Key dan Secret Key bersamaan.');

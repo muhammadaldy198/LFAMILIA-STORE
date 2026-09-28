@@ -17,8 +17,11 @@ class OrderStatusReconciliationTest extends TestCase
 
     public function test_midtrans_status_refresh_can_authoritatively_settle_pending_order(): void
     {
-        config()->set('lfamilia.integrations.midtrans.environment', 'sandbox');
-        config()->set('lfamilia.integrations.midtrans.server_key', 'server-key');
+        $this->saveIntegrationSetting('midtrans_environment', 'sandbox');
+        $this->saveIntegrationProfile('midtrans', 'snap', 'sandbox', [
+            'serverKey' => 'server-key',
+            'clientKey' => 'client-key',
+        ]);
         config()->set('lfamilia.integrations.midtrans.api_base_url', 'https://api.midtrans.test');
 
         $id = (string) Str::uuid();
@@ -76,8 +79,11 @@ class OrderStatusReconciliationTest extends TestCase
 
     public function test_provider_amount_mismatch_does_not_mark_order_paid(): void
     {
-        config()->set('lfamilia.integrations.midtrans.environment', 'sandbox');
-        config()->set('lfamilia.integrations.midtrans.server_key', 'server-key');
+        $this->saveIntegrationSetting('midtrans_environment', 'sandbox');
+        $this->saveIntegrationProfile('midtrans', 'snap', 'sandbox', [
+            'serverKey' => 'server-key',
+            'clientKey' => 'client-key',
+        ]);
         config()->set('lfamilia.integrations.midtrans.api_base_url', 'https://api.midtrans.test');
 
         $id = (string) Str::uuid();

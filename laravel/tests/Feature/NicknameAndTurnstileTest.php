@@ -16,9 +16,6 @@ class NicknameAndTurnstileTest extends TestCase
 
     public function test_turnstile_is_optional_when_both_keys_are_unconfigured(): void
     {
-        config()->set('lfamilia.integrations.turnstile.site_key', null);
-        config()->set('lfamilia.integrations.turnstile.secret_key', null);
-
         $this->getJson('/api/security/turnstile')
             ->assertOk()
             ->assertJson([
@@ -29,8 +26,7 @@ class NicknameAndTurnstileTest extends TestCase
 
     public function test_partial_turnstile_configuration_fails_closed(): void
     {
-        config()->set('lfamilia.integrations.turnstile.site_key', 'site-key');
-        config()->set('lfamilia.integrations.turnstile.secret_key', null);
+        $this->saveIntegrationProfile('turnstile', 'service', 'global', ['siteKey' => 'site-key']);
 
         $this->getJson('/api/security/turnstile')
             ->assertStatus(503);
@@ -73,8 +69,10 @@ class NicknameAndTurnstileTest extends TestCase
 
     public function test_kokinpay_nickname_uses_runtime_configuration_without_hardcoded_secret(): void
     {
-        config()->set('lfamilia.integrations.kokinpay.api_key', 'test-api-key');
-        config()->set('lfamilia.integrations.kokinpay.base_url', 'https://kokinpay.invalid');
+        $this->saveIntegrationProfile('kokinpay', 'service', 'global', [
+            'apiKey' => 'test-api-key',
+            'baseUrl' => 'https://kokinpay.invalid',
+        ]);
 
         DB::table('products')->insert([
             'slug' => 'free-fire',

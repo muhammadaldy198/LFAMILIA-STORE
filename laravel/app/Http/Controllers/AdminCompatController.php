@@ -94,7 +94,7 @@ class AdminCompatController extends Controller
             $security->assertSameOrigin($request);
             $input = $request->validate([
                 'action'=>['required','in:save_profile,save_selections,test_relay,test_digiflazz'],
-                'provider'=>['nullable','in:digiflazz,kokinpay,google,resend,relay,security'],
+                'provider'=>['nullable','in:digiflazz,kokinpay,google,resend,turnstile,relay,security'],
                 'mode'=>['nullable','in:direct,service'],
                 'environment'=>['nullable','in:sandbox,production,development,global'],
                 'values'=>['nullable','array','max:32'],
@@ -219,10 +219,10 @@ class AdminCompatController extends Controller
                 'server'=>['nullable','string','max:40'],
                 'customerNumber'=>['nullable','regex:/^\d{11,12}$/'],
             ]);
-            $apiKey = $integrations->kokinpayApiKey();
-            if (!$apiKey) throw new RuntimeException('API Key KokinPay belum disimpan.');
-            $base = rtrim(trim((string) config('lfamilia.integrations.kokinpay.base_url')), '/');
-            if ($base === '') throw new RuntimeException('URL KokinPay belum dikonfigurasi.');
+            $runtime = $integrations->kokinpayRuntime();
+            $apiKey = $runtime['apiKey'];
+            $base = $runtime['baseUrl'];
+            if ($apiKey === '' || $base === '') throw new RuntimeException('KokinPay belum dikonfigurasi lengkap.');
 
             if ($input['action'] === 'pln') {
                 if (empty($input['customerNumber'])) throw new RuntimeException('Nomor meter PLN wajib diisi.');

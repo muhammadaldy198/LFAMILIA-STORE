@@ -13,12 +13,13 @@ class AdminDigiflazzApiTest extends TestCase
     {
         parent::setUp();
         $this->artisan('migrate:fresh');
-        config([
-            'lfamilia.integrations.digiflazz.environment' => 'development',
-            'lfamilia.integrations.digiflazz.username' => 'buyer-test',
-            'lfamilia.integrations.digiflazz.development_api_key' => 'dev-secret',
-            'lfamilia.integrations.digiflazz.development_transaction_url' => 'https://api.test/v1/transaction',
-            'lfamilia.integrations.digiflazz.development_price_list_url' => 'https://api.test/v1/price-list',
+        $this->saveIntegrationSetting('digiflazz_environment', 'development');
+        $this->saveIntegrationProfile('digiflazz', 'direct', 'development', [
+            'username' => 'buyer-test',
+            'apiKey' => 'dev-secret',
+            'transactionApiUrl' => 'https://api.test/v1/transaction',
+            'priceListUrl' => 'https://api.test/v1/price-list',
+            'webhookSecret' => 'webhook-secret',
         ]);
     }
 
