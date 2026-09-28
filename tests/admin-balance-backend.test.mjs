@@ -1,3 +1,5 @@
+[Reading 31 lines from start (total: 31 lines, 0 remaining)]
+
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -23,9 +25,11 @@ test("admin credentials use their private ledger row and UI calls the endpoint",
   assert.match(route, /'__lfadmin__:' \|\| lower\(a\.email\)/);
   assert.match(panel, /balances: \{ GET: balances\.GET, PUT: balances\.PUT \}/);
   assert.match(manager, /fetch\(url, init\)/);
-  assert.match(manager, /requestJson<BalancePayload>\("\/api\/panel\/balances"/);
+  assert.match(manager, /requestJson<BalancePayload>\("\/api\/admin\/balances"/);
   assert.match(manager, /accountType === "Pelanggan" \? "customer" : "admin"/);
   assert.match(manager, /operation === "Tambah" \? "credit" : "debit"/);
   assert.match(customer, /<AdminBalanceManager \/>/);
   assert.doesNotMatch(manager, /dicatat pada UI/);
 });
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
