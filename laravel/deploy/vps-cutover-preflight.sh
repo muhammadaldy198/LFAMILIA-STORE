@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="${LFAMILIA_ROOT:-/var/www/lfamilia-store}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${LFAMILIA_ROOT:-$(cd -- "${SCRIPT_DIR}/../.." && pwd)}"
 MAX_BACKUP_AGE_SECONDS="${LFAMILIA_MAX_BACKUP_AGE_SECONDS:-86400}"
 BACKUP_DIR="${LFAMILIA_BACKUP_DIR:-/var/backups/lfamilia/mariadb}"
 
