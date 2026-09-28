@@ -103,3 +103,15 @@ cd /var/www/lfamilia-store
 ```
 
 Backup harus diuji dengan restore ke database sementara sebelum cutover; checksum file saja tidak cukup membuktikan dump dapat direstore.
+
+
+## 7. Observability dan memory headroom
+
+Production VPS juga memakai baseline operasional berikut:
+
+- MariaDB slow query log aktif dengan `long_query_time=1` detik. File log: `/var/log/mysql/lfamilia-slow.log`.
+- Slow log dan Laravel log dirotasi harian selama 14 hari.
+- VPS 4 GiB menggunakan 1 GiB swap dengan `vm.swappiness=10` untuk memberi headroom saat build/restart tanpa mendorong workload normal ke swap.
+- `lfamilia-healthcheck.timer` menjalankan read-only smoke check setiap 5 menit dan hanya menulis hasil ke journal; timer ini tidak melakukan payment, fulfillment, atau restart otomatis.
+
+Template MariaDB, logrotate, PHP-FPM, Nginx, systemd, dan sysctl disimpan di folder `deploy/` agar konfigurasi VPS dapat direproduksi.
