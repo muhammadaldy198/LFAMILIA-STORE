@@ -1,5 +1,3 @@
-[Reading 57 lines from start (total: 57 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -41,7 +39,7 @@ test("admin reference exposes the approved desktop information architecture", ()
 
 test("dashboard keeps the approved reference while using live summary data", () => {
   assert.match(overview, /fetchAdminSummary<Summary>\(range\)/);
-  assert.match(summaryClient, /\/api\/panel\/summary\?range=/);
+  assert.match(summaryClient, /\/api\/admin\/summary\?range=/);
   assert.match(overview, /summary\?\.recentOrders/);
   assert.match(overview, /summary\?\.topProducts/);
   for (const label of [
@@ -57,5 +55,3 @@ test("dashboard keeps the approved reference while using live summary data", () 
     "Produk Populer",
   ]) assert.ok(overview.includes(label), label);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
