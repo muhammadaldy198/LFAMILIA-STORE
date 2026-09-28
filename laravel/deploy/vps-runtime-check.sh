@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_ROOT="${LFAMILIA_ROOT:-/var/www/lfamilia-store}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+APP_ROOT="${LFAMILIA_ROOT:-$(cd -- "${SCRIPT_DIR}/../.." && pwd)}"
 HOST="${LFAMILIA_HOST:-lfamiliastore.my.id}"
 
 as_app() {
