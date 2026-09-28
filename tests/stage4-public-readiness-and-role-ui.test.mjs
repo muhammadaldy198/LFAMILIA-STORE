@@ -1,5 +1,3 @@
-[Reading 72 lines from start (total: 72 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
@@ -72,5 +70,3 @@ test("operator copy does not advertise unavailable capabilities or e-wallets", (
   assert.doesNotMatch(payments, /id: "gopay"|id: "ovo"/);
   assert.match(login, /yang dibuat oleh Super Admin/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
