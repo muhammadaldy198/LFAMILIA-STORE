@@ -67,6 +67,118 @@ class CustomerAuthService
         return $this->createSession((string) $row->id);
     }
 
+    /** @return array{customer:array<string,mixed>,token:string,expires_at:string} */
+    public function loginOrRegisterGoogle(array $identity, ?string $phoneInput): array
+    {
+        $subject = trim((string) ($identity['subject'] ?? ''));
+        $email = $this->normalizeEmail((string) ($identity['email'] ?? ''));
+        $name = trim((string) ($identity['name'] ?? '')) ?: 'Pelanggan';
+        $picture = trim((string) ($identity['picture'] ?? '')) ?: null;
+
+        if ($subject === '' || $email === '') {
+            throw new RuntimeException('Credential Google tidak valid.');
+        }
+
+        $customerId = DB::transaction(function () use ($subject, $email, $name, $picture, $phoneInput): string {
+            $oauth = DB::table('customer_oauth_accounts')
+                ->where('provider', 'google')
+                ->where('provider_subject', $subject)
+                ->lockForUpdate()
+                ->first();
+
+            if ($oauth) {
+                $customer = DB::table('customer_users')
+                    ->where('id', $oauth->customer_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$customer || !(bool) $customer->is_active) {
+                    throw new RuntimeException('Akun pelanggan sedang dinonaktifkan.');
+                }
+
+                $storedPhone = trim((string) $customer->phone);
+                $phone = $storedPhone !== ''
+                    ? $storedPhone
+                    : ($phoneInput ? PhoneNormalizer::whatsapp($phoneInput) : '');
+
+                if ($phone === '') {
+                    throw new RuntimeException('PHONE_REQUIRED');
+                }
+
+                DB::table('customer_oauth_accounts')->where('id', $oauth->id)->update([
+                    'provider_email' => $email,
+                    'avatar_url' => $picture,
+                    'updated_at' => now(),
+                ]);
+                DB::table('customer_users')->where('id', $customer->id)->update([
+                    'phone' => $phone,
+                    'last_login_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                return (string) $customer->id;
+            }
+
+            $customer = DB::table('customer_users')
+                ->where('email', $email)
+                ->lockForUpdate()
+                ->first();
+
+            if ($customer && !(bool) $customer->is_active) {
+                throw new RuntimeException('Akun pelanggan sedang dinonaktifkan.');
+            }
+
+            $storedPhone = $customer ? trim((string) $customer->phone) : '';
+            $phone = $storedPhone !== ''
+                ? $storedPhone
+                : ($phoneInput ? PhoneNormalizer::whatsapp($phoneInput) : '');
+
+            if ($phone === '') {
+                throw new RuntimeException('PHONE_REQUIRED');
+            }
+
+            $customerId = $customer ? (string) $customer->id : (string) Str::uuid();
+
+            if (!$customer) {
+                DB::table('customer_users')->insert([
+                    'id' => $customerId,
+                    'email' => $email,
+                    'name' => $name,
+                    'phone' => $phone,
+                    'password_hash' => bin2hex(random_bytes(32)),
+                    'password_salt' => bin2hex(random_bytes(16)),
+                    'balance' => 0,
+                    'leaderboard_opt_in' => 0,
+                    'is_active' => 1,
+                    'last_login_at' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            } else {
+                DB::table('customer_users')->where('id', $customerId)->update([
+                    'phone' => $phone,
+                    'last_login_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            DB::table('customer_oauth_accounts')->insert([
+                'id' => (string) Str::uuid(),
+                'customer_id' => $customerId,
+                'provider' => 'google',
+                'provider_subject' => $subject,
+                'provider_email' => $email,
+                'avatar_url' => $picture,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return $customerId;
+        }, 3);
+
+        return $this->createSession($customerId);
+    }
+
     /** @return array<string,mixed>|null */
     public function current(Request $request): ?array
     {

@@ -34,13 +34,14 @@ return [
         ],
         'resend' => [
             'api_key' => env('RESEND_API_KEY'),
-            'from' => env('RESEND_FROM'),
-            'base_url' => env('RESEND_BASE_URL'),
+            'from' => env('RESEND_FROM_EMAIL', env('RESEND_FROM')),
+            'api_url' => env('RESEND_API_URL', env('RESEND_BASE_URL')),
         ],
         'google' => [
-            'client_id' => env('GOOGLE_CLIENT_ID'),
+            'client_id' => env('GOOGLE_OAUTH_CLIENT_ID', env('GOOGLE_CLIENT_ID')),
             'client_secret' => env('GOOGLE_CLIENT_SECRET'),
             'redirect_uri' => env('GOOGLE_REDIRECT_URI'),
+            'tokeninfo_url' => env('GOOGLE_TOKENINFO_URL'),
         ],
         'turnstile' => [
             'site_key' => env('TURNSTILE_SITE_KEY'),
