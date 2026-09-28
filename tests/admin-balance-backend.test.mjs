@@ -29,5 +29,3 @@ test("admin credentials use their private ledger row and UI calls the endpoint",
   assert.match(customer, /<AdminBalanceManager \/>/);
   assert.doesNotMatch(manager, /dicatat pada UI/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
