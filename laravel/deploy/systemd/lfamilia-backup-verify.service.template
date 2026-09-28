@@ -5,7 +5,8 @@ Requires=mariadb.service
 
 [Service]
 Type=oneshot
-ExecStart=/var/www/lfamilia-store/laravel/deploy/verify-latest-backup.sh
+EnvironmentFile=-/etc/lfamilia/ops.env
+ExecStart=/usr/local/sbin/lfamilia-backup-verify
 User=root
 Group=root
 Nice=10
