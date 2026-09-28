@@ -80,3 +80,26 @@ Lanjutkan smoke test auth, katalog, checkout tanpa pembayaran nyata, panel RBAC,
 ## CloudPanel
 
 Jika VPS memakai CloudPanel, gunakan **PHP Site** dan arahkan document root ke `laravel/public`. Site user CloudPanel dapat dipakai sebagai `LFAMILIA_RUN_USER`/`LFAMILIA_RUN_GROUP`; jangan gunakan user root untuk worker aplikasi. Email tetap dikelola terpisah (misalnya Resend/DNS email), bukan oleh CloudPanel.
+
+
+## 6. Reproduce Nginx, PHP-FPM, backup, dan runtime check
+
+Template production yang dipakai VPS disimpan di folder deploy:
+
+- `deploy/nginx/lfamilia-origin.conf.template` — reverse proxy HTTPS apex + redirect `www`, Laravel `/api/*`, dan frontend Vinext.
+- `deploy/nginx/cloudflare-origin-only.conf` — allowlist origin agar public vhost hanya menerima Cloudflare edge + localhost.
+- `deploy/php-fpm/lfamilia.conf.template` — pool PHP khusus user aplikasi; upload PHP diset di atas limit aplikasi 5 MiB.
+- `deploy/logrotate/lfamilia-laravel` — rotasi log Laravel harian.
+- `deploy/lfamilia-db-backup.sh` + unit systemd backup — dump MariaDB terkompresi dengan checksum dan retention.
+- `deploy/vps-runtime-check.sh` — read-only smoke check service, health endpoint, migration status, dan working tree.
+
+Laravel membaca `CF-Connecting-IP` langsung untuk rate-limit/security. Jangan mengaktifkan Nginx `real_ip_header CF-Connecting-IP` bersamaan dengan `allow/deny` origin ini tanpa mengubah desain allowlist, karena access phase akan melihat IP customer dan dapat menolak request Cloudflare yang valid.
+
+Contoh check runtime:
+
+```bash
+cd /var/www/lfamilia-store
+./laravel/deploy/vps-runtime-check.sh
+```
+
+Backup harus diuji dengan restore ke database sementara sebelum cutover; checksum file saja tidak cukup membuktikan dump dapat direstore.
