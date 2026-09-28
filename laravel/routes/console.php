@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\D1SnapshotImporter;
+use App\Services\MediaMigrationService;
 use App\Services\ProductionReconciliationService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -32,6 +33,26 @@ Artisan::command(
         );
     },
 )->purpose('Import and reconcile a D1 production snapshot into MariaDB');
+
+
+Artisan::command(
+    'lfamilia:migrate-media {--source=https://lfamiliastore.my.id}',
+    function (MediaMigrationService $service) {
+        $result = $service->migrateReferenced(
+            (string) $this->option('source'),
+            fn (string $message) => $this->line($message),
+        );
+
+        $this->newLine();
+        $this->info('Referenced media migration completed.');
+        $this->line(json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        if ($result['failed'] > 0) {
+            return self::FAILURE;
+        }
+
+        return self::SUCCESS;
+    },
+)->purpose('Copy referenced production media into the VPS media_assets table');
 
 
 Artisan::command('lfamilia:reconcile', function (ProductionReconciliationService $service) {
