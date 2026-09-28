@@ -1,0 +1,10 @@
+[Unit]
+Description=LFAMILIA VPS read-only health check
+After=network-online.target nginx.service php8.3-fpm.service mariadb.service lfamilia-web.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/var/www/lfamilia-store/laravel/deploy/vps-healthcheck.sh
+User=root
+Group=root
