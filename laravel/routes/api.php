@@ -9,6 +9,7 @@ use App\Http\Controllers\ExternalCheckoutController;
 use App\Http\Controllers\MidtransNotificationController;
 use App\Http\Controllers\NicknameController;
 use App\Http\Controllers\OrderSearchController;
+use App\Http\Controllers\OrderStatusController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SystemStatusController;
 use App\Http\Controllers\TurnstileController;
@@ -38,6 +39,7 @@ Route::post('/payments/auto/create', [ExternalCheckoutController::class, 'create
 
 Route::get('/orders/search', [OrderSearchController::class, 'recent']);
 Route::post('/orders/search', [OrderSearchController::class, 'search']);
+Route::post('/orders/status', [OrderStatusController::class, 'show']);
 
 Route::get('/admin/session', [AdminSessionController::class, 'session']);
 
@@ -47,5 +49,5 @@ Route::get('/payments/doku/callback', [DokuCallbackController::class, 'show']);
 Route::post('/payments/doku/callback', [DokuCallbackController::class, 'handle']);
 Route::post('/fulfillment/digiflazz/callback', [DigiflazzCallbackController::class, 'handle']);
 
-// Provider fulfillment and external-payment reconciliation polling remain
-// disabled until their complete retry/state-reconciliation paths are ported.
+// Remaining migration work is focused on background schedulers, notifications,
+// admin/customer UI parity, and the final production data cutover.

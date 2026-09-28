@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Http;
+use RuntimeException;
+
 class MidtransSnapService
 {
     public function __construct(private readonly IntegrationConfigService $integrations)
@@ -52,6 +55,64 @@ class MidtransSnapService
         }
 
         return 'ignore';
+    }
+
+    /** @return array{status:string,amount:int,transactionId:string,raw:array<string,mixed>} */
+    public function queryStatus(string $orderId, string $environment): array
+    {
+        $serverKey = $this->serverKey($environment);
+        if (!$serverKey) {
+            throw new RuntimeException('Server Key Midtrans belum tersedia untuk environment transaksi.');
+        }
+
+        $configuredEnvironment = trim((string) config('lfamilia.integrations.midtrans.environment'));
+        $apiOrigin = trim((string) config('lfamilia.integrations.midtrans.api_base_url'));
+        if ($configuredEnvironment !== $environment || !$this->validHttpsOrigin($apiOrigin)) {
+            throw new RuntimeException('URL API Midtrans belum dikonfigurasi untuk environment transaksi.');
+        }
+
+        $response = Http::acceptJson()
+            ->withBasicAuth($serverKey, '')
+            ->timeout(15)
+            ->get(rtrim($apiOrigin, '/').'/v2/'.rawurlencode($orderId).'/status');
+
+        $raw = $response->json();
+        if (!is_array($raw)) {
+            $raw = [];
+        }
+
+        if (!$response->successful()) {
+            $message = trim((string) ($raw['status_message'] ?? ''));
+            throw new RuntimeException($message ?: 'Midtrans belum dapat mengembalikan status transaksi.');
+        }
+
+        $responseOrderId = trim((string) ($raw['order_id'] ?? ''));
+        if ($responseOrderId !== '' && !hash_equals($orderId, $responseOrderId)) {
+            throw new RuntimeException('Order ID dari Midtrans tidak sesuai.');
+        }
+
+        $amount = is_numeric($raw['gross_amount'] ?? null)
+            ? (int) round((float) $raw['gross_amount'])
+            : 0;
+
+        return [
+            'status' => $this->mapStatus(
+                (string) ($raw['transaction_status'] ?? ''),
+                isset($raw['fraud_status']) ? (string) $raw['fraud_status'] : null,
+            ),
+            'amount' => $amount,
+            'transactionId' => trim((string) ($raw['transaction_id'] ?? '')),
+            'raw' => $raw,
+        ];
+    }
+
+    private function validHttpsOrigin(string $value): bool
+    {
+        $parts = parse_url($value);
+
+        return is_array($parts)
+            && strtolower((string) ($parts['scheme'] ?? '')) === 'https'
+            && !empty($parts['host']);
     }
 
     private function serverKey(string $environment): ?string

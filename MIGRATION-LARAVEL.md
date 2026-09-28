@@ -29,13 +29,14 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] D1 snapshot importer accepts a D1 SQL export or SQLite snapshot.
 - [x] Import requires an explicit destructive confirmation and reconciles table row counts.
 - [x] Import reconciles paid-order totals, wallet credit/debit totals, and aggregate customer balances.
-- [ ] Port authentication and RBAC.
-- [ ] Port products, pricing, nickname checks, checkout, promotions, reviews.
+- [x] Port customer authentication and Admin/Staff RBAC/session compatibility.
+- [x] Port public products, availability/Max Price, nickname checks, checkout pricing, and promotion quoting.
+- [ ] Port review submission/moderation and remaining content/admin CRUD.
 - [x] Port wallet checkout debit path with row locking, server-side price, idempotency, and promo capacity checks.
 - [ ] Port external wallet top-up creation/reconciliation.
 - [x] Port Midtrans Snap and DOKU callback signature/amount/idempotency state transitions.
 - [x] Port Midtrans Snap / DOKU Checkout payment creation with server-side price, customer fee, idempotency, and uncertain-create handling.
-- [ ] Port external-payment reconciliation polling.
+- [x] Port order-status Midtrans/DOKU reconciliation polling with amount checks and paid-state recovery.
 - [x] Port Digiflazz paid-only fulfillment, Max Price/availability recheck, bounded retries, multi-unit handling, and signed callback processing.
 - [ ] Port Resend email and Google OAuth.
 - [ ] Port Admin / Staff / Super Admin APIs.
