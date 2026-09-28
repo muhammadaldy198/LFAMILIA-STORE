@@ -1,5 +1,3 @@
-[Reading 107 lines from start (total: 107 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -107,5 +105,3 @@ test("wallet and compatibility helpers keep read paths lightweight", () => {
   assert.match(members, /await db\.batch\(/);
   assert.match(monitor, /monitorSchemaPromise/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
