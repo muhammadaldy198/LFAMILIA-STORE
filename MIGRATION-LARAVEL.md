@@ -33,7 +33,8 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Port public products, availability/Max Price, nickname checks, checkout pricing, and promotion quoting.
 - [x] Port verified customer/guest review submission and Staff moderation.
 - [x] Port customer support tickets/refund ownership checks and Staff replies.
-- [ ] Port remaining content/admin CRUD.
+- [x] Port storefront settings, banners, popups, news, FAQ, and category CRUD with role boundaries.
+- [ ] Port remaining product/customer/promo/Digiflazz admin CRUD.
 - [x] Port wallet checkout debit path with row locking, server-side price, idempotency, and promo capacity checks.
 - [x] Port external wallet top-up creation with Admin-selected gateway, customer fee, and idempotency.
 - [x] Port wallet top-up/provider reconciliation scheduler with safe-window handling and success notifications.
