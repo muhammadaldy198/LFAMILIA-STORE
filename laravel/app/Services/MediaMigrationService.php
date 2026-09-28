@@ -110,7 +110,7 @@ class MediaMigrationService
     {
         if (is_string($value)) {
             $match = [];
-            if (preg_match('#(?:^|/)(media-[0-9a-f-]{36}\.(?:jpg|jpeg|png|webp|gif))(?:[?#].*)?$#i', trim($value), $match)) {
+            if (preg_match('~(?:^|/)(media-[0-9a-f-]{36}\\.(?:jpg|jpeg|png|webp|gif))(?:[?#].*)?$~i', trim($value), $match)) {
                 $keys[$match[1]] = true;
             }
             return;
