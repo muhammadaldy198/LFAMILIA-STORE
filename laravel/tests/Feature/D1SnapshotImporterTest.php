@@ -17,11 +17,13 @@ class D1SnapshotImporterTest extends TestCase
         $row = $method->invoke($importer, [
             'expires_at' => '2026-10-23T13:43:34.897Z',
             'created_at' => '2026-09-23T13:43:34.123Z',
+            'updated_at' => '2026-09-23 13:43:34',
             'name' => 'unchanged',
         ]);
 
         $this->assertSame('2026-10-23 13:43:34', $row['expires_at']);
         $this->assertSame('2026-09-23 13:43:34', $row['created_at']);
+        $this->assertSame('2026-09-23 13:43:34', $row['updated_at']);
         $this->assertSame('unchanged', $row['name']);
     }
 }

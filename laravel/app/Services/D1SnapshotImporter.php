@@ -248,7 +248,9 @@ class D1SnapshotImporter
             }
 
             try {
-                $date = new DateTimeImmutable($value);
+                // D1/SQLite CURRENT_TIMESTAMP values without an explicit offset are UTC.
+                // Parse them as UTC so the Laravel app timezone cannot shift historical data.
+                $date = new DateTimeImmutable($value, new DateTimeZone('UTC'));
                 $row[$column] = $date
                     ->setTimezone(new DateTimeZone('UTC'))
                     ->format('Y-m-d H:i:s');
