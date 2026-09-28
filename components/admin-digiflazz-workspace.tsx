@@ -107,9 +107,9 @@ export function AdminDigiflazzWorkspace() {
     setError("");
     try {
       const [monitor, pricing, orderPayload] = await Promise.all([
-        readJson<MonitorResponse>(await fetch("/api/panel/digiflazz-monitor", { cache: "no-store" })),
-        readJson<PricingResponse>(await fetch("/api/panel/digiflazz-pricing", { cache: "no-store" })),
-        readJson<{ orders?: ProviderOrder[] }>(await fetch("/api/panel/orders", { cache: "no-store" })),
+        readJson<MonitorResponse>(await fetch("/api/admin/digiflazz-monitor", { cache: "no-store" })),
+        readJson<PricingResponse>(await fetch("/api/admin/digiflazz-pricing", { cache: "no-store" })),
+        readJson<{ orders?: ProviderOrder[] }>(await fetch("/api/admin/orders", { cache: "no-store" })),
       ]);
       setData(monitor);
       setAutoSync(pricing.settings?.isAutoSync !== false);
@@ -155,7 +155,7 @@ export function AdminDigiflazzWorkspace() {
     setError("");
     setNotice("");
     try {
-      const result = await readJson<{ message?: string }>(await fetch("/api/panel/digiflazz-monitor", {
+      const result = await readJson<{ message?: string }>(await fetch("/api/admin/digiflazz-monitor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{}",
@@ -173,7 +173,7 @@ export function AdminDigiflazzWorkspace() {
     const next = !autoSync;
     setError("");
     try {
-      await readJson(await fetch("/api/panel/digiflazz-pricing", {
+      await readJson(await fetch("/api/admin/digiflazz-pricing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isAutoSync: next }),
@@ -205,7 +205,7 @@ export function AdminDigiflazzWorkspace() {
     setSaving(true);
     setError("");
     try {
-      const payload = await readJson<{ pricing: { sellingPrice: number } }>(await fetch("/api/panel/digiflazz-pricing", {
+      const payload = await readJson<{ pricing: { sellingPrice: number } }>(await fetch("/api/admin/digiflazz-pricing", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ packageId: editing.packageId, maxPrice, marginType, marginValue }),
