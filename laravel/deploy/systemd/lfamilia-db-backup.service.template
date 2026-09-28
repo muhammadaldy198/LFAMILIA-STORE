@@ -1,0 +1,13 @@
+[Unit]
+Description=LFAMILIA MariaDB backup
+After=mariadb.service
+Requires=mariadb.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/lfamilia-db-backup
+User=root
+Group=root
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

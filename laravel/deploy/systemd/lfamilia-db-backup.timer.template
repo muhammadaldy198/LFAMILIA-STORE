@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily LFAMILIA MariaDB backup
+
+[Timer]
+OnCalendar=*-*-* 03:20:00 UTC
+Persistent=true
+RandomizedDelaySec=10m
+Unit=lfamilia-db-backup.service
+
+[Install]
+WantedBy=timers.target
