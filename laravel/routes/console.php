@@ -1,7 +1,9 @@
 <?php
 
 use App\Services\D1SnapshotImporter;
+use App\Services\ProductionReconciliationService;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('lfamilia:status', function () {
     $this->info('LFAMILIA Laravel migration runtime is available.');
@@ -30,3 +32,19 @@ Artisan::command(
         );
     },
 )->purpose('Import and reconcile a D1 production snapshot into MariaDB');
+
+
+Artisan::command('lfamilia:reconcile', function (ProductionReconciliationService $service) {
+    $result = $service->run();
+    $this->info('LFAMILIA reconciliation completed.');
+    $this->line(json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+})->purpose('Reconcile payments, topups, promotions, and stale fulfillment');
+
+Schedule::command('lfamilia:reconcile')
+    ->everyMinute()
+    ->withoutOverlapping(5);
+
+Schedule::command('queue:prune-failed --hours=168')
+    ->dailyAt('02:10')
+    ->withoutOverlapping();
+

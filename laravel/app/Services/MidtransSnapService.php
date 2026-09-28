@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use App\Exceptions\MidtransTransactionNotFoundException;
 use RuntimeException;
 
 class MidtransSnapService
@@ -83,6 +84,11 @@ class MidtransSnapService
 
         if (!$response->successful()) {
             $message = trim((string) ($raw['status_message'] ?? ''));
+            if ($response->status() === 404) {
+                throw new MidtransTransactionNotFoundException(
+                    $message ?: 'Transaksi Midtrans tidak ditemukan.',
+                );
+            }
             throw new RuntimeException($message ?: 'Midtrans belum dapat mengembalikan status transaksi.');
         }
 

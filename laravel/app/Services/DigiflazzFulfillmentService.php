@@ -266,7 +266,7 @@ class DigiflazzFulfillmentService
 
             $stale = $order->updated_at ? now()->subMinutes(2)->gte($order->updated_at) : true;
             $eligible = $order->provider_status === null
-                || (in_array($order->provider_status, ['dispatching', 'retryable_error'], true) && $stale);
+                || (in_array($order->provider_status, ['processing', 'dispatching', 'retryable_error'], true) && $stale);
 
             if (!$eligible) {
                 return false;

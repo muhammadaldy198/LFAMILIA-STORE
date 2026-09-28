@@ -34,7 +34,7 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [ ] Port review submission/moderation and remaining content/admin CRUD.
 - [x] Port wallet checkout debit path with row locking, server-side price, idempotency, and promo capacity checks.
 - [x] Port external wallet top-up creation with Admin-selected gateway, customer fee, and idempotency.
-- [ ] Port wallet top-up provider polling/expiry scheduler and success notifications.
+- [x] Port wallet top-up/provider reconciliation scheduler with safe-window handling and success notifications.
 - [x] Port Midtrans Snap and DOKU callback signature/amount/idempotency state transitions.
 - [x] Port Midtrans Snap / DOKU Checkout payment creation with server-side price, customer fee, idempotency, and uncertain-create handling.
 - [x] Port order-status Midtrans/DOKU reconciliation polling with amount checks and paid-state recovery.
@@ -44,7 +44,8 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [ ] Port phone OTP delivery only after the final non-WhatsApp/WhatsApp provider choice is confirmed.
 - [ ] Port Admin / Staff / Super Admin APIs.
 - [ ] Port customer frontend and panel UI.
-- [ ] Add production queue worker and scheduler jobs.
+- [x] Add minute-level production reconciliation scheduler with overlap protection.
+- [ ] Add final VPS Supervisor/systemd process definitions for queue worker and scheduler.
 - [ ] Deploy to VPS without DNS cutover.
 - [ ] Import the current production D1 snapshot and reconcile.
 - [ ] Cut over `lfamiliastore.my.id` only after validation.
