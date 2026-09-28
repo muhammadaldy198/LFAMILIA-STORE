@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminOrdersController;
+use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\AdminSessionController;
 use App\Http\Controllers\AdminSummaryController;
 use App\Http\Controllers\AdminTeamController;
@@ -58,6 +59,11 @@ Route::get('/admin/summary', [AdminSummaryController::class, 'show']);
 Route::get('/admin/orders', [AdminOrdersController::class, 'index']);
 Route::post('/admin/orders', [AdminOrdersController::class, 'create']);
 Route::patch('/admin/orders', [AdminOrdersController::class, 'update']);
+Route::get('/admin/payment-routing', [AdminPaymentController::class, 'routing']);
+Route::put('/admin/payment-routing', [AdminPaymentController::class, 'updateRouting']);
+Route::get('/admin/payment-methods', [AdminPaymentController::class, 'methods']);
+Route::post('/admin/payment-methods', [AdminPaymentController::class, 'saveMethod']);
+Route::delete('/admin/payment-methods', [AdminPaymentController::class, 'deleteMethod']);
 Route::get('/admin/team', [AdminTeamController::class, 'index']);
 Route::post('/admin/team', [AdminTeamController::class, 'save']);
 Route::delete('/admin/team', [AdminTeamController::class, 'destroy']);

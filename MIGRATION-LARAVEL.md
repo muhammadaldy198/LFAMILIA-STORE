@@ -42,7 +42,7 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Port Resend password-reset delivery and Google Identity login/linking with mandatory phone collection.
 - [x] Port Resend transaction-success email notifications with idempotent order delivery.
 - [ ] Port phone OTP delivery only after the final non-WhatsApp/WhatsApp provider choice is confirmed.
-- [~] Port Admin / Staff / Super Admin APIs: session/RBAC, dashboard summary, team management, and order operations are now native Laravel; remaining operational CRUD is in progress.
+- [~] Port Admin / Staff / Super Admin APIs: session/RBAC, dashboard summary, team management, order operations, and payment routing/channel management are now native Laravel; remaining operational CRUD is in progress.
 - [ ] Port customer frontend and panel UI.
 - [x] Add minute-level production reconciliation scheduler with overlap protection.
 - [ ] Add final VPS Supervisor/systemd process definitions for queue worker and scheduler.
