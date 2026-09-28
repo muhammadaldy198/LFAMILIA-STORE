@@ -4,27 +4,29 @@ Branch: `migration/laravel-vps-production`
 
 ## Goal
 
-Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB on the new VPS without changing customer-visible behavior or weakening payment/security controls.
+Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB on the VPS without changing customer-visible behavior or weakening payment/security controls.
 
-## Non-negotiable rules
+## Rules
 
-1. No API keys, passwords, database credentials, encryption keys, provider secrets, provider URLs, or environment-specific values are committed as production values.
-2. Existing production remains the rollback source until the Laravel runtime passes full regression testing.
-3. Payment redirect pages never mark an order paid. Only validated server callbacks may transition payment state.
+1. No API keys, passwords, database credentials, encryption keys, provider secrets, provider URLs, or production-only values are committed as live configuration.
+2. Existing production remains the rollback source until Laravel passes full regression testing.
+3. Payment redirects never mark an order paid; only validated server callbacks may transition payment state.
 4. Midtrans/DOKU callbacks must remain signature-validated, amount-validated, idempotent, and monotonic.
 5. Digiflazz fulfillment happens only after a validated paid state and remains idempotent.
-6. Wallet balances are changed only inside audited database transactions.
-7. Super Admin / Admin / Staff permissions are preserved.
-8. Database migration is reconciled before DNS cutover.
+6. Wallet mutations use database transactions and immutable ledger references.
+7. Super Admin / Admin / Staff boundaries are preserved.
+8. D1 -> MariaDB migration is reconciled before DNS cutover.
 
-## Migration stages
+## Migration status
 
-- [x] Create isolated migration branch.
-- [x] Add Laravel 13 production scaffold.
-- [x] Remove environment/provider secrets and URLs from committed runtime configuration.
-- [x] Add queue foundation and Laravel CI smoke test.
-- [ ] Translate D1 schema into MariaDB migrations.
-- [ ] Build D1 export -> MariaDB importer with row-count and financial reconciliation.
+- [x] Isolated migration branch.
+- [x] Laravel 13 / PHP 8.3 foundation.
+- [x] MariaDB runtime configuration.
+- [x] Secrets and provider endpoints moved to environment-only configuration.
+- [x] CI installs Laravel, checks PHP syntax, migrates the full schema on SQLite, and runs tests.
+- [x] Current customer/auth, catalog, order, wallet, content, payment-config, integration, security, and Digiflazz tables translated to Laravel migrations.
+- [x] MariaDB Digiflazz maintenance guard preserved as a database trigger.
+- [ ] Build D1 SQL export -> MariaDB importer with row-count and financial reconciliation.
 - [ ] Port authentication and RBAC.
 - [ ] Port products, pricing, nickname checks, checkout, promotions, reviews.
 - [ ] Port wallet and top-up ledger.
@@ -33,8 +35,7 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [ ] Port Resend email and Google OAuth.
 - [ ] Port Admin / Staff / Super Admin APIs.
 - [ ] Port customer frontend and panel UI.
-- [ ] Add queue worker and scheduler jobs.
-- [ ] Add integration and regression tests.
+- [ ] Add production queue worker and scheduler jobs.
 - [ ] Deploy to VPS without DNS cutover.
-- [ ] Import production data and run reconciliation.
+- [ ] Import production data and reconcile.
 - [ ] Cut over `lfamiliastore.my.id` only after validation.
