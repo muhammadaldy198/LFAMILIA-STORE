@@ -48,6 +48,9 @@ return [
             'secret_key' => env('TURNSTILE_SECRET_KEY'),
             'verify_url' => env('TURNSTILE_VERIFY_URL'),
         ],
+        'voucher' => [
+            'encryption_key' => env('VOUCHER_ENCRYPTION_KEY'),
+        ],
     ],
 
     'integration_encryption_key' => env('INTEGRATION_ENCRYPTION_KEY'),
