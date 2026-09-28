@@ -93,6 +93,117 @@ class PromotionService
         ];
     }
 
+    public function reserveExternal(
+        string $orderId,
+        ?string $voucherCode,
+        ?int $flashSaleId,
+        string $expiresAt,
+    ): void {
+        DB::transaction(function () use ($orderId, $voucherCode, $flashSaleId, $expiresAt): void {
+            $voucher = null;
+            if ($voucherCode) {
+                $voucher = DB::table('discount_vouchers')
+                    ->where('code', $voucherCode)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$voucher || !(bool) $voucher->is_active
+                    || now()->lt($voucher->starts_at)
+                    || now()->gt($voucher->ends_at)
+                    || ($voucher->usage_limit !== null
+                        && (int) $voucher->used_count + (int) $voucher->reserved_count >= (int) $voucher->usage_limit)) {
+                    throw new PromotionQuoteException('Voucher baru saja habis atau tidak lagi tersedia.');
+                }
+            }
+
+            $flash = null;
+            if ($flashSaleId) {
+                $flash = DB::table('flash_sales')
+                    ->where('id', $flashSaleId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$flash || !(bool) $flash->is_active
+                    || now()->lt($flash->starts_at)
+                    || now()->gt($flash->ends_at)
+                    || ($flash->stock_limit !== null
+                        && (int) $flash->sold_count + (int) $flash->reserved_count >= (int) $flash->stock_limit)) {
+                    throw new PromotionQuoteException('Flash sale baru saja habis atau tidak lagi tersedia.');
+                }
+            }
+
+            DB::table('promotion_reservations')->insert([
+                'order_id' => $orderId,
+                'voucher_code' => $voucherCode,
+                'flash_sale_id' => $flashSaleId,
+                'status' => 'reserved',
+                'expires_at' => $expiresAt,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            if ($voucher) {
+                DB::table('discount_vouchers')->where('id', $voucher->id)->update([
+                    'reserved_count' => DB::raw('reserved_count + 1'),
+                    'updated_at' => now(),
+                ]);
+            }
+            if ($flash) {
+                DB::table('flash_sales')->where('id', $flash->id)->update([
+                    'reserved_count' => DB::raw('reserved_count + 1'),
+                    'updated_at' => now(),
+                ]);
+            }
+        }, 3);
+    }
+
+    public function releaseExternal(string $orderId): void
+    {
+        DB::transaction(function () use ($orderId): void {
+            $reservation = DB::table('promotion_reservations')
+                ->where('order_id', $orderId)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$reservation || $reservation->status !== 'reserved') {
+                return;
+            }
+
+            DB::table('promotion_reservations')->where('order_id', $orderId)->update([
+                'status' => 'released',
+                'updated_at' => now(),
+            ]);
+
+            if ($reservation->voucher_code) {
+                DB::table('discount_vouchers')->where('code', $reservation->voucher_code)->update([
+                    'reserved_count' => DB::raw('CASE WHEN reserved_count > 0 THEN reserved_count - 1 ELSE 0 END'),
+                    'updated_at' => now(),
+                ]);
+            }
+            if ($reservation->flash_sale_id) {
+                DB::table('flash_sales')->where('id', $reservation->flash_sale_id)->update([
+                    'reserved_count' => DB::raw('CASE WHEN reserved_count > 0 THEN reserved_count - 1 ELSE 0 END'),
+                    'updated_at' => now(),
+                ]);
+            }
+        }, 3);
+    }
+
+    public function updateExternalExpiry(string $orderId, ?string $expiresAt): void
+    {
+        if (!$expiresAt) {
+            return;
+        }
+
+        DB::table('promotion_reservations')
+            ->where('order_id', $orderId)
+            ->where('status', 'reserved')
+            ->update([
+                'expires_at' => $expiresAt,
+                'updated_at' => now(),
+            ]);
+    }
+
     /** @return array{0:?string,1:float} */
     private function memberDiscount(?string $customerId): array
     {

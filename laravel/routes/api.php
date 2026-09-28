@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminSessionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DokuCallbackController;
+use App\Http\Controllers\ExternalCheckoutController;
 use App\Http\Controllers\MidtransNotificationController;
 use App\Http\Controllers\NicknameController;
 use App\Http\Controllers\OrderSearchController;
@@ -32,6 +33,7 @@ Route::patch('/account', [AccountController::class, 'update']);
 Route::get('/products', [ProductController::class, 'index']);
 Route::post('/nickname', [NicknameController::class, 'verify']);
 Route::post('/payments/wallet/create', [WalletCheckoutController::class, 'create']);
+Route::post('/payments/auto/create', [ExternalCheckoutController::class, 'create']);
 
 Route::get('/orders/search', [OrderSearchController::class, 'recent']);
 Route::post('/orders/search', [OrderSearchController::class, 'search']);
@@ -43,5 +45,5 @@ Route::post('/payments/midtrans/snap/notification', [MidtransNotificationControl
 Route::get('/payments/doku/callback', [DokuCallbackController::class, 'show']);
 Route::post('/payments/doku/callback', [DokuCallbackController::class, 'handle']);
 
-// External gateway payment creation and provider fulfillment remain disabled
-// until their complete retry/reconciliation paths are ported.
+// Provider fulfillment and external-payment reconciliation polling remain
+// disabled until their complete retry/state-reconciliation paths are ported.
