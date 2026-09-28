@@ -1,5 +1,3 @@
-[Reading 43 lines from start (total: 43 lines, 0 remaining)]
-
 "use client";
 
 type CachedSummary = {
