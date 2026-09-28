@@ -87,6 +87,15 @@ class AdminContentController extends Controller
                 'primaryLabel'=>'','primaryHref'=>'','secondaryLabel'=>'','secondaryHref'=>'',
                 'summary'=>'','coverUrl'=>'','publishedAt'=>'',
             ], $validated);
+            foreach ([
+                'subtitle','mobileImageUrl','ctaLabel','ctaHref',
+                'primaryLabel','primaryHref','secondaryLabel','secondaryHref',
+                'summary','coverUrl','publishedAt',
+            ] as $key) {
+                if (($validated[$key] ?? null) === null) {
+                    $validated[$key] = '';
+                }
+            }
 
             foreach (['imageUrl','mobileImageUrl','coverUrl'] as $key) {
                 if (isset($validated[$key]) && !$content->validMedia((string) $validated[$key])) {
