@@ -4,16 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Services\CustomerAuthService;
 use App\Services\SecurityGuard;
+use App\Services\TurnstileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Throwable;
 
 class AuthController extends Controller
 {
-    public function login(Request $request, CustomerAuthService $auth, SecurityGuard $security, TurnstileService $turnstile): JsonResponse
-    {
+    public function login(
+        Request $request,
+        CustomerAuthService $auth,
+        SecurityGuard $security,
+        TurnstileService $turnstile,
+    ): JsonResponse {
         $security->assertSameOrigin($request);
         $rate = $security->rateLimit($request, 'customer-login', 8);
         if (!$rate['allowed']) {
@@ -31,7 +37,15 @@ class AuthController extends Controller
                 'turnstileToken' => ['nullable', 'string', 'max:2048'],
             ]);
 
-            if (!$turnstile->verify($request, $input['turnstileToken'] ?? null)) {
+            try {
+                $verified = $turnstile->verify($request, $input['turnstileToken'] ?? null);
+            } catch (RuntimeException $error) {
+                return response()->json([
+                    'error' => $error->getMessage() ?: 'Verifikasi keamanan sedang tidak tersedia.',
+                ], 503);
+            }
+
+            if (!$verified) {
                 return response()->json(['error' => 'Verifikasi keamanan gagal. Coba lagi.'], 403);
             }
 
@@ -56,8 +70,12 @@ class AuthController extends Controller
         }
     }
 
-    public function register(Request $request, CustomerAuthService $auth, SecurityGuard $security, TurnstileService $turnstile): JsonResponse
-    {
+    public function register(
+        Request $request,
+        CustomerAuthService $auth,
+        SecurityGuard $security,
+        TurnstileService $turnstile,
+    ): JsonResponse {
         $security->assertSameOrigin($request);
         $rate = $security->rateLimit($request, 'customer-register', 5, 3600);
         if (!$rate['allowed']) {
@@ -77,7 +95,15 @@ class AuthController extends Controller
                 'turnstileToken' => ['nullable', 'string', 'max:2048'],
             ]);
 
-            if (!$turnstile->verify($request, $input['turnstileToken'] ?? null)) {
+            try {
+                $verified = $turnstile->verify($request, $input['turnstileToken'] ?? null);
+            } catch (RuntimeException $error) {
+                return response()->json([
+                    'error' => $error->getMessage() ?: 'Verifikasi keamanan sedang tidak tersedia.',
+                ], 503);
+            }
+
+            if (!$verified) {
                 return response()->json(['error' => 'Verifikasi keamanan gagal. Coba lagi.'], 403);
             }
 

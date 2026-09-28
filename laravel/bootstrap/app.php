@@ -14,6 +14,16 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
+
+        // These legacy-compatible panel form endpoints use an explicit same-origin
+        // guard and rate limiter. Excluding only these exact paths prevents the
+        // current frontend from requiring a new CSRF field during the migration.
+        $middleware->validateCsrfTokens(except: [
+            'admin/panel/auth/login',
+            'admin/panel/auth/logout',
+            'staff/panel/auth/login',
+            'staff/panel/auth/logout',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
