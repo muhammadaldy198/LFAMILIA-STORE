@@ -1,3 +1,5 @@
+[Reading 116 lines from start (total: 116 lines, 0 remaining)]
+
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -114,3 +116,5 @@ test("admin workspaces include explicit responsive breakpoints", () => {
   assert.match(integrations, /md:grid-cols-2/);
   assert.match(operations, /xl:grid-cols-4/);
 });
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
