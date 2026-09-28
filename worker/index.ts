@@ -150,12 +150,14 @@ const worker = {
     };
     const url = new URL(request.url);
     const isAccessProtectedRequest =
-      url.pathname === "/admin/panel" ||
-      url.pathname.startsWith("/admin/panel/") ||
-      url.pathname === "/admin/setup" ||
-      url.pathname.startsWith("/admin/setup/") ||
-      url.pathname === "/api/admin" ||
-      url.pathname.startsWith("/api/admin/");
+      Boolean(runtimeEnv.DB) && (
+        url.pathname === "/admin/panel" ||
+        url.pathname.startsWith("/admin/panel/") ||
+        url.pathname === "/admin/setup" ||
+        url.pathname.startsWith("/admin/setup/") ||
+        url.pathname === "/api/admin" ||
+        url.pathname.startsWith("/api/admin/")
+      );
 
     if (isAccessProtectedRequest) {
       const accessIdentity = await verifyCloudflareAccess(request, runtimeEnv);
