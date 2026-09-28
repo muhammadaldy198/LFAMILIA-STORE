@@ -40,7 +40,9 @@ test("login UI exposes forgot password and SEO routes exclude private surfaces",
   assert.match(robots, /\/admin/);
   assert.match(robots, /\/api\//);
   assert.match(robots, /\/checkout/);
-  assert.match(sitemap, /LFAMILIA_LARAVEL_INTERNAL_URL/);\n  assert.match(sitemap, /\\/api\\/news/);\n  assert.doesNotMatch(sitemap, /news_articles WHERE is_published = 1/);
+  assert.match(sitemap, /LFAMILIA_LARAVEL_INTERNAL_URL/);
+  assert.match(sitemap, /\/api\/news/);
+  assert.doesNotMatch(sitemap, /news_articles WHERE is_published = 1/);
   assert.match(layout, /metadataBase/);
   assert.match(layout, /openGraph/);
   assert.match(layout, /application\/ld\+json/);
