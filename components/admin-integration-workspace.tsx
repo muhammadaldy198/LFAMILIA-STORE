@@ -72,8 +72,8 @@ export function AdminIntegrationWorkspace() {
 
   const load = useCallback(async () => {
     const [integrationResponse, paymentResponse] = await Promise.all([
-      fetch("/api/panel/integrations", { cache: "no-store" }),
-      fetch("/api/panel/payment-routing", { cache: "no-store" }),
+      fetch("/api/admin/integrations", { cache: "no-store" }),
+      fetch("/api/admin/payment-routing", { cache: "no-store" }),
     ]);
     const integrationPayload = await integrationResponse.json().catch(() => ({})) as Overview & { error?: string };
     const paymentPayload = await paymentResponse.json().catch(() => ({})) as PaymentOverview & { error?: string };
@@ -110,7 +110,7 @@ export function AdminIntegrationWorkspace() {
   const dokuConfigured = Boolean(paymentOverview?.configured.doku[dokuProfileEnvironment]);
   const midtransConfigured = Boolean(paymentOverview?.configured.midtrans[midtransProfileEnvironment]);
   async function put(body: object) {
-    const response = await fetch("/api/panel/integrations", {
+    const response = await fetch("/api/admin/integrations", {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
@@ -122,7 +122,7 @@ export function AdminIntegrationWorkspace() {
   }
 
   async function paymentPut(body: object) {
-    const response = await fetch("/api/panel/payment-routing", {
+    const response = await fetch("/api/admin/payment-routing", {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
@@ -268,7 +268,7 @@ export function AdminIntegrationWorkspace() {
         if (relay.every((item) => item.connected)) setMessage(details);
         else setError(details);
       } else if (tab === "DOKU Checkout" || tab === "Midtrans Snap") {
-        const response = await fetch("/api/panel/payment-routing", { cache: "no-store" });
+        const response = await fetch("/api/admin/payment-routing", { cache: "no-store" });
         const payload = await response.json().catch(() => ({})) as PaymentOverview & { error?: string };
         if (!response.ok) throw new Error(payload.error || "Status payment gateway gagal dimuat.");
         setPaymentOverview(payload);
