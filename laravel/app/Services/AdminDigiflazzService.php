@@ -15,6 +15,10 @@ class AdminDigiflazzService
     private const SYNC_COOLDOWN_SECONDS = 60;
     private const SYNC_LOCK_MINUTES = 2;
 
+    public function __construct(private readonly IntegrationConfigService $integrations)
+    {
+    }
+
     /** @return array{isAutoSync:bool} */
     public function pricingSettings(): array
     {
@@ -642,24 +646,22 @@ class AdminDigiflazzService
     /** @return array{environment:string,username:string,apiKey:string,priceListUrl?:string,transactionUrl?:string} */
     private function runtimeConfig(bool $needsPriceList, bool $needsTransaction): array
     {
-        $environment = trim((string) config('lfamilia.integrations.digiflazz.environment'));
-        if (!in_array($environment, ['development','production'], true)) {
-            throw new RuntimeException('DIGIFLAZZ_ENV belum dikonfigurasi.');
-        }
-        $username = trim((string) config('lfamilia.integrations.digiflazz.username'));
-        $apiKey = trim((string) config('lfamilia.integrations.digiflazz.'.($environment === 'production' ? 'production_api_key' : 'development_api_key')));
+        $runtime = $this->integrations->digiflazzRuntime();
+        $environment = $runtime['environment'];
+        $username = $runtime['username'];
+        $apiKey = $runtime['apiKey'];
         if ($username === '' || $apiKey === '') {
             throw new RuntimeException('Kredensial DigiFlazz belum lengkap.');
         }
 
         $result = ['environment' => $environment, 'username' => $username, 'apiKey' => $apiKey];
         if ($needsPriceList) {
-            $url = trim((string) config('lfamilia.integrations.digiflazz.'.($environment === 'production' ? 'production_price_list_url' : 'development_price_list_url')));
+            $url = $runtime['priceListUrl'];
             $this->assertHttpsUrl($url, 'URL price list DigiFlazz belum valid.');
             $result['priceListUrl'] = $url;
         }
         if ($needsTransaction) {
-            $url = trim((string) config('lfamilia.integrations.digiflazz.'.($environment === 'production' ? 'production_transaction_url' : 'development_transaction_url')));
+            $url = $runtime['transactionApiUrl'];
             $this->assertHttpsUrl($url, 'URL transaksi DigiFlazz belum valid.');
             $result['transactionUrl'] = $url;
         }
