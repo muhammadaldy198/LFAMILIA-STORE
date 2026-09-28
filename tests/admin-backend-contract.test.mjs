@@ -1,5 +1,3 @@
-[Reading 33 lines from start (total: 33 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -28,9 +26,7 @@ test("every admin endpoint used by the VPS frontend is exposed by Laravel", () =
     for (const match of source.matchAll(/\/api\/admin\/([a-z-]+(?:\/[a-z-]+)?)/g)) used.add(match[1]);
   }
   assert.ok(used.size > 0, "no Laravel admin endpoints found in admin components");
-  for (const endpoint of used) {
-    assert.ok(routes.includes("/admin/" + endpoint), "missing Laravel admin route: " + endpoint);
-  }
+  for (const endpoint of used) assert.ok(routes.includes("/admin/" + endpoint), "missing Laravel admin route: " + endpoint);
   assert.match(routes, /AdminSessionController/);
 });
 
