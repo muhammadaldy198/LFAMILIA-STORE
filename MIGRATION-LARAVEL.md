@@ -46,13 +46,23 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Port Resend password-reset delivery and Google Identity login/linking with mandatory phone collection.
 - [x] Port Resend transaction-success email notifications with idempotent order delivery.
 - [ ] Port phone OTP delivery only after the final non-WhatsApp/WhatsApp provider choice is confirmed.
-- [~] Port Admin / Staff / Super Admin APIs: session/RBAC, dashboard, team, orders, payment routing/channels, products, reviews, support, customer/member balances, account cleanup, promotions, and DigiFlazz pricing/monitor are native Laravel; remaining UI-adjacent operational endpoints are still in progress.
-- [ ] Port customer frontend and panel UI.
+- [x] Port Admin / Staff / Super Admin APIs: session/RBAC, dashboard, team, orders, payment routing/channels, products, reviews, support, customer/member balances, account cleanup, promotions, DigiFlazz pricing/monitor, and UI-adjacent operational endpoints are native Laravel.
+- [x] Port customer frontend and panel UI to the VPS runtime; browser `/api/*` traffic is served by Laravel and panel SSR validates the Laravel session internally.
 - [x] Add minute-level production reconciliation scheduler with overlap protection.
 - [x] Add final VPS systemd process definitions for queue worker and scheduler.
-- [ ] Deploy to VPS without DNS cutover.
-- [ ] Import the current production D1 snapshot and reconcile.
-- [ ] Cut over `lfamiliastore.my.id` only after validation.
+- [x] Deploy to VPS without DNS cutover; Node frontend, Laravel/PHP-FPM, MariaDB, and Nginx are running with loopback-only internal services.
+- [x] Import the current production D1 snapshot and reconcile; the final export checksum matched the imported snapshot.
+- [ ] Re-enter/validate provider credentials on the VPS after the credential step is resumed.
+- [ ] Cut over `lfamiliastore.my.id` only after provider readiness and final validation.
+
+## VPS readiness notes
+
+- Public-origin Nginx is prepared for `lfamiliastore.my.id` and `www.lfamiliastore.my.id` with a Cloudflare Origin certificate.
+- The public origin only accepts Cloudflare edge source ranges plus localhost; Node (`127.0.0.1:3000`), Laravel (`127.0.0.1:8080`), and MariaDB (`127.0.0.1:3306`) are not exposed directly.
+- Cloudflare Access still protects `/admin*` and `/api/admin*`; Staff remains on the separate password panel path.
+- Daily MariaDB backup is installed on the VPS with 7-day local retention, SHA-256 sidecars, gzip validation, and a successful restore verification.
+- Queue worker and scheduler are intentionally disabled until provider credentials are resumed, so a reboot cannot trigger provider-facing background work prematurely.
+- A temporary `trycloudflare.com` preview is used only for pre-cutover smoke tests and is not part of the final architecture.
 
 ## Import safety
 
