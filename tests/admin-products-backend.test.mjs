@@ -1,5 +1,3 @@
-[Reading 29 lines from start (total: 29 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -8,7 +6,7 @@ import test from "node:test";
 const source = fs.readFileSync(path.join(process.cwd(), "components/admin-product-manager.tsx"), "utf8");
 
 test("product list and mutations use the real panel endpoint", () => {
-  assert.match(source, /fetch\("\/api\/panel\/products"/);
+  assert.match(source, /fetch\("\/api\/admin\/products"/);
   assert.match(source, /payload\.products\.map\(mapProduct\)/);
   assert.match(source, /JSON\.stringify\(raw\)/);
   assert.match(source, /JSON\.stringify\(buildPayload\(\)\)/);
@@ -29,5 +27,3 @@ test("manual product creation uploads the selected product image before persisti
   assert.match(source, /upload\.set\("file", image\)/);
   assert.match(source, /raw\.imageUrl = uploaded\.url/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
