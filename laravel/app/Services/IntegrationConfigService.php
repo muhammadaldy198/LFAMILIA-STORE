@@ -185,6 +185,90 @@ class IntegrationConfigService
         return $this->profile($provider, $mode, $environment);
     }
 
+    /** @return array{environment:string,username:string,apiKey:string,webhookSecret:string,transactionApiUrl:string,priceListUrl:string} */
+    public function digiflazzRuntime(): array
+    {
+        $environment = $this->setting('digiflazz_environment')
+            ?: trim((string) config('lfamilia.integrations.digiflazz.environment'))
+            ?: 'development';
+        if (!in_array($environment, ['development', 'production'], true)) {
+            $environment = 'development';
+        }
+
+        $profile = [];
+        try {
+            $profile = $this->profile('digiflazz', 'direct', $environment);
+        } catch (Throwable) {
+            $profile = [];
+        }
+
+        $production = $environment === 'production';
+        return [
+            'environment' => $environment,
+            'username' => trim((string) ($profile['username'] ?? config('lfamilia.integrations.digiflazz.username'))),
+            'apiKey' => trim((string) ($profile['apiKey'] ?? config(
+                'lfamilia.integrations.digiflazz.'.($production ? 'production_api_key' : 'development_api_key'),
+            ))),
+            'webhookSecret' => trim((string) ($profile['webhookSecret'] ?? config('lfamilia.integrations.digiflazz.webhook_secret'))),
+            'transactionApiUrl' => trim((string) ($profile['transactionApiUrl'] ?? config(
+                'lfamilia.integrations.digiflazz.'.($production ? 'production_transaction_url' : 'development_transaction_url'),
+            ))),
+            'priceListUrl' => trim((string) ($profile['priceListUrl'] ?? config(
+                'lfamilia.integrations.digiflazz.'.($production ? 'production_price_list_url' : 'development_price_list_url'),
+            ))),
+        ];
+    }
+
+    /** @return array{apiKey:string,fromEmail:string,apiUrl:string,deliveryChannel:string} */
+    public function resendRuntime(): array
+    {
+        $profile = [];
+        try {
+            $profile = $this->profile('resend', 'service', 'global');
+        } catch (Throwable) {
+            $profile = [];
+        }
+
+        return [
+            'apiKey' => trim((string) ($profile['apiKey'] ?? config('lfamilia.integrations.resend.api_key'))),
+            'fromEmail' => trim((string) ($profile['fromEmail'] ?? config('lfamilia.integrations.resend.from'))),
+            'apiUrl' => trim((string) ($profile['apiUrl'] ?? config('lfamilia.integrations.resend.api_url'))),
+            'deliveryChannel' => strtolower(trim((string) ($profile['deliveryChannel'] ?? 'website'))) ?: 'website',
+        ];
+    }
+
+    public function googleClientId(): ?string
+    {
+        $profile = [];
+        try {
+            $profile = $this->profile('google', 'service', 'global');
+        } catch (Throwable) {
+            $profile = [];
+        }
+        $value = trim((string) ($profile['clientId'] ?? config('lfamilia.integrations.google.client_id')));
+        return $value !== '' ? $value : null;
+    }
+
+    public function voucherEncryptionKey(): ?string
+    {
+        $profile = [];
+        try {
+            $profile = $this->profile('security', 'service', 'global');
+        } catch (Throwable) {
+            $profile = [];
+        }
+        $value = trim((string) ($profile['voucherEncryptionKey'] ?? config('lfamilia.integrations.voucher.encryption_key')));
+        return strlen($value) >= 32 ? $value : null;
+    }
+
+    public function voucherDeliveryChannel(): string
+    {
+        $resend = $this->resendRuntime();
+        return in_array($resend['deliveryChannel'], ['website', 'email'], true)
+            ? $resend['deliveryChannel']
+            : 'website';
+    }
+
     /** @return array<string,mixed> */
     public function integrationOverview(): array
     {
