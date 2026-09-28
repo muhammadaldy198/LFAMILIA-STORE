@@ -201,7 +201,20 @@ class AdminAuthService
     /** @return array<string,mixed>|null */
     public function current(Request $request): ?array
     {
-        return $this->fromToken($request->cookie(self::COOKIE));
+        $token = $request->cookie(self::COOKIE);
+
+        if (!$token) {
+            $cookieHeader = (string) $request->headers->get('cookie', '');
+            foreach (explode(';', $cookieHeader) as $part) {
+                [$name, $value] = array_pad(explode('=', trim($part), 2), 2, '');
+                if ($name === self::COOKIE && $value !== '') {
+                    $token = rawurldecode($value);
+                    break;
+                }
+            }
+        }
+
+        return $this->fromToken(is_string($token) ? $token : null);
     }
 
     /** @return array<string,mixed>|null */
