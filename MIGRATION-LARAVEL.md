@@ -34,7 +34,8 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Port verified customer/guest review submission and Staff moderation.
 - [x] Port customer support tickets/refund ownership checks and Staff replies.
 - [x] Port storefront settings, banners, popups, news, FAQ, and category CRUD with role boundaries.
-- [ ] Port remaining product/customer/promo/Digiflazz admin CRUD.
+- [x] Port Admin product/package/notices CRUD while keeping DigiFlazz pricing authority server-owned.
+- [ ] Port remaining customer/promo/Digiflazz admin CRUD.
 - [x] Port wallet checkout debit path with row locking, server-side price, idempotency, and promo capacity checks.
 - [x] Port external wallet top-up creation with Admin-selected gateway, customer fee, and idempotency.
 - [x] Port wallet top-up/provider reconciliation scheduler with safe-window handling and success notifications.
@@ -45,7 +46,7 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Port Resend password-reset delivery and Google Identity login/linking with mandatory phone collection.
 - [x] Port Resend transaction-success email notifications with idempotent order delivery.
 - [ ] Port phone OTP delivery only after the final non-WhatsApp/WhatsApp provider choice is confirmed.
-- [~] Port Admin / Staff / Super Admin APIs: session/RBAC, dashboard summary, team management, order operations, and payment routing/channel management, reviews, and support operations are now native Laravel; remaining operational CRUD is in progress.
+- [~] Port Admin / Staff / Super Admin APIs: session/RBAC, dashboard summary, team management, order operations, and payment routing/channel management, products, reviews, and support operations are now native Laravel; remaining operational CRUD is in progress.
 - [ ] Port customer frontend and panel UI.
 - [x] Add minute-level production reconciliation scheduler with overlap protection.
 - [ ] Add final VPS Supervisor/systemd process definitions for queue worker and scheduler.

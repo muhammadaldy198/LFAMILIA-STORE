@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminOrdersController;
 use App\Http\Controllers\AdminPaymentController;
+use App\Http\Controllers\AdminProductController;
 use App\Http\Controllers\AdminReviewController;
 use App\Http\Controllers\AdminSupportController;
 use App\Http\Controllers\AdminContentController;
@@ -77,6 +78,10 @@ Route::put('/admin/payment-routing', [AdminPaymentController::class, 'updateRout
 Route::get('/admin/payment-methods', [AdminPaymentController::class, 'methods']);
 Route::post('/admin/payment-methods', [AdminPaymentController::class, 'saveMethod']);
 Route::delete('/admin/payment-methods', [AdminPaymentController::class, 'deleteMethod']);
+Route::get('/admin/products', [AdminProductController::class, 'index']);
+Route::post('/admin/products', [AdminProductController::class, 'create']);
+Route::patch('/admin/products', [AdminProductController::class, 'update']);
+Route::delete('/admin/products', [AdminProductController::class, 'destroy']);
 Route::get('/admin/reviews', [AdminReviewController::class, 'index']);
 Route::patch('/admin/reviews', [AdminReviewController::class, 'update']);
 Route::get('/admin/support', [AdminSupportController::class, 'index']);
