@@ -1,5 +1,3 @@
-[Reading 31 lines from start (total: 31 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -7,13 +5,12 @@ import test from "node:test";
 
 const root = process.cwd();
 
-test("admin UI uses the unified panel API instead of direct admin API routes", () => {
+test("VPS admin UI uses Laravel admin API routes", () => {
   const componentDir = path.join(root, "components");
   const files = fs.readdirSync(componentDir).filter((name) => name.startsWith("admin-") && name.endsWith(".tsx"));
-  for (const name of files) {
-    const source = fs.readFileSync(path.join(componentDir, name), "utf8");
-    assert.doesNotMatch(source, /\/api\/admin\//, `${name} must use /api/panel/*`);
-  }
+  const joined = files.map((name) => fs.readFileSync(path.join(componentDir, name), "utf8")).join("\n");
+  assert.match(joined, /\/api\/admin\//);
+  assert.doesNotMatch(joined, /\/api\/panel\//);
 });
 
 test("panel route map has no duplicate endpoint keys", () => {
@@ -31,5 +28,3 @@ test("Cloudflare Access protects direct admin API but not staff panel API", () =
   const guard = source.slice(source.indexOf("const isAccessProtectedRequest"), source.indexOf("if (isAccessProtectedRequest)"));
   assert.doesNotMatch(guard, /\/api\/panel/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
