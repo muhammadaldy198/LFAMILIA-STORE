@@ -75,3 +75,14 @@ Run it only on the prepared VPS after a fresh D1 export has been copied to the s
 ## Cutover hold
 
 DNS remains on the existing Cloudflare Worker until provider credentials are re-entered on the VPS and verified. Queue and scheduler services intentionally remain stopped while provider integrations are deferred. The VPS origin is otherwise prepared for cutover, including TLS for the apex and `www` hostnames, canonical `www` redirect, Cloudflare-only origin access, frontend/API smoke tests, and regression validation.
+
+
+### VPS edge validation (non-provider)
+
+- A temporary proxied Cloudflare hostname was pointed at the VPS with a short-lived Origin CA certificate.
+- Cloudflare edge -> Nginx -> Vinext/Laravel returned HTTP 200 for homepage, health, catalog/storefront/content, and panel login pages.
+- Direct origin access by public IP returned HTTP 403, confirming the Cloudflare-only origin allowlist.
+- The temporary DNS record, certificate, and Nginx smoke vhost were removed after validation.
+- Cloudflare SSL is Full (strict), TLS 1.3 is enabled, minimum TLS is 1.2, and Admin Access destinations cover both `/admin/*` and `/api/admin/*`; Staff remains outside Access as intended.
+- The existing Cloudflare rate-limit rule already targets the Laravel checkout/auth paths, including `/api/payments/auto/create` and `/api/payments/wallet/create`.
+- Daily MariaDB backup is enabled, a generated dump passed checksum verification, and a restore drill matched order/customer/package/media row counts plus paid-order totals.
