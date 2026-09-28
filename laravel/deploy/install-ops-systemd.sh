@@ -16,7 +16,15 @@ MYSQL_CLIENT="/root/.my.cnf"
 
 [[ -f "${ENV_FILE}" ]] || { echo "Laravel .env tidak ditemukan." >&2; exit 1; }
 
-DB_NAME="$(awk -F= '$1=="DB_DATABASE"{sub(/^[^=]*=/,""); gsub(/^[\"'\'' ]+|[\"'\'' ]+$/,""); print; exit}' "${ENV_FILE}")"
+DB_NAME="$(python3 - "${ENV_FILE}" <<'PY'
+from pathlib import Path
+import sys
+for raw in Path(sys.argv[1]).read_text().splitlines():
+    if raw.startswith('DB_DATABASE='):
+        print(raw.split('=', 1)[1].strip().strip('"').strip("'"))
+        break
+PY
+)"
 [[ "${DB_NAME}" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "DB_DATABASE tidak valid." >&2; exit 1; }
 
 install -d -m 0700 "${OPS_DIR}"
