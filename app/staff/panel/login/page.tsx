@@ -1,15 +1,13 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { PanelLogin } from "@/components/panel-login";
-import { getRuntimePanelSession, PANEL_COOKIE_NAME } from "@/lib/server/panel-session-runtime";
+import { getVpsPanelSession } from "@/lib/server/vps-panel-session";
 
 export default async function PanelLoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const cookieStore = await cookies();
-  const session = await getRuntimePanelSession(cookieStore.get(PANEL_COOKIE_NAME)?.value);
+  const session = await getVpsPanelSession();
   if (session?.role === "staff") redirect("/staff/panel");
 
   const params = await searchParams;
