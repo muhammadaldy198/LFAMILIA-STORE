@@ -1,3 +1,5 @@
+[Reading 21 lines from start (total: 21 lines, 0 remaining)]
+
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -14,8 +16,10 @@ test("admin desktop shell keeps active notifications and account controls", () =
   assert.match(dashboard, /<AdminAccountMenu/);
   assert.match(dashboard, /Gamepad2/);
   assert.match(notifications, /fetchAdminSummary<Summary>\("7d"/);
-  assert.match(summaryClient, /\/api\/panel\/summary\?range=/);
+  assert.match(summaryClient, /\/api\/admin\/summary\?range=/);
   assert.match(notifications, /recentActivities/);
   assert.match(notifications, /recentOrders/);
   assert.match(notifications, /localStorage/);
 });
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
