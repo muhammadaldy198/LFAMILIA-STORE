@@ -5,6 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/var/www/lfamilia-store/laravel/deploy/vps-healthcheck.sh
+ExecStart=/usr/local/sbin/lfamilia-healthcheck
 User=root
 Group=root
