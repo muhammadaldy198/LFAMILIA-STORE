@@ -1,5 +1,3 @@
-[Reading 77 lines from start (total: 77 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -27,7 +25,7 @@ test("product creation is manual and DigiFlazz imports nominal only", () => {
   assert.match(source, /Produk tetap dibuat manual\. Hanya nominal terpilih yang diambil dari Digiflazz/);
   assert.match(source, /provider: "Digiflazz" as const/);
   assert.doesNotMatch(source, /Import Produk dari Digiflazz/);
-  assert.match(source, /fetch\("\/api\/panel\/products"/);
+  assert.match(source, /fetch\("\/api\/admin\/products"/);
   assert.match(source, /method: "POST"/);
   assert.match(source, /method: "PATCH"/);
 });
@@ -77,5 +75,3 @@ test("product controls persist instead of showing frontend-only simulations", ()
   assert.match(source, /Nominal dan tabel pemisah berhasil disimpan ke database/);
   assert.doesNotMatch(source, /disimpan sementara di frontend|endpoint khusus berikutnya/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
