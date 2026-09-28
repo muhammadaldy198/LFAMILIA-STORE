@@ -25,7 +25,7 @@ class MediaMigrationService
         foreach ($keys as $key) {
             if (DB::table('media_assets')->where('media_key', $key)->exists()) {
                 $existing++;
-                $log?.call($this, 'skip '.$key.' (sudah ada)');
+                $log('skip '.$key.' (sudah ada)');
                 continue;
             }
 
@@ -58,11 +58,11 @@ class MediaMigrationService
                     'created_at' => now(),
                 ]);
                 $downloaded++;
-                $log?.call($this, 'ok '.$key.' ('.strlen($body).' bytes)');
+                $log('ok '.$key.' ('.strlen($body).' bytes)');
             } catch (\Throwable $error) {
                 $failed++;
                 $failures[] = ['key' => $key, 'error' => $error->getMessage()];
-                $log?.call($this, 'gagal '.$key.': '.$error->getMessage());
+                $log('gagal '.$key.': '.$error->getMessage());
             }
         }
 
