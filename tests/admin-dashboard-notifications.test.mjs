@@ -19,5 +19,3 @@ test("admin desktop shell keeps active notifications and account controls", () =
   assert.match(notifications, /recentOrders/);
   assert.match(notifications, /localStorage/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
