@@ -66,6 +66,8 @@ class AdminPromotionController extends Controller
                     throw new RuntimeException('Persentase diskon maksimal 100%.');
                 }
                 $input['description'] = (string) ($input['description'] ?? '');
+                $input['maxDiscount'] = $input['maxDiscount'] ?? null;
+                $input['usageLimit'] = $input['usageLimit'] ?? null;
                 $id = $promotions->saveVoucher($input, isset($input['id']) ? (int) $input['id'] : null);
 
                 return response()->json(['ok' => true, 'id' => $id], empty($input['id']) ? 201 : 200);
@@ -82,6 +84,7 @@ class AdminPromotionController extends Controller
                     'stockLimit' => ['nullable','integer','min:1','max:100000000'],
                 ]);
                 $this->normalizePeriod($input);
+                $input['stockLimit'] = $input['stockLimit'] ?? null;
                 $id = $promotions->saveFlashSale($input, isset($input['id']) ? (int) $input['id'] : null);
 
                 return response()->json(['ok' => true, 'id' => $id], empty($input['id']) ? 201 : 200);

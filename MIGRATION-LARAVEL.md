@@ -1,6 +1,6 @@
 # LFAMILIA STORE — Laravel VPS migration
 
-Branch: \`migration/laravel-vps-production\`
+Branch: `migration/laravel-vps-production`
 
 ## Goal
 
@@ -49,15 +49,15 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [~] Port Admin / Staff / Super Admin APIs: session/RBAC, dashboard, team, orders, payment routing/channels, products, reviews, support, customer/member balances, account cleanup, promotions, and DigiFlazz pricing/monitor are native Laravel; remaining UI-adjacent operational endpoints are still in progress.
 - [ ] Port customer frontend and panel UI.
 - [x] Add minute-level production reconciliation scheduler with overlap protection.
-- [ ] Add final VPS Supervisor/systemd process definitions for queue worker and scheduler.
+- [x] Add final VPS systemd process definitions for queue worker and scheduler.
 - [ ] Deploy to VPS without DNS cutover.
 - [ ] Import the current production D1 snapshot and reconcile.
-- [ ] Cut over \`lfamiliastore.my.id\` only after validation.
+- [ ] Cut over `lfamiliastore.my.id` only after validation.
 
 ## Import safety
 
 The production import is intentionally guarded and cannot run accidentally:
 
-\`php artisan lfamilia:import-d1 /absolute/path/export.sql --replace --confirm=IMPORT_D1_TO_MARIADB\`
+`php artisan lfamilia:import-d1 /absolute/path/export.sql --replace --confirm=IMPORT_D1_TO_MARIADB`
 
 Run it only on the prepared VPS after a fresh D1 export has been copied to the server. The command never reads credentials from Git; it uses the active Laravel database connection from the server environment.
