@@ -188,7 +188,7 @@ export function AdminOrderManager() {
   async function loadOrders(signal?: AbortSignal) {
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/panel/orders", { cache: "no-store", signal });
+      const response = await fetch("/api/admin/orders", { cache: "no-store", signal });
       const payload = await response.json().catch(() => ({})) as { orders?: ApiOrder[]; role?: "super_admin" | "admin" | "staff"; error?: string };
       if (!response.ok || !payload.orders) throw new Error(payload.error || "Pesanan gagal dimuat.");
       setRole(payload.role || "staff");
@@ -279,7 +279,7 @@ export function AdminOrderManager() {
     if (!order.dbId) return;
     setDetailLoading(true);
     try {
-      const response = await fetch(`/api/panel/orders?id=${encodeURIComponent(order.dbId)}`, { cache: "no-store" });
+      const response = await fetch(`/api/admin/orders?id=${encodeURIComponent(order.dbId)}`, { cache: "no-store" });
       const payload = await response.json().catch(() => ({})) as { order?: ApiOrder; events?: ApiOrderEvent[]; error?: string };
       if (!response.ok || !payload.order) throw new Error(payload.error || "Detail pesanan gagal dimuat.");
       setDetailOrder(mapApiOrder(payload.order));
@@ -314,7 +314,7 @@ export function AdminOrderManager() {
 
   async function refreshFulfillmentStatus(order: Order) {
     if (!order.dbId) throw new Error("ID pesanan tidak tersedia.");
-    const response = await fetch("/api/panel/orders", {
+    const response = await fetch("/api/admin/orders", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: order.dbId, action: "refresh_fulfillment" }),
@@ -331,7 +331,7 @@ export function AdminOrderManager() {
     const data = new FormData(event.currentTarget);
     setSaving(true); setError("");
     try {
-      const response = await fetch("/api/panel/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(data.entries())) });
+      const response = await fetch("/api/admin/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(data.entries())) });
       const payload = await response.json().catch(() => ({})) as { referenceId?: string; error?: string };
       if (!response.ok) throw new Error(payload.error || "Pesanan manual gagal disimpan.");
       setManualOpen(false);
@@ -626,7 +626,7 @@ function OrderDetailModal({
     if (order.deliveryMode === "voucher" && !serialNumber.trim()) { setError("Kode voucher / serial wajib diisi."); return; }
     setSaving(true); setError("");
     try {
-      const response = await fetch("/api/panel/orders", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: order.dbId, action: "complete_manual", serialNumber: serialNumber.trim() || undefined }) });
+      const response = await fetch("/api/admin/orders", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: order.dbId, action: "complete_manual", serialNumber: serialNumber.trim() || undefined }) });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Pesanan gagal diselesaikan.");
       onNotice(`${order.id} berhasil diselesaikan.`);
