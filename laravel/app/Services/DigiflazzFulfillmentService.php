@@ -577,45 +577,6 @@ class DigiflazzFulfillmentService
         ];
     }
 
-    private function runtimeConfig(): array
-    {
-        $environment = trim((string) config('lfamilia.integrations.digiflazz.environment'));
-        if (!in_array($environment, ['development', 'production'], true)) {
-            throw new RuntimeException('DIGIFLAZZ_ENV belum dikonfigurasi.');
-        }
-
-        $username = trim((string) config('lfamilia.integrations.digiflazz.username'));
-        $apiKey = trim((string) config(
-            'lfamilia.integrations.digiflazz.'.($environment === 'production' ? 'production_api_key' : 'development_api_key'),
-        ));
-        $transactionUrl = trim((string) config(
-            'lfamilia.integrations.digiflazz.'.($environment === 'production'
-                ? 'production_transaction_url'
-                : 'development_transaction_url'),
-        ));
-
-        if ($username === '' || $apiKey === '') {
-            throw new RuntimeException('Kredensial DigiFlazz belum lengkap.');
-        }
-
-        $parts = parse_url($transactionUrl);
-        if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || empty($parts['host'])) {
-            throw new RuntimeException('URL transaksi DigiFlazz belum valid.');
-        }
-
-        $publicBaseUrl = trim((string) config('lfamilia.public_base_url'));
-        if (!preg_match('#^https://[^/]+#i', $publicBaseUrl)) {
-            throw new RuntimeException('PUBLIC_BASE_URL belum dikonfigurasi untuk callback DigiFlazz.');
-        }
-
-        return [
-            'environment' => $environment,
-            'username' => $username,
-            'apiKey' => $apiKey,
-            'transactionUrl' => $transactionUrl,
-        ];
-    }
-
     private function providerMessage(array $data, string $fallback): string
     {
         $message = trim((string) ($data['message'] ?? '')) ?: $fallback;
