@@ -14,16 +14,24 @@ class DigiflazzFulfillmentService
     public function __construct(
         private readonly CheckoutService $checkout,
         private readonly TransactionNotificationService $notifications,
+        private readonly IntegrationConfigService $integrations,
+        private readonly VoucherStockService $vouchers,
     ) {
     }
 
     public function fulfillOrder(string $orderId): void
     {
         $order = DB::table('orders')->where('id', $orderId)->first();
-        if (!$order
-            || $order->payment_status !== 'paid'
-            || $order->fulfillment_type !== 'automatic'
-            || strtolower(trim((string) $order->provider_code)) !== 'digiflazz') {
+        if (!$order || $order->payment_status !== 'paid' || $order->fulfillment_type !== 'automatic') {
+            return;
+        }
+
+        $providerCode = strtolower(trim((string) $order->provider_code));
+        if ($providerCode === 'voucher-stock') {
+            $this->vouchers->fulfillOrder($orderId);
+            return;
+        }
+        if ($providerCode !== 'digiflazz') {
             return;
         }
 
@@ -127,7 +135,7 @@ class DigiflazzFulfillmentService
 
     public function verifyWebhook(string $rawBody, ?string $signature): bool
     {
-        $secret = trim((string) config('lfamilia.integrations.digiflazz.webhook_secret'));
+        $secret = $this->integrations->digiflazzRuntime()['webhookSecret'];
         if ($secret === '' || !$signature) {
             return false;
         }
@@ -543,6 +551,32 @@ class DigiflazzFulfillmentService
     }
 
     /** @return array{environment:string,username:string,apiKey:string,transactionUrl:string} */
+    private function runtimeConfig(): array
+    {
+        $runtime = $this->integrations->digiflazzRuntime();
+        $environment = $runtime['environment'];
+        $username = $runtime['username'];
+        $apiKey = $runtime['apiKey'];
+        $transactionUrl = $runtime['transactionApiUrl'];
+
+        if ($username === '' || $apiKey === '') {
+            throw new RuntimeException('Kredensial DigiFlazz belum lengkap.');
+        }
+        $parts = parse_url($transactionUrl);
+        if (!is_array($parts)
+            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || empty($parts['host'])) {
+            throw new RuntimeException('URL transaksi DigiFlazz belum valid.');
+        }
+
+        return [
+            'environment'=>$environment,
+            'username'=>$username,
+            'apiKey'=>$apiKey,
+            'transactionUrl'=>$transactionUrl,
+        ];
+    }
+
     private function runtimeConfig(): array
     {
         $environment = trim((string) config('lfamilia.integrations.digiflazz.environment'));
