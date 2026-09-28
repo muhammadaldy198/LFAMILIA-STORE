@@ -1,3 +1,5 @@
+[Reading 49 lines from start (total: 49 lines, 0 remaining)]
+
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -40,8 +42,12 @@ test("login UI exposes forgot password and SEO routes exclude private surfaces",
   assert.match(robots, /\/admin/);
   assert.match(robots, /\/api\//);
   assert.match(robots, /\/checkout/);
-  assert.match(sitemap, /news_articles WHERE is_published = 1/);
+  assert.match(sitemap, /LFAMILIA_LARAVEL_INTERNAL_URL/);
+  assert.match(sitemap, /\/api\/news/);
+  assert.doesNotMatch(sitemap, /news_articles WHERE is_published = 1/);
   assert.match(layout, /metadataBase/);
   assert.match(layout, /openGraph/);
   assert.match(layout, /application\/ld\+json/);
 });
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
