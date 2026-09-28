@@ -1,5 +1,3 @@
-[Reading 63 lines from start (total: 63 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -58,10 +56,8 @@ test("admin product reads avoid global compatibility repair while writes keep ni
 
 test("panel exposes product-input and editor persists real values", () => {
   assert.match(panel, /"product-input": \{ GET: productInput\.GET, PATCH: productInput\.PATCH \}/);
-  assert.match(manager, /fetch\(`\/api\/panel\/product-input\?slug=/);
-  assert.match(manager, /fetch\("\/api\/panel\/product-input", \{/);
+  assert.match(manager, /fetch\(`\/api\/admin\/product-input\?slug=/);
+  assert.match(manager, /fetch\("\/api\/admin\/product-input", \{/);
   assert.match(manager, /method: "PATCH"/);
   assert.match(manager, /Pengaturan input dan kode game berhasil disimpan ke backend/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
