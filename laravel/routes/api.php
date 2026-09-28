@@ -3,6 +3,8 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminSessionController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DokuCallbackController;
+use App\Http\Controllers\MidtransNotificationController;
 use App\Http\Controllers\NicknameController;
 use App\Http\Controllers\OrderSearchController;
 use App\Http\Controllers\ProductController;
