@@ -40,7 +40,8 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Port order-status Midtrans/DOKU reconciliation polling with amount checks and paid-state recovery.
 - [x] Port Digiflazz paid-only fulfillment, Max Price/availability recheck, bounded retries, multi-unit handling, and signed callback processing.
 - [x] Port Resend password-reset delivery and Google Identity login/linking with mandatory phone collection.
-- [ ] Port transaction-success email notifications and phone OTP delivery.
+- [x] Port Resend transaction-success email notifications with idempotent order delivery.
+- [ ] Port phone OTP delivery only after the final non-WhatsApp/WhatsApp provider choice is confirmed.
 - [ ] Port Admin / Staff / Super Admin APIs.
 - [ ] Port customer frontend and panel UI.
 - [ ] Add production queue worker and scheduler jobs.

@@ -6,6 +6,7 @@ use App\Services\DigiflazzFulfillmentService;
 use App\Services\ExternalWalletSettlementService;
 use App\Services\MidtransSnapService;
 use App\Services\PaymentTransitionService;
+use App\Services\TransactionNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,7 @@ class MidtransNotificationController extends Controller
         PaymentTransitionService $transitions,
         ExternalWalletSettlementService $wallet,
         DigiflazzFulfillmentService $fulfillment,
+        TransactionNotificationService $notifications,
     ): JsonResponse {
         $rawBody = $request->getContent();
         $body = json_decode($rawBody, true);
@@ -85,7 +87,7 @@ class MidtransNotificationController extends Controller
 
             if ($topup) {
                 if ($status !== 'ignore') {
-                    $wallet->apply(
+                    $settlement = $wallet->apply(
                         $referenceId,
                         'midtrans',
                         $status,
@@ -93,6 +95,15 @@ class MidtransNotificationController extends Controller
                         null,
                         $status === 'paid',
                     );
+                    if ($settlement['credited']) {
+                        $topupId = DB::table('wallet_topups')
+                            ->where('reference_id', $referenceId)
+                            ->where('payment_gateway', 'midtrans')
+                            ->value('id');
+                        if ($topupId) {
+                            $notifications->notifyWalletTopupSuccessById((string) $topupId);
+                        }
+                    }
                 }
 
                 return response()->json(['ok' => true]);

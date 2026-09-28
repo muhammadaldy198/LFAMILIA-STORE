@@ -6,6 +6,7 @@ use App\Services\DigiflazzFulfillmentService;
 use App\Services\DokuCheckoutService;
 use App\Services\ExternalWalletSettlementService;
 use App\Services\PaymentTransitionService;
+use App\Services\TransactionNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,7 @@ class DokuCallbackController extends Controller
         PaymentTransitionService $transitions,
         ExternalWalletSettlementService $wallet,
         DigiflazzFulfillmentService $fulfillment,
+        TransactionNotificationService $notifications,
     ) {
         $rawBody = $request->getContent();
         $payload = json_decode($rawBody, true);
@@ -74,7 +76,7 @@ class DokuCallbackController extends Controller
             }
 
             if ($topup) {
-                $wallet->apply(
+                $settlement = $wallet->apply(
                     $notification['referenceId'],
                     'doku',
                     $notification['status'],
@@ -82,6 +84,15 @@ class DokuCallbackController extends Controller
                     $notification['originalRequestId'],
                     $notification['status'] === 'paid',
                 );
+                if ($settlement['credited']) {
+                    $topupId = DB::table('wallet_topups')
+                        ->where('reference_id', $notification['referenceId'])
+                        ->where('payment_gateway', 'doku')
+                        ->value('id');
+                    if ($topupId) {
+                        $notifications->notifyWalletTopupSuccessById((string) $topupId);
+                    }
+                }
 
                 return $this->acknowledge();
             }

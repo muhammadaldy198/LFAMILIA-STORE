@@ -11,8 +11,10 @@ use Throwable;
 
 class DigiflazzFulfillmentService
 {
-    public function __construct(private readonly CheckoutService $checkout)
-    {
+    public function __construct(
+        private readonly CheckoutService $checkout,
+        private readonly TransactionNotificationService $notifications,
+    ) {
     }
 
     public function fulfillOrder(string $orderId): void
@@ -62,6 +64,9 @@ class DigiflazzFulfillmentService
                 (string) $order->reference_id,
             );
             $this->applyOrderResult($orderId, $result);
+            if ($result['status'] === 'success') {
+                $this->notifications->notifyOrderSuccessById($orderId);
+            }
         } catch (Throwable $error) {
             $this->setRetryableError($orderId, $error->getMessage() ?: 'Provider gagal dihubungi.');
         }
@@ -137,7 +142,7 @@ class DigiflazzFulfillmentService
      */
     public function applyWebhook(string $providerRefId, string $eventId, array $result): bool
     {
-        return DB::transaction(function () use ($providerRefId, $eventId, $result): bool {
+        $changed = DB::transaction(function () use ($providerRefId, $eventId, $result): bool {
             $unit = DB::table('order_fulfillment_units')
                 ->where('provider_ref_id', $providerRefId)
                 ->lockForUpdate()
@@ -216,6 +221,12 @@ class DigiflazzFulfillmentService
 
             return $changed > 0;
         }, 3);
+
+        if ($result['status'] === 'success') {
+            $this->notifications->notifyOrderSuccessByProviderRef('digiflazz', $providerRefId);
+        }
+
+        return $changed;
     }
 
     public function mapStatus(string $status, string $rc = ''): string
@@ -353,6 +364,10 @@ class DigiflazzFulfillmentService
         }
 
         $this->refreshMultiUnitOrder((string) $order->id);
+        $freshOrder = DB::table('orders')->where('id', $order->id)->first(['fulfillment_status']);
+        if ($freshOrder?->fulfillment_status === 'success') {
+            $this->notifications->notifyOrderSuccessById((string) $order->id);
+        }
     }
 
     private function claimUnit(int $unitId): bool
