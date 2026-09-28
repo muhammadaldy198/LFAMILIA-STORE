@@ -5,6 +5,7 @@ Requires=mariadb.service
 
 [Service]
 Type=oneshot
+EnvironmentFile=-/etc/lfamilia/ops.env
 ExecStart=/usr/local/sbin/lfamilia-db-backup
 User=root
 Group=root
