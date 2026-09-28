@@ -1,5 +1,3 @@
-[Reading 57 lines from start (total: 57 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -50,12 +48,10 @@ test("orders table exposes all reference columns and local controls", () => {
 });
 
 test("orders UI loads and mutates backend data", () => {
-  assert.match(source, /fetch\("\/api\/panel\/orders"/);
+  assert.match(source, /fetch\("\/api\/admin\/orders"/);
   assert.match(source, /method: "POST"/);
   assert.match(source, /method: "PATCH"/);
   assert.match(source, /complete_manual/);
   assert.match(source, /setInterval/);
   assert.doesNotMatch(source, /const initialOrders|12\.450 pesanan|Data tampilan berhasil diperbarui/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
