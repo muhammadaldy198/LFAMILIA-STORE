@@ -31,7 +31,8 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Import reconciles paid-order totals, wallet credit/debit totals, and aggregate customer balances.
 - [ ] Port authentication and RBAC.
 - [ ] Port products, pricing, nickname checks, checkout, promotions, reviews.
-- [ ] Port wallet and top-up ledger.
+- [x] Port wallet checkout debit path with row locking, server-side price, idempotency, and promo capacity checks.
+- [ ] Port external wallet top-up creation/reconciliation.
 - [x] Port Midtrans Snap and DOKU callback signature/amount/idempotency state transitions.
 - [ ] Port Midtrans/DOKU payment creation and reconciliation polling.
 - [ ] Port Digiflazz fulfillment and callback processing.

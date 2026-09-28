@@ -10,6 +10,7 @@ use App\Http\Controllers\OrderSearchController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SystemStatusController;
 use App\Http\Controllers\TurnstileController;
+use App\Http\Controllers\WalletCheckoutController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', static fn () => response()->json([
@@ -30,6 +31,7 @@ Route::patch('/account', [AccountController::class, 'update']);
 
 Route::get('/products', [ProductController::class, 'index']);
 Route::post('/nickname', [NicknameController::class, 'verify']);
+Route::post('/payments/wallet/create', [WalletCheckoutController::class, 'create']);
 
 Route::get('/orders/search', [OrderSearchController::class, 'recent']);
 Route::post('/orders/search', [OrderSearchController::class, 'search']);
@@ -41,5 +43,5 @@ Route::post('/payments/midtrans/snap/notification', [MidtransNotificationControl
 Route::get('/payments/doku/callback', [DokuCallbackController::class, 'show']);
 Route::post('/payments/doku/callback', [DokuCallbackController::class, 'handle']);
 
-// Payment creation, wallet checkout mutation, and provider fulfillment remain
-// disabled until their complete server-side validation and retry paths are ported.
+// External gateway payment creation and provider fulfillment remain disabled
+// until their complete retry/reconciliation paths are ported.

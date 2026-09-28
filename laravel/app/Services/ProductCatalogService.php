@@ -60,7 +60,10 @@ class ProductCatalogService
                 if ($providerCode === 'voucher-stock') {
                     $available = $providerSku !== '' && $voucherStock->has($providerSku);
                 } elseif ($providerCode === 'digiflazz') {
-                    $available = $this->digiflazzAvailable($monitor->get($package->id));
+                    $available = $this->digiflazzAvailable(
+                        $monitor->get($package->id),
+                        $package->provider_max_price === null ? null : (int) $package->provider_max_price,
+                    );
                 }
 
                 if (!$available) {
@@ -136,13 +139,17 @@ class ProductCatalogService
         return ['products' => $result, 'databaseReady' => true];
     }
 
-    private function digiflazzAvailable(?object $row): bool
+    private function digiflazzAvailable(?object $row, ?int $maxPrice = null): bool
     {
         if (!$row || !(bool) $row->buyer_product_status || !(bool) $row->seller_product_status) {
             return false;
         }
 
         if (!(bool) $row->unlimited_stock && (int) $row->stock <= 0) {
+            return false;
+        }
+
+        if ($maxPrice !== null && $row->current_price !== null && (int) $row->current_price > $maxPrice) {
             return false;
         }
 
