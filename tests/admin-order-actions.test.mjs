@@ -1,3 +1,5 @@
+[Reading 39 lines from start (total: 39 lines, 0 remaining)]
+
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -37,3 +39,5 @@ test("admin fulfillment refresh never marks payment paid and reconciles DigiFlaz
   assert.match(reconciliation, /provider_status = 'dispatching' AND updated_at <= datetime\('now', '-2 minutes'\)/);
   assert.match(reconciliation, /fulfillment_status NOT IN \('success', 'failed', 'cancelled'\)/);
 });
+
+[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
