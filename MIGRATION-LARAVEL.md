@@ -86,3 +86,17 @@ DNS remains on the existing Cloudflare Worker until provider credentials are re-
 - Cloudflare SSL is Full (strict), TLS 1.3 is enabled, minimum TLS is 1.2, and Admin Access destinations cover both `/admin/*` and `/api/admin/*`; Staff remains outside Access as intended.
 - The existing Cloudflare rate-limit rule already targets the Laravel checkout/auth paths, including `/api/payments/auto/create` and `/api/payments/wallet/create`.
 - Daily MariaDB backup is enabled, a generated dump passed checksum verification, and a restore drill matched order/customer/package/media row counts plus paid-order totals.
+
+
+### Additional production hardening
+
+- UFW is active with only SSH/HTTP/HTTPS exposed; Node :3000, MariaDB :3306, and Laravel :8080 remain loopback-only.
+- Fail2Ban protects SSH and automatically bans repeated password attacks. The initial audit observed heavy internet brute-force traffic, so the highest-volume abusive IPs were also banned immediately.
+- Systemd service hardening reduced the exposure score of the web/queue/scheduler units while preserving their required network access.
+- A read-only health timer checks health/system-status/products/storefront every five minutes.
+- MariaDB slow-query logging is enabled at a 1-second threshold and rotated daily.
+- MariaDB backups are created daily and the newest backup is restored into a temporary database every week for automated verification.
+- Production PHP upload limits now exceed the application 5 MiB image limit without exceeding Nginx's 8 MiB request limit.
+- Laravel Composer dependencies are pinned by `composer.lock`; npm/composer security audits reported no known vulnerabilities at this checkpoint.
+- API CORS is restricted to the configured storefront origin instead of wildcard browser origins.
+- Cloudflare rate limiting now covers customer auth/password-reset, nickname, order lookup, promo quote/reviews, support/top-up/payment creation, and Admin/Staff login mutations.
