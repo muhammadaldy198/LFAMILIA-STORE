@@ -18,6 +18,8 @@ fail() {
   exit 1
 }
 
+[[ "$(id -u)" -eq 0 ]] || fail "run this cutover preflight as root; the backup directory is intentionally root-only"
+
 echo "== Runtime =="
 "$ROOT/laravel/deploy/vps-runtime-check.sh"
 
