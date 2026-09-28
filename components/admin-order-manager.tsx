@@ -13,7 +13,6 @@ import {
   Cog,
   Copy,
   Download,
-  Eye,
   Landmark,
   Plus,
   QrCode,

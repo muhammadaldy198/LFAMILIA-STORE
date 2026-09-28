@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element, react-hooks/set-state-in-effect */
 
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowLeft,
@@ -183,7 +183,7 @@ export function AdminProductManager() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  async function loadProducts(signal?: AbortSignal) {
+  const loadProducts = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError("");
     try {
@@ -194,7 +194,7 @@ export function AdminProductManager() {
       const nextCategories = (categoryPayload.categories || [])
         .slice()
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
-      const usableCategories = nextCategories.length ? nextCategories : categoryOptions;
+      const usableCategories = nextCategories.length ? nextCategories : PRODUCT_CATEGORIES.map((item, index) => ({ slug: item.slug, name: item.label, isActive: true, sortOrder: index }));
       setCategoryOptions(usableCategories);
       const payload = productPayload;
       const mapProduct = (item: ManagedProductPayload) => mapProductRecord(item, usableCategories);
@@ -205,13 +205,13 @@ export function AdminProductManager() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     void loadProducts(controller.signal);
     return () => controller.abort();
-  }, []);
+  }, [loadProducts]);
 
   const visibleProducts = useMemo(() => {
     const term = query.trim().toLowerCase();
