@@ -66,5 +66,3 @@ test("forged Access email and unsigned assertion are rejected", async () => {
   const payload = await response.json();
   assert.equal(payload.error, "Cloudflare Access belum memvalidasi area Admin.");
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
