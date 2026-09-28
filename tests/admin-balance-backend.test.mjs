@@ -1,5 +1,3 @@
-[Reading 31 lines from start (total: 31 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
