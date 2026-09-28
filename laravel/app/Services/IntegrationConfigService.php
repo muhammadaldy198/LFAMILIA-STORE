@@ -133,18 +133,26 @@ class IntegrationConfigService
 
         $encrypted = $this->encrypt($existing, $secret);
 
-        DB::table('integration_profiles')->updateOrInsert(
-            [
+        $scope = DB::table('integration_profiles')
+            ->where('provider', $provider)
+            ->where('mode', $mode)
+            ->where('environment', $environment);
+
+        if ($scope->exists()) {
+            $scope->update([
+                'encrypted_config' => $encrypted,
+                'updated_at' => now(),
+            ]);
+        } else {
+            DB::table('integration_profiles')->insert([
                 'provider' => $provider,
                 'mode' => $mode,
                 'environment' => $environment,
-            ],
-            [
                 'encrypted_config' => $encrypted,
+                'created_at' => now(),
                 'updated_at' => now(),
-                'created_at' => DB::raw('COALESCE(created_at, CURRENT_TIMESTAMP)'),
-            ],
-        );
+            ]);
+        }
     }
 
     public function setting(string $key): ?string
