@@ -4,6 +4,14 @@ set -euo pipefail
 APP_ROOT="${LFAMILIA_ROOT:-/var/www/lfamilia-store}"
 HOST="${LFAMILIA_HOST:-lfamiliastore.my.id}"
 
+as_app() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    runuser -u lfamilia -- bash -lc "$1"
+  else
+    bash -lc "$1"
+  fi
+}
+
 check_service() {
   local name="$1"
   if ! systemctl is-active --quiet "$name"; then
@@ -38,7 +46,7 @@ check_http /api/storefront 200
 check_http /admin/panel/login 200
 check_http /staff/panel/login 200
 
-runuser -u lfamilia -- bash -lc "cd '${APP_ROOT}' && git diff --check"
-runuser -u lfamilia -- bash -lc "cd '${APP_ROOT}/laravel' && php artisan migrate:status >/dev/null"
+as_app "cd '${APP_ROOT}' && git diff --check"
+as_app "cd '${APP_ROOT}/laravel' && php artisan migrate:status >/dev/null"
 
 echo "VPS runtime check passed."
