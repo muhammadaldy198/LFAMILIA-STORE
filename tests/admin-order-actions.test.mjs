@@ -1,5 +1,3 @@
-[Reading 39 lines from start (total: 39 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -11,7 +9,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 test("admin order detail uses real persisted events and status-aware actions", () => {
   const ui = read("components/admin-order-manager.tsx");
 
-  assert.match(ui, /\/api\/panel\/orders\?id=/);
+  assert.match(ui, /\/api\/admin\/orders\?id=/);
   assert.match(ui, /events\?: ApiOrderEvent\[\]/);
   assert.match(ui, /eventLabel\(event\.status\)/);
   assert.match(ui, /Cek Status Pembayaran/);
@@ -39,5 +37,3 @@ test("admin fulfillment refresh never marks payment paid and reconciles DigiFlaz
   assert.match(reconciliation, /provider_status = 'dispatching' AND updated_at <= datetime\('now', '-2 minutes'\)/);
   assert.match(reconciliation, /fulfillment_status NOT IN \('success', 'failed', 'cancelled'\)/);
 });
-
-[executed on device: server.lfamiliastore.my.id (6e813ea5-0449-4fcd-b21d-fddea1cea590)]
