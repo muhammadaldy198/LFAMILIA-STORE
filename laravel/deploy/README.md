@@ -94,13 +94,16 @@ Template production yang dipakai VPS disimpan di folder deploy:
 - `deploy/logrotate/lfamilia-laravel` — rotasi log Laravel harian.
 - `deploy/lfamilia-db-backup.sh` + unit systemd backup — dump MariaDB terkompresi dengan checksum dan retention.
 - `deploy/vps-runtime-check.sh` — read-only smoke check service, health endpoint, migration status, dan working tree.
+- `deploy/install-ops-systemd.sh` — memasang backup harian, verifikasi restore mingguan, dan healthcheck berkala tanpa mengaktifkan queue/scheduler provider. Pada CloudPanel, script membuat login client MariaDB root-only dari master credential CloudPanel tanpa menyimpan credential di repository.
+
+Jalankan installer operasional sebagai root dari checkout aktif. Installer membaca `DB_DATABASE` dari `laravel/.env`, menyimpan hanya konfigurasi operasional non-provider di `/etc/lfamilia/ops.env`, lalu memasang unit systemd dalam keadaan belum diaktifkan agar setiap service dapat diuji satu per satu sebelum timer dinyalakan.
 
 Laravel membaca `CF-Connecting-IP` langsung untuk rate-limit/security. Jangan mengaktifkan Nginx `real_ip_header CF-Connecting-IP` bersamaan dengan `allow/deny` origin ini tanpa mengubah desain allowlist, karena access phase akan melihat IP customer dan dapat menolak request Cloudflare yang valid.
 
 Contoh check runtime:
 
 ```bash
-cd /var/www/lfamilia-store
+cd /path/to/LFAMILIA-STORE
 ./laravel/deploy/vps-runtime-check.sh
 ```
 
