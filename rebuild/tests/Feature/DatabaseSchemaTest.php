@@ -29,13 +29,13 @@ class DatabaseSchemaTest extends TestCase
     public function test_wallet_ledger_accepts_a_valid_debit_and_rejects_an_invalid_balance(): void
     {
         $userId = DB::table('users')->insertGetId(['name' => 'Customer']);
-        $walletId = DB::table('wallets')->insertGetId(['user_id' => $userId, 'balance_minor' => 900]);
+        $walletId = DB::table('wallets')->insertGetId(['user_id' => $userId, 'balance_idr' => 900]);
 
         DB::table('wallet_ledger')->insert([
             'wallet_id' => $walletId,
-            'amount_minor' => -100,
-            'balance_before_minor' => 1000,
-            'balance_after_minor' => 900,
+            'amount_idr' => -100,
+            'balance_before_idr' => 1000,
+            'balance_after_idr' => 900,
             'source' => 'CHECKOUT',
             'reference_type' => 'ORDER',
             'reference_id' => 'test-order-1',
@@ -45,9 +45,9 @@ class DatabaseSchemaTest extends TestCase
         $this->expectException(QueryException::class);
         DB::table('wallet_ledger')->insert([
             'wallet_id' => $walletId,
-            'amount_minor' => -100,
-            'balance_before_minor' => 900,
-            'balance_after_minor' => 900,
+            'amount_idr' => -100,
+            'balance_before_idr' => 900,
+            'balance_after_idr' => 900,
             'source' => 'CHECKOUT',
             'reference_type' => 'ORDER',
             'reference_id' => 'test-order-2',
@@ -82,9 +82,9 @@ class DatabaseSchemaTest extends TestCase
             'product_package_id' => $packageId,
             'customer_input' => json_encode(['user_id' => '123']),
             'snapshot' => json_encode(['package' => 'TEST1']),
-            'cost_minor' => 0,
-            'margin_minor' => 0,
-            'total_minor' => 0,
+            'cost_idr' => 0,
+            'margin_idr' => 0,
+            'total_idr' => 0,
             'idempotency_key' => 'test-zero-order',
         ]);
     }
