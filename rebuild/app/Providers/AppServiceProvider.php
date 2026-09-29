@@ -47,7 +47,7 @@ class AppServiceProvider extends ServiceProvider
             return $limits;
         });
         RateLimiter::for('checkout-create', fn (Request $request) => Limit::perMinute(20)
-            ->by('checkout-create:'.($request->user()?->id ?? $request->ip()));
+            ->by('checkout-create:'.($request->user()?->id ?? $request->ip())));
         RateLimiter::for('guest-order', fn (Request $request) => Limit::perMinute(10)
             ->by('guest-order:'.$request->ip()));
         RateLimiter::for('google-oauth', fn (Request $request) => Limit::perMinute(10)
