@@ -6,7 +6,16 @@ import { AlertTriangle, Archive, BarChart3, CheckCircle2, Clock3, Download, Edit
 import { Field, MetricCard, Modal, Panel, Status, TabBar, Toggle, WorkspaceHeader, buttonClass, inputClass, primaryButtonClass } from "./admin-workspace-ui";
 
 type Voucher = { id: number; code: string; name: string; description: string; discountType: "fixed" | "percentage"; discountValue: number; minPurchase: number; maxDiscount: number | null; usageLimit: number | null; usedCount?: number; startsAt: string; endsAt: string; isActive: boolean };
-type FlashSale = { id: number; productSlug: string; packageSku: string; salePrice: number; badge: string; stockLimit: number | null; startsAt: string; endsAt: string; isActive: boolean };
+type PopularProduct = {
+  dbId: number;
+  slug: string;
+  name: string;
+  category: string;
+  popular: boolean;
+  isActive: boolean;
+  packages: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+};
 type SupportRequest = { id: string; kind: string; order_reference: string | null; subject: string; message: string; status: "open" | "in_progress" | "resolved" | "rejected"; staff_reply: string | null; customer_name: string; customer_email: string; created_at: string; updated_at: string };
 type TeamUser = { id: number; username: string; name: string; role: "super_admin" | "admin" | "staff"; isActive: boolean; created_at: string; updated_at: string };
 type Summary = { canViewFinance?: boolean; metrics: { totalOrders: number; paidRevenue: number | null; profit: number | null; totalDiscount: number | null; fulfilledOrders: number; pendingPayments: number; pendingFulfillments: number; failedOrders: number; customers: number }; chart: Array<{ day: string; orders: number; revenue: number | null; profit: number | null }>; topProducts: Array<{ slug: string; name: string; totalOrders: number; fulfilledOrders: number; revenue: number | null; profit: number | null }>; recentOrders: Array<{ id: string; referenceId: string; productName: string; paymentChannel: string; paymentStatus: string; fulfillmentStatus: string; total: number | null; createdAt: string }>; recentActivities: Array<{ id: string; adminName: string; adminRole: string; action: string; target: string; createdAt: string }>; attention: Record<string, number>; integrations?: { doku?: { ready?: boolean }; digiflazz?: { ready?: boolean } } };
@@ -26,33 +35,106 @@ function saveDownload(name: string, content: string, type: string) { const link 
 
 export function AdminPromoWorkspace() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  const [flashSales, setFlashSales] = useState<FlashSale[]>([]);
+  const [products, setProducts] = useState<PopularProduct[]>([]);
   const [editing, setEditing] = useState<Voucher | null | undefined>(undefined);
-  const [editingFlash, setEditingFlash] = useState<FlashSale | null | undefined>(undefined);
   const [query, setQuery] = useState("");
+  const [productQuery, setProductQuery] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  async function load() { try { const data = await api<{ vouchers: Voucher[]; flashSales: FlashSale[] }>("/api/admin/promotions", { cache: "no-store" }); setVouchers(data.vouchers); setFlashSales(data.flashSales); setError(""); } catch (reason) { setError(reason instanceof Error ? reason.message : "Promo gagal dimuat."); } }
-  useEffect(() => { void load(); }, []);
-  async function persist(item: Voucher) { setSaving(true); try { await api("/api/admin/promotions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "voucher", ...item, id: item.id > 0 ? item.id : null }) }); setEditing(undefined); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Promo gagal disimpan."); } finally { setSaving(false); } }
-  async function remove(item: Voucher) { if (!window.confirm(`Hapus promo ${item.code}?`)) return; try { await api(`/api/admin/promotions?kind=voucher&id=${item.id}`, { method: "DELETE" }); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Promo gagal dihapus."); } }
-  async function persistFlash(item: FlashSale) { setSaving(true); try { await api("/api/admin/promotions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "flash", ...item, id: item.id > 0 ? item.id : null }) }); setEditingFlash(undefined); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Flash sale gagal disimpan."); } finally { setSaving(false); } }
-  async function removeFlash(item: FlashSale) { if (!window.confirm(`Hapus flash sale ${item.badge}?`)) return; try { await api(`/api/admin/promotions?kind=flash&id=${item.id}`, { method: "DELETE" }); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Flash sale gagal dihapus."); } }
-  const shown = vouchers.filter((item) => `${item.code} ${item.name}`.toLowerCase().includes(query.toLowerCase()));
-  return <div><WorkspaceHeader title="Promo" description="Kelola voucher diskon, promo member, jadwal event, dan batas penggunaan." actions={<><button type="button" onClick={() => void load()} className={buttonClass}><RefreshCw className="size-3.5" />Refresh</button><button type="button" onClick={() => setEditingFlash(null)} className={buttonClass}><Sparkles className="size-3.5" />Tambah Flash Sale</button><button type="button" onClick={() => setEditing(null)} className={primaryButtonClass}><Plus className="size-3.5" />Tambah Promo</button></>} />{error && <ErrorBox message={error} />}
-    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"><MetricCard icon={Ticket} label="Promo Aktif" value={String(vouchers.filter((item) => item.isActive).length)} detail={`${flashSales.filter((item) => item.isActive).length} flash sale aktif`} /><MetricCard icon={Gift} label="Total Pemakaian" value={String(vouchers.reduce((sum, item) => sum + Number(item.usedCount || 0), 0))} detail="Seluruh voucher" tone="green" /><MetricCard icon={Sparkles} label="Flash Sale" value={String(flashSales.length)} detail="Campaign tersimpan" tone="violet" /><MetricCard icon={Users} label="Kuota Tersisa" value={String(vouchers.reduce((sum, item) => sum + Math.max(0, Number(item.usageLimit || 0) - Number(item.usedCount || 0)), 0))} detail="Voucher terbatas" tone="amber" /></div>
-    <Panel title="Daftar Promo" description="Voucher yang aktif akan dapat dipakai pelanggan saat checkout." action={<div className="relative"><Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#8190a5]" /><input value={query} onChange={(event) => setQuery(event.target.value)} className={`${inputClass} w-full pl-8 sm:w-56`} placeholder="Cari kode promo..." /></div>}><Table headers={["Kode", "Nama", "Nilai", "Terpakai", "Periode", "Status", "Ditampilkan", "Aksi"]}>{shown.map((item) => <tr key={item.id} className="text-[9px] text-[#42516a]"><td className="px-4 py-3"><strong className="rounded bg-blue-50 px-2 py-1 font-extrabold text-[#0769e9]">{item.code}</strong></td><td className="px-4 font-semibold">{item.name}</td><td className="px-4">{item.discountType === "percentage" ? `${item.discountValue}%` : rupiah(item.discountValue)}</td><td className="px-4">{item.usedCount || 0} / {item.usageLimit || "∞"}</td><td className="px-4">{date(item.startsAt)} – {date(item.endsAt)}</td><td className="px-4"><Status tone={item.isActive ? "green" : "gray"}>{item.isActive ? "Aktif" : "Nonaktif"}</Status></td><td className="px-4"><Toggle checked={item.isActive} onChange={(value) => void persist({ ...item, isActive: value })} /></td><td className="px-4"><div className="flex gap-1"><button type="button" className={buttonClass} onClick={() => setEditing(item)}><Edit3 className="size-3.5" />Edit</button><button type="button" className={`${buttonClass} px-2 text-rose-500`} onClick={() => void remove(item)}><Trash2 className="size-3.5" /></button></div></td></tr>)}</Table></Panel>
-    <Panel title="Daftar Flash Sale" description="Harga khusus aktif otomatis pada produk dan nominal yang dipilih pelanggan." className="mt-4" action={<button type="button" className={primaryButtonClass} onClick={() => setEditingFlash(null)}><Plus className="size-3.5" />Tambah Flash Sale</button>}><Table headers={["Produk", "SKU Nominal", "Harga Sale", "Periode", "Stok", "Status", "Aksi"]}>{flashSales.map((item) => <tr key={item.id} className="text-[9px] text-[#42516a]"><td className="px-4 py-3 font-semibold">{item.productSlug}</td><td className="px-4">{item.packageSku}</td><td className="px-4">{rupiah(item.salePrice)}</td><td className="px-4">{date(item.startsAt)} – {date(item.endsAt)}</td><td className="px-4">{item.stockLimit || "∞"}</td><td className="px-4"><Status tone={item.isActive ? "green" : "gray"}>{item.isActive ? "Aktif" : "Nonaktif"}</Status></td><td className="px-4"><div className="flex gap-1"><button type="button" className={buttonClass} onClick={() => setEditingFlash(item)}><Edit3 className="size-3.5" />Edit</button><button type="button" className={`${buttonClass} px-2 text-rose-500`} onClick={() => void removeFlash(item)}><Trash2 className="size-3.5" /></button></div></td></tr>)}</Table></Panel>
-    <PromoModal value={editing} saving={saving} onClose={() => setEditing(undefined)} onSave={(item) => void persist(item)} />
-    <FlashSaleModal value={editingFlash} saving={saving} onClose={() => setEditingFlash(undefined)} onSave={(item) => void persistFlash(item)} />
-  </div>;
-}
 
-function FlashSaleModal({ value, saving, onClose, onSave }: { value: FlashSale | null | undefined; saving: boolean; onClose(): void; onSave(item: FlashSale): void }) {
-  if (value === undefined) return null;
-  const local = (iso?: string) => iso ? new Date(iso).toISOString().slice(0, 16) : "";
-  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); onSave({ id: value?.id || -1, productSlug: String(data.get("productSlug") || "").trim(), packageSku: String(data.get("packageSku") || "").trim(), salePrice: Number(data.get("salePrice")), badge: String(data.get("badge") || "").trim(), stockLimit: Number(data.get("stockLimit")) || null, startsAt: new Date(String(data.get("startsAt"))).toISOString(), endsAt: new Date(String(data.get("endsAt"))).toISOString(), isActive: data.get("isActive") === "on" }); }
-  return <Modal open title={value ? "Edit Flash Sale" : "Tambah Flash Sale"} description="Masukkan slug produk dan SKU nominal yang sudah ada. Server memvalidasi harga sale lebih rendah dari harga normal." onClose={onClose}><form onSubmit={submit}><div className="grid grid-cols-1 gap-4 lg:grid-cols-2"><Field label="Slug produk"><input name="productSlug" required defaultValue={value?.productSlug} className={inputClass} placeholder="mobile-legends" /></Field><Field label="SKU nominal"><input name="packageSku" required defaultValue={value?.packageSku} className={inputClass} placeholder="ml-86" /></Field><Field label="Harga flash sale"><input name="salePrice" required type="number" min="1" defaultValue={value?.salePrice} className={inputClass} /></Field><Field label="Badge"><input name="badge" required maxLength={30} defaultValue={value?.badge || "Flash Sale"} className={inputClass} /></Field><Field label="Batas stok"><input name="stockLimit" type="number" min="1" defaultValue={value?.stockLimit || ""} className={inputClass} placeholder="Kosong = tanpa batas" /></Field><Field label="Status"><label className="flex h-9 items-center gap-2"><input name="isActive" type="checkbox" defaultChecked={value?.isActive ?? true} /> Aktif</label></Field><Field label="Mulai"><input name="startsAt" type="datetime-local" required defaultValue={local(value?.startsAt)} className={inputClass} /></Field><Field label="Berakhir"><input name="endsAt" type="datetime-local" required defaultValue={local(value?.endsAt)} className={inputClass} /></Field></div><p className="mt-4 text-[9px] leading-5 text-[#718198]">Harga normal dan kecocokan slug/SKU diperiksa backend sebelum flash sale disimpan.</p><div className="mt-4 flex justify-end gap-2"><button type="button" className={buttonClass} onClick={onClose}>Batal</button><button disabled={saving} className={primaryButtonClass}>{saving ? "Menyimpan..." : "Simpan Flash Sale"}</button></div></form></Modal>;
+  async function load() {
+    try {
+      const [promoData, productData] = await Promise.all([
+        api<{ vouchers: Voucher[] }>("/api/admin/promotions", { cache: "no-store" }),
+        api<{ products: PopularProduct[] }>("/api/admin/products", { cache: "no-store" }),
+      ]);
+      setVouchers(promoData.vouchers || []);
+      setProducts(productData.products || []);
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Promo gagal dimuat.");
+    }
+  }
+
+  useEffect(() => { void load(); }, []);
+
+  async function persist(item: Voucher) {
+    setSaving(true);
+    try {
+      await api("/api/admin/promotions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "voucher", ...item, id: item.id > 0 ? item.id : null }),
+      });
+      setEditing(undefined);
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Promo gagal disimpan.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(item: Voucher) {
+    if (!window.confirm(`Hapus promo ${item.code}?`)) return;
+    try {
+      await api(`/api/admin/promotions?kind=voucher&id=${item.id}`, { method: "DELETE" });
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Promo gagal dihapus.");
+    }
+  }
+
+  async function togglePopular(item: PopularProduct, popular: boolean) {
+    setSaving(true);
+    setError("");
+    try {
+      await api("/api/admin/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...item, popular }),
+      });
+      setProducts((current) => current.map((product) => product.dbId === item.dbId ? { ...product, popular } : product));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Status Populer sekarang gagal disimpan.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const shown = vouchers.filter((item) => `${item.code} ${item.name}`.toLowerCase().includes(query.toLowerCase()));
+  const shownProducts = products
+    .filter((item) => `${item.name} ${item.slug} ${item.category}`.toLowerCase().includes(productQuery.toLowerCase()))
+    .sort((left, right) => Number(right.popular) - Number(left.popular) || left.name.localeCompare(right.name));
+
+  return <div>
+    <WorkspaceHeader
+      title="Promo"
+      description="Kelola voucher diskon dan prioritas produk pada bagian Populer sekarang di frontend customer."
+      actions={<><button type="button" onClick={() => void load()} className={buttonClass}><RefreshCw className="size-3.5" />Refresh</button><button type="button" onClick={() => setEditing(null)} className={primaryButtonClass}><Plus className="size-3.5" />Tambah Voucher</button></>}
+    />
+    {error && <ErrorBox message={error} />}
+    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <MetricCard icon={Ticket} label="Voucher Aktif" value={String(vouchers.filter((item) => item.isActive).length)} detail="Dapat dipakai saat checkout" />
+      <MetricCard icon={Gift} label="Total Pemakaian" value={String(vouchers.reduce((sum, item) => sum + Number(item.usedCount || 0), 0))} detail="Seluruh voucher" tone="green" />
+      <MetricCard icon={Sparkles} label="Populer Sekarang" value={String(products.filter((item) => item.popular).length)} detail="Produk diprioritaskan di homepage" tone="violet" />
+      <MetricCard icon={Users} label="Kuota Tersisa" value={String(vouchers.reduce((sum, item) => sum + Math.max(0, Number(item.usageLimit || 0) - Number(item.usedCount || 0)), 0))} detail="Voucher terbatas" tone="amber" />
+    </div>
+
+    <Panel title="Voucher Diskon" description="Voucher aktif dapat dipakai pelanggan pada checkout." action={<div className="relative"><Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#8190a5]" /><input value={query} onChange={(event) => setQuery(event.target.value)} className={`${inputClass} w-full pl-8 sm:w-56`} placeholder="Cari kode voucher..." /></div>}>
+      <Table headers={["Kode", "Nama", "Nilai", "Terpakai", "Periode", "Status", "Aktif", "Aksi"]}>
+        {shown.map((item) => <tr key={item.id} className="text-[9px] text-[#42516a]"><td className="px-4 py-3"><strong className="rounded bg-blue-50 px-2 py-1 font-extrabold text-[#0769e9]">{item.code}</strong></td><td className="px-4 font-semibold">{item.name}</td><td className="px-4">{item.discountType === "percentage" ? `${item.discountValue}%` : rupiah(item.discountValue)}</td><td className="px-4">{item.usedCount || 0} / {item.usageLimit || "∞"}</td><td className="px-4">{date(item.startsAt)} – {date(item.endsAt)}</td><td className="px-4"><Status tone={item.isActive ? "green" : "gray"}>{item.isActive ? "Aktif" : "Nonaktif"}</Status></td><td className="px-4"><Toggle checked={item.isActive} onChange={(value) => void persist({ ...item, isActive: value })} /></td><td className="px-4"><div className="flex gap-1"><button type="button" className={buttonClass} onClick={() => setEditing(item)}><Edit3 className="size-3.5" />Edit</button><button type="button" className={`${buttonClass} px-2 text-rose-500`} onClick={() => void remove(item)}><Trash2 className="size-3.5" /></button></div></td></tr>)}
+      </Table>
+    </Panel>
+
+    <Panel title="Populer sekarang" description="Produk bertanda populer diprioritaskan pada bagian Populer sekarang di homepage customer. Produk lain tetap dapat mengisi slot berdasarkan rating." className="mt-4" action={<div className="relative"><Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#8190a5]" /><input value={productQuery} onChange={(event) => setProductQuery(event.target.value)} className={`${inputClass} w-full pl-8 sm:w-56`} placeholder="Cari produk..." /></div>}>
+      <Table headers={["Produk", "Kategori", "Nominal", "Status Produk", "Prioritas Populer"]}>
+        {shownProducts.map((item) => <tr key={item.dbId} className="text-[9px] text-[#42516a]"><td className="px-4 py-3"><strong className="block text-[#23334e]">{item.name}</strong><span className="text-[8px] text-[#8190a5]">{item.slug}</span></td><td className="px-4">{item.category}</td><td className="px-4">{item.packages?.length || 0}</td><td className="px-4"><Status tone={item.isActive ? "green" : "gray"}>{item.isActive ? "Aktif" : "Nonaktif"}</Status></td><td className="px-4"><Toggle checked={item.popular} onChange={(value) => void togglePopular(item, value)} /></td></tr>)}
+      </Table>
+    </Panel>
+
+    <PromoModal value={editing} saving={saving} onClose={() => setEditing(undefined)} onSave={(item) => void persist(item)} />
+  </div>;
 }
 
 function PromoModal({ value, saving, onClose, onSave }: { value: Voucher | null | undefined; saving: boolean; onClose(): void; onSave(item: Voucher): void }) {
