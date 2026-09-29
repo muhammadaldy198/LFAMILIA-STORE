@@ -117,5 +117,8 @@ jobs:
       - name: Run rebuild tests
         run: vendor/bin/phpunit
 
+      - name: Run M11 browser smoke
+        run: bash tests/Browser/smoke.sh
+
       - name: Check PHP style
         run: vendor/bin/pint --test
