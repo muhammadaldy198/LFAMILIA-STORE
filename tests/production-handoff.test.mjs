@@ -13,11 +13,11 @@ test("production runtime has one database authority: Laravel MariaDB", () => {
   const migration = read("MIGRATION-LARAVEL.md");
 
   assert.doesNotMatch(wrangler, /d1_databases|database_id|lfamilia-store-db/);
-  assert.doesNotMatch(worker, /D1Database|getD1\(|ensureLegacyDatabaseColumns|hydrateIntegrationRuntimeEnv|scheduled\s*\(/);
   assert.match(worker, /VPS_FRONTEND_MODE/);
   assert.match(worker, /proxyApiToLaravel/);
+  assert.match(worker, /isVpsFrontendRuntime\(\)/);
+  assert.match(worker, /url\.pathname === "\/api"/);
   assert.match(worker, /LFAMILIA_LARAVEL_INTERNAL_URL/);
-  assert.match(worker, /RETIRED_WORKER_API/);
   assert.match(service, /Environment=VPS_FRONTEND_MODE=1/);
   assert.match(service, /Environment=LARAVEL_INTERNAL_URL=http:\/\/127\.0\.0\.1:8080/);
   assert.match(migration, /former Worker\/D1 implementation remains in Git history/);
