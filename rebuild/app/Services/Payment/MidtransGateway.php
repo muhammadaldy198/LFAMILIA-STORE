@@ -10,6 +10,50 @@ use RuntimeException;
 class MidtransGateway
 {
     /**
+     * @return array<string, mixed>
+     */
+    public function status(string $merchantReference): array
+    {
+        $credential = IntegrationCredential::where('code', 'midtrans')->where('is_active', true)->first();
+        $config = $credential?->config_ciphertext;
+        if (! is_array($config) || empty($config['server_key'])) {
+            throw new RuntimeException('MIDTRANS_STATUS_UNAVAILABLE');
+        }
+
+        $production = (bool) ($config['is_production'] ?? false);
+        $baseUrl = $production
+            ? 'https://api.midtrans.com'
+            : 'https://api.sandbox.midtrans.com';
+
+        try {
+            $response = Http::acceptJson()
+                ->withBasicAuth((string) $config['server_key'], '')
+                ->connectTimeout(2)
+                ->timeout(4)
+                ->get($baseUrl.'/v2/'.rawurlencode($merchantReference).'/status');
+        } catch (\Throwable $exception) {
+            throw new RuntimeException('MIDTRANS_STATUS_UNAVAILABLE', previous: $exception);
+        }
+
+        if (! $response->successful()) {
+            throw new RuntimeException('MIDTRANS_STATUS_UNAVAILABLE');
+        }
+
+        $data = $response->json();
+        if (! is_array($data)) {
+            throw new RuntimeException('MIDTRANS_STATUS_UNAVAILABLE');
+        }
+
+        foreach (['order_id', 'status_code', 'gross_amount', 'transaction_status'] as $key) {
+            if (! isset($data[$key]) || ! is_scalar($data[$key])) {
+                throw new RuntimeException('MIDTRANS_STATUS_UNAVAILABLE');
+            }
+        }
+
+        return $data;
+    }
+
+    /**
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\IntegrationCredential;
 use App\Services\Payment\DokuSignature;
+use App\Services\Payment\MidtransGateway;
 use App\Services\PaymentStateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,8 +13,11 @@ use Illuminate\Validation\ValidationException;
 
 class PaymentWebhookController
 {
-    public function midtrans(Request $request, PaymentStateService $states): JsonResponse
-    {
+    public function midtrans(
+        Request $request,
+        PaymentStateService $states,
+        MidtransGateway $midtrans,
+    ): JsonResponse {
         $payload = $request->json()->all();
         $credential = IntegrationCredential::where('code', 'midtrans')->first();
         $config = $credential?->config_ciphertext;
@@ -46,15 +50,29 @@ class PaymentWebhookController
             (string) $payload['status_code'],
             (string) ($payload['settlement_time'] ?? ''),
         ]));
-        $processed = DB::transaction(function () use ($payment, $eventId, $payload, $states): bool {
+        if (DB::table('payment_callbacks')->where('gateway_code', 'MIDTRANS')
+            ->where('event_id', $eventId)->exists()) {
+            return response()->json(['status' => 'duplicate']);
+        }
+
+        try {
+            $verified = $midtrans->status((string) $payment->merchant_reference);
+        } catch (\RuntimeException) {
+            abort(503, 'Payment status verification unavailable.');
+        }
+
+        abort_unless(hash_equals((string) $payment->merchant_reference, (string) $verified['order_id']), 422);
+        abort_unless($this->amount($verified['gross_amount']) === (int) $payment->amount_idr, 422);
+
+        $processed = DB::transaction(function () use ($payment, $eventId, $payload, $verified, $states): bool {
             if (! $this->claimCallback($payment->id, 'MIDTRANS', $eventId, $payload)) {
                 return false;
             }
 
-            $status = $this->midtransStatus($payload);
+            $status = $this->midtransStatus($verified);
             $result = $states->apply($payment->id, $status, [
-                'source' => 'midtrans_callback',
-                'transaction_status' => $payload['transaction_status'],
+                'source' => 'midtrans_status_challenge',
+                'transaction_status' => $verified['transaction_status'],
             ]);
             $this->finishCallback('MIDTRANS', $eventId, (string) $result['result']);
 
@@ -79,6 +97,8 @@ class PaymentWebhookController
         $timestamp = (string) $request->header('Request-Timestamp', '');
         $headerSignature = (string) $request->header('Signature', '');
         abort_unless($clientId !== '' && $requestId !== '' && $timestamp !== '' && $headerSignature !== '', 400);
+        abort_unless(preg_match('/^[A-Za-z0-9._:-]{8,128}$/', $requestId) === 1, 400);
+        abort_unless($signature->isFreshTimestamp($timestamp), 401);
         abort_unless(hash_equals((string) $config['client_id'], $clientId), 401);
         abort_unless($signature->verify(
             $headerSignature,

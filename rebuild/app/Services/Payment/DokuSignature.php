@@ -2,6 +2,9 @@
 
 namespace App\Services\Payment;
 
+use Carbon\CarbonImmutable;
+use Throwable;
+
 class DokuSignature
 {
     public function digest(string $body): string
@@ -60,6 +63,17 @@ class DokuSignature
             $this->signResponse($clientId, $requestId, $timestamp, $target, $body, $secretKey),
             $signature
         );
+    }
+
+    public function isFreshTimestamp(string $timestamp, int $windowSeconds = 300): bool
+    {
+        try {
+            $parsed = CarbonImmutable::parse($timestamp);
+        } catch (Throwable) {
+            return false;
+        }
+
+        return abs(now('UTC')->getTimestamp() - $parsed->getTimestamp()) <= $windowSeconds;
     }
 
     public function verify(

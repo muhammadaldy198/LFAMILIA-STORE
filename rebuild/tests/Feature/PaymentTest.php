@@ -152,12 +152,28 @@ class PaymentTest extends TestCase
             'is_active' => true,
         ]);
 
-        Http::fake([
-            'https://app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
-                'token' => 'snap-token-test',
-                'redirect_url' => 'https://sandbox.midtrans.test/pay',
-            ]),
-        ]);
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions') {
+                return Http::response([
+                    'token' => 'snap-token-test',
+                    'redirect_url' => 'https://sandbox.midtrans.test/pay',
+                ]);
+            }
+
+            if (preg_match('#https://api\.sandbox\.midtrans\.com/v2/(.+)/status$#', $request->url(), $matches)) {
+                return Http::response([
+                    'transaction_id' => 'midtrans-transaction-1',
+                    'transaction_status' => 'settlement',
+                    'status_code' => '200',
+                    'order_id' => rawurldecode($matches[1]),
+                    'gross_amount' => '11077.00',
+                    'fraud_status' => 'accept',
+                    'settlement_time' => now()->format('Y-m-d H:i:s'),
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
 
         $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
             $catalog['package_id'],
@@ -203,6 +219,70 @@ class PaymentTest extends TestCase
 
         $this->assertSame('PAID', DB::table('orders')->value('status'));
         $this->assertSame('PAID', DB::table('payment_transactions')->value('status'));
+    }
+
+    public function test_midtrans_callback_cannot_override_server_status_challenge(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions') {
+                return Http::response([
+                    'token' => 'snap-token-security',
+                    'redirect_url' => 'https://sandbox.midtrans.test/security',
+                ]);
+            }
+
+            if (preg_match('#https://api\.sandbox\.midtrans\.com/v2/(.+)/status$#', $request->url(), $matches)) {
+                return Http::response([
+                    'transaction_id' => 'midtrans-security-1',
+                    'transaction_status' => 'pending',
+                    'status_code' => '201',
+                    'order_id' => rawurldecode($matches[1]),
+                    'gross_amount' => '11077.00',
+                    'fraud_status' => 'accept',
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'qris',
+            'm10-midtrans-order-0001'
+        ))->assertCreated();
+
+        $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'm10-midtrans-payment-0001',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk();
+
+        $payment = DB::table('payment_transactions')->first();
+        $notification = [
+            'transaction_id' => 'midtrans-security-1',
+            'transaction_status' => 'settlement',
+            'status_code' => '200',
+            'order_id' => $payment->merchant_reference,
+            'gross_amount' => '11077.00',
+            'fraud_status' => 'accept',
+            'settlement_time' => now()->format('Y-m-d H:i:s'),
+        ];
+        $notification['signature_key'] = hash('sha512',
+            $notification['order_id'].$notification['status_code'].$notification['gross_amount'].'server-test'
+        );
+
+        $this->postJson('/api/payments/midtrans/notification', $notification)
+            ->assertOk();
+
+        $this->assertSame('PENDING_PAYMENT', DB::table('orders')->value('status'));
+        $this->assertSame('PENDING', DB::table('payment_transactions')->value('status'));
+        $this->assertSame(0, DB::table('order_events')->where('event_type', 'PAYMENT_VERIFIED')->count());
     }
 
     public function test_midtrans_rejects_fake_signature(): void
@@ -254,7 +334,7 @@ class PaymentTest extends TestCase
                 'virtual_account_info' => ['virtual_account_number' => '88000000123456'],
             ];
             $responseBody = json_encode($responseData, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-            $timestamp = '2026-09-30T03:00:00Z';
+            $timestamp = now('UTC')->format('Y-m-d\\TH:i:s\\Z');
             $signature = $dokuSignature->signResponse(
                 'MCH-TEST',
                 $requestId,
@@ -288,12 +368,12 @@ class PaymentTest extends TestCase
         $payment = DB::table('payment_transactions')->first();
         $payload = [
             'service' => ['id' => 'VIRTUAL_ACCOUNT'],
-            'transaction' => ['status' => 'SUCCESS', 'date' => '2026-09-30T03:05:00Z'],
+            'transaction' => ['status' => 'SUCCESS', 'date' => now('UTC')->format('Y-m-d\\TH:i:s\\Z')],
             'order' => ['invoice_number' => $payment->merchant_reference, 'amount' => 13500],
         ];
         $raw = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         $requestId = 'doku-event-0001';
-        $timestamp = '2026-09-30T03:05:01Z';
+        $timestamp = now('UTC')->format('Y-m-d\\TH:i:s\\Z');
         $signature = $dokuSignature->sign(
             'MCH-TEST',
             $requestId,

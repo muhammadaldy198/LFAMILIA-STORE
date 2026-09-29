@@ -678,7 +678,7 @@ class FulfillmentService
             'attempt_no' => $attemptNo,
             'external_reference' => $externalReference,
             'status' => $status,
-            'correlation_id' => (string) Str::uuid(),
+            'correlation_id' => $this->correlationId($orderId),
             'safe_to_failover' => false,
             'last_error' => $error,
             'created_at' => now(),
@@ -803,6 +803,14 @@ class FulfillmentService
         $decoded = json_decode($value, true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    private function correlationId(int $orderId): string
+    {
+        $root = DB::table('order_events')->where('order_id', $orderId)
+            ->whereNotNull('correlation_id')->orderBy('id')->value('correlation_id');
+
+        return is_string($root) && $root !== '' ? $root : (string) Str::uuid();
     }
 
     private function event(int $orderId, string $type, ?string $from, ?string $to, array $metadata): void

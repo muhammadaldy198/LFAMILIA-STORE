@@ -88,6 +88,7 @@ class CheckoutController
             'external_sku' => ['prohibited'],
             'buyer_sku_code' => ['prohibited'],
         ]);
+        $data['_correlation_id'] = (string) $request->attributes->get('correlation_id');
 
         $result = $checkout->create($data, $request->user());
         $order = $result['order'];

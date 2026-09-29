@@ -1,32 +1,34 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const props = defineProps({
-    siteKey: { type: String, default: '' },
+    siteKey: { type: String, required: true },
     action: { type: String, required: true },
 });
-const emit = defineEmits(['update:modelValue']);
-const container = ref(null);
+const emit = defineEmits(['token']);
+const target = ref(null);
 let widgetId = null;
 
-const render = () => {
-    if (!props.siteKey || !container.value || !window.turnstile) return;
-    widgetId = window.turnstile.render(container.value, {
+function renderWidget() {
+    if (!target.value || !window.turnstile || widgetId !== null) return;
+    widgetId = window.turnstile.render(target.value, {
         sitekey: props.siteKey,
         action: props.action,
-        theme: 'dark',
-        callback: (token) => emit('update:modelValue', token),
-        'expired-callback': () => emit('update:modelValue', ''),
-        'error-callback': () => emit('update:modelValue', ''),
+        callback: (token) => emit('token', token),
+        'expired-callback': () => emit('token', ''),
+        'error-callback': () => emit('token', ''),
     });
-};
+}
 
-onMounted(() => {
-    if (!props.siteKey) return;
+function ensureScript() {
+    if (window.turnstile) {
+        renderWidget();
+        return;
+    }
+
     const existing = document.querySelector('script[data-lfamilia-turnstile]');
     if (existing) {
-        if (window.turnstile) render();
-        else existing.addEventListener('load', render, { once: true });
+        existing.addEventListener('load', renderWidget, { once: true });
         return;
     }
 
@@ -35,18 +37,27 @@ onMounted(() => {
     script.async = true;
     script.defer = true;
     script.dataset.lfamiliaTurnstile = '1';
-    script.addEventListener('load', render, { once: true });
+    script.addEventListener('load', renderWidget, { once: true });
     document.head.appendChild(script);
-});
+}
 
+function reset() {
+    emit('token', '');
+    if (window.turnstile && widgetId !== null) {
+        window.turnstile.reset(widgetId);
+    }
+}
+
+defineExpose({ reset });
+
+onMounted(() => nextTick(ensureScript));
 onBeforeUnmount(() => {
-    if (widgetId !== null && window.turnstile) window.turnstile.remove(widgetId);
+    if (window.turnstile && widgetId !== null) {
+        window.turnstile.remove(widgetId);
+    }
 });
 </script>
 
 <template>
-    <div v-if="siteKey" class="space-y-2">
-        <div ref="container"></div>
-        <p class="text-xs text-slate-400">Verifikasi keamanan Cloudflare.</p>
-    </div>
+    <div ref="target" class="min-h-[65px]"></div>
 </template>

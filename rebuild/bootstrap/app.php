@@ -4,12 +4,12 @@ use App\Http\Middleware\AssignCorrelationId;
 use App\Http\Middleware\EnsureAdminPermission;
 use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsurePhone;
+use App\Http\Middleware\EnforceTrustedHost;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Http\Middleware\RateLimitSensitiveRoutes;
+use App\Http\Middleware\PublicAbuseProtection;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\TrackCustomerActivity;
-use App\Http\Middleware\VerifySelectiveTurnstile;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -23,15 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(append: [
-            AssignCorrelationId::class,
-            RateLimitSensitiveRoutes::class,
-            VerifySelectiveTurnstile::class,
-            SecurityHeaders::class,
-            HandleInertiaRequests::class,
-        ]);
-        $middleware->api(prepend: [AssignCorrelationId::class]);
-        $middleware->api(append: [SecurityHeaders::class]);
+        $middleware->append([AssignCorrelationId::class, EnforceTrustedHost::class, SecurityHeaders::class]);
+        $middleware->web(append: [PublicAbuseProtection::class, HandleInertiaRequests::class]);
         $middleware->statefulApi();
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('admin/*')
             ? route('admin.login') : route('login'));

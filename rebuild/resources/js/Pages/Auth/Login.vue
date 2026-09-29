@@ -1,11 +1,18 @@
 <script setup>
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 import TurnstileWidget from '../../Components/TurnstileWidget.vue';
 
 const page = usePage();
-const turnstile = page.props.security?.turnstile ?? {};
+const turnstile = ref(null);
+const security = computed(() => page.props.security || {});
 const form = useForm({ email: '', password: '', remember: false, turnstile_token: '' });
-const submit = () => form.post('/login', { onFinish: () => form.reset('password') });
+const submit = () => form.post('/login', {
+    onFinish: () => {
+        form.reset('password');
+        turnstile.value?.reset();
+    },
+});
 </script>
 
 <template>
@@ -22,7 +29,13 @@ const submit = () => form.post('/login', { onFinish: () => form.reset('password'
                 <span v-if="form.errors.password" class="text-sm text-red-300">{{ form.errors.password }}</span>
             </label>
             <label class="flex items-center gap-2"><input v-model="form.remember" type="checkbox"> Ingat saya</label>
-            <TurnstileWidget v-if="turnstile.enabled" :site-key="turnstile.site_key" action="login" v-model="form.turnstile_token" />
+            <TurnstileWidget
+                v-if="security.turnstile_required"
+                ref="turnstile"
+                :site-key="security.turnstile_site_key"
+                :action="security.turnstile_action"
+                @token="form.turnstile_token = $event"
+            />
             <span v-if="form.errors.turnstile_token" class="text-sm text-red-300">{{ form.errors.turnstile_token }}</span>
             <button type="submit" :disabled="form.processing" class="w-full rounded-md bg-cyan-400 p-3 font-semibold text-slate-950 disabled:opacity-50">Masuk</button>
             <a href="/auth/google/redirect" class="block rounded-md border border-slate-600 p-3 text-center">Masuk dengan Google</a>

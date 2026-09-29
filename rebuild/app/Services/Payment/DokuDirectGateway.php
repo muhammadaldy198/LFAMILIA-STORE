@@ -70,6 +70,7 @@ class DokuDirectGateway
         $responseTimestamp = (string) $response->header('Response-Timestamp');
         $responseSignature = (string) $response->header('Signature');
         if ($responseTimestamp === '' || $responseSignature === ''
+            || ! $this->signature->isFreshTimestamp($responseTimestamp)
             || ! $this->signature->verifyResponse(
                 $responseSignature,
                 $clientId,

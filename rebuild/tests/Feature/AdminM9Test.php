@@ -92,8 +92,9 @@ class AdminM9Test extends TestCase
         $this->assertStringNotContainsString('secret-api-key', (string) $audit->after);
         $this->assertStringContainsString('[REDACTED]', (string) $audit->after);
 
-        $this->postJson('/admin/integrations/digiflazz/reveal/api_key')
-            ->assertOk()
+        $this->postJson('/admin/integrations/digiflazz/reveal/api_key', [
+            'password' => 'VeryStrongPassword123!',
+        ])->assertOk()
             ->assertJsonPath('value', 'secret-api-key');
         $this->assertSame(1, DB::table('audit_logs')
             ->where('action', 'integration.secret.revealed')

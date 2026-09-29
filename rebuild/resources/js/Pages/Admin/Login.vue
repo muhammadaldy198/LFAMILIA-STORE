@@ -1,8 +1,18 @@
 <script setup>
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import TurnstileWidget from '../../Components/TurnstileWidget.vue';
 
-const form = useForm({ email: '', password: '' });
-const submit = () => form.post('/admin/login', { onFinish: () => form.reset('password') });
+const page = usePage();
+const turnstile = ref(null);
+const security = computed(() => page.props.security || {});
+const form = useForm({ email: '', password: '', turnstile_token: '' });
+const submit = () => form.post('/admin/login', {
+    onFinish: () => {
+        form.reset('password');
+        turnstile.value?.reset();
+    },
+});
 </script>
 
 <template>
@@ -17,6 +27,14 @@ const submit = () => form.post('/admin/login', { onFinish: () => form.reset('pas
             <label class="block">Kata sandi
                 <input v-model="form.password" type="password" autocomplete="current-password" required class="mt-1 w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
             </label>
+            <TurnstileWidget
+                v-if="security.turnstile_required"
+                ref="turnstile"
+                :site-key="security.turnstile_site_key"
+                :action="security.turnstile_action"
+                @token="form.turnstile_token = $event"
+            />
+            <span v-if="form.errors.turnstile_token" class="text-sm text-red-300">{{ form.errors.turnstile_token }}</span>
             <button type="submit" :disabled="form.processing" class="w-full rounded-md bg-cyan-400 p-3 font-semibold text-slate-950 disabled:opacity-50">Masuk</button>
         </form>
     </main>

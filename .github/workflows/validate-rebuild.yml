@@ -71,6 +71,17 @@ jobs:
         run: |
           composer validate --strict
           composer install --no-interaction --prefer-dist
+      - name: Security guardrails
+        run: |
+          composer audit --no-interaction
+          if git -C .. ls-files | grep -E '(^|/)\.env
+            echo "Private key material detected in tracked source."
+            exit 1
+          fi
+          if git -C .. grep -n -E "(api_key|server_key|client_secret|secret_key|access_token|bot_token)[[:space:]]*=>[[:space:]]*['\"][^$]" -- 'rebuild/app/**' 'rebuild/config/**' 'rebuild/routes/**' 'rebuild/resources/**'; then
+            echo "Possible hardcoded secret detected."
+            exit 1
+          fi
       - name: Install frontend dependencies
         run: npm ci
       - name: Configure test app
@@ -78,7 +89,45 @@ jobs:
           cp .env.example .env
           php artisan key:generate
       - name: Check PHP syntax
-        run: find app bootstrap public routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
+        run: find app bootstrap config public routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Validate cached configuration
+        run: |
+          php artisan config:cache
+          php artisan config:clear
+      - name: Validate schema and assets
+        run: |
+          php artisan migrate --force
+          php artisan migrate:rollback --step=10 --force
+          php artisan migrate --force
+          npm run build
+      - name: Run rebuild tests
+        run: vendor/bin/phpunit
+      - name: Check PHP style
+        run: vendor/bin/pint --test
+; then
+            echo "Tracked .env file detected."
+            exit 1
+          fi
+          if git -C .. grep -n -E 'BEGIN (RSA |EC |OPENSSH |)?PRIVATE KEY' -- . ':!rebuild/tests/**'; then
+            echo "Private key material detected in tracked source."
+            exit 1
+          fi
+          if git grep -n -E "(api_key|server_key|client_secret|secret_key|access_token|bot_token)[[:space:]]*=>[[:space:]]*['\"][^$]" -- app config routes resources; then
+            echo "Possible hardcoded secret detected."
+            exit 1
+          fi
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Configure test app
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+      - name: Check PHP syntax
+        run: find app bootstrap config public routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Validate cached configuration
+        run: |
+          php artisan config:cache
+          php artisan config:clear
       - name: Validate schema and assets
         run: |
           php artisan migrate --force

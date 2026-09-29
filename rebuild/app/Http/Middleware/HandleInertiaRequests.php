@@ -17,13 +17,44 @@ class HandleInertiaRequests extends Middleware
     {
         $admin = $request->user('admin');
         $permissions = app(AdminPermissionService::class);
+        $turnstile = app(TurnstileService::class);
 
         return [
             ...parent::share($request),
             'status' => fn () => $request->session()->get('status'),
-            'security' => [
-                'turnstile' => app(TurnstileService::class)->publicConfig(),
-            ],
+            'security' => function () use ($request, $turnstile): array {
+                $config = $turnstile->publicConfig();
+                $path = trim($request->path(), '/');
+                $required = false;
+                $action = null;
+
+                if ($path === 'register') {
+                    $required = true;
+                    $action = 'register';
+                } elseif ($path === 'forgot-password') {
+                    $required = true;
+                    $action = 'forgot_password';
+                } elseif ($path === 'orders/check') {
+                    $required = true;
+                    $action = 'order_lookup';
+                } elseif (str_starts_with($path, 'catalog/') && ! $request->user()) {
+                    $required = true;
+                    $action = 'guest_checkout';
+                } elseif ($path === 'login' && $request->session()->get('security.customer_login_challenge') === true) {
+                    $required = true;
+                    $action = 'customer_login';
+                } elseif ($path === 'admin/login' && $request->session()->get('security.admin_login_challenge') === true) {
+                    $required = true;
+                    $action = 'admin_login';
+                }
+
+                return [
+                    'turnstile_enabled' => $config['enabled'],
+                    'turnstile_site_key' => $config['site_key'],
+                    'turnstile_required' => $config['enabled'] && $required,
+                    'turnstile_action' => $config['enabled'] && $required ? $action : null,
+                ];
+            },
             'adminPanel' => function () use ($admin, $permissions): ?array {
                 if (! $admin) {
                     return null;

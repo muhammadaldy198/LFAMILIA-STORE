@@ -1,78 +1,124 @@
 # Security Hardening (M10)
 
-M10 applies the application-level security baseline from the LFAMILIA STORE master PRD. It does not configure Cloudflare WAF, trusted proxies, Nginx, TLS, VPS firewall, or production credentials; those environment-specific controls remain M12.
+M10 hardens the application layer without changing the LFAMILIA business flow. Cloudflare/VPS deployment policy remains M12 and the broad abuse/browser campaign remains M11.
 
-## Request hardening
+## Sessions and production startup
 
-Every web/API request receives a correlation ID. A safe incoming X-Correlation-ID is preserved; malformed/untrusted values are replaced with a UUID. The ID is returned in X-Correlation-ID and is available to audit/event code.
+- Session lifetime remains 1440 minutes (24 hours) as defined by the PRD.
+- Session payload encryption defaults to enabled.
+- Cookies remain HttpOnly and SameSite=Lax.
+- Production startup fails if APP_DEBUG is enabled, session encryption is disabled, the session cookie is not Secure, APP_URL is not HTTPS, or APP_TRUSTED_HOSTS is empty.
+- APP_TRUSTED_HOSTS is environment configuration, not hardcoded source.
+- Customer password change/reset rotates remember_token.
 
-Global response headers include:
+## Security headers
 
+Global responses receive:
 - X-Content-Type-Options: nosniff
 - X-Frame-Options: DENY
 - Referrer-Policy: strict-origin-when-cross-origin
-- Permissions-Policy disabling camera, microphone, geolocation and browser payment API
-- Content-Security-Policy restricting origin, frames, forms, scripts and connections
-- HSTS on HTTPS requests
-- no-store/private caching for Admin, customer account and guest order detail pages
+- Permissions-Policy disabling camera, microphone and geolocation
+- Cross-Origin-Opener-Policy
+- Cross-Origin-Resource-Policy
+- HSTS for HTTPS requests
+- CSP outside the local development environment
 
-Laravel web CSRF protection remains enabled. Authentication and authorization remain server-side.
+Admin/account/auth responses are no-store/private.
 
-## Rate limiting
+## Correlation IDs
 
-Existing named limits remain for nickname, quote/voucher validation, checkout creation, guest order lookup, Google OAuth, support tickets, payment creation, wallet top-up, payment callbacks and fulfillment callbacks.
+Every request receives a validated X-Request-ID or a generated UUID. The value is:
+- attached to the request,
+- added to logging context,
+- returned in the response,
+- used by sensitive Admin audit records,
+- used as the root order correlation ID at checkout,
+- reused by payment/order and fulfillment events for the same order.
 
-M10 adds:
-
-- register: 5 attempts/hour per normalized email + IP
-- forgot password: 5 attempts/hour per normalized email + IP
-- reset password: 8 attempts/hour per normalized email + IP
-- sensitive Super Admin operations: 30/minute per Admin
-- secret reveal: 6/minute per Admin
-
-Customer/Admin login remains 5/minute per email + IP through the existing Fortify/Admin limiter.
-
-Production proxy/IP trust must be configured against the actual Cloudflare/Nginx topology in M12. The application intentionally does not trust arbitrary forwarded IP headers.
+Malformed inbound request IDs are never reflected.
 
 ## Turnstile
 
-Cloudflare Turnstile credentials are read only from the encrypted Super Admin -> Integrasi record with code turnstile.
+Turnstile configuration is read from the encrypted Integrasi record and only the site key is exposed to the browser.
 
-Only the public site_key is shared with the browser. secret_key remains server-side.
+Server-side Siteverify is enforced when Turnstile is active for:
+- register
+- forgot password
+- guest order lookup
+- guest checkout
+- customer login after repeated failures
+- Admin login after repeated failures
 
-When the integration is active and both keys exist:
+Validation checks success and the expected action. Optional allowed_hostnames can restrict accepted Turnstile hostnames. Verification transport failures fail closed with a customer-safe validation message. Widgets reset after submission because Turnstile tokens are single-use.
 
-- registration requires a valid Turnstile token
-- forgot-password requires a valid token
-- login requires a valid token after three attempts for the same email + IP
+## Suspicious login
 
-Verification uses Cloudflare siteverify server-side with the requester IP. Each widget is tagged with a form action and the backend requires the returned action to match register, forgot_password, or login, preventing cross-form token reuse. Missing/invalid/wrong-action tokens are rejected. Upstream verification outages fail closed for challenged requests.
+Failed customer/Admin logins are counted per source for 30 minutes. Starting after the third failure, the next login attempt requires Turnstile when Turnstile is configured. A successful login clears the risk counter.
 
-When Turnstile is disabled/not configured, these flows continue without a challenge so pre-production is not locked before credentials are entered.
+The existing email+IP Fortify/Admin login rate limits remain active in addition to this challenge.
 
-## Secrets and audit
+## Application rate limits
 
-integration_credentials continues to use Laravel encrypted array casts. M10 regression coverage verifies secret plaintext is absent from the raw database column while the model can decrypt the configured value.
+M10 retains existing endpoint-specific limits and adds/strengthens:
+- checkout creation: 20/minute per user/IP
+- voucher validation: 10/minute per IP+voucher in addition to quote limit
+- register: 5 attempts / 10 minutes
+- forgot password: 5 attempts / 10 minutes
+- reset password: 5 attempts / 10 minutes
+- authenticated account API: 60/minute
+- sensitive customer account actions: 10/minute
+- sensitive Admin configuration actions: 20/minute
+- secret reveal: 5/minute
 
-Normal Inertia integration data never includes secret values. Controlled reveal remains SUPER_ADMIN-only, rate-limited and audit-logged.
+Nickname, order lookup, payment creation, wallet top-up, Google OAuth, support and webhook limits from earlier milestones remain in force.
 
-Audit redaction covers nested values whose keys contain password, credential, secret, token or signature, plus authorization/cookie fields. Sensitive values are replaced with [REDACTED].
+## Secret handling
 
-## Callback/webhook review
+IntegrationCredential continues to use Laravel encrypted array casts.
 
-M10 re-audited the M7/M8 callback paths rather than replacing them:
+Secret reveal now requires all of:
+- authenticated active SUPER_ADMIN
+- Super Admin route authorization
+- current Super Admin password re-authentication
+- dedicated reveal rate limit
+- audit event
+- no-store response
 
-- Midtrans: SHA-512 signature, amount match, event idempotency and monotonic payment state.
-- DOKU: Client-Id match, request signature verification, amount match, request-id event idempotency and monotonic payment state.
-- Digiflazz: event/user-agent validation, HMAC signature and callback idempotency.
-- Callback endpoints retain dedicated rate limits.
+Normal Inertia props contain only whether a secret is configured, never the secret value. Audit payloads use the shared redaction service.
 
-## Session
+CI now runs Composer audit and repository secret-material guardrails and rejects tracked .env/private-key material.
 
-SESSION_LIFETIME remains 1440 minutes (24 hours), satisfying the v1 Admin/Super Admin session requirement. Session IDs are regenerated after login and invalidated/regenerated on logout.
+## Payment/webhook hardening
+
+### Midtrans
+The notification signature is checked first. Before a callback is allowed to change local payment/order state, LFAMILIA performs a server-to-server Midtrans GET Status challenge using the encrypted server key. The authoritative status response must match the stored merchant reference and amount. Callback duplication remains idempotent.
+
+### DOKU
+Signed notifications additionally require a bounded Request-Id and a request timestamp inside the allowed replay window. Direct API responses also require a fresh Response-Timestamp before the response signature is accepted.
+
+### Digiflazz
+M8 HMAC-SHA1 webhook verification, Hookshot source marker, stored ref_id identity checks and callback deduplication remain active.
+
+Final order/payment states remain monotonic; old callbacks cannot reopen or downgrade a final state.
+
+## Logging and audit
+
+Raw OAuth/provider exceptions are not dumped into application logs where they could carry request details. Security-relevant errors log safe metadata such as exception class while the global correlation ID remains available in log context.
+
+Catalog, payment and fulfillment Admin audit writers now share AdminAuditService, so secret redaction and request correlation behavior are consistent.
+
+## CI security gates
+
+The rebuild workflow additionally:
+- runs composer audit,
+- rejects a tracked .env,
+- rejects tracked private-key headers,
+- scans application/config/routes/resources for likely hardcoded secret assignments,
+- validates Laravel config cache/clear,
+- then runs the existing syntax, MySQL migration rollback/reapply, frontend build, PHPUnit and Pint gates.
 
 ## Milestone boundary
 
-M11 owns the broad cross-system abuse/browser/security test campaign. M10 includes focused regression tests for the controls introduced here.
+M10 does not configure Cloudflare WAF/rate-limit rules or production server headers. Those runtime/edge settings are applied and validated in M12.
 
-M12 owns Cloudflare WAF/rate-limit rules, trusted proxy configuration, Nginx/TLS/security at the server edge, queue/scheduler process supervision, production secrets and deployment validation.
+M11 remains responsible for the full cross-system security/abuse/browser regression campaign.

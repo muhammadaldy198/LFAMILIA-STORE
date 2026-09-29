@@ -116,7 +116,9 @@ class CheckoutService
 
             $reservationMinutes = max(5, min(120, (int) config('lfamilia.checkout_reservation_minutes', 30)));
             $expiresAt = now()->addMinutes($reservationMinutes);
-            $correlationId = (string) Str::uuid();
+            $correlationId = preg_match('/^[A-Za-z0-9._:-]{8,100}$/', (string) ($data['_correlation_id'] ?? ''))
+                ? (string) $data['_correlation_id']
+                : (string) Str::uuid();
             $snapshot = [
                 'checkout_fingerprint' => $fingerprint,
                 'product' => [

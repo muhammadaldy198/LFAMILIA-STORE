@@ -6,6 +6,7 @@ use App\Models\MembershipTier;
 use App\Models\Wallet;
 use App\Services\CustomerAccountDeletion;
 use App\Services\PaymentRoutingService;
+use App\Services\TransactionalEmailService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -74,7 +75,7 @@ class CustomerAccountController
         return back()->with('status', 'Profil diperbarui.');
     }
 
-    public function password(Request $request): RedirectResponse
+    public function password(Request $request, TransactionalEmailService $emails): RedirectResponse
     {
         $data = $request->validate([
             'current_password' => ['nullable', 'string'],
@@ -87,8 +88,18 @@ class CustomerAccountController
             throw ValidationException::withMessages(['current_password' => 'Kata sandi saat ini salah.']);
         }
 
-        $user->forceFill(['password' => Hash::make($data['password'])])->save();
+        $user->forceFill([
+            'password' => Hash::make($data['password']),
+            'remember_token' => Str::random(60),
+        ])->save();
         $request->session()->regenerate();
+        if (is_string($user->email)) {
+            $emails->queue(
+                $user->email,
+                'Password LFAMILIA STORE diperbarui',
+                'Password akun LFAMILIA STORE Anda baru saja diubah.'
+            );
+        }
 
         return back()->with('status', 'Kata sandi diperbarui.');
     }

@@ -422,6 +422,14 @@ class PaymentStateService
             ]);
     }
 
+    private function correlationId(int $orderId): string
+    {
+        $root = DB::table('order_events')->where('order_id', $orderId)
+            ->whereNotNull('correlation_id')->orderBy('id')->value('correlation_id');
+
+        return is_string($root) && $root !== '' ? $root : (string) Str::uuid();
+    }
+
     private function orderEvent(int $orderId, string $type, ?string $from, ?string $to, array $metadata): void
     {
         DB::table('order_events')->insert([
@@ -429,7 +437,7 @@ class PaymentStateService
             'event_type' => $type,
             'from_status' => $from,
             'to_status' => $to,
-            'correlation_id' => (string) Str::uuid(),
+            'correlation_id' => $this->correlationId($orderId),
             'metadata' => $metadata === [] ? null : json_encode($metadata, JSON_THROW_ON_ERROR),
             'created_at' => now(),
         ]);

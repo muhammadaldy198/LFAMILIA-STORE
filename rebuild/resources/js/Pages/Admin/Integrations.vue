@@ -7,6 +7,7 @@ const props = defineProps({ integrations: Array });
 const items = reactive(props.integrations.map((item) => ({
     ...item,
     result: null,
+    reveal_password: '',
     config: Object.fromEntries(item.fields.map((field) => [field.key, field.value ?? (field.type === 'boolean' ? false : '')])),
 })));
 
@@ -21,12 +22,17 @@ async function reveal(item, field) {
     const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const response = await fetch('/admin/integrations/' + encodeURIComponent(item.code) + '/reveal/' + encodeURIComponent(field.key), {
         method: 'POST',
-        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': token },
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+        body: JSON.stringify({ password: item.reveal_password }),
     });
     const data = await response.json().catch(() => ({}));
     if (response.ok) {
         item.config[field.key] = data.value || '';
         field.revealed = true;
+        item.reveal_password = '';
+        item.result = { status: 'OK', message: 'Secret ditampilkan setelah re-authentication.' };
+    } else {
+        item.result = { status: 'DOWN', message: data.errors?.password?.[0] || data.message || 'Reveal ditolak.' };
     }
 }
 
@@ -63,10 +69,14 @@ async function testConnection(item) {
                                 class="min-w-0 flex-1 rounded bg-slate-800 p-2"
                             >
                             <input v-else v-model="item.config[field.key]" type="checkbox" class="mt-2">
-                            <button v-if="field.secret && field.configured" type="button" class="rounded bg-slate-700 px-3 py-2 text-xs" @click="reveal(item, field)">Reveal</button>
+                            <button v-if="field.secret && field.configured" type="button" :disabled="!item.reveal_password" class="rounded bg-slate-700 px-3 py-2 text-xs disabled:opacity-40" @click="reveal(item, field)">Reveal</button>
                         </div>
                     </label>
                 </div>
+                <label v-if="item.fields.some((field) => field.secret && field.configured)" class="mt-4 block max-w-md text-sm">
+                    Password Super Admin untuk Reveal
+                    <input v-model="item.reveal_password" type="password" autocomplete="current-password" class="mt-1 block w-full rounded bg-slate-800 p-2" placeholder="Masukkan ulang password">
+                </label>
                 <div class="mt-4 flex flex-wrap gap-2">
                     <button class="rounded bg-cyan-300 px-4 py-2 font-semibold text-slate-950" @click="save(item)">Simpan</button>
                     <button class="rounded bg-slate-700 px-4 py-2 text-sm" @click="testConnection(item)">Tes Koneksi</button>

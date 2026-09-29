@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Throwable;
@@ -43,7 +44,9 @@ class GoogleAuthController
         try {
             $profile = Socialite::driver('google')->user();
         } catch (Throwable $exception) {
-            report($exception);
+            Log::warning('Google OAuth callback failed.', [
+                'exception_class' => $exception::class,
+            ]);
 
             return redirect()->route('login')->withErrors(['google' => 'Login Google gagal.']);
         }
