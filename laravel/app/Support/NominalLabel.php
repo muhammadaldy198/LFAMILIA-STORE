@@ -25,7 +25,7 @@ final class NominalLabel
 
         // Accept common provider variations such as "Mobile Legends", "MOBILELEGEND", or "Free-Fire".
         $last = '(?:'.$last.'s?)';
-        $pattern = '/^\s*'.implode('[\s._\-–—|]*', [...$parts, $last]).'\s*(?:[-–—|:]+\s*)?/iu';
+        $pattern = '/^\\s*'.implode('[\\s._\\-–—|]*', [...$parts, $last]).'(?:\\s*[-–—|:]+\\s*|\\s+)(?=\\S)/iu';
         $clean = trim((string) preg_replace($pattern, '', $label, 1));
 
         return $clean !== '' ? $clean : $label;

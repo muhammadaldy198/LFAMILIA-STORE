@@ -14,6 +14,7 @@ class NominalLabelTest extends TestCase
         self::assertSame('5 Diamonds', NominalLabel::clean('Free Fire', 'Free Fire - 5 Diamonds'));
         self::assertSame('Membership Premium', NominalLabel::clean('Free Fire', 'Membership Premium'));
         self::assertSame('5 Diamonds', NominalLabel::clean('Free Fire', '5 Diamonds'));
+        self::assertSame('Free Firebird - 5 Diamonds', NominalLabel::clean('Free Fire', 'Free Firebird - 5 Diamonds'));
     }
 
     public function test_numeric_order_uses_nominal_instead_of_sku_or_alphabetical_label(): void
