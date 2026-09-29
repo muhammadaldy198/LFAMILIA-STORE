@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -14,6 +15,18 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        TrustProxies::flushState();
+        $trustedProxies = config('lfamilia.trusted_proxies', []);
+        if ($trustedProxies !== [] && $trustedProxies !== '') {
+            TrustProxies::at($trustedProxies);
+            TrustProxies::withHeaders(
+                Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO
+            );
+        }
+
         if ($this->app->environment('production')) {
             if (config('app.debug')) {
                 throw new LogicException('APP_DEBUG must be false in production.');
