@@ -19,9 +19,9 @@ type PopularProduct = {
 type SupportRequest = { id: string; kind: string; order_reference: string | null; subject: string; message: string; status: "open" | "in_progress" | "resolved" | "rejected"; staff_reply: string | null; customer_name: string; customer_email: string; created_at: string; updated_at: string };
 type TeamUser = { id: number; username: string; name: string; role: "super_admin" | "admin" | "staff"; isActive: boolean; created_at: string; updated_at: string };
 type Summary = { canViewFinance?: boolean; metrics: { totalOrders: number; paidRevenue: number | null; profit: number | null; totalDiscount: number | null; fulfilledOrders: number; pendingPayments: number; pendingFulfillments: number; failedOrders: number; customers: number }; chart: Array<{ day: string; orders: number; revenue: number | null; profit: number | null }>; topProducts: Array<{ slug: string; name: string; totalOrders: number; fulfilledOrders: number; revenue: number | null; profit: number | null }>; recentOrders: Array<{ id: string; referenceId: string; productName: string; paymentChannel: string; paymentStatus: string; fulfillmentStatus: string; total: number | null; createdAt: string }>; recentActivities: Array<{ id: string; adminName: string; adminRole: string; action: string; target: string; createdAt: string }>; attention: Record<string, number>; integrations?: { doku?: { ready?: boolean }; digiflazz?: { ready?: boolean } } };
-type StoreSettings = { storeName: string; storeShortName: string; tagline: string; logoUrl: string; announcement: string; bannerEnabled: boolean; bannerEyebrow: string; bannerTitle: string; bannerHighlight: string; bannerDescription: string; bannerImageUrl: string; bannerCtaLabel: string; bannerCtaHref: string; supportWhatsapp: string; supportEmail: string; instagramUrl: string; discordUrl: string; supportHours: string; supportWidgetEnabled: boolean };
+type StoreSettings = { storeName: string; storeShortName: string; tagline: string; logoUrl: string; footerBannerDesktopUrl: string; footerBannerMobileUrl: string; announcement: string; bannerEnabled: boolean; bannerEyebrow: string; bannerTitle: string; bannerHighlight: string; bannerDescription: string; bannerImageUrl: string; bannerCtaLabel: string; bannerCtaHref: string; supportWhatsapp: string; supportEmail: string; instagramUrl: string; discordUrl: string; supportHours: string; supportWidgetEnabled: boolean };
 
-const emptyStore: StoreSettings = { storeName: "LFAMILIA STORE", storeShortName: "LF", tagline: "Top Up Game Solution", logoUrl: "", announcement: "", bannerEnabled: true, bannerEyebrow: "Top Up & Layanan Digital", bannerTitle: "Top Up Game Favorit", bannerHighlight: "Cepat dan Aman", bannerDescription: "Pilih produk dan selesaikan pembayaran dengan mudah.", bannerImageUrl: "", bannerCtaLabel: "Lihat Produk", bannerCtaHref: "/#products", supportWhatsapp: "", supportEmail: "", instagramUrl: "", discordUrl: "", supportHours: "", supportWidgetEnabled: true };
+const emptyStore: StoreSettings = { storeName: "LFAMILIA STORE", storeShortName: "LF", tagline: "Top Up Game Solution", logoUrl: "", footerBannerDesktopUrl: "", footerBannerMobileUrl: "", announcement: "", bannerEnabled: true, bannerEyebrow: "Top Up & Layanan Digital", bannerTitle: "Top Up Game Favorit", bannerHighlight: "Cepat dan Aman", bannerDescription: "Pilih produk dan selesaikan pembayaran dengan mudah.", bannerImageUrl: "", bannerCtaLabel: "Lihat Produk", bannerCtaHref: "/#products", supportWhatsapp: "", supportEmail: "", instagramUrl: "", discordUrl: "", supportHours: "", supportWidgetEnabled: true };
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
@@ -215,7 +215,7 @@ export function AdminSettingsWorkspace() {
     }
   }
 
-  async function upload(field: "logoUrl", file?: File) {
+  async function upload(field: "logoUrl" | "footerBannerDesktopUrl" | "footerBannerMobileUrl", file?: File) {
     if (!file) return;
     try {
       const form = new FormData();
@@ -256,12 +256,15 @@ export function AdminSettingsWorkspace() {
           <StoreField label="Instagram" value={store.instagramUrl} onChange={(value) => setStore({ ...store, instagramUrl: value })} />
           <StoreField label="Discord" value={store.discordUrl} onChange={(value) => setStore({ ...store, discordUrl: value })} />
           <StoreField label="Jam operasional" value={store.supportHours} onChange={(value) => setStore({ ...store, supportHours: value })} />
-          <StoreField label="Pengumuman" value={store.announcement} onChange={(value) => setStore({ ...store, announcement: value })} />
           <SettingToggle label="Aktifkan widget bantuan" checked={store.supportWidgetEnabled} onChange={(value) => setStore({ ...store, supportWidgetEnabled: value })} />
         </div>
       </Panel>
-      <Panel title="Logo Toko" description="Logo ini digunakan oleh frontend customer. Banner homepage tetap dikelola di Banner & Konten.">
-        <div className="space-y-4 p-4"><ImageSetting label="Logo toko" value={store.logoUrl} onChange={(file) => void upload("logoUrl", file)} /></div>
+      <Panel title="Branding Toko" description="Logo dan banner bawah/footer yang benar-benar digunakan frontend customer. Banner homepage tetap dikelola di Banner & Konten.">
+        <div className="space-y-4 p-4">
+          <ImageSetting label="Logo toko" value={store.logoUrl} onChange={(file) => void upload("logoUrl", file)} />
+          <ImageSetting label="Banner footer desktop" value={store.footerBannerDesktopUrl} onChange={(file) => void upload("footerBannerDesktopUrl", file)} />
+          <ImageSetting label="Banner footer mobile" value={store.footerBannerMobileUrl} onChange={(file) => void upload("footerBannerMobileUrl", file)} />
+        </div>
       </Panel>
     </div>}
 
