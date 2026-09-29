@@ -16,7 +16,7 @@ source "${OPS_ENV_FILE}"
 APP_DIR="${REPO_DIR%/}/${APP_SUBDIR}"
 DEPLOY_DIR="${APP_DIR}/deploy"
 
-"${DEPLOY_DIR}/preflight.sh"
+bash "${DEPLOY_DIR}/preflight.sh"
 
 cd "${REPO_DIR}"
 [[ -z "$(git status --porcelain)" ]] || { echo "Repository has uncommitted changes" >&2; exit 1; }
@@ -44,10 +44,11 @@ trap 'if [[ "${maintenance:-0}" == 1 ]]; then echo "Deployment failed; applicati
 
 systemctl restart lfamilia-queue.service
 systemctl restart lfamilia-scheduler.service
+systemctl start lfamilia-healthcheck.timer lfamilia-backup.timer lfamilia-restore-verify.timer
 
 "${PHP_BIN}" artisan up
 maintenance=0
 trap - EXIT
 
-"${DEPLOY_DIR}/healthcheck.sh"
+bash "${DEPLOY_DIR}/healthcheck.sh"
 echo "M12 deployment complete: ${previous_sha} -> ${target_sha}"
