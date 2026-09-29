@@ -107,6 +107,17 @@ jobs:
           php artisan config:cache
           php artisan config:clear
 
+      - name: Validate M12 deployment assets
+        run: |
+          find deploy -maxdepth 1 -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+          test -f deploy/systemd/lfamilia-queue.service.in
+          test -f deploy/systemd/lfamilia-scheduler.service.in
+          test -f deploy/systemd/lfamilia-backup.timer.in
+          test -f deploy/systemd/lfamilia-restore-verify.timer.in
+          grep -Fq 'BACKUP_REQUIRE_REMOTE=true' deploy/ops.env.example
+          grep -Fq 'SESSION_SECURE_COOKIE=true' deploy/production.env.example
+          grep -Fq 'TRUSTED_PROXIES=*' deploy/production.env.example
+
       - name: Validate schema and assets
         run: |
           php artisan migrate --force
