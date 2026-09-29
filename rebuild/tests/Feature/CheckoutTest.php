@@ -21,6 +21,8 @@ class CheckoutTest extends TestCase
     {
         $category = Category::where('slug', 'game')->firstOrFail();
         DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        DB::table('payment_gateways')->where('code', 'MANUAL_QRIS')->update(['is_active' => true]);
+        DB::table('payment_channels')->where('code', 'manual_qris')->update(['is_active' => true]);
         $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
 
         $product = Product::create([
@@ -71,6 +73,7 @@ class CheckoutTest extends TestCase
     {
         return [
             'package_id' => $packageId,
+            'payment_channel_code' => 'manual_qris',
             'customer_input' => ['user_id' => '123456', 'zone_id' => '9876'],
             'voucher_code' => null,
             'guest_email' => 'buyer@example.test',

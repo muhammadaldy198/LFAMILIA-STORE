@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\MembershipTier;
 use App\Models\Wallet;
 use App\Services\CustomerAccountDeletion;
+use App\Services\PaymentRoutingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -113,12 +114,15 @@ class CustomerAccountController
         return redirect('/')->with('status', 'Akun dihapus.');
     }
 
-    public function wallet(Request $request): Response
+    public function wallet(Request $request, PaymentRoutingService $paymentRouting): Response
     {
         $wallet = Wallet::firstOrCreate(['user_id' => $request->user()->id]);
+        $minimumRaw = DB::table('system_settings')->where('key', 'wallet.minimum_topup_idr')->value('value');
 
         return Inertia::render('Customer/Wallet', [
             'balanceIdr' => (int) $wallet->balance_idr,
+            'minimumTopupIdr' => max(1, (int) json_decode((string) $minimumRaw, true)),
+            'paymentChannels' => $paymentRouting->publicTopupChannels(),
             'entries' => DB::table('wallet_ledger')->where('wallet_id', $wallet->id)
                 ->orderByDesc('id')->select('id', 'amount_idr', 'balance_after_idr', 'source', 'created_at')
                 ->paginate(10),

@@ -7,6 +7,7 @@ const props = defineProps({
     packages: Array,
     fields: Array,
     customer: Object,
+    paymentChannels: Array,
     faviconUrl: String,
 });
 
@@ -15,16 +16,19 @@ const customerInput = reactive(Object.fromEntries(props.fields.map((field) => [f
 const guestEmail = ref(props.customer?.email || '');
 const guestPhone = ref(props.customer?.phone || '');
 const voucherCode = ref('');
+const paymentChannelCode = ref('');
 const quote = ref(null);
 const nicknameResult = ref(null);
 const checkoutResult = ref(null);
+const paymentResult = ref(null);
 const errors = ref({});
 const busy = ref('');
 const idempotencyKey = ref(newIdempotencyKey());
+const paymentIdempotencyKey = ref(newIdempotencyKey());
 
 const selectedPackage = computed(() => props.packages.find((item) => String(item.id) === String(selectedPackageId.value)));
 
-watch([selectedPackageId, voucherCode, guestEmail, guestPhone], () => {
+watch([selectedPackageId, voucherCode, guestEmail, guestPhone, paymentChannelCode], () => {
     quote.value = null;
     checkoutResult.value = null;
 });
@@ -64,6 +68,7 @@ async function postJson(url, payload) {
 function basePayload() {
     return {
         package_id: selectedPackageId.value ? Number(selectedPackageId.value) : null,
+        payment_channel_code: paymentChannelCode.value || null,
         voucher_code: voucherCode.value.trim() || null,
         ...(props.customer ? {} : {
             guest_email: guestEmail.value.trim(),
@@ -104,6 +109,7 @@ async function loadQuote() {
 async function createOrder() {
     errors.value = {};
     checkoutResult.value = null;
+    paymentResult.value = null;
     busy.value = 'order';
     try {
         checkoutResult.value = await postJson('/checkout/orders', {
@@ -112,11 +118,27 @@ async function createOrder() {
             idempotency_key: idempotencyKey.value,
         });
         quote.value = {
-            subtotal_idr: checkoutResult.value.total_idr,
-            discount_idr: 0,
-            fee_idr: 0,
+            ...(quote.value || {}),
             total_idr: checkoutResult.value.total_idr,
         };
+    } catch (error) {
+        errors.value = error.validation || {};
+    } finally {
+        busy.value = '';
+    }
+}
+
+async function startPayment() {
+    if (!checkoutResult.value) return;
+    errors.value = {};
+    busy.value = 'payment';
+    try {
+        paymentResult.value = await postJson('/payments/orders/' + encodeURIComponent(checkoutResult.value.order_number), {
+            idempotency_key: paymentIdempotencyKey.value,
+            access_code: checkoutResult.value.access_code || null,
+        });
+        const redirect = paymentResult.value?.instructions?.redirect_url;
+        if (redirect) window.location.assign(redirect);
     } catch (error) {
         errors.value = error.validation || {};
     } finally {
@@ -212,10 +234,26 @@ function fieldError(key) {
                         Checkout sebagai <strong>{{ customer.name }}</strong> · {{ customer.phone || 'nomor HP belum lengkap' }}
                     </div>
 
+                    <div class="space-y-2">
+                        <span class="text-sm">Metode pembayaran</span>
+                        <div v-if="paymentChannels.length" class="grid gap-2 sm:grid-cols-2">
+                            <button
+                                v-for="channel in paymentChannels"
+                                :key="channel.code"
+                                type="button"
+                                class="rounded-lg border px-3 py-2 text-left text-sm"
+                                :class="paymentChannelCode === channel.code ? 'border-cyan-400 bg-cyan-400/10' : 'border-slate-700 bg-slate-950'"
+                                @click="paymentChannelCode = channel.code"
+                            >{{ channel.name }}</button>
+                        </div>
+                        <p v-else class="text-sm text-amber-200">Belum ada metode pembayaran aktif.</p>
+                        <span v-if="errors.payment_channel_code" class="text-xs text-red-300">{{ errors.payment_channel_code[0] }}</span>
+                    </div>
+
                     <label class="block text-sm">Voucher
                         <div class="mt-1 flex gap-2">
                             <input v-model="voucherCode" maxlength="100" placeholder="Kode voucher" class="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 uppercase">
-                            <button type="button" :disabled="busy === 'quote' || !selectedPackage" class="rounded-lg bg-slate-700 px-4 py-2 font-semibold disabled:opacity-50" @click="loadQuote">Pakai</button>
+                            <button type="button" :disabled="busy === 'quote' || !selectedPackage || !paymentChannelCode" class="rounded-lg bg-slate-700 px-4 py-2 font-semibold disabled:opacity-50" @click="loadQuote">Pakai</button>
                         </div>
                     </label>
                     <span v-if="errors.voucher_code" class="text-sm text-red-300">{{ errors.voucher_code[0] }}</span>
@@ -231,10 +269,10 @@ function fieldError(key) {
                         <div class="flex justify-between"><span>Biaya pembayaran</span><span>{{ formatIdr(quote?.fee_idr || 0) }}</span></div>
                         <div class="flex justify-between border-t border-slate-700 pt-3 text-base font-bold"><span>Total</span><span class="text-cyan-300">{{ formatIdr(quote?.total_idr ?? selectedPackage?.price_idr) }}</span></div>
                     </div>
-                    <button type="button" :disabled="busy === 'order' || !selectedPackage" class="w-full rounded-lg bg-cyan-400 px-4 py-3 font-bold text-slate-950 disabled:opacity-50" @click="createOrder">
+                    <button type="button" :disabled="busy === 'order' || !selectedPackage || !paymentChannelCode" class="w-full rounded-lg bg-cyan-400 px-4 py-3 font-bold text-slate-950 disabled:opacity-50" @click="createOrder">
                         {{ busy === 'order' ? 'Membuat pesanan...' : 'Buat pesanan' }}
                     </button>
-                    <p class="text-xs text-slate-500">Pesanan dibuat sebagai Menunggu Pembayaran. Metode pembayaran akan dipilih pada alur pembayaran.</p>
+                    <p class="text-xs text-slate-500">Pesanan dibuat sebagai Menunggu Pembayaran. Gateway internal dipilih server dan tidak ditampilkan ke customer.</p>
                     <p v-if="errors.checkout" class="text-sm text-red-300">{{ errors.checkout[0] }}</p>
                 </aside>
             </section>
@@ -244,7 +282,25 @@ function fieldError(key) {
                 <p class="text-sm">Nomor pesanan: <strong>{{ checkoutResult.order_number }}</strong></p>
                 <p v-if="checkoutResult.access_code" class="break-all text-sm">Kode akses guest: <strong>{{ checkoutResult.access_code }}</strong></p>
                 <p v-if="checkoutResult.access_code" class="text-xs text-amber-200">Simpan kode akses ini untuk mengecek pesanan dari perangkat lain.</p>
-                <a :href="checkoutResult.status_url" class="inline-block rounded-lg bg-emerald-300 px-4 py-2 font-semibold text-slate-950">Lihat status pesanan</a>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" :disabled="busy === 'payment'" class="rounded-lg bg-cyan-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" @click="startPayment">
+                        {{ busy === 'payment' ? 'Menyiapkan pembayaran...' : 'Bayar sekarang' }}
+                    </button>
+                    <a :href="checkoutResult.status_url" class="inline-block rounded-lg bg-emerald-300 px-4 py-2 font-semibold text-slate-950">Lihat status pesanan</a>
+                </div>
+                <p v-if="errors.payment" class="text-sm text-red-300">{{ errors.payment[0] }}</p>
+            </section>
+
+            <section v-if="paymentResult" class="space-y-3 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-5">
+                <h2 class="text-xl font-semibold">Pembayaran</h2>
+                <p class="text-sm">Status: <strong>{{ paymentResult.status }}</strong></p>
+                <img v-if="paymentResult.instructions?.qr_url" :src="paymentResult.instructions.qr_url" alt="QRIS pembayaran" class="max-h-72 rounded-lg bg-white p-2">
+                <p v-if="paymentResult.instructions?.va_number" class="text-sm">Nomor VA: <strong>{{ paymentResult.instructions.va_number }}</strong></p>
+                <p v-if="paymentResult.instructions?.payment_code" class="text-sm">Kode pembayaran: <strong>{{ paymentResult.instructions.payment_code }}</strong></p>
+                <p v-if="paymentResult.instructions?.qr_string" class="break-all text-xs text-slate-300">{{ paymentResult.instructions.qr_string }}</p>
+                <a v-if="paymentResult.instructions?.payment_url" :href="paymentResult.instructions.payment_url" class="inline-block rounded-lg bg-cyan-300 px-4 py-2 font-semibold text-slate-950">Buka pembayaran</a>
+                <p v-if="paymentResult.status === 'PAID'" class="text-sm text-emerald-200">Pembayaran sudah terverifikasi.</p>
+                <p v-if="paymentResult.status === 'UNKNOWN'" class="text-sm text-amber-200">Status pembuatan pembayaran belum pasti. Jangan membuat pembayaran baru.</p>
             </section>
         </div>
     </main>

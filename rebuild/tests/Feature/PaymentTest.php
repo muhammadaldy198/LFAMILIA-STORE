@@ -1,0 +1,574 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\AdminUser;
+use App\Models\Category;
+use App\Models\IntegrationCredential;
+use App\Models\Product;
+use App\Models\User;
+use App\Services\Payment\DokuSignature;
+use App\Services\PaymentStateService;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+class PaymentTest extends TestCase
+{
+    use DatabaseTransactions;
+
+    /**
+     * @return array{product:Product,package_id:int}
+     */
+    private function catalog(): array
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Payment Game '.bin2hex(random_bytes(3)),
+            'slug' => 'payment-game-'.bin2hex(random_bytes(4)),
+            'margin_percent' => 10,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'is_active' => true,
+        ]);
+        $product->fields()->create([
+            'field_key' => 'user_id',
+            'label' => 'User ID',
+            'type' => 'text',
+            'is_required' => true,
+            'sort_order' => 0,
+        ]);
+        $package = $product->packages()->create([
+            'code' => 'PAY'.bin2hex(random_bytes(3)),
+            'name' => '100 Diamonds',
+            'nominal_value' => 100,
+            'is_active' => true,
+        ]);
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $package->id,
+            'provider_id' => $providerId,
+            'external_sku' => 'PAY-SKU-'.bin2hex(random_bytes(4)),
+            'cost_idr' => 10000,
+            'max_price_idr' => 12000,
+            'priority' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return ['product' => $product, 'package_id' => $package->id];
+    }
+
+    private function route(
+        string $channel,
+        string $gateway,
+        int $flat = 0,
+        int $bps = 0,
+        ?string $providerChannel = null,
+        ?array $configuration = null,
+    ): int {
+        DB::table('payment_gateways')->where('code', $gateway)->update([
+            'is_active' => true,
+            'is_maintenance' => false,
+            'updated_at' => now(),
+        ]);
+        DB::table('payment_channels')->where('code', $channel)->update([
+            'is_active' => true,
+            'fee_flat_idr' => $flat,
+            'fee_percent_bps' => $bps,
+            'updated_at' => now(),
+        ]);
+
+        $channelId = DB::table('payment_channels')->where('code', $channel)->value('id');
+        $gatewayId = DB::table('payment_gateways')->where('code', $gateway)->value('id');
+
+        DB::table('payment_routes')->updateOrInsert(
+            ['payment_channel_id' => $channelId, 'payment_gateway_id' => $gatewayId],
+            [
+                'provider_channel' => $providerChannel,
+                'configuration' => $configuration === null ? null : json_encode($configuration, JSON_THROW_ON_ERROR),
+                'priority' => 0,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+
+        return (int) DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $gatewayId)
+            ->value('id');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function guestCheckout(int $packageId, string $channel, string $key): array
+    {
+        return [
+            'package_id' => $packageId,
+            'payment_channel_code' => $channel,
+            'customer_input' => ['user_id' => '123456'],
+            'voucher_code' => null,
+            'guest_email' => 'pay@example.test',
+            'guest_phone' => '081234567890',
+            'idempotency_key' => $key,
+        ];
+    }
+
+    public function test_payment_channel_fee_is_server_side_and_gateway_is_not_exposed(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('manual_qris', 'MANUAL_QRIS', 500);
+
+        $response = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'manual_qris',
+            'm7-fee-server-side-0001'
+        ))->assertCreated();
+
+        $response->assertJsonPath('total_idr', 11500)
+            ->assertJsonMissing(['gateway_code' => 'MANUAL_QRIS']);
+
+        $order = DB::table('orders')->first();
+        $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(500, (int) $order->fee_idr);
+        $this->assertSame(11500, (int) $order->total_idr);
+        $this->assertSame('manual_qris', $snapshot['payment']['channel_code']);
+        $this->assertSame('MANUAL_QRIS', $snapshot['payment']['gateway_code']);
+    }
+
+    public function test_midtrans_settlement_is_verified_idempotent_and_stale_pending_cannot_downgrade_paid(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+
+        Http::fake([
+            'https://app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
+                'token' => 'snap-token-test',
+                'redirect_url' => 'https://sandbox.midtrans.test/pay',
+            ]),
+        ]);
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'qris',
+            'm7-midtrans-order-0001'
+        ))->assertCreated();
+        $this->assertSame(11077, $checkout->json('total_idr'));
+
+        $payment = $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'm7-midtrans-payment-0001',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk();
+        $payment->assertJsonPath('status', 'PENDING')
+            ->assertJsonPath('instructions.token', 'snap-token-test')
+            ->assertJsonMissing(['gateway_code' => 'MIDTRANS']);
+
+        $row = DB::table('payment_transactions')->first();
+        $notification = [
+            'transaction_id' => 'midtrans-transaction-1',
+            'transaction_status' => 'settlement',
+            'status_code' => '200',
+            'order_id' => $row->merchant_reference,
+            'gross_amount' => '11077.00',
+            'fraud_status' => 'accept',
+            'settlement_time' => '2026-09-30 10:00:00',
+        ];
+        $notification['signature_key'] = hash('sha512',
+            $notification['order_id'].$notification['status_code'].$notification['gross_amount'].'server-test'
+        );
+
+        $this->postJson('/api/payments/midtrans/notification', $notification)
+            ->assertOk()->assertJsonPath('status', 'ok');
+        $this->postJson('/api/payments/midtrans/notification', $notification)
+            ->assertOk()->assertJsonPath('status', 'duplicate');
+
+        $this->assertSame('PAID', DB::table('orders')->value('status'));
+        $this->assertSame(1, DB::table('order_events')->where('event_type', 'PAYMENT_VERIFIED')->count());
+
+        $stale = $notification;
+        $stale['transaction_status'] = 'pending';
+        unset($stale['settlement_time']);
+        $this->postJson('/api/payments/midtrans/notification', $stale)->assertOk();
+
+        $this->assertSame('PAID', DB::table('orders')->value('status'));
+        $this->assertSame('PAID', DB::table('payment_transactions')->value('status'));
+    }
+
+    public function test_midtrans_rejects_fake_signature(): void
+    {
+        $this->catalog();
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test'],
+            'is_active' => true,
+        ]);
+
+        $this->postJson('/api/payments/midtrans/notification', [
+            'transaction_id' => 'fake',
+            'transaction_status' => 'settlement',
+            'status_code' => '200',
+            'order_id' => 'fake-order',
+            'gross_amount' => '10000.00',
+            'signature_key' => 'not-valid',
+        ])->assertUnauthorized();
+
+        $this->assertSame(0, DB::table('payment_callbacks')->count());
+    }
+
+    public function test_doku_direct_request_and_signed_callback_mark_order_paid(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('virtual_account', 'DOKU', 2500, 0, null, [
+            'api_path' => '/doku-virtual-account/v2/payment-code',
+            'public_paths' => ['va_number' => 'virtual_account_info.virtual_account_number'],
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'doku'], [
+            'config_ciphertext' => [
+                'client_id' => 'MCH-TEST',
+                'secret_key' => 'doku-secret',
+                'base_url' => 'https://api-sandbox.doku.test',
+            ],
+            'is_active' => true,
+        ]);
+
+        $dokuSignature = new DokuSignature;
+        Http::fake(function ($request) use ($dokuSignature) {
+            $requestId = (string) (($request->header('Request-Id')[0] ?? ''));
+            $clientId = (string) (($request->header('Client-Id')[0] ?? ''));
+            $this->assertSame('MCH-TEST', $clientId);
+            $this->assertStringStartsWith('HMACSHA256=', (string) (($request->header('Signature')[0] ?? '')));
+
+            $body = json_decode($request->body(), true, 512, JSON_THROW_ON_ERROR);
+            $responseData = [
+                'order' => ['invoice_number' => $body['order']['invoice_number']],
+                'virtual_account_info' => ['virtual_account_number' => '88000000123456'],
+            ];
+            $responseBody = json_encode($responseData, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            $timestamp = '2026-09-30T03:00:00Z';
+            $signature = $dokuSignature->signResponse(
+                'MCH-TEST',
+                $requestId,
+                $timestamp,
+                '/doku-virtual-account/v2/payment-code',
+                $responseBody,
+                'doku-secret'
+            );
+
+            return Http::response($responseBody, 200, [
+                'Content-Type' => 'application/json',
+                'Response-Timestamp' => $timestamp,
+                'Signature' => $signature,
+            ]);
+        });
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'virtual_account',
+            'm7-doku-order-0001'
+        ))->assertCreated();
+        $this->assertSame(13500, $checkout->json('total_idr'));
+
+        $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'm7-doku-payment-0001',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk()
+            ->assertJsonPath('status', 'PENDING')
+            ->assertJsonPath('instructions.va_number', '88000000123456');
+
+        $payment = DB::table('payment_transactions')->first();
+        $payload = [
+            'service' => ['id' => 'VIRTUAL_ACCOUNT'],
+            'transaction' => ['status' => 'SUCCESS', 'date' => '2026-09-30T03:05:00Z'],
+            'order' => ['invoice_number' => $payment->merchant_reference, 'amount' => 13500],
+        ];
+        $raw = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $requestId = 'doku-event-0001';
+        $timestamp = '2026-09-30T03:05:01Z';
+        $signature = $dokuSignature->sign(
+            'MCH-TEST',
+            $requestId,
+            $timestamp,
+            '/api/payments/doku/notification',
+            $raw,
+            'doku-secret'
+        );
+
+        $response = $this->call('POST', '/api/payments/doku/notification', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'application/json',
+            'HTTP_CLIENT_ID' => 'MCH-TEST',
+            'HTTP_REQUEST_ID' => $requestId,
+            'HTTP_REQUEST_TIMESTAMP' => $timestamp,
+            'HTTP_SIGNATURE' => $signature,
+        ], $raw);
+        $response->assertOk()->assertJsonPath('status', 'ok');
+
+        $this->assertSame('PAID', DB::table('orders')->value('status'));
+        $this->assertSame('PAID', DB::table('payment_transactions')->value('status'));
+    }
+
+    public function test_wallet_payment_debits_once_on_idempotent_retry(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('saldo', 'WALLET');
+
+        $user = User::create([
+            'name' => 'Wallet Buyer',
+            'email' => 'wallet@example.test',
+            'phone' => '081234567891',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        DB::table('wallets')->where('user_id', $user->id)->update(['balance_idr' => 50000]);
+
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'saldo',
+            'customer_input' => ['user_id' => '888888'],
+            'voucher_code' => null,
+            'idempotency_key' => 'm7-wallet-order-0001',
+        ])->assertCreated();
+
+        $first = $this->actingAs($user)->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'm7-wallet-payment-0001',
+        ])->assertOk();
+        $second = $this->actingAs($user)->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'm7-wallet-payment-0001',
+        ])->assertOk();
+
+        $first->assertJsonPath('status', 'PAID');
+        $second->assertJsonPath('status', 'PAID');
+        $this->assertSame(39000, (int) DB::table('wallets')->where('user_id', $user->id)->value('balance_idr'));
+        $this->assertSame(1, DB::table('wallet_ledger')->where('source', 'CHECKOUT')->count());
+        $this->assertSame('PAID', DB::table('orders')->value('status'));
+    }
+
+    public function test_wallet_topup_paid_callback_credit_is_idempotent_and_fee_is_not_credited(): void
+    {
+        $user = User::create([
+            'name' => 'Topup Buyer',
+            'email' => 'topup@example.test',
+            'phone' => '081234567892',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->first();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+
+        $topupId = DB::table('wallet_topups')->insertGetId([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'PENDING_PAYMENT',
+            'idempotency_key' => 'm7-topup-direct-0001',
+            'request_fingerprint' => hash('sha256', 'topup'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'wallet_topup_id' => $topupId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'merchant_reference' => 'TOPUP-TEST-1',
+            'amount_idr' => 10700,
+            'status' => 'PENDING',
+            'idempotency_key' => 'm7-topup-payment-0001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $states = app(PaymentStateService::class);
+        $states->apply($paymentId, 'PAID');
+        $states->apply($paymentId, 'PAID');
+
+        $this->assertSame(10000, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
+        $this->assertSame(1, DB::table('wallet_ledger')->where('source', 'TOPUP')->count());
+        $this->assertSame('PAID', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+
+        $states->apply($paymentId, 'REFUNDED');
+        $states->apply($paymentId, 'PAID');
+
+        $this->assertSame(0, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
+        $this->assertSame(1, DB::table('wallet_ledger')->where('source', 'REFUND')->count());
+        $this->assertSame('REFUNDED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+        $this->assertSame('REFUNDED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+    }
+
+    public function test_expired_payment_closes_order_releases_voucher_and_late_paid_does_not_reopen(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('manual_qris', 'MANUAL_QRIS');
+        $voucherId = DB::table('vouchers')->insertGetId([
+            'code' => 'M7EXPIRE',
+            'discount_type' => 'FIXED',
+            'discount_value' => 1000,
+            'minimum_total_idr' => 0,
+            'total_quota' => 10,
+            'per_customer_limit' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $payload = $this->guestCheckout(
+            $catalog['package_id'],
+            'manual_qris',
+            'm7-expire-order-0001'
+        );
+        $payload['voucher_code'] = 'M7EXPIRE';
+        $checkout = $this->postJson('/checkout/orders', $payload)->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->first();
+
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'order_id' => $order->id,
+            'payment_route_id' => $routeId,
+            'gateway_code' => 'MANUAL_QRIS',
+            'channel_code' => 'manual_qris',
+            'merchant_reference' => 'EXPIRE-'.$order->id,
+            'amount_idr' => $order->total_idr,
+            'status' => 'PENDING',
+            'idempotency_key' => 'm7-expire-payment-0001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $states = app(PaymentStateService::class);
+        $states->apply($paymentId, 'EXPIRED');
+
+        $this->assertSame('EXPIRED', DB::table('orders')->where('id', $order->id)->value('status'));
+        $this->assertSame('EXPIRED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame('RELEASED', DB::table('voucher_redemptions')
+            ->where('voucher_id', $voucherId)->value('status'));
+
+        $states->apply($paymentId, 'PAID');
+
+        $this->assertSame('EXPIRED', DB::table('orders')->where('id', $order->id)->value('status'));
+        $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame(1, DB::table('order_events')
+            ->where('order_id', $order->id)
+            ->where('event_type', 'PAYMENT_LATE_VERIFIED')->count());
+    }
+
+    public function test_second_payment_key_for_same_order_reuses_existing_payment(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        Http::fake([
+            'https://app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
+                'token' => 'one-token-only',
+                'redirect_url' => 'https://sandbox.midtrans.test/pay-one',
+            ]),
+        ]);
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'qris',
+            'm7-one-payment-order-0001'
+        ))->assertCreated();
+
+        $first = $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'm7-one-payment-key-0001',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk();
+
+        $second = $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'm7-one-payment-key-0002',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk();
+
+        $this->assertSame($first->json('payment_id'), $second->json('payment_id'));
+        $this->assertSame('one-token-only', $second->json('instructions.token'));
+        $this->assertSame(1, DB::table('payment_transactions')->count());
+        Http::assertSentCount(1);
+    }
+
+    public function test_uncertain_external_create_is_not_blindly_retried(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        Http::fake([
+            'https://app.sandbox.midtrans.com/snap/v1/transactions' => Http::response(['error' => 'upstream'], 503),
+        ]);
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'qris',
+            'm7-uncertain-order-0001'
+        ))->assertCreated();
+
+        $payload = [
+            'idempotency_key' => 'm7-uncertain-payment-0001',
+            'access_code' => $checkout->json('access_code'),
+        ];
+        $this->postJson('/payments/orders/'.$checkout->json('order_number'), $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors(['payment']);
+
+        $this->postJson('/payments/orders/'.$checkout->json('order_number'), $payload)
+            ->assertOk()->assertJsonPath('status', 'UNKNOWN');
+
+        Http::assertSentCount(1);
+        $this->assertSame(1, DB::table('payment_transactions')->count());
+    }
+
+    public function test_admin_can_confirm_manual_qris_once(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('manual_qris', 'MANUAL_QRIS');
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'manual_qris',
+            'm7-manual-order-0001'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->first();
+
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'order_id' => $order->id,
+            'payment_route_id' => $routeId,
+            'gateway_code' => 'MANUAL_QRIS',
+            'channel_code' => 'manual_qris',
+            'merchant_reference' => 'MANUAL-'.$order->id,
+            'amount_idr' => $order->total_idr,
+            'status' => 'PENDING',
+            'idempotency_key' => 'm7-manual-payment-0001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $admin = AdminUser::create([
+            'name' => 'Admin Payment',
+            'email' => 'payadmin@example.test',
+            'password' => Hash::make('StrongPassword123!'),
+            'role' => 'ADMIN',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($admin, 'admin')
+            ->post('/admin/payments/manual/'.$paymentId.'/confirm')
+            ->assertRedirect();
+
+        $this->assertSame('PAID', DB::table('orders')->where('id', $order->id)->value('status'));
+        $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame(1, DB::table('audit_logs')->where('action', 'payment.manual.confirmed')->count());
+    }
+}

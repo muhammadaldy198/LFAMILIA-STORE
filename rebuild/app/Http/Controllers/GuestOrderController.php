@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\GuestOrderAccess;
+use App\Services\PaymentPresentationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,8 +36,11 @@ class GuestOrderController
         return redirect()->route('guest.orders.show', $order->order_number);
     }
 
-    public function show(Request $request, string $orderNumber): Response
-    {
+    public function show(
+        Request $request,
+        string $orderNumber,
+        PaymentPresentationService $payments,
+    ): Response {
         $order = DB::table('orders')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->whereNull('orders.user_id')->where('orders.order_number', $orderNumber)
@@ -46,6 +50,9 @@ class GuestOrderController
 
         abort_unless($order, 404);
 
-        return Inertia::render('Guest/OrderStatus', ['order' => $order]);
+        return Inertia::render('Guest/OrderStatus', [
+            'order' => $order,
+            'payment' => $payments->forOrder((int) $order->id),
+        ]);
     }
 }
