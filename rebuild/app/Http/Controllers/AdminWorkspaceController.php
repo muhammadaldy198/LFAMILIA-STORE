@@ -5,12 +5,15 @@ namespace App\Http\Controllers;
 use App\Services\AdminAuditService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use JsonException;
+use Throwable;
 
 class AdminWorkspaceController
 {
@@ -352,14 +355,14 @@ class AdminWorkspaceController
         try {
             DB::select('SELECT 1');
             $checks[] = ['name' => 'MySQL', 'status' => 'HEALTHY', 'message' => 'Database dapat diakses.'];
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $checks[] = ['name' => 'MySQL', 'status' => 'DOWN', 'message' => 'Database tidak dapat diakses.'];
         }
 
         try {
             Redis::connection()->ping();
             $checks[] = ['name' => 'Redis', 'status' => 'HEALTHY', 'message' => 'Redis dapat diakses.'];
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $checks[] = ['name' => 'Redis', 'status' => 'DOWN', 'message' => 'Redis tidak dapat diakses.'];
         }
 
@@ -373,7 +376,7 @@ class AdminWorkspaceController
         $heartbeat = DB::table('system_settings')->where('key', 'system.scheduler_heartbeat')->value('value');
         $heartbeatAt = json_decode((string) $heartbeat, true);
         $healthyScheduler = is_string($heartbeatAt)
-            && now()->diffInMinutes(\Illuminate\Support\Carbon::parse($heartbeatAt), true) <= 3;
+            && now()->diffInMinutes(Carbon::parse($heartbeatAt), true) <= 3;
         $checks[] = [
             'name' => 'Scheduler',
             'status' => $healthyScheduler ? 'HEALTHY' : 'DEGRADED',
@@ -420,7 +423,7 @@ class AdminWorkspaceController
 
         try {
             $decoded = json_decode($json, true, 64, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
+        } catch (JsonException) {
             throw ValidationException::withMessages([$field => 'Harus berupa JSON valid.']);
         }
 
