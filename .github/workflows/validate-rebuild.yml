@@ -68,10 +68,11 @@ jobs:
         with:
           node-version: '22'
       - name: Install PHP dependencies
-        run: composer install --no-interaction --prefer-dist
-      - name: Install frontend dependencies
         run: |
-          if test -f package-lock.json; then npm ci; else npm install; fi
+          composer validate --strict
+          composer install --no-interaction --prefer-dist
+      - name: Install frontend dependencies
+        run: npm ci
       - name: Configure test app
         run: |
           cp .env.example .env
@@ -83,15 +84,6 @@ jobs:
           php artisan migrate --force
           npm run build
       - name: Run foundation tests
-        run: php artisan test
+        run: vendor/bin/phpunit
       - name: Check PHP style
         run: vendor/bin/pint --test
-      - name: Upload generated lockfiles for the first M1 run
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rebuild-lockfiles
-          path: |
-            rebuild/composer.lock
-            rebuild/package-lock.json
-          if-no-files-found: ignore
