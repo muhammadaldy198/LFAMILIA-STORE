@@ -39,13 +39,13 @@ class AdminCustomerController extends Controller
         try {
             $auth->require($request, 'owner');
             $input = $request->validate([
-                'settings' => ['required','array','size:4'],
-                'settings.*.tier' => ['required','in:basic,gold,diamond,platinum'],
+                'settings' => ['required','array','size:5'],
+                'settings.*.tier' => ['required','in:basic,gold,diamond,platinum,mafia'],
                 'settings.*.discountPercent' => ['required','numeric','min:0','max:100'],
                 'settings.*.benefits' => ['nullable','string','max:1000'],
             ]);
             $seen = array_unique(array_column($input['settings'], 'tier'));
-            if (count($seen) !== 4) {
+            if (count($seen) !== 5) {
                 throw new RuntimeException('Semua tier member wajib dikirim satu kali.');
             }
             $settings = array_map(fn (array $item) => [
@@ -74,7 +74,7 @@ class AdminCustomerController extends Controller
             $access = $auth->require($request, 'owner');
             $input = $request->validate([
                 'customerId' => ['required','uuid'],
-                'role' => ['required','in:automatic,basic,gold,diamond,platinum'],
+                'role' => ['required','in:automatic,basic,gold,diamond,platinum,mafia'],
                 'addBalance' => ['nullable','integer','min:0','max:100000000'],
                 'reason' => ['nullable','string','max:300'],
             ]);
