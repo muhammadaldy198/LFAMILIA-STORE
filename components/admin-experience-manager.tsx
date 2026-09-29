@@ -248,18 +248,23 @@ export function AdminExperienceManager({ role }: { role: "super_admin" | "admin"
 
       <div className="mt-[10px] grid grid-cols-1 gap-[12px] xl:grid-cols-[minmax(0,1fr)_300px]">
         <main className="min-w-0 space-y-[10px]">
-          <ContentPanel title="Daftar Banner" description="Atur banner yang tampil di halaman utama. Kamu bisa mengatur urutan, status, dan link tujuan." action="Tambah Banner" onAdd={() => add("banner")}>
-            <BannerTable items={banners} onEdit={(id) => focus("banner", id)} onToggle={(id) => toggle("banner", id)} />
-          </ContentPanel>
-
-          <div className="grid grid-cols-1 gap-[10px] md:grid-cols-2">
+          {activeTab === "banner" && (
+            <ContentPanel title="Daftar Banner" description="Atur banner yang tampil di halaman utama. Kamu bisa mengatur urutan, status, dan link tujuan." action="Tambah Banner" onAdd={() => add("banner")}>
+              <BannerTable items={banners} onEdit={(id) => focus("banner", id)} onToggle={(id) => toggle("banner", id)} />
+            </ContentPanel>
+          )}
+          {activeTab === "popup" && (
             <MiniPanel title="Pop-up" description="Kelola pop-up informasi, promo, atau pengumuman." action="Tambah Pop-up" items={popups} kind="popup" onAdd={() => add("popup")} onEdit={focus} onToggle={toggle} />
+          )}
+          {activeTab === "news" && (
             <MiniPanel title="Berita" description="Kelola berita yang ditampilkan di halaman utama." action="Tulis Berita" items={news} kind="news" onAdd={() => add("news")} onEdit={focus} onToggle={toggle} />
-          </div>
-          <div className="grid grid-cols-1 gap-[10px] md:grid-cols-2">
+          )}
+          {activeTab === "review" && (
             <MiniPanel title="Ulasan Pelanggan" description="Ulasan dibuat oleh pelanggan yang sudah bertransaksi; admin hanya mengatur visibilitas." items={reviews} kind="review" onEdit={focus} onToggle={toggle} reviews />
+          )}
+          {activeTab === "faq" && (
             <MiniPanel title="FAQ" description="Kelola pertanyaan yang sering ditanyakan." action="Tambah FAQ" items={faqs} kind="faq" onAdd={() => add("faq")} onEdit={focus} onToggle={toggle} />
-          </div>
+          )}
         </main>
 
         <EditorPanel editor={editor} banners={banners} popups={popups} news={news} reviews={reviews} faqs={faqs} canDelete={role !== "staff"} saving={saving} onAdd={() => add(editor.kind)} onDelete={() => void deleteEditor()} onCancel={() => void loadContent()} onImage={updateImage} onError={setError} onSubmit={saveEditor} />
