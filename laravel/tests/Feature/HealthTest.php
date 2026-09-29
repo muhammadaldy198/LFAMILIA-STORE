@@ -15,4 +15,23 @@ class HealthTest extends TestCase
                 'service' => 'lfamilia-laravel',
             ]);
     }
+
+    public function test_system_status_preserves_storefront_contract_on_vps_runtime(): void
+    {
+        $this->getJson('/api/system-status')
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('runtime', 'laravel')
+            ->assertJsonPath('database', 'ok')
+            ->assertJsonStructure([
+                'services' => [
+                    '*' => ['id', 'name', 'state', 'detail'],
+                ],
+                'merchant' => ['legalName', 'registrationId', 'address'],
+                'updatedAt',
+            ])
+            ->assertJsonCount(4, 'services')
+            ->assertJsonPath('services.0.id', 'catalog')
+            ->assertJsonPath('services.3.id', 'support');
+    }
 }
