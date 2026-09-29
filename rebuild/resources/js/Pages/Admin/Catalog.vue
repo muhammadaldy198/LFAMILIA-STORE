@@ -166,7 +166,7 @@ const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { i
                 <button v-if="fieldsProductId" type="button" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950" @click="saveFields">Simpan field</button>
             </section>
 
-            <section class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <section id="media" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Media toko</h2>
                 <div v-for="asset in assets" :key="asset.id" class="space-y-2 border-t border-slate-800 pt-3">
                     <div class="flex flex-wrap items-end gap-3"><strong>{{ asset.key }}</strong><label class="flex gap-2 text-sm"><input v-model="asset.is_active" type="checkbox">Aktif</label><label v-if="asset.key.startsWith('banner')" class="text-sm">Tautan banner<input v-model="asset.target_url" type="url" class="mt-1 block rounded bg-slate-800 p-2"></label><button type="button" class="rounded bg-slate-700 px-3 py-2 text-sm" @click="saveAsset(asset)">Simpan</button></div>
