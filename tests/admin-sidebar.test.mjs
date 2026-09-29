@@ -29,15 +29,15 @@ test("admin reference exposes the approved desktop information architecture", ()
     "Layanan Pelanggan",
     "Laporan",
     "Staff & Admin Akses",
-    "Integrasi",
     "Pengaturan",
+    "Integrasi",
   ]) assert.ok(source.includes(`label: "${label}"`), label);
   assert.doesNotMatch(source, /value: "site-content"/);
   assert.equal([...source.matchAll(/\{ value: "[^"]+", label: "[^"]+"/g)].length, 14);
-  assert.ok(source.indexOf('label: "Integrasi"') < source.indexOf('label: "Pengaturan"'));
+  assert.ok(source.indexOf('label: "Pengaturan"') < source.indexOf('label: "Integrasi"'));
 });
 
-test("dashboard keeps the approved reference while using live summary data", () => {
+test("dashboard uses live summary data and labels sales ranking accurately", () => {
   assert.match(overview, /fetchAdminSummary<Summary>\(range\)/);
   assert.match(summaryClient, /\/api\/admin\/summary\?range=/);
   assert.match(overview, /summary\?\.recentOrders/);
@@ -52,6 +52,7 @@ test("dashboard keeps the approved reference while using live summary data", () 
     "Aktivitas Terbaru",
     "Status Integrasi",
     "Pesanan Terbaru",
-    "Produk Populer",
+    "Produk Terlaris",
   ]) assert.ok(overview.includes(label), label);
+  assert.doesNotMatch(overview, /const featureCards =/);
 });
