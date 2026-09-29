@@ -15,6 +15,8 @@ test("retired Worker has no cron and Laravel schedules reconciliation", () => {
   const wrangler = read("wrangler.jsonc");
   const scheduler = read("laravel/routes/console.php");
   assert.match(wrangler, /"crons": \[\]/);
+  assert.match(wrangler, /"workers_dev": false/);
+  assert.match(wrangler, /"preview_urls": false/);
   assert.match(scheduler, /Schedule::command\('lfamilia:reconcile'\)/);
   assert.match(scheduler, /->everyMinute\(\)/);
 });
