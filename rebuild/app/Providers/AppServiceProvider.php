@@ -24,6 +24,6 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('google-oauth', fn (Request $request) => Limit::perMinute(10)
             ->by('google-oauth:'.$request->ip()));
         RateLimiter::for('support-ticket', fn (Request $request) => Limit::perMinute(5)
-            ->by('support-ticket:'.($request->user()?->id ?? $request->ip()));
+            ->by('support-ticket:'.($request->user()?->id ?? $request->ip())));
     }
 }
