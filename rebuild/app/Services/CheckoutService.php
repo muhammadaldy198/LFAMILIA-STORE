@@ -17,8 +17,7 @@ class CheckoutService
         private readonly CheckoutInputValidator $inputValidator,
         private readonly NicknameService $nickname,
         private readonly GuestOrderAccess $guestAccess,
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<string, mixed>

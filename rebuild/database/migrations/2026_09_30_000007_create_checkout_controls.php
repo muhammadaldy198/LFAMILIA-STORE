@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('nickname_server_field_key', 80)->nullable();
         });
 
-        DB::statement("ALTER TABLE products ADD CONSTRAINT products_nickname_config_check CHECK (nickname_check_enabled = 0 OR (nickname_game_code IS NOT NULL AND nickname_user_field_key IS NOT NULL))");
+        DB::statement('ALTER TABLE products ADD CONSTRAINT products_nickname_config_check CHECK (nickname_check_enabled = 0 OR (nickname_game_code IS NOT NULL AND nickname_user_field_key IS NOT NULL))');
         DB::statement("ALTER TABLE vouchers ADD CONSTRAINT vouchers_discount_check CHECK (discount_type IN ('FIXED', 'PERCENT') AND discount_value > 0 AND (discount_type <> 'PERCENT' OR discount_value <= 100))");
         DB::statement('ALTER TABLE orders ADD CONSTRAINT orders_price_math_check CHECK (discount_idr <= cost_idr + margin_idr AND total_idr = cost_idr + margin_idr - discount_idr + fee_idr)');
     }

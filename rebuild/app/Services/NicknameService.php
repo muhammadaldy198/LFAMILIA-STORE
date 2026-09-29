@@ -82,7 +82,7 @@ class NicknameService
                 data_get($nicknameData, 'data.username'),
             ]);
             if (! $nickname) {
-                throw new NicknameServiceUnavailable();
+                throw new NicknameServiceUnavailable;
             }
 
             $country = $this->firstString([
@@ -101,7 +101,7 @@ class NicknameService
                     data_get($regionData, 'data.country'),
                 ]);
                 if (! $country) {
-                    throw new NicknameServiceUnavailable();
+                    throw new NicknameServiceUnavailable;
                 }
             }
 
@@ -126,7 +126,7 @@ class NicknameService
         try {
             $response = Http::acceptJson()->timeout(8)->post($url, $body);
         } catch (Throwable) {
-            throw new NicknameServiceUnavailable();
+            throw new NicknameServiceUnavailable;
         }
 
         if (in_array($response->status(), [400, 404], true)) {
@@ -135,12 +135,12 @@ class NicknameService
             ]);
         }
         if (! $response->successful()) {
-            throw new NicknameServiceUnavailable();
+            throw new NicknameServiceUnavailable;
         }
 
         $data = $response->json();
         if (! is_array($data) || ($data['status'] ?? null) !== true) {
-            throw new NicknameServiceUnavailable();
+            throw new NicknameServiceUnavailable;
         }
 
         return $data;
