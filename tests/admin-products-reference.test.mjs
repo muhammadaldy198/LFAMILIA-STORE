@@ -5,11 +5,10 @@ import test from "node:test";
 
 const source = fs.readFileSync(path.join(process.cwd(), "components/admin-product-manager.tsx"), "utf8");
 
-test("products page matches the supplied desktop list reference", () => {
+test("products page keeps the real product list controls without duplicate nominal action", () => {
   for (const label of [
     "Kelola semua produk top up, voucher, dan layanan digital.",
-    "Tambah Produk Manual",
-    "Kelola Nominal",
+    "Tambah Produk",
     "Semua Kategori",
     "Semua Provider",
     "Semua Status",
@@ -18,6 +17,8 @@ test("products page matches the supplied desktop list reference", () => {
     "Ditampilkan",
     "Terakhir Update",
   ]) assert.ok(source.includes(label), `missing products label: ${label}`);
+  assert.doesNotMatch(source, />Kelola Nominal<\/button>/);
+  assert.doesNotMatch(source, />Nominal<\/button>/);
 });
 
 test("product creation is manual and DigiFlazz imports nominal only", () => {
@@ -30,21 +31,22 @@ test("product creation is manual and DigiFlazz imports nominal only", () => {
   assert.match(source, /method: "PATCH"/);
 });
 
-test("editor includes nominal, separators, reordering and store preview", () => {
+test("editor includes real nominal separator and reordering controls without fake preview", () => {
   for (const label of [
     "Daftar Nominal",
     "Tambah dari Digiflazz",
     "Tambah Manual",
-    "Upload Gambar Nominal",
-    "Atur Urutan",
     "Sync Harga",
     "Atur Margin Massal",
     "Tabel Pemisah Nominal",
     "Tambah Tabel Pemisah",
-    "Preview Tampilan di Toko",
+    "Lihat di Toko",
     "Grup / Tabel",
   ]) assert.ok(source.includes(label), `missing editor label: ${label}`);
 
+  assert.doesNotMatch(source, />Upload Gambar Nominal<\/ActionButton>/);
+  assert.doesNotMatch(source, />Atur Urutan<\/ActionButton>/);
+  assert.doesNotMatch(source, /function StorePreview/);
   assert.match(source, /draggable/);
   assert.match(source, /moveNominal/);
   assert.match(source, /moveSection/);
