@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminAuthService;
+use App\Services\AdminDigiflazzService;
 use App\Services\IntegrationConfigService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -13,7 +14,7 @@ use Throwable;
 
 class AdminSummaryController extends Controller
 {
-    public function show(Request $request, AdminAuthService $auth, IntegrationConfigService $integrations): JsonResponse
+    public function show(Request $request, AdminAuthService $auth, IntegrationConfigService $integrations, AdminDigiflazzService $digiflazz): JsonResponse
     {
         try {
             $access = $auth->require($request, 'staff');
@@ -192,8 +193,20 @@ class AdminSummaryController extends Controller
                     ->whereIn('fulfillment_status', ['manual_pending', 'processing'])->count(),
             ];
 
-            $digiflazzRuntime = $integrations->digiflazzRuntime();
-            $digiflazzReady = $digiflazzRuntime['username'] !== '' && $digiflazzRuntime['apiKey'] !== '';
+            $digiflazzState = $digiflazz->readiness();
+            $digiflazzReady = (bool) $digiflazzState['ready'];
+            $digiflazzBalance = null;
+            $digiflazzReason = $digiflazzState['reason'];
+            if ($canViewFinance && $digiflazzReady) {
+                try {
+                    $digiflazzBalance = $digiflazz->balance();
+                    $digiflazzReason = null;
+                } catch (Throwable $error) {
+                    $digiflazzReady = false;
+                    $digiflazzReason = $error->getMessage() ?: 'Koneksi DigiFlazz gagal.';
+                }
+            }
+
             $paymentOverview = $integrations->paymentOverview();
             $dokuReady = (bool) ($paymentOverview['dokuCheckoutConfigured'] ?? false);
 
@@ -236,10 +249,10 @@ class AdminSummaryController extends Controller
                     'digiflazz' => [
                         'ready' => $access['role'] !== 'staff' && $digiflazzReady,
                         'environment' => $canViewFinance
-                            ? $digiflazzRuntime['environment']
+                            ? $digiflazzState['environment']
                             : null,
-                        'reason' => null,
-                        'balance' => null,
+                        'reason' => $access['role'] === 'staff' ? null : $digiflazzReason,
+                        'balance' => $canViewFinance ? $digiflazzBalance : null,
                         'issues' => array_sum($attention),
                         'lastSyncAt' => DB::table('product_packages')
                             ->where('provider_code', 'digiflazz')
