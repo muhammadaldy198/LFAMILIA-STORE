@@ -73,7 +73,6 @@ Artisan::command('lfamilia:cleanup-empty-customers', function (CustomerAccountDe
 
 Schedule::command('lfamilia:cleanup-empty-customers')->dailyAt('03:30');
 
-
 Artisan::command('lfamilia:recover-fulfillment', function (): void {
     $queued = 0;
 
