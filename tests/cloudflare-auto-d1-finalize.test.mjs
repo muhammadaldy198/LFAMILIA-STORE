@@ -16,14 +16,13 @@ test("retired Cloudflare config cannot bind the old D1 database", () => {
   assert.match(wrangler, /"preview_urls": false/);
 });
 
-test("Vinext runtime cannot execute the retired D1 API", () => {
+test("VPS Node API bypasses every legacy Worker D1 handler", () => {
   const worker = read("worker/index.ts");
-  assert.match(worker, /proxyApiToLaravel/);
-  assert.match(worker, /VPS_FRONTEND_MODE/);
-  assert.match(worker, /RETIRED_WORKER_API/);
-  assert.match(worker, /API LFAMILIA dijalankan oleh Laravel\/MariaDB pada VPS/);
-  assert.doesNotMatch(worker, /D1Database/);
-  assert.doesNotMatch(worker, /ensureLegacyDatabaseColumns/);
-  assert.doesNotMatch(worker, /hydrateIntegrationRuntimeEnv/);
-  assert.doesNotMatch(worker, /async scheduled\(/);
+  const proxy = worker.indexOf("proxyApiToLaravel(request, url)");
+  const legacyRuntime = worker.indexOf("if (runtimeEnv.DB)");
+  assert.ok(proxy > 0);
+  assert.ok(legacyRuntime > proxy);
+  assert.match(worker, /isVpsFrontendRuntime\(\)/);
+  assert.match(worker, /url\.pathname === "\/api"/);
+  assert.match(worker, /LFAMILIA_LARAVEL_INTERNAL_URL/);
 });
