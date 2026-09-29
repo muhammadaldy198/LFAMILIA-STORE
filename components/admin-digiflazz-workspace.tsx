@@ -1,18 +1,15 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   RefreshCw,
   Search,
-  Settings2,
-  SlidersHorizontal,
   X,
 } from "lucide-react";
 
-type MarginType = "fixed" | "percent";
 type Health = "healthy" | "warning" | "critical" | "unknown";
 
 type MonitorItem = {
@@ -23,10 +20,6 @@ type MonitorItem = {
   category: string;
   brand: string;
   currentPrice: number | null;
-  maxPrice: number | null;
-  marginType: MarginType;
-  marginValue: number;
-  sellingPrice: number;
   buyerProductStatus: boolean;
   sellerProductStatus: boolean;
   unlimitedStock: boolean;
@@ -79,10 +72,6 @@ function formatDate(value: string | null | undefined) {
   return new Intl.DateTimeFormat("id-ID", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(parsed);
 }
 
-function calculateSale(basePrice: number, type: MarginType, value: number) {
-  return type === "percent" ? Math.ceil(basePrice * (100 + value) / 100) : Math.ceil(basePrice + value);
-}
-
 export function AdminDigiflazzWorkspace() {
   const [data, setData] = useState<MonitorResponse>({
     items: [],
@@ -92,13 +81,11 @@ export function AdminDigiflazzWorkspace() {
   const [autoSync, setAutoSync] = useState(true);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Semua Kategori");
-  const [brand, setBrand] = useState("Semua Subkategori");
+  const [brand, setBrand] = useState("Semua Produk / Brand");
   const [health, setHealth] = useState("Semua Status");
   const [page, setPage] = useState(1);
-  const [editing, setEditing] = useState<MonitorItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -137,11 +124,19 @@ export function AdminDigiflazzWorkspace() {
   );
   const visible = useMemo(() => {
     const term = query.trim().toLowerCase();
+    const nominalNumber = (label: string) => {
+      const match = label.match(/\d[\d.,]*/);
+      return match ? Number(match[0].replace(/\D/g, "")) : Number.MAX_SAFE_INTEGER;
+    };
     return data.items.filter((item) =>
       (!term || `${item.productName} ${item.packageLabel} ${item.providerSku} ${item.category} ${item.brand}`.toLowerCase().includes(term)) &&
       (category === "Semua Kategori" || item.category === category) &&
       (brand === "Semua Subkategori" || item.brand === brand) &&
       (health === "Semua Status" || item.health === health),
+    ).sort((left, right) =>
+      left.productName.localeCompare(right.productName, "id", { numeric: true, sensitivity: "base" }) ||
+      nominalNumber(left.packageLabel) - nominalNumber(right.packageLabel) ||
+      left.packageLabel.localeCompare(right.packageLabel, "id", { numeric: true, sensitivity: "base" }),
     );
   }, [brand, category, data.items, health, query]);
 
@@ -187,37 +182,8 @@ export function AdminDigiflazzWorkspace() {
 
   function chooseCategory(value: string) {
     setCategory(value);
-    setBrand("Semua Subkategori");
+    setBrand("Semua Produk / Brand");
     setPage(1);
-  }
-
-  async function savePricing(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editing) return;
-    const form = new FormData(event.currentTarget);
-    const maxPrice = Number(form.get("maxPrice"));
-    const marginType = String(form.get("marginType")) as MarginType;
-    const marginValue = Number(form.get("marginValue"));
-    if (!Number.isInteger(maxPrice) || maxPrice < 1 || !Number.isInteger(marginValue) || marginValue < 0) {
-      setError("Max Price dan margin harus berupa angka yang valid.");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    try {
-      const payload = await readJson<{ pricing: { sellingPrice: number } }>(await fetch("/api/admin/digiflazz-pricing", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packageId: editing.packageId, maxPrice, marginType, marginValue }),
-      }));
-      setNotice(`${editing.productName} - ${editing.packageLabel}: Price Control LFAMILIA disimpan. Harga jual ${formatRupiah(payload.pricing.sellingPrice)}.`);
-      setEditing(null);
-      await load();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Price Control gagal disimpan.");
-    } finally {
-      setSaving(false);
-    }
   }
 
   return (
@@ -225,7 +191,7 @@ export function AdminDigiflazzWorkspace() {
       <header className="flex flex-wrap items-start justify-between gap-[12px]">
         <div>
           <h1 className="text-[24px] font-black tracking-[-0.04em] text-[#0c1933]">Digiflazz</h1>
-          <p className="mt-[3px] text-[10px] text-[#62748c]">Pusat operasional provider dan Price Control LFAMILIA.</p>
+          <p className="mt-[3px] text-[10px] text-[#62748c]">Pusat operasional, pricelist, stok, cutoff, dan status DigiFlazz.</p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-[8px] sm:w-auto">
           <button type="button" onClick={() => void toggleAutoSync()} className={`h-[34px] rounded-[5px] border px-[12px] text-[8px] font-bold ${autoSync ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-[#dce3eb] bg-white text-[#55667c]"}`}>Auto Sync: {autoSync ? "ON" : "OFF"}</button>
@@ -249,10 +215,10 @@ export function AdminDigiflazzWorkspace() {
 
         <div className="flex flex-wrap items-end justify-between gap-[10px] border-b border-[#e4e9ef] px-[14px] py-[11px]">
           <div>
-            <div className="flex items-center gap-[7px]"><SlidersHorizontal className="size-[14px] text-[#0875ed]" /><h2 className="text-[13px] font-extrabold">Price Control LFAMILIA</h2></div>
-            <p className="mt-[2px] text-[8px] text-[#687a91]">Harga Digiflazz = modal aktual · Max Price = nilai Harga Max yang diatur di dashboard Digiflazz · Margin = keuntungan · Harga Jual = Max Price + margin.</p>
+            <h2 className="text-[13px] font-extrabold">Pricelist DigiFlazz</h2>
+            <p className="mt-[2px] text-[8px] text-[#687a91]">Harga DigiFlazz adalah modal aktual hasil sinkronisasi. Harga jual dan margin dikelola pada menu Produk, bukan di panel ini.</p>
           </div>
-          <span className="rounded-[4px] bg-[#eef6ff] px-[8px] py-[5px] text-[7px] font-bold text-[#0875df]">Kategori → Subkategori / Brand → SKU</span>
+          <span className="rounded-[4px] bg-[#eef6ff] px-[8px] py-[5px] text-[7px] font-bold text-[#0875df]">Kategori → Produk → Nominal</span>
         </div>
 
         <div className="grid grid-cols-1 gap-[7px] border-b border-[#e8edf3] px-[14px] py-[10px] md:grid-cols-[1.4fr_.75fr_.75fr_.65fr]">
@@ -263,12 +229,12 @@ export function AdminDigiflazzWorkspace() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1250px] table-fixed text-left">
-            <thead className="bg-[#f4f7fa] text-[7px] font-bold uppercase tracking-[.02em] text-[#58697f]"><tr><th className="w-[95px] px-[10px] py-[9px]">Kategori</th><th className="w-[125px]">Subkategori</th><th className="w-[130px]">Produk</th><th className="w-[150px]">Nominal</th><th className="w-[105px]">SKU</th><th className="w-[105px]">Harga Digiflazz</th><th className="w-[110px]">Max Price Digiflazz</th><th className="w-[90px]">Margin</th><th className="w-[105px]">Harga Jual</th><th className="w-[100px]">Status</th><th className="w-[70px]">Aksi</th></tr></thead>
+          <table className="w-full min-w-[890px] table-fixed text-left">
+            <thead className="bg-[#f4f7fa] text-[7px] font-bold uppercase tracking-[.02em] text-[#58697f]"><tr><th className="w-[110px] px-[10px] py-[9px]">Kategori</th><th className="w-[180px]">Produk</th><th className="w-[180px]">Nominal</th><th className="w-[125px]">SKU</th><th className="w-[135px]">Harga DigiFlazz</th><th className="w-[120px]">Stok</th><th className="w-[120px]">Status</th></tr></thead>
             <tbody>
-              {rows.map((item) => <tr key={item.packageId} className="border-t border-[#e7ebf0] text-[7.5px] text-[#35475f] hover:bg-[#fafcfe]"><td className="px-[10px] py-[8px] font-semibold">{item.category}</td><td className="truncate pr-[8px] font-semibold text-[#213752]">{item.brand}</td><td className="truncate pr-[8px]">{item.productName}</td><td className="truncate pr-[8px]">{item.packageLabel}</td><td className="truncate font-mono text-[7px]">{item.providerSku}</td><td className="font-semibold">{formatRupiah(item.currentPrice)}</td><td className="font-semibold">{formatRupiah(item.maxPrice)}</td><td>{item.marginType === "percent" ? `${item.marginValue}%` : formatRupiah(item.marginValue)}</td><td className="font-bold text-[#0c6fd4]">{formatRupiah(item.sellingPrice)}</td><td><Status item={item} /></td><td><button type="button" onClick={() => setEditing(item)} className="inline-flex h-[27px] items-center gap-[5px] rounded-[4px] border border-[#cfe0f2] bg-white px-[8px] font-bold text-[#0875df]"><Settings2 className="size-[10px]" />Atur</button></td></tr>)}
-              {!loading && !rows.length && <tr><td colSpan={11} className="py-[28px] text-center text-[8px] text-[#728198]">Tidak ada SKU yang cocok dengan filter.</td></tr>}
-              {loading && <tr><td colSpan={11} className="py-[28px] text-center text-[8px] text-[#728198]">Memuat Price Control Digiflazz...</td></tr>}
+              {rows.map((item) => <tr key={item.packageId} className="border-t border-[#e7ebf0] text-[7.5px] text-[#35475f] hover:bg-[#fafcfe]"><td className="px-[10px] py-[8px] font-semibold">{item.category}</td><td className="truncate pr-[8px] font-semibold text-[#213752]">{item.productName}</td><td className="truncate pr-[8px] font-bold">{item.packageLabel}</td><td className="truncate font-mono text-[7px]">{item.providerSku}</td><td className="font-semibold">{formatRupiah(item.currentPrice)}</td><td>{item.unlimitedStock ? "Tidak terbatas" : item.stock.toLocaleString("id-ID")}</td><td><Status item={item} /></td></tr>)}
+              {!loading && !rows.length && <tr><td colSpan={7} className="py-[28px] text-center text-[8px] text-[#728198]">Tidak ada SKU yang cocok dengan filter.</td></tr>}
+              {loading && <tr><td colSpan={7} className="py-[28px] text-center text-[8px] text-[#728198]">Memuat pricelist DigiFlazz...</td></tr>}
             </tbody>
           </table>
         </div>
@@ -278,8 +244,7 @@ export function AdminDigiflazzWorkspace() {
         <div className="border-t border-[#e4e9ef] px-[14px] py-[11px]"><h3 className="text-[11px] font-extrabold">Status Sinkronisasi & Transaksi Provider Terbaru</h3><p className="mt-[2px] text-[7.5px] text-[#6d7d91]">Ringkasan operasional tetap berada dalam satu workspace Digiflazz.</p></div>
         <div className="overflow-x-auto border-t border-[#edf0f4]"><table className="w-full min-w-[760px] text-left text-[7.5px]"><thead className="bg-[#fafbfd] text-[7px] font-bold text-[#5f7084]"><tr><th className="px-[12px] py-[8px]">Invoice</th><th>Produk</th><th>Nominal</th><th>Status</th><th>Waktu</th><th>Catatan</th></tr></thead><tbody>{orders.map((item) => <tr key={item.reference_id} className="border-t border-[#edf0f4]"><td className="px-[12px] py-[8px] font-mono">{item.reference_id}</td><td>{item.product_name}</td><td>{item.package_label}</td><td>{item.fulfillment_status}</td><td>{formatDate(item.created_at)}</td><td className="max-w-[220px] truncate pr-[12px]">{item.provider_message || item.provider_status || "-"}</td></tr>)}{!orders.length && <tr><td colSpan={6} className="py-[18px] text-center text-[#7b8999]">Belum ada transaksi provider terbaru.</td></tr>}</tbody></table></div>
       </section>
-
-      {editing && <PricingDialog item={editing} saving={saving} onClose={() => setEditing(null)} onSubmit={savePricing} />}
+}
     </div>
   );
 }
@@ -293,16 +258,4 @@ function Status({ item }: { item: MonitorItem }) {
   if (item.health === "warning") return <span title={item.alertReason || undefined} className="inline-flex items-center gap-[4px] rounded-[4px] bg-amber-50 px-[6px] py-[4px] font-bold text-amber-700"><AlertTriangle className="size-[9px]" />Peringatan</span>;
   if (item.health === "healthy") return <span className="inline-flex items-center gap-[4px] rounded-[4px] bg-emerald-50 px-[6px] py-[4px] font-bold text-emerald-700"><CheckCircle2 className="size-[9px]" />Normal</span>;
   return <span className="rounded-[4px] bg-slate-100 px-[6px] py-[4px] font-bold text-slate-600">Belum Dicek</span>;
-}
-
-function PricingDialog({ item, saving, onClose, onSubmit }: { item: MonitorItem; saving: boolean; onClose(): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
-  const [maxPrice, setMaxPrice] = useState(item.maxPrice ?? item.currentPrice ?? 1);
-  const [marginType, setMarginType] = useState<MarginType>(item.marginType);
-  const [marginValue, setMarginValue] = useState(item.marginValue);
-  const sale = maxPrice > 0 ? calculateSale(maxPrice, marginType, marginValue) : 0;
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#071426]/55 p-[20px]" role="dialog" aria-modal="true" aria-label="Atur Price Control LFAMILIA"><form onSubmit={onSubmit} className="w-full max-w-[520px] overflow-hidden rounded-[8px] bg-white shadow-2xl"><header className="flex items-start justify-between border-b border-[#e3e8ef] px-[15px] py-[12px]"><div><h2 className="text-[14px] font-black text-[#101d35]">Atur Price Control LFAMILIA</h2><p className="mt-[2px] text-[8px] text-[#6d7d92]">{item.brand} · {item.productName} · {item.packageLabel}</p></div><button type="button" onClick={onClose} className="grid size-[27px] place-items-center"><X className="size-[14px]" /></button></header><div className="p-[15px]"><div className="grid grid-cols-1 gap-[8px] rounded-[6px] border border-[#e0e7ef] bg-[#f8fafc] p-[10px] sm:grid-cols-2"><PriceInfo label="Harga Digiflazz sekarang" value={formatRupiah(item.currentPrice)} /><PriceInfo label="Harga Jual saat ini" value={formatRupiah(item.sellingPrice)} /></div><div className="mt-[12px] grid grid-cols-1 gap-[10px] sm:grid-cols-2"><label className="text-[8px] font-bold text-[#3e5068] sm:col-span-2">Max Price Digiflazz<input name="maxPrice" type="number" min={1} required value={maxPrice} onChange={(event) => setMaxPrice(Number(event.target.value))} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /><small className="mt-[4px] block font-normal text-[#738296]">Isi sama dengan kolom Harga Max (Rp) yang kamu atur di dashboard Digiflazz. Guard transaksi tetap dikelola oleh Digiflazz.</small></label><label className="text-[8px] font-bold text-[#3e5068]">Tipe Margin<select name="marginType" value={marginType} onChange={(event) => setMarginType(event.target.value as MarginType)} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] bg-white px-[9px] text-[8px]"><option value="fixed">Rupiah</option><option value="percent">Persen</option></select></label><label className="text-[8px] font-bold text-[#3e5068]">Nilai Margin<input name="marginValue" type="number" min={0} required value={marginValue} onChange={(event) => setMarginValue(Number(event.target.value))} className="mt-[4px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px]" /></label></div><div className="mt-[12px] rounded-[5px] border border-[#cfe4fa] bg-[#f0f7ff] px-[10px] py-[8px] text-[8px] text-[#355b7f]"><strong>Preview:</strong> Harga jual = {formatRupiah(sale)}. Rumus: Max Price + margin.</div></div><footer className="flex justify-end gap-[8px] border-t border-[#e5e9ef] px-[15px] py-[11px]"><button type="button" onClick={onClose} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[13px] text-[8px] font-bold">Batal</button><button type="submit" disabled={saving} className="h-[32px] rounded-[4px] bg-[#0875ed] px-[14px] text-[8px] font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Simpan Price Control"}</button></footer></form></div>;
-}
-
-function PriceInfo({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-[7px] text-[#718196]">{label}</p><strong className="mt-[2px] block text-[10px] text-[#18324f]">{value}</strong></div>;
 }
