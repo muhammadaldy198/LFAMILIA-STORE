@@ -4,17 +4,13 @@ import { useEffect, useState } from "react";
 import { fetchAdminSummary } from "@/lib/client/admin-summary";
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
   Boxes,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
   CircleDollarSign,
-  FileText,
-  Link2,
   ShoppingCart,
   UserCog,
-  Users,
   WalletCards,
 } from "lucide-react";
 
@@ -60,8 +56,6 @@ type DashboardIntegration = {
 };
 
 type AdminRole = "super_admin" | "admin" | "staff";
-const roleRank = { staff: 0, admin: 1, super_admin: 2 } as const;
-
 export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigate?: (value: string) => void }) {
   const isStaff = role === "staff";
   const canExpectFinance = role === "super_admin";
