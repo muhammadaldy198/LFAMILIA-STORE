@@ -1,0 +1,21 @@
+[Unit]
+Description=LFAMILIA STORE Laravel Scheduler
+After=network-online.target lfamilia-queue.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@@APP_USER@@
+Group=@@APP_GROUP@@
+WorkingDirectory=@@APP_DIR@@
+ExecStart=@@PHP_BIN@@ artisan schedule:work
+Restart=always
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=@@APP_DIR@@/storage @@APP_DIR@@/bootstrap/cache
+
+[Install]
+WantedBy=multi-user.target
