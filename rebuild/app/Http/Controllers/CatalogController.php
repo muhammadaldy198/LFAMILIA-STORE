@@ -65,8 +65,7 @@ class CatalogController
         string $slug,
         CheckoutPricing $pricing,
         PaymentRoutingService $paymentRouting,
-    ): Response
-    {
+    ): Response {
         $product = Product::with('category')->where('slug', $slug)
             ->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('is_active', true))

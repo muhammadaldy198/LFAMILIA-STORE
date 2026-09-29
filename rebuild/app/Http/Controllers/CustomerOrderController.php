@@ -27,8 +27,7 @@ class CustomerOrderController
         Request $request,
         int $order,
         PaymentPresentationService $payments,
-    ): Response
-    {
+    ): Response {
         $record = DB::table('orders')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')

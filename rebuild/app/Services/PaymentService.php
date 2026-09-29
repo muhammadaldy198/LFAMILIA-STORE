@@ -6,7 +6,6 @@ use App\Services\Payment\DokuDirectGateway;
 use App\Services\Payment\ManualQrisGateway;
 use App\Services\Payment\MidtransGateway;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpException;

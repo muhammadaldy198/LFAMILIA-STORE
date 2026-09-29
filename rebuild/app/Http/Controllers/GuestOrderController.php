@@ -40,8 +40,7 @@ class GuestOrderController
         Request $request,
         string $orderNumber,
         PaymentPresentationService $payments,
-    ): Response
-    {
+    ): Response {
         $order = DB::table('orders')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->whereNull('orders.user_id')->where('orders.order_number', $orderNumber)

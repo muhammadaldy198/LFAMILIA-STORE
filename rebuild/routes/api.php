@@ -17,7 +17,6 @@ Route::middleware('auth:sanctum')->get('/account', function (Request $request) {
     ]);
 });
 
-
 Route::post('/payments/midtrans/notification', [PaymentWebhookController::class, 'midtrans'])
     ->middleware('throttle:payment-webhook');
 Route::post('/payments/doku/notification', [PaymentWebhookController::class, 'doku'])
