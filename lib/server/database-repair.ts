@@ -74,6 +74,8 @@ const columns: Array<[table: string, column: string, definition: string]> = [
   ["customer_users", "tier_mode", "tier_mode TEXT DEFAULT 'automatic' NOT NULL"],
   ["customer_users", "tier_override", "tier_override TEXT"],
   ["customer_users", "tier_progress_bonus", "tier_progress_bonus INTEGER DEFAULT 0 NOT NULL"],
+  ["store_settings", "footer_banner_desktop_url", "footer_banner_desktop_url TEXT"],
+  ["store_settings", "footer_banner_mobile_url", "footer_banner_mobile_url TEXT"],
   ["store_settings", "discord_url", "discord_url TEXT"],
   ["store_settings", "support_widget_enabled", "support_widget_enabled INTEGER DEFAULT 1 NOT NULL"],
   ["product_packages", "package_group", "package_group TEXT"],
