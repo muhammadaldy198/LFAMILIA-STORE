@@ -69,8 +69,8 @@ jobs:
           node-version: '22'
       - name: Install PHP dependencies
         run: |
-          composer validate --strict
           composer update spatie/laravel-medialibrary --with-all-dependencies --no-interaction --prefer-dist
+          composer validate --strict
       - name: Install frontend dependencies
         run: npm ci
       - name: Configure test app
