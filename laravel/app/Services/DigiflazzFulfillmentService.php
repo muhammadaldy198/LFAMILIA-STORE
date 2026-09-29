@@ -79,6 +79,71 @@ class DigiflazzFulfillmentService
         }
     }
 
+    /**
+     * Explicit admin recovery for a paid DigiFlazz order that ended in a failure/review state.
+     * The original LFAMILIA reference_id is reused so the provider sees the same idempotency key.
+     *
+     * @return object|null
+     */
+    public function retryFailedOrder(string $orderId, string $adminEmail): ?object
+    {
+        DB::transaction(function () use ($orderId, $adminEmail): void {
+            $order = DB::table('orders')->where('id', $orderId)->lockForUpdate()->first();
+            if (!$order) {
+                throw new RuntimeException('Pesanan tidak ditemukan.');
+            }
+            if ($order->payment_status !== 'paid'
+                || $order->fulfillment_type !== 'automatic'
+                || strtolower(trim((string) $order->provider_code)) !== 'digiflazz') {
+                throw new RuntimeException('Hanya pesanan DigiFlazz otomatis yang sudah dibayar yang dapat dikirim ulang.');
+            }
+            if (in_array($order->fulfillment_status, ['success', 'cancelled'], true)
+                || in_array($order->provider_status, ['success'], true)) {
+                throw new RuntimeException('Pesanan sudah selesai dan tidak boleh dikirim ulang.');
+            }
+
+            $retryable = in_array((string) $order->fulfillment_status, ['failed', 'needs_review'], true)
+                || in_array((string) $order->provider_status, ['failed', 'retry_exhausted', 'retryable_error', 'error', 'unknown'], true);
+            if (!$retryable) {
+                throw new RuntimeException('Pesanan belum berada pada status gagal yang membutuhkan kirim ulang.');
+            }
+
+            $changed = DB::table('orders')
+                ->where('id', $orderId)
+                ->where('payment_status', 'paid')
+                ->whereNotIn('fulfillment_status', ['success', 'cancelled'])
+                ->update([
+                    'fulfillment_status' => 'processing',
+                    'provider_status' => null,
+                    'provider_message' => 'Kirim ulang DigiFlazz diizinkan oleh '.$adminEmail.'.',
+                    'updated_at' => now(),
+                ]);
+
+            if ($changed !== 1) {
+                throw new RuntimeException('Status pesanan berubah. Muat ulang sebelum mencoba lagi.');
+            }
+
+            DB::table('order_events')->insert([
+                'order_id' => $orderId,
+                'source' => 'admin',
+                'event_id' => 'admin-retry-'.$orderId.'-'.Str::uuid(),
+                'status' => 'retry_authorized',
+                'payload_json' => json_encode([
+                    'adminEmail' => $adminEmail,
+                    'providerCode' => 'digiflazz',
+                    'referenceId' => (string) $order->reference_id,
+                    'previousFulfillmentStatus' => (string) $order->fulfillment_status,
+                    'previousProviderStatus' => $order->provider_status,
+                ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                'created_at' => now(),
+            ]);
+        }, 3);
+
+        $this->fulfillOrder($orderId);
+
+        return DB::table('orders')->where('id', $orderId)->first();
+    }
+
     /** @return array{externalId:string,status:string,message:string,serialNumber:?string,raw:array<string,mixed>} */
     public function send(string $providerSku, string $customerNo, string $referenceId): array
     {
@@ -279,11 +344,21 @@ class DigiflazzFulfillmentService
                 return false;
             }
 
-            $attempts = DB::table('order_events')
+            $latestManualRetry = DB::table('order_events')
                 ->where('order_id', $orderId)
                 ->where('source', 'admin')
-                ->where('status', 'dispatching')
-                ->count();
+                ->where('status', 'retry_authorized')
+                ->orderByDesc('id')
+                ->first(['id']);
+
+            $attemptQuery = DB::table('order_events')
+                ->where('order_id', $orderId)
+                ->where('source', 'admin')
+                ->where('status', 'dispatching');
+            if ($latestManualRetry) {
+                $attemptQuery->where('id', '>', $latestManualRetry->id);
+            }
+            $attempts = $attemptQuery->count();
 
             if ($attempts >= 5) {
                 DB::table('orders')->where('id', $orderId)->update([
