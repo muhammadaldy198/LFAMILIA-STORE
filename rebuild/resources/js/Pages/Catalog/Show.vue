@@ -1,11 +1,11 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
 
-defineProps({ product: Object, packages: Array, fields: Array });
+defineProps({ product: Object, packages: Array, fields: Array, faviconUrl: String });
 </script>
 
 <template>
-    <Head :title="product.name" />
+    <Head :title="product.name"><link v-if="faviconUrl" rel="icon" :href="faviconUrl"></Head>
     <main class="min-h-screen bg-[#090e1b] text-slate-100">
         <header class="border-b border-white/10 bg-[#0c1424] px-5 py-4"><div class="mx-auto flex max-w-6xl items-center justify-between"><Link href="/" class="font-bold text-cyan-300">LFAMILIA STORE</Link><Link href="/orders/check" class="text-sm text-slate-300">Cek pesanan</Link></div></header>
         <div class="mx-auto max-w-6xl space-y-7 px-5 py-8">

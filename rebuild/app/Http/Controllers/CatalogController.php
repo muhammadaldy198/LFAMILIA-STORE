@@ -51,6 +51,9 @@ class CatalogController
             'filters' => $filters,
             'logoUrl' => $assets->get('logo')?->getFirstMediaUrl('image'),
             'bannerUrl' => $assets->get('banner_desktop')?->getFirstMediaUrl('image'),
+            'mobileBannerUrl' => $assets->get('banner_mobile')?->getFirstMediaUrl('image'),
+            'popupUrl' => $assets->get('popup')?->getFirstMediaUrl('image'),
+            'faviconUrl' => $assets->get('favicon')?->getFirstMediaUrl('image'),
             'bannerTarget' => $assets->get('banner_desktop')?->target_url,
         ]);
     }
@@ -81,6 +84,8 @@ class CatalogController
             'packages' => $packages,
             'fields' => ProductInputField::where('product_id', $product->id)->orderBy('sort_order')
                 ->get(['field_key', 'label', 'type', 'is_required']),
+            'faviconUrl' => StoreAsset::where('key', 'favicon')->where('is_active', true)
+                ->first()?->getFirstMediaUrl('image'),
         ]);
     }
 }

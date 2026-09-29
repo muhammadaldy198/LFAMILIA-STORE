@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductPackage;
 use App\Models\ProviderMapping;
+use App\Models\StoreAsset;
 use App\Services\DigiflazzCatalogImport;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -152,6 +153,29 @@ class CatalogTest extends TestCase
         $other = $product->packages()->create(['code' => 'AUTO20', 'name' => '20 Unit']);
         $this->expectException(InvalidArgumentException::class);
         app(DigiflazzCatalogImport::class)->upsert($other, 'PROVIDER-SKU-5', 5000);
+    }
+
+
+    public function test_brand_media_is_connected_to_customer_catalog(): void
+    {
+        Storage::fake('public');
+        $assets = [];
+
+        foreach (['logo', 'favicon', 'banner_desktop', 'banner_mobile', 'popup'] as $key) {
+            $asset = StoreAsset::where('key', $key)->firstOrFail();
+            $asset->update(['is_active' => true]);
+            $asset->addMedia(UploadedFile::fake()->image($key.'.png'))->toMediaCollection('image', 'public');
+            $assets[$key] = $asset->getFirstMediaUrl('image');
+        }
+
+        $this->get('/')->assertInertia(fn (Assert $page) => $page
+            ->component('Catalog/Index')
+            ->where('logoUrl', $assets['logo'])
+            ->where('bannerUrl', $assets['banner_desktop'])
+            ->where('mobileBannerUrl', $assets['banner_mobile'])
+            ->where('popupUrl', $assets['popup'])
+            ->where('faviconUrl', $assets['favicon'])
+            ->etc());
     }
 
     public function test_super_admin_can_upload_and_replace_media(): void

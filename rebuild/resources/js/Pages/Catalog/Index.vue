@@ -2,7 +2,8 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
-const props = defineProps({ categories: Array, products: Object, filters: Object, logoUrl: String, bannerUrl: String, bannerTarget: String });
+const props = defineProps({ categories: Array, products: Object, filters: Object, logoUrl: String, bannerUrl: String, mobileBannerUrl: String, popupUrl: String, faviconUrl: String, bannerTarget: String });
+const popupOpen = ref(true);
 const search = ref(props.filters.q ?? '');
 const query = (changes = {}) => {
     const params = { ...props.filters, ...changes };
@@ -13,7 +14,7 @@ const submit = () => router.get('/', { ...props.filters, q: search.value }, { pr
 </script>
 
 <template>
-    <Head title="Katalog" />
+    <Head title="Katalog"><link v-if="faviconUrl" rel="icon" :href="faviconUrl"></Head>
     <main class="min-h-screen bg-[#090e1b] text-slate-100">
         <header class="border-b border-white/10 bg-[#0c1424]">
             <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-4">
@@ -26,8 +27,13 @@ const submit = () => router.get('/', { ...props.filters, q: search.value }, { pr
             </div>
         </header>
         <div class="mx-auto max-w-7xl space-y-9 px-5 py-8">
-            <a v-if="bannerUrl && bannerTarget" :href="bannerTarget" class="block"><img :src="bannerUrl" alt="Banner LFAMILIA STORE" class="max-h-72 w-full rounded-xl object-contain"></a>
-            <img v-else-if="bannerUrl" :src="bannerUrl" alt="Banner LFAMILIA STORE" class="max-h-72 w-full rounded-xl object-contain">
+            <a v-if="bannerUrl && bannerTarget" :href="bannerTarget" class="block">
+                <picture><source v-if="mobileBannerUrl" media="(max-width: 640px)" :srcset="mobileBannerUrl"><img :src="bannerUrl" alt="Banner LFAMILIA STORE" class="max-h-72 w-full rounded-xl object-contain"></picture>
+            </a>
+            <picture v-else-if="bannerUrl || mobileBannerUrl"><source v-if="mobileBannerUrl" media="(max-width: 640px)" :srcset="mobileBannerUrl"><img :src="bannerUrl || mobileBannerUrl" alt="Banner LFAMILIA STORE" class="max-h-72 w-full rounded-xl object-contain"></picture>
+            <div v-if="popupUrl && popupOpen" role="dialog" aria-modal="true" aria-label="Informasi LFAMILIA STORE" class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-5">
+                <div class="max-w-lg rounded-xl bg-slate-900 p-3"><button type="button" class="mb-2 block rounded bg-slate-700 px-3 py-1 text-sm" @click="popupOpen = false">Tutup</button><img :src="popupUrl" alt="Informasi LFAMILIA STORE" class="max-h-[70vh] w-full object-contain"></div>
+            </div>
             <section class="space-y-5">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[.25em] text-cyan-300">LFAMILIA STORE</p>
