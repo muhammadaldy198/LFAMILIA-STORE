@@ -1,0 +1,78 @@
+<script setup>
+import { Head, router } from '@inertiajs/vue3';
+import { reactive } from 'vue';
+import AdminShell from '../../Components/AdminShell.vue';
+
+const props = defineProps({ integrations: Array });
+const items = reactive(props.integrations.map((item) => ({
+    ...item,
+    result: null,
+    config: Object.fromEntries(item.fields.map((field) => [field.key, field.value ?? (field.type === 'boolean' ? false : '')])),
+})));
+
+function save(item) {
+    router.put('/admin/integrations/' + item.code, {
+        is_active: item.is_active,
+        config: item.config,
+    }, { preserveScroll: true });
+}
+
+async function reveal(item, field) {
+    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const response = await fetch('/admin/integrations/' + encodeURIComponent(item.code) + '/reveal/' + encodeURIComponent(field.key), {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': token },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+        item.config[field.key] = data.value || '';
+        field.revealed = true;
+    }
+}
+
+async function testConnection(item) {
+    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const response = await fetch('/admin/integrations/' + encodeURIComponent(item.code) + '/test', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': token },
+    });
+    item.result = await response.json().catch(() => ({ status: 'DOWN', message: 'Tes gagal.' }));
+}
+</script>
+
+<template>
+    <Head title="Integrasi" />
+    <AdminShell>
+        <div class="space-y-6">
+            <div><h1 class="text-3xl font-semibold">Integrasi</h1><p class="text-sm text-slate-400">Secret terenkripsi di database dan tidak disimpan di GitHub.</p></div>
+
+            <section v-for="item in items" :key="item.code" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div><h2 class="text-xl font-semibold">{{ item.name }}</h2><p v-if="item.note" class="mt-1 text-xs text-amber-200">{{ item.note }}</p></div>
+                    <label class="flex gap-2 text-sm"><input v-model="item.is_active" type="checkbox">Aktif</label>
+                </div>
+                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                    <label v-for="field in item.fields" :key="field.key" class="text-sm">
+                        {{ field.label }}
+                        <div class="mt-1 flex gap-2">
+                            <input
+                                v-if="field.type !== 'boolean'"
+                                v-model="item.config[field.key]"
+                                :type="field.secret && !field.revealed ? 'password' : 'text'"
+                                :placeholder="field.secret && field.configured ? 'Tersimpan — kosongkan untuk mempertahankan' : ''"
+                                class="min-w-0 flex-1 rounded bg-slate-800 p-2"
+                            >
+                            <input v-else v-model="item.config[field.key]" type="checkbox" class="mt-2">
+                            <button v-if="field.secret && field.configured" type="button" class="rounded bg-slate-700 px-3 py-2 text-xs" @click="reveal(item, field)">Reveal</button>
+                        </div>
+                    </label>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <button class="rounded bg-cyan-300 px-4 py-2 font-semibold text-slate-950" @click="save(item)">Simpan</button>
+                    <button class="rounded bg-slate-700 px-4 py-2 text-sm" @click="testConnection(item)">Tes Koneksi</button>
+                </div>
+                <p v-if="item.result" class="mt-3 text-sm" :class="item.result.status === 'HEALTHY' ? 'text-emerald-300' : 'text-amber-200'">{{ item.result.status }} · {{ item.result.message }}</p>
+            </section>
+        </div>
+    </AdminShell>
+</template>

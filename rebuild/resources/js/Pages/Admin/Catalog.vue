@@ -1,5 +1,6 @@
 <script setup>
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import AdminShell from '../../Components/AdminShell.vue';
 import { computed, ref, watch } from 'vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
 
@@ -64,7 +65,7 @@ const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { i
 
 <template>
     <Head title="Kelola katalog" />
-    <main class="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+    <AdminShell>
         <div class="mx-auto max-w-7xl space-y-8">
             <div class="flex flex-wrap items-center justify-between gap-3"><div><Link href="/admin/panel" class="text-sm text-cyan-300">← Panel Admin</Link><h1 class="mt-2 text-3xl font-bold">Katalog & media</h1></div><Link href="/" class="text-sm text-cyan-300">Lihat katalog pelanggan</Link></div>
             <p class="text-sm text-slate-400">Produk baru tidak langsung aktif. SKU Digiflazz hanya masuk melalui sinkronisasi provider; pengaturan integrasi menyusul di M9.</p>
@@ -173,5 +174,5 @@ const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { i
                 </div>
             </section>
         </div>
-    </main>
+    </AdminShell>
 </template>

@@ -15,6 +15,8 @@ class FulfillmentService
     public function __construct(
         private readonly DigiflazzClient $digiflazz,
         private readonly FulfillmentTargetBuilder $targetBuilder,
+        private readonly AdminNotificationService $notifications,
+        private readonly TransactionalEmailService $emails,
     ) {}
 
     public function startOrder(int $orderId): void
@@ -48,6 +50,15 @@ class FulfillmentService
                 $this->event((int) $order->id, 'MANUAL_FULFILLMENT_QUEUED', $order->status, 'PROCESSING', [
                     'attempt_id' => $attempt->id,
                 ]);
+                $this->notifications->record(
+                    'fulfillment.manual.pending',
+                    'Fulfillment manual menunggu',
+                    'Order '.$order->order_number.' menunggu proses manual.',
+                    'WARNING',
+                    'fulfillment_attempt',
+                    $attempt->id,
+                    ['order_id' => (int) $order->id]
+                );
 
                 return null;
             }
@@ -221,12 +232,14 @@ class FulfillmentService
             if ($attempt->status === 'SUCCESS') {
                 return false;
             }
-            if ($attempt->status === 'FAILED_CONFIRMED' && $incoming !== 'FAILED_CONFIRMED') {
-                $this->event((int) $order->id, 'FULFILLMENT_CONFLICT_IGNORED', $order->status, $order->status, [
-                    'attempt_id' => $attempt->id,
-                    'incoming_status' => $incoming,
-                    'source' => $source,
-                ]);
+            if ($attempt->status === 'FAILED_CONFIRMED') {
+                if ($incoming !== 'FAILED_CONFIRMED') {
+                    $this->event((int) $order->id, 'FULFILLMENT_CONFLICT_IGNORED', $order->status, $order->status, [
+                        'attempt_id' => $attempt->id,
+                        'incoming_status' => $incoming,
+                        'source' => $source,
+                    ]);
+                }
 
                 return false;
             }
@@ -271,6 +284,19 @@ class FulfillmentService
                     'attempt_id' => $attempt->id,
                     'source' => $source,
                 ]);
+                $this->notifications->record(
+                    'fulfillment.success',
+                    'Order berhasil',
+                    'Order '.$order->order_number.' selesai diproses.',
+                    'INFO',
+                    'order',
+                    $order->id
+                );
+                $this->emails->queueForOrder(
+                    (int) $order->id,
+                    'Pesanan LFAMILIA berhasil',
+                    'Order '.$order->order_number.' telah berhasil diproses.'
+                );
 
                 if ($price !== null && $price > (int) ($request['max_price'] ?? PHP_INT_MAX)) {
                     $this->event((int) $order->id, 'FULFILLMENT_PRICE_GUARD_BREACH', 'SUCCESS', 'SUCCESS', [
@@ -293,10 +319,20 @@ class FulfillmentService
                     'attempt_id' => $attempt->id,
                     'source' => $source,
                 ]);
+                $this->notifications->record(
+                    'fulfillment.failed',
+                    'Provider mengonfirmasi gagal',
+                    'Fulfillment order '.$order->order_number.' gagal dan baru boleh failover dari state ini.',
+                    'ERROR',
+                    'fulfillment_attempt',
+                    $attempt->id,
+                    ['order_id' => (int) $order->id]
+                );
 
                 return true;
             }
 
+            $previousAttemptStatus = $attempt->status;
             DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
                 ...$common,
                 'status' => $incoming,
@@ -313,6 +349,17 @@ class FulfillmentService
                 'attempt_id' => $attempt->id,
                 'source' => $source,
             ]);
+            if ($previousAttemptStatus !== $incoming && in_array($incoming, ['PENDING', 'UNKNOWN'], true)) {
+                $this->notifications->record(
+                    'fulfillment.'.strtolower($incoming),
+                    'Fulfillment '.$incoming,
+                    'Order '.$order->order_number.' memerlukan reconciliation dengan reference yang sama.',
+                    'WARNING',
+                    'fulfillment_attempt',
+                    $attempt->id,
+                    ['order_id' => (int) $order->id]
+                );
+            }
 
             return false;
         }, 3);
@@ -410,6 +457,19 @@ class FulfillmentService
                 'attempt_id' => $attempt->id,
                 'admin_id' => $adminId,
             ]);
+            $this->notifications->record(
+                'fulfillment.manual.success',
+                'Order manual berhasil',
+                'Order '.$order->order_number.' telah diselesaikan manual.',
+                'INFO',
+                'order',
+                $order->id
+            );
+            $this->emails->queueForOrder(
+                (int) $order->id,
+                'Pesanan LFAMILIA berhasil',
+                'Order '.$order->order_number.' telah berhasil diproses.'
+            );
         }, 3);
     }
 
@@ -443,6 +503,14 @@ class FulfillmentService
                 'attempt_id' => $attempt->id,
                 'admin_id' => $adminId,
             ]);
+            $this->notifications->record(
+                'fulfillment.manual.failed',
+                'Order manual gagal',
+                'Order '.$order->order_number.' ditandai gagal oleh Admin.',
+                'ERROR',
+                'order',
+                $order->id
+            );
         }, 3);
     }
 

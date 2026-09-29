@@ -5,6 +5,7 @@ use App\Jobs\SendFulfillmentJob;
 use App\Jobs\StartFulfillmentJob;
 use App\Models\AdminUser;
 use App\Models\User;
+use App\Services\AdminNotificationService;
 use App\Services\CustomerAccountDeletion;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -116,3 +117,44 @@ Artisan::command('lfamilia:recover-fulfillment', function (): void {
 })->purpose('Recover paid orders and reconcile uncertain provider attempts without creating duplicate fulfillment');
 
 Schedule::command('lfamilia:recover-fulfillment')->everyMinute()->withoutOverlapping();
+
+
+Schedule::call(function (): void {
+    DB::table('system_settings')->updateOrInsert(
+        ['key' => 'system.scheduler_heartbeat'],
+        [
+            'value' => json_encode(now()->toIso8601String(), JSON_THROW_ON_ERROR),
+            'updated_at' => now(),
+            'created_at' => now(),
+        ]
+    );
+})->everyMinute()->name('lfamilia-scheduler-heartbeat')->withoutOverlapping();
+
+Schedule::call(function (): void {
+    $notifications = app(AdminNotificationService::class);
+
+    DB::table('fulfillment_attempts')
+        ->whereIn('status', ['PENDING', 'UNKNOWN', 'SENDING'])
+        ->where('updated_at', '<=', now()->subMinutes(15))
+        ->orderBy('id')
+        ->limit(100)
+        ->get(['id', 'order_id', 'status'])
+        ->each(function (object $attempt) use ($notifications): void {
+            $already = DB::table('admin_notifications')
+                ->where('event_type', 'fulfillment.pending.stale')
+                ->where('target_type', 'fulfillment_attempt')
+                ->where('target_id', (string) $attempt->id)
+                ->exists();
+            if (! $already) {
+                $notifications->record(
+                    'fulfillment.pending.stale',
+                    'Fulfillment perlu reconciliation',
+                    'Attempt #'.$attempt->id.' berstatus '.$attempt->status.' lebih dari 15 menit.',
+                    'WARNING',
+                    'fulfillment_attempt',
+                    $attempt->id,
+                    ['order_id' => (int) $attempt->order_id]
+                );
+            }
+        });
+})->everyFiveMinutes()->name('lfamilia-stale-fulfillment-alert')->withoutOverlapping();

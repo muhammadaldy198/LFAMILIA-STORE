@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureAdminPermission;
 use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsurePhone;
 use App\Http\Middleware\EnsureSuperAdmin;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'phone.required' => EnsurePhone::class,
             'admin.role' => EnsureAdminRole::class,
+            'admin.permission' => EnsureAdminPermission::class,
             'admin.super' => EnsureSuperAdmin::class,
             'customer.activity' => TrackCustomerActivity::class,
         ]);

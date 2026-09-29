@@ -9,6 +9,10 @@ use Illuminate\Validation\ValidationException;
 
 class PaymentStateService
 {
+    public function __construct(
+        private readonly AdminNotificationService $notifications,
+        private readonly TransactionalEmailService $emails,
+    ) {}
     /**
      * @return array<string, mixed>
      */
@@ -121,6 +125,14 @@ class PaymentStateService
                     'updated_at' => now(),
                 ]);
                 $this->orderEvent($order->id, 'PAYMENT_LATE_VERIFIED', $order->status, $order->status, $metadata);
+                $this->notifications->record(
+                    'payment.late_verified',
+                    'Pembayaran terlambat terverifikasi',
+                    'Pembayaran order '.$order->order_number.' masuk setelah order '.$order->status.'. Perlu review.',
+                    'WARNING',
+                    'order',
+                    $order->id
+                );
 
                 return ['result' => 'LATE_PAID_REVIEW', 'status' => $order->status];
             }
@@ -145,6 +157,19 @@ class PaymentStateService
                     $this->releaseVoucher((int) $order->id);
                 }
                 $this->orderEvent($order->id, 'PAYMENT_REFUNDED', $before, 'REFUND', $metadata);
+                $this->notifications->record(
+                    'payment.refunded',
+                    'Order refund',
+                    'Order '.$order->order_number.' berubah menjadi REFUND.',
+                    'WARNING',
+                    'order',
+                    $order->id
+                );
+                $this->emails->queueForOrder(
+                    (int) $order->id,
+                    'Refund LFAMILIA STORE',
+                    'Order '.$order->order_number.' telah masuk proses/status refund.'
+                );
 
                 return ['result' => 'REFUNDED', 'status' => 'REFUND'];
             }
@@ -354,6 +379,19 @@ class PaymentStateService
                 'updated_at' => now(),
             ]);
         $this->orderEvent($order->id, 'PAYMENT_VERIFIED', 'PENDING_PAYMENT', 'PAID', $metadata);
+        $this->notifications->record(
+            'payment.paid',
+            'Pembayaran berhasil',
+            'Pembayaran order '.$order->order_number.' telah terverifikasi.',
+            'INFO',
+            'order',
+            $order->id
+        );
+        $this->emails->queueForOrder(
+            (int) $order->id,
+            'Pembayaran berhasil',
+            'Pembayaran order '.$order->order_number.' telah terverifikasi dan pesanan akan diproses.'
+        );
         StartFulfillmentJob::dispatch((int) $order->id)->afterCommit();
 
         return ['result' => 'PAID', 'status' => 'PAID'];
