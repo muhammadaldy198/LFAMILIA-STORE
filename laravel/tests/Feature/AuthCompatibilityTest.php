@@ -135,7 +135,7 @@ class AuthCompatibilityTest extends TestCase
         $this->assertNotNull($cookie);
 
         $this->withUnencryptedCookie(AdminAuthService::COOKIE, $cookie->getValue())
-            ->getJson('/api/admin/session')
+            ->get('/api/admin/session', ['Accept' => 'application/json'])
             ->assertOk()
             ->assertJsonPath('session.email', $username)
             ->assertJsonPath('session.role', 'super_admin');
