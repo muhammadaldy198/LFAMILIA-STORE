@@ -14,6 +14,8 @@ const schema = z.object({
   storeShortName: z.string().trim().min(1).max(6),
   tagline: z.string().trim().min(3).max(160),
   logoUrl: optionalMediaUrl,
+  footerBannerDesktopUrl: optionalMediaUrl,
+  footerBannerMobileUrl: optionalMediaUrl,
   announcement: z.string().trim().max(160).optional().or(z.literal("")),
   bannerEnabled: z.boolean(),
   bannerEyebrow: z.string().trim().min(2).max(80),
