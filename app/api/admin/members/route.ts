@@ -12,13 +12,13 @@ import { permanentlyDeleteEmptyCustomer } from "@/lib/server/customer-cleanup";
 export const dynamic = "force-dynamic";
 
 const tierSchema = z.object({
-  tier: z.enum(["basic", "gold", "diamond", "platinum"]),
+  tier: z.enum(["basic", "gold", "diamond", "platinum", "mafia"]),
   discountPercent: z.number().min(0).max(100),
   benefits: z.string().trim().max(1000),
 });
 
 const updateSchema = z.object({
-  settings: z.array(tierSchema).length(4),
+  settings: z.array(tierSchema).length(5),
 });
 
 export async function GET(request: Request) {
@@ -51,7 +51,7 @@ export async function PUT(request: Request) {
   try {
     const input = updateSchema.parse(await request.json());
     const unique = new Set(input.settings.map((item) => item.tier));
-    if (unique.size !== 4) throw new Error("Semua tier member wajib dikirim satu kali.");
+    if (unique.size !== 5) throw new Error("Semua tier member wajib dikirim satu kali.");
     await saveMemberTierSettings(input.settings);
     return Response.json({ ok: true, settings: await listMemberTierSettings() });
   } catch (error) {
@@ -68,7 +68,7 @@ export async function PUT(request: Request) {
 
 const memberActionSchema = z.object({
   customerId: z.string().uuid(),
-  role: z.enum(["automatic", "basic", "gold", "diamond", "platinum"]),
+  role: z.enum(["automatic", "basic", "gold", "diamond", "platinum", "mafia"]),
   addBalance: z.number().int().min(0).max(100_000_000).default(0),
   reason: z.string().trim().max(300).optional(),
 });
