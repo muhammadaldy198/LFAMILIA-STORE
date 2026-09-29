@@ -35,6 +35,6 @@ Dokumen `MIGRATION-LARAVEL.md` menjelaskan migrasi terdahulu, bukan status seles
 
 Setiap milestone berakhir dengan PR yang berisi perubahan terukur, bukti tes, dan sisa risiko. Jangan merge atau mengganti jalur trafik hanya berdasarkan checklist. Tidak ada kredensial di repo: nilai sensitif operasional dikelola terenkripsi melalui Super Admin → Integrasi; secret bootstrap server tetap di environment VPS.
 
-## Batas PR pertama
+## Status M1 Foundation
 
-PR ini mengunci PRD dan keputusan arsitektur. M1 belum dinyatakan selesai sebelum project scaffold berjalan, dependency/lockfile di-commit, dan CI hijau di PHP 8.4, MySQL 8, Redis, dan build Vue/Inertia.
+Fondasi terisolasi berada di `rebuild/`: Laravel 12/PHP 8.4, Vue 3/Inertia v2/Tailwind v4, konfigurasi MySQL 8/Redis, lockfile Composer/npm, Inertia root page, readiness route, dan CI khusus. CI menguji Composer, npm, sintaks PHP, migrasi pada MySQL 8, build frontend, PHPUnit, dan Pint. Run awal lulus; URL publik dan deployment belum dialihkan. M2 adalah skema bisnis MySQL, bukan impor D1 lama.
