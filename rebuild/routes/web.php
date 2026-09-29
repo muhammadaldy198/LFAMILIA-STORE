@@ -185,7 +185,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             ->name('admin.settings.membership.update');
     });
 
-    Route::middleware('admin.super')->group(function (): void {
+    Route::middleware(['admin.super', 'throttle:admin-sensitive'])->group(function (): void {
         Route::get('/admin/access', [AdminAccessController::class, 'index'])->name('admin.access');
         Route::post('/admin/access', [AdminAccessController::class, 'store'])->name('admin.access.store');
         Route::put('/admin/access/{admin}', [AdminAccessController::class, 'update'])->name('admin.access.update');
@@ -193,7 +193,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::get('/admin/integrations', [AdminIntegrationController::class, 'index'])->name('admin.integrations');
         Route::put('/admin/integrations/{code}', [AdminIntegrationController::class, 'update'])->name('admin.integrations.update');
         Route::post('/admin/integrations/{code}/reveal/{field}', [AdminIntegrationController::class, 'reveal'])
-            ->name('admin.integrations.reveal');
+            ->middleware('throttle:secret-reveal')->name('admin.integrations.reveal');
         Route::post('/admin/integrations/{code}/test', [AdminIntegrationController::class, 'test'])
             ->name('admin.integrations.test');
 
