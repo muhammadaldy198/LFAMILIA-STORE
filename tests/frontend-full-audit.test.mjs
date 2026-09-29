@@ -19,13 +19,14 @@ test("checkout rejects invalid product slugs and renders live storefront FAQs", 
   assert.doesNotMatch(checkout, /\["Bagaimana cara top up\?"/);
 });
 
-test("product admin uses real pagination and explicit nominal action", () => {
+test("product admin uses real pagination and one non-duplicated editor action", () => {
   const products = read("components/admin-product-manager.tsx");
   assert.match(products, /const \[page, setPage\] = useState\(1\)/);
   assert.match(products, /const \[pageSize, setPageSize\] = useState\(25\)/);
   assert.match(products, /visibleProducts\.slice\(\(activePage - 1\) \* pageSize, activePage \* pageSize\)/);
   assert.match(products, /25 \/ halaman/);
-  assert.match(products, />Nominal<\/button>/);
+  assert.doesNotMatch(products, />Nominal<\/button>/);
+  assert.match(products, /<Pencil className="size-\[10px\]" \/>Edit/);
   assert.doesNotMatch(products, /MoreVertical/);
 });
 
@@ -41,13 +42,16 @@ test("admin global search queries real order product and customer records", () =
   assert.match(dashboard, /Tidak ada hasil/);
 });
 
-test("banner admin mirrors image-only customer banner and supports mobile uploads", () => {
+test("banner admin edits the same desktop and mobile images consumed by customer frontend", () => {
   const manager = read("components/admin-experience-manager.tsx");
+  const customerBanner = read("components/home-banner-carousel.tsx");
   assert.match(manager, /Gambar Desktop/);
   assert.match(manager, /Gambar Mobile/);
   assert.match(manager, /Link Tujuan \(opsional — klik gambar\)/);
   assert.match(manager, /target === "mobile" \? \{ mobileImageUrl: url \}/);
-  assert.match(manager, /mode === "mobile" \? \(banner\.raw\?\.mobileImageUrl \|\| banner\.raw\?\.imageUrl\)/);
+  assert.match(customerBanner, /const mobileImageUrl = banner\.mobileImageUrl \|\| mobileFallback\(banner\.imageUrl\)/);
+  assert.match(customerBanner, /<source media="\(max-width: 639px\)" srcSet=\{mobileImageUrl\} \/>/);
+  assert.doesNotMatch(manager, /function PreviewPanel/);
   assert.doesNotMatch(manager, /EditorTextArea label="Subjudul"/);
   assert.doesNotMatch(manager, /EditorField label="Teks tombol"/);
   assert.match(manager, /onCancel=\{\(\) => void loadContent\(\)\}/);
