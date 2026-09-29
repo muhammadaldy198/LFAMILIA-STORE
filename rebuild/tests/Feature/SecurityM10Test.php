@@ -6,6 +6,7 @@ use App\Models\AdminUser;
 use App\Models\IntegrationCredential;
 use App\Services\AdminAuditService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -123,7 +124,7 @@ class SecurityM10Test extends TestCase
             'is_active' => true,
         ]);
 
-        $raw = (string) \Illuminate\Support\Facades\DB::table('integration_credentials')
+        $raw = (string) DB::table('integration_credentials')
             ->where('code', 'm10-encryption-test')
             ->value('config_ciphertext');
 
