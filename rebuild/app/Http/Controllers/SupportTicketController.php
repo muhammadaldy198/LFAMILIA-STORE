@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\SupportTicket;
+use App\Services\AdminNotificationService;
+use App\Services\TransactionalEmailService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,8 +24,11 @@ class SupportTicketController
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        AdminNotificationService $notifications,
+        TransactionalEmailService $emails,
+    ): RedirectResponse {
         $data = $request->validate([
             'subject' => ['required', 'string', 'max:150'],
             'message' => ['required', 'string', 'max:5000'],
@@ -37,6 +42,23 @@ class SupportTicketController
             'subject' => $data['subject'],
             'message' => $data['message'],
         ]);
+
+        $notifications->record(
+            'support.ticket.created',
+            'Tiket pelanggan baru',
+            'Tiket #'.$ticket->id.' · '.$ticket->subject,
+            'INFO',
+            'support_ticket',
+            $ticket->id,
+            ['order_id' => $ticket->order_id]
+        );
+        if (is_string($request->user()->email)) {
+            $emails->queue(
+                $request->user()->email,
+                'Tiket LFAMILIA diterima',
+                'Tiket #'.$ticket->id.' "'.$ticket->subject.'" telah diterima tim LFAMILIA.'
+            );
+        }
 
         return redirect()->route('account.tickets.show', $ticket->id);
     }

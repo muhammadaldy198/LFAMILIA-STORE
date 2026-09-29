@@ -1,5 +1,6 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
+import AdminShell from '../../Components/AdminShell.vue';
 import { reactive } from 'vue';
 
 const props = defineProps({ attempts: Array });
@@ -30,7 +31,7 @@ function retry(id) {
 
 <template>
     <Head title="Fulfillment" />
-    <main class="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+    <AdminShell>
         <div class="mx-auto max-w-7xl space-y-6">
             <div>
                 <Link href="/admin/panel" class="text-sm text-cyan-300">← Panel Admin</Link>
@@ -88,5 +89,5 @@ function retry(id) {
                 </p>
             </section>
         </div>
-    </main>
+    </AdminShell>
 </template>

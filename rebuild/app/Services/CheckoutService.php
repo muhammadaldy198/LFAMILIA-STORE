@@ -18,6 +18,7 @@ class CheckoutService
         private readonly NicknameService $nickname,
         private readonly GuestOrderAccess $guestAccess,
         private readonly PaymentRoutingService $paymentRouting,
+        private readonly AdminNotificationService $notifications,
     ) {}
 
     /**
@@ -226,6 +227,27 @@ class CheckoutService
             $result['order']->id,
             $data['idempotency_key']
         );
+
+        $snapshot = json_decode((string) $result['order']->snapshot, true) ?: [];
+        $this->notifications->record(
+            'order.created',
+            'Order baru',
+            'Order '.$result['order']->order_number.' dibuat dengan total Rp'.number_format((int) $result['order']->total_idr, 0, ',', '.').'.',
+            'INFO',
+            'order',
+            $result['order']->id,
+            ['order_number' => $result['order']->order_number]
+        );
+        if (data_get($snapshot, 'payment.gateway_code') === 'MANUAL_QRIS') {
+            $this->notifications->record(
+                'payment.manual_qris.pending',
+                'QRIS manual menunggu konfirmasi',
+                'Order '.$result['order']->order_number.' menggunakan QRIS manual.',
+                'WARNING',
+                'order',
+                $result['order']->id
+            );
+        }
 
         return [
             'order' => $result['order'],

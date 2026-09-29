@@ -1,10 +1,15 @@
 <?php
 
+use App\Http\Controllers\AdminAccessController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
 use App\Http\Controllers\AdminCatalogMediaController;
+use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminFulfillmentController;
+use App\Http\Controllers\AdminIntegrationController;
+use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\AdminPaymentController;
+use App\Http\Controllers\AdminWorkspaceController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerAccountController;
@@ -18,7 +23,6 @@ use App\Http\Controllers\WalletTopupController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::get('/', [CatalogController::class, 'index'])->name('catalog.index');
 Route::get('/catalog/{slug}', [CatalogController::class, 'show'])->name('catalog.show');
@@ -92,41 +96,116 @@ Route::middleware('guest:admin')->group(function (): void {
 });
 
 Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
-    Route::get('/admin/panel', fn () => Inertia::render('Admin/Dashboard', [
-        'admin' => auth('admin')->user()->only('id', 'name', 'email', 'role'),
-    ]))->name('admin.panel');
     Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
-    Route::get('/admin/payments', [AdminPaymentController::class, 'index'])->name('admin.payments.index');
-    Route::get('/admin/fulfillment', [AdminFulfillmentController::class, 'index'])->name('admin.fulfillment.index');
-    Route::post('/admin/fulfillment/{attemptId}/complete', [AdminFulfillmentController::class, 'completeManual'])
-        ->name('admin.fulfillment.complete');
-    Route::post('/admin/fulfillment/{attemptId}/fail', [AdminFulfillmentController::class, 'failManual'])
-        ->name('admin.fulfillment.fail');
-    Route::post('/admin/fulfillment/{attemptId}/retry', [AdminFulfillmentController::class, 'retry'])
-        ->name('admin.fulfillment.retry');
-    Route::post('/admin/payments/manual/{paymentId}/confirm', [AdminPaymentController::class, 'confirmManual'])
-        ->name('admin.payments.manual.confirm');
 
-    Route::middleware('admin.super')->prefix('admin/payments')->name('admin.payments.')->group(function (): void {
-        Route::put('/gateways/{id}', [AdminPaymentController::class, 'gateway'])->name('gateways.update');
-        Route::put('/channels/{id}', [AdminPaymentController::class, 'channel'])->name('channels.update');
-        Route::post('/routes', [AdminPaymentController::class, 'route'])->name('routes.store');
-        Route::put('/routes/{id}', [AdminPaymentController::class, 'updateRoute'])->name('routes.update');
-        Route::put('/settings', [AdminPaymentController::class, 'settings'])->name('settings.update');
+    Route::get('/admin/panel', AdminDashboardController::class)
+        ->middleware('admin.permission:dashboard.view')->name('admin.panel');
+
+    Route::middleware('admin.permission:notifications.view')->prefix('admin/notifications')
+        ->name('admin.notifications.')->group(function (): void {
+            Route::get('/', [AdminNotificationController::class, 'index'])->name('index');
+            Route::post('/read-all', [AdminNotificationController::class, 'readAll'])->name('read-all');
+            Route::post('/{id}/read', [AdminNotificationController::class, 'read'])->name('read');
+        });
+
+    Route::middleware('admin.permission:payments.manage')->group(function (): void {
+        Route::get('/admin/payments', [AdminPaymentController::class, 'index'])->name('admin.payments.index');
+        Route::post('/admin/payments/manual/{paymentId}/confirm', [AdminPaymentController::class, 'confirmManual'])
+            ->name('admin.payments.manual.confirm');
     });
 
-    Route::middleware('admin.super')->prefix('admin/catalog')->name('admin.catalog.')->group(function (): void {
-        Route::get('/', [AdminCatalogController::class, 'index'])->name('index');
-        Route::post('/categories', [AdminCatalogController::class, 'category'])->name('categories.store');
-        Route::put('/categories/{category}', [AdminCatalogController::class, 'updateCategory'])->name('categories.update');
-        Route::post('/products', [AdminCatalogController::class, 'product'])->name('products.store');
-        Route::put('/products/{product}', [AdminCatalogController::class, 'updateProduct'])->name('products.update');
-        Route::post('/products/{product}/packages', [AdminCatalogController::class, 'package'])->name('packages.store');
-        Route::put('/packages/{package}', [AdminCatalogController::class, 'updatePackage'])->name('packages.update');
-        Route::put('/products/{product}/fields', [AdminCatalogController::class, 'fields'])->name('fields.update');
-        Route::put('/mappings/{mapping}', [AdminCatalogController::class, 'mapping'])->name('mappings.update');
-        Route::put('/assets/{asset}', [AdminCatalogController::class, 'asset'])->name('assets.update');
-        Route::post('/media/{type}/{id}', [AdminCatalogMediaController::class, 'store'])->name('media.store');
-        Route::delete('/media/{type}/{id}', [AdminCatalogMediaController::class, 'destroy'])->name('media.destroy');
+    Route::middleware('admin.permission:fulfillment.manage')->prefix('admin/fulfillment')
+        ->name('admin.fulfillment.')->group(function (): void {
+            Route::get('/', [AdminFulfillmentController::class, 'index'])->name('index');
+            Route::post('/{attemptId}/complete', [AdminFulfillmentController::class, 'completeManual'])->name('complete');
+            Route::post('/{attemptId}/fail', [AdminFulfillmentController::class, 'failManual'])->name('fail');
+            Route::post('/{attemptId}/retry', [AdminFulfillmentController::class, 'retry'])->name('retry');
+        });
+
+    Route::get('/admin/catalog', [AdminCatalogController::class, 'index'])
+        ->middleware('admin.permission:catalog.manage,content.manage')->name('admin.catalog.index');
+
+    Route::middleware('admin.permission:catalog.manage')->prefix('admin/catalog')
+        ->name('admin.catalog.')->group(function (): void {
+            Route::post('/categories', [AdminCatalogController::class, 'category'])->name('categories.store');
+            Route::put('/categories/{category}', [AdminCatalogController::class, 'updateCategory'])->name('categories.update');
+            Route::post('/products', [AdminCatalogController::class, 'product'])->name('products.store');
+            Route::put('/products/{product}', [AdminCatalogController::class, 'updateProduct'])->name('products.update');
+            Route::post('/products/{product}/packages', [AdminCatalogController::class, 'package'])->name('packages.store');
+            Route::put('/packages/{package}', [AdminCatalogController::class, 'updatePackage'])->name('packages.update');
+            Route::put('/products/{product}/fields', [AdminCatalogController::class, 'fields'])->name('fields.update');
+            Route::put('/mappings/{mapping}', [AdminCatalogController::class, 'mapping'])->name('mappings.update');
+        });
+
+    Route::middleware('admin.permission:content.manage')->prefix('admin/catalog')->name('admin.catalog.')
+        ->group(function (): void {
+            Route::put('/assets/{asset}', [AdminCatalogController::class, 'asset'])->name('assets.update');
+            Route::post('/media/{type}/{id}', [AdminCatalogMediaController::class, 'store'])->name('media.store');
+            Route::delete('/media/{type}/{id}', [AdminCatalogMediaController::class, 'destroy'])->name('media.destroy');
+        });
+
+    Route::middleware('admin.permission:providers.manage')->group(function (): void {
+        Route::get('/admin/providers', [AdminWorkspaceController::class, 'providers'])->name('admin.providers');
+        Route::put('/admin/providers/{id}', [AdminWorkspaceController::class, 'updateProvider'])->name('admin.providers.update');
+    });
+
+    Route::get('/admin/orders', [AdminWorkspaceController::class, 'orders'])
+        ->middleware('admin.permission:orders.view')->name('admin.orders');
+
+    Route::get('/admin/customers', [AdminWorkspaceController::class, 'customers'])
+        ->middleware('admin.permission:customers.view')->name('admin.customers');
+
+    Route::middleware('admin.super')->group(function (): void {
+        Route::post('/admin/customers/{userId}/wallet', [AdminWorkspaceController::class, 'adjustWallet'])
+            ->name('admin.customers.wallet');
+        Route::put('/admin/customers/{userId}/membership', [AdminWorkspaceController::class, 'updateMembership'])
+            ->name('admin.customers.membership');
+    });
+
+    Route::middleware('admin.permission:vouchers.manage')->prefix('admin/vouchers')
+        ->name('admin.vouchers.')->group(function (): void {
+            Route::get('/', [AdminWorkspaceController::class, 'vouchers'])->name('index');
+            Route::post('/', [AdminWorkspaceController::class, 'storeVoucher'])->name('store');
+            Route::put('/{id}', [AdminWorkspaceController::class, 'updateVoucher'])->name('update');
+        });
+
+    Route::middleware('admin.permission:support.manage')->prefix('admin/support')
+        ->name('admin.support.')->group(function (): void {
+            Route::get('/', [AdminWorkspaceController::class, 'support'])->name('index');
+            Route::put('/{id}', [AdminWorkspaceController::class, 'updateSupport'])->name('update');
+        });
+
+    Route::get('/admin/reports', [AdminWorkspaceController::class, 'reports'])
+        ->middleware('admin.permission:reports.view')->name('admin.reports');
+
+    Route::middleware('admin.permission:settings.manage')->group(function (): void {
+        Route::get('/admin/settings', [AdminWorkspaceController::class, 'settings'])->name('admin.settings');
+        Route::put('/admin/settings', [AdminWorkspaceController::class, 'updateSettings'])->name('admin.settings.update');
+        Route::put('/admin/settings/membership/{code}', [AdminWorkspaceController::class, 'updateTier'])
+            ->name('admin.settings.membership.update');
+    });
+
+    Route::middleware('admin.super')->group(function (): void {
+        Route::get('/admin/access', [AdminAccessController::class, 'index'])->name('admin.access');
+        Route::post('/admin/access', [AdminAccessController::class, 'store'])->name('admin.access.store');
+        Route::put('/admin/access/{admin}', [AdminAccessController::class, 'update'])->name('admin.access.update');
+
+        Route::get('/admin/integrations', [AdminIntegrationController::class, 'index'])->name('admin.integrations');
+        Route::put('/admin/integrations/{code}', [AdminIntegrationController::class, 'update'])->name('admin.integrations.update');
+        Route::post('/admin/integrations/{code}/reveal/{field}', [AdminIntegrationController::class, 'reveal'])
+            ->name('admin.integrations.reveal');
+        Route::post('/admin/integrations/{code}/test', [AdminIntegrationController::class, 'test'])
+            ->name('admin.integrations.test');
+
+        Route::get('/admin/health', [AdminWorkspaceController::class, 'health'])->name('admin.health');
+        Route::get('/admin/audit', [AdminWorkspaceController::class, 'audit'])->name('admin.audit');
+
+        Route::prefix('admin/payments')->name('admin.payments.')->group(function (): void {
+            Route::put('/gateways/{id}', [AdminPaymentController::class, 'gateway'])->name('gateways.update');
+            Route::put('/channels/{id}', [AdminPaymentController::class, 'channel'])->name('channels.update');
+            Route::post('/routes', [AdminPaymentController::class, 'route'])->name('routes.store');
+            Route::put('/routes/{id}', [AdminPaymentController::class, 'updateRoute'])->name('routes.update');
+            Route::put('/settings', [AdminPaymentController::class, 'settings'])->name('settings.update');
+        });
     });
 });

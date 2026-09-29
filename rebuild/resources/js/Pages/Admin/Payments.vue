@@ -1,5 +1,6 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
+import AdminShell from '../../Components/AdminShell.vue';
 import { reactive, ref } from 'vue';
 
 const props = defineProps({
@@ -92,7 +93,7 @@ function toggleManualAsset() {
 
 <template>
     <Head title="Pembayaran" />
-    <main class="min-h-screen bg-[#090e1b] px-5 py-8 text-slate-100">
+    <AdminShell>
         <div class="mx-auto max-w-7xl space-y-6">
             <div class="flex items-center justify-between">
                 <div>
@@ -193,5 +194,5 @@ function toggleManualAsset() {
                 </section>
             </template>
         </div>
-    </main>
+    </AdminShell>
 </template>

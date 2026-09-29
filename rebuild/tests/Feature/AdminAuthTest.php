@@ -18,6 +18,7 @@ class AdminAuthTest extends TestCase
             'email' => 'admin@example.test',
             'password' => Hash::make('secure-password-123'),
             'role' => 'ADMIN',
+            'permissions' => ['dashboard.view'],
             'is_active' => true,
         ]);
 
