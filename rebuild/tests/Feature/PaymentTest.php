@@ -433,6 +433,41 @@ class PaymentTest extends TestCase
         $this->assertSame('PAID', DB::table('orders')->value('status'));
     }
 
+    public function test_wallet_payment_cannot_overdraw_or_create_ledger_when_balance_is_insufficient(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('saldo', 'WALLET');
+
+        $user = User::create([
+            'name' => 'Low Balance Buyer',
+            'email' => 'low-balance@example.test',
+            'phone' => '081234567893',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        DB::table('wallets')->where('user_id', $user->id)->update(['balance_idr' => 5000]);
+
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'saldo',
+            'customer_input' => ['user_id' => '999999'],
+            'voucher_code' => null,
+            'idempotency_key' => 'm11-wallet-low-order-0001',
+        ])->assertCreated();
+
+        $this->actingAs($user)->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'm11-wallet-low-payment-0001',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['payment']);
+
+        $this->assertSame(5000, (int) DB::table('wallets')->where('user_id', $user->id)->value('balance_idr'));
+        $this->assertSame(0, DB::table('wallet_ledger')
+            ->where('wallet_id', DB::table('wallets')->where('user_id', $user->id)->value('id'))
+            ->where('source', 'CHECKOUT')
+            ->count());
+        $this->assertSame('PENDING_PAYMENT', DB::table('orders')->value('status'));
+        $this->assertSame('REJECTED', DB::table('payment_transactions')->value('status'));
+    }
+
     public function test_wallet_topup_paid_callback_credit_is_idempotent_and_fee_is_not_credited(): void
     {
         $user = User::create([
