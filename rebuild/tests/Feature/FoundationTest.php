@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Redis;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
