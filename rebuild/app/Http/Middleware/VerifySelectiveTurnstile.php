@@ -20,7 +20,11 @@ class VerifySelectiveTurnstile
         }
 
         try {
-            $valid = $this->turnstile->verify($request, $request->input('turnstile_token'));
+            $valid = $this->turnstile->verify(
+                $request,
+                $request->input('turnstile_token'),
+                $this->action($request),
+            );
         } catch (RuntimeException) {
             return back()->withErrors([
                 'turnstile_token' => 'Verifikasi keamanan sedang tidak tersedia. Coba lagi.',
@@ -34,6 +38,15 @@ class VerifySelectiveTurnstile
         }
 
         return $next($request);
+    }
+
+    private function action(Request $request): string
+    {
+        return match (true) {
+            $request->is('register') => 'register',
+            $request->is('forgot-password') => 'forgot_password',
+            default => 'login',
+        };
     }
 
     private function requiresChallenge(Request $request): bool
