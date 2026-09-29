@@ -46,13 +46,13 @@ When the integration is active and both keys exist:
 - forgot-password requires a valid token
 - login requires a valid token after three attempts for the same email + IP
 
-Verification uses Cloudflare siteverify server-side with the requester IP. Missing/invalid tokens are rejected. Upstream verification outages fail closed for challenged requests.
+Verification uses Cloudflare siteverify server-side with the requester IP. Each widget is tagged with a form action and the backend requires the returned action to match register, forgot_password, or login, preventing cross-form token reuse. Missing/invalid/wrong-action tokens are rejected. Upstream verification outages fail closed for challenged requests.
 
 When Turnstile is disabled/not configured, these flows continue without a challenge so pre-production is not locked before credentials are entered.
 
 ## Secrets and audit
 
-integration_credentials continues to use Laravel encrypted array casts.
+integration_credentials continues to use Laravel encrypted array casts. M10 regression coverage verifies secret plaintext is absent from the raw database column while the model can decrypt the configured value.
 
 Normal Inertia integration data never includes secret values. Controlled reveal remains SUPER_ADMIN-only, rate-limited and audit-logged.
 
