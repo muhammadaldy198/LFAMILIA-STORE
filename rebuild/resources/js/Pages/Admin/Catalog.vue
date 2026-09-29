@@ -1,0 +1,162 @@
+<script setup>
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
+import AdminMediaControl from '../../Components/AdminMediaControl.vue';
+
+const props = defineProps({ categories: Array, products: Array, assets: Array });
+const cloneProducts = (items) => items.map((item) => ({
+    ...item,
+    packages: item.packages.map((pack) => ({
+        ...pack,
+        mappings: pack.mappings.map((mapping) => ({ ...mapping })),
+    })),
+}));
+const categories = ref(props.categories.map((item) => ({ ...item })));
+const products = ref(cloneProducts(props.products));
+const assets = ref(props.assets.map((item) => ({ ...item })));
+watch(() => props.categories, (items) => { categories.value = items.map((item) => ({ ...item })); });
+watch(() => props.products, (items) => { products.value = cloneProducts(items); });
+watch(() => props.assets, (items) => { assets.value = items.map((item) => ({ ...item })); });
+
+const tab = ref('AUTO_PROVIDER');
+const visibleProducts = computed(() => products.value.filter((item) => item.fulfillment_mode === tab.value));
+const categoryForm = useForm({ name: '', sort_order: 0 });
+const productForm = useForm({ category_id: '', name: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', margin_percent: 0, sort_order: 0 });
+const packageForm = useForm({ product_id: '', code: '', name: '', nominal_value: '', sort_order: 0, cost_idr: '' });
+const fieldsProductId = ref('');
+const fieldsText = ref('');
+watch(fieldsProductId, (id) => {
+    const product = products.value.find((item) => String(item.id) === String(id));
+    fieldsText.value = product?.fields.map((field) => [field.field_key, field.label, field.type, field.is_required ? '1' : '0'].join('|')).join('\n') ?? '';
+});
+const fieldsError = ref('');
+const saveFields = () => {
+    const fields = fieldsText.value.trim() ? fieldsText.value.trim().split('\n').map((line) => {
+        const [field_key, label, type, required] = line.split('|').map((part) => part.trim());
+        return { field_key, label, type, is_required: required === '1' };
+    }) : [];
+    fieldsError.value = '';
+    router.put('/admin/catalog/products/' + fieldsProductId.value + '/fields', { fields }, {
+        onError: (errors) => { fieldsError.value = Object.values(errors).join(' · '); },
+    });
+};
+const saveCategory = (item) => router.put('/admin/catalog/categories/' + item.id, { name: item.name, sort_order: item.sort_order, is_active: item.is_active });
+const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
+    category_id: item.category_id, name: item.name, description: item.description,
+    manual_instructions: item.manual_instructions, margin_percent: item.margin_percent,
+    sort_order: item.sort_order, is_active: item.is_active,
+});
+const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
+    code: pack.code, name: pack.name, nominal_value: pack.nominal_value,
+    sort_order: pack.sort_order, is_active: pack.is_active,
+});
+const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping.id, {
+    priority: mapping.priority, is_active: mapping.is_active,
+    ...(mapping.provider_code === 'MANUAL' ? { cost_idr: mapping.cost_idr } : {}),
+});
+const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { is_active: asset.is_active, target_url: asset.target_url || null });
+</script>
+
+<template>
+    <Head title="Kelola katalog" />
+    <main class="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+        <div class="mx-auto max-w-7xl space-y-8">
+            <div class="flex flex-wrap items-center justify-between gap-3"><div><Link href="/admin/panel" class="text-sm text-cyan-300">← Panel Admin</Link><h1 class="mt-2 text-3xl font-bold">Katalog & media</h1></div><Link href="/" class="text-sm text-cyan-300">Lihat katalog pelanggan</Link></div>
+            <p class="text-sm text-slate-400">Produk baru tidak langsung aktif. SKU Digiflazz hanya masuk melalui sinkronisasi provider; pengaturan integrasi menyusul di M9.</p>
+
+            <section class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <h2 class="text-xl font-semibold">Kategori</h2>
+                <form class="flex flex-wrap items-end gap-3" @submit.prevent="categoryForm.post('/admin/catalog/categories', { onSuccess: () => categoryForm.reset() })">
+                    <label class="text-sm">Nama kategori<input v-model="categoryForm.name" required class="mt-1 block rounded-md bg-slate-800 p-2"></label>
+                    <label class="text-sm">Urutan<input v-model.number="categoryForm.sort_order" type="number" min="0" required class="mt-1 block w-24 rounded-md bg-slate-800 p-2"></label>
+                    <button :disabled="categoryForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah</button>
+                    <span v-if="categoryForm.errors.name" class="text-sm text-red-300">{{ categoryForm.errors.name }}</span>
+                </form>
+                <div v-for="item in categories" :key="item.id" class="space-y-3 border-t border-slate-800 pt-3">
+                    <div class="flex flex-wrap items-end gap-3">
+                        <label class="text-sm">Nama<input v-model="item.name" class="mt-1 block rounded-md bg-slate-800 p-2"></label>
+                        <label class="text-sm">Urutan<input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-24 rounded-md bg-slate-800 p-2"></label>
+                        <label class="flex gap-2 text-sm"><input v-model="item.is_active" type="checkbox">Aktif</label>
+                        <button type="button" class="rounded-md bg-slate-700 px-3 py-2 text-sm" @click="saveCategory(item)">Simpan</button>
+                        <span class="text-xs text-slate-500">/{{ item.slug }}</span>
+                    </div>
+                    <AdminMediaControl type="category" :id="item.id" :url="item.image_url" />
+                </div>
+            </section>
+
+            <section class="space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <h2 class="text-xl font-semibold">Produk</h2>
+                <div class="flex gap-2"><button v-for="mode in ['AUTO_PROVIDER', 'MANUAL']" :key="mode" type="button" class="rounded-md px-4 py-2 text-sm" :class="tab === mode ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800'" @click="tab = mode">{{ mode === 'MANUAL' ? 'Produk Manual' : 'Produk Provider' }}</button></div>
+                <form class="grid gap-3 md:grid-cols-3" @submit.prevent="productForm.fulfillment_mode = tab; productForm.post('/admin/catalog/products', { onSuccess: () => productForm.reset() })">
+                    <label class="text-sm">Kategori<select v-model="productForm.category_id" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="">Pilih kategori</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
+                    <label class="text-sm">Nama produk<input v-model="productForm.name" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
+                    <label class="text-sm">Margin persen<input v-model.number="productForm.margin_percent" type="number" step="0.0001" min="0" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
+                    <label class="text-sm md:col-span-2">Deskripsi<textarea v-model="productForm.description" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
+                    <label class="text-sm">Urutan<input v-model.number="productForm.sort_order" type="number" min="0" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
+                    <label v-if="tab === 'MANUAL'" class="text-sm md:col-span-3">Instruksi fulfillment internal<textarea v-model="productForm.manual_instructions" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
+                    <div class="md:col-span-3"><button :disabled="productForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah {{ tab === 'MANUAL' ? 'produk manual' : 'produk provider' }}</button><p v-if="Object.keys(productForm.errors).length" class="mt-2 text-sm text-red-300">{{ Object.values(productForm.errors).join(' · ') }}</p></div>
+                </form>
+                <div v-for="item in visibleProducts" :key="item.id" class="space-y-4 border-t border-slate-700 pt-5">
+                    <div class="grid gap-3 md:grid-cols-4">
+                        <label class="text-sm">Nama<input v-model="item.name" class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
+                        <label class="text-sm">Kategori<select v-model="item.category_id" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option></select></label>
+                        <label class="text-sm">Margin %<input v-model.number="item.margin_percent" type="number" step="0.0001" min="0" class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
+                        <label class="text-sm">Urutan<input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
+                        <label class="text-sm md:col-span-3">Deskripsi<textarea v-model="item.description" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
+                        <label class="flex items-center gap-2 text-sm"><input v-model="item.is_active" type="checkbox"> Produk aktif</label>
+                        <label v-if="item.fulfillment_mode === 'MANUAL'" class="text-sm md:col-span-4">Instruksi internal<textarea v-model="item.manual_instructions" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
+                    </div>
+                    <button type="button" class="rounded-md bg-slate-700 px-4 py-2 text-sm" @click="saveProduct(item)">Simpan produk</button>
+                    <div class="grid gap-3 md:grid-cols-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /><AdminMediaControl type="product" :id="item.id" collection="banner" :url="item.banner_url" /></div>
+                    <div class="space-y-3 rounded-md bg-slate-950 p-4">
+                        <h3 class="font-semibold">Nominal / paket</h3>
+                        <div v-for="pack in item.packages" :key="pack.id" class="space-y-2 border-t border-slate-800 pt-3">
+                            <div class="flex flex-wrap items-end gap-2">
+                                <label class="text-xs">Kode internal<input v-model="pack.code" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
+                                <label class="text-xs">Nama nominal<input v-model="pack.name" class="mt-1 block rounded bg-slate-800 p-2"></label>
+                                <label class="text-xs">Nilai nominal<input v-model.number="pack.nominal_value" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
+                                <label class="text-xs">Urutan<input v-model.number="pack.sort_order" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2"></label>
+                                <label class="flex gap-2 text-xs"><input v-model="pack.is_active" type="checkbox">Aktif</label>
+                                <button type="button" class="rounded bg-slate-700 px-3 py-2 text-xs" @click="savePackage(pack)">Simpan</button>
+                            </div>
+                            <AdminMediaControl type="package" :id="pack.id" :url="pack.image_url" />
+                            <div v-for="mapping in pack.mappings" :key="mapping.id" class="flex flex-wrap items-end gap-2 text-xs text-slate-300">
+                                <span>{{ mapping.provider_code }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span></span>
+                                <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
+                                <label>Prioritas<input v-model.number="mapping.priority" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2"></label>
+                                <label class="flex gap-2"><input v-model="mapping.is_active" type="checkbox">Aktif</label>
+                                <button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan mapping</button>
+                            </div>
+                        </div>
+                        <form class="flex flex-wrap items-end gap-2 border-t border-slate-800 pt-3" @submit.prevent="packageForm.post('/admin/catalog/products/' + item.id + '/packages', { onSuccess: () => packageForm.reset() })">
+                            <label class="text-xs">Kode internal<input v-model="packageForm.code" required class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
+                            <label class="text-xs">Nama nominal<input v-model="packageForm.name" required class="mt-1 block rounded bg-slate-800 p-2"></label>
+                            <label class="text-xs">Nilai nominal<input v-model.number="packageForm.nominal_value" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
+                            <label class="text-xs">Urutan<input v-model.number="packageForm.sort_order" type="number" min="0" required class="mt-1 block w-20 rounded bg-slate-800 p-2"></label>
+                            <label v-if="item.fulfillment_mode === 'MANUAL'" class="text-xs">Modal Rp<input v-model.number="packageForm.cost_idr" type="number" min="0" required class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
+                            <button :disabled="packageForm.processing" class="rounded bg-cyan-400 px-3 py-2 text-xs font-semibold text-slate-950">Tambah nominal</button>
+                            <span v-if="Object.keys(packageForm.errors).length" class="text-xs text-red-300">{{ Object.values(packageForm.errors).join(' · ') }}</span>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <section class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <h2 class="text-xl font-semibold">Field input produk</h2>
+                <p class="text-sm text-slate-400">Satu baris per field: kode|label|tipe|wajib (1/0). Tipe: text, tel, email. Contoh: user_id|User ID|text|1</p>
+                <select v-model="fieldsProductId" class="w-full max-w-md rounded-md bg-slate-800 p-2"><option value="">Pilih produk</option><option v-for="item in products" :key="item.id" :value="item.id">{{ item.name }}</option></select>
+                <textarea v-if="fieldsProductId" v-model="fieldsText" rows="5" aria-label="Daftar field input" class="block w-full rounded-md bg-slate-800 p-3 font-mono text-sm" />
+                <p v-if="fieldsError" class="text-sm text-red-300">{{ fieldsError }}</p>
+                <button v-if="fieldsProductId" type="button" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950" @click="saveFields">Simpan field</button>
+            </section>
+
+            <section class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <h2 class="text-xl font-semibold">Media toko</h2>
+                <div v-for="asset in assets" :key="asset.id" class="space-y-2 border-t border-slate-800 pt-3">
+                    <div class="flex flex-wrap items-end gap-3"><strong>{{ asset.key }}</strong><label class="flex gap-2 text-sm"><input v-model="asset.is_active" type="checkbox">Aktif</label><label v-if="asset.key.startsWith('banner')" class="text-sm">Tautan banner<input v-model="asset.target_url" type="url" class="mt-1 block rounded bg-slate-800 p-2"></label><button type="button" class="rounded bg-slate-700 px-3 py-2 text-sm" @click="saveAsset(asset)">Simpan</button></div>
+                    <AdminMediaControl type="asset" :id="asset.id" :url="asset.image_url" />
+                </div>
+            </section>
+        </div>
+    </main>
+</template>

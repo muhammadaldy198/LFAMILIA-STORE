@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\AdminAuthController;
+use App\Http\Controllers\AdminCatalogController;
+use App\Http\Controllers\AdminCatalogMediaController;
+use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CustomerAccountController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\CustomerPhoneController;
@@ -12,7 +15,8 @@ use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', fn () => Inertia::render('Foundation'));
+Route::get('/', [CatalogController::class, 'index'])->name('catalog.index');
+Route::get('/catalog/{slug}', [CatalogController::class, 'show'])->name('catalog.show');
 
 Route::get('/health/ready', function () {
     try {
@@ -74,4 +78,19 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         'admin' => auth('admin')->user()->only('id', 'name', 'email', 'role'),
     ]))->name('admin.panel');
     Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
+
+    Route::middleware('admin.super')->prefix('admin/catalog')->name('admin.catalog.')->group(function (): void {
+        Route::get('/', [AdminCatalogController::class, 'index'])->name('index');
+        Route::post('/categories', [AdminCatalogController::class, 'category'])->name('categories.store');
+        Route::put('/categories/{category}', [AdminCatalogController::class, 'updateCategory'])->name('categories.update');
+        Route::post('/products', [AdminCatalogController::class, 'product'])->name('products.store');
+        Route::put('/products/{product}', [AdminCatalogController::class, 'updateProduct'])->name('products.update');
+        Route::post('/products/{product}/packages', [AdminCatalogController::class, 'package'])->name('packages.store');
+        Route::put('/packages/{package}', [AdminCatalogController::class, 'updatePackage'])->name('packages.update');
+        Route::put('/products/{product}/fields', [AdminCatalogController::class, 'fields'])->name('fields.update');
+        Route::put('/mappings/{mapping}', [AdminCatalogController::class, 'mapping'])->name('mappings.update');
+        Route::put('/assets/{asset}', [AdminCatalogController::class, 'asset'])->name('assets.update');
+        Route::post('/media/{type}/{id}', [AdminCatalogMediaController::class, 'store'])->name('media.store');
+        Route::delete('/media/{type}/{id}', [AdminCatalogMediaController::class, 'destroy'])->name('media.destroy');
+    });
 });

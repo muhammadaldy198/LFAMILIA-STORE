@@ -62,7 +62,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, pdo_mysql, redis
+          extensions: mbstring, pdo_mysql, redis, gd, exif
           coverage: none
       - uses: actions/setup-node@v4
         with:
@@ -82,7 +82,7 @@ jobs:
       - name: Validate schema and assets
         run: |
           php artisan migrate --force
-          php artisan migrate:rollback --step=5 --force
+          php artisan migrate:rollback --step=6 --force
           php artisan migrate --force
           npm run build
       - name: Run rebuild tests

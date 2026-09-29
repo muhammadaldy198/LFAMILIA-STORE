@@ -11,7 +11,7 @@ class FoundationTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('Foundation'));
+            ->assertInertia(fn (Assert $page) => $page->component('Catalog/Index'));
     }
 
     public function test_readiness_requires_mysql_and_redis(): void
