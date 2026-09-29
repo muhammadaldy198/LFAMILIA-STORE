@@ -125,6 +125,35 @@ jobs:
           php artisan migrate --force
           npm run build
 
+      - name: Verify M12 encrypted backup and restore
+        run: |
+          if ! command -v mysqldump >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y mysql-client
+          fi
+          install -d -m 0700 /tmp/lfamilia-ci-etc /tmp/lfamilia-ci-backups
+          cat > /tmp/lfamilia-ci-etc/mysql.cnf <<EOF
+          [client]
+          host=127.0.0.1
+          port=3306
+          user=root
+          password=${DB_PASSWORD}
+          EOF
+          chmod 0600 /tmp/lfamilia-ci-etc/mysql.cnf
+          printf '%s\n' 'm12-ci-backup-passphrase' > /tmp/lfamilia-ci-etc/backup.pass
+          chmod 0600 /tmp/lfamilia-ci-etc/backup.pass
+          cat > /tmp/lfamilia-ci-etc/ops.env <<EOF
+          BACKUP_DATABASE_NAME=${DB_DATABASE}
+          MYSQL_DEFAULTS_FILE=/tmp/lfamilia-ci-etc/mysql.cnf
+          MYSQL_ADMIN_DEFAULTS_FILE=/tmp/lfamilia-ci-etc/mysql.cnf
+          BACKUP_PASSPHRASE_FILE=/tmp/lfamilia-ci-etc/backup.pass
+          BACKUP_DIR=/tmp/lfamilia-ci-backups
+          BACKUP_RETENTION_DAYS=7
+          BACKUP_REQUIRE_REMOTE=false
+          EOF
+          OPS_ENV_FILE=/tmp/lfamilia-ci-etc/ops.env bash deploy/backup.sh
+          OPS_ENV_FILE=/tmp/lfamilia-ci-etc/ops.env bash deploy/restore-verify.sh
+
       - name: Run rebuild tests
         run: vendor/bin/phpunit
 
