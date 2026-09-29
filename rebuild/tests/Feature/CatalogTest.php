@@ -155,7 +155,6 @@ class CatalogTest extends TestCase
         app(DigiflazzCatalogImport::class)->upsert($other, 'PROVIDER-SKU-5', 5000);
     }
 
-
     public function test_brand_media_is_connected_to_customer_catalog(): void
     {
         Storage::fake('public');
