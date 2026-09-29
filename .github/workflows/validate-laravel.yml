@@ -1,0 +1,78 @@
+name: Validate Laravel migration
+
+on:
+  push:
+    branches:
+      - main
+      - migration/laravel-vps-final
+  pull_request:
+    paths:
+      - 'laravel/**'
+      - 'MIGRATION-LARAVEL.md'
+      - '.github/workflows/validate-laravel.yml'
+
+jobs:
+  laravel:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: secret
+          MARIADB_DATABASE: lfamilia_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mariadb-admin ping -h 127.0.0.1 -uroot -psecret"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: laravel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, pdo_mysql
+          coverage: none
+      - name: Install Composer dependencies
+        env:
+          APP_URL: http://localhost
+        run: composer install --no-interaction --prefer-dist
+      - name: PHP syntax check
+        run: find app bootstrap config database routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Deployment shell syntax check
+        run: bash -n deploy/preflight.sh deploy/install-systemd.sh
+      - name: Run schema migrations on SQLite
+        env:
+          APP_URL: http://localhost
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          DB_CONNECTION: sqlite
+          DB_DATABASE: database/testing.sqlite
+          CACHE_STORE: array
+          SESSION_DRIVER: array
+          QUEUE_CONNECTION: sync
+        run: |
+          rm -f database/testing.sqlite
+          touch database/testing.sqlite
+          php artisan migrate --force
+      - name: Run schema migrations on MariaDB
+        env:
+          APP_URL: http://localhost
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          DB_CONNECTION: mariadb
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: lfamilia_ci
+          DB_USERNAME: root
+          DB_PASSWORD: secret
+          CACHE_STORE: array
+          SESSION_DRIVER: array
+          QUEUE_CONNECTION: sync
+        run: php artisan migrate:fresh --force
+      - name: Run Laravel tests
+        env:
+          APP_URL: http://localhost
+        run: vendor/bin/phpunit

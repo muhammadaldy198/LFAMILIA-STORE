@@ -31,9 +31,9 @@ test("product admin uses real pagination and explicit nominal action", () => {
 
 test("admin global search queries real order product and customer records", () => {
   const dashboard = read("components/admin-dashboard.tsx");
-  assert.match(dashboard, /fetch\("\/api\/panel\/orders"/);
-  assert.match(dashboard, /fetch\("\/api\/panel\/products"/);
-  assert.match(dashboard, /fetch\("\/api\/panel\/members"/);
+  assert.match(dashboard, /fetch\("\/api\/admin\/orders"/);
+  assert.match(dashboard, /fetch\("\/api\/admin\/products"/);
+  assert.match(dashboard, /fetch\("\/api\/admin\/members"/);
   assert.match(dashboard, /globalResults\.map/);
   assert.match(dashboard, /!responses\[index\]\.ok/);
   assert.match(dashboard, /globalSearchRequestRef\.current !== requestId/);

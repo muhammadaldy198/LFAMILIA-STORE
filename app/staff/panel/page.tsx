@@ -1,11 +1,9 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminDashboard } from "@/components/admin-dashboard";
-import { getPanelSessionFromToken, PANEL_COOKIE_NAME } from "@/lib/server/admin-auth";
+import { getVpsPanelSession } from "@/lib/server/vps-panel-session";
 
 export default async function StaffPanelPage() {
-  const cookieStore = await cookies();
-  const session = await getPanelSessionFromToken(cookieStore.get(PANEL_COOKIE_NAME)?.value);
+  const session = await getVpsPanelSession();
 
   if (!session || session.role !== "staff") {
     redirect("/staff/panel/login");

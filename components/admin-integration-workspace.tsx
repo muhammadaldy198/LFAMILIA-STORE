@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CreditCard, KeyRound, LogIn, Mail, Network, Save, Server, ShieldCheck } from "lucide-react";
+import { CreditCard, KeyRound, LogIn, Mail, Network, Save, ShieldCheck } from "lucide-react";
 import { CopyUrl, Field, Panel, Status, TabBar, WorkspaceHeader, buttonClass, inputClass, primaryButtonClass } from "@/components/admin-workspace-ui";
 
-const tabs = ["Ringkasan", "DOKU Checkout", "Midtrans Snap", "Digiflazz", "KokinPay", "Google Login", "Resend Email", "Relay & Keamanan"] as const;
+const tabs = ["Ringkasan", "DOKU Checkout", "Midtrans Snap", "Digiflazz", "KokinPay", "Google Login", "Resend Email", "Keamanan"] as const;
 type Tab = (typeof tabs)[number];
-type Provider = "digiflazz" | "kokinpay" | "google" | "resend" | "relay" | "security";
+type Provider = "digiflazz" | "kokinpay" | "google" | "resend" | "turnstile" | "security";
 type Environment = "development" | "production" | "global";
 type PaymentEnvironment = "sandbox" | "production";
 type Profile = { provider: Provider; environment: Environment; configured: boolean; configuredFields?: string[]; decryptionError: boolean };
@@ -18,11 +18,9 @@ type Overview = {
   profiles: Profile[];
   callbacks: Callback[];
 };
-type RelayResult = { provider: string; label: string; connected: boolean; status: number | null; message: string };
 type IntegrationPutResult = {
   error?: string;
   overview?: Overview;
-  relay?: RelayResult[];
   digiflazz?: { connected?: boolean; balance?: number };
 };
 type PaymentOverview = {
@@ -59,9 +57,10 @@ export function AdminIntegrationWorkspace() {
   const [values, setValues] = useState<Record<string, string>>({
     transactionApiUrl: "https://api.digiflazz.com/v1/transaction",
     priceListUrl: "https://api.digiflazz.com/v1/price-list",
-    relayOrigin: "https://digiflazz-relay.lfamiliastore.my.id",
     resendApiUrl: "https://api.resend.com/emails",
     resendDeliveryChannel: "email",
+    kokinpayBaseUrl: "https://api.kokinpay.com",
+    turnstileVerifyUrl: "https://challenges.cloudflare.com/turnstile/v0/siteverify",
     dokuApiUrl: "",
   });
   const initializedPaymentEnvironments = useRef(false);
@@ -72,8 +71,8 @@ export function AdminIntegrationWorkspace() {
 
   const load = useCallback(async () => {
     const [integrationResponse, paymentResponse] = await Promise.all([
-      fetch("/api/panel/integrations", { cache: "no-store" }),
-      fetch("/api/panel/payment-routing", { cache: "no-store" }),
+      fetch("/api/admin/integrations", { cache: "no-store" }),
+      fetch("/api/admin/payment-routing", { cache: "no-store" }),
     ]);
     const integrationPayload = await integrationResponse.json().catch(() => ({})) as Overview & { error?: string };
     const paymentPayload = await paymentResponse.json().catch(() => ({})) as PaymentOverview & { error?: string };
@@ -110,7 +109,7 @@ export function AdminIntegrationWorkspace() {
   const dokuConfigured = Boolean(paymentOverview?.configured.doku[dokuProfileEnvironment]);
   const midtransConfigured = Boolean(paymentOverview?.configured.midtrans[midtransProfileEnvironment]);
   async function put(body: object) {
-    const response = await fetch("/api/panel/integrations", {
+    const response = await fetch("/api/admin/integrations", {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
@@ -122,7 +121,7 @@ export function AdminIntegrationWorkspace() {
   }
 
   async function paymentPut(body: object) {
-    const response = await fetch("/api/panel/payment-routing", {
+    const response = await fetch("/api/admin/payment-routing", {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
@@ -196,7 +195,13 @@ export function AdminIntegrationWorkspace() {
         });
         await put({ action: "save_selections", selections: { digiflazzEnvironment } });
       } else if (tab === "KokinPay") {
-        await put({ action: "save_profile", provider: "kokinpay", mode: "service", environment: "global", values: { apiKey: values.kokinpayApiKey || "" } });
+        await put({
+          action: "save_profile",
+          provider: "kokinpay",
+          mode: "service",
+          environment: "global",
+          values: { apiKey: values.kokinpayApiKey || "", baseUrl: values.kokinpayBaseUrl || "" },
+        });
       } else if (tab === "Google Login") {
         await put({ action: "save_profile", provider: "google", mode: "service", environment: "global", values: { clientId: values.googleClientId || "" } });
       } else if (tab === "Resend Email") {
@@ -212,13 +217,17 @@ export function AdminIntegrationWorkspace() {
             deliveryChannel: values.resendDeliveryChannel || "email",
           },
         });
-      } else if (tab === "Relay & Keamanan") {
+      } else if (tab === "Keamanan") {
         await put({
           action: "save_profile",
-          provider: "relay",
+          provider: "turnstile",
           mode: "service",
           environment: "global",
-          values: { digiflazzOrigin: values.relayOrigin || "", hosts: values.relayHosts || "", token: values.relayToken || "" },
+          values: {
+            siteKey: values.turnstileSiteKey || "",
+            secretKey: values.turnstileSecretKey || "",
+            verifyUrl: values.turnstileVerifyUrl || "",
+          },
         });
         if (values.voucherEncryptionKey?.trim()) {
           await put({
@@ -237,7 +246,7 @@ export function AdminIntegrationWorkspace() {
         webhookSecret: "",
         kokinpayApiKey: "",
         resendApiKey: "",
-        relayToken: "",
+        turnstileSecretKey: "",
         voucherEncryptionKey: "",
       }));
       setMessage("Konfigurasi tersimpan aman di backend.");
@@ -256,19 +265,8 @@ export function AdminIntegrationWorkspace() {
       if (tab === "Digiflazz") {
         const result = await put({ action: "test_digiflazz" });
         setMessage(`Koneksi Digiflazz berhasil. Saldo terbaca: Rp${Number(result.digiflazz?.balance || 0).toLocaleString("id-ID")}.`);
-      } else if (tab === "Relay & Keamanan") {
-        const result = await put({ action: "test_relay" });
-        const relay = result.relay ?? [];
-        if (!relay.length) throw new Error("Backend tidak mengembalikan hasil pemeriksaan relay.");
-        const details = relay.map((item) => {
-          const connection = item.connected ? "Terhubung" : "Gagal";
-          const http = item.status === null ? "" : ` · HTTP ${item.status}`;
-          return `${item.label}: ${connection}${http} · ${item.message}`;
-        }).join(" | ");
-        if (relay.every((item) => item.connected)) setMessage(details);
-        else setError(details);
       } else if (tab === "DOKU Checkout" || tab === "Midtrans Snap") {
-        const response = await fetch("/api/panel/payment-routing", { cache: "no-store" });
+        const response = await fetch("/api/admin/payment-routing", { cache: "no-store" });
         const payload = await response.json().catch(() => ({})) as PaymentOverview & { error?: string };
         if (!response.ok) throw new Error(payload.error || "Status payment gateway gagal dimuat.");
         setPaymentOverview(payload);
@@ -289,6 +287,7 @@ export function AdminIntegrationWorkspace() {
         const mapping: Partial<Record<Tab, [Provider, Environment, string]>> = {
           "KokinPay": ["kokinpay", "global", "KokinPay"],
           "Resend Email": ["resend", "global", "Resend Email"],
+          "Keamanan": ["turnstile", "global", "Turnstile"],
         };
         const target = mapping[tab];
         if (!target) throw new Error("Tidak ada pemeriksaan untuk menu ini.");
@@ -346,7 +345,7 @@ export function AdminIntegrationWorkspace() {
       <Card icon={<KeyRound className="size-5" />} title="KokinPay" ready={isConfigured("kokinpay", "global")} onClick={() => setTab("KokinPay")} />
       <Card icon={<LogIn className="size-5" />} title="Google Login" ready={isConfigured("google", "global")} onClick={() => setTab("Google Login")} />
       <Card icon={<Mail className="size-5" />} title="Resend Email" ready={isConfigured("resend", "global")} onClick={() => setTab("Resend Email")} />
-      <Card icon={<Server className="size-5" />} title="VPS Relay" ready={isConfigured("relay", "global")} onClick={() => setTab("Relay & Keamanan")} />
+      <Card icon={<ShieldCheck className="size-5" />} title="Keamanan" ready={isConfigured("turnstile", "global")} onClick={() => setTab("Keamanan")} />
       <Panel title="Callback & Notification URL" description="Tempel URL berikut pada dashboard provider terkait." className="sm:col-span-2">
         <div className="grid gap-3 p-4">
           <CopyUrl label="DOKU Checkout Notification" value={paymentOverview?.callbacks.dokuNotification || "/api/payments/doku/callback"} />
@@ -402,6 +401,7 @@ export function AdminIntegrationWorkspace() {
     {tab === "KokinPay" && <Panel title="KokinPay" description="Credential untuk validasi nickname.">
       <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
         <Text label="API Key" secret value={values.kokinpayApiKey || ""} onChange={(value) => setValue("kokinpayApiKey", value)} />
+        <Text label="API URL" value={values.kokinpayBaseUrl || ""} onChange={(value) => setValue("kokinpayBaseUrl", value)} />
       </div>
     </Panel>}
 
@@ -424,16 +424,12 @@ export function AdminIntegrationWorkspace() {
       </div>
     </Panel>}
 
-    {tab === "Relay & Keamanan" && <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <Panel title="VPS Relay" description="Hanya untuk request Digiflazz.">
-        <div className="grid gap-4 p-4">
-          <Text label="Relay URL" value={values.relayOrigin || ""} onChange={(value) => setValue("relayOrigin", value)} />
-          <Text label="Host diizinkan" value={values.relayHosts || ""} onChange={(value) => setValue("relayHosts", value)} />
-          <Text label="Relay Token" secret value={values.relayToken || ""} onChange={(value) => setValue("relayToken", value)} />
-        </div>
-      </Panel>
+    {tab === "Keamanan" && <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <Panel title="Keamanan">
         <div className="grid gap-4 p-4">
+          <Text label="Turnstile Site Key" value={values.turnstileSiteKey || ""} onChange={(value) => setValue("turnstileSiteKey", value)} />
+          <Text label="Turnstile Secret Key" secret value={values.turnstileSecretKey || ""} onChange={(value) => setValue("turnstileSecretKey", value)} />
+          <Text label="Turnstile Verify URL" value={values.turnstileVerifyUrl || ""} onChange={(value) => setValue("turnstileVerifyUrl", value)} />
           <Text label="Voucher Encryption Key" secret value={values.voucherEncryptionKey || ""} onChange={(value) => setValue("voucherEncryptionKey", value)} />
           <p className="text-[9px] text-[#718198]"><ShieldCheck className="mr-1 inline size-3.5 text-emerald-600" />Credential tidak dikirim kembali ke browser.</p>
         </div>

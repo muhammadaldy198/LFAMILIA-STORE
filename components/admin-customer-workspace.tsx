@@ -92,8 +92,8 @@ export function AdminCustomerWorkspace() {
 
   const load = useCallback(async () => {
     const [payload, cleanup] = await Promise.all([
-      requestJson<MemberPayload>("/api/panel/members", { cache: "no-store" }),
-      requestJson<{ settings: CleanupSettings }>("/api/panel/customer-cleanup", { cache: "no-store" }),
+      requestJson<MemberPayload>("/api/admin/members", { cache: "no-store" }),
+      requestJson<{ settings: CleanupSettings }>("/api/admin/customer-cleanup", { cache: "no-store" }),
     ]);
     setSettings(payload.settings ?? []);
     setMembers(payload.members ?? []);
@@ -104,8 +104,8 @@ export function AdminCustomerWorkspace() {
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
-      requestJson<MemberPayload>("/api/panel/members", { cache: "no-store" }),
-      requestJson<{ settings: CleanupSettings }>("/api/panel/customer-cleanup", { cache: "no-store" }),
+      requestJson<MemberPayload>("/api/admin/members", { cache: "no-store" }),
+      requestJson<{ settings: CleanupSettings }>("/api/admin/customer-cleanup", { cache: "no-store" }),
     ])
       .then(([payload, cleanup]) => {
         if (cancelled) return;
@@ -134,7 +134,7 @@ export function AdminCustomerWorkspace() {
   async function saveTierSettings() {
     setBusy(true); setError(""); setNotice("");
     try {
-      const payload = await requestJson<{ settings: TierSetting[] }>("/api/panel/members", {
+      const payload = await requestJson<{ settings: TierSetting[] }>("/api/admin/members", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -168,7 +168,7 @@ export function AdminCustomerWorkspace() {
     }
     setBusy(true); setError(""); setNotice("");
     try {
-      const payload = await requestJson<{ members: Member[] }>("/api/panel/members", {
+      const payload = await requestJson<{ members: Member[] }>("/api/admin/members", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customerId: editing.id, role, addBalance, reason: reason || undefined }),
@@ -188,7 +188,7 @@ export function AdminCustomerWorkspace() {
   async function saveCleanupSettings() {
     setCleanupBusy(true); setError(""); setNotice("");
     try {
-      const payload = await requestJson<{ settings: CleanupSettings }>("/api/panel/customer-cleanup", {
+      const payload = await requestJson<{ settings: CleanupSettings }>("/api/admin/customer-cleanup", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -207,7 +207,7 @@ export function AdminCustomerWorkspace() {
     if (!window.confirm("Jalankan pembersihan sekarang? Hanya akun saldo Rp0, tanpa riwayat transaksi, dan tidak login sesuai batas hari yang akan dihapus.")) return;
     setCleanupBusy(true); setError(""); setNotice("");
     try {
-      const payload = await requestJson<{ deleted: number; settings: CleanupSettings }>("/api/panel/customer-cleanup", { method: "POST" });
+      const payload = await requestJson<{ deleted: number; settings: CleanupSettings }>("/api/admin/customer-cleanup", { method: "POST" });
       setCleanupSettings(payload.settings);
       await load();
       setNotice(`Pembersihan selesai. ${payload.deleted} akun kosong dihapus permanen.`);
@@ -223,7 +223,7 @@ export function AdminCustomerWorkspace() {
     if (confirmation !== "HAPUS") return;
     setBusy(true); setError(""); setNotice("");
     try {
-      const payload = await requestJson<{ members: Member[] }>(`/api/panel/members?id=${encodeURIComponent(member.id)}`, { method: "DELETE" });
+      const payload = await requestJson<{ members: Member[] }>(`/api/admin/members?id=${encodeURIComponent(member.id)}`, { method: "DELETE" });
       setMembers(payload.members);
       if (editing?.id === member.id) setEditing(null);
       setNotice("Akun pelanggan kosong berhasil dihapus permanen.");

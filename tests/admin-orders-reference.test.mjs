@@ -48,7 +48,7 @@ test("orders table exposes all reference columns and local controls", () => {
 });
 
 test("orders UI loads and mutates backend data", () => {
-  assert.match(source, /fetch\("\/api\/panel\/orders"/);
+  assert.match(source, /fetch\("\/api\/admin\/orders"/);
   assert.match(source, /method: "POST"/);
   assert.match(source, /method: "PATCH"/);
   assert.match(source, /complete_manual/);

@@ -15,7 +15,7 @@ test("all literal Admin Panel API calls have a unified panel route", () => {
   const endpoints = new Set();
   for (const name of files) {
     const source = fs.readFileSync(path.join(componentDir, name), "utf8");
-    for (const match of source.matchAll(/["'`]\/api\/panel\/([a-z0-9/-]+)/gi)) {
+    for (const match of source.matchAll(/["'`]\/api\/admin\/([a-z0-9/-]+)/gi)) {
       endpoints.add(match[1].replace(/\/$/, ""));
     }
   }

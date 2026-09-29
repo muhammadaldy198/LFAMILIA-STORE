@@ -23,7 +23,7 @@ test("admin credentials use their private ledger row and UI calls the endpoint",
   assert.match(route, /'__lfadmin__:' \|\| lower\(a\.email\)/);
   assert.match(panel, /balances: \{ GET: balances\.GET, PUT: balances\.PUT \}/);
   assert.match(manager, /fetch\(url, init\)/);
-  assert.match(manager, /requestJson<BalancePayload>\("\/api\/panel\/balances"/);
+  assert.match(manager, /requestJson<BalancePayload>\("\/api\/admin\/balances"/);
   assert.match(manager, /accountType === "Pelanggan" \? "customer" : "admin"/);
   assert.match(manager, /operation === "Tambah" \? "credit" : "debit"/);
   assert.match(customer, /<AdminBalanceManager \/>/);

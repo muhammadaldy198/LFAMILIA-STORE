@@ -20,11 +20,10 @@ test("outbound integration URLs reject local and private SSRF targets", () => {
   assert.match(source, /normalized\.startsWith\("fd"\)/);
 });
 
-test("payment relay and email outbound sinks use the SSRF guard", () => {
+test("payment and email outbound sinks use the SSRF guard", () => {
   const doku = read("lib/server/doku-checkout.ts");
   const paymentConfig = read("lib/server/payment-mode-config.ts");
   const integrations = read("lib/server/integration-config.ts");
-  const relay = read("lib/server/provider-relay.ts");
   const reset = read("lib/server/password-reset.ts");
   const vouchers = read("lib/server/vouchers.ts");
   const notifications = read("lib/server/transaction-notifications.ts");
@@ -32,7 +31,6 @@ test("payment relay and email outbound sinks use the SSRF guard", () => {
   assert.match(doku, /safeHttpsOrigin/);
   assert.match(paymentConfig, /safeHttpsOrigin\(merged\.apiUrl/);
   assert.match(integrations, /validateProfileUrls/);
-  assert.match(relay, /assertSafeHttpsUrl\(relayOrigin/);
   assert.match(reset, /assertSafeHttpsUrl\(configuredApiUrl/);
   assert.match(vouchers, /assertSafeHttpsUrl\(requireRuntimeValue/);
   assert.match(notifications, /assertSafeHttpsUrl\(config\.RESEND_API_URL/);
@@ -62,12 +60,12 @@ test("critical production paths use redacted structured error logging", () => {
   assert.doesNotMatch(logger, /error\.stack/);
 });
 
-test("production CI includes safe live security probes", () => {
+test("prelaunch CI keeps security checks and Laravel validation", () => {
   const workflow = read(".github/workflows/validate.yml");
-  assert.match(workflow, /lfamilia-production-security-smoke/);
-  assert.match(workflow, /Cross-site mutation tidak ditolak/);
-  assert.match(workflow, /CORS wildcard terdeteksi/);
-  assert.match(workflow, /Admin API tidak tertutup/);
-  assert.match(workflow, /strict-transport-security/);
-  assert.match(workflow, /content-security-policy/);
+  const laravelWorkflow = read(".github/workflows/validate-laravel.yml");
+  assert.match(workflow, /npm audit --omit=dev --audit-level=high/);
+  assert.match(workflow, /npm run lint/);
+  assert.match(workflow, /node --test tests\/\*\.test\.mjs/);
+  assert.match(laravelWorkflow, /Run Laravel tests/);
+  assert.doesNotMatch(workflow, /lfamilia-production-security-smoke/);
 });

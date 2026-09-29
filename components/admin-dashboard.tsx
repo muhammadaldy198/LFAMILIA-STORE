@@ -132,12 +132,12 @@ export function AdminDashboard({
     setGlobalSearchError("");
     try {
       const requests: Array<Promise<Response>> = [
-        fetch("/api/panel/orders", { cache: "no-store" }),
+        fetch("/api/admin/orders", { cache: "no-store" }),
       ];
       const canSearchBackoffice = isOwner || isAdmin;
       if (canSearchBackoffice) {
-        requests.push(fetch("/api/panel/products", { cache: "no-store" }));
-        requests.push(fetch("/api/panel/members", { cache: "no-store" }));
+        requests.push(fetch("/api/admin/products", { cache: "no-store" }));
+        requests.push(fetch("/api/admin/members", { cache: "no-store" }));
       }
       const responses = await Promise.all(requests);
       const payloads = await Promise.all(responses.map((response) => response.json().catch(() => ({}))));

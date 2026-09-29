@@ -31,7 +31,7 @@ test("Staff product-content is safe and routed through the panel proxy", () => {
   assert.match(route, /products: products\.map/);
   assert.doesNotMatch(route, /providerCode|providerSku|supplierPrice|marginValue/);
   assert.match(proxy, /"product-content": \{ GET: productContent\.GET, PUT: productContent\.PUT \}/);
-  assert.match(workspace, /fetch\("\/api\/panel\/product-content"/);
+  assert.match(workspace, /fetch\("\/api\/admin\/product-content"/);
   assert.match(workspace, /method: "PUT"/);
 });
 

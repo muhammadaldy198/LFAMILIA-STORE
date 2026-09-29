@@ -6,7 +6,7 @@ import test from "node:test";
 const source = fs.readFileSync(path.join(process.cwd(), "components/admin-product-manager.tsx"), "utf8");
 
 test("product list and mutations use the real panel endpoint", () => {
-  assert.match(source, /fetch\("\/api\/panel\/products"/);
+  assert.match(source, /fetch\("\/api\/admin\/products"/);
   assert.match(source, /payload\.products\.map\(mapProduct\)/);
   assert.match(source, /JSON\.stringify\(raw\)/);
   assert.match(source, /JSON\.stringify\(buildPayload\(\)\)/);

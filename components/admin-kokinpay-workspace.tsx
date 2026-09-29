@@ -57,7 +57,7 @@ export function AdminKokinpayWorkspace() {
         : action === "region"
           ? { action, userId: userId.trim(), server: server.trim() }
           : { action, customerNumber: customerNumber.trim() };
-      const response = await fetch("/api/panel/nickname-tools", {
+      const response = await fetch("/api/admin/nickname-tools", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

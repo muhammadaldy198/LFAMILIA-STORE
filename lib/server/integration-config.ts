@@ -1,8 +1,9 @@
 import { getD1 } from "@/db";
 import { getRuntimeEnv } from "@/lib/server/runtime-env";
-import { assertSafeHttpsUrl, safeHttpsOrigin } from "@/lib/server/outbound-url";
+import { assertSafeHttpsUrl } from "@/lib/server/outbound-url";
+import { requireDigiflazzEndpoint } from "@/lib/server/digiflazz-endpoint";
 
-export type IntegrationProvider = "digiflazz" | "kokinpay" | "google" | "resend" | "relay" | "security";
+export type IntegrationProvider = "digiflazz" | "kokinpay" | "google" | "resend" | "security";
 export type IntegrationMode = "direct" | "service";
 export type IntegrationEnvironment = "sandbox" | "production" | "development" | "global";
 
@@ -17,9 +18,6 @@ type RuntimeLike = Record<string, unknown> & {
   RESEND_FROM_EMAIL?: string;
   RESEND_API_URL?: string;
   VOUCHER_DELIVERY_CHANNEL?: string;
-  PROVIDER_RELAY_TOKEN?: string;
-  PROVIDER_RELAY_HOSTS?: string;
-  PROVIDER_RELAY_DIGIFLAZZ_ORIGIN?: string;
   VOUCHER_ENCRYPTION_KEY?: string;
 };
 
@@ -61,7 +59,6 @@ export const profileFields: Record<string, readonly string[]> = {
   "kokinpay:service": ["apiKey"],
   "google:service": ["clientId"],
   "resend:service": ["apiKey", "fromEmail", "apiUrl", "deliveryChannel"],
-  "relay:service": ["digiflazzOrigin", "hosts", "token"],
   "security:service": ["voucherEncryptionKey"],
 };
 
@@ -75,7 +72,7 @@ function profileFieldKey(provider: IntegrationProvider, mode: IntegrationMode) {
 
 function isProfileSupported(provider: IntegrationProvider, mode: IntegrationMode, environment: IntegrationEnvironment) {
   if (provider === "digiflazz") return mode === "direct" && (environment === "development" || environment === "production");
-  return (provider === "kokinpay" || provider === "google" || provider === "resend" || provider === "relay" || provider === "security")
+  return (provider === "kokinpay" || provider === "google" || provider === "resend" || provider === "security")
     && mode === "service"
     && environment === "global";
 }
@@ -215,14 +212,11 @@ function validateProfileUrls(
   values: Record<string, string>,
 ) {
   if (provider === "digiflazz" && mode === "direct") {
-    if (values.transactionApiUrl) assertSafeHttpsUrl(values.transactionApiUrl, "URL transaksi DigiFlazz");
-    if (values.priceListUrl) assertSafeHttpsUrl(values.priceListUrl, "URL daftar harga DigiFlazz");
+    if (values.transactionApiUrl) requireDigiflazzEndpoint(values.transactionApiUrl, "/v1/transaction");
+    if (values.priceListUrl) requireDigiflazzEndpoint(values.priceListUrl, "/v1/price-list");
   }
   if (provider === "resend" && mode === "service" && values.apiUrl) {
     assertSafeHttpsUrl(values.apiUrl, "URL API email");
-  }
-  if (provider === "relay" && mode === "service" && values.digiflazzOrigin) {
-    values.digiflazzOrigin = safeHttpsOrigin(values.digiflazzOrigin, "URL VPS Relay");
   }
 }
 
@@ -578,11 +572,6 @@ function applyResendConfig(target: Record<string, unknown>, config: Record<strin
   const channel = config.deliveryChannel?.trim().toLowerCase();
   if (channel === "website" || channel === "email") target.VOUCHER_DELIVERY_CHANNEL = channel;
 }
-function applyRelayConfig(target: Record<string, unknown>, config: Record<string, string>) {
-  put(target, "PROVIDER_RELAY_DIGIFLAZZ_ORIGIN", config.digiflazzOrigin);
-  put(target, "PROVIDER_RELAY_HOSTS", config.hosts);
-  put(target, "PROVIDER_RELAY_TOKEN", config.token);
-}
 function applySecurityConfig(target: Record<string, unknown>, config: Record<string, string>) {
   put(target, "VOUCHER_ENCRYPTION_KEY", config.voucherEncryptionKey);
 }
@@ -614,7 +603,6 @@ export async function hydrateIntegrationRuntimeEnv<T extends object>(env: T): Pr
       if (profile.provider === "kokinpay" && profile.mode === "service" && profile.environment === "global") applyKokinpayConfig(target, config);
       if (profile.provider === "google" && profile.mode === "service" && profile.environment === "global") applyGoogleConfig(target, config);
       if (profile.provider === "resend" && profile.mode === "service" && profile.environment === "global") applyResendConfig(target, config);
-      if (profile.provider === "relay" && profile.mode === "service" && profile.environment === "global") applyRelayConfig(target, config);
       if (profile.provider === "security" && profile.mode === "service" && profile.environment === "global") applySecurityConfig(target, config);
     }
     return target as T;

@@ -56,8 +56,8 @@ test("admin product reads avoid global compatibility repair while writes keep ni
 
 test("panel exposes product-input and editor persists real values", () => {
   assert.match(panel, /"product-input": \{ GET: productInput\.GET, PATCH: productInput\.PATCH \}/);
-  assert.match(manager, /fetch\(`\/api\/panel\/product-input\?slug=/);
-  assert.match(manager, /fetch\("\/api\/panel\/product-input", \{/);
+  assert.match(manager, /fetch\(`\/api\/admin\/product-input\?slug=/);
+  assert.match(manager, /fetch\("\/api\/admin\/product-input", \{/);
   assert.match(manager, /method: "PATCH"/);
   assert.match(manager, /Pengaturan input dan kode game berhasil disimpan ke backend/);
 });

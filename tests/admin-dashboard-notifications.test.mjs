@@ -14,7 +14,7 @@ test("admin desktop shell keeps active notifications and account controls", () =
   assert.match(dashboard, /<AdminAccountMenu/);
   assert.match(dashboard, /Gamepad2/);
   assert.match(notifications, /fetchAdminSummary<Summary>\("7d"/);
-  assert.match(summaryClient, /\/api\/panel\/summary\?range=/);
+  assert.match(summaryClient, /\/api\/admin\/summary\?range=/);
   assert.match(notifications, /recentActivities/);
   assert.match(notifications, /recentOrders/);
   assert.match(notifications, /localStorage/);

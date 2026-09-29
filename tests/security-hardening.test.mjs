@@ -151,7 +151,7 @@ test("owner setup trusts only Worker-injected Access identity", () => {
 
 test("Worker cryptographically validates Cloudflare Access assertions", () => {
   const source = read("worker/index.ts");
-  assert.match(source, /verifyCloudflareAccess\(request, env\)/);
+  assert.match(source, /verifyCloudflareAccess\(request, runtimeEnv\)/);
   assert.doesNotMatch(source, /ctx\.access|getIdentity\(\)/);
   assert.doesNotMatch(source, /cf-access-authenticated-user-email/);
 

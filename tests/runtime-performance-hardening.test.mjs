@@ -12,9 +12,9 @@ test("public reads warm runtime and schema repair outside the critical response 
 
   assert.match(worker, /RUNTIME_HYDRATION_TTL_MS = 15_000/);
   assert.match(worker, /requestNeedsHydratedRuntime/);
-  assert.match(worker, /if \(!runtimeHydrationCache\) setRuntimeEnv\(env\)/);
-  assert.match(worker, /ctx\.waitUntil\(\s*hydrateRuntime\(env\)\.catch/);
-  assert.match(worker, /if \(isReadOnlyRequest\(request\)\)[\s\S]*ctx\.waitUntil\([\s\S]*ensureLegacyDatabaseColumns/);
+  assert.match(worker, /const hydrated = await runtimeHydrationCache\.promise;\s*setRuntimeEnv\(hydrated\)/);
+  assert.match(worker, /runtimeCtx\.waitUntil\(\s*hydrateRuntime\(runtimeEnv\)\.catch/);
+  assert.match(worker, /if \(isReadOnlyRequest\(request\)\)[\s\S]*runtimeCtx\.waitUntil\([\s\S]*ensureLegacyDatabaseColumns/);
   assert.match(worker, /else \{\s*await ensureLegacyDatabaseColumns\(\)\.catch/);
   assert.match(panel, /if \(!\["GET", "HEAD", "OPTIONS"\]\.includes\(method\)\) \{\s*await ensureLegacyDatabaseColumns\(\)/);
 });
@@ -82,11 +82,11 @@ test("Admin overview and notification bell share one short-lived summary request
 
   assert.match(helper, /SUMMARY_CACHE_TTL_MS = 5_000/);
   assert.match(helper, /summaries\.get\(key\)/);
-  assert.match(helper, /api\/panel\/summary\?range=/);
+  assert.match(helper, /api\/admin\/summary\?range=/);
   assert.match(overview, /fetchAdminSummary<Summary>\(range\)/);
   assert.match(notifications, /fetchAdminSummary<Summary>\("7d", \{ force \}\)/);
-  assert.ok(!overview.includes('fetch(`/api/panel/summary'));
-  assert.ok(!notifications.includes('fetch("/api/panel/summary'));
+  assert.ok(!overview.includes('fetch(`/api/admin/summary'));
+  assert.ok(!notifications.includes('fetch("/api/admin/summary'));
 });
 
 test("wallet and compatibility helpers keep read paths lightweight", () => {

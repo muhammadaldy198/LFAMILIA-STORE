@@ -19,7 +19,7 @@ export async function fetchAdminSummary<T>(
     return cached.promise as Promise<T>;
   }
 
-  const promise = fetch(`/api/panel/summary?range=${encodeURIComponent(key)}`, {
+  const promise = fetch(`/api/admin/summary?range=${encodeURIComponent(key)}`, {
     cache: "no-store",
   }).then(async (response) => {
     const payload = await response.json().catch(() => ({})) as T & { error?: string };

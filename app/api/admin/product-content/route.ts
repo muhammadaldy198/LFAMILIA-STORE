@@ -2,7 +2,6 @@ import { z } from "zod";
 import { requireAdminSession } from "@/lib/server/admin";
 import { readProducts, saveProductContent } from "@/lib/server/products";
 import { isAllowedMediaUrl } from "@/lib/media-url";
-import { ensureKokinpayNicknameGameCodeBackfill } from "@/lib/server/nickname-config";
 
 const noticeSchema = z.object({
   title: z.string().trim().min(2).max(180),

@@ -55,7 +55,7 @@ export function AdminBalanceManager() {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    const payload = await requestJson<BalancePayload>("/api/panel/balances", { cache: "no-store" });
+    const payload = await requestJson<BalancePayload>("/api/admin/balances", { cache: "no-store" });
     const nextCustomers = payload.customers ?? [];
     const nextAdmins = payload.admins ?? [];
     setCustomers(nextCustomers);
@@ -65,7 +65,7 @@ export function AdminBalanceManager() {
 
   useEffect(() => {
     let cancelled = false;
-    void requestJson<BalancePayload>("/api/panel/balances", { cache: "no-store" })
+    void requestJson<BalancePayload>("/api/admin/balances", { cache: "no-store" })
       .then((payload) => {
         if (cancelled) return;
         const nextCustomers = payload.customers ?? [];
@@ -100,7 +100,7 @@ export function AdminBalanceManager() {
     }
     setBusy(true);
     try {
-      const payload = await requestJson<{ balanceBefore: number; balanceAfter: number }>("/api/panel/balances", {
+      const payload = await requestJson<{ balanceBefore: number; balanceAfter: number }>("/api/admin/balances", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

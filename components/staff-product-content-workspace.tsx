@@ -14,7 +14,7 @@ export function StaffProductContentWorkspace() {
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const load = useCallback(async () => {
-    const response = await fetch("/api/panel/product-content", { cache: "no-store" });
+    const response = await fetch("/api/admin/product-content", { cache: "no-store" });
     const payload = await response.json().catch(() => ({})) as { products?: ProductContent[]; error?: string };
     if (!response.ok) { setMessage(payload.error || "Konten produk gagal dimuat."); return; }
     const next = payload.products || []; setProducts(next);
@@ -28,14 +28,14 @@ export function StaffProductContentWorkspace() {
   function select(id: number) { const current = products.find((item) => item.dbId === id) || null; setSelectedId(id); setDraft(current ? { ...current, notices: current.notices.map((notice) => ({ ...notice })) } : null); }
   async function upload(file: File | undefined, field: "imageUrl" | "bannerUrl") {
     if (!file) return; const form = new FormData(); form.set("file", file);
-    const response = await fetch("/api/panel/media", { method: "POST", body: form });
+    const response = await fetch("/api/admin/media", { method: "POST", body: form });
     const payload = await response.json().catch(() => ({})) as { url?: string; error?: string };
     if (!response.ok || !payload.url) { setMessage(payload.error || "Gambar gagal diunggah."); return; }
     setDraft((current) => current ? { ...current, [field]: payload.url! } : current);
   }
   async function save(event: FormEvent) {
     event.preventDefault(); if (!draft) return; setSaving(true); setMessage("");
-    const response = await fetch("/api/panel/product-content", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
+    const response = await fetch("/api/admin/product-content", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
     const payload = await response.json().catch(() => ({})) as { error?: string };
     setSaving(false); if (!response.ok) { setMessage(payload.error || "Konten produk gagal disimpan."); return; }
     setMessage("Konten produk tersimpan dan langsung dipakai katalog pelanggan."); await load();

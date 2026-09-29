@@ -5,13 +5,12 @@ import test from "node:test";
 
 const root = process.cwd();
 
-test("admin UI uses the unified panel API instead of direct admin API routes", () => {
+test("VPS admin UI uses Laravel admin API routes", () => {
   const componentDir = path.join(root, "components");
   const files = fs.readdirSync(componentDir).filter((name) => name.startsWith("admin-") && name.endsWith(".tsx"));
-  for (const name of files) {
-    const source = fs.readFileSync(path.join(componentDir, name), "utf8");
-    assert.doesNotMatch(source, /\/api\/admin\//, `${name} must use /api/panel/*`);
-  }
+  const joined = files.map((name) => fs.readFileSync(path.join(componentDir, name), "utf8")).join("\n");
+  assert.match(joined, /\/api\/admin\//);
+  assert.doesNotMatch(joined, /\/api\/panel\//);
 });
 
 test("panel route map has no duplicate endpoint keys", () => {

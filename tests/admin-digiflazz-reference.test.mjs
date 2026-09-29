@@ -40,9 +40,9 @@ test("Digiflazz price control separates current provider cost, Max Price, margin
 });
 
 test("Digiflazz workspace uses backend operations while credentials stay in Integrasi", () => {
-  assert.match(source, /fetch\("\/api\/panel\/digiflazz-monitor"/);
-  assert.match(source, /fetch\("\/api\/panel\/digiflazz-pricing"/);
-  assert.match(source, /fetch\("\/api\/panel\/orders"/);
+  assert.match(source, /fetch\("\/api\/admin\/digiflazz-monitor"/);
+  assert.match(source, /fetch\("\/api\/admin\/digiflazz-pricing"/);
+  assert.match(source, /fetch\("\/api\/admin\/orders"/);
   assert.match(source, /method: "POST"/);
   assert.doesNotMatch(source, /Simulasi sync|Backend Digiflazz belum dihubungkan|rancangan frontend/);
   assert.doesNotMatch(source, /api key|username|secret/i);

@@ -10,7 +10,7 @@ export function AdminCustomerDirectory() {
   const [error, setError] = useState("");
   useEffect(() => {
     void (async () => {
-      const response = await fetch("/api/panel/members", { cache: "no-store" });
+      const response = await fetch("/api/admin/members", { cache: "no-store" });
       const payload = await response.json().catch(() => ({})) as { members?: Customer[]; error?: string };
       if (!response.ok) { setError(payload.error || "Pelanggan gagal dimuat."); return; }
       setCustomers(payload.members || []);

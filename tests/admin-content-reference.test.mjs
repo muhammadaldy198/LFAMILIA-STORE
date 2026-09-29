@@ -40,10 +40,10 @@ test("content reference exposes add, edit, ordering, visibility and preview cont
 
 test("content controls persist through the admin APIs", () => {
   for (const endpoint of [
-    "/api/panel/content",
-    "/api/panel/faqs",
-    "/api/panel/reviews",
-    "/api/panel/media",
+    "/api/admin/content",
+    "/api/admin/faqs",
+    "/api/admin/reviews",
+    "/api/admin/media",
   ]) assert.ok(source.includes(endpoint), `missing content endpoint: ${endpoint}`);
   assert.match(source, /method: "POST"/);
   assert.match(source, /method: "PATCH"/);

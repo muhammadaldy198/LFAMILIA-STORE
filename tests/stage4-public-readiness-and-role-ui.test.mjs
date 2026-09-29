@@ -34,10 +34,10 @@ test("dashboard search and Staff stay inside their permitted workspace", () => {
 
   assert.match(dashboard, /const visibleNavigation = navigation\.filter/);
   assert.match(dashboard, /const canSearchBackoffice = isOwner \|\| isAdmin/);
-  assert.match(dashboard, /fetch\("\/api\/panel\/orders"/);
+  assert.match(dashboard, /fetch\("\/api\/admin\/orders"/);
   assert.match(dashboard, /if \(canSearchBackoffice\)/);
-  assert.match(dashboard, /fetch\("\/api\/panel\/products"/);
-  assert.match(dashboard, /fetch\("\/api\/panel\/members"/);
+  assert.match(dashboard, /fetch\("\/api\/admin\/products"/);
+  assert.match(dashboard, /fetch\("\/api\/admin\/members"/);
   assert.match(dashboard, /setActiveTab\(result\.tab\)/);
   assert.doesNotMatch(dashboard, /setActiveTab\("products"\)/);
   assert.match(overview, /const visibleFeatureCards = featureCards\.filter/);

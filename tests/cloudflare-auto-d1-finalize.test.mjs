@@ -50,7 +50,7 @@ test("Cloudflare request and scheduled entry points repair D1 before application
     2,
   );
   const fetchRepair = worker.indexOf("await ensureLegacyDatabaseColumns().catch");
-  const appFetch = worker.indexOf("handler.fetch(request, env, ctx)");
+  const appFetch = worker.indexOf("handler.fetch(request, runtimeEnv, runtimeCtx)");
   assert.ok(fetchRepair >= 0 && fetchRepair < appFetch);
   const scheduled = worker.indexOf("async scheduled(");
   const scheduledRepair = worker.indexOf("await ensureLegacyDatabaseColumns().catch", scheduled);

@@ -33,15 +33,13 @@ test("Wrangler migration marker is replay-idempotent for its normal ledger shape
   db.close();
 });
 
-test("main validation waits for Cloudflare deployment then performs read-only production smoke", () => {
-  assert.match(workflow, /Wait for Cloudflare production deployment/);
-  assert.match(workflow, /Workers Builds:/);
-  assert.match(workflow, /cloudflare\.conclusion !== "success"/);
-  assert.match(workflow, /Production smoke test/);
-  assert.match(workflow, /https:\/\/lfamiliastore\.my\.id/);
-  assert.match(workflow, /read\("\/api\/products", true\)/);
-  assert.match(workflow, /read\("\/api\/storefront", true\)/);
-  assert.match(workflow, /providerCode/);
-  assert.match(workflow, /providerSku/);
-  assert.doesNotMatch(workflow, /api\/payments\/auto\/create|api\/account\/topups|api\/fulfillment\/digiflazz\/callback/);
+test("main validates source without depending on retired Worker deployment", () => {
+  const laravelWorkflow = fs.readFileSync(path.join(root, ".github/workflows/validate-laravel.yml"), "utf8");
+  assert.match(workflow, /branches: \[main\]/);
+  assert.match(workflow, /npm run build/);
+  assert.match(workflow, /node --test tests\/\*\.test\.mjs/);
+  assert.doesNotMatch(workflow, /Workers Builds:|Wait for Cloudflare production deployment/);
+  assert.match(laravelWorkflow, /- main/);
+  assert.match(laravelWorkflow, /Run schema migrations on MariaDB/);
+  assert.match(laravelWorkflow, /vendor\/bin\/phpunit/);
 });

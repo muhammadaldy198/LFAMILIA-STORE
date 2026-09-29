@@ -39,7 +39,7 @@ test("admin reference exposes the approved desktop information architecture", ()
 
 test("dashboard keeps the approved reference while using live summary data", () => {
   assert.match(overview, /fetchAdminSummary<Summary>\(range\)/);
-  assert.match(summaryClient, /\/api\/panel\/summary\?range=/);
+  assert.match(summaryClient, /\/api\/admin\/summary\?range=/);
   assert.match(overview, /summary\?\.recentOrders/);
   assert.match(overview, /summary\?\.topProducts/);
   for (const label of [

@@ -11,7 +11,7 @@ test("Integrasi owns DOKU Checkout and Midtrans Snap credentials", () => {
   const integration = read("components/admin-integration-workspace.tsx");
   assert.match(integration, /DOKU Checkout/);
   assert.match(integration, /Midtrans Snap/);
-  assert.match(integration, /\/api\/panel\/payment-routing/);
+  assert.match(integration, /\/api\/admin\/payment-routing/);
   assert.match(integration, /provider: "doku"/);
   assert.match(integration, /mode: "checkout"/);
   assert.match(integration, /provider: "midtrans"/);
@@ -29,7 +29,7 @@ test("Integrasi Periksa button is enabled for Google and payment gateway tabs", 
   assert.match(integration, /Google Login aktif/);
   assert.match(integration, /Konfigurasi DOKU Checkout/);
   assert.match(integration, /Konfigurasi Midtrans Snap/);
-  assert.doesNotMatch(integration, /tab !== "Digiflazz" && tab !== "Relay & Keamanan"/);
+  assert.doesNotMatch(integration, /test_relay|Relay & Keamanan|relayOrigin/);
 });
 
 test("first-time payment credential setup requires both credential fields", () => {

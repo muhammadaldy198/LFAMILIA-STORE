@@ -25,7 +25,7 @@ test("product creation is manual and DigiFlazz imports nominal only", () => {
   assert.match(source, /Produk tetap dibuat manual\. Hanya nominal terpilih yang diambil dari Digiflazz/);
   assert.match(source, /provider: "Digiflazz" as const/);
   assert.doesNotMatch(source, /Import Produk dari Digiflazz/);
-  assert.match(source, /fetch\("\/api\/panel\/products"/);
+  assert.match(source, /fetch\("\/api\/admin\/products"/);
   assert.match(source, /method: "POST"/);
   assert.match(source, /method: "PATCH"/);
 });

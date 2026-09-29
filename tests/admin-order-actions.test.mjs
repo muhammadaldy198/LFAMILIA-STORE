@@ -9,7 +9,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 test("admin order detail uses real persisted events and status-aware actions", () => {
   const ui = read("components/admin-order-manager.tsx");
 
-  assert.match(ui, /\/api\/panel\/orders\?id=/);
+  assert.match(ui, /\/api\/admin\/orders\?id=/);
   assert.match(ui, /events\?: ApiOrderEvent\[\]/);
   assert.match(ui, /eventLabel\(event\.status\)/);
   assert.match(ui, /Cek Status Pembayaran/);

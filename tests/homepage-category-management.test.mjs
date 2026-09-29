@@ -36,7 +36,7 @@ test("custom category slugs survive public products and admin product editing", 
 
   assert.match(categories, /return normalized\.replace/);
   assert.match(publicProducts, /category: normalizeProductCategorySlug\(item\.category\)/);
-  assert.match(products, /fetch\("\/api\/panel\/categories"/);
+  assert.match(products, /fetch\("\/api\/admin\/categories"/);
   assert.match(products, /categoryOptions\.map/);
   assert.match(products, /name="category"/);
 });
