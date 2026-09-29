@@ -28,7 +28,7 @@ class GatewayPaymentService
             if ($gateway === 'midtrans') {
                 $ready = trim((string) ($credentials['serverKey'] ?? '')) !== ''
                     && trim((string) ($credentials['clientKey'] ?? '')) !== ''
-                    && $this->httpsOrigin((string) config('lfamilia.integrations.midtrans.snap_base_url')) !== null;
+                    && $this->midtransSnapOrigin($environment) !== null;
                 return [
                     'ready' => $ready,
                     'environment' => $environment,
@@ -111,7 +111,7 @@ class GatewayPaymentService
     {
         [, $credentials] = $this->credentials('midtrans');
         $serverKey = (string) $credentials['serverKey'];
-        $origin = $this->httpsOrigin((string) config('lfamilia.integrations.midtrans.snap_base_url'));
+        $origin = $this->midtransSnapOrigin($environment);
         if (!$origin) {
             throw new RuntimeException('URL Midtrans Snap belum dikonfigurasi.');
         }
@@ -272,6 +272,18 @@ class GatewayPaymentService
             'expiredAt' => $expiredAt ?: now()->addMinutes(60)->toIso8601String(),
             'raw' => $body,
         ];
+    }
+
+    private function midtransSnapOrigin(string $environment): ?string
+    {
+        $configured = $this->httpsOrigin((string) config('lfamilia.integrations.midtrans.snap_base_url'));
+        if ($configured) {
+            return $configured;
+        }
+
+        return $environment === 'production'
+            ? 'https://app.midtrans.com'
+            : 'https://app.sandbox.midtrans.com';
     }
 
     private function httpsOrigin(string $value): ?string
