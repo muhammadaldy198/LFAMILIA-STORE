@@ -88,6 +88,20 @@ class AdminProductPricingAuthorityTest extends TestCase
         ]);
     }
 
+
+    public function test_super_admin_can_load_products_with_seller_monitor(): void
+    {
+        $owner = $this->panelToken('product-owner-list','Product Owner List','super_admin','owner-password-123');
+
+        $this->withHeader('Cookie', AdminAuthService::COOKIE.'='.rawurlencode($owner))
+            ->getJson('/api/admin/products')
+            ->assertOk()
+            ->assertJsonPath('role', 'super_admin')
+            ->assertJsonPath('databaseReady', true)
+            ->assertJsonPath('sellerMonitor', []);
+    }
+
+
     private function panelToken(string $username,string $name,string $role,string $password): string
     {
         $auth=app(AdminAuthService::class);
