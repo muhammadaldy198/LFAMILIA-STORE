@@ -33,7 +33,9 @@ class AdminCatalogController
             'products' => Product::with(['packages.mappings', 'fields'])->orderBy('sort_order')->get()
                 ->map(fn (Product $product): array => [
                     ...$product->only('id', 'category_id', 'name', 'slug', 'description', 'fulfillment_mode',
-                        'manual_instructions', 'margin_percent', 'sort_order', 'is_active'),
+                        'manual_instructions', 'margin_percent', 'sort_order', 'is_active',
+                        'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
+                        'nickname_server_field_key'),
                     'image_url' => $product->getFirstMediaUrl('image'),
                     'banner_url' => $product->getFirstMediaUrl('banner'),
                     'fields' => $product->fields->sortBy('sort_order')->values()->toArray(),
@@ -131,7 +133,30 @@ class AdminCatalogController
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
+            'nickname_check_enabled' => ['sometimes', 'boolean'],
+            'nickname_game_code' => ['nullable', 'string', 'max:80', 'regex:/^[a-z0-9][a-z0-9-]*$/'],
+            'nickname_user_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
+            'nickname_server_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
         ]);
+        if (($data['nickname_check_enabled'] ?? false) === true) {
+            $fieldKeys = $product->fields()->pluck('field_key')->all();
+            if (empty($data['nickname_game_code']) || empty($data['nickname_user_field_key'])) {
+                throw ValidationException::withMessages([
+                    'nickname_game_code' => 'Game code dan field User ID wajib diisi ketika cek nickname aktif.',
+                ]);
+            }
+            if (! in_array($data['nickname_user_field_key'], $fieldKeys, true)) {
+                throw ValidationException::withMessages([
+                    'nickname_user_field_key' => 'Field User ID harus memakai field produk yang tersedia.',
+                ]);
+            }
+            if (! empty($data['nickname_server_field_key'])
+                && ! in_array($data['nickname_server_field_key'], $fieldKeys, true)) {
+                throw ValidationException::withMessages([
+                    'nickname_server_field_key' => 'Field Server harus memakai field produk yang tersedia.',
+                ]);
+            }
+        }
         if ($product->fulfillment_mode !== 'MANUAL') {
             $data['manual_instructions'] = null;
         }

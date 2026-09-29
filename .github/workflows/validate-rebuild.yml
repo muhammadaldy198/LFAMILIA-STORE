@@ -82,7 +82,7 @@ jobs:
       - name: Validate schema and assets
         run: |
           php artisan migrate --force
-          php artisan migrate:rollback --step=6 --force
+          php artisan migrate:rollback --step=7 --force
           php artisan migrate --force
           npm run build
       - name: Run rebuild tests
