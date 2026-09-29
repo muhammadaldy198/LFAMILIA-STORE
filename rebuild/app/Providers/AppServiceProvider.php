@@ -31,5 +31,7 @@ class AppServiceProvider extends ServiceProvider
             ->by('wallet-topup:'.($request->user()?->id ?? $request->ip())));
         RateLimiter::for('payment-webhook', fn (Request $request) => Limit::perMinute(120)
             ->by('payment-webhook:'.$request->ip()));
+        RateLimiter::for('fulfillment-webhook', fn (Request $request) => Limit::perMinute(180)
+            ->by('fulfillment-webhook:'.$request->ip()));
     }
 }

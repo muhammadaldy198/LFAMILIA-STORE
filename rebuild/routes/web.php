@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
 use App\Http\Controllers\AdminCatalogMediaController;
+use App\Http\Controllers\AdminFulfillmentController;
 use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CheckoutController;
@@ -96,6 +97,13 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     ]))->name('admin.panel');
     Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
     Route::get('/admin/payments', [AdminPaymentController::class, 'index'])->name('admin.payments.index');
+    Route::get('/admin/fulfillment', [AdminFulfillmentController::class, 'index'])->name('admin.fulfillment.index');
+    Route::post('/admin/fulfillment/{attemptId}/complete', [AdminFulfillmentController::class, 'completeManual'])
+        ->name('admin.fulfillment.complete');
+    Route::post('/admin/fulfillment/{attemptId}/fail', [AdminFulfillmentController::class, 'failManual'])
+        ->name('admin.fulfillment.fail');
+    Route::post('/admin/fulfillment/{attemptId}/retry', [AdminFulfillmentController::class, 'retry'])
+        ->name('admin.fulfillment.retry');
     Route::post('/admin/payments/manual/{paymentId}/confirm', [AdminPaymentController::class, 'confirmManual'])
         ->name('admin.payments.manual.confirm');
 

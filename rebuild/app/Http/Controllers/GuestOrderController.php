@@ -46,9 +46,12 @@ class GuestOrderController
             ->whereNull('orders.user_id')->where('orders.order_number', $orderNumber)
             ->where('orders.id', $request->session()->get('guest_order_id'))
             ->select('orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
-                'orders.created_at', 'products.name as product_name')->first();
+                'orders.created_at', 'orders.delivery_payload', 'products.name as product_name')->first();
 
         abort_unless($order, 404);
+        $order->delivery = is_string($order->delivery_payload)
+            ? (json_decode($order->delivery_payload, true) ?: null) : null;
+        unset($order->delivery_payload);
 
         return Inertia::render('Guest/OrderStatus', [
             'order' => $order,

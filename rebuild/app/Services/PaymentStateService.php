@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\StartFulfillmentJob;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -353,6 +354,7 @@ class PaymentStateService
                 'updated_at' => now(),
             ]);
         $this->orderEvent($order->id, 'PAYMENT_VERIFIED', 'PENDING_PAYMENT', 'PAID', $metadata);
+        StartFulfillmentJob::dispatch((int) $order->id)->afterCommit();
 
         return ['result' => 'PAID', 'status' => 'PAID'];
     }

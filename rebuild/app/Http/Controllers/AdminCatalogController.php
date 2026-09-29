@@ -48,6 +48,7 @@ class AdminCatalogController
                             ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
                                 'max_price_idr', 'priority', 'is_active'),
                             'provider_code' => $providers->get($mapping->provider_id)?->code,
+                            'customer_no_template' => data_get($mapping->fulfillment_config, 'customer_no_template'),
                         ])->all(),
                     ])->all(),
                 ]),
@@ -261,9 +262,38 @@ class AdminCatalogController
             'priority' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
             'cost_idr' => [$provider->code === 'MANUAL' ? 'required' : 'prohibited', 'integer', 'min:0'],
+            'customer_no_template' => [$provider->code === 'DIGIFLAZZ' ? 'nullable' : 'prohibited', 'string', 'max:500'],
         ]);
         if ($provider->code !== 'MANUAL') {
             unset($data['cost_idr']);
+        }
+
+        if ($provider->code === 'DIGIFLAZZ') {
+            $template = trim((string) ($data['customer_no_template'] ?? ''));
+            $productId = DB::table('product_packages')->where('id', $mapping->product_package_id)
+                ->value('product_id');
+            $fieldKeys = DB::table('product_input_fields')->where('product_id', $productId)
+                ->pluck('field_key')->all();
+
+            preg_match_all('/\{\{([^}]+)\}\}/', $template, $matches);
+            foreach ($matches[1] ?? [] as $fieldKey) {
+                if (! preg_match('/^[a-z][a-z0-9_]*$/', $fieldKey)
+                    || ! in_array($fieldKey, $fieldKeys, true)) {
+                    throw ValidationException::withMessages([
+                        'customer_no_template' => 'Placeholder {{'.$fieldKey.'}} tidak cocok dengan field produk.',
+                    ]);
+                }
+            }
+
+            if ($data['is_active'] && count($fieldKeys) > 1 && $template === '') {
+                throw ValidationException::withMessages([
+                    'customer_no_template' => 'Template customer_no wajib untuk produk dengan lebih dari satu field.',
+                ]);
+            }
+
+            $data['fulfillment_config'] = $template === ''
+                ? null : ['customer_no_template' => $template];
+            unset($data['customer_no_template']);
         }
 
         DB::transaction(function () use ($request, $mapping, $data, $audit): void {
