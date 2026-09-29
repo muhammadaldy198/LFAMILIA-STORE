@@ -76,6 +76,10 @@ export type OrderRecord = {
   base_subtotal: number;
   subtotal: number;
   discount_amount: number;
+  member_tier_snapshot: string | null;
+  member_discount_percent_snapshot: number;
+  member_discount_amount: number;
+  voucher_discount_amount: number;
   voucher_code: string | null;
   flash_sale_id: number | null;
   admin_fee: number;
@@ -348,10 +352,11 @@ export async function insertPendingOrder(input: {
       id, customer_id, wallet_checkout_key, external_checkout_key, reference_id, product_slug, product_name, package_sku, package_label,
       provider_code, provider_sku, fulfillment_type, delivery_mode, supplier_cost_snapshot, provider_max_price_snapshot, target_template, destination, server,
       nickname, customer_no, buyer_name, buyer_email, buyer_phone, customer_notes, customer_inputs_json, quantity,
-      base_subtotal, subtotal, discount_amount, voucher_code, flash_sale_id,
+      base_subtotal, subtotal, discount_amount, member_tier_snapshot, member_discount_percent_snapshot,
+      member_discount_amount, voucher_discount_amount, voucher_code, flash_sale_id,
       admin_fee, total, payment_method, payment_channel,
       payment_gateway, payment_gateway_mode, payment_gateway_environment
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       input.id,
@@ -383,6 +388,10 @@ export async function insertPendingOrder(input: {
       input.promotion.basePrice,
       input.promotion.sellingPrice,
       input.promotion.discountAmount,
+      input.promotion.memberTier,
+      input.promotion.memberDiscountPercent,
+      input.promotion.memberDiscountAmount,
+      input.promotion.voucherDiscountAmount,
       input.promotion.voucherCode,
       input.promotion.flashSaleId,
       input.adminFee ?? 0,
