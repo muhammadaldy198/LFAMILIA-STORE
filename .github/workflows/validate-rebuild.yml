@@ -70,7 +70,7 @@ jobs:
       - name: Install PHP dependencies
         run: |
           composer validate --strict
-          composer install --no-interaction --prefer-dist
+          composer update spatie/laravel-medialibrary --with-all-dependencies --no-interaction --prefer-dist
       - name: Install frontend dependencies
         run: npm ci
       - name: Configure test app
@@ -89,3 +89,10 @@ jobs:
         run: vendor/bin/phpunit
       - name: Check PHP style
         run: vendor/bin/pint --test
+      - name: Upload M5 lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m5-composer-lock
+          path: rebuild/composer.lock
+          if-no-files-found: ignore
