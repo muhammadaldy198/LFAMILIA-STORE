@@ -1,10 +1,10 @@
 # LFAMILIA Laravel VPS deployment
 
-Target production LFAMILIA adalah **fresh Ubuntu 24.04 → CloudPanel → Laravel/MariaDB**. Stack Nginx/PHP/MariaDB manual yang dipakai untuk rehearsal bukan arsitektur final. Folder ini menyiapkan deployment tanpa menyimpan kredensial di Git dan tanpa memindahkan DNS lebih awal.
+Target production LFAMILIA adalah **VPS Laravel + MariaDB**. MariaDB `lfamilia-store` adalah satu-satunya database authority aplikasi. Cloudflare hanya dipakai untuk DNS, TLS/proxy, Access/security, dan object storage R2; D1 tidak menjadi runtime database.
 
-## Prinsip cutover
+## Prinsip runtime
 
-Worker Cloudflare + D1 tetap menjadi production/rollback sampai Laravel di VPS lulus preflight, migrasi MariaDB, import D1, rekonsiliasi, dan smoke test. Jangan hapus Worker, D1, DNS email/Resend, atau `tools.lfamiliastore.my.id` pada tahap ini.
+Browser customer/Admin memakai `/api/*` pada domain LFAMILIA. Nginx meneruskan seluruh jalur tersebut ke Laravel, dan Laravel membaca/menulis MariaDB. Frontend Vinext tidak boleh menjadi database authority atau melayani handler D1 lama. Implementasi Worker/D1 terdahulu hanya tersisa sebagai riwayat migrasi di Git dan tidak boleh diberi binding D1 pada konfigurasi runtime.
 
 ## 1. Siapkan runtime
 
@@ -77,11 +77,9 @@ curl -fsS -H 'Host: lfamiliastore.my.id' http://127.0.0.1/api/health
 
 Lanjutkan smoke test auth, katalog, checkout tanpa pembayaran nyata, panel RBAC, callback signature rejection, scheduler, dan koneksi provider sesuai environment yang dipilih. DNS baru boleh dipindahkan setelah data production di MariaDB direkonsiliasi dan semua smoke test lolos.
 
-## CloudPanel — wajib untuk target production
+## Runtime production saat ini
 
-CloudPanel dipasang **lebih dulu pada server yang bersih**. Setelah itu buat site LFAMILIA melalui CloudPanel, gunakan site user CloudPanel untuk aplikasi, dan biarkan CloudPanel mengelola Nginx/PHP-FPM/MariaDB/TLS pada host. Repository kemudian dideploy ke site directory dan Laravel `public` menjadi web root untuk jalur backend. Jangan memasang CloudPanel di atas rehearsal stack manual yang sudah berisi Nginx/PHP/MariaDB.
-
-Queue/scheduler LFAMILIA tetap boleh memakai unit systemd milik aplikasi dengan site user CloudPanel; jangan menjalankannya sebagai root. Email tetap dikelola terpisah melalui Resend/DNS email, bukan oleh CloudPanel.
+Production memakai Nginx, PHP-FPM, MariaDB, dan frontend Vinext pada VPS. Jangan membuat database aplikasi kedua. Queue/scheduler LFAMILIA memakai unit systemd aplikasi dengan user aplikasi, bukan root. Email tetap dikelola terpisah melalui Resend/DNS email.
 
 
 ## 6. Reproduce Nginx, PHP-FPM, backup, dan runtime check
