@@ -76,6 +76,40 @@ function withSecurityHeaders(response: Response, url: URL) {
   });
 }
 
+
+function isVpsFrontendRuntime() {
+  return process.env.VPS_FRONTEND_MODE === "1" || process.env.LFAMILIA_DEPLOY_TARGET === "node";
+}
+
+function laravelInternalOrigin() {
+  return (
+    process.env.LFAMILIA_LARAVEL_INTERNAL_URL ||
+    process.env.LARAVEL_INTERNAL_URL ||
+    "http://127.0.0.1:8080"
+  ).replace(/\/+$/, "");
+}
+
+async function proxyApiToLaravel(request: Request, url: URL) {
+  const target = new URL(`${url.pathname}${url.search}`, `${laravelInternalOrigin()}/`);
+  const headers = new Headers(request.headers);
+  headers.delete("content-length");
+  headers.delete("host");
+  headers.set("x-forwarded-host", url.host);
+  headers.set("x-forwarded-proto", url.protocol.replace(":", ""));
+
+  const method = request.method.toUpperCase();
+  const body = method === "GET" || method === "HEAD"
+    ? undefined
+    : await request.arrayBuffer();
+
+  return fetch(target, {
+    method,
+    headers,
+    body,
+    redirect: "manual",
+  });
+}
+
 const RUNTIME_HYDRATION_TTL_MS = 15_000;
 let runtimeHydrationCache: { expiresAt: number; promise: Promise<Env> } | null = null;
 let requestRepairPrimed = false;
@@ -149,6 +183,16 @@ const worker = {
       passThroughOnException() {},
     };
     const url = new URL(request.url);
+
+    // Production VPS has one database authority: Laravel + MariaDB.
+    // Nginx already routes public /api/* to Laravel; this guard also protects
+    // direct Node/Vinext access so the legacy D1 handlers cannot run on VPS.
+    if (
+      isVpsFrontendRuntime() &&
+      (url.pathname === "/api" || url.pathname.startsWith("/api/"))
+    ) {
+      return withSecurityHeaders(await proxyApiToLaravel(request, url), url);
+    }
     const isAccessProtectedRequest =
       Boolean(runtimeEnv.DB) && (
         url.pathname === "/admin/panel" ||

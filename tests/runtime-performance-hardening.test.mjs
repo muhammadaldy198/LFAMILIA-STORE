@@ -6,17 +6,16 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("public reads warm runtime and schema repair outside the critical response path", () => {
+test("VPS frontend sends every API request straight to Laravel instead of legacy D1", () => {
   const worker = read("worker/index.ts");
-  const panel = read("app/api/panel/[...path]/route.ts");
+  const service = read("laravel/deploy/systemd/lfamilia-web.service.template");
 
-  assert.match(worker, /RUNTIME_HYDRATION_TTL_MS = 15_000/);
-  assert.match(worker, /requestNeedsHydratedRuntime/);
-  assert.match(worker, /const hydrated = await runtimeHydrationCache\.promise;\s*setRuntimeEnv\(hydrated\)/);
-  assert.match(worker, /runtimeCtx\.waitUntil\(\s*hydrateRuntime\(runtimeEnv\)\.catch/);
-  assert.match(worker, /if \(isReadOnlyRequest\(request\)\)[\s\S]*runtimeCtx\.waitUntil\([\s\S]*ensureLegacyDatabaseColumns/);
-  assert.match(worker, /else \{\s*await ensureLegacyDatabaseColumns\(\)\.catch/);
-  assert.match(panel, /if \(!\["GET", "HEAD", "OPTIONS"\]\.includes\(method\)\) \{\s*await ensureLegacyDatabaseColumns\(\)/);
+  assert.match(worker, /url\.pathname === "\/api" \|\| url\.pathname\.startsWith\("\/api\/"\)/);
+  assert.match(worker, /isVpsFrontendRuntime\(\)/);
+  assert.match(worker, /proxyApiToLaravel\(request, url\)/);
+  assert.ok(worker.indexOf("proxyApiToLaravel(request, url)") < worker.indexOf("if (runtimeEnv.DB)"));
+  assert.match(service, /VPS_FRONTEND_MODE=1/);
+  assert.match(service, /LARAVEL_INTERNAL_URL=http:\/\/127\.0\.0\.1:8080/);
 });
 
 test("payment runtime initialization and readiness avoid repeated D1 work", () => {
