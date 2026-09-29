@@ -1,5 +1,5 @@
 <script setup>
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 </script>
 
 <template>
@@ -11,6 +11,10 @@ import { Head } from '@inertiajs/vue3';
             <p class="mt-4 max-w-xl text-lg text-slate-300">
                 Fondasi aplikasi baru sedang disiapkan. Katalog dan checkout akan tersedia setelah pengujian selesai.
             </p>
+            <div class="mt-8 flex flex-wrap gap-3">
+                <Link href="/login" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Masuk akun</Link>
+                <Link href="/orders/check" class="rounded-md border border-slate-700 px-4 py-2 text-slate-100">Cek pesanan guest</Link>
+            </div>
         </div>
     </main>
 </template>

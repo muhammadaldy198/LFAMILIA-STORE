@@ -82,10 +82,10 @@ jobs:
       - name: Validate schema and assets
         run: |
           php artisan migrate --force
-          php artisan migrate:rollback --step=4 --force
+          php artisan migrate:rollback --step=5 --force
           php artisan migrate --force
           npm run build
-      - name: Run foundation tests
+      - name: Run rebuild tests
         run: vendor/bin/phpunit
       - name: Check PHP style
         run: vendor/bin/pint --test
