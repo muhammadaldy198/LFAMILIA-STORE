@@ -1,7 +1,10 @@
 <script setup>
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import TurnstileWidget from '../../Components/TurnstileWidget.vue';
 
-const form = useForm({ email: '', password: '', remember: false });
+const page = usePage();
+const turnstile = page.props.security?.turnstile ?? {};
+const form = useForm({ email: '', password: '', remember: false, turnstile_token: '' });
 const submit = () => form.post('/login', { onFinish: () => form.reset('password') });
 </script>
 
@@ -19,6 +22,8 @@ const submit = () => form.post('/login', { onFinish: () => form.reset('password'
                 <span v-if="form.errors.password" class="text-sm text-red-300">{{ form.errors.password }}</span>
             </label>
             <label class="flex items-center gap-2"><input v-model="form.remember" type="checkbox"> Ingat saya</label>
+            <TurnstileWidget v-if="turnstile.enabled" :site-key="turnstile.site_key" v-model="form.turnstile_token" />
+            <span v-if="form.errors.turnstile_token" class="text-sm text-red-300">{{ form.errors.turnstile_token }}</span>
             <button type="submit" :disabled="form.processing" class="w-full rounded-md bg-cyan-400 p-3 font-semibold text-slate-950 disabled:opacity-50">Masuk</button>
             <a href="/auth/google/redirect" class="block rounded-md border border-slate-600 p-3 text-center">Masuk dengan Google</a>
             <div class="flex justify-between text-sm text-cyan-300">
