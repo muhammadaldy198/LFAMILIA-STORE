@@ -7,7 +7,9 @@ use App\Models\Product;
 use App\Models\ProductInputField;
 use App\Models\ProductPackage;
 use App\Models\StoreAsset;
+use App\Services\CheckoutPricing;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -58,7 +60,7 @@ class CatalogController
         ]);
     }
 
-    public function show(string $slug): Response
+    public function show(string $slug, CheckoutPricing $pricing): Response
     {
         $product = Product::with('category')->where('slug', $slug)
             ->where('is_active', true)
@@ -69,14 +71,29 @@ class CatalogController
             ->where('is_active', true)
             ->orderByRaw('nominal_value IS NULL')
             ->orderBy('nominal_value')->orderBy('sort_order')->orderBy('id')->get()
-            ->map(fn (ProductPackage $package): array => [
-                ...$package->only('id', 'name', 'nominal_value'),
-                'image_url' => $package->getFirstMediaUrl('image'),
-            ]);
+            ->map(function (ProductPackage $package) use ($pricing): array {
+                try {
+                    $quote = $pricing->forPackage($package->id);
+                    $available = true;
+                    $price = $quote['subtotal_idr'];
+                } catch (ValidationException) {
+                    $available = false;
+                    $price = null;
+                }
+
+                return [
+                    ...$package->only('id', 'name', 'nominal_value'),
+                    'image_url' => $package->getFirstMediaUrl('image'),
+                    'is_available' => $available,
+                    'price_idr' => $price,
+                ];
+            });
+
+        $user = auth('web')->user();
 
         return Inertia::render('Catalog/Show', [
             'product' => [
-                ...$product->only('name', 'slug', 'description'),
+                ...$product->only('id', 'name', 'slug', 'description', 'nickname_check_enabled'),
                 'category_name' => $product->category->name,
                 'image_url' => $product->getFirstMediaUrl('image'),
                 'banner_url' => $product->getFirstMediaUrl('banner'),
@@ -84,6 +101,11 @@ class CatalogController
             'packages' => $packages,
             'fields' => ProductInputField::where('product_id', $product->id)->orderBy('sort_order')
                 ->get(['field_key', 'label', 'type', 'is_required']),
+            'customer' => $user ? [
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+            ] : null,
             'faviconUrl' => StoreAsset::where('key', 'favicon')->where('is_active', true)
                 ->first()?->getFirstMediaUrl('image'),
         ]);

@@ -15,11 +15,16 @@ class Product extends Model implements HasMedia
     protected $fillable = [
         'category_id', 'name', 'slug', 'description', 'fulfillment_mode',
         'manual_instructions', 'margin_percent', 'sort_order', 'is_active',
+        'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
+        'nickname_server_field_key',
     ];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return [
+            'is_active' => 'boolean',
+            'nickname_check_enabled' => 'boolean',
+        ];
     }
 
     public function category(): BelongsTo

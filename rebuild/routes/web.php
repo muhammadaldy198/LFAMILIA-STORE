@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
 use App\Http\Controllers\AdminCatalogMediaController;
 use App\Http\Controllers\CatalogController;
+use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerAccountController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\CustomerPhoneController;
@@ -17,6 +18,13 @@ use Inertia\Inertia;
 
 Route::get('/', [CatalogController::class, 'index'])->name('catalog.index');
 Route::get('/catalog/{slug}', [CatalogController::class, 'show'])->name('catalog.show');
+
+Route::middleware('throttle:30,1')->group(function (): void {
+    Route::post('/checkout/nickname', [CheckoutController::class, 'nickname'])->name('checkout.nickname');
+    Route::post('/checkout/quote', [CheckoutController::class, 'quote'])->name('checkout.quote');
+});
+Route::post('/checkout/orders', [CheckoutController::class, 'store'])
+    ->middleware('throttle:10,1')->name('checkout.store');
 
 Route::get('/health/ready', function () {
     try {
