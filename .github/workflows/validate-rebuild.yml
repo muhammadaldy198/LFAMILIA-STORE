@@ -67,6 +67,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Record branch base tree
+        run: |
+          git fetch --depth=1 origin refs/heads/rebuild/m3-authentication
+          echo "BASE_TREE_SHA=$(git rev-parse 'FETCH_HEAD^{tree}')"
       - name: Install PHP dependencies
         run: |
           composer update --no-interaction --prefer-dist
