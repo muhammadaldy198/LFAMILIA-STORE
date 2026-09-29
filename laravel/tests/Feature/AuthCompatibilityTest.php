@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Services\SecurityGuard;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -59,6 +62,44 @@ class AuthCompatibilityTest extends TestCase
             'email' => 'legacy@example.com',
             'password' => 'rahasia-123',
         ])->assertOk()->assertJsonPath('customer.email', 'legacy@example.com');
+    }
+
+    public function test_panel_login_accepts_its_public_https_origin_behind_an_http_proxy_hop(): void
+    {
+        config()->set('app.url', 'https://lfamiliastore.my.id');
+
+        $request = Request::create('http://lfamiliastore.my.id/admin/panel/auth/login', 'POST', server: [
+            'HTTP_ORIGIN' => 'https://lfamiliastore.my.id',
+            'HTTP_SEC_FETCH_SITE' => 'cross-site',
+        ]);
+
+        app(SecurityGuard::class)->assertSameOrigin($request);
+        $this->assertTrue(true);
+    }
+
+    public function test_panel_login_rejects_a_foreign_origin(): void
+    {
+        config()->set('app.url', 'https://lfamiliastore.my.id');
+
+        $request = Request::create('http://lfamiliastore.my.id/admin/panel/auth/login', 'POST', server: [
+            'HTTP_ORIGIN' => 'https://other.example',
+            'HTTP_SEC_FETCH_SITE' => 'cross-site',
+        ]);
+
+        $this->expectException(HttpResponseException::class);
+        app(SecurityGuard::class)->assertSameOrigin($request);
+    }
+
+    public function test_panel_login_rejects_cross_site_post_without_origin(): void
+    {
+        config()->set('app.url', 'https://lfamiliastore.my.id');
+
+        $request = Request::create('http://lfamiliastore.my.id/admin/panel/auth/login', 'POST', server: [
+            'HTTP_SEC_FETCH_SITE' => 'cross-site',
+        ]);
+
+        $this->expectException(HttpResponseException::class);
+        app(SecurityGuard::class)->assertSameOrigin($request);
     }
 
     public function test_staff_cannot_login_through_backoffice_area(): void
