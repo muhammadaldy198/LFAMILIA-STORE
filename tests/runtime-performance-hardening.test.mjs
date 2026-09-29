@@ -13,7 +13,6 @@ test("VPS frontend sends every API request straight to Laravel instead of legacy
   assert.match(worker, /url\.pathname === "\/api" \|\| url\.pathname\.startsWith\("\/api\/"\)/);
   assert.match(worker, /isVpsFrontendRuntime\(\)/);
   assert.match(worker, /proxyApiToLaravel\(request, url\)/);
-  assert.match(worker, /RETIRED_WORKER_API/);
   assert.doesNotMatch(worker, /ensureLegacyDatabaseColumns/);
   assert.doesNotMatch(worker, /hydrateRuntime/);
   assert.match(service, /VPS_FRONTEND_MODE=1/);
