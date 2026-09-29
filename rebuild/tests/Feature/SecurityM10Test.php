@@ -61,7 +61,10 @@ class SecurityM10Test extends TestCase
     public function test_valid_turnstile_allows_registration_without_exposing_secret(): void
     {
         Http::fake([
-            'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response(['success' => true]),
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([
+                'success' => true,
+                'action' => 'register',
+            ]),
         ]);
         IntegrationCredential::create([
             'code' => 'turnstile',
@@ -83,6 +86,53 @@ class SecurityM10Test extends TestCase
         $page = $this->get('/')->getContent();
         $this->assertStringContainsString('site-public', $page);
         $this->assertStringNotContainsString('secret-private', $page);
+    }
+
+
+    public function test_turnstile_rejects_token_for_wrong_form_action(): void
+    {
+        Http::fake([
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([
+                'success' => true,
+                'action' => 'login',
+            ]),
+        ]);
+        IntegrationCredential::create([
+            'code' => 'turnstile',
+            'config_ciphertext' => ['site_key' => 'site-public', 'secret_key' => 'secret-private'],
+            'is_active' => true,
+        ]);
+
+        $this->post('/register', [
+            'name' => 'Wrong Action',
+            'email' => 'wrong-action@example.test',
+            'phone' => '081234567892',
+            'password' => 'VeryStrongPassword123!',
+            'password_confirmation' => 'VeryStrongPassword123!',
+            'turnstile_token' => 'token-from-login',
+        ])->assertSessionHasErrors('turnstile_token');
+
+        $this->assertDatabaseMissing('users', ['email' => 'wrong-action@example.test']);
+    }
+
+    public function test_integration_secret_is_encrypted_at_rest(): void
+    {
+        IntegrationCredential::create([
+            'code' => 'm10-encryption-test',
+            'config_ciphertext' => ['api_key' => 'plaintext-must-not-appear'],
+            'is_active' => true,
+        ]);
+
+        $raw = (string) \Illuminate\Support\Facades\DB::table('integration_credentials')
+            ->where('code', 'm10-encryption-test')
+            ->value('config_ciphertext');
+
+        $this->assertStringNotContainsString('plaintext-must-not-appear', $raw);
+        $this->assertSame(
+            'plaintext-must-not-appear',
+            IntegrationCredential::where('code', 'm10-encryption-test')->firstOrFail()
+                ->config_ciphertext['api_key']
+        );
     }
 
     public function test_forgot_password_is_rate_limited_per_identity_and_ip(): void
