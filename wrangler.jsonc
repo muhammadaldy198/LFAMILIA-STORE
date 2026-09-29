@@ -13,14 +13,6 @@
     "not_found_handling": "none",
     "binding": "ASSETS"
   },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "lfamilia-store-db",
-      "database_id": "d13939fa-c5c6-4c0e-868a-912bb875fc8d",
-      "migrations_dir": "drizzle"
-    }
-  ],
   "r2_buckets": [
     {
       "binding": "BUCKET",
