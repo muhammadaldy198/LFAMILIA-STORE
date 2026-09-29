@@ -158,6 +158,8 @@ class AdminContentController extends Controller
                 'storeShortName'=>['required','string','min:1','max:6'],
                 'tagline'=>['required','string','min:3','max:160'],
                 'logoUrl'=>['nullable','string','max:500'],
+                'footerBannerDesktopUrl'=>['nullable','string','max:500'],
+                'footerBannerMobileUrl'=>['nullable','string','max:500'],
                 'announcement'=>['nullable','string','max:160'],
                 'bannerEnabled'=>['required','boolean'],
                 'bannerEyebrow'=>['required','string','min:2','max:80'],
@@ -175,7 +177,7 @@ class AdminContentController extends Controller
                 'supportWidgetEnabled'=>['required','boolean'],
             ]);
 
-            foreach(['logoUrl','bannerImageUrl'] as $key) if(!empty($input[$key])&&!$content->validMedia((string)$input[$key])) throw new RuntimeException('URL gambar tidak valid.');
+            foreach(['logoUrl','footerBannerDesktopUrl','footerBannerMobileUrl','bannerImageUrl'] as $key) if(!empty($input[$key])&&!$content->validMedia((string)$input[$key])) throw new RuntimeException('URL gambar tidak valid.');
             if(!$content->validNavigation((string)$input['bannerCtaHref'])) throw new RuntimeException('Tujuan tombol banner tidak valid.');
             foreach(['instagramUrl','discordUrl'] as $key) {
                 if(!empty($input[$key])) {
