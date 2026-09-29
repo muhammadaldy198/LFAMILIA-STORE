@@ -479,7 +479,7 @@ class DigiflazzFulfillmentService
                     DB::table('order_events')->insertOrIgnore([
                         'order_id' => $order->id,
                         'source' => 'digiflazz',
-                        'event_id' => 'unit-request-'.$unit->provider_ref_id.'-'.$fresh->attempts,
+                        'event_id' => 'unit-request-'.$unit->provider_ref_id.'-'.Str::uuid(),
                         'status' => $result['status'],
                         'payload_json' => json_encode($result['raw'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                         'created_at' => now(),

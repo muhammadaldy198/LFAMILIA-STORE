@@ -206,11 +206,17 @@ class DigiflazzFulfillmentSecurityTest extends TestCase
         ]);
         DB::table('order_fulfillment_units')->insert([
             ['order_id' => $orderId, 'unit_index' => 1, 'provider_ref_id' => $reference.'-Q01',
-                'provider_status' => 'success', 'provider_serial_number' => 'FIRST-SN',
+                'provider_status' => 'success', 'provider_message' => null, 'provider_serial_number' => 'FIRST-SN',
                 'attempts' => 1, 'created_at' => now(), 'updated_at' => now()],
             ['order_id' => $orderId, 'unit_index' => 2, 'provider_ref_id' => $reference.'-Q02',
-                'provider_status' => 'failed', 'provider_message' => 'Failed',
+                'provider_status' => 'failed', 'provider_message' => 'Failed', 'provider_serial_number' => null,
                 'attempts' => 1, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        DB::table('order_events')->insert([
+            'order_id' => $orderId, 'source' => 'digiflazz',
+            'event_id' => 'unit-request-'.$reference.'-Q02-1',
+            'status' => 'failed', 'payload_json' => '{}', 'created_at' => now(),
         ]);
 
         Http::fake([
@@ -239,6 +245,7 @@ class DigiflazzFulfillmentSecurityTest extends TestCase
         ]);
         Http::assertSent(fn ($request) => $request['ref_id'] === $reference.'-Q02');
         Http::assertSentCount(1);
+        $this->assertSame(2, DB::table('order_events')->where('order_id', $orderId)->where('source', 'digiflazz')->count());
     }
 
     /** @return array{0:string,1:string} */

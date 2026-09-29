@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Services\AdminAuthService;
 use App\Services\PaymentChannelService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class AdminPaymentConfigTest extends TestCase
@@ -164,6 +165,40 @@ class AdminPaymentConfigTest extends TestCase
             ->assertOk()
             ->assertJsonPath('gatewayReadiness.midtrans.ready', true)
             ->assertJsonPath('channels.0.readiness.ready', true);
+    }
+
+    public function test_wallet_topup_history_includes_customer_whatsapp_fee_and_total(): void
+    {
+        $owner = $this->panelToken('wallet-owner', 'Wallet Owner', 'super_admin', 'owner-password-123');
+        $customerId = (string) Str::uuid();
+        DB::table('customer_users')->insert([
+            'id' => $customerId, 'email' => 'wallet@example.com',
+            'name' => 'Wallet Customer', 'phone' => '+6281234567890',
+            'password_hash' => str_repeat('a', 64), 'password_salt' => str_repeat('b', 32),
+            'balance' => 0, 'leaderboard_opt_in' => 0, 'is_active' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('wallet_topups')->insert([
+            'id' => (string) Str::uuid(), 'customer_id' => $customerId,
+            'amount' => 100000, 'sender_name' => 'Wallet Customer',
+            'payment_method' => 'qris', 'proof_url' => '',
+            'source' => 'gateway', 'reference_id' => 'WALLET-REF-123',
+            'payment_gateway' => 'midtrans', 'gateway_payment_name' => 'QRIS',
+            'payment_fee' => 1500, 'payment_total' => 101500,
+            'status' => 'pending', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->withHeader('Cookie', AdminAuthService::COOKIE.'='.rawurlencode($owner))
+            ->getJson('/api/admin/wallet')
+            ->assertOk()
+            ->assertJsonPath('topups.0.reference_id', 'WALLET-REF-123')
+            ->assertJsonPath('topups.0.customer_name', 'Wallet Customer')
+            ->assertJsonPath('topups.0.customer_phone', '+6281234567890')
+            ->assertJsonPath('topups.0.payment_gateway', 'midtrans')
+            ->assertJsonPath('topups.0.amount', 100000)
+            ->assertJsonPath('topups.0.payment_fee', 1500)
+            ->assertJsonPath('topups.0.payment_total', 101500)
+            ->assertJsonPath('topups.0.status', 'pending');
     }
 
     private function panelToken(string $username, string $name, string $role, string $password): string
