@@ -69,8 +69,8 @@ jobs:
           node-version: '22'
       - name: Install PHP dependencies
         run: |
+          composer update --no-interaction --prefer-dist
           composer validate --strict
-          composer install --no-interaction --prefer-dist
       - name: Install frontend dependencies
         run: npm ci
       - name: Configure test app
@@ -89,3 +89,10 @@ jobs:
         run: vendor/bin/phpunit
       - name: Check PHP style
         run: vendor/bin/pint --test
+      - name: Upload resolved M3 Composer lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-composer-lock
+          path: rebuild/composer.lock
+          if-no-files-found: ignore
