@@ -25,7 +25,7 @@ Di **Super Admin → Pembayaran**, DOKU Checkout dan Midtrans memiliki toggle ak
 
 Backend Laravel di VPS memanggil Digiflazz langsung melalui `https://api.digiflazz.com` untuk transaksi, pricelist, dan saldo. URL di panel hanya menerima endpoint resmi Digiflazz; whitelist IP Digiflazz menggunakan IP egress VPS. Pengaturan relay tidak lagi dipakai oleh Laravel. Redirect halaman pembayaran tidak pernah dianggap sebagai bukti pembayaran; backend hanya mengubah order menjadi `paid` setelah callback/status gateway tervalidasi. Digiflazz baru dipanggil setelah status pembayaran benar-benar `paid`.
 
-Cloudflare sekarang meneruskan domain publik ke VPS. Route Worker, cron Worker, dan DNS relay lama telah dinonaktifkan/dihapus. Data profil `relay` lama tetap disimpan sebagai histori, tetapi tidak dibaca runtime Laravel dan tidak bisa diubah lagi lewat panel. Kredensial Digiflazz dan whitelist IP VPS masih perlu divalidasi sebelum transaksi provider diaktifkan.
+Cloudflare sekarang meneruskan domain publik ke VPS. Route, cron, dan deployment Worker lama serta DNS relay telah dihapus. Data profil `relay` lama tetap disimpan sebagai histori, tetapi tidak dibaca runtime Laravel dan tidak bisa diubah lagi lewat panel. Kredensial Digiflazz dan whitelist IP VPS masih perlu divalidasi sebelum transaksi provider diaktifkan.
 
 ## Google Login pelanggan
 
