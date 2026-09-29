@@ -63,7 +63,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, pdo_mysql, redis, gd, exif
+          extensions: mbstring, pdo_mysql, redis, gd, exif, pcntl
           coverage: none
 
       - uses: actions/setup-node@v4
@@ -116,6 +116,9 @@ jobs:
 
       - name: Run rebuild tests
         run: vendor/bin/phpunit
+
+      - name: Run M11 browser smoke
+        run: bash tests/Browser/smoke.sh
 
       - name: Check PHP style
         run: vendor/bin/pint --test
