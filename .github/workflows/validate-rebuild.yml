@@ -1,9 +1,9 @@
-name: Validate LFAMILIA rebuild M1
+name: Validate LFAMILIA rebuild
 
 on:
   push:
     branches:
-      - rebuild/prd-m1-foundation
+      - 'rebuild/**'
     paths:
       - 'rebuild/**'
       - '.github/workflows/validate-rebuild.yml'
@@ -81,6 +81,8 @@ jobs:
         run: find app bootstrap public routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Validate schema and assets
         run: |
+          php artisan migrate --force
+          php artisan migrate:rollback --step=3 --force
           php artisan migrate --force
           npm run build
       - name: Run foundation tests
