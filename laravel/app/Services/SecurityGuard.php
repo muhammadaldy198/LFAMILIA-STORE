@@ -16,29 +16,39 @@ class SecurityGuard
         }
 
         $fetchSite = strtolower((string) $request->header('sec-fetch-site', ''));
-        if ($fetchSite === 'cross-site') {
-            throw new HttpResponseException(response()->json([
-                'error' => 'Permintaan lintas situs ditolak.',
-            ], 403));
-        }
-
         $origin = $request->headers->get('origin');
+
+        // A cross-site navigation through Cloudflare Access can retain Fetch
+        // Metadata from that navigation. The browser Origin header identifies
+        // the document that submitted this form and is the decisive CSRF check.
         if (!$origin) {
+            if ($fetchSite === 'cross-site') {
+                throw new HttpResponseException(response()->json([
+                    'error' => 'Permintaan lintas situs ditolak.',
+                ], 403));
+            }
+
             return;
         }
 
         $originParts = parse_url($origin);
-        if (!is_array($originParts) || empty($originParts['scheme']) || empty($originParts['host'])) {
+        $siteParts = parse_url((string) config('app.url'));
+        if (!is_array($originParts) || empty($originParts['scheme']) || empty($originParts['host'])
+            || !is_array($siteParts) || empty($siteParts['scheme']) || empty($siteParts['host'])) {
             throw new HttpResponseException(response()->json([
                 'error' => 'Origin permintaan tidak valid.',
             ], 403));
         }
 
         $originPort = isset($originParts['port']) ? ':'.$originParts['port'] : '';
+        $sitePort = isset($siteParts['port']) ? ':'.$siteParts['port'] : '';
         $normalizedOrigin = strtolower($originParts['scheme'].'://'.$originParts['host'].$originPort);
-        $requestOrigin = strtolower($request->getSchemeAndHttpHost());
+        $siteOrigin = strtolower($siteParts['scheme'].'://'.$siteParts['host'].$sitePort);
 
-        if (!hash_equals($requestOrigin, $normalizedOrigin)) {
+        // APP_URL is the trusted public origin. The request scheme can appear
+        // as HTTP at the Laravel hop even when the browser used HTTPS.
+        if (!hash_equals($siteOrigin, $normalizedOrigin)
+            || !hash_equals(strtolower($siteParts['host']), strtolower($request->getHost()))) {
             throw new HttpResponseException(response()->json([
                 'error' => 'Permintaan lintas situs ditolak.',
             ], 403));
