@@ -25,7 +25,7 @@ class HandleInertiaRequests extends Middleware
                 'turnstile' => app(TurnstileService::class)->publicConfig(),
             ],
             'adminPanel' => function () use ($admin, $permissions): ?array {
-                if (!$admin) {
+                if (! $admin) {
                     return null;
                 }
 
