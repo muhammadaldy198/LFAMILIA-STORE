@@ -189,13 +189,27 @@ class AdminOrdersController extends Controller
             $access = $auth->require($request, 'staff');
             $input = $request->validate([
                 'id' => ['required', 'uuid'],
-                'action' => ['required', 'in:complete_manual,refresh_fulfillment'],
+                'action' => ['required', 'in:complete_manual,refresh_fulfillment,retry_digiflazz'],
                 'serialNumber' => ['nullable', 'string', 'max:500'],
             ]);
 
             $order = DB::table('orders')->where('id', $input['id'])->first();
             if (!$order) {
                 return response()->json(['error' => 'Pesanan tidak ditemukan.'], 404);
+            }
+
+            if ($input['action'] === 'retry_digiflazz') {
+                if ($access['role'] === 'staff') {
+                    throw new RuntimeException('Akses panel tidak diizinkan.');
+                }
+
+                $fresh = $fulfillment->retryFailedOrder((string) $order->id, (string) $access['email']);
+
+                return response()->json([
+                    'ok' => true,
+                    'retried' => true,
+                    'order' => $fresh ? $this->visibleOrder($fresh, (string) $access['role']) : null,
+                ]);
             }
 
             if ($input['action'] === 'complete_manual') {
