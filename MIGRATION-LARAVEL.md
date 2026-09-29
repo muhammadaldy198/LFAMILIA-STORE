@@ -1,21 +1,21 @@
 # LFAMILIA STORE — Laravel VPS migration
 
-Branch: `migration/laravel-vps-production`
+Active VPS branch: `migration/laravel-vps-final`
 
 ## Goal
 
-Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB on the VPS without changing customer-visible behavior or weakening payment/security controls.
+Run the prelaunch storefront on Laravel + MariaDB on the VPS, with Cloudflare as DNS, TLS, Access, and edge proxy.
 
 ## Rules
 
 1. No live secrets are committed to Git. Provider/payment credentials and provider runtime settings are managed from **Super Admin → Integrasi** and stored encrypted in MariaDB; only bootstrap/infrastructure secrets such as `APP_KEY`, database credentials, and `INTEGRATION_ENCRYPTION_KEY` remain server-side.
-2. Existing production remains the rollback source until Laravel passes full regression testing.
+2. The former Worker/D1 implementation remains in Git history for migration reference; it is no longer the public runtime.
 3. Payment redirects never mark an order paid; only validated server callbacks may transition payment state.
 4. Midtrans/DOKU callbacks must remain signature-validated, amount-validated, idempotent, and monotonic.
 5. Digiflazz fulfillment happens only after a validated paid state and remains idempotent.
 6. Wallet mutations use database transactions and immutable ledger references.
 7. Super Admin / Admin / Staff boundaries are preserved.
-8. D1 -> MariaDB migration is reconciled before DNS cutover.
+8. The imported D1 snapshot and MariaDB reconciliation are recorded before provider activation.
 
 ## Migration status
 
@@ -51,10 +51,12 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - [x] Add minute-level production reconciliation scheduler with overlap protection.
 - [x] Add final VPS systemd process definitions for queue worker and scheduler.
 - [x] Laravel/MariaDB migration runtime was validated on the VPS without DNS cutover.
-- [ ] Reinstall the VPS clean and install **CloudPanel first** before the final production deployment; the temporary hand-built Nginx/PHP/MariaDB stack is not the target architecture.
+- [ ] Decide whether CloudPanel installation is still needed before launch; current Nginx/PHP/MariaDB stack serves the prelaunch site.
 - [x] Import the current production D1 snapshot and reconcile; the final export checksum matched the imported snapshot.
 - [ ] Re-enter/validate provider credentials on the VPS after the credential step is resumed.
-- [ ] Cut over `lfamiliastore.my.id` only after provider readiness and final validation.
+- [x] Route `lfamiliastore.my.id` and `www` through Cloudflare to the VPS; public storefront, health, products, and panel login respond.
+- [x] Remove the old Worker routes, Worker cron schedules, and two relay DNS records.
+- [ ] Enter Digiflazz/payment credentials, verify callbacks and fulfillment, then enable queue/scheduler.
 
 ## VPS readiness notes
 
@@ -63,7 +65,7 @@ Move LFAMILIA STORE production from Cloudflare Worker + D1 to Laravel + MariaDB 
 - Cloudflare Access still protects `/admin*` and `/api/admin*`; Staff remains on the separate password panel path.
 - Daily MariaDB backup is installed on the VPS with 7-day local retention, SHA-256 sidecars, gzip validation, and a successful restore verification.
 - Queue worker and scheduler are intentionally disabled until provider credentials are resumed, so a reboot cannot trigger provider-facing background work prematurely.
-- A temporary `trycloudflare.com` preview is used only for pre-cutover smoke tests and is not part of the final architecture.
+- The apex and `www` now resolve through Cloudflare to the VPS; temporary preview is no longer used.
 
 ## Import safety
 
@@ -73,14 +75,11 @@ The production import is intentionally guarded and cannot run accidentally:
 
 Run it only on the prepared VPS after a fresh D1 export has been copied to the server. The command never reads credentials from Git; it uses the active Laravel database connection from the server environment.
 
-## Cutover hold
+## Current prelaunch routing and relay retirement
 
-### Relay retirement gate
+Cloudflare proxies the public apex and `www` to the VPS. The old `lfamilia-store` Worker has no public route or cron schedule, and the Digiflazz/Midtrans relay DNS records are removed. The historical D1 `relay` profile and migrations remain intact for audit history; neither the Laravel runtime nor Admin → Integrasi uses relay.
 
-Laravel mengirim transaksi, pricelist, dan cek saldo Digiflazz langsung dari IP egress VPS. Panel Integrasi tidak lagi menerima atau menampilkan profil relay; data historis dan migration tetap utuh. Route Cloudflare `lfamiliastore.my.id/*` dan `www.lfamiliastore.my.id/*` masih dapat menunjuk Worker lama selama migrasi, sehingga DNS relay/konfigurasi Worker yang aktif jangan dihapus sebelum cutover teruji. Setelah cutover, verifikasi callback dan fulfillment Digiflazz serta whitelist IP VPS sebelum menghapus dua DNS relay lama; hentikan layanan relay hanya jika masih berjalan. Tidak perlu menjalankan migrasi yang menghapus baris `integration_profiles`.
-
-DNS remains on the existing Cloudflare Worker until provider credentials are re-entered on the VPS and verified. Queue and scheduler services intentionally remain stopped while provider integrations are deferred. The VPS origin is otherwise prepared for cutover, including TLS for the apex and `www` hostnames, canonical `www` redirect, Cloudflare-only origin access, frontend/API smoke tests, and regression validation.
-
+Laravel sends Digiflazz transaction, pricelist, and balance requests directly from VPS egress IP `202.155.17.191` to `https://api.digiflazz.com`. Network reachability and source IP were checked, but authenticated transactions, callback delivery, and fulfillment still require credentials and Digiflazz IP allowlisting. Queue and scheduler stay stopped until that validation.
 
 ### VPS edge validation (non-provider)
 
