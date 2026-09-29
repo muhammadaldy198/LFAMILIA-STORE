@@ -289,11 +289,16 @@ class PublicCompatController extends Controller
         $progress = $lifetime + $bonus;
         $automatic = 'basic';
         foreach ($defs as $def) if ($progress >= $def['min']) $automatic = $def['tier'];
-        $override = in_array($user?->tier_override,['basic','gold','diamond','platinum'],true) ? $user->tier_override : null;
+        $override = in_array($user?->tier_override,['basic','gold','diamond','platinum','mafia'],true) ? $user->tier_override : null;
         $tier = ($user?->tier_mode === 'manual' && $override) ? $override : $automatic;
-        $idx = array_search($tier,array_column($defs,'tier'),true);
-        $current = $defs[$idx === false ? 0 : $idx];
-        $next = $defs[($idx === false ? 0 : $idx)+1] ?? null;
+        if ($tier === 'mafia') {
+            $current = ['tier'=>'mafia','label'=>'MAFIA','min'=>null];
+            $next = null;
+        } else {
+            $idx = array_search($tier,array_column($defs,'tier'),true);
+            $current = $defs[$idx === false ? 0 : $idx];
+            $next = $defs[($idx === false ? 0 : $idx)+1] ?? null;
+        }
         $setting = DB::table('member_tier_settings')->where('tier',$tier)->first();
         return [
             'tier'=>$tier,'label'=>$current['label'],'lifetimeSpend'=>$lifetime,'tierProgress'=>$progress,
