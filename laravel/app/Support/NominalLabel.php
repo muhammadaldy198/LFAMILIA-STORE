@@ -18,12 +18,18 @@ final class NominalLabel
         }
 
         $parts = array_map(static fn (string $word): string => preg_quote($word, '/'), $words);
+        $lastWord = array_pop($words);
         $last = array_pop($parts);
-        if ($last === null) {
+        if ($last === null || $lastWord === null) {
             return $label;
         }
 
         // Accept common provider variations such as "Mobile Legends", "MOBILELEGEND", or "Free-Fire".
+        // Provider labels often omit a plural suffix: "Mobile Legends" → "MOBILELEGEND".
+        // Avoid singularizing short names ("Us") and words ending in "ss" ("Chess").
+        if (mb_strlen($lastWord) >= 5 && preg_match('/(?<!s)s$/iu', $lastWord)) {
+            $last = preg_quote(mb_substr($lastWord, 0, -1), '/');
+        }
         $last = '(?:'.$last.'s?)';
         $pattern = '/^\\s*'.implode('[\\s._\\-–—|]*', [...$parts, $last]).'(?:\\s*[-–—|:]+\\s*|\\s+)(?=\\S)/iu';
         $clean = trim((string) preg_replace($pattern, '', $label, 1));
