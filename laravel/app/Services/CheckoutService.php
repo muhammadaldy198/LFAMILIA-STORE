@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\CheckoutValidationException;
+use App\Support\NominalLabel;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -59,7 +60,7 @@ class CheckoutService
             'manualTimezone' => $row->manual_timezone ?: 'Asia/Jakarta',
             'packageId' => (int) $row->package_id,
             'packageSku' => (string) $row->package_sku,
-            'packageLabel' => (string) $row->package_label,
+            'packageLabel' => NominalLabel::clean((string) $row->product_name, (string) $row->package_label),
             'price' => (int) $row->price,
             'providerCode' => trim(strtolower((string) ($row->provider_code ?? ''))) ?: null,
             'providerSku' => trim((string) ($row->provider_sku ?? '')) ?: null,
