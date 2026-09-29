@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -29,11 +30,14 @@ class AdminIntegrationController
                 $fields = collect($definition['fields'])->map(function (array $field, string $key) use ($config): array {
                     $secret = (bool) ($field['secret'] ?? false);
                     $value = $config[$key] ?? null;
+                    $publicValue = ($field['type'] ?? null) === 'csv' && is_array($value)
+                        ? implode(', ', array_map('strval', $value))
+                        : $value;
 
                     return [
                         ...$field,
                         'key' => $key,
-                        'value' => $secret ? null : $value,
+                        'value' => $secret ? null : $publicValue,
                         'configured' => $secret
                             ? (is_scalar($value) && trim((string) $value) !== '')
                             : $value !== null && $value !== '',
@@ -165,6 +169,25 @@ class AdminIntegrationController
         $definition = $registry->get($code);
         abort_unless($definition && in_array($field, $registry->secretFields($code), true), 404);
 
+        $data = $request->validate([
+            'password' => ['required', 'string', 'max:255'],
+        ]);
+        $admin = $request->user('admin');
+        if (! $admin || ! Hash::check($data['password'], $admin->password)) {
+            $audit->record(
+                $request,
+                'integration.secret.reveal_denied',
+                'integration_credential',
+                $code,
+                null,
+                ['field' => $field]
+            );
+
+            throw ValidationException::withMessages([
+                'password' => 'Password Super Admin tidak cocok.',
+            ]);
+        }
+
         $record = IntegrationCredential::where('code', $code)->firstOrFail();
         $config = is_array($record->config_ciphertext) ? $record->config_ciphertext : [];
         $value = $config[$field] ?? null;
@@ -174,7 +197,8 @@ class AdminIntegrationController
             'field' => $field,
         ]);
 
-        return response()->json(['value' => (string) $value]);
+        return response()->json(['value' => (string) $value])
+            ->header('Cache-Control', 'no-store, private');
     }
 
     public function test(

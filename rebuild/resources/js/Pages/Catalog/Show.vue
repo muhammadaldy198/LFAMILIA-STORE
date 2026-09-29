@@ -1,6 +1,7 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
+import TurnstileWidget from '../../Components/TurnstileWidget.vue';
 
 const props = defineProps({
     product: Object,
@@ -11,6 +12,10 @@ const props = defineProps({
     faviconUrl: String,
 });
 
+const page = usePage();
+const security = computed(() => page.props.security || {});
+const turnstile = ref(null);
+const turnstileToken = ref('');
 const selectedPackageId = ref('');
 const customerInput = reactive(Object.fromEntries(props.fields.map((field) => [field.field_key, ''])));
 const guestEmail = ref(props.customer?.email || '');
@@ -116,6 +121,7 @@ async function createOrder() {
             ...basePayload(),
             customer_input: { ...customerInput },
             idempotency_key: idempotencyKey.value,
+            turnstile_token: turnstileToken.value || null,
         });
         quote.value = {
             ...(quote.value || {}),
@@ -124,6 +130,7 @@ async function createOrder() {
     } catch (error) {
         errors.value = error.validation || {};
     } finally {
+        turnstile.value?.reset();
         busy.value = '';
     }
 }
@@ -269,6 +276,14 @@ function fieldError(key) {
                         <div class="flex justify-between"><span>Biaya pembayaran</span><span>{{ formatIdr(quote?.fee_idr || 0) }}</span></div>
                         <div class="flex justify-between border-t border-slate-700 pt-3 text-base font-bold"><span>Total</span><span class="text-cyan-300">{{ formatIdr(quote?.total_idr ?? selectedPackage?.price_idr) }}</span></div>
                     </div>
+                    <TurnstileWidget
+                        v-if="security.turnstile_required"
+                        ref="turnstile"
+                        :site-key="security.turnstile_site_key"
+                        :action="security.turnstile_action"
+                        @token="turnstileToken = $event"
+                    />
+                    <span v-if="errors.turnstile_token" class="text-xs text-red-300">{{ errors.turnstile_token[0] }}</span>
                     <button type="button" :disabled="busy === 'order' || !selectedPackage || !paymentChannelCode" class="w-full rounded-lg bg-cyan-400 px-4 py-3 font-bold text-slate-950 disabled:opacity-50" @click="createOrder">
                         {{ busy === 'order' ? 'Membuat pesanan...' : 'Buat pesanan' }}
                     </button>

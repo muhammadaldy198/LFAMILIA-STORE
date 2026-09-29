@@ -1,8 +1,18 @@
 <script setup>
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import TurnstileWidget from '../../Components/TurnstileWidget.vue';
 
-const form = useForm({ name: '', email: '', phone: '', password: '', password_confirmation: '' });
-const submit = () => form.post('/register', { onFinish: () => form.reset('password', 'password_confirmation') });
+const page = usePage();
+const turnstile = ref(null);
+const security = computed(() => page.props.security || {});
+const form = useForm({ name: '', email: '', phone: '', password: '', password_confirmation: '', turnstile_token: '' });
+const submit = () => form.post('/register', {
+    onFinish: () => {
+        form.reset('password', 'password_confirmation');
+        turnstile.value?.reset();
+    },
+});
 </script>
 
 <template>
@@ -22,6 +32,14 @@ const submit = () => form.post('/register', { onFinish: () => form.reset('passwo
             <label class="block">Ulangi kata sandi
                 <input v-model="form.password_confirmation" type="password" autocomplete="new-password" required class="mt-1 w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
             </label>
+            <TurnstileWidget
+                v-if="security.turnstile_required"
+                ref="turnstile"
+                :site-key="security.turnstile_site_key"
+                :action="security.turnstile_action"
+                @token="form.turnstile_token = $event"
+            />
+            <span v-if="form.errors.turnstile_token" class="text-sm text-red-300">{{ form.errors.turnstile_token }}</span>
             <button type="submit" :disabled="form.processing" class="w-full rounded-md bg-cyan-400 p-3 font-semibold text-slate-950 disabled:opacity-50">Daftar</button>
             <a href="/auth/google/redirect" class="block rounded-md border border-slate-600 p-3 text-center">Daftar dengan Google</a>
             <Link href="/login" class="block text-center text-sm text-cyan-300">Sudah punya akun? Masuk</Link>

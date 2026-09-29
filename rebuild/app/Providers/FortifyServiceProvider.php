@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Models\User;
+use App\Services\LoginRiskService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -31,10 +32,25 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::verifyEmailView(fn () => Inertia::render('Auth/VerifyEmail'));
 
         Fortify::authenticateUsing(function (Request $request): ?User {
+            $risk = app(LoginRiskService::class);
             $user = User::where('email', Str::lower((string) $request->input('email')))->first();
+            $valid = $user && is_string($user->password)
+                && Hash::check((string) $request->input('password'), $user->password);
 
-            return $user && is_string($user->password)
-                && Hash::check((string) $request->input('password'), $user->password) ? $user : null;
+            $identity = Str::lower(trim((string) $request->input('email')));
+            if (! $valid) {
+                $failures = $risk->recordFailure('customer', $request->ip(), $identity);
+                if ($failures >= 3) {
+                    $request->session()->put('security.customer_login_challenge', true);
+                }
+
+                return null;
+            }
+
+            $risk->clear('customer', $request->ip(), $identity);
+            $request->session()->forget('security.customer_login_challenge');
+
+            return $user;
         });
 
         RateLimiter::for('customer-login', fn (Request $request) => Limit::perMinute(5)

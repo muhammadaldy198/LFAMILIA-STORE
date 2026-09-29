@@ -21,6 +21,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\WalletTopupController;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 
@@ -43,7 +44,7 @@ Route::get('/health/ready', function () {
 
         return response()->json(['status' => 'healthy']);
     } catch (Throwable $exception) {
-        report($exception);
+        Log::warning('Readiness check failed.', ['exception_class' => $exception::class]);
 
         return response()->json(['status' => 'unavailable'], 503);
     }
@@ -70,9 +71,12 @@ Route::middleware('auth:web')->group(function (): void {
     Route::middleware(['phone.required', 'customer.activity'])->group(function (): void {
         Route::get('/account', [CustomerAccountController::class, 'dashboard'])->name('account');
         Route::get('/account/profile', [CustomerAccountController::class, 'profile'])->name('account.profile');
-        Route::put('/account/profile', [CustomerAccountController::class, 'update'])->name('account.profile.update');
-        Route::put('/account/password', [CustomerAccountController::class, 'password'])->name('account.password.update');
-        Route::delete('/account', [CustomerAccountController::class, 'destroy'])->name('account.destroy');
+        Route::put('/account/profile', [CustomerAccountController::class, 'update'])
+            ->middleware('throttle:account-sensitive')->name('account.profile.update');
+        Route::put('/account/password', [CustomerAccountController::class, 'password'])
+            ->middleware('throttle:account-sensitive')->name('account.password.update');
+        Route::delete('/account', [CustomerAccountController::class, 'destroy'])
+            ->middleware('throttle:account-sensitive')->name('account.destroy');
         Route::get('/account/wallet', [CustomerAccountController::class, 'wallet'])->name('account.wallet');
         Route::post('/account/wallet/topups/quote', [WalletTopupController::class, 'quote'])
             ->middleware('throttle:wallet-topup')->name('account.wallet.topups.quote');
@@ -157,7 +161,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.super')->group(function (): void {
         Route::post('/admin/customers/{userId}/wallet', [AdminWorkspaceController::class, 'adjustWallet'])
-            ->name('admin.customers.wallet');
+            ->middleware('throttle:admin-sensitive')->name('admin.customers.wallet');
         Route::put('/admin/customers/{userId}/membership', [AdminWorkspaceController::class, 'updateMembership'])
             ->name('admin.customers.membership');
     });
@@ -187,20 +191,23 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.super')->group(function (): void {
         Route::get('/admin/access', [AdminAccessController::class, 'index'])->name('admin.access');
-        Route::post('/admin/access', [AdminAccessController::class, 'store'])->name('admin.access.store');
-        Route::put('/admin/access/{admin}', [AdminAccessController::class, 'update'])->name('admin.access.update');
+        Route::post('/admin/access', [AdminAccessController::class, 'store'])
+            ->middleware('throttle:admin-sensitive')->name('admin.access.store');
+        Route::put('/admin/access/{admin}', [AdminAccessController::class, 'update'])
+            ->middleware('throttle:admin-sensitive')->name('admin.access.update');
 
         Route::get('/admin/integrations', [AdminIntegrationController::class, 'index'])->name('admin.integrations');
-        Route::put('/admin/integrations/{code}', [AdminIntegrationController::class, 'update'])->name('admin.integrations.update');
+        Route::put('/admin/integrations/{code}', [AdminIntegrationController::class, 'update'])
+            ->middleware('throttle:admin-sensitive')->name('admin.integrations.update');
         Route::post('/admin/integrations/{code}/reveal/{field}', [AdminIntegrationController::class, 'reveal'])
-            ->name('admin.integrations.reveal');
+            ->middleware('throttle:secret-reveal')->name('admin.integrations.reveal');
         Route::post('/admin/integrations/{code}/test', [AdminIntegrationController::class, 'test'])
-            ->name('admin.integrations.test');
+            ->middleware('throttle:admin-sensitive')->name('admin.integrations.test');
 
         Route::get('/admin/health', [AdminWorkspaceController::class, 'health'])->name('admin.health');
         Route::get('/admin/audit', [AdminWorkspaceController::class, 'audit'])->name('admin.audit');
 
-        Route::prefix('admin/payments')->name('admin.payments.')->group(function (): void {
+        Route::middleware('throttle:admin-sensitive')->prefix('admin/payments')->name('admin.payments.')->group(function (): void {
             Route::put('/gateways/{id}', [AdminPaymentController::class, 'gateway'])->name('gateways.update');
             Route::put('/channels/{id}', [AdminPaymentController::class, 'channel'])->name('channels.update');
             Route::post('/routes', [AdminPaymentController::class, 'route'])->name('routes.store');

@@ -77,8 +77,9 @@ class IntegrationRegistry
                 'fields' => [
                     'site_key' => ['label' => 'Site Key', 'secret' => false],
                     'secret_key' => ['label' => 'Secret Key', 'secret' => true],
+                    'allowed_hostnames' => ['label' => 'Allowed hostnames', 'secret' => false, 'type' => 'csv'],
                 ],
-                'note' => 'Credential dapat disimpan di M9; enforcement Turnstile dikerjakan di M10.',
+                'note' => 'Turnstile aktif pada register, forgot password, order lookup, guest checkout, dan login yang terdeteksi mencurigakan.',
             ],
         ];
     }

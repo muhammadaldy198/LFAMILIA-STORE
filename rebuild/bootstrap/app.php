@@ -1,10 +1,14 @@
 <?php
 
+use App\Http\Middleware\AssignCorrelationId;
+use App\Http\Middleware\EnforceTrustedHost;
 use App\Http\Middleware\EnsureAdminPermission;
 use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsurePhone;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\PublicAbuseProtection;
+use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\TrackCustomerActivity;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,7 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(append: [HandleInertiaRequests::class]);
+        $middleware->append([AssignCorrelationId::class, EnforceTrustedHost::class, SecurityHeaders::class]);
+        $middleware->web(append: [PublicAbuseProtection::class, HandleInertiaRequests::class]);
         $middleware->statefulApi();
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('admin/*')
             ? route('admin.login') : route('login'));
