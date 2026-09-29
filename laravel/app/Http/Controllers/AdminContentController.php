@@ -7,6 +7,7 @@ use App\Services\SecurityGuard;
 use App\Services\StoreContentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
@@ -213,7 +214,7 @@ class AdminContentController extends Controller
     public function deleteFaq(Request $request, AdminAuthService $auth, SecurityGuard $security): JsonResponse
     {
         $security->assertSameOrigin($request);
-        try { $auth->require($request,'admin'); $id=(int)$request->query('id',0); if($id<1)throw new RuntimeException('ID FAQ tidak valid.'); IlluminateSupportFacadesDB::table('faq_entries')->where('id',$id)->delete(); return response()->json(['ok'=>true]); }
+        try { $auth->require($request,'admin'); $id=(int)$request->query('id',0); if($id<1)throw new RuntimeException('ID FAQ tidak valid.'); DB::table('faq_entries')->where('id',$id)->delete(); return response()->json(['ok'=>true]); }
         catch(RuntimeException $error){if($this->isAccessError($error))return $this->accessError($error);return response()->json(['error'=>$error->getMessage()],400);}
     }
 
