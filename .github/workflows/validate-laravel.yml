@@ -3,7 +3,8 @@ name: Validate Laravel migration
 on:
   push:
     branches:
-      - migration/laravel-vps-production
+      - main
+      - migration/laravel-vps-final
   pull_request:
     paths:
       - 'laravel/**'
