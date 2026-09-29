@@ -1,0 +1,13 @@
+[Unit]
+Description=LFAMILIA STORE Encrypted MySQL Backup
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=@@BACKUP_RUN_USER@@
+Group=@@BACKUP_RUN_GROUP@@
+Environment=OPS_ENV_FILE=/etc/lfamilia/ops.env
+ExecStart=/bin/bash @@APP_DIR@@/deploy/backup.sh
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
