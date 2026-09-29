@@ -99,4 +99,4 @@ printf '%s\n' "$READINESS"
 
 echo
 echo "NON-PROVIDER CUTOVER PREFLIGHT PASSED."
-echo "HOLD: do not switch production DNS or start queue/scheduler until provider credentials are re-entered and validated."
+echo "HOLD: DNS already points to the VPS; keep queue/scheduler stopped until provider credentials, callbacks, and fulfillment are validated."
