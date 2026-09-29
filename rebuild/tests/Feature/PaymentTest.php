@@ -462,6 +462,43 @@ class PaymentTest extends TestCase
             ->where('event_type', 'PAYMENT_LATE_VERIFIED')->count());
     }
 
+    public function test_second_payment_key_for_same_order_reuses_existing_payment(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        Http::fake([
+            'https://app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
+                'token' => 'one-token-only',
+                'redirect_url' => 'https://sandbox.midtrans.test/pay-one',
+            ]),
+        ]);
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'qris',
+            'm7-one-payment-order-0001'
+        ))->assertCreated();
+
+        $first = $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'm7-one-payment-key-0001',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk();
+
+        $second = $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'm7-one-payment-key-0002',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk();
+
+        $this->assertSame($first->json('payment_id'), $second->json('payment_id'));
+        $this->assertSame('one-token-only', $second->json('instructions.token'));
+        $this->assertSame(1, DB::table('payment_transactions')->count());
+        Http::assertSentCount(1);
+    }
+
     public function test_uncertain_external_create_is_not_blindly_retried(): void
     {
         $catalog = $this->catalog();
