@@ -77,7 +77,7 @@ Run it only on the prepared VPS after a fresh D1 export has been copied to the s
 
 ## Current prelaunch routing and relay retirement
 
-Cloudflare proxies the public apex and `www` to the VPS. The old `lfamilia-store` Worker has no public route, cron schedule, workers.dev subdomain, preview URL, or GitHub build trigger. The Digiflazz/Midtrans relay DNS records are removed. The historical D1 `relay` profile and migrations remain intact for audit history; neither the Laravel runtime nor Admin → Integrasi uses relay.
+Cloudflare proxies the public apex and `www` to the VPS. The old `lfamilia-store` Worker deployment has been deleted after its public routes, cron schedule, workers.dev subdomain, preview URLs, and GitHub build triggers were retired. The Digiflazz/Midtrans relay DNS records are removed. The historical D1 `relay` profile and migrations remain intact for audit history; neither the Laravel runtime nor Admin → Integrasi uses relay.
 
 Laravel sends Digiflazz transaction, pricelist, and balance requests directly from VPS egress IP `202.155.17.191` to `https://api.digiflazz.com`. Network reachability and source IP were checked, but authenticated transactions, callback delivery, and fulfillment still require credentials and Digiflazz IP allowlisting. Queue and scheduler stay stopped until that validation.
 
