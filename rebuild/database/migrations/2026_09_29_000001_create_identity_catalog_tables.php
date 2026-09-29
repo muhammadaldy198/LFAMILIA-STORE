@@ -126,8 +126,8 @@ return new class extends Migration
             $table->foreignId('product_package_id')->constrained()->restrictOnDelete();
             $table->foreignId('provider_id')->constrained()->restrictOnDelete();
             $table->string('external_sku', 120)->nullable();
-            $table->unsignedBigInteger('cost_minor')->nullable();
-            $table->unsignedBigInteger('max_price_minor')->nullable();
+            $table->unsignedBigInteger('cost_idr')->nullable();
+            $table->unsignedBigInteger('max_price_idr')->nullable();
             $table->unsignedInteger('priority')->default(0);
             $table->boolean('is_active')->default(false);
             $table->timestamps();
