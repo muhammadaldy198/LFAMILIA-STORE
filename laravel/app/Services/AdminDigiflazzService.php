@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\NominalLabel;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -235,7 +236,7 @@ class AdminDigiflazzService
         $items = $rows->map(fn ($row) => [
             'packageId' => (int) $row->package_id,
             'productName' => (string) $row->product_name,
-            'packageLabel' => (string) $row->package_label,
+            'packageLabel' => NominalLabel::clean((string) $row->product_name, (string) $row->package_label),
             'providerSku' => (string) $row->provider_sku,
             'category' => trim((string) ($row->category ?? '')) ?: 'Tanpa Kategori',
             'brand' => trim((string) ($row->brand ?? '')) ?: (string) $row->product_name,
@@ -258,6 +259,19 @@ class AdminDigiflazzService
             'alertReason' => $row->alert_reason,
             'lastCheckedAt' => $row->last_checked_at,
         ])->all();
+
+        usort($items, static function (array $left, array $right): int {
+            $product = strnatcasecmp((string) $left['productName'], (string) $right['productName']);
+            if ($product !== 0) {
+                return $product;
+            }
+
+            $nominal = NominalLabel::numericKey((string) $left['productName'], (string) $left['packageLabel'])
+                <=> NominalLabel::numericKey((string) $right['productName'], (string) $right['packageLabel']);
+            return $nominal !== 0
+                ? $nominal
+                : strnatcasecmp((string) $left['packageLabel'], (string) $right['packageLabel']);
+        });
 
         return [
             'items' => $items,
