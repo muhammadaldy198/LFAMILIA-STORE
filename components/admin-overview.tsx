@@ -41,7 +41,7 @@ type Summary = {
   topProducts: Array<{ slug: string; name: string; fulfilledOrders: number }>;
   integrations: {
     doku: { ready: boolean };
-    digiflazz: { ready: boolean; balance: number | null; lastSyncAt: string | null };
+    digiflazz: { ready: boolean; balance: number | null; reason?: string | null; lastSyncAt: string | null };
     webhook: { ready: boolean };
   };
 };
@@ -142,7 +142,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
         {canViewFinance && <MetricCard Icon={WalletCards} label="Omzet Hari Ini" value={money(summary?.todayMetrics.paidRevenue)} note="transaksi dibayar" />}
         <MetricCard Icon={ShoppingCart} label="Pesanan Hari Ini" value={String(summary?.todayMetrics.totalOrders || 0)} note="pesanan tercatat" />
         {!isStaff && <MetricCard Icon={Boxes} label="Produk Aktif" value={String(summary?.todayMetrics.activeProducts || 0)} note="tersedia di toko" />}
-        {canViewFinance && <MetricCard Icon={CircleDollarSign} label="Saldo Digiflazz" value={money(summary?.integrations.digiflazz.balance)} note={summary?.integrations.digiflazz.ready ? "provider online" : "perlu diperiksa"} />}
+        {canViewFinance && <MetricCard Icon={CircleDollarSign} label="Saldo Digiflazz" value={money(summary?.integrations.digiflazz.balance)} note={summary?.integrations.digiflazz.balance != null ? "saldo akun provider" : summary?.integrations.digiflazz.reason || "perlu diperiksa"} />}
         <MetricCard Icon={CheckCircle2} label="Pembayaran Berhasil" value={String(summary?.metrics.fulfilledOrders || 0)} note="periode dipilih" />
       </section>
 
