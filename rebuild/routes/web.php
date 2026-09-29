@@ -19,12 +19,12 @@ use Inertia\Inertia;
 Route::get('/', [CatalogController::class, 'index'])->name('catalog.index');
 Route::get('/catalog/{slug}', [CatalogController::class, 'show'])->name('catalog.show');
 
-Route::middleware('throttle:30,1')->group(function (): void {
-    Route::post('/checkout/nickname', [CheckoutController::class, 'nickname'])->name('checkout.nickname');
-    Route::post('/checkout/quote', [CheckoutController::class, 'quote'])->name('checkout.quote');
-});
+Route::post('/checkout/nickname', [CheckoutController::class, 'nickname'])
+    ->middleware('throttle:checkout-nickname')->name('checkout.nickname');
+Route::post('/checkout/quote', [CheckoutController::class, 'quote'])
+    ->middleware('throttle:checkout-quote')->name('checkout.quote');
 Route::post('/checkout/orders', [CheckoutController::class, 'store'])
-    ->middleware('throttle:10,1')->name('checkout.store');
+    ->middleware('throttle:checkout-create')->name('checkout.store');
 
 Route::get('/health/ready', function () {
     try {
@@ -39,7 +39,7 @@ Route::get('/health/ready', function () {
     }
 });
 
-Route::middleware('throttle:10,1')->group(function (): void {
+Route::middleware('throttle:guest-order')->group(function (): void {
     Route::get('/orders/check', [GuestOrderController::class, 'lookup'])->name('guest.orders.lookup');
     Route::post('/orders/check', [GuestOrderController::class, 'verify'])->name('guest.orders.verify');
 });
@@ -48,9 +48,9 @@ Route::get('/orders/guest/{orderNumber}', [GuestOrderController::class, 'show'])
 
 Route::middleware('guest:web')->group(function (): void {
     Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])
-        ->middleware('throttle:10,1')->name('google.redirect');
+        ->middleware('throttle:google-oauth')->name('google.redirect');
     Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])
-        ->middleware('throttle:10,1')->name('google.callback');
+        ->middleware('throttle:google-oauth')->name('google.callback');
 });
 
 Route::middleware('auth:web')->group(function (): void {
@@ -69,7 +69,7 @@ Route::middleware('auth:web')->group(function (): void {
         Route::get('/account/orders/{order}', [CustomerOrderController::class, 'show'])->name('account.orders.show');
         Route::get('/account/tickets', [SupportTicketController::class, 'index'])->name('account.tickets');
         Route::post('/account/tickets', [SupportTicketController::class, 'store'])
-            ->middleware('throttle:5,1')->name('account.tickets.store');
+            ->middleware('throttle:support-ticket')->name('account.tickets.store');
         Route::get('/account/tickets/{ticket}', [SupportTicketController::class, 'show'])
             ->name('account.tickets.show');
     });
