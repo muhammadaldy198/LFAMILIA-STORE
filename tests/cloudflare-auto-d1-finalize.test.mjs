@@ -4,56 +4,26 @@ import path from "node:path";
 import test from "node:test";
 
 const root = process.cwd();
-const repair = fs.readFileSync(path.join(root, "lib/server/database-repair.ts"), "utf8");
-const migration = fs.readFileSync(path.join(root, "drizzle/0029_final_source_audit_remediation.sql"), "utf8");
-const worker = fs.readFileSync(path.join(root, "worker/index.ts"), "utf8");
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-test("Cloudflare runtime compatibility repair mirrors every 0029 added column", () => {
-  const addedColumns = [...migration.matchAll(/ALTER TABLE\s+([A-Za-z0-9_]+)\s+ADD COLUMN\s+([A-Za-z0-9_]+)/g)]
-    .map((match) => [match[1], match[2]]);
-  assert.ok(addedColumns.length > 0);
-  for (const [table, column] of addedColumns) {
-    assert.match(
-      repair,
-      new RegExp(`\\[\\s*"${escapeRegExp(table)}"\\s*,\\s*"${escapeRegExp(column)}"`),
-      `runtime repair is missing ${table}.${column}`,
-    );
-  }
+test("retired Cloudflare config cannot bind the old D1 database", () => {
+  const wrangler = read("wrangler.jsonc");
+  assert.doesNotMatch(wrangler, /d1_databases/);
+  assert.doesNotMatch(wrangler, /database_id/);
+  assert.doesNotMatch(wrangler, /lfamilia-store-db/);
+  assert.match(wrangler, /"crons": \[\]/);
+  assert.match(wrangler, /"workers_dev": false/);
+  assert.match(wrangler, /"preview_urls": false/);
 });
 
-test("Cloudflare runtime repair owns the final 0029 indexes, reservation table, triggers, and snapshot backfill", () => {
-  for (const token of [
-    "wallet_topups_external_checkout_key_unique",
-    "promotion_reservations",
-    "promotion_reservations_expiry_idx",
-    "promotion_reservation_voucher_guard",
-    "promotion_reservation_flash_guard",
-    "promotion_reservation_insert",
-    "promotion_reservation_consumed",
-    "promotion_reservation_released",
-    "supplier_cost_snapshot",
-    "delivery_mode",
-  ]) {
-    assert.match(repair, new RegExp(escapeRegExp(token)));
-  }
-  assert.doesNotMatch(repair, /DELETE\s+FROM\s+(orders|wallet_topups|promotion_reservations)/i);
-});
-
-test("Cloudflare request and scheduled entry points repair D1 before application or maintenance work", () => {
-  assert.match(worker, /import \{ ensureLegacyDatabaseColumns \} from "\.\.\/lib\/server\/database-repair"/);
-  assert.equal(
-    (worker.match(/await ensureLegacyDatabaseColumns\(\)\.catch/g) ?? []).length,
-    2,
-  );
-  const fetchRepair = worker.indexOf("await ensureLegacyDatabaseColumns().catch");
-  const appFetch = worker.indexOf("handler.fetch(request, runtimeEnv, runtimeCtx)");
-  assert.ok(fetchRepair >= 0 && fetchRepair < appFetch);
-  const scheduled = worker.indexOf("async scheduled(");
-  const scheduledRepair = worker.indexOf("await ensureLegacyDatabaseColumns().catch", scheduled);
-  const maintenance = worker.indexOf("releaseExpiredExternalPromotions()", scheduled);
-  assert.ok(scheduledRepair > scheduled && scheduledRepair < maintenance);
+test("Vinext runtime cannot execute the retired D1 API", () => {
+  const worker = read("worker/index.ts");
+  assert.match(worker, /proxyApiToLaravel/);
+  assert.match(worker, /VPS_FRONTEND_MODE/);
+  assert.match(worker, /RETIRED_WORKER_API/);
+  assert.match(worker, /API LFAMILIA dijalankan oleh Laravel\/MariaDB pada VPS/);
+  assert.doesNotMatch(worker, /D1Database/);
+  assert.doesNotMatch(worker, /ensureLegacyDatabaseColumns/);
+  assert.doesNotMatch(worker, /hydrateIntegrationRuntimeEnv/);
+  assert.doesNotMatch(worker, /async scheduled\(/);
 });
