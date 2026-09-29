@@ -11,7 +11,7 @@ class AdminAuditService
     private const SECRET_KEYS = [
         'password', 'api_key', 'server_key', 'client_secret', 'secret_key',
         'access_token', 'private_key', 'bearer_token', 'webhook_secret',
-        'bot_token', 'client_id',
+        'bot_token', 'client_id', 'authorization', 'cookie', 'set_cookie',
     ];
 
     public function record(
@@ -50,6 +50,8 @@ class AdminAuditService
         foreach ($array as $key => $item) {
             $normalized = strtolower((string) $key);
             $array[$key] = in_array($normalized, self::SECRET_KEYS, true)
+                || str_contains($normalized, 'password')
+                || str_contains($normalized, 'credential')
                 || str_contains($normalized, 'secret')
                 || str_contains($normalized, 'token')
                 || str_contains($normalized, 'signature')
