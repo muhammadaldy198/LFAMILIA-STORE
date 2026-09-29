@@ -36,6 +36,13 @@ class PromotionService
             ? (int) $flash->sale_price
             : $unitPrice) * $quantity;
 
+        [$tier, $memberPercent] = $this->memberDiscount($customerId);
+        $memberDiscount = min(
+            (int) floor($sellingPrice * $memberPercent / 100),
+            max(0, $sellingPrice - 1),
+        );
+        $afterMember = max(1, $sellingPrice - $memberDiscount);
+
         $voucher = null;
         $voucherDiscount = 0;
         $code = strtoupper(trim((string) $voucherCode));
@@ -61,35 +68,34 @@ class PromotionService
 
             $voucherDiscount = $voucher->discount_type === 'fixed'
                 ? (int) $voucher->discount_value
-                : (int) floor($sellingPrice * (int) $voucher->discount_value / 100);
+                : (int) floor($afterMember * (int) $voucher->discount_value / 100);
             if ($voucher->max_discount !== null) {
                 $voucherDiscount = min($voucherDiscount, (int) $voucher->max_discount);
             }
-            $voucherDiscount = min($voucherDiscount, max(0, $sellingPrice - 1));
+            $voucherDiscount = min($voucherDiscount, max(0, $afterMember - 1));
         }
 
-        [$tier, $memberPercent] = $this->memberDiscount($customerId);
-        $memberDiscount = min(
-            (int) floor($sellingPrice * $memberPercent / 100),
+        $discountAmount = min(
+            $memberDiscount + $voucherDiscount,
             max(0, $sellingPrice - 1),
         );
-
-        $useMember = $memberDiscount > 0 && $memberDiscount >= $voucherDiscount;
-        $discountAmount = $useMember ? $memberDiscount : $voucherDiscount;
-        $discountSource = $discountAmount > 0 ? ($useMember ? 'member' : 'voucher') : null;
+        $discountSources = [];
+        if ($memberDiscount > 0) $discountSources[] = 'member';
+        if ($voucherDiscount > 0) $discountSources[] = 'voucher';
 
         return [
             'basePrice' => $basePrice,
             'sellingPrice' => $sellingPrice,
             'discountAmount' => $discountAmount,
             'finalPrice' => max(1, $sellingPrice - $discountAmount),
-            'voucherCode' => $discountSource === 'voucher' ? ($voucher?->code ?? null) : null,
+            'voucherCode' => $voucher?->code ?? null,
+            'voucherDiscountAmount' => $voucherDiscount,
             'flashSaleId' => $flash?->id ? (int) $flash->id : null,
             'flashSaleEndsAt' => $flash?->ends_at,
             'memberTier' => $tier,
             'memberDiscountPercent' => $memberPercent,
             'memberDiscountAmount' => $memberDiscount,
-            'discountSource' => $discountSource,
+            'discountSource' => $discountSources !== [] ? implode('+', $discountSources) : null,
         ];
     }
 
@@ -234,7 +240,7 @@ class PromotionService
         }
 
         if ($user->tier_mode === 'manual'
-            && in_array($user->tier_override, ['basic', 'gold', 'diamond', 'platinum'], true)) {
+            && in_array($user->tier_override, ['basic', 'gold', 'diamond', 'platinum', 'mafia'], true)) {
             $tier = (string) $user->tier_override;
         }
 
