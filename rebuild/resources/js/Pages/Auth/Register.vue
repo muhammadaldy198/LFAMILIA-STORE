@@ -25,7 +25,7 @@ const submit = () => form.post('/register', { onFinish: () => form.reset('passwo
             <label class="block">Ulangi kata sandi
                 <input v-model="form.password_confirmation" type="password" autocomplete="new-password" required class="mt-1 w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
             </label>
-            <TurnstileWidget v-if="turnstile.enabled" :site-key="turnstile.site_key" v-model="form.turnstile_token" />
+            <TurnstileWidget v-if="turnstile.enabled" :site-key="turnstile.site_key" action="register" v-model="form.turnstile_token" />
             <span v-if="form.errors.turnstile_token" class="text-sm text-red-300">{{ form.errors.turnstile_token }}</span>
             <button type="submit" :disabled="form.processing" class="w-full rounded-md bg-cyan-400 p-3 font-semibold text-slate-950 disabled:opacity-50">Daftar</button>
             <a href="/auth/google/redirect" class="block rounded-md border border-slate-600 p-3 text-center">Daftar dengan Google</a>
