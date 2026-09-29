@@ -78,6 +78,10 @@ class CustomerAreaTest extends TestCase
 
         $this->put('/account/profile', [
             'name' => 'Updated', 'email' => 'new@example.test', 'phone' => '081298765432',
+        ])->assertSessionHasErrors('current_password');
+        $this->put('/account/profile', [
+            'name' => 'Updated', 'email' => 'new@example.test', 'phone' => '081298765432',
+            'current_password' => 'old-password-123',
         ])->assertRedirect();
         $this->assertSame('new@example.test', $user->fresh()->email);
         $this->assertNull($user->fresh()->email_verified_at);

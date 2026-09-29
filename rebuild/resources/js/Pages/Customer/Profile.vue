@@ -4,7 +4,7 @@ import AccountShell from '../../Components/AccountShell.vue';
 
 const props = defineProps({ customer: Object, hasPassword: Boolean });
 const page = usePage();
-const profile = useForm({ name: props.customer.name, email: props.customer.email, phone: props.customer.phone });
+const profile = useForm({ name: props.customer.name, email: props.customer.email, phone: props.customer.phone, current_password: '' });
 const password = useForm({ current_password: '', password: '', password_confirmation: '' });
 const removal = useForm({ confirmation: '', password: '' });
 const updatePassword = () => password.put('/account/password', { onFinish: () => password.reset() });
@@ -25,6 +25,10 @@ const remove = () => {
             <label v-for="field in [{ key: 'name', label: 'Nama', type: 'text' }, { key: 'email', label: 'Email', type: 'email' }, { key: 'phone', label: 'Nomor HP', type: 'tel' }]" :key="field.key" class="block">{{ field.label }}
                 <input v-model="profile[field.key]" :type="field.type" required class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
                 <span v-if="profile.errors[field.key]" class="text-sm text-red-300">{{ profile.errors[field.key] }}</span>
+            </label>
+            <label v-if="hasPassword" class="block">Kata sandi saat ini (wajib jika mengubah email)
+                <input v-model="profile.current_password" type="password" autocomplete="current-password" class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
+                <span v-if="profile.errors.current_password" class="text-sm text-red-300">{{ profile.errors.current_password }}</span>
             </label>
             <button :disabled="profile.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50">Simpan profil</button>
         </form>

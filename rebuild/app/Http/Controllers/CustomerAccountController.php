@@ -47,8 +47,17 @@ class CustomerAccountController
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['required', 'regex:/^\+?[0-9]{8,16}$/'],
+            'current_password' => ['nullable', 'string'],
         ]);
         $email = $data['email'];
+
+        if ($email !== $user->email && $user->password
+            && (! isset($data['current_password'])
+                || ! Hash::check($data['current_password'], $user->password))) {
+            throw ValidationException::withMessages(['current_password' => 'Kata sandi saat ini salah.']);
+        }
+
+        $oldEmail = $user->email;
         $user->forceFill([
             'name' => $data['name'],
             'email' => $email,
@@ -56,7 +65,8 @@ class CustomerAccountController
             'email_verified_at' => $email === $user->email ? $user->email_verified_at : null,
         ])->save();
 
-        if (! $user->hasVerifiedEmail()) {
+        if ($oldEmail !== $email) {
+            DB::table('password_reset_tokens')->where('email', $oldEmail)->delete();
             $user->sendEmailVerificationNotification();
         }
 
