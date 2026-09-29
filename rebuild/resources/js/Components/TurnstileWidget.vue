@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 const props = defineProps({
     siteKey: { type: String, default: '' },
+    action: { type: String, required: true },
 });
 const emit = defineEmits(['update:modelValue']);
 const container = ref(null);
@@ -12,6 +13,8 @@ const render = () => {
     if (!props.siteKey || !container.value || !window.turnstile) return;
     widgetId = window.turnstile.render(container.value, {
         sitekey: props.siteKey,
+        action: props.action,
+        theme: 'dark',
         callback: (token) => emit('update:modelValue', token),
         'expired-callback': () => emit('update:modelValue', ''),
         'error-callback': () => emit('update:modelValue', ''),
