@@ -19,7 +19,7 @@ class TurnstileService
         ];
     }
 
-    public function verify(Request $request, ?string $token): bool
+    public function verify(Request $request, ?string $token, string $expectedAction): bool
     {
         $config = $this->config();
         if ($config === null) {
@@ -43,7 +43,13 @@ class TurnstileService
             throw new RuntimeException('TURNSTILE_UNAVAILABLE');
         }
 
-        return $response->json('success') === true;
+        if ($response->json('success') !== true) {
+            return false;
+        }
+
+        $action = $response->json('action');
+
+        return is_string($action) && hash_equals($expectedAction, $action);
     }
 
     private function config(): ?array
