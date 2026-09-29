@@ -141,8 +141,11 @@ export function AdminExperienceManager({ role }: { role: "super_admin" | "admin"
       const mappedFaqs = (faqData.faqs || []).map(mapFaq);
       const mappedReviews = (reviewData.reviews || []).map(mapReview);
       setBanners(mappedBanners); setPopups(mappedPopups); setNews(mappedNews); setFaqs(mappedFaqs); setReviews(mappedReviews);
-      const first = mappedBanners[0] || mappedPopups[0] || mappedNews[0] || mappedReviews[0] || mappedFaqs[0];
-      if (first) setEditor({ kind: mappedBanners[0] ? "banner" : mappedPopups[0] ? "popup" : mappedNews[0] ? "news" : mappedReviews[0] ? "review" : "faq", id: first.id });
+      setEditor((current) => {
+        const byKind = { banner: mappedBanners, popup: mappedPopups, news: mappedNews, review: mappedReviews, faq: mappedFaqs };
+        const items = byKind[current.kind];
+        return { kind: current.kind, id: items.some((item) => item.id === current.id) ? current.id : (items[0]?.id ?? 0) };
+      });
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Konten gagal dimuat."); }
   }
 
@@ -244,7 +247,7 @@ export function AdminExperienceManager({ role }: { role: "super_admin" | "admin"
       {notice && <button type="button" onClick={() => setNotice("")} className="mt-[9px] flex w-full items-center justify-between rounded-[5px] border border-[#bce4cf] bg-[#edf9f3] px-[11px] py-[7px] text-left text-[8px] font-semibold text-[#168653]"><span>{notice}</span><X className="size-[11px]" /></button>}
       {error && <button type="button" onClick={() => setError("")} className="mt-[9px] w-full rounded-[5px] border border-red-200 bg-red-50 px-[11px] py-[7px] text-left text-[8px] text-red-700">{error}</button>}
 
-      <nav className="mt-[10px] flex overflow-x-auto border-b border-[#dfe5ec]">{tabs.map((tab) => <button type="button" key={tab.value} onClick={() => setActiveTab(tab.value)} className={`h-[38px] border-b-2 px-[15px] text-[9px] font-bold ${activeTab === tab.value ? "border-[#0875ed] text-[#0875ed]" : "border-transparent text-[#53647c]"}`}>{tab.label}</button>)}</nav>
+      <nav className="mt-[10px] flex overflow-x-auto border-b border-[#dfe5ec]">{tabs.map((tab) => <button type="button" key={tab.value} onClick={() => { setActiveTab(tab.value); const items = { banner: banners, popup: popups, news, review: reviews, faq: faqs }[tab.value]; setEditor({ kind: tab.value, id: items[0]?.id ?? 0 }); }} className={`h-[38px] border-b-2 px-[15px] text-[9px] font-bold ${activeTab === tab.value ? "border-[#0875ed] text-[#0875ed]" : "border-transparent text-[#53647c]"}`}>{tab.label}</button>)}</nav>
 
       <div className="mt-[10px] grid grid-cols-1 gap-[12px] xl:grid-cols-[minmax(0,1fr)_300px]">
         <main className="min-w-0 space-y-[10px]">

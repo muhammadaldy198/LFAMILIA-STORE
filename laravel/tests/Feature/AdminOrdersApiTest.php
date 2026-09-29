@@ -108,6 +108,18 @@ class AdminOrdersApiTest extends TestCase
         $this->assertArrayNotHasKey('provider_sku', $response->json('orders.0'));
         $this->assertArrayNotHasKey('supplier_cost_snapshot', $response->json('orders.0'));
         $this->assertArrayNotHasKey('buyer_email', $response->json('orders.0'));
+
+        DB::table('orders')->where('id', '22222222-2222-4222-8222-222222222222')->update([
+            'fulfillment_status' => 'needs_review',
+            'provider_status' => 'failed',
+        ]);
+        $this->withHeader('Cookie', AdminAuthService::COOKIE.'='.rawurlencode($staff))
+            ->patchJson('/api/admin/orders', [
+                'id' => '22222222-2222-4222-8222-222222222222',
+                'action' => 'retry_digiflazz',
+            ])
+            ->assertForbidden();
+        Http::assertNothingSent();
     }
 
     private function panelToken(string $username, string $name, string $role, string $password): string

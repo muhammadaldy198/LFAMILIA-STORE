@@ -108,6 +108,39 @@ class DigiflazzFulfillmentService
                 throw new RuntimeException('Pesanan belum berada pada status gagal yang membutuhkan kirim ulang.');
             }
 
+            $retryUnits = [];
+            if ((int) $order->quantity > 1) {
+                $units = DB::table('order_fulfillment_units')
+                    ->where('order_id', $orderId)
+                    ->orderBy('unit_index')
+                    ->lockForUpdate()
+                    ->get();
+                if ($units->count() !== (int) $order->quantity) {
+                    throw new RuntimeException('Unit pemenuhan DigiFlazz tidak lengkap; periksa pesanan sebelum kirim ulang.');
+                }
+                foreach ($units as $unit) {
+                    if (in_array($unit->provider_status, ['failed', 'retry_exhausted'], true)) {
+                        $retryUnits[] = [
+                            'unitIndex' => (int) $unit->unit_index,
+                            'referenceId' => (string) $unit->provider_ref_id,
+                            'previousStatus' => (string) $unit->provider_status,
+                            'previousMessage' => $unit->provider_message,
+                        ];
+                        DB::table('order_fulfillment_units')->where('id', $unit->id)->update([
+                            'provider_status' => 'waiting',
+                            'provider_message' => null,
+                            'attempts' => 0,
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+                if ($retryUnits === [] && !$units->contains(
+                    fn ($unit) => in_array($unit->provider_status, ['waiting', 'retryable_error'], true)
+                )) {
+                    throw new RuntimeException('Tidak ada unit gagal yang dapat dikirim ulang.');
+                }
+            }
+
             $changed = DB::table('orders')
                 ->where('id', $orderId)
                 ->where('payment_status', 'paid')
@@ -134,12 +167,31 @@ class DigiflazzFulfillmentService
                     'referenceId' => (string) $order->reference_id,
                     'previousFulfillmentStatus' => (string) $order->fulfillment_status,
                     'previousProviderStatus' => $order->provider_status,
+                    'previousProviderMessage' => $order->provider_message,
+                    'units' => $retryUnits,
                 ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                 'created_at' => now(),
             ]);
         }, 3);
 
-        $this->fulfillOrder($orderId);
+        try {
+            $this->fulfillOrder($orderId);
+        } finally {
+            $result = DB::table('orders')->where('id', $orderId)->first();
+            DB::table('order_events')->insert([
+                'order_id' => $orderId,
+                'source' => 'admin',
+                'event_id' => 'admin-retry-result-'.$orderId.'-'.Str::uuid(),
+                'status' => 'retry_result',
+                'payload_json' => json_encode([
+                    'adminEmail' => $adminEmail,
+                    'fulfillmentStatus' => $result?->fulfillment_status,
+                    'providerStatus' => $result?->provider_status,
+                    'providerMessage' => $result?->provider_message,
+                ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                'created_at' => now(),
+            ]);
+        }
 
         return DB::table('orders')->where('id', $orderId)->first();
     }

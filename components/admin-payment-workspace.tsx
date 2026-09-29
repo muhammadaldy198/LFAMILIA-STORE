@@ -216,17 +216,6 @@ export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" 
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action: "save_wallet_topup_gateway", walletTopupGateway: routing.walletTopupGateway }),
           });
-          if (role === "super_admin") {
-            await request("/api/admin/payment-routing", {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "save_modes",
-                dokuEnvironment: routing.dokuEnvironment,
-                midtransEnvironment: routing.midtransEnvironment,
-              }),
-            });
-          }
         }
         for (const gateway of gatewaySettings) {
           await request("/api/admin/payment-methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "gateway_status", gateway: gateway.gateway, enabled: gateway.isActive }) });
@@ -258,9 +247,11 @@ export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" 
   async function syncChannels() {
     setMessage(""); setError(""); setBusy(true);
     try {
-      await request("/api/admin/payment-methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "sync", gateways: ["midtrans", "doku"] }) });
+      const result = await request("/api/admin/payment-methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "sync", gateways: ["midtrans", "doku"] }) });
       await load();
-      setMessage("Daftar metode bawaan provider berhasil disinkronkan. Metode yang baru masuk tetap OFF sampai diaktifkan manual.");
+      const mappingIssues = Array.isArray(result.mappingIssues) ? result.mappingIssues.filter((item): item is string => typeof item === "string") : [];
+      setMessage("Daftar metode bawaan diperiksa. Routing dan status channel lama dipertahankan; channel baru tetap OFF.");
+      if (mappingIssues.length) setError(`Mapping perlu diperiksa: ${mappingIssues.join(", ")}.`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Sinkronisasi metode gagal."); }
     finally { setBusy(false); }
   }
@@ -287,7 +278,7 @@ export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" 
   const previewOrder = paymentOrders[0] ?? null;
 
   return <div>
-    <WorkspaceHeader title="Pembayaran" description="Kelola metode, gateway, top up saldo, tampilan halaman, dan transaksi. Customer tidak melihat nama gateway internal." actions={<><button type="button" disabled={busy} onClick={testConnection} className={buttonClass}><RefreshCw className={`size-3.5 ${busy ? "animate-spin" : ""}`} />Periksa Konfigurasi</button><button type="button" disabled={busy} onClick={save} className={primaryButtonClass}><Save className="size-3.5" />{busy ? "Memproses..." : "Simpan Perubahan"}</button></>} />
+    <WorkspaceHeader title="Pembayaran" description="Kelola metode, gateway, top up saldo, tampilan halaman, dan transaksi. Customer tidak melihat nama gateway internal." actions={<><button type="button" disabled={busy} onClick={testConnection} className={buttonClass}><RefreshCw className={`size-3.5 ${busy ? "animate-spin" : ""}`} />Periksa Konfigurasi</button><button type="button" disabled={busy || role === "staff"} onClick={save} className={primaryButtonClass}><Save className="size-3.5" />{busy ? "Memproses..." : "Simpan Perubahan"}</button></>} />
 
     {message && <button type="button" onClick={() => setMessage("")} className="mb-3 flex w-full items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-left text-[9px] font-semibold text-emerald-700"><CheckCircle2 className="size-3.5" />{message}</button>}
     {error && <button type="button" onClick={() => setError("")} className="mb-3 flex w-full items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-[9px] font-semibold text-red-700"><AlertTriangle className="size-3.5" />{error}</button>}
@@ -313,8 +304,8 @@ export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" 
       </Panel>
       <div className="space-y-4">
         <Panel title="Gateway & Environment" description="Status siap dan status aktif dipisahkan. Gateway yang valid tetap bisa dimatikan dengan toggle."><div className="space-y-3 p-4">
-          <GatewayControl gateway="doku" title="DOKU Checkout" ready={Boolean(gatewayReadiness.doku?.ready)} enabled={gatewayActive("doku")} environment={routing?.dokuEnvironment || "sandbox"} onEnabled={(value) => setGatewaySettings((current) => current.map((item) => item.gateway === "doku" ? { ...item, isActive: value } : item))} onEnvironment={(value) => setRouting((current) => current ? { ...current, dokuEnvironment: value } : current)} />
-          <GatewayControl gateway="midtrans" title="Midtrans Snap" ready={Boolean(gatewayReadiness.midtrans?.ready)} enabled={gatewayActive("midtrans")} environment={routing?.midtransEnvironment || "sandbox"} onEnabled={(value) => setGatewaySettings((current) => current.map((item) => item.gateway === "midtrans" ? { ...item, isActive: value } : item))} onEnvironment={(value) => setRouting((current) => current ? { ...current, midtransEnvironment: value } : current)} />
+          <GatewayControl gateway="doku" title="DOKU Checkout" ready={Boolean(gatewayReadiness.doku?.ready)} enabled={gatewayActive("doku")} environment={routing?.dokuEnvironment || "sandbox"} onEnabled={(value) => setGatewaySettings((current) => current.map((item) => item.gateway === "doku" ? { ...item, isActive: value } : item))} />
+          <GatewayControl gateway="midtrans" title="Midtrans Snap" ready={Boolean(gatewayReadiness.midtrans?.ready)} enabled={gatewayActive("midtrans")} environment={routing?.midtransEnvironment || "sandbox"} onEnabled={(value) => setGatewaySettings((current) => current.map((item) => item.gateway === "midtrans" ? { ...item, isActive: value } : item))} />
         </div></Panel>
         {routing && <Panel title="Top Up Saldo" description="Admin/Super Admin memilih gateway top up secara eksplisit. Tidak ada fallback hardcoded."><div className="grid gap-3 p-4">
           <Field label="Gateway top up saldo"><select className={inputClass} value={walletTopupGateway ?? ""} onChange={(event) => setRouting((current) => current ? { ...current, walletTopupGateway: event.target.value as Gateway } : current)}><option value="" disabled>Pilih gateway top up</option><option value="doku">DOKU Checkout</option><option value="midtrans">Midtrans Snap</option></select></Field>
@@ -385,11 +376,11 @@ export function AdminPaymentWorkspace({ role }: { role: "super_admin" | "admin" 
   </div>;
 }
 
-function GatewayControl({ title, ready, enabled, environment, onEnabled, onEnvironment }: { gateway: Gateway; title: string; ready: boolean; enabled: boolean; environment: Environment; onEnabled(value: boolean): void; onEnvironment(value: Environment): void }) {
+function GatewayControl({ title, ready, enabled, environment, onEnabled }: { gateway: Gateway; title: string; ready: boolean; enabled: boolean; environment: Environment; onEnabled(value: boolean): void }) {
   return <div className="rounded-md border border-[#e3e8ef] p-3">
     <div className="mb-3 flex items-center justify-between"><div><strong className="block text-[10px] text-[#34445f]">{title}</strong><Status tone={ready ? "green" : "amber"}>{ready ? "Konfigurasi Siap" : "Belum Siap"}</Status></div><div className="flex items-center gap-2"><span className="text-[8px] font-semibold text-[#718198]">Aktif</span><Toggle checked={enabled} onChange={onEnabled} /></div></div>
     <div className="space-y-2">
-      <div><span className="mb-1 block text-[8px] font-bold text-[#52627a]">Environment</span><div className="flex items-center justify-between rounded-md border border-[#e3e8ef] bg-[#f8fafc] px-3 py-2"><span className={`text-[8px] ${environment === "sandbox" ? "font-extrabold text-[#1769e8]" : "font-semibold text-[#8190a5]"}`}>Sandbox</span><Toggle checked={environment === "production"} onChange={(checked) => onEnvironment(checked ? "production" : "sandbox")} /><span className={`text-[8px] ${environment === "production" ? "font-extrabold text-[#1769e8]" : "font-semibold text-[#8190a5]"}`}>Production</span></div></div>
+      <div className="rounded-md border border-[#e3e8ef] bg-[#f8fafc] px-3 py-2 text-[8px] text-[#52627a]">Environment aktif: <strong>{environment}</strong> · ubah di Super Admin → Integrasi.</div>
     </div>
   </div>;
 }

@@ -35,6 +35,10 @@ class PaymentChannelService
         }
         $config = array_filter($config, fn ($value, $key) => is_string($key) && is_string($value), ARRAY_FILTER_USE_BOTH);
 
+        if (!in_array($config['customerFeeMode'] ?? null, ['percent', 'fixed'], true)) {
+            $config['customerFeeMode'] = (int) ($config['customerFeeBps'] ?? 0) > 0 ? 'percent' : 'fixed';
+        }
+
         return [
             'id' => (int) $row->id,
             'method' => (string) $row->method,
@@ -43,7 +47,7 @@ class PaymentChannelService
             'gateway' => (string) $row->gateway,
             'gatewayConfig' => [
                 'customerFeeEnabled' => 'true',
-                'customerFeeMode' => 'fixed',
+                'customerFeeMode' => $config['customerFeeMode'],
                 'customerFeeBps' => '0',
                 'customerFeeFixed' => '0',
                 ...$config,

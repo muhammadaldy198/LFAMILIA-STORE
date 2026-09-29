@@ -260,12 +260,20 @@ class AdminPaymentController extends Controller
                 }
 
                 $synced = $this->syncBuiltInChannels($selected);
+                $mappingIssues = [];
+                foreach (DB::table('payment_channels')->whereIn('gateway', $selected)->get() as $row) {
+                    $config = $this->decodeConfig((string) $row->gateway_config_json);
+                    if ($channels->paymentType((string) $row->gateway, (string) $row->method, (string) $row->channel, $config) === null) {
+                        $mappingIssues[] = (string) $row->name.' ('.(string) $row->gateway.')';
+                    }
+                }
 
                 return response()->json([
                     'ok' => true,
                     'gateways' => $selected,
                     'mode' => 'admin-routed',
                     'synced' => $synced,
+                    'mappingIssues' => $mappingIssues,
                     'activationPolicy' => 'manual',
                 ]);
             }
@@ -285,10 +293,12 @@ class AdminPaymentController extends Controller
             ]);
 
             $config = [];
+            $allowedConfig = ['paymentType', 'customerFeeEnabled', 'customerFeeMode', 'customerFeeBps', 'customerFeeFixed'];
             foreach (($input['gatewayConfig'] ?? []) as $key => $value) {
-                if (is_string($key) && is_string($value)) {
-                    $config[$key] = $value;
+                if (!is_string($key) || !in_array($key, $allowedConfig, true) || !is_string($value)) {
+                    throw new RuntimeException('Konfigurasi channel hanya boleh berisi routing dan biaya.');
                 }
+                $config[$key] = $value;
             }
             $mode = strtolower(trim((string) ($config['customerFeeMode'] ?? 'fixed')));
             if (!in_array($mode, ['percent', 'fixed'], true)) {
@@ -472,15 +482,7 @@ class AdminPaymentController extends Controller
                 ->where('channel', $channel)
                 ->first(['id']);
 
-            if ($existing) {
-                DB::table('payment_channels')->where('id', $existing->id)->update([
-                    'name' => $name,
-                    'description' => $description,
-                    'gateway' => $gateway,
-                    'sort_order' => $index,
-                    'updated_at' => now(),
-                ]);
-            } else {
+            if (!$existing) {
                 DB::table('payment_channels')->insert([
                     'method' => $method,
                     'channel' => $channel,
@@ -511,7 +513,8 @@ class AdminPaymentController extends Controller
 
         $result = [];
         foreach ($decoded as $key => $value) {
-            if (is_string($key) && is_string($value)) {
+            if (is_string($key) && is_string($value)
+                && in_array($key, ['paymentType', 'customerFeeEnabled', 'customerFeeMode', 'customerFeeBps', 'customerFeeFixed'], true)) {
                 $result[$key] = $value;
             }
         }

@@ -317,7 +317,7 @@ export function AdminProductManager() {
       {error && <button type="button" onClick={() => setError("")} className="mt-[10px] w-full rounded-[6px] border border-red-200 bg-red-50 px-[12px] py-[8px] text-left text-[9px] text-red-700">{error}</button>}
 
       <div className="mt-[15px] grid grid-cols-1 gap-[8px] sm:grid-cols-2 xl:grid-cols-[1.65fr_.75fr_.78fr_.72fr_.85fr_auto]">
-        <label className="relative"><Search className="absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#708198]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama produk, kategori, atau slug..." className="h-[34px] w-full rounded-[5px] border border-[#dce3eb] bg-white pl-[31px] pr-[9px] text-[9px] outline-none placeholder:text-[#8290a2] focus:border-[#2680eb]" /></label>
+        <label className="relative"><Search className="pointer-events-none absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#708198]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama produk, kategori, atau slug..." className="h-[34px] w-full rounded-[5px] border border-[#dce3eb] bg-white pl-[31px] pr-[9px] text-[9px] outline-none placeholder:text-[#8290a2] focus:border-[#2680eb]" /></label>
         <CompactSelect value={category} onChange={setCategory} options={["Semua Kategori", ...categoryOptions.map((item) => item.name)]} />
         <CompactSelect value={provider} onChange={setProvider} options={["Semua Provider", "Digiflazz", "Manual"]} />
         <CompactSelect value={status} onChange={setStatus} options={["Semua Status", "Aktif", "Nonaktif"]} />
@@ -892,7 +892,7 @@ function ImportNominalModal({ existing, onClose, onImport }: { existing: Nominal
       )}
       {!loading && !error && step === 2 && (
         <div>
-          <label className="relative block"><Search className="absolute left-[9px] top-1/2 size-[12px] -translate-y-1/2 text-[#7b899b]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama atau SKU di Digiflazz..." className="h-[32px] w-full rounded-[4px] border border-[#dce3eb] pl-[28px] text-[8px]" /></label>
+          <label className="relative block"><Search className="pointer-events-none absolute left-[9px] top-1/2 size-[12px] -translate-y-1/2 text-[#7b899b]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama atau SKU di Digiflazz..." className="h-[32px] w-full rounded-[4px] border border-[#dce3eb] pl-[28px] text-[8px]" /></label>
           <div className="mt-[8px] max-h-[310px] overflow-auto rounded-[5px] border border-[#e0e6ed]">
             {available.map((item) => <label key={item.buyerSkuCode} className="grid grid-cols-[22px_1fr_75px_80px_55px] items-center border-t border-[#e8ecf1] px-[8px] py-[6px] text-[7px] first:border-0"><input type="checkbox" checked={selected.includes(item.buyerSkuCode)} onChange={() => setSelected((current) => current.includes(item.buyerSkuCode) ? current.filter((sku) => sku !== item.buyerSkuCode) : [...current, item.buyerSkuCode])} /><span>{item.productName}</span><span>{item.buyerSkuCode}</span><span>{formatRupiah(item.price)}</span><span className="rounded bg-[#ddf8e8] px-[6px] py-[3px] text-center font-bold text-[#15955a]">Normal</span></label>)}
             {!available.length && <p className="p-[18px] text-center text-[8px] text-[#718198]">Tidak ada nominal aktif yang cocok atau seluruh SKU sudah diimpor.</p>}

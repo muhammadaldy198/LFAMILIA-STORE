@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Services\AdminAuthService;
+use App\Services\AdminCustomerService;
+use App\Services\CheckoutService;
+use App\Services\PromotionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -40,6 +43,7 @@ class AdminCustomerPromotionApiTest extends TestCase
                     ['tier' => 'gold', 'discountPercent' => 1, 'benefits' => 'Gold'],
                     ['tier' => 'diamond', 'discountPercent' => 2, 'benefits' => 'Diamond'],
                     ['tier' => 'platinum', 'discountPercent' => 3, 'benefits' => 'Platinum'],
+                    ['tier' => 'mafia', 'discountPercent' => 0, 'benefits' => ''],
                 ],
             ])
             ->assertOk()
@@ -163,6 +167,68 @@ class AdminCustomerPromotionApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('vouchers.0.code', 'HEMAT10')
             ->assertJsonPath('flashSales.0.packageSku', 'PG10');
+    }
+
+    public function test_mafia_is_manual_only_and_member_discount_stacks_before_voucher_with_snapshots(): void
+    {
+        $customerId = (string) Str::uuid();
+        $this->customer($customerId, 'mafia@example.com', now());
+        $service = app(AdminCustomerService::class);
+        $service->updateMember($customerId, 'mafia', 0, 'owner@example.com', null);
+        $this->assertDatabaseHas('customer_users', [
+            'id' => $customerId, 'tier_mode' => 'manual',
+            'tier_override' => 'mafia', 'tier_progress_bonus' => 0,
+        ]);
+        DB::table('member_tier_settings')->where('tier', 'mafia')->update(['discount_percent' => 10]);
+        DB::table('discount_vouchers')->insert([
+            'code' => 'STACK5', 'name' => 'Stack 5', 'description' => '',
+            'discount_type' => 'percentage', 'discount_value' => 5,
+            'min_purchase' => 0, 'starts_at' => now()->subDay(),
+            'ends_at' => now()->addDay(), 'is_active' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->productWithPackage();
+        DB::table('product_packages')->where('sku', 'PG10')->update([
+            'price' => 100000, 'label' => 'Promo Game - 100 Unit',
+        ]);
+
+        $quote = app(PromotionService::class)->quote('promo-game', 'PG10', 100000, 'STACK5', $customerId, 1);
+        $this->assertSame('mafia', $quote['memberTier']);
+        $this->assertSame(10000, $quote['memberDiscountAmount']);
+        $this->assertSame(4500, $quote['voucherDiscountAmount']);
+        $this->assertSame(14500, $quote['discountAmount']);
+        $this->assertSame(85500, $quote['finalPrice']);
+
+        $checkout = app(CheckoutService::class);
+        $item = $checkout->resolveItem('promo-game', 'PG10');
+        $this->assertSame('100 Unit', $item['packageLabel']);
+        $identity = $checkout->identity();
+        $checkout->insertPendingOrder([
+            'id' => $identity['id'], 'referenceId' => $identity['referenceId'],
+            'customerId' => $customerId, 'item' => $item, 'promotion' => $quote,
+            'destination' => '123456', 'server' => null, 'nickname' => null,
+            'customerInputs' => [], 'buyerName' => 'Customer',
+            'buyerEmail' => 'mafia@example.com', 'buyerPhone' => '+6281234567890',
+            'customerNotes' => null, 'quantity' => 1, 'adminFee' => 0,
+            'paymentMethod' => 'wallet', 'paymentChannel' => 'wallet',
+        ]);
+        $this->assertDatabaseHas('orders', [
+            'id' => $identity['id'], 'package_label' => '100 Unit',
+            'member_tier_snapshot' => 'mafia',
+            'member_discount_percent_snapshot' => 10,
+            'member_discount_amount' => 10000,
+            'voucher_discount_amount' => 4500,
+            'discount_amount' => 14500,
+            'voucher_code' => 'STACK5',
+            'total' => 85500,
+        ]);
+
+        $service->updateMember($customerId, 'automatic', 0, 'owner@example.com', null);
+        $this->assertDatabaseHas('customer_users', ['id' => $customerId, 'tier_override' => null]);
+        $newQuote = app(PromotionService::class)->quote('promo-game', 'PG10', 100000, null, $customerId, 1);
+        $this->assertSame('basic', $newQuote['memberTier']);
+        $this->assertSame(0, $newQuote['memberDiscountAmount']);
+        $this->assertDatabaseHas('orders', ['id' => $identity['id'], 'member_tier_snapshot' => 'mafia']);
     }
 
     private function customer(string $id, string $email, $createdAt): void

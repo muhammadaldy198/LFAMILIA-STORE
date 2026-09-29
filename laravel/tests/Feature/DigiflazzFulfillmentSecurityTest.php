@@ -153,6 +153,93 @@ class DigiflazzFulfillmentSecurityTest extends TestCase
         ]);
     }
 
+    public function test_admin_retry_reuses_reference_and_records_result_without_resending_success(): void
+    {
+        [$orderId, $reference] = $this->paidOrder();
+        DB::table('orders')->where('id', $orderId)->update([
+            'fulfillment_status' => 'failed',
+            'provider_status' => 'failed',
+            'provider_message' => 'Provider menolak sementara.',
+        ]);
+
+        Http::fake([
+            'https://api.digiflazz.com/v1/transaction' => Http::response([
+                'data' => [
+                    'ref_id' => $reference,
+                    'buyer_sku_code' => 'DF10',
+                    'customer_no' => '123456',
+                    'status' => 'Sukses',
+                    'rc' => '00',
+                    'message' => 'Berhasil',
+                    'sn' => 'RETRY-SN',
+                ],
+            ], 200),
+        ]);
+
+        app(DigiflazzFulfillmentService::class)->retryFailedOrder($orderId, 'admin@example.com');
+        $this->assertDatabaseHas('orders', [
+            'id' => $orderId,
+            'fulfillment_status' => 'success',
+            'provider_serial_number' => 'RETRY-SN',
+        ]);
+        $this->assertSame(1, DB::table('order_events')->where('order_id', $orderId)->where('status', 'retry_authorized')->count());
+        $this->assertSame(1, DB::table('order_events')->where('order_id', $orderId)->where('status', 'retry_result')->count());
+        Http::assertSent(fn ($request) => $request['ref_id'] === $reference);
+        Http::assertSentCount(1);
+
+        try {
+            app(DigiflazzFulfillmentService::class)->retryFailedOrder($orderId, 'admin@example.com');
+            $this->fail('Successful orders must reject a second retry.');
+        } catch (\RuntimeException $error) {
+            $this->assertStringContainsString('sudah selesai', $error->getMessage());
+        }
+        Http::assertSentCount(1);
+    }
+
+    public function test_partial_multi_unit_retry_only_resends_failed_reference(): void
+    {
+        [$orderId, $reference] = $this->paidOrder();
+        DB::table('orders')->where('id', $orderId)->update([
+            'quantity' => 2,
+            'fulfillment_status' => 'needs_review',
+            'provider_status' => 'partial_failed',
+        ]);
+        DB::table('order_fulfillment_units')->insert([
+            ['order_id' => $orderId, 'unit_index' => 1, 'provider_ref_id' => $reference.'-Q01',
+                'provider_status' => 'success', 'provider_serial_number' => 'FIRST-SN',
+                'attempts' => 1, 'created_at' => now(), 'updated_at' => now()],
+            ['order_id' => $orderId, 'unit_index' => 2, 'provider_ref_id' => $reference.'-Q02',
+                'provider_status' => 'failed', 'provider_message' => 'Failed',
+                'attempts' => 1, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        Http::fake([
+            'https://api.digiflazz.com/v1/transaction' => Http::response([
+                'data' => [
+                    'ref_id' => $reference.'-Q02',
+                    'buyer_sku_code' => 'DF10',
+                    'customer_no' => '123456',
+                    'status' => 'Sukses',
+                    'rc' => '00',
+                    'message' => 'Berhasil',
+                    'sn' => 'SECOND-SN',
+                ],
+            ], 200),
+        ]);
+
+        app(DigiflazzFulfillmentService::class)->retryFailedOrder($orderId, 'admin@example.com');
+        $this->assertDatabaseHas('orders', ['id' => $orderId, 'fulfillment_status' => 'success']);
+        $this->assertDatabaseHas('order_fulfillment_units', [
+            'order_id' => $orderId, 'unit_index' => 1, 'provider_serial_number' => 'FIRST-SN',
+        ]);
+        $this->assertDatabaseHas('order_fulfillment_units', [
+            'order_id' => $orderId, 'unit_index' => 2, 'provider_status' => 'success',
+            'provider_serial_number' => 'SECOND-SN',
+        ]);
+        Http::assertSent(fn ($request) => $request['ref_id'] === $reference.'-Q02');
+        Http::assertSentCount(1);
+    }
+
     /** @return array{0:string,1:string} */
     private function paidOrder(): array
     {

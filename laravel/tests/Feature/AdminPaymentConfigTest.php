@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\AdminAuthService;
+use App\Services\PaymentChannelService;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -102,6 +103,67 @@ class AdminPaymentConfigTest extends TestCase
         $this->assertSame('qris', $response->json('channels.0.method'));
         $this->assertArrayNotHasKey('secretKey', $response->json('channels.0.gatewayConfig'));
         $this->assertArrayNotHasKey('serverKey', $response->json('channels.0.gatewayConfig'));
+    }
+
+    public function test_fee_uses_only_selected_mode_and_sync_preserves_admin_routing(): void
+    {
+        $fees = app(PaymentChannelService::class);
+        $this->assertSame(5264, $fees->customerFee(100000, [
+            'customerFeeEnabled' => 'true', 'customerFeeMode' => 'percent',
+            'customerFeeBps' => '500', 'customerFeeFixed' => '9999',
+        ]));
+        $this->assertSame(9999, $fees->customerFee(100000, [
+            'customerFeeEnabled' => 'true', 'customerFeeMode' => 'fixed',
+            'customerFeeBps' => '500', 'customerFeeFixed' => '9999',
+        ]));
+
+        $admin = $this->panelToken('sync-admin', 'Sync Admin', 'admin', 'admin-password-123');
+        DB::table('payment_channels')->insert([
+            'method' => 'qris', 'channel' => 'mpm', 'name' => 'QRIS custom',
+            'description' => 'Routing dipilih Admin', 'is_active' => 1,
+            'sort_order' => 30, 'gateway' => 'midtrans',
+            'gateway_config_json' => json_encode(['customerFeeMode' => 'fixed', 'customerFeeFixed' => '1500']),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->withHeader('Cookie', AdminAuthService::COOKIE.'='.rawurlencode($admin))
+            ->postJson('/api/admin/payment-methods', [
+                'action' => 'sync', 'gateways' => ['doku', 'midtrans'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('mappingIssues', []);
+        $this->assertDatabaseHas('payment_channels', [
+            'method' => 'qris', 'channel' => 'mpm', 'gateway' => 'midtrans',
+            'name' => 'QRIS custom', 'is_active' => 1,
+        ]);
+    }
+
+    public function test_midtrans_readiness_uses_integration_profile_and_official_environment_url(): void
+    {
+        $owner = $this->panelToken('ready-owner', 'Ready Owner', 'super_admin', 'owner-password-123');
+        $cookie = AdminAuthService::COOKIE.'='.rawurlencode($owner);
+
+        $this->withHeader('Cookie', $cookie)->putJson('/api/admin/payment-routing', [
+            'action' => 'save_profile', 'provider' => 'midtrans',
+            'mode' => 'snap', 'environment' => 'production',
+            'values' => ['serverKey' => 'server-key', 'clientKey' => 'client-key'],
+        ])->assertOk();
+        $this->withHeader('Cookie', $cookie)->putJson('/api/admin/payment-routing', [
+            'action' => 'save_modes', 'dokuEnvironment' => 'sandbox',
+            'midtransEnvironment' => 'production',
+        ])->assertOk();
+        DB::table('payment_channels')->insert([
+            'method' => 'qris', 'channel' => 'mpm', 'name' => 'QRIS',
+            'description' => 'QRIS', 'is_active' => 1, 'sort_order' => 0,
+            'gateway' => 'midtrans', 'gateway_config_json' => '{}',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->withHeader('Cookie', $cookie)
+            ->getJson('/api/admin/payment-methods')
+            ->assertOk()
+            ->assertJsonPath('gatewayReadiness.midtrans.ready', true)
+            ->assertJsonPath('channels.0.readiness.ready', true);
     }
 
     private function panelToken(string $username, string $name, string $role, string $password): string

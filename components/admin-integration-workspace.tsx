@@ -155,6 +155,11 @@ export function AdminIntegrationWorkspace() {
           environment: dokuProfileEnvironment,
           values: gatewayValues,
         });
+        await paymentPut({
+          action: "save_modes",
+          dokuEnvironment: dokuProfileEnvironment,
+          midtransEnvironment: paymentOverview?.midtransEnvironment || "sandbox",
+        });
         setValues((current) => ({
           ...current,
           dokuClientId: "",
@@ -177,6 +182,11 @@ export function AdminIntegrationWorkspace() {
           mode: "snap",
           environment: midtransProfileEnvironment,
           values: gatewayValues,
+        });
+        await paymentPut({
+          action: "save_modes",
+          dokuEnvironment: paymentOverview?.dokuEnvironment || "sandbox",
+          midtransEnvironment: midtransProfileEnvironment,
         });
         setValues((current) => ({ ...current, midtransServerKey: "", midtransClientKey: "" }));
       } else if (tab === "Digiflazz") {
@@ -382,7 +392,7 @@ export function AdminIntegrationWorkspace() {
         <Text label="Server Key" secret value={values.midtransServerKey || ""} onChange={(value) => setValue("midtransServerKey", value)} />
         <Text label="Client Key" value={values.midtransClientKey || ""} onChange={(value) => setValue("midtransClientKey", value)} />
         <div className="sm:col-span-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-700">
-          Server Key tidak pernah ditampilkan kembali setelah disimpan. Environment aktif untuk checkout/top up tetap dipilih dari menu Pembayaran.
+          Server Key tidak pernah ditampilkan kembali setelah disimpan. Environment yang disimpan di sini menjadi aktif untuk checkout dan top up.
         </div>
       </div>
     </Panel>}

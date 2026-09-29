@@ -392,7 +392,7 @@ export function AdminOrderManager() {
           <div className="grid grid-cols-1 gap-[8px] border-b border-[#e5eaf0] bg-[#fbfcfe] p-[10px] sm:grid-cols-2 xl:grid-cols-[1.55fr_.82fr_.86fr_1fr_1.05fr_.54fr]">
             <label className="relative">
               <span className="sr-only">Cari pesanan</span>
-              <Search className="absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#71829a]" />
+              <Search className="pointer-events-none absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#71829a]" />
               <input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Cari ID / Customer / UID" className="h-[32px] w-full rounded-[5px] border border-[#dfe5ed] bg-white pl-[30px] pr-[9px] text-[9px] outline-none placeholder:text-[#7b899c] focus:border-[#2b82ef]" />
             </label>
             <FilterSelect value={status} onChange={(value) => { setStatus(value); setPage(1); }} options={["Semua Status", "Pending", "Diproses", "Berhasil", "Gagal", "Komplain"]} />
@@ -574,6 +574,8 @@ function eventLabel(status: string) {
     needs_review: "Perlu pemeriksaan admin",
     retry_exhausted: "Batas percobaan otomatis tercapai",
     refresh_requested: "Admin meminta pengecekan ulang",
+    retry_authorized: "Admin mengizinkan kirim ulang DigiFlazz",
+    retry_result: "Hasil kirim ulang DigiFlazz",
   };
   return labels[status] || status.replaceAll("_", " ");
 }
@@ -662,6 +664,8 @@ function OrderDetailModal({
     order.deliveryMode === "direct";
   const canRetryDigiflazz =
     role !== "staff" &&
+    !["success", "cancelled"].includes(order.fulfillmentStatus || "") &&
+    order.providerStatus !== "success" &&
     order.paymentStatus === "paid" &&
     order.provider === "Digiflazz" &&
     order.deliveryMode === "direct" &&

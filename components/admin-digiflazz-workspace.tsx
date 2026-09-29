@@ -81,7 +81,7 @@ export function AdminDigiflazzWorkspace() {
   const [autoSync, setAutoSync] = useState(true);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Semua Kategori");
-  const [brand, setBrand] = useState("Semua Produk / Brand");
+  const [product, setProduct] = useState("Semua Produk");
   const [health, setHealth] = useState("Semua Status");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -114,12 +114,12 @@ export function AdminDigiflazzWorkspace() {
     () => Array.from(new Set(data.items.map((item) => item.category).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [data.items],
   );
-  const brands = useMemo(
+  const products = useMemo(
     () => Array.from(new Set(data.items
       .filter((item) => category === "Semua Kategori" || item.category === category)
-      .map((item) => item.brand)
+      .map((item) => item.productName)
       .filter(Boolean)))
-      .sort((a, b) => a.localeCompare(b)),
+      .sort((a, b) => a.localeCompare(b, "id", { numeric: true, sensitivity: "base" })),
     [category, data.items],
   );
   const visible = useMemo(() => {
@@ -131,14 +131,14 @@ export function AdminDigiflazzWorkspace() {
     return data.items.filter((item) =>
       (!term || `${item.productName} ${item.packageLabel} ${item.providerSku} ${item.category} ${item.brand}`.toLowerCase().includes(term)) &&
       (category === "Semua Kategori" || item.category === category) &&
-      (brand === "Semua Subkategori" || item.brand === brand) &&
+      (product === "Semua Produk" || item.productName === product) &&
       (health === "Semua Status" || item.health === health),
     ).sort((left, right) =>
       left.productName.localeCompare(right.productName, "id", { numeric: true, sensitivity: "base" }) ||
       nominalNumber(left.packageLabel) - nominalNumber(right.packageLabel) ||
       left.packageLabel.localeCompare(right.packageLabel, "id", { numeric: true, sensitivity: "base" }),
     );
-  }, [brand, category, data.items, health, query]);
+  }, [product, category, data.items, health, query]);
 
   const pageSize = 30;
   const pages = Math.max(1, Math.ceil(visible.length / pageSize));
@@ -182,7 +182,7 @@ export function AdminDigiflazzWorkspace() {
 
   function chooseCategory(value: string) {
     setCategory(value);
-    setBrand("Semua Produk / Brand");
+    setProduct("Semua Produk");
     setPage(1);
   }
 
@@ -222,9 +222,9 @@ export function AdminDigiflazzWorkspace() {
         </div>
 
         <div className="grid grid-cols-1 gap-[7px] border-b border-[#e8edf3] px-[14px] py-[10px] md:grid-cols-[1.4fr_.75fr_.75fr_.65fr]">
-          <label className="relative"><Search className="absolute left-[9px] top-1/2 size-[12px] -translate-y-1/2 text-[#74849a]" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Cari produk, nominal, SKU, kategori..." className="h-[32px] w-full rounded-[4px] border border-[#dce3eb] pl-[28px] pr-[8px] text-[8px] outline-none focus:border-[#2680eb]" /></label>
+          <label className="relative"><Search className="pointer-events-none absolute left-[9px] top-1/2 size-[12px] -translate-y-1/2 text-[#74849a]" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Cari produk, nominal, SKU, kategori..." className="h-[32px] w-full rounded-[4px] border border-[#dce3eb] pl-[28px] pr-[8px] text-[8px] outline-none focus:border-[#2680eb]" /></label>
           <select value={category} onChange={(event) => chooseCategory(event.target.value)} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[8px] text-[8px]"><option>Semua Kategori</option>{categories.map((item) => <option key={item}>{item}</option>)}</select>
-          <select value={brand} onChange={(event) => { setBrand(event.target.value); setPage(1); }} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[8px] text-[8px]"><option>Semua Subkategori</option>{brands.map((item) => <option key={item}>{item}</option>)}</select>
+          <select aria-label="Produk" value={product} onChange={(event) => { setProduct(event.target.value); setPage(1); }} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[8px] text-[8px]"><option>Semua Produk</option>{products.map((item) => <option key={item}>{item}</option>)}</select>
           <select value={health} onChange={(event) => { setHealth(event.target.value); setPage(1); }} className="h-[32px] rounded-[4px] border border-[#dce3eb] bg-white px-[8px] text-[8px]"><option>Semua Status</option><option value="healthy">Normal</option><option value="warning">Peringatan</option><option value="critical">Kritis</option><option value="unknown">Belum Dicek</option></select>
         </div>
 
@@ -244,7 +244,6 @@ export function AdminDigiflazzWorkspace() {
         <div className="border-t border-[#e4e9ef] px-[14px] py-[11px]"><h3 className="text-[11px] font-extrabold">Status Sinkronisasi & Transaksi Provider Terbaru</h3><p className="mt-[2px] text-[7.5px] text-[#6d7d91]">Ringkasan operasional tetap berada dalam satu workspace Digiflazz.</p></div>
         <div className="overflow-x-auto border-t border-[#edf0f4]"><table className="w-full min-w-[760px] text-left text-[7.5px]"><thead className="bg-[#fafbfd] text-[7px] font-bold text-[#5f7084]"><tr><th className="px-[12px] py-[8px]">Invoice</th><th>Produk</th><th>Nominal</th><th>Status</th><th>Waktu</th><th>Catatan</th></tr></thead><tbody>{orders.map((item) => <tr key={item.reference_id} className="border-t border-[#edf0f4]"><td className="px-[12px] py-[8px] font-mono">{item.reference_id}</td><td>{item.product_name}</td><td>{item.package_label}</td><td>{item.fulfillment_status}</td><td>{formatDate(item.created_at)}</td><td className="max-w-[220px] truncate pr-[12px]">{item.provider_message || item.provider_status || "-"}</td></tr>)}{!orders.length && <tr><td colSpan={6} className="py-[18px] text-center text-[#7b8999]">Belum ada transaksi provider terbaru.</td></tr>}</tbody></table></div>
       </section>
-}
     </div>
   );
 }
