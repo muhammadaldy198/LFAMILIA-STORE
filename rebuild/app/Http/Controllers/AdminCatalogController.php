@@ -167,7 +167,7 @@ class AdminCatalogController
             ]);
             if ($product->fulfillment_mode === 'MANUAL') {
                 $provider = Provider::where('code', 'MANUAL')->firstOrFail();
-                ProviderMapping::create([
+                $mapping = ProviderMapping::create([
                     'product_package_id' => $package->id,
                     'provider_id' => $provider->id,
                     'external_sku' => null,
@@ -176,6 +176,8 @@ class AdminCatalogController
                     'priority' => 0,
                     'is_active' => false,
                 ]);
+                $audit->record($request, 'catalog.mapping.created', 'provider_mapping',
+                    $mapping->id, null, $mapping->toArray());
             }
             $audit->record($request, 'catalog.package.created', 'product_package', $package->id, null, $package->toArray());
         });

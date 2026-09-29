@@ -4,11 +4,18 @@ import { computed, ref, watch } from 'vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
 
 const props = defineProps({ categories: Array, products: Array, assets: Array });
+const cloneProducts = (items) => items.map((item) => ({
+    ...item,
+    packages: item.packages.map((pack) => ({
+        ...pack,
+        mappings: pack.mappings.map((mapping) => ({ ...mapping })),
+    })),
+}));
 const categories = ref(props.categories.map((item) => ({ ...item })));
-const products = ref(props.products.map((item) => ({ ...item, packages: item.packages.map((pack) => ({ ...pack, mappings: pack.mappings.map((mapping) => ({ ...mapping })) })) })));
+const products = ref(cloneProducts(props.products));
 const assets = ref(props.assets.map((item) => ({ ...item })));
 watch(() => props.categories, (items) => { categories.value = items.map((item) => ({ ...item })); });
-watch(() => props.products, (items) => { products.value = items.map((item) => ({ ...item, packages: item.packages.map((pack) => ({ ...pack, mappings: pack.mappings.map((mapping) => ({ ...mapping })) })) }); });
+watch(() => props.products, (items) => { products.value = cloneProducts(items); });
 watch(() => props.assets, (items) => { assets.value = items.map((item) => ({ ...item })); });
 
 const tab = ref('AUTO_PROVIDER');

@@ -6,6 +6,7 @@ use App\Models\ProductPackage;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 class DigiflazzCatalogImport
@@ -41,9 +42,20 @@ class DigiflazzCatalogImport
                 ]);
             }
 
+            $before = $mapping->exists ? $mapping->toArray() : null;
             $mapping->cost_idr = $costIdr;
             $mapping->max_price_idr = $maxPriceIdr;
             $mapping->save();
+            DB::table('audit_logs')->insert([
+                'actor_type' => 'system',
+                'actor_role' => 'PROVIDER_SYNC',
+                'action' => 'catalog.mapping.synced',
+                'target_type' => 'provider_mapping',
+                'target_id' => (string) $mapping->id,
+                'before' => $before ? json_encode($before, JSON_THROW_ON_ERROR) : null,
+                'after' => json_encode($mapping->toArray(), JSON_THROW_ON_ERROR),
+                'correlation_id' => (string) Str::uuid(),
+            ]);
 
             return $mapping;
         });
