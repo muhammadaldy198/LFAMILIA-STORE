@@ -63,8 +63,8 @@ actual[product_packages]="$(query_temp 'SELECT COUNT(*) FROM product_packages')"
 actual[paid_total_idr]="$(query_temp "SELECT COALESCE(SUM(total_idr),0) FROM orders WHERE status IN ('PAID','PROCESSING','SUCCESS','REFUND')")"
 
 for key in users orders product_packages paid_total_idr; do
-  [[ -n "${expected[${key}]}" ]] || { echo "Missing metadata key: ${key}" >&2; exit 1; }
-  [[ "${expected[${key}]}" == "${actual[${key}]}" ]]     || { echo "Restore verification mismatch for ${key}" >&2; exit 1; }
+  [[ -n "${expected[$key]}" ]] || { echo "Missing metadata key: ${key}" >&2; exit 1; }
+  [[ "${expected[$key]}" == "${actual[$key]}" ]]     || { echo "Restore verification mismatch for ${key}" >&2; exit 1; }
 done
 
 if [[ -n "${BACKUP_RCLONE_REMOTE:-}" ]]; then
