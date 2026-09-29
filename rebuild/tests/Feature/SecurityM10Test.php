@@ -20,14 +20,6 @@ class SecurityM10Test extends TestCase
 {
     use DatabaseTransactions;
 
-    protected function tearDown(): void
-    {
-        app(LoginRiskService::class)->clear('customer', '127.0.0.1', 'login-risk@example.test');
-        app(LoginRiskService::class)->clear('admin', '127.0.0.1', 'admin-risk@example.test');
-
-        parent::tearDown();
-    }
-
     private function enableTurnstile(array $extra = []): void
     {
         IntegrationCredential::updateOrCreate(['code' => 'turnstile'], [
@@ -179,6 +171,7 @@ class SecurityM10Test extends TestCase
         ])->assertSessionHasErrors('turnstile_token');
 
         $this->assertGuest();
+        app(LoginRiskService::class)->clear('customer', '127.0.0.1', 'login-risk@example.test');
     }
 
     public function test_register_rate_limit_is_recorded_even_when_turnstile_is_missing(): void
