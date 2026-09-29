@@ -6,37 +6,14 @@ import test from "node:test";
 const source = fs.readFileSync(path.join(process.cwd(), "components/admin-digiflazz-workspace.tsx"), "utf8");
 const dashboard = fs.readFileSync(path.join(process.cwd(), "components/admin-dashboard.tsx"), "utf8");
 
-test("Digiflazz workspace owns operational pricing controls", () => {
-  for (const label of [
-    "Pusat operasional provider dan Price Control LFAMILIA.",
-    "Price Control LFAMILIA",
-    "Sync Pricelist",
-    "Auto Sync:",
-    "Semua Kategori",
-    "Semua Subkategori",
-    "Max Price Digiflazz",
-  ]) assert.ok(source.includes(label), `missing Digiflazz label: ${label}`);
+test("Digiflazz workspace shows provider inventory and keeps selling controls in Produk", () => {
+  for (const label of ["Sync Pricelist", "Auto Sync:", "Semua Kategori", "Semua Produk", "Harga DigiFlazz", "Stok", "Status"]) {
+    assert.ok(source.includes(label), `missing provider label: ${label}`);
+  }
+  assert.doesNotMatch(source, /async function savePricing|Max Price Digiflazz|Harga Jual = Max Price|marginType|marginValue/);
+  assert.match(source, /item\.productName === product/);
+  assert.match(source, /nominalNumber\(left\.packageLabel\) - nominalNumber\(right\.packageLabel\)/);
   assert.match(dashboard, /<AdminDigiflazzWorkspace/);
-});
-
-test("Digiflazz price control separates current provider cost, Max Price, margin and selling price", () => {
-  for (const field of [
-    "currentPrice",
-    "maxPrice",
-    "marginType",
-    "marginValue",
-    "sellingPrice",
-    "category",
-    "brand",
-  ]) assert.ok(source.includes(field), `missing Digiflazz pricing field: ${field}`);
-  assert.doesNotMatch(source, /blockedByMaxPrice/);
-  assert.match(source, /async function savePricing/);
-  assert.match(source, /method: "PUT"/);
-  assert.match(source, /packageId: editing\.packageId, maxPrice, marginType, marginValue/);
-  assert.match(source, /calculateSale\(maxPrice, marginType, marginValue\)/);
-  assert.match(source, /Harga Jual = Max Price \+ margin/);
-  assert.match(source, /item\.category === category/);
-  assert.match(source, /item\.brand === brand/);
 });
 
 test("Digiflazz workspace uses backend operations while credentials stay in Integrasi", () => {

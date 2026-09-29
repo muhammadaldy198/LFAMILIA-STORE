@@ -110,12 +110,13 @@ export type PromotionQuote = {
   discountAmount: number;
   finalPrice: number;
   voucherCode: string | null;
+  voucherDiscountAmount: number;
   flashSaleId: number | null;
   flashSaleEndsAt: string | null;
   memberTier: MemberTier | null;
   memberDiscountPercent: number;
   memberDiscountAmount: number;
-  discountSource: "voucher" | "member" | null;
+  discountSource: "voucher" | "member" | "member+voucher" | null;
 };
 
 export class PromotionQuoteError extends Error {}
@@ -138,6 +139,13 @@ export async function quotePromotion(
   const normalizedQuantity = Math.max(1, Math.min(5, Math.trunc(Number(quantity) || 1)));
   const basePrice = unitPrice * normalizedQuantity;
   const sellingPrice = (flash && flash.sale_price < unitPrice ? flash.sale_price : unitPrice) * normalizedQuantity;
+  const memberDiscountPercent = Math.max(0, Math.min(100, Number(member?.discountPercent ?? 0)));
+  const memberDiscountAmount = Math.min(
+    Math.floor(sellingPrice * memberDiscountPercent / 100),
+    Math.max(0, sellingPrice - 1),
+  );
+  const afterMember = Math.max(1, sellingPrice - memberDiscountAmount);
+
   let voucherDiscountAmount = 0;
   let voucher: VoucherRow | null = null;
 
@@ -151,27 +159,31 @@ export async function quotePromotion(
     if (sellingPrice < voucher.min_purchase) throw new PromotionQuoteError(`Minimum transaksi voucher ini Rp${voucher.min_purchase.toLocaleString("id-ID")}.`);
     voucherDiscountAmount = voucher.discount_type === "fixed"
       ? voucher.discount_value
-      : Math.floor(sellingPrice * voucher.discount_value / 100);
+      : Math.floor(afterMember * voucher.discount_value / 100);
     if (voucher.max_discount !== null) voucherDiscountAmount = Math.min(voucherDiscountAmount, voucher.max_discount);
-    voucherDiscountAmount = Math.min(voucherDiscountAmount, Math.max(0, sellingPrice - 1));
+    voucherDiscountAmount = Math.min(voucherDiscountAmount, Math.max(0, afterMember - 1));
   }
 
-  const memberDiscountPercent = Math.max(0, Math.min(100, Number(member?.discountPercent ?? 0)));
-  const memberDiscountAmount = Math.min(
-    Math.floor(sellingPrice * memberDiscountPercent / 100),
+  const discountAmount = Math.min(
+    memberDiscountAmount + voucherDiscountAmount,
     Math.max(0, sellingPrice - 1),
   );
-  const useMemberDiscount = memberDiscountAmount > 0 && memberDiscountAmount >= voucherDiscountAmount;
-  const discountAmount = useMemberDiscount ? memberDiscountAmount : voucherDiscountAmount;
-  const discountSource = discountAmount > 0 ? (useMemberDiscount ? "member" : "voucher") : null;
-  const appliedCode = discountSource === "voucher" ? voucher?.code ?? null : null;
+  const discountSource = memberDiscountAmount > 0 && voucherDiscountAmount > 0
+    ? "member+voucher" as const
+    : memberDiscountAmount > 0
+      ? "member" as const
+      : voucherDiscountAmount > 0
+        ? "voucher" as const
+        : null;
+
 
   return {
     basePrice,
     sellingPrice,
     discountAmount,
     finalPrice: Math.max(1, sellingPrice - discountAmount),
-    voucherCode: appliedCode,
+    voucherCode: voucher?.code ?? null,
+    voucherDiscountAmount,
     flashSaleId: flash?.id ?? null,
     flashSaleEndsAt: flash?.ends_at ?? null,
     memberTier: member?.tier ?? null,

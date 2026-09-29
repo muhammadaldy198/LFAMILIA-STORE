@@ -6,19 +6,21 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("customer payment fee supports fixed fee and percentage gross-up", () => {
+test("customer payment fee uses one configured mode for fixed or percentage gross-up", () => {
   const source = read("lib/payment-fees.ts");
   assert.match(source, /customerFeeEnabled/);
   assert.match(source, /customerFeeBps/);
   assert.match(source, /customerFeeFixed/);
   assert.match(source, /10_000 - config\.customerFeeBps/);
-  assert.match(source, /base = amount \+ config\.customerFeeFixed/);
+  assert.match(source, /customerFeeMode/);
+  assert.match(source, /mode === "percent" \? customerFeeBps : 0/);
+  assert.match(source, /mode === "fixed" \? customerFeeFixed : 0/);
 
   const grossUp = (amount, bps, fixed) =>
     Math.ceil(((amount + fixed) * 10_000) / (10_000 - bps)) - amount;
   assert.equal(grossUp(100_000, 70, 0), 705);
   assert.equal(grossUp(100_000, 0, 4_000), 4_000);
-  assert.equal(grossUp(100_000, 150, 2_000), 3_554);
+  assert.equal(grossUp(100_000, 150, 0), 1_523);
 });
 
 test("payment channel fees are database-configured and never hardcode QRIS 0.7 percent", () => {
@@ -29,7 +31,7 @@ test("payment channel fees are database-configured and never hardcode QRIS 0.7 p
   assert.doesNotMatch(server, /item\.method === "qris"\s*\?\s*"70"/);
   assert.doesNotMatch(admin, /channel\.method === "qris"\s*\?\s*"70"/);
   assert.doesNotMatch(admin, /editChannel\?\.method === "qris"\s*\?\s*70/);
-  assert.match(admin, /channel\.gatewayConfig\.customerFeeBps \|\| "0"/);
+  assert.match(admin, /customerFeeMode/);
   assert.match(admin, /editChannel\?\.gatewayConfig\.customerFeeBps \?\? 0/);
 });
 
@@ -61,7 +63,7 @@ test("public payment APIs expose fee details without exposing gateway identity",
   }
 });
 
-test("admin can toggle and configure percent plus fixed customer fee per channel", () => {
+test("admin can select either percent or fixed customer fee per channel", () => {
   const ui = read("components/admin-payment-workspace.tsx");
   const route = read("app/api/admin/payment-methods/route.ts");
   for (const field of ["customerFeeEnabled", "customerFeeBps", "customerFeeFixed"]) {

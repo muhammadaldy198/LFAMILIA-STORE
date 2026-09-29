@@ -35,6 +35,10 @@ class PaymentChannelService
         }
         $config = array_filter($config, fn ($value, $key) => is_string($key) && is_string($value), ARRAY_FILTER_USE_BOTH);
 
+        if (!in_array($config['customerFeeMode'] ?? null, ['percent', 'fixed'], true)) {
+            $config['customerFeeMode'] = (int) ($config['customerFeeBps'] ?? 0) > 0 ? 'percent' : 'fixed';
+        }
+
         return [
             'id' => (int) $row->id,
             'method' => (string) $row->method,
@@ -43,6 +47,7 @@ class PaymentChannelService
             'gateway' => (string) $row->gateway,
             'gatewayConfig' => [
                 'customerFeeEnabled' => 'true',
+                'customerFeeMode' => $config['customerFeeMode'],
                 'customerFeeBps' => '0',
                 'customerFeeFixed' => '0',
                 ...$config,
@@ -65,8 +70,12 @@ class PaymentChannelService
             return 0;
         }
 
+        $mode = strtolower(trim((string) ($config['customerFeeMode'] ?? '')));
         $bps = $this->integer($config['customerFeeBps'] ?? 0);
         $fixed = $this->integer($config['customerFeeFixed'] ?? 0);
+        if (!in_array($mode, ['percent', 'fixed'], true)) {
+            $mode = $bps > 0 ? 'percent' : 'fixed';
+        }
 
         if ($bps < 0 || $bps >= 10000) {
             throw new CheckoutValidationException('Persentase biaya payment gateway tidak valid.');
@@ -75,12 +84,14 @@ class PaymentChannelService
             throw new CheckoutValidationException('Biaya tetap payment gateway tidak valid.');
         }
 
-        $base = $amount + $fixed;
-        if ($bps === 0) {
+        if ($mode === 'fixed') {
             return $fixed;
         }
+        if ($bps === 0) {
+            return 0;
+        }
 
-        $total = (int) ceil(($base * 10000) / (10000 - $bps));
+        $total = (int) ceil(($amount * 10000) / (10000 - $bps));
         if ($total < $amount) {
             throw new CheckoutValidationException('Total pembayaran setelah biaya tidak valid.');
         }

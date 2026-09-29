@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\NominalLabel;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -46,7 +47,7 @@ class AdminProductService
                 'packages' => $packages->get($product->id, collect())->map(fn ($row) => [
                     'dbId' => (int) $row->id,
                     'id' => (string) $row->sku,
-                    'label' => (string) $row->label,
+                    'label' => NominalLabel::clean((string) $product->name, (string) $row->label),
                     'price' => (int) $row->price,
                     'note' => $row->note,
                     'group' => $row->package_group,
@@ -158,7 +159,7 @@ class AdminProductService
                 $providerSku = trim((string) ($package['providerSku'] ?? '')) ?: null;
 
                 $packageValues = [
-                    'label' => trim((string) $package['label']),
+                    'label' => NominalLabel::clean(trim((string) $input['name']), trim((string) $package['label'])),
                     'note' => trim((string) ($package['note'] ?? '')) ?: null,
                     'package_group' => trim((string) ($package['group'] ?? '')) ?: null,
                     'image_url' => trim((string) ($package['imageUrl'] ?? '')) ?: null,

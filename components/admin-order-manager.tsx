@@ -325,6 +325,20 @@ export function AdminOrderManager() {
     setNotice(`Status provider ${order.id} sudah diperiksa dengan reference yang sama.`);
   }
 
+  async function retryDigiflazz(order: Order) {
+    if (!order.dbId) throw new Error("ID pesanan tidak tersedia.");
+    const response = await fetch("/api/admin/orders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: order.dbId, action: "retry_digiflazz" }),
+    });
+    const payload = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) throw new Error(payload.error || "Kirim ulang DigiFlazz gagal.");
+    await loadOrders();
+    await fetchOrderDetail(order);
+    setNotice(`${order.id} dikirim ulang ke DigiFlazz dengan reference yang sama.`);
+  }
+
   async function addManualOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -378,7 +392,7 @@ export function AdminOrderManager() {
           <div className="grid grid-cols-1 gap-[8px] border-b border-[#e5eaf0] bg-[#fbfcfe] p-[10px] sm:grid-cols-2 xl:grid-cols-[1.55fr_.82fr_.86fr_1fr_1.05fr_.54fr]">
             <label className="relative">
               <span className="sr-only">Cari pesanan</span>
-              <Search className="absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#71829a]" />
+              <Search className="pointer-events-none absolute left-[10px] top-1/2 size-[13px] -translate-y-1/2 text-[#71829a]" />
               <input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Cari ID / Customer / UID" className="h-[32px] w-full rounded-[5px] border border-[#dfe5ed] bg-white pl-[30px] pr-[9px] text-[9px] outline-none placeholder:text-[#7b899c] focus:border-[#2b82ef]" />
             </label>
             <FilterSelect value={status} onChange={(value) => { setStatus(value); setPage(1); }} options={["Semua Status", "Pending", "Diproses", "Berhasil", "Gagal", "Komplain"]} />
@@ -418,7 +432,7 @@ export function AdminOrderManager() {
         <ActivityPanel activities={liveActivities} />
       </div>
 
-      {detailOrder && <OrderDetailModal order={detailOrder} events={detailEvents} loading={detailLoading} onClose={() => { setDetailOrder(null); setDetailEvents([]); }} onNotice={setNotice} onRefreshPayment={() => refreshPaymentStatus(detailOrder)} onRefreshFulfillment={() => refreshFulfillmentStatus(detailOrder)} onCompleted={() => void loadOrders()} />}
+      {detailOrder && <OrderDetailModal role={role} order={detailOrder} events={detailEvents} loading={detailLoading} onClose={() => { setDetailOrder(null); setDetailEvents([]); }} onNotice={setNotice} onRefreshPayment={() => refreshPaymentStatus(detailOrder)} onRefreshFulfillment={() => refreshFulfillmentStatus(detailOrder)} onRetryDigiflazz={() => retryDigiflazz(detailOrder)} onCompleted={() => void loadOrders()} />}
       {manualOpen && <ManualOrderModal saving={saving} onClose={() => setManualOpen(false)} onSubmit={addManualOrder} />}
     </div>
   );
@@ -560,6 +574,8 @@ function eventLabel(status: string) {
     needs_review: "Perlu pemeriksaan admin",
     retry_exhausted: "Batas percobaan otomatis tercapai",
     refresh_requested: "Admin meminta pengecekan ulang",
+    retry_authorized: "Admin mengizinkan kirim ulang DigiFlazz",
+    retry_result: "Hasil kirim ulang DigiFlazz",
   };
   return labels[status] || status.replaceAll("_", " ");
 }
@@ -575,6 +591,7 @@ function eventSource(source: string) {
 }
 
 function OrderDetailModal({
+  role,
   order,
   events,
   loading,
@@ -582,8 +599,10 @@ function OrderDetailModal({
   onNotice,
   onRefreshPayment,
   onRefreshFulfillment,
+  onRetryDigiflazz,
   onCompleted,
 }: {
+  role: "super_admin" | "admin" | "staff";
   order: Order;
   events: ApiOrderEvent[];
   loading: boolean;
@@ -591,11 +610,12 @@ function OrderDetailModal({
   onNotice(message: string): void;
   onRefreshPayment(): Promise<void>;
   onRefreshFulfillment(): Promise<void>;
+  onRetryDigiflazz(): Promise<void>;
   onCompleted(): void;
 }) {
   const [serialNumber, setSerialNumber] = useState("");
   const [saving, setSaving] = useState(false);
-  const [actionBusy, setActionBusy] = useState<"payment" | "provider" | null>(null);
+  const [actionBusy, setActionBusy] = useState<"payment" | "provider" | "retry" | null>(null);
   const [error, setError] = useState("");
 
   async function copyInvoice() {
@@ -607,12 +627,13 @@ function OrderDetailModal({
     }
   }
 
-  async function runRefresh(kind: "payment" | "provider") {
+  async function runRefresh(kind: "payment" | "provider" | "retry") {
     setActionBusy(kind);
     setError("");
     try {
       if (kind === "payment") await onRefreshPayment();
-      else await onRefreshFulfillment();
+      else if (kind === "provider") await onRefreshFulfillment();
+      else await onRetryDigiflazz();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Status pesanan gagal diperiksa.");
     } finally {
@@ -641,6 +662,15 @@ function OrderDetailModal({
     !terminalFulfillment &&
     order.provider === "Digiflazz" &&
     order.deliveryMode === "direct";
+  const canRetryDigiflazz =
+    role !== "staff" &&
+    !["success", "cancelled"].includes(order.fulfillmentStatus || "") &&
+    order.providerStatus !== "success" &&
+    order.paymentStatus === "paid" &&
+    order.provider === "Digiflazz" &&
+    order.deliveryMode === "direct" &&
+    (["failed", "needs_review"].includes(order.fulfillmentStatus || "") ||
+      ["failed", "retry_exhausted", "retryable_error", "error", "unknown"].includes(order.providerStatus || ""));
   const timeline = [
     ...(order.createdAt ? [{ id: -1, source: "system", status: "created", created_at: order.createdAt }] : []),
     ...events.filter((event) => event.status !== "created"),
@@ -675,6 +705,7 @@ function OrderDetailModal({
           <button type="button" onClick={copyInvoice} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] border border-[#dce3eb] bg-white px-[10px] text-[8px] font-bold text-[#40516a]"><Copy className="size-[12px]" />Copy Invoice</button>
           {canRefreshPayment && <button type="button" disabled={actionBusy !== null || saving} onClick={() => void runRefresh("payment")} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] bg-[#0875ed] px-[11px] text-[8px] font-bold text-white disabled:opacity-50"><RefreshCw className={`size-[12px] ${actionBusy === "payment" ? "animate-spin" : ""}`} />{actionBusy === "payment" ? "Memeriksa..." : "Cek Status Pembayaran"}</button>}
           {canRefreshProvider && <button type="button" disabled={actionBusy !== null || saving} onClick={() => void runRefresh("provider")} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] bg-amber-500 px-[11px] text-[8px] font-bold text-white disabled:opacity-50"><RefreshCw className={`size-[12px] ${actionBusy === "provider" ? "animate-spin" : ""}`} />{actionBusy === "provider" ? "Memeriksa..." : "Cek Ulang DigiFlazz"}</button>}
+          {canRetryDigiflazz && <button type="button" disabled={actionBusy !== null || saving} onClick={() => void runRefresh("retry")} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] bg-rose-600 px-[11px] text-[8px] font-bold text-white disabled:opacity-50"><Send className="size-[12px]" />{actionBusy === "retry" ? "Mengirim ulang..." : "Kirim Ulang DigiFlazz"}</button>}
           {order.fulfillmentStatus === "manual_pending" && <button type="button" disabled={saving || actionBusy !== null} onClick={() => void completeManual()} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] bg-emerald-600 px-[11px] text-[8px] font-bold text-white disabled:opacity-50"><CheckCircle2 className="size-[12px]" />{saving ? "Menyimpan..." : "Selesaikan Pesanan"}</button>}
           <button type="button" onClick={onClose} className="inline-flex h-[32px] items-center gap-[6px] rounded-[5px] border border-[#dce3eb] bg-white px-[10px] text-[8px] font-bold text-[#40516a]"><X className="size-[12px]" />Tutup</button>
         </div></div>

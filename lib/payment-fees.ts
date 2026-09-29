@@ -1,11 +1,13 @@
 export type CustomerPaymentFeeInput = {
   customerFeeEnabled?: string | number | boolean | null;
+  customerFeeMode?: "percent" | "fixed" | string | null;
   customerFeeBps?: string | number | null;
   customerFeeFixed?: string | number | null;
 };
 
 export type PublicCustomerPaymentFee = {
   customerFeeEnabled: boolean;
+  customerFeeMode: "percent" | "fixed";
   customerFeeBps: number;
   customerFeeFixed: number;
 };
@@ -38,7 +40,9 @@ export function publicCustomerPaymentFee(input?: CustomerPaymentFeeInput): Publi
   if (customerFeeFixed < 0 || customerFeeFixed > 100_000_000) {
     throw new Error("Biaya tetap payment gateway tidak valid.");
   }
-  return { customerFeeEnabled, customerFeeBps, customerFeeFixed };
+  const mode = input?.customerFeeMode || (customerFeeBps > 0 ? "percent" : "fixed");
+  if (mode !== "percent" && mode !== "fixed") throw new Error("Tipe biaya payment gateway tidak valid.");
+  return { customerFeeEnabled, customerFeeMode: mode, customerFeeBps: mode === "percent" ? customerFeeBps : 0, customerFeeFixed: mode === "fixed" ? customerFeeFixed : 0 };
 }
 
 /**
@@ -46,7 +50,7 @@ export function publicCustomerPaymentFee(input?: CustomerPaymentFeeInput): Publi
  *
  * Percentage fees are grossed up so a percentage charged against the final
  * transaction total is also covered by the customer:
- *   total = ceil((amount + fixed) / (1 - percentage))
+ *   total = ceil(amount / (1 - percentage)) in percent mode
  *   fee   = total - amount
  */
 export function calculateCustomerPaymentFee(

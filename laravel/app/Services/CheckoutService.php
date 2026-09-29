@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\CheckoutValidationException;
+use App\Support\NominalLabel;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -59,7 +60,7 @@ class CheckoutService
             'manualTimezone' => $row->manual_timezone ?: 'Asia/Jakarta',
             'packageId' => (int) $row->package_id,
             'packageSku' => (string) $row->package_sku,
-            'packageLabel' => (string) $row->package_label,
+            'packageLabel' => NominalLabel::clean((string) $row->product_name, (string) $row->package_label),
             'price' => (int) $row->price,
             'providerCode' => trim(strtolower((string) ($row->provider_code ?? ''))) ?: null,
             'providerSku' => trim((string) ($row->provider_sku ?? '')) ?: null,
@@ -244,6 +245,10 @@ class CheckoutService
             'base_subtotal' => $data['promotion']['basePrice'],
             'subtotal' => $data['promotion']['sellingPrice'],
             'discount_amount' => $data['promotion']['discountAmount'],
+            'member_tier_snapshot' => $data['promotion']['memberTier'] ?? null,
+            'member_discount_percent_snapshot' => (float) ($data['promotion']['memberDiscountPercent'] ?? 0),
+            'member_discount_amount' => (int) ($data['promotion']['memberDiscountAmount'] ?? 0),
+            'voucher_discount_amount' => (int) ($data['promotion']['voucherDiscountAmount'] ?? 0),
             'voucher_code' => $data['promotion']['voucherCode'],
             'flash_sale_id' => $data['promotion']['flashSaleId'],
             'admin_fee' => $data['adminFee'] ?? 0,

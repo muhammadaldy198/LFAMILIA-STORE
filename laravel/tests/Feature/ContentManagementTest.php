@@ -79,6 +79,28 @@ class ContentManagementTest extends TestCase
     }
 
 
+    public function test_footer_banners_are_saved_and_public_announcement_is_removed(): void
+    {
+        $admin = $this->panelToken('brand-admin', 'Brand Admin', 'admin', 'admin-password-123');
+        $cookie = AdminAuthService::COOKIE.'='.rawurlencode($admin);
+        $settings = $this->withHeader('Cookie', $cookie)
+            ->getJson('/api/admin/storefront')->assertOk()->json('settings');
+
+        $this->withHeader('Cookie', $cookie)
+            ->putJson('/api/admin/storefront', [
+                ...$settings,
+                'footerBannerDesktopUrl' => '/brand/footer-desktop-test.webp',
+                'footerBannerMobileUrl' => '/brand/footer-mobile-test.webp',
+                'announcement' => 'Pemesanan tersedia 24 jam',
+            ])->assertOk();
+
+        $this->getJson('/api/storefront')->assertOk()
+            ->assertJsonPath('settings.footerBannerDesktopUrl', '/brand/footer-desktop-test.webp')
+            ->assertJsonPath('settings.footerBannerMobileUrl', '/brand/footer-mobile-test.webp')
+            ->assertJsonPath('settings.announcement', null);
+        $this->assertDatabaseHas('store_settings', ['id' => 1, 'announcement' => null]);
+    }
+
     private function panelToken(string $username,string $name,string $role,string $password): string
     {
         $auth=app(AdminAuthService::class);

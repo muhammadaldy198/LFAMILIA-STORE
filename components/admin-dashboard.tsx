@@ -243,13 +243,13 @@ export function AdminDashboard({
         <header className="sticky top-0 z-30 flex h-[56px] items-center gap-2 border-b border-[#e5eaf1] bg-white px-3 shadow-[0_1px_2px_rgba(15,23,42,0.02)] lg:h-[58px] lg:px-5">
           <button type="button" onClick={() => setMobileNavigationOpen(true)} aria-label="Buka menu admin" className="grid size-10 shrink-0 place-items-center rounded-md border border-[#dfe5ed] bg-[#f8fafc] text-[#183451] lg:hidden"><Menu className="size-5" /></button>
           <form onSubmit={submitGlobalSearch} className="relative min-w-0 flex-1 max-w-[550px]">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#7d8ba3]" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#7d8ba3]" />
             <Input
               ref={searchRef}
               value={globalSearch}
               onChange={(event) => { globalSearchRequestRef.current += 1; setGlobalSearchBusy(false); setGlobalSearch(event.target.value); setGlobalResults([]); setGlobalSearchError(""); }}
               placeholder="Cari menu, produk, pesanan, atau pelanggan..."
-              className="h-9 rounded-md border-[#dfe5ed] bg-[#f8fafc] pl-9 pr-3 sm:pr-20 text-[11px] text-[#26364f] shadow-none placeholder:text-[#98a5b8] focus-visible:ring-[#1769e8]/30"
+              className="h-9 rounded-md border-[#dfe5ed] bg-[#f8fafc] !pl-10 pr-3 sm:pr-20 text-[11px] text-[#26364f] shadow-none placeholder:text-[#98a5b8] focus-visible:ring-[#1769e8]/30"
             />
             <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-[#dfe5ed] bg-white px-1.5 py-0.5 text-[9px] font-semibold text-[#8b98aa] sm:block">
               {globalSearchBusy ? "..." : "Ctrl K"}

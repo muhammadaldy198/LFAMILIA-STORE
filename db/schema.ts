@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const customerUsers = sqliteTable(
   "customer_users",
@@ -220,6 +220,10 @@ export const orders = sqliteTable(
     baseSubtotal: integer("base_subtotal").notNull().default(0),
     subtotal: integer("subtotal").notNull(),
     discountAmount: integer("discount_amount").notNull().default(0),
+    memberTierSnapshot: text("member_tier_snapshot"),
+    memberDiscountPercentSnapshot: real("member_discount_percent_snapshot").notNull().default(0),
+    memberDiscountAmount: integer("member_discount_amount").notNull().default(0),
+    voucherDiscountAmount: integer("voucher_discount_amount").notNull().default(0),
     voucherCode: text("voucher_code"),
     flashSaleId: integer("flash_sale_id"),
     adminFee: integer("admin_fee").notNull().default(0),
@@ -370,6 +374,8 @@ export const storeSettings = sqliteTable("store_settings", {
   storeShortName: text("store_short_name").notNull(),
   tagline: text("tagline").notNull(),
   logoUrl: text("logo_url"),
+  footerBannerDesktopUrl: text("footer_banner_desktop_url"),
+  footerBannerMobileUrl: text("footer_banner_mobile_url"),
   announcement: text("announcement"),
   bannerEnabled: integer("banner_enabled", { mode: "boolean" }).notNull().default(true),
   bannerEyebrow: text("banner_eyebrow").notNull(),

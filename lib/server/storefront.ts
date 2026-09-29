@@ -8,6 +8,8 @@ type SettingsRow = {
   store_short_name: string;
   tagline: string;
   logo_url: string | null;
+  footer_banner_desktop_url: string | null;
+  footer_banner_mobile_url: string | null;
   announcement: string | null;
   banner_enabled: number;
   banner_eyebrow: string;
@@ -56,7 +58,9 @@ export async function readStorefrontSettings(
       logoUrl: ["/brand/lfamilia-pixel-logo.webp", "/brand/lfamilia-neon-logo.webp", "/brand/lfamilia-logo-2026.jpg"].includes(row.logo_url ?? "")
         ? defaultStorefrontSettings.logoUrl
         : (row.logo_url || defaultStorefrontSettings.logoUrl),
-      announcement: row.announcement ?? undefined,
+      footerBannerDesktopUrl: row.footer_banner_desktop_url || defaultStorefrontSettings.footerBannerDesktopUrl,
+      footerBannerMobileUrl: row.footer_banner_mobile_url || defaultStorefrontSettings.footerBannerMobileUrl,
+      announcement: undefined,
       bannerEnabled: Boolean(row.banner_enabled),
       bannerEyebrow: row.banner_eyebrow,
       bannerTitle: row.banner_title,
@@ -81,14 +85,16 @@ export async function saveStorefrontSettings(input: StorefrontSettings) {
   await ensureLegacyDatabaseColumns();
   await getD1().prepare(
     `INSERT INTO store_settings (
-      id, store_name, store_short_name, tagline, logo_url, announcement, banner_enabled,
+      id, store_name, store_short_name, tagline, logo_url, footer_banner_desktop_url, footer_banner_mobile_url, announcement, banner_enabled,
       banner_eyebrow, banner_title, banner_highlight, banner_description, banner_image_url,
       banner_cta_label, banner_cta_href, support_whatsapp, support_email, instagram_url,
       discord_url, support_hours, support_widget_enabled, updated_at
-    ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ) VALUES (1, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(id) DO UPDATE SET
       store_name = excluded.store_name, store_short_name = excluded.store_short_name,
-      tagline = excluded.tagline, logo_url = excluded.logo_url, announcement = excluded.announcement,
+      tagline = excluded.tagline, logo_url = excluded.logo_url,
+      footer_banner_desktop_url = excluded.footer_banner_desktop_url,
+      footer_banner_mobile_url = excluded.footer_banner_mobile_url, announcement = NULL,
       banner_enabled = excluded.banner_enabled, banner_eyebrow = excluded.banner_eyebrow,
       banner_title = excluded.banner_title, banner_highlight = excluded.banner_highlight,
       banner_description = excluded.banner_description, banner_image_url = excluded.banner_image_url,
@@ -99,7 +105,8 @@ export async function saveStorefrontSettings(input: StorefrontSettings) {
       updated_at = CURRENT_TIMESTAMP`,
   ).bind(
     input.storeName, input.storeShortName, input.tagline, input.logoUrl || null,
-    input.announcement || null, input.bannerEnabled ? 1 : 0, input.bannerEyebrow,
+    input.footerBannerDesktopUrl || null, input.footerBannerMobileUrl || null,
+    input.bannerEnabled ? 1 : 0, input.bannerEyebrow,
     input.bannerTitle, input.bannerHighlight, input.bannerDescription,
     input.bannerImageUrl || null, input.bannerCtaLabel, input.bannerCtaHref,
     input.supportWhatsapp || null, input.supportEmail || null, input.instagramUrl || null,

@@ -138,6 +138,16 @@ class AdminPaymentController extends Controller
                         'customerFeeFixed' => '0',
                         ...$config,
                     ];
+                    $mode = strtolower(trim((string) ($config['customerFeeMode'] ?? '')));
+                    if (!in_array($mode, ['percent', 'fixed'], true)) {
+                        $mode = (int) ($config['customerFeeBps'] ?? 0) > 0 ? 'percent' : 'fixed';
+                    }
+                    $config['customerFeeMode'] = $mode;
+                    if ($mode === 'percent') {
+                        $config['customerFeeFixed'] = '0';
+                    } else {
+                        $config['customerFeeBps'] = '0';
+                    }
 
                     $readiness = $gateway->readiness(
                         (string) $row->gateway,
@@ -250,12 +260,20 @@ class AdminPaymentController extends Controller
                 }
 
                 $synced = $this->syncBuiltInChannels($selected);
+                $mappingIssues = [];
+                foreach (DB::table('payment_channels')->whereIn('gateway', $selected)->get() as $row) {
+                    $config = $this->decodeConfig((string) $row->gateway_config_json);
+                    if ($channels->paymentType((string) $row->gateway, (string) $row->method, (string) $row->channel, $config) === null) {
+                        $mappingIssues[] = (string) $row->name.' ('.(string) $row->gateway.')';
+                    }
+                }
 
                 return response()->json([
                     'ok' => true,
                     'gateways' => $selected,
                     'mode' => 'admin-routed',
                     'synced' => $synced,
+                    'mappingIssues' => $mappingIssues,
                     'activationPolicy' => 'manual',
                 ]);
             }
@@ -275,10 +293,22 @@ class AdminPaymentController extends Controller
             ]);
 
             $config = [];
+            $allowedConfig = ['paymentType', 'customerFeeEnabled', 'customerFeeMode', 'customerFeeBps', 'customerFeeFixed'];
             foreach (($input['gatewayConfig'] ?? []) as $key => $value) {
-                if (is_string($key) && is_string($value)) {
-                    $config[$key] = $value;
+                if (!is_string($key) || !in_array($key, $allowedConfig, true) || !is_string($value)) {
+                    throw new RuntimeException('Konfigurasi channel hanya boleh berisi routing dan biaya.');
                 }
+                $config[$key] = $value;
+            }
+            $mode = strtolower(trim((string) ($config['customerFeeMode'] ?? 'fixed')));
+            if (!in_array($mode, ['percent', 'fixed'], true)) {
+                throw new RuntimeException('Tipe biaya customer harus Persentase atau Nominal Tetap.');
+            }
+            $config['customerFeeMode'] = $mode;
+            if ($mode === 'percent') {
+                $config['customerFeeFixed'] = '0';
+            } else {
+                $config['customerFeeBps'] = '0';
             }
             $this->validateFeeConfig($config);
 
@@ -387,6 +417,11 @@ class AdminPaymentController extends Controller
     /** @param array<string,string> $config */
     private function validateFeeConfig(array $config): void
     {
+        if (isset($config['customerFeeMode'])
+            && !in_array(strtolower(trim($config['customerFeeMode'])), ['percent', 'fixed'], true)) {
+            throw new RuntimeException('Tipe biaya customer tidak valid.');
+        }
+
         if (isset($config['customerFeeEnabled'])
             && !preg_match('/^(?:true|false|1|0)$/i', $config['customerFeeEnabled'])) {
             throw new RuntimeException('Status biaya customer tidak valid.');
@@ -447,14 +482,7 @@ class AdminPaymentController extends Controller
                 ->where('channel', $channel)
                 ->first(['id']);
 
-            if ($existing) {
-                DB::table('payment_channels')->where('id', $existing->id)->update([
-                    'name' => $name,
-                    'description' => $description,
-                    'sort_order' => $index,
-                    'updated_at' => now(),
-                ]);
-            } else {
+            if (!$existing) {
                 DB::table('payment_channels')->insert([
                     'method' => $method,
                     'channel' => $channel,
@@ -485,7 +513,8 @@ class AdminPaymentController extends Controller
 
         $result = [];
         foreach ($decoded as $key => $value) {
-            if (is_string($key) && is_string($value)) {
+            if (is_string($key) && is_string($value)
+                && in_array($key, ['paymentType', 'customerFeeEnabled', 'customerFeeMode', 'customerFeeBps', 'customerFeeFixed'], true)) {
                 $result[$key] = $value;
             }
         }

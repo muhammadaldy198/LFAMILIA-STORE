@@ -44,35 +44,23 @@ test("LFAMILIA selling price uses configured Digiflazz Max Price plus margin", (
   assert.match(pricing, /provider_max_price = COALESCE\(provider_max_price, \?\)/);
 });
 
-test("Digiflazz dashboard owns the Max Price guard, not LFAMILIA fulfillment", () => {
+test("Digiflazz fulfillment still uses the provider price guard while the panel shows current cost", () => {
   assert.doesNotMatch(provider, /max_price\s*:/);
-  assert.doesNotMatch(provider, /Max Price DigiFlazz pada order tidak valid/);
   assert.doesNotMatch(availability, /currentPrice\s*>\s*maxPrice/);
-  assert.doesNotMatch(availability, /provider_max_price/);
-  assert.doesNotMatch(workspace, /blockedByMaxPrice/);
-  assert.match(workspace, /Guard transaksi tetap dikelola oleh Digiflazz/);
+  assert.match(workspace, /Harga DigiFlazz/);
+  assert.doesNotMatch(workspace, /Max Price Digiflazz|marginType|marginValue|Harga Jual = Max Price/);
 });
 
-test("Digiflazz workspace owns LFAMILIA max price and margin controls", () => {
+test("Digiflazz panel filters product and sorts numeric nominal while Produk owns selling price", () => {
   const route = read("app/api/admin/digiflazz-pricing/route.ts");
   const proxy = read("app/api/panel/[...path]/route.ts");
   assert.match(route, /export async function PUT/);
   assert.match(route, /updateDigiflazzPackagePricing/);
   assert.match(proxy, /digiflazzPricing\.PUT/);
-  assert.match(workspace, /Price Control LFAMILIA/);
-  assert.match(workspace, /Max Price Digiflazz/);
-  assert.match(workspace, /Harga Digiflazz/);
-  assert.match(workspace, /Harga Jual/);
-  assert.match(workspace, /Rumus: Max Price \+ margin/);
-  assert.match(workspace, /method: "PUT"/);
-});
-
-test("Digiflazz filters use provider category and brand as subcategory", () => {
-  assert.match(workspace, /item\.category/);
-  assert.match(workspace, /item\.brand/);
-  assert.match(workspace, /Semua Subkategori/);
-  assert.match(workspace, /Kategori → Subkategori \/ Brand → SKU/);
-  assert.doesNotMatch(workspace, /Steam Wallet.*Google Play/);
+  assert.match(workspace, /Semua Produk/);
+  assert.match(workspace, /item\.productName === product/);
+  assert.match(workspace, /nominalNumber\(left\.packageLabel\) - nominalNumber\(right\.packageLabel\)/);
+  assert.match(workspace, /Harga jual dan margin dikelola pada menu Produk/);
 });
 
 test("product save cannot overwrite existing Digiflazz price control", () => {

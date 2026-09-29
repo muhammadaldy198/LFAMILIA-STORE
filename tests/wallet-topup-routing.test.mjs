@@ -90,5 +90,6 @@ test("Admin and Super Admin can manage topup routing, but credentials stay Super
   assert.match(routingRoute, /action: z\.literal\("save_wallet_topup_gateway"\)/);
   assert.match(routingRoute, /walletTopupGateway: z\.enum\(\["doku", "midtrans"\]\)/);
   assert.match(adminPayment, /action: "save_wallet_topup_gateway"/);
-  assert.match(adminPayment, /role === "super_admin"/);
+  assert.match(adminPayment, /role === "staff"/);
+  assert.doesNotMatch(adminPayment, /save_profile/);
 });

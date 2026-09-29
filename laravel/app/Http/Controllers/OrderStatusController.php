@@ -85,7 +85,7 @@ class OrderStatusController extends Controller
                 'order' => [
                     'referenceId' => $this->publicReferenceId((string) $order->reference_id),
                     'productName' => (string) $order->product_name,
-                    'packageLabel' => (string) $order->package_label,
+                    'packageLabel' => \App\Support\NominalLabel::clean((string) $order->product_name, (string) $order->package_label),
                     'destination' => $internalVoucherDestination
                         ? null
                         : $this->maskDestination((string) $order->destination, $order->server),

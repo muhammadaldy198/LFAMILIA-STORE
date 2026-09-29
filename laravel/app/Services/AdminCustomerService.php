@@ -13,6 +13,7 @@ class AdminCustomerService
         'gold' => ['label' => 'GOLD', 'minSpend' => 1000000],
         'diamond' => ['label' => 'DIAMOND', 'minSpend' => 10000000],
         'platinum' => ['label' => 'PLATINUM', 'minSpend' => 50000000],
+        'mafia' => ['label' => 'MAFIA', 'minSpend' => null],
     ];
 
     /** @return array<int,array<string,mixed>> */
@@ -143,14 +144,16 @@ class AdminCustomerService
                     throw new RuntimeException('Tier member tidak valid.');
                 }
 
-                $lifetimeSpend = (int) DB::table('orders')
-                    ->where('customer_id', $customerId)
-                    ->where('payment_status', 'paid')
-                    ->sum('total');
-                $currentBonus = max(0, (int) $customer->tier_progress_bonus);
-                $currentProgress = $lifetimeSpend + $currentBonus;
-                $minimum = (int) self::TIERS[$role]['minSpend'];
-                $bonus = $currentBonus + max(0, $minimum - $currentProgress);
+                $bonus = max(0, (int) $customer->tier_progress_bonus);
+                if ($role !== 'mafia') {
+                    $lifetimeSpend = (int) DB::table('orders')
+                        ->where('customer_id', $customerId)
+                        ->where('payment_status', 'paid')
+                        ->sum('total');
+                    $currentProgress = $lifetimeSpend + $bonus;
+                    $minimum = (int) self::TIERS[$role]['minSpend'];
+                    $bonus += max(0, $minimum - $currentProgress);
+                }
 
                 DB::table('customer_users')->where('id', $customerId)->update([
                     'tier_mode' => 'manual',

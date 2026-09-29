@@ -67,9 +67,9 @@ class MidtransSnapService
         }
 
         $configuredEnvironment = $this->integrations->setting('midtrans_environment') ?: 'sandbox';
-        $apiOrigin = trim((string) config('lfamilia.integrations.midtrans.api_base_url'));
-        if ($configuredEnvironment !== $environment || !$this->validHttpsOrigin($apiOrigin)) {
-            throw new RuntimeException('URL API Midtrans belum dikonfigurasi untuk environment transaksi.');
+        $apiOrigin = $this->apiOrigin($environment);
+        if ($configuredEnvironment !== $environment || !$apiOrigin) {
+            throw new RuntimeException('Environment Midtrans transaksi tidak sesuai konfigurasi aktif.');
         }
 
         $response = Http::acceptJson()
@@ -110,6 +110,18 @@ class MidtransSnapService
             'transactionId' => trim((string) ($raw['transaction_id'] ?? '')),
             'raw' => $raw,
         ];
+    }
+
+    private function apiOrigin(string $environment): ?string
+    {
+        $configured = trim((string) config('lfamilia.integrations.midtrans.api_base_url'));
+        if ($this->validHttpsOrigin($configured)) {
+            return rtrim($configured, '/');
+        }
+
+        return $environment === 'production'
+            ? 'https://api.midtrans.com'
+            : 'https://api.sandbox.midtrans.com';
     }
 
     private function validHttpsOrigin(string $value): bool

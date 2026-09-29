@@ -356,6 +356,8 @@ export type StorefrontSettings = {
   storeShortName: string;
   tagline: string;
   logoUrl?: string;
+  footerBannerDesktopUrl?: string;
+  footerBannerMobileUrl?: string;
   announcement?: string;
   bannerEnabled: boolean;
   bannerEyebrow: string;
@@ -381,7 +383,9 @@ export const defaultStorefrontSettings: StorefrontSettings = {
   storeShortName: "LF",
   tagline: "Top up favoritmu, sat set tanpa ribet.",
   logoUrl: "/brand/lfamilia-logo-transparent-v2.png",
-  announcement: "Pemesanan tersedia 24 jam",
+  footerBannerDesktopUrl: "/brand/lfamilia-footer-desktop-wordmark.jpg",
+  footerBannerMobileUrl: "/brand/lfamilia-footer-mobile-wordmark.jpg",
+  announcement: "",
   bannerEnabled: true,
   bannerEyebrow: "Top up & voucher digital",
   bannerTitle: "Top up favoritmu,",

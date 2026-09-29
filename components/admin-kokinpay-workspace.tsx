@@ -118,7 +118,7 @@ export function AdminKokinpayWorkspace() {
       </div> : <div className="p-4">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div><h3 className="text-[11px] font-extrabold text-[#243653]">Daftar Kode Game</h3><p className="mt-0.5 text-[9px] text-[#8190a5]">Gunakan kode ini pada Produk → Input Customer → Kode Game Nickname.</p></div>
-          <div className="relative w-full sm:w-[280px]"><Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#8a98aa]" /><input value={query} onChange={(event) => setQuery(event.target.value)} className={`${inputClass} pl-8`} placeholder="Cari game atau kode..." /></div>
+          <div className="relative w-full sm:w-[280px]"><Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#8a98aa]" /><input value={query} onChange={(event) => setQuery(event.target.value)} className={`${inputClass} !pl-9`} placeholder="Cari game atau kode..." /></div>
         </div>
         <div className="overflow-x-auto rounded-md border border-[#e1e6ed]">
           <table className="min-w-[620px] w-full text-left text-[9px]">

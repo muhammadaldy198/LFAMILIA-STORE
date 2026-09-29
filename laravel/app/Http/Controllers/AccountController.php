@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\CustomerAuthService;
 use App\Services\SecurityGuard;
 use App\Support\PhoneNormalizer;
+use App\Support\NominalLabel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +43,7 @@ class AccountController extends Controller
             ->map(fn ($order) => [
                 ...((array) $order),
                 'reference_id' => $this->publicReference((string) $order->reference_id),
+                'package_label' => NominalLabel::clean((string) $order->product_name, (string) $order->package_label),
             ]);
 
         return response()->json([
@@ -120,13 +122,18 @@ class AccountController extends Controller
             }
         }
 
-        $override = in_array($user?->tier_override, ['basic', 'gold', 'diamond', 'platinum'], true)
+        $override = in_array($user?->tier_override, ['basic', 'gold', 'diamond', 'platinum', 'mafia'], true)
             ? $user->tier_override
             : null;
         $tier = ($user?->tier_mode === 'manual' && $override) ? $override : $automatic;
-        $index = array_search($tier, array_column($definitions, 'tier'), true);
-        $current = $definitions[$index === false ? 0 : $index];
-        $next = $definitions[($index === false ? 0 : $index) + 1] ?? null;
+        if ($tier === 'mafia') {
+            $current = ['tier' => 'mafia', 'label' => 'MAFIA', 'min' => null];
+            $next = null;
+        } else {
+            $index = array_search($tier, array_column($definitions, 'tier'), true);
+            $current = $definitions[$index === false ? 0 : $index];
+            $next = $definitions[($index === false ? 0 : $index) + 1] ?? null;
+        }
         $setting = DB::table('member_tier_settings')->where('tier', $tier)->first();
 
         return [
@@ -140,7 +147,7 @@ class AccountController extends Controller
             'nextTier' => $next['tier'] ?? null,
             'nextTierLabel' => $next['label'] ?? null,
             'nextTarget' => $next['min'] ?? null,
-            'remainingToNextTier' => $next ? max(0, $next['min'] - $progress) : 0,
+            'remainingToNextTier' => $next ? max(0, (int) $next['min'] - $progress) : 0,
             'setting' => [
                 'tier' => $tier,
                 'label' => $current['label'],

@@ -74,7 +74,7 @@ export function HomeProductBrowser() {
             value={query}
             onChange={(event) => changeQuery(event.target.value)}
             placeholder="Cari game, voucher, pulsa, PLN..."
-            className="h-[36px] rounded-[8px] border-white/10 bg-[#10131b] pl-[34px] pr-[34px] text-[11px] text-white placeholder:text-white/25"
+            className="h-[36px] rounded-[8px] border-white/10 bg-[#10131b] !pl-[38px] pr-[34px] text-[11px] text-white placeholder:text-white/25"
           />
           {query && (
             <button

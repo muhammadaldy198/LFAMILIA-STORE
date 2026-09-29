@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminAuthService;
+use App\Support\NominalLabel;
 use App\Services\CheckoutService;
 use App\Services\DigiflazzFulfillmentService;
 use App\Services\SecurityGuard;
@@ -112,7 +113,7 @@ class AdminOrdersController extends Controller
                     'product_slug' => $slug,
                     'product_name' => trim($input['product']),
                     'package_sku' => 'MANUAL-'.strtoupper(substr(str_replace('-', '', $identity['id']), 0, 8)),
-                    'package_label' => trim($input['packageName']),
+                    'package_label' => NominalLabel::clean(trim($input['product']), trim($input['packageName'])),
                     'provider_code' => null,
                     'provider_sku' => null,
                     'fulfillment_type' => 'manual',
@@ -189,13 +190,27 @@ class AdminOrdersController extends Controller
             $access = $auth->require($request, 'staff');
             $input = $request->validate([
                 'id' => ['required', 'uuid'],
-                'action' => ['required', 'in:complete_manual,refresh_fulfillment'],
+                'action' => ['required', 'in:complete_manual,refresh_fulfillment,retry_digiflazz'],
                 'serialNumber' => ['nullable', 'string', 'max:500'],
             ]);
 
             $order = DB::table('orders')->where('id', $input['id'])->first();
             if (!$order) {
                 return response()->json(['error' => 'Pesanan tidak ditemukan.'], 404);
+            }
+
+            if ($input['action'] === 'retry_digiflazz') {
+                if ($access['role'] === 'staff') {
+                    throw new RuntimeException('Akses panel tidak diizinkan.');
+                }
+
+                $fresh = $fulfillment->retryFailedOrder((string) $order->id, (string) $access['email']);
+
+                return response()->json([
+                    'ok' => true,
+                    'retried' => true,
+                    'order' => $fresh ? $this->visibleOrder($fresh, (string) $access['role']) : null,
+                ]);
             }
 
             if ($input['action'] === 'complete_manual') {
@@ -305,6 +320,7 @@ class AdminOrdersController extends Controller
     private function visibleOrder(object $order, string $role): array
     {
         $all = (array) $order;
+        $all['package_label'] = NominalLabel::clean((string) $order->product_name, (string) $order->package_label);
         $all['delivery_mode'] = $this->deliveryMode($order);
 
         if ($role !== 'staff') {
@@ -317,7 +333,7 @@ class AdminOrdersController extends Controller
             'product_slug' => (string) $order->product_slug,
             'product_name' => (string) $order->product_name,
             'package_sku' => (string) $order->package_sku,
-            'package_label' => (string) $order->package_label,
+            'package_label' => NominalLabel::clean((string) $order->product_name, (string) $order->package_label),
             'destination' => (string) $order->destination,
             'server' => $order->server,
             'nickname' => $order->nickname,

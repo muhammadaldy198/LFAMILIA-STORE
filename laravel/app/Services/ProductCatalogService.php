@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\NominalLabel;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -72,7 +73,7 @@ class ProductCatalogService
 
                 $publicPackages[] = [
                     'id' => (string) $package->sku,
-                    'label' => (string) $package->label,
+                    'label' => NominalLabel::clean((string) $product->name, (string) $package->label),
                     'price' => (int) $package->price,
                     'note' => $package->note,
                     'group' => $package->package_group,
@@ -80,7 +81,7 @@ class ProductCatalogService
                     'fulfillmentMode' => $mode,
                     'fulfillmentReady' => $product->fulfillment_type === 'manual' || ($providerCode !== '' && $providerSku !== ''),
                     'fulfillmentAvailable' => true,
-                    '_sort' => [(int) $package->price, (int) $package->sort_order, (string) $package->label],
+                    '_sort' => [NominalLabel::numericKey((string) $product->name, (string) $package->label), (int) $package->sort_order, (string) $package->label],
                 ];
             }
 

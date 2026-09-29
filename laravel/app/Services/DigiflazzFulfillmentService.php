@@ -79,6 +79,123 @@ class DigiflazzFulfillmentService
         }
     }
 
+    /**
+     * Explicit admin recovery for a paid DigiFlazz order that ended in a failure/review state.
+     * The original LFAMILIA reference_id is reused so the provider sees the same idempotency key.
+     *
+     * @return object|null
+     */
+    public function retryFailedOrder(string $orderId, string $adminEmail): ?object
+    {
+        DB::transaction(function () use ($orderId, $adminEmail): void {
+            $order = DB::table('orders')->where('id', $orderId)->lockForUpdate()->first();
+            if (!$order) {
+                throw new RuntimeException('Pesanan tidak ditemukan.');
+            }
+            if ($order->payment_status !== 'paid'
+                || $order->fulfillment_type !== 'automatic'
+                || strtolower(trim((string) $order->provider_code)) !== 'digiflazz') {
+                throw new RuntimeException('Hanya pesanan DigiFlazz otomatis yang sudah dibayar yang dapat dikirim ulang.');
+            }
+            if (in_array($order->fulfillment_status, ['success', 'cancelled'], true)
+                || in_array($order->provider_status, ['success'], true)) {
+                throw new RuntimeException('Pesanan sudah selesai dan tidak boleh dikirim ulang.');
+            }
+
+            $retryable = in_array((string) $order->fulfillment_status, ['failed', 'needs_review'], true)
+                || in_array((string) $order->provider_status, ['failed', 'retry_exhausted', 'retryable_error', 'error', 'unknown'], true);
+            if (!$retryable) {
+                throw new RuntimeException('Pesanan belum berada pada status gagal yang membutuhkan kirim ulang.');
+            }
+
+            $retryUnits = [];
+            if ((int) $order->quantity > 1) {
+                $units = DB::table('order_fulfillment_units')
+                    ->where('order_id', $orderId)
+                    ->orderBy('unit_index')
+                    ->lockForUpdate()
+                    ->get();
+                if ($units->count() !== (int) $order->quantity) {
+                    throw new RuntimeException('Unit pemenuhan DigiFlazz tidak lengkap; periksa pesanan sebelum kirim ulang.');
+                }
+                foreach ($units as $unit) {
+                    if (in_array($unit->provider_status, ['failed', 'retry_exhausted'], true)) {
+                        $retryUnits[] = [
+                            'unitIndex' => (int) $unit->unit_index,
+                            'referenceId' => (string) $unit->provider_ref_id,
+                            'previousStatus' => (string) $unit->provider_status,
+                            'previousMessage' => $unit->provider_message,
+                        ];
+                        DB::table('order_fulfillment_units')->where('id', $unit->id)->update([
+                            'provider_status' => 'waiting',
+                            'provider_message' => null,
+                            'attempts' => 0,
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+                if ($retryUnits === [] && !$units->contains(
+                    fn ($unit) => in_array($unit->provider_status, ['waiting', 'retryable_error'], true)
+                )) {
+                    throw new RuntimeException('Tidak ada unit gagal yang dapat dikirim ulang.');
+                }
+            }
+
+            $changed = DB::table('orders')
+                ->where('id', $orderId)
+                ->where('payment_status', 'paid')
+                ->whereNotIn('fulfillment_status', ['success', 'cancelled'])
+                ->update([
+                    'fulfillment_status' => 'processing',
+                    'provider_status' => null,
+                    'provider_message' => 'Kirim ulang DigiFlazz diizinkan oleh '.$adminEmail.'.',
+                    'updated_at' => now(),
+                ]);
+
+            if ($changed !== 1) {
+                throw new RuntimeException('Status pesanan berubah. Muat ulang sebelum mencoba lagi.');
+            }
+
+            DB::table('order_events')->insert([
+                'order_id' => $orderId,
+                'source' => 'admin',
+                'event_id' => 'admin-retry-'.$orderId.'-'.Str::uuid(),
+                'status' => 'retry_authorized',
+                'payload_json' => json_encode([
+                    'adminEmail' => $adminEmail,
+                    'providerCode' => 'digiflazz',
+                    'referenceId' => (string) $order->reference_id,
+                    'previousFulfillmentStatus' => (string) $order->fulfillment_status,
+                    'previousProviderStatus' => $order->provider_status,
+                    'previousProviderMessage' => $order->provider_message,
+                    'units' => $retryUnits,
+                ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                'created_at' => now(),
+            ]);
+        }, 3);
+
+        try {
+            $this->fulfillOrder($orderId);
+        } finally {
+            $result = DB::table('orders')->where('id', $orderId)->first();
+            DB::table('order_events')->insert([
+                'order_id' => $orderId,
+                'source' => 'admin',
+                'event_id' => 'admin-retry-result-'.$orderId.'-'.Str::uuid(),
+                'status' => 'retry_result',
+                'payload_json' => json_encode([
+                    'adminEmail' => $adminEmail,
+                    'fulfillmentStatus' => $result?->fulfillment_status,
+                    'providerStatus' => $result?->provider_status,
+                    'providerMessage' => $result?->provider_message,
+                ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                'created_at' => now(),
+            ]);
+        }
+
+        return DB::table('orders')->where('id', $orderId)->first();
+    }
+
     /** @return array{externalId:string,status:string,message:string,serialNumber:?string,raw:array<string,mixed>} */
     public function send(string $providerSku, string $customerNo, string $referenceId): array
     {
@@ -279,11 +396,21 @@ class DigiflazzFulfillmentService
                 return false;
             }
 
-            $attempts = DB::table('order_events')
+            $latestManualRetry = DB::table('order_events')
                 ->where('order_id', $orderId)
                 ->where('source', 'admin')
-                ->where('status', 'dispatching')
-                ->count();
+                ->where('status', 'retry_authorized')
+                ->orderByDesc('id')
+                ->first(['id']);
+
+            $attemptQuery = DB::table('order_events')
+                ->where('order_id', $orderId)
+                ->where('source', 'admin')
+                ->where('status', 'dispatching');
+            if ($latestManualRetry) {
+                $attemptQuery->where('id', '>', $latestManualRetry->id);
+            }
+            $attempts = $attemptQuery->count();
 
             if ($attempts >= 5) {
                 DB::table('orders')->where('id', $orderId)->update([
@@ -352,7 +479,7 @@ class DigiflazzFulfillmentService
                     DB::table('order_events')->insertOrIgnore([
                         'order_id' => $order->id,
                         'source' => 'digiflazz',
-                        'event_id' => 'unit-request-'.$unit->provider_ref_id.'-'.$fresh->attempts,
+                        'event_id' => 'unit-request-'.$unit->provider_ref_id.'-'.Str::uuid(),
                         'status' => $result['status'],
                         'payload_json' => json_encode($result['raw'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                         'created_at' => now(),
