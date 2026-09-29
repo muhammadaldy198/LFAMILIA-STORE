@@ -28,8 +28,7 @@ class SupportTicketController
         Request $request,
         AdminNotificationService $notifications,
         TransactionalEmailService $emails,
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
         $data = $request->validate([
             'subject' => ['required', 'string', 'max:150'],
             'message' => ['required', 'string', 'max:5000'],
