@@ -8,6 +8,7 @@ use App\Services\SecurityGuard;
 use App\Services\StoreContentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
@@ -24,7 +25,7 @@ class AdminProductController extends Controller
                 'adminEmail' => $access['email'],
                 'role' => $access['role'],
                 'sellerMonitor' => $access['role'] === 'super_admin'
-                    ? Illuminate\Support\Facades\DB::table('digiflazz_seller_monitor')->get()
+                    ? DB::table('digiflazz_seller_monitor')->get()
                     : null,
             ], 200, ['Cache-Control' => 'no-store']);
         } catch (RuntimeException $error) {
