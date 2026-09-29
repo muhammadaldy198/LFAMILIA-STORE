@@ -69,10 +69,22 @@ class PaymentService
         $route = $this->routing->byRouteId((int) $order->payment_route_id);
 
         $payment = DB::transaction(function () use ($order, $route, $idempotencyKey, $fingerprint): object {
+            DB::table('orders')->where('id', $order->id)->lockForUpdate()->firstOrFail();
+
             $existing = DB::table('payment_transactions')->where('idempotency_key', $idempotencyKey)
                 ->lockForUpdate()->first();
             if ($existing) {
                 return $existing;
+            }
+
+            $existingOrderPayment = DB::table('payment_transactions')
+                ->where('order_id', $order->id)
+                ->where('status', '<>', 'REJECTED')
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
+            if ($existingOrderPayment) {
+                return $existingOrderPayment;
             }
 
             $id = DB::table('payment_transactions')->insertGetId([
@@ -98,7 +110,11 @@ class PaymentService
             return DB::table('payment_transactions')->where('id', $id)->first();
         }, 3);
 
-        if ($payment->request_fingerprint !== $fingerprint) {
+        if (! hash_equals((string) $payment->request_fingerprint, $fingerprint)) {
+            if ((int) $payment->order_id === (int) $order->id) {
+                return $this->publicResult($payment);
+            }
+
             throw new HttpException(409, 'Idempotency key pembayaran sudah dipakai untuk transaksi berbeda.');
         }
 
