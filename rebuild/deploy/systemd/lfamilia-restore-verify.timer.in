@@ -1,0 +1,10 @@
+[Unit]
+Description=Verify LFAMILIA STORE backup restore weekly
+
+[Timer]
+OnCalendar=@@RESTORE_VERIFY_CALENDAR@@
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target
