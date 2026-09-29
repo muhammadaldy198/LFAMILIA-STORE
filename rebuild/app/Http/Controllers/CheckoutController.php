@@ -69,6 +69,7 @@ class CheckoutController
         $guest = ! $request->user();
         $data = $request->validate([
             'package_id' => ['required', 'integer'],
+            'payment_channel_code' => ['required', 'string', 'max:60'],
             'customer_input' => ['required', 'array', 'max:20'],
             'customer_input.*' => ['nullable', 'string', 'max:255'],
             'voucher_code' => ['nullable', 'string', 'max:100'],
