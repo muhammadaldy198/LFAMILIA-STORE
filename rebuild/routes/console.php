@@ -118,7 +118,6 @@ Artisan::command('lfamilia:recover-fulfillment', function (): void {
 
 Schedule::command('lfamilia:recover-fulfillment')->everyMinute()->withoutOverlapping();
 
-
 Schedule::call(function (): void {
     DB::table('system_settings')->updateOrInsert(
         ['key' => 'system.scheduler_heartbeat'],
