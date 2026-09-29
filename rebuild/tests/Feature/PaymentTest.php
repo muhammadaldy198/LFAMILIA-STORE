@@ -397,6 +397,69 @@ class PaymentTest extends TestCase
         $this->assertSame(10000, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
         $this->assertSame(1, DB::table('wallet_ledger')->where('source', 'TOPUP')->count());
         $this->assertSame('PAID', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+
+        $states->apply($paymentId, 'REFUNDED');
+        $states->apply($paymentId, 'PAID');
+
+        $this->assertSame(0, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
+        $this->assertSame(1, DB::table('wallet_ledger')->where('source', 'REFUND')->count());
+        $this->assertSame('REFUNDED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+        $this->assertSame('REFUNDED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+    }
+
+    public function test_expired_payment_closes_order_releases_voucher_and_late_paid_does_not_reopen(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('manual_qris', 'MANUAL_QRIS');
+        $voucherId = DB::table('vouchers')->insertGetId([
+            'code' => 'M7EXPIRE',
+            'discount_type' => 'FIXED',
+            'discount_value' => 1000,
+            'minimum_total_idr' => 0,
+            'total_quota' => 10,
+            'per_customer_limit' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $payload = $this->guestCheckout(
+            $catalog['package_id'],
+            'manual_qris',
+            'm7-expire-order-0001'
+        );
+        $payload['voucher_code'] = 'M7EXPIRE';
+        $checkout = $this->postJson('/checkout/orders', $payload)->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->first();
+
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'order_id' => $order->id,
+            'payment_route_id' => $routeId,
+            'gateway_code' => 'MANUAL_QRIS',
+            'channel_code' => 'manual_qris',
+            'merchant_reference' => 'EXPIRE-'.$order->id,
+            'amount_idr' => $order->total_idr,
+            'status' => 'PENDING',
+            'idempotency_key' => 'm7-expire-payment-0001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $states = app(PaymentStateService::class);
+        $states->apply($paymentId, 'EXPIRED');
+
+        $this->assertSame('EXPIRED', DB::table('orders')->where('id', $order->id)->value('status'));
+        $this->assertSame('EXPIRED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame('RELEASED', DB::table('voucher_redemptions')
+            ->where('voucher_id', $voucherId)->value('status'));
+
+        $states->apply($paymentId, 'PAID');
+
+        $this->assertSame('EXPIRED', DB::table('orders')->where('id', $order->id)->value('status'));
+        $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame(1, DB::table('order_events')
+            ->where('order_id', $order->id)
+            ->where('event_type', 'PAYMENT_LATE_VERIFIED')->count());
     }
 
     public function test_uncertain_external_create_is_not_blindly_retried(): void

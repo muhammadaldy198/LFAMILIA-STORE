@@ -25,6 +25,9 @@ class PaymentStateService
                 throw ValidationException::withMessages(['payment' => 'Status pembayaran tidak valid.']);
             }
 
+            if ($payment->status === 'REFUNDED') {
+                return ['result' => 'IGNORED_FINAL', 'status' => 'REFUNDED'];
+            }
             if ($payment->status === 'PAID' && $incomingStatus !== 'REFUNDED') {
                 return ['result' => 'IGNORED_FINAL', 'status' => 'PAID'];
             }
@@ -130,16 +133,22 @@ class PaymentStateService
                 'last_callback_at' => now(),
                 'updated_at' => now(),
             ]);
-            if (in_array($order->status, ['PAID', 'PROCESSING', 'SUCCESS'], true)) {
+
+            if (in_array($order->status, ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS'], true)) {
                 $before = $order->status;
                 DB::table('orders')->where('id', $order->id)->update([
                     'status' => 'REFUND',
                     'updated_at' => now(),
                 ]);
+                if ($before === 'PENDING_PAYMENT') {
+                    $this->releaseVoucher((int) $order->id);
+                }
                 $this->orderEvent($order->id, 'PAYMENT_REFUNDED', $before, 'REFUND', $metadata);
+
+                return ['result' => 'REFUNDED', 'status' => 'REFUND'];
             }
 
-            return ['result' => 'REFUNDED', 'status' => 'REFUND'];
+            return ['result' => 'REFUNDED', 'status' => $order->status];
         }
 
         DB::table('payment_transactions')->where('id', $payment->id)->update([
@@ -147,6 +156,23 @@ class PaymentStateService
             'last_callback_at' => now(),
             'updated_at' => now(),
         ]);
+
+        if ($incomingStatus === 'EXPIRED' && $order->status === 'PENDING_PAYMENT') {
+            $this->expireOrder($order);
+
+            return ['result' => 'EXPIRED', 'status' => 'EXPIRED'];
+        }
+
+        if ($incomingStatus === 'FAILED' && $order->status === 'PENDING_PAYMENT') {
+            DB::table('orders')->where('id', $order->id)->update([
+                'status' => 'FAILED',
+                'updated_at' => now(),
+            ]);
+            $this->releaseVoucher((int) $order->id);
+            $this->orderEvent($order->id, 'PAYMENT_FAILED', 'PENDING_PAYMENT', 'FAILED', $metadata);
+
+            return ['result' => 'FAILED', 'status' => 'FAILED'];
+        }
 
         return ['result' => 'PAYMENT_UPDATED', 'status' => $incomingStatus];
     }
@@ -211,6 +237,69 @@ class PaymentStateService
             return ['result' => 'PAID', 'status' => 'PAID'];
         }
 
+        if ($incomingStatus === 'REFUNDED') {
+            DB::table('payment_transactions')->where('id', $payment->id)->update([
+                'status' => 'REFUNDED',
+                'last_callback_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            if ($topup->status !== 'PAID') {
+                DB::table('wallet_topups')->where('id', $topup->id)->update([
+                    'status' => 'REFUNDED',
+                    'updated_at' => now(),
+                ]);
+
+                return ['result' => 'REFUNDED', 'status' => 'REFUNDED'];
+            }
+
+            $wallet = DB::table('wallets')->where('id', $topup->wallet_id)->lockForUpdate()->first();
+            if (! $wallet) {
+                throw ValidationException::withMessages(['payment' => 'Wallet tidak ditemukan.']);
+            }
+
+            $refundKey = 'wallet-topup-refund:'.$payment->id;
+            if (DB::table('wallet_ledger')->where('idempotency_key', $refundKey)->exists()) {
+                return ['result' => 'REFUNDED', 'status' => 'REFUNDED'];
+            }
+
+            if ((int) $wallet->balance_idr < (int) $topup->amount_idr) {
+                DB::table('wallet_topups')->where('id', $topup->id)->update([
+                    'status' => 'REFUND_REVIEW',
+                    'updated_at' => now(),
+                ]);
+
+                return ['result' => 'REFUND_REVIEW', 'status' => 'REFUND_REVIEW'];
+            }
+
+            $before = (int) $wallet->balance_idr;
+            $after = $before - (int) $topup->amount_idr;
+            DB::table('wallets')->where('id', $wallet->id)->update([
+                'balance_idr' => $after,
+                'version' => DB::raw('version + 1'),
+                'updated_at' => now(),
+            ]);
+            DB::table('wallet_ledger')->insert([
+                'wallet_id' => $wallet->id,
+                'amount_idr' => -((int) $topup->amount_idr),
+                'balance_before_idr' => $before,
+                'balance_after_idr' => $after,
+                'source' => 'REFUND',
+                'reference_type' => 'WALLET_TOPUP',
+                'reference_id' => (string) $topup->id,
+                'actor_type' => 'payment_gateway',
+                'actor_id' => null,
+                'idempotency_key' => $refundKey,
+                'created_at' => now(),
+            ]);
+            DB::table('wallet_topups')->where('id', $topup->id)->update([
+                'status' => 'REFUNDED',
+                'updated_at' => now(),
+            ]);
+
+            return ['result' => 'REFUNDED', 'status' => 'REFUNDED'];
+        }
+
         if (in_array($incomingStatus, ['FAILED', 'EXPIRED'], true)) {
             DB::table('wallet_topups')->where('id', $topup->id)
                 ->where('status', 'PENDING_PAYMENT')->update([
@@ -229,7 +318,10 @@ class PaymentStateService
 
     private function markOrderPaid(object $payment, object $order, array $metadata): array
     {
-        if (in_array($order->status, ['PAID', 'PROCESSING', 'SUCCESS', 'REFUND'], true)) {
+        if ($order->status === 'REFUND') {
+            return ['result' => 'IGNORED_ORDER_STATE', 'status' => 'REFUND'];
+        }
+        if (in_array($order->status, ['PAID', 'PROCESSING', 'SUCCESS'], true)) {
             DB::table('payment_transactions')->where('id', $payment->id)->update([
                 'status' => 'PAID',
                 'verified_at' => $payment->verified_at ?: now(),
@@ -275,13 +367,18 @@ class PaymentStateService
             'status' => 'EXPIRED',
             'updated_at' => now(),
         ]);
-        DB::table('voucher_redemptions')->where('order_id', $order->id)
+        $this->releaseVoucher((int) $order->id);
+        $this->orderEvent($order->id, 'ORDER_EXPIRED', 'PENDING_PAYMENT', 'EXPIRED', []);
+    }
+
+    private function releaseVoucher(int $orderId): void
+    {
+        DB::table('voucher_redemptions')->where('order_id', $orderId)
             ->where('status', 'RESERVED')->update([
                 'status' => 'RELEASED',
                 'reserved_until' => now(),
                 'updated_at' => now(),
             ]);
-        $this->orderEvent($order->id, 'ORDER_EXPIRED', 'PENDING_PAYMENT', 'EXPIRED', []);
     }
 
     private function orderEvent(int $orderId, string $type, ?string $from, ?string $to, array $metadata): void
