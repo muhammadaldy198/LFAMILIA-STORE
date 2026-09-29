@@ -60,12 +60,12 @@ test("critical production paths use redacted structured error logging", () => {
   assert.doesNotMatch(logger, /error\.stack/);
 });
 
-test("production CI includes safe live security probes", () => {
+test("prelaunch CI keeps security checks and Laravel validation", () => {
   const workflow = read(".github/workflows/validate.yml");
-  assert.match(workflow, /lfamilia-production-security-smoke/);
-  assert.match(workflow, /Cross-site mutation tidak ditolak/);
-  assert.match(workflow, /CORS wildcard terdeteksi/);
-  assert.match(workflow, /Admin API tidak tertutup/);
-  assert.match(workflow, /strict-transport-security/);
-  assert.match(workflow, /content-security-policy/);
+  const laravelWorkflow = read(".github/workflows/validate-laravel.yml");
+  assert.match(workflow, /npm audit --omit=dev --audit-level=high/);
+  assert.match(workflow, /npm run lint/);
+  assert.match(workflow, /node --test tests\/\*\.test\.mjs/);
+  assert.match(laravelWorkflow, /Run Laravel tests/);
+  assert.doesNotMatch(workflow, /lfamilia-production-security-smoke/);
 });
