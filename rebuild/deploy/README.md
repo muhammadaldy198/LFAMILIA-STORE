@@ -20,11 +20,17 @@ All secret files should be owned by root (or the dedicated service user that nee
 3. Clone this repository to the server and keep `main` as the production ref.
 4. Copy `production.env.example` to `rebuild/.env`, fill infrastructure values, and generate `APP_KEY`.
 5. Copy `ops.env.example` to `/etc/lfamilia/ops.env` and fill paths/user/backup storage settings.
-6. Run `deploy/install-systemd.sh`.
-7. Configure the CloudPanel vhost to point to `rebuild/public`; keep CloudPanel's generated PHP-FPM block.
-8. Run `deploy/preflight.sh`.
-9. Run `deploy/deploy.sh`.
-10. Verify Cloudflare proxy/DNS + Full (strict) TLS and run `deploy/healthcheck.sh`.
+6. Configure the CloudPanel vhost to point to `rebuild/public`; keep CloudPanel's generated PHP-FPM block.
+7. Configure Cloudflare apex/`www` proxy and Full (strict) TLS so the public health URL can reach this VPS.
+8. Run `bash deploy/install-systemd.sh` as root.
+9. Run `bash deploy/preflight.sh`.
+10. Run `bash deploy/deploy.sh`.
+11. Re-run `bash deploy/healthcheck.sh` and verify backup/restore timers.
+
+## Source rollback
+
+Use `ROLLBACK_REF=<known-good-sha> CONFIRM_ROLLBACK=ROLLBACK_SOURCE_ONLY bash deploy/rollback-source.sh`.
+This intentionally does not roll database migrations backward.
 
 ## Safety rules
 
