@@ -1,13 +1,13 @@
 import { getD1 } from "@/db";
 import { resolveMemberTierFromProgress } from "@/lib/server/final-audit-rules";
 
-export type MemberTier = "basic" | "gold" | "diamond" | "platinum";
+export type MemberTier = "basic" | "gold" | "diamond" | "platinum" | "mafia";
 export type MemberTierMode = "automatic" | "manual";
 
 export type MemberTierSetting = {
   tier: MemberTier;
   label: string;
-  minSpend: number;
+  minSpend: number | null;
   discountPercent: number;
   benefits: string;
 };
@@ -27,11 +27,12 @@ export type MemberTierProfile = {
   setting: MemberTierSetting;
 };
 
-export const MEMBER_TIER_DEFINITIONS: ReadonlyArray<{ tier: MemberTier; label: string; minSpend: number }> = [
+export const MEMBER_TIER_DEFINITIONS: ReadonlyArray<{ tier: MemberTier; label: string; minSpend: number | null }> = [
   { tier: "basic", label: "BASIC", minSpend: 0 },
   { tier: "gold", label: "GOLD", minSpend: 1_000_000 },
   { tier: "diamond", label: "DIAMOND", minSpend: 10_000_000 },
   { tier: "platinum", label: "PLATINUM", minSpend: 50_000_000 },
+  { tier: "mafia", label: "MAFIA", minSpend: null },
 ];
 
 let ensurePromise: Promise<void> | null = null;
@@ -62,7 +63,7 @@ export function resolveMemberTier(progress: number): MemberTier {
 }
 
 function isMemberTier(value: unknown): value is MemberTier {
-  return value === "basic" || value === "gold" || value === "diamond" || value === "platinum";
+  return value === "basic" || value === "gold" || value === "diamond" || value === "platinum" || value === "mafia";
 }
 function definitionFor(tier: MemberTier) {
   return MEMBER_TIER_DEFINITIONS.find((item) => item.tier === tier)!;
@@ -117,12 +118,13 @@ export async function getMemberTierProfile(customerId: string): Promise<MemberTi
   const tier = role.tierMode === "manual" && role.tierOverride ? role.tierOverride : automaticTier;
   const index = MEMBER_TIER_DEFINITIONS.findIndex((item) => item.tier === tier);
   const current = MEMBER_TIER_DEFINITIONS[index];
-  const next = MEMBER_TIER_DEFINITIONS[index + 1] ?? null;
+  const candidate = MEMBER_TIER_DEFINITIONS[index + 1] ?? null;
+  const next = candidate?.tier === "mafia" ? null : candidate;
   return {
     tier, label: current.label, lifetimeSpend, tierProgress, tierProgressBonus: role.tierProgressBonus,
     tierMode: role.tierMode, tierOverride: role.tierOverride,
     nextTier: next?.tier ?? null, nextTierLabel: next?.label ?? null, nextTarget: next?.minSpend ?? null,
-    remainingToNextTier: next ? Math.max(0, next.minSpend - tierProgress) : 0,
+    remainingToNextTier: next?.minSpend != null ? Math.max(0, next.minSpend - tierProgress) : 0,
     setting: settings.find((item) => item.tier === tier) ?? { ...current, discountPercent: 0, benefits: "" },
   };
 }
@@ -138,7 +140,9 @@ export async function setMemberRole(customerId: string, role: "automatic" | Memb
   const lifetimeSpend = await getMemberLifetimeSpend(customerId);
   const minimum = definitionFor(role).minSpend;
   const currentProgress = lifetimeSpend + current.tierProgressBonus;
-  const bonus = current.tierProgressBonus + Math.max(0, minimum - currentProgress);
+  const bonus = role === "mafia" || minimum == null
+    ? current.tierProgressBonus
+    : current.tierProgressBonus + Math.max(0, minimum - currentProgress);
   await db.prepare(`UPDATE customer_users SET tier_mode = 'manual', tier_override = ?, tier_progress_bonus = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
     .bind(role, bonus, customerId).run();
 }
