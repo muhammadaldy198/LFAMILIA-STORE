@@ -24,7 +24,7 @@ M11 is a regression milestone. It does not change checkout, payment, fulfillment
 | Voucher double use / quota | CheckoutTest::test_voucher_is_reserved_atomically_and_quota_cannot_be_reused |
 | Duplicate order | Checkout idempotency and idempotency-fingerprint conflict tests |
 | Duplicate payment | PaymentTest payment-key and wallet idempotency tests |
-| Insufficient / negative wallet | PaymentTest M11 insufficient-balance regression + wallet schema invariants |
+| Insufficient / negative wallet | PaymentTest M11 insufficient-balance regression + wallet schema invariants |\n| Wallet race condition | WalletConcurrencyM11Test runs two simultaneous debits against one MySQL wallet row and requires exactly one winner |
 | Fake / replayed payment callback | PaymentTest + SecurityM10Test |
 | Late callback / final-state downgrade | PaymentTest expired/late and stale callback tests |
 | Duplicate fulfillment | FulfillmentTest single-attempt and webhook idempotency tests |
