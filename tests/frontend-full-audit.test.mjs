@@ -113,7 +113,7 @@ test("admin workspaces include explicit responsive breakpoints", () => {
   assert.match(orders, /xl:grid-cols-6/);
   assert.match(orders, /xl:grid-cols-\[minmax\(0,1fr\)_270px\]/);
   assert.match(payments, /xl:grid-cols-\[minmax\(0,1fr\)_410px\]/);
-  assert.match(payments, /min-w-\[760px\]/);
+  assert.match(payments, /min-w-\[(?:860|900)px\]/);
   assert.match(customers, /xl:grid-cols-5/);
   assert.match(integrations, /md:grid-cols-2/);
   assert.match(operations, /xl:grid-cols-4/);

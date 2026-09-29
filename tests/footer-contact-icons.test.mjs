@@ -21,8 +21,8 @@ test("customer footer brand banner is full viewport width on every breakpoint", 
 
   assert.match(source, /data-sitewide-footer-banner/);
   assert.match(source, /relative left-1\/2 [^"\n]*w-screen -translate-x-1\/2/);
-  assert.match(source, /src="\/brand\/lfamilia-footer-mobile-wordmark\.jpg"/);
-  assert.match(source, /src="\/brand\/lfamilia-footer-desktop-wordmark\.jpg"/);
+  assert.match(source, /settings\.footerBannerMobileUrl \|\| "\/brand\/lfamilia-footer-mobile-wordmark\.jpg"/);
+  assert.match(source, /settings\.footerBannerDesktopUrl \|\| "\/brand\/lfamilia-footer-desktop-wordmark\.jpg"/);
   assert.match(source, /sm:h-\[/);
   assert.match(source, /lg:h-\[/);
   assert.match(source, /xl:h-\[/);

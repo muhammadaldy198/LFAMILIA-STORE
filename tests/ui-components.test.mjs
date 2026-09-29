@@ -77,15 +77,15 @@ test("accepts managed and HTTPS image URLs while rejecting unsafe schemes", asyn
   assert.equal(isAllowedMediaUrl("/brand/../private.png"), false);
 });
 
-test("customer actions tolerate empty responses and Digiflazz workspace exposes active controls", async () => {
+test("customer actions tolerate empty responses and Digiflazz workspace exposes sync and refresh", async () => {
   const accounts = await readFile(path.join(root, "components/customer-game-accounts.tsx"), "utf8");
   const pricing = await readFile(path.join(root, "components/admin-digiflazz-workspace.tsx"), "utf8");
   assert.match(accounts, /const data = await readJson\(response\)/);
   assert.match(accounts, /Akun game gagal dihapus/);
   assert.match(pricing, /onClick=\{\(\) => void syncNow\(\)\}/);
-  assert.match(pricing, /async function savePricing/);
-  assert.match(pricing, /method: "PUT"/);
-  assert.match(pricing, /setEditing/);
+  assert.match(pricing, /async function toggleAutoSync/);
+  assert.match(pricing, /async function load/);
+  assert.doesNotMatch(pricing, /async function savePricing/);
 });
 
 test("Contact Us uses brand marks for WhatsApp, Instagram, and Discord", async () => {

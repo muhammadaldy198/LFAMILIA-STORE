@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\CustomerAuthService;
 use App\Services\SecurityGuard;
 use App\Support\PhoneNormalizer;
+use App\Support\NominalLabel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +43,7 @@ class AccountController extends Controller
             ->map(fn ($order) => [
                 ...((array) $order),
                 'reference_id' => $this->publicReference((string) $order->reference_id),
+                'package_label' => NominalLabel::clean((string) $order->product_name, (string) $order->package_label),
             ]);
 
         return response()->json([

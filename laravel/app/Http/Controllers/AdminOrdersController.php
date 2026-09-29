@@ -113,7 +113,7 @@ class AdminOrdersController extends Controller
                     'product_slug' => $slug,
                     'product_name' => trim($input['product']),
                     'package_sku' => 'MANUAL-'.strtoupper(substr(str_replace('-', '', $identity['id']), 0, 8)),
-                    'package_label' => trim($input['packageName']),
+                    'package_label' => NominalLabel::clean(trim($input['product']), trim($input['packageName'])),
                     'provider_code' => null,
                     'provider_sku' => null,
                     'fulfillment_type' => 'manual',
@@ -320,6 +320,7 @@ class AdminOrdersController extends Controller
     private function visibleOrder(object $order, string $role): array
     {
         $all = (array) $order;
+        $all['package_label'] = NominalLabel::clean((string) $order->product_name, (string) $order->package_label);
         $all['delivery_mode'] = $this->deliveryMode($order);
 
         if ($role !== 'staff') {

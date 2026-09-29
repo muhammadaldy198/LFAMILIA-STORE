@@ -228,6 +228,7 @@ class DigiflazzFulfillmentSecurityTest extends TestCase
         ]);
 
         app(DigiflazzFulfillmentService::class)->retryFailedOrder($orderId, 'admin@example.com');
+        $this->assertSame('success', DB::table('order_fulfillment_units')->where('order_id', $orderId)->where('unit_index', 2)->value('provider_status'), DB::table('order_fulfillment_units')->where('order_id', $orderId)->get()->toJson());
         $this->assertDatabaseHas('orders', ['id' => $orderId, 'fulfillment_status' => 'success']);
         $this->assertDatabaseHas('order_fulfillment_units', [
             'order_id' => $orderId, 'unit_index' => 1, 'provider_serial_number' => 'FIRST-SN',

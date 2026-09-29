@@ -92,7 +92,7 @@ class OrderSearchController extends Controller
             'referenceId' => $reference,
             'maskedReferenceId' => $reference ?: $this->maskInvoice((string) $row->reference_id),
             'productName' => (string) $row->product_name,
-            'packageLabel' => (string) $row->package_label,
+            'packageLabel' => \App\Support\NominalLabel::clean((string) $row->product_name, (string) $row->package_label),
             'total' => (int) $row->total,
             'status' => $this->publicStatus((string) $row->payment_status, (string) $row->fulfillment_status),
             'createdAt' => $row->created_at,
