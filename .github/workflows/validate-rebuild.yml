@@ -62,15 +62,15 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, pdo_mysql, redis
+          extensions: mbstring, pdo_mysql, redis, gd, exif
           coverage: none
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Install PHP dependencies
         run: |
-          composer update spatie/laravel-medialibrary --with-all-dependencies --no-interaction --prefer-dist
           composer validate --strict
+          composer install --no-interaction --prefer-dist
       - name: Install frontend dependencies
         run: npm ci
       - name: Configure test app
@@ -82,17 +82,10 @@ jobs:
       - name: Validate schema and assets
         run: |
           php artisan migrate --force
-          php artisan migrate:rollback --step=5 --force
+          php artisan migrate:rollback --step=6 --force
           php artisan migrate --force
           npm run build
       - name: Run rebuild tests
         run: vendor/bin/phpunit
       - name: Check PHP style
         run: vendor/bin/pint --test
-      - name: Upload M5 lock
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: m5-composer-lock
-          path: rebuild/composer.lock
-          if-no-files-found: ignore

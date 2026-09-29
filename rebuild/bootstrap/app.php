@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsurePhone;
+use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\TrackCustomerActivity;
 use Illuminate\Foundation\Application;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'phone.required' => EnsurePhone::class,
             'admin.role' => EnsureAdminRole::class,
+            'admin.super' => EnsureSuperAdmin::class,
             'customer.activity' => TrackCustomerActivity::class,
         ]);
     })

@@ -63,7 +63,7 @@ class DatabaseSchemaTest extends TestCase
 
     public function test_zero_total_order_is_rejected_by_mysql(): void
     {
-        $categoryId = DB::table('categories')->insertGetId(['name' => 'Game', 'slug' => 'game']);
+        $categoryId = DB::table('categories')->insertGetId(['name' => 'Schema Game', 'slug' => 'schema-game']);
         $productId = DB::table('products')->insertGetId([
             'category_id' => $categoryId,
             'name' => 'Test Product',
