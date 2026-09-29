@@ -33,5 +33,9 @@ class AppServiceProvider extends ServiceProvider
             ->by('payment-webhook:'.$request->ip()));
         RateLimiter::for('fulfillment-webhook', fn (Request $request) => Limit::perMinute(180)
             ->by('fulfillment-webhook:'.$request->ip()));
+        RateLimiter::for('admin-sensitive', fn (Request $request) => Limit::perMinute(30)
+            ->by('admin-sensitive:'.($request->user('admin')?->id ?? $request->ip())));
+        RateLimiter::for('secret-reveal', fn (Request $request) => Limit::perMinute(6)
+            ->by('secret-reveal:'.($request->user('admin')?->id ?? $request->ip())));
     }
 }
