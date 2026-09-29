@@ -15,7 +15,6 @@ class AdminPermissionService
         'providers.manage' => 'Digiflazz & provider',
         'payments.manage' => 'Pembayaran operasional',
         'customers.view' => 'Pelanggan',
-        'customers.wallet' => 'Penyesuaian saldo pelanggan',
         'vouchers.manage' => 'Promo / voucher',
         'support.manage' => 'Layanan pelanggan',
         'reports.view' => 'Laporan',
