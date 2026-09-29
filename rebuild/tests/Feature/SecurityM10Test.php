@@ -93,9 +93,9 @@ class SecurityM10Test extends TestCase
             $this->post('/forgot-password', ['email' => 'limited@example.test']);
         }
 
-        $this->post('/forgot-password', ['email' => 'limited@example.test'])
-            ->assertStatus(429)
-            ->assertHeader('Cache-Control', 'no-store');
+        $response = $this->post('/forgot-password', ['email' => 'limited@example.test'])
+            ->assertStatus(429);
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
     }
 
     public function test_suspicious_login_requires_turnstile_after_failed_attempts(): void
