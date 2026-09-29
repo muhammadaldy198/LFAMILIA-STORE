@@ -11,15 +11,12 @@ const provider = read("lib/server/providers/digiflazz.ts");
 const manager = read("components/admin-product-manager.tsx");
 const workspace = read("components/admin-digiflazz-workspace.tsx");
 
-test("automatic DigiFlazz recovery runs every five minutes while pricelist sync stays hourly", () => {
-  const worker = read("worker/index.ts");
+test("retired Worker has no cron and Laravel schedules reconciliation", () => {
   const wrangler = read("wrangler.jsonc");
-  assert.match(wrangler, /"\*\/5 \* \* \* \*"/);
-  assert.match(wrangler, /"5 \* \* \* \*"/);
-  assert.match(worker, /event\.cron === "5 \* \* \* \*"/);
-  assert.match(worker, /tasks\.push\(syncDigiflazzPrices\(\)/);
-  assert.match(worker, /recoverStaleAutomaticOrders\(publicBaseUrl\)/);
-  assert.match(worker, /reconcileStaleDigiflazzProcessing\(publicBaseUrl\)/);
+  const scheduler = read("laravel/routes/console.php");
+  assert.match(wrangler, /"crons": \[\]/);
+  assert.match(scheduler, /Schedule::command\('lfamilia:reconcile'\)/);
+  assert.match(scheduler, /->everyMinute\(\)/);
 });
 
 test("DigiFlazz price parser requires data array before filtering", () => {
