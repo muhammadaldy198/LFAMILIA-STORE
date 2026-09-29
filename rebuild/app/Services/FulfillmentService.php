@@ -678,7 +678,7 @@ class FulfillmentService
             'attempt_no' => $attemptNo,
             'external_reference' => $externalReference,
             'status' => $status,
-            'correlation_id' => $this->correlationId($orderId),
+            'correlation_id' => $this->correlationId((int) $order->id),
             'safe_to_failover' => false,
             'last_error' => $error,
             'created_at' => now(),
