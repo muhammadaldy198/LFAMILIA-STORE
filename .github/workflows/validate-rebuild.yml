@@ -107,4 +107,6 @@ jobs:
       - name: Run rebuild tests
         run: vendor/bin/phpunit
       - name: Check PHP style
-        run: vendor/bin/pint --test
+        run: |
+          vendor/bin/pint
+          git diff --exit-code
