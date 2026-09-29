@@ -18,17 +18,17 @@ class SecurityHeaders
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
         $response->headers->set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
         $response->headers->set('Cross-Origin-Resource-Policy', 'same-site');
-        if (! app()->environment('local')) {
+        if (!app()->environment('local')) {
             $response->headers->set(
                 'Content-Security-Policy',
-                "default-src 'self'; ".
-                "script-src 'self' https://challenges.cloudflare.com; ".
-                "style-src 'self' 'unsafe-inline'; ".
-                "img-src 'self' data: https:; ".
-                "font-src 'self' data:; ".
-                "connect-src 'self' https://challenges.cloudflare.com; ".
-                "frame-src https://challenges.cloudflare.com; ".
-                "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+                'default-src \'self\'; '.
+                'script-src \'self\' https://challenges.cloudflare.com; '.
+                'style-src \'self\' \'unsafe-inline\'; '.
+                'img-src \'self\' data: https:; '.
+                'font-src \'self\' data:; '.
+                'connect-src \'self\' https://challenges.cloudflare.com; '.
+                'frame-src https://challenges.cloudflare.com; '.
+                'object-src \'none\'; base-uri \'self\'; frame-ancestors \'none\'; form-action \'self\''
             );
         }
         $response->headers->remove('X-Powered-By');
