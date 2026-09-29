@@ -13,6 +13,7 @@ class PaymentStateService
         private readonly AdminNotificationService $notifications,
         private readonly TransactionalEmailService $emails,
     ) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -90,7 +91,7 @@ class PaymentStateService
             ]);
             DB::table('wallet_ledger')->insertOrIgnore([
                 'wallet_id' => $wallet->id,
-                'amount_idr' => -((int) $payment->amount_idr),
+                'amount_idr' => -(int) $payment->amount_idr,
                 'balance_before_idr' => $before,
                 'balance_after_idr' => $after,
                 'source' => 'CHECKOUT',
@@ -307,7 +308,7 @@ class PaymentStateService
             ]);
             DB::table('wallet_ledger')->insert([
                 'wallet_id' => $wallet->id,
-                'amount_idr' => -((int) $topup->amount_idr),
+                'amount_idr' => -(int) $topup->amount_idr,
                 'balance_before_idr' => $before,
                 'balance_after_idr' => $after,
                 'source' => 'REFUND',
