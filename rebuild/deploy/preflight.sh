@@ -34,12 +34,55 @@ for ext in pdo_mysql redis mbstring openssl; do
 done
 
 for pair in   'APP_ENV=production'   'APP_DEBUG=false'   'SESSION_ENCRYPT=true'   'SESSION_SECURE_COOKIE=true'; do
-  grep -Eq "^\${pair}$" "${ENV_FILE}" || { echo "Required setting missing: ${pair}" >&2; exit 1; }
+  grep -Eq "^${pair}$" "${ENV_FILE}" || { echo "Required setting missing: ${pair}" >&2; exit 1; }
 done
 
 grep -Eq '^APP_KEY=base64:.+$' "${ENV_FILE}" || { echo "APP_KEY must be generated server-side" >&2; exit 1; }
 grep -Eq '^APP_URL=https://' "${ENV_FILE}" || { echo "APP_URL must use HTTPS" >&2; exit 1; }
-grep -Eq '^APP_TRUSTED_HOSTS=.+$' "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
+grep -Eq '^APP_TRUSTED_HOSTS=.+
+cd "${APP_DIR}"
+"${COMPOSER_BIN}" validate --strict
+"${NPM_BIN}" --version >/dev/null
+
+mysql --defaults-extra-file="${MYSQL_DEFAULTS_FILE}" "${BACKUP_DATABASE_NAME}"   --batch --skip-column-names -e 'SELECT 1' | grep -Fxq '1'
+
+if [[ -n "${REDIS_PASSWORD_FILE:-}" ]]; then
+  [[ -r "${REDIS_PASSWORD_FILE}" ]] || { echo "Redis password file is not readable" >&2; exit 1; }
+  REDISCLI_AUTH="$(<"${REDIS_PASSWORD_FILE}")" redis-cli -h 127.0.0.1 ping | grep -Fxq PONG
+else
+  redis-cli -h 127.0.0.1 ping | grep -Fxq PONG
+fi
+
+if [[ "${BACKUP_REQUIRE_REMOTE:-true}" == "true" ]]; then
+  require_cmd rclone
+  : "${BACKUP_RCLONE_REMOTE:?BACKUP_RCLONE_REMOTE is required}"
+  [[ -r "${RCLONE_CONFIG:?RCLONE_CONFIG is required}" ]] || { echo "rclone config is not readable" >&2; exit 1; }
+fi
+
+echo "M12 production preflight passed."
+ "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
+grep -Eq '^TRUSTED_PROXIES=.+
+cd "${APP_DIR}"
+"${COMPOSER_BIN}" validate --strict
+"${NPM_BIN}" --version >/dev/null
+
+mysql --defaults-extra-file="${MYSQL_DEFAULTS_FILE}" "${BACKUP_DATABASE_NAME}"   --batch --skip-column-names -e 'SELECT 1' | grep -Fxq '1'
+
+if [[ -n "${REDIS_PASSWORD_FILE:-}" ]]; then
+  [[ -r "${REDIS_PASSWORD_FILE}" ]] || { echo "Redis password file is not readable" >&2; exit 1; }
+  REDISCLI_AUTH="$(<"${REDIS_PASSWORD_FILE}")" redis-cli -h 127.0.0.1 ping | grep -Fxq PONG
+else
+  redis-cli -h 127.0.0.1 ping | grep -Fxq PONG
+fi
+
+if [[ "${BACKUP_REQUIRE_REMOTE:-true}" == "true" ]]; then
+  require_cmd rclone
+  : "${BACKUP_RCLONE_REMOTE:?BACKUP_RCLONE_REMOTE is required}"
+  [[ -r "${RCLONE_CONFIG:?RCLONE_CONFIG is required}" ]] || { echo "rclone config is not readable" >&2; exit 1; }
+fi
+
+echo "M12 production preflight passed."
+ "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
 
 cd "${APP_DIR}"
 "${COMPOSER_BIN}" validate --strict
