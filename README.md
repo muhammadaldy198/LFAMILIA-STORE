@@ -1,6 +1,6 @@
 # LFAMILIA STORE
 
-Toko top up digital dalam tahap pra-peluncuran. Domain publik melewati Cloudflare menuju VPS; aplikasi web dan API dijalankan oleh Vinext dan Laravel dengan MariaDB. Cloudflare Worker/D1 tetap ada sebagai arsip migrasi, tanpa route publik dan tanpa cron aktif.
+Toko top up digital dalam tahap pra-peluncuran. Domain publik melewati Cloudflare menuju VPS; aplikasi web dan API dijalankan oleh Vinext dan Laravel dengan MariaDB. Kode Worker dan migrasi D1 tetap ada di Git sebagai arsip; deployment Worker lama telah dihapus dari Cloudflare.
 
 ## Fitur utama
 
