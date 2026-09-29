@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsurePhone;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\TrackCustomerActivity;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'phone.required' => EnsurePhone::class,
             'admin.role' => EnsureAdminRole::class,
+            'customer.activity' => TrackCustomerActivity::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

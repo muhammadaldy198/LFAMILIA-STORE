@@ -3,6 +3,7 @@
 namespace App\Actions\Fortify;
 
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -18,16 +19,16 @@ class CreateNewUser implements CreatesNewUsers
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-            'phone' => ['required', 'regex:/^\\+?[0-9]{8,16}$/'],
+            'phone' => ['required', 'regex:/^\+?[0-9]{8,16}$/'],
             'password' => ['required', 'string', 'min:12', 'confirmed'],
         ])->validate();
 
-        return User::create([
+        return DB::transaction(fn (): User => User::create([
             'name' => $input['name'],
             'email' => $input['email'],
             'phone' => $input['phone'],
             'password' => Hash::make($input['password']),
             'membership_tier_code' => 'BASIC',
-        ]);
+        ]));
     }
 }
