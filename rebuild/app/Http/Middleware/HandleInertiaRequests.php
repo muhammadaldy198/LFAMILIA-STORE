@@ -21,8 +21,11 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'status' => fn () => $request->session()->get('status'),
+            'security' => [
+                'turnstile' => app(TurnstileService::class)->publicConfig(),
+            ],
             'adminPanel' => function () use ($admin, $permissions): ?array {
-                if (! $admin) {
+                if (!$admin) {
                     return null;
                 }
 
