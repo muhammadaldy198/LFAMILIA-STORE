@@ -1,9 +1,13 @@
 <?php
 
+use App\Jobs\ReconcileFulfillmentJob;
+use App\Jobs\SendFulfillmentJob;
+use App\Jobs\StartFulfillmentJob;
 use App\Models\AdminUser;
 use App\Models\User;
 use App\Services\CustomerAccountDeletion;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
@@ -68,3 +72,48 @@ Artisan::command('lfamilia:cleanup-empty-customers', function (CustomerAccountDe
 })->purpose('Remove inactive empty accounts after 30 days, retaining accounts with obligations');
 
 Schedule::command('lfamilia:cleanup-empty-customers')->dailyAt('03:30');
+
+
+Artisan::command('lfamilia:recover-fulfillment', function (): void {
+    $queued = 0;
+
+    DB::table('orders')
+        ->where('status', 'PAID')
+        ->whereNotExists(function ($query): void {
+            $query->selectRaw('1')->from('fulfillment_attempts')
+                ->whereColumn('fulfillment_attempts.order_id', 'orders.id');
+        })
+        ->orderBy('id')
+        ->chunkById(100, function ($orders) use (&$queued): void {
+            foreach ($orders as $order) {
+                StartFulfillmentJob::dispatch((int) $order->id);
+                $queued++;
+            }
+        });
+
+    DB::table('fulfillment_attempts')
+        ->where('status', 'CREATED')
+        ->where('updated_at', '<=', now()->subMinute())
+        ->orderBy('id')
+        ->chunkById(100, function ($attempts) use (&$queued): void {
+            foreach ($attempts as $attempt) {
+                SendFulfillmentJob::dispatch((int) $attempt->id);
+                $queued++;
+            }
+        });
+
+    DB::table('fulfillment_attempts')
+        ->whereIn('status', ['PENDING', 'UNKNOWN', 'SENDING'])
+        ->where('updated_at', '<=', now()->subMinutes(2))
+        ->orderBy('id')
+        ->chunkById(100, function ($attempts) use (&$queued): void {
+            foreach ($attempts as $attempt) {
+                ReconcileFulfillmentJob::dispatch((int) $attempt->id);
+                $queued++;
+            }
+        });
+
+    $this->info("Fulfillment jobs queued: {$queued}");
+})->purpose('Recover paid orders and reconcile uncertain provider attempts without creating duplicate fulfillment');
+
+Schedule::command('lfamilia:recover-fulfillment')->everyMinute()->withoutOverlapping();

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\FulfillmentWebhookController;
 use App\Http\Controllers\PaymentWebhookController;
 use App\Models\Wallet;
 use Illuminate\Http\Request;
@@ -21,3 +22,6 @@ Route::post('/payments/midtrans/notification', [PaymentWebhookController::class,
     ->middleware('throttle:payment-webhook');
 Route::post('/payments/doku/notification', [PaymentWebhookController::class, 'doku'])
     ->middleware('throttle:payment-webhook');
+
+Route::post('/fulfillment/digiflazz/webhook', [FulfillmentWebhookController::class, 'digiflazz'])
+    ->middleware('throttle:fulfillment-webhook');

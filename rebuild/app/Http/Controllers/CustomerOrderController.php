@@ -33,10 +33,13 @@ class CustomerOrderController
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
             ->where('orders.user_id', $request->user()->id)->where('orders.id', $order)
             ->select('orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
-                'orders.created_at', 'orders.paid_at', 'products.name as product_name',
-                'product_packages.name as package_name')->first();
+                'orders.created_at', 'orders.paid_at', 'orders.delivery_payload',
+                'products.name as product_name', 'product_packages.name as package_name')->first();
 
         abort_unless($record, 404);
+        $record->delivery = is_string($record->delivery_payload)
+            ? (json_decode($record->delivery_payload, true) ?: null) : null;
+        unset($record->delivery_payload);
 
         return Inertia::render('Customer/OrderDetail', [
             'order' => $record,

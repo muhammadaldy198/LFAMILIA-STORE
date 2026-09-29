@@ -57,6 +57,7 @@ const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
 const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping.id, {
     priority: mapping.priority, is_active: mapping.is_active,
     ...(mapping.provider_code === 'MANUAL' ? { cost_idr: mapping.cost_idr } : {}),
+    ...(mapping.provider_code === 'DIGIFLAZZ' ? { customer_no_template: mapping.customer_no_template || null } : {}),
 });
 const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { is_active: asset.is_active, target_url: asset.target_url || null });
 </script>
@@ -136,6 +137,7 @@ const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { i
                             <div v-for="mapping in pack.mappings" :key="mapping.id" class="flex flex-wrap items-end gap-2 text-xs text-slate-300">
                                 <span>{{ mapping.provider_code }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span></span>
                                 <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
+                                <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Template customer_no<input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2"><span class="mt-1 block text-[11px] text-slate-500">Gunakan placeholder field produk. Jika hanya satu field, boleh dikosongkan.</span></label>
                                 <label>Prioritas<input v-model.number="mapping.priority" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2"></label>
                                 <label class="flex gap-2"><input v-model="mapping.is_active" type="checkbox">Aktif</label>
                                 <button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan mapping</button>

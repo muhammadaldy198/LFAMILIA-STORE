@@ -65,6 +65,13 @@ async function continuePayment() {
             <p v-if="errors.payment" class="text-sm text-red-300">{{ errors.payment[0] }}</p>
         </section>
 
+        <section v-if="order.status === 'SUCCESS' && order.delivery" class="space-y-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5">
+            <h2 class="text-lg font-semibold">Hasil pesanan</h2>
+            <p v-if="order.delivery.serial_number" class="break-all text-sm">Serial / SN: <strong>{{ order.delivery.serial_number }}</strong></p>
+            <p v-if="order.delivery.code" class="break-all text-sm">Kode / hasil: <strong>{{ order.delivery.code }}</strong></p>
+            <p v-if="order.delivery.note" class="whitespace-pre-wrap text-sm">{{ order.delivery.note }}</p>
+        </section>
+
         <Link href="/account/tickets" class="text-cyan-300">Butuh bantuan? Buat tiket</Link>
     </AccountShell>
 </template>
