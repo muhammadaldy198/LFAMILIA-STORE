@@ -13,6 +13,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 use InvalidArgumentException;
 use Tests\TestCase;
 
@@ -78,8 +79,15 @@ class CatalogTest extends TestCase
 
         $this->get('/?mode=manual')->assertOk()->assertSee('Manual Gift');
         $this->get('/catalog/manual-gift')->assertOk()
-            ->assertSee('10 Gift')->assertDontSee('Check order in panel')
-            ->assertDontSee('MANUAL')->assertDontSee('8000');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Show')
+                ->where('product.name', 'Manual Gift')
+                ->missing('product.manual_instructions')
+                ->missing('product.fulfillment_mode')
+                ->where('packages.0.name', '10 Gift')
+                ->missing('packages.0.cost_idr')
+                ->missing('packages.0.mappings')
+                ->etc());
         $this->assertGreaterThan(0, DB::table('audit_logs')
             ->where('actor_id', (string) $admin->id)->count());
 
