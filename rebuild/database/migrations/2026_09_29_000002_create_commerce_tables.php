@@ -33,7 +33,7 @@ return new class extends Migration
             $table->index(['wallet_id', 'created_at']);
             $table->unique(['source', 'reference_type', 'reference_id'], 'wallet_source_reference_unique');
         });
-        DB::statement('ALTER TABLE wallet_ledger ADD CONSTRAINT wallet_ledger_balance_check CHECK (balance_after_minor = balance_before_minor + amount_minor AND amount_minor <> 0)');
+        DB::statement('ALTER TABLE wallet_ledger ADD CONSTRAINT wallet_ledger_balance_check CHECK (CAST(balance_after_minor AS DECIMAL(20,0)) = CAST(balance_before_minor AS DECIMAL(20,0)) + CAST(amount_minor AS DECIMAL(20,0)) AND amount_minor <> 0)');
 
         Schema::create('vouchers', function (Blueprint $table): void {
             $table->id();
