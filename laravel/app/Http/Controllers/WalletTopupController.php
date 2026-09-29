@@ -75,6 +75,7 @@ class WalletTopupController extends Controller
                             ['false', '0'],
                             true,
                         ),
+                        'customerFeeMode' => (string) ($config['customerFeeMode'] ?? 'fixed'),
                         'customerFeeBps' => max(0, (int) ($config['customerFeeBps'] ?? 0)),
                         'customerFeeFixed' => max(0, (int) ($config['customerFeeFixed'] ?? 0)),
                     ];
@@ -355,6 +356,7 @@ class WalletTopupController extends Controller
 
         $defaults = [
             'customerFeeEnabled' => 'true',
+            'customerFeeMode' => 'fixed',
             'customerFeeBps' => '0',
             'customerFeeFixed' => '0',
         ];
@@ -365,6 +367,7 @@ class WalletTopupController extends Controller
 
         return [
             'customerFeeEnabled' => (string) ($config['customerFeeEnabled'] ?? 'true'),
+            'customerFeeMode' => (string) ($config['customerFeeMode'] ?? ((int) ($config['customerFeeBps'] ?? 0) > 0 ? 'percent' : 'fixed')),
             'customerFeeBps' => (string) ($config['customerFeeBps'] ?? '0'),
             'customerFeeFixed' => (string) ($config['customerFeeFixed'] ?? '0'),
         ];
