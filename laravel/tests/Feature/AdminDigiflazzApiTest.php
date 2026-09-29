@@ -138,6 +138,27 @@ class AdminDigiflazzApiTest extends TestCase
         $this->assertStringNotContainsString('buyer-test', $payload);
     }
 
+
+    public function test_owner_dashboard_summary_reads_real_digiflazz_balance(): void
+    {
+        $owner = $this->panelToken('df-summary-owner', 'Digi Summary Owner', 'super_admin', 'owner-password-123');
+
+        Http::fake([
+            'https://api.digiflazz.com/v1/cek-saldo' => Http::response([
+                'data' => ['deposit' => 654321, 'rc' => '00'],
+            ], 200),
+        ]);
+
+        $this->withHeader('Cookie', AdminAuthService::COOKIE.'='.rawurlencode($owner))
+            ->getJson('/api/admin/summary?range=7d')
+            ->assertOk()
+            ->assertJsonPath('integrations.digiflazz.ready', true)
+            ->assertJsonPath('integrations.digiflazz.balance', 654321)
+            ->assertJsonPath('integrations.digiflazz.environment', 'development')
+            ->assertJsonPath('integrations.digiflazz.reason', null);
+    }
+
+
     /** @return array{0:int,1:int} */
     private function digiflazzPackage(): array
     {
