@@ -3,12 +3,11 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
+  ExternalLink,
   ImageIcon,
   Pencil,
   Plus,
   Save,
-  Smartphone,
-  Monitor,
   Upload,
   X,
 } from "lucide-react";
@@ -118,7 +117,6 @@ export function AdminExperienceManager({ role }: { role: "super_admin" | "admin"
   const [reviews, setReviews] = useState<MiniItem[]>([]);
   const [faqs, setFaqs] = useState<MiniItem[]>([]);
   const [editor, setEditor] = useState<Editor>({ kind: "banner", id: 0 });
-  const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("mobile");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -235,9 +233,12 @@ export function AdminExperienceManager({ role }: { role: "super_admin" | "admin"
 
   return (
     <div className="admin-content-reference min-w-0 text-[#14213a]">
-      <header>
-        <h1 className="text-[21px] font-black tracking-[-0.035em] text-[#0c1933]">Banner, Pop-up, Berita & Ulasan</h1>
-        <p className="mt-[4px] text-[9px] text-[#65768d]">Kelola semua konten tampilan pelanggan di halaman utama.</p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[21px] font-black tracking-[-0.035em] text-[#0c1933]">Banner, Pop-up, Berita & Ulasan</h1>
+          <p className="mt-[4px] text-[9px] text-[#65768d]">Kelola konten yang benar-benar ditampilkan pada frontend customer.</p>
+        </div>
+        <button type="button" onClick={() => window.open("/", "_blank", "noopener,noreferrer")} className="inline-flex h-[32px] items-center gap-[6px] rounded-[4px] border border-[#dce3eb] bg-white px-[11px] text-[8px] font-bold text-[#40516a]"><ExternalLink className="size-[11px] text-[#0875ed]" />Lihat Website Customer</button>
       </header>
 
       {notice && <button type="button" onClick={() => setNotice("")} className="mt-[9px] flex w-full items-center justify-between rounded-[5px] border border-[#bce4cf] bg-[#edf9f3] px-[11px] py-[7px] text-left text-[8px] font-semibold text-[#168653]"><span>{notice}</span><X className="size-[11px]" /></button>}
@@ -256,7 +257,7 @@ export function AdminExperienceManager({ role }: { role: "super_admin" | "admin"
             <MiniPanel title="Berita" description="Kelola berita yang ditampilkan di halaman utama." action="Tulis Berita" items={news} kind="news" onAdd={() => add("news")} onEdit={focus} onToggle={toggle} />
           </div>
           <div className="grid grid-cols-1 gap-[10px] md:grid-cols-2">
-            <MiniPanel title="Ulasan Pelanggan" description="Kelola ulasan yang tampil di halaman utama." action="Tambah Ulasan" items={reviews} kind="review" onAdd={() => add("review")} onEdit={focus} onToggle={toggle} reviews />
+            <MiniPanel title="Ulasan Pelanggan" description="Ulasan dibuat oleh pelanggan yang sudah bertransaksi; admin hanya mengatur visibilitas." items={reviews} kind="review" onEdit={focus} onToggle={toggle} reviews />
             <MiniPanel title="FAQ" description="Kelola pertanyaan yang sering ditanyakan." action="Tambah FAQ" items={faqs} kind="faq" onAdd={() => add("faq")} onEdit={focus} onToggle={toggle} />
           </div>
         </main>
@@ -264,7 +265,6 @@ export function AdminExperienceManager({ role }: { role: "super_admin" | "admin"
         <EditorPanel editor={editor} banners={banners} popups={popups} news={news} reviews={reviews} faqs={faqs} canDelete={role !== "staff"} saving={saving} onAdd={() => add(editor.kind)} onDelete={() => void deleteEditor()} onCancel={() => void loadContent()} onImage={updateImage} onError={setError} onSubmit={saveEditor} />
       </div>
 
-      <PreviewPanel banners={banners} popups={popups} news={news} reviews={reviews} faqs={faqs} mode={previewMode} onMode={setPreviewMode} />
     </div>
   );
 }
@@ -273,11 +273,11 @@ function BannerTable({ items, onEdit, onToggle }: { items: Banner[]; onEdit(id: 
   return <div className="overflow-x-auto border-t border-[#e5eaf0]"><table className="w-full min-w-[720px] table-fixed text-left"><thead className="bg-[#f3f6fa] text-[6.5px] font-bold text-[#52647c]"><tr><th className="w-[30px] px-[10px] py-[8px]">#</th><th className="w-[120px]">Gambar</th><th className="w-[145px]">Nama Internal</th><th className="w-[150px]">Link Tujuan</th><th className="w-[105px]">Tampilan</th><th className="w-[55px]">Urutan</th><th className="w-[55px]">Status</th><th className="w-[85px]">Aksi</th></tr></thead><tbody>{items.map((item, index) => <tr key={item.id} className="border-t border-[#e5eaf0] text-[7px] text-[#35475f]"><td className="px-[10px] py-[7px]">{index + 1}</td><td><BannerArtwork banner={item} /></td><td className="truncate pr-[8px] font-semibold">{item.title}</td><td className="truncate pr-[8px] font-semibold text-[#0875df]">{item.href}</td><td><span className={`rounded-[4px] px-[6px] py-[4px] font-semibold ${item.devices === "Mobile" ? "bg-red-50 text-red-600" : "bg-[#edf2f7] text-[#4e6077]"}`}>{item.devices}</span></td><td><span className="grid size-[28px] place-items-center rounded-[4px] border border-[#dce3eb] bg-white">{item.order}</span></td><td><Switch enabled={item.active} onToggle={() => onToggle(item.id)} /></td><td><div className="flex items-center gap-[6px]"><button type="button" onClick={() => onEdit(item.id)} className="inline-flex h-[27px] items-center gap-[4px] rounded-[4px] border border-[#dce3eb] bg-white px-[9px] font-bold"><Pencil className="size-[10px]" />Edit</button></div></td></tr>)}</tbody></table></div>;
 }
 
-function MiniPanel({ title, description, action, items, kind, onAdd, onEdit, onToggle, reviews: isReviews }: { title: string; description: string; action: string; items: MiniItem[]; kind: ContentKind; onAdd(): void; onEdit(kind: ContentKind, id: number): void; onToggle(kind: ContentKind, id: number): void; reviews?: boolean }) {
+function MiniPanel({ title, description, action, items, kind, onAdd, onEdit, onToggle, reviews: isReviews }: { title: string; description: string; action?: string; items: MiniItem[]; kind: ContentKind; onAdd?: () => void; onEdit(kind: ContentKind, id: number): void; onToggle(kind: ContentKind, id: number): void; reviews?: boolean }) {
   return <ContentPanel title={title} description={description} action={action} onAdd={onAdd}><div className="border-t border-[#e5eaf0]"><div className="grid grid-cols-[24px_1fr_90px_50px_70px] bg-[#f3f6fa] px-[9px] py-[8px] text-[6.5px] font-bold text-[#52647c]"><span>#</span><span>{isReviews ? "Pelanggan" : kind === "faq" ? "Pertanyaan" : "Judul"}</span><span>{isReviews ? "Rating / Pesan" : kind === "news" ? "Tanggal" : kind === "faq" ? "Urutan" : "Tampilan"}</span><span>Status</span><span>Aksi</span></div>{items.map((item, index) => <div key={item.id} className="grid min-h-[39px] grid-cols-[24px_1fr_90px_50px_70px] items-center border-t border-[#e7ebf0] px-[9px] text-[7px] text-[#35475f]"><span>{index + 1}</span><strong className="truncate pr-[5px]">{item.title}</strong><span className={`truncate pr-[4px] ${isReviews ? "text-amber-500" : ""}`}>{isReviews ? <><span className="block tracking-[-1px]">{"★".repeat(Math.max(0, Math.min(5, Number((item.raw as ReviewPayload | undefined)?.rating || 0))))}</span><small className="block truncate text-[6px] text-[#51627a]">{item.detail}</small></> : item.detail}</span><Switch enabled={item.active} onToggle={() => onToggle(kind, item.id)} /><div className="flex items-center gap-[5px]"><button type="button" onClick={() => onEdit(kind, item.id)} className="inline-flex h-[26px] items-center gap-[4px] rounded-[4px] border border-[#dce3eb] bg-white px-[8px] font-bold"><Pencil className="size-[9px]" />Edit</button></div></div>)}</div></ContentPanel>;
 }
 
-function ContentPanel({ title, description, action, onAdd, children }: { title: string; description: string; action: string; onAdd(): void; children: ReactNode }) { return <section className="overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white shadow-[0_1px_4px_rgba(20,33,58,.04)]"><header className="flex items-start justify-between px-[13px] py-[11px]"><div><h2 className="text-[12px] font-extrabold text-[#101d35]">{title}</h2><p className="mt-[2px] text-[7.5px] text-[#6b7c92]">{description}</p></div><button type="button" onClick={onAdd} className="inline-flex h-[30px] items-center gap-[5px] rounded-[4px] bg-[#0875ed] px-[11px] text-[7.5px] font-bold text-white"><Plus className="size-[11px]" />{action}</button></header>{children}</section>; }
+function ContentPanel({ title, description, action, onAdd, children }: { title: string; description: string; action?: string; onAdd?: () => void; children: ReactNode }) { return <section className="overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white shadow-[0_1px_4px_rgba(20,33,58,.04)]"><header className="flex items-start justify-between px-[13px] py-[11px]"><div><h2 className="text-[12px] font-extrabold text-[#101d35]">{title}</h2><p className="mt-[2px] text-[7.5px] text-[#6b7c92]">{description}</p></div>{action && onAdd && <button type="button" onClick={onAdd} className="inline-flex h-[30px] items-center gap-[5px] rounded-[4px] bg-[#0875ed] px-[11px] text-[7.5px] font-bold text-white"><Plus className="size-[11px]" />{action}</button>}</header>{children}</section>; }
 
 function EditorPanel({ editor, banners, popups, news, reviews, faqs, canDelete, saving, onAdd, onDelete, onCancel, onImage, onError, onSubmit }: { editor: Editor; banners: Banner[]; popups: MiniItem[]; news: MiniItem[]; reviews: MiniItem[]; faqs: MiniItem[]; canDelete: boolean; saving: boolean; onAdd(): void; onDelete(): void; onCancel(): void; onImage(kind: ContentKind, id: number, url: string, target?: "desktop" | "mobile" | "cover"): void; onError(message: string): void; onSubmit(event: FormEvent<HTMLFormElement>): void }) {
   const banner = editor.kind === "banner" ? banners.find((item) => item.id === editor.id) : undefined;
@@ -337,8 +337,6 @@ function EditorPanel({ editor, banners, popups, news, reviews, faqs, canDelete, 
         )}
         <EditorField label={editor.kind === "banner" ? "Nama internal / alt banner" : editor.kind === "faq" ? "Pertanyaan" : editor.kind === "review" ? "Pelanggan" : "Judul"} name="title" defaultValue={banner?.title ?? item?.title ?? ""} readOnly={editor.kind === "review"} />
         {editor.kind === "banner" && <>
-          <EditorField label="URL gambar desktop" name="imageUrl" defaultValue={banner?.raw?.imageUrl ?? ""} />
-          <EditorField label="URL gambar mobile (opsional)" name="mobileImageUrl" defaultValue={banner?.raw?.mobileImageUrl ?? ""} />
           <EditorField label="Link Tujuan (opsional — klik gambar)" name="href" defaultValue={banner?.raw?.ctaHref ?? ""} />
           <p className="mt-[11px] text-[8px] font-bold">Tampilkan di</p>
           <div className="mt-[7px] flex justify-between text-[8px] font-semibold">
@@ -360,7 +358,6 @@ function EditorPanel({ editor, banners, popups, news, reviews, faqs, canDelete, 
           <EditorField label="Slug URL" name="slug" defaultValue={article?.slug ?? ""} />
           <EditorTextArea label="Ringkasan" name="summary" defaultValue={article?.summary ?? ""} />
           <EditorTextArea label="Isi berita" name="body" defaultValue={article?.body ?? ""} rows={7} />
-          <EditorField label="URL cover" name="coverUrl" defaultValue={article?.coverUrl ?? ""} />
           <EditorField label="Tanggal terbit (ISO, opsional)" name="publishedAt" defaultValue={article?.publishedAt ?? ""} />
           <EditorField label="Urutan" name="order" type="number" defaultValue={String((article?.sortOrder ?? 0) + 1)} />
         </>}
@@ -385,15 +382,11 @@ function BannerImageUpload({ label, value, hint, onUpload }: { label: string; va
 function EditorField({ label, name, defaultValue, type = "text", readOnly = false }: { label: string; name: string; defaultValue: string; type?: string; readOnly?: boolean }) { return <label className="mt-[11px] block text-[8px] font-bold">{label}<input key={defaultValue} name={name} type={type} defaultValue={defaultValue} readOnly={readOnly} className="mt-[5px] h-[34px] w-full rounded-[4px] border border-[#dce3eb] px-[9px] text-[8px] font-medium outline-none focus:border-[#2781ed] read-only:bg-[#f5f7fa]" /></label>; }
 function EditorTextArea({ label, name, defaultValue, rows = 4 }: { label: string; name: string; defaultValue: string; rows?: number }) { return <label className="mt-[11px] block text-[8px] font-bold">{label}<textarea key={defaultValue} name={name} defaultValue={defaultValue} rows={rows} className="mt-[5px] w-full resize-y rounded-[4px] border border-[#dce3eb] px-[9px] py-[8px] text-[8px] font-medium outline-none focus:border-[#2781ed]" /></label>; }
 
-function PreviewPanel({ banners, popups, news, reviews, faqs, mode, onMode }: { banners: Banner[]; popups: MiniItem[]; news: MiniItem[]; reviews: MiniItem[]; faqs: MiniItem[]; mode: "desktop" | "mobile"; onMode(value: "desktop" | "mobile"): void }) {
-  const popup = popups.find((item) => item.active);
-  return <section className="mt-[12px] overflow-hidden rounded-[7px] border border-[#dfe6ef] bg-white p-[13px]"><header className="flex items-start justify-between"><div><h2 className="text-[12px] font-extrabold">Preview Tampilan di Website</h2><p className="mt-[2px] text-[7.5px] text-[#6a7b91]">Preview memakai data yang sedang dikelola untuk banner, pop-up, berita, ulasan, dan FAQ.</p></div><div className="flex overflow-hidden rounded-[4px] border border-[#dce3eb]"><button type="button" onClick={() => onMode("desktop")} className={`inline-flex h-[29px] items-center gap-[5px] px-[10px] text-[7.5px] font-bold ${mode === "desktop" ? "bg-[#0875ed] text-white" : "bg-white text-[#4f6078]"}`}><Monitor className="size-[11px]" />Tampilan Desktop</button><button type="button" onClick={() => onMode("mobile")} className={`inline-flex h-[29px] items-center gap-[5px] px-[10px] text-[7.5px] font-bold ${mode === "mobile" ? "bg-[#0875ed] text-white" : "bg-white text-[#4f6078]"}`}><Smartphone className="size-[11px]" />Tampilan Mobile</button></div></header><div className={`mt-[12px] grid gap-[10px] ${mode === "mobile" ? "mx-auto max-w-[300px] grid-cols-1" : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"}`}><PreviewCard title="Banner"><Phone mode={mode}><div className="p-[7px]"><div className="mb-[7px] h-[25px] rounded bg-white px-[7px] py-[6px] text-[6px] text-[#8290a3]">⌕ Cari game atau layanan...</div>{banners.find((item) => item.active) ? <BannerArtwork banner={banners.find((item) => item.active)!} large mode={mode} /> : <EmptyPreview text="Belum ada banner aktif" />}</div></Phone></PreviewCard><PreviewCard title="Pop-up"><Phone mode={mode}><div className="relative h-full bg-[#1b2940]/55 p-[24px_12px]">{popup ? <div className="rounded-[6px] bg-gradient-to-br from-[#0875ed] via-[#2b7ee8] to-[#d64db6] p-[13px] text-center text-white shadow"><strong className="text-[11px]">{popup.title}</strong><p className="mt-[4px] line-clamp-3 text-[7px]">{popup.detail}</p><button type="button" className="mt-[15px] h-[25px] w-full rounded-[4px] bg-[#075bd4] text-[7px] font-bold">{(popup.raw as PopupPayload).primaryLabel || "Tutup"}</button></div> : <EmptyPreview text="Belum ada pop-up aktif" />}</div></Phone></PreviewCard><PreviewCard title="Berita"><Phone mode={mode}><div className="p-[8px]"><h3 className="text-[10px] font-black">Berita Terbaru</h3>{news.filter((item) => item.active).slice(0, 2).map((item) => <div key={item.id} className="mt-[7px] rounded-[5px] border bg-white p-[7px]"><strong className="block text-[7px]">{item.title}</strong><span className="text-[6px] text-[#718198]">{item.detail}</span></div>)}</div></Phone></PreviewCard><PreviewCard title="Ulasan"><Phone mode={mode}><div className="p-[8px]"><h3 className="text-[10px] font-black">Ulasan Pelanggan</h3>{reviews.filter((item) => item.active).slice(0, 2).map((item) => <div key={item.id} className="mt-[7px] rounded-[5px] border bg-white p-[7px]"><strong className="text-[7px]">{item.title}</strong><div className="text-[7px] text-amber-500">{"★".repeat(Number((item.raw as ReviewPayload).rating || 0))}</div><span className="text-[6px] text-[#607189]">{item.detail}</span></div>)}</div></Phone></PreviewCard><PreviewCard title="FAQ"><Phone mode={mode}><div className="p-[8px]"><h3 className="text-[10px] font-black">Pertanyaan Umum</h3>{faqs.filter((item) => item.active).slice(0, 2).map((item) => <div key={item.id} className="mt-[7px] rounded-[5px] border bg-white p-[7px]"><strong className="block text-[7px]">{item.title}</strong><span className="line-clamp-2 text-[6px] text-[#718198]">{item.detail}</span></div>)}</div></Phone></PreviewCard></div></section>;
+function BannerArtwork({ banner }: { banner: Banner }) {
+  const imageUrl = banner.raw?.imageUrl;
+  return <div className="grid h-[38px] w-[108px] place-items-center overflow-hidden rounded-[4px] bg-[#edf2f7]">{imageUrl ? <img src={imageUrl} alt={banner.title} className="size-full object-cover" /> : <span className="px-2 text-center text-[6px] font-bold text-[#718198]">Belum ada gambar</span>}</div>;
 }
 
-function PreviewCard({ title, children }: { title: string; children: ReactNode }) { return <div><h3 className="mb-[6px] text-center text-[8px] font-extrabold">{title}</h3>{children}</div>; }
-function Phone({ children, mode }: { children: ReactNode; mode: "desktop" | "mobile" }) { return <div className={`mx-auto overflow-hidden border-[5px] border-[#101923] bg-[#f4f7fa] shadow-[0_7px_18px_rgba(17,34,58,.15)] ${mode === "mobile" ? "h-[245px] max-w-[220px] rounded-[25px]" : "h-[230px] w-full rounded-[10px]"}`}><div className="flex h-[22px] items-center justify-between bg-white px-[10px] text-[6px] font-bold"><span>9:41</span><span>● ◔ ▰</span></div><div className="h-[218px] overflow-hidden">{children}</div></div>; }
-function EmptyPreview({ text }: { text: string }) { return <div className="grid h-full place-items-center text-center text-[7px] text-[#718198]">{text}</div>; }
-function BannerArtwork({ banner, large, mode = "desktop" }: { banner: Banner; large?: boolean; mode?: "desktop" | "mobile" }) { const imageUrl = mode === "mobile" ? (banner.raw?.mobileImageUrl || banner.raw?.imageUrl) : banner.raw?.imageUrl; return <div className={`grid place-items-center overflow-hidden rounded-[4px] bg-[#edf2f7] ${large ? "h-full w-full" : "h-[38px] w-[108px]"}`}>{imageUrl ? <img src={imageUrl} alt={banner.title} className="size-full object-cover" /> : <span className="px-2 text-center text-[6px] font-bold text-[#718198]">Belum ada gambar</span>}</div>; }
 function Switch({ enabled, onToggle }: { enabled: boolean; onToggle(): void }) { return <button type="button" aria-pressed={enabled} onClick={onToggle} className={`relative h-[18px] w-[33px] rounded-full ${enabled ? "bg-[#0875ed]" : "bg-[#c9d4e0]"}`}><span className={`absolute top-[2px] size-[14px] rounded-full bg-white shadow transition ${enabled ? "left-[17px]" : "left-[2px]"}`} /></button>; }
 function flip(items: MiniItem[], id: number) { return items.map((item) => item.id === id ? { ...item, active: !item.active } : item); }
 function labelKind(kind: ContentKind) { return kind === "banner" ? "Banner" : kind === "popup" ? "Pop-up" : kind === "news" ? "Berita" : kind === "review" ? "Ulasan" : "FAQ"; }

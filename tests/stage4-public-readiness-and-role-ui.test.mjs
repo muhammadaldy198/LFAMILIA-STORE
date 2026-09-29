@@ -40,10 +40,11 @@ test("dashboard search and Staff stay inside their permitted workspace", () => {
   assert.match(dashboard, /fetch\("\/api\/admin\/members"/);
   assert.match(dashboard, /setActiveTab\(result\.tab\)/);
   assert.doesNotMatch(dashboard, /setActiveTab\("products"\)/);
-  assert.match(overview, /const visibleFeatureCards = featureCards\.filter/);
-  assert.match(overview, /minimumRole: "admin"/);
-  assert.match(overview, /minimumRole: "super_admin"/);
+  assert.doesNotMatch(overview, /const featureCards =/);
+  assert.match(overview, /const isStaff = role === "staff"/);
+  assert.match(overview, /if \(isStaff\) return/);
   assert.match(overview, /role === "super_admin" \? "team" : "orders"/);
+  assert.match(overview, /role === "super_admin" && <button type="button" onClick=\{\(\) => onNavigate\?\.\("integrations"\)\}/);
 });
 
 test("Admin dashboard does not render backend-restricted finance data or integrations navigation", () => {

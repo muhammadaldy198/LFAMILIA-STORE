@@ -4,24 +4,13 @@ import { useEffect, useState } from "react";
 import { fetchAdminSummary } from "@/lib/client/admin-summary";
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
   Boxes,
   CalendarDays,
-  Check,
   CheckCircle2,
   ChevronDown,
-  ChevronRight,
   CircleDollarSign,
-  CreditCard,
-  FileText,
-  Headphones,
-  ImageIcon,
-  Link2,
-  Settings,
   ShoppingCart,
-  Sparkles,
   UserCog,
-  Users,
   WalletCards,
 } from "lucide-react";
 
@@ -67,26 +56,9 @@ type DashboardIntegration = {
 };
 
 type AdminRole = "super_admin" | "admin" | "staff";
-const roleRank = { staff: 0, admin: 1, super_admin: 2 } as const;
-
-const featureCards = [
-  { title: "Pesanan", Icon: FileText, target: "orders", minimumRole: "staff", items: ["Kelola pesanan & invoice", "Update status pesanan", "Callback log & notifikasi", "Proses manual / refund"] },
-  { title: "Produk", Icon: Boxes, target: "products", minimumRole: "admin", items: ["Kategori game & layanan", "SKU provider", "Struktur nominal", "Jenis pengiriman", "Kelola produk voucher"] },
-  { title: "Banner & Konten", Icon: ImageIcon, target: "content", minimumRole: "staff", items: ["Kelola banner utama", "Pop-up informasi", "Berita & pengumuman", "Ulasan pelanggan", "Halaman FAQ"] },
-  { title: "Digiflazz", Icon: Link2, target: "digiflazz", minimumRole: "admin", items: ["Sinkronisasi pricelist", "Price Control", "Mapping SKU produk", "Monitor layanan", "Log API & history"] },
-  { title: "Pembayaran", Icon: CreditCard, target: "payments", minimumRole: "admin", items: ["DOKU Checkout", "Midtrans Snap", "QRIS / VA / E-Wallet", "Callback otomatis", "Routing metode aktif"] },
-  { title: "Pelanggan", Icon: Users, target: "customers", minimumRole: "admin", items: ["Data pelanggan", "Wallet & saldo", "Riwayat transaksi", "Status akun pelanggan"] },
-  { title: "Promo", Icon: Sparkles, target: "promotions", minimumRole: "admin", items: ["Kode voucher", "Diskon checkout", "Promo member", "Event promo khusus"] },
-  { title: "Layanan Pelanggan", Icon: Headphones, target: "support", minimumRole: "staff", items: ["Sistem tiket", "Status tiket pelanggan", "Prioritas penanganan", "Lampiran bukti transaksi"] },
-  { title: "Laporan", Icon: BarChart3, target: "reports", minimumRole: "admin", items: ["Laporan penjualan", "Laporan profit", "Produk terlaris", "Riwayat transaksi", "Filter periode lengkap"] },
-  { title: "Staff & Admin Akses", Icon: UserCog, target: "team", minimumRole: "super_admin", items: ["Role Super Admin", "Role Admin & Staff", "Akses sesuai role", "Log aktivitas admin"] },
-  { title: "Pengaturan", Icon: Settings, target: "settings", minimumRole: "super_admin", items: ["Profil toko & kontak", "Logo & favicon", "Pengaturan keamanan", "Notifikasi sistem"] },
-];
-
 export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigate?: (value: string) => void }) {
   const isStaff = role === "staff";
   const canExpectFinance = role === "super_admin";
-  const visibleFeatureCards = featureCards.filter((item) => roleRank[role] >= roleRank[item.minimumRole as AdminRole]);
   const [now, setNow] = useState<Date | null>(null);
   const [range, setRange] = useState("7d");
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -209,13 +181,6 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
         </Panel>}
       </section>
 
-      <section className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${isStaff ? "xl:grid-cols-2" : "xl:grid-cols-5"}`}>
-        {visibleFeatureCards.slice(0, 5).map((item) => <FeatureCard key={item.title} {...item} onNavigate={onNavigate} />)}
-      </section>
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-6">
-        {visibleFeatureCards.slice(5).map((item) => <FeatureCard key={item.title} {...item} onNavigate={onNavigate} />)}
-      </section>
-
       <section className={`grid gap-3 ${isStaff ? "grid-cols-1" : "grid-cols-[minmax(0,2.5fr)_minmax(250px,1fr)]"}`}>
         <Panel>
           <PanelHeader title="Pesanan Terbaru"><button type="button" onClick={() => onNavigate?.("orders")} className="text-[8px] font-bold text-[#1769e8]">Lihat Semua Pesanan</button></PanelHeader>
@@ -230,7 +195,7 @@ export function AdminOverview({ role, onNavigate }: { role: AdminRole; onNavigat
         </Panel>
 
         {!isStaff && <Panel>
-          <PanelHeader title="Produk Populer"><button type="button" onClick={() => onNavigate?.("products")} className="text-[8px] font-bold text-[#1769e8]">Lihat Semua</button></PanelHeader>
+          <PanelHeader title="Produk Terlaris"><button type="button" onClick={() => onNavigate?.("products")} className="text-[8px] font-bold text-[#1769e8]">Lihat Semua</button></PanelHeader>
           <div className="divide-y divide-[#edf0f4] px-3">
             {products.length ? products.map((item, index) => <div key={item.slug || item.name} className="flex items-center gap-2.5 py-2.5"><span className="grid size-5 place-items-center rounded-full bg-[#f0f4f9] text-[7px] font-semibold text-[#65748a]">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-[8px] font-bold text-[#2b3951]">{item.name}</p><p className="text-[7px] text-[#8996a8]">Paling banyak dibeli</p></div><strong className="text-[8px] text-[#26364f]">{item.fulfilledOrders}</strong></div>) : <EmptyState text="Belum ada data produk." />}
           </div>
@@ -266,10 +231,6 @@ function IntegrationRow({ item }: { item: DashboardIntegration }) {
 
 function StatusLine({ label, value, good = false }: { label: string; value: string; good?: boolean }) {
   return <div className="flex items-center justify-between"><dt className="text-[#78869a]">{label}</dt><dd className="flex items-center gap-1.5 font-semibold text-[#4d5c72]">{good && <i className="size-1.5 rounded-full bg-emerald-500" />}{value}</dd></div>;
-}
-
-function FeatureCard({ title, Icon, target, items, onNavigate }: { title: string; Icon: LucideIcon; target: string; items: string[]; onNavigate?: (value: string) => void }) {
-  return <button type="button" onClick={() => onNavigate?.(target)} className="min-h-[155px] rounded-lg border border-[#e1e6ed] bg-white p-3 text-left shadow-[0_2px_9px_rgba(15,23,42,0.03)] transition hover:border-[#cdd9e8]"><div className="mb-2.5 flex items-center gap-2.5"><span className="grid size-7 place-items-center rounded-md bg-[#edf4ff] text-[#1769e8]"><Icon className="size-4" /></span><h3 className="min-w-0 flex-1 truncate text-[9px] font-extrabold text-[#273650]">{title}</h3><ChevronRight className="size-3.5 text-[#64758d]" /></div><ul className="space-y-1.5">{items.map((item) => <li key={item} className="flex items-center gap-1.5 text-[7px] leading-3 text-[#607089]"><Check className="size-2.5 shrink-0 text-emerald-500" strokeWidth={3} />{item}</li>)}</ul></button>;
 }
 
 function EmptyState({ text }: { text: string }) {

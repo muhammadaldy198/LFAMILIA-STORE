@@ -47,13 +47,14 @@ test("payment credential backend keeps DOKU and Midtrans values encrypted", () =
   assert.match(config, /snap: \["serverKey", "clientKey"\]/);
 });
 
-
-test("obsolete duplicate payment credential panel is removed and dashboard says DOKU Checkout", () => {
+test("obsolete duplicate payment credential panel is removed and Integrasi remains the credential owner", () => {
   assert.equal(fs.existsSync(path.join(root, "components/admin-payment-routing-panel.tsx")), false);
-  const overview = read("components/admin-overview.tsx");
-  assert.match(overview, /DOKU Checkout/);
+  const integration = read("components/admin-integration-workspace.tsx");
+  const dashboard = read("components/admin-dashboard.tsx");
+  assert.match(integration, /DOKU Checkout/);
+  assert.match(integration, /Midtrans Snap/);
+  assert.match(dashboard, /label: "Integrasi"/);
 });
-
 
 test("Admin payment readiness reuses gateway readiness while validating each channel", () => {
   const route = read("app/api/admin/payment-methods/route.ts");
@@ -68,7 +69,6 @@ test("Admin payment readiness reuses gateway readiness while validating each cha
   assert.match(workspace, /channel\.readiness/);
   assert.match(workspace, /Simpan untuk cek/);
 });
-
 
 test("Admin payment UI has no stale DOKU Direct label or hardcoded production callback host", () => {
   const workspace = read("components/admin-payment-workspace.tsx");
