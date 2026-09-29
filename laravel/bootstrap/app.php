@@ -15,6 +15,15 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
 
+        // The panel session token is already HMAC-signed and must be readable by
+        // both the web login routes and the stateless /api/admin/* routes.
+        // Leaving Laravel cookie encryption enabled for this cookie makes the
+        // API middleware receive an encrypted value that AdminAuthService cannot
+        // validate, causing a successful login to bounce back to the login page.
+        $middleware->encryptCookies(except: [
+            'lfamilia_panel_session',
+        ]);
+
         // These legacy-compatible panel form endpoints use an explicit same-origin
         // guard and rate limiter. Excluding only these exact paths prevents the
         // current frontend from requiring a new CSRF field during the migration.

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\AdminAuthService;
 use App\Services\SecurityGuard;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
@@ -100,6 +101,44 @@ class AuthCompatibilityTest extends TestCase
 
         $this->expectException(HttpResponseException::class);
         app(SecurityGuard::class)->assertSameOrigin($request);
+    }
+
+    public function test_panel_login_cookie_is_readable_by_api_session_route(): void
+    {
+        $username = 'owner01';
+
+        DB::table('admin_users')->insert([
+            'email' => $username,
+            'name' => 'Owner',
+            'role' => 'super_admin',
+            'is_active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        app(AdminAuthService::class)->createCredential(
+            $username,
+            'Owner',
+            'password-owner-123',
+            true,
+        );
+
+        $login = $this->post('/admin/panel/auth/login', [
+            'username' => $username,
+            'password' => 'password-owner-123',
+        ]);
+        $login->assertRedirect('/admin/panel');
+
+        $cookie = collect($login->headers->getCookies())
+            ->first(fn ($cookie) => $cookie->getName() === AdminAuthService::COOKIE);
+
+        $this->assertNotNull($cookie);
+
+        $this->withUnencryptedCookie(AdminAuthService::COOKIE, $cookie->getValue())
+            ->get('/api/admin/session', ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('session.email', $username)
+            ->assertJsonPath('session.role', 'super_admin');
     }
 
     public function test_staff_cannot_login_through_backoffice_area(): void
