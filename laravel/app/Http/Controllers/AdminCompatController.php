@@ -468,7 +468,15 @@ class AdminCompatController extends Controller
                         'minTopup'=>max(1000,(int)($row?->min_topup ?? 10000)),
                         'automaticTopupEnabled'=>(bool)($row?->doku_topup_enabled ?? false),
                     ],
-                    'topups'=>DB::table('wallet_topups')->orderByDesc('created_at')->limit(100)->get(),
+                    'topups'=>DB::table('wallet_topups as t')
+                        ->leftJoin('customer_users as u', 'u.id', '=', 't.customer_id')
+                        ->orderByDesc('t.created_at')
+                        ->limit(100)
+                        ->get([
+                            't.id','t.customer_id','t.amount','t.payment_method','t.source','t.reference_id',
+                            't.payment_gateway','t.gateway_payment_name','t.payment_fee','t.payment_total',
+                            't.status','t.created_at','u.name as customer_name','u.phone as customer_phone',
+                        ]),
                 ], 200, ['Cache-Control'=>'no-store']);
             }
             $security->assertSameOrigin($request);
