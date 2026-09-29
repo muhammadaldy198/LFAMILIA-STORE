@@ -41,7 +41,7 @@ export function StoreFooter({ showBrandBanner = true }: { showBrandBanner?: bool
           data-sitewide-footer-banner
         >
           <Image
-            src="/brand/lfamilia-footer-mobile-wordmark.jpg"
+            src={settings.footerBannerMobileUrl || "/brand/lfamilia-footer-mobile-wordmark.jpg"}
             alt="LFAMILIA STORE"
             width={1200}
             height={400}
@@ -50,7 +50,7 @@ export function StoreFooter({ showBrandBanner = true }: { showBrandBanner?: bool
             unoptimized
           />
           <Image
-            src="/brand/lfamilia-footer-desktop-wordmark.jpg"
+            src={settings.footerBannerDesktopUrl || "/brand/lfamilia-footer-desktop-wordmark.jpg"}
             alt=""
             width={2172}
             height={724}
