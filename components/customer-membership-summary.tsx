@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Crown, Sparkles } from "lucide-react";
 import { formatRupiah } from "@/lib/store-data";
 
-type MemberTier = "basic" | "gold" | "diamond" | "platinum";
+type MemberTier = "basic" | "gold" | "diamond" | "platinum" | "mafia";
 
 type Membership = {
   tier: MemberTier;
@@ -17,7 +17,7 @@ type Membership = {
   setting: {
     tier: MemberTier;
     label: string;
-    minSpend: number;
+    minSpend: number | null;
     discountPercent: number;
     benefits: string;
   };
@@ -28,6 +28,7 @@ const tierClass: Record<MemberTier, string> = {
   gold: "border-amber-300/20 bg-amber-300/[0.07] text-amber-200",
   diamond: "border-cyan-300/20 bg-cyan-300/[0.07] text-cyan-200",
   platinum: "border-violet-300/20 bg-violet-300/[0.07] text-violet-200",
+  mafia: "border-rose-300/20 bg-rose-300/[0.07] text-rose-200",
 };
 
 export function CustomerMembershipSummary() {
@@ -62,7 +63,7 @@ export function CustomerMembershipSummary() {
 
   const progress = useMemo(() => {
     if (!membership?.nextTarget) return 100;
-    const start = membership.setting.minSpend;
+    const start = membership.setting.minSpend ?? 0;
     const span = Math.max(1, membership.nextTarget - start);
     return Math.max(0, Math.min(100, ((membership.lifetimeSpend - start) / span) * 100));
   }, [membership]);
@@ -115,7 +116,7 @@ export function CustomerMembershipSummary() {
         </div>
         {membership.nextTarget && (
           <div className="mt-2 flex justify-between text-[9px] text-white/25">
-            <span>{formatRupiah(membership.setting.minSpend)}</span>
+            <span>{formatRupiah(membership.setting.minSpend ?? 0)}</span>
             <span>{formatRupiah(membership.nextTarget)}</span>
           </div>
         )}
