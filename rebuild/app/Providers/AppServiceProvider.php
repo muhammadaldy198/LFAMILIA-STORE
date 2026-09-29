@@ -17,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
             ->by('checkout-nickname:'.$request->ip()));
         RateLimiter::for('checkout-quote', fn (Request $request) => Limit::perMinute(30)
             ->by('checkout-quote:'.$request->ip()));
-        RateLimiter::for('checkout-create', fn (Request $request) => Limit::perMinute(20)
+        RateLimiter::for('checkout-create', fn (Request $request) => Limit::perMinute(60)
             ->by('checkout-create:'.$request->ip()));
         RateLimiter::for('guest-order', fn (Request $request) => Limit::perMinute(10)
             ->by('guest-order:'.$request->ip()));
@@ -25,5 +25,11 @@ class AppServiceProvider extends ServiceProvider
             ->by('google-oauth:'.$request->ip()));
         RateLimiter::for('support-ticket', fn (Request $request) => Limit::perMinute(5)
             ->by('support-ticket:'.($request->user()?->id ?? $request->ip())));
+        RateLimiter::for('payment-create', fn (Request $request) => Limit::perMinute(12)
+            ->by('payment-create:'.($request->user()?->id ?? $request->ip())));
+        RateLimiter::for('wallet-topup', fn (Request $request) => Limit::perMinute(10)
+            ->by('wallet-topup:'.($request->user()?->id ?? $request->ip())));
+        RateLimiter::for('payment-webhook', fn (Request $request) => Limit::perMinute(120)
+            ->by('payment-webhook:'.$request->ip()));
     }
 }

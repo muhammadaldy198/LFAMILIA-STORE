@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\PaymentPresentationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -22,7 +23,11 @@ class CustomerOrderController
         ]);
     }
 
-    public function show(Request $request, int $order): Response
+    public function show(
+        Request $request,
+        int $order,
+        PaymentPresentationService $payments,
+    ): Response
     {
         $record = DB::table('orders')
             ->join('products', 'products.id', '=', 'orders.product_id')
@@ -34,6 +39,9 @@ class CustomerOrderController
 
         abort_unless($record, 404);
 
-        return Inertia::render('Customer/OrderDetail', ['order' => $record]);
+        return Inertia::render('Customer/OrderDetail', [
+            'order' => $record,
+            'payment' => $payments->forOrder((int) $record->id),
+        ]);
     }
 }

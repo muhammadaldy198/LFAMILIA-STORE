@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\PaymentWebhookController;
 use App\Models\Wallet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -15,3 +16,9 @@ Route::middleware('auth:sanctum')->get('/account', function (Request $request) {
         'balance_idr' => (int) $wallet->balance_idr,
     ]);
 });
+
+
+Route::post('/payments/midtrans/notification', [PaymentWebhookController::class, 'midtrans'])
+    ->middleware('throttle:payment-webhook');
+Route::post('/payments/doku/notification', [PaymentWebhookController::class, 'doku'])
+    ->middleware('throttle:payment-webhook');

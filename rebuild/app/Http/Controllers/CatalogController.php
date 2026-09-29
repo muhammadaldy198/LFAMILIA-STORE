@@ -8,6 +8,7 @@ use App\Models\ProductInputField;
 use App\Models\ProductPackage;
 use App\Models\StoreAsset;
 use App\Services\CheckoutPricing;
+use App\Services\PaymentRoutingService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -60,7 +61,11 @@ class CatalogController
         ]);
     }
 
-    public function show(string $slug, CheckoutPricing $pricing): Response
+    public function show(
+        string $slug,
+        CheckoutPricing $pricing,
+        PaymentRoutingService $paymentRouting,
+    ): Response
     {
         $product = Product::with('category')->where('slug', $slug)
             ->where('is_active', true)
@@ -106,6 +111,7 @@ class CatalogController
                 'email' => $user->email,
                 'phone' => $user->phone,
             ] : null,
+            'paymentChannels' => $paymentRouting->publicOrderChannels($user),
             'faviconUrl' => StoreAsset::where('key', 'favicon')->where('is_active', true)
                 ->first()?->getFirstMediaUrl('image'),
         ]);

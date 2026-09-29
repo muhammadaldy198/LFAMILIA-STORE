@@ -17,6 +17,7 @@ class CheckoutService
         private readonly CheckoutInputValidator $inputValidator,
         private readonly NicknameService $nickname,
         private readonly GuestOrderAccess $guestAccess,
+        private readonly PaymentRoutingService $paymentRouting,
     ) {}
 
     /**
@@ -24,6 +25,7 @@ class CheckoutService
      */
     public function quote(
         int $packageId,
+        string $paymentChannelCode,
         ?string $voucherCode,
         ?User $user,
         ?string $guestEmail,
@@ -31,13 +33,22 @@ class CheckoutService
     ): array {
         $price = $this->pricing->forPackage($packageId);
         $voucher = $this->voucher($voucherCode, $price, $user, $guestEmail, $guestPhone, false);
+        $route = $this->paymentRouting->resolve($paymentChannelCode, false, 'order');
+        if ($route['gateway_code'] === 'WALLET' && ! $user) {
+            throw ValidationException::withMessages([
+                'payment_channel_code' => 'Saldo hanya tersedia untuk akun customer.',
+            ]);
+        }
+        $chargeable = $price['subtotal_idr'] - $voucher['discount_idr'];
+        $fee = $this->paymentRouting->fee($chargeable, $route);
 
         return [
             'subtotal_idr' => $price['subtotal_idr'],
             'discount_idr' => $voucher['discount_idr'],
-            'fee_idr' => 0,
-            'total_idr' => $price['subtotal_idr'] - $voucher['discount_idr'],
+            'fee_idr' => $fee,
+            'total_idr' => $chargeable + $fee,
             'voucher_code' => $voucher['code'],
+            'payment_channel_code' => $route['channel_code'],
         ];
     }
 
@@ -82,8 +93,20 @@ class CheckoutService
                 $data['guest_phone'] ?? null,
                 true
             );
+            $paymentRoute = $this->paymentRouting->resolve(
+                $data['payment_channel_code'],
+                true,
+                'order'
+            );
+            if ($paymentRoute['gateway_code'] === 'WALLET' && ! $user) {
+                throw ValidationException::withMessages([
+                    'payment_channel_code' => 'Saldo hanya tersedia untuk akun customer.',
+                ]);
+            }
 
-            $total = $price['subtotal_idr'] - $voucher['discount_idr'];
+            $chargeable = $price['subtotal_idr'] - $voucher['discount_idr'];
+            $fee = $this->paymentRouting->fee($chargeable, $paymentRoute);
+            $total = $chargeable + $fee;
             if ($total <= 0) {
                 throw ValidationException::withMessages([
                     'voucher_code' => 'Voucher menghasilkan total tidak valid.',
@@ -121,8 +144,16 @@ class CheckoutService
                     'cost_idr' => $price['cost_idr'],
                     'margin_idr' => $price['margin_idr'],
                     'discount_idr' => $voucher['discount_idr'],
-                    'fee_idr' => 0,
+                    'fee_idr' => $fee,
                     'total_idr' => $total,
+                ],
+                'payment' => [
+                    'channel_id' => $paymentRoute['channel_id'],
+                    'channel_code' => $paymentRoute['channel_code'],
+                    'channel_name' => $paymentRoute['channel_name'],
+                    'route_id' => $paymentRoute['route_id'],
+                    'gateway_id' => $paymentRoute['gateway_id'],
+                    'gateway_code' => $paymentRoute['gateway_code'],
                 ],
                 'voucher' => $voucher['snapshot'],
                 'customer_input' => $lockedInput,
@@ -138,6 +169,8 @@ class CheckoutService
                 'product_package_id' => $price['package_id'],
                 'provider_mapping_id' => $price['provider_mapping_id'],
                 'voucher_id' => $voucher['voucher_id'],
+                'payment_channel_id' => $paymentRoute['channel_id'],
+                'payment_route_id' => $paymentRoute['route_id'],
                 'status' => 'PENDING_PAYMENT',
                 'currency' => 'IDR',
                 'customer_input' => json_encode($lockedInput, JSON_THROW_ON_ERROR),
@@ -145,7 +178,7 @@ class CheckoutService
                 'cost_idr' => $price['cost_idr'],
                 'margin_idr' => $price['margin_idr'],
                 'discount_idr' => $voucher['discount_idr'],
-                'fee_idr' => 0,
+                'fee_idr' => $fee,
                 'total_idr' => $total,
                 'idempotency_key' => $data['idempotency_key'],
                 'expires_at' => $expiresAt,
@@ -319,6 +352,7 @@ class CheckoutService
                     'phone' => $this->normalizePhone((string) $data['guest_phone']),
                 ],
             'package_id' => (int) $data['package_id'],
+            'payment_channel_code' => (string) $data['payment_channel_code'],
             'voucher_code' => Str::upper(trim((string) ($data['voucher_code'] ?? ''))),
             'customer_input' => $input,
         ];

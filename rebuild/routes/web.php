@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
 use App\Http\Controllers\AdminCatalogMediaController;
+use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerAccountController;
@@ -10,7 +11,9 @@ use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\CustomerPhoneController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\GuestOrderController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SupportTicketController;
+use App\Http\Controllers\WalletTopupController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +28,8 @@ Route::post('/checkout/quote', [CheckoutController::class, 'quote'])
     ->middleware('throttle:checkout-quote')->name('checkout.quote');
 Route::post('/checkout/orders', [CheckoutController::class, 'store'])
     ->middleware('throttle:checkout-create')->name('checkout.store');
+Route::post('/payments/orders/{orderNumber}', [PaymentController::class, 'create'])
+    ->middleware('throttle:payment-create')->name('payments.orders.create');
 
 Route::get('/health/ready', function () {
     try {
@@ -64,6 +69,10 @@ Route::middleware('auth:web')->group(function (): void {
         Route::put('/account/password', [CustomerAccountController::class, 'password'])->name('account.password.update');
         Route::delete('/account', [CustomerAccountController::class, 'destroy'])->name('account.destroy');
         Route::get('/account/wallet', [CustomerAccountController::class, 'wallet'])->name('account.wallet');
+        Route::post('/account/wallet/topups/quote', [WalletTopupController::class, 'quote'])
+            ->middleware('throttle:wallet-topup')->name('account.wallet.topups.quote');
+        Route::post('/account/wallet/topups', [WalletTopupController::class, 'store'])
+            ->middleware('throttle:wallet-topup')->name('account.wallet.topups.store');
         Route::get('/account/membership', [CustomerAccountController::class, 'membership'])->name('account.membership');
         Route::get('/account/orders', [CustomerOrderController::class, 'index'])->name('account.orders');
         Route::get('/account/orders/{order}', [CustomerOrderController::class, 'show'])->name('account.orders.show');
@@ -86,6 +95,17 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         'admin' => auth('admin')->user()->only('id', 'name', 'email', 'role'),
     ]))->name('admin.panel');
     Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
+    Route::get('/admin/payments', [AdminPaymentController::class, 'index'])->name('admin.payments.index');
+    Route::post('/admin/payments/manual/{paymentId}/confirm', [AdminPaymentController::class, 'confirmManual'])
+        ->name('admin.payments.manual.confirm');
+
+    Route::middleware('admin.super')->prefix('admin/payments')->name('admin.payments.')->group(function (): void {
+        Route::put('/gateways/{id}', [AdminPaymentController::class, 'gateway'])->name('gateways.update');
+        Route::put('/channels/{id}', [AdminPaymentController::class, 'channel'])->name('channels.update');
+        Route::post('/routes', [AdminPaymentController::class, 'route'])->name('routes.store');
+        Route::put('/routes/{id}', [AdminPaymentController::class, 'updateRoute'])->name('routes.update');
+        Route::put('/settings', [AdminPaymentController::class, 'settings'])->name('settings.update');
+    });
 
     Route::middleware('admin.super')->prefix('admin/catalog')->name('admin.catalog.')->group(function (): void {
         Route::get('/', [AdminCatalogController::class, 'index'])->name('index');

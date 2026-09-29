@@ -37,6 +37,7 @@ class CheckoutController
         $guest = ! $request->user();
         $data = $request->validate([
             'package_id' => ['required', 'integer'],
+            'payment_channel_code' => ['required', 'string', 'max:60'],
             'voucher_code' => ['nullable', 'string', 'max:100'],
             'guest_email' => $guest ? ['required', 'email:rfc', 'max:255'] : ['prohibited'],
             'guest_phone' => $guest
@@ -55,6 +56,7 @@ class CheckoutController
 
         return response()->json($checkout->quote(
             (int) $data['package_id'],
+            $data['payment_channel_code'],
             $data['voucher_code'] ?? null,
             $request->user(),
             $data['guest_email'] ?? null,
