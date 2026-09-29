@@ -17,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
             ->by('checkout-nickname:'.$request->ip()));
         RateLimiter::for('checkout-quote', fn (Request $request) => Limit::perMinute(30)
             ->by('checkout-quote:'.$request->ip()));
-        RateLimiter::for('checkout-create', fn (Request $request) => Limit::perMinute(10)
+        RateLimiter::for('checkout-create', fn (Request $request) => Limit::perMinute(20)
             ->by('checkout-create:'.$request->ip()));
         RateLimiter::for('guest-order', fn (Request $request) => Limit::perMinute(10)
             ->by('guest-order:'.$request->ip()));
