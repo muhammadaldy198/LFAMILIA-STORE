@@ -75,6 +75,10 @@ Run it only on the prepared VPS after a fresh D1 export has been copied to the s
 
 ## Cutover hold
 
+### Relay retirement gate
+
+Laravel mengirim transaksi, pricelist, dan cek saldo Digiflazz langsung dari IP egress VPS. Panel Integrasi tidak lagi menerima atau menampilkan profil relay; data historis dan migration tetap utuh. Route Cloudflare `lfamiliastore.my.id/*` dan `www.lfamiliastore.my.id/*` masih dapat menunjuk Worker lama selama migrasi, sehingga DNS relay/konfigurasi Worker yang aktif jangan dihapus sebelum cutover teruji. Setelah cutover, verifikasi callback dan fulfillment Digiflazz serta whitelist IP VPS sebelum menghapus dua DNS relay lama; hentikan layanan relay hanya jika masih berjalan. Tidak perlu menjalankan migrasi yang menghapus baris `integration_profiles`.
+
 DNS remains on the existing Cloudflare Worker until provider credentials are re-entered on the VPS and verified. Queue and scheduler services intentionally remain stopped while provider integrations are deferred. The VPS origin is otherwise prepared for cutover, including TLS for the apex and `www` hostnames, canonical `www` redirect, Cloudflare-only origin access, frontend/API smoke tests, and regression validation.
 
 

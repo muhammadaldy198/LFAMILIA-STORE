@@ -17,8 +17,8 @@ class AdminDigiflazzApiTest extends TestCase
         $this->saveIntegrationProfile('digiflazz', 'direct', 'development', [
             'username' => 'buyer-test',
             'apiKey' => 'dev-secret',
-            'transactionApiUrl' => 'https://api.test/v1/transaction',
-            'priceListUrl' => 'https://api.test/v1/price-list',
+            'transactionApiUrl' => 'https://api.digiflazz.com/v1/transaction',
+            'priceListUrl' => 'https://api.digiflazz.com/v1/price-list',
             'webhookSecret' => 'webhook-secret',
         ]);
     }
@@ -34,7 +34,7 @@ class AdminDigiflazzApiTest extends TestCase
             ->assertForbidden();
 
         Http::fake([
-            'https://api.test/v1/price-list' => Http::response([
+            'https://api.digiflazz.com/v1/price-list' => Http::response([
                 'data' => [[
                     'buyer_sku_code' => 'ML5',
                     'product_name' => 'Mobile Legends 5 Diamonds',
@@ -121,7 +121,7 @@ class AdminDigiflazzApiTest extends TestCase
         $this->digiflazzPackage();
 
         Http::fake([
-            'https://api.test/v1/cek-saldo' => Http::response([
+            'https://api.digiflazz.com/v1/cek-saldo' => Http::response([
                 'data' => ['deposit' => 123456, 'rc' => '00'],
             ], 200),
         ]);

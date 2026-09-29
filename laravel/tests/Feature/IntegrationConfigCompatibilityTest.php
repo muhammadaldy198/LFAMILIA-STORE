@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\IntegrationConfigService;
+use App\Services\DigiflazzEndpoint;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -50,5 +51,42 @@ class IntegrationConfigCompatibilityTest extends TestCase
 
         $service = app(IntegrationConfigService::class);
         $this->assertSame('legacy-key', $service->kokinpayApiKey());
+    }
+
+    public function test_historical_relay_profile_is_preserved_but_hidden_and_not_writable(): void
+    {
+        DB::table('integration_profiles')->insert([
+            'provider' => 'relay', 'mode' => 'service', 'environment' => 'global',
+            'encrypted_config' => 'historical-value', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $service = app(IntegrationConfigService::class);
+        $this->assertFalse(collect($service->integrationOverview()['profiles'])
+            ->contains(fn ($item) => $item['provider'] === 'relay'));
+        try {
+            $service->saveIntegrationProfile('relay', 'service', 'global', ['token' => 'new']);
+            $this->fail('Profil relay historis tidak boleh diaktifkan kembali.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Scope integrasi tidak valid.', $error->getMessage());
+        }
+        $this->assertDatabaseHas('integration_profiles', [
+            'provider' => 'relay', 'encrypted_config' => 'historical-value',
+        ]);
+    }
+
+    public function test_digiflazz_endpoints_reject_relay_and_redirect_targets(): void
+    {
+        $this->assertSame('https://api.digiflazz.com/v1/transaction',
+            DigiflazzEndpoint::requireOfficial('https://api.digiflazz.com/v1/transaction', '/v1/transaction'));
+        foreach (['https://digiflazz-relay.lfamiliastore.my.id/v1/transaction',
+            'https://api.digiflazz.com:443/v1/transaction',
+            'https://api.digiflazz.com/v1/transaction?target=relay'] as $url) {
+            try {
+                DigiflazzEndpoint::requireOfficial($url, '/v1/transaction');
+                $this->fail('URL nonresmi diterima: '.$url);
+            } catch (\RuntimeException $error) {
+                $this->assertStringContainsString('api.digiflazz.com', $error->getMessage());
+            }
+        }
     }
 }

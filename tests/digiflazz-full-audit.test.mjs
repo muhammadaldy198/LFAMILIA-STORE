@@ -28,13 +28,11 @@ test("valid signed DigiFlazz webhook ping is acknowledged before ref_id validati
   assert.match(callback, /event: "ping"/);
 });
 
-test("Digiflazz relay only forwards the three endpoints LFAMILIA needs", () => {
-  const relay = read("relay/server.mjs");
-  assert.match(relay, /const digiflazzAllowedPaths = new Set/);
-  for (const endpoint of ["/v1/transaction", "/v1/price-list", "/v1/cek-saldo"]) {
-    assert.match(relay, new RegExp(endpoint.replaceAll("/", "\\/")));
+test("Digiflazz runtime does not route requests through the retired relay", () => {
+  for (const file of ["lib/server/providers/digiflazz.ts", "lib/server/digiflazz-pricing.ts"]) {
+    assert.doesNotMatch(read(file), /providerRelayRequest|provider-relay/);
   }
-  assert.match(relay, /provider\.name === "digiflazz"\) return digiflazzAllowedPaths\.has\(path\)/);
+  assert.match(read("lib/server/digiflazz-endpoint.ts"), /api\.digiflazz\.com/);
 });
 
 test("saving a product refreshes DigiFlazz seller snapshots from cached pricelist only", () => {
@@ -180,8 +178,9 @@ test("DigiFlazz transaction response is JSON-safe and requires exact LFAMILIA co
 
 test("DigiFlazz dispatch uses the official endpoint and fails closed on provider response codes", () => {
   const provider = read("lib/server/providers/digiflazz.ts");
-  assert.match(provider, /https:\/\/api\.digiflazz\.com\/v1\/transaction/);
-  assert.match(provider, /parsed\.hostname !== "api\.digiflazz\.com"/);
+  const endpoint = read("lib/server/digiflazz-endpoint.ts");
+  assert.match(provider, /requireDigiflazzEndpoint\(rawApiUrl, "\/v1\/transaction"\)/);
+  assert.match(endpoint, /url\.hostname !== "api\.digiflazz\.com"/);
   assert.match(provider, /code === "00"/);
   assert.match(provider, /code === "03" \|\| code === "99"/);
   assert.match(provider, /if \(code\) return "failed"/);

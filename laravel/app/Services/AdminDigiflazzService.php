@@ -5,7 +5,6 @@ namespace App\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -299,7 +298,7 @@ class AdminDigiflazzService
             }
             $port = isset($parts['port']) ? ':'.$parts['port'] : '';
             $balanceUrl = strtolower((string) $parts['scheme']).'://'.$parts['host'].$port.'/v1/cek-saldo';
-            $response = Http::acceptJson()->timeout(12)->post($balanceUrl, [
+            $response = DigiflazzEndpoint::request()->timeout(12)->post($balanceUrl, [
                 'cmd' => 'deposit',
                 'username' => $config['username'],
                 'sign' => md5($config['username'].$config['apiKey'].'depo'),
@@ -379,7 +378,7 @@ class AdminDigiflazzService
     private function fetchPriceList(): array
     {
         $config = $this->runtimeConfig(true, false);
-        $response = Http::acceptJson()->timeout(20)->post($config['priceListUrl'], [
+        $response = DigiflazzEndpoint::request()->timeout(20)->post($config['priceListUrl'], [
             'cmd' => 'prepaid',
             'username' => $config['username'],
             'sign' => md5($config['username'].$config['apiKey'].'pricelist'),
@@ -657,24 +656,14 @@ class AdminDigiflazzService
         $result = ['environment' => $environment, 'username' => $username, 'apiKey' => $apiKey];
         if ($needsPriceList) {
             $url = $runtime['priceListUrl'];
-            $this->assertHttpsUrl($url, 'URL price list DigiFlazz belum valid.');
-            $result['priceListUrl'] = $url;
+            $result['priceListUrl'] = DigiflazzEndpoint::requireOfficial($url, '/v1/price-list');
         }
         if ($needsTransaction) {
             $url = $runtime['transactionApiUrl'];
-            $this->assertHttpsUrl($url, 'URL transaksi DigiFlazz belum valid.');
-            $result['transactionUrl'] = $url;
+            $result['transactionUrl'] = DigiflazzEndpoint::requireOfficial($url, '/v1/transaction');
         }
 
         return $result;
-    }
-
-    private function assertHttpsUrl(string $url, string $message): void
-    {
-        $parts = parse_url($url);
-        if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || empty($parts['host'])) {
-            throw new RuntimeException($message);
-        }
     }
 
     private function providerMessage(string $message, string $rc, string $fallback): string

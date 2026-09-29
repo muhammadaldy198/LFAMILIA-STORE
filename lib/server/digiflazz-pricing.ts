@@ -1,7 +1,7 @@
 import { getD1 } from "@/db";
 import { ensureLegacyDatabaseColumns } from "@/lib/server/database-repair";
 import { hashHex } from "@/lib/server/crypto";
-import { providerRelayRequest } from "@/lib/server/provider-relay";
+import { requireDigiflazzEndpoint } from "@/lib/server/digiflazz-endpoint";
 import { buildDigiflazzSellerMonitorStatement, ensureDigiflazzSellerMonitorTable } from "@/lib/server/digiflazz-monitor";
 import {
   getRuntimeEnv,
@@ -257,18 +257,13 @@ async function fetchPriceListItems(): Promise<DigiflazzPriceListItem[]> {
     environment === "development" ? env.DIGIFLAZZ_DEVELOPMENT_API_KEY : env.DIGIFLAZZ_PRODUCTION_API_KEY,
     environment === "development" ? "DIGIFLAZZ_DEVELOPMENT_API_KEY" : "DIGIFLAZZ_PRODUCTION_API_KEY",
   );
-  const priceListUrl = requireRuntimeValue(
+  const priceListUrl = requireDigiflazzEndpoint(requireRuntimeValue(
     environment === "development" ? env.DIGIFLAZZ_DEVELOPMENT_PRICE_LIST_URL : env.DIGIFLAZZ_PRODUCTION_PRICE_LIST_URL,
     environment === "development" ? "DIGIFLAZZ_DEVELOPMENT_PRICE_LIST_URL" : "DIGIFLAZZ_PRODUCTION_PRICE_LIST_URL",
-  );
-  const relay = providerRelayRequest(
-    priceListUrl,
-    { "content-type": "application/json", accept: "application/json" },
-    { provider: "digiflazz", environment },
-  );
-  const response = await fetch(relay.url, {
+  ), "/v1/price-list");
+  const response = await fetch(priceListUrl, {
     method: "POST",
-    headers: relay.headers,
+    headers: { "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify({ cmd: "prepaid", username, sign: hashHex("md5", `${username}${key}pricelist`) }),
     signal: AbortSignal.timeout(20_000),
   });

@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Exceptions\CheckoutValidationException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -97,7 +96,7 @@ class DigiflazzFulfillmentService
             $body['allow_dot'] = true;
         }
 
-        $response = Http::acceptJson()
+        $response = DigiflazzEndpoint::request()
             ->timeout(15)
             ->post($config['transactionUrl'], $body);
 
@@ -562,12 +561,7 @@ class DigiflazzFulfillmentService
         if ($username === '' || $apiKey === '') {
             throw new RuntimeException('Kredensial DigiFlazz belum lengkap.');
         }
-        $parts = parse_url($transactionUrl);
-        if (!is_array($parts)
-            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
-            || empty($parts['host'])) {
-            throw new RuntimeException('URL transaksi DigiFlazz belum valid.');
-        }
+        $transactionUrl = DigiflazzEndpoint::requireOfficial($transactionUrl, '/v1/transaction');
 
         return [
             'environment'=>$environment,

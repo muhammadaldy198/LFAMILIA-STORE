@@ -80,7 +80,7 @@ async function gatewayReadiness() {
       mode: "checkout" as const,
       reason: modes.dokuCheckoutConfigured ? null : `Kredensial DOKU Checkout ${modes.dokuEnvironment} belum lengkap.`,
     },
-    midtrans: { ...midtrans, mode: "snap" as const, relayReady: true },
+    midtrans: { ...midtrans, mode: "snap" as const },
   };
 }
 

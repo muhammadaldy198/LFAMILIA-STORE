@@ -20,11 +20,10 @@ test("outbound integration URLs reject local and private SSRF targets", () => {
   assert.match(source, /normalized\.startsWith\("fd"\)/);
 });
 
-test("payment relay and email outbound sinks use the SSRF guard", () => {
+test("payment and email outbound sinks use the SSRF guard", () => {
   const doku = read("lib/server/doku-checkout.ts");
   const paymentConfig = read("lib/server/payment-mode-config.ts");
   const integrations = read("lib/server/integration-config.ts");
-  const relay = read("lib/server/provider-relay.ts");
   const reset = read("lib/server/password-reset.ts");
   const vouchers = read("lib/server/vouchers.ts");
   const notifications = read("lib/server/transaction-notifications.ts");
@@ -32,7 +31,6 @@ test("payment relay and email outbound sinks use the SSRF guard", () => {
   assert.match(doku, /safeHttpsOrigin/);
   assert.match(paymentConfig, /safeHttpsOrigin\(merged\.apiUrl/);
   assert.match(integrations, /validateProfileUrls/);
-  assert.match(relay, /assertSafeHttpsUrl\(relayOrigin/);
   assert.match(reset, /assertSafeHttpsUrl\(configuredApiUrl/);
   assert.match(vouchers, /assertSafeHttpsUrl\(requireRuntimeValue/);
   assert.match(notifications, /assertSafeHttpsUrl\(config\.RESEND_API_URL/);

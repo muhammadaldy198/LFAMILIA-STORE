@@ -25,7 +25,7 @@ type Channel = {
 type GatewaySetting = { gateway: Gateway; isActive: boolean };
 type GatewayReadiness = {
   doku?: { ready?: boolean; reason?: string | null; environment?: string | null; mode?: string };
-  midtrans?: { ready?: boolean; reason?: string | null; missing?: string[]; environment?: string | null; relayReady?: boolean; mode?: string };
+  midtrans?: { ready?: boolean; reason?: string | null; missing?: string[]; environment?: string | null; mode?: string };
 };
 type RoutingOverview = {
   dokuMode: "checkout";

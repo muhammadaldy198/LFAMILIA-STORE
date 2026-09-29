@@ -1,6 +1,6 @@
 import { hashHex } from "@/lib/server/crypto";
 import type { ProviderAdapter, ProviderResult } from "@/lib/server/providers/types";
-import { providerRelayRequest } from "@/lib/server/provider-relay";
+import { requireDigiflazzEndpoint } from "@/lib/server/digiflazz-endpoint";
 import { isAutomatedTestRuntime,
   getRuntimeEnv,
   requireRuntimeChoice,
@@ -37,25 +37,6 @@ type DigiFlazzResponse = {
   };
 };
 
-const DIGIFLAZZ_TRANSACTION_URL = "https://api.digiflazz.com/v1/transaction";
-
-function normalizedTransactionUrl(value: string) {
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    throw new Error("URL transaksi DigiFlazz tidak valid.");
-  }
-  if (
-    parsed.protocol !== "https:" ||
-    parsed.hostname !== "api.digiflazz.com" ||
-    parsed.pathname.replace(/\/+$/, "") !== "/v1/transaction"
-  ) {
-    throw new Error(`URL transaksi DigiFlazz wajib ${DIGIFLAZZ_TRANSACTION_URL}.`);
-  }
-  return DIGIFLAZZ_TRANSACTION_URL;
-}
-
 function runtimeConfig() {
   const runtime = getRuntimeEnv<DigiFlazzEnv>();
   const environment = requireRuntimeChoice(
@@ -83,7 +64,7 @@ function runtimeConfig() {
       ? "DIGIFLAZZ_DEVELOPMENT_API_URL"
       : "DIGIFLAZZ_PRODUCTION_API_URL",
   );
-  const apiUrl = normalizedTransactionUrl(rawApiUrl);
+  const apiUrl = requireDigiflazzEndpoint(rawApiUrl, "/v1/transaction");
   return { environment, username, apiKey, apiUrl };
 }
 
@@ -121,20 +102,15 @@ function providerErrorMessage(
 
 export async function getDigiflazzBalance(options: { timeoutMs?: number } = {}) {
   if (isAutomatedTestRuntime() && runtimeConfig().environment === "production") throw new Error("DigiFlazz production dinonaktifkan saat automated test.");
-  const { environment, username, apiKey, apiUrl } = runtimeConfig();
+  const { username, apiKey, apiUrl } = runtimeConfig();
   if (balanceCache && Date.now() - balanceCache.checkedAt < 60_000) {
     return { balance: balanceCache.value, cached: true as const };
   }
   const origin = new URL(apiUrl).origin;
   const balanceUrl = new URL("/v1/cek-saldo", origin).toString();
-  const relay = providerRelayRequest(
-    balanceUrl,
-    { "content-type": "application/json", accept: "application/json" },
-    { provider: "digiflazz", environment },
-  );
-  const response = await fetch(relay.url, {
+  const response = await fetch(balanceUrl, {
     method: "POST",
-    headers: relay.headers,
+    headers: { "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify({
       cmd: "deposit",
       username,
@@ -184,14 +160,9 @@ export const digiflazzAdapter: ProviderAdapter = {
       ...(order.customerNo.includes(".") ? { allow_dot: true } : {}),
     };
 
-    const relay = providerRelayRequest(
-      apiUrl,
-      { "content-type": "application/json", accept: "application/json" },
-      { provider: "digiflazz", environment },
-    );
-    const response = await fetch(relay.url, {
+    const response = await fetch(apiUrl, {
       method: "POST",
-      headers: relay.headers,
+      headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15_000),
     });
