@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminAuthService;
+use App\Support\NominalLabel;
 use App\Services\CheckoutService;
 use App\Services\DigiflazzFulfillmentService;
 use App\Services\SecurityGuard;
@@ -331,7 +332,7 @@ class AdminOrdersController extends Controller
             'product_slug' => (string) $order->product_slug,
             'product_name' => (string) $order->product_name,
             'package_sku' => (string) $order->package_sku,
-            'package_label' => (string) $order->package_label,
+            'package_label' => NominalLabel::clean((string) $order->product_name, (string) $order->package_label),
             'destination' => (string) $order->destination,
             'server' => $order->server,
             'nickname' => $order->nickname,
