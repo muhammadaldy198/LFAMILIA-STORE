@@ -12,7 +12,7 @@ return new class extends Migration
         Schema::create('wallets', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('user_id')->unique()->constrained()->restrictOnDelete();
-            $table->unsignedBigInteger('balance_minor')->default(0);
+            $table->unsignedBigInteger('balance_idr')->default(0);
             $table->unsignedBigInteger('version')->default(0);
             $table->timestamps();
         });
@@ -20,9 +20,9 @@ return new class extends Migration
         Schema::create('wallet_ledger', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('wallet_id')->constrained()->restrictOnDelete();
-            $table->bigInteger('amount_minor');
-            $table->unsignedBigInteger('balance_before_minor');
-            $table->unsignedBigInteger('balance_after_minor');
+            $table->bigInteger('amount_idr');
+            $table->unsignedBigInteger('balance_before_idr');
+            $table->unsignedBigInteger('balance_after_idr');
             $table->string('source', 40);
             $table->string('reference_type', 40);
             $table->string('reference_id', 100);
@@ -33,14 +33,14 @@ return new class extends Migration
             $table->index(['wallet_id', 'created_at']);
             $table->unique(['source', 'reference_type', 'reference_id'], 'wallet_source_reference_unique');
         });
-        DB::statement('ALTER TABLE wallet_ledger ADD CONSTRAINT wallet_ledger_balance_check CHECK (CAST(balance_after_minor AS DECIMAL(20,0)) = CAST(balance_before_minor AS DECIMAL(20,0)) + CAST(amount_minor AS DECIMAL(20,0)) AND amount_minor <> 0)');
+        DB::statement('ALTER TABLE wallet_ledger ADD CONSTRAINT wallet_ledger_balance_check CHECK (CAST(balance_after_idr AS DECIMAL(20,0)) = CAST(balance_before_idr AS DECIMAL(20,0)) + CAST(amount_idr AS DECIMAL(20,0)) AND amount_idr <> 0)');
 
         Schema::create('vouchers', function (Blueprint $table): void {
             $table->id();
             $table->string('code')->unique();
             $table->string('discount_type', 20);
             $table->unsignedBigInteger('discount_value');
-            $table->unsignedBigInteger('minimum_total_minor')->default(0);
+            $table->unsignedBigInteger('minimum_total_idr')->default(0);
             $table->unsignedInteger('total_quota')->nullable();
             $table->unsignedInteger('per_customer_limit')->nullable();
             $table->timestamp('starts_at')->nullable();
@@ -76,11 +76,11 @@ return new class extends Migration
             $table->string('currency', 3)->default('IDR');
             $table->json('customer_input');
             $table->json('snapshot');
-            $table->unsignedBigInteger('cost_minor');
-            $table->unsignedBigInteger('margin_minor');
-            $table->unsignedBigInteger('discount_minor')->default(0);
-            $table->unsignedBigInteger('fee_minor')->default(0);
-            $table->unsignedBigInteger('total_minor');
+            $table->unsignedBigInteger('cost_idr');
+            $table->unsignedBigInteger('margin_idr');
+            $table->unsignedBigInteger('discount_idr')->default(0);
+            $table->unsignedBigInteger('fee_idr')->default(0);
+            $table->unsignedBigInteger('total_idr');
             $table->string('idempotency_key', 120)->unique();
             $table->timestamp('expires_at')->nullable();
             $table->timestamp('paid_at')->nullable();
@@ -88,7 +88,7 @@ return new class extends Migration
             $table->index(['user_id', 'created_at']);
             $table->index(['status', 'created_at']);
         });
-        DB::statement('ALTER TABLE orders ADD CONSTRAINT orders_positive_total_check CHECK (total_minor > 0)');
+        DB::statement('ALTER TABLE orders ADD CONSTRAINT orders_positive_total_check CHECK (total_idr > 0)');
 
         Schema::create('voucher_redemptions', function (Blueprint $table): void {
             $table->id();
@@ -109,16 +109,16 @@ return new class extends Migration
             $table->id();
             $table->foreignId('wallet_id')->constrained()->restrictOnDelete();
             $table->foreignId('user_id')->constrained()->restrictOnDelete();
-            $table->unsignedBigInteger('amount_minor');
-            $table->unsignedBigInteger('fee_minor')->default(0);
-            $table->unsignedBigInteger('total_minor');
+            $table->unsignedBigInteger('amount_idr');
+            $table->unsignedBigInteger('fee_idr')->default(0);
+            $table->unsignedBigInteger('total_idr');
             $table->string('status', 30)->default('PENDING_PAYMENT');
             $table->string('idempotency_key', 120)->unique();
             $table->timestamp('paid_at')->nullable();
             $table->timestamps();
             $table->index(['user_id', 'created_at']);
         });
-        DB::statement('ALTER TABLE wallet_topups ADD CONSTRAINT wallet_topups_positive_amount_check CHECK (amount_minor > 0 AND total_minor = amount_minor + fee_minor)');
+        DB::statement('ALTER TABLE wallet_topups ADD CONSTRAINT wallet_topups_positive_amount_check CHECK (amount_idr > 0 AND total_idr = amount_idr + fee_idr)');
 
         Schema::create('payment_transactions', function (Blueprint $table): void {
             $table->id();
@@ -127,7 +127,7 @@ return new class extends Migration
             $table->string('gateway_code', 40);
             $table->string('channel_code', 60);
             $table->string('external_reference', 120)->nullable();
-            $table->unsignedBigInteger('amount_minor');
+            $table->unsignedBigInteger('amount_idr');
             $table->string('status', 40)->default('CREATING');
             $table->string('idempotency_key', 120)->unique();
             $table->timestamp('verified_at')->nullable();
@@ -135,7 +135,7 @@ return new class extends Migration
             $table->unique(['gateway_code', 'external_reference']);
             $table->index(['status', 'created_at']);
         });
-        DB::statement('ALTER TABLE payment_transactions ADD CONSTRAINT payment_target_check CHECK ((order_id IS NOT NULL) <> (wallet_topup_id IS NOT NULL) AND amount_minor > 0)');
+        DB::statement('ALTER TABLE payment_transactions ADD CONSTRAINT payment_target_check CHECK ((order_id IS NOT NULL) <> (wallet_topup_id IS NOT NULL) AND amount_idr > 0)');
 
         Schema::create('payment_callbacks', function (Blueprint $table): void {
             $table->id();
