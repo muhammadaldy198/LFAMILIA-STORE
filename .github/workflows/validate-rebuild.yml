@@ -59,18 +59,22 @@ jobs:
       SESSION_DRIVER: redis
     steps:
       - uses: actions/checkout@v4
+
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo_mysql, redis, gd, exif
           coverage: none
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
       - name: Install PHP dependencies
         run: |
           composer validate --strict
           composer install --no-interaction --prefer-dist
+
       - name: Security guardrails
         run: |
           composer audit --no-interaction
@@ -82,25 +86,36 @@ jobs:
             echo "Private key material detected in tracked source."
             exit 1
           fi
+          if git -C .. grep -n -E "(api_key|server_key|client_secret|secret_key|access_token|bot_token)[[:space:]]*=>[[:space:]]*['\"][^$]" -- 'rebuild/app/**' 'rebuild/config/**' 'rebuild/routes/**' 'rebuild/resources/**'; then
+            echo "Possible hardcoded secret detected."
+            exit 1
+          fi
+
       - name: Install frontend dependencies
         run: npm ci
+
       - name: Configure test app
         run: |
           cp .env.example .env
           php artisan key:generate
+
       - name: Check PHP syntax
         run: find app bootstrap config public routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
+
       - name: Validate cached configuration
         run: |
           php artisan config:cache
           php artisan config:clear
+
       - name: Validate schema and assets
         run: |
           php artisan migrate --force
           php artisan migrate:rollback --step=10 --force
           php artisan migrate --force
           npm run build
+
       - name: Run rebuild tests
         run: vendor/bin/phpunit
+
       - name: Check PHP style
         run: vendor/bin/pint --test
