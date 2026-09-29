@@ -74,8 +74,8 @@ const navigation: NavigationItem[] = [
   { value: "support", label: "Layanan Pelanggan", Icon: Headphones, minimumRole: "staff" },
   { value: "reports", label: "Laporan", Icon: BarChart3, minimumRole: "admin" },
   { value: "team", label: "Staff & Admin Akses", Icon: UserCog, minimumRole: "super_admin" },
-  { value: "integrations", label: "Integrasi", Icon: Layers3, minimumRole: "super_admin" },
   { value: "settings", label: "Pengaturan", Icon: Settings, minimumRole: "super_admin" },
+  { value: "integrations", label: "Integrasi", Icon: Layers3, minimumRole: "super_admin" },
 ];
 
 const roleRank = { staff: 0, admin: 1, super_admin: 2 } as const;
@@ -287,8 +287,8 @@ export function AdminDashboard({
           <div className="mx-auto min-w-0 max-w-[1540px]">
             <TabsContent value="overview" className="mt-0"><AdminOverview role={initialSession.role} onNavigate={setActiveTab} /></TabsContent>
             <TabsContent value="orders" className="mt-0"><AdminOrderManager /></TabsContent>
-            {(isOwner || isAdmin) && <TabsContent value="products" className="mt-0"><AdminProductManager /></TabsContent>}
-            <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} /><AdminHomepageCategoryManager />{initialSession.role === "staff" && <StaffProductContentWorkspace />}</TabsContent>
+            {(isOwner || isAdmin) && <TabsContent value="products" className="mt-0"><AdminProductManager /><AdminHomepageCategoryManager /></TabsContent>}
+            <TabsContent value="content" className="mt-0"><AdminExperienceManager role={initialSession.role} />{initialSession.role === "staff" && <StaffProductContentWorkspace />}</TabsContent>
 
             {(isOwner || isAdmin) && <TabsContent value="digiflazz" className="mt-0"><AdminDigiflazzWorkspace /></TabsContent>}
             {(isOwner || isAdmin) && <TabsContent value="account-validation" className="mt-0"><AdminKokinpayWorkspace /></TabsContent>}
@@ -298,8 +298,8 @@ export function AdminDashboard({
             <TabsContent value="support" className="mt-0"><AdminSupportWorkspace /></TabsContent>
             {(isOwner || isAdmin) && <TabsContent value="reports" className="mt-0"><AdminReportsWorkspace /></TabsContent>}
             {isOwner && <TabsContent value="team" className="mt-0"><AdminTeamWorkspace /></TabsContent>}
-            {isOwner && <TabsContent value="integrations" className="mt-0"><AdminIntegrationWorkspace /></TabsContent>}
             {isOwner && <TabsContent value="settings" className="mt-0"><AdminSettingsWorkspace /></TabsContent>}
+            {isOwner && <TabsContent value="integrations" className="mt-0"><AdminIntegrationWorkspace /></TabsContent>}
           </div>
         </main>
       </div>
