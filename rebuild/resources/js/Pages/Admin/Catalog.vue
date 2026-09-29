@@ -45,6 +45,10 @@ const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
     category_id: item.category_id, name: item.name, description: item.description,
     manual_instructions: item.manual_instructions, margin_percent: item.margin_percent,
     sort_order: item.sort_order, is_active: item.is_active,
+    nickname_check_enabled: item.nickname_check_enabled,
+    nickname_game_code: item.nickname_game_code || null,
+    nickname_user_field_key: item.nickname_user_field_key || null,
+    nickname_server_field_key: item.nickname_server_field_key || null,
 });
 const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
     code: pack.code, name: pack.name, nominal_value: pack.nominal_value,
@@ -105,6 +109,15 @@ const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { i
                         <label class="text-sm md:col-span-3">Deskripsi<textarea v-model="item.description" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
                         <label class="flex items-center gap-2 text-sm"><input v-model="item.is_active" type="checkbox"> Produk aktif</label>
                         <label v-if="item.fulfillment_mode === 'MANUAL'" class="text-sm md:col-span-4">Instruksi internal<textarea v-model="item.manual_instructions" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
+                        <div class="space-y-3 rounded-md border border-slate-700 p-3 md:col-span-4">
+                            <label class="flex items-center gap-2 text-sm"><input v-model="item.nickname_check_enabled" type="checkbox"> Aktifkan cek nickname</label>
+                            <div v-if="item.nickname_check_enabled" class="grid gap-3 md:grid-cols-3">
+                                <label class="text-xs">Game code<input v-model="item.nickname_game_code" placeholder="mobile-legends" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                                <label class="text-xs">Field User ID<select v-model="item.nickname_user_field_key" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="">Pilih field</option><option v-for="field in item.fields" :key="field.field_key" :value="field.field_key">{{ field.label }} ({{ field.field_key }})</option></select></label>
+                                <label class="text-xs">Field Server / Zone<select v-model="item.nickname_server_field_key" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="">Tidak dipakai</option><option v-for="field in item.fields" :key="field.field_key" :value="field.field_key">{{ field.label }} ({{ field.field_key }})</option></select></label>
+                            </div>
+                            <p class="text-xs text-slate-500">Credential layanan nickname tetap dikelola di Integrasi; customer tidak melihat nama provider.</p>
+                        </div>
                     </div>
                     <button type="button" class="rounded-md bg-slate-700 px-4 py-2 text-sm" @click="saveProduct(item)">Simpan produk</button>
                     <div class="grid gap-3 md:grid-cols-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /><AdminMediaControl type="product" :id="item.id" collection="banner" :url="item.banner_url" /></div>
