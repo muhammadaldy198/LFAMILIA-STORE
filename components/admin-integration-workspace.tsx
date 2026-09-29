@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CreditCard, KeyRound, LogIn, Mail, Network, Save, Server, ShieldCheck } from "lucide-react";
+import { CreditCard, KeyRound, LogIn, Mail, Network, Save, ShieldCheck } from "lucide-react";
 import { CopyUrl, Field, Panel, Status, TabBar, WorkspaceHeader, buttonClass, inputClass, primaryButtonClass } from "@/components/admin-workspace-ui";
 
-const tabs = ["Ringkasan", "DOKU Checkout", "Midtrans Snap", "Digiflazz", "KokinPay", "Google Login", "Resend Email", "Relay & Keamanan"] as const;
+const tabs = ["Ringkasan", "DOKU Checkout", "Midtrans Snap", "Digiflazz", "KokinPay", "Google Login", "Resend Email", "Keamanan"] as const;
 type Tab = (typeof tabs)[number];
-type Provider = "digiflazz" | "kokinpay" | "google" | "resend" | "turnstile" | "relay" | "security";
+type Provider = "digiflazz" | "kokinpay" | "google" | "resend" | "turnstile" | "security";
 type Environment = "development" | "production" | "global";
 type PaymentEnvironment = "sandbox" | "production";
 type Profile = { provider: Provider; environment: Environment; configured: boolean; configuredFields?: string[]; decryptionError: boolean };
@@ -18,11 +18,9 @@ type Overview = {
   profiles: Profile[];
   callbacks: Callback[];
 };
-type RelayResult = { provider: string; label: string; connected: boolean; status: number | null; message: string };
 type IntegrationPutResult = {
   error?: string;
   overview?: Overview;
-  relay?: RelayResult[];
   digiflazz?: { connected?: boolean; balance?: number };
 };
 type PaymentOverview = {
@@ -59,7 +57,6 @@ export function AdminIntegrationWorkspace() {
   const [values, setValues] = useState<Record<string, string>>({
     transactionApiUrl: "https://api.digiflazz.com/v1/transaction",
     priceListUrl: "https://api.digiflazz.com/v1/price-list",
-    relayOrigin: "https://digiflazz-relay.lfamiliastore.my.id",
     resendApiUrl: "https://api.resend.com/emails",
     resendDeliveryChannel: "email",
     kokinpayBaseUrl: "https://api.kokinpay.com",
@@ -220,7 +217,7 @@ export function AdminIntegrationWorkspace() {
             deliveryChannel: values.resendDeliveryChannel || "email",
           },
         });
-      } else if (tab === "Relay & Keamanan") {
+      } else if (tab === "Keamanan") {
         await put({
           action: "save_profile",
           provider: "turnstile",
@@ -231,13 +228,6 @@ export function AdminIntegrationWorkspace() {
             secretKey: values.turnstileSecretKey || "",
             verifyUrl: values.turnstileVerifyUrl || "",
           },
-        });
-        await put({
-          action: "save_profile",
-          provider: "relay",
-          mode: "service",
-          environment: "global",
-          values: { digiflazzOrigin: values.relayOrigin || "", hosts: values.relayHosts || "", token: values.relayToken || "" },
         });
         if (values.voucherEncryptionKey?.trim()) {
           await put({
@@ -257,7 +247,6 @@ export function AdminIntegrationWorkspace() {
         kokinpayApiKey: "",
         resendApiKey: "",
         turnstileSecretKey: "",
-        relayToken: "",
         voucherEncryptionKey: "",
       }));
       setMessage("Konfigurasi tersimpan aman di backend.");
@@ -276,17 +265,6 @@ export function AdminIntegrationWorkspace() {
       if (tab === "Digiflazz") {
         const result = await put({ action: "test_digiflazz" });
         setMessage(`Koneksi Digiflazz berhasil. Saldo terbaca: Rp${Number(result.digiflazz?.balance || 0).toLocaleString("id-ID")}.`);
-      } else if (tab === "Relay & Keamanan") {
-        const result = await put({ action: "test_relay" });
-        const relay = result.relay ?? [];
-        if (!relay.length) throw new Error("Backend tidak mengembalikan hasil pemeriksaan relay.");
-        const details = relay.map((item) => {
-          const connection = item.connected ? "Terhubung" : "Gagal";
-          const http = item.status === null ? "" : ` · HTTP ${item.status}`;
-          return `${item.label}: ${connection}${http} · ${item.message}`;
-        }).join(" | ");
-        if (relay.every((item) => item.connected)) setMessage(details);
-        else setError(details);
       } else if (tab === "DOKU Checkout" || tab === "Midtrans Snap") {
         const response = await fetch("/api/admin/payment-routing", { cache: "no-store" });
         const payload = await response.json().catch(() => ({})) as PaymentOverview & { error?: string };
@@ -309,7 +287,7 @@ export function AdminIntegrationWorkspace() {
         const mapping: Partial<Record<Tab, [Provider, Environment, string]>> = {
           "KokinPay": ["kokinpay", "global", "KokinPay"],
           "Resend Email": ["resend", "global", "Resend Email"],
-          "Relay & Keamanan": ["turnstile", "global", "Turnstile"],
+          "Keamanan": ["turnstile", "global", "Turnstile"],
         };
         const target = mapping[tab];
         if (!target) throw new Error("Tidak ada pemeriksaan untuk menu ini.");
@@ -367,7 +345,7 @@ export function AdminIntegrationWorkspace() {
       <Card icon={<KeyRound className="size-5" />} title="KokinPay" ready={isConfigured("kokinpay", "global")} onClick={() => setTab("KokinPay")} />
       <Card icon={<LogIn className="size-5" />} title="Google Login" ready={isConfigured("google", "global")} onClick={() => setTab("Google Login")} />
       <Card icon={<Mail className="size-5" />} title="Resend Email" ready={isConfigured("resend", "global")} onClick={() => setTab("Resend Email")} />
-      <Card icon={<Server className="size-5" />} title="VPS Relay" ready={isConfigured("relay", "global")} onClick={() => setTab("Relay & Keamanan")} />
+      <Card icon={<ShieldCheck className="size-5" />} title="Keamanan" ready={isConfigured("turnstile", "global")} onClick={() => setTab("Keamanan")} />
       <Panel title="Callback & Notification URL" description="Tempel URL berikut pada dashboard provider terkait." className="sm:col-span-2">
         <div className="grid gap-3 p-4">
           <CopyUrl label="DOKU Checkout Notification" value={paymentOverview?.callbacks.dokuNotification || "/api/payments/doku/callback"} />
@@ -446,14 +424,7 @@ export function AdminIntegrationWorkspace() {
       </div>
     </Panel>}
 
-    {tab === "Relay & Keamanan" && <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <Panel title="VPS Relay" description="Hanya untuk request Digiflazz.">
-        <div className="grid gap-4 p-4">
-          <Text label="Relay URL" value={values.relayOrigin || ""} onChange={(value) => setValue("relayOrigin", value)} />
-          <Text label="Host diizinkan" value={values.relayHosts || ""} onChange={(value) => setValue("relayHosts", value)} />
-          <Text label="Relay Token" secret value={values.relayToken || ""} onChange={(value) => setValue("relayToken", value)} />
-        </div>
-      </Panel>
+    {tab === "Keamanan" && <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <Panel title="Keamanan">
         <div className="grid gap-4 p-4">
           <Text label="Turnstile Site Key" value={values.turnstileSiteKey || ""} onChange={(value) => setValue("turnstileSiteKey", value)} />

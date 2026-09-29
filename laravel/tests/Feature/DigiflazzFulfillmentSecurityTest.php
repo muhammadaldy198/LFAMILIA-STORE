@@ -20,8 +20,8 @@ class DigiflazzFulfillmentSecurityTest extends TestCase
         $this->saveIntegrationProfile('digiflazz', 'direct', 'production', [
             'username' => 'buyer-user',
             'apiKey' => 'provider-secret',
-            'transactionApiUrl' => 'https://digiflazz.test.invalid/v1/transaction',
-            'priceListUrl' => 'https://digiflazz.test.invalid/v1/price-list',
+            'transactionApiUrl' => 'https://api.digiflazz.com/v1/transaction',
+            'priceListUrl' => 'https://api.digiflazz.com/v1/price-list',
             'webhookSecret' => 'webhook-secret',
         ]);
     }
@@ -31,7 +31,7 @@ class DigiflazzFulfillmentSecurityTest extends TestCase
         [$orderId, $reference] = $this->paidOrder();
 
         Http::fake([
-            'https://digiflazz.test.invalid/v1/transaction' => Http::response([
+            'https://api.digiflazz.com/v1/transaction' => Http::response([
                 'data' => [
                     'ref_id' => $reference,
                     'buyer_sku_code' => 'DF10',
@@ -56,7 +56,7 @@ class DigiflazzFulfillmentSecurityTest extends TestCase
         ]);
 
         Http::assertSent(function ($request) use ($reference) {
-            return $request->url() === 'https://digiflazz.test.invalid/v1/transaction'
+            return $request->url() === 'https://api.digiflazz.com/v1/transaction'
                 && $request['username'] === 'buyer-user'
                 && $request['buyer_sku_code'] === 'DF10'
                 && $request['customer_no'] === '123456'

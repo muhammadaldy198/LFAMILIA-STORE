@@ -23,7 +23,9 @@ https://lfamiliastore.my.id/api/fulfillment/digiflazz/callback
 
 Di **Super Admin → Pembayaran**, DOKU Checkout dan Midtrans memiliki toggle aktif/nonaktif yang terpisah dari status kesiapan credential. Top up saldo juga mempunyai pilihan gateway sendiri (`DOKU Checkout` atau `Midtrans Snap`) dan master toggle top up otomatis. Gateway top up yang dipilih harus berstatus siap dan aktif; backend tidak melakukan fallback diam-diam ke gateway lain.
 
-DOKU Checkout berjalan langsung dari Worker LFAMILIA dan tidak memakai VPS relay. VPS relay tetap khusus Digiflazz. Redirect halaman pembayaran tidak pernah dianggap sebagai bukti pembayaran; backend hanya mengubah order menjadi `paid` setelah callback/status gateway tervalidasi. Digiflazz baru dipanggil setelah status pembayaran benar-benar `paid`.
+Pada target Laravel, backend VPS memanggil Digiflazz langsung melalui `https://api.digiflazz.com` untuk transaksi, pricelist, dan saldo. URL di panel hanya menerima endpoint resmi Digiflazz; whitelist IP Digiflazz menggunakan IP egress VPS. Pengaturan relay tidak lagi dipakai oleh Laravel. Redirect halaman pembayaran tidak pernah dianggap sebagai bukti pembayaran; backend hanya mengubah order menjadi `paid` setelah callback/status gateway tervalidasi. Digiflazz baru dipanggil setelah status pembayaran benar-benar `paid`.
+
+Selama route Cloudflare masih menunjuk Worker lama, jangan hentikan jalur Digiflazz Worker atau hapus DNS relay sampai cutover Laravel dan pengujian integrasi selesai. Data profil `relay` lama di database tetap disimpan sebagai histori, tetapi tidak dibaca runtime Laravel dan tidak bisa diubah lagi lewat panel.
 
 ## Google Login pelanggan
 

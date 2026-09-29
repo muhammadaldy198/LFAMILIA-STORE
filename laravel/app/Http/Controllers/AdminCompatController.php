@@ -9,7 +9,6 @@ use App\Services\SecurityGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -93,8 +92,8 @@ class AdminCompatController extends Controller
             }
             $security->assertSameOrigin($request);
             $input = $request->validate([
-                'action'=>['required','in:save_profile,save_selections,test_relay,test_digiflazz'],
-                'provider'=>['nullable','in:digiflazz,kokinpay,google,resend,turnstile,relay,security'],
+                'action'=>['required','in:save_profile,save_selections,test_digiflazz'],
+                'provider'=>['nullable','in:digiflazz,kokinpay,google,resend,turnstile,security'],
                 'mode'=>['nullable','in:direct,service'],
                 'environment'=>['nullable','in:sandbox,production,development,global'],
                 'values'=>['nullable','array','max:32'],
@@ -110,35 +109,6 @@ class AdminCompatController extends Controller
                     'ok'=>true,
                     'digiflazz'=>['connected'=>true,'balance'=>$digiflazz->balance()],
                 ], 200, ['Cache-Control'=>'no-store']);
-            }
-
-            if ($input['action'] === 'test_relay') {
-                $profile = [];
-                try { $profile = $integrations->profile('relay','service','global'); } catch (Throwable) {}
-                $origin = rtrim(trim((string)($profile['digiflazzOrigin'] ?? '')), '/');
-                if ($origin === '') throw new RuntimeException('Origin relay DigiFlazz belum disimpan.');
-                $target = $origin.'/health';
-                try {
-                    $response = Http::acceptJson()->timeout(8)->get($target);
-                    return response()->json([
-                        'ok'=>true,
-                        'relay'=>[[
-                            'provider'=>'digiflazz',
-                            'label'=>'Relay DigiFlazz',
-                            'connected'=>$response->successful(),
-                            'status'=>$response->status(),
-                            'message'=>$response->successful() ? 'Relay dapat dijangkau.' : 'Relay merespons error.',
-                        ]],
-                    ], 200, ['Cache-Control'=>'no-store']);
-                } catch (Throwable) {
-                    return response()->json([
-                        'ok'=>true,
-                        'relay'=>[[
-                            'provider'=>'digiflazz','label'=>'Relay DigiFlazz','connected'=>false,
-                            'status'=>null,'message'=>'Relay tidak dapat dijangkau.',
-                        ]],
-                    ], 200, ['Cache-Control'=>'no-store']);
-                }
             }
 
             if ($input['action'] === 'save_selections') {

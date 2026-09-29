@@ -197,7 +197,6 @@ class AdminPaymentController extends Controller
                         'mode' => 'snap',
                         'reason' => $overview['midtransSnapConfigured']
                             ? null : 'Kredensial Midtrans Snap belum lengkap.',
-                        'relayReady' => true,
                     ],
                 ],
             ], 200, ['Cache-Control' => 'no-store']);

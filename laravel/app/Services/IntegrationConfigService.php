@@ -292,7 +292,6 @@ class IntegrationConfigService
             ['google', 'service', 'global'],
             ['resend', 'service', 'global'],
             ['turnstile', 'service', 'global'],
-            ['relay', 'service', 'global'],
             ['security', 'service', 'global'],
         ];
 
@@ -362,13 +361,19 @@ class IntegrationConfigService
             'google:service:global' => ['clientId'],
             'resend:service:global' => ['apiKey','fromEmail','apiUrl','deliveryChannel'],
             'turnstile:service:global' => ['siteKey','secretKey','verifyUrl'],
-            'relay:service:global' => ['digiflazzOrigin','hosts','token'],
             'security:service:global' => ['voucherEncryptionKey'],
         ];
         $scope = $provider.':'.$mode.':'.$environment;
         $allowed = $allowedScopes[$scope] ?? null;
         if ($allowed === null) {
             throw new RuntimeException('Scope integrasi tidak valid.');
+        }
+        if ($provider === 'digiflazz') {
+            foreach (['transactionApiUrl' => '/v1/transaction', 'priceListUrl' => '/v1/price-list'] as $key => $path) {
+                if (trim((string) ($values[$key] ?? '')) !== '') {
+                    DigiflazzEndpoint::requireOfficial(trim((string) $values[$key]), $path);
+                }
+            }
         }
 
         $existing = [];

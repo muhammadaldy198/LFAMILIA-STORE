@@ -19,13 +19,12 @@ import {
   saveIntegrationProfile,
   saveIntegrationSelections,
 } from "@/lib/server/integration-config";
-import { testProviderRelayConnections } from "@/lib/server/provider-relay";
 
 export const dynamic = "force-dynamic";
 
 const profileInput = z.object({
   action: z.literal("save_profile"),
-  provider: z.enum(["digiflazz", "kokinpay", "google", "resend", "relay", "security"]),
+  provider: z.enum(["digiflazz", "kokinpay", "google", "resend", "security"]),
   mode: z.enum(["direct", "service"]),
   environment: z.enum(["sandbox", "production", "development", "global"]),
   values: z.record(z.string().min(1).max(80), z.string().max(12_000)).default({}),
@@ -39,11 +38,6 @@ const selectionInput = z.object({
   }),
 });
 
-const relayTestInput = z.object({
-  action: z.literal("test_relay"),
-});
-
-
 const digiflazzTestInput = z.object({
   action: z.literal("test_digiflazz"),
 });
@@ -51,7 +45,6 @@ const digiflazzTestInput = z.object({
 const schema = z.discriminatedUnion("action", [
   profileInput,
   selectionInput,
-  relayTestInput,
   digiflazzTestInput,
 ]);
 
@@ -118,12 +111,6 @@ export async function PUT(request: Request) {
   if (access instanceof Response) return access;
   try {
     const input = schema.parse(await request.json());
-    if (input.action === "test_relay") {
-      return Response.json(
-        { ok: true, relay: await testProviderRelayConnections() },
-        { headers: { "Cache-Control": "no-store" } },
-      );
-    }
     if (input.action === "test_digiflazz") {
       clearDigiflazzBalanceCache();
       const result = await getDigiflazzBalance();

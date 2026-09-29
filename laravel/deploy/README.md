@@ -10,7 +10,7 @@ Worker Cloudflare + D1 tetap menjadi production/rollback sampai Laravel di VPS l
 
 Gunakan PHP 8.3+ dengan extension `curl`, `mbstring`, `openssl`, `pdo_mysql`, `tokenizer`, `xml`, `ctype`, dan `fileinfo`; Composer 2; serta MariaDB. Web root harus menunjuk ke folder `laravel/public`.
 
-Salin `.env.example` menjadi `.env` di server dan isi **hanya bootstrap/infrastructure configuration** seperti database, `APP_KEY`, `INTEGRATION_ENCRYPTION_KEY`, `PUBLIC_BASE_URL`, dan endpoint non-secret yang memang dibutuhkan bootstrap. Jangan commit `.env`. Digiflazz, Midtrans, DOKU, KokinPay, Resend, Google Login, Turnstile, relay, dan credential provider lain dikonfigurasi dari **Super Admin → Integrasi** dan disimpan terenkripsi di MariaDB.
+Salin `.env.example` menjadi `.env` di server dan isi **hanya bootstrap/infrastructure configuration** seperti database, `APP_KEY`, `INTEGRATION_ENCRYPTION_KEY`, `PUBLIC_BASE_URL`, dan endpoint non-secret yang memang dibutuhkan bootstrap. Jangan commit `.env`. Digiflazz, Midtrans, DOKU, KokinPay, Resend, Google Login, Turnstile, dan credential provider lain dikonfigurasi dari **Super Admin → Integrasi** dan disimpan terenkripsi di MariaDB. Profil relay historis tetap tersimpan namun tidak dibaca runtime.
 
 Kemudian jalankan dari folder `laravel`:
 

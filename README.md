@@ -28,7 +28,7 @@ npm test
 
 Konfigurasi Worker berada di `wrangler.jsonc`. Binding database harus bernama `DB`. Untuk deployment aktif, persiapan schema pembayaran dilakukan dari Admin Panel. Migration SQL tetap tersedia sebagai baseline untuk instalasi baru, sedangkan metadata Drizzle lama yang sudah tidak sinkron telah dihapus.
 
-Panduan secret, callback, provider, relay, dan pengiriman kode tersedia di [INTEGRATION-SETUP.md](./INTEGRATION-SETUP.md).
+Panduan secret, callback, provider, dan pengiriman kode tersedia di [INTEGRATION-SETUP.md](./INTEGRATION-SETUP.md).
 
 ## Keamanan
 
@@ -36,4 +36,4 @@ Panduan secret, callback, provider, relay, dan pengiriman kode tersedia di [INTE
 - Jangan meminta PIN atau OTP pelanggan melalui formulir maupun catatan pesanan.
 - Lindungi halaman pemulihan Pemilik dan endpoint admin sensitif sesuai konfigurasi deployment.
 - Gunakan password admin yang kuat; password disimpan sebagai hash dan tidak dapat dibaca kembali dari panel.
-- `INTEGRATION_ENCRYPTION_KEY` tetap disimpan sebagai Cloudflare Secret root. Credential provider/service, relay, dan environment provider wajib dikelola terenkripsi melalui Integration Manager dan tidak memakai fallback Cloudflare Variables/Secrets.
+- `INTEGRATION_ENCRYPTION_KEY` tetap disimpan sebagai secret root pada runtime yang aktif. Credential provider/service dan environment provider dikelola terenkripsi melalui Integrasi, tanpa fallback ke secret provider lama di environment.

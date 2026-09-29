@@ -8,4 +8,4 @@ Top up saldo mempunyai gateway pilihan sendiri di **Super Admin → Pembayaran**
 
 Provider otomatis adalah Digiflazz. Isi username, API key per environment, URL transaksi, URL pricelist, dan webhook secret di **Super Admin → Integrasi → Digiflazz**. Credential disimpan terenkripsi dengan `INTEGRATION_ENCRYPTION_KEY`.
 
-Relay VPS hanya digunakan untuk Digiflazz bila diperlukan. DOKU Checkout dipanggil langsung dari Worker. KokinPay dipakai server untuk validasi nickname sebelum checkout.
+Pada runtime Laravel VPS, Digiflazz keluar langsung dari IP VPS ke endpoint resmi `api.digiflazz.com`. KokinPay dipakai backend untuk validasi nickname sebelum checkout. Profil relay historis di database tidak dihapus; route Worker lama dan DNS relay baru dapat dipensiunkan setelah cutover Laravel tervalidasi.
