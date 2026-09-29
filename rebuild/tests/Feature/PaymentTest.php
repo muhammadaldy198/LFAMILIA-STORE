@@ -560,6 +560,7 @@ class PaymentTest extends TestCase
             'email' => 'payadmin@example.test',
             'password' => Hash::make('StrongPassword123!'),
             'role' => 'ADMIN',
+            'permissions' => ['payments.manage'],
             'is_active' => true,
         ]);
 
