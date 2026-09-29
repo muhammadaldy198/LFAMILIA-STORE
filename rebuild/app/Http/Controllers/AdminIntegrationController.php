@@ -81,6 +81,7 @@ class AdminIntegrationController
 
             if ($type === 'boolean') {
                 $config[$key] = filter_var($incoming, FILTER_VALIDATE_BOOLEAN);
+
                 continue;
             }
             if ($type === 'csv') {
@@ -91,12 +92,14 @@ class AdminIntegrationController
                     array_map(fn ($value): string => trim((string) $value), $items),
                     fn (string $value): bool => $value !== ''
                 )));
+
                 continue;
             }
 
             $value = trim((string) ($incoming ?? ''));
             if ($secret && $value === '' && isset($existing[$key])) {
                 $config[$key] = $existing[$key];
+
                 continue;
             }
             if ($value !== '') {
