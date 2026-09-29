@@ -182,18 +182,95 @@ export function AdminTeamWorkspace() {
 function TeamModal({ value, saving, onClose, onSave }: { value: TeamUser | null | undefined; saving: boolean; onClose(): void; onSave(value: { id?: number; username: string; name: string; role: "super_admin" | "admin" | "staff"; isActive: boolean; password: string }): void }) { if (value === undefined) return null; function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); onSave({ id: value?.id, username: String(data.get("username")), name: String(data.get("name")), role: data.get("role") === "super_admin" ? "super_admin" : data.get("role") === "admin" ? "admin" : "staff", isActive: data.get("isActive") === "on", password: String(data.get("password") || "") }); } return <Modal open title={value ? "Edit Akun Panel" : "Tambah Akun Panel"} description="Kelola credential dan akses panel." onClose={onClose}><form onSubmit={submit}><div className="grid grid-cols-1 gap-4 lg:grid-cols-2"><Field label="Nama"><input name="name" required defaultValue={value?.name} className={inputClass} /></Field><Field label="ID Login"><input name="username" required defaultValue={value?.username} className={inputClass} /></Field><Field label="Role"><select name="role" defaultValue={value?.role || "staff"} className={inputClass}><option value="staff">Staff</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option></select></Field><Field label={value ? "Password baru (opsional)" : "Password sementara"}><input name="password" type="password" minLength={10} required={!value} className={inputClass} /></Field><Field label="Status akun" wide><label className="flex h-9 items-center gap-2"><input name="isActive" type="checkbox" defaultChecked={value?.isActive ?? true} /> Akun aktif</label></Field></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={onClose} className={buttonClass}>Batal</button><button disabled={saving} className={primaryButtonClass}>{saving ? "Menyimpan..." : "Simpan Akun"}</button></div></form></Modal>; }
 
 export function AdminSettingsWorkspace() {
-  const [tab, setTab] = useState("Toko"); const [store, setStore] = useState<StoreSettings>(emptyStore); const [summary, setSummary] = useState<Summary | null>(null); const [error, setError] = useState(""); const [saving, setSaving] = useState(false); const [backups, setBackups] = useState<Array<{ name: string; createdAt: string }>>([]);
-  async function load() { try { const [storeData, report] = await Promise.all([api<{ settings: StoreSettings }>("/api/admin/storefront", { cache: "no-store" }), api<Summary>("/api/admin/summary?range=30d", { cache: "no-store" })]); setStore(storeData.settings); setSummary(report); setError(""); } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengaturan gagal dimuat."); } }
+  const [tab, setTab] = useState("Toko");
+  const [store, setStore] = useState<StoreSettings>(emptyStore);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    try {
+      const storeData = await api<{ settings: StoreSettings }>("/api/admin/storefront", { cache: "no-store" });
+      setStore(storeData.settings);
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Pengaturan gagal dimuat.");
+    }
+  }
+
   useEffect(() => { void load(); }, []);
-  async function save() { setSaving(true); try { if (tab === "Toko") await api("/api/admin/storefront", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(store) }); else return; } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengaturan gagal disimpan."); } finally { setSaving(false); } }
-  async function upload(field: "logoUrl", file?: File) { if (!file) return; try { const form = new FormData(); form.set("file", file); const result = await api<{ url: string }>("/api/admin/media", { method: "POST", body: form }); setStore((current) => ({ ...current, [field]: result.url })); } catch (reason) { setError(reason instanceof Error ? reason.message : "Gambar gagal diunggah."); } }
-  function backup() { const createdAt = new Date().toISOString(); const name = `lfamilia-config-${createdAt.slice(0, 10)}-${Date.now()}.json`; saveDownload(name, JSON.stringify({ createdAt, store, summary }, null, 2), "application/json"); setBackups((current) => [{ name, createdAt }, ...current]); }
-  const saveable = tab === "Toko";
-  return <div><WorkspaceHeader title="Pengaturan" description="Identitas toko, notifikasi, keamanan, dan backup sistem." actions={<>{saveable && <button type="button" disabled={saving} onClick={() => void save()} className={primaryButtonClass}><Save className="size-3.5" />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button>}<button type="button" onClick={() => void load()} className={buttonClass}><RefreshCw className="size-3.5" />Refresh</button></>} />{error && <ErrorBox message={error} />}<TabBar tabs={["Toko", "Notifikasi", "Keamanan", "Backup"]} active={tab} onChange={setTab} />
-    {tab === "Toko" && <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]"><Panel title="Identitas Toko" description="Informasi utama yang tampil ke pelanggan."><div className="grid grid-cols-2 gap-4 p-4"><StoreField label="Nama toko" value={store.storeName} onChange={(value) => setStore({ ...store, storeName: value })} /><StoreField label="Nama singkat" value={store.storeShortName} onChange={(value) => setStore({ ...store, storeShortName: value })} /><StoreField label="Tagline" value={store.tagline} onChange={(value) => setStore({ ...store, tagline: value })} wide /><StoreField label="Email bantuan" value={store.supportEmail} onChange={(value) => setStore({ ...store, supportEmail: value })} /><StoreField label="WhatsApp bantuan" value={store.supportWhatsapp} onChange={(value) => setStore({ ...store, supportWhatsapp: value })} /><StoreField label="Instagram" value={store.instagramUrl} onChange={(value) => setStore({ ...store, instagramUrl: value })} /><StoreField label="Discord" value={store.discordUrl} onChange={(value) => setStore({ ...store, discordUrl: value })} /><StoreField label="Jam operasional" value={store.supportHours} onChange={(value) => setStore({ ...store, supportHours: value })} /><StoreField label="Pengumuman" value={store.announcement} onChange={(value) => setStore({ ...store, announcement: value })} /><SettingToggle label="Aktifkan widget bantuan" checked={store.supportWidgetEnabled} onChange={(value) => setStore({ ...store, supportWidgetEnabled: value })} /></div></Panel><Panel title="Logo & Ikon" description="Edit gambar identitas panel dan website."><div className="space-y-4 p-4"><ImageSetting label="Logo toko" value={store.logoUrl} onChange={(file) => void upload("logoUrl", file)} /><p className="rounded-md bg-blue-50 p-3 text-[8px] leading-4 text-blue-700">Banner homepage dikelola dari menu Banner & Konten. Pengaturan ini hanya untuk identitas toko.</p></div></Panel></div>}
-    {tab === "Notifikasi" && <div className="grid grid-cols-1 gap-4 lg:grid-cols-2"><Panel title="Notifikasi Admin" description="Ringkasan kondisi yang membutuhkan perhatian."><div className="space-y-3 p-4">{Object.entries(summary?.attention || {}).map(([key, value]) => <div key={key} className="flex items-center justify-between rounded-md border p-3 text-[9px]"><span>{key}</span><Status tone={value ? "amber" : "green"}>{value}</Status></div>)}</div></Panel><Panel title="Status Sistem" description="Data langsung dari pemeriksaan integrasi."><div className="space-y-3 p-4"><InfoBox title="Pembayaran" lines={[summary?.integrations?.doku?.ready ? "Siap menerima transaksi" : "Perlu konfigurasi"]} /><InfoBox title="Provider Produk" lines={[summary?.integrations?.digiflazz?.ready ? "Terhubung" : "Perlu konfigurasi"]} /></div></Panel></div>}
-    {tab === "Keamanan" && <div className="grid grid-cols-1 gap-4 lg:grid-cols-2"><Panel title="Akses & Sesi" description="Perlindungan panel admin."><div className="space-y-3 p-4">{["Akses berbasis role di setiap endpoint", "Credential tersimpan di penyimpanan aman", "Owner terakhir tidak dapat dinonaktifkan", "Perubahan penting masuk audit log"].map((item) => <SecurityRow key={item} label={item} />)}</div></Panel><Panel title="Keamanan Transaksi" description="Validasi aktif di backend."><div className="space-y-3 p-4">{["Verifikasi signature DOKU", "Idempotency callback pembayaran", "Validasi webhook Digiflazz", "Pemeriksaan nickname sebelum checkout", "Audit perubahan saldo", "Rate limit API publik"].map((item) => <SecurityRow key={item} label={item} />)}</div></Panel></div>}
-    {tab === "Backup" && <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]"><Panel title="Riwayat Backup" description="Ekspor konfigurasi yang dibuat pada sesi ini.">{backups.length ? <Table headers={["Nama Backup", "Dibuat", "Status"]}>{backups.map((item) => <tr key={item.name} className="text-[9px]"><td className="px-4 py-3">{item.name}</td><td className="px-4">{date(item.createdAt)}</td><td className="px-4"><Status tone="green">Terunduh</Status></td></tr>)}</Table> : <p className="p-4 text-[9px] text-[#718198]">Belum ada backup yang dibuat pada sesi ini.</p>}</Panel><Panel title="Pengaturan Backup" description="Ekspor snapshot konfigurasi dan ringkasan data."><div className="space-y-4 p-4"><p className="text-[9px] leading-5 text-[#52627a]">File JSON berisi pengaturan toko dan ringkasan operasional terbaru.</p><button type="button" onClick={backup} className={`${primaryButtonClass} w-full`}><Archive className="size-3.5" />Buat Backup Sekarang</button></div></Panel></div>}
+
+  async function save() {
+    setSaving(true);
+    try {
+      await api("/api/admin/storefront", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(store),
+      });
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Pengaturan gagal disimpan.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function upload(field: "logoUrl", file?: File) {
+    if (!file) return;
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const result = await api<{ url: string }>("/api/admin/media", { method: "POST", body: form });
+      setStore((current) => ({ ...current, [field]: result.url }));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Gambar gagal diunggah.");
+    }
+  }
+
+  function exportConfig() {
+    const createdAt = new Date().toISOString();
+    saveDownload(
+      `lfamilia-config-${createdAt.slice(0, 10)}.json`,
+      JSON.stringify({ createdAt, storefront: store }, null, 2),
+      "application/json",
+    );
+  }
+
+  return <div>
+    <WorkspaceHeader
+      title="Pengaturan"
+      description="Identitas dan kontak toko yang benar-benar digunakan frontend customer."
+      actions={<><button type="button" onClick={() => void load()} className={buttonClass}><RefreshCw className="size-3.5" />Refresh</button>{tab === "Toko" && <button type="button" disabled={saving} onClick={() => void save()} className={primaryButtonClass}><Save className="size-3.5" />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button>}</>}
+    />
+    {error && <ErrorBox message={error} />}
+    <TabBar tabs={["Toko", "Ekspor"]} active={tab} onChange={setTab} />
+
+    {tab === "Toko" && <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <Panel title="Identitas Toko" description="Nilai berikut dipakai langsung pada frontend customer.">
+        <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
+          <StoreField label="Nama toko" value={store.storeName} onChange={(value) => setStore({ ...store, storeName: value })} />
+          <StoreField label="Nama singkat" value={store.storeShortName} onChange={(value) => setStore({ ...store, storeShortName: value })} />
+          <StoreField label="Tagline" value={store.tagline} onChange={(value) => setStore({ ...store, tagline: value })} wide />
+          <StoreField label="Email bantuan" value={store.supportEmail} onChange={(value) => setStore({ ...store, supportEmail: value })} />
+          <StoreField label="WhatsApp bantuan" value={store.supportWhatsapp} onChange={(value) => setStore({ ...store, supportWhatsapp: value })} />
+          <StoreField label="Instagram" value={store.instagramUrl} onChange={(value) => setStore({ ...store, instagramUrl: value })} />
+          <StoreField label="Discord" value={store.discordUrl} onChange={(value) => setStore({ ...store, discordUrl: value })} />
+          <StoreField label="Jam operasional" value={store.supportHours} onChange={(value) => setStore({ ...store, supportHours: value })} />
+          <StoreField label="Pengumuman" value={store.announcement} onChange={(value) => setStore({ ...store, announcement: value })} />
+          <SettingToggle label="Aktifkan widget bantuan" checked={store.supportWidgetEnabled} onChange={(value) => setStore({ ...store, supportWidgetEnabled: value })} />
+        </div>
+      </Panel>
+      <Panel title="Logo Toko" description="Logo ini digunakan oleh frontend customer. Banner homepage tetap dikelola di Banner & Konten.">
+        <div className="space-y-4 p-4"><ImageSetting label="Logo toko" value={store.logoUrl} onChange={(file) => void upload("logoUrl", file)} /></div>
+      </Panel>
+    </div>}
+
+    {tab === "Ekspor" && <Panel title="Ekspor Konfigurasi" description="Unduh snapshot pengaturan toko yang sedang tersimpan. Ini bukan riwayat backup server.">
+      <div className="max-w-[520px] space-y-4 p-4">
+        <p className="text-[9px] leading-5 text-[#52627a]">File JSON berisi konfigurasi storefront saat ini untuk dokumentasi atau pemulihan manual.</p>
+        <button type="button" onClick={exportConfig} className={primaryButtonClass}><Archive className="size-3.5" />Ekspor Konfigurasi JSON</button>
+      </div>
+    </Panel>}
   </div>;
 }
 
@@ -203,4 +280,3 @@ function ErrorBox({ message }: { message: string }) { return <div className="mb-
 function SettingToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange(value: boolean): void }) { return <div className="flex min-h-10 items-center justify-between rounded-md border border-[#e3e8ef] px-3"><span className="text-[9px] font-semibold text-[#42516a]">{label}</span><Toggle checked={checked} onChange={onChange} /></div>; }
 function StoreField({ label, value, onChange, wide = false }: { label: string; value: string; onChange(value: string): void; wide?: boolean }) { return <Field label={label} wide={wide}><input value={value} onChange={(event) => onChange(event.target.value)} className={inputClass} /></Field>; }
 function ImageSetting({ label, value, onChange }: { label: string; value: string; onChange(file?: File): void }) { return <div><span className="mb-1.5 block text-[9px] font-bold text-[#34445f]">{label}</span><div className="flex items-center gap-3 rounded-md border border-dashed border-[#b9c8db] bg-[#f8fafc] p-3">{value ? <img src={value} alt={label} className="size-14 rounded object-cover" /> : <span className="grid size-14 place-items-center rounded bg-white text-[#8a98aa]"><ImagePlus className="size-5" /></span>}<label className={`${buttonClass} cursor-pointer`}><ImagePlus className="size-3.5" />Edit Gambar<input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => onChange(event.target.files?.[0])} /></label></div></div>; }
-function SecurityRow({ label }: { label: string }) { return <div className="flex items-center gap-2 rounded-md border border-[#e3e8ef] p-3 text-[9px] font-semibold text-[#42516a]"><ShieldCheck className="size-3.5 text-emerald-600" />{label}</div>; }
