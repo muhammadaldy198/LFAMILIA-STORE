@@ -138,6 +138,16 @@ class AdminPaymentController extends Controller
                         'customerFeeFixed' => '0',
                         ...$config,
                     ];
+                    $mode = strtolower(trim((string) ($config['customerFeeMode'] ?? '')));
+                    if (!in_array($mode, ['percent', 'fixed'], true)) {
+                        $mode = (int) ($config['customerFeeBps'] ?? 0) > 0 ? 'percent' : 'fixed';
+                    }
+                    $config['customerFeeMode'] = $mode;
+                    if ($mode === 'percent') {
+                        $config['customerFeeFixed'] = '0';
+                    } else {
+                        $config['customerFeeBps'] = '0';
+                    }
 
                     $readiness = $gateway->readiness(
                         (string) $row->gateway,
@@ -280,6 +290,16 @@ class AdminPaymentController extends Controller
                     $config[$key] = $value;
                 }
             }
+            $mode = strtolower(trim((string) ($config['customerFeeMode'] ?? 'fixed')));
+            if (!in_array($mode, ['percent', 'fixed'], true)) {
+                throw new RuntimeException('Tipe biaya customer harus Persentase atau Nominal Tetap.');
+            }
+            $config['customerFeeMode'] = $mode;
+            if ($mode === 'percent') {
+                $config['customerFeeFixed'] = '0';
+            } else {
+                $config['customerFeeBps'] = '0';
+            }
             $this->validateFeeConfig($config);
 
             if ($input['isActive']
@@ -387,6 +407,11 @@ class AdminPaymentController extends Controller
     /** @param array<string,string> $config */
     private function validateFeeConfig(array $config): void
     {
+        if (isset($config['customerFeeMode'])
+            && !in_array(strtolower(trim($config['customerFeeMode'])), ['percent', 'fixed'], true)) {
+            throw new RuntimeException('Tipe biaya customer tidak valid.');
+        }
+
         if (isset($config['customerFeeEnabled'])
             && !preg_match('/^(?:true|false|1|0)$/i', $config['customerFeeEnabled'])) {
             throw new RuntimeException('Status biaya customer tidak valid.');
@@ -451,6 +476,7 @@ class AdminPaymentController extends Controller
                 DB::table('payment_channels')->where('id', $existing->id)->update([
                     'name' => $name,
                     'description' => $description,
+                    'gateway' => $gateway,
                     'sort_order' => $index,
                     'updated_at' => now(),
                 ]);
