@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\IntegrationCredential;
 use App\Services\AdminAuditService;
+use App\Services\AdminNotificationService;
 use App\Services\IntegrationConnectionService;
 use App\Services\IntegrationRegistry;
 use Illuminate\Http\JsonResponse;
@@ -179,7 +180,7 @@ class AdminIntegrationController
         IntegrationRegistry $registry,
         IntegrationConnectionService $connections,
         AdminAuditService $audit,
-        \App\Services\AdminNotificationService $notifications,
+        AdminNotificationService $notifications,
     ): JsonResponse {
         abort_unless($registry->get($code), 404);
         $record = IntegrationCredential::where('code', $code)->first();
