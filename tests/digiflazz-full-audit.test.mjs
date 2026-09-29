@@ -189,16 +189,14 @@ test("DigiFlazz dispatch uses the official endpoint and fails closed on provider
   assert.match(provider, /Customer No DigiFlazz order kosong/);
 });
 
-test("automatic paid-order recovery runs frequently enough for retryable DigiFlazz dispatches", () => {
+test("Laravel reconciliation is scheduled every minute while retired Worker has no cron", () => {
   const wrangler = read("wrangler.jsonc");
-  const worker = read("worker/index.ts");
-  const orders = read("lib/server/orders.ts");
-  const reconciliation = read("lib/server/digiflazz-reconciliation.ts");
+  const scheduler = read("laravel/routes/console.php");
+  const reconciliation = read("laravel/app/Services/ProductionReconciliationService.php");
 
-  assert.match(wrangler, /"\*\/5 \* \* \* \*"/);
-  assert.match(worker, /recoverStaleAutomaticOrders\(publicBaseUrl\)/);
-  assert.match(worker, /reconcileStaleDigiflazzProcessing\(publicBaseUrl\)/);
-  assert.match(orders, /provider_status = 'retryable_error'/);
-  assert.match(reconciliation, /updated_at <= datetime\('now', '-2 minutes'\)/);
-  assert.match(reconciliation, /created_at >= datetime\('now', '-89 days'\)/);
+  assert.match(wrangler, /"crons": \[\]/);
+  assert.match(scheduler, /Schedule::command\('lfamilia:reconcile'\)/);
+  assert.match(scheduler, /->everyMinute\(\)/);
+  assert.match(scheduler, /->withoutOverlapping\(5\)/);
+  assert.match(reconciliation, /Digiflazz/i);
 });
