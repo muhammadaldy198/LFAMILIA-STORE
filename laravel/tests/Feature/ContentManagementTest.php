@@ -58,6 +58,27 @@ class ContentManagementTest extends TestCase
         $this->assertStringNotContainsString('Digiflazz',(string)$response->json('faqs.0.question'));
     }
 
+
+    public function test_admin_can_delete_faq(): void
+    {
+        $admin = $this->panelToken('faq-admin','FAQ Admin','admin','admin-password-123');
+        $id = (int) DB::table('faq_entries')->insertGetId([
+            'question' => 'Apakah FAQ ini bisa dihapus?',
+            'answer' => 'Ya, admin dapat menghapus FAQ dari panel.',
+            'is_active' => 1,
+            'sort_order' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withHeader('Cookie', AdminAuthService::COOKIE.'='.rawurlencode($admin))
+            ->deleteJson('/api/admin/faqs?id='.$id)
+            ->assertOk();
+
+        $this->assertDatabaseMissing('faq_entries', ['id' => $id]);
+    }
+
+
     private function panelToken(string $username,string $name,string $role,string $password): string
     {
         $auth=app(AdminAuthService::class);
