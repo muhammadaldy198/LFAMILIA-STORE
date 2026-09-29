@@ -1,0 +1,10 @@
+[Unit]
+Description=Run LFAMILIA STORE encrypted backup daily
+
+[Timer]
+OnCalendar=@@BACKUP_CALENDAR@@
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

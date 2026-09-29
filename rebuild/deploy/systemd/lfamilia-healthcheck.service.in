@@ -1,0 +1,13 @@
+[Unit]
+Description=LFAMILIA STORE Production Health Check
+After=network-online.target lfamilia-queue.service lfamilia-scheduler.service
+
+[Service]
+Type=oneshot
+User=@@APP_USER@@
+Group=@@APP_GROUP@@
+Environment=OPS_ENV_FILE=/etc/lfamilia/ops.env
+ExecStart=/bin/bash @@APP_DIR@@/deploy/healthcheck.sh
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true

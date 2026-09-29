@@ -107,12 +107,52 @@ jobs:
           php artisan config:cache
           php artisan config:clear
 
+      - name: Validate M12 deployment assets
+        run: |
+          find deploy -maxdepth 1 -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+          test -f deploy/systemd/lfamilia-queue.service.in
+          test -f deploy/systemd/lfamilia-scheduler.service.in
+          test -f deploy/systemd/lfamilia-backup.timer.in
+          test -f deploy/systemd/lfamilia-restore-verify.timer.in
+          grep -Fq 'BACKUP_REQUIRE_REMOTE=true' deploy/ops.env.example
+          grep -Fq 'SESSION_SECURE_COOKIE=true' deploy/production.env.example
+          grep -Fq 'TRUSTED_PROXIES=*' deploy/production.env.example
+
       - name: Validate schema and assets
         run: |
           php artisan migrate --force
           php artisan migrate:rollback --step=10 --force
           php artisan migrate --force
           npm run build
+
+      - name: Verify M12 encrypted backup and restore
+        run: |
+          if ! command -v mysqldump >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y mysql-client
+          fi
+          install -d -m 0700 /tmp/lfamilia-ci-etc /tmp/lfamilia-ci-backups
+          cat > /tmp/lfamilia-ci-etc/mysql.cnf <<EOF
+          [client]
+          host=127.0.0.1
+          port=3306
+          user=root
+          password=${DB_PASSWORD}
+          EOF
+          chmod 0600 /tmp/lfamilia-ci-etc/mysql.cnf
+          printf '%s\n' 'm12-ci-backup-passphrase' > /tmp/lfamilia-ci-etc/backup.pass
+          chmod 0600 /tmp/lfamilia-ci-etc/backup.pass
+          cat > /tmp/lfamilia-ci-etc/ops.env <<EOF
+          BACKUP_DATABASE_NAME=${DB_DATABASE}
+          MYSQL_DEFAULTS_FILE=/tmp/lfamilia-ci-etc/mysql.cnf
+          MYSQL_ADMIN_DEFAULTS_FILE=/tmp/lfamilia-ci-etc/mysql.cnf
+          BACKUP_PASSPHRASE_FILE=/tmp/lfamilia-ci-etc/backup.pass
+          BACKUP_DIR=/tmp/lfamilia-ci-backups
+          BACKUP_RETENTION_DAYS=7
+          BACKUP_REQUIRE_REMOTE=false
+          EOF
+          OPS_ENV_FILE=/tmp/lfamilia-ci-etc/ops.env bash deploy/backup.sh
+          OPS_ENV_FILE=/tmp/lfamilia-ci-etc/ops.env bash deploy/restore-verify.sh
 
       - name: Run rebuild tests
         run: vendor/bin/phpunit

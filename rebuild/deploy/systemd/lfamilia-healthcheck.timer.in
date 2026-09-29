@@ -1,0 +1,10 @@
+[Unit]
+Description=Run LFAMILIA STORE health check periodically
+
+[Timer]
+OnCalendar=@@HEALTHCHECK_CALENDAR@@
+Persistent=true
+RandomizedDelaySec=20
+
+[Install]
+WantedBy=timers.target

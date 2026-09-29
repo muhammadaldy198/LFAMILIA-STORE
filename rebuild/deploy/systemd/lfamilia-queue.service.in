@@ -1,0 +1,24 @@
+[Unit]
+Description=LFAMILIA STORE Laravel Queue Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@@APP_USER@@
+Group=@@APP_GROUP@@
+WorkingDirectory=@@APP_DIR@@
+ExecStart=@@PHP_BIN@@ artisan queue:work redis --sleep=1 --tries=3 --timeout=120 --max-time=3600
+ExecReload=@@PHP_BIN@@ artisan queue:restart
+Restart=always
+RestartSec=5
+TimeoutStopSec=180
+KillSignal=SIGTERM
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=@@APP_DIR@@/storage @@APP_DIR@@/bootstrap/cache
+
+[Install]
+WantedBy=multi-user.target
