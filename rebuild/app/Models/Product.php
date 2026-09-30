@@ -13,7 +13,7 @@ class Product extends Model implements HasMedia
     use InteractsWithMedia;
 
     protected $fillable = [
-        'category_id', 'name', 'slug', 'description', 'fulfillment_mode',
+        'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
         'manual_instructions', 'margin_percent', 'sort_order', 'is_active',
         'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
         'nickname_server_field_key',
@@ -40,6 +40,16 @@ class Product extends Model implements HasMedia
     public function fields(): HasMany
     {
         return $this->hasMany(ProductInputField::class);
+    }
+
+    public function notices(): HasMany
+    {
+        return $this->hasMany(ProductNotice::class);
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(ProductReview::class);
     }
 
     public function registerMediaCollections(): void
