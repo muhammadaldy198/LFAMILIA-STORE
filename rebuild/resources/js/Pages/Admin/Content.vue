@@ -6,6 +6,8 @@ import AdminMediaControl from '../../Components/AdminMediaControl.vue';
 
 const props = defineProps({
     assets: Array,
+    banners: Array,
+    popups: Array,
     news: Array,
     faqs: Array,
     pages: Array,
@@ -14,12 +16,16 @@ const props = defineProps({
 });
 
 const assets = ref((props.assets || []).map((x) => ({ ...x })));
+const banners = ref((props.banners || []).map((x) => ({ ...x })));
+const popups = ref((props.popups || []).map((x) => ({ ...x })));
 const news = ref((props.news || []).map((x) => ({ ...x })));
 const faqs = ref((props.faqs || []).map((x) => ({ ...x })));
 const pages = ref((props.pages || []).map((x) => ({ ...x })));
 const reviews = ref((props.reviews || []).map((x) => ({ ...x })));
 
 watch(() => props.assets, (v) => { assets.value = (v || []).map((x) => ({ ...x })); });
+watch(() => props.banners, (v) => { banners.value = (v || []).map((x) => ({ ...x })); });
+watch(() => props.popups, (v) => { popups.value = (v || []).map((x) => ({ ...x })); });
 watch(() => props.news, (v) => { news.value = (v || []).map((x) => ({ ...x })); });
 watch(() => props.faqs, (v) => { faqs.value = (v || []).map((x) => ({ ...x })); });
 watch(() => props.pages, (v) => { pages.value = (v || []).map((x) => ({ ...x })); });
@@ -38,6 +44,16 @@ const settingsForm = useForm({
     business_hours: props.settings?.['store.business_hours'] || '',
 });
 
+const bannerForm = useForm({
+    title: 'Banner Baru', subtitle: '', cta_label: '', cta_href: '',
+    show_desktop: true, show_mobile: true, sort_order: 0, is_active: true,
+});
+
+const popupForm = useForm({
+    title: 'Pop-up Baru', body: '', primary_label: '', primary_href: '',
+    secondary_label: '', secondary_href: '', dismiss_days: 7, sort_order: 0, is_active: true,
+});
+
 const newsForm = useForm({
     slug: '', title: '', summary: '', body: '', source_label: 'LFAMILIA News',
     sort_order: 0, is_active: false, published_at: '',
@@ -51,8 +67,8 @@ const assetHint = (key) => ({
     logo: 'Patokan aset LFAMILIA lama: 320×320 (1:1) · PNG/WebP transparan',
     favicon: 'Rekomendasi 512×512 (1:1)',
     banner_desktop: '1920×600 · fokus elemen penting di area tengah',
-    banner_mobile: '1080×1080 · aman untuk crop mobile',
-    popup: 'Rekomendasi 1080×1080 · konten penting jangan terlalu dekat tepi',
+    banner_mobile: 'Legacy fallback saja. Carousel baru memakai gambar mobile terpisah dan frontend mengikuti rasio asli file.',
+    popup: 'Legacy fallback gambar. Pop-up homepage baru dikelola melalui bagian Pop-up Homepage di bawah.',
     footer_banner_desktop: '2172×724 · rasio ±3:1',
     footer_banner_mobile: '1200×400 · rasio 3:1',
 }[key] || 'Gunakan gambar tajam dengan ukuran file efisien.');
@@ -61,6 +77,35 @@ const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, {
     is_active: Boolean(asset.is_active),
     target_url: asset.target_url || null,
 });
+const saveBanner = (item) => router.put('/admin/content/banners/' + item.id, {
+    title: item.title,
+    subtitle: item.subtitle || '',
+    cta_label: item.cta_label || '',
+    cta_href: item.cta_href || null,
+    show_desktop: Boolean(item.show_desktop),
+    show_mobile: Boolean(item.show_mobile),
+    sort_order: Number(item.sort_order || 0),
+    is_active: Boolean(item.is_active),
+}, { preserveScroll: true });
+const deleteBanner = (item) => {
+    if (confirm('Hapus banner ini?')) router.delete('/admin/content/banners/' + item.id, { preserveScroll: true });
+};
+
+const savePopup = (item) => router.put('/admin/content/popups/' + item.id, {
+    title: item.title,
+    body: item.body,
+    primary_label: item.primary_label || '',
+    primary_href: item.primary_href || null,
+    secondary_label: item.secondary_label || '',
+    secondary_href: item.secondary_href || null,
+    dismiss_days: Number(item.dismiss_days || 0),
+    sort_order: Number(item.sort_order || 0),
+    is_active: Boolean(item.is_active),
+}, { preserveScroll: true });
+const deletePopup = (item) => {
+    if (confirm('Hapus pop-up ini?')) router.delete('/admin/content/popups/' + item.id, { preserveScroll: true });
+};
+
 
 const saveNews = (item) => router.put('/admin/content/news/' + item.id, {
     slug: item.slug || '',
