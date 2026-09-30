@@ -179,23 +179,68 @@ class AdminWorkspaceController
 
     public function vouchers(): Response
     {
+        $rows = DB::table('vouchers')->orderByDesc('id')->limit(150)->get()
+            ->map(function (object $voucher): array {
+                return [
+                    ...((array) $voucher),
+                    'starts_at' => $voucher->starts_at
+                        ? Carbon::parse($voucher->starts_at)->format('Y-m-d\\TH:i') : null,
+                    'ends_at' => $voucher->ends_at
+                        ? Carbon::parse($voucher->ends_at)->format('Y-m-d\\TH:i') : null,
+                    'product_ids' => DB::table('voucher_products')->where('voucher_id', $voucher->id)
+                        ->orderBy('product_id')->pluck('product_id')->map(fn ($id): int => (int) $id)->all(),
+                    'category_ids' => DB::table('voucher_categories')->where('voucher_id', $voucher->id)
+                        ->orderBy('category_id')->pluck('category_id')->map(fn ($id): int => (int) $id)->all(),
+                ];
+            });
+
         return Inertia::render('Admin/Workspace', [
             'kind' => 'vouchers',
             'title' => 'Promo & Voucher',
-            'rows' => DB::table('vouchers')->orderByDesc('id')->limit(150)->get(),
+            'rows' => $rows,
+            'voucherCategories' => DB::table('product_categories')->orderBy('sort_order')->orderBy('name')
+                ->get(['id', 'name']),
+            'voucherProducts' => DB::table('products')->orderBy('sort_order')->orderBy('name')
+                ->get(['id', 'name', 'category_id']),
         ]);
     }
 
     public function storeVoucher(Request $request, AdminAuditService $audit): RedirectResponse
     {
         $data = $this->voucherData($request);
-        $id = DB::table('vouchers')->insertGetId([
+        $productIds = array_values(array_unique(array_map('intval', $data['product_ids'] ?? [])));
+        $categoryIds = array_values(array_unique(array_map('intval', $data['category_ids'] ?? [])));
+        unset($data['product_ids'], $data['category_ids']);
+
+        $id = DB::transaction(function () use ($data, $productIds, $categoryIds): int {
+            $id = DB::table('vouchers')->insertGetId([
+                ...$data,
+                'code' => strtoupper($data['code']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            foreach ($productIds as $productId) {
+                DB::table('voucher_products')->insert([
+                    'voucher_id' => $id,
+                    'product_id' => $productId,
+                ]);
+            }
+            foreach ($categoryIds as $categoryId) {
+                DB::table('voucher_categories')->insert([
+                    'voucher_id' => $id,
+                    'category_id' => $categoryId,
+                ]);
+            }
+
+            return $id;
+        }, 3);
+
+        $audit->record($request, 'voucher.created', 'voucher', $id, null, [
             ...$data,
-            'code' => strtoupper($data['code']),
-            'created_at' => now(),
-            'updated_at' => now(),
+            'product_ids' => $productIds,
+            'category_ids' => $categoryIds,
         ]);
-        $audit->record($request, 'voucher.created', 'voucher', $id, null, $data);
 
         return back();
     }
@@ -204,13 +249,47 @@ class AdminWorkspaceController
     {
         $before = DB::table('vouchers')->where('id', $id)->first();
         abort_unless($before, 404);
+        $beforeScope = [
+            'product_ids' => DB::table('voucher_products')->where('voucher_id', $id)->pluck('product_id')->all(),
+            'category_ids' => DB::table('voucher_categories')->where('voucher_id', $id)->pluck('category_id')->all(),
+        ];
+
         $data = $this->voucherData($request, $id);
-        DB::table('vouchers')->where('id', $id)->update([
+        $productIds = array_values(array_unique(array_map('intval', $data['product_ids'] ?? [])));
+        $categoryIds = array_values(array_unique(array_map('intval', $data['category_ids'] ?? [])));
+        unset($data['product_ids'], $data['category_ids']);
+
+        DB::transaction(function () use ($id, $data, $productIds, $categoryIds): void {
+            DB::table('vouchers')->where('id', $id)->update([
+                ...$data,
+                'code' => strtoupper($data['code']),
+                'updated_at' => now(),
+            ]);
+            DB::table('voucher_products')->where('voucher_id', $id)->delete();
+            DB::table('voucher_categories')->where('voucher_id', $id)->delete();
+
+            foreach ($productIds as $productId) {
+                DB::table('voucher_products')->insert([
+                    'voucher_id' => $id,
+                    'product_id' => $productId,
+                ]);
+            }
+            foreach ($categoryIds as $categoryId) {
+                DB::table('voucher_categories')->insert([
+                    'voucher_id' => $id,
+                    'category_id' => $categoryId,
+                ]);
+            }
+        }, 3);
+
+        $audit->record($request, 'voucher.updated', 'voucher', $id, [
+            ...((array) $before),
+            ...$beforeScope,
+        ], [
             ...$data,
-            'code' => strtoupper($data['code']),
-            'updated_at' => now(),
+            'product_ids' => $productIds,
+            'category_ids' => $categoryIds,
         ]);
-        $audit->record($request, 'voucher.updated', 'voucher', $id, (array) $before, $data);
 
         return back();
     }
@@ -604,6 +683,10 @@ class AdminWorkspaceController
             'per_customer_limit' => ['nullable', 'integer', 'min:1'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after:starts_at'],
+            'product_ids' => ['array', 'max:500'],
+            'product_ids.*' => ['integer', Rule::exists('products', 'id')],
+            'category_ids' => ['array', 'max:100'],
+            'category_ids.*' => ['integer', Rule::exists('product_categories', 'id')],
             'is_active' => ['required', 'boolean'],
         ]);
     }
