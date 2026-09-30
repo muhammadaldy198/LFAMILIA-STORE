@@ -361,23 +361,23 @@
 @media(max-width:900px){.lf-home-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.lf-home-review-grid{grid-template-columns:1fr}.lf-order-review-form{grid-template-columns:1fr}.lf-order-review-form textarea,.lf-order-review-form .lf-primary{grid-column:auto}}
 
-/* OURASTORE reference proportions; LFAMILIA branding and transaction logic retained. */
-.lf-customer .lf-reference-checkout{--lf-lime:#ad9372;--lf-lime-2:#cfb998;--lf-line:rgba(255,255,255,.12);background:#222424!important}
-.lf-reference-checkout .lf-checkout-panel{background:#42474b;border-color:transparent}
-.lf-reference-checkout .lf-checkout-panel>header{background:#606870!important}
-.lf-reference-checkout .lf-checkout-panel>header>span{background:#ad9372!important}
-.lf-reference-checkout .lf-checkout-tabs{background:#363b40}
-.lf-reference-checkout .lf-checkout-tabs button.active{background:#ad9372;box-shadow:none}
-.lf-reference-checkout .lf-account-fields input,.lf-reference-checkout .lf-promo-input input,.lf-reference-checkout .lf-saved-account-select select{background:#606870!important;border-color:#545b62!important}
-.lf-reference-checkout .lf-nominal-grid button{background:#606870!important}
-.lf-reference-checkout .lf-mobile-checkout-bar{background:#222!important;backdrop-filter:none}
-.lf-reference-checkout .lf-mobile-total button{color:#fff}
+/* Checkout reference proportions; LFAMILIA branding and transaction logic retained. */
+.lf-customer .lf-reference-checkout{--lf-lime:#9ee52d;--lf-lime-2:#c9ff68;--lf-line:rgba(255,255,255,.12);background:#060a10!important}
+.lf-reference-checkout .lf-checkout-panel{background:#101824;border-color:rgba(83,142,255,.15)}
+.lf-reference-checkout .lf-checkout-panel>header{background:#172335!important}
+.lf-reference-checkout .lf-checkout-panel>header>span{background:#1769e8!important}
+.lf-reference-checkout .lf-checkout-tabs{background:#142033}
+.lf-reference-checkout .lf-checkout-tabs button.active{background:#9ee52d;color:#071009;box-shadow:none}
+.lf-reference-checkout .lf-account-fields input,.lf-reference-checkout .lf-promo-input input,.lf-reference-checkout .lf-saved-account-select select{background:#172335!important;border-color:#263a55!important}
+.lf-reference-checkout .lf-nominal-grid button{background:#172335!important}
+.lf-reference-checkout .lf-mobile-checkout-bar{background:#080d15!important;backdrop-filter:none}
+.lf-reference-checkout .lf-mobile-total button{color:#071009}
 .lf-reference-checkout{padding-bottom:174px}
 .lf-reference-checkout .lf-container{width:min(1040px,calc(100% - 32px))}
 .lf-reference-checkout .lf-product-hero{height:clamp(240px,24vw,360px)}
 .lf-reference-checkout .lf-product-identity{background:repeating-linear-gradient(135deg,transparent 0 72px,rgba(255,255,255,.025) 72px 116px),#10151c}
 .lf-reference-checkout .lf-product-identity-inner{min-height:220px;grid-template-columns:290px minmax(0,1fr);grid-template-rows:128px 64px;gap:0 24px;padding-top:16px;padding-bottom:12px}
-.lf-reference-checkout .lf-product-cover-3d{left:0;top:-104px;width:264px;height:304px;border-radius:20px;transform:perspective(950px) rotateY(7deg) rotateZ(-2deg)}
+.lf-reference-checkout .lf-product-cover-3d{left:0;top:-104px;width:264px;height:320px;border-radius:22px;transform:perspective(800px) rotateY(-22deg) rotateZ(1deg);box-shadow:-8px 7px 0 #172338,16px 24px 36px -16px #000b}
 .lf-reference-checkout .lf-product-title{padding:0;align-self:center}
 .lf-reference-checkout .lf-product-title h1{font-size:26px;line-height:1.25;overflow-wrap:anywhere}
 .lf-reference-checkout .lf-product-title p{margin-top:10px;font-size:17px}
@@ -452,8 +452,8 @@
 @media(max-width:640px){
  .lf-reference-checkout .lf-container{width:calc(100% - 30px)}
  .lf-reference-checkout .lf-product-hero{height:53vw;max-height:340px;min-height:170px}
- .lf-reference-checkout .lf-product-identity-inner{min-height:120px;grid-template-columns:112px minmax(0,1fr);grid-template-rows:71px 40px;gap:0 14px;padding-top:7px;padding-bottom:2px}
- .lf-reference-checkout .lf-product-cover-3d{left:0;top:-44px;width:106px;height:114px;border-radius:14px}
+ .lf-reference-checkout .lf-product-identity-inner{min-height:140px;grid-template-columns:112px minmax(0,1fr);grid-template-rows:91px 40px;gap:0 14px;padding-top:7px;padding-bottom:2px}
+ .lf-reference-checkout .lf-product-cover-3d{left:0;top:-44px;width:106px;height:132px;border-radius:14px;transform:perspective(500px) rotateY(-22deg) rotateZ(1deg);box-shadow:-4px 4px 0 #172338,10px 14px 24px -12px #000b}
  .lf-reference-checkout .lf-product-title h1{font-size:16px;letter-spacing:.02em;line-height:1.3}
  .lf-reference-checkout .lf-product-title p{font-size:14px;margin-top:7px}
  .lf-reference-checkout .lf-product-perks>div{font-size:10px;gap:6px;font-weight:500;white-space:nowrap}
@@ -487,4 +487,52 @@
  .lf-reference-checkout .lf-product-perks>div{font-size:9px;gap:3px}
  .lf-reference-checkout .lf-account-fields{gap:10px}
  .lf-reference-checkout .lf-nominal-grid button>b{font-size:11px}
+}
+
+/* Payment cards keep the reference layout in the LFAMILIA palette. */
+.lf-reference-checkout .lf-payment-groups details{background:#0c1420;border-color:#24344b}
+.lf-reference-checkout .lf-payment-groups summary{background:#142033}
+.lf-reference-checkout .lf-payment-groups details[open] summary>b{transform:rotate(180deg)}
+.lf-reference-checkout .lf-payment-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:16px;border-top:1px solid #24344b}
+.lf-reference-checkout .lf-payment-list-wide{grid-template-columns:1fr}
+.lf-reference-checkout .lf-payment-list button{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 8px;min-height:128px;padding:16px 16px 0;border:1px solid #30415b;border-radius:12px;background:#1a2940;overflow:hidden;box-shadow:none}
+.lf-reference-checkout .lf-payment-list button.selected{border:2px solid var(--lf-lime);background:#192d29;box-shadow:none}
+.lf-reference-checkout .lf-payment-brand{grid-column:1/-1;justify-self:start;max-width:100%;overflow-wrap:anywhere;background:#f5f8ff;color:#15315b;border-radius:5px;padding:7px 10px;font-size:18px;font-weight:850;line-height:1.2}
+.lf-reference-checkout .lf-payment-brand-qris{letter-spacing:.06em;color:#090f18;font-size:23px}
+.lf-reference-checkout .lf-payment-brand-wallet{color:#143b0b;background:#d5ff9a;font-size:16px}
+.lf-reference-checkout .lf-payment-channel-name{overflow-wrap:anywhere;font-size:13px!important}
+.lf-reference-checkout .lf-payment-list .lf-payment-choice{font-size:12px;color:var(--lf-lime);white-space:nowrap}
+.lf-reference-checkout .lf-payment-list .lf-payment-card-footer{grid-column:1/-1;align-self:end;margin:0 -16px;padding:9px 16px;border-top:1px dashed #ffffff20;background:#0003;font-size:11px;font-style:italic;line-height:1.5}
+.lf-reference-checkout .lf-contact-fields{grid-template-columns:1fr;gap:16px}
+.lf-reference-checkout .lf-phone-input{display:flex;align-items:center;gap:10px}
+.lf-reference-checkout .lf-phone-input>span{padding-top:9px;font-size:22px}
+.lf-reference-checkout .lf-phone-input input{flex:1;min-width:0}
+@media(max-width:640px){
+ .lf-reference-checkout .lf-payment-list{gap:10px;padding:12px}
+ .lf-reference-checkout .lf-payment-list button{min-height:118px;padding:12px 12px 0}
+ .lf-reference-checkout .lf-payment-brand{font-size:14px;padding:6px 8px}
+ .lf-reference-checkout .lf-payment-list .lf-payment-card-footer{margin-inline:-12px;padding:8px 12px;font-size:10px}
+ .lf-reference-checkout .lf-payment-channel-name{font-size:12px!important}
+ .lf-reference-checkout .lf-contact-fields{grid-template-columns:1fr}
+}
+
+.lf-reference-checkout .lf-payment-groups summary{grid-template-columns:minmax(0,1fr) auto;gap:0;padding:0;overflow:hidden}
+.lf-reference-checkout .lf-payment-groups summary>strong{padding:15px 16px;font-size:14px}
+.lf-reference-checkout .lf-payment-chevron{padding:12px 16px;transition:transform .15s}
+.lf-reference-checkout .lf-payment-groups details[open] .lf-payment-chevron{transform:rotate(180deg)}
+.lf-reference-checkout .lf-payment-summary-brands{grid-column:1/-1;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px;padding:10px 12px;background:#20314a;border-top:1px solid #2c405d}
+.lf-reference-checkout .lf-payment-summary-brands>span{padding:3px 6px;background:#f2f6fd;color:#19324f;border-radius:3px;font-size:9px;font-weight:700}
+.lf-reference-checkout .lf-payment-groups details[open] .lf-payment-summary-brands{display:none}
+.lf-reference-checkout .lf-payment-groups .lf-payment-featured{border:0;border-radius:12px;background:transparent}
+.lf-reference-checkout .lf-payment-featured>summary{display:none}
+.lf-reference-checkout .lf-payment-featured .lf-payment-list{padding:0;border:0}
+.lf-reference-checkout .lf-payment-featured .lf-payment-list button{grid-template-columns:auto minmax(0,1fr) auto;min-height:88px;padding:16px;gap:8px 16px;align-items:center}
+.lf-reference-checkout .lf-payment-featured .lf-payment-brand{grid-column:1;grid-row:1/3}
+.lf-reference-checkout .lf-payment-featured .lf-payment-channel-name{grid-column:2;grid-row:1}
+.lf-reference-checkout .lf-payment-featured .lf-payment-choice{grid-column:3;grid-row:1/3}
+.lf-reference-checkout .lf-payment-featured .lf-payment-card-footer{grid-column:2;grid-row:2;background:transparent;border:0;padding:0;margin:0;font-style:normal}
+@media(max-width:640px){
+ .lf-reference-checkout .lf-payment-featured .lf-payment-list button{padding:12px;gap:6px 10px}
+ .lf-reference-checkout .lf-payment-groups summary>strong{padding:12px;font-size:13px}
+ .lf-reference-checkout .lf-payment-featured .lf-payment-brand-wallet{font-size:11px;max-width:80px}
 }
