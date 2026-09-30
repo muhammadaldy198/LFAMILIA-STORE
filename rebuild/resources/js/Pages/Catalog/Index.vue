@@ -87,7 +87,6 @@ onUnmounted(()=>{
             <div v-if="popupOpen&&activePopup" class="lf-home-popup-backdrop" @click.self="closePopup">
                 <section class="lf-home-popup" role="dialog" aria-modal="true" :aria-label="activePopup.title">
                     <button type="button" class="lf-home-popup-close" aria-label="Tutup pop-up" @click="closePopup">×</button>
-                    <div class="lf-home-popup-count">1/1</div>
                     <div class="lf-home-popup-body">
                         <h2>{{activePopup.title}}</h2>
                         <p>{{activePopup.body}}</p>
