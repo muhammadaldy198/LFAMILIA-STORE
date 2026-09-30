@@ -34,7 +34,7 @@ class AdminCatalogController
             'products' => Product::with(['packages.mappings', 'fields', 'notices'])->orderBy('sort_order')->get()
                 ->map(fn (Product $product): array => [
                     ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
-                        'manual_instructions', 'margin_percent', 'sort_order', 'is_active',
+                        'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active',
                         'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
                         'nickname_server_field_key'),
                     'image_url' => $product->getFirstMediaUrl('image'),
@@ -127,6 +127,9 @@ class AdminCatalogController
             'description' => ['nullable', 'string', 'max:5000'],
             'fulfillment_mode' => ['required', Rule::in(['AUTO_PROVIDER', 'MANUAL'])],
             'manual_instructions' => ['nullable', 'string', 'max:5000'],
+            'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
+            'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
+            'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
             'sort_order' => ['required', 'integer', 'min:0'],
         ]);
@@ -136,6 +139,11 @@ class AdminCatalogController
         }
         if ($data['fulfillment_mode'] !== 'MANUAL') {
             $data['manual_instructions'] = null;
+            $data['manual_open_time'] = null;
+            $data['manual_close_time'] = null;
+            $data['manual_timezone'] = 'Asia/Jakarta';
+        } else {
+            $data['manual_timezone'] = $data['manual_timezone'] ?: 'Asia/Jakarta';
         }
 
         DB::transaction(function () use ($request, $data, $audit): void {
@@ -154,6 +162,9 @@ class AdminCatalogController
             'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'manual_instructions' => ['nullable', 'string', 'max:5000'],
+            'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
+            'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
+            'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
@@ -190,6 +201,11 @@ class AdminCatalogController
         }
         if ($product->fulfillment_mode !== 'MANUAL') {
             $data['manual_instructions'] = null;
+            $data['manual_open_time'] = null;
+            $data['manual_close_time'] = null;
+            $data['manual_timezone'] = 'Asia/Jakarta';
+        } else {
+            $data['manual_timezone'] = $data['manual_timezone'] ?: 'Asia/Jakarta';
         }
 
         DB::transaction(function () use ($request, $product, $data, $audit): void {
