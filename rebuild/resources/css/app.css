@@ -4207,3 +4207,32 @@
     margin-inline:auto!important;
   }
 }
+
+
+/* Effective old-mobile control sizing: production ergonomics overrides dense checkout sizing. */
+@media(max-width:639px){
+  /* These are Input/select controls inside <main>; old globals force 44px + 16px text on phones. */
+  .lf-saved-account-select select,
+  .lf-checkout-account-panel .lf-account-fields input,
+  .lf-checkout-contact-panel .lf-account-fields input,
+  .lf-promo-input input,
+  .lf-review-form>input,
+  .lf-review-guest-fields input{
+    height:44px!important;
+    min-height:44px!important;
+    font-size:16px!important;
+  }
+
+  .lf-review-form>textarea{
+    font-size:16px!important;
+  }
+
+  /* Old dense globals shrink mt-3/gap-3 to .4rem for descendants of <main>. */
+  .lf-checkout-tabs{
+    margin-top:6.4px!important;
+  }
+  .lf-checkout-grid{
+    margin-top:6.4px!important;
+    gap:6.4px!important;
+  }
+}
