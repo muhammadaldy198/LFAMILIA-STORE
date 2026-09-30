@@ -85,6 +85,7 @@ class CatalogController
     }
 
     public function show(
+        Request $request,
         string $slug,
         CheckoutPricing $pricing,
         PaymentRoutingService $paymentRouting,
@@ -166,6 +167,12 @@ class CatalogController
                 'average' => round((float) ($reviewStats?->average ?? 0), 1),
             ],
             'faqs' => $content->faqs()->take(6)->values(),
+            'initialPackageId' => $request->filled('package')
+                ? (string) ($packages->first(fn (array $item): bool =>
+                    (string) $item['id'] === (string) $request->query('package')
+                    || strcasecmp((string) $item['name'], (string) $request->query('package')) === 0
+                )['id'] ?? '')
+                : '',
             'faviconUrl' => StoreAsset::where('key', 'favicon')->where('is_active', true)
                 ->first()?->getFirstMediaUrl('image'),
         ]);
