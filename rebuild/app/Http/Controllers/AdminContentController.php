@@ -31,7 +31,7 @@ class AdminContentController
             ->map(fn ($value) => json_decode((string) $value, true));
 
         return Inertia::render('Admin/Content', [
-            'assets' => StoreAsset::orderBy('id')->get()->map(fn (StoreAsset $asset): array => [
+            'assets' => StoreAsset::where('key', '!=', 'popup')->orderBy('id')->get()->map(fn (StoreAsset $asset): array => [
                 ...$asset->only('id', 'key', 'target_url', 'is_active'),
                 'image_url' => $asset->getFirstMediaUrl('image'),
             ]),
