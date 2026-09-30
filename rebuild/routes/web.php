@@ -9,6 +9,7 @@ use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminFulfillmentController;
 use App\Http\Controllers\AdminIntegrationController;
 use App\Http\Controllers\AdminNotificationController;
+use App\Http\Controllers\AdminNicknameController;
 use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\AdminWorkspaceController;
 use App\Http\Controllers\CatalogController;
@@ -161,6 +162,13 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::get('/', [AdminNotificationController::class, 'index'])->name('index');
             Route::post('/read-all', [AdminNotificationController::class, 'readAll'])->name('read-all');
             Route::post('/{id}/read', [AdminNotificationController::class, 'read'])->name('read');
+        });
+
+    Route::middleware('admin.permission:nickname.manage')->prefix('admin/nickname-tools')
+        ->name('admin.nickname-tools.')->group(function (): void {
+            Route::get('/', [AdminNicknameController::class, 'index'])->name('index');
+            Route::post('/check', [AdminNicknameController::class, 'check'])
+                ->middleware('throttle:admin-sensitive')->name('check');
         });
 
     Route::middleware('admin.permission:payments.manage')->group(function (): void {
