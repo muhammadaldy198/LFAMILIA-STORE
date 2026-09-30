@@ -11,6 +11,7 @@ const props = defineProps({
     minimumTopupIdr: Number,
     manualQrisAsset: Object,
     manualPayments: Array,
+    pageSettings: Object,
 });
 
 const gateways = reactive(props.gateways.map((item) => ({ ...item })));
@@ -22,6 +23,30 @@ const routes = reactive(props.routes.map((item) => ({
         : '',
 })));
 const minimumTopupIdr = ref(props.minimumTopupIdr);
+const paymentPage = reactive({
+    accentColor: props.pageSettings?.accentColor || '#b9ff35',
+    headerImageUrl: props.pageSettings?.headerImageUrl || '',
+    eyebrow: props.pageSettings?.eyebrow || 'LFAMILIA PAYMENT',
+    pendingTitle: props.pageSettings?.pendingTitle || 'Selesaikan pembayaran',
+    paidTitle: props.pageSettings?.paidTitle || 'Pembayaran berhasil',
+    failedTitle: props.pageSettings?.failedTitle || 'Pembayaran tidak aktif',
+    subtitle: props.pageSettings?.subtitle || '',
+    invoiceNoticeTitle: props.pageSettings?.invoiceNoticeTitle || 'Simpan invoice sebelum membayar',
+    invoiceNoticeText: props.pageSettings?.invoiceNoticeText || '',
+    pendingStatusText: props.pageSettings?.pendingStatusText || '',
+    paidStatusText: props.pageSettings?.paidStatusText || '',
+    failedStatusText: props.pageSettings?.failedStatusText || '',
+    payButtonText: props.pageSettings?.payButtonText || 'Bayar Sekarang',
+    checkStatusButtonText: props.pageSettings?.checkStatusButtonText || 'Cek status',
+    checkInvoiceButtonText: props.pageSettings?.checkInvoiceButtonText || 'Cek invoice',
+    supportText: props.pageSettings?.supportText || 'Butuh bantuan pembayaran?',
+    supportUrl: props.pageSettings?.supportUrl || '/contact',
+    showStoreBrand: props.pageSettings?.showStoreBrand !== false,
+    showInvoiceNotice: props.pageSettings?.showInvoiceNotice !== false,
+    showOrderSummary: props.pageSettings?.showOrderSummary !== false,
+    showStatusBox: props.pageSettings?.showStatusBox !== false,
+    showSupport: props.pageSettings?.showSupport !== false,
+});
 const routeForm = reactive({
     payment_channel_id: '',
     payment_gateway_id: '',
@@ -67,6 +92,20 @@ function saveSettings() {
     router.put('/admin/payments/settings', {
         minimum_topup_idr: Number(minimumTopupIdr.value),
     }, { preserveScroll: true });
+}
+
+function savePaymentPage() {
+    router.put('/admin/payments/page-settings', { ...paymentPage }, { preserveScroll: true });
+}
+
+function uploadPaymentHeader(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    router.post('/admin/payments/page-settings/header', { image: file }, {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => { event.target.value = ''; },
+    });
 }
 
 function confirmManual(id) {
@@ -135,6 +174,57 @@ function toggleManualAsset() {
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </section>
+
+            <section class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div><h2 class="text-xl font-semibold">Tampilan Halaman Pembayaran</h2><p class="mt-1 text-sm text-slate-400">Editor customer payment page. Tidak mengubah routing gateway atau credential.</p></div>
+                    <button type="button" class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950" @click="savePaymentPage">Simpan tampilan</button>
+                </div>
+                <div class="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <label class="text-xs">Accent HEX<input v-model="paymentPage.accentColor" maxlength="7" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <label class="text-xs">Teks kecil<input v-model="paymentPage.eyebrow" maxlength="60" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <label class="text-xs">Judul pending<input v-model="paymentPage.pendingTitle" maxlength="100" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <label class="text-xs">Judul berhasil<input v-model="paymentPage.paidTitle" maxlength="100" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <label class="text-xs">Judul gagal<input v-model="paymentPage.failedTitle" maxlength="100" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <label class="text-xs">Subtitle<input v-model="paymentPage.subtitle" maxlength="240" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <label class="text-xs">Judul notice invoice<input v-model="paymentPage.invoiceNoticeTitle" maxlength="120" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <label class="text-xs">Teks notice invoice<textarea v-model="paymentPage.invoiceNoticeText" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2"></textarea></label>
+                        <label class="text-xs">Status pending<textarea v-model="paymentPage.pendingStatusText" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2"></textarea></label>
+                        <label class="text-xs">Status berhasil<textarea v-model="paymentPage.paidStatusText" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2"></textarea></label>
+                        <label class="text-xs">Status gagal<textarea v-model="paymentPage.failedStatusText" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2"></textarea></label>
+                        <label class="text-xs">Tombol bayar<input v-model="paymentPage.payButtonText" maxlength="80" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <label class="text-xs">Tombol cek status<input v-model="paymentPage.checkStatusButtonText" maxlength="80" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <label class="text-xs">Tombol cek invoice<input v-model="paymentPage.checkInvoiceButtonText" maxlength="80" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <label class="text-xs">Teks bantuan<input v-model="paymentPage.supportText" maxlength="120" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <label class="text-xs">URL bantuan<input v-model="paymentPage.supportUrl" maxlength="500" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <div class="md:col-span-2">
+                            <label class="text-xs">Banner pembayaran<input type="file" accept="image/png,image/jpeg,image/webp" class="mt-1 block w-full text-sm" @change="uploadPaymentHeader"></label>
+                            <p class="mt-1 text-[11px] text-slate-500">Disimpan sebagai media aplikasi. Tidak perlu hardcode URL.</p>
+                        </div>
+                        <div class="grid gap-2 md:col-span-2 sm:grid-cols-2">
+                            <label class="flex gap-2 text-sm"><input v-model="paymentPage.showStoreBrand" type="checkbox">Identitas toko</label>
+                            <label class="flex gap-2 text-sm"><input v-model="paymentPage.showInvoiceNotice" type="checkbox">Notice invoice</label>
+                            <label class="flex gap-2 text-sm"><input v-model="paymentPage.showOrderSummary" type="checkbox">Ringkasan pesanan</label>
+                            <label class="flex gap-2 text-sm"><input v-model="paymentPage.showStatusBox" type="checkbox">Status pembayaran</label>
+                            <label class="flex gap-2 text-sm"><input v-model="paymentPage.showSupport" type="checkbox">Bantuan</label>
+                        </div>
+                    </div>
+                    <div class="overflow-hidden rounded-xl border border-slate-700 bg-[#0d1019]">
+                        <img v-if="paymentPage.headerImageUrl" :src="paymentPage.headerImageUrl" alt="" class="h-28 w-full object-cover">
+                        <div class="p-4">
+                            <p class="text-[9px] font-black uppercase tracking-[0.18em]" :style="{color:paymentPage.accentColor}">{{ paymentPage.eyebrow }}</p>
+                            <h3 class="mt-1 text-lg font-black text-white">{{ paymentPage.pendingTitle }}</h3>
+                            <p class="mt-2 text-xs text-white/45">{{ paymentPage.subtitle }}</p>
+                            <div v-if="paymentPage.showInvoiceNotice" class="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/[0.06] p-3">
+                                <strong class="text-[10px] text-amber-200">{{ paymentPage.invoiceNoticeTitle }}</strong>
+                                <p class="mt-1 text-[9px] text-white/40">{{ paymentPage.invoiceNoticeText }}</p>
+                            </div>
+                            <button class="mt-4 h-9 w-full rounded font-black text-slate-950" :style="{backgroundColor:paymentPage.accentColor}">{{ paymentPage.payButtonText }}</button>
+                        </div>
+                    </div>
                 </div>
             </section>
 
