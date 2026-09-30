@@ -48,7 +48,7 @@ function saveVoucher(row) {
 }
 function updateMembership(row) {
     router.put('/admin/customers/' + row.id + '/membership', {
-        membership_tier_code: row.membership_tier_code,
+        membership_tier_code: row.membership_assignment || 'AUTO',
     }, { preserveScroll: true });
 }
 function saveTier(tier) {
@@ -96,7 +96,7 @@ function adjustWallet(row) {
                     <div class="grid gap-3 md:grid-cols-5">
                         <div class="md:col-span-2"><strong>{{ row.name }}</strong><p class="text-xs text-slate-400">{{ row.email || '-' }} · {{ row.phone || '-' }}</p></div>
                         <div><span class="text-xs text-slate-500">Saldo</span><div>Rp{{ Number(row.balance_idr || 0).toLocaleString('id-ID') }}</div></div>
-                        <label class="text-xs">Membership<select v-model="row.membership_tier_code" :disabled="!isSuper" class="mt-1 block w-full rounded bg-slate-800 p-2"><option v-for="tier in membershipTiers" :key="tier" :value="tier">{{ tier }}</option></select></label>
+                        <label class="text-xs">Membership<select v-model="row.membership_assignment" :disabled="!isSuper" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="AUTO">AUTO (berdasarkan transaksi)</option><option v-for="tier in membershipTiers" :key="tier" :value="tier">{{ tier }} (manual)</option></select><small class="mt-1 block text-[10px] text-slate-500">Aktif: {{row.membership_tier_code}} · Belanja Rp{{Number(row.lifetime_spend_idr||0).toLocaleString('id-ID')}}</small></label>
                         <button v-if="isSuper" class="self-end rounded bg-slate-700 px-3 py-2 text-xs" @click="updateMembership(row)">Simpan tier</button>
                     </div>
                     <div v-if="isSuper" class="mt-3 flex flex-wrap items-end gap-2 border-t border-slate-800 pt-3">
