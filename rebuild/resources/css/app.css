@@ -2605,3 +2605,64 @@
   .lf-product-notice-body p{font-size:14px!important;line-height:28px!important}
   .lf-product-notice-dismiss{padding:20px 24px!important;font-size:12px!important}
 }
+
+
+/* Final checkout structural parity refinements. */
+.lf-product-perks svg{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.lf-product-perks svg polygon{fill:none}
+.lf-mobile-order-lock{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+@media(max-width:639px){
+  .lf-checkout-account-panel{
+    padding:0!important;
+  }
+  .lf-checkout-account-panel>header{
+    align-items:center!important;
+    justify-content:space-between!important;
+    padding:10px 8px!important;
+    border-bottom:1px solid rgba(255,255,255,.08)!important;
+    background:rgba(255,255,255,.025)!important;
+  }
+  .lf-checkout-account-panel>.lf-panel-body{
+    padding:7.2px!important;
+  }
+
+  .lf-checkout-compact-panel{
+    padding:7.2px!important;
+  }
+  .lf-checkout-compact-panel>header{
+    align-items:flex-start!important;
+    gap:5.6px!important;
+    padding:0!important;
+    border:0!important;
+    background:transparent!important;
+  }
+  .lf-checkout-compact-panel>.lf-panel-body{
+    padding:6.4px 0 0!important;
+  }
+  .lf-checkout-contact-panel>.lf-panel-body,
+  .lf-checkout-promo-panel>.lf-panel-body{
+    padding-top:10px!important;
+  }
+
+  .lf-product-perks span{
+    width:16px!important;
+    height:16px!important;
+    display:grid!important;
+    place-items:center!important;
+  }
+  .lf-product-perks svg{
+    width:16px!important;
+    height:16px!important;
+    stroke-width:2!important;
+  }
+  .lf-mobile-order-button{
+    gap:7px!important;
+  }
+  .lf-mobile-order-lock{
+    width:16px!important;
+    height:16px!important;
+    flex:0 0 16px!important;
+    stroke-width:2!important;
+  }
+}
