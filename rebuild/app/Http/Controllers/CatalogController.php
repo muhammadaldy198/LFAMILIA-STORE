@@ -119,7 +119,7 @@ class CatalogController
 
         return Inertia::render('Catalog/Show', [
             'product' => [
-                ...$product->only('id', 'name', 'publisher', 'slug', 'description', 'nickname_check_enabled', 'manual_instructions'),
+                ...$product->only('id', 'name', 'publisher', 'slug', 'description', 'nickname_check_enabled'),
                 'category_name' => $product->category->name,
                 'image_url' => $product->getFirstMediaUrl('image'),
                 'banner_url' => $product->getFirstMediaUrl('banner'),
