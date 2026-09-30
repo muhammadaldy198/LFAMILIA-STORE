@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import TurnstileWidget from '../../Components/TurnstileWidget.vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 
@@ -40,6 +40,9 @@ const voucherLoading = ref(false);
 const voucherError = ref('');
 const confirmOpen = ref(false);
 const summaryOpen = ref(false);
+const noticeOpen = ref(false);
+const noticeIndex = ref(0);
+const hideNotice = ref(false);
 const selectedSavedId = ref('');
 const turnstile = ref(null);
 const turnstileToken = ref('');
@@ -86,6 +89,25 @@ const paymentGroups = computed(() => {
         items,
     }));
 });
+
+function noticeVersion(items) {
+    let hash = 2166136261;
+    for (const character of (items || []).map((item) => `${item.title}\n${item.body}`).join('\n---\n')) {
+        hash ^= character.charCodeAt(0);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
+}
+
+function closeNotice() {
+    if (hideNotice.value) {
+        window.localStorage.setItem(
+            `lfamilia-notice:${props.product.slug}:${noticeVersion(props.notices || [])}`,
+            String(Date.now() + (7 * 24 * 60 * 60 * 1000)),
+        );
+    }
+    noticeOpen.value = false;
+}
 
 function newIdempotencyKey() {
     return globalThis.crypto?.randomUUID?.() || ('checkout-' + Date.now() + '-' + Math.random().toString(36).slice(2));
@@ -302,6 +324,28 @@ async function createOrder() {
     }
 }
 
+onMounted(() => {
+    const preferredGroups = ['qris', 'ewallet', 'va', 'retail', 'other', 'wallet'];
+    if (!paymentChannelCode.value) {
+        for (const key of preferredGroups) {
+            const group = paymentGroups.value.find((item) => item.key === key);
+            const first = group?.items?.[0];
+            if (first?.code) {
+                paymentChannelCode.value = first.code;
+                break;
+            }
+        }
+    }
+
+    if ((props.notices || []).length) {
+        noticeIndex.value = 0;
+        hideNotice.value = false;
+        const key = `lfamilia-notice:${props.product.slug}:${noticeVersion(props.notices || [])}`;
+        const hiddenUntil = Number(window.localStorage.getItem(key) || 0);
+        noticeOpen.value = hiddenUntil < Date.now();
+    }
+});
+
 watch([guestEmail, guestPhone], () => {
     quote.value = null;
 });
@@ -355,7 +399,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
         <div v-if="activeTab==='transaction'" class="lf-checkout-grid">
             <div class="lf-checkout-panels">
                 <section v-if="fields.length" class="lf-checkout-panel">
-                    <header><span>1</span><div><h2>Masukkan Data Akun</h2><p>Pastikan ID dan server tujuan sudah benar.</p></div></header>
+                    <header><span>1</span><div><h2>Masukkan Data Akun</h2><p>Isi ID tujuan dengan benar. Nickname diperiksa otomatis jika didukung.</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-account-product-mobile">
                             <span class="lf-account-product-art">
@@ -389,6 +433,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                         </div>
                         <div v-if="nicknameResult?.verified" class="lf-success-note">Nickname ditemukan: <strong>{{nicknameResult.nickname}}</strong><span v-if="nicknameResult.country"> · {{nicknameResult.country}}</span></div>
                         <div v-else-if="nicknameResult?.warning" class="lf-warning-note">{{nicknameResult.warning}}</div>
+                        <div v-else-if="!product.nickname_check_enabled" class="lf-checkout-info-note">ⓘ Verifikasi nickname otomatis belum tersedia. Periksa kembali data sebelum membayar.</div>
                     </div>
                 </section>
 
@@ -477,7 +522,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             <span class="lf-account-avatar">{{customer.name?.slice(0,1)?.toUpperCase()}}</span>
                             <div><strong>{{customer.name}}</strong><small>{{customer.email}} · {{customer.phone || 'Nomor HP belum lengkap'}}</small></div>
                         </div>
-                        <p class="lf-panel-hint">Pastikan kontak aktif agar pemberitahuan transaksi dapat diterima.</p>
+                        <p class="lf-contact-privacy">✓ Kami hanya memakai kontak untuk invoice dan status transaksi.</p>
                     </div>
                 </section>
 
@@ -577,6 +622,27 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
             <button type="button" class="lf-mobile-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">
                 {{busy==='order'?'Memproses...':'🔒 Pesan Sekarang'}}
             </button>
+        </div>
+    </div>
+
+    <div v-if="noticeOpen && notices?.length" class="lf-modal-backdrop" @click.self="closeNotice">
+        <div class="lf-product-notice-modal">
+            <header>
+                <span>{{noticeIndex + 1}}/{{notices.length}}</span>
+                <button type="button" aria-label="Tutup informasi" @click="closeNotice">×</button>
+            </header>
+            <div class="lf-product-notice-body">
+                <h2>{{notices[noticeIndex]?.title}}</h2>
+                <p>{{notices[noticeIndex]?.body}}</p>
+                <div v-if="notices.length > 1" class="lf-product-notice-actions">
+                    <button type="button" class="lf-secondary" :disabled="noticeIndex===0" @click="noticeIndex=Math.max(0,noticeIndex-1)">Sebelumnya</button>
+                    <button type="button" class="lf-primary" :disabled="noticeIndex===notices.length-1" @click="noticeIndex=Math.min(notices.length-1,noticeIndex+1)">Berikutnya</button>
+                </div>
+            </div>
+            <label class="lf-product-notice-dismiss">
+                <input v-model="hideNotice" type="checkbox">
+                Jangan tampilkan lagi dalam 7 hari
+            </label>
         </div>
     </div>
 
