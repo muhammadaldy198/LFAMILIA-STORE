@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\FaqEntry;
+use App\Models\HomeBanner;
 use App\Models\NewsArticle;
 use App\Models\ProductReview;
+use App\Models\SitePopup;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
 use Illuminate\Http\RedirectResponse;
@@ -33,6 +35,15 @@ class AdminContentController
                 ...$asset->only('id', 'key', 'target_url', 'is_active'),
                 'image_url' => $asset->getFirstMediaUrl('image'),
             ]),
+            'banners' => HomeBanner::orderBy('sort_order')->orderBy('id')->get()->map(fn (HomeBanner $banner): array => [
+                ...$banner->only(
+                    'id', 'title', 'subtitle', 'cta_label', 'cta_href',
+                    'show_desktop', 'show_mobile', 'sort_order', 'is_active'
+                ),
+                'desktop_url' => $banner->getFirstMediaUrl('desktop'),
+                'mobile_url' => $banner->getFirstMediaUrl('mobile'),
+            ]),
+            'popups' => SitePopup::orderBy('sort_order')->orderBy('id')->get(),
             'news' => NewsArticle::orderBy('sort_order')->orderByDesc('id')->get()->map(fn (NewsArticle $article): array => [
                 ...$article->only('id', 'slug', 'title', 'summary', 'body', 'source_label', 'sort_order', 'is_active'),
                 'published_at' => $article->published_at?->format('Y-m-d\TH:i'),
@@ -51,6 +62,66 @@ class AdminContentController
             'pages' => DB::table('content_pages')->orderBy('key')->get(),
             'settings' => collect($settingsKeys)->mapWithKeys(fn (string $key): array => [$key => $settings[$key] ?? '']),
         ]);
+    }
+
+    public function storeBanner(Request $request, AdminAuditService $audit): RedirectResponse
+    {
+        $data = $this->bannerData($request);
+        $banner = HomeBanner::create($data);
+        $audit->record($request, 'content.banner.created', 'home_banner', $banner->id, null, $banner->toArray());
+
+        return back();
+    }
+
+    public function updateBanner(Request $request, HomeBanner $banner, AdminAuditService $audit): RedirectResponse
+    {
+        $data = $this->bannerData($request);
+        $before = $banner->toArray();
+        $banner->update($data);
+        $audit->record($request, 'content.banner.updated', 'home_banner', $banner->id, $before, $banner->toArray());
+
+        return back();
+    }
+
+    public function destroyBanner(Request $request, HomeBanner $banner, AdminAuditService $audit): RedirectResponse
+    {
+        $before = $banner->toArray();
+        $id = $banner->id;
+        $banner->clearMediaCollection('desktop');
+        $banner->clearMediaCollection('mobile');
+        $banner->delete();
+        $audit->record($request, 'content.banner.deleted', 'home_banner', $id, $before, null);
+
+        return back();
+    }
+
+    public function storePopup(Request $request, AdminAuditService $audit): RedirectResponse
+    {
+        $data = $this->popupData($request);
+        $popup = SitePopup::create($data);
+        $audit->record($request, 'content.popup.created', 'site_popup', $popup->id, null, $popup->toArray());
+
+        return back();
+    }
+
+    public function updatePopup(Request $request, SitePopup $popup, AdminAuditService $audit): RedirectResponse
+    {
+        $data = $this->popupData($request);
+        $before = $popup->toArray();
+        $popup->update($data);
+        $audit->record($request, 'content.popup.updated', 'site_popup', $popup->id, $before, $popup->toArray());
+
+        return back();
+    }
+
+    public function destroyPopup(Request $request, SitePopup $popup, AdminAuditService $audit): RedirectResponse
+    {
+        $before = $popup->toArray();
+        $id = $popup->id;
+        $popup->delete();
+        $audit->record($request, 'content.popup.deleted', 'site_popup', $id, $before, null);
+
+        return back();
     }
 
     public function storeNews(Request $request, AdminAuditService $audit): RedirectResponse
@@ -187,6 +258,41 @@ class AdminContentController
         $audit->record($request, 'content.settings.updated', 'system_setting', 'storefront', null, $map);
 
         return back();
+    }
+
+    private function bannerData(Request $request): array
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:180'],
+            'subtitle' => ['nullable', 'string', 'max:500'],
+            'cta_label' => ['nullable', 'string', 'max:80'],
+            'cta_href' => ['nullable', 'string', 'max:500', 'regex:/^(\/(?!\/)|https?:\/\/)/i'],
+            'show_desktop' => ['required', 'boolean'],
+            'show_mobile' => ['required', 'boolean'],
+            'sort_order' => ['required', 'integer', 'min:0', 'max:100000'],
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        if (! $data['show_desktop'] && ! $data['show_mobile']) {
+            abort(422, 'Pilih minimal satu tampilan banner.');
+        }
+
+        return $data;
+    }
+
+    private function popupData(Request $request): array
+    {
+        return $request->validate([
+            'title' => ['required', 'string', 'max:180'],
+            'body' => ['required', 'string', 'max:5000'],
+            'primary_label' => ['nullable', 'string', 'max:80'],
+            'primary_href' => ['nullable', 'string', 'max:500', 'regex:/^(\/(?!\/)|https?:\/\/)/i'],
+            'secondary_label' => ['nullable', 'string', 'max:80'],
+            'secondary_href' => ['nullable', 'string', 'max:500', 'regex:/^(\/(?!\/)|https?:\/\/)/i'],
+            'dismiss_days' => ['required', 'integer', 'min:0', 'max:365'],
+            'sort_order' => ['required', 'integer', 'min:0', 'max:100000'],
+            'is_active' => ['required', 'boolean'],
+        ]);
     }
 
     private function newsData(Request $request, ?int $ignoreId = null): array
