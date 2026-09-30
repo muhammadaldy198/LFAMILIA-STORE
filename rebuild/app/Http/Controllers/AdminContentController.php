@@ -43,7 +43,7 @@ class AdminContentController
                 'desktop_url' => $banner->getFirstMediaUrl('desktop'),
                 'mobile_url' => $banner->getFirstMediaUrl('mobile'),
             ]),
-            'popups' => SitePopup::orderBy('sort_order')->orderBy('id')->get(),
+            'popups' => SitePopup::orderBy('id')->limit(1)->get(),
             'news' => NewsArticle::orderBy('sort_order')->orderByDesc('id')->get()->map(fn (NewsArticle $article): array => [
                 ...$article->only('id', 'slug', 'title', 'summary', 'body', 'source_label', 'sort_order', 'is_active'),
                 'published_at' => $article->published_at?->format('Y-m-d\TH:i'),
@@ -103,6 +103,7 @@ class AdminContentController
         if ($popup) {
             $before = $popup->toArray();
             $popup->update($data);
+            SitePopup::where('id', '!=', $popup->id)->delete();
             $audit->record($request, 'content.popup.updated', 'site_popup', $popup->id, $before, $popup->toArray());
 
             return back();
@@ -119,6 +120,7 @@ class AdminContentController
         $data = $this->popupData($request);
         $before = $popup->toArray();
         $popup->update($data);
+        SitePopup::where('id', '!=', $popup->id)->delete();
         $audit->record($request, 'content.popup.updated', 'site_popup', $popup->id, $before, $popup->toArray());
 
         return back();
@@ -292,13 +294,21 @@ class AdminContentController
 
     private function popupData(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'title' => ['required', 'string', 'max:180'],
             'body' => ['required', 'string', 'max:5000'],
             'dismiss_days' => ['required', 'integer', 'min:0', 'max:365'],
-            'sort_order' => ['required', 'integer', 'min:0', 'max:100000'],
             'is_active' => ['required', 'boolean'],
         ]);
+
+        return [
+            ...$data,
+            'primary_label' => null,
+            'primary_href' => null,
+            'secondary_label' => null,
+            'secondary_href' => null,
+            'sort_order' => 0,
+        ];
     }
 
     private function newsData(Request $request, ?int $ignoreId = null): array
