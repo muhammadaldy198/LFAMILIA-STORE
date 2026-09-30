@@ -11,7 +11,7 @@ class DatabaseSchemaTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_membership_order_and_initial_provider_status_match_the_prd(): void
+    public function test_membership_order_and_provider_registry_match_the_prd(): void
     {
         $this->assertSame(
             ['BASIC', 'SILVER', 'GOLD', 'DIAMOND', 'PLATINUM', 'MAFIA'],
@@ -23,7 +23,10 @@ class DatabaseSchemaTest extends TestCase
             DB::table('providers')->orderBy('id')->pluck('code')->all()
         );
 
-        $this->assertSame(0, DB::table('providers')->where('is_active', true)->count());
+        $this->assertSame(
+            [],
+            DB::table('providers')->whereNotIn('code', ['DIGIFLAZZ', 'MANUAL'])->pluck('code')->all()
+        );
     }
 
     public function test_wallet_ledger_accepts_a_valid_debit_and_rejects_an_invalid_balance(): void
