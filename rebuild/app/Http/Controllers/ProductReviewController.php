@@ -28,6 +28,10 @@ class ProductReviewController
 
         $user = $request->user();
         $authorized = $user && (int) $order->user_id === (int) $user->id;
+        if (! $authorized && $order->user_id === null
+            && (int) $request->session()->get('guest_order_id') === (int) $order->id) {
+            $authorized = true;
+        }
         if (! $authorized && $order->user_id === null && is_string($data['access_code'] ?? null)) {
             $authorized = $guestAccess->matches((int) $order->id, (string) $data['access_code']);
         }
