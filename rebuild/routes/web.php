@@ -48,6 +48,8 @@ Route::post('/checkout/nickname', [CheckoutController::class, 'nickname'])
     ->middleware('throttle:checkout-nickname')->name('checkout.nickname');
 Route::post('/checkout/quote', [CheckoutController::class, 'quote'])
     ->middleware('throttle:checkout-quote')->name('checkout.quote');
+Route::get('/checkout/vouchers', [CheckoutController::class, 'vouchers'])
+    ->middleware('throttle:checkout-quote')->name('checkout.vouchers');
 Route::post('/checkout/orders', [CheckoutController::class, 'store'])
     ->middleware('throttle:checkout-create')->name('checkout.store');
 Route::post('/payments/orders/{orderNumber}', [PaymentController::class, 'create'])
