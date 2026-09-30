@@ -362,7 +362,7 @@
 @media(max-width:640px){.lf-home-review-grid{grid-template-columns:1fr}.lf-order-review-form{grid-template-columns:1fr}.lf-order-review-form textarea,.lf-order-review-form .lf-primary{grid-column:auto}}
 
 /* OURASTORE reference proportions; LFAMILIA branding and transaction logic retained. */
-.lf-reference-checkout{--lf-lime:#ad9372;--lf-lime-2:#cfb998;--lf-line:rgba(255,255,255,.12);background:#222424!important}
+.lf-customer .lf-reference-checkout{--lf-lime:#ad9372;--lf-lime-2:#cfb998;--lf-line:rgba(255,255,255,.12);background:#222424!important}
 .lf-reference-checkout .lf-checkout-panel{background:#42474b;border-color:transparent}
 .lf-reference-checkout .lf-checkout-panel>header{background:#606870!important}
 .lf-reference-checkout .lf-checkout-panel>header>span{background:#ad9372!important}
