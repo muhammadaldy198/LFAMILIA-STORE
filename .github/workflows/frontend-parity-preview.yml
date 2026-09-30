@@ -6,7 +6,7 @@ on:
       - 'rebuild/frontend-parity'
     paths:
       - 'rebuild/**'
-      - '.github/workflows/frontend-preview.yml'
+      - '.github/workflows/frontend-parity-preview.yml'
 
 jobs:
   screenshots:
