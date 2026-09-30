@@ -47,7 +47,7 @@ const newsDate=v=>v?new Date(v).toLocaleDateString('id-ID',{day:'numeric',month:
                 <p class="lf-eyebrow">🔥 POPULER SEKARANG!</p>
                 <p class="lf-copy !mt-0">Berikut adalah beberapa produk yang paling populer saat ini.</p>
                 <div class="lf-popular">
-                    <Link v-for="x in popular" :key="x.slug" :href="'/catalog/'+x.slug" class="lf-popular-card">
+                    <Link v-for="(x,i) in popular" :key="x.slug" :href="'/catalog/'+x.slug" class="lf-popular-card" :class="'tone-'+(i%8)">
                         <span class="lf-popular-art">
                             <img v-if="x.image_url" :src="x.image_url" :alt="x.name">
                             <span v-else>{{initial(x.name)}}</span>
@@ -93,6 +93,18 @@ const newsDate=v=>v?new Date(v).toLocaleDateString('id-ID',{day:'numeric',month:
                 </nav>
             </section>
 
+            <section class="lf-steps">
+                <div class="lf-container lf-section">
+                    <p class="lf-eyebrow">CARA TOP UP</p>
+                    <h2 class="lf-title">Empat langkah sederhana</h2>
+                    <div class="lf-step-grid">
+                        <article v-for="s in [['01','Pilih produk','Cari game atau produk digital yang kamu inginkan.'],['02','Isi data','Masukkan ID dan pilih nominal top up.'],['03','Bayar aman','Selesaikan pembayaran sesuai total pesanan.'],['04','Pesanan diproses','Pantau status menggunakan nomor pesanan.']]" :key="s[0]" class="lf-step">
+                            <span>{{s[0]}}</span><h3>{{s[1]}}</h3><p>{{s[2]}}</p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
             <section v-if="news?.length" class="lf-news-home">
                 <div class="lf-container lf-section">
                     <p class="lf-eyebrow">LFAMILIA NEWS</p>
@@ -112,18 +124,6 @@ const newsDate=v=>v?new Date(v).toLocaleDateString('id-ID',{day:'numeric',month:
                         </Link>
                     </div>
                     <Link href="/news" class="lf-secondary mt-4">Lihat Semua Artikel</Link>
-                </div>
-            </section>
-
-            <section class="lf-steps">
-                <div class="lf-container lf-section">
-                    <p class="lf-eyebrow">CARA TOP UP</p>
-                    <h2 class="lf-title">Empat langkah sederhana</h2>
-                    <div class="lf-step-grid">
-                        <article v-for="s in [['01','Pilih produk','Cari game atau produk digital yang kamu inginkan.'],['02','Isi data','Masukkan ID dan pilih nominal top up.'],['03','Bayar aman','Selesaikan pembayaran sesuai total pesanan.'],['04','Pesanan diproses','Pantau status menggunakan nomor pesanan.']]" :key="s[0]" class="lf-step">
-                            <span>{{s[0]}}</span><h3>{{s[1]}}</h3><p>{{s[2]}}</p>
-                        </article>
-                    </div>
                 </div>
             </section>
 
