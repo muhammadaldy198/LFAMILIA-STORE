@@ -46,7 +46,6 @@ class CustomerAuthTest extends TestCase
 
     public function test_password_reset_changes_the_hash_with_a_valid_token(): void
     {
-        Notification::fake();
         $user = User::create([
             'name' => 'Customer',
             'email' => 'reset@example.test',
