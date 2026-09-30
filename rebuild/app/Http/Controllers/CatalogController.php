@@ -109,7 +109,7 @@ class CatalogController
                 }
 
                 return [
-                    ...$package->only('id', 'name', 'group_name', 'nominal_value'),
+                    ...$package->only('id', 'name', 'note', 'group_name', 'nominal_value'),
                     'image_url' => $package->getFirstMediaUrl('image'),
                     'is_available' => $available,
                     'price_idr' => $price,
