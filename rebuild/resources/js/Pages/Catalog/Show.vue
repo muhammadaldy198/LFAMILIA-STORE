@@ -367,12 +367,9 @@ async function prepareOrder() {
         errors.value = { guest_phone: ['Lengkapi email dan nomor WhatsApp dengan benar.'] };
         return;
     }
-    if (!isVoucherProduct.value && props.product.nickname_check_enabled && !nicknameResult.value?.verified) {
+    if (!isVoucherProduct.value && props.product.nickname_check_enabled && !nicknameResult.value) {
         await checkNickname();
-        if (!nicknameResult.value?.verified) {
-            errors.value = { checkout: ['Nickname harus berhasil diverifikasi sebelum checkout.'] };
-            return;
-        }
+        if (!nicknameResult.value && Object.keys(errors.value).length) return;
     }
     const currentQuote = await loadQuote();
     if (!currentQuote) return;
@@ -548,10 +545,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
                             <span>Verifikasi nickname otomatis belum tersedia. Periksa kembali data sebelum membayar.</span>
                         </div>
-                        <div v-if="product.manual_instructions" class="lf-manual-instructions">
-                            <strong>Instruksi produk manual</strong>
-                            <p>{{product.manual_instructions}}</p>
-                        </div>
+
                     </div>
                 </section>
 
