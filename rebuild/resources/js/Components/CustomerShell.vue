@@ -13,6 +13,9 @@ const supportOpen = ref(false);
 const supportPosition = ref(null);
 let supportDrag = null;
 const logged = computed(() => Boolean(page.props.auth?.user));
+const balanceIdr = computed(() => Number(page.props.auth?.user?.balance_idr || 0));
+const membershipTier = computed(() => page.props.auth?.user?.membership_tier_code || 'BASIC');
+const money = (value) => 'Rp' + Number(value || 0).toLocaleString('id-ID');
 const storefront = computed(() => page.props.storefront || {});
 const assets = computed(() => storefront.value.assets || {});
 const logo = computed(() => assets.value.logo?.url || '');
@@ -202,9 +205,18 @@ function supportHref(kind) {
             <template v-if="logged">
                 <div class="lf-drawer-profile">
                     <span>{{String(page.props.auth?.user?.name||'L').slice(0,1).toUpperCase()}}</span>
-                    <div><strong>{{page.props.auth?.user?.name}}</strong><small>Akun aktif</small></div>
+                    <div><strong>{{page.props.auth?.user?.name}}</strong><small>{{membershipTier}} · Akun aktif</small></div>
                 </div>
-                <Link href="/account" class="lf-primary" @click="closeDrawer">Akun & Saldo</Link>
+                <div class="lf-drawer-balance">
+                    <span>Saldo LFAMILIA</span>
+                    <strong>{{money(balanceIdr)}}</strong>
+                </div>
+                <div class="lf-drawer-account-links">
+                    <Link href="/account/wallet" @click="closeDrawer"><span>Saldo</span><b>›</b></Link>
+                    <Link href="/account/orders" @click="closeDrawer"><span>Pesanan</span><b>›</b></Link>
+                    <Link href="/account/tickets" @click="closeDrawer"><span>Tiket</span><b>›</b></Link>
+                    <Link href="/account/profile" @click="closeDrawer"><span>Profil</span><b>›</b></Link>
+                </div>
             </template>
             <template v-else>
                 <p class="lf-eyebrow">SELAMAT DATANG</p>
