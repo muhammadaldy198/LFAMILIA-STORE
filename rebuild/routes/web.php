@@ -19,6 +19,7 @@ use App\Http\Controllers\CustomerPhoneController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\GuestOrderController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PaymentPageController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\PublicContentController;
 use App\Http\Controllers\PublicOrderTrackingController;
@@ -54,6 +55,7 @@ Route::post('/checkout/orders', [CheckoutController::class, 'store'])
     ->middleware('throttle:checkout-create')->name('checkout.store');
 Route::post('/payments/orders/{orderNumber}', [PaymentController::class, 'create'])
     ->middleware('throttle:payment-create')->name('payments.orders.create');
+Route::get('/payment', [PaymentPageController::class, 'show'])->name('payment.show');
 
 Route::get('/health/ready', function () {
     try {
