@@ -142,8 +142,6 @@ Route::redirect('/panel', '/admin/panel', 302);
 Route::redirect('/panel/login', '/admin/login', 302);
 Route::redirect('/panel/admin', '/admin/panel', 302);
 Route::redirect('/panel/admin/login', '/admin/login', 302);
-Route::redirect('/panel/staff', '/admin/panel', 302);
-Route::redirect('/panel/staff/login', '/admin/login', 302);
 
 
 
