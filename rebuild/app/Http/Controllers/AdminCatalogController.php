@@ -97,6 +97,23 @@ class AdminCatalogController
         return back();
     }
 
+    public function destroyCategory(Request $request, Category $category, CatalogAudit $audit): RedirectResponse
+    {
+        if ($category->products()->exists()) {
+            return back()->withErrors([
+                'category' => 'Kategori masih memiliki produk. Pindahkan atau nonaktifkan produknya terlebih dahulu.',
+            ]);
+        }
+
+        $before = $category->toArray();
+        $id = $category->id;
+        $category->clearMediaCollection('image');
+        $category->delete();
+        $audit->record($request, 'catalog.category.deleted', 'category', $id, $before, null);
+
+        return back();
+    }
+
     public function product(Request $request, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate([
