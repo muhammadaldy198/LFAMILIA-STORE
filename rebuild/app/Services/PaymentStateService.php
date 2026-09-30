@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Jobs\StartFulfillmentJob;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -156,7 +157,7 @@ class PaymentStateService
                     'updated_at' => now(),
                 ]);
                 if ($order->user_id !== null) {
-                    $user = \App\Models\User::find((int) $order->user_id);
+                    $user = User::find((int) $order->user_id);
                     if ($user) {
                         $this->membership->sync($user);
                     }
@@ -381,7 +382,7 @@ class PaymentStateService
             'updated_at' => now(),
         ]);
         if ($order->user_id !== null) {
-            $user = \App\Models\User::find((int) $order->user_id);
+            $user = User::find((int) $order->user_id);
             if ($user) {
                 $this->membership->sync($user);
             }
