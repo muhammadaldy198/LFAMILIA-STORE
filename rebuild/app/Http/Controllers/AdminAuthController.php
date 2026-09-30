@@ -53,7 +53,7 @@ class AdminAuthController
 
         $admin = Auth::guard('admin')->user();
 
-        if (! in_array($admin->role, ['SUPER_ADMIN', 'ADMIN'], true)) {
+        if (! in_array($admin->role, ['SUPER_ADMIN', 'ADMIN', 'STAFF'], true)) {
             Auth::guard('admin')->logout();
 
             throw ValidationException::withMessages(['email' => 'Akses ditolak.']);
@@ -64,7 +64,9 @@ class AdminAuthController
         $request->session()->regenerate();
         $admin->forceFill(['last_login_at' => now()])->save();
 
-        return redirect()->intended(route('admin.panel'));
+        $landing = $admin->role === 'STAFF' ? route('staff.panel') : route('admin.panel');
+
+        return redirect()->intended($landing);
     }
 
     public function logout(Request $request): RedirectResponse
