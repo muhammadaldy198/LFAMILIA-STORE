@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\MembershipTier;
 use App\Models\Wallet;
 use App\Services\CustomerAccountDeletion;
+use App\Services\MembershipService;
 use App\Services\PaymentRoutingService;
 use App\Services\TransactionalEmailService;
 use Illuminate\Http\RedirectResponse;
@@ -260,12 +261,14 @@ class CustomerAccountController
         return Inertia::render('Customer/Notifications', ['items' => $items]);
     }
 
-    public function membership(Request $request): Response
+    public function membership(Request $request, MembershipService $membership): Response
     {
         $user = $request->user();
+        $profile = $membership->sync($user);
 
         return Inertia::render('Customer/Membership', [
-            'currentCode' => $user->membership_tier_code,
+            'currentCode' => $profile['code'],
+            'profile' => $profile,
             'tiers' => MembershipTier::query()->where('is_active', true)->orderBy('rank')
                 ->get(['code', 'rank', 'requirements', 'benefits']),
         ]);
