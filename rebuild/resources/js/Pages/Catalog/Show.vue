@@ -2,6 +2,7 @@
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
 import TurnstileWidget from '../../Components/TurnstileWidget.vue';
+import CustomerShell from '../../Components/CustomerShell.vue';
 
 const props = defineProps({
     product: Object,
@@ -160,31 +161,24 @@ function fieldError(key) {
 
 <template>
     <Head :title="product.name"><link v-if="faviconUrl" rel="icon" :href="faviconUrl"></Head>
-    <main class="min-h-screen bg-[#090e1b] text-slate-100">
-        <header class="border-b border-white/10 bg-[#0c1424] px-5 py-4">
-            <div class="mx-auto flex max-w-6xl items-center justify-between">
-                <Link href="/" class="font-bold text-cyan-300">LFAMILIA STORE</Link>
-                <Link href="/orders/check" class="text-sm text-slate-300">Cek pesanan</Link>
-            </div>
-        </header>
+    <CustomerShell><main class="lf-checkout-page text-slate-100">
+        <div class="lf-container space-y-5 py-5 sm:py-7">
+            <Link href="/" class="text-[10px] font-bold text-cyan-300">← Pilih produk lain</Link>
 
-        <div class="mx-auto max-w-6xl space-y-7 px-5 py-8">
-            <Link href="/" class="text-sm text-cyan-300">← Katalog</Link>
+            <img v-if="product.banner_url" :src="product.banner_url" :alt="'Banner ' + product.name" class="max-h-[245px] w-full rounded-xl border border-white/10 bg-[#10131b] object-contain">
 
-            <img v-if="product.banner_url" :src="product.banner_url" :alt="'Banner ' + product.name" class="max-h-64 w-full rounded-xl object-contain">
-
-            <div class="flex items-center gap-5">
-                <img v-if="product.image_url" :src="product.image_url" :alt="product.name" class="h-24 w-24 rounded-xl object-cover">
+            <div class="flex items-center gap-3">
+                <img v-if="product.image_url" :src="product.image_url" :alt="product.name" class="h-[58px] w-[58px] rounded-xl object-cover">
                 <div>
-                    <p class="text-sm text-cyan-300">{{ product.category_name }}</p>
-                    <h1 class="text-3xl font-bold">{{ product.name }}</h1>
-                    <p v-if="product.description" class="mt-2 max-w-2xl text-sm text-slate-400">{{ product.description }}</p>
+                    <p class="text-[10px] font-black uppercase tracking-[.14em] text-cyan-300">{{ product.category_name }}</p>
+                    <h1 class="text-[24px] font-black tracking-[-.035em]">{{ product.name }}</h1>
+                    <p v-if="product.description" class="mt-1 max-w-2xl text-[10px] leading-4 text-slate-400">{{ product.description }}</p>
                 </div>
             </div>
 
-            <section v-if="fields.length" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <div><h2 class="text-xl font-semibold">Data tujuan</h2><p class="mt-1 text-sm text-slate-400">Isi data sesuai akun atau tujuan produk.</p></div>
-                <div class="grid gap-3 md:grid-cols-2">
+            <section v-if="fields.length" class="space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-3">
+                <div><h2 class="text-[13px] font-black">Data tujuan</h2><p class="mt-1 text-[9px] text-slate-400">Isi data sesuai akun atau tujuan produk.</p></div>
+                <div class="grid gap-2 sm:grid-cols-2">
                     <label v-for="field in fields" :key="field.field_key" class="text-sm">
                         {{ field.label }}{{ field.is_required ? ' *' : '' }}
                         <input
@@ -207,20 +201,20 @@ function fieldError(key) {
             </section>
 
             <section class="space-y-4">
-                <h2 class="text-xl font-semibold">Pilih nominal</h2>
+                <h2 class="text-[13px] font-black">Pilih nominal</h2>
                 <p v-if="!packages.length" class="text-slate-400">Belum ada nominal aktif.</p>
-                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     <button
                         v-for="item in packages"
                         :key="item.id"
                         type="button"
                         :disabled="!item.is_available"
-                        class="flex items-center justify-between gap-3 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-40"
+                        class="flex min-h-[62px] items-center justify-between gap-2 rounded-lg border p-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-40"
                         :class="String(selectedPackageId) === String(item.id) ? 'border-cyan-400 bg-cyan-400/10' : 'border-slate-800 bg-slate-900'"
                         @click="selectedPackageId = item.id"
                     >
                         <div class="flex items-center gap-3">
-                            <img v-if="item.image_url" :src="item.image_url" :alt="item.name" class="h-12 w-12 rounded-md object-contain">
+                            <img v-if="item.image_url" :src="item.image_url" :alt="item.name" class="h-10 w-10 rounded-md object-contain">
                             <span class="font-semibold">{{ item.name }}</span>
                         </div>
                         <span class="text-sm text-cyan-300">{{ item.is_available ? formatIdr(item.price_idr) : 'Tidak tersedia' }}</span>
@@ -229,8 +223,8 @@ function fieldError(key) {
                 <span v-if="errors.package_id" class="text-sm text-red-300">{{ errors.package_id[0] }}</span>
             </section>
 
-            <section class="grid gap-5 lg:grid-cols-[1fr_380px]">
-                <div class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <section class="grid gap-3 lg:grid-cols-[1fr_340px]">
+                <div class="space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-3">
                     <div v-if="!customer" class="grid gap-3 md:grid-cols-2">
                         <label class="text-sm">Email guest<input v-model="guestEmail" type="email" maxlength="255" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"></label>
                         <label class="text-sm">Nomor HP guest<input v-model="guestPhone" type="tel" maxlength="32" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"></label>
@@ -267,8 +261,8 @@ function fieldError(key) {
                     <p class="text-xs text-slate-500">Harga final dihitung ulang oleh server. Data harga/provider dari browser tidak digunakan.</p>
                 </div>
 
-                <aside class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
-                    <h2 class="text-xl font-semibold">Ringkasan</h2>
+                <aside class="space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-3">
+                    <h2 class="text-[13px] font-black">Ringkasan</h2>
                     <div class="space-y-2 text-sm">
                         <div class="flex justify-between"><span>Nominal</span><span>{{ selectedPackage?.name || '-' }}</span></div>
                         <div class="flex justify-between"><span>Harga</span><span>{{ formatIdr(quote?.subtotal_idr ?? selectedPackage?.price_idr) }}</span></div>
@@ -284,7 +278,7 @@ function fieldError(key) {
                         @token="turnstileToken = $event"
                     />
                     <span v-if="errors.turnstile_token" class="text-xs text-red-300">{{ errors.turnstile_token[0] }}</span>
-                    <button type="button" :disabled="busy === 'order' || !selectedPackage || !paymentChannelCode" class="w-full rounded-lg bg-cyan-400 px-4 py-3 font-bold text-slate-950 disabled:opacity-50" @click="createOrder">
+                    <button type="button" :disabled="busy === 'order' || !selectedPackage || !paymentChannelCode" class="lf-primary w-full disabled:opacity-50" @click="createOrder">
                         {{ busy === 'order' ? 'Membuat pesanan...' : 'Buat pesanan' }}
                     </button>
                     <p class="text-xs text-slate-500">Pesanan dibuat sebagai Menunggu Pembayaran. Gateway internal dipilih server dan tidak ditampilkan ke customer.</p>
@@ -307,7 +301,7 @@ function fieldError(key) {
             </section>
 
             <section v-if="paymentResult" class="space-y-3 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-5">
-                <h2 class="text-xl font-semibold">Pembayaran</h2>
+                <h2 class="text-[13px] font-black">Pembayaran</h2>
                 <p class="text-sm">Status: <strong>{{ paymentResult.status }}</strong></p>
                 <img v-if="paymentResult.instructions?.qr_url" :src="paymentResult.instructions.qr_url" alt="QRIS pembayaran" class="max-h-72 rounded-lg bg-white p-2">
                 <p v-if="paymentResult.instructions?.va_number" class="text-sm">Nomor VA: <strong>{{ paymentResult.instructions.va_number }}</strong></p>
@@ -318,5 +312,5 @@ function fieldError(key) {
                 <p v-if="paymentResult.status === 'UNKNOWN'" class="text-sm text-amber-200">Status pembuatan pembayaran belum pasti. Jangan membuat pembayaran baru.</p>
             </section>
         </div>
-    </main>
+    </main></CustomerShell>
 </template>
