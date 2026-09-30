@@ -745,3 +745,287 @@
     object-position:center!important;
   }
 }
+
+
+/* =========================================================
+   MOBILE PASS 2 — HOMEPAGE ONLY
+   ========================================================= */
+@media(max-width:640px){
+  /* Homepage banner */
+  .lf-home-banner{
+    width:100%;
+    overflow:hidden;
+    background:#05070b;
+  }
+  .lf-home-banner picture,
+  .lf-home-banner a{display:block;width:100%}
+  .lf-home-banner img{
+    display:block;
+    width:100%;
+    height:auto!important;
+    aspect-ratio:1/1!important;
+    max-height:none!important;
+    object-fit:cover!important;
+    object-position:center!important;
+  }
+
+  /* Section rhythm */
+  main > .lf-container.lf-section,
+  .lf-news-home .lf-section,
+  .lf-home-reviews .lf-section,
+  .lf-steps .lf-section{
+    padding-top:22px!important;
+    padding-bottom:22px!important;
+  }
+  .lf-eyebrow{font-size:10px!important}
+  .lf-title{
+    font-size:23px!important;
+    line-height:1.1!important;
+    letter-spacing:-.035em;
+  }
+  .lf-copy{
+    margin-top:6px!important;
+    font-size:11px!important;
+    line-height:1.55!important;
+  }
+
+  /* Popular now — old LFAMILIA mobile proportions */
+  .lf-popular{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+    margin-top:11px!important;
+  }
+  .lf-popular-card{
+    min-height:70px!important;
+    gap:8px!important;
+    padding:8px!important;
+    border-radius:20px!important;
+  }
+  .lf-popular-art{
+    width:54px!important;
+    height:54px!important;
+    flex:0 0 54px!important;
+    border-radius:13px!important;
+  }
+  .lf-popular-card strong{
+    display:-webkit-box;
+    overflow:hidden;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    font-size:11px!important;
+    line-height:1.35!important;
+  }
+  .lf-popular-card small{
+    display:block;
+    margin-top:2px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:9px!important;
+  }
+
+  /* Product browser */
+  .lf-browser-head{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:14px!important;
+    align-items:start!important;
+  }
+  .lf-search{
+    width:100%!important;
+    max-width:none!important;
+  }
+  .lf-search input{
+    height:38px!important;
+    padding-left:34px!important;
+    font-size:11px!important;
+  }
+  .lf-search>span{
+    position:absolute;
+    left:11px;
+    top:50%;
+    transform:translateY(-50%);
+    color:rgba(255,255,255,.34);
+    font-size:15px;
+    pointer-events:none;
+  }
+  .lf-filters{
+    gap:6px!important;
+    margin-top:14px!important;
+    padding-bottom:10px!important;
+    scrollbar-width:none;
+  }
+  .lf-filters::-webkit-scrollbar{display:none}
+  .lf-chip{
+    height:30px!important;
+    flex:0 0 auto;
+    gap:5px;
+    padding:0 10px!important;
+    font-size:10px!important;
+  }
+  .lf-chip img{
+    width:14px;
+    height:14px;
+    border-radius:4px;
+    object-fit:cover;
+  }
+
+  /* Legacy LFAMILIA homepage used 3 product columns on phone. */
+  .lf-products{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:10px 8px!important;
+    margin-top:16px!important;
+  }
+  .lf-product{
+    aspect-ratio:2/3!important;
+    border-radius:11px!important;
+    box-shadow:0 9px 20px -16px rgba(0,0,0,.9);
+  }
+  .lf-product>img{
+    width:100%;
+    height:100%;
+    object-fit:cover!important;
+    object-position:center!important;
+  }
+  .lf-product-fallback{
+    padding:8px!important;
+  }
+  .lf-product-fallback strong{
+    font-size:10px!important;
+    line-height:1.3;
+  }
+  .lf-product-fallback small{
+    margin-top:3px;
+    font-size:8px!important;
+  }
+  .lf-pages{
+    gap:4px!important;
+    margin-top:18px!important;
+  }
+  .lf-pages a,.lf-pages span{
+    min-width:31px!important;
+    height:31px!important;
+    border-radius:7px!important;
+    font-size:9px!important;
+  }
+
+  /* Cara Top Up */
+  .lf-step-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+    margin-top:13px!important;
+  }
+  .lf-step{
+    min-height:128px;
+    padding:11px!important;
+    border-radius:10px!important;
+  }
+  .lf-step span{
+    width:31px!important;
+    height:31px!important;
+    font-size:10px!important;
+  }
+  .lf-step h3{
+    margin-top:9px!important;
+    font-size:11px!important;
+    line-height:1.3;
+  }
+  .lf-step p{
+    margin-top:4px!important;
+    font-size:9px!important;
+    line-height:1.5;
+  }
+
+  /* News — old LFAMILIA reference */
+  .lf-news-grid{
+    grid-template-columns:1fr!important;
+    gap:10px!important;
+    margin-top:16px!important;
+  }
+  .lf-news-card{
+    height:205px!important;
+    border-radius:11px!important;
+  }
+  .lf-news-body{
+    padding:12px!important;
+  }
+  .lf-news-body small{
+    font-size:8px!important;
+  }
+  .lf-news-body h3{
+    margin-top:5px!important;
+    font-size:15px!important;
+    line-height:1.28!important;
+  }
+  .lf-news-body p{
+    margin-top:5px!important;
+    display:-webkit-box;
+    overflow:hidden;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    font-size:10px!important;
+    line-height:1.45!important;
+  }
+  .lf-news-body strong{
+    margin-top:7px;
+    font-size:9px!important;
+  }
+  .lf-news-home .lf-secondary{
+    height:34px!important;
+    margin-top:14px!important;
+    padding:0 12px!important;
+    font-size:10px!important;
+  }
+
+  /* Reviews */
+  .lf-home-review-grid{
+    grid-template-columns:1fr!important;
+    gap:9px!important;
+    margin-top:14px!important;
+  }
+  .lf-home-review-grid article{
+    padding:13px!important;
+    border-radius:11px!important;
+  }
+  .lf-home-review-grid strong{font-size:11px!important}
+  .lf-home-review-grid span{font-size:9px!important}
+  .lf-home-review-grid p{
+    margin:8px 0!important;
+    font-size:10px!important;
+    line-height:1.6!important;
+  }
+  .lf-home-review-grid a{font-size:9px!important}
+
+  /* Help CTA */
+  .lf-help{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:12px!important;
+    padding:14px!important;
+    border-radius:11px!important;
+  }
+  .lf-help h2{
+    font-size:18px!important;
+    line-height:1.2!important;
+  }
+  .lf-help .lf-primary{
+    width:100%;
+    height:38px!important;
+    font-size:10px!important;
+  }
+}
+
+@media(max-width:380px){
+  .lf-products{
+    gap:8px 6px!important;
+  }
+  .lf-popular-card{
+    min-height:66px!important;
+    padding:7px!important;
+  }
+  .lf-popular-art{
+    width:50px!important;
+    height:50px!important;
+    flex-basis:50px!important;
+  }
+}
