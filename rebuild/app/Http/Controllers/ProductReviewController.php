@@ -18,7 +18,6 @@ class ProductReviewController
             'product_slug' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
             'order_number' => ['nullable', 'string', 'max:80'],
             'access_code' => ['nullable', 'string', 'size:64'],
-            'phone' => ['nullable', 'string', 'max:32'],
             'rating' => ['required', 'integer', 'min:1', 'max:5'],
             'title' => ['nullable', 'string', 'max:100'],
             'body' => ['required', 'string', 'min:5', 'max:1200'],
@@ -75,16 +74,9 @@ class ProductReviewController
                 $authorized = $guestAccess->matches((int) $order->id, (string) $data['access_code']);
             }
 
-            if (! $authorized && filled($data['phone'] ?? null) && filled($order->guest_phone)) {
-                $authorized = hash_equals(
-                    $this->normalizePhone((string) $order->guest_phone),
-                    $this->normalizePhone((string) $data['phone'])
-                );
-            }
-
             if (! $authorized) {
                 throw ValidationException::withMessages([
-                    'phone' => 'Nomor WhatsApp tidak cocok dengan invoice.',
+                    'access_code' => 'Akses ulasan guest tidak valid. Buka pesanan melalui kode akses yang diberikan saat checkout.',
                 ]);
             }
 
@@ -118,16 +110,4 @@ class ProductReviewController
         ], 201);
     }
 
-    private function normalizePhone(string $value): string
-    {
-        $digits = preg_replace('/\D+/', '', trim($value)) ?? '';
-        if (str_starts_with($digits, '0')) {
-            return '62'.substr($digits, 1);
-        }
-        if (str_starts_with($digits, '8')) {
-            return '62'.$digits;
-        }
-
-        return $digits;
-    }
 }
