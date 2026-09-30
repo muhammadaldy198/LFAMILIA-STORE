@@ -68,6 +68,19 @@ const guestContactComplete = computed(() => props.customer || (
 ));
 const canQuote = computed(() => Boolean(selectedPackage.value && paymentChannelCode.value && guestContactComplete.value));
 const displayTotal = computed(() => quote.value?.total_idr ?? selectedPackage.value?.price_idr ?? 0);
+const hasAccountStep = computed(() => (props.fields || []).length > 0);
+const isVoucherProduct = computed(() => String(props.product?.category_slug || '').toLowerCase() === 'voucher');
+const nominalStep = computed(() => hasAccountStep.value ? 2 : 1);
+const paymentStep = computed(() => nominalStep.value + 1);
+const contactStep = computed(() => nominalStep.value + 2);
+const promoStep = computed(() => nominalStep.value + 3);
+const firstCheckoutError = computed(() => {
+    for (const messages of Object.values(errors.value || {})) {
+        if (Array.isArray(messages) && messages.length) return messages[0];
+        if (typeof messages === 'string' && messages) return messages;
+    }
+    return '';
+});
 
 const packageGroups = computed(() => {
     const groups = new Map();
@@ -525,11 +538,15 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
                             <span>Verifikasi nickname otomatis belum tersedia. Periksa kembali data sebelum membayar.</span>
                         </div>
+                        <div v-if="product.manual_instructions" class="lf-manual-instructions">
+                            <strong>Instruksi produk manual</strong>
+                            <p>{{product.manual_instructions}}</p>
+                        </div>
                     </div>
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-nominal-panel">
-                    <header><span>2</span><div><h2>Pilih Nominal</h2><p>{{product.checkout_nominal_description || 'Pesanan diproses otomatis setelah pembayaran.'}}</p></div></header>
+                    <header><span>{{nominalStep}}</span><div><h2>Pilih Nominal</h2><p>{{product.checkout_nominal_description || 'Pesanan diproses otomatis setelah pembayaran.'}}</p></div></header>
                     <div class="lf-panel-body lf-package-sections">
                         <section v-for="group in packageGroups" :key="group.name || 'all'">
                             <div v-if="group.name" class="lf-package-group-head"><h3>{{group.name}}</h3><span></span></div>
@@ -547,7 +564,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-payment-panel">
-                    <header><span>3</span><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang ingin digunakan.</p></div></header>
+                    <header><span>{{paymentStep}}</span><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang ingin digunakan.</p></div></header>
                     <div class="lf-panel-body lf-payment-groups">
                         <div
                             v-for="group in paymentGroups"
@@ -602,7 +619,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-contact-panel">
-                    <header><span>4</span><div><h2>Data Pembeli</h2><p>Email dan WhatsApp digunakan untuk invoice serta status transaksi.</p></div></header>
+                    <header><span>{{contactStep}}</span><div><h2>Data Pembeli</h2><p>Email dan WhatsApp digunakan untuk invoice serta status transaksi.</p></div></header>
                     <div class="lf-panel-body">
                         <div v-if="!customer" class="lf-account-fields">
                             <label><span>Email</span><input v-model="guestEmail" type="email" maxlength="255" placeholder="nama@email.com"></label>
@@ -617,7 +634,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-promo-panel">
-                    <header><span>5</span><div><h2>Kode Promo</h2><p>Masukkan kode promo atau voucher diskon yang tersedia.</p></div></header>
+                    <header><span>{{promoStep}}</span><div><h2>Kode Promo</h2><p>Masukkan kode promo atau voucher diskon yang tersedia.</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-promo-input">
                             <input :value="voucherCode" maxlength="100" placeholder="Ketik kode promo kamu" @input="voucherCode=normalizePromo($event.target.value)">
@@ -637,9 +654,9 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     @token="turnstileToken=$event"
                 />
 
-                <div v-if="Object.keys(errors).length" class="lf-checkout-errors">
-                    <strong>Periksa kembali checkout</strong>
-                    <p v-for="(messages,key) in errors" :key="key">{{Array.isArray(messages)?messages[0]:messages}}</p>
+                <div v-if="Object.keys(errors).length" class="lf-checkout-errors lf-checkout-error-legacy">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+                    <span><strong>Periksa kembali checkout</strong><small>{{firstCheckoutError}}</small></span>
                 </div>
 
             </div>
@@ -836,7 +853,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
             </div>
             <h2>Buat Pesanan</h2>
-            <p class="lf-confirm-copy">Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai.</p>
+            <p class="lf-confirm-copy">{{isVoucherProduct ? 'Pastikan produk, nominal, dan pembayaran yang kamu pilih sudah sesuai.' : 'Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai.'}}</p>
             <dl>
                 <div v-if="nicknameResult?.nickname"><dt>Username</dt><dd>{{nicknameResult.nickname}}</dd></div>
                 <div v-for="field in fields" :key="field.field_key"><dt>{{field.label}}</dt><dd>{{customerInput[field.field_key] || '-'}}</dd></div>
