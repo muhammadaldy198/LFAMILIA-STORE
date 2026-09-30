@@ -39,6 +39,7 @@ const vouchers = ref([]);
 const voucherLoading = ref(false);
 const voucherError = ref('');
 const confirmOpen = ref(false);
+const agreed = ref(false);
 const summaryOpen = ref(false);
 const noticeOpen = ref(false);
 const noticeIndex = ref(0);
@@ -163,31 +164,6 @@ function chooseSavedAccount(id) {
     nicknameResult.value = saved.nickname ? { verified: true, nickname: saved.nickname } : null;
 }
 
-async function saveGameAccount() {
-    if (!props.customer || !requiredFieldsComplete.value) return;
-    const defaultLabel = nicknameResult.value?.nickname || props.product.name;
-    const label = window.prompt('Nama akun tersimpan', defaultLabel);
-    if (!label?.trim()) return;
-    busy.value = 'save-account';
-    errors.value = {};
-    try {
-        const saved = await requestJson('/account/game-accounts', {
-            method: 'POST',
-            body: JSON.stringify({
-                product_id: props.product.id,
-                label: label.trim(),
-                customer_input: { ...customerInput },
-            }),
-        });
-        savedAccountItems.value.unshift(saved);
-        selectedSavedId.value = String(saved.id);
-    } catch (error) {
-        errors.value = error.validation || { checkout: [error.message] };
-    } finally {
-        busy.value = '';
-    }
-}
-
 async function checkNickname() {
     if (!requiredFieldsComplete.value) return;
     errors.value = {};
@@ -286,10 +262,12 @@ async function prepareOrder() {
     }
     const currentQuote = await loadQuote();
     if (!currentQuote) return;
+    agreed.value = false;
     confirmOpen.value = true;
 }
 
 async function createOrder() {
+    if (!agreed.value) return;
     confirmOpen.value = false;
     errors.value = {};
     checkoutResult.value = null;
@@ -436,13 +414,26 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             </label>
                         </div>
 
-                        <div v-if="product.nickname_check_enabled" class="lf-nickname-actions">
-                            <button type="button" :disabled="busy==='nickname'||!requiredFieldsComplete" class="lf-secondary" @click="checkNickname">{{busy==='nickname'?'Memeriksa...':'Cek Nickname'}}</button>
-                            <button v-if="customer && nicknameResult?.verified" type="button" :disabled="busy==='save-account'" class="lf-secondary" @click="saveGameAccount">{{busy==='save-account'?'Menyimpan...':'Simpan Akun Game'}}</button>
+                        <div v-if="product.nickname_check_enabled && busy==='nickname'" class="lf-nickname-state lf-nickname-loading">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/></svg>
+                            <span>Memeriksa ID dan Server…</span>
                         </div>
-                        <div v-if="nicknameResult?.verified" class="lf-success-note">Nickname ditemukan: <strong>{{nicknameResult.nickname}}</strong><span v-if="nicknameResult.country"> · {{nicknameResult.country}}</span></div>
-                        <div v-else-if="nicknameResult?.warning" class="lf-warning-note">{{nicknameResult.warning}}</div>
-                        <div v-else-if="!product.nickname_check_enabled" class="lf-checkout-info-note">ⓘ Verifikasi nickname otomatis belum tersedia. Periksa kembali data sebelum membayar.</div>
+                        <div v-else-if="nicknameResult?.verified" class="lf-nickname-state lf-nickname-success">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                            <div><small>Akun ditemukan</small><strong>{{nicknameResult.nickname}}</strong><span v-if="nicknameResult.country">dari {{nicknameResult.country}}</span></div>
+                        </div>
+                        <div v-else-if="nicknameResult?.warning" class="lf-nickname-state lf-nickname-error">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+                            <div><strong>Akun belum terverifikasi</strong><span>{{nicknameResult.warning}}</span></div>
+                        </div>
+                        <div v-else-if="product.nickname_check_enabled" class="lf-checkout-info-note">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+                            <span>Nickname akan tampil otomatis setelah User ID dan Server yang diperlukan terisi.</span>
+                        </div>
+                        <div v-else class="lf-checkout-info-note">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+                            <span>Verifikasi nickname otomatis belum tersedia. Periksa kembali data sebelum membayar.</span>
+                        </div>
                     </div>
                 </section>
 
@@ -671,20 +662,30 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
     </div>
 
     <div v-if="confirmOpen" class="lf-modal-backdrop" @click.self="confirmOpen=false">
-        <div class="lf-confirm-modal">
-            <header><div><p class="lf-eyebrow">KONFIRMASI</p><h2>Periksa pesananmu</h2></div><button @click="confirmOpen=false">×</button></header>
+        <div class="lf-confirm-modal lf-confirm-legacy">
+            <div class="lf-confirm-status-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+            </div>
+            <h2>Buat Pesanan</h2>
+            <p class="lf-confirm-copy">Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai.</p>
             <dl>
+                <div v-if="nicknameResult?.nickname"><dt>Username</dt><dd>{{nicknameResult.nickname}}</dd></div>
+                <div v-for="field in fields" :key="field.field_key"><dt>{{field.label}}</dt><dd>{{customerInput[field.field_key] || '-'}}</dd></div>
+                <div><dt>Item</dt><dd>{{selectedPackage?.name || '-'}}</dd></div>
                 <div><dt>Produk</dt><dd>{{product.name}}</dd></div>
-                <div><dt>Nominal</dt><dd>{{selectedPackage?.name}}</dd></div>
-                <div v-if="nicknameResult?.nickname"><dt>Nickname</dt><dd>{{nicknameResult.nickname}}</dd></div>
-                <div><dt>Pembayaran</dt><dd>{{paymentChannels.find(x=>x.code===paymentChannelCode)?.name}}</dd></div>
-                <div v-if="quote?.discount_idr"><dt>Diskon</dt><dd>-{{formatIdr(quote.discount_idr)}}</dd></div>
-                <div><dt>Biaya</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
-                <div class="total"><dt>Total</dt><dd>{{formatIdr(quote?.total_idr)}}</dd></div>
+                <div><dt>Payment</dt><dd>{{paymentChannels.find(x=>x.code===paymentChannelCode)?.name || '-'}}</dd></div>
+                <div><dt>Biaya Pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
+                <div class="total"><dt>Total Bayar</dt><dd>{{formatIdr(quote?.total_idr)}}</dd></div>
             </dl>
-            <div class="lf-confirm-actions"><button class="lf-secondary" @click="confirmOpen=false">Kembali</button><button class="lf-primary" :disabled="busy==='order'" @click="createOrder">Buat Pesanan</button></div>
+            <label class="lf-confirm-agreement">
+                <input v-model="agreed" type="checkbox">
+                <span>Dengan melanjutkan, saya menyetujui syarat &amp; ketentuan yang berlaku.</span>
+            </label>
+            <div class="lf-confirm-actions">
+                <button class="lf-primary" :disabled="busy==='order'||!agreed" @click="createOrder">{{busy==='order'?'Memproses...':'Pesan Sekarang'}}</button>
+                <button class="lf-secondary" @click="confirmOpen=false">Batalkan</button>
+            </div>
         </div>
-    </div>
-</main>
+    </div></main>
 </CustomerShell>
 </template>
