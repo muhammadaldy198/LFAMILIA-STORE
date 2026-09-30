@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ProductReview extends Model
 {
     protected $fillable = [
-        'order_id', 'product_id', 'user_id', 'display_name', 'rating', 'body',
+        'order_id', 'product_id', 'user_id', 'display_name', 'rating', 'title', 'body',
         'is_active', 'published_at',
     ];
 
