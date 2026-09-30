@@ -36,10 +36,10 @@ const paymentLabel = computed(() => {
     return name || '-';
 });
 const statusText = computed(() => paid.value
-    ? 'Pembayaran sudah diterima dan pesanan sedang ditangani sesuai status transaksi.'
+    ? 'Pembayaran sudah diterima. Status pesanan akan diperbarui otomatis.'
     : failed.value
-        ? 'Pembayaran tidak berhasil atau masa pembayarannya sudah berakhir.'
-        : 'Status pembayaran diperiksa otomatis. Halaman ini akan memperbarui status tanpa perlu membuat pesanan baru.');
+        ? 'Transaksi ini tidak dapat dilanjutkan. Buat checkout baru bila diperlukan.'
+        : 'Status diperiksa otomatis setiap 3 detik.');
 
 function formatIdr(value) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -93,8 +93,8 @@ onBeforeUnmount(() => {
 
             <div class="flex items-center justify-between gap-4">
                 <div>
-                    <p class="text-[9px] font-black uppercase tracking-[0.2em] text-[#b9ff35]">PEMBAYARAN</p>
-                    <h1 class="mt-1 text-xl font-black">{{paid ? 'Pembayaran berhasil' : failed ? 'Pembayaran gagal' : 'Menunggu pembayaran'}}</h1>
+                    <p class="text-[9px] font-black uppercase tracking-[0.2em] text-[#b9ff35]">LFAMILIA PAYMENT</p>
+                    <h1 class="mt-1 text-xl font-black">{{paid ? 'Pembayaran berhasil' : failed ? 'Pembayaran tidak aktif' : 'Selesaikan pembayaran'}}</h1>
                 </div>
                 <span class="lf-payment-status-icon" :class="{paid,failed}">
                     <svg v-if="paid" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
@@ -102,14 +102,14 @@ onBeforeUnmount(() => {
                 </span>
             </div>
             <p class="mt-2 text-xs leading-5 text-white/45">
-                {{paid ? 'Pembayaran sudah diterima. Pesanan akan diproses sesuai status transaksi.' : failed ? 'Pembayaran tidak dapat dilanjutkan.' : 'Selesaikan pembayaran sesuai instruksi di bawah ini.'}}
+                Pembayaran diproses aman oleh LFAMILIA STORE.
             </p>
         </div>
 
         <div class="lf-payment-body p-5 sm:p-6">
             <div class="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3">
-                <strong class="text-[10px] text-amber-200">Simpan nomor invoice</strong>
-                <p class="mt-1 text-[9px] leading-4 text-white/42">Gunakan invoice ini untuk mengecek status transaksi.</p>
+                <strong class="text-[10px] text-amber-200">Simpan invoice sebelum membayar</strong>
+                <p class="mt-1 text-[9px] leading-4 text-white/42">Invoice diperlukan untuk mengecek transaksi jika halaman pembayaran tertutup atau terjadi kendala.</p>
                 <div class="mt-3 flex items-center justify-between gap-3 rounded-lg bg-black/20 px-3 py-2.5">
                     <code class="break-all text-sm font-black tracking-wider text-white">{{order.order_number}}</code>
                     <button type="button" class="shrink-0 text-[10px] font-bold text-[#b9ff35]" @click="copy(order.order_number)">Salin Invoice</button>
@@ -162,7 +162,7 @@ onBeforeUnmount(() => {
                 <button type="button" class="h-10 rounded-lg border border-white/10 bg-white/[0.03] text-[10px] font-bold text-white" @click="router.reload({ only: ['order','payment'], preserveScroll: true })">Cek status</button>
                 <Link :href="statusUrl" class="flex h-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-[10px] font-bold text-white">Cek invoice</Link>
             </div>
-            <div class="lf-payment-support"><Link href="/contact">Butuh bantuan? Hubungi kami</Link></div>
+            <div class="lf-payment-support"><Link href="/contact">Butuh bantuan pembayaran?</Link></div>
         </div>
     </section>
 </main>
