@@ -46,9 +46,6 @@ function saveVoucher(row) {
         starts_at: row.starts_at || null, ends_at: row.ends_at || null, is_active: Boolean(row.is_active),
     }, { preserveScroll: true });
 }
-function updateTicket(row) {
-    router.put(base.value + '/support/' + row.id, { status: row.status }, { preserveScroll: true });
-}
 function updateMembership(row) {
     router.put('/admin/customers/' + row.id + '/membership', {
         membership_tier_code: row.membership_tier_code,
@@ -135,9 +132,25 @@ function adjustWallet(row) {
 
             <section v-else-if="kind === 'support'" class="space-y-3">
                 <div v-for="row in rows" :key="row.id" class="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                    <div class="flex flex-wrap justify-between gap-2"><strong>{{ row.subject }}</strong><span class="text-xs text-slate-500">{{ row.customer_name }} · {{ row.order_number || 'tanpa order' }}</span></div>
-                    <p class="mt-2 whitespace-pre-wrap text-sm text-slate-300">{{ row.message }}</p>
-                    <div class="mt-3 flex gap-2"><select v-model="row.status" class="rounded bg-slate-800 p-2 text-sm"><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option></select><button class="rounded bg-slate-700 px-3 py-2 text-sm" @click="updateTicket(row)">Simpan</button></div>
+                    <div class="flex flex-wrap justify-between gap-2"><strong>Tiket #{{row.id}} · {{ row.subject }}</strong><span class="text-xs text-slate-500">{{ row.customer_name }} · {{ row.order_number || 'tanpa order' }}</span></div>
+                    <div class="mt-3 rounded-lg bg-slate-950 p-3">
+                        <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Pesan awal pelanggan</p>
+                        <p class="mt-2 whitespace-pre-wrap text-sm text-slate-300">{{ row.message }}</p>
+                    </div>
+                    <div v-if="row.messages?.length" class="mt-3 space-y-2">
+                        <article v-for="message in row.messages" :key="message.id" class="rounded-lg border p-3" :class="message.sender_type==='ADMIN' ? 'border-cyan-900/60 bg-cyan-950/20' : 'border-slate-800 bg-slate-950/50'">
+                            <div class="flex justify-between gap-3 text-[10px] text-slate-500">
+                                <strong>{{message.sender_type==='ADMIN' ? (message.admin_name || 'Admin LFAMILIA') : (message.customer_name || row.customer_name)}}</strong>
+                                <span>{{message.created_at}}</span>
+                            </div>
+                            <p class="mt-2 whitespace-pre-wrap text-sm text-slate-300">{{message.message}}</p>
+                        </article>
+                    </div>
+                    <div class="mt-3 grid gap-2 md:grid-cols-[180px_minmax(0,1fr)_auto]">
+                        <select v-model="row.status" class="rounded bg-slate-800 p-2 text-sm"><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option></select>
+                        <textarea v-model="row.quick_reply" rows="2" class="rounded bg-slate-800 p-2 text-sm" placeholder="Quick reply ke pelanggan (opsional)"></textarea>
+                        <button class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950" @click="updateSupport(row)">Simpan / Balas</button>
+                    </div>
                 </div>
             </section>
 
