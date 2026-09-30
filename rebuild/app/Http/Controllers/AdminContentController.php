@@ -22,7 +22,9 @@ class AdminContentController
     public function index(): Response
     {
         $settingsKeys = [
-            'store.support_widget_enabled', 'store.footer_description',
+            'store.support_widget_enabled', 'store.support_cta_enabled',
+            'store.support_cta_label', 'store.support_cta_title', 'store.support_cta_body', 'store.support_cta_button',
+            'store.footer_description',
             'store.home_news_title', 'store.home_news_intro',
             'store.support_whatsapp', 'store.instagram_url', 'store.email',
             'store.discord_url', 'store.support_url', 'store.business_hours',
@@ -241,6 +243,11 @@ class AdminContentController
     {
         $data = $request->validate([
             'support_widget_enabled' => ['required', 'boolean'],
+            'support_cta_enabled' => ['required', 'boolean'],
+            'support_cta_label' => ['nullable', 'string', 'max:80'],
+            'support_cta_title' => ['nullable', 'string', 'max:180'],
+            'support_cta_body' => ['nullable', 'string', 'max:1000'],
+            'support_cta_button' => ['nullable', 'string', 'max:80'],
             'footer_description' => ['nullable', 'string', 'max:1000'],
             'home_news_title' => ['nullable', 'string', 'max:255'],
             'home_news_intro' => ['nullable', 'string', 'max:1000'],
@@ -253,6 +260,11 @@ class AdminContentController
         ]);
         $map = [
             'store.support_widget_enabled' => (bool) $data['support_widget_enabled'],
+            'store.support_cta_enabled' => (bool) $data['support_cta_enabled'],
+            'store.support_cta_label' => $data['support_cta_label'] ?? '',
+            'store.support_cta_title' => $data['support_cta_title'] ?? '',
+            'store.support_cta_body' => $data['support_cta_body'] ?? '',
+            'store.support_cta_button' => $data['support_cta_button'] ?? '',
             'store.footer_description' => $data['footer_description'] ?? '',
             'store.home_news_title' => $data['home_news_title'] ?? '',
             'store.home_news_intro' => $data['home_news_intro'] ?? '',
