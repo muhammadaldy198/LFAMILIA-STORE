@@ -120,10 +120,12 @@ class CatalogController
         $reviews = ProductReview::where('product_id', $product->id)->where('is_active', true)
             ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
             ->orderByDesc('published_at')->orderByDesc('id')->limit(30)
-            ->get(['id', 'display_name', 'rating', 'body', 'published_at'])
+            ->get(['id', 'display_name', 'rating', 'title', 'body', 'published_at', 'created_at'])
             ->map(fn (ProductReview $review): array => [
-                ...$review->only('id', 'display_name', 'rating', 'body'),
+                ...$review->only('id', 'display_name', 'rating', 'title', 'body'),
                 'published_at' => $review->published_at?->toIso8601String(),
+                'created_at' => $review->created_at?->toIso8601String(),
+                'verified_purchase' => true,
             ]);
         $reviewStats = ProductReview::where('product_id', $product->id)->where('is_active', true)
             ->selectRaw('COUNT(*) as total, COALESCE(AVG(rating), 0) as average')->first();
