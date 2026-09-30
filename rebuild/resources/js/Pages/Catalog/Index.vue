@@ -1,67 +1,11 @@
 <script setup>
-import { Head, Link, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
-
-const props = defineProps({ categories: Array, products: Object, filters: Object, logoUrl: String, bannerUrl: String, mobileBannerUrl: String, popupUrl: String, faviconUrl: String, bannerTarget: String });
-const popupOpen = ref(true);
-const search = ref(props.filters.q ?? '');
-const query = (changes = {}) => {
-    const params = { ...props.filters, ...changes };
-    Object.keys(params).forEach((key) => { if (!params[key]) delete params[key]; });
-    return '/?' + new URLSearchParams(params).toString();
-};
-const submit = () => router.get('/', { ...props.filters, q: search.value }, { preserveState: true });
-</script>
-
-<template>
-    <Head title="Katalog"><link v-if="faviconUrl" rel="icon" :href="faviconUrl"></Head>
-    <main class="min-h-screen bg-[#090e1b] text-slate-100">
-        <header class="border-b border-white/10 bg-[#0c1424]">
-            <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-4">
-                <Link href="/" class="flex items-center gap-3 text-xl font-bold tracking-wide text-cyan-300">
-                    <img v-if="logoUrl" :src="logoUrl" alt="" class="h-9 w-9 object-contain"> LFAMILIA STORE
-                </Link>
-                <nav aria-label="Navigasi utama" class="flex flex-wrap items-center gap-5 text-sm text-slate-300">
-                    <Link href="/">Top up</Link><Link href="/orders/check">Cek pesanan</Link><Link href="/account">Akun</Link><Link href="/login">Masuk</Link>
-                </nav>
-            </div>
-        </header>
-        <div class="mx-auto max-w-7xl space-y-9 px-5 py-8">
-            <a v-if="bannerUrl && bannerTarget" :href="bannerTarget" class="block">
-                <picture><source v-if="mobileBannerUrl" media="(max-width: 640px)" :srcset="mobileBannerUrl"><img :src="bannerUrl" alt="Banner LFAMILIA STORE" class="max-h-72 w-full rounded-xl object-contain"></picture>
-            </a>
-            <picture v-else-if="bannerUrl || mobileBannerUrl"><source v-if="mobileBannerUrl" media="(max-width: 640px)" :srcset="mobileBannerUrl"><img :src="bannerUrl || mobileBannerUrl" alt="Banner LFAMILIA STORE" class="max-h-72 w-full rounded-xl object-contain"></picture>
-            <div v-if="popupUrl && popupOpen" role="dialog" aria-modal="true" aria-label="Informasi LFAMILIA STORE" class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-5">
-                <div class="max-w-lg rounded-xl bg-slate-900 p-3"><button type="button" class="mb-2 block rounded bg-slate-700 px-3 py-1 text-sm" @click="popupOpen = false">Tutup</button><img :src="popupUrl" alt="Informasi LFAMILIA STORE" class="max-h-[70vh] w-full object-contain"></div>
-            </div>
-            <section class="space-y-5">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[.25em] text-cyan-300">LFAMILIA STORE</p>
-                    <h1 class="mt-2 text-3xl font-bold md:text-4xl">Jelajahi produk digital</h1>
-                    <p class="mt-2 text-sm text-slate-400">Pilih kategori dan produk. Checkout akan tersedia setelah pengembangan tahap berikutnya.</p>
-                </div>
-                <form class="flex max-w-lg gap-2" @submit.prevent="submit">
-                    <label class="sr-only" for="catalog-search">Cari produk</label>
-                    <input id="catalog-search" v-model="search" maxlength="80" placeholder="Cari produk" class="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 focus:outline-cyan-300">
-                    <button class="rounded-lg bg-cyan-400 px-5 font-semibold text-slate-950">Cari</button>
-                </form>
-                <nav aria-label="Filter katalog" class="flex gap-2 overflow-x-auto pb-2 text-sm">
-                    <Link :href="query({ category: '', mode: '' })" class="whitespace-nowrap rounded-full px-4 py-2" :class="!filters.category && !filters.mode ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800'">Semua</Link>
-                    <Link :href="query({ category: '', mode: 'manual' })" class="whitespace-nowrap rounded-full px-4 py-2" :class="filters.mode === 'manual' ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800'">Produk Manual</Link>
-                    <Link v-for="category in categories" :key="category.slug" :href="query({ category: category.slug, mode: '' })" class="whitespace-nowrap rounded-full px-4 py-2" :class="filters.category === category.slug ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800'">{{ category.name }}</Link>
-                </nav>
-            </section>
-            <section>
-                <h2 class="mb-4 text-xl font-semibold">Produk</h2>
-                <p v-if="!products.data.length" class="rounded-lg border border-slate-800 p-8 text-slate-400">Belum ada produk aktif di pilihan ini.</p>
-                <div v-else class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                    <Link v-for="product in products.data" :key="product.slug" :href="'/catalog/' + product.slug" class="group overflow-hidden rounded-xl border border-white/10 bg-slate-900 transition hover:border-cyan-400">
-                        <div class="aspect-[4/3] bg-slate-800"><img v-if="product.image_url" :src="product.image_url" :alt="product.name" class="h-full w-full object-cover"></div>
-                        <div class="p-3"><p class="text-xs text-cyan-300">{{ product.category_name }}</p><h3 class="mt-1 font-semibold group-hover:text-cyan-300">{{ product.name }}</h3></div>
-                    </Link>
-                </div>
-                <nav aria-label="Halaman katalog" class="mt-6 flex gap-2"><Link v-for="link in products.links" :key="link.label" :href="link.url || '#'" class="rounded-md px-3 py-2 text-sm" :class="link.active ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800'" v-html="link.label" /></nav>
-            </section>
-        </div>
-    </main>
-</template>
+import {Head,Link,router} from '@inertiajs/vue3';import {computed,ref} from 'vue';import CustomerShell from '../../Components/CustomerShell.vue';
+const p=defineProps({categories:Array,products:Object,filters:Object,logoUrl:String,bannerUrl:String,mobileBannerUrl:String,popupUrl:String,faviconUrl:String,bannerTarget:String});const pop=ref(true),search=ref(p.filters.q??''),popular=computed(()=>(p.products?.data??[]).slice(0,8));const q=(x={})=>{const a={...p.filters,...x};Object.keys(a).forEach(k=>{if(!a[k])delete a[k]});const s=new URLSearchParams(a).toString();return s?'/?'+s:'/'};const submit=()=>router.get('/',{...p.filters,q:search.value},{preserveState:true});const initial=n=>(n||'L').slice(0,1).toUpperCase();const label=l=>String(l).includes('Previous')?'‹':String(l).includes('Next')?'›':String(l).replace(/&laquo;|&raquo;/g,'').trim();
+</script><template><Head title="LFAMILIA STORE"/><CustomerShell :logo-url="logoUrl"><main>
+<section v-if="bannerUrl||mobileBannerUrl" class="lf-container lf-banner"><div class="lf-banner-frame"><a v-if="bannerTarget" :href="bannerTarget"><picture><source v-if="mobileBannerUrl" media="(max-width:640px)" :srcset="mobileBannerUrl"><img :src="bannerUrl||mobileBannerUrl" alt="Banner LFAMILIA"></picture></a><picture v-else><source v-if="mobileBannerUrl" media="(max-width:640px)" :srcset="mobileBannerUrl"><img :src="bannerUrl||mobileBannerUrl" alt="Banner LFAMILIA"></picture></div></section>
+<div v-if="popupUrl&&pop" class="fixed inset-0 z-[100] grid place-items-center bg-black/75 p-4"><div class="max-w-lg rounded-xl bg-[#0d1019] p-2"><button class="lf-secondary mb-2" @click="pop=false">Tutup</button><img :src="popupUrl" class="max-h-[70vh] w-full object-contain"></div></div>
+<section v-if="popular.length" class="lf-container lf-section pb-2"><p class="lf-eyebrow">🔥 Populer sekarang!</p><p class="lf-copy !mt-0">Berikut adalah beberapa produk yang paling populer saat ini.</p><div class="lf-popular"><Link v-for="x in popular" :key="x.slug" :href="'/catalog/'+x.slug" class="lf-popular-card"><span class="lf-popular-art"><img v-if="x.image_url" :src="x.image_url"><span v-else>{{initial(x.name)}}</span></span><span><strong>{{x.name}}</strong><small>{{x.category_name}}</small></span></Link></div></section>
+<section id="produk" class="lf-container lf-section"><div class="lf-browser-head"><div><p class="lf-eyebrow">Otomatis & manual</p><h1 class="lf-title">Pilih produk favoritmu</h1><p class="lf-copy">Top up game, voucher, hiburan, pulsa, PLN, dan produk digital langsung dari halaman utama.</p></div><form class="lf-search" @submit.prevent="submit"><input v-model="search" placeholder="Cari game, voucher, pulsa, PLN..."></form></div><nav class="lf-filters"><Link :href="q({category:'',mode:''})" class="lf-chip" :class="{active:!filters.category&&!filters.mode}">Semua</Link><Link :href="q({category:'',mode:'manual'})" class="lf-chip" :class="{active:filters.mode==='manual'}">Produk Manual</Link><Link v-for="c in categories" :key="c.slug" :href="q({category:c.slug,mode:''})" class="lf-chip" :class="{active:filters.category===c.slug}">{{c.name}}</Link></nav><div v-if="products.data.length" class="lf-products"><Link v-for="x in products.data" :key="x.slug" :href="'/catalog/'+x.slug" class="lf-product"><img v-if="x.image_url" :src="x.image_url"><span v-else class="lf-product-fallback"><strong>{{x.name}}</strong><small>{{x.category_name}}</small></span></Link></div><p v-else class="mt-6 text-center text-sm text-white/40">Produk tidak ditemukan.</p><nav v-if="products.links?.length>3" class="lf-pages"><template v-for="x in products.links" :key="x.label"><Link v-if="x.url" :href="x.url" :class="{active:x.active}">{{label(x.label)}}</Link><span v-else>{{label(x.label)}}</span></template></nav></section>
+<section class="lf-steps"><div class="lf-container lf-section"><p class="lf-eyebrow">Cara top up</p><h2 class="lf-title">Empat langkah sederhana</h2><div class="lf-step-grid"><article v-for="s in [['01','Pilih produk','Cari game atau produk digital yang kamu inginkan.'],['02','Isi data','Masukkan ID dan pilih nominal top up.'],['03','Bayar aman','Selesaikan pembayaran sesuai total pesanan.'],['04','Pesanan diproses','Pantau status menggunakan nomor pesanan.']]" :key="s[0]" class="lf-step"><span>{{s[0]}}</span><h3>{{s[1]}}</h3><p>{{s[2]}}</p></article></div></div></section>
+<section class="lf-container lf-section"><div class="lf-help"><div><p class="lf-eyebrow">Butuh bantuan?</p><h2 class="m-0 text-[22px] font-black">Tim LFAMILIA siap membantu.</h2><p class="lf-copy">Sampaikan pertanyaan mengenai produk, pembayaran, atau status pesanan.</p></div><Link href="/account/tickets" class="lf-primary">Layanan Pelanggan</Link></div></section>
+</main></CustomerShell></template>
