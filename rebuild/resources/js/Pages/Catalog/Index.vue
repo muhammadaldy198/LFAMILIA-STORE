@@ -199,12 +199,6 @@ onUnmounted(()=>{
                 </div>
             </section>
 
-            <section class="lf-container lf-section">
-                <div class="lf-help">
-                    <div><p class="lf-eyebrow">BUTUH BANTUAN?</p><h2 class="m-0 text-[22px] font-black">Tim LFAMILIA siap membantu.</h2><p class="lf-copy">Sampaikan pertanyaan mengenai produk, pembayaran, atau status pesanan.</p></div>
-                    <Link href="/contact" class="lf-primary">Hubungi Kami</Link>
-                </div>
-            </section>
         </main>
     </CustomerShell>
 </template>
