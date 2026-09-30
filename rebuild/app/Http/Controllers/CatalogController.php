@@ -140,8 +140,9 @@ class CatalogController
 
         return Inertia::render('Catalog/Show', [
             'product' => [
-                ...$product->only('id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'nickname_check_enabled'),
+                ...$product->only('id', 'name', 'publisher', 'slug', 'description', 'nickname_check_enabled'),
                 'category_name' => $product->category->name,
+                'category_slug' => $product->category->slug,
                 'image_url' => $product->getFirstMediaUrl('image'),
                 'banner_url' => $product->getFirstMediaUrl('banner'),
                 'checkout_nominal_description' => $product->fulfillment_mode === 'MANUAL'
@@ -159,7 +160,25 @@ class CatalogController
             ] : null,
             'paymentChannels' => $paymentRouting->publicOrderChannels($user),
             'notices' => $product->notices()->where('is_active', true)->orderBy('sort_order')
-                ->get(['id', 'title', 'body']),
+                ->get(['id', 'title', 'body'])
+                ->map(function ($notice) use ($product): array {
+                    $zone = match ($product->manual_timezone) {
+                        'Asia/Makassar' => 'WITA',
+                        'Asia/Jayapura' => 'WIT',
+                        default => 'WIB',
+                    };
+                    $replace = [
+                        '{{jam_buka}}' => $product->manual_open_time ?: '-',
+                        '{{jam_tutup}}' => $product->manual_close_time ?: '-',
+                        '{{zona_waktu}}' => $zone,
+                    ];
+
+                    return [
+                        'id' => (int) $notice->id,
+                        'title' => strtr((string) $notice->title, $replace),
+                        'body' => strtr((string) $notice->body, $replace),
+                    ];
+                })->values(),
             'savedAccounts' => $savedAccounts,
             'reviews' => $reviews,
             'reviewStats' => [
