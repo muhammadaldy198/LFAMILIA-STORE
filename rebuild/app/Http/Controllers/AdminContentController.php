@@ -43,7 +43,10 @@ class AdminContentController
                 'desktop_url' => $banner->getFirstMediaUrl('desktop'),
                 'mobile_url' => $banner->getFirstMediaUrl('mobile'),
             ]),
-            'popups' => SitePopup::orderBy('id')->limit(1)->get(),
+            'popups' => SitePopup::orderBy('id')->limit(1)->get()->map(fn (SitePopup $popup): array => [
+                ...$popup->toArray(),
+                'image_url' => $popup->getFirstMediaUrl('image'),
+            ]),
             'news' => NewsArticle::orderBy('sort_order')->orderByDesc('id')->get()->map(fn (NewsArticle $article): array => [
                 ...$article->only('id', 'slug', 'title', 'summary', 'body', 'source_label', 'sort_order', 'is_active'),
                 'published_at' => $article->published_at?->format('Y-m-d\TH:i'),
@@ -130,6 +133,7 @@ class AdminContentController
     {
         $before = $popup->toArray();
         $id = $popup->id;
+        $popup->clearMediaCollection('image');
         $popup->delete();
         $audit->record($request, 'content.popup.deleted', 'site_popup', $id, $before, null);
 
