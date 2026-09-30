@@ -46,6 +46,7 @@ Route::get('/refund', [PublicContentController::class, 'refund'])->name('content
 Route::get('/privacy', [PublicContentController::class, 'privacy'])->name('content.privacy');
 Route::get('/leaderboard', [PublicContentController::class, 'leaderboard'])->name('content.leaderboard');
 Route::get('/promo', [PublicContentController::class, 'promo'])->name('content.promo');
+Route::get('/status', [PublicContentController::class, 'status'])->name('content.status');
 Route::get('/tools', [PublicContentController::class, 'tools'])->name('content.tools');
 Route::get('/tools/{tool}', [PublicContentController::class, 'tool'])->name('content.tool');
 
