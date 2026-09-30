@@ -22,6 +22,75 @@ use Inertia\Response;
 
 class AdminCatalogController
 {
+    public function contentIndex(): Response
+    {
+        return Inertia::render('Admin/ProductContent', [
+            'products' => Product::with(['packages', 'notices'])->orderBy('sort_order')->orderBy('name')->get()
+                ->map(fn (Product $product): array => [
+                    ...$product->only(
+                        'id', 'name', 'publisher', 'description', 'fulfillment_mode',
+                        'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone',
+                        'is_active'
+                    ),
+                    'image_url' => $product->getFirstMediaUrl('image'),
+                    'banner_url' => $product->getFirstMediaUrl('banner'),
+                    'notices' => $product->notices->sortBy('sort_order')->values()->map(fn (ProductNotice $notice): array => [
+                        ...$notice->only('id', 'title', 'body', 'sort_order', 'is_active'),
+                    ])->all(),
+                    'packages' => $product->packages->sortBy([
+                        ['nominal_value', 'asc'], ['sort_order', 'asc'],
+                    ])->values()->map(fn (ProductPackage $package): array => [
+                        ...$package->only('id', 'name', 'note', 'group_name', 'is_active'),
+                        'image_url' => $package->getFirstMediaUrl('image'),
+                    ])->all(),
+                ]),
+        ]);
+    }
+
+    public function updateProductContent(
+        Request $request,
+        Product $product,
+        CatalogAudit $audit,
+    ): RedirectResponse {
+        $data = $request->validate([
+            'publisher' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'manual_instructions' => ['nullable', 'string', 'max:5000'],
+            'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
+            'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
+            'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
+        ]);
+        if ($product->fulfillment_mode !== 'MANUAL') {
+            $data['manual_instructions'] = null;
+            $data['manual_open_time'] = null;
+            $data['manual_close_time'] = null;
+            $data['manual_timezone'] = 'Asia/Jakarta';
+        }
+
+        $before = $product->only(array_keys($data));
+        $product->update($data);
+        $audit->record($request, 'catalog.product.content_updated', 'product', $product->id, $before, $data);
+
+        return back();
+    }
+
+    public function updatePackageContent(
+        Request $request,
+        ProductPackage $package,
+        CatalogAudit $audit,
+    ): RedirectResponse {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'note' => ['nullable', 'string', 'max:80'],
+            'group_name' => ['nullable', 'string', 'max:120'],
+        ]);
+        $before = $package->only(array_keys($data));
+        $package->update($data);
+        $audit->record($request, 'catalog.package.content_updated', 'product_package', $package->id, $before, $data);
+
+        return back();
+    }
+
     public function index(): Response
     {
         $providers = Provider::all(['id', 'code', 'is_active'])->keyBy('id');
