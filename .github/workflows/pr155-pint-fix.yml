@@ -1,0 +1,45 @@
+name: PR155 Pint Auto-fix
+
+on:
+  push:
+    branches:
+      - rebuild/customer-frontend-final
+    paths:
+      - '.github/workflows/pr155-pint-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  pint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild/customer-frontend-final
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Install PHP dependencies
+        working-directory: rebuild
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Apply Pint formatting
+        working-directory: rebuild
+        run: vendor/bin/pint
+
+      - name: Commit formatting and remove temporary workflow
+        run: |
+          rm .github/workflows/pr155-pint-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "style: apply Pint formatting"
+          git push origin HEAD:rebuild/customer-frontend-final
