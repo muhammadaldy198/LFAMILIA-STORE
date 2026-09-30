@@ -1,7 +1,9 @@
 <script setup>
-import { router, useForm } from '@inertiajs/vue3';
+import { router, useForm, usePage } from '@inertiajs/vue3';
 
 const props = defineProps({ type: String, id: Number, collection: { type: String, default: 'image' }, url: String });
+const page = usePage();
+const base = page.props.adminPanel?.base_path || '/admin';
 const form = useForm({ image: null, collection: props.collection });
 const collectionLabel = () => ({
     image: '',
@@ -9,8 +11,8 @@ const collectionLabel = () => ({
     desktop: 'desktop',
     mobile: 'mobile',
 }[props.collection] || props.collection);
-const upload = () => form.post('/admin/catalog/media/' + props.type + '/' + props.id, { forceFormData: true, onSuccess: () => form.reset('image') });
-const remove = () => router.delete('/admin/catalog/media/' + props.type + '/' + props.id, { data: { collection: props.collection } });
+const upload = () => form.post(base + '/catalog/media/' + props.type + '/' + props.id, { forceFormData: true, onSuccess: () => form.reset('image') });
+const remove = () => router.delete(base + '/catalog/media/' + props.type + '/' + props.id, { data: { collection: props.collection } });
 </script>
 
 <template>
