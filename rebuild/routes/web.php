@@ -164,7 +164,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::post('/{id}/read', [AdminNotificationController::class, 'read'])->name('read');
         });
 
-    Route::middleware('admin.permission:nickname.manage')->prefix('admin/nickname-tools')
+    Route::middleware('admin.super')->prefix('admin/nickname-tools')
         ->name('admin.nickname-tools.')->group(function (): void {
             Route::get('/', [AdminNicknameController::class, 'index'])->name('index');
             Route::post('/check', [AdminNicknameController::class, 'check'])
