@@ -98,6 +98,16 @@ class AdminContentController
     public function storePopup(Request $request, AdminAuditService $audit): RedirectResponse
     {
         $data = $this->popupData($request);
+        $popup = SitePopup::orderBy('id')->first();
+
+        if ($popup) {
+            $before = $popup->toArray();
+            $popup->update($data);
+            $audit->record($request, 'content.popup.updated', 'site_popup', $popup->id, $before, $popup->toArray());
+
+            return back();
+        }
+
         $popup = SitePopup::create($data);
         $audit->record($request, 'content.popup.created', 'site_popup', $popup->id, null, $popup->toArray());
 
@@ -285,10 +295,6 @@ class AdminContentController
         return $request->validate([
             'title' => ['required', 'string', 'max:180'],
             'body' => ['required', 'string', 'max:5000'],
-            'primary_label' => ['nullable', 'string', 'max:80'],
-            'primary_href' => ['nullable', 'string', 'max:500', 'regex:/^(\/(?!\/)|https?:\/\/)/i'],
-            'secondary_label' => ['nullable', 'string', 'max:80'],
-            'secondary_href' => ['nullable', 'string', 'max:500', 'regex:/^(\/(?!\/)|https?:\/\/)/i'],
             'dismiss_days' => ['required', 'integer', 'min:0', 'max:365'],
             'sort_order' => ['required', 'integer', 'min:0', 'max:100000'],
             'is_active' => ['required', 'boolean'],
