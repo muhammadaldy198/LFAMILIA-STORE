@@ -146,6 +146,10 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::get('/admin/payments', [AdminPaymentController::class, 'index'])->name('admin.payments.index');
         Route::post('/admin/payments/manual/{paymentId}/confirm', [AdminPaymentController::class, 'confirmManual'])
             ->name('admin.payments.manual.confirm');
+        Route::put('/admin/payments/page-settings', [AdminPaymentController::class, 'pageSettings'])
+            ->name('admin.payments.page-settings.update');
+        Route::post('/admin/payments/page-settings/header', [AdminPaymentController::class, 'uploadPageHeader'])
+            ->name('admin.payments.page-settings.header');
     });
 
     Route::middleware('admin.permission:fulfillment.manage')->prefix('admin/fulfillment')
@@ -265,8 +269,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::post('/routes', [AdminPaymentController::class, 'route'])->name('routes.store');
             Route::put('/routes/{id}', [AdminPaymentController::class, 'updateRoute'])->name('routes.update');
             Route::put('/settings', [AdminPaymentController::class, 'settings'])->name('settings.update');
-            Route::put('/page-settings', [AdminPaymentController::class, 'pageSettings'])->name('page-settings.update');
-            Route::post('/page-settings/header', [AdminPaymentController::class, 'uploadPageHeader'])->name('page-settings.header');
         });
     });
 });
