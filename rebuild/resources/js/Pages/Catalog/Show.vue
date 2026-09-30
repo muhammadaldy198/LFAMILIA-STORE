@@ -383,9 +383,18 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <div v-if="reviewStats?.total" class="lf-product-rating"><span>★</span><strong>{{reviewStats.average}}</strong><small>{{reviewStats.total}} ulasan</small></div>
             </div>
             <div class="lf-product-perks">
-                <div><span>⚡</span><strong>Proses cepat</strong></div>
-                <div><span>◉</span><strong>Chat 24/7</strong></div>
-                <div><span>✓</span><strong>Pembayaran aman</strong></div>
+                <div>
+                    <span><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+                    <strong>Proses cepat</strong>
+                </div>
+                <div>
+                    <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg></span>
+                    <strong>Chat 24/7</strong>
+                </div>
+                <div>
+                    <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3z"/><path d="m9 12 2 2 4-4"/></svg></span>
+                    <strong>Pembayaran aman</strong>
+                </div>
             </div>
         </div>
     </section>
@@ -398,7 +407,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
 
         <div v-if="activeTab==='transaction'" class="lf-checkout-grid">
             <div class="lf-checkout-panels">
-                <section v-if="fields.length" class="lf-checkout-panel">
+                <section v-if="fields.length" class="lf-checkout-panel lf-checkout-account-panel">
                     <header><span>1</span><div><h2>Masukkan Data Akun</h2><p>Isi ID tujuan dengan benar. Nickname diperiksa otomatis jika didukung.</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-account-product-mobile">
@@ -437,7 +446,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     </div>
                 </section>
 
-                <section class="lf-checkout-panel">
+                <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-nominal-panel">
                     <header><span>2</span><div><h2>Pilih Nominal</h2><p>Pilih paket sesuai kebutuhanmu.</p></div></header>
                     <div class="lf-panel-body lf-package-sections">
                         <section v-for="group in packageGroups" :key="group.name || 'all'">
@@ -454,7 +463,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     </div>
                 </section>
 
-                <section class="lf-checkout-panel lf-checkout-payment-panel">
+                <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-payment-panel">
                     <header><span>3</span><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang ingin digunakan.</p></div></header>
                     <div class="lf-panel-body lf-payment-groups">
                         <div
@@ -507,7 +516,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     </div>
                 </section>
 
-                <section class="lf-checkout-panel">
+                <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-contact-panel">
                     <header><span>4</span><div><h2>Data Pembeli</h2><p>Email dan WhatsApp digunakan untuk invoice serta status transaksi.</p></div></header>
                     <div class="lf-panel-body">
                         <div v-if="!customer" class="lf-account-fields">
@@ -522,7 +531,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     </div>
                 </section>
 
-                <section class="lf-checkout-panel">
+                <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-promo-panel">
                     <header><span>5</span><div><h2>Kode Promo</h2><p>Masukkan kode voucher atau pilih promo yang tersedia.</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-promo-input">
@@ -616,7 +625,11 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <span><strong>{{formatIdr(displayTotal)}}</strong><b>⌃</b></span>
             </button>
             <button type="button" class="lf-mobile-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">
-                {{busy==='order'?'Memproses...':'🔒 Pesan Sekarang'}}
+                <template v-if="busy==='order'">Memproses...</template>
+                <template v-else>
+                    <svg class="lf-mobile-order-lock" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                    <span>Pesan Sekarang</span>
+                </template>
             </button>
         </div>
     </div>
