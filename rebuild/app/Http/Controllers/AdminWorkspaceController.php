@@ -400,11 +400,19 @@ class AdminWorkspaceController
             'name' => 'Laravel',
             'status' => 'HEALTHY',
             'message' => 'Laravel '.app()->version().' berjalan.',
-        ], [
-            'name' => 'Queue',
-            'status' => config('queue.default') === 'redis' ? 'DEGRADED' : 'DEGRADED',
-            'message' => 'Queue '.config('queue.default').' terkonfigurasi; worker runtime divalidasi saat deployment M12.',
         ]];
+
+        $queueHeartbeat = DB::table('system_settings')->where('key', 'system.queue_worker_heartbeat')->value('value');
+        $queueHeartbeatAt = json_decode((string) $queueHeartbeat, true);
+        $healthyQueue = is_string($queueHeartbeatAt)
+            && now()->diffInMinutes(Carbon::parse($queueHeartbeatAt), true) <= 3;
+        $checks[] = [
+            'name' => 'Queue',
+            'status' => $healthyQueue ? 'HEALTHY' : 'DEGRADED',
+            'message' => $healthyQueue
+                ? 'Worker queue '.config('queue.default').' aktif. Heartbeat '.$queueHeartbeatAt
+                : 'Worker queue belum memberi heartbeat dalam 3 menit terakhir.',
+        ];
 
         try {
             DB::select('SELECT 1');
