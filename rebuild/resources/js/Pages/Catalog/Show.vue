@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import TurnstileWidget from '../../Components/TurnstileWidget.vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
@@ -10,15 +10,16 @@ const props = defineProps({
     fields: Array,
     customer: Object,
     paymentChannels: Array,
+    notices: Array,
+    savedAccounts: Array,
+    reviews: Array,
+    reviewStats: Object,
+    faqs: Array,
     faviconUrl: String,
 });
 
-const page = usePage();
-const security = computed(() => page.props.security || {});
-const turnstile = ref(null);
-const turnstileToken = ref('');
 const selectedPackageId = ref('');
-const customerInput = reactive(Object.fromEntries(props.fields.map((field) => [field.field_key, ''])));
+const customerInput = reactive(Object.fromEntries((props.fields || []).map((field) => [field.field_key, ''])));
 const guestEmail = ref(props.customer?.email || '');
 const guestPhone = ref(props.customer?.phone || '');
 const voucherCode = ref('');
@@ -32,56 +33,87 @@ const busy = ref('');
 const activeTab = ref('transaction');
 const idempotencyKey = ref(newIdempotencyKey());
 const paymentIdempotencyKey = ref(newIdempotencyKey());
-const nominalSection = ref(null);
-const paymentSection = ref(null);
-const autoScrolledToNominal = ref(false);
+const voucherOpen = ref(false);
+const vouchers = ref([]);
+const voucherLoading = ref(false);
+const voucherError = ref('');
+const confirmOpen = ref(false);
+const selectedSavedId = ref('');
+const turnstile = ref(null);
+const turnstileToken = ref('');
 
-const selectedPackage = computed(() => props.packages.find((item) => String(item.id) === String(selectedPackageId.value)));
-const requiredFieldsComplete = computed(() => props.fields
-    .filter((field) => field.is_required)
+const selectedPackage = computed(() => (props.packages || []).find((item) => String(item.id) === String(selectedPackageId.value)));
+const requiredFieldsComplete = computed(() => (props.fields || []).filter((field) => field.is_required)
     .every((field) => String(customerInput[field.field_key] || '').trim() !== ''));
+const guestContactComplete = computed(() => props.customer || (
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.value.trim())
+    && guestPhone.value.replace(/\D/g, '').length >= 8
+));
+const canQuote = computed(() => Boolean(selectedPackage.value && paymentChannelCode.value && guestContactComplete.value));
+const displayTotal = computed(() => quote.value?.total_idr ?? selectedPackage.value?.price_idr ?? 0);
 
-watch([selectedPackageId, voucherCode, guestEmail, guestPhone, paymentChannelCode], () => {
-    quote.value = null;
-    checkoutResult.value = null;
+const packageGroups = computed(() => {
+    const groups = new Map();
+    for (const item of props.packages || []) {
+        const name = item.group_name || '';
+        if (!groups.has(name)) groups.set(name, []);
+        groups.get(name).push(item);
+    }
+    return [...groups.entries()].map(([name, items]) => ({ name, items }));
 });
 
-watch(
-    () => props.fields.map((field) => String(customerInput[field.field_key] || '').trim()),
-    async () => {
-        if (!props.fields.length || !requiredFieldsComplete.value || autoScrolledToNominal.value) return;
-        autoScrolledToNominal.value = true;
-        await nextTick();
-        nominalSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    },
-);
+const paymentGroups = computed(() => {
+    const labels = {
+        wallet: ['LFAMILIA Cash', 'Gunakan saldo akun LFAMILIA'],
+        qris: ['QRIS', 'Scan QR dari aplikasi pembayaran favoritmu'],
+        ewallet: ['E-Wallet', 'Dompet digital'],
+        va: ['Virtual Account', 'Transfer melalui bank'],
+        retail: ['Retail', 'Bayar melalui gerai retail'],
+        other: ['Metode Lainnya', 'Metode pembayaran tersedia'],
+    };
+    const map = new Map();
+    for (const channel of props.paymentChannels || []) {
+        const key = channel.group || 'other';
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(channel);
+    }
+    return [...map.entries()].map(([key, items]) => ({
+        key,
+        title: labels[key]?.[0] || labels.other[0],
+        description: labels[key]?.[1] || labels.other[1],
+        items,
+    }));
+});
 
 function newIdempotencyKey() {
     return globalThis.crypto?.randomUUID?.() || ('checkout-' + Date.now() + '-' + Math.random().toString(36).slice(2));
 }
 
 function formatIdr(value) {
-    if (value === null || value === undefined) return '-';
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value);
+    return 'Rp ' + Number(value || 0).toLocaleString('id-ID');
 }
 
-async function postJson(url, payload) {
+function fieldError(key) {
+    return errors.value['customer_input.' + key]?.[0];
+}
+
+async function requestJson(url, options = {}) {
     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const response = await fetch(url, {
-        method: 'POST',
+        cache: 'no-store',
         headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': token,
+            ...(options.headers || {}),
         },
-        body: JSON.stringify(payload),
+        ...options,
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-        const message = data.message || 'Permintaan gagal.';
+        const message = data.message || Object.values(data.errors || {})?.[0]?.[0] || 'Permintaan gagal.';
         const error = new Error(message);
         error.validation = data.errors || { checkout: [message] };
-        error.status = response.status;
         throw error;
     }
     return data;
@@ -99,27 +131,48 @@ function basePayload() {
     };
 }
 
-async function choosePackage(item) {
-    if (!item.is_available) return;
-    selectedPackageId.value = item.id;
-    await nextTick();
-    paymentSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+function chooseSavedAccount(id) {
+    selectedSavedId.value = id;
+    const saved = (props.savedAccounts || []).find((item) => String(item.id) === String(id));
+    if (!saved) return;
+    Object.keys(customerInput).forEach((key) => { customerInput[key] = saved.customer_input?.[key] || ''; });
+    nicknameResult.value = saved.nickname ? { verified: true, nickname: saved.nickname } : null;
 }
 
-async function choosePayment(code) {
-    paymentChannelCode.value = code;
-    await nextTick();
-    if (selectedPackage.value) await loadQuote();
+async function saveGameAccount() {
+    if (!props.customer || !requiredFieldsComplete.value) return;
+    const defaultLabel = nicknameResult.value?.nickname || props.product.name;
+    const label = window.prompt('Nama akun tersimpan', defaultLabel);
+    if (!label?.trim()) return;
+    busy.value = 'save-account';
+    errors.value = {};
+    try {
+        const saved = await requestJson('/account/game-accounts', {
+            method: 'POST',
+            body: JSON.stringify({
+                product_id: props.product.id,
+                label: label.trim(),
+                customer_input: { ...customerInput },
+            }),
+        });
+        props.savedAccounts.unshift(saved);
+        selectedSavedId.value = String(saved.id);
+    } catch (error) {
+        errors.value = error.validation || { checkout: [error.message] };
+    } finally {
+        busy.value = '';
+    }
 }
 
 async function checkNickname() {
+    if (!requiredFieldsComplete.value) return;
     errors.value = {};
     nicknameResult.value = null;
     busy.value = 'nickname';
     try {
-        nicknameResult.value = await postJson('/checkout/nickname', {
-            product_id: props.product.id,
-            customer_input: { ...customerInput },
+        nicknameResult.value = await requestJson('/checkout/nickname', {
+            method: 'POST',
+            body: JSON.stringify({ product_id: props.product.id, customer_input: { ...customerInput } }),
         });
     } catch (error) {
         errors.value = error.validation || {};
@@ -128,33 +181,109 @@ async function checkNickname() {
     }
 }
 
-async function loadQuote() {
-    if (!selectedPackage.value || !paymentChannelCode.value) return;
-    errors.value = {};
+function choosePackage(item) {
+    if (!item.is_available) return;
+    selectedPackageId.value = String(item.id);
     quote.value = null;
+}
+
+async function choosePayment(code) {
+    paymentChannelCode.value = code;
+    quote.value = null;
+    if (canQuote.value) await loadQuote();
+}
+
+async function loadQuote() {
+    if (!canQuote.value) return null;
+    errors.value = {};
     busy.value = 'quote';
     try {
-        quote.value = await postJson('/checkout/quote', basePayload());
+        quote.value = await requestJson('/checkout/quote', {
+            method: 'POST',
+            body: JSON.stringify(basePayload()),
+        });
+        return quote.value;
     } catch (error) {
         errors.value = error.validation || {};
+        return null;
     } finally {
         busy.value = '';
     }
 }
 
+async function openVoucherPicker() {
+    if (!selectedPackage.value) {
+        errors.value = { package_id: ['Pilih nominal terlebih dahulu.'] };
+        return;
+    }
+    voucherOpen.value = true;
+    voucherLoading.value = true;
+    voucherError.value = '';
+    try {
+        const data = await requestJson('/checkout/vouchers?package_id=' + encodeURIComponent(selectedPackage.value.id));
+        vouchers.value = data.vouchers || [];
+    } catch (error) {
+        voucherError.value = error.message || 'Voucher gagal dimuat.';
+    } finally {
+        voucherLoading.value = false;
+    }
+}
+
+async function applyVoucher(code) {
+    voucherCode.value = code;
+    voucherOpen.value = false;
+    if (canQuote.value) await loadQuote();
+}
+
+async function prepareOrder() {
+    errors.value = {};
+    if (!requiredFieldsComplete.value) {
+        errors.value = { checkout: ['Lengkapi data akun terlebih dahulu.'] };
+        return;
+    }
+    if (!selectedPackage.value) {
+        errors.value = { package_id: ['Pilih nominal terlebih dahulu.'] };
+        return;
+    }
+    if (!paymentChannelCode.value) {
+        errors.value = { payment_channel_code: ['Pilih metode pembayaran terlebih dahulu.'] };
+        return;
+    }
+    if (!guestContactComplete.value) {
+        errors.value = { guest_phone: ['Lengkapi email dan nomor WhatsApp dengan benar.'] };
+        return;
+    }
+    if (props.product.nickname_check_enabled && !nicknameResult.value?.verified) {
+        await checkNickname();
+        if (!nicknameResult.value?.verified) {
+            errors.value = { checkout: ['Nickname harus berhasil diverifikasi sebelum checkout.'] };
+            return;
+        }
+    }
+    const currentQuote = await loadQuote();
+    if (!currentQuote) return;
+    confirmOpen.value = true;
+}
+
 async function createOrder() {
+    confirmOpen.value = false;
     errors.value = {};
     checkoutResult.value = null;
     paymentResult.value = null;
     busy.value = 'order';
     try {
-        checkoutResult.value = await postJson('/checkout/orders', {
-            ...basePayload(),
-            customer_input: { ...customerInput },
-            idempotency_key: idempotencyKey.value,
-            turnstile_token: turnstileToken.value || null,
+        checkoutResult.value = await requestJson('/checkout/orders', {
+            method: 'POST',
+            body: JSON.stringify({
+                ...basePayload(),
+                customer_input: { ...customerInput },
+                idempotency_key: idempotencyKey.value,
+                turnstile_token: turnstileToken.value || null,
+            }),
         });
         quote.value = { ...(quote.value || {}), total_idr: checkoutResult.value.total_idr };
+        await nextTick();
+        document.getElementById('lf-checkout-result')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (error) {
         errors.value = error.validation || {};
     } finally {
@@ -168,9 +297,12 @@ async function startPayment() {
     errors.value = {};
     busy.value = 'payment';
     try {
-        paymentResult.value = await postJson('/payments/orders/' + encodeURIComponent(checkoutResult.value.order_number), {
-            idempotency_key: paymentIdempotencyKey.value,
-            access_code: checkoutResult.value.access_code || null,
+        paymentResult.value = await requestJson('/payments/orders/' + encodeURIComponent(checkoutResult.value.order_number), {
+            method: 'POST',
+            body: JSON.stringify({
+                idempotency_key: paymentIdempotencyKey.value,
+                access_code: checkoutResult.value.access_code || null,
+            }),
         });
         const redirect = paymentResult.value?.instructions?.redirect_url || paymentResult.value?.instructions?.payment_url;
         if (redirect) window.location.assign(redirect);
@@ -181,168 +313,258 @@ async function startPayment() {
     }
 }
 
-function fieldError(key) {
-    return errors.value['customer_input.' + key]?.[0];
-}
+watch([guestEmail, guestPhone], () => {
+    quote.value = null;
+});
+
+watch(() => props.fields.map((field) => String(customerInput[field.field_key] || '')), () => {
+    nicknameResult.value = null;
+    selectedSavedId.value = '';
+});
 </script>
 
 <template>
-    <Head :title="product.name" />
-    <CustomerShell>
-        <main class="lf-checkout-page">
-            <section class="lf-product-hero">
-                <img v-if="product.banner_url || product.image_url" :src="product.banner_url || product.image_url" :alt="'Banner '+product.name">
-                <div v-else class="lf-product-hero-placeholder"></div>
-            </section>
+<Head :title="product.name" />
+<CustomerShell>
+<main class="lf-checkout-page">
+    <section class="lf-product-hero">
+        <img v-if="product.banner_url || product.image_url" :src="product.banner_url || product.image_url" :alt="'Banner '+product.name">
+        <div v-else class="lf-product-hero-placeholder"></div>
+    </section>
 
-            <section class="lf-product-identity">
-                <div class="lf-container lf-product-identity-inner">
-                    <div class="lf-product-cover-3d">
-                        <img v-if="product.image_url" :src="product.image_url" :alt="product.name">
-                        <span v-else>{{product.name.slice(0,1)}}</span>
-                    </div>
-                    <div class="lf-product-title">
-                        <h1>{{product.name}}</h1>
-                        <p>{{product.category_name}}</p>
-                    </div>
-                    <div class="lf-product-perks">
-                        <div><span>⚡</span><strong>Proses Cepat</strong></div>
-                        <div><span>◉</span><strong>Layanan Chat 24/7</strong></div>
-                        <div><span>✓</span><strong>Pembayaran Aman!</strong></div>
-                    </div>
-                </div>
-            </section>
+    <section class="lf-product-identity">
+        <div class="lf-container lf-product-identity-inner">
+            <div class="lf-product-cover-3d">
+                <img v-if="product.image_url" :src="product.image_url" :alt="product.name">
+                <span v-else>{{product.name.slice(0,1)}}</span>
+            </div>
+            <div class="lf-product-title">
+                <h1>{{product.name}}</h1>
+                <p>{{product.publisher || product.category_name}}</p>
+                <div v-if="reviewStats?.total" class="lf-product-rating"><span>★</span><strong>{{reviewStats.average}}</strong><small>{{reviewStats.total}} ulasan</small></div>
+            </div>
+            <div class="lf-product-perks">
+                <div><span>⚡</span><strong>Proses Cepat</strong></div>
+                <div><span>◉</span><strong>Layanan Chat</strong></div>
+                <div><span>✓</span><strong>Pembayaran Aman</strong></div>
+            </div>
+        </div>
+    </section>
 
-            <div class="lf-container">
-                <div class="lf-checkout-tabs">
-                    <button type="button" :class="{active:activeTab==='transaction'}" @click="activeTab='transaction'">Transaksi</button>
-                    <button type="button" :class="{active:activeTab==='details'}" @click="activeTab='details'">Keterangan</button>
-                </div>
+    <div class="lf-container">
+        <div class="lf-checkout-tabs">
+            <button type="button" :class="{active:activeTab==='transaction'}" @click="activeTab='transaction'">Transaksi</button>
+            <button type="button" :class="{active:activeTab==='details'}" @click="activeTab='details'">Keterangan</button>
+        </div>
 
-                <div v-if="activeTab==='transaction'" class="lf-checkout-grid">
-                    <div class="lf-checkout-panels">
-                        <section v-if="fields.length" class="lf-checkout-panel">
-                            <header><span>1</span><div><h2>Masukkan Data Akun</h2><p>Pastikan data tujuan sudah benar sebelum melanjutkan.</p></div></header>
-                            <div class="lf-panel-body">
-                                <div class="lf-account-fields">
-                                    <label v-for="field in fields" :key="field.field_key">
-                                        <span>{{field.label}}{{field.is_required?' *':''}}</span>
-                                        <input v-model="customerInput[field.field_key]" :type="field.type==='email'?'email':field.type==='tel'?'tel':'text'" :required="field.is_required" maxlength="255" :placeholder="'Masukkan '+field.label">
-                                        <small v-if="fieldError(field.field_key)" class="text-red-300">{{fieldError(field.field_key)}}</small>
-                                    </label>
-                                </div>
-                                <button v-if="product.nickname_check_enabled" type="button" :disabled="busy==='nickname'" class="lf-secondary mt-3" @click="checkNickname">{{busy==='nickname'?'Memeriksa...':'Cek Nickname'}}</button>
-                                <div v-if="nicknameResult?.verified" class="lf-success-note">Nickname: <strong>{{nicknameResult.nickname}}</strong><span v-if="nicknameResult.country"> · {{nicknameResult.country}}</span></div>
-                                <div v-else-if="nicknameResult?.warning" class="lf-warning-note">{{nicknameResult.warning}}</div>
-                            </div>
-                        </section>
+        <div v-if="activeTab==='transaction'" class="lf-checkout-grid">
+            <div class="lf-checkout-panels">
+                <section v-if="fields.length" class="lf-checkout-panel">
+                    <header><span>1</span><div><h2>Masukkan Data Akun</h2><p>Pastikan ID dan server tujuan sudah benar.</p></div></header>
+                    <div class="lf-panel-body">
+                        <label v-if="savedAccounts?.length" class="lf-saved-account-select">
+                            <span>Akun game tersimpan</span>
+                            <select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)">
+                                <option value="">Isi manual</option>
+                                <option v-for="saved in savedAccounts" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option>
+                            </select>
+                        </label>
 
-                        <section ref="nominalSection" class="lf-checkout-panel lf-scroll-anchor">
-                            <header><span>2</span><div><h2>Pilih Nominal</h2><p>Pilih nominal yang ingin dibeli.</p></div></header>
-                            <div class="lf-panel-body">
-                                <div v-if="packages.length" class="lf-nominal-grid">
-                                    <button v-for="item in packages" :key="item.id" type="button" :disabled="!item.is_available" :class="{selected:String(selectedPackageId)===String(item.id)}" @click="choosePackage(item)">
-                                        <img v-if="item.image_url" :src="item.image_url" :alt="item.name">
-                                        <span v-else class="lf-nominal-fallback">{{item.name.slice(0,1)}}</span>
-                                        <span class="lf-nominal-copy"><strong>{{item.name}}</strong><small v-if="item.nominal_value">{{item.nominal_value}}</small></span>
-                                        <b>{{item.is_available?formatIdr(item.price_idr):'Tidak tersedia'}}</b>
-                                    </button>
-                                </div>
-                                <p v-else class="lf-empty">Belum ada nominal aktif.</p>
-                            </div>
-                        </section>
-
-                        <section ref="paymentSection" class="lf-checkout-panel lf-scroll-anchor">
-                            <header><span>3</span><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang tersedia untuk pesanan ini.</p></div></header>
-                            <div class="lf-panel-body">
-                                <div class="lf-payment-list">
-                                    <button v-for="channel in paymentChannels" :key="channel.code" type="button" :class="{selected:paymentChannelCode===channel.code}" @click="choosePayment(channel.code)">
-                                        <span class="lf-payment-icon">▣</span>
-                                        <span><strong>{{channel.name}}</strong><small>Biaya dihitung otomatis oleh server</small></span>
-                                        <b v-if="paymentChannelCode===channel.code">{{quote?formatIdr(quote.total_idr):'Dipilih'}}</b>
-                                    </button>
-                                </div>
-                                <p v-if="!paymentChannels.length" class="lf-warning-note">Belum ada metode pembayaran aktif.</p>
-                            </div>
-                        </section>
-
-                        <section class="lf-checkout-panel">
-                            <header><span>4</span><div><h2>Detail Kontak</h2><p>Kontak digunakan jika ada kendala pada transaksi.</p></div></header>
-                            <div class="lf-panel-body">
-                                <div v-if="!customer" class="lf-account-fields">
-                                    <label><span>Email</span><input v-model="guestEmail" type="email" maxlength="255" placeholder="example@gmail.com"></label>
-                                    <label><span>No. WhatsApp</span><input v-model="guestPhone" type="tel" maxlength="32" placeholder="628XXXXXXXXXX"></label>
-                                </div>
-                                <div v-else class="lf-customer-checkout-note">Checkout sebagai <strong>{{customer.name}}</strong><br>{{customer.email}} · {{customer.phone||'Nomor HP belum lengkap'}}</div>
-                                <p class="lf-panel-hint">Nomor ini akan dihubungi jika terjadi masalah pada pesanan.</p>
-                            </div>
-                        </section>
-
-                        <section class="lf-checkout-panel">
-                            <header><span>5</span><div><h2>Kode Promo</h2><p>Gunakan voucher jika tersedia dan memenuhi syarat.</p></div></header>
-                            <div class="lf-panel-body">
-                                <div class="lf-promo-input">
-                                    <input v-model="voucherCode" maxlength="100" placeholder="Ketik Kode Promo Kamu">
-                                    <button type="button" :disabled="busy==='quote'||!selectedPackage||!paymentChannelCode" @click="loadQuote">{{busy==='quote'?'Memeriksa...':'Gunakan'}}</button>
-                                </div>
-                                <Link href="/promo" class="lf-available-promo">Pakai Promo Yang Tersedia →</Link>
-                            </div>
-                        </section>
-
-                        <section v-if="checkoutResult" class="lf-result-panel">
-                            <h2>Pesanan berhasil dibuat</h2>
-                            <p>Nomor pesanan: <strong>{{checkoutResult.order_number}}</strong></p>
-                            <p v-if="checkoutResult.access_code">Kode akses guest: <strong class="break-all">{{checkoutResult.access_code}}</strong></p>
-                            <div class="mt-3 flex flex-wrap gap-2">
-                                <button class="lf-primary" :disabled="busy==='payment'" @click="startPayment">{{busy==='payment'?'Menyiapkan...':'Bayar sekarang'}}</button>
-                                <a :href="checkoutResult.status_url" class="lf-secondary">Lihat status</a>
-                            </div>
-                        </section>
-
-                        <section v-if="paymentResult" class="lf-result-panel">
-                            <h2>Pembayaran</h2>
-                            <p>Status: <strong>{{paymentResult.status}}</strong></p>
-                            <img v-if="paymentResult.instructions?.qr_url" :src="paymentResult.instructions.qr_url" alt="QR pembayaran" class="mt-3 max-h-64 rounded-lg bg-white p-2">
-                            <p v-if="paymentResult.instructions?.va_number">Nomor VA: <strong>{{paymentResult.instructions.va_number}}</strong></p>
-                            <a v-if="paymentResult.instructions?.payment_url" :href="paymentResult.instructions.payment_url" class="lf-primary mt-3">Buka pembayaran</a>
-                        </section>
-                    </div>
-
-                    <aside class="lf-order-summary">
-                        <h2>Ringkasan Pesanan</h2>
-                        <div v-if="selectedPackage" class="lf-summary-product">
-                            <img v-if="selectedPackage.image_url" :src="selectedPackage.image_url" alt="">
-                            <div><strong>{{product.name}}</strong><small>{{selectedPackage.name}}</small></div>
+                        <div class="lf-account-fields">
+                            <label v-for="field in fields" :key="field.field_key">
+                                <span>{{field.label}}{{field.is_required?' *':''}}</span>
+                                <input v-model="customerInput[field.field_key]" :type="field.type==='email'?'email':field.type==='tel'?'tel':'text'" :required="field.is_required" maxlength="255" :placeholder="'Masukkan '+field.label">
+                                <small v-if="fieldError(field.field_key)" class="lf-field-error">{{fieldError(field.field_key)}}</small>
+                            </label>
                         </div>
-                        <dl>
-                            <div><dt>Harga</dt><dd>{{formatIdr(quote?.subtotal_idr??selectedPackage?.price_idr)}}</dd></div>
-                            <div><dt>Diskon</dt><dd>- {{formatIdr(quote?.discount_idr||0)}}</dd></div>
-                            <div><dt>Biaya pembayaran</dt><dd>{{formatIdr(quote?.fee_idr||0)}}</dd></div>
-                            <div class="total"><dt>Total</dt><dd>{{formatIdr(quote?.total_idr??selectedPackage?.price_idr)}}</dd></div>
-                        </dl>
-                        <TurnstileWidget v-if="security.turnstile_required" ref="turnstile" class="mt-3" :site-key="security.turnstile_site_key" :action="security.turnstile_action" @token="turnstileToken=$event"/>
-                        <button type="button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" class="lf-order-button" @click="createOrder">{{busy==='order'?'Membuat pesanan...':'Pesan Sekarang!'}}</button>
-                        <p v-if="errors.checkout" class="mt-2 text-[10px] text-red-300">{{errors.checkout[0]}}</p>
-                    </aside>
+
+                        <div v-if="product.nickname_check_enabled" class="lf-nickname-actions">
+                            <button type="button" :disabled="busy==='nickname'||!requiredFieldsComplete" class="lf-secondary" @click="checkNickname">{{busy==='nickname'?'Memeriksa...':'Cek Nickname'}}</button>
+                            <button v-if="customer && nicknameResult?.verified" type="button" :disabled="busy==='save-account'" class="lf-secondary" @click="saveGameAccount">{{busy==='save-account'?'Menyimpan...':'Simpan Akun Game'}}</button>
+                        </div>
+                        <div v-if="nicknameResult?.verified" class="lf-success-note">Nickname ditemukan: <strong>{{nicknameResult.nickname}}</strong><span v-if="nicknameResult.country"> · {{nicknameResult.country}}</span></div>
+                        <div v-else-if="nicknameResult?.warning" class="lf-warning-note">{{nicknameResult.warning}}</div>
+                    </div>
+                </section>
+
+                <section v-if="notices?.length" class="lf-product-notices">
+                    <article v-for="notice in notices" :key="notice.id"><strong>{{notice.title}}</strong><p>{{notice.body}}</p></article>
+                </section>
+
+                <section class="lf-checkout-panel">
+                    <header><span>2</span><div><h2>Pilih Nominal</h2><p>Pilih paket sesuai kebutuhanmu.</p></div></header>
+                    <div class="lf-panel-body lf-package-sections">
+                        <section v-for="group in packageGroups" :key="group.name || 'all'">
+                            <h3 v-if="group.name">{{group.name}}</h3>
+                            <div class="lf-nominal-grid">
+                                <button v-for="item in group.items" :key="item.id" type="button" :disabled="!item.is_available" :class="{selected:String(selectedPackageId)===String(item.id)}" @click="choosePackage(item)">
+                                    <img v-if="item.image_url" :src="item.image_url" :alt="item.name">
+                                    <span v-else class="lf-nominal-fallback">◆</span>
+                                    <span class="lf-nominal-copy"><strong>{{item.name}}</strong><small v-if="item.nominal_value">{{Number(item.nominal_value).toLocaleString('id-ID')}}</small></span>
+                                    <b>{{item.is_available?formatIdr(item.price_idr):'Tidak tersedia'}}</b>
+                                </button>
+                            </div>
+                        </section>
+                    </div>
+                </section>
+
+                <section class="lf-checkout-panel">
+                    <header><span>3</span><div><h2>Pilih Pembayaran</h2><p>Pilih channel pembayaran. Routing gateway ditentukan sistem.</p></div></header>
+                    <div class="lf-panel-body lf-payment-groups">
+                        <details v-for="group in paymentGroups" :key="group.key" :open="paymentGroups.length===1 || group.items.some(x=>x.code===paymentChannelCode)">
+                            <summary><span class="lf-payment-group-icon">{{group.key==='wallet'?'LF':group.key==='qris'?'QR':group.key==='va'?'VA':'◈'}}</span><span><strong>{{group.title}}</strong><small>{{group.description}}</small></span><b>⌄</b></summary>
+                            <div class="lf-payment-list">
+                                <button v-for="channel in group.items" :key="channel.code" type="button" :class="{selected:paymentChannelCode===channel.code}" @click="choosePayment(channel.code)">
+                                    <span class="lf-payment-icon">{{group.key==='wallet'?'LF':group.key==='qris'?'QR':group.key==='va'?'VA':'◈'}}</span>
+                                    <span><strong>{{channel.name}}</strong><small>{{channel.description}}</small></span>
+                                    <b>{{paymentChannelCode===channel.code?'Dipilih':'Pilih'}}</b>
+                                </button>
+                            </div>
+                        </details>
+                        <p v-if="!paymentChannels?.length" class="lf-warning-note">Belum ada metode pembayaran aktif.</p>
+                    </div>
+                </section>
+
+                <section class="lf-checkout-panel">
+                    <header><span>4</span><div><h2>Detail Kontak</h2><p>Dipakai untuk status dan penanganan transaksi jika diperlukan.</p></div></header>
+                    <div class="lf-panel-body">
+                        <div v-if="!customer" class="lf-account-fields">
+                            <label><span>Email *</span><input v-model="guestEmail" type="email" maxlength="255" placeholder="example@gmail.com"></label>
+                            <label><span>No. WhatsApp *</span><input v-model="guestPhone" type="tel" maxlength="32" placeholder="08xxxxxxxxxx"></label>
+                        </div>
+                        <div v-else class="lf-customer-checkout-note">
+                            <span class="lf-account-avatar">{{customer.name?.slice(0,1)?.toUpperCase()}}</span>
+                            <div><strong>{{customer.name}}</strong><small>{{customer.email}} · {{customer.phone || 'Nomor HP belum lengkap'}}</small></div>
+                        </div>
+                        <p class="lf-panel-hint">Pastikan kontak aktif agar pemberitahuan transaksi dapat diterima.</p>
+                    </div>
+                </section>
+
+                <section class="lf-checkout-panel">
+                    <header><span>5</span><div><h2>Kode Promo</h2><p>Masukkan kode voucher atau pilih promo yang tersedia.</p></div></header>
+                    <div class="lf-panel-body">
+                        <div class="lf-promo-input">
+                            <input v-model="voucherCode" maxlength="100" placeholder="Ketik Kode Promo Kamu">
+                            <button type="button" :disabled="busy==='quote'||!canQuote" @click="loadQuote">{{busy==='quote'?'Memeriksa...':'Gunakan'}}</button>
+                        </div>
+                        <button type="button" class="lf-available-promo" @click="openVoucherPicker">Pakai Voucher Yang Tersedia →</button>
+                        <div v-if="quote?.voucher_code" class="lf-success-note">Voucher <strong>{{quote.voucher_code}}</strong> aktif · Hemat {{formatIdr(quote.discount_idr)}}</div>
+                    </div>
+                </section>
+
+                <TurnstileWidget ref="turnstile" v-model="turnstileToken" action="checkout" />
+
+                <div v-if="Object.keys(errors).length" class="lf-checkout-errors">
+                    <strong>Periksa kembali checkout</strong>
+                    <p v-for="(messages,key) in errors" :key="key">{{Array.isArray(messages)?messages[0]:messages}}</p>
                 </div>
 
-                <section v-else class="lf-product-description">
-                    <h2>Deskripsi {{product.name}}</h2>
-                    <p>{{product.description||'Informasi produk akan ditampilkan di sini.'}}</p>
+                <section v-if="checkoutResult" id="lf-checkout-result" class="lf-result-panel">
+                    <h2>Pesanan berhasil dibuat</h2>
+                    <p>Nomor pesanan: <strong>{{checkoutResult.order_number}}</strong></p>
+                    <p v-if="checkoutResult.access_code">Simpan kode akses guest ini untuk melihat detail sensitif pesanan.</p>
+                    <div class="lf-result-actions">
+                        <button class="lf-primary" :disabled="busy==='payment'" @click="startPayment">{{busy==='payment'?'Menyiapkan...':'Bayar Sekarang'}}</button>
+                        <a :href="checkoutResult.status_url" class="lf-secondary">Lihat Status</a>
+                    </div>
+                </section>
+
+                <section v-if="paymentResult" class="lf-result-panel">
+                    <h2>Instruksi Pembayaran</h2>
+                    <p>Status: <strong>{{paymentResult.status}}</strong></p>
+                    <img v-if="paymentResult.instructions?.qr_url" :src="paymentResult.instructions.qr_url" alt="QR pembayaran" class="lf-payment-qr">
+                    <p v-if="paymentResult.instructions?.va_number">Nomor VA: <strong>{{paymentResult.instructions.va_number}}</strong></p>
+                    <a v-if="paymentResult.instructions?.payment_url" :href="paymentResult.instructions.payment_url" class="lf-primary mt-3">Buka Pembayaran</a>
                 </section>
             </div>
 
-            <div v-if="activeTab==='transaction'" class="lf-mobile-checkout-bar">
-                <div class="lf-mobile-selected">
-                    <img v-if="selectedPackage?.image_url" :src="selectedPackage.image_url" alt="">
+            <aside class="lf-order-summary">
+                <h2>Ringkasan Pesanan</h2>
+                <div class="lf-summary-product">
+                    <img v-if="selectedPackage?.image_url || product.image_url" :src="selectedPackage?.image_url || product.image_url" :alt="product.name">
                     <span v-else class="lf-mobile-package-fallback">LF</span>
-                    <div><strong>{{product.name}}</strong><small>{{selectedPackage?.name||'Pilih nominal terlebih dahulu'}}</small></div>
+                    <div><strong>{{product.name}}</strong><small>{{selectedPackage?.name || 'Pilih nominal'}}</small></div>
                 </div>
-                <div class="lf-mobile-total">
-                    <span>{{formatIdr(quote?.total_idr??selectedPackage?.price_idr)}}</span>
-                    <button type="button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="createOrder">{{busy==='order'?'Memproses...':'Pesan Sekarang!'}}</button>
+                <dl>
+                    <div><dt>Harga</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
+                    <div v-if="quote?.discount_idr"><dt>Diskon</dt><dd class="lf-discount">-{{formatIdr(quote.discount_idr)}}</dd></div>
+                    <div><dt>Biaya pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
+                    <div class="total"><dt>Total</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
+                </dl>
+                <button type="button" class="lf-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">{{busy==='order'?'Memproses...':'Pesan Sekarang'}}</button>
+                <p class="lf-summary-security">🔒 Harga dihitung server-side dan dikunci saat pesanan dibuat.</p>
+            </aside>
+        </div>
+
+        <section v-else class="lf-product-details">
+            <article class="lf-product-description">
+                <p class="lf-eyebrow">TENTANG PRODUK</p>
+                <h2>{{product.name}}</h2>
+                <p>{{product.description || 'Top up cepat dan aman melalui LFAMILIA STORE.'}}</p>
+            </article>
+
+            <section class="lf-product-review-section">
+                <div class="lf-review-head">
+                    <div><p class="lf-eyebrow">ULASAN PELANGGAN</p><h2>Apa kata pembeli?</h2></div>
+                    <div v-if="reviewStats?.total" class="lf-review-score"><strong>{{reviewStats.average}}</strong><span>★★★★★</span><small>{{reviewStats.total}} ulasan terverifikasi</small></div>
                 </div>
+                <div v-if="reviews?.length" class="lf-review-grid">
+                    <article v-for="review in reviews" :key="review.id">
+                        <div><strong>{{review.display_name}}</strong><span>{{'★'.repeat(review.rating)}}{{'☆'.repeat(5-review.rating)}}</span></div>
+                        <p>{{review.body}}</p>
+                    </article>
+                </div>
+                <div v-else class="lf-empty">Belum ada ulasan untuk produk ini.</div>
+            </section>
+
+            <section v-if="faqs?.length" class="lf-product-faq">
+                <p class="lf-eyebrow">PERTANYAAN UMUM</p><h2>Kamu punya pertanyaan?</h2>
+                <details v-for="faq in faqs" :key="faq.id"><summary>{{faq.question}}<b>+</b></summary><p>{{faq.answer}}</p></details>
+            </section>
+        </section>
+    </div>
+
+    <div v-if="activeTab==='transaction'" class="lf-mobile-checkout-bar">
+        <div class="lf-mobile-selected">
+            <img v-if="selectedPackage?.image_url || product.image_url" :src="selectedPackage?.image_url || product.image_url" alt="">
+            <span v-else class="lf-mobile-package-fallback">LF</span>
+            <div><strong>{{selectedPackage?.name || 'Pilih nominal'}}</strong><small>{{formatIdr(displayTotal)}}</small></div>
+        </div>
+        <div class="lf-mobile-total">
+            <button type="button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">Pesan Sekarang</button>
+        </div>
+    </div>
+
+    <div v-if="voucherOpen" class="lf-modal-backdrop" @click.self="voucherOpen=false">
+        <div class="lf-voucher-modal">
+            <header><div><p class="lf-eyebrow">VOUCHER TERSEDIA</p><h2>Pilih promo</h2></div><button @click="voucherOpen=false">×</button></header>
+            <div v-if="voucherLoading" class="lf-empty">Memuat voucher...</div>
+            <div v-else-if="voucherError" class="lf-warning-note">{{voucherError}}</div>
+            <div v-else-if="vouchers.length" class="lf-voucher-list">
+                <button v-for="voucher in vouchers" :key="voucher.code" @click="applyVoucher(voucher.code)">
+                    <span><strong>{{voucher.code}}</strong><small>Minimum {{formatIdr(voucher.minimum_total_idr)}}</small></span>
+                    <b>{{voucher.discount_type==='PERCENT'?voucher.discount_value+'%':formatIdr(voucher.discount_value)}}</b>
+                </button>
             </div>
-        </main>
-    </CustomerShell>
+            <div v-else class="lf-empty">Belum ada voucher yang cocok untuk nominal ini.</div>
+        </div>
+    </div>
+
+    <div v-if="confirmOpen" class="lf-modal-backdrop" @click.self="confirmOpen=false">
+        <div class="lf-confirm-modal">
+            <header><div><p class="lf-eyebrow">KONFIRMASI</p><h2>Periksa pesananmu</h2></div><button @click="confirmOpen=false">×</button></header>
+            <dl>
+                <div><dt>Produk</dt><dd>{{product.name}}</dd></div>
+                <div><dt>Nominal</dt><dd>{{selectedPackage?.name}}</dd></div>
+                <div v-if="nicknameResult?.nickname"><dt>Nickname</dt><dd>{{nicknameResult.nickname}}</dd></div>
+                <div><dt>Pembayaran</dt><dd>{{paymentChannels.find(x=>x.code===paymentChannelCode)?.name}}</dd></div>
+                <div v-if="quote?.discount_idr"><dt>Diskon</dt><dd>-{{formatIdr(quote.discount_idr)}}</dd></div>
+                <div><dt>Biaya</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
+                <div class="total"><dt>Total</dt><dd>{{formatIdr(quote?.total_idr)}}</dd></div>
+            </dl>
+            <div class="lf-confirm-actions"><button class="lf-secondary" @click="confirmOpen=false">Kembali</button><button class="lf-primary" :disabled="busy==='order'" @click="createOrder">Buat Pesanan</button></div>
+        </div>
+    </div>
+</main>
+</CustomerShell>
 </template>
