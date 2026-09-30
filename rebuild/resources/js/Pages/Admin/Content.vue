@@ -48,7 +48,7 @@ const faqForm = useForm({
 });
 
 const assetHint = (key) => ({
-    logo: 'Rekomendasi 512×512 (1:1) · PNG/WebP transparan',
+    logo: 'Patokan aset LFAMILIA lama: 320×320 (1:1) · PNG/WebP transparan',
     favicon: 'Rekomendasi 512×512 (1:1)',
     banner_desktop: '1920×600 · fokus elemen penting di area tengah',
     banner_mobile: '1080×1080 · aman untuk crop mobile',
@@ -171,6 +171,7 @@ const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
                             <input v-model="item.published_at" type="datetime-local" class="rounded border border-slate-200 p-2 text-sm">
                             <label class="flex items-center gap-2 text-xs"><input v-model="item.is_active" type="checkbox"> Aktif</label>
                         </div>
+                        <p class="mt-3 rounded bg-slate-50 px-3 py-2 text-[11px] text-slate-500">Gambar berita: rekomendasi 1200×675 (16:9), fokus utama di tengah agar aman saat card di-crop.</p>
                         <div class="mt-3"><AdminMediaControl type="news" :id="item.id" :url="item.image_url" /></div>
                         <div class="mt-3 flex gap-2"><button class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="saveNews(item)">Simpan</button><button class="rounded bg-red-50 px-3 py-2 text-xs font-bold text-red-700" @click="deleteNews(item)">Hapus</button></div>
                     </article>
