@@ -58,7 +58,7 @@ class PaymentPageSettingsService
     }
 
     /**
-     * @param array<string, mixed> $settings
+     * @param  array<string, mixed>  $settings
      */
     public function write(array $settings, ?int $adminId): void
     {
