@@ -118,9 +118,12 @@ function moveSupportDrag(event) {
     const dy = event.clientY - supportDrag.startY;
     if (Math.hypot(dx, dy) > 5) supportDrag.moved = true;
 
+    const x = clamp(supportDrag.originX + dx, 8, window.innerWidth - supportDrag.width - 8);
+    const y = clamp(supportDrag.originY + dy, 68, window.innerHeight - supportDrag.height - 14);
     supportPosition.value = {
-        x: clamp(supportDrag.originX + dx, 8, window.innerWidth - supportDrag.width - 8),
-        y: clamp(supportDrag.originY + dy, 68, window.innerHeight - supportDrag.height - 14),
+        x,
+        y,
+        side: x < window.innerWidth / 2 ? 'right' : 'left',
     };
     event.preventDefault();
 }
@@ -287,7 +290,7 @@ function supportHref(kind) {
     <div
         v-if="storefront.supportWidgetEnabled !== false"
         class="lf-live-support"
-        :class="{ 'is-dragged': supportPosition }"
+        :class="{ 'is-dragged': supportPosition, 'open-right': supportPosition?.side === 'right' }"
         :style="supportPosition ? { left: supportPosition.x + 'px', top: supportPosition.y + 'px', right: 'auto', bottom: 'auto' } : undefined"
     >
         <div v-if="supportOpen" class="lf-support-panel">
