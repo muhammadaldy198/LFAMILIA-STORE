@@ -222,6 +222,10 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                         <label class="text-xs">Jangan tampil lagi selama (hari)<input v-model.number="popups[0].dismiss_days" type="number" min="0" max="365" class="mt-1 w-full rounded border border-slate-200 p-2 text-sm"></label>
                         <label class="flex items-center gap-2 self-end pb-2 text-xs"><input v-model="popups[0].is_active" type="checkbox"> Aktif</label>
                     </div>
+                    <div class="mt-3 rounded-lg bg-slate-50 p-3">
+                        <p class="mb-2 text-[11px] text-slate-500">Gambar pop-up opsional. Jika dipakai, tetap berada dalam satu panel pop-up dan dapat diganti tanpa ubah source code.</p>
+                        <AdminMediaControl type="popup" :id="popups[0].id" :url="popups[0].image_url" />
+                    </div>
                     <div class="mt-3">
                         <button type="button" class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="savePopup(popups[0])">Simpan</button>
                     </div>
