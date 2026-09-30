@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import TurnstileWidget from '../../Components/TurnstileWidget.vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
@@ -17,6 +17,9 @@ const props = defineProps({
     faqs: Array,
     faviconUrl: String,
 });
+
+const page = usePage();
+const security = computed(() => page.props.security || {});
 
 const selectedPackageId = ref('');
 const savedAccountItems = ref([...(props.savedAccounts || [])]);
@@ -581,7 +584,13 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     </div>
                 </section>
 
-                <TurnstileWidget ref="turnstile" v-model="turnstileToken" action="checkout" />
+                <TurnstileWidget
+                    v-if="security.turnstile_required"
+                    ref="turnstile"
+                    :site-key="security.turnstile_site_key"
+                    :action="security.turnstile_action"
+                    @token="turnstileToken=$event"
+                />
 
                 <div v-if="Object.keys(errors).length" class="lf-checkout-errors">
                     <strong>Periksa kembali checkout</strong>
