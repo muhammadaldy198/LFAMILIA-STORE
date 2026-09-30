@@ -21,8 +21,8 @@ const storefront = computed(() => page.props.storefront || {});
 const assets = computed(() => storefront.value.assets || {});
 const logo = computed(() => assets.value.logo?.url || '');
 const favicon = computed(() => assets.value.favicon?.url || '');
-const footerDesktop = computed(() => assets.value.footer_banner_desktop?.url || '');
-const footerMobile = computed(() => assets.value.footer_banner_mobile?.url || '');
+const footerDesktop = computed(() => assets.value.footer_banner_desktop?.url || '/brand/lfamilia-footer-desktop-wordmark.jpg');
+const footerMobile = computed(() => assets.value.footer_banner_mobile?.url || '/brand/lfamilia-footer-mobile-wordmark.jpg');
 const accountHref = computed(() => logged.value ? '/account' : '/login');
 const accountLabel = computed(() => logged.value ? (page.props.auth?.user?.name?.split(' ')?.[0] || 'Akun') : 'Akun');
 const whatsapp = computed(() => {
