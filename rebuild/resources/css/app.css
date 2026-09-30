@@ -4806,7 +4806,7 @@
   width:100%;
   max-height:42vh;
   object-fit:cover;
-  border-radius:inherit inherit 0 0;
+  border-radius:20px 20px 0 0;
 }
 @media(max-width:639px){
   .lf-home-popup-image{
