@@ -410,11 +410,11 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <strong>Proses cepat</strong>
                 </div>
                 <div>
-                    <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg></span>
+                    <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3z"/><path d="m9 12 2 2 4-4"/></svg></span>
                     <strong>Chat 24/7</strong>
                 </div>
                 <div>
-                    <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3z"/><path d="m9 12 2 2 4-4"/></svg></span>
+                    <span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg></span>
                     <strong>Pembayaran aman</strong>
                 </div>
             </div>
@@ -452,7 +452,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
 
                         <div class="lf-account-fields">
                             <label v-for="field in fields" :key="field.field_key">
-                                <span>{{field.label}}{{field.is_required?' *':''}}</span>
+                                <span>{{field.label}}{{field.is_required ? '' : ' (opsional)'}}</span>
                                 <input v-model="customerInput[field.field_key]" :type="field.type==='email'?'email':field.type==='tel'?'tel':'text'" :required="field.is_required" maxlength="255" :placeholder="'Masukkan '+field.label">
                                 <small v-if="fieldError(field.field_key)" class="lf-field-error">{{fieldError(field.field_key)}}</small>
                             </label>
@@ -482,7 +482,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-nominal-panel">
-                    <header><span>2</span><div><h2>Pilih Nominal</h2><p>Pilih paket sesuai kebutuhanmu.</p></div></header>
+                    <header><span>2</span><div><h2>Pilih Nominal</h2><p>{{product.checkout_nominal_description || 'Pesanan diproses otomatis setelah pembayaran.'}}</p></div></header>
                     <div class="lf-panel-body lf-package-sections">
                         <section v-for="group in packageGroups" :key="group.name || 'all'">
                             <div v-if="group.name" class="lf-package-group-head"><h3>{{group.name}}</h3><span></span></div>
@@ -491,7 +491,6 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                     <span class="lf-nominal-top">
                                         <span class="lf-nominal-copy"><strong>{{nominalLabel(item.name, product.name)}}</strong></span>
                                         <img v-if="item.image_url" :src="item.image_url" :alt="nominalLabel(item.name, product.name)">
-                                        <span v-else class="lf-nominal-fallback">◆</span>
                                     </span>
                                     <b>{{item.is_available?formatIdr(item.price_idr):'Tidak tersedia'}}</b>
                                 </button>
@@ -524,7 +523,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                     <small v-else-if="group.key==='wallet'">Masuk akun untuk memakai saldo</small>
                                     <small v-else>{{group.description}}</small>
                                 </span>
-                                <span v-if="group.items.some(x=>x.code===paymentChannelCode)" class="lf-payment-check">✓</span>
+                                <span v-if="group.items.some(x=>x.code===paymentChannelCode)" class="lf-payment-check"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></svg></span>
                             </button>
 
                             <div v-if="group.key!=='wallet'" class="lf-payment-brand-strip">
