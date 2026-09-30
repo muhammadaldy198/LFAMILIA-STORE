@@ -437,10 +437,6 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     </div>
                 </section>
 
-                <section v-if="notices?.length" class="lf-product-notices">
-                    <article v-for="notice in notices" :key="notice.id"><strong>{{notice.title}}</strong><p>{{notice.body}}</p></article>
-                </section>
-
                 <section class="lf-checkout-panel">
                     <header><span>2</span><div><h2>Pilih Nominal</h2><p>Pilih paket sesuai kebutuhanmu.</p></div></header>
                     <div class="lf-panel-body lf-package-sections">
