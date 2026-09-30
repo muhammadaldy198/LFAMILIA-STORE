@@ -492,7 +492,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             <div class="lf-nominal-grid">
                                 <button v-for="item in group.items" :key="item.id" type="button" :disabled="!item.is_available" :class="{selected:String(selectedPackageId)===String(item.id)}" @click="choosePackage(item)">
                                     <span class="lf-nominal-top">
-                                        <span class="lf-nominal-copy"><strong>{{nominalLabel(item.name, product.name)}}</strong></span>
+                                        <span class="lf-nominal-copy"><strong>{{nominalLabel(item.name, product.name)}}</strong><small v-if="item.note" class="lf-nominal-note">{{item.note}}</small></span>
                                         <img v-if="item.image_url" :src="item.image_url" :alt="nominalLabel(item.name, product.name)">
                                     </span>
                                     <b>{{item.is_available?formatIdr(item.price_idr):'Tidak tersedia'}}</b>
