@@ -4,7 +4,7 @@ import {computed,onMounted,onUnmounted,ref} from 'vue';
 import {rupiah} from '../../lib/money';
 import CustomerShell from '../../Components/CustomerShell.vue';
 
-const props=defineProps({order:Object,payment:Object,events:Array});
+const props=defineProps({order:Object,payment:Object,events:Array,review:Object});
 const orderState=ref({...props.order});
 const paymentState=ref(props.payment);
 const timeline=ref([...(props.events||[])]);
@@ -12,6 +12,11 @@ const errors=ref({});
 const busy=ref(false);
 const refreshing=ref(false);
 const paymentKey=ref(globalThis.crypto?.randomUUID?.()||('payment-'+Date.now()));
+const reviewRating=ref(Number(props.review?.rating||5));
+const reviewBody=ref(props.review?.body||'');
+const reviewName=ref('');
+const reviewDone=ref(Boolean(props.review));
+const reviewMessage=ref('');
 let timer=null;
 
 const terminal=computed(()=>['SUCCESS','FAILED','CANCELLED','EXPIRED','REFUNDED'].includes(orderState.value.status));
@@ -64,6 +69,21 @@ async function continuePayment(){
     }finally{busy.value=false;}
 }
 
+async function submitReview(){
+    if(reviewDone.value||orderState.value.status!=='SUCCESS')return;
+    reviewMessage.value='';busy.value=true;
+    try{
+        const token=document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')||'';
+        const response=await fetch('/reviews',{
+            method:'POST',headers:{Accept:'application/json','Content-Type':'application/json','X-CSRF-TOKEN':token},
+            body:JSON.stringify({order_number:orderState.value.order_number,rating:Number(reviewRating.value),body:reviewBody.value,display_name:reviewName.value||null}),
+        });
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok){reviewMessage.value=data.message||Object.values(data.errors||{})?.[0]?.[0]||'Ulasan gagal dikirim.';return;}
+        reviewDone.value=true;reviewMessage.value=data.message||'Ulasan berhasil dikirim.';
+    }finally{busy.value=false;}
+}
+
 onMounted(()=>{refreshStatus();if(!terminal.value)timer=setInterval(refreshStatus,3500);});
 onUnmounted(()=>{if(timer)clearInterval(timer);});
 </script>
@@ -106,6 +126,25 @@ onUnmounted(()=>{if(timer)clearInterval(timer);});
                     <p v-if="orderState.delivery.serial_number">Serial / SN: <strong>{{orderState.delivery.serial_number}}</strong></p>
                     <p v-if="orderState.delivery.code">Kode / hasil: <strong>{{orderState.delivery.code}}</strong></p>
                     <p v-if="orderState.delivery.note">{{orderState.delivery.note}}</p>
+                </section>
+
+                <section v-if="orderState.status==='SUCCESS'" class="lf-order-review">
+                    <template v-if="reviewDone">
+                        <h2>Ulasan kamu</h2>
+                        <div class="lf-review-stars">{{'★'.repeat(reviewRating)}}{{'☆'.repeat(5-reviewRating)}}</div>
+                        <p>{{reviewBody || 'Terima kasih sudah memberi ulasan.'}}</p>
+                    </template>
+                    <template v-else>
+                        <h2>Beri ulasan</h2>
+                        <p>Ulasan hanya tersedia untuk pesanan yang sudah berhasil.</p>
+                        <div class="lf-order-review-form">
+                            <input v-model="reviewName" maxlength="100" placeholder="Nama tampilan (opsional)">
+                            <select v-model.number="reviewRating"><option :value="5">5 ★</option><option :value="4">4 ★</option><option :value="3">3 ★</option><option :value="2">2 ★</option><option :value="1">1 ★</option></select>
+                            <textarea v-model="reviewBody" rows="3" maxlength="2000" placeholder="Bagaimana pengalaman transaksi kamu?"></textarea>
+                            <button class="lf-primary" :disabled="busy||reviewBody.trim().length<3" @click="submitReview">Kirim Ulasan</button>
+                        </div>
+                    </template>
+                    <p v-if="reviewMessage" class="lf-review-message">{{reviewMessage}}</p>
                 </section>
             </div>
 
