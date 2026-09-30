@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\HomeBanner;
 use App\Models\NewsArticle;
 use App\Models\Product;
 use App\Models\ProductPackage;
@@ -19,6 +20,7 @@ class AdminCatalogMediaController
     {
         return match ($type) {
             'category' => Category::findOrFail($id),
+            'banner' => HomeBanner::findOrFail($id),
             'product' => Product::findOrFail($id),
             'package' => ProductPackage::findOrFail($id),
             'asset' => StoreAsset::findOrFail($id),
@@ -31,7 +33,10 @@ class AdminCatalogMediaController
     {
         $data = $request->validate([
             'image' => ['required', 'image', 'mimes:jpeg,png,webp,gif', 'max:5120'],
-            'collection' => ['required', Rule::in($type === 'product' ? ['image', 'banner'] : ['image'])],
+            'collection' => ['required', Rule::in(
+                $type === 'product' ? ['image', 'banner']
+                    : ($type === 'banner' ? ['desktop', 'mobile'] : ['image'])
+            )],
         ]);
         $model = $this->target($type, $id);
         $media = $model->addMediaFromRequest('image')
@@ -46,7 +51,10 @@ class AdminCatalogMediaController
     public function destroy(Request $request, string $type, int $id, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate([
-            'collection' => ['required', Rule::in($type === 'product' ? ['image', 'banner'] : ['image'])],
+            'collection' => ['required', Rule::in(
+                $type === 'product' ? ['image', 'banner']
+                    : ($type === 'banner' ? ['desktop', 'mobile'] : ['image'])
+            )],
         ]);
         $model = $this->target($type, $id);
         $media = $model->getFirstMedia($data['collection']);
