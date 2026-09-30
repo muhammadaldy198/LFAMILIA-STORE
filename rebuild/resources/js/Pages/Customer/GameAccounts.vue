@@ -1,22 +1,130 @@
 <script setup>
-import { Head, router } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
+import { computed, reactive, ref } from 'vue';
 import AccountShell from '../../Components/AccountShell.vue';
-defineProps({ accounts: Array });
-function remove(id) {
+
+const props = defineProps({ accounts: Array, products: Array });
+const selectedProductId = ref('');
+const label = ref('');
+const values = reactive({});
+const editingId = ref(null);
+const busy = ref(false);
+const message = ref('');
+const error = ref('');
+
+const selectedProduct = computed(() => (props.products || []).find((item) => String(item.id) === String(selectedProductId.value)) || null);
+const fields = computed(() => selectedProduct.value?.fields || []);
+
+function csrf() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+}
+function reset() {
+    editingId.value = null;
+    selectedProductId.value = '';
+    label.value = '';
+    Object.keys(values).forEach((key) => delete values[key]);
+}
+function chooseProduct() {
+    const keep = new Set(fields.value.map((field) => field.field_key));
+    Object.keys(values).forEach((key) => { if (!keep.has(key)) delete values[key]; });
+}
+function edit(account) {
+    editingId.value = account.id;
+    selectedProductId.value = String(account.product_id);
+    label.value = account.label;
+    Object.keys(values).forEach((key) => delete values[key]);
+    Object.assign(values, account.customer_input || {});
+    message.value = '';
+    error.value = '';
+}
+async function save() {
+    error.value = '';
+    message.value = '';
+    if (!selectedProduct.value) { error.value = 'Pilih game terlebih dahulu.'; return; }
+    if (!label.value.trim()) { error.value = 'Nama akun wajib diisi.'; return; }
+    busy.value = true;
+    try {
+        const url = editingId.value ? '/account/game-accounts/' + editingId.value : '/account/game-accounts';
+        const response = await fetch(url, {
+            method: editingId.value ? 'PUT' : 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf() },
+            body: JSON.stringify({
+                product_id: Number(selectedProductId.value),
+                label: label.value.trim(),
+                customer_input: Object.fromEntries(fields.value.map((field) => [field.field_key, String(values[field.field_key] || '').trim()])),
+            }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || Object.values(data.errors || {})?.[0]?.[0] || 'Akun game gagal disimpan.');
+        message.value = editingId.value ? 'Akun game diperbarui.' : 'Akun game tersimpan.';
+        window.location.reload();
+    } catch (reason) {
+        error.value = reason instanceof Error ? reason.message : 'Akun game gagal disimpan.';
+    } finally {
+        busy.value = false;
+    }
+}
+async function remove(account) {
     if (!confirm('Hapus akun game tersimpan ini?')) return;
-    router.delete('/account/game-accounts/' + id, { preserveScroll: true });
+    busy.value = true;
+    error.value = '';
+    try {
+        const response = await fetch('/account/game-accounts/' + account.id, {
+            method:'DELETE',
+            headers:{ Accept:'application/json', 'X-CSRF-TOKEN':csrf() },
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.message || 'Akun game gagal dihapus.');
+        }
+        window.location.reload();
+    } catch (reason) {
+        error.value = reason instanceof Error ? reason.message : 'Akun game gagal dihapus.';
+    } finally {
+        busy.value = false;
+    }
 }
 </script>
+
 <template>
 <Head title="Akun Game" />
 <AccountShell>
-    <div><p class="lf-eyebrow">AKUN TERSIMPAN</p><h1 class="lf-account-title">Akun game</h1><p class="lf-account-copy">Akun yang disimpan dari checkout dapat dipakai lagi agar top up berikutnya lebih cepat.</p></div>
-    <div v-if="accounts?.length" class="lf-account-list">
+    <div><p class="lf-eyebrow">AKUN TERSIMPAN</p><h1 class="lf-account-title">Akun game</h1><p class="lf-account-copy">Simpan User ID dan server agar dapat dipilih kembali saat checkout.</p></div>
+
+    <p v-if="message" class="rounded-xl border border-lime-300/20 bg-lime-300/[0.06] p-3 text-xs text-lime-200">{{message}}</p>
+    <p v-if="error" class="rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-xs text-red-200">{{error}}</p>
+
+    <section class="lf-account-card">
+        <div class="lf-account-card-head">
+            <div><strong>{{editingId ? 'Edit akun game' : 'Simpan akun game'}}</strong><small>Data tetap diverifikasi lagi saat checkout bila game mendukung cek nickname.</small></div>
+            <button v-if="editingId" type="button" class="lf-danger-link" @click="reset">Batal</button>
+        </div>
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <label class="text-xs">Game
+                <select v-model="selectedProductId" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3" @change="chooseProduct">
+                    <option value="">Pilih game</option>
+                    <option v-for="product in products" :key="product.id" :value="String(product.id)">{{product.name}}</option>
+                </select>
+            </label>
+            <label class="text-xs">Nama akun<input v-model="label" maxlength="100" placeholder="Contoh: ML Main" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3"></label>
+            <label v-for="field in fields" :key="field.field_key" class="text-xs">
+                {{field.label}}
+                <input v-model="values[field.field_key]" :type="field.type || 'text'" :required="field.is_required" :placeholder="field.placeholder || ''" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3">
+            </label>
+        </div>
+        <button type="button" class="lf-primary mt-4" :disabled="busy" @click="save">{{busy?'Menyimpan...':editingId?'Simpan perubahan':'Tambah akun'}}</button>
+    </section>
+
+    <section class="space-y-3">
+        <h2 class="text-sm font-bold">Akun tersimpan</h2>
         <article v-for="account in accounts" :key="account.id" class="lf-account-card">
-            <div class="lf-account-card-head"><div><strong>{{account.label}}</strong><small>{{account.product_name}}<template v-if="account.nickname"> · {{account.nickname}}</template></small></div><button type="button" class="lf-danger-link" @click="remove(account.id)">Hapus</button></div>
+            <div class="lf-account-card-head">
+                <div><strong>{{account.label}}</strong><small>{{account.product_name}}<template v-if="account.nickname"> · {{account.nickname}}</template></small></div>
+                <div class="flex gap-2"><button type="button" class="text-xs text-lime-200" @click="edit(account)">Edit</button><button type="button" class="lf-danger-link" @click="remove(account)">Hapus</button></div>
+            </div>
             <dl class="lf-account-kv"><div v-for="(value,key) in account.customer_input" :key="key"><dt>{{String(key).replaceAll('_',' ')}}</dt><dd>{{value}}</dd></div></dl>
         </article>
-    </div>
-    <div v-else class="lf-account-empty">Belum ada akun game tersimpan. Simpan akun dari halaman checkout setelah nickname berhasil diperiksa.</div>
+        <div v-if="!accounts?.length" class="lf-account-empty">Belum ada akun game tersimpan.</div>
+    </section>
 </AccountShell>
 </template>
