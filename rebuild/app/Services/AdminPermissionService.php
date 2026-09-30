@@ -13,7 +13,6 @@ class AdminPermissionService
         'content.manage' => 'Banner & konten',
         'fulfillment.manage' => 'Manual & fulfillment',
         'providers.manage' => 'Digiflazz & provider',
-        'nickname.manage' => 'Validasi akun / nickname',
         'payments.manage' => 'Pembayaran operasional',
         'customers.view' => 'Pelanggan',
         'vouchers.manage' => 'Promo / voucher',
@@ -54,7 +53,7 @@ class AdminPermissionService
         $items = [
             ['label' => 'Dashboard', 'href' => '/admin/panel', 'permission' => 'dashboard.view'],
             ['label' => 'Pesanan', 'href' => '/admin/orders', 'permission' => 'orders.view'],
-            ['label' => 'Produk', 'href' => '/admin/catalog', 'permissions' => ['catalog.manage', 'content.manage']],
+            ['label' => 'Produk', 'href' => '/admin/catalog', 'permission' => 'catalog.manage'],
             ['label' => 'Manual', 'href' => '/admin/fulfillment', 'permission' => 'fulfillment.manage'],
             ['label' => 'Banner & Konten', 'href' => '/admin/content', 'permission' => 'content.manage'],
             ['label' => 'Digiflazz', 'href' => '/admin/providers?provider=DIGIFLAZZ', 'permission' => 'providers.manage'],
