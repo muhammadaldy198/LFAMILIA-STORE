@@ -74,6 +74,9 @@ const nominalStep = computed(() => hasAccountStep.value ? 2 : 1);
 const paymentStep = computed(() => nominalStep.value + 1);
 const contactStep = computed(() => nominalStep.value + 2);
 const promoStep = computed(() => nominalStep.value + 3);
+const hasExternalPaymentOption = computed(() => paymentGroups.value.some((group) =>
+    group.key !== 'wallet' && group.items.some((item) => item.available !== false)
+));
 const firstCheckoutError = computed(() => {
     for (const messages of Object.values(errors.value || {})) {
         if (Array.isArray(messages) && messages.length) return messages[0];
@@ -566,6 +569,9 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-payment-panel">
                     <header><span>{{paymentStep}}</span><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang ingin digunakan.</p></div></header>
                     <div class="lf-panel-body lf-payment-groups">
+                        <div v-if="!hasExternalPaymentOption" class="lf-payment-unavailable">
+                            Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi.
+                        </div>
                         <div
                             v-for="group in paymentGroups"
                             :key="group.key"
@@ -609,7 +615,12 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                     :class="{selected:paymentChannelCode===channel.code}"
                                     @click="choosePayment(channel.code)"
                                 >
-                                    <span>{{channel.name}}</span>
+                                    <span class="lf-payment-channel-copy">
+                                        <strong>{{channel.name}}</strong>
+                                        <small v-if="Number(channel.fee_percent_bps || 0) > 0 || Number(channel.fee_flat_idr || 0) > 0">
+                                            Fee <template v-if="Number(channel.fee_percent_bps || 0) > 0">{{(Number(channel.fee_percent_bps || 0) / 100).toLocaleString('id-ID', {maximumFractionDigits:2})}}%</template><template v-if="Number(channel.fee_percent_bps || 0) > 0 && Number(channel.fee_flat_idr || 0) > 0"> + </template><template v-if="Number(channel.fee_flat_idr || 0) > 0">{{formatIdr(channel.fee_flat_idr)}}</template>
+                                        </small>
+                                    </span>
                                 </button>
                             </div>
                         </div>
