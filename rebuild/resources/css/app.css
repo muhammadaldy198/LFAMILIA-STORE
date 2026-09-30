@@ -339,3 +339,22 @@
 @media(max-width:410px){
  .lf-brand-copy{display:none}.lf-action{padding:0 7px}.lf-account-fields{grid-template-columns:1fr}.lf-faq-status-grid{grid-template-columns:1fr}.lf-calc-result-grid{grid-template-columns:1fr}
 }
+
+/* verified reviews */
+.lf-home-reviews{border-top:1px solid var(--lf-line);border-bottom:1px solid var(--lf-line);background:#06090e}
+.lf-home-review-head{display:flex;align-items:end;justify-content:space-between;gap:14px}
+.lf-home-review-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:16px}
+.lf-home-review-grid article{padding:13px;border:1px solid var(--lf-line);border-radius:11px;background:#080c12}
+.lf-home-review-grid article>div{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lf-home-review-grid strong{font-size:9px}.lf-home-review-grid span{color:#ffd34d;font-size:8px}
+.lf-home-review-grid p{margin:8px 0;color:rgba(255,255,255,.45);font-size:9px;line-height:1.65}
+.lf-home-review-grid a{color:#70aaff;font-size:8px;font-weight:800;text-decoration:none}
+.lf-order-review{padding:14px;border:1px solid rgba(158,229,45,.17);border-radius:14px;background:rgba(158,229,45,.045)}
+.lf-order-review h2{margin:0;font-size:13px}.lf-order-review>p{font-size:9px;color:rgba(255,255,255,.43)}
+.lf-review-stars{margin-top:8px;color:#ffd34d;font-size:12px;letter-spacing:1px}
+.lf-order-review-form{display:grid;grid-template-columns:minmax(0,1fr) 90px;gap:8px;margin-top:10px}
+.lf-order-review-form input,.lf-order-review-form select,.lf-order-review-form textarea{border:1px solid var(--lf-line);border-radius:8px;background:#05080d;color:#fff;padding:9px;font-size:9px}
+.lf-order-review-form textarea{grid-column:1/-1;resize:vertical}.lf-order-review-form .lf-primary{grid-column:1/-1;width:max-content}
+.lf-review-message{margin-top:8px!important;color:#8de1af!important}
+@media(max-width:900px){.lf-home-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.lf-home-review-grid{grid-template-columns:1fr}.lf-order-review-form{grid-template-columns:1fr}.lf-order-review-form textarea,.lf-order-review-form .lf-primary{grid-column:auto}}
