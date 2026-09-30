@@ -72,19 +72,23 @@ class PublicContentController
     public function leaderboard(Request $request): Response
     {
         $period = $request->query('period') === 'all' ? 'all' : 'month';
-        $query = DB::table('orders')
-            ->whereNotNull('user_id')->where('status', 'SUCCESS')
-            ->when($period === 'month', fn ($q) => $q->where('created_at', '>=', now()->startOfMonth()))
-            ->groupBy('user_id')
-            ->orderByDesc(DB::raw('SUM(total_idr)'))
-            ->limit(50)
+        $query = DB::table('users as users')
+            ->join('orders as orders', 'orders.user_id', '=', 'users.id')
+            ->whereNull('users.deleted_at')
+            ->where('users.leaderboard_opt_in', true)
+            ->where('orders.status', 'SUCCESS')
+            ->when($period === 'month', fn ($q) => $q->where('orders.created_at', '>=', now()->startOfMonth()))
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc(DB::raw('SUM(orders.total_idr)'))
+            ->orderByDesc(DB::raw('COUNT(orders.id)'))
+            ->limit(20)
             ->get([
-                'user_id',
-                DB::raw('COUNT(*) as order_count'),
-                DB::raw('SUM(total_idr) as total_spent'),
+                'users.name',
+                DB::raw('COUNT(orders.id) as order_count'),
+                DB::raw('SUM(orders.total_idr) as total_spent'),
             ])->values()->map(fn ($row, int $index): array => [
                 'rank' => $index + 1,
-                'name' => 'Pelanggan #'.str_pad((string) $row->user_id, 4, '0', STR_PAD_LEFT),
+                'name' => $this->leaderboardName((string) $row->name),
                 'order_count' => (int) $row->order_count,
                 'total_spent' => (int) $row->total_spent,
             ]);
@@ -169,6 +173,17 @@ class PublicContentController
             ],
             'updatedAt' => now()->toIso8601String(),
         ]);
+    }
+
+    private function leaderboardName(string $name): string
+    {
+        $words = preg_split('/\s+/', trim($name)) ?: [];
+        $words = array_values(array_filter($words, fn (string $word): bool => $word !== ''));
+        if (count($words) < 2) {
+            return $words[0] ?? 'Pelanggan';
+        }
+
+        return $words[0].' '.mb_strtoupper(mb_substr($words[count($words) - 1], 0, 1)).'.';
     }
 
     public function promo(): Response
