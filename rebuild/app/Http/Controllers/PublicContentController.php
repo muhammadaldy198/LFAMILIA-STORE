@@ -57,7 +57,7 @@ class PublicContentController
 
     public function tools(): Response
     {
-        return Inertia::render('Content/Tool', ['tool' => 'win-rate']);
+        return Inertia::render('Content/Tools');
     }
 
     public function legal(string $key): Response
