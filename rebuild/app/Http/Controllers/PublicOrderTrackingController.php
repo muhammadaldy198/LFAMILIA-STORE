@@ -33,18 +33,23 @@ class PublicOrderTrackingController
                 : response()->json(['message' => 'Invoice tidak ditemukan.'], 404);
         }
 
-        $phone = $this->normalizePhone($query);
-        if ($phone === '') {
+        $phones = $this->phoneVariants($query);
+        if ($phones === []) {
             return response()->json(['message' => 'Masukkan invoice atau nomor WhatsApp yang valid.'], 422);
         }
+
+        $normalizedGuest = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(orders.guest_phone,''), '+', ''), '-', ''), ' ', ''), '.', ''), '(', ''), ')', ''), '/', '')";
+        $normalizedUser = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(users.phone,''), '+', ''), '-', ''), ' ', ''), '.', ''), '(', ''), ')', ''), '/', '')";
 
         $orders = DB::table('orders')
             ->leftJoin('users', 'users.id', '=', 'orders.user_id')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
-            ->where(function ($builder) use ($phone): void {
-                $builder->where('orders.guest_phone', $phone)
-                    ->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(users.phone,''), '+', ''), '-', ''), ' ', ''), '.', '') = ?", [$phone]);
+            ->where(function ($builder) use ($phones, $normalizedGuest, $normalizedUser): void {
+                foreach ($phones as $phone) {
+                    $builder->orWhereRaw($normalizedGuest.' = ?', [$phone])
+                        ->orWhereRaw($normalizedUser.' = ?', [$phone]);
+                }
             })
             ->orderByDesc('orders.id')->limit(25)
             ->get([
@@ -149,16 +154,28 @@ class PublicOrderTrackingController
         return str_starts_with(strtoupper(trim($value)), 'LF');
     }
 
-    private function normalizePhone(string $value): string
+    private function phoneVariants(string $value): array
     {
         $digits = preg_replace('/\D+/', '', $value) ?: '';
-        if (str_starts_with($digits, '0')) {
-            $digits = '62'.substr($digits, 1);
-        } elseif (str_starts_with($digits, '8')) {
-            $digits = '62'.$digits;
+        if ($digits === '') {
+            return [];
         }
 
-        return preg_match('/^62\d{7,15}$/', $digits) ? $digits : '';
+        if (str_starts_with($digits, '62')) {
+            $local = substr($digits, 2);
+        } elseif (str_starts_with($digits, '0')) {
+            $local = substr($digits, 1);
+        } elseif (str_starts_with($digits, '8')) {
+            $local = $digits;
+        } else {
+            return [];
+        }
+
+        if (! preg_match('/^8\d{7,14}$/', $local)) {
+            return [];
+        }
+
+        return array_values(array_unique(['62'.$local, '0'.$local, $local]));
     }
 
     private function maskReference(string $reference): string
