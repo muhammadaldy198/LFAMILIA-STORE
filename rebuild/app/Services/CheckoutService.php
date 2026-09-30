@@ -72,7 +72,7 @@ class CheckoutService
         }
 
         $prePrice = $this->pricing->forPackage((int) $data['package_id']);
-        $product = Product::with('fields')->findOrFail($prePrice['product_id']);
+        $product = Product::with(['fields', 'category'])->findOrFail($prePrice['product_id']);
         $input = $this->inputValidator->validate($product, $data['customer_input']);
         $nickname = $this->nickname->check($product, $input);
 
@@ -84,7 +84,7 @@ class CheckoutService
             }
 
             $price = $this->pricing->forPackage((int) $data['package_id'], true);
-            $lockedProduct = Product::with('fields')->findOrFail($price['product_id']);
+            $lockedProduct = Product::with(['fields', 'category'])->findOrFail($price['product_id']);
             $lockedInput = $this->inputValidator->validate($lockedProduct, $input);
             $voucher = $this->voucher(
                 $data['voucher_code'] ?? null,
