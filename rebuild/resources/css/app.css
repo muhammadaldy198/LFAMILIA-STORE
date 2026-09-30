@@ -536,3 +536,7 @@
  .lf-reference-checkout .lf-payment-groups summary>strong{padding:12px;font-size:13px}
  .lf-reference-checkout .lf-payment-featured .lf-payment-brand-wallet{font-size:11px;max-width:80px}
 }
+.lf-reference-checkout .lf-payment-list .lf-payment-card-footer{color:#b8c6d9}
+.lf-reference-checkout .lf-mobile-selected:not(.is-empty){justify-content:flex-start;gap:12px;text-align:left}
+.lf-reference-checkout .lf-mobile-selected>div{min-width:0}
+.lf-reference-checkout .lf-mobile-selected strong,.lf-reference-checkout .lf-mobile-selected small{display:block}
