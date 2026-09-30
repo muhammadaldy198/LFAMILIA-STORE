@@ -124,6 +124,7 @@ function moveSupportDrag(event) {
         x,
         y,
         side: x < window.innerWidth / 2 ? 'right' : 'left',
+        vertical: y < window.innerHeight / 2 ? 'down' : 'up',
     };
     event.preventDefault();
 }
@@ -290,7 +291,11 @@ function supportHref(kind) {
     <div
         v-if="storefront.supportWidgetEnabled !== false"
         class="lf-live-support"
-        :class="{ 'is-dragged': supportPosition, 'open-right': supportPosition?.side === 'right' }"
+        :class="{
+            'is-dragged': supportPosition,
+            'open-right': supportPosition?.side === 'right',
+            'open-down': supportPosition?.vertical === 'down',
+        }"
         :style="supportPosition ? { left: supportPosition.x + 'px', top: supportPosition.y + 'px', right: 'auto', bottom: 'auto' } : undefined"
     >
         <div v-if="supportOpen" class="lf-support-panel">
