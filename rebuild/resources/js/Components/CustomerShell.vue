@@ -10,6 +10,8 @@ defineProps({
 const page = usePage();
 const open = ref(false);
 const supportOpen = ref(false);
+const supportPosition = ref(null);
+let supportDrag = null;
 const logged = computed(() => Boolean(page.props.auth?.user));
 const storefront = computed(() => page.props.storefront || {});
 const assets = computed(() => storefront.value.assets || {});
@@ -77,7 +79,61 @@ watch(open, (value) => {
 });
 onUnmounted(() => {
     document.documentElement.style.overflow = '';
+    window.removeEventListener('pointermove', moveSupportDrag);
 });
+
+function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+}
+
+function startSupportDrag(event) {
+    if (window.innerWidth > 640) {
+        supportOpen.value = !supportOpen.value;
+        return;
+    }
+
+    const trigger = event.currentTarget;
+    const rect = trigger.getBoundingClientRect();
+    supportDrag = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: rect.left,
+        originY: rect.top,
+        width: rect.width,
+        height: rect.height,
+        moved: false,
+    };
+
+    trigger.setPointerCapture?.(event.pointerId);
+    window.addEventListener('pointermove', moveSupportDrag, { passive: false });
+    window.addEventListener('pointerup', endSupportDrag, { once: true });
+    event.preventDefault();
+}
+
+function moveSupportDrag(event) {
+    if (!supportDrag || event.pointerId !== supportDrag.pointerId) return;
+
+    const dx = event.clientX - supportDrag.startX;
+    const dy = event.clientY - supportDrag.startY;
+    if (Math.hypot(dx, dy) > 5) supportDrag.moved = true;
+
+    supportPosition.value = {
+        x: clamp(supportDrag.originX + dx, 8, window.innerWidth - supportDrag.width - 8),
+        y: clamp(supportDrag.originY + dy, 68, window.innerHeight - supportDrag.height - 14),
+    };
+    event.preventDefault();
+}
+
+function endSupportDrag(event) {
+    if (!supportDrag || event.pointerId !== supportDrag.pointerId) return;
+
+    const moved = supportDrag.moved;
+    supportDrag = null;
+    window.removeEventListener('pointermove', moveSupportDrag);
+
+    if (!moved) supportOpen.value = !supportOpen.value;
+}
 
 function supportHref(kind) {
     if (kind === 'wa') return whatsapp.value || '/contact';
@@ -189,17 +245,17 @@ function supportHref(kind) {
                 </Link>
                 <p>{{storefront.footerDescription || storefront.tagline || 'Top up favoritmu, sat set tanpa ribet.'}}</p>
                 <div class="lf-socials">
-                    <a :href="supportHref('ig')" :target="storefront.instagramUrl?'_blank':undefined" rel="noreferrer" aria-label="Instagram">
-                        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg>
+                    <a class="social-instagram" :href="supportHref('ig')" :target="storefront.instagramUrl?'_blank':undefined" rel="noreferrer" aria-label="Instagram">
+                        <svg class="lf-brand-social-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm0 2A3.75 3.75 0 0 0 4 7.75v8.5A3.75 3.75 0 0 0 7.75 20h8.5A3.75 3.75 0 0 0 20 16.25v-8.5A3.75 3.75 0 0 0 16.25 4h-8.5Zm8.96 1.5a1.29 1.29 0 1 1 0 2.58 1.29 1.29 0 0 1 0-2.58ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>
                     </a>
-                    <a :href="supportHref('wa')" :target="whatsapp?'_blank':undefined" rel="noreferrer" aria-label="WhatsApp">
-                        <svg viewBox="0 0 24 24"><path d="M20 11.5a8 8 0 0 1-11.7 7L4 20l1.5-4A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.2c.7 2.5 2.6 4.4 5.2 5.3l1.3-1.2"/></svg>
+                    <a class="social-whatsapp" :href="supportHref('wa')" :target="whatsapp?'_blank':undefined" rel="noreferrer" aria-label="WhatsApp">
+                        <svg class="lf-brand-social-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
                     </a>
-                    <a :href="supportHref('email')" aria-label="Email">
-                        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
+                    <a class="social-email" :href="supportHref('email')" aria-label="Email">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
                     </a>
-                    <a :href="supportHref('discord')" :target="storefront.discordUrl?'_blank':undefined" rel="noreferrer" aria-label="Discord">
-                        <svg viewBox="0 0 24 24"><path d="M7 7c3-2 7-2 10 0l2 9c-2 2-4 3-6 3l-1-2-1 2c-2 0-4-1-6-3Z"/><circle cx="9.5" cy="12.5" r="1"/><circle cx="14.5" cy="12.5" r="1"/></svg>
+                    <a class="social-discord" :href="supportHref('discord')" :target="storefront.discordUrl?'_blank':undefined" rel="noreferrer" aria-label="Discord">
+                        <svg class="lf-brand-social-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.37a19.8 19.8 0 00-4.885-1.515.074.074 0 00-.079.037c-.211.375-.445.865-.608 1.25a15.4 15.4 0 00-5.487 0c-.164-.394-.406-.875-.618-1.25a.077.077 0 00-.078-.037A19.74 19.74 0 003.677 4.37a.07.07 0 00-.032.028C.533 9.046-.319 13.58.1 18.058a.082.082 0 00.031.056c2.053 1.507 4.041 2.422 5.993 3.029a.077.077 0 00.084-.028c.462-.63.873-1.295 1.226-1.994a.077.077 0 00-.042-.106 12.3 12.3 0 01-1.872-.892.077.077 0 01-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 01.078-.01c3.927 1.793 8.18 1.793 12.061 0a.073.073 0 01.079.01c.12.099.246.198.373.292a.077.077 0 01-.007.128c-.598.343-1.22.644-1.873.891a.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.077.077 0 00.084.029c1.961-.607 3.95-1.522 6.002-3.03a.082.082 0 00.032-.055c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.029ZM8.02 15.331c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.211 0 2.176 1.095 2.157 2.419 0 1.333-.956 2.419-2.157 2.419Zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.095 2.157 2.419 0 1.333-.946 2.419-2.157 2.419Z"/></svg>
                     </a>
                 </div>
             </div>
@@ -228,7 +284,12 @@ function supportHref(kind) {
         <div class="lf-footer-copy">© 2026 {{storefront.storeName || 'LFAMILIA STORE'}}. Produk dan merek dagang adalah milik pemegang hak masing-masing.</div>
     </footer>
 
-    <div v-if="storefront.supportWidgetEnabled !== false" class="lf-live-support">
+    <div
+        v-if="storefront.supportWidgetEnabled !== false"
+        class="lf-live-support"
+        :class="{ 'is-dragged': supportPosition }"
+        :style="supportPosition ? { left: supportPosition.x + 'px', top: supportPosition.y + 'px', right: 'auto', bottom: 'auto' } : undefined"
+    >
         <div v-if="supportOpen" class="lf-support-panel">
             <header>
                 <div><strong>Butuh bantuan?</strong><small>{{storefront.supportHours || 'Setiap hari, 08.00–23.00 WIB'}}</small></div>
@@ -236,11 +297,11 @@ function supportHref(kind) {
             </header>
             <div>
                 <a :href="supportHref('wa')" :target="whatsapp?'_blank':undefined" rel="noreferrer">
-                    <svg viewBox="0 0 24 24" class="support-wa"><path d="M20 11.5a8 8 0 0 1-11.7 7L4 20l1.5-4A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.2c.7 2.5 2.6 4.4 5.2 5.3l1.3-1.2"/></svg>
+                    <svg viewBox="0 0 24 24" class="support-wa lf-brand-social-icon" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
                     <span><strong>WhatsApp</strong><small>{{storefront.supportWhatsapp || 'Hubungi tim bantuan'}}</small></span>
                 </a>
                 <a :href="supportHref('discord')" :target="storefront.discordUrl?'_blank':undefined" rel="noreferrer">
-                    <svg viewBox="0 0 24 24" class="support-dc"><path d="M7 7c3-2 7-2 10 0l2 9c-2 2-4 3-6 3l-1-2-1 2c-2 0-4-1-6-3Z"/><circle cx="9.5" cy="12.5" r="1"/><circle cx="14.5" cy="12.5" r="1"/></svg>
+                    <svg viewBox="0 0 24 24" class="support-dc lf-brand-social-icon" aria-hidden="true"><path d="M20.317 4.37a19.8 19.8 0 00-4.885-1.515.074.074 0 00-.079.037c-.211.375-.445.865-.608 1.25a15.4 15.4 0 00-5.487 0c-.164-.394-.406-.875-.618-1.25a.077.077 0 00-.078-.037A19.74 19.74 0 003.677 4.37a.07.07 0 00-.032.028C.533 9.046-.319 13.58.1 18.058a.082.082 0 00.031.056c2.053 1.507 4.041 2.422 5.993 3.029a.077.077 0 00.084-.028c.462-.63.873-1.295 1.226-1.994a.077.077 0 00-.042-.106 12.3 12.3 0 01-1.872-.892.077.077 0 01-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 01.078-.01c3.927 1.793 8.18 1.793 12.061 0a.073.073 0 01.079.01c.12.099.246.198.373.292a.077.077 0 01-.007.128c-.598.343-1.22.644-1.873.891a.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.077.077 0 00.084.029c1.961-.607 3.95-1.522 6.002-3.03a.082.082 0 00.032-.055c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.029ZM8.02 15.331c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.211 0 2.176 1.095 2.157 2.419 0 1.333-.956 2.419-2.157 2.419Zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.095 2.157 2.419 0 1.333-.946 2.419-2.157 2.419Z"/></svg>
                     <span><strong>Discord</strong><small>Komunitas & bantuan</small></span>
                 </a>
                 <a :href="supportHref('email')">
@@ -253,7 +314,13 @@ function supportHref(kind) {
                 </Link>
             </div>
         </div>
-        <button type="button" class="lf-support-trigger" :aria-label="supportOpen?'Tutup bantuan':'Buka bantuan'" @click="supportOpen=!supportOpen">
+        <button
+            type="button"
+            class="lf-support-trigger"
+            :aria-label="supportOpen?'Tutup bantuan':'Buka bantuan'"
+            @pointerdown="startSupportDrag"
+            @keydown.enter.space.prevent="supportOpen=!supportOpen"
+        >
             <svg viewBox="0 0 24 24"><path d="M5 5h14v11H9l-4 3Z"/><path d="M8 9h8M8 12h5"/></svg>
         </button>
     </div>
