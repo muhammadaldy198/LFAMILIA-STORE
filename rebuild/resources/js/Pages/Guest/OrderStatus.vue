@@ -76,7 +76,7 @@ async function submitReview(){
         const token=document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')||'';
         const response=await fetch('/reviews',{
             method:'POST',headers:{Accept:'application/json','Content-Type':'application/json','X-CSRF-TOKEN':token},
-            body:JSON.stringify({order_number:orderState.value.order_number,rating:Number(reviewRating.value),body:reviewBody.value,display_name:reviewName.value||null}),
+            body:JSON.stringify({product_slug:orderState.value.product_slug,order_number:orderState.value.order_number,rating:Number(reviewRating.value),body:reviewBody.value,display_name:reviewName.value||null}),
         });
         const data=await response.json().catch(()=>({}));
         if(!response.ok){reviewMessage.value=data.message||Object.values(data.errors||{})?.[0]?.[0]||'Ulasan gagal dikirim.';return;}
