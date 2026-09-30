@@ -44,6 +44,7 @@ class CustomerOrderController
         return Inertia::render('Customer/OrderDetail', [
             'order' => $record,
             'payment' => $payments->forOrder((int) $record->id),
+            'review' => DB::table('product_reviews')->where('order_id', $record->id)->first(['rating', 'body']),
         ]);
     }
 }
