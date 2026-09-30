@@ -4,12 +4,16 @@ import { ref } from 'vue';
 import AccountShell from '../../Components/AccountShell.vue';
 import { rupiah } from '../../lib/money';
 
-const props = defineProps({ order: Object, payment: Object });
+const props = defineProps({ order: Object, payment: Object, review: Object });
 
 const paymentState = ref(props.payment);
 const errors = ref({});
 const busy = ref(false);
 const paymentKey = ref(globalThis.crypto?.randomUUID?.() || ('payment-' + Date.now()));
+const reviewRating = ref(Number(props.review?.rating || 5));
+const reviewBody = ref(props.review?.body || '');
+const reviewDone = ref(Boolean(props.review));
+const reviewMessage = ref('');
 
 async function continuePayment() {
     errors.value = {};
@@ -36,6 +40,24 @@ async function continuePayment() {
     } finally {
         busy.value = false;
     }
+}
+
+async function submitReview() {
+    if (reviewDone.value || props.order.status !== 'SUCCESS') return;
+    reviewMessage.value = '';
+    busy.value = true;
+    try {
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const response = await fetch('/reviews', {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+            body: JSON.stringify({ order_number: props.order.order_number, rating: Number(reviewRating.value), body: reviewBody.value }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) { reviewMessage.value = data.message || Object.values(data.errors || {})?.[0]?.[0] || 'Ulasan gagal dikirim.'; return; }
+        reviewDone.value = true;
+        reviewMessage.value = data.message || 'Ulasan berhasil dikirim.';
+    } finally { busy.value = false; }
 }
 </script>
 
@@ -70,6 +92,23 @@ async function continuePayment() {
             <p v-if="order.delivery.serial_number" class="break-all text-sm">Serial / SN: <strong>{{ order.delivery.serial_number }}</strong></p>
             <p v-if="order.delivery.code" class="break-all text-sm">Kode / hasil: <strong>{{ order.delivery.code }}</strong></p>
             <p v-if="order.delivery.note" class="whitespace-pre-wrap text-sm">{{ order.delivery.note }}</p>
+        </section>
+
+        <section v-if="order.status === 'SUCCESS'" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <template v-if="reviewDone">
+                <h2 class="text-lg font-semibold">Ulasan kamu</h2>
+                <div class="text-amber-400">{{ '★'.repeat(reviewRating) }}{{ '☆'.repeat(5-reviewRating) }}</div>
+                <p class="text-sm text-slate-300">{{ reviewBody || 'Terima kasih sudah memberi ulasan.' }}</p>
+            </template>
+            <template v-else>
+                <h2 class="text-lg font-semibold">Beri ulasan</h2>
+                <div class="grid gap-3 sm:grid-cols-[120px_1fr]">
+                    <select v-model.number="reviewRating" class="rounded bg-slate-800 p-2"><option :value="5">5 ★</option><option :value="4">4 ★</option><option :value="3">3 ★</option><option :value="2">2 ★</option><option :value="1">1 ★</option></select>
+                    <textarea v-model="reviewBody" rows="3" maxlength="2000" placeholder="Bagaimana pengalaman transaksi kamu?" class="rounded bg-slate-800 p-2"></textarea>
+                </div>
+                <button type="button" class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50" :disabled="busy || reviewBody.trim().length < 3" @click="submitReview">Kirim ulasan</button>
+            </template>
+            <p v-if="reviewMessage" class="text-sm text-emerald-300">{{ reviewMessage }}</p>
         </section>
 
         <Link href="/account/tickets" class="text-cyan-300">Butuh bantuan? Buat tiket</Link>
