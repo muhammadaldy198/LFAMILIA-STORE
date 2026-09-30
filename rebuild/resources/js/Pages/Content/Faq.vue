@@ -1,0 +1,4 @@
+<script setup>
+import {Head,Link} from '@inertiajs/vue3';import CustomerShell from '../../Components/CustomerShell.vue';defineProps({faqs:Array});
+</script>
+<template><Head title="Pertanyaan Umum"/><CustomerShell><main class="lf-container lf-content-page"><section class="lf-content-hero"><span>?</span><div><p class="lf-eyebrow">PUSAT BANTUAN · FAQ</p><h1 class="lf-title">Jawaban cepat untuk transaksi kamu.</h1><p class="lf-copy">Pembayaran, status pesanan, pengiriman produk, promo, dan bantuan.</p></div></section><section class="mt-7"><details v-for="faq in faqs" :key="faq.id" class="lf-faq"><summary>{{faq.question}}</summary><p>{{faq.answer}}</p></details><div v-if="!faqs?.length" class="lf-empty">FAQ sedang diperbarui.</div></section><div class="lf-help mt-7"><div><p class="lf-eyebrow">BUTUH BANTUAN?</p><h2>Tim LFAMILIA siap membantu.</h2></div><Link href="/contact" class="lf-primary">Hubungi Kami</Link></div></main></CustomerShell></template>
