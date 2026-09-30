@@ -176,6 +176,12 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::middleware('admin.permission:content.manage')->group(function (): void {
         Route::get('/admin/content', [AdminContentController::class, 'index'])->name('admin.content');
         Route::put('/admin/content/settings', [AdminContentController::class, 'updateSettings'])->name('admin.content.settings');
+        Route::post('/admin/content/banners', [AdminContentController::class, 'storeBanner'])->name('admin.content.banners.store');
+        Route::put('/admin/content/banners/{banner}', [AdminContentController::class, 'updateBanner'])->name('admin.content.banners.update');
+        Route::delete('/admin/content/banners/{banner}', [AdminContentController::class, 'destroyBanner'])->name('admin.content.banners.destroy');
+        Route::post('/admin/content/popups', [AdminContentController::class, 'storePopup'])->name('admin.content.popups.store');
+        Route::put('/admin/content/popups/{popup}', [AdminContentController::class, 'updatePopup'])->name('admin.content.popups.update');
+        Route::delete('/admin/content/popups/{popup}', [AdminContentController::class, 'destroyPopup'])->name('admin.content.popups.destroy');
         Route::post('/admin/content/news', [AdminContentController::class, 'storeNews'])->name('admin.content.news.store');
         Route::put('/admin/content/news/{news}', [AdminContentController::class, 'updateNews'])->name('admin.content.news.update');
         Route::delete('/admin/content/news/{news}', [AdminContentController::class, 'destroyNews'])->name('admin.content.news.destroy');
