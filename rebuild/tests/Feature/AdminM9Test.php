@@ -235,6 +235,7 @@ class AdminM9Test extends TestCase
 
     public function test_last_active_super_admin_cannot_be_disabled(): void
     {
+        AdminUser::where('role', 'SUPER_ADMIN')->update(['is_active' => false]);
         $super = $this->superAdmin();
         $this->actingAs($super, 'admin');
 
