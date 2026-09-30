@@ -91,9 +91,10 @@ class StorefrontContentService
         }
 
         return SitePopup::where('is_active', true)
-            ->orderBy('sort_order')->orderBy('id')->get([
-                'id', 'title', 'body', 'primary_label', 'primary_href',
-                'secondary_label', 'secondary_href', 'dismiss_days', 'sort_order',
+            ->orderBy('sort_order')->orderBy('id')
+            ->limit(1)
+            ->get([
+                'id', 'title', 'body', 'dismiss_days', 'sort_order',
             ]);
     }
 
