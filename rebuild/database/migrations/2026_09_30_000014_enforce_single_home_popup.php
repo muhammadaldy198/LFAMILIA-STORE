@@ -25,6 +25,13 @@ return new class extends Migration
                 'updated_at' => now(),
             ]);
         }
+
+        if (Schema::hasTable('store_assets')) {
+            DB::table('store_assets')->where('key', 'popup')->update([
+                'is_active' => false,
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     public function down(): void
