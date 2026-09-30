@@ -15,6 +15,7 @@ const props = defineProps({
     checks: { type: Array, default: () => [] },
 });
 const page = usePage();
+const base = computed(() => page.props.adminPanel?.base_path || '/admin');
 const isSuper = computed(() => page.props.adminPanel?.admin?.role === 'SUPER_ADMIN');
 const rows = reactive(Array.isArray(props.rows) ? props.rows.map((row) => ({ ...row })) : (props.rows?.data || []).map((row) => ({ ...row })));
 
@@ -46,7 +47,7 @@ function saveVoucher(row) {
     }, { preserveScroll: true });
 }
 function updateTicket(row) {
-    router.put('/admin/support/' + row.id, { status: row.status }, { preserveScroll: true });
+    router.put(base.value + '/support/' + row.id, { status: row.status }, { preserveScroll: true });
 }
 function updateMembership(row) {
     router.put('/admin/customers/' + row.id + '/membership', {
