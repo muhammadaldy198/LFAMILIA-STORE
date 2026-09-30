@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\QueueHeartbeatJob;
 use App\Jobs\ReconcileFulfillmentJob;
 use App\Jobs\SendFulfillmentJob;
 use App\Jobs\StartFulfillmentJob;
@@ -117,6 +118,8 @@ Artisan::command('lfamilia:recover-fulfillment', function (): void {
 })->purpose('Recover paid orders and reconcile uncertain provider attempts without creating duplicate fulfillment');
 
 Schedule::command('lfamilia:recover-fulfillment')->everyMinute()->withoutOverlapping();
+
+Schedule::job(new QueueHeartbeatJob)->everyMinute()->name('lfamilia-queue-worker-heartbeat');
 
 Schedule::call(function (): void {
     DB::table('system_settings')->updateOrInsert(
