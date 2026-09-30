@@ -302,6 +302,7 @@ class AdminCatalogController
             'fields' => ['required', 'array', 'max:20'],
             'fields.*.field_key' => ['required', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/', 'distinct'],
             'fields.*.label' => ['required', 'string', 'max:255'],
+            'fields.*.placeholder' => ['nullable', 'string', 'max:255'],
             'fields.*.type' => ['required', Rule::in(['text', 'tel', 'email'])],
             'fields.*.is_required' => ['required', 'boolean'],
         ]);
