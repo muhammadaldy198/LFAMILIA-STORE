@@ -95,6 +95,9 @@ class StorefrontContentService
             ->limit(1)
             ->get([
                 'id', 'title', 'body', 'dismiss_days', 'sort_order',
+            ])->map(fn (SitePopup $popup): array => [
+                ...$popup->only('id', 'title', 'body', 'dismiss_days', 'sort_order'),
+                'image_url' => $popup->getFirstMediaUrl('image'),
             ]);
     }
 
