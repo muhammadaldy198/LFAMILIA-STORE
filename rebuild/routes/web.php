@@ -138,22 +138,19 @@ Route::middleware('auth:web')->group(function (): void {
 
 Route::redirect('/admin', '/admin/panel', 302);
 Route::redirect('/admin/panel/login', '/admin/login', 302);
-Route::redirect('/panel', '/staff/panel', 302);
-Route::redirect('/panel/login', '/staff/login', 302);
+Route::redirect('/panel', '/admin/panel', 302);
+Route::redirect('/panel/login', '/admin/login', 302);
 Route::redirect('/panel/admin', '/admin/panel', 302);
 Route::redirect('/panel/admin/login', '/admin/login', 302);
-Route::redirect('/panel/staff', '/staff/panel', 302);
-Route::redirect('/panel/staff/login', '/staff/login', 302);
-Route::redirect('/staff', '/staff/panel', 302);
-Route::redirect('/staff/panel/login', '/staff/login', 302);
+Route::redirect('/panel/staff', '/admin/panel', 302);
+Route::redirect('/panel/staff/login', '/admin/login', 302);
+
+
 
 Route::middleware('guest:admin')->group(function (): void {
     Route::get('/admin/login', [AdminAuthController::class, 'show'])->name('admin.login');
     Route::post('/admin/login', [AdminAuthController::class, 'login'])
         ->middleware('throttle:admin-login')->name('admin.login.store');
-    Route::get('/staff/login', [AdminAuthController::class, 'show'])->name('staff.login');
-    Route::post('/staff/login', [AdminAuthController::class, 'login'])
-        ->middleware('throttle:admin-login')->name('staff.login.store');
 });
 
 Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
@@ -306,76 +303,4 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         });
     });
 });
-
-Route::middleware(['auth:admin', 'admin.role', 'staff.only'])
-    ->prefix('staff')->name('staff.')->group(function (): void {
-        Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
-
-        Route::get('/panel', AdminDashboardController::class)
-            ->middleware('admin.permission:dashboard.view')->name('panel');
-
-        Route::middleware('admin.permission:notifications.view')->prefix('notifications')
-            ->name('notifications.')->group(function (): void {
-                Route::get('/', [AdminNotificationController::class, 'index'])->name('index');
-                Route::post('/read-all', [AdminNotificationController::class, 'readAll'])->name('read-all');
-                Route::post('/{id}/read', [AdminNotificationController::class, 'read'])->name('read');
-            });
-
-        Route::get('/orders', [AdminWorkspaceController::class, 'orders'])
-            ->middleware('admin.permission:orders.view')->name('orders');
-
-        Route::middleware('admin.permission:content.manage')->group(function (): void {
-            Route::get('/catalog', [AdminCatalogController::class, 'contentIndex'])->name('catalog');
-            Route::put('/catalog/products/{product}/content', [AdminCatalogController::class, 'updateProductContent'])
-                ->name('catalog.products.content');
-            Route::put('/catalog/packages/{package}/content', [AdminCatalogController::class, 'updatePackageContent'])
-                ->name('catalog.packages.content');
-            Route::post('/catalog/products/{product}/notices', [AdminCatalogController::class, 'storeNotice'])
-                ->name('catalog.notices.store');
-            Route::put('/catalog/notices/{notice}', [AdminCatalogController::class, 'updateNotice'])
-                ->name('catalog.notices.update');
-            Route::delete('/catalog/notices/{notice}', [AdminCatalogController::class, 'destroyNotice'])
-                ->name('catalog.notices.destroy');
-            Route::put('/catalog/assets/{asset}', [AdminCatalogController::class, 'asset'])
-                ->name('catalog.assets.update');
-            Route::post('/catalog/media/{type}/{id}', [AdminCatalogMediaController::class, 'store'])
-                ->name('catalog.media.store');
-            Route::delete('/catalog/media/{type}/{id}', [AdminCatalogMediaController::class, 'destroy'])
-                ->name('catalog.media.destroy');
-
-            Route::get('/content', [AdminContentController::class, 'index'])->name('content');
-            Route::put('/content/settings', [AdminContentController::class, 'updateSettings'])->name('content.settings');
-            Route::post('/content/banners', [AdminContentController::class, 'storeBanner'])->name('content.banners.store');
-            Route::put('/content/banners/{banner}', [AdminContentController::class, 'updateBanner'])->name('content.banners.update');
-            Route::delete('/content/banners/{banner}', [AdminContentController::class, 'destroyBanner'])->name('content.banners.destroy');
-            Route::post('/content/popups', [AdminContentController::class, 'storePopup'])->name('content.popups.store');
-            Route::put('/content/popups/{popup}', [AdminContentController::class, 'updatePopup'])->name('content.popups.update');
-            Route::delete('/content/popups/{popup}', [AdminContentController::class, 'destroyPopup'])->name('content.popups.destroy');
-            Route::post('/content/news', [AdminContentController::class, 'storeNews'])->name('content.news.store');
-            Route::put('/content/news/{news}', [AdminContentController::class, 'updateNews'])->name('content.news.update');
-            Route::delete('/content/news/{news}', [AdminContentController::class, 'destroyNews'])->name('content.news.destroy');
-            Route::post('/content/faqs', [AdminContentController::class, 'storeFaq'])->name('content.faqs.store');
-            Route::put('/content/faqs/{faq}', [AdminContentController::class, 'updateFaq'])->name('content.faqs.update');
-            Route::delete('/content/faqs/{faq}', [AdminContentController::class, 'destroyFaq'])->name('content.faqs.destroy');
-            Route::put('/content/reviews/{review}', [AdminContentController::class, 'updateReview'])->name('content.reviews.update');
-            Route::put('/content/pages/{key}', [AdminContentController::class, 'updatePage'])->name('content.pages.update');
-        });
-
-        Route::middleware('admin.permission:fulfillment.manage')->prefix('fulfillment')
-            ->name('fulfillment.')->group(function (): void {
-                Route::get('/', [AdminFulfillmentController::class, 'index'])->name('index');
-                Route::post('/{attemptId}/complete', [AdminFulfillmentController::class, 'completeManual'])->name('complete');
-                Route::post('/{attemptId}/fail', [AdminFulfillmentController::class, 'failManual'])->name('fail');
-                Route::post('/{attemptId}/retry', [AdminFulfillmentController::class, 'retry'])->name('retry');
-            });
-
-        Route::get('/customers', [AdminWorkspaceController::class, 'customers'])
-            ->middleware('admin.permission:customers.view')->name('customers');
-
-        Route::middleware('admin.permission:support.manage')->prefix('support')
-            ->name('support.')->group(function (): void {
-                Route::get('/', [AdminWorkspaceController::class, 'support'])->name('index');
-                Route::put('/{id}', [AdminWorkspaceController::class, 'updateSupport'])->name('update');
-            });
-    });
 
