@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminAccessController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
+use App\Http\Controllers\AdminContentController;
 use App\Http\Controllers\AdminCatalogMediaController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminFulfillmentController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\CustomerPhoneController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\GuestOrderController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PublicContentController;
 use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\WalletTopupController;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +29,17 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [CatalogController::class, 'index'])->name('catalog.index');
 Route::get('/catalog/{slug}', [CatalogController::class, 'show'])->name('catalog.show');
+Route::get('/news', [PublicContentController::class, 'news'])->name('content.news');
+Route::get('/news/{slug}', [PublicContentController::class, 'article'])->name('content.article');
+Route::get('/faq', [PublicContentController::class, 'faq'])->name('content.faq');
+Route::get('/contact', [PublicContentController::class, 'contact'])->name('content.contact');
+Route::get('/terms', [PublicContentController::class, 'terms'])->name('content.terms');
+Route::get('/refund', [PublicContentController::class, 'refund'])->name('content.refund');
+Route::get('/privacy', [PublicContentController::class, 'privacy'])->name('content.privacy');
+Route::get('/leaderboard', [PublicContentController::class, 'leaderboard'])->name('content.leaderboard');
+Route::get('/promo', [PublicContentController::class, 'promo'])->name('content.promo');
+Route::get('/tools', [PublicContentController::class, 'tools'])->name('content.tools');
+Route::get('/tools/{tool}', [PublicContentController::class, 'tool'])->name('content.tool');
 
 Route::post('/checkout/nickname', [CheckoutController::class, 'nickname'])
     ->middleware('throttle:checkout-nickname')->name('checkout.nickname');
@@ -56,6 +69,8 @@ Route::middleware('throttle:guest-order')->group(function (): void {
 });
 Route::get('/orders/guest/{orderNumber}', [GuestOrderController::class, 'show'])
     ->name('guest.orders.show');
+Route::get('/orders/guest/{orderNumber}/events', [GuestOrderController::class, 'events'])
+    ->middleware('throttle:guest-order')->name('guest.orders.events');
 
 Route::middleware('guest:web')->group(function (): void {
     Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])
@@ -133,6 +148,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         ->name('admin.catalog.')->group(function (): void {
             Route::post('/categories', [AdminCatalogController::class, 'category'])->name('categories.store');
             Route::put('/categories/{category}', [AdminCatalogController::class, 'updateCategory'])->name('categories.update');
+            Route::delete('/categories/{category}', [AdminCatalogController::class, 'destroyCategory'])->name('categories.destroy');
             Route::post('/products', [AdminCatalogController::class, 'product'])->name('products.store');
             Route::put('/products/{product}', [AdminCatalogController::class, 'updateProduct'])->name('products.update');
             Route::post('/products/{product}/packages', [AdminCatalogController::class, 'package'])->name('packages.store');
@@ -141,12 +157,23 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::put('/mappings/{mapping}', [AdminCatalogController::class, 'mapping'])->name('mappings.update');
         });
 
-    Route::middleware('admin.permission:content.manage')->prefix('admin/catalog')->name('admin.catalog.')
-        ->group(function (): void {
+    Route::middleware('admin.permission:content.manage')->group(function (): void {
+        Route::get('/admin/content', [AdminContentController::class, 'index'])->name('admin.content');
+        Route::put('/admin/content/settings', [AdminContentController::class, 'updateSettings'])->name('admin.content.settings');
+        Route::post('/admin/content/news', [AdminContentController::class, 'storeNews'])->name('admin.content.news.store');
+        Route::put('/admin/content/news/{news}', [AdminContentController::class, 'updateNews'])->name('admin.content.news.update');
+        Route::delete('/admin/content/news/{news}', [AdminContentController::class, 'destroyNews'])->name('admin.content.news.destroy');
+        Route::post('/admin/content/faqs', [AdminContentController::class, 'storeFaq'])->name('admin.content.faqs.store');
+        Route::put('/admin/content/faqs/{faq}', [AdminContentController::class, 'updateFaq'])->name('admin.content.faqs.update');
+        Route::delete('/admin/content/faqs/{faq}', [AdminContentController::class, 'destroyFaq'])->name('admin.content.faqs.destroy');
+        Route::put('/admin/content/pages/{key}', [AdminContentController::class, 'updatePage'])->name('admin.content.pages.update');
+
+        Route::prefix('admin/catalog')->name('admin.catalog.')->group(function (): void {
             Route::put('/assets/{asset}', [AdminCatalogController::class, 'asset'])->name('assets.update');
             Route::post('/media/{type}/{id}', [AdminCatalogMediaController::class, 'store'])->name('media.store');
             Route::delete('/media/{type}/{id}', [AdminCatalogMediaController::class, 'destroy'])->name('media.destroy');
         });
+    });
 
     Route::middleware('admin.permission:providers.manage')->group(function (): void {
         Route::get('/admin/providers', [AdminWorkspaceController::class, 'providers'])->name('admin.providers');
