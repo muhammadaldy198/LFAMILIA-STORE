@@ -12,6 +12,7 @@ class PaymentStateService
     public function __construct(
         private readonly AdminNotificationService $notifications,
         private readonly TransactionalEmailService $emails,
+        private readonly MembershipService $membership,
     ) {}
 
     /**
@@ -154,6 +155,12 @@ class PaymentStateService
                     'status' => 'REFUND',
                     'updated_at' => now(),
                 ]);
+                if ($order->user_id !== null) {
+                    $user = \App\Models\User::find((int) $order->user_id);
+                    if ($user) {
+                        $this->membership->sync($user);
+                    }
+                }
                 if ($before === 'PENDING_PAYMENT') {
                     $this->releaseVoucher((int) $order->id);
                 }
@@ -373,6 +380,12 @@ class PaymentStateService
             'paid_at' => now(),
             'updated_at' => now(),
         ]);
+        if ($order->user_id !== null) {
+            $user = \App\Models\User::find((int) $order->user_id);
+            if ($user) {
+                $this->membership->sync($user);
+            }
+        }
         DB::table('voucher_redemptions')->where('order_id', $order->id)
             ->where('status', 'RESERVED')->update([
                 'status' => 'REDEEMED',
