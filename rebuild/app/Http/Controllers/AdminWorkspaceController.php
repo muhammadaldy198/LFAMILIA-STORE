@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\AdminAuditService;
 use App\Services\TransactionalEmailService;
+use App\Services\MembershipService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -82,10 +83,17 @@ class AdminWorkspaceController
                 ->orderByDesc('users.id')->limit(150)
                 ->get([
                     'users.id', 'users.name', 'users.email', 'users.phone',
-                    'users.membership_tier_code', 'users.created_at',
-                    'wallets.balance_idr',
+                    'users.membership_tier_code', 'users.membership_mode',
+                    'users.membership_override_code', 'users.membership_progress_bonus_idr',
+                    'users.created_at', 'wallets.balance_idr',
+                    DB::raw("(SELECT COALESCE(SUM(o.total_idr),0) FROM orders o WHERE o.user_id=users.id AND o.status IN ('PAID','PROCESSING','SUCCESS')) as lifetime_spend_idr"),
+                ])->map(fn (object $row): array => [
+                    ...((array) $row),
+                    'membership_assignment' => $row->membership_mode === 'MANUAL'
+                        ? ($row->membership_override_code ?: $row->membership_tier_code)
+                        : 'AUTO',
                 ]),
-            'membershipTiers' => DB::table('membership_tiers')->orderBy('rank')->pluck('code'),
+            'membershipTiers' => DB::table('membership_tiers')->where('is_active', true)->orderBy('rank')->pluck('code'),
         ]);
     }
 
@@ -138,19 +146,31 @@ class AdminWorkspaceController
         return back();
     }
 
-    public function updateMembership(Request $request, int $userId, AdminAuditService $audit): RedirectResponse
-    {
+    public function updateMembership(
+        Request $request,
+        int $userId,
+        AdminAuditService $audit,
+        MembershipService $membership,
+    ): RedirectResponse {
         $data = $request->validate([
-            'membership_tier_code' => ['required', Rule::exists('membership_tiers', 'code')],
+            'membership_tier_code' => ['required', 'string', 'max:20'],
         ]);
-        $before = DB::table('users')->where('id', $userId)->first();
-        abort_unless($before, 404);
+        $value = strtoupper(trim((string) $data['membership_tier_code']));
+        if ($value !== 'AUTO' && ! DB::table('membership_tiers')->where('code', $value)->where('is_active', true)->exists()) {
+            throw ValidationException::withMessages(['membership_tier_code' => 'Tier membership tidak valid.']);
+        }
 
-        DB::table('users')->where('id', $userId)->update([
-            'membership_tier_code' => $data['membership_tier_code'],
-            'updated_at' => now(),
+        $user = \App\Models\User::findOrFail($userId);
+        $before = $user->only([
+            'membership_tier_code', 'membership_mode',
+            'membership_override_code', 'membership_progress_bonus_idr',
         ]);
-        $audit->record($request, 'customer.membership.updated', 'user', $userId, (array) $before, $data);
+        $membership->setMode($user, $value);
+        $after = $user->fresh()->only([
+            'membership_tier_code', 'membership_mode',
+            'membership_override_code', 'membership_progress_bonus_idr',
+        ]);
+        $audit->record($request, 'customer.membership.updated', 'user', $userId, $before, $after);
 
         return back();
     }
