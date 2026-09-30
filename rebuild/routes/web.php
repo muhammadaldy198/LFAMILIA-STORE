@@ -129,6 +129,8 @@ Route::middleware('auth:web')->group(function (): void {
             ->middleware('throttle:support-ticket')->name('account.tickets.reply');
         Route::post('/account/game-accounts', [SavedGameAccountController::class, 'store'])
             ->middleware('throttle:account-sensitive')->name('account.game-accounts.store');
+        Route::put('/account/game-accounts/{savedGameAccount}', [SavedGameAccountController::class, 'update'])
+            ->middleware('throttle:account-sensitive')->name('account.game-accounts.update');
         Route::delete('/account/game-accounts/{savedGameAccount}', [SavedGameAccountController::class, 'destroy'])
             ->middleware('throttle:account-sensitive')->name('account.game-accounts.destroy');
     });
