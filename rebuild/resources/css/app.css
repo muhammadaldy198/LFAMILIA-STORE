@@ -4275,3 +4275,35 @@
     margin-top:8px!important;
   }
 }
+
+
+/* Editable payment page appearance */
+.lf-payment-page{
+  --payment-accent:#b9ff35;
+}
+.lf-payment-header-image{
+  display:block;
+  width:100%;
+  height:144px;
+  object-fit:cover;
+}
+.lf-payment-page .lf-payment-brand-fallback,
+.lf-payment-page .lf-payment-status-icon.paid,
+.lf-payment-page .lf-payment-primary{
+  background:var(--payment-accent)!important;
+}
+.lf-payment-page .lf-payment-primary,
+.lf-payment-page .lf-payment-status-icon.paid{
+  color:#091006!important;
+}
+.lf-payment-page .lf-payment-support a,
+.lf-payment-page code + button,
+.lf-payment-page .lf-payment-body code{
+  color:var(--payment-accent);
+}
+.lf-payment-page .lf-payment-body dl .text-lg{
+  color:var(--payment-accent)!important;
+}
+@media(min-width:640px){
+  .lf-payment-header-image{height:176px}
+}
