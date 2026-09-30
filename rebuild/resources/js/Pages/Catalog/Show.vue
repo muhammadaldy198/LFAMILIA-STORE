@@ -69,7 +69,7 @@ const paymentGroups = computed(() => {
         qris: ['QRIS', 'Scan QR dari aplikasi pembayaran favoritmu'],
         ewallet: ['E-Wallet', 'Dompet digital'],
         va: ['Virtual Account', 'Transfer melalui bank'],
-        retail: ['Convenience Store', 'Bayar melalui gerai retail'],
+        retail: ['Retail', 'Bayar melalui gerai retail'],
         other: ['Metode Lainnya', 'Metode pembayaran tersedia'],
     };
     const map = new Map();
@@ -327,7 +327,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
 <template>
 <Head :title="product.name" />
 <CustomerShell>
-<main class="lf-checkout-page lf-reference-checkout">
+<main class="lf-checkout-page">
     <section class="lf-product-hero">
         <img v-if="product.banner_url || product.image_url" :src="product.banner_url || product.image_url" :alt="'Banner '+product.name">
         <div v-else class="lf-product-hero-placeholder"></div>
@@ -401,7 +401,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                 <button v-for="item in group.items" :key="item.id" type="button" :disabled="!item.is_available" :class="{selected:String(selectedPackageId)===String(item.id)}" @click="choosePackage(item)">
                                     <img v-if="item.image_url" :src="item.image_url" :alt="item.name">
                                     <span v-else class="lf-nominal-fallback">◆</span>
-                                    <span class="lf-nominal-copy"><strong>{{item.name}}</strong></span>
+                                    <span class="lf-nominal-copy"><strong>{{item.name}}</strong><small v-if="item.nominal_value">{{Number(item.nominal_value).toLocaleString('id-ID')}}</small></span>
                                     <b>{{item.is_available?formatIdr(item.price_idr):'Tidak tersedia'}}</b>
                                 </button>
                             </div>
@@ -410,16 +410,15 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel">
-                    <header><span>3</span><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang kamu inginkan.</p></div></header>
+                    <header><span>3</span><div><h2>Pilih Pembayaran</h2><p>Pilih channel pembayaran. Routing gateway ditentukan sistem.</p></div></header>
                     <div class="lf-panel-body lf-payment-groups">
-                        <details v-for="group in paymentGroups" :key="group.key" :class="{'lf-payment-featured':group.key==='wallet'||group.key==='qris'}" :open="group.key==='wallet'||group.key==='qris'||group.items.some(x=>x.code===paymentChannelCode)">
-                            <summary><strong>{{group.title}}</strong><span class="lf-payment-chevron" aria-hidden="true">⌄</span><span class="lf-payment-summary-brands"><span v-for="channel in group.items" :key="channel.code">{{channel.name}}</span></span></summary>
-                            <div class="lf-payment-list" :class="{'lf-payment-list-wide':group.key==='wallet'||group.key==='qris'}">
+                        <details v-for="group in paymentGroups" :key="group.key" :open="paymentGroups.length===1 || group.items.some(x=>x.code===paymentChannelCode)">
+                            <summary><span class="lf-payment-group-icon">{{group.key==='wallet'?'LF':group.key==='qris'?'QR':group.key==='va'?'VA':'◈'}}</span><span><strong>{{group.title}}</strong><small>{{group.description}}</small></span><b>⌄</b></summary>
+                            <div class="lf-payment-list">
                                 <button v-for="channel in group.items" :key="channel.code" type="button" :class="{selected:paymentChannelCode===channel.code}" @click="choosePayment(channel.code)">
-                                    <span class="lf-payment-brand" :class="'lf-payment-brand-'+group.key">{{group.key==='wallet'?'LFAMILIA CASH':group.key==='qris'?'QRIS':channel.name}}</span>
-                                    <strong class="lf-payment-channel-name">{{channel.name}}</strong>
-                                    <b class="lf-payment-choice">{{paymentChannelCode===channel.code?'✓ Dipilih':'Pilih'}}</b>
-                                    <small class="lf-payment-card-footer">{{channel.description || group.description}}</small>
+                                    <span class="lf-payment-icon">{{group.key==='wallet'?'LF':group.key==='qris'?'QR':group.key==='va'?'VA':'◈'}}</span>
+                                    <span><strong>{{channel.name}}</strong><small>{{channel.description}}</small></span>
+                                    <b>{{paymentChannelCode===channel.code?'Dipilih':'Pilih'}}</b>
                                 </button>
                             </div>
                         </details>
@@ -430,9 +429,9 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <section class="lf-checkout-panel">
                     <header><span>4</span><div><h2>Detail Kontak</h2><p>Dipakai untuk status dan penanganan transaksi jika diperlukan.</p></div></header>
                     <div class="lf-panel-body">
-                        <div v-if="!customer" class="lf-account-fields lf-contact-fields">
+                        <div v-if="!customer" class="lf-account-fields">
                             <label><span>Email *</span><input v-model="guestEmail" type="email" maxlength="255" placeholder="example@gmail.com"></label>
-                            <label><span>No. WhatsApp *</span><div class="lf-phone-input"><span aria-hidden="true">🇮🇩</span><input v-model="guestPhone" type="tel" maxlength="32" autocomplete="tel" placeholder="08xxxxxxxxxx"></div></label>
+                            <label><span>No. WhatsApp *</span><input v-model="guestPhone" type="tel" maxlength="32" placeholder="08xxxxxxxxxx"></label>
                         </div>
                         <div v-else class="lf-customer-checkout-note">
                             <span class="lf-account-avatar">{{customer.name?.slice(0,1)?.toUpperCase()}}</span>
@@ -494,7 +493,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <div class="total"><dt>Total</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
                 </dl>
                 <button type="button" class="lf-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">{{busy==='order'?'Memproses...':'Pesan Sekarang'}}</button>
-                <p class="lf-summary-security">🔒 Pembayaran aman. Periksa rincian sebelum memesan.</p>
+                <p class="lf-summary-security">🔒 Harga dihitung server-side dan dikunci saat pesanan dibuat.</p>
             </aside>
         </div>
 
@@ -527,15 +526,13 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
     </div>
 
     <div v-if="activeTab==='transaction'" class="lf-mobile-checkout-bar">
-        <div class="lf-mobile-selected" :class="{'is-empty':!selectedPackage}" aria-live="polite">
-            <template v-if="selectedPackage">
-                <img v-if="selectedPackage.image_url" :src="selectedPackage.image_url" alt="">
-                <div><strong>{{selectedPackage.name}}</strong><small>{{formatIdr(displayTotal)}}{{quote ? ' · Total pembayaran' : ' · Belum termasuk biaya pembayaran'}}</small></div>
-            </template>
-            <p v-else>Belum ada item produk yang dipilih.</p>
+        <div class="lf-mobile-selected">
+            <img v-if="selectedPackage?.image_url || product.image_url" :src="selectedPackage?.image_url || product.image_url" alt="">
+            <span v-else class="lf-mobile-package-fallback">LF</span>
+            <div><strong>{{selectedPackage?.name || 'Pilih nominal'}}</strong><small>{{formatIdr(displayTotal)}}</small></div>
         </div>
         <div class="lf-mobile-total">
-            <button type="button" :disabled="Boolean(busy)||!selectedPackage||!paymentChannelCode" @click="prepareOrder">{{busy==='order'?'Memproses...':busy==='quote'?'Memeriksa...':'Pesan Sekarang!'}}</button>
+            <button type="button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">Pesan Sekarang</button>
         </div>
     </div>
 
@@ -560,7 +557,6 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
             <dl>
                 <div><dt>Produk</dt><dd>{{product.name}}</dd></div>
                 <div><dt>Nominal</dt><dd>{{selectedPackage?.name}}</dd></div>
-                <div v-for="field in fields" :key="field.field_key"><dt>{{field.label}}</dt><dd>{{customerInput[field.field_key]}}</dd></div>
                 <div v-if="nicknameResult?.nickname"><dt>Nickname</dt><dd>{{nicknameResult.nickname}}</dd></div>
                 <div><dt>Pembayaran</dt><dd>{{paymentChannels.find(x=>x.code===paymentChannelCode)?.name}}</dd></div>
                 <div v-if="quote?.discount_idr"><dt>Diskon</dt><dd>-{{formatIdr(quote.discount_idr)}}</dd></div>
