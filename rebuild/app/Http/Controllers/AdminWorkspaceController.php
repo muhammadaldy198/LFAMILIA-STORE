@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Services\AdminAuditService;
 use App\Services\TransactionalEmailService;
 use App\Services\MembershipService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -339,6 +341,81 @@ class AdminWorkspaceController
             ]),
             'tiers' => DB::table('membership_tiers')->orderBy('rank')->get(),
         ]);
+    }
+
+    public function exportConfiguration(Request $request, AdminAuditService $audit): JsonResponse
+    {
+        $tables = [
+            'system_settings',
+            'membership_tiers',
+            'product_categories',
+            'products',
+            'product_packages',
+            'providers',
+            'provider_mappings',
+            'payment_gateways',
+            'payment_channels',
+            'payment_routes',
+            'vouchers',
+            'home_banners',
+            'faq_entries',
+            'news_articles',
+        ];
+
+        $payload = [
+            'schema' => 'lfamilia-safe-config-v1',
+            'exported_at' => now()->toIso8601String(),
+            'app_version' => config('app.version'),
+            'data' => [],
+        ];
+
+        foreach ($tables as $table) {
+            if (! Schema::hasTable($table)) {
+                continue;
+            }
+
+            $columns = collect(Schema::getColumnListing($table))
+                ->reject(fn (string $column): bool => (bool) preg_match(
+                    '/password|secret|token|credential|api[_-]?key|private|signature|cipher|hash/i',
+                    $column
+                ))
+                ->values()->all();
+
+            if ($table === 'system_settings') {
+                $rows = DB::table($table)
+                    ->where('key', 'not like', 'integration.%')
+                    ->where('key', 'not like', '%secret%')
+                    ->where('key', 'not like', '%password%')
+                    ->where('key', 'not like', '%token%')
+                    ->where('key', 'not like', '%api_key%')
+                    ->orderBy('key')
+                    ->get($columns);
+            } else {
+                $rows = DB::table($table)->orderBy('id')->get($columns);
+            }
+
+            $payload['data'][$table] = $rows;
+        }
+
+        $audit->record(
+            $request,
+            'configuration.exported',
+            'configuration',
+            'safe-json',
+            null,
+            ['tables' => array_keys($payload['data'])]
+        );
+
+        return response()->json(
+            $payload,
+            200,
+            [
+                'Content-Type' => 'application/json; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="lfamilia-config-'.now()->format('Ymd-His').'.json"',
+                'Cache-Control' => 'no-store, private',
+            ],
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+        );
     }
 
     public function updateSettings(Request $request, AdminAuditService $audit): RedirectResponse
