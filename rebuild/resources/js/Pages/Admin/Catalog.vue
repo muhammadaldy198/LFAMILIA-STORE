@@ -42,6 +42,11 @@ const saveFields = () => {
     });
 };
 const saveCategory = (item) => router.put('/admin/catalog/categories/' + item.id, { name: item.name, sort_order: item.sort_order, is_active: item.is_active });
+const deleteCategory = (item) => {
+    if (confirm('Hapus kategori "' + item.name + '"? Kategori yang masih memiliki produk tidak akan bisa dihapus.')) {
+        router.delete('/admin/catalog/categories/' + item.id, { preserveScroll: true });
+    }
+};
 const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
     category_id: item.category_id, name: item.name, description: item.description,
     manual_instructions: item.manual_instructions, margin_percent: item.margin_percent,
@@ -84,6 +89,7 @@ const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { i
                         <label class="text-sm">Urutan<input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-24 rounded-md bg-slate-800 p-2"></label>
                         <label class="flex gap-2 text-sm"><input v-model="item.is_active" type="checkbox">Aktif</label>
                         <button type="button" class="rounded-md bg-slate-700 px-3 py-2 text-sm" @click="saveCategory(item)">Simpan</button>
+                        <button type="button" class="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" @click="deleteCategory(item)">Hapus</button>
                         <span class="text-xs text-slate-500">/{{ item.slug }}</span>
                     </div>
                     <AdminMediaControl type="category" :id="item.id" :url="item.image_url" />
