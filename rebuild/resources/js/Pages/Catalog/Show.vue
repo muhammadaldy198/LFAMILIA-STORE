@@ -121,6 +121,19 @@ const paymentGroups = computed(() => {
         .sort((left, right) => order.indexOf(left.key) - order.indexOf(right.key));
 });
 
+function formatNotice(value) {
+    const zone = props.product?.manual_timezone === 'Asia/Makassar'
+        ? 'WITA'
+        : props.product?.manual_timezone === 'Asia/Jayapura'
+            ? 'WIT'
+            : 'WIB';
+
+    return String(value || '')
+        .replaceAll('{{jam_buka}}', props.product?.manual_open_time || '-')
+        .replaceAll('{{jam_tutup}}', props.product?.manual_close_time || '-')
+        .replaceAll('{{zona_waktu}}', zone);
+}
+
 function noticeVersion(items) {
     let hash = 2166136261;
     for (const character of (items || []).map((item) => `${item.title}\n${item.body}`).join('\n---\n')) {
@@ -815,8 +828,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <button type="button" aria-label="Tutup informasi" @click="closeNotice">×</button>
             </header>
             <div class="lf-product-notice-body">
-                <h2>{{notices[noticeIndex]?.title}}</h2>
-                <p>{{notices[noticeIndex]?.body}}</p>
+                <h2>{{formatNotice(notices[noticeIndex]?.title)}}</h2>
+                <p>{{formatNotice(notices[noticeIndex]?.body)}}</p>
                 <div v-if="notices.length > 1" class="lf-product-notice-actions">
                     <button type="button" class="lf-secondary" :disabled="noticeIndex===0" @click="noticeIndex=Math.max(0,noticeIndex-1)">Sebelumnya</button>
                     <button type="button" class="lf-primary" :disabled="noticeIndex===notices.length-1" @click="noticeIndex=Math.min(notices.length-1,noticeIndex+1)">Berikutnya</button>
