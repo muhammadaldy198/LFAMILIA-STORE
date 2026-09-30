@@ -3668,3 +3668,29 @@
     border-radius:8px!important;
   }
 }
+
+
+/* Legacy checkout icon parity. */
+.lf-product-perks>div:nth-child(2) span,
+.lf-product-perks>div:nth-child(3) span{
+  color:var(--lime)!important;
+}
+.lf-payment-check{
+  width:16px!important;
+  height:16px!important;
+  display:grid!important;
+  place-items:center!important;
+  flex:0 0 16px!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:var(--lime)!important;
+}
+.lf-payment-check svg{
+  width:16px!important;
+  height:16px!important;
+  fill:none!important;
+  stroke:currentColor!important;
+  stroke-width:2!important;
+  stroke-linecap:round!important;
+  stroke-linejoin:round!important;
+}
