@@ -162,6 +162,13 @@ class AdminCatalogController
             'nickname_user_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
             'nickname_server_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
         ]);
+        $categorySlug = (string) Category::whereKey($data['category_id'])->value('slug');
+        if ($categorySlug === 'voucher' && ($data['nickname_check_enabled'] ?? false) === true) {
+            throw ValidationException::withMessages([
+                'nickname_check_enabled' => 'Produk voucher tidak memakai Kode Game Nickname.',
+            ]);
+        }
+
         if (($data['nickname_check_enabled'] ?? false) === true) {
             $fieldKeys = $product->fields()->pluck('field_key')->all();
             if (empty($data['nickname_game_code']) || empty($data['nickname_user_field_key'])) {
