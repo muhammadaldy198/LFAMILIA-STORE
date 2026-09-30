@@ -23,7 +23,11 @@ class SavedGameAccountController
             'customer_input.*' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $product = Product::with('fields')->where('id', $data['product_id'])->where('is_active', true)->firstOrFail();
+        $product = Product::with(['fields', 'category'])
+            ->where('id', $data['product_id'])
+            ->where('is_active', true)
+            ->whereHas('category', fn ($query) => $query->where('slug', 'game'))
+            ->firstOrFail();
         $input = $validator->validate($product, $data['customer_input']);
         $checked = $product->nickname_check_enabled ? $nickname->check($product, $input) : null;
 
