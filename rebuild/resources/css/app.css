@@ -1423,3 +1423,106 @@
 /* Remove legacy popup separators globally for the single-panel design. */
 .lf-home-popup>header{border-bottom:0!important}
 .lf-home-popup-dismiss{border-top:0!important}
+
+
+/* =========================================================
+   MOBILE PASS 2 — FINAL POPUP + BANNER PROPORTION
+   Reference target: supplied Oura mobile screenshot (~2.5:1).
+   ========================================================= */
+@media(max-width:640px){
+  .lf-home-banner{
+    aspect-ratio:5/2!important;
+    min-height:0!important;
+    max-height:none!important;
+  }
+  .lf-home-banner picture,
+  .lf-home-banner a{
+    display:block!important;
+    width:100%!important;
+    height:100%!important;
+  }
+  .lf-home-banner img{
+    display:block!important;
+    width:100%!important;
+    height:100%!important;
+    min-height:0!important;
+    max-height:none!important;
+    aspect-ratio:auto!important;
+    object-fit:cover!important;
+    object-position:center!important;
+  }
+
+  .lf-home-popup-backdrop{
+    align-items:end!important;
+    padding:14px 12px 26px!important;
+  }
+  .lf-home-popup{
+    position:relative!important;
+    width:100%!important;
+    max-width:520px!important;
+    padding:0!important;
+    border:1px solid rgba(255,255,255,.10)!important;
+    border-radius:20px!important;
+    background:#202020!important;
+    box-shadow:0 24px 70px rgba(0,0,0,.58)!important;
+  }
+  .lf-home-popup-close{
+    position:absolute!important;
+    top:12px!important;
+    right:12px!important;
+    z-index:3!important;
+    width:38px!important;
+    height:38px!important;
+    display:grid!important;
+    place-items:center!important;
+    padding:0!important;
+    border:2px solid rgba(220,183,131,.72)!important;
+    border-radius:11px!important;
+    background:transparent!important;
+    color:#ead0a8!important;
+    font-size:25px!important;
+    line-height:1!important;
+  }
+  .lf-home-popup-body{
+    padding:18px 22px 10px!important;
+  }
+  .lf-home-popup-body h2{
+    margin:0!important;
+    padding:0 42px!important;
+    text-align:center!important;
+    font-size:15px!important;
+    line-height:1.35!important;
+    font-weight:900!important;
+  }
+  .lf-home-popup-body>p{
+    margin:12px 0 0!important;
+    white-space:pre-line!important;
+    color:rgba(255,255,255,.78)!important;
+    font-size:12px!important;
+    line-height:1.6!important;
+  }
+  .lf-home-popup-dismiss{
+    display:flex!important;
+    align-items:center!important;
+    gap:9px!important;
+    padding:10px 22px 18px!important;
+    border:0!important;
+    background:transparent!important;
+    color:rgba(255,255,255,.78)!important;
+    font-size:10.5px!important;
+    font-weight:800!important;
+  }
+  .lf-home-popup-dismiss input{
+    width:20px!important;
+    height:20px!important;
+  }
+}
+
+/* Single announcement = one uninterrupted surface. */
+.lf-home-popup>header,
+.lf-home-popup-count,
+.lf-home-popup-actions,
+.lf-home-popup-pager{
+  display:none!important;
+}
+.lf-home-popup-dismiss{border-top:0!important}
