@@ -140,6 +140,107 @@ class CustomerAccountController
         ]);
     }
 
+    public function codes(Request $request): Response
+    {
+        $items = DB::table('orders')
+            ->join('products', 'products.id', '=', 'orders.product_id')
+            ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
+            ->where('orders.user_id', $request->user()->id)
+            ->where('orders.status', 'SUCCESS')
+            ->whereNotNull('orders.delivery_payload')
+            ->orderByDesc('orders.id')
+            ->limit(100)
+            ->get([
+                'orders.id', 'orders.order_number', 'orders.delivery_payload', 'orders.updated_at',
+                'products.name as product_name', 'product_packages.name as package_name',
+            ])
+            ->map(function (object $order): ?array {
+                $delivery = is_string($order->delivery_payload)
+                    ? (json_decode($order->delivery_payload, true) ?: []) : [];
+                $code = trim((string) ($delivery['code'] ?? $delivery['serial_number'] ?? ''));
+                if ($code === '') {
+                    return null;
+                }
+
+                return [
+                    'id' => (int) $order->id,
+                    'order_number' => $order->order_number,
+                    'product_name' => $order->product_name,
+                    'package_name' => $order->package_name,
+                    'code' => $code,
+                    'note' => isset($delivery['note']) ? (string) $delivery['note'] : null,
+                    'delivered_at' => $order->updated_at,
+                ];
+            })->filter()->values();
+
+        return Inertia::render('Customer/Codes', ['items' => $items]);
+    }
+
+    public function gameAccounts(Request $request): Response
+    {
+        return Inertia::render('Customer/GameAccounts', [
+            'accounts' => DB::table('saved_game_accounts as saved')
+                ->join('products', 'products.id', '=', 'saved.product_id')
+                ->where('saved.user_id', $request->user()->id)
+                ->orderByDesc('saved.id')
+                ->get([
+                    'saved.id', 'saved.product_id', 'saved.label', 'saved.customer_input',
+                    'saved.nickname', 'saved.created_at', 'products.name as product_name',
+                ])->map(fn (object $row): array => [
+                    'id' => (int) $row->id,
+                    'product_id' => (int) $row->product_id,
+                    'product_name' => $row->product_name,
+                    'label' => $row->label,
+                    'nickname' => $row->nickname,
+                    'customer_input' => is_string($row->customer_input)
+                        ? (json_decode($row->customer_input, true) ?: []) : (array) $row->customer_input,
+                    'created_at' => $row->created_at,
+                ]),
+        ]);
+    }
+
+    public function notifications(Request $request): Response
+    {
+        $userId = (int) $request->user()->id;
+
+        $orderItems = DB::table('order_events as events')
+            ->join('orders', 'orders.id', '=', 'events.order_id')
+            ->where('orders.user_id', $userId)
+            ->orderByDesc('events.id')
+            ->limit(40)
+            ->get([
+                'events.id', 'events.event_type', 'events.to_status', 'events.created_at',
+                'orders.order_number',
+            ])->map(fn (object $event): array => [
+                'key' => 'order-'.$event->id,
+                'title' => 'Pesanan '.$event->order_number,
+                'detail' => $event->to_status
+                    ? 'Status berubah menjadi '.str_replace('_', ' ', (string) $event->to_status)
+                    : str_replace(['_', '.'], ' ', (string) $event->event_type),
+                'type' => 'ORDER',
+                'at' => $event->created_at,
+            ]);
+
+        $walletItems = DB::table('wallet_topups')
+            ->where('user_id', $userId)
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get(['id', 'amount_idr', 'status', 'created_at'])
+            ->map(fn (object $topup): array => [
+                'key' => 'topup-'.$topup->id,
+                'title' => 'Top up saldo',
+                'detail' => 'Rp'.number_format((int) $topup->amount_idr, 0, ',', '.').' · '.str_replace('_', ' ', (string) $topup->status),
+                'type' => 'WALLET',
+                'at' => $topup->created_at,
+            ]);
+
+        $items = $orderItems->concat($walletItems)
+            ->sortByDesc(fn (array $item) => (string) $item['at'])
+            ->take(50)->values();
+
+        return Inertia::render('Customer/Notifications', ['items' => $items]);
+    }
+
     public function membership(Request $request): Response
     {
         $user = $request->user();
