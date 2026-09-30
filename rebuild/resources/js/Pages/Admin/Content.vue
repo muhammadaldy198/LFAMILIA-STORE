@@ -9,6 +9,7 @@ const props = defineProps({
     news: Array,
     faqs: Array,
     pages: Array,
+    reviews: Array,
     settings: Object,
 });
 
@@ -16,11 +17,13 @@ const assets = ref((props.assets || []).map((x) => ({ ...x })));
 const news = ref((props.news || []).map((x) => ({ ...x })));
 const faqs = ref((props.faqs || []).map((x) => ({ ...x })));
 const pages = ref((props.pages || []).map((x) => ({ ...x })));
+const reviews = ref((props.reviews || []).map((x) => ({ ...x })));
 
 watch(() => props.assets, (v) => { assets.value = (v || []).map((x) => ({ ...x })); });
 watch(() => props.news, (v) => { news.value = (v || []).map((x) => ({ ...x })); });
 watch(() => props.faqs, (v) => { faqs.value = (v || []).map((x) => ({ ...x })); });
 watch(() => props.pages, (v) => { pages.value = (v || []).map((x) => ({ ...x })); });
+watch(() => props.reviews, (v) => { reviews.value = (v || []).map((x) => ({ ...x })); });
 
 const settingsForm = useForm({
     support_widget_enabled: Boolean(props.settings?.['store.support_widget_enabled'] ?? true),
@@ -43,6 +46,16 @@ const newsForm = useForm({
 const faqForm = useForm({
     question: '', answer: '', sort_order: 0, is_active: true,
 });
+
+const assetHint = (key) => ({
+    logo: 'Rekomendasi 512×512 (1:1) · PNG/WebP transparan',
+    favicon: 'Rekomendasi 512×512 (1:1)',
+    banner_desktop: '1920×600 · fokus elemen penting di area tengah',
+    banner_mobile: '1080×1080 · aman untuk crop mobile',
+    popup: 'Rekomendasi 1080×1080 · konten penting jangan terlalu dekat tepi',
+    footer_banner_desktop: '2172×724 · rasio ±3:1',
+    footer_banner_mobile: '1200×400 · rasio 3:1',
+}[key] || 'Gunakan gambar tajam dengan ukuran file efisien.');
 
 const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, {
     is_active: Boolean(asset.is_active),
@@ -74,6 +87,9 @@ const saveFaq = (item) => router.put('/admin/content/faqs/' + item.id, {
 const deleteFaq = (item) => {
     if (confirm('Hapus FAQ ini?')) router.delete('/admin/content/faqs/' + item.id, { preserveScroll: true });
 };
+const saveReview = (item) => router.put('/admin/content/reviews/' + item.id, {
+    is_active: Boolean(item.is_active),
+}, { preserveScroll: true });
 
 const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
     title: item.title,
@@ -105,6 +121,7 @@ const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
                             Link ketika banner ditekan
                             <input v-model="asset.target_url" type="url" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="https://...">
                         </label>
+                        <p class="mt-3 rounded bg-slate-50 px-3 py-2 text-[11px] text-slate-500">{{ assetHint(asset.key) }}</p>
                         <div class="mt-3"><AdminMediaControl type="asset" :id="asset.id" :url="asset.image_url" /></div>
                         <button type="button" class="mt-3 rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="saveAsset(asset)">Simpan</button>
                     </article>
@@ -157,6 +174,26 @@ const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
                         <div class="mt-3"><AdminMediaControl type="news" :id="item.id" :url="item.image_url" /></div>
                         <div class="mt-3 flex gap-2"><button class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="saveNews(item)">Simpan</button><button class="rounded bg-red-50 px-3 py-2 text-xs font-bold text-red-700" @click="deleteNews(item)">Hapus</button></div>
                     </article>
+                </div>
+            </section>
+
+            <section class="rounded-xl border border-slate-200 bg-white p-5">
+                <div class="flex items-center justify-between gap-3"><div><h2 class="text-lg font-bold">Ulasan Pelanggan</h2><p class="mt-1 text-xs text-slate-500">Moderasi ulasan terverifikasi dari order sukses. Isi ulasan tidak diedit oleh Admin.</p></div><span class="rounded bg-slate-100 px-2 py-1 text-xs font-bold">{{reviews.length}} ulasan</span></div>
+                <div class="mt-4 overflow-x-auto rounded-lg border border-slate-200">
+                    <table class="w-full min-w-[780px] text-left text-xs">
+                        <thead class="bg-slate-50 text-slate-500"><tr><th class="p-3">Pelanggan</th><th class="p-3">Produk</th><th class="p-3">Rating</th><th class="p-3">Ulasan</th><th class="p-3">Status</th><th class="p-3">Aksi</th></tr></thead>
+                        <tbody>
+                            <tr v-for="item in reviews" :key="item.id" class="border-t border-slate-200">
+                                <td class="p-3 font-semibold">{{item.display_name}}</td>
+                                <td class="p-3">{{item.product_name}}</td>
+                                <td class="p-3 text-amber-500">{{'★'.repeat(item.rating)}}{{'☆'.repeat(5-item.rating)}}</td>
+                                <td class="max-w-[360px] p-3 text-slate-600">{{item.body}}</td>
+                                <td class="p-3"><label class="flex items-center gap-2"><input v-model="item.is_active" type="checkbox"> Tampil</label></td>
+                                <td class="p-3"><button type="button" class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="saveReview(item)">Simpan</button></td>
+                            </tr>
+                            <tr v-if="!reviews.length"><td colspan="6" class="p-6 text-center text-slate-400">Belum ada ulasan.</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
 
