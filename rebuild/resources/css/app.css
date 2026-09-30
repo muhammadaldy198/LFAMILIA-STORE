@@ -4454,3 +4454,177 @@
     line-height:20px;
   }
 }
+
+
+/* Restored customer account workspaces */
+.lf-account-title{
+  margin:0;
+  color:#fff;
+  font-size:24px!important;
+  font-weight:950!important;
+  letter-spacing:-.035em;
+}
+.lf-account-copy{
+  margin:8px 0 0;
+  max-width:720px;
+  color:rgba(255,255,255,.42);
+  font-size:12px;
+  line-height:20px;
+}
+.lf-account-list{
+  display:grid;
+  gap:10px;
+}
+.lf-account-card{
+  padding:16px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  background:#0d1019;
+}
+.lf-account-card-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.lf-account-card-head>div{
+  min-width:0;
+}
+.lf-account-card-head strong,
+.lf-account-card-head small{
+  display:block;
+}
+.lf-account-card-head strong{
+  color:#fff;
+  font-size:13px;
+  font-weight:900;
+}
+.lf-account-card-head small{
+  margin-top:4px;
+  color:rgba(255,255,255,.34);
+  font-size:9px;
+}
+.lf-account-card-head>span{
+  flex:0 0 auto;
+  padding:4px 7px;
+  border-radius:999px;
+  background:rgba(185,255,53,.10);
+  color:var(--lf-lime-2);
+  font-size:8px;
+  font-weight:900;
+}
+.lf-code-box{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:12px;
+  padding:12px;
+  border-radius:10px;
+  background:rgba(0,0,0,.20);
+}
+.lf-code-box code{
+  min-width:0;
+  overflow-wrap:anywhere;
+  color:var(--lf-lime-2);
+  font-size:14px;
+  font-weight:900;
+}
+.lf-code-box button{
+  flex:0 0 auto;
+  border:0;
+  background:transparent;
+  color:var(--lf-lime-2);
+  font-size:10px;
+  font-weight:900;
+}
+.lf-account-note{
+  margin:10px 0 0;
+  white-space:pre-line;
+  color:rgba(255,255,255,.50);
+  font-size:10px;
+  line-height:17px;
+}
+.lf-account-muted{
+  display:block;
+  margin-top:9px;
+  color:rgba(255,255,255,.24);
+  font-size:8px;
+}
+.lf-account-kv{
+  display:grid;
+  gap:7px;
+  margin:12px 0 0;
+}
+.lf-account-kv>div{
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  padding-top:7px;
+  border-top:1px solid rgba(255,255,255,.06);
+  font-size:10px;
+}
+.lf-account-kv dt{
+  color:rgba(255,255,255,.35);
+  text-transform:capitalize;
+}
+.lf-account-kv dd{
+  margin:0;
+  color:#fff;
+  font-weight:750;
+  text-align:right;
+}
+.lf-danger-link{
+  border:0;
+  background:transparent;
+  color:#fca5a5;
+  font-size:9px;
+  font-weight:800;
+}
+.lf-account-empty{
+  padding:32px 18px;
+  border:1px dashed rgba(255,255,255,.10);
+  border-radius:14px;
+  color:rgba(255,255,255,.32);
+  text-align:center;
+  font-size:11px;
+  line-height:19px;
+}
+.lf-notification-card{
+  display:flex;
+  align-items:flex-start;
+  gap:11px;
+}
+.lf-notification-dot{
+  width:10px;
+  height:10px;
+  margin-top:4px;
+  flex:0 0 10px;
+  border-radius:999px;
+  background:var(--lf-blue-2);
+  box-shadow:0 0 16px rgba(65,160,255,.45);
+}
+.lf-notification-dot.wallet{
+  background:var(--lf-lime);
+  box-shadow:0 0 16px rgba(158,229,45,.40);
+}
+.lf-notification-card>div{
+  min-width:0;
+}
+.lf-notification-card strong{
+  color:#fff;
+  font-size:12px;
+  font-weight:850;
+}
+.lf-notification-card p{
+  margin:4px 0 0;
+  color:rgba(255,255,255,.46);
+  font-size:10px;
+  line-height:17px;
+}
+.lf-notification-card small{
+  display:block;
+  margin-top:6px;
+  color:rgba(255,255,255,.24);
+  font-size:8px;
+}
