@@ -695,9 +695,10 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </div>
                 <dl>
                     <div><dt>Harga</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
-                    <div v-if="quote?.discount_idr"><dt>Diskon</dt><dd class="lf-discount">-{{formatIdr(quote.discount_idr)}}</dd></div>
+                    <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd class="lf-discount">-{{formatIdr(quote.member_discount_idr)}}</dd></div>
+                    <div v-if="quote?.voucher_discount_idr"><dt>Diskon Voucher</dt><dd class="lf-discount">-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
                     <div><dt>Biaya pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
-                    <div class="total"><dt>Total</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
+                    <div class="total"><dt>Total</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
                 </dl>
                 <button type="button" class="lf-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">{{busy==='order'?'Memproses...':'Pesan Sekarang'}}</button>
                 <p class="lf-summary-security">🔒 Harga dihitung server-side dan dikunci saat pesanan dibuat.</p>
@@ -804,6 +805,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <dl class="lf-mobile-summary-lines">
                     <div><dt>Harga Satuan</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
                     <div><dt>Subtotal</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
+                    <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(quote.member_discount_idr)}}</dd></div>
+                    <div v-if="quote?.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
                     <div><dt>Biaya Pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
                     <div class="total"><dt>Total Pembayaran</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
                 </dl>
@@ -889,6 +892,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <div><dt>Item</dt><dd>{{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : '-'}}</dd></div>
                 <div><dt>Produk</dt><dd>{{product.name}}</dd></div>
                 <div><dt>Payment</dt><dd>{{paymentGroups.find(group=>group.items.some(item=>item.code===paymentChannelCode))?.title || '-'}}</dd></div>
+                <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(quote.member_discount_idr)}}</dd></div>
+                <div v-if="quote?.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
                 <div><dt>Biaya Pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
                 <div class="total"><dt>Total Bayar</dt><dd>{{formatIdr(quote?.total_idr)}}</dd></div>
             </dl>
