@@ -589,6 +589,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     ref="turnstile"
                     :site-key="security.turnstile_site_key"
                     :action="security.turnstile_action"
+                    appearance="interaction-only"
                     @token="turnstileToken=$event"
                 />
 
