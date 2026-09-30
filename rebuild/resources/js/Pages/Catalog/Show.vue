@@ -39,6 +39,7 @@ const vouchers = ref([]);
 const voucherLoading = ref(false);
 const voucherError = ref('');
 const confirmOpen = ref(false);
+const summaryOpen = ref(false);
 const selectedSavedId = ref('');
 const turnstile = ref(null);
 const turnstileToken = ref('');
@@ -345,9 +346,9 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <div v-if="reviewStats?.total" class="lf-product-rating"><span>★</span><strong>{{reviewStats.average}}</strong><small>{{reviewStats.total}} ulasan</small></div>
             </div>
             <div class="lf-product-perks">
-                <div><span>⚡</span><strong>Proses Cepat</strong></div>
-                <div><span>◉</span><strong>Layanan Chat</strong></div>
-                <div><span>✓</span><strong>Pembayaran Aman</strong></div>
+                <div><span>⚡</span><strong>Proses cepat</strong></div>
+                <div><span>◉</span><strong>Chat 24/7</strong></div>
+                <div><span>✓</span><strong>Pembayaran aman</strong></div>
             </div>
         </div>
     </section>
@@ -410,7 +411,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel">
-                    <header><span>3</span><div><h2>Pilih Pembayaran</h2><p>Pilih channel pembayaran. Routing gateway ditentukan sistem.</p></div></header>
+                    <header><span>3</span><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang ingin digunakan.</p></div></header>
                     <div class="lf-panel-body lf-payment-groups">
                         <details v-for="group in paymentGroups" :key="group.key" :open="paymentGroups.length===1 || group.items.some(x=>x.code===paymentChannelCode)">
                             <summary><span class="lf-payment-group-icon">{{group.key==='wallet'?'LF':group.key==='qris'?'QR':group.key==='va'?'VA':'◈'}}</span><span><strong>{{group.title}}</strong><small>{{group.description}}</small></span><b>⌄</b></summary>
@@ -427,7 +428,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel">
-                    <header><span>4</span><div><h2>Detail Kontak</h2><p>Dipakai untuk status dan penanganan transaksi jika diperlukan.</p></div></header>
+                    <header><span>4</span><div><h2>Data Pembeli</h2><p>Email dan WhatsApp digunakan untuk invoice serta status transaksi.</p></div></header>
                     <div class="lf-panel-body">
                         <div v-if="!customer" class="lf-account-fields">
                             <label><span>Email *</span><input v-model="guestEmail" type="email" maxlength="255" placeholder="example@gmail.com"></label>
@@ -526,13 +527,34 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
     </div>
 
     <div v-if="activeTab==='transaction'" class="lf-mobile-checkout-bar">
-        <div class="lf-mobile-selected">
-            <img v-if="selectedPackage?.image_url || product.image_url" :src="selectedPackage?.image_url || product.image_url" alt="">
-            <span v-else class="lf-mobile-package-fallback">LF</span>
-            <div><strong>{{selectedPackage?.name || 'Pilih nominal'}}</strong><small>{{formatIdr(displayTotal)}}</small></div>
-        </div>
-        <div class="lf-mobile-total">
-            <button type="button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">Pesan Sekarang</button>
+        <div class="lf-mobile-checkout-inner">
+            <div v-if="summaryOpen" class="lf-mobile-summary-card">
+                <button type="button" class="lf-mobile-summary-head" aria-expanded="true" @click="summaryOpen=false">
+                    <span class="lf-mobile-summary-art">
+                        <img v-if="selectedPackage?.image_url || product.image_url" :src="selectedPackage?.image_url || product.image_url" alt="">
+                        <span v-else class="lf-mobile-package-fallback">LF</span>
+                    </span>
+                    <span class="lf-mobile-summary-copy">
+                        <strong>Ringkasan pesanan</strong>
+                        <small>{{product.name}} · {{selectedPackage?.name || 'Pilih nominal'}}</small>
+                    </span>
+                    <strong class="lf-mobile-summary-price">{{formatIdr(displayTotal)}}</strong>
+                    <span class="lf-mobile-summary-chevron">⌄</span>
+                </button>
+                <dl class="lf-mobile-summary-lines">
+                    <div><dt>Harga</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
+                    <div v-if="quote?.discount_idr"><dt>Diskon</dt><dd>-{{formatIdr(quote.discount_idr)}}</dd></div>
+                    <div><dt>Biaya Pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
+                    <div class="total"><dt>Total Pembayaran</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
+                </dl>
+            </div>
+            <button v-else type="button" class="lf-mobile-summary-toggle" aria-expanded="false" @click="summaryOpen=true">
+                <span><strong>Ringkasan pesanan</strong><small>Ketuk untuk melihat rincian</small></span>
+                <span><strong>{{formatIdr(displayTotal)}}</strong><b>⌃</b></span>
+            </button>
+            <button type="button" class="lf-mobile-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">
+                {{busy==='order'?'Memproses...':'🔒 Pesan Sekarang'}}
+            </button>
         </div>
     </div>
 
