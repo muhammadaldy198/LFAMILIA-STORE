@@ -54,8 +54,6 @@ const turnstileToken = ref('');
 const reviewRating = ref(5);
 const reviewTitle = ref('');
 const reviewBody = ref('');
-const reviewOrderNumber = ref('');
-const reviewPhone = ref('');
 const reviewSaving = ref(false);
 const reviewMessage = ref('');
 const reviewError = ref('');
@@ -223,16 +221,11 @@ async function submitReview() {
                 rating: Number(reviewRating.value),
                 title: reviewTitle.value.trim() || null,
                 body: reviewBody.value.trim(),
-                ...(props.customer ? {} : {
-                    order_number: reviewOrderNumber.value.trim().toUpperCase(),
-                    phone: normalizeWhatsapp(reviewPhone.value),
-                }),
+
             }),
         });
         reviewTitle.value = '';
         reviewBody.value = '';
-        reviewOrderNumber.value = '';
-        reviewPhone.value = '';
         reviewRating.value = 5;
         reviewMessage.value = 'Ulasanmu berhasil ditampilkan sebagai pembelian terverifikasi.';
         router.reload({ only: ['reviews', 'reviewStats'], preserveScroll: true, preserveState: true });
@@ -726,21 +719,15 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </div>
 
                 <div class="lf-review-legacy-grid">
-                    <form class="lf-review-form" @submit.prevent="submitReview">
+                    <form v-if="customer" class="lf-review-form" @submit.prevent="submitReview">
                         <div class="lf-review-form-intro">
                             <span class="lf-review-message-icon">
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
                             </span>
                             <div>
                                 <h3>Bagikan pengalamanmu</h3>
-                                <p>{{customer ? 'Pembelian dari akunmu akan diverifikasi otomatis.' : 'Tidak punya akun? Verifikasi pembelian dengan invoice dan nomor kontak checkout.'}}</p>
+                                <p>Pembelian dari akunmu akan diverifikasi otomatis.</p>
                             </div>
-                        </div>
-
-                        <div v-if="!customer" class="lf-review-guest-fields">
-                            <input v-model="reviewOrderNumber" required maxlength="80" placeholder="Nomor invoice, contoh LFABC123">
-                            <input :value="reviewPhone" required inputmode="tel" autocomplete="tel" maxlength="17" placeholder="Nomor kontak saat checkout" @input="reviewPhone=normalizeWhatsapp($event.target.value)">
-                            <p>Invoice harus sudah lunas dan nomor kontak harus sama dengan data transaksi. Satu invoice hanya bisa memberi satu ulasan.</p>
                         </div>
 
                         <div class="lf-review-stars-input">
@@ -753,6 +740,18 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                         <p v-if="reviewError" class="lf-review-error">{{reviewError}}</p>
                         <button class="lf-review-submit" :disabled="reviewSaving">{{reviewSaving ? 'Menyimpan...' : 'Simpan ulasan'}}</button>
                     </form>
+                    <div v-else class="lf-review-form lf-review-guest-secure">
+                        <div class="lf-review-form-intro">
+                            <span class="lf-review-message-icon">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+                            </span>
+                            <div>
+                                <h3>Ulasan guest tetap tersedia</h3>
+                                <p>Buka status pesanan memakai invoice + kode akses aman. Setelah pesanan Berhasil, formulir ulasan tersedia di halaman pesanan itu.</p>
+                            </div>
+                        </div>
+                        <Link href="/orders/check" class="lf-review-submit lf-review-secure-link">Buka status pesanan</Link>
+                    </div>
 
                     <div class="lf-review-list">
                         <article v-for="review in reviews" :key="review.id">
