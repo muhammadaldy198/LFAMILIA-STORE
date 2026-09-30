@@ -28,6 +28,7 @@ class AdminDashboardController
                 ->count(),
             'wallet_balance' => (int) DB::table('wallets')->sum('balance_idr'),
         ];
+
         return Inertia::render('Admin/Dashboard', [
             'metrics' => $metrics,
             'notifications' => DB::table('admin_notifications as notifications')
