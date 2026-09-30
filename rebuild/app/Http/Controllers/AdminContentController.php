@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\FaqEntry;
 use App\Models\NewsArticle;
+use App\Models\ProductReview;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
 use Illuminate\Http\RedirectResponse;
@@ -38,6 +39,15 @@ class AdminContentController
                 'image_url' => $article->getFirstMediaUrl('image'),
             ]),
             'faqs' => FaqEntry::orderBy('sort_order')->orderBy('id')->get(),
+            'reviews' => ProductReview::query()
+                ->join('products', 'products.id', '=', 'product_reviews.product_id')
+                ->orderByDesc('product_reviews.id')
+                ->limit(200)
+                ->get([
+                    'product_reviews.id', 'product_reviews.display_name', 'product_reviews.rating',
+                    'product_reviews.body', 'product_reviews.is_active', 'product_reviews.published_at',
+                    'products.name as product_name', 'products.slug as product_slug',
+                ]),
             'pages' => DB::table('content_pages')->orderBy('key')->get(),
             'settings' => collect($settingsKeys)->mapWithKeys(fn (string $key): array => [$key => $settings[$key] ?? '']),
         ]);
@@ -103,6 +113,18 @@ class AdminContentController
         $id = $faq->id;
         $faq->delete();
         $audit->record($request, 'content.faq.deleted', 'faq_entry', $id, $before, null);
+
+        return back();
+    }
+
+    public function updateReview(Request $request, ProductReview $review, AdminAuditService $audit): RedirectResponse
+    {
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+        $before = $review->toArray();
+        $review->update($data);
+        $audit->record($request, 'content.review.updated', 'product_review', $review->id, $before, $review->toArray());
 
         return back();
     }
