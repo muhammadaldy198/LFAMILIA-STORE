@@ -284,21 +284,7 @@ async function createOrder() {
             }),
         });
         quote.value = { ...(quote.value || {}), total_idr: checkoutResult.value.total_idr };
-        await nextTick();
-        document.getElementById('lf-checkout-result')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    } catch (error) {
-        errors.value = error.validation || {};
-    } finally {
-        turnstile.value?.reset();
-        busy.value = '';
-    }
-}
 
-async function startPayment() {
-    if (!checkoutResult.value) return;
-    errors.value = {};
-    busy.value = 'payment';
-    try {
         paymentResult.value = await requestJson('/payments/orders/' + encodeURIComponent(checkoutResult.value.order_number), {
             method: 'POST',
             body: JSON.stringify({
@@ -306,11 +292,12 @@ async function startPayment() {
                 access_code: checkoutResult.value.access_code || null,
             }),
         });
-        const redirect = paymentResult.value?.instructions?.redirect_url || paymentResult.value?.instructions?.payment_url;
-        if (redirect) window.location.assign(redirect);
+
+        window.location.assign('/payment?invoice=' + encodeURIComponent(checkoutResult.value.order_number));
     } catch (error) {
-        errors.value = error.validation || {};
+        errors.value = error.validation || { checkout: [error.message || 'Pesanan atau pembayaran gagal dibuat.'] };
     } finally {
+        turnstile.value?.reset();
         busy.value = '';
     }
 }
@@ -402,7 +389,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                 <button v-for="item in group.items" :key="item.id" type="button" :disabled="!item.is_available" :class="{selected:String(selectedPackageId)===String(item.id)}" @click="choosePackage(item)">
                                     <img v-if="item.image_url" :src="item.image_url" :alt="item.name">
                                     <span v-else class="lf-nominal-fallback">◆</span>
-                                    <span class="lf-nominal-copy"><strong>{{item.name}}</strong><small v-if="item.nominal_value">{{Number(item.nominal_value).toLocaleString('id-ID')}}</small></span>
+                                    <span class="lf-nominal-copy"><strong>{{item.name}}</strong></span>
                                     <b>{{item.is_available?formatIdr(item.price_idr):'Tidak tersedia'}}</b>
                                 </button>
                             </div>
@@ -461,23 +448,6 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <p v-for="(messages,key) in errors" :key="key">{{Array.isArray(messages)?messages[0]:messages}}</p>
                 </div>
 
-                <section v-if="checkoutResult" id="lf-checkout-result" class="lf-result-panel">
-                    <h2>Pesanan berhasil dibuat</h2>
-                    <p>Nomor pesanan: <strong>{{checkoutResult.order_number}}</strong></p>
-                    <p v-if="checkoutResult.access_code">Simpan kode akses guest ini untuk melihat detail sensitif pesanan.</p>
-                    <div class="lf-result-actions">
-                        <button class="lf-primary" :disabled="busy==='payment'" @click="startPayment">{{busy==='payment'?'Menyiapkan...':'Bayar Sekarang'}}</button>
-                        <a :href="checkoutResult.status_url" class="lf-secondary">Lihat Status</a>
-                    </div>
-                </section>
-
-                <section v-if="paymentResult" class="lf-result-panel">
-                    <h2>Instruksi Pembayaran</h2>
-                    <p>Status: <strong>{{paymentResult.status}}</strong></p>
-                    <img v-if="paymentResult.instructions?.qr_url" :src="paymentResult.instructions.qr_url" alt="QR pembayaran" class="lf-payment-qr">
-                    <p v-if="paymentResult.instructions?.va_number">Nomor VA: <strong>{{paymentResult.instructions.va_number}}</strong></p>
-                    <a v-if="paymentResult.instructions?.payment_url" :href="paymentResult.instructions.payment_url" class="lf-primary mt-3">Buka Pembayaran</a>
-                </section>
             </div>
 
             <aside class="lf-order-summary">
