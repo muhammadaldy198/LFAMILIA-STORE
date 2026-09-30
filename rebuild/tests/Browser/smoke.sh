@@ -48,7 +48,7 @@ assert_page() {
 assert_page "/" "LFAMILIA STORE"
 assert_page "/login" "Masuk LFAMILIA"
 assert_page "/register" "Daftar LFAMILIA"
-assert_page "/orders/check" "Cek pesanan guest"
+assert_page "/orders/check" "Cek status pesananmu"
 assert_page "/admin/login" "Admin LFAMILIA"
 
 echo "M11 browser smoke passed."
