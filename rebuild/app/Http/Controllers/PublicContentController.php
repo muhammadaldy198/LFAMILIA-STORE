@@ -39,6 +39,26 @@ class PublicContentController
         return Inertia::render('Content/Contact');
     }
 
+    public function terms(): Response
+    {
+        return $this->legal('terms');
+    }
+
+    public function refund(): Response
+    {
+        return $this->legal('refund');
+    }
+
+    public function privacy(): Response
+    {
+        return $this->legal('privacy');
+    }
+
+    public function tools(): Response
+    {
+        return Inertia::render('Content/Tool', ['tool' => 'win-rate']);
+    }
+
     public function legal(string $key): Response
     {
         abort_unless(in_array($key, ['terms', 'refund', 'privacy'], true), 404);
