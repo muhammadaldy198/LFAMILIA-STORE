@@ -1,0 +1,4 @@
+<script setup>
+import {Head} from '@inertiajs/vue3';import CustomerShell from '../../Components/CustomerShell.vue';defineProps({vouchers:Array});const money=v=>'Rp'+Number(v||0).toLocaleString('id-ID');
+</script>
+<template><Head title="Promo"/><CustomerShell><main class="lf-container lf-content-page"><p class="lf-eyebrow">PROMO</p><h1 class="lf-title">Voucher aktif</h1><p class="lf-copy">Gunakan kode yang tersedia pada panel Kode Promo di checkout.</p><div class="lf-promo-grid mt-6"><article v-for="v in vouchers" :key="v.code"><strong>{{v.code}}</strong><p>{{v.discount_type==='PERCENT'?v.discount_value+'%':'Potongan '+money(v.discount_value)}}</p><small>Minimum {{money(v.minimum_total_idr)}}<span v-if="v.ends_at"> · berakhir {{new Date(v.ends_at).toLocaleDateString('id-ID')}}</span></small></article><div v-if="!vouchers?.length" class="lf-empty">Belum ada promo publik aktif.</div></div></main></CustomerShell></template>
