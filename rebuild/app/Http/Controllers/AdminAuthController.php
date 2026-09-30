@@ -13,14 +13,9 @@ use Inertia\Response;
 
 class AdminAuthController
 {
-    public function show(Request $request): Response
+    public function show(): Response
     {
-        $staffPortal = $request->is('staff/*');
-
-        return Inertia::render('Admin/Login', [
-            'loginAction' => $staffPortal ? route('staff.login.store') : route('admin.login.store'),
-            'portal' => $staffPortal ? 'STAFF' : 'ADMIN',
-        ]);
+        return Inertia::render('Admin/Login');
     }
 
     public function login(
@@ -58,22 +53,10 @@ class AdminAuthController
 
         $admin = Auth::guard('admin')->user();
 
-        if (! in_array($admin->role, ['SUPER_ADMIN', 'ADMIN', 'STAFF'], true)) {
+        if (! in_array($admin->role, ['SUPER_ADMIN', 'ADMIN'], true)) {
             Auth::guard('admin')->logout();
 
             throw ValidationException::withMessages(['email' => 'Akses ditolak.']);
-        }
-
-        $staffPortal = $request->is('staff/*');
-        if (($staffPortal && $admin->role !== 'STAFF')
-            || (! $staffPortal && $admin->role === 'STAFF')) {
-            Auth::guard('admin')->logout();
-
-            throw ValidationException::withMessages([
-                'email' => $staffPortal
-                    ? 'Gunakan akun STAFF untuk portal ini.'
-                    : 'Akun STAFF harus masuk melalui portal STAFF.',
-            ]);
         }
 
         $risk->clear('admin', $request->ip(), $identity);
@@ -81,18 +64,15 @@ class AdminAuthController
         $request->session()->regenerate();
         $admin->forceFill(['last_login_at' => now()])->save();
 
-        $landing = $admin->role === 'STAFF' ? route('staff.panel') : route('admin.panel');
-
-        return redirect()->intended($landing);
+        return redirect()->intended(route('admin.panel'));
     }
 
     public function logout(Request $request): RedirectResponse
     {
-        $staffPortal = $request->is('staff/*');
         Auth::guard('admin')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route($staffPortal ? 'staff.login' : 'admin.login');
+        return redirect()->route('admin.login');
     }
 }
