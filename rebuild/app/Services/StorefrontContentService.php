@@ -79,7 +79,9 @@ class StorefrontContentService
                 ),
                 'desktop_url' => $banner->getFirstMediaUrl('desktop'),
                 'mobile_url' => $banner->getFirstMediaUrl('mobile'),
-            ]);
+            ])
+            ->filter(fn (array $banner): bool => $banner['desktop_url'] !== '' || $banner['mobile_url'] !== '')
+            ->values();
     }
 
     public function popups()
