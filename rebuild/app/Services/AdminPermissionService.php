@@ -104,6 +104,14 @@ class AdminPermissionService
 
                 return collect($item['permissions'])
                     ->contains(fn (string $permission): bool => $this->allows($admin, $permission));
-            })->values()->all();
+            })
+            ->map(function (array $item) use ($admin): array {
+                if ($admin?->role === 'STAFF' && str_starts_with($item['href'], '/admin')) {
+                    $item['href'] = '/staff'.substr($item['href'], strlen('/admin'));
+                }
+
+                return $item;
+            })
+            ->values()->all();
     }
 }
