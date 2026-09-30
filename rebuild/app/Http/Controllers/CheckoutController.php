@@ -76,7 +76,6 @@ class CheckoutController
             ->where('is_active', true)
             ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
             ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>=', $now))
-            ->where('minimum_total_idr', '<=', $price['subtotal_idr'])
             ->where(function ($query) use ($price): void {
                 $query->whereNotExists(function ($sub): void {
                     $sub->selectRaw('1')->from('voucher_products')
