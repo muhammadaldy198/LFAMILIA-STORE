@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class CustomerAuthTest extends TestCase
