@@ -688,3 +688,60 @@
     grid-template-columns:1fr 1fr!important;
   }
 }
+
+
+/* =========================================================
+   MOBILE PASS 1 — TYPOGRAPHY + FOOTER BANNER CONSISTENCY
+   ========================================================= */
+@media(max-width:640px){
+  /* Header */
+  .lf-brand-name{font-size:11px!important}
+  .lf-brand-sub{font-size:7px!important}
+  .lf-action{font-size:9px!important}
+
+  /* Drawer */
+  .lf-drawer-head strong{font-size:12px!important}
+  .lf-drawer-head p{font-size:8px!important}
+  .lf-drawer-account .lf-eyebrow{font-size:8px!important}
+  .lf-drawer-account h2{font-size:13px!important}
+  .lf-drawer-account>p:last-of-type{font-size:9px!important}
+  .lf-drawer-account-actions .lf-primary,
+  .lf-drawer-account-actions .lf-secondary{font-size:9px!important}
+  .lf-drawer-profile strong{font-size:10px!important}
+  .lf-drawer-profile small{font-size:8px!important}
+  .lf-drawer-profile + .lf-primary{font-size:9px!important}
+  .lf-drawer-nav a,
+  .lf-drawer-nav a span{font-size:11px!important}
+
+  /* Floating support */
+  .lf-support-panel header strong{font-size:14px!important}
+  .lf-support-panel header small{font-size:10px!important}
+  .lf-support-panel>div>a strong{font-size:12px!important}
+  .lf-support-panel>div>a small{font-size:10px!important}
+
+  /* Footer */
+  .lf-footer-brand-column>p{font-size:11px!important}
+  .lf-footer-column h2{font-size:11px!important}
+  .lf-footer-column a{font-size:11px!important}
+  .lf-footer-copy{font-size:9px!important}
+
+  /* Keep footer artwork ratio identical to Admin guidance: 3:1.
+     The viewport is deliberately short, but crop/ratio remains consistent. */
+  .lf-footer-banner{
+    height:72px!important;
+    aspect-ratio:3/1;
+  }
+  .lf-footer-banner picture{
+    width:100%;
+    height:100%;
+  }
+  .lf-footer-banner img{
+    width:100%!important;
+    height:100%!important;
+    min-height:0!important;
+    max-height:none!important;
+    aspect-ratio:3/1!important;
+    object-fit:cover!important;
+    object-position:center!important;
+  }
+}
