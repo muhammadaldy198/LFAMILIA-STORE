@@ -76,6 +76,9 @@ const promoStep = computed(() => nominalStep.value + 3);
 const hasExternalPaymentOption = computed(() => paymentGroups.value.some((group) =>
     group.key !== 'wallet' && group.items.some((item) => item.available !== false)
 ));
+const hasWalletPaymentOption = computed(() => paymentGroups.value.some((group) =>
+    group.key === 'wallet'
+));
 const firstCheckoutError = computed(() => {
     for (const messages of Object.values(errors.value || {})) {
         if (Array.isArray(messages) && messages.length) return messages[0];
@@ -570,7 +573,10 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-payment-panel">
                     <header><span>{{paymentStep}}</span><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang ingin digunakan.</p></div></header>
                     <div class="lf-panel-body lf-payment-groups">
-                        <div v-if="!hasExternalPaymentOption" class="lf-payment-unavailable">
+                        <div v-if="!paymentChannels?.length" class="lf-payment-unavailable">
+                            Belum ada metode pembayaran aktif.
+                        </div>
+                        <div v-else-if="!hasExternalPaymentOption" class="lf-payment-unavailable">
                             Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi.
                         </div>
                         <div
@@ -625,8 +631,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                 </button>
                             </div>
                         </div>
-                        <p v-if="!paymentChannels?.length" class="lf-warning-note">Belum ada metode pembayaran aktif.</p>
-                        <p v-if="!customer" class="lf-payment-login-hint">Ingin membayar memakai saldo? <Link href="/login">Masuk atau daftar akun</Link>.</p>
+                        <p v-if="!customer && hasWalletPaymentOption" class="lf-payment-login-hint">Ingin membayar memakai saldo? <Link href="/login">Masuk atau daftar akun</Link>.</p>
                     </div>
                 </section>
 
