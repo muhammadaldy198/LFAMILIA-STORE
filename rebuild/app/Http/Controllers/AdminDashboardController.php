@@ -28,10 +28,6 @@ class AdminDashboardController
                 ->count(),
             'wallet_balance' => (int) DB::table('wallets')->sum('balance_idr'),
         ];
-        if ($request->user('admin')->role === 'STAFF') {
-            unset($metrics['revenue_today'], $metrics['wallet_balance']);
-        }
-
         return Inertia::render('Admin/Dashboard', [
             'metrics' => $metrics,
             'notifications' => DB::table('admin_notifications as notifications')
