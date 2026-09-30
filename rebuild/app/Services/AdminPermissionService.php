@@ -31,12 +31,7 @@ class AdminPermissionService
         if ($admin->role === 'SUPER_ADMIN') {
             return true;
         }
-        if (! in_array($admin->role, ['ADMIN', 'STAFF'], true)
-            || ! array_key_exists($permission, self::DEFINITIONS)) {
-            return false;
-        }
-
-        if ($admin->role === 'STAFF' && ! in_array($permission, $this->staffPermissionKeys(), true)) {
+        if ($admin->role !== 'ADMIN' || ! array_key_exists($permission, self::DEFINITIONS)) {
             return false;
         }
 
@@ -49,22 +44,6 @@ class AdminPermissionService
     public function definitions(): array
     {
         return self::DEFINITIONS;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    public function staffPermissionKeys(): array
-    {
-        return [
-            'dashboard.view',
-            'orders.view',
-            'content.manage',
-            'fulfillment.manage',
-            'customers.view',
-            'support.manage',
-            'notifications.view',
-        ];
     }
 
     /**
@@ -106,13 +85,6 @@ class AdminPermissionService
 
                 return collect($item['permissions'])
                     ->contains(fn (string $permission): bool => $this->allows($admin, $permission));
-            })
-            ->map(function (array $item) use ($admin): array {
-                if ($admin?->role === 'STAFF' && str_starts_with($item['href'], '/admin')) {
-                    $item['href'] = '/staff'.substr($item['href'], strlen('/admin'));
-                }
-
-                return $item;
             })
             ->values()->all();
     }
