@@ -18,21 +18,26 @@ class PaymentRoutingService
             ->where('channels.supports_order', true)
             ->orderBy('channels.sort_order')
             ->get()
-            ->filter(function (object $channel) use ($user): bool {
+            ->filter(function (object $channel): bool {
                 try {
-                    $route = $this->resolve((string) $channel->code, false, 'order');
+                    $this->resolve((string) $channel->code, false, 'order');
+
+                    return true;
                 } catch (ValidationException) {
                     return false;
                 }
-
-                return $route['gateway_code'] !== 'WALLET' || $user !== null;
             })
-            ->map(fn (object $channel): array => [
-                'code' => (string) $channel->code,
-                'name' => (string) $channel->name,
-                'group' => $this->publicGroup((string) $channel->code, (string) $channel->name),
-                'description' => $this->publicDescription((string) $channel->code, (string) $channel->name),
-            ])->values()->all();
+            ->map(function (object $channel) use ($user): array {
+                $route = $this->resolve((string) $channel->code, false, 'order');
+
+                return [
+                    'code' => (string) $channel->code,
+                    'name' => (string) $channel->name,
+                    'group' => $this->publicGroup((string) $channel->code, (string) $channel->name),
+                    'description' => $this->publicDescription((string) $channel->code, (string) $channel->name),
+                    'available' => $route['gateway_code'] !== 'WALLET' || $user !== null,
+                ];
+            })->values()->all();
     }
 
     /**
