@@ -263,7 +263,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                     <label class="text-xs">Email<input v-model="settingsForm.email" type="email" class="mt-1 block w-full rounded border border-slate-200 p-2"></label>
                     <label class="text-xs">Instagram URL<input v-model="settingsForm.instagram_url" type="url" class="mt-1 block w-full rounded border border-slate-200 p-2"></label>
                     <label class="text-xs">Discord URL<input v-model="settingsForm.discord_url" type="url" class="mt-1 block w-full rounded border border-slate-200 p-2"></label>
-                    <label class="text-xs">Support URL<input v-model="settingsForm.support_url" type="url" class="mt-1 block w-full rounded border border-slate-200 p-2"></label>
+                    <label class="text-xs">Support URL<input v-model="settingsForm.support_url" type="text" class="mt-1 block w-full rounded border border-slate-200 p-2"></label>
                     <label class="flex items-center gap-2 self-end text-xs"><input v-model="settingsForm.support_widget_enabled" type="checkbox"> Floating bantuan aktif</label>
                     <div class="md:col-span-2"><button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Simpan konten umum</button></div>
                 </form>
