@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureAdminPermission;
 use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsurePhone;
 use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\EnsureStaffRole;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PublicAbuseProtection;
 use App\Http\Middleware\SecurityHeaders;
@@ -26,14 +27,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append([AssignCorrelationId::class, EnforceTrustedHost::class, SecurityHeaders::class]);
         $middleware->web(append: [PublicAbuseProtection::class, HandleInertiaRequests::class]);
         $middleware->statefulApi();
-        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('admin/*')
-            ? route('admin.login') : route('login'));
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('staff/*')
+            ? route('staff.login')
+            : ($request->is('admin/*') ? route('admin.login') : route('login')));
 
         $middleware->alias([
             'phone.required' => EnsurePhone::class,
             'admin.role' => EnsureAdminRole::class,
             'admin.permission' => EnsureAdminPermission::class,
             'admin.super' => EnsureSuperAdmin::class,
+            'staff.only' => EnsureStaffRole::class,
             'customer.activity' => TrackCustomerActivity::class,
         ]);
     })
