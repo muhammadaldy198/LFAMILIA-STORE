@@ -62,8 +62,7 @@ class HandleInertiaRequests extends Middleware
                 } elseif ($path === 'login' && $request->session()->get('security.customer_login_challenge') === true) {
                     $required = true;
                     $action = 'customer_login';
-                } elseif (in_array($path, ['admin/login', 'staff/login'], true)
-                    && $request->session()->get('security.admin_login_challenge') === true) {
+                } elseif ($path === 'admin/login' && $request->session()->get('security.admin_login_challenge') === true) {
                     $required = true;
                     $action = 'admin_login';
                 }
@@ -82,7 +81,7 @@ class HandleInertiaRequests extends Middleware
 
                 return [
                     'admin' => $admin->only('id', 'name', 'email', 'role'),
-                    'base_path' => $admin->role === 'STAFF' ? '/staff' : '/admin',
+                    'base_path' => '/admin',
                     'menu' => $permissions->menu($admin),
                     'can_notifications' => $permissions->allows($admin, 'notifications.view'),
                     'unread_notifications' => Schema::hasTable('admin_notifications')
