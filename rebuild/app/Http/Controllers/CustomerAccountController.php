@@ -51,7 +51,7 @@ class CustomerAccountController
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['required', 'regex:/^\+?[0-9]{8,16}$/'],
             'current_password' => ['nullable', 'string'],
-            'leaderboard_opt_in' => ['required', 'boolean'],
+            'leaderboard_opt_in' => ['sometimes', 'boolean'],
         ]);
         $email = $data['email'];
 
@@ -66,7 +66,9 @@ class CustomerAccountController
             'name' => $data['name'],
             'email' => $email,
             'phone' => $data['phone'],
-            'leaderboard_opt_in' => (bool) $data['leaderboard_opt_in'],
+            'leaderboard_opt_in' => array_key_exists('leaderboard_opt_in', $data)
+                ? (bool) $data['leaderboard_opt_in']
+                : (bool) $user->leaderboard_opt_in,
             'email_verified_at' => $email === $user->email ? $user->email_verified_at : null,
         ])->save();
 
