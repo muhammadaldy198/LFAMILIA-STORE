@@ -58,6 +58,7 @@ class GuestOrderController
             'order' => $order,
             'payment' => $payments->forOrder((int) $order->id),
             'events' => $this->publicEvents((int) $order->id),
+            'review' => DB::table('product_reviews')->where('order_id', $order->id)->first(['rating', 'body']),
         ]);
     }
 
