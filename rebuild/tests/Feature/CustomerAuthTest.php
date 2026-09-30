@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Password;
 use Tests\TestCase;
 
@@ -13,10 +13,14 @@ class CustomerAuthTest extends TestCase
 {
     use DatabaseTransactions;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Queue::fake();
+    }
+
     public function test_customer_can_register_login_and_cannot_enter_admin_panel(): void
     {
-        Notification::fake();
-
         $this->post('/register', [
             'name' => 'Customer',
             'email' => 'CUSTOMER@example.test',
