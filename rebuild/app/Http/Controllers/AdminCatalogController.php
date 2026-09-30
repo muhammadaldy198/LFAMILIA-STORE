@@ -46,7 +46,7 @@ class AdminCatalogController
                     'packages' => $product->packages->sortBy([
                         ['nominal_value', 'asc'], ['sort_order', 'asc'],
                     ])->values()->map(fn (ProductPackage $package): array => [
-                        ...$package->only('id', 'code', 'name', 'group_name', 'nominal_value', 'sort_order', 'is_active'),
+                        ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active'),
                         'image_url' => $package->getFirstMediaUrl('image'),
                         'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
                             ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
@@ -200,6 +200,7 @@ class AdminCatalogController
             'code' => ['required', 'string', 'max:80', 'regex:/^[A-Za-z0-9_-]+$/',
                 Rule::unique('product_packages', 'code')->where('product_id', $product->id)],
             'name' => ['required', 'string', 'max:255'],
+            'note' => ['nullable', 'string', 'max:80'],
             'group_name' => ['nullable', 'string', 'max:120'],
             'nominal_value' => ['nullable', 'integer', 'min:0'],
             'sort_order' => ['required', 'integer', 'min:0'],
@@ -211,6 +212,7 @@ class AdminCatalogController
             $package = $product->packages()->create([
                 'code' => $data['code'],
                 'name' => $data['name'],
+                'note' => $data['note'] ?? null,
                 'group_name' => $data['group_name'] ?? null,
                 'nominal_value' => $data['nominal_value'] ?? null,
                 'sort_order' => $data['sort_order'],
@@ -242,6 +244,7 @@ class AdminCatalogController
             'code' => ['required', 'string', 'max:80', 'regex:/^[A-Za-z0-9_-]+$/',
                 Rule::unique('product_packages', 'code')->where('product_id', $package->product_id)->ignore($package->id)],
             'name' => ['required', 'string', 'max:255'],
+            'note' => ['nullable', 'string', 'max:80'],
             'group_name' => ['nullable', 'string', 'max:120'],
             'nominal_value' => ['nullable', 'integer', 'min:0'],
             'sort_order' => ['required', 'integer', 'min:0'],
