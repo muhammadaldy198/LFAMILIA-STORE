@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\NewsArticle;
 use App\Models\Product;
 use App\Models\ProductPackage;
 use App\Models\StoreAsset;
@@ -21,6 +22,7 @@ class AdminCatalogMediaController
             'product' => Product::findOrFail($id),
             'package' => ProductPackage::findOrFail($id),
             'asset' => StoreAsset::findOrFail($id),
+            'news' => NewsArticle::findOrFail($id),
             default => abort(404),
         };
     }
@@ -28,7 +30,7 @@ class AdminCatalogMediaController
     public function store(Request $request, string $type, int $id, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate([
-            'image' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
+            'image' => ['required', 'image', 'mimes:jpeg,png,webp,gif', 'max:5120'],
             'collection' => ['required', Rule::in($type === 'product' ? ['image', 'banner'] : ['image'])],
         ]);
         $model = $this->target($type, $id);
