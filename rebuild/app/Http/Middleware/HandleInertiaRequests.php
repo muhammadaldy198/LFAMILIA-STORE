@@ -62,7 +62,8 @@ class HandleInertiaRequests extends Middleware
                 } elseif ($path === 'login' && $request->session()->get('security.customer_login_challenge') === true) {
                     $required = true;
                     $action = 'customer_login';
-                } elseif ($path === 'admin/login' && $request->session()->get('security.admin_login_challenge') === true) {
+                } elseif (in_array($path, ['admin/login', 'staff/login'], true)
+                    && $request->session()->get('security.admin_login_challenge') === true) {
                     $required = true;
                     $action = 'admin_login';
                 }
