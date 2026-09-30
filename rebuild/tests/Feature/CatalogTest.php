@@ -205,21 +205,28 @@ class CatalogTest extends TestCase
         $this->post('/admin/content/popups', [
             'title' => 'Popup Managed',
             'body' => 'Isi popup yang bisa diedit Admin.',
-            'primary_label' => 'Buka Promo',
-            'primary_href' => '/promo',
-            'secondary_label' => '',
-            'secondary_href' => null,
             'dismiss_days' => 3,
-            'sort_order' => 0,
             'is_active' => true,
         ])->assertRedirect();
+
+        $this->post('/admin/content/popups', [
+            'title' => 'Popup Managed Updated',
+            'body' => 'Tetap satu record popup.',
+            'dismiss_days' => 5,
+            'is_active' => true,
+        ])->assertRedirect();
+
+        $this->assertSame(1, DB::table('site_popups')->count());
 
         $this->get('/')->assertInertia(fn (Assert $page) => $page
             ->component('Catalog/Index')
             ->where('banners.0.title', 'Promo Managed')
             ->where('banners.0.desktop_url', $banner->fresh()->getFirstMediaUrl('desktop'))
             ->where('banners.0.mobile_url', $banner->fresh()->getFirstMediaUrl('mobile'))
-            ->where('popups', fn ($popups) => collect($popups)->contains(fn ($popup) => $popup['title'] === 'Popup Managed'))
+            ->where('popups.0.title', 'Popup Managed Updated')
+            ->where('popups.0.body', 'Tetap satu record popup.')
+            ->where('popups.0.dismiss_days', 5)
+            ->missing('popups.1')
             ->etc());
     }
 
