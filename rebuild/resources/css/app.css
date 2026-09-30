@@ -2546,3 +2546,62 @@
     font-size:15px!important;
   }
 }
+
+
+/* Checkout parity helpers used by the legacy structure port. */
+.lf-account-product-mobile{display:none}
+.lf-payment-group-card{overflow:hidden;border:1px solid var(--lf-line);border-radius:10px;background:#060a10}
+.lf-payment-group-main{width:100%;display:flex;align-items:center;gap:10px;padding:10px 12px;border:0;background:transparent;color:#fff;text-align:left;cursor:pointer}
+.lf-payment-group-copy{min-width:0;flex:1}
+.lf-payment-group-copy strong,.lf-payment-group-copy small{display:block}
+.lf-payment-group-copy strong{font-size:11px}
+.lf-payment-group-copy small{margin-top:3px;color:rgba(255,255,255,.33);font-size:8px}
+.lf-payment-check{color:var(--lf-lime);font-size:12px;font-weight:950}
+.lf-payment-wallet-art{width:38px;height:38px;display:block;overflow:hidden;flex:0 0 auto;border:1px solid var(--lf-line);border-radius:9px;background:#000}
+.lf-payment-wallet-art img{width:100%;height:100%;object-fit:cover}
+.lf-payment-brand-strip{display:flex;align-items:center;gap:7px;overflow:hidden;padding:7px 12px;border-top:1px solid var(--lf-line);background:#05080d}
+.lf-payment-brand-strip>span{white-space:nowrap;color:rgba(255,255,255,.55);font-size:8px;font-weight:750}
+.lf-payment-channel-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:10px;border-top:1px solid var(--lf-line);background:#05080d}
+.lf-payment-channel-grid button{min-height:40px;border:1px solid var(--lf-line);border-radius:8px;background:#080c12;color:rgba(255,255,255,.55);font-size:9px;font-weight:800}
+.lf-payment-channel-grid button.selected{border-color:rgba(158,229,45,.55);background:rgba(158,229,45,.08);color:var(--lf-lime-2)}
+.lf-payment-login-hint{margin:10px 0 0;color:rgba(255,255,255,.4);font-size:9px}
+.lf-payment-login-hint a{color:var(--lf-lime-2);text-decoration:none;font-weight:800}
+.lf-checkout-info-note{margin-top:11px;padding:10px 12px;border:1px solid var(--lf-line);border-radius:9px;background:rgba(255,255,255,.025);color:rgba(255,255,255,.42);font-size:9px;line-height:1.55}
+.lf-contact-privacy{margin:10px 0 0;color:rgba(255,255,255,.32);font-size:9px;line-height:16px}
+
+/* Product notice dialog from the legacy checkout. */
+.lf-product-notice-modal{width:min(512px,100%);overflow:hidden;border:1px solid rgba(255,255,255,.10);border-radius:14px;background:#080b14;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.lf-product-notice-modal>header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid rgba(255,255,255,.08)}
+.lf-product-notice-modal>header>span{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:rgba(255,255,255,.4);font-size:12px}
+.lf-product-notice-modal>header>button{width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:rgba(255,255,255,.55);font-size:22px;line-height:1;cursor:pointer}
+.lf-product-notice-body{padding:24px}
+.lf-product-notice-body h2{margin:0;font-size:18px;font-weight:900;line-height:28px;text-transform:uppercase}
+.lf-product-notice-body p{margin:8px 0 0;white-space:pre-line;color:rgba(255,255,255,.64);font-size:14px;line-height:28px}
+.lf-product-notice-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px}
+.lf-product-notice-dismiss{display:flex;align-items:center;gap:12px;padding:20px 24px;border-top:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.45);font-size:12px;cursor:pointer}
+.lf-product-notice-dismiss input{width:16px;height:16px;accent-color:var(--lime)}
+
+@media(max-width:639px){
+  .lf-checkout-info-note{
+    margin-top:12px!important;
+    padding:10px!important;
+    border-radius:6.4px!important;
+    font-size:10px!important;
+    line-height:16px!important;
+  }
+  .lf-contact-privacy{
+    margin:10px 0 0!important;
+    color:rgba(255,255,255,.32)!important;
+    font-size:9px!important;
+    line-height:16px!important;
+  }
+  .lf-product-notice-modal{
+    width:min(512px,100%)!important;
+    border-radius:10px!important;
+  }
+  .lf-product-notice-modal>header{padding:16px 24px!important}
+  .lf-product-notice-body{padding:24px!important}
+  .lf-product-notice-body h2{font-size:18px!important;line-height:28px!important}
+  .lf-product-notice-body p{font-size:14px!important;line-height:28px!important}
+  .lf-product-notice-dismiss{padding:20px 24px!important;font-size:12px!important}
+}
