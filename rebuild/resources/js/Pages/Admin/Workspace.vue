@@ -15,11 +15,13 @@ const props = defineProps({
     checks: { type: Array, default: () => [] },
     voucherCategories: { type: Array, default: () => [] },
     voucherProducts: { type: Array, default: () => [] },
+    popularProducts: { type: Array, default: () => [] },
 });
 const page = usePage();
 const base = computed(() => page.props.adminPanel?.base_path || '/admin');
 const isSuper = computed(() => page.props.adminPanel?.admin?.role === 'SUPER_ADMIN');
 const rows = reactive(Array.isArray(props.rows) ? props.rows.map((row) => ({ ...row })) : (props.rows?.data || []).map((row) => ({ ...row })));
+const popularProducts = reactive((props.popularProducts || []).map((row) => ({ ...row })));
 
 const voucherForm = useForm({
     code: '', discount_type: 'FIXED', discount_value: 1000, minimum_total_idr: 0,
@@ -40,6 +42,11 @@ const settingsForm = useForm({
 
 function updateProvider(row) {
     router.put('/admin/providers/' + row.id, { is_active: row.is_active }, { preserveScroll: true });
+}
+function savePopularProduct(row) {
+    router.put('/admin/vouchers/popular/' + row.id, {
+        popular: Boolean(row.popular),
+    }, { preserveScroll: true });
 }
 function saveVoucher(row) {
     router.put('/admin/vouchers/' + row.id, {
@@ -118,6 +125,26 @@ function adjustWallet(row) {
             </section>
 
             <section v-else-if="kind === 'vouchers'" class="space-y-5">
+                <div class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+                    <div class="flex flex-wrap items-end justify-between gap-3">
+                        <div>
+                            <h2 class="text-xl font-semibold">Populer Sekarang</h2>
+                            <p class="mt-1 text-xs text-slate-500">Produk bertanda populer diprioritaskan di homepage. Jika slot belum penuh, homepage melanjutkan dengan produk aktif berulasan terbanyak seperti repo LFAMILIA sebelumnya.</p>
+                        </div>
+                    </div>
+                    <div class="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                        <article v-for="product in popularProducts" :key="product.id" class="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 p-3">
+                            <div class="min-w-0">
+                                <strong class="block truncate text-sm">{{product.name}}</strong>
+                                <span class="text-[10px] text-slate-500">{{product.category_name}} · {{product.is_active ? 'Aktif' : 'Nonaktif'}}</span>
+                            </div>
+                            <label class="flex shrink-0 items-center gap-2 text-xs">
+                                <input v-model="product.popular" type="checkbox" @change="savePopularProduct(product)">
+                                Populer
+                            </label>
+                        </article>
+                    </div>
+                </div>
                 <form class="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-5 md:grid-cols-4" @submit.prevent="voucherForm.post('/admin/vouchers', { preserveScroll: true, onSuccess: () => voucherForm.reset() })">
                     <input v-model="voucherForm.code" required placeholder="Kode voucher" class="rounded bg-slate-800 p-2">
                     <select v-model="voucherForm.discount_type" class="rounded bg-slate-800 p-2"><option>FIXED</option><option>PERCENT</option></select>

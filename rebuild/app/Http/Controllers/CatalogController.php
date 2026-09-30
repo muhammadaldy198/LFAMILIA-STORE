@@ -50,6 +50,24 @@ class CatalogController
                 'image_url' => $product->getFirstMediaUrl('image'),
             ]);
 
+        $popularProducts = Product::with('category')
+            ->withCount(['reviews as active_reviews_count' => fn ($query) => $query->where('is_active', true)])
+            ->where('is_active', true)
+            ->whereHas('category', fn ($query) => $query->where('is_active', true))
+            ->whereHas('packages', fn ($query) => $query->where('is_active', true))
+            ->orderByDesc('popular')
+            ->orderByDesc('active_reviews_count')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->limit(8)
+            ->get()
+            ->map(fn (Product $product): array => [
+                ...$product->only('name', 'slug', 'popular'),
+                'category_name' => $product->category->name,
+                'category_slug' => $product->category->slug,
+                'image_url' => $product->getFirstMediaUrl('image'),
+            ]);
+
         $assets = StoreAsset::where('is_active', true)->get()->keyBy('key');
         $banners = $content->homeBanners();
         if ($banners->isEmpty()) {
@@ -74,6 +92,7 @@ class CatalogController
         return Inertia::render('Catalog/Index', [
             'categories' => $categories,
             'products' => $products,
+            'popularProducts' => $popularProducts,
             'filters' => $filters,
             'logoUrl' => $assets->get('logo')?->getFirstMediaUrl('image'),
             'faviconUrl' => $assets->get('favicon')?->getFirstMediaUrl('image'),

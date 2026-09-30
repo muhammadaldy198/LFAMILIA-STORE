@@ -203,6 +203,17 @@ class AdminWorkspaceController
                 ->get(['id', 'name']),
             'voucherProducts' => DB::table('products')->orderBy('sort_order')->orderBy('name')
                 ->get(['id', 'name', 'category_id']),
+            'popularProducts' => DB::table('products as products')
+                ->join('product_categories as categories', 'categories.id', '=', 'products.category_id')
+                ->orderByDesc('products.popular')->orderBy('products.sort_order')->orderBy('products.name')
+                ->get([
+                    'products.id', 'products.name', 'products.popular', 'products.is_active',
+                    'categories.name as category_name',
+                ])->map(fn (object $product): array => [
+                    ...((array) $product),
+                    'popular' => (bool) $product->popular,
+                    'is_active' => (bool) $product->is_active,
+                ]),
         ]);
     }
 
@@ -290,6 +301,31 @@ class AdminWorkspaceController
             ...$data,
             'product_ids' => $productIds,
             'category_ids' => $categoryIds,
+        ]);
+
+        return back();
+    }
+
+    public function updatePopularProduct(
+        Request $request,
+        int $productId,
+        AdminAuditService $audit,
+    ): RedirectResponse {
+        $data = $request->validate([
+            'popular' => ['required', 'boolean'],
+        ]);
+        $before = DB::table('products')->where('id', $productId)->first();
+        abort_unless($before, 404);
+
+        DB::table('products')->where('id', $productId)->update([
+            'popular' => (bool) $data['popular'],
+            'updated_at' => now(),
+        ]);
+
+        $audit->record($request, 'promotion.popular.updated', 'product', $productId, [
+            'popular' => (bool) $before->popular,
+        ], [
+            'popular' => (bool) $data['popular'],
         ]);
 
         return back();

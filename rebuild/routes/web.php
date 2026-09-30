@@ -253,6 +253,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         ->name('admin.vouchers.')->group(function (): void {
             Route::get('/', [AdminWorkspaceController::class, 'vouchers'])->name('index');
             Route::post('/', [AdminWorkspaceController::class, 'storeVoucher'])->name('store');
+            Route::put('/popular/{productId}', [AdminWorkspaceController::class, 'updatePopularProduct'])
+                ->name('popular.update');
             Route::put('/{id}', [AdminWorkspaceController::class, 'updateVoucher'])->name('update');
         });
 

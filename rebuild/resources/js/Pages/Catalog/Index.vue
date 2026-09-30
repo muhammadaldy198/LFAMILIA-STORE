@@ -4,7 +4,7 @@ import {computed,onMounted,onUnmounted,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 
 const p=defineProps({
-    categories:Array,products:Object,filters:Object,logoUrl:String,faviconUrl:String,
+    categories:Array,products:Object,popularProducts:Array,filters:Object,logoUrl:String,faviconUrl:String,
     banners:Array,popups:Array,news:Array,reviews:Array,
 });
 const page=usePage();
@@ -20,7 +20,7 @@ let mediaQuery=null;
 const visibleBanners=computed(()=>(p.banners||[]).filter((item)=>mobile.value ? item.show_mobile!==false : item.show_desktop!==false));
 const activeBanner=computed(()=>visibleBanners.value[Math.min(bannerIndex.value,Math.max(visibleBanners.value.length-1,0))]||null);
 const activePopup=computed(()=>popupItem.value);
-const popular=computed(()=>(p.products?.data??[]).slice(0,8));
+const popular=computed(()=>p.popularProducts??[]);
 const q=(x={})=>{const a={...p.filters,...x};Object.keys(a).forEach(k=>{if(!a[k])delete a[k]});const s=new URLSearchParams(a).toString();return s?'/?'+s:'/'};
 const submit=()=>router.get('/',{...p.filters,q:search.value},{preserveState:true,preserveScroll:true});
 const initial=n=>(n||'L').slice(0,1).toUpperCase();

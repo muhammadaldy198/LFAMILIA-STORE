@@ -222,6 +222,28 @@ class StorefrontParityTest extends TestCase
             ])->assertUnprocessable();
     }
 
+    public function test_popular_now_restores_legacy_priority_and_can_be_controlled_from_promo(): void
+    {
+        $catalog = $this->catalog();
+        $catalog['product']->update(['popular' => true]);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Index')
+                ->where('popularProducts.0.slug', $catalog['product']->slug)
+                ->where('popularProducts.0.popular', true)
+                ->etc());
+
+        $admin = $this->superAdmin();
+        $this->actingAs($admin, 'admin');
+        $this->put('/admin/vouchers/popular/'.$catalog['product']->id, [
+            'popular' => false,
+        ])->assertRedirect();
+
+        $this->assertFalse((bool) $catalog['product']->fresh()->popular);
+    }
+
     public function test_super_admin_can_manage_product_notice_group_publisher_and_review_visibility(): void
     {
         $catalog = $this->catalog();

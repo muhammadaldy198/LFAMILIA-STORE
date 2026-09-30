@@ -14,7 +14,7 @@ class Product extends Model implements HasMedia
 
     protected $fillable = [
         'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
-        'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active',
+        'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active', 'popular',
         'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
         'nickname_server_field_key',
     ];
@@ -23,6 +23,7 @@ class Product extends Model implements HasMedia
     {
         return [
             'is_active' => 'boolean',
+            'popular' => 'boolean',
             'nickname_check_enabled' => 'boolean',
         ];
     }
