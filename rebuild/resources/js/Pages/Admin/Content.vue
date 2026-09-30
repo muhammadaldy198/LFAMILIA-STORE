@@ -50,7 +50,7 @@ const bannerForm = useForm({
 });
 
 const popupForm = useForm({
-    title: 'Pengumuman LFAMILIA STORE', body: '', dismiss_days: 7, sort_order: 0, is_active: true,
+    title: 'Pengumuman LFAMILIA STORE', body: '', dismiss_days: 7, is_active: true,
 });
 
 const newsForm = useForm({
@@ -94,12 +94,8 @@ const savePopup = (item) => router.put('/admin/content/popups/' + item.id, {
     title: item.title,
     body: item.body,
     dismiss_days: Number(item.dismiss_days || 0),
-    sort_order: Number(item.sort_order || 0),
     is_active: Boolean(item.is_active),
 }, { preserveScroll: true });
-const deletePopup = (item) => {
-    if (confirm('Hapus pop-up ini?')) router.delete('/admin/content/popups/' + item.id, { preserveScroll: true });
-};
 
 
 const saveNews = (item) => router.put('/admin/content/news/' + item.id, {
@@ -210,9 +206,8 @@ const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
                 <form v-if="!popups.length" class="mt-4 grid gap-3" @submit.prevent="popupForm.post('/admin/content/popups', { preserveScroll: true })">
                     <input v-model="popupForm.title" required placeholder="Judul pop-up" class="rounded border border-slate-200 p-2 text-sm">
                     <textarea v-model="popupForm.body" required rows="5" placeholder="Isi pengumuman" class="rounded border border-slate-200 p-2 text-sm"></textarea>
-                    <div class="grid gap-3 sm:grid-cols-3">
+                    <div class="grid gap-3 sm:grid-cols-2">
                         <label class="text-xs">Jangan tampil lagi selama (hari)<input v-model.number="popupForm.dismiss_days" type="number" min="0" max="365" class="mt-1 w-full rounded border border-slate-200 p-2 text-sm"></label>
-                        <label class="text-xs">Urutan<input v-model.number="popupForm.sort_order" type="number" min="0" class="mt-1 w-full rounded border border-slate-200 p-2 text-sm"></label>
                         <label class="flex items-center gap-2 self-end pb-2 text-xs"><input v-model="popupForm.is_active" type="checkbox"> Aktif</label>
                     </div>
                     <div><button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Simpan Pop-up</button></div>
@@ -221,14 +216,12 @@ const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
                 <article v-else class="mt-4 rounded-lg border border-slate-200 p-4">
                     <input v-model="popups[0].title" class="w-full rounded border border-slate-200 p-2 text-sm" placeholder="Judul pop-up">
                     <textarea v-model="popups[0].body" rows="5" class="mt-3 w-full rounded border border-slate-200 p-2 text-sm" placeholder="Isi pengumuman"></textarea>
-                    <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
                         <label class="text-xs">Jangan tampil lagi selama (hari)<input v-model.number="popups[0].dismiss_days" type="number" min="0" max="365" class="mt-1 w-full rounded border border-slate-200 p-2 text-sm"></label>
-                        <label class="text-xs">Urutan<input v-model.number="popups[0].sort_order" type="number" min="0" class="mt-1 w-full rounded border border-slate-200 p-2 text-sm"></label>
                         <label class="flex items-center gap-2 self-end pb-2 text-xs"><input v-model="popups[0].is_active" type="checkbox"> Aktif</label>
                     </div>
-                    <div class="mt-3 flex gap-2">
+                    <div class="mt-3">
                         <button type="button" class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="savePopup(popups[0])">Simpan</button>
-                        <button type="button" class="rounded bg-red-50 px-3 py-2 text-xs font-bold text-red-700" @click="deletePopup(popups[0])">Hapus</button>
                     </div>
                 </article>
             </section>
