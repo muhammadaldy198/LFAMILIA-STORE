@@ -33,6 +33,10 @@ class NicknameService
      */
     public function check(Product $product, array $input): array
     {
+        if ($product->relationLoaded('category') && strtolower((string) $product->category?->slug) === 'voucher') {
+            return $this->unsupported();
+        }
+
         if (! $product->nickname_check_enabled) {
             return $this->unsupported();
         }
