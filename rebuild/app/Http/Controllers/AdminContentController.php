@@ -244,7 +244,7 @@ class AdminContentController
             'instagram_url' => ['nullable', 'url:http,https', 'max:500'],
             'email' => ['nullable', 'email:rfc', 'max:255'],
             'discord_url' => ['nullable', 'url:http,https', 'max:500'],
-            'support_url' => ['nullable', 'url:http,https', 'max:500'],
+            'support_url' => ['nullable', 'string', 'max:500', 'regex:/^(\/(?!\/)|https?:\/\/)/i'],
             'business_hours' => ['nullable', 'string', 'max:500'],
         ]);
         $map = [
