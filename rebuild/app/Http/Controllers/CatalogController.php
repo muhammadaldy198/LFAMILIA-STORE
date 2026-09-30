@@ -70,6 +70,7 @@ class CatalogController
         string $slug,
         CheckoutPricing $pricing,
         PaymentRoutingService $paymentRouting,
+        StorefrontContentService $content,
     ): Response {
         $product = Product::with('category')->where('slug', $slug)
             ->where('is_active', true)
@@ -141,6 +142,7 @@ class CatalogController
                 'total' => (int) ($reviewStats?->total ?? 0),
                 'average' => round((float) ($reviewStats?->average ?? 0), 1),
             ],
+            'faqs' => $content->faqs()->take(6)->values(),
             'faviconUrl' => StoreAsset::where('key', 'favicon')->where('is_active', true)
                 ->first()?->getFirstMediaUrl('image'),
         ]);
