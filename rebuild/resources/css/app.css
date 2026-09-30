@@ -1529,384 +1529,598 @@
 
 
 /* =========================================================
-   MOBILE PASS 3 — PRODUCT + CHECKOUT
-   Mobile-first. Desktop remains unchanged until mobile is approved.
+   MOBILE CHECKOUT — LEGACY LFAMILIA PARITY
+   Source of truth: pre-Laravel app/checkout/page.tsx.
+   Vue/Inertia is only the Laravel presentation layer; no redesign.
    ========================================================= */
 @media(max-width:640px){
   .lf-checkout-page{
-    padding-bottom:96px!important;
+    min-height:calc(100vh - 66px)!important;
+    padding-bottom:118px!important;
+    background:#17191d!important;
   }
 
-  /* Product hero + identity */
+  /* Legacy checkout banner: h-44 on phone. */
   .lf-product-hero{
-    height:190px!important;
+    height:176px!important;
+    background:#10131b!important;
   }
   .lf-product-hero>img{
+    width:100%!important;
+    height:100%!important;
     object-fit:cover!important;
     object-position:center!important;
   }
+
+  /* Legacy product identity: flat square artwork, not a redesigned 3D card. */
+  .lf-product-identity{
+    overflow:visible!important;
+    border-block:1px solid rgba(255,255,255,.10)!important;
+    background:#202224!important;
+  }
   .lf-product-identity-inner{
-    min-height:156px!important;
-    grid-template-columns:102px minmax(0,1fr)!important;
-    grid-template-rows:86px 50px!important;
-    column-gap:10px!important;
-    padding-top:10px!important;
-    padding-bottom:8px!important;
+    position:relative!important;
+    min-height:118px!important;
+    display:block!important;
+    padding-top:12px!important;
+    padding-bottom:12px!important;
   }
   .lf-product-cover-3d{
-    left:2px!important;
-    top:-34px!important;
-    width:94px!important;
-    height:118px!important;
-    border-radius:15px!important;
-    transform:perspective(650px) rotateY(7deg) rotateZ(-2deg)!important;
-    box-shadow:15px 20px 28px -22px rgba(0,0,0,.95)!important;
+    position:absolute!important;
+    left:0!important;
+    top:-48px!important;
+    width:96px!important;
+    height:96px!important;
+    overflow:hidden!important;
+    border:3px solid #202224!important;
+    border-radius:14px!important;
+    background:#11151c!important;
+    box-shadow:0 14px 30px rgba(0,0,0,.42)!important;
+    transform:none!important;
+  }
+  .lf-product-cover-3d::after{display:none!important}
+  .lf-product-cover-3d img{
+    width:100%!important;
+    height:100%!important;
+    object-fit:cover!important;
   }
   .lf-product-title{
-    min-width:0;
-    padding:4px 0 0!important;
+    min-width:0!important;
+    padding:4px 0 0 112px!important;
   }
   .lf-product-title h1{
-    overflow:hidden;
-    text-overflow:ellipsis;
-    font-size:17px!important;
-    line-height:1.2!important;
-    letter-spacing:.01em!important;
-    white-space:nowrap;
+    margin:0!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+    font-size:14px!important;
+    line-height:1.25!important;
+    font-weight:900!important;
+    letter-spacing:.06em!important;
+    text-transform:uppercase!important;
   }
   .lf-product-title p{
-    margin-top:5px!important;
-    overflow:hidden;
-    text-overflow:ellipsis;
+    margin:5px 0 0!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+    color:rgba(255,255,255,.55)!important;
     font-size:10px!important;
-    white-space:nowrap;
   }
-  .lf-product-rating{
-    gap:5px!important;
-    margin-top:6px!important;
-  }
-  .lf-product-rating strong{font-size:10px!important}
-  .lf-product-rating small{font-size:8.5px!important}
+  .lf-product-rating{display:none!important}
   .lf-product-perks{
-    grid-row:2!important;
-    gap:4px!important;
-    padding-top:3px;
+    position:absolute!important;
+    left:0!important;
+    right:0!important;
+    bottom:11px!important;
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:8px!important;
   }
   .lf-product-perks>div{
-    gap:4px!important;
-    font-size:8.5px!important;
-    line-height:1.15;
+    display:block!important;
+    color:rgba(255,255,255,.50)!important;
+    font-size:8px!important;
+    line-height:1.25!important;
+    text-align:center!important;
   }
-  .lf-product-perks span{font-size:13px!important}
+  .lf-product-perks span{
+    display:block!important;
+    margin-bottom:2px!important;
+    color:#cfff72!important;
+    font-size:14px!important;
+  }
 
-  /* Tabs + panel rhythm */
+  /* Legacy Transaksi / Keterangan switch. */
   .lf-checkout-tabs{
     width:100%!important;
     max-width:none!important;
-    margin-top:11px!important;
-    padding:3px!important;
-    border-radius:10px!important;
+    margin:12px auto 0!important;
+    padding:4px!important;
+    border:1px solid rgba(255,255,255,.07)!important;
+    border-radius:8px!important;
+    background:rgba(255,255,255,.04)!important;
   }
   .lf-checkout-tabs button{
-    height:37px!important;
-    border-radius:7px!important;
-    font-size:10.5px!important;
+    height:34px!important;
+    border-radius:6px!important;
+    color:rgba(255,255,255,.50)!important;
+    font-size:11px!important;
+    font-weight:800!important;
   }
+  .lf-checkout-tabs button.active{
+    background:#bca17d!important;
+    color:#fff!important;
+    box-shadow:none!important;
+  }
+
   .lf-checkout-grid{
-    margin-top:9px!important;
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:10px!important;
+    margin-top:10px!important;
     padding-bottom:0!important;
   }
   .lf-checkout-panels{
-    gap:9px!important;
+    display:grid!important;
+    gap:10px!important;
   }
+
+  /* Legacy panel surface from old checkout. */
   .lf-checkout-panel,
   .lf-result-panel,
   .lf-product-description{
-    border-radius:11px!important;
+    overflow:hidden!important;
+    border:1px solid rgba(255,255,255,.10)!important;
+    border-radius:8px!important;
+    background:#2f3338!important;
   }
   .lf-checkout-panel>header{
-    gap:0!important;
-    padding:11px 12px!important;
+    gap:8px!important;
+    padding:11px 12px 4px!important;
+    border:0!important;
+    background:transparent!important;
   }
-  /* User requested checkout step numbers removed on mobile. */
+  .lf-checkout-panel:first-child>header{
+    padding-bottom:10px!important;
+    border-bottom:1px solid rgba(255,255,255,.08)!important;
+    background:rgba(255,255,255,.025)!important;
+  }
   .lf-checkout-panel>header>span{
-    display:none!important;
+    width:26px!important;
+    height:26px!important;
+    border-radius:6px!important;
+    background:#bca17d!important;
+    color:#fff!important;
+    font-size:11px!important;
+    font-weight:900!important;
   }
   .lf-checkout-panel>header h2{
+    margin:0!important;
     font-size:12px!important;
-    line-height:1.25!important;
+    line-height:16px!important;
+    font-weight:900!important;
   }
   .lf-checkout-panel>header p{
-    margin-top:3px!important;
+    margin:2px 0 0!important;
+    color:rgba(255,255,255,.45)!important;
     font-size:9px!important;
-    line-height:1.4!important;
+    line-height:16px!important;
   }
   .lf-panel-body{
-    padding:11px 12px 12px!important;
+    padding:9px 12px 12px!important;
   }
 
-  /* Account/contact fields */
+  /* Account/contact form density follows old mobile checkout. */
   .lf-saved-account-select{
     margin-bottom:10px!important;
+    padding:10px!important;
+    border:1px solid rgba(185,255,53,.18)!important;
+    border-radius:8px!important;
+    background:rgba(185,255,53,.045)!important;
   }
-  .lf-saved-account-select>span,
-  .lf-account-fields label>span{
-    font-size:9.5px!important;
+  .lf-saved-account-select>span{
+    margin-bottom:6px!important;
+    color:#d8ff8d!important;
+    font-size:10px!important;
+  }
+  .lf-saved-account-select select{
+    width:100%!important;
+    height:36px!important;
+    border:1px solid rgba(255,255,255,.10)!important;
+    border-radius:8px!important;
+    background:#171c27!important;
+    color:#fff!important;
+    font-size:11px!important;
   }
   .lf-account-fields{
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
-    gap:8px!important;
+    gap:10px!important;
+  }
+  .lf-account-fields label>span{
+    margin-bottom:4px!important;
+    color:rgba(255,255,255,.72)!important;
+    font-size:10.5px!important;
+    font-weight:700!important;
   }
   .lf-account-fields input,
-  .lf-promo-input input,
-  .lf-saved-account-select select{
-    height:39px!important;
-    border-radius:8px!important;
-    font-size:11px!important;
+  .lf-promo-input input{
+    height:31px!important;
+    min-height:31px!important;
+    margin-top:0!important;
+    padding:3px 10px!important;
+    border:1px solid rgba(255,255,255,.10)!important;
+    border-radius:6px!important;
+    background:rgba(255,255,255,.035)!important;
+    color:#fff!important;
+    font-size:12px!important;
   }
   .lf-nickname-actions{
-    display:grid!important;
-    grid-template-columns:repeat(2,minmax(0,1fr));
+    display:flex!important;
     gap:7px!important;
     margin-top:9px!important;
   }
   .lf-nickname-actions .lf-secondary{
-    width:100%;
-    min-width:0;
-    height:36px!important;
-    padding:0 9px!important;
+    height:31px!important;
+    min-height:31px!important;
+    padding:0 10px!important;
+    border-radius:6px!important;
     font-size:9px!important;
   }
   .lf-success-note,
   .lf-warning-note,
   .lf-customer-checkout-note{
     margin-top:9px!important;
-    padding:9px 10px!important;
+    padding:10px!important;
     border-radius:8px!important;
     font-size:9.5px!important;
+    line-height:1.5!important;
   }
   .lf-panel-hint{
-    margin-top:8px!important;
-    font-size:8.5px!important;
+    margin-top:9px!important;
+    font-size:9px!important;
   }
 
-  /* Product notices */
-  .lf-product-notices{
-    gap:6px!important;
-  }
-  .lf-product-notices article{
-    padding:9px 10px!important;
-    border-radius:8px!important;
-  }
-  .lf-product-notices strong{font-size:9.5px!important}
-  .lf-product-notices p{
-    margin-top:3px!important;
-    font-size:8.5px!important;
-  }
-
-  /* Nominal cards */
+  /* Old nominal cards: 2 columns, text left, optional artwork right, price below. */
   .lf-package-sections{
-    gap:13px!important;
+    gap:18px!important;
   }
   .lf-package-sections>section>h3{
-    margin-bottom:7px!important;
-    font-size:10.5px!important;
+    margin:0 0 8px!important;
+    font-size:14px!important;
+    font-weight:900!important;
   }
   .lf-nominal-grid{
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
-    gap:7px!important;
+    gap:8px!important;
   }
   .lf-nominal-grid button{
-    min-height:70px!important;
-    grid-template-columns:36px minmax(0,1fr)!important;
+    position:relative!important;
+    min-height:78px!important;
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 40px!important;
     grid-template-rows:auto auto!important;
-    gap:2px 7px!important;
-    padding:8px!important;
-    border-radius:9px!important;
-    box-shadow:0 7px 18px -15px rgba(0,0,0,.9);
+    gap:3px 8px!important;
+    padding:10px!important;
+    border:1px solid rgba(255,255,255,.09)!important;
+    border-radius:8px!important;
+    background:rgba(255,255,255,.025)!important;
+    color:#fff!important;
   }
   .lf-nominal-grid button.selected{
-    box-shadow:0 0 0 1px rgba(185,255,53,.12),0 10px 22px -18px rgba(185,255,53,.75)!important;
+    border-color:#b9ff35!important;
+    background:rgba(185,255,53,.10)!important;
+    box-shadow:inset 0 0 0 1px rgba(185,255,53,.18)!important;
+  }
+  .lf-nominal-grid button:disabled{
+    border-color:rgba(252,211,77,.10)!important;
+    background:rgba(0,0,0,.20)!important;
+    opacity:.45!important;
   }
   .lf-nominal-grid img,
   .lf-nominal-fallback{
-    width:36px!important;
-    height:36px!important;
+    grid-column:2!important;
+    grid-row:1/3!important;
+    width:40px!important;
+    height:40px!important;
+    align-self:start!important;
     border-radius:7px!important;
+    object-fit:contain!important;
+    background:transparent!important;
+  }
+  .lf-nominal-copy{
+    grid-column:1!important;
+    grid-row:1!important;
+    min-width:0!important;
+    align-self:start!important;
   }
   .lf-nominal-copy strong{
-    font-size:9.5px!important;
-    line-height:1.3!important;
+    display:block!important;
+    overflow:visible!important;
+    white-space:normal!important;
+    text-overflow:clip!important;
+    font-size:11px!important;
+    line-height:16px!important;
   }
-  .lf-nominal-copy small{font-size:7.5px!important}
+  .lf-nominal-copy small{
+    margin-top:2px!important;
+    font-size:8px!important;
+  }
   .lf-nominal-grid button>b{
-    font-size:8.5px!important;
-    line-height:1.2!important;
+    grid-column:1!important;
+    grid-row:2!important;
+    align-self:end!important;
+    color:#cfff72!important;
+    font-size:10px!important;
   }
 
-  /* Payment groups: compact layered panel, no provider/gateway identity. */
+  /* Legacy payment cards. */
   .lf-payment-groups{
-    gap:7px!important;
+    gap:8px!important;
   }
   .lf-payment-groups details{
-    border-radius:10px!important;
-    background:linear-gradient(145deg,#080d15,#05080d)!important;
-    box-shadow:0 10px 22px -20px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.025);
+    overflow:hidden!important;
+    border:1px solid rgba(255,255,255,.09)!important;
+    border-radius:8px!important;
+    background:rgba(255,255,255,.025)!important;
+  }
+  .lf-payment-groups details[open]{
+    border-color:rgba(185,255,53,.60)!important;
+    background:rgba(185,255,53,.06)!important;
   }
   .lf-payment-groups summary{
-    grid-template-columns:34px minmax(0,1fr) auto!important;
+    grid-template-columns:32px minmax(0,1fr) auto!important;
     gap:8px!important;
-    padding:9px 10px!important;
+    min-height:48px!important;
+    padding:8px 10px!important;
   }
   .lf-payment-group-icon{
     width:32px!important;
     height:32px!important;
+    border:1px solid rgba(255,255,255,.10)!important;
     border-radius:8px!important;
-    font-size:8.5px!important;
-  }
-  .lf-payment-groups summary strong{font-size:10px!important}
-  .lf-payment-groups summary small{
-    margin-top:2px!important;
+    background:#11151b!important;
+    color:#d8ff8d!important;
     font-size:8px!important;
   }
+  .lf-payment-groups summary strong{
+    font-size:11px!important;
+  }
+  .lf-payment-groups summary small{
+    margin-top:2px!important;
+    color:rgba(255,255,255,.40)!important;
+    font-size:9px!important;
+  }
+  .lf-payment-list{
+    border-top:1px solid rgba(255,255,255,.08)!important;
+  }
   .lf-payment-list button{
-    min-height:52px!important;
-    grid-template-columns:32px minmax(0,1fr) auto!important;
+    min-height:44px!important;
+    grid-template-columns:30px minmax(0,1fr) auto!important;
     gap:8px!important;
-    padding:8px 10px!important;
+    padding:7px 10px!important;
+    border:0!important;
+    border-bottom:1px solid rgba(255,255,255,.07)!important;
+    border-radius:0!important;
+    background:rgba(0,0,0,.10)!important;
+  }
+  .lf-payment-list button:last-child{border-bottom:0!important}
+  .lf-payment-list button.selected{
+    background:rgba(185,255,53,.08)!important;
+    box-shadow:inset 3px 0 0 #b9ff35!important;
   }
   .lf-payment-icon{
-    width:31px!important;
-    height:31px!important;
-    border-radius:8px!important;
-    font-size:8.5px!important;
+    width:30px!important;
+    height:30px!important;
+    border-radius:7px!important;
+    background:rgba(255,255,255,.06)!important;
+    color:#d8ff8d!important;
+    font-size:8px!important;
   }
   .lf-payment-list button strong{font-size:9.5px!important}
   .lf-payment-list button small{font-size:7.5px!important}
   .lf-payment-list button>b{font-size:8px!important}
 
-  /* Promo */
+  /* Legacy promo buttons use the bronze checkout accent. */
   .lf-promo-input{
-    grid-template-columns:minmax(0,1fr) 82px!important;
-    gap:7px!important;
+    grid-template-columns:minmax(0,1fr) auto!important;
+    gap:6px!important;
   }
   .lf-promo-input button{
-    min-width:0!important;
-    border-radius:8px!important;
-    font-size:9px!important;
+    min-width:74px!important;
+    height:31px!important;
+    border:0!important;
+    border-radius:6px!important;
+    background:#bca17d!important;
+    color:#fff!important;
+    font-size:10px!important;
   }
   .lf-available-promo{
-    margin-top:9px!important;
-    font-size:9px!important;
+    min-height:31px!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    margin-top:10px!important;
+    padding:0 11px!important;
+    border:0!important;
+    border-radius:6px!important;
+    background:#bca17d!important;
+    color:#fff!important;
+    font-size:10px!important;
   }
 
-  /* Sticky mobile order bar */
   .lf-order-summary{
     display:none!important;
   }
+
+  /* Old mobile checkout bar: expandable order summary + full-width checkout button. */
   .lf-mobile-checkout-bar{
-    grid-template-columns:minmax(0,1fr) auto!important;
-    gap:9px!important;
-    padding:8px 12px calc(8px + env(safe-area-inset-bottom))!important;
+    position:fixed!important;
+    inset:auto 0 0!important;
+    z-index:65!important;
+    display:block!important;
+    padding:6px 12px max(10px,env(safe-area-inset-bottom))!important;
+    border-top:1px solid rgba(255,255,255,.10)!important;
+    background:rgba(16,18,23,.96)!important;
+    backdrop-filter:blur(14px)!important;
+    box-shadow:0 -12px 35px rgba(0,0,0,.36)!important;
   }
-  .lf-mobile-selected{
-    gap:8px!important;
+  .lf-mobile-checkout-inner{
+    width:100%!important;
+    max-width:576px!important;
+    margin:0 auto!important;
   }
-  .lf-mobile-selected>img,
-  .lf-mobile-package-fallback{
-    width:39px!important;
-    height:39px!important;
-    border-radius:8px!important;
+  .lf-mobile-summary-toggle{
+    width:100%!important;
+    min-height:40px!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:10px!important;
+    margin-bottom:7px!important;
+    padding:7px 11px!important;
+    border:1px solid rgba(255,255,255,.10)!important;
+    border-radius:6px!important;
+    background:rgba(255,255,255,.04)!important;
+    color:#fff!important;
+    text-align:left!important;
   }
-  .lf-mobile-selected strong{font-size:9.5px!important}
-  .lf-mobile-selected small{
+  .lf-mobile-summary-toggle>span:first-child strong,
+  .lf-mobile-summary-toggle>span:first-child small{
+    display:block!important;
+  }
+  .lf-mobile-summary-toggle>span:first-child strong{font-size:11px!important}
+  .lf-mobile-summary-toggle>span:first-child small{
     margin-top:2px!important;
+    color:rgba(255,255,255,.40)!important;
     font-size:9px!important;
   }
-  .lf-mobile-total button{
-    height:39px!important;
-    padding:0 13px!important;
+  .lf-mobile-summary-toggle>span:last-child{
+    display:flex!important;
+    align-items:center!important;
+    gap:7px!important;
+  }
+  .lf-mobile-summary-toggle>span:last-child strong{
+    color:#cfff72!important;
+    font-size:12px!important;
+  }
+  .lf-mobile-summary-toggle b{
+    color:rgba(255,255,255,.60)!important;
+    font-size:14px!important;
+  }
+  .lf-mobile-summary-card{
+    overflow:hidden!important;
+    margin-bottom:7px!important;
+    border:1px solid rgba(255,255,255,.12)!important;
     border-radius:8px!important;
-    font-size:9.5px!important;
+    background:#191b20!important;
+    box-shadow:0 18px 45px rgba(0,0,0,.45)!important;
+  }
+  .lf-mobile-summary-head{
+    width:100%!important;
+    min-height:48px!important;
+    display:grid!important;
+    grid-template-columns:36px minmax(0,1fr) auto 16px!important;
+    align-items:center!important;
+    gap:8px!important;
+    padding:6px 9px!important;
+    border:0!important;
+    background:transparent!important;
+    color:#fff!important;
+    text-align:left!important;
+  }
+  .lf-mobile-summary-art{
+    width:36px!important;
+    height:36px!important;
+    overflow:hidden!important;
+    border-radius:8px!important;
+  }
+  .lf-mobile-summary-art img,
+  .lf-mobile-summary-art .lf-mobile-package-fallback{
+    width:100%!important;
+    height:100%!important;
+    object-fit:cover!important;
+  }
+  .lf-mobile-summary-copy{
+    min-width:0!important;
+  }
+  .lf-mobile-summary-copy strong,
+  .lf-mobile-summary-copy small{
+    display:block!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+  }
+  .lf-mobile-summary-copy strong{font-size:11px!important}
+  .lf-mobile-summary-copy small{
+    margin-top:2px!important;
+    color:rgba(255,255,255,.45)!important;
+    font-size:9px!important;
+  }
+  .lf-mobile-summary-price{
+    color:#cfff72!important;
+    font-size:12px!important;
+  }
+  .lf-mobile-summary-chevron{
+    color:rgba(255,255,255,.55)!important;
+    font-size:15px!important;
+  }
+  .lf-mobile-summary-lines{
+    display:grid!important;
+    gap:6px!important;
+    margin:0!important;
+    padding:7px 10px!important;
+    border-top:1px solid rgba(255,255,255,.10)!important;
+    font-size:9px!important;
+  }
+  .lf-mobile-summary-lines>div{
+    display:flex!important;
+    justify-content:space-between!important;
+    gap:12px!important;
+  }
+  .lf-mobile-summary-lines dt{color:rgba(255,255,255,.38)!important}
+  .lf-mobile-summary-lines dd{
+    margin:0!important;
+    color:#fff!important;
+    font-weight:700!important;
+  }
+  .lf-mobile-summary-lines .total dd{
+    color:#cfff72!important;
+  }
+  .lf-mobile-order-button{
+    width:100%!important;
+    min-height:35px!important;
+    border:0!important;
+    border-radius:6px!important;
+    background:#bca17d!important;
+    color:#fff!important;
+    font-size:13px!important;
+    font-weight:900!important;
+  }
+  .lf-mobile-order-button:disabled{
+    opacity:.45!important;
   }
 
-  /* Confirmation + voucher are bottom sheets on phone. */
+  /* Keep confirmation/voucher behavior, but restore old visual treatment. */
   .lf-modal-backdrop{
-    align-items:end!important;
-    padding:12px 10px calc(12px + env(safe-area-inset-bottom))!important;
+    align-items:center!important;
+    padding:16px!important;
   }
   .lf-voucher-modal,
   .lf-confirm-modal{
-    width:100%!important;
-    max-height:78vh!important;
-    border-radius:17px!important;
-  }
-  .lf-voucher-modal>header,
-  .lf-confirm-modal>header{
-    padding:12px 13px!important;
-  }
-  .lf-voucher-modal h2,
-  .lf-confirm-modal h2{
-    font-size:13px!important;
-  }
-  .lf-voucher-modal>header>button,
-  .lf-confirm-modal>header>button{
-    width:31px!important;
-    height:31px!important;
-  }
-  .lf-voucher-list{
-    gap:6px!important;
-    padding:10px!important;
-  }
-  .lf-voucher-list button{
-    padding:10px!important;
+    width:min(520px,100%)!important;
+    max-height:80vh!important;
+    border:1px solid rgba(255,255,255,.10)!important;
     border-radius:8px!important;
+    background:#191b20!important;
   }
-  .lf-voucher-list strong{font-size:9.5px!important}
-  .lf-voucher-list small{font-size:7.5px!important}
-  .lf-voucher-list b{font-size:9px!important}
-  .lf-confirm-modal dl{
-    gap:8px!important;
-    padding:12px 13px!important;
+  .lf-confirm-actions .lf-primary{
+    background:#bca17d!important;
+    color:#fff!important;
   }
-  .lf-confirm-modal dl>div{
-    gap:12px!important;
-    font-size:9px!important;
-  }
-  .lf-confirm-modal .total{
-    padding-top:10px!important;
-    font-size:10px!important;
-  }
-  .lf-confirm-modal .total dd{font-size:14px!important}
-  .lf-confirm-actions{
-    display:grid!important;
-    grid-template-columns:1fr 1fr!important;
-    gap:7px!important;
-    padding:0 13px 13px!important;
-  }
-  .lf-confirm-actions .lf-primary,
   .lf-confirm-actions .lf-secondary{
-    width:100%!important;
-    height:38px!important;
-    font-size:9.5px!important;
-  }
-
-  /* Details/reviews/FAQ mobile */
-  .lf-product-details{
-    padding-bottom:16px;
-  }
-  .lf-product-description{
-    padding:14px!important;
-  }
-  .lf-product-description h2,
-  .lf-review-head h2,
-  .lf-product-faq h2{
-    font-size:18px!important;
-  }
-  .lf-product-description p,
-  .lf-review-grid article p,
-  .lf-product-faq details p{
-    font-size:10.5px!important;
+    border-color:rgba(255,255,255,.10)!important;
+    background:rgba(255,255,255,.04)!important;
+    color:#fff!important;
   }
 }
 
@@ -1914,10 +2128,7 @@
   .lf-account-fields{
     grid-template-columns:1fr!important;
   }
-  .lf-nickname-actions{
-    grid-template-columns:1fr!important;
-  }
   .lf-product-title h1{
-    font-size:16px!important;
+    font-size:13px!important;
   }
 }
