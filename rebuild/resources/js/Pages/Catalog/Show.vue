@@ -19,6 +19,7 @@ const props = defineProps({
 });
 
 const selectedPackageId = ref('');
+const savedAccountItems = ref([...(props.savedAccounts || [])]);
 const customerInput = reactive(Object.fromEntries((props.fields || []).map((field) => [field.field_key, ''])));
 const guestEmail = ref(props.customer?.email || '');
 const guestPhone = ref(props.customer?.phone || '');
@@ -133,7 +134,7 @@ function basePayload() {
 
 function chooseSavedAccount(id) {
     selectedSavedId.value = id;
-    const saved = (props.savedAccounts || []).find((item) => String(item.id) === String(id));
+    const saved = savedAccountItems.value.find((item) => String(item.id) === String(id));
     if (!saved) return;
     Object.keys(customerInput).forEach((key) => { customerInput[key] = saved.customer_input?.[key] || ''; });
     nicknameResult.value = saved.nickname ? { verified: true, nickname: saved.nickname } : null;
@@ -155,7 +156,7 @@ async function saveGameAccount() {
                 customer_input: { ...customerInput },
             }),
         });
-        props.savedAccounts.unshift(saved);
+        savedAccountItems.value.unshift(saved);
         selectedSavedId.value = String(saved.id);
     } catch (error) {
         errors.value = error.validation || { checkout: [error.message] };
@@ -362,11 +363,11 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <section v-if="fields.length" class="lf-checkout-panel">
                     <header><span>1</span><div><h2>Masukkan Data Akun</h2><p>Pastikan ID dan server tujuan sudah benar.</p></div></header>
                     <div class="lf-panel-body">
-                        <label v-if="savedAccounts?.length" class="lf-saved-account-select">
+                        <label v-if="savedAccountItems.length" class="lf-saved-account-select">
                             <span>Akun game tersimpan</span>
                             <select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)">
                                 <option value="">Isi manual</option>
-                                <option v-for="saved in savedAccounts" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option>
+                                <option v-for="saved in savedAccountItems" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option>
                             </select>
                         </label>
 
