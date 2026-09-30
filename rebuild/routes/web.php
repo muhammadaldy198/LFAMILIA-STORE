@@ -18,6 +18,7 @@ use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\CustomerPhoneController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\GuestOrderController;
+use App\Http\Controllers\LegacyFrontendController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentPageController;
 use App\Http\Controllers\ProductReviewController;
@@ -32,6 +33,9 @@ use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [CatalogController::class, 'index'])->name('catalog.index');
+Route::get('/catalog', [LegacyFrontendController::class, 'catalog'])->name('legacy.catalog');
+Route::get('/checkout', [LegacyFrontendController::class, 'checkout'])->name('legacy.checkout');
+Route::get('/track', [LegacyFrontendController::class, 'track'])->name('legacy.track');
 Route::get('/catalog/{slug}', [CatalogController::class, 'show'])->name('catalog.show');
 Route::get('/news', [PublicContentController::class, 'news'])->name('content.news');
 Route::get('/news/{slug}', [PublicContentController::class, 'article'])->name('content.article');
