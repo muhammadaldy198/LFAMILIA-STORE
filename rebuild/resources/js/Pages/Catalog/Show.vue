@@ -16,12 +16,13 @@ const props = defineProps({
     reviewStats: Object,
     faqs: Array,
     faviconUrl: String,
+    initialPackageId: { type: String, default: '' },
 });
 
 const page = usePage();
 const security = computed(() => page.props.security || {});
 
-const selectedPackageId = ref('');
+const selectedPackageId = ref(props.initialPackageId || '');
 const savedAccountItems = ref([...(props.savedAccounts || [])]);
 const customerInput = reactive(Object.fromEntries((props.fields || []).map((field) => [field.field_key, ''])));
 const guestEmail = ref(props.customer?.email || '');
