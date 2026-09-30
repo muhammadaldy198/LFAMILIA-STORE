@@ -3983,3 +3983,133 @@
     grid-template-columns:.82fr 1.18fr;
   }
 }
+
+
+/* Checkout legacy detail parity additions */
+.lf-manual-instructions{
+  margin-top:12px;
+  padding:10px;
+  border:1px solid rgba(253,224,71,.20);
+  border-radius:8px;
+  background:rgba(253,224,71,.06);
+  color:rgba(254,243,199,.70);
+  font-size:10px;
+  line-height:16px;
+}
+.lf-manual-instructions strong{
+  display:block;
+  margin-bottom:4px;
+  color:#fde68a;
+}
+.lf-manual-instructions p{
+  margin:0;
+  white-space:pre-line;
+}
+.lf-checkout-error-legacy{
+  display:flex!important;
+  align-items:flex-start!important;
+  gap:8px!important;
+  padding:12px!important;
+  border:1px solid rgba(248,113,113,.30)!important;
+  border-radius:8px!important;
+  background:rgba(248,113,113,.08)!important;
+  color:#fee2e2!important;
+}
+.lf-checkout-error-legacy>svg{
+  width:16px;
+  height:16px;
+  flex:0 0 16px;
+  margin-top:2px;
+  fill:none;
+  stroke:#fca5a5;
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.lf-checkout-error-legacy>span{
+  min-width:0;
+}
+.lf-checkout-error-legacy strong{
+  display:block!important;
+  margin:0!important;
+  color:#fecaca!important;
+  font-size:11px!important;
+  line-height:16px!important;
+}
+.lf-checkout-error-legacy small{
+  display:block;
+  margin-top:2px;
+  color:rgba(254,226,226,.70);
+  font-size:10px;
+  line-height:16px;
+}
+
+.lf-product-description-legacy,
+.lf-product-faq-legacy{
+  border:1px solid rgba(255,255,255,.10)!important;
+  border-radius:8px!important;
+  background:#0d1019!important;
+  padding:8.8px!important;
+}
+.lf-product-description-legacy h2,
+.lf-product-faq-legacy h2{
+  margin:0!important;
+  color:#fff!important;
+  font-size:16px!important;
+  line-height:1.25!important;
+  font-weight:950!important;
+}
+.lf-product-description-legacy p{
+  margin:6.4px 0 0!important;
+  white-space:pre-line!important;
+  color:rgba(255,255,255,.60)!important;
+  font-size:12px!important;
+  line-height:24px!important;
+}
+.lf-product-faq-legacy>div{
+  display:grid;
+  gap:6.4px;
+  margin-top:8px;
+}
+.lf-product-faq-legacy details{
+  overflow:hidden;
+  border:0!important;
+  border-radius:8px!important;
+  background:rgba(255,255,255,.04)!important;
+}
+.lf-product-faq-legacy summary{
+  padding:8.8px!important;
+  cursor:pointer;
+  list-style:none;
+  color:#fff!important;
+  font-size:12px!important;
+  font-weight:800!important;
+}
+.lf-product-faq-legacy summary::-webkit-details-marker{display:none}
+.lf-product-faq-legacy details p{
+  margin:0!important;
+  padding:0 8.8px 8.8px!important;
+  white-space:pre-line!important;
+  color:rgba(255,255,255,.55)!important;
+  font-size:12px!important;
+  line-height:20px!important;
+}
+
+@media(max-width:639px){
+  .lf-product-details{
+    display:grid!important;
+    gap:6.4px!important;
+    margin-top:12px!important;
+    margin-bottom:40px!important;
+  }
+  .lf-manual-instructions{
+    margin-top:12px!important;
+    padding:10px!important;
+    border-radius:6.4px!important;
+  }
+  .lf-checkout-error-legacy{
+    gap:8px!important;
+    padding:12px!important;
+    border-radius:6.4px!important;
+  }
+}
