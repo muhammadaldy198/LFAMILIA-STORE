@@ -6,6 +6,8 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductInputField;
 use App\Models\ProductPackage;
+use App\Models\ProductReview;
+use App\Models\SavedGameAccount;
 use App\Models\StoreAsset;
 use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
@@ -60,6 +62,7 @@ class CatalogController
             'faviconUrl' => $assets->get('favicon')?->getFirstMediaUrl('image'),
             'bannerTarget' => $assets->get('banner_desktop')?->target_url,
             'news' => $content->news(3),
+            'reviews' => $content->reviews(6),
         ]);
     }
 
@@ -88,7 +91,7 @@ class CatalogController
                 }
 
                 return [
-                    ...$package->only('id', 'name', 'nominal_value'),
+                    ...$package->only('id', 'name', 'group_name', 'nominal_value'),
                     'image_url' => $package->getFirstMediaUrl('image'),
                     'is_available' => $available,
                     'price_idr' => $price,
@@ -96,10 +99,26 @@ class CatalogController
             });
 
         $user = auth('web')->user();
+        $reviews = ProductReview::where('product_id', $product->id)->where('is_active', true)
+            ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
+            ->orderByDesc('published_at')->orderByDesc('id')->limit(30)
+            ->get(['id', 'display_name', 'rating', 'body', 'published_at'])
+            ->map(fn (ProductReview $review): array => [
+                ...$review->only('id', 'display_name', 'rating', 'body'),
+                'published_at' => $review->published_at?->toIso8601String(),
+            ]);
+        $reviewStats = ProductReview::where('product_id', $product->id)->where('is_active', true)
+            ->selectRaw('COUNT(*) as total, COALESCE(AVG(rating), 0) as average')->first();
+        $savedAccounts = $user ? SavedGameAccount::where('user_id', $user->id)
+            ->where('product_id', $product->id)->orderByDesc('id')->get()
+            ->map(fn (SavedGameAccount $saved): array => [
+                ...$saved->only('id', 'label', 'nickname'),
+                'customer_input' => $saved->customer_input,
+            ])->values() : collect();
 
         return Inertia::render('Catalog/Show', [
             'product' => [
-                ...$product->only('id', 'name', 'slug', 'description', 'nickname_check_enabled'),
+                ...$product->only('id', 'name', 'publisher', 'slug', 'description', 'nickname_check_enabled', 'manual_instructions'),
                 'category_name' => $product->category->name,
                 'image_url' => $product->getFirstMediaUrl('image'),
                 'banner_url' => $product->getFirstMediaUrl('banner'),
@@ -111,8 +130,17 @@ class CatalogController
                 'name' => $user->name,
                 'email' => $user->email,
                 'phone' => $user->phone,
+                'balance_idr' => (int) ($user->wallet?->balance_idr ?? 0),
             ] : null,
             'paymentChannels' => $paymentRouting->publicOrderChannels($user),
+            'notices' => $product->notices()->where('is_active', true)->orderBy('sort_order')
+                ->get(['id', 'title', 'body']),
+            'savedAccounts' => $savedAccounts,
+            'reviews' => $reviews,
+            'reviewStats' => [
+                'total' => (int) ($reviewStats?->total ?? 0),
+                'average' => round((float) ($reviewStats?->average ?? 0), 1),
+            ],
             'faviconUrl' => StoreAsset::where('key', 'favicon')->where('is_active', true)
                 ->first()?->getFirstMediaUrl('image'),
         ]);
