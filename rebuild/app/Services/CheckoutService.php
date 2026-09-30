@@ -18,6 +18,7 @@ class CheckoutService
         private readonly NicknameService $nickname,
         private readonly GuestOrderAccess $guestAccess,
         private readonly PaymentRoutingService $paymentRouting,
+        private readonly MembershipService $membership,
         private readonly AdminNotificationService $notifications,
     ) {}
 
@@ -33,19 +34,35 @@ class CheckoutService
         ?string $guestPhone,
     ): array {
         $price = $this->pricing->forPackage($packageId);
-        $voucher = $this->voucher($voucherCode, $price, $user, $guestEmail, $guestPhone, false);
+        $member = $user
+            ? $this->membership->discount($user, $price['subtotal_idr'])
+            : ['amount_idr' => 0, 'tier_code' => null, 'discount_bps' => 0, 'profile' => null];
+        $voucher = $this->voucher(
+            $voucherCode,
+            $price,
+            $user,
+            $guestEmail,
+            $guestPhone,
+            false,
+            (int) $member['amount_idr']
+        );
         $route = $this->paymentRouting->resolve($paymentChannelCode, false, 'order');
         if ($route['gateway_code'] === 'WALLET' && ! $user) {
             throw ValidationException::withMessages([
                 'payment_channel_code' => 'Saldo hanya tersedia untuk akun customer.',
             ]);
         }
-        $chargeable = $price['subtotal_idr'] - $voucher['discount_idr'];
+        $discount = (int) $member['amount_idr'] + (int) $voucher['discount_idr'];
+        $chargeable = $price['subtotal_idr'] - $discount;
         $fee = $this->paymentRouting->fee($chargeable, $route);
 
         return [
             'subtotal_idr' => $price['subtotal_idr'],
-            'discount_idr' => $voucher['discount_idr'],
+            'member_discount_idr' => (int) $member['amount_idr'],
+            'voucher_discount_idr' => (int) $voucher['discount_idr'],
+            'discount_idr' => $discount,
+            'member_tier_code' => $member['tier_code'],
+            'member_discount_bps' => (int) $member['discount_bps'],
             'fee_idr' => $fee,
             'total_idr' => $chargeable + $fee,
             'voucher_code' => $voucher['code'],
@@ -86,13 +103,17 @@ class CheckoutService
             $price = $this->pricing->forPackage((int) $data['package_id'], true);
             $lockedProduct = Product::with(['fields', 'category'])->findOrFail($price['product_id']);
             $lockedInput = $this->inputValidator->validate($lockedProduct, $input);
+            $member = $user
+                ? $this->membership->discount($user, $price['subtotal_idr'])
+                : ['amount_idr' => 0, 'tier_code' => null, 'discount_bps' => 0, 'profile' => null];
             $voucher = $this->voucher(
                 $data['voucher_code'] ?? null,
                 $price,
                 $user,
                 $data['guest_email'] ?? null,
                 $data['guest_phone'] ?? null,
-                true
+                true,
+                (int) $member['amount_idr']
             );
             $paymentRoute = $this->paymentRouting->resolve(
                 $data['payment_channel_code'],
@@ -105,7 +126,8 @@ class CheckoutService
                 ]);
             }
 
-            $chargeable = $price['subtotal_idr'] - $voucher['discount_idr'];
+            $discount = (int) $member['amount_idr'] + (int) $voucher['discount_idr'];
+            $chargeable = $price['subtotal_idr'] - $discount;
             $fee = $this->paymentRouting->fee($chargeable, $paymentRoute);
             $total = $chargeable + $fee;
             if ($total <= 0) {
@@ -146,7 +168,9 @@ class CheckoutService
                     'margin_percent' => $price['margin_percent'],
                     'cost_idr' => $price['cost_idr'],
                     'margin_idr' => $price['margin_idr'],
-                    'discount_idr' => $voucher['discount_idr'],
+                    'member_discount_idr' => (int) $member['amount_idr'],
+                    'voucher_discount_idr' => (int) $voucher['discount_idr'],
+                    'discount_idr' => $discount,
                     'fee_idr' => $fee,
                     'total_idr' => $total,
                 ],
@@ -158,6 +182,11 @@ class CheckoutService
                     'gateway_id' => $paymentRoute['gateway_id'],
                     'gateway_code' => $paymentRoute['gateway_code'],
                 ],
+                'membership' => $user ? [
+                    'tier_code' => $member['tier_code'],
+                    'discount_bps' => (int) $member['discount_bps'],
+                    'discount_idr' => (int) $member['amount_idr'],
+                ] : null,
                 'voucher' => $voucher['snapshot'],
                 'customer_input' => $lockedInput,
                 'nickname' => $nickname,
@@ -180,7 +209,7 @@ class CheckoutService
                 'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR),
                 'cost_idr' => $price['cost_idr'],
                 'margin_idr' => $price['margin_idr'],
-                'discount_idr' => $voucher['discount_idr'],
+                'discount_idr' => $discount,
                 'fee_idr' => $fee,
                 'total_idr' => $total,
                 'idempotency_key' => $data['idempotency_key'],
@@ -269,6 +298,7 @@ class CheckoutService
         ?string $guestEmail,
         ?string $guestPhone,
         bool $lock,
+        int $memberDiscountIdr = 0,
     ): array {
         $code = Str::upper(trim((string) $code));
         if ($code === '') {
@@ -338,11 +368,13 @@ class CheckoutService
 
         $type = Str::upper((string) $voucher->discount_type);
         $value = (int) $voucher->discount_value;
+        $afterMember = max(1, $price['subtotal_idr'] - max(0, $memberDiscountIdr));
         $discount = $type === 'PERCENT'
-            ? intdiv($price['subtotal_idr'] * $value, 100)
+            ? intdiv($afterMember * $value, 100)
             : $value;
+        $discount = min($discount, max(0, $afterMember - 1));
 
-        if ($discount <= 0 || $discount >= $price['subtotal_idr']) {
+        if ($discount <= 0) {
             throw ValidationException::withMessages(['voucher_code' => 'Nilai voucher menghasilkan total tidak valid.']);
         }
 
