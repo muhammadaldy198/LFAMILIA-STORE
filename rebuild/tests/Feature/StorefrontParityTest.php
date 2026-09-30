@@ -189,8 +189,18 @@ class StorefrontParityTest extends TestCase
 
         auth('web')->logout();
         $orderId = $this->guestOrder($catalog['product'], $catalog['package_id'], 'LF260930-REVIEW01');
+        $this->postJson('/reviews', [
+            'product_slug' => $catalog['product']->slug,
+            'order_number' => 'LF260930-REVIEW01',
+            'access_code' => null,
+            'rating' => 5,
+            'body' => 'Proses cepat dan sesuai.',
+            'display_name' => 'Guest Review',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['access_code']);
+
         $this->withSession(['guest_order_id' => $orderId])
             ->postJson('/reviews', [
+                'product_slug' => $catalog['product']->slug,
                 'order_number' => 'LF260930-REVIEW01',
                 'rating' => 5,
                 'body' => 'Proses cepat dan sesuai.',
@@ -205,6 +215,7 @@ class StorefrontParityTest extends TestCase
 
         $this->withSession(['guest_order_id' => $orderId])
             ->postJson('/reviews', [
+                'product_slug' => $catalog['product']->slug,
                 'order_number' => 'LF260930-REVIEW01',
                 'rating' => 4,
                 'body' => 'Ulasan kedua tidak boleh.',
