@@ -16,7 +16,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
     use HasApiTokens, MustVerifyEmail, Notifiable, SoftDeletes;
 
     protected $fillable = [
-        'name', 'email', 'email_verified_at', 'phone', 'password', 'google_sub', 'membership_tier_code',
+        'name', 'email', 'email_verified_at', 'phone', 'password', 'google_sub', 'membership_tier_code', 'leaderboard_opt_in',
     ];
 
     protected $hidden = ['password', 'remember_token', 'google_sub'];
@@ -75,6 +75,6 @@ class User extends Authenticatable implements MustVerifyEmailContract
 
     protected function casts(): array
     {
-        return ['email_verified_at' => 'datetime', 'last_active_at' => 'datetime'];
+        return ['email_verified_at' => 'datetime', 'last_active_at' => 'datetime', 'leaderboard_opt_in' => 'boolean'];
     }
 }
