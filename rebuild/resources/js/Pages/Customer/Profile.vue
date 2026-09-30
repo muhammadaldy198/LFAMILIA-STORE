@@ -4,7 +4,7 @@ import AccountShell from '../../Components/AccountShell.vue';
 
 const props = defineProps({ customer: Object, hasPassword: Boolean });
 const page = usePage();
-const profile = useForm({ name: props.customer.name, email: props.customer.email, phone: props.customer.phone, current_password: '' });
+const profile = useForm({ name: props.customer.name, email: props.customer.email, phone: props.customer.phone, leaderboard_opt_in: Boolean(props.customer.leaderboard_opt_in), current_password: '' });
 const password = useForm({ current_password: '', password: '', password_confirmation: '' });
 const removal = useForm({ confirmation: '', password: '' });
 const updatePassword = () => password.put('/account/password', { onFinish: () => password.reset() });
@@ -25,6 +25,10 @@ const remove = () => {
             <label v-for="field in [{ key: 'name', label: 'Nama', type: 'text' }, { key: 'email', label: 'Email', type: 'email' }, { key: 'phone', label: 'Nomor HP', type: 'tel' }]" :key="field.key" class="block">{{ field.label }}
                 <input v-model="profile[field.key]" :type="field.type" required class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
                 <span v-if="profile.errors[field.key]" class="text-sm text-red-300">{{ profile.errors[field.key] }}</span>
+            </label>
+            <label class="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                <span><strong class="block text-sm">Tampil di leaderboard</strong><small class="mt-1 block text-xs text-slate-400">Jika aktif, hanya nama singkat yang ditampilkan. Email, telepon, dan data game tidak pernah ditampilkan.</small></span>
+                <input v-model="profile.leaderboard_opt_in" type="checkbox" class="size-5 accent-lime-400">
             </label>
             <label v-if="hasPassword" class="block">Kata sandi saat ini (wajib jika mengubah email)
                 <input v-model="profile.current_password" type="password" autocomplete="current-password" class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
