@@ -238,6 +238,42 @@ class AdminPaymentController
         return back();
     }
 
+    public function uploadPageHeader(
+        Request $request,
+        PaymentPageSettingsService $settings,
+    ): RedirectResponse {
+        $request->validate([
+            'image' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $asset = StoreAsset::where('key', 'payment_header')->first();
+        if (! $asset) {
+            $id = DB::table('store_assets')->insertGetId([
+                'key' => 'payment_header',
+                'target_url' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $asset = StoreAsset::findOrFail($id);
+        }
+
+        $before = $settings->read();
+        $asset->clearMediaCollection('image');
+        $asset->addMediaFromRequest('image')
+            ->toMediaCollection('image', config('media-library.disk_name', 'public'));
+        $asset->forceFill(['is_active' => true])->save();
+
+        $after = [
+            ...$before,
+            'headerImageUrl' => $asset->getFirstMediaUrl('image'),
+        ];
+        $settings->write($after, $request->user('admin')->id);
+        $this->audit($request, 'payment.page.header.updated', 'store_asset', $asset->id, $before, $after);
+
+        return back();
+    }
+
     public function confirmManual(Request $request, int $paymentId, PaymentStateService $states): RedirectResponse
     {
         $payment = DB::table('payment_transactions')->where('id', $paymentId)->firstOrFail();
