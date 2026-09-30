@@ -47,7 +47,7 @@ class GuestOrderController
             ->whereNull('orders.user_id')->where('orders.order_number', $orderNumber)
             ->where('orders.id', $request->session()->get('guest_order_id'))
             ->select('orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
-                'orders.created_at', 'orders.delivery_payload', 'products.name as product_name')->first();
+                'orders.created_at', 'orders.delivery_payload', 'products.name as product_name', 'products.slug as product_slug')->first();
 
         abort_unless($order, 404);
         $order->delivery = is_string($order->delivery_payload)
@@ -72,7 +72,7 @@ class GuestOrderController
             ->whereNull('orders.user_id')->where('orders.order_number', $orderNumber)
             ->where('orders.id', $request->session()->get('guest_order_id'))
             ->select('orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
-                'orders.created_at', 'orders.delivery_payload', 'products.name as product_name')->first();
+                'orders.created_at', 'orders.delivery_payload', 'products.name as product_name', 'products.slug as product_slug')->first();
 
         abort_unless($order, 404);
         $delivery = is_string($order->delivery_payload)
@@ -85,6 +85,7 @@ class GuestOrderController
                 'total_idr' => (int) $order->total_idr,
                 'created_at' => $order->created_at,
                 'product_name' => $order->product_name,
+                'product_slug' => $order->product_slug,
                 'delivery' => $order->status === 'SUCCESS' ? $delivery : null,
             ],
             'payment' => $payments->forOrder((int) $order->id),
