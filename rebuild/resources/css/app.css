@@ -1029,3 +1029,296 @@
     flex-basis:50px!important;
   }
 }
+
+
+/* =========================================================
+   MOBILE PASS 2 — REVISION: BANNER / POPUP / SUPPORT / TYPE
+   ========================================================= */
+
+/* Managed homepage carousel */
+.lf-home-banner-wrap{padding-top:12px;padding-bottom:4px}
+.lf-home-banner{
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:12px;
+  background:#0b0f16;
+}
+.lf-home-banner picture,.lf-home-banner a{display:block;width:100%}
+.lf-home-banner img{
+  display:block;
+  width:100%;
+  height:auto;
+  max-height:none;
+  aspect-ratio:auto;
+  object-fit:contain;
+  object-position:center;
+}
+.lf-banner-nav{
+  position:absolute;
+  top:50%;
+  z-index:3;
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  transform:translateY(-50%);
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:50%;
+  background:rgba(0,0,0,.46);
+  color:#fff;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+  backdrop-filter:blur(6px);
+}
+.lf-banner-nav.prev{left:8px}
+.lf-banner-nav.next{right:8px}
+.lf-banner-dots{
+  position:absolute;
+  left:50%;
+  bottom:8px;
+  z-index:3;
+  display:flex;
+  gap:5px;
+  transform:translateX(-50%);
+}
+.lf-banner-dots button{
+  width:6px;
+  height:6px;
+  padding:0;
+  border:0;
+  border-radius:999px;
+  background:rgba(255,255,255,.35);
+}
+.lf-banner-dots button.active{
+  width:18px;
+  background:var(--lf-lime);
+}
+
+/* First-open homepage popup */
+.lf-home-popup-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:120;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  background:rgba(0,0,0,.76);
+  backdrop-filter:blur(4px);
+}
+.lf-home-popup{
+  width:min(570px,100%);
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.11);
+  border-radius:18px;
+  background:#181818;
+  color:#fff;
+  box-shadow:0 28px 90px rgba(0,0,0,.62);
+}
+.lf-home-popup>header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  min-height:54px;
+  padding:8px 13px 8px 18px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.lf-home-popup>header>span{
+  flex:1;
+  text-align:center;
+  font-size:11px;
+  color:rgba(255,255,255,.65);
+}
+.lf-home-popup>header>button{
+  width:40px;
+  height:40px;
+  border:2px solid rgba(231,190,132,.7);
+  border-radius:12px;
+  background:transparent;
+  color:#f4d2a1;
+  font-size:28px;
+  line-height:1;
+}
+.lf-home-popup-body{padding:20px 24px}
+.lf-home-popup-body h2{
+  margin:0;
+  text-align:center;
+  font-size:20px;
+  font-weight:950;
+  line-height:1.28;
+}
+.lf-home-popup-body>p{
+  margin:13px 0 0;
+  white-space:pre-line;
+  color:rgba(255,255,255,.76);
+  font-size:14px;
+  line-height:1.7;
+}
+.lf-home-popup-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:18px;
+}
+.lf-home-popup-pager{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  margin-top:18px;
+}
+.lf-home-popup-pager button{
+  border:0;
+  background:transparent;
+  color:rgba(255,255,255,.58);
+  font-size:11px;
+  font-weight:800;
+}
+.lf-home-popup-pager button:disabled{opacity:.25}
+.lf-home-popup-dismiss{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:15px 24px 18px;
+  border-top:1px solid rgba(255,255,255,.08);
+  color:rgba(255,255,255,.72);
+  font-size:12px;
+  font-weight:800;
+}
+.lf-home-popup-dismiss input{
+  width:20px;
+  height:20px;
+  accent-color:var(--lf-lime);
+}
+
+/* Stronger but still dark popular card tones */
+.lf-popular-card.tone-0{background:linear-gradient(135deg,#142743,#0c1813)!important}
+.lf-popular-card.tone-1{background:linear-gradient(135deg,#281d43,#13141c)!important}
+.lf-popular-card.tone-2{background:linear-gradient(135deg,#153242,#0d171a)!important}
+.lf-popular-card.tone-3{background:linear-gradient(135deg,#362518,#17130d)!important}
+.lf-popular-card.tone-4{background:linear-gradient(135deg,#351a2b,#171018)!important}
+.lf-popular-card.tone-5{background:linear-gradient(135deg,#12332d,#0d1714)!important}
+.lf-popular-card.tone-6{background:linear-gradient(135deg,#351923,#171014)!important}
+.lf-popular-card.tone-7{background:linear-gradient(135deg,#243314,#11170d)!important}
+
+@media(max-width:640px){
+  /* Banner follows the actual mobile artwork ratio like legacy LFAMILIA. */
+  .lf-home-banner-wrap{
+    width:calc(100% - 24px)!important;
+    padding-top:12px!important;
+    padding-bottom:5px!important;
+  }
+  .lf-home-banner{
+    border-radius:11px!important;
+  }
+  .lf-home-banner img{
+    width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    aspect-ratio:auto!important;
+    object-fit:contain!important;
+    object-position:center!important;
+  }
+  .lf-banner-nav{
+    width:30px;
+    height:30px;
+    font-size:20px;
+  }
+  .lf-banner-nav.prev{left:6px}
+  .lf-banner-nav.next{right:6px}
+  .lf-banner-dots{bottom:6px}
+
+  /* Mobile type: one more step larger across the customer shell/home. */
+  .lf-brand-name{font-size:12px!important}
+  .lf-brand-sub{font-size:8px!important}
+  .lf-action{font-size:10px!important}
+  .lf-eyebrow{font-size:11px!important}
+  .lf-title{font-size:25px!important}
+  .lf-copy{font-size:12px!important}
+  .lf-popular-card strong{font-size:12px!important}
+  .lf-popular-card small{font-size:10px!important}
+  .lf-search input{font-size:12px!important}
+  .lf-chip{font-size:11px!important}
+  .lf-product-fallback strong{font-size:11px!important}
+  .lf-product-fallback small{font-size:9px!important}
+  .lf-step h3{font-size:12px!important}
+  .lf-step p{font-size:10px!important}
+  .lf-news-body small{font-size:9px!important}
+  .lf-news-body h3{font-size:17px!important}
+  .lf-news-body p{font-size:11px!important}
+  .lf-news-body strong{font-size:10px!important}
+  .lf-home-review-grid strong{font-size:12px!important}
+  .lf-home-review-grid span{font-size:10px!important}
+  .lf-home-review-grid p{font-size:11px!important}
+  .lf-home-review-grid a{font-size:10px!important}
+  .lf-help h2{font-size:20px!important}
+  .lf-help .lf-primary{font-size:11px!important}
+  .lf-footer-brand-column>p{font-size:12px!important}
+  .lf-footer-column h2{font-size:12px!important}
+  .lf-footer-column a{font-size:12px!important}
+  .lf-footer-copy{font-size:10px!important}
+
+  /* Support panel follows the floating trigger instead of being locked to center. */
+  .lf-support-panel{
+    position:absolute!important;
+    left:auto!important;
+    right:0!important;
+    top:auto!important;
+    bottom:58px!important;
+    width:min(310px,calc(100vw - 24px))!important;
+    max-width:310px!important;
+    max-height:min(390px,62vh);
+    margin:0!important;
+    overflow:auto;
+  }
+  .lf-live-support.open-right .lf-support-panel{
+    left:0!important;
+    right:auto!important;
+  }
+  .lf-live-support.open-down .lf-support-panel{
+    top:58px!important;
+    bottom:auto!important;
+  }
+  .lf-support-panel header strong{font-size:15px!important}
+  .lf-support-panel header small{font-size:11px!important}
+  .lf-support-panel>div>a strong{font-size:13px!important}
+  .lf-support-panel>div>a small{font-size:11px!important}
+
+  /* Popup proportions inspired by the old LFAMILIA flow / supplied reference. */
+  .lf-home-popup-backdrop{
+    align-items:end;
+    padding:16px 12px 28px;
+  }
+  .lf-home-popup{
+    width:100%;
+    max-width:520px;
+    border-radius:20px;
+  }
+  .lf-home-popup>header{
+    min-height:52px;
+    padding:7px 12px 7px 18px;
+  }
+  .lf-home-popup>header>span{font-size:12px}
+  .lf-home-popup>header>button{
+    width:42px;
+    height:42px;
+    font-size:29px;
+  }
+  .lf-home-popup-body{padding:18px 22px 20px}
+  .lf-home-popup-body h2{font-size:20px}
+  .lf-home-popup-body>p{
+    margin-top:12px;
+    font-size:15px;
+    line-height:1.65;
+  }
+  .lf-home-popup-actions .lf-primary,
+  .lf-home-popup-actions .lf-secondary{
+    min-height:36px;
+    font-size:11px;
+  }
+  .lf-home-popup-dismiss{
+    padding:14px 22px 18px;
+    font-size:12px;
+  }
+}
