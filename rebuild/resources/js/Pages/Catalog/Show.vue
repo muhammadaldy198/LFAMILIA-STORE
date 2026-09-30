@@ -68,8 +68,8 @@ const guestContactComplete = computed(() => props.customer || (
 ));
 const canQuote = computed(() => Boolean(selectedPackage.value && paymentChannelCode.value && guestContactComplete.value));
 const displayTotal = computed(() => quote.value?.total_idr ?? selectedPackage.value?.price_idr ?? 0);
-const hasAccountStep = computed(() => (props.fields || []).length > 0);
 const isVoucherProduct = computed(() => String(props.product?.category_slug || '').toLowerCase() === 'voucher');
+const hasAccountStep = computed(() => !isVoucherProduct.value && (props.fields || []).length > 0);
 const nominalStep = computed(() => hasAccountStep.value ? 2 : 1);
 const paymentStep = computed(() => nominalStep.value + 1);
 const contactStep = computed(() => nominalStep.value + 2);
@@ -269,7 +269,7 @@ function chooseSavedAccount(id) {
 }
 
 async function checkNickname() {
-    if (!requiredFieldsComplete.value) return;
+    if (isVoucherProduct.value || !requiredFieldsComplete.value) return;
     errors.value = {};
     nicknameResult.value = null;
     busy.value = 'nickname';
@@ -357,7 +357,7 @@ async function prepareOrder() {
         errors.value = { guest_phone: ['Lengkapi email dan nomor WhatsApp dengan benar.'] };
         return;
     }
-    if (props.product.nickname_check_enabled && !nicknameResult.value?.verified) {
+    if (!isVoucherProduct.value && props.product.nickname_check_enabled && !nicknameResult.value?.verified) {
         await checkNickname();
         if (!nicknameResult.value?.verified) {
             errors.value = { checkout: ['Nickname harus berhasil diverifikasi sebelum checkout.'] };
@@ -437,7 +437,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
     nicknameResult.value = null;
     selectedSavedId.value = '';
     if (nicknameAutoTimer) window.clearTimeout(nicknameAutoTimer);
-    if (!props.product.nickname_check_enabled || !requiredFieldsComplete.value) return;
+    if (isVoucherProduct.value || !props.product.nickname_check_enabled || !requiredFieldsComplete.value) return;
     nicknameAutoTimer = window.setTimeout(() => {
         void checkNickname();
     }, 700);
@@ -489,7 +489,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
 
         <div v-if="activeTab==='transaction'" class="lf-checkout-grid">
             <div class="lf-checkout-panels">
-                <section v-if="fields.length" class="lf-checkout-panel lf-checkout-account-panel">
+                <section v-if="hasAccountStep" class="lf-checkout-panel lf-checkout-account-panel">
                     <header><span>1</span><div><h2>Masukkan Data Akun</h2><p>Isi ID tujuan dengan benar. Nickname diperiksa otomatis jika didukung.</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-account-product-mobile">
