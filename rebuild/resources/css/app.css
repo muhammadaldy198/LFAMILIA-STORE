@@ -1537,7 +1537,7 @@
   .lf-checkout-page{
     min-height:calc(100vh - 66px)!important;
     padding-bottom:118px!important;
-    background:#17191d!important;
+    background:#0a1220!important;
   }
 
   /* Legacy checkout banner: h-44 on phone. */
@@ -1556,7 +1556,7 @@
   .lf-product-identity{
     overflow:visible!important;
     border-block:1px solid rgba(255,255,255,.10)!important;
-    background:#202224!important;
+    background:#0d1019!important;
   }
   .lf-product-identity-inner{
     position:relative!important;
@@ -1572,9 +1572,9 @@
     width:96px!important;
     height:96px!important;
     overflow:hidden!important;
-    border:3px solid #202224!important;
+    border:3px solid #0d1019!important;
     border-radius:14px!important;
-    background:#11151c!important;
+    background:#08111d!important;
     box-shadow:0 14px 30px rgba(0,0,0,.42)!important;
     transform:none!important;
   }
@@ -1649,8 +1649,8 @@
     font-weight:800!important;
   }
   .lf-checkout-tabs button.active{
-    background:#bca17d!important;
-    color:#fff!important;
+    background:var(--lime)!important;
+    color:#061006!important;
     box-shadow:none!important;
   }
 
@@ -1673,7 +1673,7 @@
     overflow:hidden!important;
     border:1px solid rgba(255,255,255,.10)!important;
     border-radius:8px!important;
-    background:#2f3338!important;
+    background:#0d1019!important;
   }
   .lf-checkout-panel>header{
     gap:8px!important;
@@ -1690,8 +1690,8 @@
     width:26px!important;
     height:26px!important;
     border-radius:6px!important;
-    background:#bca17d!important;
-    color:#fff!important;
+    background:var(--lime)!important;
+    color:#061006!important;
     font-size:11px!important;
     font-weight:900!important;
   }
@@ -1931,8 +1931,8 @@
     height:31px!important;
     border:0!important;
     border-radius:6px!important;
-    background:#bca17d!important;
-    color:#fff!important;
+    background:var(--lime)!important;
+    color:#061006!important;
     font-size:10px!important;
   }
   .lf-available-promo{
@@ -1943,8 +1943,8 @@
     padding:0 11px!important;
     border:0!important;
     border-radius:6px!important;
-    background:#bca17d!important;
-    color:#fff!important;
+    background:var(--lime)!important;
+    color:#061006!important;
     font-size:10px!important;
   }
 
@@ -2091,8 +2091,8 @@
     min-height:35px!important;
     border:0!important;
     border-radius:6px!important;
-    background:#bca17d!important;
-    color:#fff!important;
+    background:var(--lime)!important;
+    color:#061006!important;
     font-size:13px!important;
     font-weight:900!important;
   }
@@ -2114,8 +2114,8 @@
     background:#191b20!important;
   }
   .lf-confirm-actions .lf-primary{
-    background:#bca17d!important;
-    color:#fff!important;
+    background:var(--lime)!important;
+    color:#061006!important;
   }
   .lf-confirm-actions .lf-secondary{
     border-color:rgba(255,255,255,.10)!important;
