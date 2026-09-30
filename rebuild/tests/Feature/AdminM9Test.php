@@ -74,6 +74,7 @@ class AdminM9Test extends TestCase
         $this->get('/admin/panel')->assertOk();
         $this->get('/admin/orders')->assertOk();
         $this->get('/admin/providers')->assertForbidden();
+        $this->get('/admin/nickname-tools')->assertForbidden();
         $this->get('/admin/integrations')->assertForbidden();
 
         auth('admin')->logout();
@@ -81,6 +82,7 @@ class AdminM9Test extends TestCase
         $this->actingAs($super, 'admin');
 
         $this->get('/admin/integrations')->assertOk();
+        $this->get('/admin/nickname-tools')->assertOk();
         $this->get('/admin/health')->assertOk();
         $this->get('/admin/audit')->assertOk();
     }
