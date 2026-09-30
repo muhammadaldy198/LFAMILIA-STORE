@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\FaqEntry;
+use App\Models\HomeBanner;
 use App\Models\NewsArticle;
 use App\Models\ProductReview;
+use App\Models\SitePopup;
 use App\Models\StoreAsset;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -60,6 +62,37 @@ class StorefrontContentService
                 'target' => $asset->target_url,
             ],
         ])->all();
+    }
+
+    public function homeBanners()
+    {
+        if (! Schema::hasTable('home_banners')) {
+            return collect();
+        }
+
+        return HomeBanner::where('is_active', true)
+            ->orderBy('sort_order')->orderBy('id')->get()
+            ->map(fn (HomeBanner $banner): array => [
+                ...$banner->only(
+                    'id', 'title', 'subtitle', 'cta_label', 'cta_href',
+                    'show_desktop', 'show_mobile', 'sort_order'
+                ),
+                'desktop_url' => $banner->getFirstMediaUrl('desktop'),
+                'mobile_url' => $banner->getFirstMediaUrl('mobile'),
+            ]);
+    }
+
+    public function popups()
+    {
+        if (! Schema::hasTable('site_popups')) {
+            return collect();
+        }
+
+        return SitePopup::where('is_active', true)
+            ->orderBy('sort_order')->orderBy('id')->get([
+                'id', 'title', 'body', 'primary_label', 'primary_href',
+                'secondary_label', 'secondary_href', 'dismiss_days', 'sort_order',
+            ]);
     }
 
     public function news(int $limit = 3)
