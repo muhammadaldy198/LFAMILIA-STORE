@@ -121,6 +121,8 @@ Route::middleware('auth:web')->group(function (): void {
             ->middleware('throttle:support-ticket')->name('account.tickets.store');
         Route::get('/account/tickets/{ticket}', [SupportTicketController::class, 'show'])
             ->name('account.tickets.show');
+        Route::post('/account/tickets/{ticket}/messages', [SupportTicketController::class, 'reply'])
+            ->middleware('throttle:support-ticket')->name('account.tickets.reply');
         Route::post('/account/game-accounts', [SavedGameAccountController::class, 'store'])
             ->middleware('throttle:account-sensitive')->name('account.game-accounts.store');
         Route::delete('/account/game-accounts/{savedGameAccount}', [SavedGameAccountController::class, 'destroy'])
