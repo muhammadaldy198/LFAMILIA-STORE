@@ -68,7 +68,7 @@ const assetHint = (key) => ({
     logo: 'Patokan aset LFAMILIA lama: 320×320 (1:1) · PNG/WebP transparan',
     favicon: 'Rekomendasi 512×512 (1:1)',
     banner_desktop: '1920×600 · fokus elemen penting di area tengah',
-    banner_mobile: '1200×480 · rasio 2.5:1 · banner mobile pendek',
+    banner_mobile: '1320×600 · rasio 11:5 · mengikuti banner mobile storefront',
     popup: 'Legacy fallback gambar. Pop-up homepage baru dikelola melalui bagian Pop-up Homepage di bawah.',
     footer_banner_desktop: '2172×724 · rasio ±3:1',
     footer_banner_mobile: '1200×400 · rasio 3:1',
