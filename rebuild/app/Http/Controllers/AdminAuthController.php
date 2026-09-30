@@ -13,9 +13,14 @@ use Inertia\Response;
 
 class AdminAuthController
 {
-    public function show(): Response
+    public function show(Request $request): Response
     {
-        return Inertia::render('Admin/Login');
+        $staffPortal = $request->is('staff/*');
+
+        return Inertia::render('Admin/Login', [
+            'loginAction' => $staffPortal ? route('staff.login.store') : route('admin.login.store'),
+            'portal' => $staffPortal ? 'STAFF' : 'ADMIN',
+        ]);
     }
 
     public function login(
@@ -59,6 +64,18 @@ class AdminAuthController
             throw ValidationException::withMessages(['email' => 'Akses ditolak.']);
         }
 
+        $staffPortal = $request->is('staff/*');
+        if (($staffPortal && $admin->role !== 'STAFF')
+            || (! $staffPortal && $admin->role === 'STAFF')) {
+            Auth::guard('admin')->logout();
+
+            throw ValidationException::withMessages([
+                'email' => $staffPortal
+                    ? 'Gunakan akun STAFF untuk portal ini.'
+                    : 'Akun STAFF harus masuk melalui portal STAFF.',
+            ]);
+        }
+
         $risk->clear('admin', $request->ip(), $identity);
         $request->session()->forget('security.admin_login_challenge');
         $request->session()->regenerate();
@@ -71,10 +88,11 @@ class AdminAuthController
 
     public function logout(Request $request): RedirectResponse
     {
+        $staffPortal = $request->is('staff/*');
         Auth::guard('admin')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('admin.login');
+        return redirect()->route($staffPortal ? 'staff.login' : 'admin.login');
     }
 }
