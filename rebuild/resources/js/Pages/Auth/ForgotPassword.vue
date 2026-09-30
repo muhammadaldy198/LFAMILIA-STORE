@@ -1,37 +1,4 @@
 <script setup>
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
-import TurnstileWidget from '../../Components/TurnstileWidget.vue';
-
-const page = usePage();
-const turnstile = ref(null);
-const security = computed(() => page.props.security || {});
-const form = useForm({ email: '', turnstile_token: '' });
-const submit = () => form.post('/forgot-password', {
-    onFinish: () => turnstile.value?.reset(),
-});
-</script>
-
-<template>
-    <Head title="Lupa kata sandi" />
-    <main class="min-h-screen bg-slate-950 px-4 py-16 text-slate-100">
-        <form class="mx-auto max-w-md space-y-5 rounded-xl bg-slate-900 p-6" @submit.prevent="submit">
-            <h1 class="text-2xl font-semibold">Atur ulang kata sandi</h1>
-            <p v-if="page.props.status" role="status" class="text-cyan-300">{{ page.props.status }}</p>
-            <label class="block">Email
-                <input v-model="form.email" type="email" autocomplete="email" required class="mt-1 w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
-                <span v-if="form.errors.email" class="text-sm text-red-300">{{ form.errors.email }}</span>
-            </label>
-            <TurnstileWidget
-                v-if="security.turnstile_required"
-                ref="turnstile"
-                :site-key="security.turnstile_site_key"
-                :action="security.turnstile_action"
-                @token="form.turnstile_token = $event"
-            />
-            <span v-if="form.errors.turnstile_token" class="text-sm text-red-300">{{ form.errors.turnstile_token }}</span>
-            <button type="submit" :disabled="form.processing" class="w-full rounded-md bg-cyan-400 p-3 font-semibold text-slate-950 disabled:opacity-50">Kirim tautan reset</button>
-            <Link href="/login" class="block text-center text-cyan-300">Kembali ke masuk</Link>
-        </form>
-    </main>
-</template>
+import {Head,Link,useForm,usePage} from '@inertiajs/vue3';import {computed,ref} from 'vue';import TurnstileWidget from '../../Components/TurnstileWidget.vue';import CustomerShell from '../../Components/CustomerShell.vue';
+const page=usePage(),turnstile=ref(null),security=computed(()=>page.props.security||{}),form=useForm({email:'',turnstile_token:''});const submit=()=>form.post('/forgot-password',{onFinish:()=>turnstile.value?.reset()});
+</script><template><Head title="Lupa kata sandi"/><CustomerShell compact-footer><main class="lf-auth-wrap"><form class="lf-auth-card" @submit.prevent="submit"><p class="lf-eyebrow">Pemulihan akun</p><h1>Atur ulang kata sandi</h1><p>Masukkan email akun LFAMILIA untuk menerima tautan reset.</p><p v-if="page.props.status" class="rounded-lg border border-[#b9ff35]/20 bg-[#b9ff35]/10 p-2 text-[10px] text-[#cfff72]">{{page.props.status}}</p><label class="text-[10px] font-semibold text-white/70">Email<input v-model="form.email" type="email" required></label><TurnstileWidget v-if="security.turnstile_required" ref="turnstile" :site-key="security.turnstile_site_key" :action="security.turnstile_action" @token="form.turnstile_token=$event"/><button class="lf-primary mt-3 w-full" :disabled="form.processing">Kirim tautan reset</button><div class="lf-auth-links justify-end"><Link href="/login">Kembali ke masuk</Link></div></form></main></CustomerShell></template>
