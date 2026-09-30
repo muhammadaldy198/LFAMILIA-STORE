@@ -1431,7 +1431,7 @@
    ========================================================= */
 @media(max-width:640px){
   .lf-home-banner{
-    aspect-ratio:12/5!important;
+    aspect-ratio:11/5!important;
     min-height:0!important;
     max-height:none!important;
   }
