@@ -44,7 +44,7 @@ class PublicAbuseProtection
             (string) $request->input('email')
         )) {
             $this->turnstile->verify($request, 'customer_login');
-        } elseif ($path === 'admin/login' && $this->loginRisk->requiresChallenge(
+        } elseif (in_array($path, ['admin/login', 'staff/login'], true) && $this->loginRisk->requiresChallenge(
             'admin',
             $request->ip(),
             (string) $request->input('email')
