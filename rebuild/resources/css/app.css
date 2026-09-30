@@ -2666,3 +2666,171 @@
     stroke-width:2!important;
   }
 }
+
+
+/* Legacy checkout nickname feedback and confirmation dialog. */
+.lf-nickname-state{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  margin-top:12px;
+  padding:10px;
+  border-radius:8px;
+  font-size:10px;
+}
+.lf-nickname-state>svg,
+.lf-checkout-info-note>svg{
+  width:16px;
+  height:16px;
+  flex:0 0 16px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.lf-nickname-loading{border:1px solid rgba(185,255,53,.15);background:rgba(185,255,53,.05);color:rgba(255,255,255,.55)}
+.lf-nickname-loading>svg{color:var(--lime);animation:lf-spin .9s linear infinite}
+.lf-nickname-success{border:1px solid rgba(52,211,153,.30);background:rgba(52,211,153,.08);color:#d1fae5}
+.lf-nickname-success>svg{color:#34d399}
+.lf-nickname-success small{display:block;color:rgba(167,243,208,.70);font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.14em}
+.lf-nickname-success strong{display:block;margin-top:2px;color:#a7f3d0;font-size:12px}
+.lf-nickname-success span{display:block;margin-top:2px;color:rgba(209,250,229,.55);font-size:9px}
+.lf-nickname-error{border:1px solid rgba(248,113,113,.30);background:rgba(248,113,113,.08);color:#fecaca}
+.lf-nickname-error>svg{color:#fca5a5}
+.lf-nickname-error strong{display:block;font-size:10px}
+.lf-nickname-error span{display:block;margin-top:2px;color:rgba(254,202,202,.60);font-size:9px;line-height:16px}
+.lf-checkout-info-note{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+}
+.lf-checkout-info-note>svg{color:var(--lime)}
+@keyframes lf-spin{to{transform:rotate(360deg)}}
+
+.lf-confirm-legacy{
+  width:min(448px,calc(100% - 32px))!important;
+  max-height:calc(100vh - 32px)!important;
+  display:grid!important;
+  gap:16px!important;
+  padding:24px!important;
+  overflow:auto!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  border-radius:8px!important;
+  background:#10131b!important;
+  box-shadow:0 24px 80px rgba(0,0,0,.60)!important;
+}
+.lf-confirm-legacy .lf-confirm-status-icon{
+  width:56px;
+  height:56px;
+  display:grid;
+  place-items:center;
+  margin:0 auto;
+  border-radius:999px;
+  background:rgba(185,255,53,.15);
+  color:var(--lime);
+}
+.lf-confirm-legacy .lf-confirm-status-icon svg{
+  width:32px;
+  height:32px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.lf-confirm-legacy>h2{
+  margin:-4px 0 0!important;
+  color:#fff;
+  font-size:18px!important;
+  line-height:1.15;
+  font-weight:900;
+  text-align:center;
+}
+.lf-confirm-legacy>.lf-confirm-copy{
+  margin:-8px 0 0;
+  color:rgba(255,255,255,.55);
+  font-size:12px;
+  line-height:20px;
+  text-align:center;
+}
+.lf-confirm-legacy>dl{
+  display:grid!important;
+  gap:0!important;
+  margin:0!important;
+  padding:16px!important;
+  border-radius:12px!important;
+  background:rgba(0,0,0,.15)!important;
+}
+.lf-confirm-legacy>dl>div{
+  display:flex!important;
+  justify-content:space-between!important;
+  gap:16px!important;
+  padding:4px 0!important;
+  color:rgba(255,255,255,.38)!important;
+  font-size:12px!important;
+  line-height:18px!important;
+}
+.lf-confirm-legacy>dl dd{
+  max-width:62%;
+  margin:0!important;
+  overflow-wrap:anywhere;
+  color:#fff!important;
+  font-weight:600!important;
+  text-align:right!important;
+}
+.lf-confirm-legacy>dl .total{
+  margin-top:8px!important;
+  padding-top:12px!important;
+  border-top:1px solid rgba(255,255,255,.10)!important;
+}
+.lf-confirm-legacy>dl .total dd{
+  color:var(--lime)!important;
+  font-size:16px!important;
+  font-weight:900!important;
+}
+.lf-confirm-agreement{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  color:rgba(255,255,255,.60);
+  font-size:12px;
+  line-height:20px;
+  cursor:pointer;
+}
+.lf-confirm-agreement input{
+  width:16px;
+  height:16px;
+  flex:0 0 16px;
+  margin-top:2px;
+  accent-color:var(--lime);
+}
+.lf-confirm-legacy>.lf-confirm-actions{
+  display:grid!important;
+  grid-template-columns:1fr 1fr!important;
+  gap:12px!important;
+  padding:0!important;
+}
+.lf-confirm-legacy>.lf-confirm-actions button{
+  width:100%!important;
+  height:36px!important;
+  border-radius:8px!important;
+  font-size:12px!important;
+}
+.lf-confirm-legacy>.lf-confirm-actions .lf-primary:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+@media(max-width:639px){
+  .lf-nickname-state{
+    margin-top:12px!important;
+    padding:10px!important;
+    border-radius:6.4px!important;
+  }
+  .lf-confirm-legacy{
+    width:calc(100% - 32px)!important;
+    gap:16px!important;
+    padding:24px!important;
+  }
+}
