@@ -148,8 +148,13 @@ class CatalogTest extends TestCase
             'code' => 'AUTO10', 'name' => '10 Unit', 'sort_order' => 1,
             'external_sku' => 'FORGED-SKU',
         ])->assertRedirect();
-        $this->assertSame(1, ProviderMapping::count());
-        $this->assertSame('PROVIDER-SKU-5', ProviderMapping::first()->external_sku);
+        $productMappingQuery = ProviderMapping::whereIn(
+            'product_package_id',
+            $product->packages()->pluck('id')
+        );
+        $this->assertSame(1, (clone $productMappingQuery)->count());
+        $this->assertSame('PROVIDER-SKU-5', (clone $productMappingQuery)->firstOrFail()->external_sku);
+        $this->assertFalse(ProviderMapping::where('external_sku', 'FORGED-SKU')->exists());
 
         $other = $product->packages()->create(['code' => 'AUTO20', 'name' => '20 Unit']);
         $this->expectException(InvalidArgumentException::class);
