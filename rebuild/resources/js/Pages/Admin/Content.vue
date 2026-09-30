@@ -1,5 +1,5 @@
 <script setup>
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
@@ -14,6 +14,8 @@ const props = defineProps({
     reviews: Array,
     settings: Object,
 });
+const page = usePage();
+const base = page.props.adminPanel?.base_path || '/admin';
 
 const assets = ref((props.assets || []).map((x) => ({ ...x })));
 const banners = ref((props.banners || []).map((x) => ({ ...x })));
@@ -72,11 +74,11 @@ const assetHint = (key) => ({
     footer_banner_mobile: '1200×400 · rasio 3:1',
 }[key] || 'Gunakan gambar tajam dengan ukuran file efisien.');
 
-const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, {
+const saveAsset = (asset) => router.put(base + '/catalog/assets/' + asset.id, {
     is_active: Boolean(asset.is_active),
     target_url: asset.target_url || null,
 });
-const saveBanner = (item) => router.put('/admin/content/banners/' + item.id, {
+const saveBanner = (item) => router.put(base + '/content/banners/' + item.id, {
     title: item.title,
     subtitle: item.subtitle || '',
     cta_label: item.cta_label || '',
@@ -87,10 +89,10 @@ const saveBanner = (item) => router.put('/admin/content/banners/' + item.id, {
     is_active: Boolean(item.is_active),
 }, { preserveScroll: true });
 const deleteBanner = (item) => {
-    if (confirm('Hapus banner ini?')) router.delete('/admin/content/banners/' + item.id, { preserveScroll: true });
+    if (confirm('Hapus banner ini?')) router.delete(base + '/content/banners/' + item.id, { preserveScroll: true });
 };
 
-const savePopup = (item) => router.put('/admin/content/popups/' + item.id, {
+const savePopup = (item) => router.put(base + '/content/popups/' + item.id, {
     title: item.title,
     body: item.body,
     dismiss_days: Number(item.dismiss_days || 0),
@@ -98,7 +100,7 @@ const savePopup = (item) => router.put('/admin/content/popups/' + item.id, {
 }, { preserveScroll: true });
 
 
-const saveNews = (item) => router.put('/admin/content/news/' + item.id, {
+const saveNews = (item) => router.put(base + '/content/news/' + item.id, {
     slug: item.slug || '',
     title: item.title,
     summary: item.summary || '',
@@ -110,10 +112,10 @@ const saveNews = (item) => router.put('/admin/content/news/' + item.id, {
 }, { preserveScroll: true });
 
 const deleteNews = (item) => {
-    if (confirm('Hapus berita "' + item.title + '"?')) router.delete('/admin/content/news/' + item.id, { preserveScroll: true });
+    if (confirm('Hapus berita "' + item.title + '"?')) router.delete(base + '/content/news/' + item.id, { preserveScroll: true });
 };
 
-const saveFaq = (item) => router.put('/admin/content/faqs/' + item.id, {
+const saveFaq = (item) => router.put(base + '/content/faqs/' + item.id, {
     question: item.question,
     answer: item.answer,
     sort_order: Number(item.sort_order || 0),
@@ -121,13 +123,13 @@ const saveFaq = (item) => router.put('/admin/content/faqs/' + item.id, {
 }, { preserveScroll: true });
 
 const deleteFaq = (item) => {
-    if (confirm('Hapus FAQ ini?')) router.delete('/admin/content/faqs/' + item.id, { preserveScroll: true });
+    if (confirm('Hapus FAQ ini?')) router.delete(base + '/content/faqs/' + item.id, { preserveScroll: true });
 };
-const saveReview = (item) => router.put('/admin/content/reviews/' + item.id, {
+const saveReview = (item) => router.put(base + '/content/reviews/' + item.id, {
     is_active: Boolean(item.is_active),
 }, { preserveScroll: true });
 
-const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
+const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
     title: item.title,
     intro: item.intro || '',
     body: item.body || '',
@@ -152,7 +154,7 @@ const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
                     </div>
                 </div>
 
-                <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="bannerForm.post('/admin/content/banners', { preserveScroll: true, onSuccess: () => bannerForm.reset() })">
+                <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="bannerForm.post(base + '/content/banners', { preserveScroll: true, onSuccess: () => bannerForm.reset() })">
                     <input v-model="bannerForm.title" required placeholder="Nama internal / alt banner" class="rounded border border-slate-200 p-2 text-sm">
                     <input v-model="bannerForm.cta_href" placeholder="Link klik, contoh /promo" class="rounded border border-slate-200 p-2 text-sm">
                     <input v-model.number="bannerForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm">
@@ -203,7 +205,7 @@ const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
                     <p class="mt-1 text-xs text-slate-500">Hanya 1 pop-up pengumuman. Muncul saat customer membuka homepage dan dapat disembunyikan lewat “Jangan tampilkan lagi”.</p>
                 </div>
 
-                <form v-if="!popups.length" class="mt-4 grid gap-3" @submit.prevent="popupForm.post('/admin/content/popups', { preserveScroll: true })">
+                <form v-if="!popups.length" class="mt-4 grid gap-3" @submit.prevent="popupForm.post(base + '/content/popups', { preserveScroll: true })">
                     <input v-model="popupForm.title" required placeholder="Judul pop-up" class="rounded border border-slate-200 p-2 text-sm">
                     <textarea v-model="popupForm.body" required rows="5" placeholder="Isi pengumuman" class="rounded border border-slate-200 p-2 text-sm"></textarea>
                     <div class="grid gap-3 sm:grid-cols-2">
@@ -248,7 +250,7 @@ const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
 
             <section class="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 class="text-lg font-bold">Customer support & homepage text</h2>
-                <form class="mt-4 grid gap-3 md:grid-cols-2" @submit.prevent="settingsForm.put('/admin/content/settings')">
+                <form class="mt-4 grid gap-3 md:grid-cols-2" @submit.prevent="settingsForm.put(base + '/content/settings')">
                     <label class="text-xs">Judul berita homepage<input v-model="settingsForm.home_news_title" class="mt-1 block w-full rounded border border-slate-200 p-2"></label>
                     <label class="text-xs">Jam layanan<input v-model="settingsForm.business_hours" class="mt-1 block w-full rounded border border-slate-200 p-2"></label>
                     <label class="text-xs md:col-span-2">Intro berita homepage<textarea v-model="settingsForm.home_news_intro" rows="2" class="mt-1 block w-full rounded border border-slate-200 p-2"></textarea></label>
@@ -265,7 +267,7 @@ const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
 
             <section class="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 class="text-lg font-bold">Berita</h2>
-                <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="newsForm.post('/admin/content/news', { preserveScroll: true, onSuccess: () => newsForm.reset() })">
+                <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="newsForm.post(base + '/content/news', { preserveScroll: true, onSuccess: () => newsForm.reset() })">
                     <input v-model="newsForm.title" required placeholder="Judul berita" class="rounded border border-slate-200 p-2 text-sm">
                     <input v-model="newsForm.slug" placeholder="Slug (opsional)" class="rounded border border-slate-200 p-2 text-sm">
                     <input v-model="newsForm.source_label" placeholder="Sumber/label" class="rounded border border-slate-200 p-2 text-sm">
@@ -318,7 +320,7 @@ const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
 
             <section class="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 class="text-lg font-bold">FAQ / Pertanyaan umum</h2>
-                <form class="mt-4 grid gap-3 md:grid-cols-[1fr_120px_auto]" @submit.prevent="faqForm.post('/admin/content/faqs', { preserveScroll: true, onSuccess: () => faqForm.reset() })">
+                <form class="mt-4 grid gap-3 md:grid-cols-[1fr_120px_auto]" @submit.prevent="faqForm.post(base + '/content/faqs', { preserveScroll: true, onSuccess: () => faqForm.reset() })">
                     <input v-model="faqForm.question" required placeholder="Pertanyaan" class="rounded border border-slate-200 p-2 text-sm">
                     <input v-model.number="faqForm.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm">
                     <label class="flex items-center gap-2 text-xs"><input v-model="faqForm.is_active" type="checkbox"> Aktif</label>
