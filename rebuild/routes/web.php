@@ -130,6 +130,17 @@ Route::middleware('auth:web')->group(function (): void {
     });
 });
 
+Route::redirect('/admin', '/admin/panel', 302);
+Route::redirect('/admin/panel/login', '/admin/login', 302);
+Route::redirect('/panel', '/staff/panel', 302);
+Route::redirect('/panel/login', '/staff/login', 302);
+Route::redirect('/panel/admin', '/admin/panel', 302);
+Route::redirect('/panel/admin/login', '/admin/login', 302);
+Route::redirect('/panel/staff', '/staff/panel', 302);
+Route::redirect('/panel/staff/login', '/staff/login', 302);
+Route::redirect('/staff', '/staff/panel', 302);
+Route::redirect('/staff/panel/login', '/staff/login', 302);
+
 Route::middleware('guest:admin')->group(function (): void {
     Route::get('/admin/login', [AdminAuthController::class, 'show'])->name('admin.login');
     Route::post('/admin/login', [AdminAuthController::class, 'login'])
