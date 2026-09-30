@@ -167,6 +167,9 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::post('/products/{product}/packages', [AdminCatalogController::class, 'package'])->name('packages.store');
             Route::put('/packages/{package}', [AdminCatalogController::class, 'updatePackage'])->name('packages.update');
             Route::put('/products/{product}/fields', [AdminCatalogController::class, 'fields'])->name('fields.update');
+            Route::post('/products/{product}/notices', [AdminCatalogController::class, 'storeNotice'])->name('notices.store');
+            Route::put('/notices/{notice}', [AdminCatalogController::class, 'updateNotice'])->name('notices.update');
+            Route::delete('/notices/{notice}', [AdminCatalogController::class, 'destroyNotice'])->name('notices.destroy');
             Route::put('/mappings/{mapping}', [AdminCatalogController::class, 'mapping'])->name('mappings.update');
         });
 
