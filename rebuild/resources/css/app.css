@@ -4179,3 +4179,12 @@
     font-size:13px!important;
   }
 }
+
+
+/* Dialog overlay correction: legacy Radix Dialog uses bg-black/50 without blur. */
+.lf-modal-backdrop{
+  z-index:50!important;
+  padding:16px!important;
+  background:rgba(0,0,0,.50)!important;
+  backdrop-filter:none!important;
+}
