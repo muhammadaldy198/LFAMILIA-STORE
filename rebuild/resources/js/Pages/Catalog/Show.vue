@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
-import { computed, nextTick, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import TurnstileWidget from '../../Components/TurnstileWidget.vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 
