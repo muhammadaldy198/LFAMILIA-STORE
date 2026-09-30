@@ -6,6 +6,7 @@ use App\Models\NewsArticle;
 use App\Services\StorefrontContentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -96,6 +97,78 @@ class PublicContentController
         abort_unless(in_array($tool, ['win-rate', 'zodiac', 'magic-wheel'], true), 404);
 
         return Inertia::render('Content/Tool', ['tool' => $tool]);
+    }
+
+    public function status(): Response
+    {
+        $databaseOk = true;
+        $cacheOk = true;
+        try {
+            DB::select('SELECT 1');
+        } catch (\Throwable) {
+            $databaseOk = false;
+        }
+        try {
+            Redis::connection()->ping();
+        } catch (\Throwable) {
+            $cacheOk = false;
+        }
+
+        $paymentOk = $databaseOk && DB::table('payment_channels')
+            ->where('is_active', true)->where('supports_order', true)->exists();
+        $fulfillmentOk = $databaseOk && (
+            DB::table('providers')->where('is_active', true)->exists()
+            || DB::table('products')->where('is_active', true)->where('fulfillment_mode', 'MANUAL')->exists()
+        );
+
+        $services = [
+            [
+                'id' => 'catalog',
+                'name' => 'Katalog & akun',
+                'state' => $databaseOk && $cacheOk ? 'operational' : 'degraded',
+                'detail' => $databaseOk && $cacheOk
+                    ? 'Katalog, akun pelanggan, dan sesi aplikasi berjalan normal.'
+                    : 'Sebagian layanan katalog atau sesi sedang ditinjau.',
+            ],
+            [
+                'id' => 'payment',
+                'name' => 'Pembayaran',
+                'state' => $paymentOk ? 'operational' : 'degraded',
+                'detail' => $paymentOk
+                    ? 'Minimal satu channel pembayaran order sedang aktif.'
+                    : 'Channel pembayaran otomatis belum siap atau sedang dinonaktifkan.',
+            ],
+            [
+                'id' => 'fulfillment',
+                'name' => 'Pemrosesan pesanan',
+                'state' => $fulfillmentOk ? 'operational' : 'degraded',
+                'detail' => $fulfillmentOk
+                    ? 'Pemrosesan produk otomatis/manual tersedia sesuai konfigurasi produk.'
+                    : 'Pemrosesan pesanan sedang ditinjau.',
+            ],
+            [
+                'id' => 'support',
+                'name' => 'Layanan pelanggan',
+                'state' => $databaseOk ? 'operational' : 'degraded',
+                'detail' => $databaseOk
+                    ? 'Support ticket dan kanal bantuan tersedia.'
+                    : 'Status layanan pelanggan sedang ditinjau.',
+            ],
+        ];
+
+        $keys = ['store.name', 'store.legal_name', 'store.registration_id', 'store.address'];
+        $settings = DB::table('system_settings')->whereIn('key', $keys)->pluck('value', 'key')
+            ->map(fn ($value) => json_decode((string) $value, true));
+
+        return Inertia::render('Content/Status', [
+            'services' => $services,
+            'merchant' => [
+                'legalName' => $settings['store.legal_name'] ?? $settings['store.name'] ?? '',
+                'registrationId' => $settings['store.registration_id'] ?? '',
+                'address' => $settings['store.address'] ?? '',
+            ],
+            'updatedAt' => now()->toIso8601String(),
+        ]);
     }
 
     public function promo(): Response
