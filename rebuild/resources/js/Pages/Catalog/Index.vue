@@ -1,46 +1,112 @@
 <script setup>
 import {Head,Link,router,usePage} from '@inertiajs/vue3';
-import {computed,ref} from 'vue';
+import {computed,onMounted,onUnmounted,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 
 const p=defineProps({
-    categories:Array,products:Object,filters:Object,logoUrl:String,bannerUrl:String,
-    mobileBannerUrl:String,popupUrl:String,faviconUrl:String,bannerTarget:String,news:Array,reviews:Array,
+    categories:Array,products:Object,filters:Object,logoUrl:String,faviconUrl:String,
+    banners:Array,popups:Array,news:Array,reviews:Array,
 });
 const page=usePage();
 const storefront=computed(()=>page.props.storefront||{});
-const pop=ref(true);
 const search=ref(p.filters.q??'');
+const mobile=ref(false);
+const bannerIndex=ref(0);
+const popupOpen=ref(false);
+const popupIndex=ref(0);
+const popupHideAgain=ref(false);
+const popupItems=ref([]);
+let bannerTimer=null;
+let mediaQuery=null;
+const visibleBanners=computed(()=>(p.banners||[]).filter((item)=>mobile.value ? item.show_mobile!==false : item.show_desktop!==false));
+const activeBanner=computed(()=>visibleBanners.value[Math.min(bannerIndex.value,Math.max(visibleBanners.value.length-1,0))]||null);
+const activePopup=computed(()=>popupItems.value[popupIndex.value]||null);
 const popular=computed(()=>(p.products?.data??[]).slice(0,8));
 const q=(x={})=>{const a={...p.filters,...x};Object.keys(a).forEach(k=>{if(!a[k])delete a[k]});const s=new URLSearchParams(a).toString();return s?'/?'+s:'/'};
 const submit=()=>router.get('/',{...p.filters,q:search.value},{preserveState:true,preserveScroll:true});
 const initial=n=>(n||'L').slice(0,1).toUpperCase();
 const label=l=>String(l).includes('Previous')?'‹':String(l).includes('Next')?'›':String(l).replace(/&laquo;|&raquo;/g,'').trim();
 const newsDate=v=>v?new Date(v).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):'LFAMILIA News';
+const bannerPrev=()=>{const n=visibleBanners.value.length;if(n)bannerIndex.value=(bannerIndex.value-1+n)%n};
+const bannerNext=()=>{const n=visibleBanners.value.length;if(n)bannerIndex.value=(bannerIndex.value+1)%n};
+const popupKey=(item)=>'lfamilia-home-popup:'+String(item.id??'fallback')+':'+String(item.title||'').slice(0,24);
+const closePopup=()=>{
+    if(popupHideAgain.value){
+        for(const item of popupItems.value){
+            const days=Math.max(1,Number(item.dismiss_days||0));
+            window.localStorage.setItem(popupKey(item),String(Date.now()+days*86400000));
+        }
+    }
+    popupOpen.value=false;
+};
+onMounted(()=>{
+    mediaQuery=window.matchMedia('(max-width:639px)');
+    const updateMobile=()=>{mobile.value=mediaQuery.matches;bannerIndex.value=0};
+    updateMobile();
+    mediaQuery.addEventListener?.('change',updateMobile);
+
+    popupItems.value=(p.popups||[]).filter((item)=>Number(window.localStorage.getItem(popupKey(item))||0)<Date.now());
+    popupOpen.value=popupItems.value.length>0;
+
+    bannerTimer=window.setInterval(()=>{
+        if(visibleBanners.value.length>1)bannerNext();
+    },6500);
+});
+onUnmounted(()=>{
+    if(bannerTimer)window.clearInterval(bannerTimer);
+    if(mediaQuery)mediaQuery.onchange=null;
+});
 </script>
 
 <template>
     <Head title="LFAMILIA STORE" />
     <CustomerShell :logo-url="logoUrl">
         <main>
-            <section v-if="bannerUrl||mobileBannerUrl" class="lf-home-banner">
-                <a v-if="bannerTarget" :href="bannerTarget" class="block">
-                    <picture>
-                        <source v-if="mobileBannerUrl" media="(max-width:640px)" :srcset="mobileBannerUrl">
-                        <img :src="bannerUrl||mobileBannerUrl" alt="Banner LFAMILIA STORE">
+            <section v-if="activeBanner" class="lf-container lf-home-banner-wrap">
+                <div class="lf-home-banner">
+                    <a v-if="activeBanner.cta_href" :href="activeBanner.cta_href" class="block">
+                        <picture>
+                            <source v-if="activeBanner.mobile_url" media="(max-width:639px)" :srcset="activeBanner.mobile_url">
+                            <img :src="activeBanner.desktop_url||activeBanner.mobile_url" :alt="activeBanner.title||'Banner LFAMILIA STORE'">
+                        </picture>
+                    </a>
+                    <picture v-else>
+                        <source v-if="activeBanner.mobile_url" media="(max-width:639px)" :srcset="activeBanner.mobile_url">
+                        <img :src="activeBanner.desktop_url||activeBanner.mobile_url" :alt="activeBanner.title||'Banner LFAMILIA STORE'">
                     </picture>
-                </a>
-                <picture v-else>
-                    <source v-if="mobileBannerUrl" media="(max-width:640px)" :srcset="mobileBannerUrl">
-                    <img :src="bannerUrl||mobileBannerUrl" alt="Banner LFAMILIA STORE">
-                </picture>
+                    <template v-if="visibleBanners.length>1">
+                        <button type="button" class="lf-banner-nav prev" aria-label="Banner sebelumnya" @click="bannerPrev">‹</button>
+                        <button type="button" class="lf-banner-nav next" aria-label="Banner berikutnya" @click="bannerNext">›</button>
+                        <div class="lf-banner-dots">
+                            <button v-for="(_,i) in visibleBanners" :key="i" type="button" :class="{active:i===bannerIndex}" :aria-label="'Banner '+(i+1)" @click="bannerIndex=i"></button>
+                        </div>
+                    </template>
+                </div>
             </section>
 
-            <div v-if="popupUrl&&pop" class="fixed inset-0 z-[100] grid place-items-center bg-black/75 p-4">
-                <div class="max-w-lg rounded-xl border border-white/10 bg-[#070a10] p-2">
-                    <button class="lf-secondary mb-2" @click="pop=false">Tutup</button>
-                    <img :src="popupUrl" class="max-h-[70vh] w-full object-contain">
-                </div>
+            <div v-if="popupOpen&&activePopup" class="lf-home-popup-backdrop" @click.self="closePopup">
+                <section class="lf-home-popup" role="dialog" aria-modal="true" :aria-label="activePopup.title">
+                    <header>
+                        <span>{{popupIndex+1}}/{{popupItems.length}}</span>
+                        <button type="button" aria-label="Tutup pop-up" @click="closePopup">×</button>
+                    </header>
+                    <div class="lf-home-popup-body">
+                        <h2>{{activePopup.title}}</h2>
+                        <p>{{activePopup.body}}</p>
+                        <div v-if="activePopup.primary_href||activePopup.secondary_href" class="lf-home-popup-actions">
+                            <a v-if="activePopup.primary_href" :href="activePopup.primary_href" class="lf-primary">{{activePopup.primary_label||'Buka tautan'}}</a>
+                            <a v-if="activePopup.secondary_href" :href="activePopup.secondary_href" class="lf-secondary">{{activePopup.secondary_label||'Tautan lainnya'}}</a>
+                        </div>
+                        <div v-if="popupItems.length>1" class="lf-home-popup-pager">
+                            <button type="button" :disabled="popupIndex===0" @click="popupIndex--">‹ Sebelumnya</button>
+                            <button type="button" :disabled="popupIndex===popupItems.length-1" @click="popupIndex++">Berikutnya ›</button>
+                        </div>
+                    </div>
+                    <label class="lf-home-popup-dismiss">
+                        <input v-model="popupHideAgain" type="checkbox">
+                        <span>Jangan tampilkan lagi</span>
+                    </label>
+                </section>
             </div>
 
             <section v-if="popular.length" class="lf-container lf-section pb-2">
