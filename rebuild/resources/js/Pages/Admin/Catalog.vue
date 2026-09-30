@@ -24,7 +24,7 @@ const tab = ref('AUTO_PROVIDER');
 const visibleProducts = computed(() => products.value.filter((item) => item.fulfillment_mode === tab.value));
 const categoryForm = useForm({ name: '', sort_order: 0 });
 const productForm = useForm({ category_id: '', name: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', margin_percent: 0, sort_order: 0 });
-const packageForm = useForm({ product_id: '', code: '', name: '', group_name: '', nominal_value: '', sort_order: 0, cost_idr: '' });
+const packageForm = useForm({ product_id: '', code: '', name: '', note: '', group_name: '', nominal_value: '', sort_order: 0, cost_idr: '' });
 const noticeDrafts = reactive({});
 const fieldsProductId = ref('');
 const fieldsText = ref('');
@@ -59,7 +59,7 @@ const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
     nickname_server_field_key: item.nickname_server_field_key || null,
 });
 const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
-    code: pack.code, name: pack.name, group_name: pack.group_name || null, nominal_value: pack.nominal_value,
+    code: pack.code, name: pack.name, note: pack.note || null, group_name: pack.group_name || null, nominal_value: pack.nominal_value,
     sort_order: pack.sort_order, is_active: pack.is_active,
 });
 const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping.id, {
@@ -179,6 +179,7 @@ const deleteNotice = (notice) => {
                             <div class="flex flex-wrap items-end gap-2">
                                 <label class="text-xs">Kode internal<input v-model="pack.code" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
                                 <label class="text-xs">Nama nominal<input v-model="pack.name" class="mt-1 block rounded bg-slate-800 p-2"></label>
+                                <label class="text-xs">Badge<input v-model="pack.note" maxlength="80" placeholder="Contoh: Populer" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
                                 <label class="text-xs">Grup / Tabel<input v-model="pack.group_name" placeholder="Contoh: Diamonds" class="mt-1 block rounded bg-slate-800 p-2"></label>
                                 <label class="text-xs">Nilai nominal<input v-model.number="pack.nominal_value" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
                                 <label class="text-xs">Urutan<input v-model.number="pack.sort_order" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2"></label>
@@ -201,6 +202,7 @@ const deleteNotice = (notice) => {
                         <form class="flex flex-wrap items-end gap-2 border-t border-slate-800 pt-3" @submit.prevent="packageForm.post('/admin/catalog/products/' + item.id + '/packages', { onSuccess: () => packageForm.reset() })">
                             <label class="text-xs">Kode internal<input v-model="packageForm.code" required class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
                             <label class="text-xs">Nama nominal<input v-model="packageForm.name" required class="mt-1 block rounded bg-slate-800 p-2"></label>
+                            <label class="text-xs">Badge<input v-model="packageForm.note" maxlength="80" placeholder="Contoh: Populer" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
                             <label class="text-xs">Grup / Tabel<input v-model="packageForm.group_name" placeholder="Contoh: Weekly / Diamonds" class="mt-1 block rounded bg-slate-800 p-2"></label>
                             <label class="text-xs">Nilai nominal<input v-model.number="packageForm.nominal_value" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
                             <label class="text-xs">Urutan<input v-model.number="packageForm.sort_order" type="number" min="0" required class="mt-1 block w-20 rounded bg-slate-800 p-2"></label>
