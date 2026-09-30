@@ -6,6 +6,7 @@ use App\Models\IntegrationCredential;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
 use App\Services\PaymentStateService;
+use App\Services\PaymentPageSettingsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +17,7 @@ use Inertia\Response;
 
 class AdminPaymentController
 {
-    public function index(): Response
+    public function index(PaymentPageSettingsService $pageSettings): Response
     {
         $configured = IntegrationCredential::whereIn('code', ['midtrans', 'doku'])
             ->get(['code', 'is_active'])->keyBy('code');
@@ -45,6 +46,7 @@ class AdminPaymentController
                 ->orderBy('channels.sort_order')->orderBy('routes.priority')
                 ->select('routes.*', 'channels.code as channel_code', 'gateways.code as gateway_code')->get(),
             'minimumTopupIdr' => $this->minimumTopup(),
+            'pageSettings' => $pageSettings->read(),
             'manualQrisAsset' => $manualAsset ? [
                 'id' => $manualAsset->id,
                 'is_active' => (bool) $manualAsset->is_active,
@@ -197,6 +199,41 @@ class AdminPaymentController
             ]
         );
         $this->audit($request, 'payment.settings.updated', 'system_setting', 0, null, $data);
+
+        return back();
+    }
+
+    public function pageSettings(
+        Request $request,
+        PaymentPageSettingsService $settings,
+    ): RedirectResponse {
+        $data = $request->validate([
+            'accentColor' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'headerImageUrl' => ['nullable', 'string', 'max:500'],
+            'eyebrow' => ['required', 'string', 'min:1', 'max:60'],
+            'pendingTitle' => ['required', 'string', 'min:2', 'max:100'],
+            'paidTitle' => ['required', 'string', 'min:2', 'max:100'],
+            'failedTitle' => ['required', 'string', 'min:2', 'max:100'],
+            'subtitle' => ['nullable', 'string', 'max:240'],
+            'invoiceNoticeTitle' => ['required', 'string', 'min:2', 'max:120'],
+            'invoiceNoticeText' => ['nullable', 'string', 'max:500'],
+            'pendingStatusText' => ['nullable', 'string', 'max:300'],
+            'paidStatusText' => ['nullable', 'string', 'max:300'],
+            'failedStatusText' => ['nullable', 'string', 'max:300'],
+            'payButtonText' => ['required', 'string', 'min:1', 'max:80'],
+            'checkStatusButtonText' => ['required', 'string', 'min:1', 'max:80'],
+            'checkInvoiceButtonText' => ['required', 'string', 'min:1', 'max:80'],
+            'supportText' => ['nullable', 'string', 'max:120'],
+            'supportUrl' => ['nullable', 'string', 'max:500', 'regex:/^(\/(?!\/)|https?:\/\/)/i'],
+            'showStoreBrand' => ['required', 'boolean'],
+            'showInvoiceNotice' => ['required', 'boolean'],
+            'showOrderSummary' => ['required', 'boolean'],
+            'showStatusBox' => ['required', 'boolean'],
+            'showSupport' => ['required', 'boolean'],
+        ]);
+        $before = $settings->read();
+        $settings->write($data, $request->user('admin')->id);
+        $this->audit($request, 'payment.page.updated', 'system_setting', 0, $before, $data);
 
         return back();
     }
