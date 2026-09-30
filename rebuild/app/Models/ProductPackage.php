@@ -12,7 +12,7 @@ class ProductPackage extends Model implements HasMedia
 {
     use InteractsWithMedia;
 
-    protected $fillable = ['product_id', 'code', 'name', 'group_name', 'nominal_value', 'sort_order', 'is_active'];
+    protected $fillable = ['product_id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active'];
 
     protected function casts(): array
     {
