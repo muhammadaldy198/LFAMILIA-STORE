@@ -55,7 +55,7 @@ class AdminPermissionService
             ['label' => 'Pesanan', 'href' => '/admin/orders', 'permission' => 'orders.view'],
             ['label' => 'Produk', 'href' => '/admin/catalog', 'permission' => 'catalog.manage'],
             ['label' => 'Manual', 'href' => '/admin/fulfillment', 'permission' => 'fulfillment.manage'],
-            ['label' => 'Banner & Konten', 'href' => '/admin/catalog#media', 'permission' => 'content.manage'],
+            ['label' => 'Banner & Konten', 'href' => '/admin/content', 'permission' => 'content.manage'],
             ['label' => 'Digiflazz', 'href' => '/admin/providers?provider=DIGIFLAZZ', 'permission' => 'providers.manage'],
             ['label' => 'Provider', 'href' => '/admin/providers', 'permission' => 'providers.manage'],
             ['label' => 'Pembayaran', 'href' => '/admin/payments', 'permission' => 'payments.manage'],
