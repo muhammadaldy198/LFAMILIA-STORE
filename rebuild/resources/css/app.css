@@ -4113,3 +4113,37 @@
     border-radius:6.4px!important;
   }
 }
+
+
+/* Checkout payment availability parity */
+.lf-payment-unavailable{
+  padding:8px 12px;
+  border:1px solid rgba(253,224,71,.20);
+  border-radius:6.4px;
+  background:rgba(253,224,71,.05);
+  color:rgba(254,243,199,.75);
+  font-size:10px;
+  line-height:16px;
+}
+.lf-payment-channel-copy{
+  min-width:0;
+  display:block;
+}
+.lf-payment-channel-copy strong,
+.lf-payment-channel-copy small{
+  display:block;
+}
+.lf-payment-channel-copy strong{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:inherit;
+  font-size:9px;
+}
+.lf-payment-channel-copy small{
+  margin-top:2px;
+  color:currentColor;
+  font-size:7px;
+  font-weight:600;
+  opacity:.70;
+}
