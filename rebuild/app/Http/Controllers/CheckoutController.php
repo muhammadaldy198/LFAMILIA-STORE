@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Services\CheckoutInputValidator;
+use App\Services\CheckoutPricing;
 use App\Services\CheckoutService;
 use App\Services\NicknameService;
 use Illuminate\Http\JsonResponse;
