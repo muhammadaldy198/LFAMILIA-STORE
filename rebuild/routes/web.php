@@ -266,6 +266,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::put('/routes/{id}', [AdminPaymentController::class, 'updateRoute'])->name('routes.update');
             Route::put('/settings', [AdminPaymentController::class, 'settings'])->name('settings.update');
             Route::put('/page-settings', [AdminPaymentController::class, 'pageSettings'])->name('page-settings.update');
+            Route::post('/page-settings/header', [AdminPaymentController::class, 'uploadPageHeader'])->name('page-settings.header');
         });
     });
 });
