@@ -126,7 +126,8 @@ onUnmounted(()=>{
                 </div>
 
                 <nav class="lf-filters">
-                    <Link :href="q({category:'',mode:''})" class="lf-chip" :class="{active:!filters.category}">Semua</Link>
+                    <Link :href="q({category:'',mode:''})" class="lf-chip" :class="{active:!filters.category&&!filters.mode}">Semua</Link>
+                    <Link :href="q({category:'',mode:'manual'})" class="lf-chip" :class="{active:filters.mode==='manual'}">Produk Manual</Link>
                     <Link v-for="c in categories" :key="c.slug" :href="q({category:c.slug,mode:''})" class="lf-chip" :class="{active:filters.category===c.slug}">
                         <img v-if="c.image_url" :src="c.image_url" alt="">{{c.name}}
                     </Link>
@@ -200,7 +201,7 @@ onUnmounted(()=>{
             <section class="lf-container lf-section">
                 <div class="lf-help">
                     <div><p class="lf-eyebrow">BUTUH BANTUAN?</p><h2 class="m-0 text-[22px] font-black">Tim LFAMILIA siap membantu.</h2><p class="lf-copy">Sampaikan pertanyaan mengenai produk, pembayaran, atau status pesanan.</p></div>
-                    <Link href="/contact" class="lf-primary">Layanan Pelanggan</Link>
+                    <Link href="/contact" class="lf-primary">Hubungi Kami</Link>
                 </div>
             </section>
         </main>
