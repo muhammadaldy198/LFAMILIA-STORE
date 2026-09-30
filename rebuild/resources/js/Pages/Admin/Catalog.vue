@@ -109,7 +109,11 @@ const deleteNotice = (notice) => {
                         <button type="button" class="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" @click="deleteCategory(item)">Hapus</button>
                         <span class="text-xs text-slate-500">/{{ item.slug }}</span>
                     </div>
-                    <AdminMediaControl type="category" :id="item.id" :url="item.image_url" />
+                    <div class="rounded-md border border-slate-200 p-3">
+                        <strong class="text-xs">Gambar kategori</strong>
+                        <p class="mt-1 text-[11px] text-slate-500">Rekomendasi 512×512 (1:1). Dipakai sebagai ikon/tab kategori.</p>
+                        <div class="mt-2"><AdminMediaControl type="category" :id="item.id" :url="item.image_url" /></div>
+                    </div>
                 </div>
             </section>
 
@@ -148,8 +152,8 @@ const deleteNotice = (notice) => {
                     </div>
                     <button type="button" class="rounded-md bg-slate-700 px-4 py-2 text-sm" @click="saveProduct(item)">Simpan produk</button>
                     <div class="grid gap-3 md:grid-cols-2">
-                        <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk</strong><p class="mt-1 text-[11px] text-slate-500">Rekomendasi 1:1, minimal 512×512. Homepage akan crop dari tengah seperti kartu produk checkout.</p><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
-                        <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Banner halaman produk</strong><p class="mt-1 text-[11px] text-slate-500">Gunakan banner lebar dengan fokus subjek di tengah agar aman pada desktop dan mobile.</p><div class="mt-2"><AdminMediaControl type="product" :id="item.id" collection="banner" :url="item.banner_url" /></div></div>
+                        <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk / card</strong><p class="mt-1 text-[11px] text-slate-500">Patokan LFAMILIA lama: 600×900 (2:3). Homepage dan cover 3D checkout mengambil crop dari area tengah.</p><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
+                        <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Banner halaman produk</strong><p class="mt-1 text-[11px] text-slate-500">Patokan LFAMILIA lama: 1280×560. Letakkan subjek utama di tengah agar desktop/mobile aman.</p><div class="mt-2"><AdminMediaControl type="product" :id="item.id" collection="banner" :url="item.banner_url" /></div></div>
                     </div>
                     <div class="space-y-3 rounded-md border border-slate-200 bg-white p-4">
                         <div><h3 class="font-semibold">Notice produk</h3><p class="mt-1 text-xs text-slate-500">Informasi publik yang tampil di checkout, terpisah dari instruksi fulfillment internal.</p></div>
@@ -181,7 +185,10 @@ const deleteNotice = (notice) => {
                                 <label class="flex gap-2 text-xs"><input v-model="pack.is_active" type="checkbox">Aktif</label>
                                 <button type="button" class="rounded bg-slate-700 px-3 py-2 text-xs" @click="savePackage(pack)">Simpan</button>
                             </div>
-                            <AdminMediaControl type="package" :id="pack.id" :url="pack.image_url" />
+                            <div class="rounded border border-slate-700 p-2">
+                                <p class="mb-2 text-[11px] text-slate-400">Gambar nominal: rekomendasi 512×512 (1:1), PNG/WebP transparan bila memungkinkan.</p>
+                                <AdminMediaControl type="package" :id="pack.id" :url="pack.image_url" />
+                            </div>
                             <div v-for="mapping in pack.mappings" :key="mapping.id" class="flex flex-wrap items-end gap-2 text-xs text-slate-300">
                                 <span>{{ mapping.provider_code }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span></span>
                                 <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
