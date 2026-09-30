@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MembershipTier;
+use App\Models\Product;
 use App\Models\Wallet;
 use App\Services\CustomerAccountDeletion;
 use App\Services\MembershipService;
@@ -184,13 +185,13 @@ class CustomerAccountController
     public function gameAccounts(Request $request): Response
     {
         return Inertia::render('Customer/GameAccounts', [
-            'products' => \App\Models\Product::query()
+            'products' => Product::query()
                 ->with(['fields' => fn ($query) => $query->orderBy('sort_order')])
                 ->where('is_active', true)
                 ->whereHas('category', fn ($query) => $query->where('slug', 'game'))
                 ->orderBy('name')
                 ->get()
-                ->map(fn (\App\Models\Product $product): array => [
+                ->map(fn (Product $product): array => [
                     'id' => (int) $product->id,
                     'name' => $product->name,
                     'fields' => $product->fields->map(fn ($field): array => [
