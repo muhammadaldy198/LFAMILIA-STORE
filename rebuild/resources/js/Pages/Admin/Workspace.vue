@@ -160,6 +160,13 @@ function adjustWallet(row) {
             </template>
 
             <section v-else-if="kind === 'settings'" class="space-y-5">
+                <section v-if="isSuper" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
+                    <div>
+                        <h2 class="font-semibold">Export Configuration JSON</h2>
+                        <p class="mt-1 text-xs text-slate-400">Unduh konfigurasi aman tanpa credential, password, API key, token, private key, atau payment signature.</p>
+                    </div>
+                    <a href="/admin/configuration/export" class="rounded bg-slate-700 px-4 py-2 text-sm font-semibold text-white">Export JSON</a>
+                </section>
                 <form class="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-5 md:grid-cols-2" @submit.prevent="settingsForm.put('/admin/settings')">
                     <label class="text-sm">Nama toko<input v-model="settingsForm.store_name" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
                     <label class="text-sm">Tagline<input v-model="settingsForm.tagline" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
