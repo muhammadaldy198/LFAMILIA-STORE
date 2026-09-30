@@ -9,6 +9,7 @@ use App\Models\ProductPackage;
 use App\Models\StoreAsset;
 use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
+use App\Services\StorefrontContentService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -16,7 +17,7 @@ use Inertia\Response;
 
 class CatalogController
 {
-    public function index(Request $request): Response
+    public function index(Request $request, StorefrontContentService $content): Response
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:80'],
@@ -58,6 +59,7 @@ class CatalogController
             'popupUrl' => $assets->get('popup')?->getFirstMediaUrl('image'),
             'faviconUrl' => $assets->get('favicon')?->getFirstMediaUrl('image'),
             'bannerTarget' => $assets->get('banner_desktop')?->target_url,
+            'news' => $content->news(3),
         ]);
     }
 
