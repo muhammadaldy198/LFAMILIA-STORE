@@ -35,6 +35,11 @@ watch(() => props.reviews, (v) => { reviews.value = (v || []).map((x) => ({ ...x
 
 const settingsForm = useForm({
     support_widget_enabled: Boolean(props.settings?.['store.support_widget_enabled'] ?? true),
+    support_cta_enabled: Boolean(props.settings?.['store.support_cta_enabled'] ?? true),
+    support_cta_label: props.settings?.['store.support_cta_label'] || 'BUTUH BANTUAN?',
+    support_cta_title: props.settings?.['store.support_cta_title'] || 'Tim LFAMILIA siap membantu.',
+    support_cta_body: props.settings?.['store.support_cta_body'] || 'Butuh bantuan memilih produk, pembayaran, atau mengecek status pesanan? Hubungi tim kami.',
+    support_cta_button: props.settings?.['store.support_cta_button'] || 'Hubungi Kami',
     footer_description: props.settings?.['store.footer_description'] || '',
     home_news_title: props.settings?.['store.home_news_title'] || '',
     home_news_intro: props.settings?.['store.home_news_intro'] || '',
@@ -258,6 +263,11 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                     <label class="text-xs">Judul berita homepage<input v-model="settingsForm.home_news_title" class="mt-1 block w-full rounded border border-slate-200 p-2"></label>
                     <label class="text-xs">Jam layanan<input v-model="settingsForm.business_hours" class="mt-1 block w-full rounded border border-slate-200 p-2"></label>
                     <label class="text-xs md:col-span-2">Intro berita homepage<textarea v-model="settingsForm.home_news_intro" rows="2" class="mt-1 block w-full rounded border border-slate-200 p-2"></textarea></label>
+                    <label class="flex items-center gap-2 text-xs md:col-span-2"><input v-model="settingsForm.support_cta_enabled" type="checkbox"> Blok bantuan/CTA menjelang footer aktif</label>
+                    <label class="text-xs">Label CTA<input v-model="settingsForm.support_cta_label" maxlength="80" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="BUTUH BANTUAN?"></label>
+                    <label class="text-xs">Teks tombol CTA<input v-model="settingsForm.support_cta_button" maxlength="80" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="Hubungi Kami"></label>
+                    <label class="text-xs md:col-span-2">Judul CTA<input v-model="settingsForm.support_cta_title" maxlength="180" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="Tim LFAMILIA siap membantu."></label>
+                    <label class="text-xs md:col-span-2">Deskripsi CTA<textarea v-model="settingsForm.support_cta_body" rows="2" maxlength="1000" class="mt-1 block w-full rounded border border-slate-200 p-2"></textarea></label>
                     <label class="text-xs md:col-span-2">Deskripsi footer<textarea v-model="settingsForm.footer_description" rows="2" class="mt-1 block w-full rounded border border-slate-200 p-2"></textarea></label>
                     <label class="text-xs">WhatsApp<input v-model="settingsForm.support_whatsapp" class="mt-1 block w-full rounded border border-slate-200 p-2"></label>
                     <label class="text-xs">Email<input v-model="settingsForm.email" type="email" class="mt-1 block w-full rounded border border-slate-200 p-2"></label>
