@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductInputField;
 use App\Models\ProductPackage;
+use App\Models\ProductNotice;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Models\StoreAsset;
@@ -30,19 +31,22 @@ class AdminCatalogController
                 ...$category->only('id', 'name', 'slug', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),
             ]),
-            'products' => Product::with(['packages.mappings', 'fields'])->orderBy('sort_order')->get()
+            'products' => Product::with(['packages.mappings', 'fields', 'notices'])->orderBy('sort_order')->get()
                 ->map(fn (Product $product): array => [
-                    ...$product->only('id', 'category_id', 'name', 'slug', 'description', 'fulfillment_mode',
+                    ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
                         'manual_instructions', 'margin_percent', 'sort_order', 'is_active',
                         'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
                         'nickname_server_field_key'),
                     'image_url' => $product->getFirstMediaUrl('image'),
                     'banner_url' => $product->getFirstMediaUrl('banner'),
                     'fields' => $product->fields->sortBy('sort_order')->values()->toArray(),
+                    'notices' => $product->notices->sortBy('sort_order')->values()->map(fn (ProductNotice $notice): array => [
+                        ...$notice->only('id', 'title', 'body', 'sort_order', 'is_active'),
+                    ])->all(),
                     'packages' => $product->packages->sortBy([
                         ['nominal_value', 'asc'], ['sort_order', 'asc'],
                     ])->values()->map(fn (ProductPackage $package): array => [
-                        ...$package->only('id', 'code', 'name', 'nominal_value', 'sort_order', 'is_active'),
+                        ...$package->only('id', 'code', 'name', 'group_name', 'nominal_value', 'sort_order', 'is_active'),
                         'image_url' => $package->getFirstMediaUrl('image'),
                         'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
                             ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
@@ -119,6 +123,7 @@ class AdminCatalogController
         $data = $request->validate([
             'category_id' => ['required', 'integer', Rule::exists('categories', 'id')],
             'name' => ['required', 'string', 'max:255'],
+            'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'fulfillment_mode' => ['required', Rule::in(['AUTO_PROVIDER', 'MANUAL'])],
             'manual_instructions' => ['nullable', 'string', 'max:5000'],
@@ -146,6 +151,7 @@ class AdminCatalogController
         $data = $request->validate([
             'category_id' => ['required', 'integer', Rule::exists('categories', 'id')],
             'name' => ['required', 'string', 'max:255'],
+            'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'manual_instructions' => ['nullable', 'string', 'max:5000'],
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
@@ -194,6 +200,7 @@ class AdminCatalogController
             'code' => ['required', 'string', 'max:80', 'regex:/^[A-Za-z0-9_-]+$/',
                 Rule::unique('product_packages', 'code')->where('product_id', $product->id)],
             'name' => ['required', 'string', 'max:255'],
+            'group_name' => ['nullable', 'string', 'max:120'],
             'nominal_value' => ['nullable', 'integer', 'min:0'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'cost_idr' => [$product->fulfillment_mode === 'MANUAL' ? 'required' : 'nullable',
@@ -204,6 +211,7 @@ class AdminCatalogController
             $package = $product->packages()->create([
                 'code' => $data['code'],
                 'name' => $data['name'],
+                'group_name' => $data['group_name'] ?? null,
                 'nominal_value' => $data['nominal_value'] ?? null,
                 'sort_order' => $data['sort_order'],
                 'is_active' => false,
@@ -234,6 +242,7 @@ class AdminCatalogController
             'code' => ['required', 'string', 'max:80', 'regex:/^[A-Za-z0-9_-]+$/',
                 Rule::unique('product_packages', 'code')->where('product_id', $package->product_id)->ignore($package->id)],
             'name' => ['required', 'string', 'max:255'],
+            'group_name' => ['nullable', 'string', 'max:120'],
             'nominal_value' => ['nullable', 'integer', 'min:0'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
@@ -244,6 +253,35 @@ class AdminCatalogController
             $package->update($data);
             $audit->record($request, 'catalog.package.updated', 'product_package', $package->id, $before, $package->toArray());
         });
+
+        return back();
+    }
+
+    public function storeNotice(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
+    {
+        $data = $this->noticeData($request);
+        $notice = $product->notices()->create($data);
+        $audit->record($request, 'catalog.notice.created', 'product_notice', $notice->id, null, $notice->toArray());
+
+        return back();
+    }
+
+    public function updateNotice(Request $request, ProductNotice $notice, CatalogAudit $audit): RedirectResponse
+    {
+        $data = $this->noticeData($request);
+        $before = $notice->toArray();
+        $notice->update($data);
+        $audit->record($request, 'catalog.notice.updated', 'product_notice', $notice->id, $before, $notice->toArray());
+
+        return back();
+    }
+
+    public function destroyNotice(Request $request, ProductNotice $notice, CatalogAudit $audit): RedirectResponse
+    {
+        $before = $notice->toArray();
+        $id = $notice->id;
+        $notice->delete();
+        $audit->record($request, 'catalog.notice.deleted', 'product_notice', $id, $before, null);
 
         return back();
     }
@@ -321,6 +359,16 @@ class AdminCatalogController
         });
 
         return back();
+    }
+
+    private function noticeData(Request $request): array
+    {
+        return $request->validate([
+            'title' => ['required', 'string', 'max:180'],
+            'body' => ['required', 'string', 'max:5000'],
+            'sort_order' => ['required', 'integer', 'min:0', 'max:100000'],
+            'is_active' => ['required', 'boolean'],
+        ]);
     }
 
     public function asset(Request $request, StoreAsset $asset, CatalogAudit $audit): RedirectResponse
