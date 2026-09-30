@@ -4628,3 +4628,173 @@
   color:rgba(255,255,255,.24);
   font-size:8px;
 }
+
+
+/* Membership customer parity */
+.lf-membership-hero{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:20px;
+  padding:20px;
+  border:1px solid rgba(185,255,53,.16);
+  border-radius:18px;
+  background:
+    radial-gradient(circle at 85% 10%,rgba(185,255,53,.08),transparent 14rem),
+    #0d1019;
+}
+.lf-membership-hero h1{
+  margin:4px 0 0!important;
+  color:var(--lf-lime-2);
+  font-size:30px!important;
+  font-weight:950!important;
+}
+.lf-membership-hero p:last-child{
+  margin:8px 0 0;
+  max-width:640px;
+  color:rgba(255,255,255,.42);
+  font-size:11px;
+  line-height:19px;
+}
+.lf-membership-discount{
+  flex:0 0 auto;
+  text-align:right;
+}
+.lf-membership-discount span,
+.lf-membership-discount strong{
+  display:block;
+}
+.lf-membership-discount span{
+  color:rgba(255,255,255,.34);
+  font-size:9px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.lf-membership-discount strong{
+  margin-top:4px;
+  color:var(--lf-lime);
+  font-size:26px;
+  font-weight:950;
+}
+.lf-membership-progress{
+  padding:16px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  background:#0d1019;
+}
+.lf-membership-progress-head{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+}
+.lf-membership-progress-head small,
+.lf-membership-progress-head strong{
+  display:block;
+}
+.lf-membership-progress-head small{
+  color:rgba(255,255,255,.32);
+  font-size:9px;
+}
+.lf-membership-progress-head strong{
+  margin-top:3px;
+  color:#fff;
+  font-size:12px;
+}
+.lf-membership-progress-bar{
+  height:7px;
+  margin-top:12px;
+  overflow:hidden;
+  border-radius:999px;
+  background:rgba(255,255,255,.07);
+}
+.lf-membership-progress-bar span{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,var(--lf-blue),var(--lf-lime));
+}
+.lf-membership-progress>p{
+  margin:8px 0 0;
+  color:rgba(255,255,255,.30);
+  font-size:9px;
+}
+.lf-membership-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.lf-membership-grid article{
+  padding:14px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  background:#0d1019;
+}
+.lf-membership-grid article.active{
+  border-color:rgba(185,255,53,.40);
+  box-shadow:inset 0 0 0 1px rgba(185,255,53,.08);
+}
+.lf-membership-tier-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.lf-membership-tier-head strong{
+  font-size:13px;
+  font-weight:950;
+}
+.lf-membership-tier-head span{
+  padding:3px 7px;
+  border-radius:999px;
+  background:rgba(185,255,53,.10);
+  color:var(--lf-lime-2);
+  font-size:7px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.lf-membership-grid dl{
+  display:grid;
+  gap:6px;
+  margin:12px 0 0;
+}
+.lf-membership-grid dl>div{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding-top:6px;
+  border-top:1px solid rgba(255,255,255,.06);
+  font-size:9px;
+}
+.lf-membership-grid dt{color:rgba(255,255,255,.32)}
+.lf-membership-grid dd{margin:0;color:#fff;font-weight:800;text-align:right}
+.lf-membership-benefits{
+  display:grid;
+  gap:5px;
+  margin-top:10px;
+}
+.lf-membership-benefits p{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  margin:0;
+  color:rgba(255,255,255,.40);
+  font-size:8px;
+  text-transform:capitalize;
+}
+.lf-membership-benefits span{
+  color:#fff;
+  text-align:right;
+}
+@media(max-width:767px){
+  .lf-membership-hero{
+    align-items:flex-start;
+    padding:16px;
+  }
+  .lf-membership-hero h1{font-size:24px!important}
+  .lf-membership-discount strong{font-size:20px}
+  .lf-membership-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:420px){
+  .lf-membership-grid{grid-template-columns:1fr}
+}
