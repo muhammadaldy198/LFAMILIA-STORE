@@ -115,6 +115,9 @@ Route::middleware('auth:web')->group(function (): void {
         Route::post('/account/wallet/topups', [WalletTopupController::class, 'store'])
             ->middleware('throttle:wallet-topup')->name('account.wallet.topups.store');
         Route::get('/account/membership', [CustomerAccountController::class, 'membership'])->name('account.membership');
+        Route::get('/account/codes', [CustomerAccountController::class, 'codes'])->name('account.codes');
+        Route::get('/account/game-accounts', [CustomerAccountController::class, 'gameAccounts'])->name('account.game-accounts');
+        Route::get('/account/notifications', [CustomerAccountController::class, 'notifications'])->name('account.notifications');
         Route::get('/account/orders', [CustomerOrderController::class, 'index'])->name('account.orders');
         Route::get('/account/orders/{order}', [CustomerOrderController::class, 'show'])->name('account.orders.show');
         Route::get('/account/tickets', [SupportTicketController::class, 'index'])->name('account.tickets');
