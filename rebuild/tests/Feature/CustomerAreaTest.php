@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class CustomerAreaTest extends TestCase
@@ -72,7 +72,7 @@ class CustomerAreaTest extends TestCase
 
     public function test_profile_password_and_deletion_checks(): void
     {
-        Notification::fake();
+        Queue::fake();
         $user = $this->customer('profile@example.test');
         $this->actingAs($user, 'web');
 
