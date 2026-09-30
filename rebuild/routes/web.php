@@ -8,8 +8,8 @@ use App\Http\Controllers\AdminContentController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminFulfillmentController;
 use App\Http\Controllers\AdminIntegrationController;
-use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\AdminNicknameController;
+use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\AdminWorkspaceController;
 use App\Http\Controllers\CatalogController;
@@ -142,8 +142,6 @@ Route::redirect('/panel', '/admin/panel', 302);
 Route::redirect('/panel/login', '/admin/login', 302);
 Route::redirect('/panel/admin', '/admin/panel', 302);
 Route::redirect('/panel/admin/login', '/admin/login', 302);
-
-
 
 Route::middleware('guest:admin')->group(function (): void {
     Route::get('/admin/login', [AdminAuthController::class, 'show'])->name('admin.login');
@@ -303,4 +301,3 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         });
     });
 });
-
