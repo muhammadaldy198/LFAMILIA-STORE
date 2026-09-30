@@ -1,0 +1,256 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class PublicOrderTrackingController
+{
+    public function index(): Response
+    {
+        return Inertia::render('Guest/Track', [
+            'transactions' => $this->recentTransactions(),
+        ]);
+    }
+
+    public function search(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'query' => ['required', 'string', 'max:100'],
+        ]);
+
+        $query = trim((string) $data['query']);
+        if ($this->looksLikeInvoice($query)) {
+            $order = $this->orderByNumber(strtoupper($query));
+
+            return $order
+                ? response()->json(['mode' => 'order', 'order' => $this->publicOrder($order)])
+                    ->header('Cache-Control', 'no-store, private')
+                : response()->json(['message' => 'Invoice tidak ditemukan.'], 404);
+        }
+
+        $phone = $this->normalizePhone($query);
+        if ($phone === '') {
+            return response()->json(['message' => 'Masukkan invoice atau nomor WhatsApp yang valid.'], 422);
+        }
+
+        $orders = DB::table('orders')
+            ->leftJoin('users', 'users.id', '=', 'orders.user_id')
+            ->join('products', 'products.id', '=', 'orders.product_id')
+            ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
+            ->where(function ($builder) use ($phone): void {
+                $builder->where('orders.guest_phone', $phone)
+                    ->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(users.phone,''), '+', ''), '-', ''), ' ', ''), '.', '') = ?", [$phone]);
+            })
+            ->orderByDesc('orders.id')->limit(25)
+            ->get([
+                'orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr', 'orders.created_at',
+                'products.name as product_name', 'product_packages.name as package_name',
+            ])->map(fn (object $order): array => [
+                'referenceId' => $order->order_number,
+                'maskedReferenceId' => $this->maskReference((string) $order->order_number),
+                'productName' => $order->product_name,
+                'packageLabel' => $order->package_name,
+                'total' => (int) $order->total_idr,
+                'status' => $this->publicStatus((string) $order->status),
+                'createdAt' => $order->created_at,
+            ])->values();
+
+        return response()->json(['mode' => 'phone', 'orders' => $orders])
+            ->header('Cache-Control', 'no-store, private');
+    }
+
+    public function status(string $orderNumber): JsonResponse
+    {
+        $order = $this->orderByNumber(strtoupper($orderNumber));
+        abort_unless($order, 404);
+
+        return response()->json(['order' => $this->publicOrder($order)])
+            ->header('Cache-Control', 'no-store, private');
+    }
+
+    public function feed(): JsonResponse
+    {
+        return response()->json(['transactions' => $this->recentTransactions()])
+            ->header('Cache-Control', 'no-store, public, max-age=0');
+    }
+
+    private function orderByNumber(string $orderNumber): ?object
+    {
+        return DB::table('orders')
+            ->join('products', 'products.id', '=', 'orders.product_id')
+            ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
+            ->leftJoin('payment_channels', 'payment_channels.id', '=', 'orders.payment_channel_id')
+            ->where('orders.order_number', $orderNumber)
+            ->select(
+                'orders.id', 'orders.order_number', 'orders.status', 'orders.customer_input',
+                'orders.total_idr', 'orders.created_at', 'orders.updated_at',
+                'products.name as product_name', 'product_packages.name as package_name',
+                'payment_channels.name as payment_channel_name'
+            )->first();
+    }
+
+    private function publicOrder(object $order): array
+    {
+        $payment = DB::table('payment_transactions')->where('order_id', $order->id)
+            ->orderByDesc('id')->first(['status']);
+        $events = DB::table('order_events')->where('order_id', $order->id)
+            ->orderBy('id')->get(['id', 'event_type', 'from_status', 'to_status', 'created_at'])
+            ->map(fn (object $event): array => [
+                'id' => (int) $event->id,
+                'source' => $this->eventSource((string) $event->event_type),
+                'status' => strtolower((string) ($event->to_status ?: $event->event_type)),
+                'label' => $this->eventLabel((string) $event->event_type, $event->to_status),
+                'createdAt' => $event->created_at,
+            ])->values()->all();
+
+        return [
+            'referenceId' => $order->order_number,
+            'productName' => $order->product_name,
+            'packageLabel' => $order->package_name,
+            'destination' => $this->maskedDestination($order->customer_input),
+            'total' => (int) $order->total_idr,
+            'paymentMethod' => $order->payment_channel_name ?: 'Pembayaran',
+            'paymentStatus' => $this->paymentStatus((string) ($payment?->status ?? ''), (string) $order->status),
+            'fulfillmentStatus' => $this->publicStatus((string) $order->status),
+            'events' => $events,
+            'createdAt' => $order->created_at,
+            'updatedAt' => $order->updated_at,
+        ];
+    }
+
+    private function recentTransactions(): array
+    {
+        return DB::table('orders')
+            ->join('products', 'products.id', '=', 'orders.product_id')
+            ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
+            ->whereIn('orders.status', ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'EXPIRED'])
+            ->orderByDesc('orders.id')->limit(20)
+            ->get([
+                'orders.order_number', 'orders.status', 'orders.total_idr', 'orders.created_at',
+                'products.name as product_name', 'product_packages.name as package_name',
+            ])->map(fn (object $order): array => [
+                'referenceId' => null,
+                'maskedReferenceId' => $this->maskReference((string) $order->order_number),
+                'productName' => $order->product_name,
+                'packageLabel' => $order->package_name,
+                'total' => (int) $order->total_idr,
+                'status' => $this->publicStatus((string) $order->status),
+                'createdAt' => $order->created_at,
+            ])->values()->all();
+    }
+
+    private function looksLikeInvoice(string $value): bool
+    {
+        return str_starts_with(strtoupper(trim($value)), 'LF');
+    }
+
+    private function normalizePhone(string $value): string
+    {
+        $digits = preg_replace('/\D+/', '', $value) ?: '';
+        if (str_starts_with($digits, '0')) {
+            $digits = '62'.substr($digits, 1);
+        } elseif (str_starts_with($digits, '8')) {
+            $digits = '62'.$digits;
+        }
+
+        return preg_match('/^62\d{7,15}$/', $digits) ? $digits : '';
+    }
+
+    private function maskReference(string $reference): string
+    {
+        if (strlen($reference) <= 9) {
+            return substr($reference, 0, 3).'***';
+        }
+
+        return substr($reference, 0, 5).'••••'.substr($reference, -4);
+    }
+
+    private function maskedDestination(mixed $raw): ?string
+    {
+        $input = is_string($raw) ? json_decode($raw, true) : $raw;
+        if (! is_array($input) || $input === []) {
+            return null;
+        }
+
+        $parts = [];
+        foreach (array_values($input) as $value) {
+            $text = trim((string) $value);
+            if ($text === '') {
+                continue;
+            }
+            if (strlen($text) <= 4) {
+                $parts[] = str_repeat('•', max(2, strlen($text)));
+            } else {
+                $parts[] = substr($text, 0, 2).str_repeat('•', min(6, max(2, strlen($text) - 4))).substr($text, -2);
+            }
+        }
+
+        return $parts ? implode(' / ', $parts) : null;
+    }
+
+    private function publicStatus(string $status): string
+    {
+        return match (strtoupper($status)) {
+            'PENDING_PAYMENT' => 'pending',
+            'PAID' => 'paid',
+            'PROCESSING' => 'processing',
+            'SUCCESS' => 'success',
+            'EXPIRED' => 'expired',
+            'CANCELLED' => 'failed',
+            'REFUNDED' => 'refunded',
+            default => 'failed',
+        };
+    }
+
+    private function paymentStatus(string $paymentStatus, string $orderStatus): string
+    {
+        $payment = strtoupper($paymentStatus);
+        if (in_array($payment, ['SETTLEMENT', 'CAPTURE', 'PAID', 'SUCCESS'], true)) {
+            return 'paid';
+        }
+        if (in_array($payment, ['EXPIRE', 'EXPIRED'], true) || strtoupper($orderStatus) === 'EXPIRED') {
+            return 'expired';
+        }
+        if (in_array($payment, ['DENY', 'CANCEL', 'FAILED'], true)) {
+            return 'failed';
+        }
+
+        return in_array(strtoupper($orderStatus), ['PAID', 'PROCESSING', 'SUCCESS'], true) ? 'paid' : 'pending';
+    }
+
+    private function eventSource(string $eventType): string
+    {
+        $event = strtoupper($eventType);
+        if (str_contains($event, 'PAYMENT')) return 'payment';
+        if (str_contains($event, 'FULFILL') || str_contains($event, 'PROCESS')) return 'processing';
+        if (str_contains($event, 'DELIVERY') || str_contains($event, 'SUCCESS')) return 'delivery';
+        if (str_contains($event, 'ADMIN')) return 'admin';
+
+        return 'system';
+    }
+
+    private function eventLabel(string $eventType, mixed $toStatus): string
+    {
+        if (is_string($toStatus) && $toStatus !== '') {
+            return match (strtoupper($toStatus)) {
+                'PENDING_PAYMENT' => 'Menunggu pembayaran',
+                'PAID' => 'Pembayaran diterima',
+                'PROCESSING' => 'Pesanan sedang diproses',
+                'SUCCESS' => 'Pesanan berhasil',
+                'FAILED' => 'Transaksi gagal',
+                'EXPIRED' => 'Pembayaran kedaluwarsa',
+                default => str_replace('_', ' ', ucfirst(strtolower($toStatus))),
+            };
+        }
+
+        return match (strtoupper($eventType)) {
+            'ORDER_CREATED' => 'Pesanan dibuat',
+            default => str_replace('_', ' ', ucfirst(strtolower($eventType))),
+        };
+    }
+}
