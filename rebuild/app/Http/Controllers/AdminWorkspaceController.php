@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Services\AdminAuditService;
-use App\Services\TransactionalEmailService;
 use App\Services\MembershipService;
+use App\Services\TransactionalEmailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -162,7 +163,7 @@ class AdminWorkspaceController
             throw ValidationException::withMessages(['membership_tier_code' => 'Tier membership tidak valid.']);
         }
 
-        $user = \App\Models\User::findOrFail($userId);
+        $user = User::findOrFail($userId);
         $before = $user->only([
             'membership_tier_code', 'membership_mode',
             'membership_override_code', 'membership_progress_bonus_idr',
