@@ -29,7 +29,7 @@ class StorefrontContentService
             'supportHours' => $settings['store.business_hours'] ?? 'Setiap hari, 08.00–23.00 WIB',
             'supportWidgetEnabled' => (bool) ($settings['store.support_widget_enabled'] ?? true),
             'footerDescription' => $settings['store.footer_description']
-                ?? 'Top up game dan produk digital dengan alur transaksi yang cepat, aman, dan transparan.',
+                ?? ($settings['store.tagline'] ?? 'Top up favoritmu, sat set tanpa ribet.'),
             'homeNewsTitle' => $settings['store.home_news_title'] ?? 'LFAMILIA NEWS',
             'homeNewsIntro' => $settings['store.home_news_intro'] ?? 'Info gaming, promo, dan update terbaru.',
             'assets' => $assets,
