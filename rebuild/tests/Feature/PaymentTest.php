@@ -135,7 +135,7 @@ class PaymentTest extends TestCase
         $response->assertJsonPath('total_idr', 11500)
             ->assertJsonMissing(['gateway_code' => 'MANUAL_QRIS']);
 
-        $order = DB::table('orders')->first();
+        $order = DB::table('orders')->where('order_number', $response->json('order_number'))->firstOrFail();
         $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame(500, (int) $order->fee_idr);
         $this->assertSame(11500, (int) $order->total_idr);
@@ -190,7 +190,8 @@ class PaymentTest extends TestCase
             ->assertJsonPath('instructions.token', 'snap-token-test')
             ->assertJsonMissing(['gateway_code' => 'MIDTRANS']);
 
-        $row = DB::table('payment_transactions')->first();
+        $row = DB::table('payment_transactions')
+            ->where('idempotency_key', 'm7-midtrans-payment-0001')->firstOrFail();
         $notification = [
             'transaction_id' => 'midtrans-transaction-1',
             'transaction_status' => 'settlement',
@@ -209,16 +210,18 @@ class PaymentTest extends TestCase
         $this->postJson('/api/payments/midtrans/notification', $notification)
             ->assertOk()->assertJsonPath('status', 'duplicate');
 
-        $this->assertSame('PAID', DB::table('orders')->value('status'));
-        $this->assertSame(1, DB::table('order_events')->where('event_type', 'PAYMENT_VERIFIED')->count());
+        $this->assertSame('PAID', DB::table('orders')->where('id', $row->order_id)->value('status'));
+        $this->assertSame(1, DB::table('order_events')
+            ->where('order_id', $row->order_id)
+            ->where('event_type', 'PAYMENT_VERIFIED')->count());
 
         $stale = $notification;
         $stale['transaction_status'] = 'pending';
         unset($stale['settlement_time']);
         $this->postJson('/api/payments/midtrans/notification', $stale)->assertOk();
 
-        $this->assertSame('PAID', DB::table('orders')->value('status'));
-        $this->assertSame('PAID', DB::table('payment_transactions')->value('status'));
+        $this->assertSame('PAID', DB::table('orders')->where('id', $row->order_id)->value('status'));
+        $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $row->id)->value('status'));
     }
 
     public function test_midtrans_callback_cannot_override_server_status_challenge(): void
@@ -263,7 +266,8 @@ class PaymentTest extends TestCase
             'access_code' => $checkout->json('access_code'),
         ])->assertOk();
 
-        $payment = DB::table('payment_transactions')->first();
+        $payment = DB::table('payment_transactions')
+            ->where('idempotency_key', 'm10-midtrans-payment-0001')->firstOrFail();
         $notification = [
             'transaction_id' => 'midtrans-security-1',
             'transaction_status' => 'settlement',
@@ -280,9 +284,11 @@ class PaymentTest extends TestCase
         $this->postJson('/api/payments/midtrans/notification', $notification)
             ->assertOk();
 
-        $this->assertSame('PENDING_PAYMENT', DB::table('orders')->value('status'));
-        $this->assertSame('PENDING', DB::table('payment_transactions')->value('status'));
-        $this->assertSame(0, DB::table('order_events')->where('event_type', 'PAYMENT_VERIFIED')->count());
+        $this->assertSame('PENDING_PAYMENT', DB::table('orders')->where('id', $payment->order_id)->value('status'));
+        $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $payment->id)->value('status'));
+        $this->assertSame(0, DB::table('order_events')
+            ->where('order_id', $payment->order_id)
+            ->where('event_type', 'PAYMENT_VERIFIED')->count());
     }
 
     public function test_midtrans_rejects_fake_signature(): void
@@ -302,7 +308,9 @@ class PaymentTest extends TestCase
             'signature_key' => 'not-valid',
         ])->assertUnauthorized();
 
-        $this->assertSame(0, DB::table('payment_callbacks')->count());
+        $this->assertSame(0, DB::table('payment_callbacks')
+            ->where('gateway_code', 'MIDTRANS')
+            ->where('event_id', 'fake')->count());
     }
 
     public function test_doku_direct_request_and_signed_callback_mark_order_paid(): void
@@ -365,7 +373,8 @@ class PaymentTest extends TestCase
             ->assertJsonPath('status', 'PENDING')
             ->assertJsonPath('instructions.va_number', '88000000123456');
 
-        $payment = DB::table('payment_transactions')->first();
+        $payment = DB::table('payment_transactions')
+            ->where('idempotency_key', 'm7-doku-payment-0001')->firstOrFail();
         $payload = [
             'service' => ['id' => 'VIRTUAL_ACCOUNT'],
             'transaction' => ['status' => 'SUCCESS', 'date' => now('UTC')->format('Y-m-d\\TH:i:s\\Z')],
@@ -393,8 +402,8 @@ class PaymentTest extends TestCase
         ], $raw);
         $response->assertOk()->assertJsonPath('status', 'ok');
 
-        $this->assertSame('PAID', DB::table('orders')->value('status'));
-        $this->assertSame('PAID', DB::table('payment_transactions')->value('status'));
+        $this->assertSame('PAID', DB::table('orders')->where('id', $payment->order_id)->value('status'));
+        $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $payment->id)->value('status'));
     }
 
     public function test_wallet_payment_debits_once_on_idempotent_retry(): void
@@ -429,8 +438,11 @@ class PaymentTest extends TestCase
         $first->assertJsonPath('status', 'PAID');
         $second->assertJsonPath('status', 'PAID');
         $this->assertSame(39000, (int) DB::table('wallets')->where('user_id', $user->id)->value('balance_idr'));
-        $this->assertSame(1, DB::table('wallet_ledger')->where('source', 'CHECKOUT')->count());
-        $this->assertSame('PAID', DB::table('orders')->value('status'));
+        $walletId = DB::table('wallets')->where('user_id', $user->id)->value('id');
+        $this->assertSame(1, DB::table('wallet_ledger')
+            ->where('wallet_id', $walletId)->where('source', 'CHECKOUT')->count());
+        $this->assertSame('PAID', DB::table('orders')
+            ->where('order_number', $checkout->json('order_number'))->value('status'));
     }
 
     public function test_wallet_payment_cannot_overdraw_or_create_ledger_when_balance_is_insufficient(): void
@@ -464,8 +476,10 @@ class PaymentTest extends TestCase
             ->where('wallet_id', DB::table('wallets')->where('user_id', $user->id)->value('id'))
             ->where('source', 'CHECKOUT')
             ->count());
-        $this->assertSame('PENDING_PAYMENT', DB::table('orders')->value('status'));
-        $this->assertSame('REJECTED', DB::table('payment_transactions')->value('status'));
+        $this->assertSame('PENDING_PAYMENT', DB::table('orders')
+            ->where('order_number', $checkout->json('order_number'))->value('status'));
+        $this->assertSame('REJECTED', DB::table('payment_transactions')
+            ->where('idempotency_key', 'm11-wallet-low-payment-0001')->value('status'));
     }
 
     public function test_wallet_topup_paid_callback_credit_is_idempotent_and_fee_is_not_credited(): void
@@ -610,7 +624,8 @@ class PaymentTest extends TestCase
 
         $this->assertSame($first->json('payment_id'), $second->json('payment_id'));
         $this->assertSame('one-token-only', $second->json('instructions.token'));
-        $this->assertSame(1, DB::table('payment_transactions')->count());
+        $orderId = DB::table('orders')->where('order_number', $checkout->json('order_number'))->value('id');
+        $this->assertSame(1, DB::table('payment_transactions')->where('order_id', $orderId)->count());
         Http::assertSentCount(1);
     }
 
@@ -643,7 +658,8 @@ class PaymentTest extends TestCase
             ->assertOk()->assertJsonPath('status', 'UNKNOWN');
 
         Http::assertSentCount(1);
-        $this->assertSame(1, DB::table('payment_transactions')->count());
+        $orderId = DB::table('orders')->where('order_number', $checkout->json('order_number'))->value('id');
+        $this->assertSame(1, DB::table('payment_transactions')->where('order_id', $orderId)->count());
     }
 
     public function test_admin_can_confirm_manual_qris_once(): void
