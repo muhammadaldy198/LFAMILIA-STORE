@@ -35,6 +35,8 @@ class PaymentRoutingService
                     'name' => (string) $channel->name,
                     'group' => $this->publicGroup((string) $channel->code, (string) $channel->name),
                     'description' => $this->publicDescription((string) $channel->code, (string) $channel->name),
+                    'fee_flat_idr' => (int) $channel->fee_flat_idr,
+                    'fee_percent_bps' => (int) $channel->fee_percent_bps,
                     'available' => $route['gateway_code'] !== 'WALLET' || $user !== null,
                 ];
             })->values()->all();
