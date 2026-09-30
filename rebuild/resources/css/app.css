@@ -1526,3 +1526,398 @@
   display:none!important;
 }
 .lf-home-popup-dismiss{border-top:0!important}
+
+
+/* =========================================================
+   MOBILE PASS 3 — PRODUCT + CHECKOUT
+   Mobile-first. Desktop remains unchanged until mobile is approved.
+   ========================================================= */
+@media(max-width:640px){
+  .lf-checkout-page{
+    padding-bottom:96px!important;
+  }
+
+  /* Product hero + identity */
+  .lf-product-hero{
+    height:190px!important;
+  }
+  .lf-product-hero>img{
+    object-fit:cover!important;
+    object-position:center!important;
+  }
+  .lf-product-identity-inner{
+    min-height:156px!important;
+    grid-template-columns:102px minmax(0,1fr)!important;
+    grid-template-rows:86px 50px!important;
+    column-gap:10px!important;
+    padding-top:10px!important;
+    padding-bottom:8px!important;
+  }
+  .lf-product-cover-3d{
+    left:2px!important;
+    top:-34px!important;
+    width:94px!important;
+    height:118px!important;
+    border-radius:15px!important;
+    transform:perspective(650px) rotateY(7deg) rotateZ(-2deg)!important;
+    box-shadow:15px 20px 28px -22px rgba(0,0,0,.95)!important;
+  }
+  .lf-product-title{
+    min-width:0;
+    padding:4px 0 0!important;
+  }
+  .lf-product-title h1{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    font-size:17px!important;
+    line-height:1.2!important;
+    letter-spacing:.01em!important;
+    white-space:nowrap;
+  }
+  .lf-product-title p{
+    margin-top:5px!important;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    font-size:10px!important;
+    white-space:nowrap;
+  }
+  .lf-product-rating{
+    gap:5px!important;
+    margin-top:6px!important;
+  }
+  .lf-product-rating strong{font-size:10px!important}
+  .lf-product-rating small{font-size:8.5px!important}
+  .lf-product-perks{
+    grid-row:2!important;
+    gap:4px!important;
+    padding-top:3px;
+  }
+  .lf-product-perks>div{
+    gap:4px!important;
+    font-size:8.5px!important;
+    line-height:1.15;
+  }
+  .lf-product-perks span{font-size:13px!important}
+
+  /* Tabs + panel rhythm */
+  .lf-checkout-tabs{
+    width:100%!important;
+    max-width:none!important;
+    margin-top:11px!important;
+    padding:3px!important;
+    border-radius:10px!important;
+  }
+  .lf-checkout-tabs button{
+    height:37px!important;
+    border-radius:7px!important;
+    font-size:10.5px!important;
+  }
+  .lf-checkout-grid{
+    margin-top:9px!important;
+    padding-bottom:0!important;
+  }
+  .lf-checkout-panels{
+    gap:9px!important;
+  }
+  .lf-checkout-panel,
+  .lf-result-panel,
+  .lf-product-description{
+    border-radius:11px!important;
+  }
+  .lf-checkout-panel>header{
+    gap:0!important;
+    padding:11px 12px!important;
+  }
+  /* User requested checkout step numbers removed on mobile. */
+  .lf-checkout-panel>header>span{
+    display:none!important;
+  }
+  .lf-checkout-panel>header h2{
+    font-size:12px!important;
+    line-height:1.25!important;
+  }
+  .lf-checkout-panel>header p{
+    margin-top:3px!important;
+    font-size:9px!important;
+    line-height:1.4!important;
+  }
+  .lf-panel-body{
+    padding:11px 12px 12px!important;
+  }
+
+  /* Account/contact fields */
+  .lf-saved-account-select{
+    margin-bottom:10px!important;
+  }
+  .lf-saved-account-select>span,
+  .lf-account-fields label>span{
+    font-size:9.5px!important;
+  }
+  .lf-account-fields{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+  }
+  .lf-account-fields input,
+  .lf-promo-input input,
+  .lf-saved-account-select select{
+    height:39px!important;
+    border-radius:8px!important;
+    font-size:11px!important;
+  }
+  .lf-nickname-actions{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:7px!important;
+    margin-top:9px!important;
+  }
+  .lf-nickname-actions .lf-secondary{
+    width:100%;
+    min-width:0;
+    height:36px!important;
+    padding:0 9px!important;
+    font-size:9px!important;
+  }
+  .lf-success-note,
+  .lf-warning-note,
+  .lf-customer-checkout-note{
+    margin-top:9px!important;
+    padding:9px 10px!important;
+    border-radius:8px!important;
+    font-size:9.5px!important;
+  }
+  .lf-panel-hint{
+    margin-top:8px!important;
+    font-size:8.5px!important;
+  }
+
+  /* Product notices */
+  .lf-product-notices{
+    gap:6px!important;
+  }
+  .lf-product-notices article{
+    padding:9px 10px!important;
+    border-radius:8px!important;
+  }
+  .lf-product-notices strong{font-size:9.5px!important}
+  .lf-product-notices p{
+    margin-top:3px!important;
+    font-size:8.5px!important;
+  }
+
+  /* Nominal cards */
+  .lf-package-sections{
+    gap:13px!important;
+  }
+  .lf-package-sections>section>h3{
+    margin-bottom:7px!important;
+    font-size:10.5px!important;
+  }
+  .lf-nominal-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;
+  }
+  .lf-nominal-grid button{
+    min-height:70px!important;
+    grid-template-columns:36px minmax(0,1fr)!important;
+    grid-template-rows:auto auto!important;
+    gap:2px 7px!important;
+    padding:8px!important;
+    border-radius:9px!important;
+    box-shadow:0 7px 18px -15px rgba(0,0,0,.9);
+  }
+  .lf-nominal-grid button.selected{
+    box-shadow:0 0 0 1px rgba(185,255,53,.12),0 10px 22px -18px rgba(185,255,53,.75)!important;
+  }
+  .lf-nominal-grid img,
+  .lf-nominal-fallback{
+    width:36px!important;
+    height:36px!important;
+    border-radius:7px!important;
+  }
+  .lf-nominal-copy strong{
+    font-size:9.5px!important;
+    line-height:1.3!important;
+  }
+  .lf-nominal-copy small{font-size:7.5px!important}
+  .lf-nominal-grid button>b{
+    font-size:8.5px!important;
+    line-height:1.2!important;
+  }
+
+  /* Payment groups: compact layered panel, no provider/gateway identity. */
+  .lf-payment-groups{
+    gap:7px!important;
+  }
+  .lf-payment-groups details{
+    border-radius:10px!important;
+    background:linear-gradient(145deg,#080d15,#05080d)!important;
+    box-shadow:0 10px 22px -20px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.025);
+  }
+  .lf-payment-groups summary{
+    grid-template-columns:34px minmax(0,1fr) auto!important;
+    gap:8px!important;
+    padding:9px 10px!important;
+  }
+  .lf-payment-group-icon{
+    width:32px!important;
+    height:32px!important;
+    border-radius:8px!important;
+    font-size:8.5px!important;
+  }
+  .lf-payment-groups summary strong{font-size:10px!important}
+  .lf-payment-groups summary small{
+    margin-top:2px!important;
+    font-size:8px!important;
+  }
+  .lf-payment-list button{
+    min-height:52px!important;
+    grid-template-columns:32px minmax(0,1fr) auto!important;
+    gap:8px!important;
+    padding:8px 10px!important;
+  }
+  .lf-payment-icon{
+    width:31px!important;
+    height:31px!important;
+    border-radius:8px!important;
+    font-size:8.5px!important;
+  }
+  .lf-payment-list button strong{font-size:9.5px!important}
+  .lf-payment-list button small{font-size:7.5px!important}
+  .lf-payment-list button>b{font-size:8px!important}
+
+  /* Promo */
+  .lf-promo-input{
+    grid-template-columns:minmax(0,1fr) 82px!important;
+    gap:7px!important;
+  }
+  .lf-promo-input button{
+    min-width:0!important;
+    border-radius:8px!important;
+    font-size:9px!important;
+  }
+  .lf-available-promo{
+    margin-top:9px!important;
+    font-size:9px!important;
+  }
+
+  /* Sticky mobile order bar */
+  .lf-order-summary{
+    display:none!important;
+  }
+  .lf-mobile-checkout-bar{
+    grid-template-columns:minmax(0,1fr) auto!important;
+    gap:9px!important;
+    padding:8px 12px calc(8px + env(safe-area-inset-bottom))!important;
+  }
+  .lf-mobile-selected{
+    gap:8px!important;
+  }
+  .lf-mobile-selected>img,
+  .lf-mobile-package-fallback{
+    width:39px!important;
+    height:39px!important;
+    border-radius:8px!important;
+  }
+  .lf-mobile-selected strong{font-size:9.5px!important}
+  .lf-mobile-selected small{
+    margin-top:2px!important;
+    font-size:9px!important;
+  }
+  .lf-mobile-total button{
+    height:39px!important;
+    padding:0 13px!important;
+    border-radius:8px!important;
+    font-size:9.5px!important;
+  }
+
+  /* Confirmation + voucher are bottom sheets on phone. */
+  .lf-modal-backdrop{
+    align-items:end!important;
+    padding:12px 10px calc(12px + env(safe-area-inset-bottom))!important;
+  }
+  .lf-voucher-modal,
+  .lf-confirm-modal{
+    width:100%!important;
+    max-height:78vh!important;
+    border-radius:17px!important;
+  }
+  .lf-voucher-modal>header,
+  .lf-confirm-modal>header{
+    padding:12px 13px!important;
+  }
+  .lf-voucher-modal h2,
+  .lf-confirm-modal h2{
+    font-size:13px!important;
+  }
+  .lf-voucher-modal>header>button,
+  .lf-confirm-modal>header>button{
+    width:31px!important;
+    height:31px!important;
+  }
+  .lf-voucher-list{
+    gap:6px!important;
+    padding:10px!important;
+  }
+  .lf-voucher-list button{
+    padding:10px!important;
+    border-radius:8px!important;
+  }
+  .lf-voucher-list strong{font-size:9.5px!important}
+  .lf-voucher-list small{font-size:7.5px!important}
+  .lf-voucher-list b{font-size:9px!important}
+  .lf-confirm-modal dl{
+    gap:8px!important;
+    padding:12px 13px!important;
+  }
+  .lf-confirm-modal dl>div{
+    gap:12px!important;
+    font-size:9px!important;
+  }
+  .lf-confirm-modal .total{
+    padding-top:10px!important;
+    font-size:10px!important;
+  }
+  .lf-confirm-modal .total dd{font-size:14px!important}
+  .lf-confirm-actions{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:7px!important;
+    padding:0 13px 13px!important;
+  }
+  .lf-confirm-actions .lf-primary,
+  .lf-confirm-actions .lf-secondary{
+    width:100%!important;
+    height:38px!important;
+    font-size:9.5px!important;
+  }
+
+  /* Details/reviews/FAQ mobile */
+  .lf-product-details{
+    padding-bottom:16px;
+  }
+  .lf-product-description{
+    padding:14px!important;
+  }
+  .lf-product-description h2,
+  .lf-review-head h2,
+  .lf-product-faq h2{
+    font-size:18px!important;
+  }
+  .lf-product-description p,
+  .lf-review-grid article p,
+  .lf-product-faq details p{
+    font-size:10.5px!important;
+  }
+}
+
+@media(max-width:390px){
+  .lf-account-fields{
+    grid-template-columns:1fr!important;
+  }
+  .lf-nickname-actions{
+    grid-template-columns:1fr!important;
+  }
+  .lf-product-title h1{
+    font-size:16px!important;
+  }
+}
