@@ -28,6 +28,12 @@ class StorefrontContentService
             'supportUrl' => $settings['store.support_url'] ?? '',
             'supportHours' => $settings['store.business_hours'] ?? 'Setiap hari, 08.00–23.00 WIB',
             'supportWidgetEnabled' => (bool) ($settings['store.support_widget_enabled'] ?? true),
+            'supportCtaEnabled' => (bool) ($settings['store.support_cta_enabled'] ?? true),
+            'supportCtaLabel' => $settings['store.support_cta_label'] ?? 'BUTUH BANTUAN?',
+            'supportCtaTitle' => $settings['store.support_cta_title'] ?? 'Tim LFAMILIA siap membantu.',
+            'supportCtaBody' => $settings['store.support_cta_body']
+                ?? 'Butuh bantuan memilih produk, pembayaran, atau mengecek status pesanan? Hubungi tim kami.',
+            'supportCtaButton' => $settings['store.support_cta_button'] ?? 'Hubungi Kami',
             'footerDescription' => $settings['store.footer_description']
                 ?? ($settings['store.tagline'] ?? 'Top up favoritmu, sat set tanpa ribet.'),
             'homeNewsTitle' => $settings['store.home_news_title'] ?? 'LFAMILIA NEWS',
