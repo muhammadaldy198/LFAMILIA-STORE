@@ -182,6 +182,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::post('/admin/content/faqs', [AdminContentController::class, 'storeFaq'])->name('admin.content.faqs.store');
         Route::put('/admin/content/faqs/{faq}', [AdminContentController::class, 'updateFaq'])->name('admin.content.faqs.update');
         Route::delete('/admin/content/faqs/{faq}', [AdminContentController::class, 'destroyFaq'])->name('admin.content.faqs.destroy');
+        Route::put('/admin/content/reviews/{review}', [AdminContentController::class, 'updateReview'])->name('admin.content.reviews.update');
         Route::put('/admin/content/pages/{key}', [AdminContentController::class, 'updatePage'])->name('admin.content.pages.update');
 
         Route::prefix('admin/catalog')->name('admin.catalog.')->group(function (): void {
