@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\PaymentPresentationService;
+use App\Services\PaymentPageSettingsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -10,7 +11,7 @@ use Inertia\Response;
 
 class PaymentPageController
 {
-    public function show(Request $request, PaymentPresentationService $payments): Response
+    public function show(Request $request, PaymentPresentationService $payments, PaymentPageSettingsService $settings): Response
     {
         $invoice = strtoupper(trim((string) $request->query('invoice', '')));
         abort_if($invoice === '', 404);
@@ -58,6 +59,7 @@ class PaymentPageController
             ],
             'payment' => $payments->forOrder((int) $order->id),
             'statusUrl' => $statusUrl,
+            'pageSettings' => $settings->read(),
         ]);
     }
 }
