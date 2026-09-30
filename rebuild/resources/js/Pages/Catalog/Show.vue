@@ -121,6 +121,29 @@ function formatIdr(value) {
     return 'Rp ' + Number(value || 0).toLocaleString('id-ID');
 }
 
+function nominalLabel(label, productName) {
+    const cleanLabel = String(label || '').trim();
+    const cleanProductName = String(productName || '').trim();
+    if (!cleanProductName) return cleanLabel;
+
+    const lowerLabel = cleanLabel.toLowerCase();
+    const lowerProductName = cleanProductName.toLowerCase();
+    const boundary = cleanLabel.slice(cleanProductName.length, cleanProductName.length + 1);
+    if (lowerLabel.startsWith(lowerProductName) && (!boundary || /\s|[-–—|:]/.test(boundary))) {
+        const directLabel = cleanLabel
+            .slice(cleanProductName.length)
+            .trimStart()
+            .replace(/^(?:-|–|—|\||:)\s*/, '')
+            .trim();
+        if (directLabel) return directLabel;
+    }
+
+    const separated = cleanLabel.match(/^(.+?)\s+(?:-|–|—|\|)\s+(.+)$/);
+    if (!separated) return cleanLabel;
+    const normalize = (value) => value.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/s$/, '');
+    return normalize(separated[1]) === normalize(cleanProductName) ? separated[2].trim() : cleanLabel;
+}
+
 function fieldError(key) {
     return errors.value['customer_input.' + key]?.[0];
 }
@@ -444,12 +467,14 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <header><span>2</span><div><h2>Pilih Nominal</h2><p>Pilih paket sesuai kebutuhanmu.</p></div></header>
                     <div class="lf-panel-body lf-package-sections">
                         <section v-for="group in packageGroups" :key="group.name || 'all'">
-                            <h3 v-if="group.name">{{group.name}}</h3>
+                            <div v-if="group.name" class="lf-package-group-head"><h3>{{group.name}}</h3><span></span></div>
                             <div class="lf-nominal-grid">
                                 <button v-for="item in group.items" :key="item.id" type="button" :disabled="!item.is_available" :class="{selected:String(selectedPackageId)===String(item.id)}" @click="choosePackage(item)">
-                                    <img v-if="item.image_url" :src="item.image_url" :alt="item.name">
-                                    <span v-else class="lf-nominal-fallback">◆</span>
-                                    <span class="lf-nominal-copy"><strong>{{item.name}}</strong></span>
+                                    <span class="lf-nominal-top">
+                                        <span class="lf-nominal-copy"><strong>{{nominalLabel(item.name, product.name)}}</strong></span>
+                                        <img v-if="item.image_url" :src="item.image_url" :alt="nominalLabel(item.name, product.name)">
+                                        <span v-else class="lf-nominal-fallback">◆</span>
+                                    </span>
                                     <b>{{item.is_available?formatIdr(item.price_idr):'Tidak tersedia'}}</b>
                                 </button>
                             </div>
@@ -553,13 +578,13 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <div class="lf-summary-product">
                     <img v-if="selectedPackage?.image_url || product.image_url" :src="selectedPackage?.image_url || product.image_url" :alt="product.name">
                     <span v-else class="lf-mobile-package-fallback">LF</span>
-                    <div><strong>{{product.name}}</strong><small>{{selectedPackage?.name || 'Pilih nominal'}}</small></div>
+                    <div><strong>{{product.name}}</strong><small>{{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : 'Pilih nominal'}}</small></div>
                 </div>
                 <dl>
                     <div><dt>Harga</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
                     <div v-if="quote?.discount_idr"><dt>Diskon</dt><dd class="lf-discount">-{{formatIdr(quote.discount_idr)}}</dd></div>
                     <div><dt>Biaya pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
-                    <div class="total"><dt>Total</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
+                    <div class="total"><dt>Total</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
                 </dl>
                 <button type="button" class="lf-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">{{busy==='order'?'Memproses...':'Pesan Sekarang'}}</button>
                 <p class="lf-summary-security">🔒 Harga dihitung server-side dan dikunci saat pesanan dibuat.</p>
@@ -604,9 +629,9 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     </span>
                     <span class="lf-mobile-summary-copy">
                         <strong>Ringkasan pesanan</strong>
-                        <small>{{product.name}} · {{selectedPackage?.name || 'Pilih nominal'}}</small>
+                        <small>{{product.name}} · {{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : 'Pilih nominal'}}</small>
                     </span>
-                    <strong class="lf-mobile-summary-price">{{formatIdr(displayTotal)}}</strong>
+                    <strong class="lf-mobile-summary-price">{{formatIdr(selectedPackage?.price_idr)}}</strong>
                     <span class="lf-mobile-summary-chevron">⌄</span>
                 </button>
                 <dl class="lf-mobile-summary-lines">
@@ -618,7 +643,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
             </div>
             <button v-else type="button" class="lf-mobile-summary-toggle" aria-expanded="false" @click="summaryOpen=true">
                 <span><strong>Ringkasan pesanan</strong><small>Ketuk untuk melihat rincian</small></span>
-                <span><strong>{{formatIdr(displayTotal)}}</strong><b>⌃</b></span>
+                <span><strong>{{formatIdr(selectedPackage?.price_idr)}}</strong><b>⌃</b></span>
             </button>
             <button type="button" class="lf-mobile-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">
                 <template v-if="busy==='order'">Memproses...</template>
@@ -676,9 +701,9 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
             <dl>
                 <div v-if="nicknameResult?.nickname"><dt>Username</dt><dd>{{nicknameResult.nickname}}</dd></div>
                 <div v-for="field in fields" :key="field.field_key"><dt>{{field.label}}</dt><dd>{{customerInput[field.field_key] || '-'}}</dd></div>
-                <div><dt>Item</dt><dd>{{selectedPackage?.name || '-'}}</dd></div>
+                <div><dt>Item</dt><dd>{{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : '-'}}</dd></div>
                 <div><dt>Produk</dt><dd>{{product.name}}</dd></div>
-                <div><dt>Payment</dt><dd>{{paymentChannels.find(x=>x.code===paymentChannelCode)?.name || '-'}}</dd></div>
+                <div><dt>Payment</dt><dd>{{paymentGroups.find(group=>group.items.some(item=>item.code===paymentChannelCode))?.title || '-'}}</dd></div>
                 <div><dt>Biaya Pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
                 <div class="total"><dt>Total Bayar</dt><dd>{{formatIdr(quote?.total_idr)}}</dd></div>
             </dl>
