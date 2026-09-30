@@ -5,7 +5,7 @@ import CustomerShell from '../../Components/CustomerShell.vue';
 
 const p=defineProps({
     categories:Array,products:Object,filters:Object,logoUrl:String,bannerUrl:String,
-    mobileBannerUrl:String,popupUrl:String,faviconUrl:String,bannerTarget:String,news:Array,
+    mobileBannerUrl:String,popupUrl:String,faviconUrl:String,bannerTarget:String,news:Array,reviews:Array,
 });
 const page=usePage();
 const storefront=computed(()=>page.props.storefront||{});
@@ -124,6 +124,21 @@ const newsDate=v=>v?new Date(v).toLocaleDateString('id-ID',{day:'numeric',month:
                         </Link>
                     </div>
                     <Link href="/news" class="lf-secondary mt-4">Lihat Semua Artikel</Link>
+                </div>
+            </section>
+
+            <section v-if="reviews?.length" class="lf-home-reviews">
+                <div class="lf-container lf-section">
+                    <div class="lf-home-review-head">
+                        <div><p class="lf-eyebrow">ULASAN PELANGGAN</p><h2 class="lf-title">Dipercaya oleh pembeli LFAMILIA</h2><p class="lf-copy">Ulasan terverifikasi dari transaksi yang sudah berhasil.</p></div>
+                    </div>
+                    <div class="lf-home-review-grid">
+                        <article v-for="review in reviews" :key="review.id">
+                            <div><strong>{{review.display_name}}</strong><span>{{'★'.repeat(review.rating)}}{{'☆'.repeat(5-review.rating)}}</span></div>
+                            <p>{{review.body}}</p>
+                            <Link :href="'/catalog/'+review.product_slug">{{review.product_name}}</Link>
+                        </article>
+                    </div>
                 </div>
             </section>
 
