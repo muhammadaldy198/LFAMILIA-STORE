@@ -514,3 +514,177 @@
   .lf-footer-column:last-child{grid-column:1/-1}
   .lf-footer-column:last-child ul{grid-template-columns:1fr 1fr}
 }
+
+
+/* =========================================================
+   MOBILE PASS 1 — FINAL SHELL CORRECTIONS
+   ========================================================= */
+.lf-brand-social-icon{
+  fill:currentColor!important;
+  stroke:none!important;
+}
+.lf-socials .social-instagram{color:#f56040}
+.lf-socials .social-whatsapp{color:#25d366}
+.lf-socials .social-email{color:#63a4ff}
+.lf-socials .social-discord{color:#7289da}
+
+@media(max-width:640px){
+  .lf-live-support{
+    touch-action:none;
+    user-select:none;
+  }
+  .lf-live-support.is-dragged{
+    right:auto!important;
+    bottom:auto!important;
+  }
+  .lf-support-trigger{
+    width:48px;
+    height:48px;
+    touch-action:none;
+    user-select:none;
+    cursor:grab;
+  }
+  .lf-support-trigger:active{cursor:grabbing}
+
+  /* Panel stays readable and centered even if the floating button is dragged. */
+  .lf-support-panel{
+    position:fixed;
+    left:12px!important;
+    right:12px!important;
+    bottom:76px!important;
+    top:auto!important;
+    width:auto!important;
+    max-width:420px;
+    max-height:min(390px,62vh);
+    margin:0 auto!important;
+    overflow:auto;
+    border-radius:14px;
+    background:#06090e;
+  }
+  .lf-support-panel header{
+    padding:12px 14px;
+  }
+  .lf-support-panel header strong{font-size:13px}
+  .lf-support-panel header small{font-size:9px;line-height:1.4}
+  .lf-support-panel>div{
+    display:grid;
+    gap:3px;
+    padding:7px;
+  }
+  .lf-support-panel>div>a{
+    display:grid!important;
+    grid-template-columns:32px minmax(0,1fr);
+    align-items:center!important;
+    gap:10px!important;
+    min-height:50px;
+    padding:8px 10px!important;
+    border-radius:9px;
+  }
+  .lf-support-panel>div>a>svg{
+    width:24px!important;
+    height:24px!important;
+    justify-self:center;
+    flex:0 0 auto;
+  }
+  .lf-support-panel>div>a>span{
+    width:auto!important;
+    min-width:0!important;
+    display:block!important;
+    text-align:left!important;
+    font-size:inherit!important;
+  }
+  .lf-support-panel>div>a strong{
+    display:block;
+    font-size:11px!important;
+    line-height:1.25;
+  }
+  .lf-support-panel>div>a small{
+    display:block;
+    margin-top:3px;
+    font-size:9px!important;
+    line-height:1.35;
+  }
+
+  /* Footer banner: match the compact legacy mobile treatment. */
+  .lf-footer-banner{
+    height:70px;
+  }
+  .lf-footer-banner picture{
+    display:block;
+    width:100%;
+    height:100%;
+  }
+  .lf-footer-banner img{
+    display:block;
+    width:100%;
+    height:70px!important;
+    min-height:0!important;
+    max-height:70px!important;
+    aspect-ratio:auto!important;
+    object-fit:cover;
+    object-position:center;
+  }
+
+  .lf-footer-main{
+    grid-template-columns:1fr 1fr!important;
+    gap:24px 20px!important;
+    padding:28px 0 26px!important;
+  }
+  .lf-footer-brand-column{
+    grid-column:1/-1;
+  }
+  .lf-footer-brand-column>p{
+    margin-top:11px;
+    font-size:10.5px!important;
+    line-height:1.65;
+    color:rgba(255,255,255,.5);
+  }
+  .lf-socials{
+    gap:8px;
+    margin-top:13px;
+  }
+  .lf-socials a{
+    width:34px!important;
+    height:34px!important;
+    border-radius:8px;
+  }
+  .lf-socials svg{
+    width:17px!important;
+    height:17px!important;
+  }
+
+  .lf-footer-column h2{
+    margin-bottom:11px!important;
+    font-size:10.5px!important;
+    line-height:1.25;
+    letter-spacing:.07em;
+  }
+  .lf-footer-column ul{
+    gap:10px!important;
+  }
+  .lf-footer-column a{
+    font-size:10.5px!important;
+    line-height:1.45;
+    color:rgba(255,255,255,.52);
+  }
+  .lf-footer-subhead{
+    margin-top:20px!important;
+  }
+
+  /* User requested no separate Dukungan block at the bottom on mobile. */
+  .lf-footer-column:last-child{
+    display:none!important;
+  }
+
+  .lf-footer-copy{
+    padding:15px 14px!important;
+    font-size:8.5px!important;
+    line-height:1.5;
+  }
+}
+
+@media(max-width:380px){
+  .lf-footer-main{
+    grid-template-columns:1fr 1fr!important;
+  }
+}
