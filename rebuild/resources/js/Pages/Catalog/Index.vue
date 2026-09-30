@@ -13,14 +13,13 @@ const search=ref(p.filters.q??'');
 const mobile=ref(false);
 const bannerIndex=ref(0);
 const popupOpen=ref(false);
-const popupIndex=ref(0);
 const popupHideAgain=ref(false);
-const popupItems=ref([]);
+const popupItem=ref(null);
 let bannerTimer=null;
 let mediaQuery=null;
 const visibleBanners=computed(()=>(p.banners||[]).filter((item)=>mobile.value ? item.show_mobile!==false : item.show_desktop!==false));
 const activeBanner=computed(()=>visibleBanners.value[Math.min(bannerIndex.value,Math.max(visibleBanners.value.length-1,0))]||null);
-const activePopup=computed(()=>popupItems.value[popupIndex.value]||null);
+const activePopup=computed(()=>popupItem.value);
 const popular=computed(()=>(p.products?.data??[]).slice(0,8));
 const q=(x={})=>{const a={...p.filters,...x};Object.keys(a).forEach(k=>{if(!a[k])delete a[k]});const s=new URLSearchParams(a).toString();return s?'/?'+s:'/'};
 const submit=()=>router.get('/',{...p.filters,q:search.value},{preserveState:true,preserveScroll:true});
@@ -31,11 +30,9 @@ const bannerPrev=()=>{const n=visibleBanners.value.length;if(n)bannerIndex.value
 const bannerNext=()=>{const n=visibleBanners.value.length;if(n)bannerIndex.value=(bannerIndex.value+1)%n};
 const popupKey=(item)=>'lfamilia-home-popup:'+String(item.id??'fallback')+':'+String(item.title||'').slice(0,24);
 const closePopup=()=>{
-    if(popupHideAgain.value){
-        for(const item of popupItems.value){
-            const days=Math.max(1,Number(item.dismiss_days||0));
-            window.localStorage.setItem(popupKey(item),String(Date.now()+days*86400000));
-        }
+    if(popupHideAgain.value && activePopup.value){
+        const days=Math.max(1,Number(activePopup.value.dismiss_days||0));
+        window.localStorage.setItem(popupKey(activePopup.value),String(Date.now()+days*86400000));
     }
     popupOpen.value=false;
 };
@@ -45,8 +42,11 @@ onMounted(()=>{
     updateMobile();
     mediaQuery.addEventListener?.('change',updateMobile);
 
-    popupItems.value=(p.popups||[]).filter((item)=>Number(window.localStorage.getItem(popupKey(item))||0)<Date.now());
-    popupOpen.value=popupItems.value.length>0;
+    const firstPopup=(p.popups||[])[0]||null;
+    if(firstPopup && Number(window.localStorage.getItem(popupKey(firstPopup))||0)<Date.now()){
+        popupItem.value=firstPopup;
+        popupOpen.value=true;
+    }
 
     bannerTimer=window.setInterval(()=>{
         if(visibleBanners.value.length>1)bannerNext();
@@ -86,21 +86,11 @@ onUnmounted(()=>{
 
             <div v-if="popupOpen&&activePopup" class="lf-home-popup-backdrop" @click.self="closePopup">
                 <section class="lf-home-popup" role="dialog" aria-modal="true" :aria-label="activePopup.title">
-                    <header>
-                        <span>{{popupIndex+1}}/{{popupItems.length}}</span>
-                        <button type="button" aria-label="Tutup pop-up" @click="closePopup">×</button>
-                    </header>
+                    <button type="button" class="lf-home-popup-close" aria-label="Tutup pop-up" @click="closePopup">×</button>
+                    <div class="lf-home-popup-count">1/1</div>
                     <div class="lf-home-popup-body">
                         <h2>{{activePopup.title}}</h2>
                         <p>{{activePopup.body}}</p>
-                        <div v-if="activePopup.primary_href||activePopup.secondary_href" class="lf-home-popup-actions">
-                            <a v-if="activePopup.primary_href" :href="activePopup.primary_href" class="lf-primary">{{activePopup.primary_label||'Buka tautan'}}</a>
-                            <a v-if="activePopup.secondary_href" :href="activePopup.secondary_href" class="lf-secondary">{{activePopup.secondary_label||'Tautan lainnya'}}</a>
-                        </div>
-                        <div v-if="popupItems.length>1" class="lf-home-popup-pager">
-                            <button type="button" :disabled="popupIndex===0" @click="popupIndex--">‹ Sebelumnya</button>
-                            <button type="button" :disabled="popupIndex===popupItems.length-1" @click="popupIndex++">Berikutnya ›</button>
-                        </div>
                     </div>
                     <label class="lf-home-popup-dismiss">
                         <input v-model="popupHideAgain" type="checkbox">
