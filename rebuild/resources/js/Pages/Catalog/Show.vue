@@ -121,6 +121,17 @@ function formatIdr(value) {
     return 'Rp ' + Number(value || 0).toLocaleString('id-ID');
 }
 
+function normalizeWhatsapp(value) {
+    const text = String(value || '');
+    const hasPlus = text.trim().startsWith('+');
+    const digits = text.replace(/\D/g, '').slice(0, 16);
+    return (hasPlus ? '+' : '') + digits;
+}
+
+function normalizePromo(value) {
+    return String(value || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+}
+
 function nominalLabel(label, productName) {
     const cleanLabel = String(label || '').trim();
     const cleanProductName = String(productName || '').trim();
@@ -541,25 +552,25 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <header><span>4</span><div><h2>Data Pembeli</h2><p>Email dan WhatsApp digunakan untuk invoice serta status transaksi.</p></div></header>
                     <div class="lf-panel-body">
                         <div v-if="!customer" class="lf-account-fields">
-                            <label><span>Email *</span><input v-model="guestEmail" type="email" maxlength="255" placeholder="example@gmail.com"></label>
-                            <label><span>No. WhatsApp *</span><input v-model="guestPhone" type="tel" maxlength="32" placeholder="08xxxxxxxxxx"></label>
+                            <label><span>Email</span><input v-model="guestEmail" type="email" maxlength="255" placeholder="nama@email.com"></label>
+                            <label><span>Nomor WhatsApp</span><input :value="guestPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="17" pattern="\\+?[0-9]{8,16}" placeholder="081234567890" @input="guestPhone=normalizeWhatsapp($event.target.value)"></label>
                         </div>
                         <div v-else class="lf-customer-checkout-note">
                             <span class="lf-account-avatar">{{customer.name?.slice(0,1)?.toUpperCase()}}</span>
                             <div><strong>{{customer.name}}</strong><small>{{customer.email}} · {{customer.phone || 'Nomor HP belum lengkap'}}</small></div>
                         </div>
-                        <p class="lf-contact-privacy">✓ Kami hanya memakai kontak untuk invoice dan status transaksi.</p>
+                        <p class="lf-contact-privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3z"/><path d="m9 12 2 2 4-4"/></svg><span>Kami hanya memakai kontak untuk invoice dan status transaksi.</span></p>
                     </div>
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-promo-panel">
-                    <header><span>5</span><div><h2>Kode Promo</h2><p>Masukkan kode voucher atau pilih promo yang tersedia.</p></div></header>
+                    <header><span>5</span><div><h2>Kode Promo</h2><p>Masukkan kode promo atau voucher diskon yang tersedia.</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-promo-input">
-                            <input v-model="voucherCode" maxlength="100" placeholder="Ketik Kode Promo Kamu">
+                            <input :value="voucherCode" maxlength="100" placeholder="Ketik kode promo kamu" @input="voucherCode=normalizePromo($event.target.value)">
                             <button type="button" :disabled="busy==='quote'||!canQuote" @click="loadQuote">{{busy==='quote'?'Memeriksa...':'Gunakan'}}</button>
                         </div>
-                        <button type="button" class="lf-available-promo" @click="openVoucherPicker">Pakai Voucher Yang Tersedia →</button>
+                        <button type="button" class="lf-available-promo" @click="openVoucherPicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9a3 3 0 0 0 0 6v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a3 3 0 0 0 0-6V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg><span>Pakai Voucher Yang Tersedia</span></button>
                         <div v-if="quote?.voucher_code" class="lf-success-note">Voucher <strong>{{quote.voucher_code}}</strong> aktif · Hemat {{formatIdr(quote.discount_idr)}}</div>
                     </div>
                 </section>
@@ -635,8 +646,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <span class="lf-mobile-summary-chevron">⌄</span>
                 </button>
                 <dl class="lf-mobile-summary-lines">
-                    <div><dt>Harga</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
-                    <div v-if="quote?.discount_idr"><dt>Diskon</dt><dd>-{{formatIdr(quote.discount_idr)}}</dd></div>
+                    <div><dt>Harga Satuan</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
+                    <div><dt>Subtotal</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
                     <div><dt>Biaya Pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
                     <div class="total"><dt>Total Pembayaran</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
                 </dl>
