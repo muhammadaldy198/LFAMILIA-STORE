@@ -4896,3 +4896,23 @@
     height:40px;
   }
 }
+
+
+/* Footer parity: keep every legacy footer group visible on mobile. */
+@media(max-width:640px){
+  .lf-footer-column:last-child{
+    display:block!important;
+    grid-column:1/-1!important;
+  }
+  .lf-footer-column:last-child ul{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:10px 18px!important;
+  }
+  .lf-footer-main{
+    padding-bottom:34px!important;
+  }
+  .lf-customer:has(.lf-mobile-checkout-bar) .lf-footer{
+    padding-bottom:96px!important;
+  }
+}
