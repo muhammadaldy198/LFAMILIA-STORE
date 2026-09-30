@@ -30,13 +30,18 @@ const fieldsProductId = ref('');
 const fieldsText = ref('');
 watch(fieldsProductId, (id) => {
     const product = products.value.find((item) => String(item.id) === String(id));
-    fieldsText.value = product?.fields.map((field) => [field.field_key, field.label, field.type, field.is_required ? '1' : '0'].join('|')).join('\n') ?? '';
+    fieldsText.value = product?.fields.map((field) => [field.field_key, field.label, field.placeholder || '', field.type, field.is_required ? '1' : '0'].join('|')).join('\n') ?? '';
 });
 const fieldsError = ref('');
 const saveFields = () => {
     const fields = fieldsText.value.trim() ? fieldsText.value.trim().split('\n').map((line) => {
-        const [field_key, label, type, required] = line.split('|').map((part) => part.trim());
-        return { field_key, label, type, is_required: required === '1' };
+        const parts = line.split('|').map((part) => part.trim());
+        const [field_key, label] = parts;
+        const legacyFourColumns = parts.length === 4;
+        const placeholder = legacyFourColumns ? '' : (parts[2] || '');
+        const type = legacyFourColumns ? parts[2] : parts[3];
+        const required = legacyFourColumns ? parts[3] : parts[4];
+        return { field_key, label, placeholder: placeholder || null, type, is_required: required === '1' };
     }) : [];
     fieldsError.value = '';
     router.put('/admin/catalog/products/' + fieldsProductId.value + '/fields', { fields }, {
@@ -216,7 +221,7 @@ const deleteNotice = (notice) => {
 
             <section class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Field input produk</h2>
-                <p class="text-sm text-slate-400">Satu baris per field: kode|label|tipe|wajib (1/0). Tipe: text, tel, email. Contoh: user_id|User ID|text|1</p>
+                <p class="text-sm text-slate-400">Satu baris per field: kode|label|placeholder|tipe|wajib (1/0). Tipe: text, tel, email. Contoh: user_id|User ID|Contoh: 123456789|text|1. Format lama 4 kolom tetap diterima.</p>
                 <select v-model="fieldsProductId" class="w-full max-w-md rounded-md bg-slate-800 p-2"><option value="">Pilih produk</option><option v-for="item in products" :key="item.id" :value="item.id">{{ item.name }}</option></select>
                 <textarea v-if="fieldsProductId" v-model="fieldsText" rows="5" aria-label="Daftar field input" class="block w-full rounded-md bg-slate-800 p-3 font-mono text-sm" />
                 <p v-if="fieldsError" class="text-sm text-red-300">{{ fieldsError }}</p>
