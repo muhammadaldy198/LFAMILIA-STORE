@@ -46,7 +46,7 @@ onBeforeUnmount(() => {
 <template>
 <Head title="Pembayaran" />
 <CustomerShell>
-<main class="mx-auto min-h-[76vh] w-[calc(100%-28px)] max-w-xl py-8 sm:w-[calc(100%-48px)] sm:py-12">
+<main class="lf-payment-page mx-auto min-h-[76vh] max-w-xl px-4 py-8 sm:py-12">
     <section class="overflow-hidden rounded-xl border border-white/10 bg-[#0d1019] shadow-2xl">
         <div class="border-b border-white/10 bg-gradient-to-br from-white/[0.035] via-transparent to-transparent p-5 sm:p-6">
             <div class="mb-5 flex items-center justify-between gap-4 border-b border-white/[0.07] pb-4">
