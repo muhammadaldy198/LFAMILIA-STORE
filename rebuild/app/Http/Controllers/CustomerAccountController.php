@@ -36,7 +36,7 @@ class CustomerAccountController
     public function profile(Request $request): Response
     {
         return Inertia::render('Customer/Profile', [
-            'customer' => $request->user()->only('name', 'email', 'phone'),
+            'customer' => $request->user()->only('name', 'email', 'phone', 'leaderboard_opt_in'),
             'hasPassword' => (bool) $request->user()->password,
         ]);
     }
@@ -50,6 +50,7 @@ class CustomerAccountController
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['required', 'regex:/^\+?[0-9]{8,16}$/'],
             'current_password' => ['nullable', 'string'],
+            'leaderboard_opt_in' => ['required', 'boolean'],
         ]);
         $email = $data['email'];
 
@@ -64,6 +65,7 @@ class CustomerAccountController
             'name' => $data['name'],
             'email' => $email,
             'phone' => $data['phone'],
+            'leaderboard_opt_in' => (bool) $data['leaderboard_opt_in'],
             'email_verified_at' => $email === $user->email ? $user->email_verified_at : null,
         ])->save();
 
