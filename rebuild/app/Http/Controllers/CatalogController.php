@@ -50,17 +50,34 @@ class CatalogController
             ]);
 
         $assets = StoreAsset::where('is_active', true)->get()->keyBy('key');
+        $banners = $content->homeBanners();
+        if ($banners->isEmpty()) {
+            $desktop = $assets->get('banner_desktop');
+            $mobile = $assets->get('banner_mobile');
+            if ($desktop || $mobile) {
+                $banners = collect([[
+                    'id' => null,
+                    'title' => 'LFAMILIA STORE',
+                    'subtitle' => null,
+                    'cta_label' => null,
+                    'cta_href' => $desktop?->target_url ?: $mobile?->target_url,
+                    'show_desktop' => true,
+                    'show_mobile' => true,
+                    'sort_order' => 0,
+                    'desktop_url' => $desktop?->getFirstMediaUrl('image') ?: $mobile?->getFirstMediaUrl('image'),
+                    'mobile_url' => $mobile?->getFirstMediaUrl('image') ?: $desktop?->getFirstMediaUrl('image'),
+                ]]);
+            }
+        }
 
         return Inertia::render('Catalog/Index', [
             'categories' => $categories,
             'products' => $products,
             'filters' => $filters,
             'logoUrl' => $assets->get('logo')?->getFirstMediaUrl('image'),
-            'bannerUrl' => $assets->get('banner_desktop')?->getFirstMediaUrl('image'),
-            'mobileBannerUrl' => $assets->get('banner_mobile')?->getFirstMediaUrl('image'),
-            'popupUrl' => $assets->get('popup')?->getFirstMediaUrl('image'),
             'faviconUrl' => $assets->get('favicon')?->getFirstMediaUrl('image'),
-            'bannerTarget' => $assets->get('banner_desktop')?->target_url,
+            'banners' => $banners,
+            'popups' => $content->popups(),
             'news' => $content->news(3),
             'reviews' => $content->reviews(6),
         ]);
