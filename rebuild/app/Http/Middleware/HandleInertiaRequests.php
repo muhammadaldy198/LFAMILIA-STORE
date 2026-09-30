@@ -24,6 +24,22 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'status' => fn () => $request->session()->get('status'),
+            'auth' => function () use ($request): array {
+                $user = $request->user();
+                if (! $user) {
+                    return ['user' => null];
+                }
+
+                $wallet = $user->wallet()->firstOrCreate([]);
+
+                return [
+                    'user' => [
+                        ...$user->only('id', 'name', 'email', 'phone', 'membership_tier_code'),
+                        'email_verified' => $user->hasVerifiedEmail(),
+                        'balance_idr' => (int) $wallet->balance_idr,
+                    ],
+                ];
+            },
             'storefront' => fn () => $storefront->shared(),
             'security' => function () use ($request, $turnstile): array {
                 $config = $turnstile->publicConfig();
