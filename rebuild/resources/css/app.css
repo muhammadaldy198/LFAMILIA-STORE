@@ -1322,3 +1322,104 @@
     font-size:12px;
   }
 }
+
+
+/* =========================================================
+   MOBILE PASS 2 — POPUP SINGLE PANEL + SHORT HERO BANNER
+   ========================================================= */
+@media(max-width:640px){
+  /* Short storefront hero: same 16:5 proportion as legacy 1920x600 banner. */
+  .lf-home-banner{
+    aspect-ratio:16/5!important;
+    min-height:0!important;
+    max-height:none!important;
+  }
+  .lf-home-banner picture,
+  .lf-home-banner a{
+    width:100%!important;
+    height:100%!important;
+  }
+  .lf-home-banner img{
+    width:100%!important;
+    height:100%!important;
+    aspect-ratio:auto!important;
+    object-fit:cover!important;
+    object-position:center!important;
+  }
+
+  /* One Oura-style announcement panel: no internal separators. */
+  .lf-home-popup-backdrop{
+    align-items:end!important;
+    padding:16px 12px 26px!important;
+  }
+  .lf-home-popup{
+    position:relative;
+    width:100%!important;
+    max-width:520px!important;
+    padding:0!important;
+    border:1px solid rgba(255,255,255,.10)!important;
+    border-radius:20px!important;
+    background:#202020!important;
+    box-shadow:0 24px 70px rgba(0,0,0,.58)!important;
+  }
+  .lf-home-popup-count{
+    padding-top:12px;
+    text-align:center;
+    color:rgba(255,255,255,.72);
+    font-size:10px;
+    line-height:1;
+  }
+  .lf-home-popup-close{
+    position:absolute;
+    top:10px;
+    right:11px;
+    z-index:2;
+    width:38px;
+    height:38px;
+    display:grid;
+    place-items:center;
+    padding:0;
+    border:2px solid rgba(220,183,131,.7);
+    border-radius:11px;
+    background:transparent;
+    color:#ead0a8;
+    font-size:27px;
+    line-height:1;
+  }
+  .lf-home-popup-body{
+    padding:14px 22px 10px!important;
+  }
+  .lf-home-popup-body h2{
+    margin:0!important;
+    padding:0 34px;
+    text-align:center;
+    font-size:15px!important;
+    line-height:1.35!important;
+    font-weight:900!important;
+  }
+  .lf-home-popup-body>p{
+    margin:12px 0 0!important;
+    white-space:pre-line;
+    color:rgba(255,255,255,.78)!important;
+    font-size:12px!important;
+    line-height:1.65!important;
+  }
+  .lf-home-popup-dismiss{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding:10px 22px 18px!important;
+    border-top:0!important;
+    color:rgba(255,255,255,.78)!important;
+    font-size:10.5px!important;
+    font-weight:800!important;
+  }
+  .lf-home-popup-dismiss input{
+    width:20px!important;
+    height:20px!important;
+  }
+}
+
+/* Remove legacy popup separators globally for the single-panel design. */
+.lf-home-popup>header{border-bottom:0!important}
+.lf-home-popup-dismiss{border-top:0!important}
