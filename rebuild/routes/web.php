@@ -19,7 +19,10 @@ use App\Http\Controllers\CustomerPhoneController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\GuestOrderController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\ProductReviewController;
+use App\Http\Controllers\PublicOrderTrackingController;
 use App\Http\Controllers\PublicContentController;
+use App\Http\Controllers\SavedGameAccountController;
 use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\WalletTopupController;
 use Illuminate\Support\Facades\DB;
@@ -64,8 +67,12 @@ Route::get('/health/ready', function () {
 });
 
 Route::middleware('throttle:guest-order')->group(function (): void {
-    Route::get('/orders/check', [GuestOrderController::class, 'lookup'])->name('guest.orders.lookup');
+    Route::get('/orders/check', [PublicOrderTrackingController::class, 'index'])->name('guest.orders.lookup');
     Route::post('/orders/check', [GuestOrderController::class, 'verify'])->name('guest.orders.verify');
+    Route::post('/orders/track/search', [PublicOrderTrackingController::class, 'search'])->name('guest.orders.track.search');
+    Route::get('/orders/track/feed', [PublicOrderTrackingController::class, 'feed'])->name('guest.orders.track.feed');
+    Route::get('/orders/track/status/{orderNumber}', [PublicOrderTrackingController::class, 'status'])->name('guest.orders.track.status');
+    Route::post('/reviews', [ProductReviewController::class, 'store'])->name('reviews.store');
 });
 Route::get('/orders/guest/{orderNumber}', [GuestOrderController::class, 'show'])
     ->name('guest.orders.show');
@@ -105,6 +112,10 @@ Route::middleware('auth:web')->group(function (): void {
             ->middleware('throttle:support-ticket')->name('account.tickets.store');
         Route::get('/account/tickets/{ticket}', [SupportTicketController::class, 'show'])
             ->name('account.tickets.show');
+        Route::post('/account/game-accounts', [SavedGameAccountController::class, 'store'])
+            ->middleware('throttle:account-sensitive')->name('account.game-accounts.store');
+        Route::delete('/account/game-accounts/{savedGameAccount}', [SavedGameAccountController::class, 'destroy'])
+            ->middleware('throttle:account-sensitive')->name('account.game-accounts.destroy');
     });
 });
 
