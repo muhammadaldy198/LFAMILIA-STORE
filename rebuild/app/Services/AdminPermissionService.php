@@ -30,7 +30,12 @@ class AdminPermissionService
         if ($admin->role === 'SUPER_ADMIN') {
             return true;
         }
-        if ($admin->role !== 'ADMIN' || ! array_key_exists($permission, self::DEFINITIONS)) {
+        if (! in_array($admin->role, ['ADMIN', 'STAFF'], true)
+            || ! array_key_exists($permission, self::DEFINITIONS)) {
+            return false;
+        }
+
+        if ($admin->role === 'STAFF' && ! in_array($permission, $this->staffPermissionKeys(), true)) {
             return false;
         }
 
@@ -46,6 +51,22 @@ class AdminPermissionService
     }
 
     /**
+     * @return array<int, string>
+     */
+    public function staffPermissionKeys(): array
+    {
+        return [
+            'dashboard.view',
+            'orders.view',
+            'content.manage',
+            'fulfillment.manage',
+            'customers.view',
+            'support.manage',
+            'notifications.view',
+        ];
+    }
+
+    /**
      * @return array<int, array{label:string,href:string,permission:?string,super_only:bool}>
      */
     public function menu(?AdminUser $admin): array
@@ -53,7 +74,7 @@ class AdminPermissionService
         $items = [
             ['label' => 'Dashboard', 'href' => '/admin/panel', 'permission' => 'dashboard.view'],
             ['label' => 'Pesanan', 'href' => '/admin/orders', 'permission' => 'orders.view'],
-            ['label' => 'Produk', 'href' => '/admin/catalog', 'permission' => 'catalog.manage'],
+            ['label' => 'Produk', 'href' => '/admin/catalog', 'permissions' => ['catalog.manage', 'content.manage']],
             ['label' => 'Manual', 'href' => '/admin/fulfillment', 'permission' => 'fulfillment.manage'],
             ['label' => 'Banner & Konten', 'href' => '/admin/content', 'permission' => 'content.manage'],
             ['label' => 'Digiflazz', 'href' => '/admin/providers?provider=DIGIFLAZZ', 'permission' => 'providers.manage'],
@@ -71,13 +92,18 @@ class AdminPermissionService
         ];
 
         return collect($items)
-            ->map(fn (array $item): array => [...$item, 'super_only' => $item['super_only'] ?? false])
+            ->map(fn (array $item): array => [
+                ...$item,
+                'super_only' => $item['super_only'] ?? false,
+                'permissions' => $item['permissions'] ?? (isset($item['permission']) ? [$item['permission']] : []),
+            ])
             ->filter(function (array $item) use ($admin): bool {
                 if ($item['super_only']) {
                     return $admin?->role === 'SUPER_ADMIN';
                 }
 
-                return $this->allows($admin, $item['permission']);
+                return collect($item['permissions'])
+                    ->contains(fn (string $permission): bool => $this->allows($admin, $permission));
             })->values()->all();
     }
 }
