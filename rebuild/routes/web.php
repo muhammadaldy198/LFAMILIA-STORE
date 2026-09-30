@@ -3,8 +3,8 @@
 use App\Http\Controllers\AdminAccessController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
-use App\Http\Controllers\AdminContentController;
 use App\Http\Controllers\AdminCatalogMediaController;
+use App\Http\Controllers\AdminContentController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminFulfillmentController;
 use App\Http\Controllers\AdminIntegrationController;
