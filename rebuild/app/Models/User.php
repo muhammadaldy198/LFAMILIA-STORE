@@ -68,6 +68,11 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return $this->hasOne(Wallet::class);
     }
 
+    public function savedGameAccounts()
+    {
+        return $this->hasMany(SavedGameAccount::class);
+    }
+
     protected function casts(): array
     {
         return ['email_verified_at' => 'datetime', 'last_active_at' => 'datetime'];
