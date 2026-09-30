@@ -181,6 +181,23 @@ class CustomerAccountController
     public function gameAccounts(Request $request): Response
     {
         return Inertia::render('Customer/GameAccounts', [
+            'products' => \App\Models\Product::query()
+                ->with(['fields' => fn ($query) => $query->orderBy('sort_order')])
+                ->where('is_active', true)
+                ->whereHas('category', fn ($query) => $query->where('slug', 'game'))
+                ->orderBy('name')
+                ->get()
+                ->map(fn (\App\Models\Product $product): array => [
+                    'id' => (int) $product->id,
+                    'name' => $product->name,
+                    'fields' => $product->fields->map(fn ($field): array => [
+                        'field_key' => $field->field_key,
+                        'label' => $field->label,
+                        'placeholder' => $field->placeholder,
+                        'type' => $field->type,
+                        'is_required' => (bool) $field->is_required,
+                    ])->values()->all(),
+                ]),
             'accounts' => DB::table('saved_game_accounts as saved')
                 ->join('products', 'products.id', '=', 'saved.product_id')
                 ->where('saved.user_id', $request->user()->id)
