@@ -291,6 +291,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
         Route::get('/admin/health', [AdminWorkspaceController::class, 'health'])->name('admin.health');
         Route::get('/admin/audit', [AdminWorkspaceController::class, 'audit'])->name('admin.audit');
+        Route::get('/admin/configuration/export', [AdminWorkspaceController::class, 'exportConfiguration'])
+            ->middleware('throttle:admin-sensitive')->name('admin.configuration.export');
 
         Route::middleware('throttle:admin-sensitive')->prefix('admin/payments')->name('admin.payments.')->group(function (): void {
             Route::put('/gateways/{id}', [AdminPaymentController::class, 'gateway'])->name('gateways.update');
