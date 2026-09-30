@@ -140,6 +140,9 @@ class CatalogController
                 'category_name' => $product->category->name,
                 'image_url' => $product->getFirstMediaUrl('image'),
                 'banner_url' => $product->getFirstMediaUrl('banner'),
+                'checkout_nominal_description' => $product->fulfillment_mode === 'MANUAL'
+                    ? 'Pesanan diproses admin setelah pembayaran.'
+                    : 'Pesanan diproses otomatis setelah pembayaran.',
             ],
             'packages' => $packages,
             'fields' => ProductInputField::where('product_id', $product->id)->orderBy('sort_order')
