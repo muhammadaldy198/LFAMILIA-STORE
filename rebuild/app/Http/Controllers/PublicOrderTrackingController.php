@@ -243,10 +243,18 @@ class PublicOrderTrackingController
     private function eventSource(string $eventType): string
     {
         $event = strtoupper($eventType);
-        if (str_contains($event, 'PAYMENT')) return 'payment';
-        if (str_contains($event, 'FULFILL') || str_contains($event, 'PROCESS')) return 'processing';
-        if (str_contains($event, 'DELIVERY') || str_contains($event, 'SUCCESS')) return 'delivery';
-        if (str_contains($event, 'ADMIN')) return 'admin';
+        if (str_contains($event, 'PAYMENT')) {
+            return 'payment';
+        }
+        if (str_contains($event, 'FULFILL') || str_contains($event, 'PROCESS')) {
+            return 'processing';
+        }
+        if (str_contains($event, 'DELIVERY') || str_contains($event, 'SUCCESS')) {
+            return 'delivery';
+        }
+        if (str_contains($event, 'ADMIN')) {
+            return 'admin';
+        }
 
         return 'system';
     }
