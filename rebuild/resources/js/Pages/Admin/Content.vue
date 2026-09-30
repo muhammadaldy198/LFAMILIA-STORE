@@ -66,7 +66,7 @@ const assetHint = (key) => ({
     logo: 'Patokan aset LFAMILIA lama: 320×320 (1:1) · PNG/WebP transparan',
     favicon: 'Rekomendasi 512×512 (1:1)',
     banner_desktop: '1920×600 · fokus elemen penting di area tengah',
-    banner_mobile: 'Legacy fallback saja. Carousel baru memakai gambar mobile terpisah dan frontend mengikuti rasio asli file.',
+    banner_mobile: '1280×400 · rasio 16:5 · banner mobile pendek',
     popup: 'Legacy fallback gambar. Pop-up homepage baru dikelola melalui bagian Pop-up Homepage di bawah.',
     footer_banner_desktop: '2172×724 · rasio ±3:1',
     footer_banner_mobile: '1200×400 · rasio 3:1',
@@ -188,7 +188,7 @@ const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
                                 <AdminMediaControl type="banner" :id="item.id" collection="desktop" :url="item.desktop_url" />
                             </div>
                             <div>
-                                <p class="mb-2 rounded bg-slate-50 px-3 py-2 text-[11px] text-slate-500">Mobile: unggah artwork mobile terpisah. Rasio mengikuti file asli seperti LFAMILIA lama; tidak dipaksa 1:1.</p>
+                                <p class="mb-2 rounded bg-slate-50 px-3 py-2 text-[11px] text-slate-500">Mobile: rekomendasi 1280×400 (16:5). Banner dibuat pendek seperti proporsi 1920×600 di LFAMILIA lama.</p>
                                 <AdminMediaControl type="banner" :id="item.id" collection="mobile" :url="item.mobile_url" />
                             </div>
                         </div>
