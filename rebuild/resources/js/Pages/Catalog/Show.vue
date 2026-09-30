@@ -680,10 +680,9 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
         </div>
 
         <section v-else class="lf-product-details">
-            <article class="lf-product-description">
-                <p class="lf-eyebrow">TENTANG PRODUK</p>
-                <h2>{{product.name}}</h2>
-                <p>{{product.description || 'Top up cepat dan aman melalui LFAMILIA STORE.'}}</p>
+            <article class="lf-product-description lf-product-description-legacy">
+                <h2>Deskripsi {{product.name}}</h2>
+                <p>{{product.description || ('Top up ' + product.name + ' cepat, aman, dan diproses otomatis setelah pembayaran berhasil.')}}</p>
             </article>
 
             <section class="lf-product-review-section lf-review-legacy">
@@ -750,10 +749,15 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </div>
             </section>
 
-            <section v-if="faqs?.length" class="lf-product-faq">
-                <p class="lf-eyebrow">PERTANYAAN UMUM</p><h2>Kamu punya pertanyaan?</h2>
-                <details v-for="faq in faqs" :key="faq.id"><summary>{{faq.question}}<b>+</b></summary><p>{{faq.answer}}</p></details>
-            </section>
+            <article v-if="faqs?.length" class="lf-product-faq lf-product-faq-legacy">
+                <h2>Pertanyaan umum</h2>
+                <div>
+                    <details v-for="faq in faqs.slice(0,4)" :key="faq.id">
+                        <summary>{{faq.question}}</summary>
+                        <p>{{faq.answer}}</p>
+                    </details>
+                </div>
+            </article>
         </section>
     </div>
 
