@@ -65,6 +65,7 @@ class HandleInertiaRequests extends Middleware
 
                 return [
                     'admin' => $admin->only('id', 'name', 'email', 'role'),
+                    'base_path' => $admin->role === 'STAFF' ? '/staff' : '/admin',
                     'menu' => $permissions->menu($admin),
                     'can_notifications' => $permissions->allows($admin, 'notifications.view'),
                     'unread_notifications' => Schema::hasTable('admin_notifications')
