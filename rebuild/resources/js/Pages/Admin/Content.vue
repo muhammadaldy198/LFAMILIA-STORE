@@ -154,7 +154,100 @@ const savePage = (item) => router.put('/admin/content/pages/' + item.key, {
             </div>
 
             <section class="rounded-xl border border-slate-200 bg-white p-5">
-                <h2 class="text-lg font-bold">Branding & banner</h2>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-bold">Homepage Banner Carousel</h2>
+                        <p class="mt-1 text-xs text-slate-500">Sama seperti LFAMILIA lama: multi-banner, urutan, desktop/mobile terpisah, link klik, aktif/nonaktif, auto-slide di customer frontend.</p>
+                    </div>
+                </div>
+
+                <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="bannerForm.post('/admin/content/banners', { preserveScroll: true, onSuccess: () => bannerForm.reset() })">
+                    <input v-model="bannerForm.title" required placeholder="Nama internal / alt banner" class="rounded border border-slate-200 p-2 text-sm">
+                    <input v-model="bannerForm.cta_href" placeholder="Link klik, contoh /promo" class="rounded border border-slate-200 p-2 text-sm">
+                    <input v-model.number="bannerForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm">
+                    <input v-model="bannerForm.subtitle" placeholder="Catatan internal (opsional)" class="rounded border border-slate-200 p-2 text-sm md:col-span-2">
+                    <input v-model="bannerForm.cta_label" placeholder="Label CTA internal (opsional)" class="rounded border border-slate-200 p-2 text-sm">
+                    <label class="flex items-center gap-2 text-xs"><input v-model="bannerForm.show_desktop" type="checkbox"> Desktop</label>
+                    <label class="flex items-center gap-2 text-xs"><input v-model="bannerForm.show_mobile" type="checkbox"> Mobile</label>
+                    <label class="flex items-center gap-2 text-xs"><input v-model="bannerForm.is_active" type="checkbox"> Aktif</label>
+                    <div class="md:col-span-3"><button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah Banner</button></div>
+                </form>
+
+                <div class="mt-5 space-y-4">
+                    <article v-for="item in banners" :key="item.id" class="rounded-lg border border-slate-200 p-4">
+                        <div class="grid gap-2 md:grid-cols-3">
+                            <input v-model="item.title" class="rounded border border-slate-200 p-2 text-sm" placeholder="Nama banner">
+                            <input v-model="item.cta_href" class="rounded border border-slate-200 p-2 text-sm" placeholder="Link klik">
+                            <input v-model.number="item.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" placeholder="Urutan">
+                            <input v-model="item.subtitle" class="rounded border border-slate-200 p-2 text-sm md:col-span-2" placeholder="Catatan internal">
+                            <input v-model="item.cta_label" class="rounded border border-slate-200 p-2 text-sm" placeholder="Label CTA">
+                        </div>
+                        <div class="mt-3 flex flex-wrap gap-4">
+                            <label class="flex items-center gap-2 text-xs"><input v-model="item.show_desktop" type="checkbox"> Desktop</label>
+                            <label class="flex items-center gap-2 text-xs"><input v-model="item.show_mobile" type="checkbox"> Mobile</label>
+                            <label class="flex items-center gap-2 text-xs"><input v-model="item.is_active" type="checkbox"> Aktif</label>
+                        </div>
+                        <div class="mt-3 grid gap-3 lg:grid-cols-2">
+                            <div>
+                                <p class="mb-2 rounded bg-slate-50 px-3 py-2 text-[11px] text-slate-500">Desktop: patokan lama 1920×600. Frontend mengikuti rasio gambar, tidak memaksa tinggi tetap.</p>
+                                <AdminMediaControl type="banner" :id="item.id" collection="desktop" :url="item.desktop_url" />
+                            </div>
+                            <div>
+                                <p class="mb-2 rounded bg-slate-50 px-3 py-2 text-[11px] text-slate-500">Mobile: unggah artwork mobile terpisah. Rasio mengikuti file asli seperti LFAMILIA lama; tidak dipaksa 1:1.</p>
+                                <AdminMediaControl type="banner" :id="item.id" collection="mobile" :url="item.mobile_url" />
+                            </div>
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <button type="button" class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="saveBanner(item)">Simpan</button>
+                            <button type="button" class="rounded bg-red-50 px-3 py-2 text-xs font-bold text-red-700" @click="deleteBanner(item)">Hapus</button>
+                        </div>
+                    </article>
+                    <p v-if="!banners.length" class="rounded bg-slate-50 p-4 text-xs text-slate-500">Belum ada banner carousel. Selama kosong, frontend memakai banner legacy sebagai fallback.</p>
+                </div>
+            </section>
+
+            <section class="rounded-xl border border-slate-200 bg-white p-5">
+                <div>
+                    <h2 class="text-lg font-bold">Pop-up Homepage</h2>
+                    <p class="mt-1 text-xs text-slate-500">Muncul otomatis saat customer baru membuka homepage. Mendukung beberapa pop-up, urutan, tombol, dan “Jangan tampilkan lagi”.</p>
+                </div>
+
+                <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="popupForm.post('/admin/content/popups', { preserveScroll: true, onSuccess: () => popupForm.reset() })">
+                    <input v-model="popupForm.title" required placeholder="Judul pop-up" class="rounded border border-slate-200 p-2 text-sm md:col-span-2">
+                    <input v-model.number="popupForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm">
+                    <textarea v-model="popupForm.body" required rows="4" placeholder="Isi pop-up" class="rounded border border-slate-200 p-2 text-sm md:col-span-3"></textarea>
+                    <input v-model="popupForm.primary_label" placeholder="Tombol utama" class="rounded border border-slate-200 p-2 text-sm">
+                    <input v-model="popupForm.primary_href" placeholder="Link tombol utama" class="rounded border border-slate-200 p-2 text-sm">
+                    <input v-model.number="popupForm.dismiss_days" type="number" min="0" max="365" placeholder="Dismiss hari" class="rounded border border-slate-200 p-2 text-sm">
+                    <input v-model="popupForm.secondary_label" placeholder="Tombol kedua" class="rounded border border-slate-200 p-2 text-sm">
+                    <input v-model="popupForm.secondary_href" placeholder="Link tombol kedua" class="rounded border border-slate-200 p-2 text-sm">
+                    <label class="flex items-center gap-2 text-xs"><input v-model="popupForm.is_active" type="checkbox"> Aktif</label>
+                    <div class="md:col-span-3"><button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah Pop-up</button></div>
+                </form>
+
+                <div class="mt-5 space-y-4">
+                    <article v-for="item in popups" :key="item.id" class="rounded-lg border border-slate-200 p-4">
+                        <div class="grid gap-2 md:grid-cols-3">
+                            <input v-model="item.title" class="rounded border border-slate-200 p-2 text-sm md:col-span-2">
+                            <input v-model.number="item.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm">
+                            <textarea v-model="item.body" rows="4" class="rounded border border-slate-200 p-2 text-sm md:col-span-3"></textarea>
+                            <input v-model="item.primary_label" class="rounded border border-slate-200 p-2 text-sm" placeholder="Tombol utama">
+                            <input v-model="item.primary_href" class="rounded border border-slate-200 p-2 text-sm" placeholder="Link utama">
+                            <input v-model.number="item.dismiss_days" type="number" min="0" max="365" class="rounded border border-slate-200 p-2 text-sm" placeholder="Dismiss hari">
+                            <input v-model="item.secondary_label" class="rounded border border-slate-200 p-2 text-sm" placeholder="Tombol kedua">
+                            <input v-model="item.secondary_href" class="rounded border border-slate-200 p-2 text-sm" placeholder="Link kedua">
+                            <label class="flex items-center gap-2 text-xs"><input v-model="item.is_active" type="checkbox"> Aktif</label>
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <button type="button" class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="savePopup(item)">Simpan</button>
+                            <button type="button" class="rounded bg-red-50 px-3 py-2 text-xs font-bold text-red-700" @click="deletePopup(item)">Hapus</button>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="rounded-xl border border-slate-200 bg-white p-5">
+                <h2 class="text-lg font-bold">Branding & fallback assets</h2>
                 <p class="mt-1 text-xs text-slate-500">Logo, favicon, banner atas, popup, serta banner bawah/footer.</p>
                 <div class="mt-4 grid gap-4 lg:grid-cols-2">
                     <article v-for="asset in assets" :key="asset.id" class="rounded-lg border border-slate-200 p-4">
