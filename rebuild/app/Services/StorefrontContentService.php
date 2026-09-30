@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\FaqEntry;
 use App\Models\NewsArticle;
+use App\Models\ProductReview;
 use App\Models\StoreAsset;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -75,6 +76,34 @@ class StorefrontContentService
                 ...$article->only('id', 'slug', 'title', 'summary', 'source_label'),
                 'published_at' => $article->published_at?->toIso8601String(),
                 'cover_url' => $article->getFirstMediaUrl('image'),
+            ]);
+    }
+
+    public function reviews(int $limit = 6)
+    {
+        if (! Schema::hasTable('product_reviews')) {
+            return collect();
+        }
+
+        return ProductReview::query()
+            ->join('products', 'products.id', '=', 'product_reviews.product_id')
+            ->where('product_reviews.is_active', true)
+            ->where(fn ($query) => $query->whereNull('product_reviews.published_at')
+                ->orWhere('product_reviews.published_at', '<=', now()))
+            ->orderByDesc('product_reviews.published_at')->orderByDesc('product_reviews.id')
+            ->limit($limit)
+            ->get([
+                'product_reviews.id', 'product_reviews.display_name', 'product_reviews.rating',
+                'product_reviews.body', 'product_reviews.published_at',
+                'products.name as product_name', 'products.slug as product_slug',
+            ])->map(fn ($review): array => [
+                'id' => (int) $review->id,
+                'display_name' => $review->display_name,
+                'rating' => (int) $review->rating,
+                'body' => $review->body,
+                'product_name' => $review->product_name,
+                'product_slug' => $review->product_slug,
+                'published_at' => $review->published_at?->toIso8601String(),
             ]);
     }
 
