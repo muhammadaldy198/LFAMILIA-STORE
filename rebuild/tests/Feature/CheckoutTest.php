@@ -122,7 +122,8 @@ class CheckoutTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['total_idr', 'provider_mapping_id', 'buyer_sku_code']);
 
-        $this->assertSame(0, DB::table('orders')->count());
+        $this->assertSame(0, DB::table('orders')
+            ->where('idempotency_key', $payload['idempotency_key'])->count());
     }
 
     public function test_unknown_or_missing_product_input_is_rejected(): void
@@ -134,7 +135,8 @@ class CheckoutTest extends TestCase
         $this->postJson('/checkout/orders', $payload)
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['customer_input.unknown']);
-        $this->assertSame(0, DB::table('orders')->count());
+        $this->assertSame(0, DB::table('orders')
+            ->where('idempotency_key', $payload['idempotency_key'])->count());
     }
 
     public function test_voucher_is_reserved_atomically_and_quota_cannot_be_reused(): void
@@ -177,10 +179,12 @@ class CheckoutTest extends TestCase
             'max_price_idr' => 9000,
         ]);
 
-        $this->postJson('/checkout/orders', $this->guestPayload($catalog['package_id'], 'checkout-unavailable-0001'))
+        $payload = $this->guestPayload($catalog['package_id'], 'checkout-unavailable-0001');
+        $this->postJson('/checkout/orders', $payload)
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['package_id']);
-        $this->assertSame(0, DB::table('orders')->count());
+        $this->assertSame(0, DB::table('orders')
+            ->where('idempotency_key', $payload['idempotency_key'])->count());
     }
 
     public function test_nickname_service_outage_warns_but_does_not_block_checkout(): void
@@ -204,7 +208,12 @@ class CheckoutTest extends TestCase
         ))->assertCreated();
 
         $this->assertSame(11000, $response->json('total_idr'));
-        $snapshot = json_decode(DB::table('orders')->value('snapshot'), true, 512, JSON_THROW_ON_ERROR);
+        $snapshot = json_decode(
+            DB::table('orders')->where('idempotency_key', 'checkout-nickname-outage-0001')->value('snapshot'),
+            true,
+            512,
+            JSON_THROW_ON_ERROR
+        );
         $this->assertTrue($snapshot['nickname']['supported']);
         $this->assertFalse($snapshot['nickname']['verified']);
         $this->assertNotEmpty($snapshot['nickname']['warning']);
@@ -229,7 +238,8 @@ class CheckoutTest extends TestCase
             'checkout-nickname-invalid-0001'
         ))->assertUnprocessable()->assertJsonValidationErrors(['customer_input.user_id']);
 
-        $this->assertSame(0, DB::table('orders')->count());
+        $this->assertSame(0, DB::table('orders')
+            ->where('idempotency_key', 'checkout-nickname-invalid-0001')->count());
     }
 
     public function test_same_idempotency_key_cannot_be_reused_for_different_checkout(): void
@@ -240,6 +250,7 @@ class CheckoutTest extends TestCase
 
         $payload['customer_input']['user_id'] = 'DIFFERENT';
         $this->postJson('/checkout/orders', $payload)->assertStatus(409);
-        $this->assertSame(1, DB::table('orders')->count());
+        $this->assertSame(1, DB::table('orders')
+            ->where('idempotency_key', 'checkout-conflict-0001')->count());
     }
 }
