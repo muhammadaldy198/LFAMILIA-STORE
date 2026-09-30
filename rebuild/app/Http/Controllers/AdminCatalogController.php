@@ -212,7 +212,7 @@ class AdminCatalogController
             $data['manual_close_time'] = null;
             $data['manual_timezone'] = 'Asia/Jakarta';
         } else {
-            $data['manual_timezone'] = $data['manual_timezone'] ?: 'Asia/Jakarta';
+            $data['manual_timezone'] = ($data['manual_timezone'] ?? null) ?: 'Asia/Jakarta';
         }
 
         DB::transaction(function () use ($request, $data, $audit): void {
@@ -274,7 +274,7 @@ class AdminCatalogController
             $data['manual_close_time'] = null;
             $data['manual_timezone'] = 'Asia/Jakarta';
         } else {
-            $data['manual_timezone'] = $data['manual_timezone'] ?: 'Asia/Jakarta';
+            $data['manual_timezone'] = ($data['manual_timezone'] ?? null) ?: 'Asia/Jakarta';
         }
 
         DB::transaction(function () use ($request, $product, $data, $audit): void {
