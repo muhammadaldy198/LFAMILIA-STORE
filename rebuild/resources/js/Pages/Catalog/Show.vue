@@ -69,7 +69,7 @@ const paymentGroups = computed(() => {
         qris: ['QRIS', 'Scan QR dari aplikasi pembayaran favoritmu'],
         ewallet: ['E-Wallet', 'Dompet digital'],
         va: ['Virtual Account', 'Transfer melalui bank'],
-        retail: ['Retail', 'Bayar melalui gerai retail'],
+        retail: ['Convenience Store', 'Bayar melalui gerai retail'],
         other: ['Metode Lainnya', 'Metode pembayaran tersedia'],
     };
     const map = new Map();
@@ -412,13 +412,14 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <section class="lf-checkout-panel">
                     <header><span>3</span><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang kamu inginkan.</p></div></header>
                     <div class="lf-panel-body lf-payment-groups">
-                        <details v-for="group in paymentGroups" :key="group.key" :open="paymentGroups.length===1 || group.items.some(x=>x.code===paymentChannelCode)">
-                            <summary><span class="lf-payment-group-icon">{{group.key==='wallet'?'LF':group.key==='qris'?'QR':group.key==='va'?'VA':'◈'}}</span><span><strong>{{group.title}}</strong><small>{{group.description}}</small></span><b>⌄</b></summary>
-                            <div class="lf-payment-list">
+                        <details v-for="group in paymentGroups" :key="group.key" :class="{'lf-payment-featured':group.key==='wallet'||group.key==='qris'}" :open="group.key==='wallet'||group.key==='qris'||group.items.some(x=>x.code===paymentChannelCode)">
+                            <summary><strong>{{group.title}}</strong><span class="lf-payment-chevron" aria-hidden="true">⌄</span><span class="lf-payment-summary-brands"><span v-for="channel in group.items" :key="channel.code">{{channel.name}}</span></span></summary>
+                            <div class="lf-payment-list" :class="{'lf-payment-list-wide':group.key==='wallet'||group.key==='qris'}">
                                 <button v-for="channel in group.items" :key="channel.code" type="button" :class="{selected:paymentChannelCode===channel.code}" @click="choosePayment(channel.code)">
-                                    <span class="lf-payment-icon">{{group.key==='wallet'?'LF':group.key==='qris'?'QR':group.key==='va'?'VA':'◈'}}</span>
-                                    <span><strong>{{channel.name}}</strong><small>{{channel.description}}</small></span>
-                                    <b>{{paymentChannelCode===channel.code?'Dipilih':'Pilih'}}</b>
+                                    <span class="lf-payment-brand" :class="'lf-payment-brand-'+group.key">{{group.key==='wallet'?'LFAMILIA CASH':group.key==='qris'?'QRIS':channel.name}}</span>
+                                    <strong class="lf-payment-channel-name">{{channel.name}}</strong>
+                                    <b class="lf-payment-choice">{{paymentChannelCode===channel.code?'✓ Dipilih':'Pilih'}}</b>
+                                    <small class="lf-payment-card-footer">{{channel.description || group.description}}</small>
                                 </button>
                             </div>
                         </details>
@@ -429,9 +430,9 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <section class="lf-checkout-panel">
                     <header><span>4</span><div><h2>Detail Kontak</h2><p>Dipakai untuk status dan penanganan transaksi jika diperlukan.</p></div></header>
                     <div class="lf-panel-body">
-                        <div v-if="!customer" class="lf-account-fields">
+                        <div v-if="!customer" class="lf-account-fields lf-contact-fields">
                             <label><span>Email *</span><input v-model="guestEmail" type="email" maxlength="255" placeholder="example@gmail.com"></label>
-                            <label><span>No. WhatsApp *</span><input v-model="guestPhone" type="tel" maxlength="32" placeholder="08xxxxxxxxxx"></label>
+                            <label><span>No. WhatsApp *</span><div class="lf-phone-input"><span aria-hidden="true">🇮🇩</span><input v-model="guestPhone" type="tel" maxlength="32" autocomplete="tel" placeholder="08xxxxxxxxxx"></div></label>
                         </div>
                         <div v-else class="lf-customer-checkout-note">
                             <span class="lf-account-avatar">{{customer.name?.slice(0,1)?.toUpperCase()}}</span>
