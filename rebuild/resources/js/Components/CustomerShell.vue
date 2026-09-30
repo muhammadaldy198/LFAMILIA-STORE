@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link, usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 
 defineProps({
     logoUrl: { type: String, default: '' },
@@ -66,7 +66,19 @@ const legal = [
     ['Kebijakan Pengembalian Dana', '/refund'],
 ];
 
+function openDrawer() {
+    supportOpen.value = false;
+    open.value = true;
+}
 function closeDrawer() { open.value = false; }
+
+watch(open, (value) => {
+    document.documentElement.style.overflow = value ? 'hidden' : '';
+});
+onUnmounted(() => {
+    document.documentElement.style.overflow = '';
+});
+
 function supportHref(kind) {
     if (kind === 'wa') return whatsapp.value || '/contact';
     if (kind === 'ig') return storefront.value.instagramUrl || '/contact';
@@ -112,7 +124,7 @@ function supportHref(kind) {
                 <Link href="/#produk" class="lf-search-mobile" aria-label="Cari produk">
                     <svg viewBox="0 0 24 24"><path d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>
                 </Link>
-                <button type="button" class="lf-menu" aria-label="Buka menu" @click="open=true">
+                <button type="button" class="lf-menu" aria-label="Buka menu" :aria-expanded="open" @click="openDrawer">
                     <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
                 </button>
             </div>
