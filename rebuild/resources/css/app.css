@@ -4916,3 +4916,75 @@
     padding-bottom:96px!important;
   }
 }
+
+
+/* Final visual hotfix from preview audit: constrain checkout icons,
+   keep support clear of the sticky checkout bar, and crop footer art
+   like the legacy storefront. */
+.lf-contact-privacy{
+  display:flex!important;
+  align-items:flex-start!important;
+  gap:6px!important;
+}
+.lf-contact-privacy>svg{
+  width:14px!important;
+  height:14px!important;
+  flex:0 0 14px!important;
+  margin-top:1px!important;
+  fill:none!important;
+  stroke:currentColor!important;
+  stroke-width:2!important;
+  stroke-linecap:round!important;
+  stroke-linejoin:round!important;
+}
+.lf-available-promo{
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:6px!important;
+}
+.lf-available-promo>svg{
+  width:14px!important;
+  height:14px!important;
+  flex:0 0 14px!important;
+  fill:none!important;
+  stroke:currentColor!important;
+  stroke-width:2!important;
+  stroke-linecap:round!important;
+  stroke-linejoin:round!important;
+}
+
+.lf-footer-banner{
+  position:relative!important;
+  height:70px!important;
+  overflow:hidden!important;
+}
+.lf-footer-banner picture{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+}
+.lf-footer-banner img{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:100%!important;
+  max-height:none!important;
+  transform:translate(-50%,-50%)!important;
+  object-fit:cover!important;
+  object-position:center!important;
+}
+@media(min-width:520px){.lf-footer-banner{height:84px!important}}
+@media(min-width:640px){.lf-footer-banner{height:72px!important}}
+@media(min-width:1024px){.lf-footer-banner{height:88px!important}}
+@media(min-width:1280px){.lf-footer-banner{height:116px!important}}
+
+@media(max-width:639px){
+  .lf-customer:has(.lf-mobile-checkout-bar) .lf-live-support{
+    bottom:112px!important;
+  }
+  .lf-customer:has(.lf-mobile-checkout-bar) .lf-live-support.is-dragged{
+    bottom:auto!important;
+  }
+}
