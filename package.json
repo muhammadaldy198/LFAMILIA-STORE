@@ -1,5 +1,3 @@
-[Reading 52 lines from start (total: 52 lines, 0 remaining)]
-
 {
   "name": "lfamilia-store",
   "version": "0.1.0",
@@ -52,5 +50,3 @@
   "type": "module",
   "displayName": "LFAMILIA STORE"
 }
-
-[executed on device: server.lfamiliastore.my.id (d1fa5a0e-209d-4f96-9bca-b79b7600c94b)]
