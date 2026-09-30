@@ -516,7 +516,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                         <div class="lf-account-fields">
                             <label v-for="field in fields" :key="field.field_key">
                                 <span>{{field.label}}{{field.is_required ? '' : ' (opsional)'}}</span>
-                                <input v-model="customerInput[field.field_key]" :type="field.type==='email'?'email':field.type==='tel'?'tel':'text'" :required="field.is_required" maxlength="255" :placeholder="'Masukkan '+field.label">
+                                <input v-model="customerInput[field.field_key]" :type="field.type==='email'?'email':field.type==='tel'?'tel':'text'" :required="field.is_required" maxlength="255" :placeholder="field.placeholder || ('Masukkan '+field.label)">
                                 <small v-if="fieldError(field.field_key)" class="lf-field-error">{{fieldError(field.field_key)}}</small>
                             </label>
                         </div>
