@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AdminUser;
 use App\Models\Category;
+use App\Models\HomeBanner;
 use App\Models\Product;
 use App\Models\ProductPackage;
 use App\Models\ProviderMapping;
@@ -160,7 +161,7 @@ class CatalogTest extends TestCase
         Storage::fake('public');
         $assets = [];
 
-        foreach (['logo', 'favicon', 'banner_desktop', 'banner_mobile', 'popup'] as $key) {
+        foreach (['logo', 'favicon', 'banner_desktop', 'banner_mobile'] as $key) {
             $asset = StoreAsset::where('key', $key)->firstOrFail();
             $asset->update(['is_active' => true]);
             $asset->addMedia(UploadedFile::fake()->image($key.'.png'))->toMediaCollection('image', 'public');
@@ -170,10 +171,55 @@ class CatalogTest extends TestCase
         $this->get('/')->assertInertia(fn (Assert $page) => $page
             ->component('Catalog/Index')
             ->where('logoUrl', $assets['logo'])
-            ->where('bannerUrl', $assets['banner_desktop'])
-            ->where('mobileBannerUrl', $assets['banner_mobile'])
-            ->where('popupUrl', $assets['popup'])
+            ->where('banners.0.desktop_url', $assets['banner_desktop'])
+            ->where('banners.0.mobile_url', $assets['banner_mobile'])
+            ->where('popups.0.title', 'Selamat datang di LFAMILIA STORE')
             ->where('faviconUrl', $assets['favicon'])
+            ->etc());
+    }
+
+    public function test_admin_managed_banner_media_and_popup_are_connected_to_homepage(): void
+    {
+        Storage::fake('public');
+        $this->actingAs($this->admin(), 'admin');
+
+        $banner = HomeBanner::create([
+            'title' => 'Promo Managed',
+            'subtitle' => 'Banner test',
+            'cta_href' => '/promo',
+            'show_desktop' => true,
+            'show_mobile' => true,
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        $this->post('/admin/catalog/media/banner/'.$banner->id, [
+            'collection' => 'desktop',
+            'image' => UploadedFile::fake()->image('desktop.png', 1200, 400),
+        ])->assertRedirect();
+        $this->post('/admin/catalog/media/banner/'.$banner->id, [
+            'collection' => 'mobile',
+            'image' => UploadedFile::fake()->image('mobile.png', 900, 500),
+        ])->assertRedirect();
+
+        $this->post('/admin/content/popups', [
+            'title' => 'Popup Managed',
+            'body' => 'Isi popup yang bisa diedit Admin.',
+            'primary_label' => 'Buka Promo',
+            'primary_href' => '/promo',
+            'secondary_label' => '',
+            'secondary_href' => null,
+            'dismiss_days' => 3,
+            'sort_order' => 0,
+            'is_active' => true,
+        ])->assertRedirect();
+
+        $this->get('/')->assertInertia(fn (Assert $page) => $page
+            ->component('Catalog/Index')
+            ->where('banners.0.title', 'Promo Managed')
+            ->where('banners.0.desktop_url', $banner->fresh()->getFirstMediaUrl('desktop'))
+            ->where('banners.0.mobile_url', $banner->fresh()->getFirstMediaUrl('mobile'))
+            ->where('popups', fn ($popups) => collect($popups)->contains(fn ($popup) => $popup['title'] === 'Popup Managed'))
             ->etc());
     }
 
