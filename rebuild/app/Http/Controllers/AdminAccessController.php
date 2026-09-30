@@ -24,7 +24,6 @@ class AdminAccessController
                     'permissions' => $admin->permissions ?? [],
                 ]),
             'permissions' => $permissions->definitions(),
-            'staffPermissions' => $permissions->staffPermissionKeys(),
         ]);
     }
 
@@ -34,14 +33,8 @@ class AdminAccessController
         AdminAuditService $audit,
     ): RedirectResponse {
         $data = $this->validateAdmin($request, $permissions, null, true);
-        if (in_array($data['role'], ['ADMIN', 'STAFF'], true)) {
+        if ($data['role'] === 'ADMIN') {
             $data['permissions'] = array_values(array_unique([...$data['permissions'], 'dashboard.view']));
-        }
-        if ($data['role'] === 'STAFF') {
-            $data['permissions'] = array_values(array_intersect(
-                $data['permissions'],
-                $permissions->staffPermissionKeys()
-            ));
         }
 
         $admin = AdminUser::create([
@@ -49,7 +42,7 @@ class AdminAccessController
             'email' => strtolower($data['email']),
             'password' => Hash::make($data['password']),
             'role' => $data['role'],
-            'permissions' => in_array($data['role'], ['ADMIN', 'STAFF'], true) ? $data['permissions'] : null,
+            'permissions' => $data['role'] === 'ADMIN' ? $data['permissions'] : null,
             'is_active' => $data['is_active'],
         ]);
         $audit->record($request, 'admin.created', 'admin_user', $admin->id, null, $admin->toArray());
@@ -65,14 +58,8 @@ class AdminAccessController
     ): RedirectResponse {
         $data = $this->validateAdmin($request, $permissions, $admin, false);
         $before = $admin->toArray();
-        if (in_array($data['role'], ['ADMIN', 'STAFF'], true)) {
+        if ($data['role'] === 'ADMIN') {
             $data['permissions'] = array_values(array_unique([...$data['permissions'], 'dashboard.view']));
-        }
-        if ($data['role'] === 'STAFF') {
-            $data['permissions'] = array_values(array_intersect(
-                $data['permissions'],
-                $permissions->staffPermissionKeys()
-            ));
         }
 
         if ($admin->role === 'SUPER_ADMIN'
@@ -87,7 +74,7 @@ class AdminAccessController
             'name' => $data['name'],
             'email' => strtolower($data['email']),
             'role' => $data['role'],
-            'permissions' => in_array($data['role'], ['ADMIN', 'STAFF'], true) ? $data['permissions'] : null,
+            'permissions' => $data['role'] === 'ADMIN' ? $data['permissions'] : null,
             'is_active' => $data['is_active'],
         ]);
         if (! empty($data['password'])) {
@@ -112,7 +99,7 @@ class AdminAccessController
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email:rfc', 'max:255',
                 Rule::unique('admin_users', 'email')->ignore($admin?->id)],
-            'role' => ['required', Rule::in(['SUPER_ADMIN', 'ADMIN', 'STAFF'])],
+            'role' => ['required', Rule::in(['SUPER_ADMIN', 'ADMIN'])],
             'permissions' => ['array'],
             'permissions.*' => [Rule::in($keys)],
             'is_active' => ['required', 'boolean'],
