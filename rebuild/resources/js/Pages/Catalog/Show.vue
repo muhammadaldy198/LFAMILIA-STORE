@@ -66,11 +66,11 @@ const packageGroups = computed(() => {
 
 const paymentGroups = computed(() => {
     const labels = {
-        wallet: ['LFAMILIA Cash', 'Gunakan saldo akun LFAMILIA'],
-        qris: ['QRIS', 'Scan QR dari aplikasi pembayaran favoritmu'],
-        ewallet: ['E-Wallet', 'Dompet digital'],
-        va: ['Virtual Account', 'Transfer melalui bank'],
-        retail: ['Retail', 'Bayar melalui gerai retail'],
+        wallet: ['LFAMILIA Cash', 'Bayar memakai saldo LFAMILIA Cash'],
+        qris: ['QRIS', 'Scan dari semua aplikasi yang mendukung QRIS'],
+        ewallet: ['E-Wallet', 'Bayar melalui aplikasi e-wallet yang tersedia'],
+        va: ['Virtual Account', 'Transfer bank dengan nomor VA unik'],
+        retail: ['Retail', 'Bayar melalui gerai retail yang tersedia'],
         other: ['Metode Lainnya', 'Metode pembayaran tersedia'],
     };
     const map = new Map();
@@ -306,9 +306,15 @@ watch([guestEmail, guestPhone], () => {
     quote.value = null;
 });
 
+let nicknameAutoTimer;
 watch(() => props.fields.map((field) => String(customerInput[field.field_key] || '')), () => {
     nicknameResult.value = null;
     selectedSavedId.value = '';
+    if (nicknameAutoTimer) window.clearTimeout(nicknameAutoTimer);
+    if (!props.product.nickname_check_enabled || !requiredFieldsComplete.value) return;
+    nicknameAutoTimer = window.setTimeout(() => {
+        void checkNickname();
+    }, 700);
 });
 </script>
 
@@ -351,6 +357,16 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <section v-if="fields.length" class="lf-checkout-panel">
                     <header><span>1</span><div><h2>Masukkan Data Akun</h2><p>Pastikan ID dan server tujuan sudah benar.</p></div></header>
                     <div class="lf-panel-body">
+                        <div class="lf-account-product-mobile">
+                            <span class="lf-account-product-art">
+                                <img v-if="product.image_url" :src="product.image_url" :alt="product.name">
+                                <span v-else>{{product.name.slice(0,1)}}</span>
+                            </span>
+                            <div class="lf-account-product-copy">
+                                <strong>{{product.name}}</strong>
+                                <Link href="/#produk">Ganti produk</Link>
+                            </div>
+                        </div>
                         <label v-if="savedAccountItems.length" class="lf-saved-account-select">
                             <span>Akun game tersimpan</span>
                             <select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)">
@@ -397,20 +413,56 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     </div>
                 </section>
 
-                <section class="lf-checkout-panel">
+                <section class="lf-checkout-panel lf-checkout-payment-panel">
                     <header><span>3</span><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang ingin digunakan.</p></div></header>
                     <div class="lf-panel-body lf-payment-groups">
-                        <details v-for="group in paymentGroups" :key="group.key" :open="paymentGroups.length===1 || group.items.some(x=>x.code===paymentChannelCode)">
-                            <summary><span class="lf-payment-group-icon">{{group.key==='wallet'?'LF':group.key==='qris'?'QR':group.key==='va'?'VA':'◈'}}</span><span><strong>{{group.title}}</strong><small>{{group.description}}</small></span><b>⌄</b></summary>
-                            <div class="lf-payment-list">
-                                <button v-for="channel in group.items" :key="channel.code" type="button" :class="{selected:paymentChannelCode===channel.code}" @click="choosePayment(channel.code)">
-                                    <span class="lf-payment-icon">{{group.key==='wallet'?'LF':group.key==='qris'?'QR':group.key==='va'?'VA':'◈'}}</span>
-                                    <span><strong>{{channel.name}}</strong><small>{{channel.description}}</small></span>
-                                    <b>{{paymentChannelCode===channel.code?'Dipilih':'Pilih'}}</b>
+                        <div
+                            v-for="group in paymentGroups"
+                            :key="group.key"
+                            class="lf-payment-group-card"
+                            :class="{selected:group.items.some(x=>x.code===paymentChannelCode)}"
+                        >
+                            <button
+                                type="button"
+                                class="lf-payment-group-main"
+                                @click="choosePayment(group.items.find(x=>x.code===paymentChannelCode)?.code || group.items[0]?.code)"
+                            >
+                                <span v-if="group.key==='wallet'" class="lf-payment-wallet-art">
+                                    <img src="/payment/lfamilia-cash.webp" alt="LFAMILIA Cash">
+                                </span>
+                                <span class="lf-payment-group-copy">
+                                    <strong>{{group.title}}</strong>
+                                    <small v-if="group.key==='wallet' && customer">Saldo {{formatIdr(customer.balance_idr)}}</small>
+                                    <small v-else-if="group.key==='wallet'">Masuk akun untuk memakai saldo</small>
+                                    <small v-else>{{group.description}}</small>
+                                </span>
+                                <span v-if="group.items.some(x=>x.code===paymentChannelCode)" class="lf-payment-check">✓</span>
+                            </button>
+
+                            <div v-if="group.key!=='wallet'" class="lf-payment-brand-strip">
+                                <span v-if="group.key==='qris'">QRIS • DANA • ShopeePay</span>
+                                <template v-else>
+                                    <span v-for="channel in group.items.slice(0,7)" :key="channel.code">{{channel.name}}</span>
+                                </template>
+                            </div>
+
+                            <div
+                                v-if="group.key!=='wallet' && group.key!=='qris' && group.items.some(x=>x.code===paymentChannelCode)"
+                                class="lf-payment-channel-grid"
+                            >
+                                <button
+                                    v-for="channel in group.items"
+                                    :key="channel.code"
+                                    type="button"
+                                    :class="{selected:paymentChannelCode===channel.code}"
+                                    @click="choosePayment(channel.code)"
+                                >
+                                    <span>{{channel.name}}</span>
                                 </button>
                             </div>
-                        </details>
+                        </div>
                         <p v-if="!paymentChannels?.length" class="lf-warning-note">Belum ada metode pembayaran aktif.</p>
+                        <p v-if="!customer" class="lf-payment-login-hint">Ingin membayar memakai saldo? <Link href="/login">Masuk atau daftar akun</Link>.</p>
                     </div>
                 </section>
 
