@@ -93,9 +93,11 @@ class CheckoutTest extends TestCase
         $this->assertSame($first->json('order_number'), $second->json('order_number'));
         $this->assertSame($first->json('access_code'), $second->json('access_code'));
         $this->assertSame(11000, $first->json('total_idr'));
-        $this->assertSame(1, DB::table('orders')->count());
+        $this->assertSame(1, DB::table('orders')
+            ->where('idempotency_key', $payload['idempotency_key'])->count());
 
-        $order = DB::table('orders')->first();
+        $order = DB::table('orders')
+            ->where('idempotency_key', $payload['idempotency_key'])->firstOrFail();
         $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame(10000, (int) $order->cost_idr);
         $this->assertSame(1000, (int) $order->margin_idr);
@@ -103,7 +105,9 @@ class CheckoutTest extends TestCase
         $this->assertSame($catalog['mapping_id'], $snapshot['provider']['mapping_id']);
         $this->assertSame('123456', $snapshot['customer_input']['user_id']);
         $this->assertSame('PENDING_PAYMENT', $order->status);
-        $this->assertSame(1, DB::table('order_events')->where('event_type', 'ORDER_CREATED')->count());
+        $this->assertSame(1, DB::table('order_events')
+            ->where('order_id', $order->id)
+            ->where('event_type', 'ORDER_CREATED')->count());
     }
 
     public function test_client_price_provider_and_sku_are_rejected(): void
