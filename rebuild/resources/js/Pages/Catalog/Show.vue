@@ -83,12 +83,15 @@ const paymentGroups = computed(() => {
         if (!map.has(key)) map.set(key, []);
         map.get(key).push(channel);
     }
-    return [...map.entries()].map(([key, items]) => ({
-        key,
-        title: labels[key]?.[0] || labels.other[0],
-        description: labels[key]?.[1] || labels.other[1],
-        items,
-    }));
+    const order = ['wallet', 'qris', 'ewallet', 'va', 'retail', 'other'];
+    return [...map.entries()]
+        .map(([key, items]) => ({
+            key,
+            title: labels[key]?.[0] || labels.other[0],
+            description: labels[key]?.[1] || labels.other[1],
+            items,
+        }))
+        .sort((left, right) => order.indexOf(left.key) - order.indexOf(right.key));
 });
 
 function noticeVersion(items) {
@@ -307,7 +310,7 @@ onMounted(() => {
     if (!paymentChannelCode.value) {
         for (const key of preferredGroups) {
             const group = paymentGroups.value.find((item) => item.key === key);
-            const first = group?.items?.[0];
+            const first = group?.items?.find((item) => item.available !== false);
             if (first?.code) {
                 paymentChannelCode.value = first.code;
                 break;
@@ -466,7 +469,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             <button
                                 type="button"
                                 class="lf-payment-group-main"
-                                @click="choosePayment(group.items.find(x=>x.code===paymentChannelCode)?.code || group.items[0]?.code)"
+                                :disabled="group.items.every(x=>x.available===false)"
+                                @click="choosePayment(group.items.find(x=>x.code===paymentChannelCode)?.code || group.items.find(x=>x.available!==false)?.code)"
                             >
                                 <span v-if="group.key==='wallet'" class="lf-payment-wallet-art">
                                     <img :src="'/payment/lfamilia-cash.webp'" alt="LFAMILIA Cash">
@@ -495,6 +499,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                     v-for="channel in group.items"
                                     :key="channel.code"
                                     type="button"
+                                    :disabled="channel.available===false"
                                     :class="{selected:paymentChannelCode===channel.code}"
                                     @click="choosePayment(channel.code)"
                                 >
