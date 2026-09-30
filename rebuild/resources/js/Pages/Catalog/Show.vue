@@ -121,6 +121,13 @@ function formatIdr(value) {
     return 'Rp ' + Number(value || 0).toLocaleString('id-ID');
 }
 
+function formatDateId(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 function normalizeWhatsapp(value) {
     const text = String(value || '');
     const hasPlus = text.trim().startsWith('+');
@@ -688,17 +695,35 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
     </div>
 
     <div v-if="voucherOpen" class="lf-modal-backdrop" @click.self="voucherOpen=false">
-        <div class="lf-voucher-modal">
-            <header><div><p class="lf-eyebrow">VOUCHER TERSEDIA</p><h2>Pilih promo</h2></div><button @click="voucherOpen=false">×</button></header>
-            <div v-if="voucherLoading" class="lf-empty">Memuat voucher...</div>
-            <div v-else-if="voucherError" class="lf-warning-note">{{voucherError}}</div>
+        <div class="lf-voucher-modal lf-voucher-legacy">
+            <header>
+                <div>
+                    <h2>Voucher Yang Tersedia</h2>
+                    <p>Pilih voucher untuk langsung menghitung diskon pada nominal pesananmu.</p>
+                </div>
+                <button type="button" aria-label="Tutup voucher" @click="voucherOpen=false">×</button>
+            </header>
+            <div v-if="voucherLoading" class="lf-voucher-state">Memuat voucher...</div>
+            <div v-else-if="voucherError" class="lf-voucher-state lf-voucher-error">{{voucherError}}</div>
             <div v-else-if="vouchers.length" class="lf-voucher-list">
-                <button v-for="voucher in vouchers" :key="voucher.code" @click="applyVoucher(voucher.code)">
-                    <span><strong>{{voucher.code}}</strong><small>Minimum {{formatIdr(voucher.minimum_total_idr)}}</small></span>
-                    <b>{{voucher.discount_type==='PERCENT'?voucher.discount_value+'%':formatIdr(voucher.discount_value)}}</b>
+                <button
+                    v-for="voucher in vouchers"
+                    :key="voucher.code"
+                    type="button"
+                    :disabled="Number(selectedPackage?.price_idr || 0) < Number(voucher.minimum_total_idr || 0)"
+                    @click="applyVoucher(voucher.code)"
+                >
+                    <span class="lf-voucher-copy">
+                        <span class="lf-voucher-topline">
+                            <strong>Voucher {{voucher.code}}</strong>
+                            <b>{{voucher.code}}</b>
+                        </span>
+                        <small>{{voucher.discount_type==='PERCENT' ? 'Potongan '+voucher.discount_value+'%' : 'Potongan '+formatIdr(voucher.discount_value)}}</small>
+                        <em>Minimum {{formatIdr(voucher.minimum_total_idr)}}<template v-if="voucher.ends_at"> · Berlaku hingga {{formatDateId(voucher.ends_at)}}</template><template v-if="Number(selectedPackage?.price_idr || 0) < Number(voucher.minimum_total_idr || 0)"> · Belum memenuhi minimum</template></em>
+                    </span>
                 </button>
             </div>
-            <div v-else class="lf-empty">Belum ada voucher yang cocok untuk nominal ini.</div>
+            <div v-else class="lf-voucher-state">Belum ada voucher yang aktif saat ini.</div>
         </div>
     </div>
 
