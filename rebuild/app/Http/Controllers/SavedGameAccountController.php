@@ -43,6 +43,45 @@ class SavedGameAccountController
         ], 201);
     }
 
+    public function update(
+        Request $request,
+        SavedGameAccount $savedGameAccount,
+        CheckoutInputValidator $validator,
+        NicknameService $nickname,
+    ): JsonResponse {
+        abort_unless((int) $savedGameAccount->user_id === (int) $request->user()->id, 404);
+
+        $data = $request->validate([
+            'product_id' => ['required', 'integer'],
+            'label' => ['required', 'string', 'max:100'],
+            'customer_input' => ['required', 'array', 'max:20'],
+            'customer_input.*' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $product = Product::with(['fields', 'category'])
+            ->where('id', $data['product_id'])
+            ->where('is_active', true)
+            ->whereHas('category', fn ($query) => $query->where('slug', 'game'))
+            ->firstOrFail();
+        $input = $validator->validate($product, $data['customer_input']);
+        $checked = $product->nickname_check_enabled ? $nickname->check($product, $input) : null;
+
+        $savedGameAccount->forceFill([
+            'product_id' => $product->id,
+            'label' => trim($data['label']),
+            'customer_input' => $input,
+            'nickname' => is_array($checked) && ($checked['verified'] ?? false)
+                ? ($checked['nickname'] ?? null) : null,
+        ])->save();
+
+        return response()->json([
+            'id' => $savedGameAccount->id,
+            'label' => $savedGameAccount->label,
+            'customer_input' => $savedGameAccount->customer_input,
+            'nickname' => $savedGameAccount->nickname,
+        ]);
+    }
+
     public function destroy(Request $request, SavedGameAccount $savedGameAccount): JsonResponse
     {
         abort_unless((int) $savedGameAccount->user_id === (int) $request->user()->id, 404);
