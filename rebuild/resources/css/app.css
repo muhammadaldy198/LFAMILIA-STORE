@@ -4188,3 +4188,22 @@
   background:rgba(0,0,0,.50)!important;
   backdrop-filter:none!important;
 }
+
+
+/* Effective mobile viewport geometry correction from the legacy px-4 main container. */
+@media(max-width:639px){
+  /* The legacy banner is full-bleed after its -mx-4 + calc(100% + 2rem) combination. */
+  .lf-product-hero{
+    width:100vw!important;
+    max-width:none!important;
+    margin:8px calc(50% - 50vw) 0!important;
+    aspect-ratio:16/8!important;
+  }
+
+  /* The transaction/details content itself remains inside the legacy 16px phone gutters. */
+  .lf-checkout-page>.lf-container{
+    width:calc(100% - 2rem)!important;
+    max-width:none!important;
+    margin-inline:auto!important;
+  }
+}
