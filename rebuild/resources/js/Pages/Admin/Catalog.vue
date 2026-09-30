@@ -1,7 +1,7 @@
 <script setup>
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
-import { computed, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
 
 const props = defineProps({ categories: Array, products: Array, assets: Array });
@@ -11,6 +11,7 @@ const cloneProducts = (items) => items.map((item) => ({
         ...pack,
         mappings: pack.mappings.map((mapping) => ({ ...mapping })),
     })),
+    notices: (item.notices || []).map((notice) => ({ ...notice })),
 }));
 const categories = ref(props.categories.map((item) => ({ ...item })));
 const products = ref(cloneProducts(props.products));
@@ -22,8 +23,9 @@ watch(() => props.assets, (items) => { assets.value = items.map((item) => ({ ...
 const tab = ref('AUTO_PROVIDER');
 const visibleProducts = computed(() => products.value.filter((item) => item.fulfillment_mode === tab.value));
 const categoryForm = useForm({ name: '', sort_order: 0 });
-const productForm = useForm({ category_id: '', name: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', margin_percent: 0, sort_order: 0 });
-const packageForm = useForm({ product_id: '', code: '', name: '', nominal_value: '', sort_order: 0, cost_idr: '' });
+const productForm = useForm({ category_id: '', name: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', margin_percent: 0, sort_order: 0 });
+const packageForm = useForm({ product_id: '', code: '', name: '', group_name: '', nominal_value: '', sort_order: 0, cost_idr: '' });
+const noticeDrafts = reactive({});
 const fieldsProductId = ref('');
 const fieldsText = ref('');
 watch(fieldsProductId, (id) => {
@@ -48,7 +50,7 @@ const deleteCategory = (item) => {
     }
 };
 const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
-    category_id: item.category_id, name: item.name, description: item.description,
+    category_id: item.category_id, name: item.name, publisher: item.publisher || '', description: item.description,
     manual_instructions: item.manual_instructions, margin_percent: item.margin_percent,
     sort_order: item.sort_order, is_active: item.is_active,
     nickname_check_enabled: item.nickname_check_enabled,
@@ -57,7 +59,7 @@ const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
     nickname_server_field_key: item.nickname_server_field_key || null,
 });
 const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
-    code: pack.code, name: pack.name, nominal_value: pack.nominal_value,
+    code: pack.code, name: pack.name, group_name: pack.group_name || null, nominal_value: pack.nominal_value,
     sort_order: pack.sort_order, is_active: pack.is_active,
 });
 const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping.id, {
@@ -66,6 +68,21 @@ const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping
     ...(mapping.provider_code === 'DIGIFLAZZ' ? { customer_no_template: mapping.customer_no_template || null } : {}),
 });
 const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { is_active: asset.is_active, target_url: asset.target_url || null });
+const noticeDraft = (productId) => noticeDrafts[productId] || (noticeDrafts[productId] = { title: '', body: '', sort_order: 0, is_active: true });
+const addNotice = (product) => {
+    const draft = noticeDraft(product.id);
+    if (!draft.title.trim() || !draft.body.trim()) return;
+    router.post('/admin/catalog/products/' + product.id + '/notices', draft, {
+        preserveScroll: true,
+        onSuccess: () => { noticeDrafts[product.id] = { title: '', body: '', sort_order: 0, is_active: true }; },
+    });
+};
+const saveNotice = (notice) => router.put('/admin/catalog/notices/' + notice.id, {
+    title: notice.title, body: notice.body, sort_order: Number(notice.sort_order || 0), is_active: Boolean(notice.is_active),
+}, { preserveScroll: true });
+const deleteNotice = (notice) => {
+    if (confirm('Hapus notice produk ini?')) router.delete('/admin/catalog/notices/' + notice.id, { preserveScroll: true });
+};
 </script>
 
 <template>
@@ -102,6 +119,7 @@ const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { i
                 <form class="grid gap-3 md:grid-cols-3" @submit.prevent="productForm.fulfillment_mode = tab; productForm.post('/admin/catalog/products', { onSuccess: () => productForm.reset() })">
                     <label class="text-sm">Kategori<select v-model="productForm.category_id" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="">Pilih kategori</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
                     <label class="text-sm">Nama produk<input v-model="productForm.name" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
+                    <label class="text-sm">Publisher<input v-model="productForm.publisher" placeholder="Contoh: Moonton" class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
                     <label class="text-sm">Margin persen<input v-model.number="productForm.margin_percent" type="number" step="0.0001" min="0" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
                     <label class="text-sm md:col-span-2">Deskripsi<textarea v-model="productForm.description" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
                     <label class="text-sm">Urutan<input v-model.number="productForm.sort_order" type="number" min="0" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
@@ -111,6 +129,7 @@ const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { i
                 <div v-for="item in visibleProducts" :key="item.id" class="space-y-4 border-t border-slate-700 pt-5">
                     <div class="grid gap-3 md:grid-cols-4">
                         <label class="text-sm">Nama<input v-model="item.name" class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
+                        <label class="text-sm">Publisher<input v-model="item.publisher" placeholder="Publisher / brand game" class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
                         <label class="text-sm">Kategori<select v-model="item.category_id" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option></select></label>
                         <label class="text-sm">Margin %<input v-model.number="item.margin_percent" type="number" step="0.0001" min="0" class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
                         <label class="text-sm">Urutan<input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
@@ -128,13 +147,35 @@ const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { i
                         </div>
                     </div>
                     <button type="button" class="rounded-md bg-slate-700 px-4 py-2 text-sm" @click="saveProduct(item)">Simpan produk</button>
-                    <div class="grid gap-3 md:grid-cols-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /><AdminMediaControl type="product" :id="item.id" collection="banner" :url="item.banner_url" /></div>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk</strong><p class="mt-1 text-[11px] text-slate-500">Rekomendasi 1:1, minimal 512×512. Homepage akan crop dari tengah seperti kartu produk checkout.</p><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
+                        <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Banner halaman produk</strong><p class="mt-1 text-[11px] text-slate-500">Gunakan banner lebar dengan fokus subjek di tengah agar aman pada desktop dan mobile.</p><div class="mt-2"><AdminMediaControl type="product" :id="item.id" collection="banner" :url="item.banner_url" /></div></div>
+                    </div>
+                    <div class="space-y-3 rounded-md border border-slate-200 bg-white p-4">
+                        <div><h3 class="font-semibold">Notice produk</h3><p class="mt-1 text-xs text-slate-500">Informasi publik yang tampil di checkout, terpisah dari instruksi fulfillment internal.</p></div>
+                        <article v-for="notice in item.notices" :key="notice.id" class="grid gap-2 rounded border border-slate-200 p-3 md:grid-cols-[1fr_110px_auto]">
+                            <input v-model="notice.title" class="rounded border border-slate-200 p-2 text-xs" placeholder="Judul">
+                            <input v-model.number="notice.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-xs" placeholder="Urutan">
+                            <label class="flex items-center gap-2 text-xs"><input v-model="notice.is_active" type="checkbox"> Aktif</label>
+                            <textarea v-model="notice.body" rows="2" class="rounded border border-slate-200 p-2 text-xs md:col-span-3" placeholder="Isi notice"></textarea>
+                            <div class="flex gap-2 md:col-span-3"><button type="button" class="rounded bg-slate-800 px-3 py-2 text-xs text-white" @click="saveNotice(notice)">Simpan</button><button type="button" class="rounded bg-red-50 px-3 py-2 text-xs font-semibold text-red-700" @click="deleteNotice(notice)">Hapus</button></div>
+                        </article>
+                        <div class="grid gap-2 rounded border border-dashed border-slate-300 p-3 md:grid-cols-[1fr_110px_auto]">
+                            <input v-model="noticeDraft(item.id).title" class="rounded border border-slate-200 p-2 text-xs" placeholder="Judul notice baru">
+                            <input v-model.number="noticeDraft(item.id).sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-xs" placeholder="Urutan">
+                            <label class="flex items-center gap-2 text-xs"><input v-model="noticeDraft(item.id).is_active" type="checkbox"> Aktif</label>
+                            <textarea v-model="noticeDraft(item.id).body" rows="2" class="rounded border border-slate-200 p-2 text-xs md:col-span-3" placeholder="Informasi yang dilihat customer"></textarea>
+                            <button type="button" class="w-fit rounded bg-[#1769e8] px-3 py-2 text-xs font-bold text-white md:col-span-3" @click="addNotice(item)">Tambah Notice</button>
+                        </div>
+                    </div>
+
                     <div class="space-y-3 rounded-md bg-slate-950 p-4">
                         <h3 class="font-semibold">Nominal / paket</h3>
                         <div v-for="pack in item.packages" :key="pack.id" class="space-y-2 border-t border-slate-800 pt-3">
                             <div class="flex flex-wrap items-end gap-2">
                                 <label class="text-xs">Kode internal<input v-model="pack.code" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
                                 <label class="text-xs">Nama nominal<input v-model="pack.name" class="mt-1 block rounded bg-slate-800 p-2"></label>
+                                <label class="text-xs">Grup / Tabel<input v-model="pack.group_name" placeholder="Contoh: Diamonds" class="mt-1 block rounded bg-slate-800 p-2"></label>
                                 <label class="text-xs">Nilai nominal<input v-model.number="pack.nominal_value" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
                                 <label class="text-xs">Urutan<input v-model.number="pack.sort_order" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2"></label>
                                 <label class="flex gap-2 text-xs"><input v-model="pack.is_active" type="checkbox">Aktif</label>
@@ -153,6 +194,7 @@ const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { i
                         <form class="flex flex-wrap items-end gap-2 border-t border-slate-800 pt-3" @submit.prevent="packageForm.post('/admin/catalog/products/' + item.id + '/packages', { onSuccess: () => packageForm.reset() })">
                             <label class="text-xs">Kode internal<input v-model="packageForm.code" required class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
                             <label class="text-xs">Nama nominal<input v-model="packageForm.name" required class="mt-1 block rounded bg-slate-800 p-2"></label>
+                            <label class="text-xs">Grup / Tabel<input v-model="packageForm.group_name" placeholder="Contoh: Weekly / Diamonds" class="mt-1 block rounded bg-slate-800 p-2"></label>
                             <label class="text-xs">Nilai nominal<input v-model.number="packageForm.nominal_value" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
                             <label class="text-xs">Urutan<input v-model.number="packageForm.sort_order" type="number" min="0" required class="mt-1 block w-20 rounded bg-slate-800 p-2"></label>
                             <label v-if="item.fulfillment_mode === 'MANUAL'" class="text-xs">Modal Rp<input v-model.number="packageForm.cost_idr" type="number" min="0" required class="mt-1 block w-28 rounded bg-slate-800 p-2"></label>
