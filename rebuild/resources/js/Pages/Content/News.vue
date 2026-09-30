@@ -1,0 +1,6 @@
+<script setup>
+import {Head,Link} from '@inertiajs/vue3';import CustomerShell from '../../Components/CustomerShell.vue';
+defineProps({articles:Array});
+const date=v=>v?new Date(v).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):'Berita LFAMILIA';
+</script>
+<template><Head title="Berita"/><CustomerShell><main class="lf-container lf-content-page"><p class="lf-eyebrow">UPDATE TERBARU</p><h1 class="lf-title">Berita LFAMILIA</h1><p class="lf-copy">Info produk, jadwal layanan, promo, dan pengumuman toko.</p><div class="lf-news-grid mt-6"><Link v-for="a in articles" :key="a.id" :href="'/news/'+a.slug" class="lf-news-card"><img v-if="a.cover_url" :src="a.cover_url" alt=""><div v-else class="lf-news-placeholder">LF</div><div class="lf-news-overlay"></div><div class="lf-news-body"><small>{{date(a.published_at)}}</small><h2>{{a.title}}</h2><p>{{a.summary}}</p><strong>Baca artikel →</strong></div></Link></div><div v-if="!articles?.length" class="lf-empty">Belum ada berita aktif.</div></main></CustomerShell></template>
