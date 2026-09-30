@@ -42,6 +42,7 @@ class StorefrontContentService
         return DB::table('system_settings')->where('key', 'like', 'store.%')->pluck('value', 'key')
             ->mapWithKeys(function ($value, $key): array {
                 $decoded = json_decode((string) $value, true);
+
                 return [$key => $decoded];
             })->all();
     }
