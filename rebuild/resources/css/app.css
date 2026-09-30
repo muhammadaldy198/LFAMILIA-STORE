@@ -2834,3 +2834,17 @@
     padding:24px!important;
   }
 }
+
+
+/* Payment card micro-parity with the legacy checkout. */
+.lf-payment-group-main:disabled,
+.lf-payment-channel-grid button:disabled{
+  cursor:not-allowed!important;
+  opacity:.45!important;
+}
+@media(max-width:639px){
+  .lf-payment-group-main{
+    min-height:43.2px!important;
+    padding:5.6px 10px!important;
+  }
+}
