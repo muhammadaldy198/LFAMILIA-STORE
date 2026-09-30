@@ -14,6 +14,12 @@ class CustomerAreaTest extends TestCase
 {
     use DatabaseTransactions;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Queue::fake();
+    }
+
     private function customer(string $email): User
     {
         return User::create([
@@ -72,7 +78,6 @@ class CustomerAreaTest extends TestCase
 
     public function test_profile_password_and_deletion_checks(): void
     {
-        Queue::fake();
         $user = $this->customer('profile@example.test');
         $this->actingAs($user, 'web');
 
