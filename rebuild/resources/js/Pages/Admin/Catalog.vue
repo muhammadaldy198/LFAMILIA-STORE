@@ -23,7 +23,7 @@ watch(() => props.assets, (items) => { assets.value = items.map((item) => ({ ...
 const tab = ref('AUTO_PROVIDER');
 const visibleProducts = computed(() => products.value.filter((item) => item.fulfillment_mode === tab.value));
 const categoryForm = useForm({ name: '', sort_order: 0 });
-const productForm = useForm({ category_id: '', name: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', margin_percent: 0, sort_order: 0 });
+const productForm = useForm({ category_id: '', name: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: 0, sort_order: 0 });
 const packageForm = useForm({ product_id: '', code: '', name: '', note: '', group_name: '', nominal_value: '', sort_order: 0, cost_idr: '' });
 const noticeDrafts = reactive({});
 const fieldsProductId = ref('');
@@ -56,7 +56,9 @@ const deleteCategory = (item) => {
 };
 const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
     category_id: item.category_id, name: item.name, publisher: item.publisher || '', description: item.description,
-    manual_instructions: item.manual_instructions, margin_percent: item.margin_percent,
+    manual_instructions: item.manual_instructions, manual_open_time: item.manual_open_time || null,
+    manual_close_time: item.manual_close_time || null, manual_timezone: item.manual_timezone || 'Asia/Jakarta',
+    margin_percent: item.margin_percent,
     sort_order: item.sort_order, is_active: item.is_active,
     nickname_check_enabled: item.nickname_check_enabled,
     nickname_game_code: item.nickname_game_code || null,
@@ -133,6 +135,11 @@ const deleteNotice = (notice) => {
                     <label class="text-sm md:col-span-2">Deskripsi<textarea v-model="productForm.description" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
                     <label class="text-sm">Urutan<input v-model.number="productForm.sort_order" type="number" min="0" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
                     <label v-if="tab === 'MANUAL'" class="text-sm md:col-span-3">Instruksi fulfillment internal<textarea v-model="productForm.manual_instructions" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
+                    <template v-if="tab === 'MANUAL'">
+                        <label class="text-sm">Jam buka<input v-model="productForm.manual_open_time" type="time" class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
+                        <label class="text-sm">Jam tutup<input v-model="productForm.manual_close_time" type="time" class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
+                        <label class="text-sm">Zona waktu<select v-model="productForm.manual_timezone" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="Asia/Jakarta">WIB — Asia/Jakarta</option><option value="Asia/Makassar">WITA — Asia/Makassar</option><option value="Asia/Jayapura">WIT — Asia/Jayapura</option></select></label>
+                    </template>
                     <div class="md:col-span-3"><button :disabled="productForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah {{ tab === 'MANUAL' ? 'produk manual' : 'produk provider' }}</button><p v-if="Object.keys(productForm.errors).length" class="mt-2 text-sm text-red-300">{{ Object.values(productForm.errors).join(' · ') }}</p></div>
                 </form>
                 <div v-for="item in visibleProducts" :key="item.id" class="space-y-4 border-t border-slate-700 pt-5">
@@ -145,6 +152,11 @@ const deleteNotice = (notice) => {
                         <label class="text-sm md:col-span-3">Deskripsi<textarea v-model="item.description" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
                         <label class="flex items-center gap-2 text-sm"><input v-model="item.is_active" type="checkbox"> Produk aktif</label>
                         <label v-if="item.fulfillment_mode === 'MANUAL'" class="text-sm md:col-span-4">Instruksi internal<textarea v-model="item.manual_instructions" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
+                        <template v-if="item.fulfillment_mode === 'MANUAL'">
+                            <label class="text-sm">Jam buka<input v-model="item.manual_open_time" type="time" class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
+                            <label class="text-sm">Jam tutup<input v-model="item.manual_close_time" type="time" class="mt-1 block w-full rounded-md bg-slate-800 p-2"></label>
+                            <label class="text-sm">Zona waktu<select v-model="item.manual_timezone" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="Asia/Jakarta">WIB — Asia/Jakarta</option><option value="Asia/Makassar">WITA — Asia/Makassar</option><option value="Asia/Jayapura">WIT — Asia/Jayapura</option></select></label>
+                        </template>
                         <div class="space-y-3 rounded-md border border-slate-700 p-3 md:col-span-4">
                             <label class="flex items-center gap-2 text-sm"><input v-model="item.nickname_check_enabled" type="checkbox"> Aktifkan cek nickname</label>
                             <div v-if="item.nickname_check_enabled" class="grid gap-3 md:grid-cols-3">
