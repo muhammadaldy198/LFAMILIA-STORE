@@ -7,6 +7,7 @@ use App\Models\HomeBanner;
 use App\Models\NewsArticle;
 use App\Models\Product;
 use App\Models\ProductPackage;
+use App\Models\SitePopup;
 use App\Models\StoreAsset;
 use App\Services\CatalogAudit;
 use Illuminate\Http\RedirectResponse;
@@ -25,6 +26,7 @@ class AdminCatalogMediaController
             'package' => ProductPackage::findOrFail($id),
             'asset' => StoreAsset::findOrFail($id),
             'news' => NewsArticle::findOrFail($id),
+            'popup' => SitePopup::findOrFail($id),
             default => abort(404),
         };
     }
