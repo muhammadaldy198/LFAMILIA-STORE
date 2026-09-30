@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import CustomerShell from '../../Layouts/CustomerShell.vue';
+import CustomerShell from '../../Components/CustomerShell.vue';
 
 const props = defineProps({
     order: { type: Object, required: true },
