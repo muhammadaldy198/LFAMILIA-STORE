@@ -24,8 +24,8 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'status' => fn () => $request->session()->get('status'),
-            'auth' => function () use ($request): array {
-                $user = $request->user();
+            'auth' => function (): array {
+                $user = auth('web')->user();
                 if (! $user) {
                     return ['user' => null];
                 }
