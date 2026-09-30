@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import TurnstileWidget from '../../Components/TurnstileWidget.vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
@@ -50,6 +50,14 @@ const hideNotice = ref(false);
 const selectedSavedId = ref('');
 const turnstile = ref(null);
 const turnstileToken = ref('');
+const reviewRating = ref(5);
+const reviewTitle = ref('');
+const reviewBody = ref('');
+const reviewOrderNumber = ref('');
+const reviewPhone = ref('');
+const reviewSaving = ref(false);
+const reviewMessage = ref('');
+const reviewError = ref('');
 
 const selectedPackage = computed(() => (props.packages || []).find((item) => String(item.id) === String(selectedPackageId.value)));
 const requiredFieldsComplete = computed(() => (props.fields || []).filter((field) => field.is_required)
@@ -167,6 +175,42 @@ function nominalLabel(label, productName) {
 
 function fieldError(key) {
     return errors.value['customer_input.' + key]?.[0];
+}
+
+async function submitReview() {
+    reviewError.value = '';
+    reviewMessage.value = '';
+    if (reviewBody.value.trim().length < 5) {
+        reviewError.value = 'Ulasan minimal 5 karakter.';
+        return;
+    }
+    reviewSaving.value = true;
+    try {
+        await requestJson('/reviews', {
+            method: 'POST',
+            body: JSON.stringify({
+                product_slug: props.product.slug,
+                rating: Number(reviewRating.value),
+                title: reviewTitle.value.trim() || null,
+                body: reviewBody.value.trim(),
+                ...(props.customer ? {} : {
+                    order_number: reviewOrderNumber.value.trim().toUpperCase(),
+                    phone: normalizeWhatsapp(reviewPhone.value),
+                }),
+            }),
+        });
+        reviewTitle.value = '';
+        reviewBody.value = '';
+        reviewOrderNumber.value = '';
+        reviewPhone.value = '';
+        reviewRating.value = 5;
+        reviewMessage.value = 'Ulasanmu berhasil ditampilkan sebagai pembelian terverifikasi.';
+        router.reload({ only: ['reviews', 'reviewStats'], preserveScroll: true, preserveState: true });
+    } catch (error) {
+        reviewError.value = error.message || 'Ulasan gagal disimpan.';
+    } finally {
+        reviewSaving.value = false;
+    }
 }
 
 async function requestJson(url, options = {}) {
@@ -625,18 +669,68 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <p>{{product.description || 'Top up cepat dan aman melalui LFAMILIA STORE.'}}</p>
             </article>
 
-            <section class="lf-product-review-section">
-                <div class="lf-review-head">
-                    <div><p class="lf-eyebrow">ULASAN PELANGGAN</p><h2>Apa kata pembeli?</h2></div>
-                    <div v-if="reviewStats?.total" class="lf-review-score"><strong>{{reviewStats.average}}</strong><span>★★★★★</span><small>{{reviewStats.total}} ulasan terverifikasi</small></div>
+            <section class="lf-product-review-section lf-review-legacy">
+                <div class="lf-review-legacy-head">
+                    <div>
+                        <p class="lf-eyebrow">PENILAIAN PELANGGAN</p>
+                        <h2>Ulasan & rating</h2>
+                        <p>Ulasan hanya dapat dibuat setelah pembelian berhasil. Akun dan pembeli guest sama-sama bisa memberi ulasan terverifikasi.</p>
+                    </div>
+                    <div class="lf-review-average">
+                        <span>★</span>
+                        <strong>{{reviewStats?.total ? Number(reviewStats.average || 0).toFixed(1) : '–'}}</strong>
+                        <small>{{reviewStats?.total || 0}} ulasan</small>
+                    </div>
                 </div>
-                <div v-if="reviews?.length" class="lf-review-grid">
-                    <article v-for="review in reviews" :key="review.id">
-                        <div><strong>{{review.display_name}}</strong><span>{{'★'.repeat(review.rating)}}{{'☆'.repeat(5-review.rating)}}</span></div>
-                        <p>{{review.body}}</p>
-                    </article>
+
+                <div class="lf-review-legacy-grid">
+                    <form class="lf-review-form" @submit.prevent="submitReview">
+                        <div class="lf-review-form-intro">
+                            <span class="lf-review-message-icon">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+                            </span>
+                            <div>
+                                <h3>Bagikan pengalamanmu</h3>
+                                <p>{{customer ? 'Pembelian dari akunmu akan diverifikasi otomatis.' : 'Tidak punya akun? Verifikasi pembelian dengan invoice dan nomor kontak checkout.'}}</p>
+                            </div>
+                        </div>
+
+                        <div v-if="!customer" class="lf-review-guest-fields">
+                            <input v-model="reviewOrderNumber" required maxlength="80" placeholder="Nomor invoice, contoh LFABC123">
+                            <input :value="reviewPhone" required inputmode="tel" autocomplete="tel" maxlength="17" placeholder="Nomor kontak saat checkout" @input="reviewPhone=normalizeWhatsapp($event.target.value)">
+                            <p>Invoice harus sudah lunas dan nomor kontak harus sama dengan data transaksi. Satu invoice hanya bisa memberi satu ulasan.</p>
+                        </div>
+
+                        <div class="lf-review-stars-input">
+                            <button v-for="value in [1,2,3,4,5]" :key="value" type="button" :aria-label="value + ' bintang'" :class="{active:value<=reviewRating}" @click="reviewRating=value">★</button>
+                        </div>
+
+                        <input v-model="reviewTitle" maxlength="100" placeholder="Judul singkat (opsional)">
+                        <textarea v-model="reviewBody" required minlength="5" maxlength="1200" placeholder="Ceritakan kecepatan proses dan pengalamanmu..."></textarea>
+                        <p v-if="reviewMessage" class="lf-review-success">{{reviewMessage}}</p>
+                        <p v-if="reviewError" class="lf-review-error">{{reviewError}}</p>
+                        <button class="lf-review-submit" :disabled="reviewSaving">{{reviewSaving ? 'Menyimpan...' : 'Simpan ulasan'}}</button>
+                    </form>
+
+                    <div class="lf-review-list">
+                        <article v-for="review in reviews" :key="review.id">
+                            <div class="lf-review-card-head">
+                                <div>
+                                    <strong>{{review.display_name}}</strong>
+                                    <span v-if="review.verified_purchase" class="lf-review-verified">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 12 2 2 4-4"/><path d="M12 2l2.1 2.1 3-.1.9 2.8 2.5 1.7-1 2.8 1 2.8-2.5 1.7-.9 2.8-3-.1L12 22l-2.1-2.1-3 .1-.9-2.8-2.5-1.7 1-2.8-1-2.8L6 7.2 6.9 4l3 .1z"/></svg>
+                                        Pembelian terverifikasi
+                                    </span>
+                                </div>
+                                <span class="lf-review-rating">★ {{review.rating}}</span>
+                            </div>
+                            <h3 v-if="review.title">{{review.title}}</h3>
+                            <p>{{review.body}}</p>
+                            <time v-if="review.published_at || review.created_at">{{formatDateId(review.published_at || review.created_at)}}</time>
+                        </article>
+                        <div v-if="!reviews?.length" class="lf-review-empty">Belum ada ulasan untuk produk ini.</div>
+                    </div>
                 </div>
-                <div v-else class="lf-empty">Belum ada ulasan untuk produk ini.</div>
             </section>
 
             <section v-if="faqs?.length" class="lf-product-faq">
