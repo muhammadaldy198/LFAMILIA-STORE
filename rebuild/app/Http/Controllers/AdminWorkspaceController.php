@@ -334,16 +334,18 @@ class AdminWorkspaceController
     public function support(): Response
     {
         $rows = DB::table('support_tickets as tickets')
-            ->join('users', 'users.id', '=', 'tickets.user_id')
+            ->leftJoin('users', 'users.id', '=', 'tickets.user_id')
             ->leftJoin('orders', 'orders.id', '=', 'tickets.order_id')
             ->orderByDesc('tickets.id')->limit(150)
             ->get([
                 'tickets.id', 'tickets.user_id', 'tickets.subject', 'tickets.message', 'tickets.status',
                 'tickets.created_at', 'users.name as customer_name', 'users.email',
-                'orders.order_number',
+                'orders.order_number', 'orders.guest_email',
             ])->map(function (object $ticket): array {
                 return [
                     ...((array) $ticket),
+                    'customer_name' => $ticket->customer_name ?? 'Guest',
+                    'email' => $ticket->email ?? $ticket->guest_email,
                     'messages' => DB::table('support_ticket_messages as messages')
                         ->leftJoin('users', 'users.id', '=', 'messages.user_id')
                         ->leftJoin('admin_users', 'admin_users.id', '=', 'messages.admin_user_id')
@@ -399,7 +401,8 @@ class AdminWorkspaceController
         if ($reply !== '') {
             $email = DB::table('support_tickets as tickets')
                 ->join('users', 'users.id', '=', 'tickets.user_id')
-                ->where('tickets.id', $id)->value('users.email');
+                ->leftJoin('orders', 'orders.id', '=', 'tickets.order_id')
+                ->where('tickets.id', $id)->value(DB::raw('COALESCE(users.email, orders.guest_email)'));
             if (is_string($email) && $email !== '') {
                 $emails->queue(
                     $email,
