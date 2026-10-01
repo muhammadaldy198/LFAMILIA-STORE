@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -56,7 +58,7 @@ class PublicOrderTrackingController
                 'orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr', 'orders.created_at',
                 'products.name as product_name', 'product_packages.name as package_name',
             ])->map(fn (object $order): array => [
-                'referenceId' => $order->order_number,
+                'trackingToken' => $this->trackingToken((int) $order->id, false),
                 'maskedReferenceId' => $this->maskReference((string) $order->order_number),
                 'productName' => $order->product_name,
                 'packageLabel' => $order->package_name,
@@ -69,13 +71,20 @@ class PublicOrderTrackingController
             ->header('Cache-Control', 'no-store, private');
     }
 
-    public function status(string $orderNumber): JsonResponse
+    public function status(Request $request): JsonResponse
     {
-        $order = $this->orderByNumber(strtoupper($orderNumber));
+        $data = $request->validate([
+            'tracking_token' => ['required', 'string', 'max:1200'],
+        ]);
+        $token = $this->trackingTokenData($data['tracking_token']);
+        abort_unless($token, 404);
+
+        $order = $this->orderById($token['id']);
         abort_unless($order, 404);
 
-        return response()->json(['order' => $this->publicOrder($order)])
-            ->header('Cache-Control', 'no-store, private');
+        return response()->json([
+            'order' => $this->publicOrder($order, $token['reveal_reference']),
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     public function feed(): JsonResponse
@@ -99,7 +108,22 @@ class PublicOrderTrackingController
             )->first();
     }
 
-    private function publicOrder(object $order): array
+    private function orderById(int $orderId): ?object
+    {
+        return DB::table('orders')
+            ->join('products', 'products.id', '=', 'orders.product_id')
+            ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
+            ->leftJoin('payment_channels', 'payment_channels.id', '=', 'orders.payment_channel_id')
+            ->where('orders.id', $orderId)
+            ->select(
+                'orders.id', 'orders.order_number', 'orders.status', 'orders.customer_input',
+                'orders.total_idr', 'orders.created_at', 'orders.updated_at',
+                'products.name as product_name', 'product_packages.name as package_name',
+                'payment_channels.name as payment_channel_name'
+            )->first();
+    }
+
+    private function publicOrder(object $order, bool $revealReference = true): array
     {
         $payment = DB::table('payment_transactions')->where('order_id', $order->id)
             ->orderByDesc('id')->first(['status']);
@@ -114,7 +138,11 @@ class PublicOrderTrackingController
             ])->values()->all();
 
         return [
-            'referenceId' => $order->order_number,
+            'referenceId' => $revealReference
+                ? $order->order_number
+                : $this->maskReference((string) $order->order_number),
+            'referenceMasked' => ! $revealReference,
+            'trackingToken' => $this->trackingToken((int) $order->id, $revealReference),
             'productName' => $order->product_name,
             'packageLabel' => $order->package_name,
             'destination' => $this->maskedDestination($order->customer_input),
@@ -176,6 +204,36 @@ class PublicOrderTrackingController
         }
 
         return array_values(array_unique(['62'.$local, '0'.$local, $local]));
+    }
+
+    private function trackingToken(int $orderId, bool $revealReference): string
+    {
+        return Crypt::encryptString(json_encode([
+            'id' => $orderId,
+            'reveal_reference' => $revealReference,
+        ], JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @return array{id:int,reveal_reference:bool}|null
+     */
+    private function trackingTokenData(string $token): ?array
+    {
+        try {
+            $payload = json_decode(Crypt::decryptString($token), true, 8, JSON_THROW_ON_ERROR);
+        } catch (DecryptException | \JsonException) {
+            return null;
+        }
+
+        $orderId = filter_var($payload['id'] ?? null, FILTER_VALIDATE_INT);
+        if (! $orderId || $orderId < 1) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $orderId,
+            'reveal_reference' => (bool) ($payload['reveal_reference'] ?? false),
+        ];
     }
 
     private function maskReference(string $reference): string
