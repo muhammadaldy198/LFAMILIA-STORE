@@ -133,7 +133,7 @@ class PublicOrderTrackingController
         return DB::table('orders')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
-            ->whereIn('orders.status', ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'EXPIRED'])
+            ->whereIn('orders.status', ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'EXPIRED', 'CANCELLED', 'REFUNDED'])
             ->orderByDesc('orders.id')->limit(20)
             ->get([
                 'orders.order_number', 'orders.status', 'orders.total_idr', 'orders.created_at',
@@ -218,7 +218,7 @@ class PublicOrderTrackingController
             'PROCESSING' => 'processing',
             'SUCCESS' => 'success',
             'EXPIRED' => 'expired',
-            'CANCELLED' => 'failed',
+            'CANCELLED' => 'cancelled',
             'REFUNDED' => 'refunded',
             default => 'failed',
         };
@@ -233,7 +233,10 @@ class PublicOrderTrackingController
         if (in_array($payment, ['EXPIRE', 'EXPIRED'], true) || strtoupper($orderStatus) === 'EXPIRED') {
             return 'expired';
         }
-        if (in_array($payment, ['DENY', 'CANCEL', 'FAILED'], true)) {
+        if (in_array($payment, ['CANCEL', 'CANCELLED'], true) || strtoupper($orderStatus) === 'CANCELLED') {
+            return 'cancelled';
+        }
+        if (in_array($payment, ['DENY', 'DENIED', 'FAILED', 'REJECTED'], true) || strtoupper($orderStatus) === 'FAILED') {
             return 'failed';
         }
 
@@ -269,6 +272,7 @@ class PublicOrderTrackingController
                 'SUCCESS' => 'Pesanan berhasil',
                 'FAILED' => 'Transaksi gagal',
                 'EXPIRED' => 'Pembayaran kedaluwarsa',
+                'CANCELLED' => 'Transaksi dibatalkan',
                 default => str_replace('_', ' ', ucfirst(strtolower($toStatus))),
             };
         }
