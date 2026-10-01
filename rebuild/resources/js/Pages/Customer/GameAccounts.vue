@@ -19,6 +19,7 @@ function csrf() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 }
 function reset() {
+    if (busy.value) return;
     editingId.value = null;
     selectedProductId.value = '';
     label.value = '';
@@ -29,6 +30,7 @@ function chooseProduct() {
     Object.keys(values).forEach((key) => { if (!keep.has(key)) delete values[key]; });
 }
 function edit(account) {
+    if (busy.value) return;
     editingId.value = account.id;
     selectedProductId.value = String(account.product_id);
     label.value = account.label;
@@ -38,6 +40,7 @@ function edit(account) {
     error.value = '';
 }
 async function save() {
+    if (busy.value) return;
     error.value = '';
     message.value = '';
     if (!selectedProduct.value) { error.value = 'Pilih game terlebih dahulu.'; return; }
@@ -65,6 +68,7 @@ async function save() {
     }
 }
 async function remove(account) {
+    if (busy.value) return;
     if (!confirm('Hapus akun game tersimpan ini?')) return;
     busy.value = true;
     error.value = '';
