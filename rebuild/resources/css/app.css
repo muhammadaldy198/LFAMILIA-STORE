@@ -4194,6 +4194,7 @@
 @media(max-width:639px){
   /* The legacy banner is full-bleed after its -mx-4 + calc(100% + 2rem) combination. */
   .lf-product-hero{
+    position:relative!important;
     width:100vw!important;
     max-width:none!important;
     margin:8px calc(50% - 50vw) 0!important;
