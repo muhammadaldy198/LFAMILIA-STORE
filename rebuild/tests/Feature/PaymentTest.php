@@ -7,16 +7,19 @@ use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
+use App\Models\StoreAsset;
 use App\Models\User;
 use App\Services\Payment\DokuSignature;
 use App\Services\PaymentRoutingService;
 use App\Services\PaymentStateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -156,6 +159,47 @@ class PaymentTest extends TestCase
         $this->assertSame(11500, (int) $order->total_idr);
         $this->assertSame('manual_qris', $snapshot['payment']['channel_code']);
         $this->assertSame('MANUAL_QRIS', $snapshot['payment']['gateway_code']);
+    }
+
+    public function test_manual_qris_pending_alert_is_created_only_after_qr_payment_is_ready(): void
+    {
+        Storage::fake(config('media-library.disk_name', 'public'));
+        $catalog = $this->catalog();
+        $this->route('manual_qris', 'MANUAL_QRIS', 500);
+
+        $assetId = DB::table('store_assets')->insertGetId([
+            'key' => 'manual_qris',
+            'target_url' => null,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $asset = StoreAsset::findOrFail($assetId);
+        $asset->addMedia(UploadedFile::fake()->image('manual-qris.png', 600, 600))
+            ->toMediaCollection('image', config('media-library.disk_name', 'public'));
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'manual_qris',
+            'stage-8-2-manual-order-0001'
+        ))->assertCreated();
+
+        $this->assertSame(0, DB::table('admin_notifications')
+            ->where('event_type', 'payment.manual_qris.pending')->count());
+
+        $payload = [
+            'idempotency_key' => 'stage-8-2-manual-payment-0001',
+            'access_code' => $checkout->json('access_code'),
+        ];
+        $first = $this->postJson('/payments/orders/'.$checkout->json('order_number'), $payload)->assertOk();
+        $second = $this->postJson('/payments/orders/'.$checkout->json('order_number'), $payload)->assertOk();
+
+        $first->assertJsonPath('status', 'PENDING')
+            ->assertJsonPath('instructions.kind', 'manual_qris');
+        $this->assertNotEmpty($first->json('instructions.qr_url'));
+        $this->assertSame($first->json('payment_id'), $second->json('payment_id'));
+        $this->assertSame(1, DB::table('admin_notifications')
+            ->where('event_type', 'payment.manual_qris.pending')->count());
     }
 
     public function test_payment_page_ignores_redirect_status_query_and_uses_server_state(): void
