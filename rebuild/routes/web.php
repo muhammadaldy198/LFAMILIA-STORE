@@ -81,7 +81,7 @@ Route::middleware('throttle:guest-order')->group(function (): void {
     Route::post('/orders/check', [GuestOrderController::class, 'verify'])->name('guest.orders.verify');
     Route::post('/orders/track/search', [PublicOrderTrackingController::class, 'search'])->name('guest.orders.track.search');
     Route::get('/orders/track/feed', [PublicOrderTrackingController::class, 'feed'])->name('guest.orders.track.feed');
-    Route::get('/orders/track/status/{orderNumber}', [PublicOrderTrackingController::class, 'status'])->name('guest.orders.track.status');
+    Route::post('/orders/track/status', [PublicOrderTrackingController::class, 'status'])->name('guest.orders.track.status');
     Route::post('/reviews', [ProductReviewController::class, 'store'])->name('reviews.store');
 });
 Route::get('/orders/guest/{orderNumber}', [GuestOrderController::class, 'show'])
