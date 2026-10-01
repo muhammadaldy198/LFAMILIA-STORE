@@ -13,7 +13,7 @@ const detail=ref(null);
 const feed=ref([...(props.transactions||[])]);
 const copied=ref(false);
 let detailTimer=null,feedTimer=null;
-let detailRefreshing=false;
+const detailRefreshing=ref(false);
 let disposed=false;
 let selectionVersion=0;
 
@@ -68,15 +68,15 @@ async function openOrder(trackingToken){
  finally{if(!disposed&&version===selectionVersion)loading.value=false;}
 }
 async function refreshDetail(){
- if(!detail.value?.trackingToken||detailRefreshing||disposed)return;
+ if(!detail.value?.trackingToken||detailRefreshing.value||disposed)return;
  const token=detail.value.trackingToken;
  const version=selectionVersion;
- detailRefreshing=true;
+ detailRefreshing.value=true;
  try{
   const data=await json('/orders/track/status',{method:'POST',body:JSON.stringify({tracking_token:token})});
   if(disposed||version!==selectionVersion||detail.value?.trackingToken!==token)return;
   detail.value=data.order;if(terminal.value)stopDetailPolling();
- }catch{}finally{detailRefreshing=false;}
+ }catch{}finally{detailRefreshing.value=false;}
 }
 async function refreshFeed(){
  try{const data=await json('/orders/track/feed');feed.value=data.transactions||feed.value;}catch{}
