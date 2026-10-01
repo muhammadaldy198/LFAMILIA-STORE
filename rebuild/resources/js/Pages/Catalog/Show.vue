@@ -1112,8 +1112,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <dl class="lf-mobile-summary-lines">
                     <div><dt>Harga Satuan</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
                     <div><dt>Subtotal</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
-                    <div v-if="confirmationSnapshot.quote.member_discount_idr"><dt>Diskon {{confirmationSnapshot.quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(confirmationSnapshot.quote.member_discount_idr)}}</dd></div>
-                    <div v-if="confirmationSnapshot.quote.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(confirmationSnapshot.quote.voucher_discount_idr)}}</dd></div>
+                    <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(quote.member_discount_idr)}}</dd></div>
+                    <div v-if="quote?.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
                     <div><dt>Biaya Pembayaran</dt><dd>{{summaryFee===null ? '—' : formatIdr(summaryFee)}}</dd></div>
                     <div class="total"><dt>Total Pembayaran</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
                 </dl>
@@ -1202,8 +1202,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <div><dt>WhatsApp</dt><dd>{{confirmationSnapshot.phone || '-'}}</dd></div>
                 <div v-if="confirmationSnapshot.voucher_code"><dt>Voucher</dt><dd>{{confirmationSnapshot.voucher_code}}</dd></div>
                 <div><dt>Subtotal</dt><dd>{{formatIdr(confirmationSnapshot.quote.subtotal_idr)}}</dd></div>
-                <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(quote.member_discount_idr)}}</dd></div>
-                <div v-if="quote?.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
+                <div v-if="confirmationSnapshot.quote.member_discount_idr"><dt>Diskon {{confirmationSnapshot.quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(confirmationSnapshot.quote.member_discount_idr)}}</dd></div>
+                <div v-if="confirmationSnapshot.quote.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(confirmationSnapshot.quote.voucher_discount_idr)}}</dd></div>
                 <div><dt>Biaya Pembayaran</dt><dd>{{formatIdr(confirmationSnapshot.quote.fee_idr)}}</dd></div>
                 <div class="total"><dt>Total Bayar</dt><dd>{{formatIdr(confirmationSnapshot.quote.total_idr)}}</dd></div>
             </dl>
