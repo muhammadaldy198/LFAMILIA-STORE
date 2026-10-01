@@ -18,6 +18,8 @@ if [[ -z "${CHROME_BIN}" ]]; then
   exit 1
 fi
 
+php tests/Browser/fixture.php >/tmp/lfamilia-browser-fixture.log
+
 php artisan serve --host=127.0.0.1 --port=8000 >"${LOG_FILE}" 2>&1 &
 SERVER_PID=$!
 
@@ -35,20 +37,39 @@ done
 assert_page() {
   local path="$1"
   local expected="$2"
+  local width="$3"
+  local height="$4"
   local output
-  output="$("${CHROME_BIN}"     --headless=new     --no-sandbox     --disable-gpu     --disable-dev-shm-usage     --virtual-time-budget=3000     --dump-dom "${APP_URL}${path}" 2>/dev/null)"
+  output="$("$CHROME_BIN" \
+    --headless=new \
+    --no-sandbox \
+    --disable-gpu \
+    --disable-dev-shm-usage \
+    --window-size="$width,$height" \
+    --virtual-time-budget=3000 \
+    --dump-dom "$APP_URL$path" 2>/dev/null)"
 
-  if ! grep -Fq "${expected}" <<<"${output}"; then
-    echo "Browser smoke failed for ${path}; expected: ${expected}"
-    cat "${LOG_FILE}"
+  if ! grep -Fq "$expected" <<<"$output"; then
+    echo "Browser smoke failed for $path at $width x $height; expected: $expected"
+    cat "$LOG_FILE"
     exit 1
   fi
 }
 
-assert_page "/" "LFAMILIA STORE"
-assert_page "/login" "Masuk LFAMILIA"
-assert_page "/register" "Daftar LFAMILIA"
-assert_page "/orders/check" "Cek status pesananmu"
-assert_page "/admin/login" "Admin LFAMILIA"
+assert_page "/" "LFAMILIA STORE" 1440 1000
+assert_page "/login" "Masuk LFAMILIA" 1440 1000
+assert_page "/register" "Daftar LFAMILIA" 1440 1000
+assert_page "/orders/check" "Cek status pesananmu" 1440 1000
+assert_page "/admin/login" "Admin LFAMILIA" 1440 1000
+
+
+# Stage 7.8: render the real customer checkout page at desktop and mobile sizes.
+assert_page "/catalog/browser-checkout-game" "Browser Checkout Game" 1440 1000
+assert_page "/catalog/browser-checkout-game" "Data Akun" 1440 1000
+assert_page "/catalog/browser-checkout-game" "Pilih Nominal" 1440 1000
+assert_page "/catalog/browser-checkout-game" "Metode Pembayaran" 1440 1000
+assert_page "/catalog/browser-checkout-game" "100 Diamonds" 1440 1000
+assert_page "/catalog/browser-checkout-game" "Total Pembayaran" 390 844
+assert_page "/catalog/browser-checkout-game" "Pakai Voucher" 390 844
 
 echo "M11 browser smoke passed."
