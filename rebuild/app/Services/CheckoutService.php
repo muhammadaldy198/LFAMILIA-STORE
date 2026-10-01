@@ -355,6 +355,7 @@ class CheckoutService
             $result['order']->id,
             ['order_number' => $result['order']->order_number]
         );
+
         return [
             'order' => $result['order'],
             'access_code' => $accessCode,
