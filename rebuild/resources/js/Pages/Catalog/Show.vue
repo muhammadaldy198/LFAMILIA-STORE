@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import TurnstileWidget from '../../Components/TurnstileWidget.vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 
@@ -45,6 +45,7 @@ const voucherError = ref('');
 const confirmOpen = ref(false);
 const agreed = ref(false);
 const summaryOpen = ref(false);
+const checkoutBarVisible = ref(true);
 const noticeOpen = ref(false);
 const noticeIndex = ref(0);
 const hideNotice = ref(false);
@@ -153,6 +154,16 @@ function closeNotice() {
         );
     }
     noticeOpen.value = false;
+}
+
+function updateCheckoutBarVisibility() {
+    if (window.innerWidth >= 640) {
+        checkoutBarVisible.value = true;
+        return;
+    }
+    const main = document.querySelector('.lf-checkout-page');
+    if (!main) return;
+    checkoutBarVisible.value = main.getBoundingClientRect().bottom > window.innerHeight + 8;
 }
 
 function newIdempotencyKey() {
@@ -417,6 +428,10 @@ async function createOrder() {
 }
 
 onMounted(() => {
+    updateCheckoutBarVisibility();
+    window.addEventListener('scroll', updateCheckoutBarVisibility, { passive: true });
+    window.addEventListener('resize', updateCheckoutBarVisibility);
+
     const preferredGroups = ['qris', 'ewallet', 'va', 'retail', 'other', 'wallet'];
     if (!paymentChannelCode.value) {
         for (const key of preferredGroups) {
@@ -436,6 +451,11 @@ onMounted(() => {
         const hiddenUntil = Number(window.localStorage.getItem(key) || 0);
         noticeOpen.value = hiddenUntil < Date.now();
     }
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('scroll', updateCheckoutBarVisibility);
+    window.removeEventListener('resize', updateCheckoutBarVisibility);
 });
 
 watch([guestEmail, guestPhone], () => {
@@ -785,7 +805,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
         </section>
     </div>
 
-    <div v-if="activeTab==='transaction'" class="lf-mobile-checkout-bar">
+    <div v-if="activeTab==='transaction'" class="lf-mobile-checkout-bar" :class="{'is-hidden': !checkoutBarVisible}">
         <div class="lf-mobile-checkout-inner">
             <div v-if="summaryOpen" class="lf-mobile-summary-card">
                 <button type="button" class="lf-mobile-summary-head" aria-expanded="true" @click="summaryOpen=false">
