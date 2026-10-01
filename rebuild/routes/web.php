@@ -19,6 +19,7 @@ use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\CustomerPhoneController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\GuestOrderController;
+use App\Http\Controllers\GuestSupportController;
 use App\Http\Controllers\LegacyFrontendController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentPageController;
@@ -42,6 +43,10 @@ Route::get('/news', [PublicContentController::class, 'news'])->name('content.new
 Route::get('/news/{slug}', [PublicContentController::class, 'article'])->name('content.article');
 Route::get('/faq', [PublicContentController::class, 'faq'])->name('content.faq');
 Route::get('/contact', [PublicContentController::class, 'contact'])->name('content.contact');
+Route::get('/support', [GuestSupportController::class, 'index'])->name('guest.support');
+Route::post('/support/verify', [GuestSupportController::class, 'verify'])->middleware('throttle:support-ticket')->name('guest.support.verify');
+Route::post('/support', [GuestSupportController::class, 'store'])->middleware('throttle:support-ticket')->name('guest.support.store');
+Route::post('/support/{ticket}/messages', [GuestSupportController::class, 'reply'])->middleware('throttle:support-ticket')->name('guest.support.reply');
 Route::get('/terms', [PublicContentController::class, 'terms'])->name('content.terms');
 Route::get('/refund', [PublicContentController::class, 'refund'])->name('content.refund');
 Route::get('/privacy', [PublicContentController::class, 'privacy'])->name('content.privacy');
