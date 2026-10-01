@@ -11,7 +11,7 @@ const statuses=[
 </script>
 <template>
 <Head title="Pertanyaan Umum"/>
-<CustomerShell>
+<CustomerShell hide-support-cta>
 <main class="lf-faq-page">
  <section class="lf-faq-hero">
   <div class="lf-container">
