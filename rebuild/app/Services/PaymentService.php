@@ -18,6 +18,7 @@ class PaymentService
         private readonly MidtransGateway $midtrans,
         private readonly DokuDirectGateway $doku,
         private readonly ManualQrisGateway $manualQris,
+        private readonly AdminNotificationService $notifications,
     ) {}
 
     /**
@@ -272,6 +273,19 @@ class PaymentService
                 ? null : json_encode($result['gateway_payload'], JSON_THROW_ON_ERROR),
             'updated_at' => now(),
         ]);
+
+        if ($route['gateway_code'] === 'MANUAL_QRIS' && $result['status'] === 'PENDING' && $payment->order_id !== null) {
+            $orderNumber = DB::table('orders')->where('id', $payment->order_id)->value('order_number');
+            $this->notifications->record(
+                'payment.manual_qris.pending',
+                'QRIS manual menunggu konfirmasi',
+                'Order '.($orderNumber ?: '#'.$payment->order_id).' sudah menampilkan QRIS manual dan menunggu verifikasi pembayaran.',
+                'WARNING',
+                'order',
+                $payment->order_id,
+                ['payment_id' => (int) $payment->id, 'order_number' => $orderNumber]
+            );
+        }
 
         return $this->publicResult(DB::table('payment_transactions')->where('id', $payment->id)->first());
     }
