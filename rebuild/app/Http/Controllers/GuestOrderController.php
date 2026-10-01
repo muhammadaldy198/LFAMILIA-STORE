@@ -50,7 +50,7 @@ class GuestOrderController
                 'orders.created_at', 'orders.delivery_payload', 'products.name as product_name', 'products.slug as product_slug')->first();
 
         abort_unless($order, 404);
-        $order->delivery = is_string($order->delivery_payload)
+        $order->delivery = $order->status === 'SUCCESS' && is_string($order->delivery_payload)
             ? (json_decode($order->delivery_payload, true) ?: null) : null;
         unset($order->delivery_payload);
 
