@@ -522,7 +522,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
         <div v-if="activeTab==='transaction'" class="lf-checkout-grid">
             <div class="lf-checkout-panels">
                 <section v-if="hasAccountStep" class="lf-checkout-panel lf-checkout-account-panel">
-                    <header><span>1</span><div><h2>Masukkan Data Akun</h2><p>Isi ID tujuan dengan benar. Nickname diperiksa otomatis jika didukung.</p></div></header>
+                    <header><div><h2>Masukkan Data Akun</h2><p>Isi ID tujuan dengan benar. Nickname diperiksa otomatis jika didukung.</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-account-product-mobile">
                             <span class="lf-account-product-art">
@@ -575,7 +575,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-nominal-panel">
-                    <header><span>{{nominalStep}}</span><div><h2>Pilih Nominal</h2><p>{{product.checkout_nominal_description || 'Pesanan diproses otomatis setelah pembayaran.'}}</p></div></header>
+                    <header><div><h2>Pilih Nominal</h2><p>{{product.checkout_nominal_description || 'Pesanan diproses otomatis setelah pembayaran.'}}</p></div></header>
                     <div class="lf-panel-body lf-package-sections">
                         <section v-for="group in packageGroups" :key="group.name || 'all'">
                             <div v-if="group.name" class="lf-package-group-head"><h3>{{group.name}}</h3><span></span></div>
@@ -593,7 +593,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-payment-panel">
-                    <header><span>{{paymentStep}}</span><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang ingin digunakan.</p></div></header>
+                    <header><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang ingin digunakan.</p></div></header>
                     <div class="lf-panel-body lf-payment-groups">
                         <div v-if="!paymentChannels?.length" class="lf-payment-unavailable">
                             Belum ada metode pembayaran aktif.
@@ -658,7 +658,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-contact-panel">
-                    <header><span>{{contactStep}}</span><div><h2>Data Pembeli</h2><p>Email dan WhatsApp digunakan untuk invoice serta status transaksi.</p></div></header>
+                    <header><div><h2>Data Pembeli</h2><p>Email dan WhatsApp digunakan untuk invoice serta status transaksi.</p></div></header>
                     <div class="lf-panel-body">
                         <div v-if="!customer" class="lf-account-fields">
                             <label><span>Email</span><input v-model="guestEmail" type="email" maxlength="255" placeholder="nama@email.com"></label>
@@ -673,7 +673,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-promo-panel">
-                    <header><span>{{promoStep}}</span><div><h2>Kode Promo</h2><p>Masukkan kode promo atau voucher diskon yang tersedia.</p></div></header>
+                    <header><div><h2>Kode Promo</h2><p>Masukkan kode promo atau voucher diskon yang tersedia.</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-promo-input">
                             <input :value="voucherCode" maxlength="100" placeholder="Ketik kode promo kamu" @input="voucherCode=normalizePromo($event.target.value)">
