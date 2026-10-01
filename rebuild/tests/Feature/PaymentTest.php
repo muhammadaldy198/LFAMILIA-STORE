@@ -801,8 +801,19 @@ class PaymentTest extends TestCase
         $this->postJson('/payments/orders/'.$checkout->json('order_number'), $payload)
             ->assertOk()->assertJsonPath('status', 'UNKNOWN');
 
-        Http::assertSentCount(1);
         $orderId = DB::table('orders')->where('order_number', $checkout->json('order_number'))->value('id');
+        $paymentId = DB::table('payment_transactions')->where('order_id', $orderId)->value('id');
+
+        $this->get('/payment?invoice='.urlencode((string) $checkout->json('order_number')).'&resume=1&transaction_status=settlement')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Payment/Show')
+                ->where('order.status', 'PENDING_PAYMENT')
+                ->where('payment.id', $paymentId)
+                ->where('payment.status', 'UNKNOWN')
+            );
+
+        Http::assertSentCount(1);
         $this->assertSame(1, DB::table('payment_transactions')->where('order_id', $orderId)->count());
     }
 
