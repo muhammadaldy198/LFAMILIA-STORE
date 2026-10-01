@@ -5689,3 +5689,34 @@
 
 /* Navigation remains left-aligned independently of global action-button geometry. */
 .lf-customer .lf-account-nav a,.lf-customer .lf-account-nav button,.lf-customer .lf-account-nav .lf-account-logout{justify-content:flex-start!important;text-align:left!important}
+
+/* FAQ readability: shared sizing on the FAQ page and product FAQ sections. */
+.lf-customer.lf-customer.lf-customer{
+ --lf-faq-title:22px;--lf-faq-question:16px;--lf-faq-answer:15px;
+}
+.lf-customer.lf-customer.lf-customer .lf-faq-hero h1,
+.lf-customer.lf-customer.lf-customer .lf-faq-layout h2,
+.lf-customer.lf-customer.lf-customer .lf-product-faq h2,
+.lf-customer.lf-customer.lf-customer .lf-product-faq-legacy h2{
+ font-size:var(--lf-faq-title)!important;line-height:1.35!important;
+}
+.lf-customer.lf-customer.lf-customer .lf-faq summary,
+.lf-customer.lf-customer.lf-customer .lf-faq-questions summary,
+.lf-customer.lf-customer.lf-customer .lf-product-faq summary,
+.lf-customer.lf-customer.lf-customer .lf-product-faq-legacy summary{
+ font-size:var(--lf-faq-question)!important;line-height:1.5!important;
+ text-align:left;overflow-wrap:anywhere;
+}
+.lf-customer.lf-customer.lf-customer .lf-faq details p,
+.lf-customer.lf-customer.lf-customer .lf-faq>p,
+.lf-customer.lf-customer.lf-customer .lf-faq-questions details p,
+.lf-customer.lf-customer.lf-customer .lf-product-faq details p,
+.lf-customer.lf-customer.lf-customer .lf-product-faq-legacy details p{
+ font-size:var(--lf-faq-answer)!important;line-height:1.7!important;
+ text-align:left;overflow-wrap:anywhere;
+}
+@media(min-width:640px){
+ .lf-customer.lf-customer.lf-customer{
+  --lf-faq-title:28px;--lf-faq-question:18px;--lf-faq-answer:17px;
+ }
+}
