@@ -196,7 +196,6 @@ class StorefrontParityTest extends TestCase
         $this->assertStringNotContainsString('PARITY-SKU', $response->getContent());
     }
 
-
     public function test_public_tracker_masks_refunds_and_keeps_internal_events_private(): void
     {
         $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.163']);
