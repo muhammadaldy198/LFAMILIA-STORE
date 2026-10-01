@@ -3244,7 +3244,15 @@
     stroke-linejoin:round!important;
   }
 
-  /* Promo controls exactly follow checkout mobile density. */
+  /* Promo controls keep checkout geometry but use the homepage palette. */
+  .lf-checkout-promo-panel{
+    border-color:var(--lf-line)!important;
+    background:
+      radial-gradient(circle at 100% 0,rgba(24,119,255,.055),transparent 38%),
+      var(--lf-panel)!important;
+  }
+  .lf-checkout-promo-panel>header h2{color:#f5f8ff!important}
+  .lf-checkout-promo-panel>header p{color:var(--lf-muted)!important}
   .lf-checkout-promo-panel>.lf-panel-body{
     padding-top:10px!important;
   }
@@ -3255,25 +3263,50 @@
     height:30.4px!important;
     min-height:30.4px!important;
     padding:3.2px 9.6px!important;
+    border:1px solid var(--lf-line)!important;
     border-radius:5.6px!important;
+    background:#080c12!important;
+    color:#fff!important;
+    caret-color:var(--lf-lime)!important;
     font-size:12.16px!important;
     line-height:16px!important;
     text-transform:uppercase!important;
     font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace!important;
+  }
+  .lf-promo-input input::placeholder{
+    color:rgba(235,242,255,.26)!important;
+  }
+  .lf-promo-input input:focus{
+    border-color:var(--lf-blue)!important;
+    box-shadow:0 0 0 3px rgba(24,119,255,.10)!important;
   }
   .lf-promo-input button,
   .lf-available-promo{
     height:30.4px!important;
     min-height:30.4px!important;
     padding:0 10.4px!important;
+    border:1px solid var(--lf-lime)!important;
     border-radius:6px!important;
+    background:var(--lf-lime)!important;
+    color:#071006!important;
     font-size:11px!important;
+    font-weight:900!important;
+  }
+  .lf-promo-input button:disabled{
+    opacity:1!important;
+    border-color:rgba(158,229,45,.20)!important;
+    background:rgba(158,229,45,.16)!important;
+    color:rgba(201,255,104,.46)!important;
+    cursor:not-allowed!important;
   }
   .lf-available-promo{
     display:inline-flex!important;
     align-items:center!important;
     gap:5.6px!important;
     margin-top:10px!important;
+  }
+  .lf-available-promo:hover{
+    background:var(--lf-lime-2)!important;
   }
   .lf-available-promo svg{
     width:14px!important;
@@ -3283,6 +3316,11 @@
     stroke-width:2!important;
     stroke-linecap:round!important;
     stroke-linejoin:round!important;
+  }
+  .lf-checkout-promo-panel .lf-success-note{
+    border:1px solid rgba(158,229,45,.22)!important;
+    background:rgba(158,229,45,.07)!important;
+    color:var(--lf-lime-2)!important;
   }
 
   /* Fixed mobile summary from data-lf-mobile-checkout. */
