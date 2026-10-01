@@ -108,6 +108,38 @@ class StorefrontParityTest extends TestCase
         ]);
     }
 
+    public function test_guest_delivery_is_only_visible_after_success_on_page_and_polling(): void
+    {
+        $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.165']);
+        $catalog = $this->catalog();
+        $orderId = $this->guestOrder($catalog['product'], $catalog['package_id'], 'LF261001-DELIVERY');
+        DB::table('orders')->where('id', $orderId)->update([
+            'status' => 'PROCESSING',
+            'delivery_payload' => json_encode(['code' => 'PRIVATE-DELIVERY-CODE']),
+        ]);
+
+        $this->withSession(['guest_order_id' => $orderId])
+            ->get('/orders/guest/LF261001-DELIVERY')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Guest/OrderStatus')
+                ->where('order.delivery', null)
+            );
+        $this->getJson('/orders/guest/LF261001-DELIVERY/events')
+            ->assertOk()->assertJsonPath('order.delivery', null);
+
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'SUCCESS']);
+        $this->get('/orders/guest/LF261001-DELIVERY')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('order.delivery.code', 'PRIVATE-DELIVERY-CODE')
+            );
+        $this->getJson('/orders/guest/LF261001-DELIVERY/events')
+            ->assertOk()->assertJsonPath('order.delivery.code', 'PRIVATE-DELIVERY-CODE');
+        $this->withSession(['guest_order_id' => $orderId + 1])
+            ->get('/orders/guest/LF261001-DELIVERY')->assertNotFound();
+    }
+
     public function test_footer_assets_and_customer_product_parity_are_available_without_internal_data(): void
     {
         $catalog = $this->catalog();
