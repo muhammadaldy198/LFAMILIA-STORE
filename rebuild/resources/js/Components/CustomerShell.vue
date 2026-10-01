@@ -5,6 +5,7 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 defineProps({
     logoUrl: { type: String, default: '' },
     compactFooter: { type: Boolean, default: false },
+    hideSupportCta: { type: Boolean, default: false },
 });
 
 const page = usePage();
@@ -230,7 +231,7 @@ function supportHref(kind) {
 
     <slot />
 
-    <section v-if="!compactFooter && storefront.supportCtaEnabled !== false" class="lf-support-cta">
+    <section v-if="!compactFooter && !hideSupportCta && storefront.supportCtaEnabled !== false" class="lf-support-cta">
         <div class="lf-container lf-support-cta-inner">
             <div>
                 <p class="lf-eyebrow">{{storefront.supportCtaLabel || 'BUTUH BANTUAN?'}}</p>
