@@ -206,7 +206,7 @@
   .lf-step-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lf-help{align-items:flex-start;flex-direction:column}
   .lf-footer-banner img{min-height:72px;object-fit:cover}.lf-footer-grid{grid-template-columns:1fr 1fr;gap:28px 18px;padding:36px 0}.lf-footer-brand-column{grid-column:1/-1}.lf-footer ul{gap:14px}
   .lf-live-support{right:14px;bottom:76px}.lf-support-trigger{width:51px;height:51px}
-  .lf-content-page{padding-top:32px;padding-bottom:48px}.lf-content-hero{padding:18px}.lf-content-hero>span{width:42px;height:42px}.lf-article h1,.lf-legal h1{font-size:27px}.lf-contact-grid{grid-template-columns:1fr}.lf-tool-fields{grid-template-columns:1fr}.lf-promo-grid{grid-template-columns:1fr}
+  .lf-content-page{min-height:0;padding-top:32px;padding-bottom:48px}.lf-content-hero{padding:18px}.lf-content-hero>span{width:42px;height:42px}.lf-article h1,.lf-legal h1{font-size:27px}.lf-contact-grid{grid-template-columns:1fr}.lf-tool-fields{grid-template-columns:1fr}.lf-promo-grid{grid-template-columns:1fr}
   .lf-product-hero{height:210px}
   .lf-product-identity-inner{min-height:174px;grid-template-columns:118px 1fr;grid-template-rows:92px 62px;column-gap:8px;padding-top:10px}.lf-product-cover-3d{left:4px;top:-42px;width:108px;height:136px;border-radius:17px;transform:perspective(700px) rotateY(8deg) rotateZ(-3deg)}.lf-product-title{padding:3px 0 0}.lf-product-title h1{font-size:16px}.lf-product-title p{margin-top:5px;font-size:10px}.lf-product-perks{grid-row:2;gap:4px}.lf-product-perks>div{gap:5px;font-size:8px;text-align:center}.lf-product-perks span{font-size:14px}
   .lf-checkout-tabs{margin-top:12px}.lf-checkout-grid{margin-top:10px;padding-bottom:112px}.lf-checkout-panel{border-radius:13px}.lf-checkout-panel>header{padding:11px}.lf-checkout-panel>header>span{width:31px;height:31px}.lf-panel-body{padding:11px}.lf-account-fields{grid-template-columns:1fr 1fr;gap:8px}.lf-account-fields input{height:39px}.lf-nominal-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.lf-nominal-grid button{min-height:72px;grid-template-columns:38px minmax(0,1fr);padding:8px}.lf-nominal-grid img,.lf-nominal-fallback{width:38px;height:38px}.lf-order-summary{display:none}
@@ -325,6 +325,8 @@
 }
 @media(max-width:640px){
  .lf-header-inner{height:62px;gap:8px}.lf-brand-logo{width:38px;height:38px}.lf-brand-name{font-size:11px}.lf-brand-sub{font-size:7px}.lf-action{height:32px;padding:0 8px;font-size:9px}.lf-search-mobile,.lf-menu{width:32px;height:32px}
+ .lf-auth-wrap{min-height:0;display:flex;align-items:flex-start;justify-content:center;padding:28px 12px 56px}.lf-auth-card{width:min(430px,100%);padding:16px}
+ .lf-track-page{min-height:0}
  .lf-home-banner img{aspect-ratio:1/1;min-height:0;max-height:none;object-position:center}
  .lf-popular{grid-template-columns:repeat(2,minmax(0,1fr))}.lf-popular-card{min-height:70px}.lf-popular-art{width:52px;height:52px;flex-basis:52px}
  .lf-footer-main{grid-template-columns:1fr 1fr;gap:26px 18px;padding:34px 0}.lf-footer-brand-column{grid-column:1/-1}.lf-footer-banner img{aspect-ratio:3/1;min-height:0}
@@ -1544,6 +1546,7 @@
 
   /* Old checkout: mobile banner is 16:8 (2:1), edge-to-edge. */
   .lf-product-hero{
+    position:relative!important;
     width:100vw!important;
     height:auto!important;
     aspect-ratio:16/8!important;
@@ -4986,5 +4989,36 @@
   }
   .lf-customer:has(.lf-mobile-checkout-bar) .lf-live-support.is-dragged{
     bottom:auto!important;
+  }
+}
+
+/* Mobile checkout audit fixes: keep the action bar inside checkout context only. */
+@media(max-width:639px){
+  .lf-customer{
+    overflow-x:clip!important;
+  }
+  .lf-product-hero{
+    width:100%!important;
+    margin:8px 0 0!important;
+    aspect-ratio:16/7!important;
+  }
+  .lf-checkout-panel>header>span{
+    display:none!important;
+  }
+  .lf-checkout-panel>header,
+  .lf-checkout-account-panel>header,
+  .lf-checkout-compact-panel>header{
+    gap:0!important;
+  }
+  .lf-mobile-checkout-bar{
+    transition:opacity .18s ease,transform .18s ease!important;
+  }
+  .lf-mobile-checkout-bar.is-hidden{
+    opacity:0!important;
+    pointer-events:none!important;
+    transform:translateY(100%)!important;
+  }
+  .lf-customer:has(.lf-mobile-checkout-bar) .lf-footer{
+    padding-bottom:0!important;
   }
 }
