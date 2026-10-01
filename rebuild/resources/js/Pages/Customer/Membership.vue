@@ -27,7 +27,7 @@ function discount(tier){
         <div>
             <p class="lf-eyebrow">MEMBERSHIP LFAMILIA</p>
             <h1>{{currentCode}}</h1>
-            <p>{{profile?.mode==='MANUAL'?'Tier ini ditetapkan manual oleh Super Admin.':'Tier mengikuti total transaksi berhasil dan manfaat yang dikonfigurasi toko.'}}</p>
+            <p>{{profile?.mode==='MANUAL'?'Tier ini ditetapkan oleh toko.':'Tier mengikuti total transaksi berhasil dan manfaat yang dikonfigurasi toko.'}}</p>
         </div>
         <div class="lf-membership-discount">
             <span>Diskon member</span>
