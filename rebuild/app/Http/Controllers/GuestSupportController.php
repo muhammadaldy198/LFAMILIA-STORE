@@ -8,6 +8,7 @@ use App\Services\GuestOrderAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -96,7 +97,7 @@ class GuestSupportController
             || $access->matches((int) $order->id, (string) ($data['access_code'] ?? ''))
         );
         if (! $authorized) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'order_number' => 'Nomor invoice atau kode akses tidak cocok.',
             ]);
         }
