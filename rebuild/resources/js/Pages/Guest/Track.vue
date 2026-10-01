@@ -103,7 +103,7 @@ onUnmounted(()=>{stopDetailPolling();if(feedTimer)clearInterval(feedTimer);});
    <div class="lf-track-summary">
     <div class="lf-track-invoice">
      <div><small>Nomor Invoice</small><strong>{{detail.referenceId}}</strong></div>
-     <button v-if="!detail.referenceMasked" @click="copyInvoice">{{copied?'Tersalin':'Salin'}}</button><span v-else class="lf-track-protected">Terlindungi</span>
+     <button v-if="!detail.referenceMasked" @click="copyInvoice">{{copied?'Tersalin':'Salin'}}</button><span v-else class="text-[8px] font-bold uppercase tracking-[0.08em] text-white/35">Terlindungi</span>
     </div>
     <div class="lf-track-status-card" :class="'tone-'+statusMeta(detail.fulfillmentStatus)[2]">
      <span></span><div><small>Status Pesanan</small><strong>{{statusMeta(detail.fulfillmentStatus)[0]}}</strong><p>{{statusMeta(detail.fulfillmentStatus)[1]}}</p></div>
