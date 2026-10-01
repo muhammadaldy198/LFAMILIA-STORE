@@ -4876,7 +4876,7 @@
 }
 @media(max-width:639px){
   .lf-support-cta{
-    padding-top:14px;
+    padding:14px 0 10px;
   }
   .lf-support-cta-inner{
     display:grid;
