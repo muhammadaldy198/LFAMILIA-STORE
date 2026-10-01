@@ -1,4 +1,4 @@
 <script setup>
-import {Head} from '@inertiajs/vue3';import CustomerShell from '../../Components/CustomerShell.vue';const props=defineProps({page:Object});const paras=String(props.page.body||'').split(/\n\s*\n/).filter(Boolean);
+import {computed} from 'vue';import {Head} from '@inertiajs/vue3';import CustomerShell from '../../Components/CustomerShell.vue';const props=defineProps({page:Object});const paras=computed(()=>String(props.page?.body||'').split(/\n\s*\n/).filter(Boolean));
 </script>
 <template><Head :title="page.title"/><CustomerShell><main class="lf-container lf-content-page"><article class="lf-legal"><p class="lf-eyebrow">INFORMASI LFAMILIA</p><h1 class="lf-title">{{page.title}}</h1><p class="lf-article-summary">{{page.intro}}</p><div class="lf-prose"><p v-for="(p,i) in paras" :key="i">{{p}}</p></div></article></main></CustomerShell></template>
