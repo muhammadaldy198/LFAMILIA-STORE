@@ -255,4 +255,55 @@ class CatalogTest extends TestCase
         $this->assertCount(1, $product->fresh()->getMedia('image'));
         $this->assertSame('second.png', $product->fresh()->getFirstMedia('image')->file_name);
     }
+
+    public function test_unavailable_nominal_cannot_be_preselected_from_deep_link(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Unavailable Deep Link',
+            'slug' => 'unavailable-deep-link-'.bin2hex(random_bytes(3)),
+            'margin_percent' => 10,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'is_active' => true,
+        ]);
+
+        $package = $product->packages()->create([
+            'code' => 'LOCKED100',
+            'name' => '100 Diamonds',
+            'nominal_value' => 100,
+            'is_active' => true,
+        ]);
+
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $package->id,
+            'provider_id' => $providerId,
+            'external_sku' => 'LOCKED-SKU-'.bin2hex(random_bytes(3)),
+            'cost_idr' => 10000,
+            'max_price_idr' => 9000,
+            'priority' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->get('/catalog/'.$product->slug.'?package='.$package->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Show')
+                ->where('initialPackageId', '')
+                ->where('packages.0.id', $package->id)
+                ->where('packages.0.is_available', false)
+                ->where('packages.0.price_idr', null)
+                ->missing('packages.0.code')
+                ->missing('packages.0.external_sku')
+                ->missing('packages.0.provider_mapping_id')
+                ->missing('packages.0.cost_idr')
+                ->missing('packages.0.max_price_idr')
+                ->etc());
+    }
+
 }

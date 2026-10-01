@@ -253,4 +253,41 @@ class CheckoutTest extends TestCase
         $this->assertSame(1, DB::table('orders')
             ->where('idempotency_key', 'checkout-conflict-0001')->count());
     }
+
+    public function test_inactive_package_cannot_be_quoted(): void
+    {
+        $catalog = $this->catalog();
+        DB::table('product_packages')->where('id', $catalog['package_id'])->update(['is_active' => false]);
+
+        $this->postJson('/checkout/quote', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'voucher_code' => null,
+            'guest_email' => 'buyer@example.test',
+            'guest_phone' => '081234567890',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['package_id']);
+    }
+
+    public function test_public_quote_uses_server_price_without_exposing_provider_or_sku(): void
+    {
+        $catalog = $this->catalog();
+
+        $this->postJson('/checkout/quote', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'voucher_code' => null,
+            'guest_email' => 'buyer@example.test',
+            'guest_phone' => '081234567890',
+        ])->assertOk()
+            ->assertJsonPath('subtotal_idr', 11000)
+            ->assertJsonMissingPath('cost_idr')
+            ->assertJsonMissingPath('margin_idr')
+            ->assertJsonMissingPath('provider_mapping_id')
+            ->assertJsonMissingPath('provider_code')
+            ->assertJsonMissingPath('provider_sku')
+            ->assertJsonMissingPath('external_sku')
+            ->assertJsonMissingPath('buyer_sku_code');
+    }
+
 }

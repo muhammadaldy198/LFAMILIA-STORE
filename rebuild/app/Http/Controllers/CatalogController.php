@@ -206,8 +206,11 @@ class CatalogController
             ],
             'faqs' => $content->faqs()->take(6)->values(),
             'initialPackageId' => $request->filled('package')
-                ? (string) ($packages->first(fn (array $item): bool => (string) $item['id'] === (string) $request->query('package')
-                    || strcasecmp((string) $item['name'], (string) $request->query('package')) === 0
+                ? (string) ($packages->first(fn (array $item): bool => $item['is_available'] === true
+                    && (
+                        (string) $item['id'] === (string) $request->query('package')
+                        || strcasecmp((string) $item['name'], (string) $request->query('package')) === 0
+                    )
                 )['id'] ?? '')
                 : '',
             'faviconUrl' => StoreAsset::where('key', 'favicon')->where('is_active', true)

@@ -61,7 +61,9 @@ const reviewSaving = ref(false);
 const reviewMessage = ref('');
 const reviewError = ref('');
 
-const selectedPackage = computed(() => (props.packages || []).find((item) => String(item.id) === String(selectedPackageId.value)));
+const selectedPackage = computed(() => (props.packages || []).find((item) =>
+    item.is_available !== false && String(item.id) === String(selectedPackageId.value)
+));
 const requiredFieldsComplete = computed(() => (props.fields || []).filter((field) => field.is_required)
     .every((field) => String(customerInput[field.field_key] || '').trim() !== ''));
 const guestContactComplete = computed(() => props.customer || (
@@ -322,7 +324,7 @@ async function requestJson(url, options = {}) {
 
 function basePayload() {
     return {
-        package_id: selectedPackageId.value ? Number(selectedPackageId.value) : null,
+        package_id: selectedPackage.value ? Number(selectedPackage.value.id) : null,
         payment_channel_code: paymentChannelCode.value || null,
         voucher_code: voucherCode.value.trim() || null,
         ...(props.customer ? {} : {
@@ -658,7 +660,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                         <section v-for="group in packageGroups" :key="group.name || 'all'">
                             <div v-if="group.name" class="lf-package-group-head"><h3>{{group.name}}</h3><span></span></div>
                             <div class="lf-nominal-grid">
-                                <button v-for="item in group.items" :key="item.id" type="button" :disabled="!item.is_available" :class="{selected:String(selectedPackageId)===String(item.id)}" @click="choosePackage(item)">
+                                <button v-for="item in group.items" :key="item.id" type="button" :disabled="!item.is_available" :class="{selected:selectedPackage && String(selectedPackage.id)===String(item.id)}" @click="choosePackage(item)">
                                     <span class="lf-nominal-top">
                                         <span class="lf-nominal-copy"><strong>{{nominalLabel(item.name, product.name)}}</strong><small v-if="item.note" class="lf-nominal-note">{{item.note}}</small></span>
                                         <img v-if="item.image_url" :src="item.image_url" :alt="nominalLabel(item.name, product.name)">
