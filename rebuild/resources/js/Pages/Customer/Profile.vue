@@ -7,8 +7,10 @@ const page = usePage();
 const profile = useForm({ name: props.customer.name, email: props.customer.email, phone: props.customer.phone, leaderboard_opt_in: Boolean(props.customer.leaderboard_opt_in), current_password: '' });
 const password = useForm({ current_password: '', password: '', password_confirmation: '' });
 const removal = useForm({ confirmation: '', password: '' });
-const updatePassword = () => password.put('/account/password', { onFinish: () => password.reset() });
+const updatePassword = () => { if (!password.processing) password.put('/account/password', { onFinish: () => password.reset() }); };
+const updateProfile = () => { if (!profile.processing) profile.put('/account/profile', { onFinish: () => profile.reset('current_password') }); };
 const remove = () => {
+    if (removal.processing) return;
     if (window.confirm('Hapus akun ini? Tindakan ini tidak dapat dibatalkan.')) {
         removal.delete('/account');
     }
@@ -20,7 +22,7 @@ const remove = () => {
     <AccountShell>
         <h1 class="text-3xl font-semibold">Profil</h1>
         <p v-if="page.props.status" role="status" class="text-cyan-300">{{ page.props.status }}</p>
-        <form class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5" @submit.prevent="profile.put('/account/profile')">
+        <form class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5" @submit.prevent="updateProfile">
             <h2 class="text-lg font-semibold">Data akun</h2>
             <label v-for="field in [{ key: 'name', label: 'Nama', type: 'text' }, { key: 'email', label: 'Email', type: 'email' }, { key: 'phone', label: 'Nomor HP', type: 'tel' }]" :key="field.key" class="block">{{ field.label }}
                 <input v-model="profile[field.key]" :type="field.type" required class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
