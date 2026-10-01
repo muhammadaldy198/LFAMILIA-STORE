@@ -6,6 +6,8 @@ const statuses=[
  ['01','Menunggu Pembayaran','Selesaikan pembayaran sesuai total dan kanal yang dipilih.','amber'],
  ['02','Sedang Diproses','Pembayaran sudah diterima dan pesanan sedang diproses.','blue'],
  ['03','Berhasil','Produk atau layanan sudah berhasil diproses.','green'],
+ ['05','Kedaluwarsa','Waktu pembayaran berakhir. Periksa invoice sebelum membuat pesanan baru.','amber'],
+ ['06','Dibatalkan','Pesanan dibatalkan. Jika sudah membayar, hubungi bantuan dengan nomor invoice.','red'],
  ['04','Gagal / Refund','Jika transaksi gagal final, tim akan menangani sesuai kebijakan refund.','red'],
 ];
 </script>
