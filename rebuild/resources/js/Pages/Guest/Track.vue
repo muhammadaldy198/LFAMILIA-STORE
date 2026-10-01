@@ -13,6 +13,9 @@ const detail=ref(null);
 const feed=ref([...(props.transactions||[])]);
 const copied=ref(false);
 let detailTimer=null,feedTimer=null;
+let detailRefreshing=false;
+let disposed=false;
+let selectionVersion=0;
 
 const money=v=>'Rp '+Number(v||0).toLocaleString('id-ID');
 const statusMeta=s=>({
@@ -37,23 +40,43 @@ async function json(url,options={}){
  return data;
 }
 async function search(){
- const value=query.value.trim();if(!value)return;
+ if(loading.value)return;
+ const value=query.value.trim();
+ stopDetailPolling();selectionVersion++;detail.value=null;orders.value=[];mode.value='';copied.value=false;
+ if(!value){error.value='Masukkan nomor invoice atau nomor WhatsApp.';return;}
  loading.value=true;error.value='';
+ const version=selectionVersion;
  try{
   const data=await json('/orders/track/search',{method:'POST',body:JSON.stringify({query:value})});
+  if(disposed||version!==selectionVersion)return;
   mode.value=data.mode;
-  if(data.mode==='order'){orders.value=[];detail.value=data.order;startDetailPolling();}
-  else{detail.value=null;orders.value=data.orders||[];stopDetailPolling();}
- }catch(e){error.value=e.message||'Pesanan tidak ditemukan.'}finally{loading.value=false;}
+  if(data.mode==='order'){detail.value=data.order;startDetailPolling();}
+  else{orders.value=data.orders||[];}
+ }catch(e){if(!disposed&&version===selectionVersion)error.value=e.message||'Pesanan tidak ditemukan.'}
+ finally{if(!disposed&&version===selectionVersion)loading.value=false;}
 }
 async function openOrder(trackingToken){
+ if(loading.value)return;
+ stopDetailPolling();selectionVersion++;detail.value=null;copied.value=false;
+ const version=selectionVersion;
  loading.value=true;error.value='';
- try{const data=await json('/orders/track/status',{method:'POST',body:JSON.stringify({tracking_token:trackingToken})});detail.value=data.order;mode.value='order';startDetailPolling();}
- catch(e){error.value=e.message||'Pesanan tidak ditemukan.'}finally{loading.value=false;}
+ try{
+  const data=await json('/orders/track/status',{method:'POST',body:JSON.stringify({tracking_token:trackingToken})});
+  if(disposed||version!==selectionVersion)return;
+  detail.value=data.order;orders.value=[];mode.value='order';startDetailPolling();
+ }catch(e){if(!disposed&&version===selectionVersion)error.value=e.message||'Pesanan tidak ditemukan.'}
+ finally{if(!disposed&&version===selectionVersion)loading.value=false;}
 }
 async function refreshDetail(){
- if(!detail.value?.trackingToken)return;
- try{const data=await json('/orders/track/status',{method:'POST',body:JSON.stringify({tracking_token:detail.value.trackingToken})});detail.value=data.order;if(terminal.value)stopDetailPolling();}catch{}
+ if(!detail.value?.trackingToken||detailRefreshing||disposed)return;
+ const token=detail.value.trackingToken;
+ const version=selectionVersion;
+ detailRefreshing=true;
+ try{
+  const data=await json('/orders/track/status',{method:'POST',body:JSON.stringify({tracking_token:token})});
+  if(disposed||version!==selectionVersion||detail.value?.trackingToken!==token)return;
+  detail.value=data.order;if(terminal.value)stopDetailPolling();
+ }catch{}finally{detailRefreshing=false;}
 }
 async function refreshFeed(){
  try{const data=await json('/orders/track/feed');feed.value=data.transactions||feed.value;}catch{}
@@ -62,7 +85,7 @@ function startDetailPolling(){stopDetailPolling();if(!terminal.value)detailTimer
 function stopDetailPolling(){if(detailTimer){clearInterval(detailTimer);detailTimer=null;}}
 async function copyInvoice(){if(!detail.value?.referenceId||detail.value?.referenceMasked)return;await navigator.clipboard?.writeText(detail.value.referenceId);copied.value=true;setTimeout(()=>copied.value=false,1400);}
 onMounted(()=>{feedTimer=setInterval(refreshFeed,15000);});
-onUnmounted(()=>{stopDetailPolling();if(feedTimer)clearInterval(feedTimer);});
+onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTimer)clearInterval(feedTimer);});
 </script>
 
 <template>
@@ -77,16 +100,18 @@ onUnmounted(()=>{stopDetailPolling();if(feedTimer)clearInterval(feedTimer);});
   </div>
   <div class="lf-track-search">
    <svg viewBox="0 0 24 24"><path d="m21 21-4.3-4.3m1.3-5.7a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>
-   <input v-model="query" @keyup.enter="search" placeholder="Contoh: LF260930 atau 081234567890">
+   <input v-model="query" @keyup.enter="search" aria-label="Nomor invoice atau nomor WhatsApp" placeholder="Masukkan nomor invoice atau nomor WhatsApp">
    <button :disabled="loading" @click="search">{{loading?'Mencari...':'Periksa'}}</button>
   </div>
-  <p v-if="error" class="lf-track-error">{{error}}</p>
+  <p v-if="error" role="alert" class="lf-track-error">{{error}}</p>
  </section>
+
+ <p v-if="mode==='phone' && !orders.length && !loading && !error" class="lf-container lf-empty" role="status">Tidak ada pesanan untuk nomor WhatsApp ini. Periksa kembali nomor yang digunakan saat checkout.</p>
 
  <section v-if="orders.length" class="lf-container lf-track-results">
   <div class="lf-track-section-head"><div><p class="lf-eyebrow">RIWAYAT NOMOR</p><h2>Pesanan ditemukan</h2></div><span>{{orders.length}} transaksi</span></div>
   <div class="lf-track-order-list">
-   <button v-for="item in orders" :key="item.trackingToken" @click="openOrder(item.trackingToken)">
+   <button v-for="item in orders" :key="item.trackingToken" :disabled="loading" @click="openOrder(item.trackingToken)">
     <div><strong>{{item.maskedReferenceId}}</strong><small>{{item.productName}} · {{item.packageLabel}}</small></div>
     <div><b>{{money(item.total)}}</b><span :class="'status-'+item.status">{{statusMeta(item.status)[0]}}</span></div>
    </button>
@@ -126,7 +151,7 @@ onUnmounted(()=>{stopDetailPolling();if(feedTimer)clearInterval(feedTimer);});
    </div>
 
    <aside class="lf-track-timeline">
-    <header><div><h3>Log Realtime</h3><p>Sinkron setiap 3 detik</p></div><button @click="refreshDetail">↻</button></header>
+    <header><div><h3>Log Realtime</h3><p>Sinkron setiap 3 detik</p></div><button :disabled="detailRefreshing" aria-label="Perbarui status pesanan" @click="refreshDetail">↻</button></header>
     <ol>
      <li v-for="event in detail.events" :key="event.id">
       <i></i><div><small>{{sourceLabel(event.source)}}</small><strong>{{event.label}}</strong><time>{{date(event.createdAt)}}</time></div>
