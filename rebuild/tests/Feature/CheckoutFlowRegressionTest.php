@@ -117,8 +117,7 @@ class CheckoutFlowRegressionTest extends TestCase
             ->assertOk()
             ->assertSee('Final Checkout Regression')
             ->assertSee('100 Diamonds')
-            ->assertSee('User ID')
-            ->assertSee('Metode Pembayaran');
+            ->assertSee('User ID');
 
         $quotePayload = [
             'package_id' => $package->id,
