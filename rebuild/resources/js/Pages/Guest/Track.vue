@@ -68,7 +68,7 @@ async function openOrder(trackingToken){
  finally{if(!disposed&&version===selectionVersion)loading.value=false;}
 }
 async function refreshDetail(){
- if(!detail.value?.trackingToken||detailRefreshing.value||disposed)return;
+ if(!detail.value?.trackingToken||detailRefreshing.value||disposed||document.hidden)return;
  const token=detail.value.trackingToken;
  const version=selectionVersion;
  detailRefreshing.value=true;
@@ -79,12 +79,13 @@ async function refreshDetail(){
  }catch{}finally{detailRefreshing.value=false;}
 }
 async function refreshFeed(){
+ if(disposed||document.hidden)return;
  try{const data=await json('/orders/track/feed');feed.value=data.transactions||feed.value;}catch{}
 }
-function startDetailPolling(){stopDetailPolling();if(!terminal.value)detailTimer=setInterval(refreshDetail,3000);}
+function startDetailPolling(){stopDetailPolling();if(!terminal.value)detailTimer=setInterval(refreshDetail,15000);}
 function stopDetailPolling(){if(detailTimer){clearInterval(detailTimer);detailTimer=null;}}
 async function copyInvoice(){if(!detail.value?.referenceId||detail.value?.referenceMasked)return;await navigator.clipboard?.writeText(detail.value.referenceId);copied.value=true;setTimeout(()=>copied.value=false,1400);}
-onMounted(()=>{feedTimer=setInterval(refreshFeed,15000);});
+onMounted(()=>{feedTimer=setInterval(refreshFeed,30000);});
 onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTimer)clearInterval(feedTimer);});
 </script>
 
@@ -151,7 +152,7 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
    </div>
 
    <aside class="lf-track-timeline">
-    <header><div><h3>Log Realtime</h3><p>Sinkron setiap 3 detik</p></div><button :disabled="detailRefreshing" aria-label="Perbarui status pesanan" @click="refreshDetail">↻</button></header>
+    <header><div><h3>Log Realtime</h3><p>Sinkron setiap 15 detik</p></div><button :disabled="detailRefreshing" aria-label="Perbarui status pesanan" @click="refreshDetail">↻</button></header>
     <ol>
      <li v-for="event in detail.events" :key="event.id">
       <i></i><div><small>{{sourceLabel(event.source)}}</small><strong>{{event.label}}</strong><time>{{date(event.createdAt)}}</time></div>
