@@ -5592,7 +5592,7 @@
 
 /* Global customer control geometry: 36px at every viewport. */
 .lf-customer{--lf-ui-control-height:36px;--lf-ui-button-sm-height:36px}
-.lf-customer button:not(:has(img)):not(:has(.lf-nominal-copy)):not(:has(.lf-voucher-copy)):not(:has(.lf-mobile-summary-copy)),
+.lf-customer button:not(.lf-menu):not(.lf-support-trigger):not(.lf-account-menu-toggle):not(.lf-account-menu-close):not(.lf-drawer-close):not(:has(img)):not(:has(.lf-nominal-copy)):not(:has(.lf-voucher-copy)):not(:has(.lf-mobile-summary-copy)),
 .lf-customer .lf-primary,.lf-customer .lf-secondary,
 .lf-customer .lf-review-submit,.lf-customer .lf-order-button,
 .lf-customer .lf-mobile-order-button,.lf-customer .lf-support-cta-button,
