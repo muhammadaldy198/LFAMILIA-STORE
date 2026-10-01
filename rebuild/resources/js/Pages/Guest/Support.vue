@@ -2,6 +2,7 @@
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
 
+import SupportMessageActions from '../../Components/SupportMessageActions.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import CustomerShell from '../../Components/CustomerShell.vue';
 const props = defineProps({ order: Object, tickets: Array });
@@ -28,6 +29,7 @@ const reply = id => { const f = replyForm(id); if (!f.processing) f.post('/suppo
   <label>{{ customerText("pages.guest.support.4bcccc29", "Subjek") }}<input v-model="form.subject" required maxlength="150"></label>
   <label>{{ customerText("pages.guest.support.cbf45484", "Pesan") }}<textarea v-model="form.message" required maxlength="5000" rows="5"></textarea></label>
   <button class="lf-primary" :disabled="form.processing">{{ customerText("pages.guest.support.c90e0db6", "Kirim tiket") }}</button>
+  <SupportMessageActions :fields="{ invoice: form.order_number, subject: form.subject, message: form.message }" />
  </form>
  <section v-if="order" class="lf-guest-support-history">
   <h2>Tiket untuk {{ order.order_number }}</h2>

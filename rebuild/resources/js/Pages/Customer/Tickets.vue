@@ -2,10 +2,11 @@
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
 
+import SupportMessageActions from '../../Components/SupportMessageActions.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AccountShell from '../../Components/AccountShell.vue';
 
-defineProps({ tickets: Object, orders: Array });
+const props = defineProps({ tickets: Object, orders: Array });
 const form = useForm({ subject: '', message: '', order_id: '' });
 const submit = () => { if (!form.processing) form.post('/account/tickets', { onSuccess: () => form.reset() }); };
 </script>
@@ -32,6 +33,7 @@ const submit = () => { if (!form.processing) form.post('/account/tickets', { onS
                 <span v-if="form.errors.message" class="text-sm text-red-300">{{ form.errors.message }}</span>
             </label>
             <button :disabled="form.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50">{{ customerText("pages.customer.tickets.c90e0db6", "Kirim tiket") }}</button>
+            <SupportMessageActions :fields="{ subject: form.subject, message: form.message, invoice: props.orders.find(order => String(order.id) === String(form.order_id))?.order_number || '' }" validate-form />
         </form>
         <h2 class="text-xl font-semibold">{{ customerText("pages.customer.tickets.1e3139df", "Riwayat tiket") }}</h2>
         <p v-if="!tickets.data.length" class="text-slate-400">{{ customerText("pages.customer.tickets.8efc1b8b", "Belum ada tiket.") }}</p>

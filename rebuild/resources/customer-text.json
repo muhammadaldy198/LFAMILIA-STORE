@@ -2898,5 +2898,145 @@
     "group": "Pages/Content/Legal",
     "label": "Hubungi kami",
     "default": "Hubungi kami"
+  },
+  "support.messageTitle": {
+    "group": "Components/Support",
+    "label": "FORMULIR BANTUAN LFAMILIA STORE",
+    "default": "FORMULIR BANTUAN LFAMILIA STORE"
+  },
+  "support.requiredMessage": {
+    "group": "Components/Support",
+    "label": "Isi pesan bantuan terlebih dahulu.",
+    "default": "Isi pesan bantuan terlebih dahulu."
+  },
+  "support.copied": {
+    "group": "Components/Support",
+    "label": "Pesan bantuan berhasil disalin.",
+    "default": "Pesan bantuan berhasil disalin."
+  },
+  "support.copyFallback": {
+    "group": "Components/Support",
+    "label": "Salin teks pesan di bawah secara manual.",
+    "default": "Salin teks pesan di bawah secara manual."
+  },
+  "support.whatsapp": {
+    "group": "Components/Support",
+    "label": "Kirim lewat WhatsApp",
+    "default": "Kirim lewat WhatsApp"
+  },
+  "support.copy": {
+    "group": "Components/Support",
+    "label": "Salin",
+    "default": "Salin"
+  },
+  "support.whatsappUnavailable": {
+    "group": "Components/Support",
+    "label": "Kanal WhatsApp belum tersedia. Kamu tetap bisa menyalin pesan atau membuat tiket bantuan.",
+    "default": "Kanal WhatsApp belum tersedia. Kamu tetap bisa menyalin pesan atau membuat tiket bantuan."
+  },
+  "support.copyPreview": {
+    "group": "Components/Support",
+    "label": "Pesan bantuan untuk disalin",
+    "default": "Pesan bantuan untuk disalin"
+  },
+  "support.formLabel": {
+    "group": "Components/Support",
+    "label": "FORMULIR BANTUAN",
+    "default": "FORMULIR BANTUAN"
+  },
+  "support.formTitle": {
+    "group": "Components/Support",
+    "label": "Ceritakan kendalamu",
+    "default": "Ceritakan kendalamu"
+  },
+  "support.formIntro": {
+    "group": "Components/Support",
+    "label": "Formulir ini akan menyiapkan pesan lengkap lalu membuka kanal bantuan resmi yang tersedia.",
+    "default": "Formulir ini akan menyiapkan pesan lengkap lalu membuka kanal bantuan resmi yang tersedia."
+  },
+  "support.field.kind": {
+    "group": "Components/Support",
+    "label": "Jenis bantuan",
+    "default": "Jenis bantuan"
+  },
+  "support.field.name": {
+    "group": "Components/Support",
+    "label": "Nama",
+    "default": "Nama"
+  },
+  "support.namePlaceholder": {
+    "group": "Components/Support",
+    "label": "Nama kamu",
+    "default": "Nama kamu"
+  },
+  "support.field.phone": {
+    "group": "Components/Support",
+    "label": "Nomor WhatsApp",
+    "default": "Nomor WhatsApp"
+  },
+  "support.phonePlaceholder": {
+    "group": "Components/Support",
+    "label": "08xxxxxxxxxx",
+    "default": "08xxxxxxxxxx"
+  },
+  "support.invoiceOptional": {
+    "group": "Components/Support",
+    "label": "Nomor invoice (opsional)",
+    "default": "Nomor invoice (opsional)"
+  },
+  "support.invoicePlaceholder": {
+    "group": "Components/Support",
+    "label": "Masukkan nomor invoice",
+    "default": "Masukkan nomor invoice"
+  },
+  "support.field.message": {
+    "group": "Components/Support",
+    "label": "Pesan",
+    "default": "Pesan"
+  },
+  "support.messagePlaceholder": {
+    "group": "Components/Support",
+    "label": "Jelaskan pertanyaan atau masalah...",
+    "default": "Jelaskan pertanyaan atau masalah..."
+  },
+  "support.privacyNote": {
+    "group": "Components/Support",
+    "label": "Jangan cantumkan password, PIN, kode OTP, atau data kartu pembayaran. Informasi yang kamu isi hanya disusun di perangkatmu sampai kamu memilih untuk mengirimnya melalui WhatsApp.",
+    "default": "Jangan cantumkan password, PIN, kode OTP, atau data kartu pembayaran. Informasi yang kamu isi hanya disusun di perangkatmu sampai kamu memilih untuk mengirimnya melalui WhatsApp."
+  },
+  "support.field.invoice": {
+    "group": "Components/Support",
+    "label": "Nomor invoice",
+    "default": "Nomor invoice"
+  },
+  "support.field.subject": {
+    "group": "Components/Support",
+    "label": "Subjek",
+    "default": "Subjek"
+  },
+  "support.kind.Kendala transaksi": {
+    "group": "Components/Support",
+    "label": "Kendala transaksi",
+    "default": "Kendala transaksi"
+  },
+  "support.kind.Pertanyaan produk": {
+    "group": "Components/Support",
+    "label": "Pertanyaan produk",
+    "default": "Pertanyaan produk"
+  },
+  "support.kind.Pengembalian dana": {
+    "group": "Components/Support",
+    "label": "Pengembalian dana",
+    "default": "Pengembalian dana"
+  },
+  "support.kind.Bantuan akun": {
+    "group": "Components/Support",
+    "label": "Bantuan akun",
+    "default": "Bantuan akun"
+  },
+  "support.kind.Lainnya": {
+    "group": "Components/Support",
+    "label": "Lainnya",
+    "default": "Lainnya"
   }
 }
