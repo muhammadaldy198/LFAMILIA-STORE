@@ -5656,3 +5656,5 @@
  .lf-customer.lf-customer.lf-customer .lf-auth-card{padding:24px!important}
  .lf-customer.lf-customer.lf-customer .lf-checkout-grid,.lf-customer.lf-customer.lf-customer .lf-account-list{gap:16px!important}
 }
+
+@media(max-width:639px){.lf-customer .lf-product-perks{position:static!important;margin-top:16px!important}.lf-customer .lf-product-identity-inner{padding-bottom:14px!important}}
