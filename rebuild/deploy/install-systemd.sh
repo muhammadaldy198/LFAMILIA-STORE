@@ -53,6 +53,13 @@ chmod 0750 "${BACKUP_DIR}"
 chown root:"${APP_GROUP}" "${OPS_ENV_FILE}"
 chmod 0640 "${OPS_ENV_FILE}"
 
+
+# Privileged services must never execute application-writable source files.
+install -d -o root -g root -m 0755 /usr/local/lib/lfamilia
+for script in backup.sh restore-verify.sh; do
+  install -o root -g root -m 0700 "${APP_DIR}/deploy/${script}" "/usr/local/lib/lfamilia/${script}"
+done
+
 for name in   lfamilia-queue.service   lfamilia-scheduler.service   lfamilia-healthcheck.service   lfamilia-healthcheck.timer   lfamilia-backup.service   lfamilia-backup.timer   lfamilia-restore-verify.service   lfamilia-restore-verify.timer; do
   render "${TEMPLATE_DIR}/${name}.in" "/etc/systemd/system/${name}"
 done
