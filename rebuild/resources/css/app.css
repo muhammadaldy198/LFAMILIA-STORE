@@ -2162,11 +2162,14 @@
     text-decoration:none!important;
   }
 
-  /* Customer card. */
+  /* Customer card uses the same lime/blue homepage accents. */
   .lf-customer-checkout-note{
     display:flex!important;
     align-items:center!important;
     gap:9px!important;
+    border:1px solid var(--lf-line)!important;
+    background:linear-gradient(135deg,rgba(24,119,255,.055),rgba(158,229,45,.035)),#080c12!important;
+    color:rgba(245,248,255,.72)!important;
   }
   .lf-account-avatar{
     width:34px!important;
@@ -2174,9 +2177,10 @@
     display:grid!important;
     place-items:center!important;
     flex:0 0 34px!important;
+    border:1px solid rgba(158,229,45,.22)!important;
     border-radius:6.4px!important;
-    background:rgba(185,255,53,.10)!important;
-    color:var(--lime)!important;
+    background:rgba(158,229,45,.09)!important;
+    color:var(--lf-lime)!important;
     font-size:11px!important;
     font-weight:900!important;
   }
@@ -3176,13 +3180,26 @@
     font-size:10px!important;
   }
 
-  /* Contact is one column on mobile in the live page. */
+  /* Contact is one column on mobile and uses the homepage palette. */
+  .lf-checkout-contact-panel{
+    border-color:var(--lf-line)!important;
+    background:
+      radial-gradient(circle at 100% 0,rgba(24,119,255,.06),transparent 38%),
+      var(--lf-panel)!important;
+  }
+  .lf-checkout-contact-panel>header h2{
+    color:#f5f8ff!important;
+  }
+  .lf-checkout-contact-panel>header p{
+    color:var(--lf-muted)!important;
+  }
   .lf-checkout-contact-panel .lf-account-fields{
     grid-template-columns:1fr!important;
     gap:10px!important;
   }
   .lf-checkout-contact-panel .lf-account-fields label>span{
     margin-bottom:4px!important;
+    color:rgba(245,248,255,.72)!important;
     font-size:11.88px!important;
     line-height:15.2px!important;
   }
@@ -3190,15 +3207,27 @@
     height:30.4px!important;
     min-height:30.4px!important;
     padding:3.2px 9.6px!important;
+    border:1px solid var(--lf-line)!important;
     border-radius:5.6px!important;
+    background:#080c12!important;
+    color:#fff!important;
+    caret-color:var(--lf-lime)!important;
     font-size:12.16px!important;
     line-height:16px!important;
+  }
+  .lf-checkout-contact-panel .lf-account-fields input::placeholder{
+    color:rgba(235,242,255,.26)!important;
+  }
+  .lf-checkout-contact-panel .lf-account-fields input:focus{
+    border-color:var(--lf-blue)!important;
+    box-shadow:0 0 0 3px rgba(24,119,255,.10)!important;
   }
   .lf-contact-privacy{
     display:flex!important;
     align-items:flex-start!important;
     gap:6px!important;
     margin-top:10px!important;
+    color:var(--lf-muted)!important;
     font-size:10px!important;
     line-height:16px!important;
   }
@@ -3207,6 +3236,7 @@
     height:12px!important;
     flex:0 0 12px!important;
     margin-top:2px!important;
+    color:var(--lf-blue-2)!important;
     fill:none!important;
     stroke:currentColor!important;
     stroke-width:2!important;
