@@ -5589,3 +5589,24 @@
 
 /* Desktop artwork keeps its original dimensions with the flat mobile treatment. */
 @media(min-width:640px){.lf-customer .lf-product-cover-3d{left:8px!important;width:188px!important;height:226px!important}}
+
+/* Global customer control geometry: 36px at every viewport. */
+.lf-customer{--lf-ui-control-height:36px;--lf-ui-button-sm-height:36px}
+.lf-customer button:not(:has(img)):not(:has(.lf-nominal-copy)):not(:has(.lf-voucher-copy)):not(:has(.lf-mobile-summary-copy)),
+.lf-customer .lf-primary,.lf-customer .lf-secondary,
+.lf-customer .lf-review-submit,.lf-customer .lf-order-button,
+.lf-customer .lf-mobile-order-button,.lf-customer .lf-support-cta-button,
+.lf-customer .lf-account-nav a,.lf-customer .lf-chip,.lf-customer .lf-pages a,.lf-customer .lf-pages span{
+  box-sizing:border-box!important;height:36px!important;min-height:36px!important;
+  padding-top:0!important;padding-bottom:0!important;
+  display:inline-flex!important;align-items:center!important;justify-content:center;
+  line-height:1.2!important;
+}
+.lf-customer .lf-account-nav a,.lf-customer .lf-account-nav button{justify-content:flex-start}
+.lf-customer table tr{height:36px}
+.lf-customer table th,.lf-customer table td{box-sizing:border-box;height:36px;padding-top:6px;padding-bottom:6px;vertical-align:middle}
+/* Content choices keep room for their artwork, prices and descriptions. */
+.lf-customer .lf-nominal-grid button,.lf-customer .lf-voucher-list button,
+.lf-customer .lf-track-order-list button,.lf-customer .lf-mobile-summary-toggle{
+  height:auto!important;min-height:36px!important;
+}
