@@ -4,7 +4,7 @@ import AccountShell from '../../Components/AccountShell.vue';
 
 defineProps({ tickets: Object, orders: Array });
 const form = useForm({ subject: '', message: '', order_id: '' });
-const submit = () => form.post('/account/tickets', { onSuccess: () => form.reset() });
+const submit = () => { if (!form.processing) form.post('/account/tickets', { onSuccess: () => form.reset() }); };
 </script>
 
 <template>
