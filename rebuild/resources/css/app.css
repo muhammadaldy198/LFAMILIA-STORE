@@ -5064,3 +5064,130 @@
     bottom:auto!important;
   }
 }
+
+
+/* CUSTOMER FRONTEND GLOBAL TYPOGRAPHY + FORM SCALE
+   Shared semantic scale for customer-facing panels and controls only. */
+.lf-customer{
+  --lf-ui-section-title:16px;
+  --lf-ui-section-desc:11px;
+  --lf-ui-field-label:11px;
+  --lf-ui-control-text:16px;
+  --lf-ui-helper:10px;
+  --lf-ui-card-title:12px;
+  --lf-ui-card-price:11px;
+  --lf-ui-button-sm:11px;
+  --lf-ui-button-main:12px;
+  --lf-ui-control-height:44px;
+}
+
+/* Section/card headers: one hierarchy across checkout, account, tools and status UI. */
+.lf-customer .lf-checkout-panel>header h2,
+.lf-customer .lf-result-panel h2,
+.lf-customer .lf-order-payment h2,
+.lf-customer .lf-order-success h2,
+.lf-customer .lf-order-review h2,
+.lf-customer .lf-tool-card h2,
+.lf-customer .lf-tools-index-card h2{
+  font-size:var(--lf-ui-section-title)!important;
+  line-height:1.3!important;
+  font-weight:800!important;
+}
+.lf-customer .lf-checkout-panel>header p,
+.lf-customer .lf-result-panel p,
+.lf-customer .lf-order-payment p,
+.lf-customer .lf-order-success p,
+.lf-customer .lf-order-review>p,
+.lf-customer .lf-tool-note,
+.lf-customer .lf-info-strip{
+  font-size:var(--lf-ui-section-desc)!important;
+  line-height:1.5!important;
+}
+
+/* Form labels: same size/weight/gap everywhere customer-facing. */
+.lf-customer .lf-account-fields label>span,
+.lf-customer .lf-saved-account-select>span,
+.lf-customer .lf-tool-fields label,
+.lf-customer .lf-review-guest-fields label>span,
+.lf-customer .field-label{
+  font-size:var(--lf-ui-field-label)!important;
+  line-height:1.4!important;
+  font-weight:700!important;
+}
+
+/* Text controls: global 44px mobile-safe field height and 16px text.
+   Textareas keep content height but use the same type scale. */
+.lf-customer input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.lf-customer select{
+  min-height:var(--lf-ui-control-height)!important;
+  height:var(--lf-ui-control-height)!important;
+  font-size:var(--lf-ui-control-text)!important;
+  line-height:1.4!important;
+}
+.lf-customer textarea{
+  min-height:96px!important;
+  font-size:var(--lf-ui-control-text)!important;
+  line-height:1.5!important;
+}
+
+/* Shared helper / metadata scale. */
+.lf-customer .lf-checkout-info-note,
+.lf-customer .lf-contact-privacy,
+.lf-customer .lf-panel-hint,
+.lf-customer .lf-payment-login-hint,
+.lf-customer .lf-field-error,
+.lf-customer .lf-account-muted,
+.lf-customer .lf-account-note{
+  font-size:var(--lf-ui-helper)!important;
+  line-height:1.5!important;
+}
+
+/* Product/payment card text. */
+.lf-customer .lf-nominal-copy strong,
+.lf-customer .lf-payment-group-copy strong,
+.lf-customer .lf-payment-channel-copy strong,
+.lf-customer .lf-summary-product strong{
+  font-size:var(--lf-ui-card-title)!important;
+  line-height:1.35!important;
+}
+.lf-customer .lf-nominal-grid button>b,
+.lf-customer .lf-mobile-summary-price,
+.lf-customer .lf-order-summary .total dd{
+  font-size:var(--lf-ui-card-price)!important;
+}
+
+/* Compact secondary actions share one size; primary checkout actions share another. */
+.lf-customer .lf-promo-input button,
+.lf-customer .lf-available-promo,
+.lf-customer .lf-secondary,
+.lf-customer .lf-track-search button{
+  font-size:var(--lf-ui-button-sm)!important;
+  font-weight:700!important;
+}
+.lf-customer .lf-order-button,
+.lf-customer .lf-mobile-order-button,
+.lf-customer .lf-primary{
+  font-size:var(--lf-ui-button-main)!important;
+  font-weight:800!important;
+}
+
+/* Keep customer form palette identical to homepage theme. */
+.lf-customer input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.lf-customer select,
+.lf-customer textarea{
+  border-color:var(--lf-line)!important;
+  background:#080c12!important;
+  color:#fff!important;
+  caret-color:var(--lf-lime)!important;
+}
+.lf-customer input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):focus,
+.lf-customer select:focus,
+.lf-customer textarea:focus{
+  border-color:var(--lf-blue)!important;
+  box-shadow:0 0 0 3px rgba(24,119,255,.10)!important;
+  outline:none!important;
+}
+.lf-customer input::placeholder,
+.lf-customer textarea::placeholder{
+  color:rgba(235,242,255,.26)!important;
+}
