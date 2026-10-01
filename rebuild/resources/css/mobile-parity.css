@@ -1,0 +1,179 @@
+/* Authoritative mobile storefront parity layer.
+   Loaded after app.css so mobile fixes do not fight legacy overrides. */
+@media (max-width: 639px) {
+  .lf-header-inner {
+    height: 50px !important;
+    gap: 7px !important;
+  }
+  .lf-brand {
+    gap: 7px !important;
+    min-width: 0 !important;
+  }
+  .lf-brand-logo {
+    width: 24px !important;
+    height: 24px !important;
+    padding: 0 !important;
+  }
+  .lf-brand-copy {
+    display: grid !important;
+    line-height: 1 !important;
+  }
+  .lf-brand-name {
+    font-size: 10px !important;
+    letter-spacing: .10em !important;
+  }
+  .lf-brand-sub {
+    margin-top: 3px !important;
+    font-size: 6px !important;
+    letter-spacing: .25em !important;
+  }
+  .lf-header-actions {
+    gap: 6px !important;
+  }
+  .lf-header-actions .lf-action {
+    display: none !important;
+  }
+  .lf-search-mobile,
+  .lf-menu {
+    width: 31px !important;
+    height: 31px !important;
+    border-radius: 7px !important;
+  }
+
+  .lf-step-grid {
+    grid-template-columns: 1fr !important;
+    gap: 7px !important;
+  }
+  .lf-step {
+    min-height: 78px !important;
+    padding: 11px 12px !important;
+    border-radius: 8px !important;
+  }
+  .lf-step > span {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 7px !important;
+    font-size: 9px !important;
+  }
+  .lf-step h3 {
+    margin-top: 8px !important;
+    font-size: 11px !important;
+  }
+  .lf-step p {
+    margin-top: 3px !important;
+    font-size: 8px !important;
+    line-height: 1.55 !important;
+  }
+
+  .lf-support-cta {
+    padding-top: 18px !important;
+  }
+  .lf-support-cta-inner {
+    gap: 12px !important;
+    padding: 15px 12px !important;
+    border-radius: 9px !important;
+    background: linear-gradient(135deg, rgba(158,229,45,.07), rgba(158,229,45,.025)) !important;
+  }
+  .lf-support-cta-inner h2 {
+    margin-top: 6px !important;
+    font-size: 18px !important;
+    line-height: 1.15 !important;
+  }
+  .lf-support-cta-inner > div > p:last-child {
+    margin-top: 7px !important;
+    font-size: 9px !important;
+    line-height: 1.6 !important;
+  }
+  .lf-support-cta-button {
+    width: auto !important;
+    min-width: 112px !important;
+    height: 34px !important;
+    justify-self: start !important;
+    padding: 0 13px !important;
+    border-radius: 7px !important;
+    font-size: 9px !important;
+  }
+
+  .lf-footer-banner {
+    height: 58px !important;
+  }
+  .lf-footer-main {
+    grid-template-columns: 1fr !important;
+    gap: 28px !important;
+    padding: 31px 0 30px !important;
+  }
+  .lf-footer-brand-column,
+  .lf-footer-column,
+  .lf-footer-column:last-child {
+    grid-column: 1 / -1 !important;
+  }
+  .lf-footer-brand-column .lf-brand {
+    display: inline-flex !important;
+  }
+  .lf-footer-brand-column .lf-brand-copy {
+    display: grid !important;
+  }
+  .lf-footer-logo {
+    width: 26px !important;
+    height: 26px !important;
+  }
+  .lf-footer-brand-column > p {
+    max-width: 285px !important;
+    margin-top: 15px !important;
+    font-size: 9px !important;
+    line-height: 1.75 !important;
+  }
+  .lf-socials {
+    gap: 7px !important;
+    margin-top: 14px !important;
+  }
+  .lf-socials a {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 7px !important;
+  }
+  .lf-socials .social-whatsapp { order: 1; }
+  .lf-socials .social-instagram { order: 2; }
+  .lf-socials .social-email { order: 3; }
+  .lf-socials .social-discord { order: 4; }
+
+  .lf-footer-column h2 {
+    margin-bottom: 12px !important;
+    font-size: 9px !important;
+    letter-spacing: .14em !important;
+  }
+  .lf-footer-column ul,
+  .lf-footer-column:last-child ul {
+    grid-template-columns: 1fr !important;
+    gap: 11px !important;
+  }
+  .lf-footer-column a {
+    font-size: 9px !important;
+  }
+  .lf-footer-copy {
+    padding: 15px 14px !important;
+    font-size: 7px !important;
+    line-height: 1.55 !important;
+  }
+
+  .lf-live-support {
+    right: 14px !important;
+    bottom: 18px !important;
+    left: auto !important;
+    top: auto !important;
+  }
+  .lf-live-support.is-dragged {
+    right: 14px !important;
+    bottom: 18px !important;
+    left: auto !important;
+    top: auto !important;
+  }
+  .lf-support-trigger {
+    width: 44px !important;
+    height: 44px !important;
+  }
+  .lf-customer:has(.lf-mobile-checkout-bar) .lf-live-support,
+  .lf-customer:has(.lf-mobile-checkout-bar) .lf-live-support.is-dragged {
+    bottom: 108px !important;
+  }
+}
