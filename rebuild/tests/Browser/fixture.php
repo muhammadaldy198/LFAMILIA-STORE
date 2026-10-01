@@ -2,8 +2,10 @@
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 require __DIR__.'/../../vendor/autoload.php';
 
@@ -11,6 +13,13 @@ $app = require __DIR__.'/../../bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
 DB::transaction(function (): void {
+    User::updateOrCreate(['email' => 'browser-account@example.test'], [
+        'name' => 'Browser Account',
+        'phone' => '081234567890',
+        'password' => Hash::make('Browser-test-password-123'),
+        'membership_tier_code' => 'BASIC',
+    ]);
+
     $category = Category::where('slug', 'game')->firstOrFail();
 
     DB::table('providers')->where('code', 'DIGIFLAZZ')->update([
