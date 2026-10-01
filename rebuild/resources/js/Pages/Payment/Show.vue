@@ -15,23 +15,36 @@ const storefront = computed(() => page.props.storefront || {});
 const storeLogo = computed(() => storefront.value.assets?.logo?.url || '');
 const settings = computed(() => props.pageSettings || {});
 const accent = computed(() => settings.value.accentColor || '#b9ff35');
-const title = computed(() => paid.value
-    ? (settings.value.paidTitle || 'Pembayaran berhasil')
-    : failed.value
-        ? (settings.value.failedTitle || 'Pembayaran tidak aktif')
-        : (settings.value.pendingTitle || 'Selesaikan pembayaran'));
 
 const paidStatuses = ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS'];
-const failedStatuses = ['FAILED', 'EXPIRED', 'REJECTED', 'CANCELLED', 'CANCEL', 'DENIED', 'DENY'];
+const expiredStatuses = ['EXPIRE', 'EXPIRED'];
+const cancelledStatuses = ['CANCEL', 'CANCELLED'];
+const failedStatuses = ['FAILED', 'REJECTED', 'DENIED', 'DENY'];
 
 const paymentStatus = computed(() => String(props.payment?.status || '').toUpperCase());
-const paid = computed(() => paidStatuses.includes(paymentStatus.value) || ['PAID', 'PROCESSING', 'SUCCESS'].includes(String(props.order.status || '').toUpperCase()));
-const failed = computed(() => failedStatuses.includes(paymentStatus.value) || ['FAILED', 'EXPIRED', 'CANCELLED'].includes(String(props.order.status || '').toUpperCase()));
+const orderStatus = computed(() => String(props.order.status || '').toUpperCase());
+const paid = computed(() => paidStatuses.includes(paymentStatus.value) || ['PAID', 'PROCESSING', 'SUCCESS'].includes(orderStatus.value));
+const expired = computed(() => expiredStatuses.includes(paymentStatus.value) || orderStatus.value === 'EXPIRED');
+const cancelled = computed(() => cancelledStatuses.includes(paymentStatus.value) || orderStatus.value === 'CANCELLED');
+const failed = computed(() => failedStatuses.includes(paymentStatus.value) || orderStatus.value === 'FAILED');
+const terminal = computed(() => paid.value || expired.value || cancelled.value || failed.value);
+const title = computed(() => paid.value
+    ? (settings.value.paidTitle || 'Pembayaran berhasil')
+    : expired.value
+        ? (settings.value.expiredTitle || 'Pembayaran kedaluwarsa')
+        : cancelled.value
+            ? (settings.value.cancelledTitle || 'Pembayaran dibatalkan')
+            : failed.value
+                ? (settings.value.failedTitle || 'Pembayaran gagal')
+                : (settings.value.pendingTitle || 'Selesaikan pembayaran'));
+
 const instructions = computed(() => props.payment?.instructions || {});
 const paymentUrl = computed(() => instructions.value.redirect_url || instructions.value.payment_url || null);
 const paymentNumber = computed(() => instructions.value.va_number || instructions.value.payment_code || null);
 const qrUrl = computed(() => instructions.value.qr_url || null);
 const qrString = computed(() => instructions.value.qr_string || null);
+const manualQris = computed(() => instructions.value.kind === 'manual_qris'
+    || String(props.payment?.channel_code || '').toLowerCase().includes('manual'));
 const copiedInvoice = ref(false);
 const copiedPayment = ref(false);
 const openingPayment = ref(false);
@@ -50,9 +63,13 @@ const paymentLabel = computed(() => {
 });
 const statusText = computed(() => paid.value
     ? (settings.value.paidStatusText || 'Pembayaran sudah diterima. Status pesanan akan diperbarui otomatis.')
-    : failed.value
-        ? (settings.value.failedStatusText || 'Transaksi ini tidak dapat dilanjutkan. Buat checkout baru bila diperlukan.')
-        : (settings.value.pendingStatusText || 'Status diperiksa otomatis setiap 3 detik.'));
+    : expired.value
+        ? (settings.value.expiredStatusText || 'Waktu pembayaran sudah berakhir. Invoice ini tetap dapat dipakai untuk mengecek status transaksi.')
+        : cancelled.value
+            ? (settings.value.cancelledStatusText || 'Pembayaran dibatalkan. Invoice tetap tersimpan dan statusnya dapat dicek kapan saja.')
+            : failed.value
+                ? (settings.value.failedStatusText || 'Pembayaran gagal. Jangan membuat pesanan baru sebelum mengecek status invoice ini.')
+                : (settings.value.pendingStatusText || 'Status diperiksa otomatis setiap 3 detik.'));
 
 function formatIdr(value) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -99,7 +116,7 @@ function paymentAttemptKey() {
 }
 
 async function resumePayment() {
-    if (props.payment || paid.value || failed.value || startingPayment.value) return;
+    if (props.payment || terminal.value || startingPayment.value) return;
 
     startingPayment.value = true;
     paymentError.value = '';
@@ -137,11 +154,11 @@ async function resumePayment() {
 let poller;
 onMounted(() => {
     const shouldResume = new URLSearchParams(window.location.search).get('resume') === '1';
-    if (shouldResume && !props.payment && !paid.value && !failed.value) {
+    if (shouldResume && !props.payment && !terminal.value) {
         void resumePayment();
     }
 
-    if (!paid.value && !failed.value) {
+    if (!terminal.value) {
         poller = window.setInterval(() => {
             router.reload({ only: ['order', 'payment'], preserveScroll: true, preserveState: true });
         }, 3000);
@@ -179,7 +196,7 @@ onBeforeUnmount(() => {
                     <p class="text-[9px] font-black uppercase tracking-[0.2em]" :style="{color:accent}">{{settings.eyebrow || 'LFAMILIA PAYMENT'}}</p>
                     <h1 class="mt-1 text-xl font-black">{{title}}</h1>
                 </div>
-                <span class="lf-payment-status-icon" :class="{paid,failed}">
+                <span class="lf-payment-status-icon" :class="{paid,failed:failed||expired||cancelled}">
                     <svg v-if="paid" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
                     <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v7c0 4.5 3.2 7 8 8.5 4.8-1.5 8-4 8-8.5V6z"/><path d="M12 8v5M12 16h.01"/></svg>
                 </span>
@@ -209,13 +226,18 @@ onBeforeUnmount(() => {
                 <div class="flex items-start justify-between gap-4"><dt class="text-white/35">Total pembayaran</dt><dd class="text-lg font-black text-[#b9ff35]">{{formatIdr(order.total_idr)}}</dd></div>
             </dl>
 
-            <div v-if="!paid && !failed && qrUrl" class="mt-5 rounded-xl border border-white/10 bg-white p-4 text-center">
+            <div v-if="!terminal && qrUrl" class="mt-5 rounded-xl border border-white/10 bg-white p-4 text-center">
                 <img :src="qrUrl" alt="QRIS pembayaran" class="mx-auto h-auto w-full max-w-[220px]">
                 <p class="mt-3 text-[10px] font-black text-[#091006]">Scan QRIS untuk membayar</p>
                 <p class="mt-1 text-[8px] text-black/55">Gunakan aplikasi bank atau e-wallet yang mendukung QRIS.</p>
             </div>
 
-            <div v-if="!paid && !failed && qrString && !qrUrl" class="mt-5 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <div v-if="!terminal && manualQris && qrUrl" class="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3">
+                <strong class="text-[10px] text-amber-200">Konfirmasi QRIS manual</strong>
+                <p class="mt-1 text-[9px] leading-4 text-white/45">Setelah pembayaran dilakukan, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama.</p>
+            </div>
+
+            <div v-if="!terminal && qrString && !qrUrl" class="mt-5 rounded-xl border border-white/10 bg-white/[0.03] p-4">
                 <p class="text-[9px] font-bold uppercase tracking-[0.14em] text-white/35">QRIS</p>
                 <div class="mt-2 flex items-center justify-between gap-3 rounded-lg bg-black/25 px-3 py-3">
                     <code class="break-all text-[10px] font-bold text-white">{{qrString}}</code>
@@ -223,7 +245,7 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-            <div v-if="!paid && !failed && paymentNumber" class="mt-5 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <div v-if="!terminal && paymentNumber" class="mt-5 rounded-xl border border-white/10 bg-white/[0.03] p-4">
                 <p class="text-[9px] font-bold uppercase tracking-[0.14em] text-white/35">{{payment?.channel_name || 'Nomor pembayaran'}}</p>
                 <div class="mt-2 flex items-center justify-between gap-3 rounded-lg bg-black/25 px-3 py-3">
                     <code class="break-all text-base font-black tracking-wider text-white">{{paymentNumber}}</code>
@@ -231,7 +253,7 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-            <p v-if="!paid && !failed && payment?.expires_at" class="lf-payment-expiry">Berlaku sampai {{formatDateTime(payment.expires_at)}}</p>
+            <p v-if="!terminal && payment?.expires_at" class="lf-payment-expiry">Berlaku sampai {{formatDateTime(payment.expires_at)}}</p>
 
             <div v-if="settings.showStatusBox !== false" class="lf-payment-status-box">
                 <svg v-if="paid" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
@@ -240,8 +262,8 @@ onBeforeUnmount(() => {
             </div>
             <p v-if="paymentError" class="mt-3 text-center text-[10px] font-semibold text-rose-300">{{paymentError}}</p>
 
-            <button v-if="!paid && !failed && !payment" type="button" :disabled="startingPayment" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="resumePayment">{{startingPayment ? 'Menyiapkan…' : 'Siapkan pembayaran'}}</button>
-            <button v-if="!paid && !failed && paymentUrl" type="button" :disabled="openingPayment" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="openPayment">{{openingPayment ? 'Memproses…' : (settings.payButtonText || 'Bayar Sekarang')}}</button>
+            <button v-if="!terminal && !payment" type="button" :disabled="startingPayment" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="resumePayment">{{startingPayment ? 'Menyiapkan…' : 'Siapkan pembayaran'}}</button>
+            <button v-if="!terminal && paymentUrl" type="button" :disabled="openingPayment" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="openPayment">{{openingPayment ? 'Memproses…' : (settings.payButtonText || 'Bayar Sekarang')}}</button>
             <Link v-if="paid" :href="statusUrl" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006]">Lihat status pesanan</Link>
 
             <div class="lf-payment-actions mt-3 grid grid-cols-2 gap-2">
