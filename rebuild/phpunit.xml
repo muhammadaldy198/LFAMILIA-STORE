@@ -9,10 +9,10 @@
         </testsuite>
     </testsuites>
     <php>
-        <env name="APP_ENV" value="testing"/>
-        <env name="SESSION_DRIVER" value="array"/>
-        <env name="CACHE_STORE" value="array"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
-        <env name="TRUSTED_PROXIES" value="*"/>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="TRUSTED_PROXIES" value="*" force="true"/>
     </php>
 </phpunit>
