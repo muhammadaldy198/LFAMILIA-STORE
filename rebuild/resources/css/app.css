@@ -5586,3 +5586,6 @@
 }
 .lf-account-logout svg{width:16px;height:16px;flex:0 0 16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .lf-customer .lf-account-nav .lf-account-logout:hover{background:rgba(248,113,113,.10)!important}
+
+/* Desktop artwork keeps its original dimensions with the flat mobile treatment. */
+@media(min-width:640px){.lf-customer .lf-product-cover-3d{left:8px!important;width:188px!important;height:226px!important}}
