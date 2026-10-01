@@ -72,4 +72,6 @@ assert_page "/catalog/browser-checkout-game" "100 Diamonds" 1440 1000
 assert_page "/catalog/browser-checkout-game" "Ringkasan pesanan" 390 844
 assert_page "/catalog/browser-checkout-game" "Pakai Voucher" 390 844
 
+node tests/Browser/responsive.mjs "$CHROME_BIN"
+
 echo "M11 browser smoke passed."
