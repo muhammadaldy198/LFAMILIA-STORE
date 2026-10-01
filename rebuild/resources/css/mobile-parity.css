@@ -240,3 +240,11 @@
     border-radius: 8px !important;
   }
 }
+
+
+@media (max-width: 639px) {
+  .lf-customer:has(.lf-mobile-checkout-bar.is-hidden) .lf-live-support,
+  .lf-customer:has(.lf-mobile-checkout-bar.is-hidden) .lf-live-support.is-dragged {
+    bottom: 18px !important;
+  }
+}
