@@ -45,6 +45,9 @@ render() {
 }
 
 mkdir -p /etc/lfamilia "${BACKUP_DIR}"
+# Health checks run as APP_USER and must traverse the operations directory.
+chown root:"${APP_GROUP}" /etc/lfamilia
+chmod 0750 /etc/lfamilia
 chown "${BACKUP_RUN_USER}:${BACKUP_RUN_GROUP}" "${BACKUP_DIR}"
 chmod 0750 "${BACKUP_DIR}"
 chown root:"${APP_GROUP}" "${OPS_ENV_FILE}"
