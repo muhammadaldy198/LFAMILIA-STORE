@@ -248,7 +248,7 @@ function supportHref(kind) {
     <slot />
 
     <footer v-if="!compactFooter" class="lf-footer">
-        <div v-if="footerDesktop || footerMobile" v-if="sectionEnabled('footerBanner')" class="lf-footer-banner">
+        <div v-if="(footerDesktop || footerMobile) && sectionEnabled('footerBanner')" class="lf-footer-banner">
             <picture>
                 <source v-if="footerMobile" media="(max-width:639px)" :srcset="footerMobile">
                 <img :src="footerDesktop || footerMobile" :alt="customerText(&quot;components.customershell.attribute.alt.adae0b8b&quot;, &quot;LFAMILIA STORE&quot;)">
@@ -329,7 +329,7 @@ function supportHref(kind) {
                 </Link>
                 <Link :href="ticketHref">
                     <svg viewBox="0 0 24 24" class="support-ticket"><path d="M4 12a8 8 0 0 1 16 0v5a3 3 0 0 1-3 3h-2"/><path d="M4 13h3v5H4ZM17 13h3v5h-3Z"/></svg>
-                    <span><strong>{{ customerText("components.customershell.2e15e52c", "Support Ticket") }}</strong><small>{{logged?'Buka tiket bantuan':'Masuk untuk membuat tiket'}}</small></span>
+                    <span><strong>{{ customerText("components.customershell.2e15e52c", "Support Ticket") }}</strong><small>{{logged?'Buka tiket bantuan':'Buat tiket bantuan tamu'}}</small></span>
                 </Link>
             </div>
         </div>

@@ -38,7 +38,7 @@ class AdminPresentationTest extends TestCase
             ->assertInertia(fn ($page) => $page->component('Admin/Presentation'));
         $this->put('/admin/content/presentation', $payload)->assertSessionHasNoErrors()->assertRedirect();
         $this->get('/faq')->assertOk()->assertInertia(fn ($page) => $page
-            ->where('storefront.presentation.text.'.$key, 'Tulisan toko diperbarui')
+            ->where('storefront.presentation.text', fn ($text) => ($text[$key] ?? null) === 'Tulisan toko diperbarui')
             ->where('storefront.presentation.typography.mobile.page', 26)
             ->where('storefront.presentation.typography.desktop.page', 32)
             ->where('storefront.presentation.sections.tutorial', false));

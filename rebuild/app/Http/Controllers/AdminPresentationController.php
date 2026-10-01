@@ -26,7 +26,7 @@ class AdminPresentationController
     public function update(Request $request, CustomerPresentationService $presentation, AdminAuditService $audit): RedirectResponse
     {
         $data = $request->validate([
-            'text' => ['required', 'array', 'max:1000'],
+            'text' => ['present', 'array', 'max:1000'],
             'typography' => ['required', 'array:mobile,desktop'],
             'typography.mobile' => ['required', 'array'],
             'typography.desktop' => ['required', 'array'],

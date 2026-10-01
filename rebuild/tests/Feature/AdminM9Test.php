@@ -43,17 +43,17 @@ class AdminM9Test extends TestCase
         ]);
     }
 
-    public function test_prd_v1_admin_menu_has_exact_seventeen_sections_and_no_staff_role(): void
+    public function test_admin_menu_includes_account_validation_and_no_staff_role(): void
     {
         $super = $this->superAdmin();
         $menu = app(AdminPermissionService::class)->menu($super);
 
         $this->assertSame([
             'Dashboard', 'Pesanan', 'Produk', 'Manual', 'Banner & Konten', 'Digiflazz',
-            'Provider', 'Pembayaran', 'Pelanggan', 'Promo', 'Layanan Pelanggan', 'Laporan',
+            'Validasi Akun', 'Provider', 'Pembayaran', 'Pelanggan', 'Promo', 'Layanan Pelanggan', 'Laporan',
             'Admin & Akses', 'Pengaturan', 'Integrasi', 'System Health', 'Audit Log',
         ], collect($menu)->pluck('label')->all());
-        $this->assertCount(17, $menu);
+        $this->assertCount(18, $menu);
 
         $unsupported = AdminUser::create([
             'name' => 'Unsupported Staff',

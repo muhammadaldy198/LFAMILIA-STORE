@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AdminPermissionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -31,7 +32,7 @@ class AdminDashboardController
 
         return Inertia::render('Admin/Dashboard', [
             'metrics' => $metrics,
-            'recentOrders' => app(\App\Services\AdminPermissionService::class)->allows($request->user('admin'), 'orders.view')
+            'recentOrders' => app(AdminPermissionService::class)->allows($request->user('admin'), 'orders.view')
                 ? DB::table('orders')->orderByDesc('id')->limit(8)->get(['id', 'order_number', 'status', 'total_idr', 'created_at']) : [],
             'notifications' => DB::table('admin_notifications as notifications')
                 ->leftJoin('admin_notification_reads as reads', function ($join) use ($adminId): void {
