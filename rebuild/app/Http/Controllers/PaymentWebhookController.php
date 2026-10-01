@@ -136,6 +136,8 @@ class PaymentWebhookController
 
             $status = match ($transactionStatus) {
                 'SUCCESS' => 'PAID',
+                'EXPIRED' => 'EXPIRED',
+                'CANCELLED', 'CANCELED' => 'CANCELLED',
                 'FAILED' => 'FAILED',
                 'REFUNDED', 'REFUND' => 'REFUNDED',
                 default => 'PENDING',
