@@ -661,8 +661,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <header><div><h2>Data Pembeli</h2><p>Email dan WhatsApp digunakan untuk invoice serta status transaksi.</p></div></header>
                     <div class="lf-panel-body">
                         <div v-if="!customer" class="lf-account-fields">
-                            <label><span>Email</span><input v-model="guestEmail" type="email" maxlength="255" placeholder="nama@email.com"></label>
-                            <label><span>Nomor WhatsApp</span><input :value="guestPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="17" pattern="\\+?[0-9]{8,16}" placeholder="081234567890" @input="guestPhone=normalizeWhatsapp($event.target.value)"></label>
+                            <label><span>Email</span><input v-model="guestEmail" type="email" maxlength="255" placeholder="Contoh: nama@email.com"></label>
+                            <label><span>Nomor WhatsApp</span><input :value="guestPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="17" pattern="\\+?[0-9]{8,16}" placeholder="Contoh: 081234567890" @input="guestPhone=normalizeWhatsapp($event.target.value)"></label>
                         </div>
                         <div v-else class="lf-customer-checkout-note">
                             <span class="lf-account-avatar">{{customer.name?.slice(0,1)?.toUpperCase()}}</span>
@@ -676,7 +676,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <header><div><h2>Kode Promo</h2><p>Masukkan kode promo atau voucher diskon yang tersedia.</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-promo-input">
-                            <input :value="voucherCode" maxlength="100" placeholder="Ketik kode promo kamu" @input="voucherCode=normalizePromo($event.target.value)">
+                            <input :value="voucherCode" maxlength="100" placeholder="Masukkan kode promo" @input="voucherCode=normalizePromo($event.target.value)">
                             <button type="button" :disabled="busy==='quote'||!canQuote" @click="loadQuote">{{busy==='quote'?'Memeriksa...':'Gunakan'}}</button>
                         </div>
                         <button type="button" class="lf-available-promo" @click="openVoucherPicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9a3 3 0 0 0 0 6v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a3 3 0 0 0 0-6V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg><span>Pakai Voucher Yang Tersedia</span></button>
@@ -755,8 +755,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             <button v-for="value in [1,2,3,4,5]" :key="value" type="button" :aria-label="value + ' bintang'" :class="{active:value<=reviewRating}" @click="reviewRating=value">★</button>
                         </div>
 
-                        <input v-model="reviewTitle" maxlength="100" placeholder="Judul singkat (opsional)">
-                        <textarea v-model="reviewBody" required minlength="5" maxlength="1200" placeholder="Ceritakan kecepatan proses dan pengalamanmu..."></textarea>
+                        <input v-model="reviewTitle" maxlength="100" placeholder="Masukkan judul singkat (opsional)">
+                        <textarea v-model="reviewBody" required minlength="5" maxlength="1200" placeholder="Ceritakan pengalaman transaksimu"></textarea>
                         <p v-if="reviewMessage" class="lf-review-success">{{reviewMessage}}</p>
                         <p v-if="reviewError" class="lf-review-error">{{reviewError}}</p>
                         <button class="lf-review-submit" :disabled="reviewSaving">{{reviewSaving ? 'Menyimpan...' : 'Simpan ulasan'}}</button>
