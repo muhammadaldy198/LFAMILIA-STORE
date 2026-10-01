@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class PaymentTest extends TestCase
@@ -155,6 +156,26 @@ class PaymentTest extends TestCase
         $this->assertSame(11500, (int) $order->total_idr);
         $this->assertSame('manual_qris', $snapshot['payment']['channel_code']);
         $this->assertSame('MANUAL_QRIS', $snapshot['payment']['gateway_code']);
+    }
+
+    public function test_payment_page_ignores_redirect_status_query_and_uses_server_state(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('manual_qris', 'MANUAL_QRIS');
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'manual_qris',
+            'm8-redirect-status-order-0001'
+        ))->assertCreated();
+
+        $this->get('/payment?invoice='.urlencode((string) $checkout->json('order_number')).'&transaction_status=settlement&status_code=200')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Payment/Show')
+                ->where('order.status', 'PENDING_PAYMENT')
+                ->where('payment', null)
+            );
     }
 
     public function test_midtrans_settlement_is_verified_idempotent_and_stale_pending_cannot_downgrade_paid(): void
