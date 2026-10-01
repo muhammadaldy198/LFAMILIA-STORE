@@ -106,7 +106,7 @@ async function remove(account) {
                     <option v-for="product in products" :key="product.id" :value="String(product.id)">{{product.name}}</option>
                 </select>
             </label>
-            <label class="text-xs">Nama akun<input v-model="label" maxlength="100" placeholder="Contoh: ML Main" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3"></label>
+            <label class="text-xs">Nama akun<input v-model="label" maxlength="100" placeholder="Contoh: Mobile Legends Utama" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3"></label>
             <label v-for="field in fields" :key="field.field_key" class="text-xs">
                 {{field.label}}
                 <input v-model="values[field.field_key]" :type="field.type || 'text'" :required="field.is_required" :placeholder="field.placeholder || ''" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3">
