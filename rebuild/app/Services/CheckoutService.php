@@ -355,17 +355,6 @@ class CheckoutService
             $result['order']->id,
             ['order_number' => $result['order']->order_number]
         );
-        if (data_get($snapshot, 'payment.gateway_code') === 'MANUAL_QRIS') {
-            $this->notifications->record(
-                'payment.manual_qris.pending',
-                'QRIS manual menunggu konfirmasi',
-                'Order '.$result['order']->order_number.' menggunakan QRIS manual.',
-                'WARNING',
-                'order',
-                $result['order']->id
-            );
-        }
-
         return [
             'order' => $result['order'],
             'access_code' => $accessCode,
