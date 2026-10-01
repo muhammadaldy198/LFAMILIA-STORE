@@ -197,7 +197,7 @@ class StorefrontParityTest extends TestCase
 
     public function test_logged_customer_can_save_game_account_and_guest_success_order_can_review_once(): void
     {
-        $this->withoutMiddleware();
+        $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.155']);
         $catalog = $this->catalog();
         $user = User::create([
             'name' => 'Parity User',
