@@ -158,6 +158,7 @@ Nominal produk diurutkan berdasarkan nilai nominal produk, bukan berdasarkan har
 | Diproses | Fulfillment sedang berjalan |
 | Berhasil | Fulfillment selesai |
 | Gagal | Transaksi gagal sesuai state machine |
+| Dibatalkan | Pembayaran/order dibatalkan sebelum fulfillment dimulai |
 | Kedaluwarsa | Batas waktu pembayaran habis |
 | Refund | Dana dikembalikan sesuai flow refund |
 
