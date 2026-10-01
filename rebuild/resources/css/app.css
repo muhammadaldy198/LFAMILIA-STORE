@@ -5076,9 +5076,9 @@
   --lf-ui-helper:10px;
   --lf-ui-card-title:12px;
   --lf-ui-card-price:11px;
-  --lf-ui-button-sm:11px;
+  --lf-ui-button-sm:12px;
   --lf-ui-button-main:12px;
-  --lf-ui-control-height:44px;
+  --lf-ui-control-height:40px;
 }
 
 /* Section/card headers: one hierarchy across checkout, account, tools and status UI. */
@@ -5163,6 +5163,12 @@
 .lf-customer .lf-track-search button{
   font-size:var(--lf-ui-button-sm)!important;
   font-weight:700!important;
+}
+.lf-customer .lf-promo-input button,
+.lf-customer .lf-available-promo{
+  height:36px!important;
+  min-height:36px!important;
+  padding-inline:12px!important;
 }
 .lf-customer .lf-order-button,
 .lf-customer .lf-mobile-order-button,
