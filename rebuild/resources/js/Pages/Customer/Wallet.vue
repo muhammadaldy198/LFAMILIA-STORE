@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import AccountShell from '../../Components/AccountShell.vue';
 import { rupiah } from '../../lib/money';
 
@@ -17,6 +17,11 @@ const quote = ref(null);
 const result = ref(null);
 const errors = ref({});
 const busy = ref('');
+const attemptLocked = ref(false);
+const quoteMatches = computed(() => quote.value && Number(quote.value.amount_idr) === Number(amountIdr.value)
+    && quote.value.payment_channel_code === paymentChannelCode.value);
+watch([amountIdr, paymentChannelCode], () => { quote.value = null; errors.value = {}; });
+const statusLabel = status => ({PENDING: 'Menunggu pembayaran', CREATING: 'Menyiapkan pembayaran', UNKNOWN: 'Status belum pasti', PAID: 'Pembayaran diterima', EXPIRED: 'Kedaluwarsa', REJECTED: 'Ditolak'}[status] || status);
 const idempotencyKey = ref(globalThis.crypto?.randomUUID?.() || ('topup-' + Date.now()));
 
 async function postJson(url, payload) {
@@ -36,6 +41,8 @@ async function postJson(url, payload) {
 }
 
 async function loadQuote() {
+    if (busy.value || attemptLocked.value || !paymentChannelCode.value) return;
+    quote.value = null;
     errors.value = {};
     busy.value = 'quote';
     try {
@@ -44,13 +51,15 @@ async function loadQuote() {
             payment_channel_code: paymentChannelCode.value,
         });
     } catch (error) {
-        errors.value = error.validation || {};
+        errors.value = error.validation || { topup: [error.message || 'Koneksi terputus. Coba lagi.'] };
     } finally {
         busy.value = '';
     }
 }
 
 async function createTopup() {
+    if (busy.value || result.value || !quoteMatches.value) return;
+    attemptLocked.value = true;
     errors.value = {};
     busy.value = 'topup';
     try {
@@ -59,7 +68,8 @@ async function createTopup() {
             payment_channel_code: paymentChannelCode.value,
             idempotency_key: idempotencyKey.value,
         });
-        const redirect = result.value?.payment?.instructions?.redirect_url;
+        const redirect = ['PENDING'].includes(result.value?.payment?.status)
+            ? (result.value?.payment?.instructions?.redirect_url || result.value?.payment?.instructions?.payment_url) : null;
         if (redirect) window.location.assign(redirect);
     } catch (error) {
         errors.value = error.validation || {};
@@ -84,7 +94,7 @@ async function createTopup() {
                 <p class="text-sm text-slate-400">Minimum {{ rupiah(minimumTopupIdr) }}. Biaya metode pembayaran dihitung server.</p>
             </div>
             <label class="block text-sm">Nominal
-                <input v-model.number="amountIdr" type="number" :min="minimumTopupIdr" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
+                <input v-model.number="amountIdr" type="number" step="1" :min="minimumTopupIdr" :disabled="Boolean(busy) || attemptLocked" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
             </label>
             <span v-if="errors.amount_idr" class="text-xs text-red-300">{{ errors.amount_idr[0] }}</span>
 
@@ -93,6 +103,7 @@ async function createTopup() {
                     v-for="channel in paymentChannels"
                     :key="channel.code"
                     type="button"
+                    :disabled="Boolean(busy) || attemptLocked"
                     class="rounded-lg border px-3 py-2 text-left text-sm"
                     :class="paymentChannelCode === channel.code ? 'border-cyan-400 bg-cyan-400/10' : 'border-slate-700 bg-slate-950'"
                     @click="paymentChannelCode = channel.code; quote = null"
@@ -101,17 +112,19 @@ async function createTopup() {
             <span v-if="errors.payment_channel_code" class="text-xs text-red-300">{{ errors.payment_channel_code[0] }}</span>
 
             <div class="flex flex-wrap gap-2">
-                <button type="button" :disabled="busy || !paymentChannelCode" class="rounded-lg bg-slate-700 px-4 py-2 disabled:opacity-50" @click="loadQuote">Hitung total</button>
-                <button type="button" :disabled="busy || !paymentChannelCode" class="rounded-lg bg-cyan-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" @click="createTopup">Top up</button>
+                <button type="button" :disabled="busy || attemptLocked || !paymentChannelCode" class="rounded-lg bg-slate-700 px-4 py-2 disabled:opacity-50" @click="loadQuote">Hitung total</button>
+                <button type="button" :disabled="busy || result || !quoteMatches" class="rounded-lg bg-cyan-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" @click="createTopup">{{busy === 'topup' ? 'Menyiapkan…' : attemptLocked ? 'Cek percobaan yang sama' : 'Top up'}}</button>
             </div>
-            <div v-if="quote" class="rounded-lg bg-slate-950 p-3 text-sm">
+            <p v-if="!paymentChannels?.length" class="text-sm text-slate-400">Metode top up belum tersedia. Hubungi bantuan.</p>
+            <p v-if="attemptLocked && !result" role="status" class="text-sm text-amber-200">Jika status belum pasti, coba cek percobaan yang sama. Jangan membuat top up baru.</p>
+            <div v-if="quoteMatches" class="rounded-lg bg-slate-950 p-3 text-sm">
                 <div class="flex justify-between"><span>Saldo masuk</span><span>{{ rupiah(quote.amount_idr) }}</span></div>
                 <div class="flex justify-between"><span>Biaya</span><span>{{ rupiah(quote.fee_idr) }}</span></div>
                 <div class="mt-2 flex justify-between border-t border-slate-800 pt-2 font-semibold"><span>Total bayar</span><span>{{ rupiah(quote.total_idr) }}</span></div>
             </div>
             <div v-if="result?.payment" class="space-y-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3 text-sm">
-                <p>Status pembayaran: <strong>{{ result.payment.status }}</strong></p>
-                <p v-if="result.payment.instructions?.va_number">Nomor VA: <strong>{{ result.payment.instructions.va_number }}</strong></p>
+                <p>Status pembayaran: <strong>{{ statusLabel(result.payment.status) }}</strong></p>
+                <p v-if="result.payment.status === 'PENDING' && result.payment.instructions?.va_number">Nomor VA: <strong>{{ result.payment.instructions.va_number }}</strong></p>
                 <p v-if="result.payment.instructions?.payment_code">Kode: <strong>{{ result.payment.instructions.payment_code }}</strong></p>
                 <a v-if="result.payment.instructions?.payment_url" :href="result.payment.instructions.payment_url" class="text-cyan-200 underline">Buka pembayaran</a>
             </div>
