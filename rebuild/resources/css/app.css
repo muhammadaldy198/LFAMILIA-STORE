@@ -4882,6 +4882,15 @@
   filter:brightness(1.04);
 }
 @media(max-width:639px){
+  .lf-auth-login{
+    min-height:0!important;
+    display:grid!important;
+    place-items:start center!important;
+    padding:24px 16px 44px!important;
+  }
+}
+
+@media(max-width:639px){
   .lf-support-cta{
     padding:14px 0 10px;
   }
