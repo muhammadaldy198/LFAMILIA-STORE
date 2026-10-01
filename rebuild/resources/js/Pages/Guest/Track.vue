@@ -21,12 +21,13 @@ const statusMeta=s=>({
  processing:['Sedang Diproses','Pesanan sedang diproses sistem.','blue'],
  success:['Berhasil','Pesanan selesai diproses.','green'],
  failed:['Gagal','Pesanan tidak berhasil diproses.','red'],
+ cancelled:['Dibatalkan','Transaksi dibatalkan dan tidak akan diproses.','red'],
  expired:['Kedaluwarsa','Waktu pembayaran telah berakhir.','gray'],
  refunded:['Refund','Pengembalian dana sedang atau telah diproses.','amber'],
 }[s]||['Diproses','Status sedang diperbarui.','blue']);
 const sourceLabel=s=>({payment:'Pembayaran',processing:'Proses Pesanan',delivery:'Pengiriman',admin:'Admin',system:'Sistem'}[s]||'Sistem');
 const date=v=>v?new Date(v).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'-';
-const terminal=computed(()=>detail.value&&['success','failed','expired','refunded'].includes(detail.value.fulfillmentStatus));
+const terminal=computed(()=>detail.value&&['success','failed','cancelled','expired','refunded'].includes(detail.value.fulfillmentStatus));
 
 async function json(url,options={}){
  const token=document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')||'';
