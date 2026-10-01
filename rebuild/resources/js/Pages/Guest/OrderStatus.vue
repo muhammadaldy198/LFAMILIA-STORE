@@ -20,10 +20,14 @@ const reviewMessage=ref('');
 let timer=null;
 
 const terminal=computed(()=>['SUCCESS','FAILED','CANCELLED','EXPIRED','REFUNDED'].includes(orderState.value.status));
+const manualQris=computed(()=>paymentState.value?.instructions?.kind==='manual_qris'
+    || String(paymentState.value?.channel_code||'').toLowerCase().includes('manual'));
 const statusLabel=s=>({
-    PENDING_PAYMENT:'Menunggu Pembayaran',PAID:'Pembayaran Diterima',PROCESSING:'Sedang Diproses',
-    SUCCESS:'Berhasil',FAILED:'Gagal',CANCELLED:'Dibatalkan',EXPIRED:'Kedaluwarsa',REFUNDED:'Refund',
-}[s]||String(s||'-').replaceAll('_',' '));
+    PENDING_PAYMENT:'Menunggu Pembayaran',PENDING:'Menunggu Pembayaran',CREATING:'Menyiapkan Pembayaran',
+    PAID:'Pembayaran Diterima',PROCESSING:'Sedang Diproses',SUCCESS:'Berhasil',FAILED:'Gagal',
+    CANCELLED:'Dibatalkan',EXPIRED:'Kedaluwarsa',REFUNDED:'Refund',REFUND:'Refund',
+    REJECTED:'Ditolak',UNKNOWN:'Status Belum Pasti',
+}[String(s||'').toUpperCase()]||String(s||'-').replaceAll('_',' '));
 const eventLabel=e=>{
     if(e.to_status) return statusLabel(e.to_status);
     const map={
@@ -117,7 +121,11 @@ onUnmounted(()=>{if(timer)clearInterval(timer);});
                     <img v-if="paymentState?.instructions?.qr_url" :src="paymentState.instructions.qr_url" alt="QRIS pembayaran">
                     <p v-if="paymentState?.instructions?.va_number">Nomor VA: <strong>{{paymentState.instructions.va_number}}</strong></p>
                     <p v-if="paymentState?.instructions?.payment_code">Kode pembayaran: <strong>{{paymentState.instructions.payment_code}}</strong></p>
-                    <button class="lf-primary mt-3" :disabled="busy" @click="continuePayment">{{busy?'Memeriksa...':paymentState?'Lanjutkan pembayaran':'Bayar sekarang'}}</button>
+                    <div v-if="manualQris&&paymentState" class="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3">
+                        <strong class="text-[10px] text-amber-200">Menunggu verifikasi QRIS manual</strong>
+                        <p class="mt-1 text-[9px] leading-4 text-white/45">Setelah membayar, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama.</p>
+                    </div>
+                    <button v-if="!manualQris" class="lf-primary mt-3" :disabled="busy" @click="continuePayment">{{busy?'Memeriksa...':paymentState?'Lanjutkan pembayaran':'Bayar sekarang'}}</button>
                     <p v-if="errors.payment" class="mt-2 text-[10px] text-red-300">{{errors.payment[0]}}</p>
                 </section>
 
