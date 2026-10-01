@@ -8,8 +8,8 @@ use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class CheckoutTest extends TestCase
@@ -482,5 +482,4 @@ class CheckoutTest extends TestCase
         $scoped = collect($response->json('vouchers'))->firstWhere('code', 'SCOPEDOR');
         $this->assertSame(1500, $scoped['discount_idr']);
     }
-
 }

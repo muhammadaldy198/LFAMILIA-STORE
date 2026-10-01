@@ -8,8 +8,8 @@ use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
 use App\Models\User;
-use App\Services\PaymentRoutingService;
 use App\Services\Payment\DokuSignature;
+use App\Services\PaymentRoutingService;
 use App\Services\PaymentStateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Routing\Middleware\ThrottleRequests;
@@ -879,5 +879,4 @@ class PaymentTest extends TestCase
         $this->assertSame(500, (int) $persisted->fee_idr);
         $this->assertSame(10500, (int) $persisted->total_idr);
     }
-
 }

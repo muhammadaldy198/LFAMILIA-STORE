@@ -305,5 +305,4 @@ class CatalogTest extends TestCase
                 ->missing('packages.0.max_price_idr')
                 ->etc());
     }
-
 }
