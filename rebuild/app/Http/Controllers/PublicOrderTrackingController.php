@@ -132,7 +132,7 @@ class PublicOrderTrackingController
             ->map(fn (object $event): array => [
                 'id' => (int) $event->id,
                 'source' => $this->eventSource((string) $event->event_type),
-                'status' => strtolower((string) ($event->to_status ?: $event->event_type)),
+                'status' => $event->to_status ? $this->publicStatus((string) $event->to_status) : null,
                 'label' => $this->eventLabel((string) $event->event_type, $event->to_status),
                 'createdAt' => $event->created_at,
             ])->values()->all();
@@ -161,7 +161,7 @@ class PublicOrderTrackingController
         return DB::table('orders')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
-            ->whereIn('orders.status', ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'EXPIRED', 'CANCELLED', 'REFUNDED'])
+            ->whereIn('orders.status', ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'EXPIRED', 'CANCELLED', 'REFUND', 'REFUNDED'])
             ->orderByDesc('orders.id')->limit(20)
             ->get([
                 'orders.order_number', 'orders.status', 'orders.total_idr', 'orders.created_at',
@@ -225,6 +225,10 @@ class PublicOrderTrackingController
             return null;
         }
 
+        if (! is_array($payload)) {
+            return null;
+        }
+
         $orderId = filter_var($payload['id'] ?? null, FILTER_VALIDATE_INT);
         if (! $orderId || $orderId < 1) {
             return null;
@@ -277,7 +281,7 @@ class PublicOrderTrackingController
             'SUCCESS' => 'success',
             'EXPIRED' => 'expired',
             'CANCELLED' => 'cancelled',
-            'REFUNDED' => 'refunded',
+            'REFUND', 'REFUNDED' => 'refunded',
             default => 'failed',
         };
     }
@@ -285,6 +289,9 @@ class PublicOrderTrackingController
     private function paymentStatus(string $paymentStatus, string $orderStatus): string
     {
         $payment = strtoupper($paymentStatus);
+        if ($payment === 'REFUNDED' || in_array(strtoupper($orderStatus), ['REFUND', 'REFUNDED'], true)) {
+            return 'refunded';
+        }
         if (in_array($payment, ['SETTLEMENT', 'CAPTURE', 'PAID', 'SUCCESS'], true)) {
             return 'paid';
         }
@@ -331,13 +338,14 @@ class PublicOrderTrackingController
                 'FAILED' => 'Transaksi gagal',
                 'EXPIRED' => 'Pembayaran kedaluwarsa',
                 'CANCELLED' => 'Transaksi dibatalkan',
-                default => str_replace('_', ' ', ucfirst(strtolower($toStatus))),
+                'REFUND', 'REFUNDED' => 'Pengembalian dana',
+                default => 'Status pesanan diperbarui',
             };
         }
 
         return match (strtoupper($eventType)) {
             'ORDER_CREATED' => 'Pesanan dibuat',
-            default => str_replace('_', ' ', ucfirst(strtolower($eventType))),
+            default => 'Status pesanan diperbarui',
         };
     }
 }
