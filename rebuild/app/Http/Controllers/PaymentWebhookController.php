@@ -187,7 +187,8 @@ class PaymentWebhookController
             'settlement' => 'PAID',
             'capture' => in_array($fraud, ['', 'accept'], true) ? 'PAID' : 'PENDING',
             'expire' => 'EXPIRED',
-            'cancel', 'deny', 'failure' => 'FAILED',
+            'cancel' => 'CANCELLED',
+            'deny', 'failure' => 'FAILED',
             'refund', 'partial_refund' => 'REFUNDED',
             default => 'PENDING',
         };
