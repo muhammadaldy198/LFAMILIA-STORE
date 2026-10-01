@@ -33,6 +33,7 @@ const quote = ref(null);
 const nicknameResult = ref(null);
 const accountValidationSignature = ref('');
 let accountValidationRequest = 0;
+let quoteRequest = 0;
 const checkoutResult = ref(null);
 const paymentResult = ref(null);
 const errors = ref({});
@@ -74,7 +75,9 @@ const selectedPaymentChannel = computed(() => (props.paymentChannels || []).find
     channel.available !== false && channel.code === paymentChannelCode.value
 ));
 const canQuote = computed(() => Boolean(selectedPackage.value && selectedPaymentChannel.value && guestContactComplete.value));
-const displayTotal = computed(() => quote.value?.total_idr ?? selectedPackage.value?.price_idr ?? 0);
+const summarySubtotal = computed(() => quote.value?.subtotal_idr ?? selectedPackage.value?.price_idr ?? 0);
+const summaryFee = computed(() => quote.value ? Number(quote.value.fee_idr || 0) : null);
+const displayTotal = computed(() => quote.value?.total_idr ?? summarySubtotal.value);
 const isVoucherProduct = computed(() => String(props.product?.category_slug || '').toLowerCase() === 'voucher');
 const hasAccountStep = computed(() => !isVoucherProduct.value && (props.fields || []).length > 0);
 const nominalStep = computed(() => hasAccountStep.value ? 2 : 1);
@@ -207,6 +210,31 @@ function normalizeWhatsapp(value) {
 
 function normalizePromo(value) {
     return String(value || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+}
+
+function currentQuoteSignature() {
+    return JSON.stringify([
+        selectedPackage.value?.id ?? null,
+        selectedPaymentChannel.value?.code ?? null,
+        normalizePromo(voucherCode.value),
+        props.customer?.id ?? null,
+        props.customer ? null : guestEmail.value.trim().toLowerCase(),
+        props.customer ? null : normalizeWhatsapp(guestPhone.value),
+    ]);
+}
+
+function invalidateQuote() {
+    quoteRequest += 1;
+    quote.value = null;
+    if (busy.value === 'quote') busy.value = '';
+}
+
+function updateVoucherInput(value) {
+    const normalized = normalizePromo(value);
+    if (voucherCode.value === normalized) return;
+
+    voucherCode.value = normalized;
+    invalidateQuote();
 }
 
 function nominalLabel(label, productName) {
@@ -390,7 +418,7 @@ async function checkNickname() {
 function choosePackage(item) {
     if (!item.is_available) return;
     selectedPackageId.value = String(item.id);
-    quote.value = null;
+    invalidateQuote();
 }
 
 async function choosePayment(code) {
@@ -398,25 +426,39 @@ async function choosePayment(code) {
     if (!channel) return;
 
     paymentChannelCode.value = channel.code;
-    quote.value = null;
+    invalidateQuote();
     if (canQuote.value) await loadQuote();
 }
 
 async function loadQuote() {
-    if (!canQuote.value) return null;
+    if (!canQuote.value) {
+        invalidateQuote();
+        return null;
+    }
+
+    const signature = currentQuoteSignature();
+    const requestId = ++quoteRequest;
+    quote.value = null;
     errors.value = {};
     busy.value = 'quote';
+
     try {
-        quote.value = await requestJson('/checkout/quote', {
+        const result = await requestJson('/checkout/quote', {
             method: 'POST',
             body: JSON.stringify(basePayload()),
         });
-        return quote.value;
+
+        if (requestId !== quoteRequest || signature !== currentQuoteSignature()) return null;
+
+        quote.value = result;
+        return result;
     } catch (error) {
+        if (requestId !== quoteRequest || signature !== currentQuoteSignature()) return null;
+
         errors.value = error.validation || {};
         return null;
     } finally {
-        busy.value = '';
+        if (requestId === quoteRequest && busy.value === 'quote') busy.value = '';
     }
 }
 
@@ -450,6 +492,7 @@ async function openVoucherPicker() {
 async function applyVoucher(code) {
     voucherCode.value = code;
     voucherOpen.value = false;
+    invalidateQuote();
     if (canQuote.value) await loadQuote();
 }
 
@@ -504,7 +547,18 @@ async function createOrder() {
                 turnstile_token: turnstileToken.value || null,
             }),
         });
-        quote.value = { ...(quote.value || {}), total_idr: checkoutResult.value.total_idr };
+        quote.value = {
+            subtotal_idr: checkoutResult.value.subtotal_idr,
+            member_discount_idr: checkoutResult.value.member_discount_idr,
+            voucher_discount_idr: checkoutResult.value.voucher_discount_idr,
+            discount_idr: checkoutResult.value.discount_idr,
+            member_tier_code: checkoutResult.value.member_tier_code,
+            member_discount_bps: checkoutResult.value.member_discount_bps,
+            fee_idr: checkoutResult.value.fee_idr,
+            total_idr: checkoutResult.value.total_idr,
+            voucher_code: checkoutResult.value.voucher_code,
+            payment_channel_code: checkoutResult.value.payment_channel_code,
+        };
 
         paymentResult.value = await requestJson('/payments/orders/' + encodeURIComponent(checkoutResult.value.order_number), {
             method: 'POST',
@@ -555,7 +609,7 @@ onBeforeUnmount(() => {
 });
 
 watch([guestEmail, guestPhone], () => {
-    quote.value = null;
+    invalidateQuote();
 });
 
 let nicknameAutoTimer;
@@ -775,7 +829,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <header><div><h2>Kode Promo</h2><p>Masukkan kode promo atau voucher diskon yang tersedia.</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-promo-input">
-                            <input :value="voucherCode" maxlength="100" placeholder="Masukkan kode promo" @input="voucherCode=normalizePromo($event.target.value)">
+                            <input :value="voucherCode" maxlength="100" placeholder="Masukkan kode promo" @input="updateVoucherInput($event.target.value)">
                             <button type="button" :disabled="busy==='quote'||!canQuote" @click="loadQuote">{{busy==='quote'?'Memeriksa...':'Gunakan'}}</button>
                         </div>
                         <button type="button" class="lf-available-promo" @click="openVoucherPicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9a3 3 0 0 0 0 6v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a3 3 0 0 0 0-6V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg><span>Pakai Voucher Yang Tersedia</span></button>
@@ -807,10 +861,10 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <div><strong>{{product.name}}</strong><small>{{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : 'Pilih nominal'}}</small></div>
                 </div>
                 <dl>
-                    <div><dt>Harga</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
+                    <div><dt>Harga</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
                     <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd class="lf-discount">-{{formatIdr(quote.member_discount_idr)}}</dd></div>
                     <div v-if="quote?.voucher_discount_idr"><dt>Diskon Voucher</dt><dd class="lf-discount">-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
-                    <div><dt>Biaya pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
+                    <div><dt>Biaya pembayaran</dt><dd>{{summaryFee===null ? '—' : formatIdr(summaryFee)}}</dd></div>
                     <div class="total"><dt>Total</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
                 </dl>
                 <button type="button" class="lf-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">{{busy==='order'?'Memproses...':'Pesan Sekarang'}}</button>
@@ -918,21 +972,21 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                         <strong>Ringkasan pesanan</strong>
                         <small>{{product.name}} · {{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : 'Pilih nominal'}}</small>
                     </span>
-                    <strong class="lf-mobile-summary-price">{{formatIdr(selectedPackage?.price_idr)}}</strong>
+                    <strong class="lf-mobile-summary-price">{{formatIdr(displayTotal)}}</strong>
                     <span class="lf-mobile-summary-chevron">⌄</span>
                 </button>
                 <dl class="lf-mobile-summary-lines">
-                    <div><dt>Harga Satuan</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
-                    <div><dt>Subtotal</dt><dd>{{formatIdr(selectedPackage?.price_idr)}}</dd></div>
+                    <div><dt>Harga Satuan</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
+                    <div><dt>Subtotal</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
                     <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(quote.member_discount_idr)}}</dd></div>
                     <div v-if="quote?.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
-                    <div><dt>Biaya Pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
+                    <div><dt>Biaya Pembayaran</dt><dd>{{summaryFee===null ? '—' : formatIdr(summaryFee)}}</dd></div>
                     <div class="total"><dt>Total Pembayaran</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
                 </dl>
             </div>
             <button v-else type="button" class="lf-mobile-summary-toggle" aria-expanded="false" @click="summaryOpen=true">
                 <span><strong>Ringkasan pesanan</strong><small>Ketuk untuk melihat rincian</small></span>
-                <span><strong>{{formatIdr(selectedPackage?.price_idr)}}</strong><b>⌃</b></span>
+                <span><strong>{{formatIdr(displayTotal)}}</strong><b>⌃</b></span>
             </button>
             <button type="button" class="lf-mobile-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">
                 <template v-if="busy==='order'">Memproses...</template>
@@ -1010,6 +1064,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <div><dt>Item</dt><dd>{{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : '-'}}</dd></div>
                 <div><dt>Produk</dt><dd>{{product.name}}</dd></div>
                 <div><dt>Payment</dt><dd>{{paymentGroups.find(group=>group.items.some(item=>item.code===paymentChannelCode))?.title || '-'}}</dd></div>
+                <div><dt>Subtotal</dt><dd>{{formatIdr(quote?.subtotal_idr)}}</dd></div>
                 <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(quote.member_discount_idr)}}</dd></div>
                 <div v-if="quote?.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
                 <div><dt>Biaya Pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>

@@ -386,7 +386,16 @@ class CheckoutTest extends TestCase
             'voucher_code' => 'STACK50',
             'idempotency_key' => 'checkout-member-voucher-0001',
         ])->assertCreated()
-            ->assertJsonPath('total_idr', 4950);
+            ->assertJsonPath('subtotal_idr', 11000)
+            ->assertJsonPath('member_discount_idr', 1100)
+            ->assertJsonPath('voucher_discount_idr', 4950)
+            ->assertJsonPath('discount_idr', 6050)
+            ->assertJsonPath('member_tier_code', 'SILVER')
+            ->assertJsonPath('member_discount_bps', 1000)
+            ->assertJsonPath('fee_idr', 0)
+            ->assertJsonPath('total_idr', 4950)
+            ->assertJsonPath('voucher_code', 'STACK50')
+            ->assertJsonPath('payment_channel_code', 'manual_qris');
 
         $row = DB::table('orders')->where('order_number', $order->json('order_number'))->firstOrFail();
         $snapshot = json_decode($row->snapshot, true, 512, JSON_THROW_ON_ERROR);

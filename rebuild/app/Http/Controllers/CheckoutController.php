@@ -148,11 +148,28 @@ class CheckoutController
             $statusUrl = route('account.orders.show', $order->id);
         }
 
+        $snapshot = is_string($order->snapshot)
+            ? json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR)
+            : (array) $order->snapshot;
+        $pricing = (array) ($snapshot['pricing'] ?? []);
+        $membership = (array) ($snapshot['membership'] ?? []);
+        $voucher = (array) ($snapshot['voucher'] ?? []);
+        $payment = (array) ($snapshot['payment'] ?? []);
+
         return response()->json([
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'status' => $order->status,
+            'subtotal_idr' => max(0, (int) $order->total_idr + (int) $order->discount_idr - (int) $order->fee_idr),
+            'member_discount_idr' => (int) ($pricing['member_discount_idr'] ?? 0),
+            'voucher_discount_idr' => (int) ($pricing['voucher_discount_idr'] ?? 0),
+            'discount_idr' => (int) $order->discount_idr,
+            'member_tier_code' => $membership['tier_code'] ?? null,
+            'member_discount_bps' => (int) ($membership['discount_bps'] ?? 0),
+            'fee_idr' => (int) $order->fee_idr,
             'total_idr' => (int) $order->total_idr,
+            'voucher_code' => $voucher['code'] ?? null,
+            'payment_channel_code' => $payment['channel_code'] ?? null,
             'access_code' => $result['access_code'],
             'status_url' => $statusUrl,
             'created' => $result['created'],

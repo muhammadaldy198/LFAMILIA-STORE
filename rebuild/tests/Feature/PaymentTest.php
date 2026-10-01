@@ -143,7 +143,10 @@ class PaymentTest extends TestCase
             'm7-fee-server-side-0001'
         ))->assertCreated();
 
-        $response->assertJsonPath('total_idr', 11500)
+        $response->assertJsonPath('subtotal_idr', 11000)
+            ->assertJsonPath('discount_idr', 0)
+            ->assertJsonPath('fee_idr', 500)
+            ->assertJsonPath('total_idr', 11500)
             ->assertJsonMissing(['gateway_code' => 'MANUAL_QRIS']);
 
         $order = DB::table('orders')->where('order_number', $response->json('order_number'))->firstOrFail();
@@ -804,6 +807,77 @@ class PaymentTest extends TestCase
         $channels = app(PaymentRoutingService::class)->publicOrderChannels(null);
 
         $this->assertNull(collect($channels)->firstWhere('code', 'manual_qris'));
+    }
+
+    public function test_quote_and_created_order_share_the_same_server_financial_summary(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('manual_qris', 'MANUAL_QRIS', 500);
+
+        DB::table('vouchers')->insert([
+            'code' => 'SUMMARY1000',
+            'discount_type' => 'FIXED',
+            'discount_value' => 1000,
+            'minimum_total_idr' => 0,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $quote = $this->postJson('/checkout/quote', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'voucher_code' => 'SUMMARY1000',
+            'guest_email' => 'summary@example.test',
+            'guest_phone' => '081234567890',
+        ])->assertOk()
+            ->assertJsonPath('subtotal_idr', 11000)
+            ->assertJsonPath('member_discount_idr', 0)
+            ->assertJsonPath('voucher_discount_idr', 1000)
+            ->assertJsonPath('discount_idr', 1000)
+            ->assertJsonPath('fee_idr', 500)
+            ->assertJsonPath('total_idr', 10500);
+
+        $payload = $this->guestCheckout(
+            $catalog['package_id'],
+            'manual_qris',
+            'm7-summary-order-0001'
+        );
+        $payload['voucher_code'] = 'SUMMARY1000';
+        $payload['guest_email'] = 'summary@example.test';
+
+        $order = $this->postJson('/checkout/orders', $payload)
+            ->assertCreated()
+            ->assertJsonPath('subtotal_idr', 11000)
+            ->assertJsonPath('member_discount_idr', 0)
+            ->assertJsonPath('voucher_discount_idr', 1000)
+            ->assertJsonPath('discount_idr', 1000)
+            ->assertJsonPath('fee_idr', 500)
+            ->assertJsonPath('total_idr', 10500)
+            ->assertJsonPath('voucher_code', 'SUMMARY1000')
+            ->assertJsonPath('payment_channel_code', 'manual_qris')
+            ->assertJsonMissingPath('cost_idr')
+            ->assertJsonMissingPath('margin_idr')
+            ->assertJsonMissingPath('gateway_code')
+            ->assertJsonMissingPath('provider_mapping_id');
+
+        foreach ([
+            'subtotal_idr',
+            'member_discount_idr',
+            'voucher_discount_idr',
+            'discount_idr',
+            'fee_idr',
+            'total_idr',
+            'voucher_code',
+            'payment_channel_code',
+        ] as $field) {
+            $this->assertSame($quote->json($field), $order->json($field));
+        }
+
+        $persisted = DB::table('orders')->where('order_number', $order->json('order_number'))->firstOrFail();
+        $this->assertSame(1000, (int) $persisted->discount_idr);
+        $this->assertSame(500, (int) $persisted->fee_idr);
+        $this->assertSame(10500, (int) $persisted->total_idr);
     }
 
 }
