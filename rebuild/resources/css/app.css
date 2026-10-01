@@ -5078,6 +5078,7 @@
   --lf-ui-card-price:11px;
   --lf-ui-button-sm:12px;
   --lf-ui-button-main:12px;
+  --lf-ui-button-sm-height:36px;
   --lf-ui-control-height:40px;
 }
 
@@ -5115,7 +5116,7 @@
   font-weight:700!important;
 }
 
-/* Text controls: global 44px mobile-safe field height and 16px text.
+/* Text controls: global 40px field height and 16px text.
    Textareas keep content height but use the same type scale. */
 .lf-customer input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
 .lf-customer select{
@@ -5165,9 +5166,11 @@
   font-weight:700!important;
 }
 .lf-customer .lf-promo-input button,
-.lf-customer .lf-available-promo{
-  height:36px!important;
-  min-height:36px!important;
+.lf-customer .lf-available-promo,
+.lf-customer .lf-secondary,
+.lf-customer .lf-track-search button{
+  height:var(--lf-ui-button-sm-height)!important;
+  min-height:var(--lf-ui-button-sm-height)!important;
   padding-inline:12px!important;
 }
 .lf-customer .lf-order-button,
