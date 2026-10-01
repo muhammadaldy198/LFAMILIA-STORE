@@ -68,6 +68,42 @@ class SupportTicketController
         $record = SupportTicket::where('user_id', $request->user()->id)
             ->whereKey($ticket)->firstOrFail(['id', 'order_id', 'subject', 'message', 'status', 'created_at']);
 
-        return Inertia::render('Customer/TicketDetail', ['ticket' => $record]);
+        return Inertia::render('Customer/TicketDetail', [
+            'ticket' => $record,
+            'messages' => DB::table('support_ticket_messages as messages')
+                ->leftJoin('users', 'users.id', '=', 'messages.user_id')
+                ->leftJoin('admin_users', 'admin_users.id', '=', 'messages.admin_user_id')
+                ->where('messages.support_ticket_id', $record->id)
+                ->orderBy('messages.id')
+                ->get([
+                    'messages.id', 'messages.sender_type', 'messages.message', 'messages.created_at',
+                    'users.name as customer_name', 'admin_users.name as admin_name',
+                ]),
+        ]);
+    }
+
+    public function reply(Request $request, int $ticket): RedirectResponse
+    {
+        $data = $request->validate([
+            'message' => ['required', 'string', 'max:5000'],
+        ]);
+        $record = SupportTicket::where('user_id', $request->user()->id)
+            ->whereKey($ticket)->firstOrFail();
+        abort_if($record->status === 'CLOSED', 422, 'Tiket sudah ditutup.');
+
+        DB::transaction(function () use ($request, $record, $data): void {
+            DB::table('support_ticket_messages')->insert([
+                'support_ticket_id' => $record->id,
+                'sender_type' => 'CUSTOMER',
+                'user_id' => $request->user()->id,
+                'admin_user_id' => null,
+                'message' => $data['message'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $record->forceFill(['status' => 'OPEN'])->save();
+        });
+
+        return back();
     }
 }

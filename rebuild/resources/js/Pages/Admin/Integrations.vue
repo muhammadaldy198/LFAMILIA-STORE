@@ -50,7 +50,7 @@ async function testConnection(item) {
     <Head title="Integrasi" />
     <AdminShell>
         <div class="space-y-6">
-            <div><h1 class="text-3xl font-semibold">Integrasi</h1><p class="text-sm text-slate-400">Secret terenkripsi di database dan tidak disimpan di GitHub.</p></div>
+            <div class="flex flex-wrap items-start justify-between gap-3"><div><h1 class="text-3xl font-semibold">Integrasi</h1><p class="text-sm text-slate-400">Secret terenkripsi di database dan tidak disimpan di GitHub.</p></div><a href="/admin/nickname-tools" class="rounded bg-slate-700 px-4 py-2 text-sm">Game Code & Test Nickname</a></div>
 
             <section v-for="item in items" :key="item.code" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3">

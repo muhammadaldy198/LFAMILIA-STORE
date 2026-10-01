@@ -1,15 +1,23 @@
 <script setup>
-import { router, useForm } from '@inertiajs/vue3';
+import { router, useForm, usePage } from '@inertiajs/vue3';
 
 const props = defineProps({ type: String, id: Number, collection: { type: String, default: 'image' }, url: String });
+const page = usePage();
+const base = page.props.adminPanel?.base_path || '/admin';
 const form = useForm({ image: null, collection: props.collection });
-const upload = () => form.post('/admin/catalog/media/' + props.type + '/' + props.id, { forceFormData: true, onSuccess: () => form.reset('image') });
-const remove = () => router.delete('/admin/catalog/media/' + props.type + '/' + props.id, { data: { collection: props.collection } });
+const collectionLabel = () => ({
+    image: '',
+    banner: 'banner',
+    desktop: 'desktop',
+    mobile: 'mobile',
+}[props.collection] || props.collection);
+const upload = () => form.post(base + '/catalog/media/' + props.type + '/' + props.id, { forceFormData: true, onSuccess: () => form.reset('image') });
+const remove = () => router.delete(base + '/catalog/media/' + props.type + '/' + props.id, { data: { collection: props.collection } });
 </script>
 
 <template>
     <div class="space-y-2 rounded-md border border-slate-800 p-3">
-        <p class="text-sm text-slate-400">Gambar {{ collection === 'banner' ? 'banner' : '' }}</p>
+        <p class="text-sm text-slate-400">Gambar {{ collectionLabel() }}</p>
         <img v-if="url" :src="url" alt="Gambar saat ini" class="h-20 max-w-full rounded object-contain">
         <form class="flex flex-wrap items-end gap-2" @submit.prevent="upload">
             <label class="text-sm">Unggah JPEG/PNG/WebP (maks. 5 MB)

@@ -1,30 +1,32 @@
 # LFAMILIA STORE
 
-Toko top up digital dalam tahap pra-peluncuran. Domain publik melewati Cloudflare menuju VPS; aplikasi web dan API dijalankan oleh Vinext dan Laravel dengan MariaDB. Kode Worker dan migrasi D1 tetap ada di Git sebagai arsip; deployment Worker lama telah dihapus dari Cloudflare.
+Repository ini memakai **satu runtime aplikasi** di `rebuild/`, sesuai PRD LFAMILIA STORE.
 
-## Fitur utama
+Stack aktif:
+- Laravel 12 + PHP 8.4
+- Vue 3 + Inertia.js v2 + TailwindCSS v4
+- MySQL 8
+- Redis untuk cache, queue, dan session
+- Nginx + CloudPanel
+- Cloudflare di edge/security
+- Laravel Fortify + Sanctum
+- Spatie Media Library
 
-- Katalog dinamis, checkout DOKU Checkout atau Midtrans Snap, saldo pelanggan, voucher, stok kode, membership, dan panel Pemilik/Staff.
-- Produk otomatis menggunakan Digiflazz setelah pembayaran tervalidasi. Permintaan Digiflazz keluar langsung dari IP VPS ke `https://api.digiflazz.com`; opsi relay lama tidak digunakan.
-- Secret pembayaran dan provider dikelola terenkripsi dari Super Admin → Integrasi, bukan disimpan di GitHub.
-- Cloudflare Access melindungi panel Admin; Staff memakai jalur panel terpisah.
+Kode Next.js/Vinext, Cloudflare Worker/D1, Drizzle, dan Laravel migrasi lama sudah dikeluarkan dari working tree agar tidak menjadi runtime atau sumber kebenaran kedua. Riwayatnya tetap tersedia di Git history.
 
-## Pengembangan dan validasi
-
-Prasyarat: Node.js `>=22.13.0`, PHP 8.3, Composer, dan MariaDB untuk pengujian skema Laravel.
+## Pengembangan
 
 ```bash
-npm ci
-npm run build
-npm run lint
-npm test
-cd laravel
+cd rebuild
 composer install
+npm ci
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+npm run build
 vendor/bin/phpunit
 ```
 
-Runtime Laravel berada di [`laravel/`](./laravel/). Petunjuk infrastruktur dan status migrasi ada di [MIGRATION-LARAVEL.md](./MIGRATION-LARAVEL.md); konfigurasi provider di [INTEGRATION-SETUP.md](./INTEGRATION-SETUP.md). Berkas Worker, D1, dan migrasinya dipertahankan untuk histori, bukan jalur transaksi aktif.
+Dokumentasi aplikasi berada di `rebuild/*.md`, deployment di `rebuild/deploy/`, dan PRD utama di `docs/PRD-LFAMILIA-STORE-v1.md`.
 
-## Keamanan
-
-Jangan simpan API key, secret pembayaran, webhook secret, atau kunci enkripsi di GitHub. `APP_KEY`, kredensial database, dan `INTEGRATION_ENCRYPTION_KEY` berada di VPS. Credential provider di panel Integrasi dienkripsi dengan kunci tersebut.
+Jangan commit secret, API key, credential provider/payment, atau file `.env`.

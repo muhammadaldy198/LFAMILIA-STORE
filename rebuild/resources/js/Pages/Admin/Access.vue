@@ -23,7 +23,7 @@ function save(admin) {
     <Head title="Admin & Akses" />
     <AdminShell>
         <div class="space-y-6">
-            <div><h1 class="text-3xl font-semibold">Admin & Akses</h1><p class="text-sm text-slate-400">V1 hanya SUPER_ADMIN dan ADMIN. Membership customer bukan role Admin.</p></div>
+            <div><h1 class="text-3xl font-semibold">Admin & Akses</h1><p class="text-sm text-slate-400">Role v1: SUPER_ADMIN dan ADMIN. Membership customer tetap terpisah dari role panel.</p></div>
 
             <section class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Tambah Admin</h2>
@@ -33,7 +33,9 @@ function save(admin) {
                     <input v-model="form.password" required type="password" minlength="12" placeholder="Password minimal 12 karakter" class="rounded bg-slate-800 p-2">
                     <select v-model="form.role" class="rounded bg-slate-800 p-2"><option>ADMIN</option><option>SUPER_ADMIN</option></select>
                     <div v-if="form.role === 'ADMIN'" class="grid gap-2 md:col-span-2 md:grid-cols-3">
-                        <label v-for="(label, key) in permissions" :key="key" class="flex gap-2 text-sm"><input v-model="form.permissions" :value="key" type="checkbox">{{ label }}</label>
+                        <label v-for="(label, key) in permissions" :key="key" class="flex gap-2 text-sm">
+                            <input v-model="form.permissions" :value="key" type="checkbox">{{ label }}
+                        </label>
                     </div>
                     <label class="flex gap-2 text-sm"><input v-model="form.is_active" type="checkbox">Aktif</label>
                     <button class="rounded bg-cyan-300 px-4 py-2 font-semibold text-slate-950">Tambah</button>
@@ -49,7 +51,9 @@ function save(admin) {
                     <input v-model="admin.password" type="password" placeholder="Password baru (opsional)" class="rounded bg-slate-800 p-2">
                 </div>
                 <div v-if="admin.role === 'ADMIN'" class="mt-4 grid gap-2 md:grid-cols-3">
-                    <label v-for="(label, key) in permissions" :key="key" class="flex gap-2 text-sm"><input v-model="admin.permissions" :value="key" type="checkbox">{{ label }}</label>
+                    <label v-for="(label, key) in permissions" :key="key" class="flex gap-2 text-sm">
+                        <input v-model="admin.permissions" :value="key" type="checkbox">{{ label }}
+                    </label>
                 </div>
                 <div class="mt-4 flex items-center gap-3"><label class="flex gap-2 text-sm"><input v-model="admin.is_active" type="checkbox">Aktif</label><button class="rounded bg-slate-700 px-4 py-2 text-sm" @click="save(admin)">Simpan</button></div>
             </section>

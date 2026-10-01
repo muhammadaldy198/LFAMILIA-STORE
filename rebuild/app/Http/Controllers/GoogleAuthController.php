@@ -14,32 +14,39 @@ use Throwable;
 
 class GoogleAuthController
 {
-    private function configure(): void
+    private function configure(): bool
     {
         $profile = IntegrationCredential::where('code', 'google_oauth')
             ->where('is_active', true)->first();
         $settings = $profile?->config_ciphertext;
 
-        abort_unless(is_array($settings) && ! empty($settings['client_id'])
-            && ! empty($settings['client_secret']), 503, 'Google login belum tersedia.');
+        if (! is_array($settings) || empty($settings['client_id']) || empty($settings['client_secret'])) {
+            return false;
+        }
 
         config(['services.google' => [
             'client_id' => $settings['client_id'],
             'client_secret' => $settings['client_secret'],
             'redirect' => route('google.callback'),
         ]]);
+
+        return true;
     }
 
     public function redirect(): RedirectResponse
     {
-        $this->configure();
+        if (! $this->configure()) {
+            return redirect()->route('login')->withErrors(['google' => 'Login Google belum tersedia. Silakan masuk dengan email dan kata sandi.']);
+        }
 
         return Socialite::driver('google')->redirect();
     }
 
     public function callback(): RedirectResponse
     {
-        $this->configure();
+        if (! $this->configure()) {
+            return redirect()->route('login')->withErrors(['google' => 'Login Google belum tersedia. Silakan masuk dengan email dan kata sandi.']);
+        }
 
         try {
             $profile = Socialite::driver('google')->user();
@@ -48,7 +55,7 @@ class GoogleAuthController
                 'exception_class' => $exception::class,
             ]);
 
-            return redirect()->route('login')->withErrors(['google' => 'Login Google gagal.']);
+            return redirect()->route('login')->withErrors(['google' => 'Login Google gagal atau dibatalkan. Silakan coba lagi.']);
         }
 
         $raw = $profile->user;

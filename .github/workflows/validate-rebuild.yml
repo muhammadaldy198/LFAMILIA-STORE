@@ -1,8 +1,9 @@
-name: Validate LFAMILIA rebuild
+name: Validate LFAMILIA Laravel
 
 on:
   push:
     branches:
+      - main
       - 'rebuild/**'
     paths:
       - 'rebuild/**'
@@ -59,6 +60,21 @@ jobs:
       SESSION_DRIVER: redis
     steps:
       - uses: actions/checkout@v4
+
+      - name: Enforce Laravel-only repository shape
+        run: |
+          legacy_paths=(
+            ../app ../components ../db ../drizzle ../hooks ../laravel ../lib
+            ../public ../scripts ../tests ../vendor ../worker
+            ../package.json ../package-lock.json ../next.config.ts ../vite.config.ts
+            ../wrangler.jsonc ../drizzle.config.ts ../cloudflare-env.d.ts
+          )
+          for path in "${legacy_paths[@]}"; do
+            if [ -e "$path" ]; then
+              echo "Legacy non-Laravel runtime path detected: $path"
+              exit 1
+            fi
+          done
 
       - uses: shivammathur/setup-php@v2
         with:

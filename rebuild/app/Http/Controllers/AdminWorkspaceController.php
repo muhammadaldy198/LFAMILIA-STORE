@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Services\AdminAuditService;
+use App\Services\MembershipService;
+use App\Services\TransactionalEmailService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -17,14 +22,16 @@ use Throwable;
 
 class AdminWorkspaceController
 {
-    public function orders(): Response
+    public function orders(Request $request): Response
     {
         return Inertia::render('Admin/Workspace', [
             'kind' => 'orders',
             'title' => 'Pesanan',
+            'filters' => ['q' => (string) $request->query('q', '')],
             'rows' => DB::table('orders')
                 ->join('products', 'products.id', '=', 'orders.product_id')
                 ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
+                ->when($request->filled('q'), fn ($query) => $query->where('orders.order_number', 'like', '%'.mb_substr((string) $request->query('q'), 0, 100).'%'))
                 ->orderByDesc('orders.id')->limit(150)
                 ->get([
                     'orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
@@ -70,21 +77,30 @@ class AdminWorkspaceController
         return back();
     }
 
-    public function customers(): Response
+    public function customers(Request $request): Response
     {
         return Inertia::render('Admin/Workspace', [
             'kind' => 'customers',
             'title' => 'Pelanggan',
+            'filters' => ['q' => (string) $request->query('q', '')],
             'rows' => DB::table('users')
                 ->leftJoin('wallets', 'wallets.user_id', '=', 'users.id')
                 ->whereNull('users.deleted_at')
+                ->when($request->filled('q'), fn ($query) => $query->where(fn ($q) => $q->where('users.name', 'like', '%'.mb_substr((string) $request->query('q'), 0, 100).'%')->orWhere('users.email', 'like', '%'.mb_substr((string) $request->query('q'), 0, 100).'%')))
                 ->orderByDesc('users.id')->limit(150)
                 ->get([
                     'users.id', 'users.name', 'users.email', 'users.phone',
-                    'users.membership_tier_code', 'users.created_at',
-                    'wallets.balance_idr',
+                    'users.membership_tier_code', 'users.membership_mode',
+                    'users.membership_override_code', 'users.membership_progress_bonus_idr',
+                    'users.created_at', 'wallets.balance_idr',
+                    DB::raw("(SELECT COALESCE(SUM(o.total_idr),0) FROM orders o WHERE o.user_id=users.id AND o.status IN ('PAID','PROCESSING','SUCCESS')) as lifetime_spend_idr"),
+                ])->map(fn (object $row): array => [
+                    ...((array) $row),
+                    'membership_assignment' => $row->membership_mode === 'MANUAL'
+                        ? ($row->membership_override_code ?: $row->membership_tier_code)
+                        : 'AUTO',
                 ]),
-            'membershipTiers' => DB::table('membership_tiers')->orderBy('rank')->pluck('code'),
+            'membershipTiers' => DB::table('membership_tiers')->where('is_active', true)->orderBy('rank')->pluck('code'),
         ]);
     }
 
@@ -137,42 +153,110 @@ class AdminWorkspaceController
         return back();
     }
 
-    public function updateMembership(Request $request, int $userId, AdminAuditService $audit): RedirectResponse
-    {
+    public function updateMembership(
+        Request $request,
+        int $userId,
+        AdminAuditService $audit,
+        MembershipService $membership,
+    ): RedirectResponse {
         $data = $request->validate([
-            'membership_tier_code' => ['required', Rule::exists('membership_tiers', 'code')],
+            'membership_tier_code' => ['required', 'string', 'max:20'],
         ]);
-        $before = DB::table('users')->where('id', $userId)->first();
-        abort_unless($before, 404);
+        $value = strtoupper(trim((string) $data['membership_tier_code']));
+        if ($value !== 'AUTO' && ! DB::table('membership_tiers')->where('code', $value)->where('is_active', true)->exists()) {
+            throw ValidationException::withMessages(['membership_tier_code' => 'Tier membership tidak valid.']);
+        }
 
-        DB::table('users')->where('id', $userId)->update([
-            'membership_tier_code' => $data['membership_tier_code'],
-            'updated_at' => now(),
+        $user = User::findOrFail($userId);
+        $before = $user->only([
+            'membership_tier_code', 'membership_mode',
+            'membership_override_code', 'membership_progress_bonus_idr',
         ]);
-        $audit->record($request, 'customer.membership.updated', 'user', $userId, (array) $before, $data);
+        $membership->setMode($user, $value);
+        $after = $user->fresh()->only([
+            'membership_tier_code', 'membership_mode',
+            'membership_override_code', 'membership_progress_bonus_idr',
+        ]);
+        $audit->record($request, 'customer.membership.updated', 'user', $userId, $before, $after);
 
         return back();
     }
 
     public function vouchers(): Response
     {
+        $rows = DB::table('vouchers')->orderByDesc('id')->limit(150)->get()
+            ->map(function (object $voucher): array {
+                return [
+                    ...((array) $voucher),
+                    'starts_at' => $voucher->starts_at
+                        ? Carbon::parse($voucher->starts_at)->format('Y-m-d\\TH:i') : null,
+                    'ends_at' => $voucher->ends_at
+                        ? Carbon::parse($voucher->ends_at)->format('Y-m-d\\TH:i') : null,
+                    'product_ids' => DB::table('voucher_products')->where('voucher_id', $voucher->id)
+                        ->orderBy('product_id')->pluck('product_id')->map(fn ($id): int => (int) $id)->all(),
+                    'category_ids' => DB::table('voucher_categories')->where('voucher_id', $voucher->id)
+                        ->orderBy('category_id')->pluck('category_id')->map(fn ($id): int => (int) $id)->all(),
+                ];
+            });
+
         return Inertia::render('Admin/Workspace', [
             'kind' => 'vouchers',
             'title' => 'Promo & Voucher',
-            'rows' => DB::table('vouchers')->orderByDesc('id')->limit(150)->get(),
+            'rows' => $rows,
+            'voucherCategories' => DB::table('product_categories')->orderBy('sort_order')->orderBy('name')
+                ->get(['id', 'name']),
+            'voucherProducts' => DB::table('products')->orderBy('sort_order')->orderBy('name')
+                ->get(['id', 'name', 'category_id']),
+            'popularProducts' => DB::table('products as products')
+                ->join('product_categories as categories', 'categories.id', '=', 'products.category_id')
+                ->orderByDesc('products.popular')->orderBy('products.sort_order')->orderBy('products.name')
+                ->get([
+                    'products.id', 'products.name', 'products.popular', 'products.is_active',
+                    'categories.name as category_name',
+                ])->map(fn (object $product): array => [
+                    ...((array) $product),
+                    'popular' => (bool) $product->popular,
+                    'is_active' => (bool) $product->is_active,
+                ]),
         ]);
     }
 
     public function storeVoucher(Request $request, AdminAuditService $audit): RedirectResponse
     {
         $data = $this->voucherData($request);
-        $id = DB::table('vouchers')->insertGetId([
+        $productIds = array_values(array_unique(array_map('intval', $data['product_ids'] ?? [])));
+        $categoryIds = array_values(array_unique(array_map('intval', $data['category_ids'] ?? [])));
+        unset($data['product_ids'], $data['category_ids']);
+
+        $id = DB::transaction(function () use ($data, $productIds, $categoryIds): int {
+            $id = DB::table('vouchers')->insertGetId([
+                ...$data,
+                'code' => strtoupper($data['code']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            foreach ($productIds as $productId) {
+                DB::table('voucher_products')->insert([
+                    'voucher_id' => $id,
+                    'product_id' => $productId,
+                ]);
+            }
+            foreach ($categoryIds as $categoryId) {
+                DB::table('voucher_categories')->insert([
+                    'voucher_id' => $id,
+                    'category_id' => $categoryId,
+                ]);
+            }
+
+            return $id;
+        }, 3);
+
+        $audit->record($request, 'voucher.created', 'voucher', $id, null, [
             ...$data,
-            'code' => strtoupper($data['code']),
-            'created_at' => now(),
-            'updated_at' => now(),
+            'product_ids' => $productIds,
+            'category_ids' => $categoryIds,
         ]);
-        $audit->record($request, 'voucher.created', 'voucher', $id, null, $data);
 
         return back();
     }
@@ -181,46 +265,161 @@ class AdminWorkspaceController
     {
         $before = DB::table('vouchers')->where('id', $id)->first();
         abort_unless($before, 404);
+        $beforeScope = [
+            'product_ids' => DB::table('voucher_products')->where('voucher_id', $id)->pluck('product_id')->all(),
+            'category_ids' => DB::table('voucher_categories')->where('voucher_id', $id)->pluck('category_id')->all(),
+        ];
+
         $data = $this->voucherData($request, $id);
-        DB::table('vouchers')->where('id', $id)->update([
+        $productIds = array_values(array_unique(array_map('intval', $data['product_ids'] ?? [])));
+        $categoryIds = array_values(array_unique(array_map('intval', $data['category_ids'] ?? [])));
+        unset($data['product_ids'], $data['category_ids']);
+
+        DB::transaction(function () use ($id, $data, $productIds, $categoryIds): void {
+            DB::table('vouchers')->where('id', $id)->update([
+                ...$data,
+                'code' => strtoupper($data['code']),
+                'updated_at' => now(),
+            ]);
+            DB::table('voucher_products')->where('voucher_id', $id)->delete();
+            DB::table('voucher_categories')->where('voucher_id', $id)->delete();
+
+            foreach ($productIds as $productId) {
+                DB::table('voucher_products')->insert([
+                    'voucher_id' => $id,
+                    'product_id' => $productId,
+                ]);
+            }
+            foreach ($categoryIds as $categoryId) {
+                DB::table('voucher_categories')->insert([
+                    'voucher_id' => $id,
+                    'category_id' => $categoryId,
+                ]);
+            }
+        }, 3);
+
+        $audit->record($request, 'voucher.updated', 'voucher', $id, [
+            ...((array) $before),
+            ...$beforeScope,
+        ], [
             ...$data,
-            'code' => strtoupper($data['code']),
+            'product_ids' => $productIds,
+            'category_ids' => $categoryIds,
+        ]);
+
+        return back();
+    }
+
+    public function updatePopularProduct(
+        Request $request,
+        int $productId,
+        AdminAuditService $audit,
+    ): RedirectResponse {
+        $data = $request->validate([
+            'popular' => ['required', 'boolean'],
+        ]);
+        $before = DB::table('products')->where('id', $productId)->first();
+        abort_unless($before, 404);
+
+        DB::table('products')->where('id', $productId)->update([
+            'popular' => (bool) $data['popular'],
             'updated_at' => now(),
         ]);
-        $audit->record($request, 'voucher.updated', 'voucher', $id, (array) $before, $data);
+
+        $audit->record($request, 'promotion.popular.updated', 'product', $productId, [
+            'popular' => (bool) $before->popular,
+        ], [
+            'popular' => (bool) $data['popular'],
+        ]);
 
         return back();
     }
 
     public function support(): Response
     {
+        $rows = DB::table('support_tickets as tickets')
+            ->leftJoin('users', 'users.id', '=', 'tickets.user_id')
+            ->leftJoin('orders', 'orders.id', '=', 'tickets.order_id')
+            ->orderByDesc('tickets.id')->limit(150)
+            ->get([
+                'tickets.id', 'tickets.user_id', 'tickets.subject', 'tickets.message', 'tickets.status',
+                'tickets.created_at', 'users.name as customer_name', 'users.email',
+                'orders.order_number', 'orders.guest_email',
+            ])->map(function (object $ticket): array {
+                return [
+                    ...((array) $ticket),
+                    'customer_name' => $ticket->customer_name ?? 'Guest',
+                    'email' => $ticket->email ?? $ticket->guest_email,
+                    'messages' => DB::table('support_ticket_messages as messages')
+                        ->leftJoin('users', 'users.id', '=', 'messages.user_id')
+                        ->leftJoin('admin_users', 'admin_users.id', '=', 'messages.admin_user_id')
+                        ->where('messages.support_ticket_id', $ticket->id)
+                        ->orderBy('messages.id')
+                        ->get([
+                            'messages.id', 'messages.sender_type', 'messages.message', 'messages.created_at',
+                            'users.name as customer_name', 'admin_users.name as admin_name',
+                        ])->values(),
+                ];
+            });
+
         return Inertia::render('Admin/Workspace', [
             'kind' => 'support',
             'title' => 'Layanan Pelanggan',
-            'rows' => DB::table('support_tickets as tickets')
-                ->join('users', 'users.id', '=', 'tickets.user_id')
-                ->leftJoin('orders', 'orders.id', '=', 'tickets.order_id')
-                ->orderByDesc('tickets.id')->limit(150)
-                ->get([
-                    'tickets.id', 'tickets.subject', 'tickets.message', 'tickets.status',
-                    'tickets.created_at', 'users.name as customer_name', 'users.email',
-                    'orders.order_number',
-                ]),
+            'rows' => $rows,
         ]);
     }
 
-    public function updateSupport(Request $request, int $id, AdminAuditService $audit): RedirectResponse
-    {
+    public function updateSupport(
+        Request $request,
+        int $id,
+        AdminAuditService $audit,
+        TransactionalEmailService $emails,
+    ): RedirectResponse {
         $data = $request->validate([
             'status' => ['required', Rule::in(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'])],
+            'reply' => ['nullable', 'string', 'max:5000'],
         ]);
         $before = DB::table('support_tickets')->where('id', $id)->first();
         abort_unless($before, 404);
-        DB::table('support_tickets')->where('id', $id)->update([
+
+        DB::transaction(function () use ($request, $id, $data): void {
+            DB::table('support_tickets')->where('id', $id)->update([
+                'status' => $data['status'],
+                'updated_at' => now(),
+            ]);
+            $reply = trim((string) ($data['reply'] ?? ''));
+            if ($reply !== '') {
+                DB::table('support_ticket_messages')->insert([
+                    'support_ticket_id' => $id,
+                    'sender_type' => 'ADMIN',
+                    'user_id' => null,
+                    'admin_user_id' => $request->user('admin')->id,
+                    'message' => $reply,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        });
+
+        $reply = trim((string) ($data['reply'] ?? ''));
+        if ($reply !== '') {
+            $email = DB::table('support_tickets as tickets')
+                ->join('users', 'users.id', '=', 'tickets.user_id')
+                ->leftJoin('orders', 'orders.id', '=', 'tickets.order_id')
+                ->where('tickets.id', $id)->value(DB::raw('COALESCE(users.email, orders.guest_email)'));
+            if (is_string($email) && $email !== '') {
+                $emails->queue(
+                    $email,
+                    'Balasan tiket LFAMILIA #'.$id,
+                    'Tim LFAMILIA membalas tiket #'.$id.': '.$reply
+                );
+            }
+        }
+
+        $audit->record($request, 'support.updated', 'support_ticket', $id, (array) $before, [
             'status' => $data['status'],
-            'updated_at' => now(),
+            'replied' => $reply !== '',
         ]);
-        $audit->record($request, 'support.status.updated', 'support_ticket', $id, (array) $before, $data);
 
         return back();
     }
@@ -267,6 +466,84 @@ class AdminWorkspaceController
         ]);
     }
 
+    public function exportConfiguration(Request $request, AdminAuditService $audit): JsonResponse
+    {
+        $tables = [
+            'system_settings',
+            'membership_tiers',
+            'categories',
+            'products',
+            'product_packages',
+            'providers',
+            'provider_mappings',
+            'payment_gateways',
+            'payment_channels',
+            'payment_routes',
+            'vouchers',
+            'home_banners',
+            'faq_entries',
+            'news_articles',
+            'content_pages',
+            'site_popups',
+            'store_assets',
+        ];
+
+        $payload = [
+            'schema' => 'lfamilia-safe-config-v1',
+            'exported_at' => now()->toIso8601String(),
+            'app_version' => config('app.version'),
+            'data' => [],
+        ];
+
+        foreach ($tables as $table) {
+            if (! Schema::hasTable($table)) {
+                continue;
+            }
+
+            $columns = collect(Schema::getColumnListing($table))
+                ->reject(fn (string $column): bool => (bool) preg_match(
+                    '/password|secret|token|credential|api[_-]?key|private|signature|cipher|hash/i',
+                    $column
+                ))
+                ->values()->all();
+
+            if ($table === 'system_settings') {
+                $rows = DB::table($table)
+                    ->where('key', 'not like', 'integration.%')
+                    ->where('key', 'not like', '%secret%')
+                    ->where('key', 'not like', '%password%')
+                    ->where('key', 'not like', '%token%')
+                    ->where('key', 'not like', '%api_key%')
+                    ->orderBy('key')
+                    ->get($columns);
+            } else {
+                $rows = DB::table($table)->orderBy($table === 'content_pages' ? 'key' : 'id')->get($columns);
+            }
+
+            $payload['data'][$table] = $rows;
+        }
+
+        $audit->record(
+            $request,
+            'configuration.exported',
+            'configuration',
+            'safe-json',
+            null,
+            ['tables' => array_keys($payload['data'])]
+        );
+
+        return response()->json(
+            $payload,
+            200,
+            [
+                'Content-Type' => 'application/json; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="lfamilia-config-'.now()->format('Ymd-His').'.json"',
+                'Cache-Control' => 'no-store, private',
+            ],
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+        );
+    }
+
     public function updateSettings(Request $request, AdminAuditService $audit): RedirectResponse
     {
         $data = $request->validate([
@@ -276,7 +553,7 @@ class AdminWorkspaceController
             'instagram_url' => ['nullable', 'url:http,https', 'max:500'],
             'email' => ['nullable', 'email:rfc', 'max:255'],
             'discord_url' => ['nullable', 'url:http,https', 'max:500'],
-            'support_url' => ['nullable', 'url:http,https', 'max:500'],
+            'support_url' => ['nullable', 'string', 'max:500', 'regex:/^(\/(?!\/)|https?:\/\/)/i'],
             'business_hours' => ['nullable', 'string', 'max:500'],
         ]);
         $mapping = [
@@ -346,11 +623,19 @@ class AdminWorkspaceController
             'name' => 'Laravel',
             'status' => 'HEALTHY',
             'message' => 'Laravel '.app()->version().' berjalan.',
-        ], [
-            'name' => 'Queue',
-            'status' => config('queue.default') === 'redis' ? 'DEGRADED' : 'DEGRADED',
-            'message' => 'Queue '.config('queue.default').' terkonfigurasi; worker runtime divalidasi saat deployment M12.',
         ]];
+
+        $queueHeartbeat = DB::table('system_settings')->where('key', 'system.queue_worker_heartbeat')->value('value');
+        $queueHeartbeatAt = json_decode((string) $queueHeartbeat, true);
+        $healthyQueue = is_string($queueHeartbeatAt)
+            && now()->diffInMinutes(Carbon::parse($queueHeartbeatAt), true) <= 3;
+        $checks[] = [
+            'name' => 'Queue',
+            'status' => $healthyQueue ? 'HEALTHY' : 'DEGRADED',
+            'message' => $healthyQueue
+                ? 'Worker queue '.config('queue.default').' aktif. Heartbeat '.$queueHeartbeatAt
+                : 'Worker queue belum memberi heartbeat dalam 3 menit terakhir.',
+        ];
 
         try {
             DB::select('SELECT 1');
@@ -445,6 +730,10 @@ class AdminWorkspaceController
             'per_customer_limit' => ['nullable', 'integer', 'min:1'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after:starts_at'],
+            'product_ids' => ['array', 'max:500'],
+            'product_ids.*' => ['integer', Rule::exists('products', 'id')],
+            'category_ids' => ['array', 'max:100'],
+            'category_ids.*' => ['integer', Rule::exists('product_categories', 'id')],
             'is_active' => ['required', 'boolean'],
         ]);
     }

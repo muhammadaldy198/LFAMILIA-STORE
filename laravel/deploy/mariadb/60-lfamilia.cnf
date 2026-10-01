@@ -1,5 +1,0 @@
-[mariadb]
-slow_query_log = 1
-slow_query_log_file = /var/log/mysql/lfamilia-slow.log
-long_query_time = 1
-log_queries_not_using_indexes = 0

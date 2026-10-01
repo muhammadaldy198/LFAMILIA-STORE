@@ -1,0 +1,7 @@
+<script setup>
+import { useCustomerPresentation } from '../../Composables/customerPresentation';
+const { customerText } = useCustomerPresentation();
+
+import {Head} from '@inertiajs/vue3';import CustomerShell from '../../Components/CustomerShell.vue';defineProps({vouchers:Array});const money=v=>'Rp'+Number(v||0).toLocaleString('id-ID');
+</script>
+<template><Head :title="customerText(&quot;pages.content.promo.attribute.title.45d1e7a0&quot;, &quot;Promo&quot;)"/><CustomerShell><main class="lf-container lf-content-page"><p class="lf-eyebrow">{{ customerText("pages.content.promo.83c1ed60", "PROMO") }}</p><h1 class="lf-title">{{ customerText("pages.content.promo.c3dd3d8a", "Voucher aktif") }}</h1><p class="lf-copy">{{ customerText("pages.content.promo.31c9f040", "Gunakan kode yang tersedia pada panel Kode Promo di checkout.") }}</p><div class="lf-promo-grid mt-6"><article v-for="v in vouchers" :key="v.code"><strong>{{v.code}}</strong><p>{{v.discount_type==='PERCENT'?v.discount_value+'%':'Potongan '+money(v.discount_value)}}</p><small>Minimum {{money(v.minimum_total_idr)}}<span v-if="v.ends_at"> · berakhir {{new Date(v.ends_at).toLocaleDateString('id-ID')}}</span></small></article><div v-if="!vouchers?.length" class="lf-empty">{{ customerText("pages.content.promo.ae5fdfcd", "Belum ada promo publik aktif.") }}</div></div></main></CustomerShell></template>

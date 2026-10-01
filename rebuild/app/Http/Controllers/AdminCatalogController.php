@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductInputField;
+use App\Models\ProductNotice;
 use App\Models\ProductPackage;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
@@ -21,6 +22,75 @@ use Inertia\Response;
 
 class AdminCatalogController
 {
+    public function contentIndex(): Response
+    {
+        return Inertia::render('Admin/ProductContent', [
+            'products' => Product::with(['packages', 'notices'])->orderBy('sort_order')->orderBy('name')->get()
+                ->map(fn (Product $product): array => [
+                    ...$product->only(
+                        'id', 'name', 'publisher', 'description', 'fulfillment_mode',
+                        'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone',
+                        'is_active'
+                    ),
+                    'image_url' => $product->getFirstMediaUrl('image'),
+                    'banner_url' => $product->getFirstMediaUrl('banner'),
+                    'notices' => $product->notices->sortBy('sort_order')->values()->map(fn (ProductNotice $notice): array => [
+                        ...$notice->only('id', 'title', 'body', 'sort_order', 'is_active'),
+                    ])->all(),
+                    'packages' => $product->packages->sortBy([
+                        ['nominal_value', 'asc'], ['sort_order', 'asc'],
+                    ])->values()->map(fn (ProductPackage $package): array => [
+                        ...$package->only('id', 'name', 'note', 'group_name', 'is_active'),
+                        'image_url' => $package->getFirstMediaUrl('image'),
+                    ])->all(),
+                ]),
+        ]);
+    }
+
+    public function updateProductContent(
+        Request $request,
+        Product $product,
+        CatalogAudit $audit,
+    ): RedirectResponse {
+        $data = $request->validate([
+            'publisher' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'manual_instructions' => ['nullable', 'string', 'max:5000'],
+            'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
+            'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
+            'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
+        ]);
+        if ($product->fulfillment_mode !== 'MANUAL') {
+            $data['manual_instructions'] = null;
+            $data['manual_open_time'] = null;
+            $data['manual_close_time'] = null;
+            $data['manual_timezone'] = 'Asia/Jakarta';
+        }
+
+        $before = $product->only(array_keys($data));
+        $product->update($data);
+        $audit->record($request, 'catalog.product.content_updated', 'product', $product->id, $before, $data);
+
+        return back();
+    }
+
+    public function updatePackageContent(
+        Request $request,
+        ProductPackage $package,
+        CatalogAudit $audit,
+    ): RedirectResponse {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'note' => ['nullable', 'string', 'max:80'],
+            'group_name' => ['nullable', 'string', 'max:120'],
+        ]);
+        $before = $package->only(array_keys($data));
+        $package->update($data);
+        $audit->record($request, 'catalog.package.content_updated', 'product_package', $package->id, $before, $data);
+
+        return back();
+    }
+
     public function index(): Response
     {
         $providers = Provider::all(['id', 'code', 'is_active'])->keyBy('id');
@@ -30,19 +100,22 @@ class AdminCatalogController
                 ...$category->only('id', 'name', 'slug', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),
             ]),
-            'products' => Product::with(['packages.mappings', 'fields'])->orderBy('sort_order')->get()
+            'products' => Product::with(['packages.mappings', 'fields', 'notices'])->orderBy('sort_order')->get()
                 ->map(fn (Product $product): array => [
-                    ...$product->only('id', 'category_id', 'name', 'slug', 'description', 'fulfillment_mode',
-                        'manual_instructions', 'margin_percent', 'sort_order', 'is_active',
+                    ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
+                        'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active',
                         'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
                         'nickname_server_field_key'),
                     'image_url' => $product->getFirstMediaUrl('image'),
                     'banner_url' => $product->getFirstMediaUrl('banner'),
                     'fields' => $product->fields->sortBy('sort_order')->values()->toArray(),
+                    'notices' => $product->notices->sortBy('sort_order')->values()->map(fn (ProductNotice $notice): array => [
+                        ...$notice->only('id', 'title', 'body', 'sort_order', 'is_active'),
+                    ])->all(),
                     'packages' => $product->packages->sortBy([
                         ['nominal_value', 'asc'], ['sort_order', 'asc'],
                     ])->values()->map(fn (ProductPackage $package): array => [
-                        ...$package->only('id', 'code', 'name', 'nominal_value', 'sort_order', 'is_active'),
+                        ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active'),
                         'image_url' => $package->getFirstMediaUrl('image'),
                         'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
                             ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
@@ -97,14 +170,35 @@ class AdminCatalogController
         return back();
     }
 
+    public function destroyCategory(Request $request, Category $category, CatalogAudit $audit): RedirectResponse
+    {
+        if ($category->products()->exists()) {
+            return back()->withErrors([
+                'category' => 'Kategori masih memiliki produk. Pindahkan atau nonaktifkan produknya terlebih dahulu.',
+            ]);
+        }
+
+        $before = $category->toArray();
+        $id = $category->id;
+        $category->clearMediaCollection('image');
+        $category->delete();
+        $audit->record($request, 'catalog.category.deleted', 'category', $id, $before, null);
+
+        return back();
+    }
+
     public function product(Request $request, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate([
             'category_id' => ['required', 'integer', Rule::exists('categories', 'id')],
             'name' => ['required', 'string', 'max:255'],
+            'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'fulfillment_mode' => ['required', Rule::in(['AUTO_PROVIDER', 'MANUAL'])],
             'manual_instructions' => ['nullable', 'string', 'max:5000'],
+            'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
+            'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
+            'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
             'sort_order' => ['required', 'integer', 'min:0'],
         ]);
@@ -114,6 +208,11 @@ class AdminCatalogController
         }
         if ($data['fulfillment_mode'] !== 'MANUAL') {
             $data['manual_instructions'] = null;
+            $data['manual_open_time'] = null;
+            $data['manual_close_time'] = null;
+            $data['manual_timezone'] = 'Asia/Jakarta';
+        } else {
+            $data['manual_timezone'] = ($data['manual_timezone'] ?? null) ?: 'Asia/Jakarta';
         }
 
         DB::transaction(function () use ($request, $data, $audit): void {
@@ -129,8 +228,12 @@ class AdminCatalogController
         $data = $request->validate([
             'category_id' => ['required', 'integer', Rule::exists('categories', 'id')],
             'name' => ['required', 'string', 'max:255'],
+            'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'manual_instructions' => ['nullable', 'string', 'max:5000'],
+            'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
+            'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
+            'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
@@ -139,6 +242,13 @@ class AdminCatalogController
             'nickname_user_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
             'nickname_server_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
         ]);
+        $categorySlug = (string) Category::whereKey($data['category_id'])->value('slug');
+        if ($categorySlug === 'voucher' && ($data['nickname_check_enabled'] ?? false) === true) {
+            throw ValidationException::withMessages([
+                'nickname_check_enabled' => 'Produk voucher tidak memakai Kode Game Nickname.',
+            ]);
+        }
+
         if (($data['nickname_check_enabled'] ?? false) === true) {
             $fieldKeys = $product->fields()->pluck('field_key')->all();
             if (empty($data['nickname_game_code']) || empty($data['nickname_user_field_key'])) {
@@ -160,6 +270,11 @@ class AdminCatalogController
         }
         if ($product->fulfillment_mode !== 'MANUAL') {
             $data['manual_instructions'] = null;
+            $data['manual_open_time'] = null;
+            $data['manual_close_time'] = null;
+            $data['manual_timezone'] = 'Asia/Jakarta';
+        } else {
+            $data['manual_timezone'] = ($data['manual_timezone'] ?? null) ?: 'Asia/Jakarta';
         }
 
         DB::transaction(function () use ($request, $product, $data, $audit): void {
@@ -177,6 +292,8 @@ class AdminCatalogController
             'code' => ['required', 'string', 'max:80', 'regex:/^[A-Za-z0-9_-]+$/',
                 Rule::unique('product_packages', 'code')->where('product_id', $product->id)],
             'name' => ['required', 'string', 'max:255'],
+            'note' => ['nullable', 'string', 'max:80'],
+            'group_name' => ['nullable', 'string', 'max:120'],
             'nominal_value' => ['nullable', 'integer', 'min:0'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'cost_idr' => [$product->fulfillment_mode === 'MANUAL' ? 'required' : 'nullable',
@@ -187,6 +304,8 @@ class AdminCatalogController
             $package = $product->packages()->create([
                 'code' => $data['code'],
                 'name' => $data['name'],
+                'note' => $data['note'] ?? null,
+                'group_name' => $data['group_name'] ?? null,
                 'nominal_value' => $data['nominal_value'] ?? null,
                 'sort_order' => $data['sort_order'],
                 'is_active' => false,
@@ -217,6 +336,8 @@ class AdminCatalogController
             'code' => ['required', 'string', 'max:80', 'regex:/^[A-Za-z0-9_-]+$/',
                 Rule::unique('product_packages', 'code')->where('product_id', $package->product_id)->ignore($package->id)],
             'name' => ['required', 'string', 'max:255'],
+            'note' => ['nullable', 'string', 'max:80'],
+            'group_name' => ['nullable', 'string', 'max:120'],
             'nominal_value' => ['nullable', 'integer', 'min:0'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
@@ -231,12 +352,42 @@ class AdminCatalogController
         return back();
     }
 
+    public function storeNotice(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
+    {
+        $data = $this->noticeData($request);
+        $notice = $product->notices()->create($data);
+        $audit->record($request, 'catalog.notice.created', 'product_notice', $notice->id, null, $notice->toArray());
+
+        return back();
+    }
+
+    public function updateNotice(Request $request, ProductNotice $notice, CatalogAudit $audit): RedirectResponse
+    {
+        $data = $this->noticeData($request);
+        $before = $notice->toArray();
+        $notice->update($data);
+        $audit->record($request, 'catalog.notice.updated', 'product_notice', $notice->id, $before, $notice->toArray());
+
+        return back();
+    }
+
+    public function destroyNotice(Request $request, ProductNotice $notice, CatalogAudit $audit): RedirectResponse
+    {
+        $before = $notice->toArray();
+        $id = $notice->id;
+        $notice->delete();
+        $audit->record($request, 'catalog.notice.deleted', 'product_notice', $id, $before, null);
+
+        return back();
+    }
+
     public function fields(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate([
             'fields' => ['required', 'array', 'max:20'],
             'fields.*.field_key' => ['required', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/', 'distinct'],
             'fields.*.label' => ['required', 'string', 'max:255'],
+            'fields.*.placeholder' => ['nullable', 'string', 'max:255'],
             'fields.*.type' => ['required', Rule::in(['text', 'tel', 'email'])],
             'fields.*.is_required' => ['required', 'boolean'],
         ]);
@@ -304,6 +455,16 @@ class AdminCatalogController
         });
 
         return back();
+    }
+
+    private function noticeData(Request $request): array
+    {
+        return $request->validate([
+            'title' => ['required', 'string', 'max:180'],
+            'body' => ['required', 'string', 'max:5000'],
+            'sort_order' => ['required', 'integer', 'min:0', 'max:100000'],
+            'is_active' => ['required', 'boolean'],
+        ]);
     }
 
     public function asset(Request $request, StoreAsset $asset, CatalogAudit $audit): RedirectResponse

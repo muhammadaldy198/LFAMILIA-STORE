@@ -16,7 +16,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
     use HasApiTokens, MustVerifyEmail, Notifiable, SoftDeletes;
 
     protected $fillable = [
-        'name', 'email', 'email_verified_at', 'phone', 'password', 'google_sub', 'membership_tier_code',
+        'name', 'email', 'email_verified_at', 'phone', 'password', 'google_sub', 'membership_tier_code', 'membership_mode', 'membership_override_code', 'membership_progress_bonus_idr', 'leaderboard_opt_in',
     ];
 
     protected $hidden = ['password', 'remember_token', 'google_sub'];
@@ -68,8 +68,18 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return $this->hasOne(Wallet::class);
     }
 
+    public function savedGameAccounts()
+    {
+        return $this->hasMany(SavedGameAccount::class);
+    }
+
     protected function casts(): array
     {
-        return ['email_verified_at' => 'datetime', 'last_active_at' => 'datetime'];
+        return [
+            'email_verified_at' => 'datetime',
+            'last_active_at' => 'datetime',
+            'leaderboard_opt_in' => 'boolean',
+            'membership_progress_bonus_idr' => 'integer',
+        ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Jobs\StartFulfillmentJob;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -12,6 +13,7 @@ class PaymentStateService
     public function __construct(
         private readonly AdminNotificationService $notifications,
         private readonly TransactionalEmailService $emails,
+        private readonly MembershipService $membership,
     ) {}
 
     /**
@@ -27,7 +29,7 @@ class PaymentStateService
             }
 
             $incomingStatus = strtoupper($incomingStatus);
-            if (! in_array($incomingStatus, ['PENDING', 'PAID', 'FAILED', 'EXPIRED', 'REFUNDED'], true)) {
+            if (! in_array($incomingStatus, ['PENDING', 'PAID', 'FAILED', 'CANCELLED', 'EXPIRED', 'REFUNDED'], true)) {
                 throw ValidationException::withMessages(['payment' => 'Status pembayaran tidak valid.']);
             }
 
@@ -37,7 +39,7 @@ class PaymentStateService
             if ($payment->status === 'PAID' && $incomingStatus !== 'REFUNDED') {
                 return ['result' => 'IGNORED_FINAL', 'status' => 'PAID'];
             }
-            if (in_array($payment->status, ['FAILED', 'EXPIRED'], true) && $incomingStatus === 'PENDING') {
+            if (in_array($payment->status, ['FAILED', 'CANCELLED', 'EXPIRED'], true) && $incomingStatus === 'PENDING') {
                 return ['result' => 'IGNORED_STALE', 'status' => (string) $payment->status];
             }
 
@@ -118,7 +120,7 @@ class PaymentStateService
         }
 
         if ($incomingStatus === 'PAID') {
-            if (in_array($order->status, ['EXPIRED', 'FAILED'], true)) {
+            if (in_array($order->status, ['EXPIRED', 'FAILED', 'CANCELLED'], true)) {
                 DB::table('payment_transactions')->where('id', $payment->id)->update([
                     'status' => 'PAID',
                     'verified_at' => now(),
@@ -154,6 +156,12 @@ class PaymentStateService
                     'status' => 'REFUND',
                     'updated_at' => now(),
                 ]);
+                if ($order->user_id !== null) {
+                    $user = User::find((int) $order->user_id);
+                    if ($user) {
+                        $this->membership->sync($user);
+                    }
+                }
                 if ($before === 'PENDING_PAYMENT') {
                     $this->releaseVoucher((int) $order->id);
                 }
@@ -190,15 +198,16 @@ class PaymentStateService
             return ['result' => 'EXPIRED', 'status' => 'EXPIRED'];
         }
 
-        if ($incomingStatus === 'FAILED' && $order->status === 'PENDING_PAYMENT') {
+        if (in_array($incomingStatus, ['FAILED', 'CANCELLED'], true) && $order->status === 'PENDING_PAYMENT') {
             DB::table('orders')->where('id', $order->id)->update([
-                'status' => 'FAILED',
+                'status' => $incomingStatus,
                 'updated_at' => now(),
             ]);
             $this->releaseVoucher((int) $order->id);
-            $this->orderEvent($order->id, 'PAYMENT_FAILED', 'PENDING_PAYMENT', 'FAILED', $metadata);
+            $eventType = $incomingStatus === 'CANCELLED' ? 'PAYMENT_CANCELLED' : 'PAYMENT_FAILED';
+            $this->orderEvent($order->id, $eventType, 'PENDING_PAYMENT', $incomingStatus, $metadata);
 
-            return ['result' => 'FAILED', 'status' => 'FAILED'];
+            return ['result' => $incomingStatus, 'status' => $incomingStatus];
         }
 
         return ['result' => 'PAYMENT_UPDATED', 'status' => $incomingStatus];
@@ -327,7 +336,7 @@ class PaymentStateService
             return ['result' => 'REFUNDED', 'status' => 'REFUNDED'];
         }
 
-        if (in_array($incomingStatus, ['FAILED', 'EXPIRED'], true)) {
+        if (in_array($incomingStatus, ['FAILED', 'CANCELLED', 'EXPIRED'], true)) {
             DB::table('wallet_topups')->where('id', $topup->id)
                 ->where('status', 'PENDING_PAYMENT')->update([
                     'status' => $incomingStatus,
@@ -373,6 +382,12 @@ class PaymentStateService
             'paid_at' => now(),
             'updated_at' => now(),
         ]);
+        if ($order->user_id !== null) {
+            $user = User::find((int) $order->user_id);
+            if ($user) {
+                $this->membership->sync($user);
+            }
+        }
         DB::table('voucher_redemptions')->where('order_id', $order->id)
             ->where('status', 'RESERVED')->update([
                 'status' => 'REDEEMED',

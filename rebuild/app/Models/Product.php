@@ -13,8 +13,8 @@ class Product extends Model implements HasMedia
     use InteractsWithMedia;
 
     protected $fillable = [
-        'category_id', 'name', 'slug', 'description', 'fulfillment_mode',
-        'manual_instructions', 'margin_percent', 'sort_order', 'is_active',
+        'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
+        'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active', 'popular',
         'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
         'nickname_server_field_key',
     ];
@@ -23,6 +23,7 @@ class Product extends Model implements HasMedia
     {
         return [
             'is_active' => 'boolean',
+            'popular' => 'boolean',
             'nickname_check_enabled' => 'boolean',
         ];
     }
@@ -42,9 +43,19 @@ class Product extends Model implements HasMedia
         return $this->hasMany(ProductInputField::class);
     }
 
+    public function notices(): HasMany
+    {
+        return $this->hasMany(ProductNotice::class);
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('image')->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])->singleFile();
+        $this->addMediaCollection('image')->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])->singleFile();
         $this->addMediaCollection('banner')->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])->singleFile();
     }
 }

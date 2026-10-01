@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AdminUser;
 use App\Models\Category;
+use App\Models\HomeBanner;
 use App\Models\Product;
 use App\Models\ProductPackage;
 use App\Models\ProviderMapping;
@@ -147,8 +148,13 @@ class CatalogTest extends TestCase
             'code' => 'AUTO10', 'name' => '10 Unit', 'sort_order' => 1,
             'external_sku' => 'FORGED-SKU',
         ])->assertRedirect();
-        $this->assertSame(1, ProviderMapping::count());
-        $this->assertSame('PROVIDER-SKU-5', ProviderMapping::first()->external_sku);
+        $productMappingQuery = ProviderMapping::whereIn(
+            'product_package_id',
+            $product->packages()->pluck('id')
+        );
+        $this->assertSame(1, (clone $productMappingQuery)->count());
+        $this->assertSame('PROVIDER-SKU-5', (clone $productMappingQuery)->firstOrFail()->external_sku);
+        $this->assertFalse(ProviderMapping::where('external_sku', 'FORGED-SKU')->exists());
 
         $other = $product->packages()->create(['code' => 'AUTO20', 'name' => '20 Unit']);
         $this->expectException(InvalidArgumentException::class);
@@ -160,7 +166,7 @@ class CatalogTest extends TestCase
         Storage::fake('public');
         $assets = [];
 
-        foreach (['logo', 'favicon', 'banner_desktop', 'banner_mobile', 'popup'] as $key) {
+        foreach (['logo', 'favicon', 'banner_desktop', 'banner_mobile'] as $key) {
             $asset = StoreAsset::where('key', $key)->firstOrFail();
             $asset->update(['is_active' => true]);
             $asset->addMedia(UploadedFile::fake()->image($key.'.png'))->toMediaCollection('image', 'public');
@@ -170,10 +176,62 @@ class CatalogTest extends TestCase
         $this->get('/')->assertInertia(fn (Assert $page) => $page
             ->component('Catalog/Index')
             ->where('logoUrl', $assets['logo'])
-            ->where('bannerUrl', $assets['banner_desktop'])
-            ->where('mobileBannerUrl', $assets['banner_mobile'])
-            ->where('popupUrl', $assets['popup'])
+            ->where('banners.0.desktop_url', $assets['banner_desktop'])
+            ->where('banners.0.mobile_url', $assets['banner_mobile'])
+            ->where('popups.0.title', 'Selamat datang di LFAMILIA STORE')
             ->where('faviconUrl', $assets['favicon'])
+            ->etc());
+    }
+
+    public function test_admin_managed_banner_media_and_popup_are_connected_to_homepage(): void
+    {
+        Storage::fake('public');
+        $this->actingAs($this->admin(), 'admin');
+
+        $banner = HomeBanner::create([
+            'title' => 'Promo Managed',
+            'subtitle' => 'Banner test',
+            'cta_href' => '/promo',
+            'show_desktop' => true,
+            'show_mobile' => true,
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        $this->post('/admin/catalog/media/banner/'.$banner->id, [
+            'collection' => 'desktop',
+            'image' => UploadedFile::fake()->image('desktop.png', 1200, 400),
+        ])->assertRedirect();
+        $this->post('/admin/catalog/media/banner/'.$banner->id, [
+            'collection' => 'mobile',
+            'image' => UploadedFile::fake()->image('mobile.png', 900, 500),
+        ])->assertRedirect();
+
+        $this->post('/admin/content/popups', [
+            'title' => 'Popup Managed',
+            'body' => 'Isi popup yang bisa diedit Admin.',
+            'dismiss_days' => 3,
+            'is_active' => true,
+        ])->assertRedirect();
+
+        $this->post('/admin/content/popups', [
+            'title' => 'Popup Managed Updated',
+            'body' => 'Tetap satu record popup.',
+            'dismiss_days' => 5,
+            'is_active' => true,
+        ])->assertRedirect();
+
+        $this->assertSame(1, DB::table('site_popups')->count());
+
+        $this->get('/')->assertInertia(fn (Assert $page) => $page
+            ->component('Catalog/Index')
+            ->where('banners.0.title', 'Promo Managed')
+            ->where('banners.0.desktop_url', $banner->fresh()->getFirstMediaUrl('desktop'))
+            ->where('banners.0.mobile_url', $banner->fresh()->getFirstMediaUrl('mobile'))
+            ->where('popups.0.title', 'Popup Managed Updated')
+            ->where('popups.0.body', 'Tetap satu record popup.')
+            ->where('popups.0.dismiss_days', 5)
+            ->missing('popups.1')
             ->etc());
     }
 
@@ -196,5 +254,55 @@ class CatalogTest extends TestCase
         ])->assertRedirect();
         $this->assertCount(1, $product->fresh()->getMedia('image'));
         $this->assertSame('second.png', $product->fresh()->getFirstMedia('image')->file_name);
+    }
+
+    public function test_unavailable_nominal_cannot_be_preselected_from_deep_link(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Unavailable Deep Link',
+            'slug' => 'unavailable-deep-link-'.bin2hex(random_bytes(3)),
+            'margin_percent' => 10,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'is_active' => true,
+        ]);
+
+        $package = $product->packages()->create([
+            'code' => 'LOCKED100',
+            'name' => '100 Diamonds',
+            'nominal_value' => 100,
+            'is_active' => true,
+        ]);
+
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $package->id,
+            'provider_id' => $providerId,
+            'external_sku' => 'LOCKED-SKU-'.bin2hex(random_bytes(3)),
+            'cost_idr' => 10000,
+            'max_price_idr' => 9000,
+            'priority' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->get('/catalog/'.$product->slug.'?package='.$package->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Show')
+                ->where('initialPackageId', '')
+                ->where('packages.0.id', $package->id)
+                ->where('packages.0.is_available', false)
+                ->where('packages.0.price_idr', null)
+                ->missing('packages.0.code')
+                ->missing('packages.0.external_sku')
+                ->missing('packages.0.provider_mapping_id')
+                ->missing('packages.0.cost_idr')
+                ->missing('packages.0.max_price_idr')
+                ->etc());
     }
 }

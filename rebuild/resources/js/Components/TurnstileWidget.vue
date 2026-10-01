@@ -4,6 +4,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 const props = defineProps({
     siteKey: { type: String, required: true },
     action: { type: String, required: true },
+    appearance: { type: String, default: 'always' },
 });
 const emit = defineEmits(['token']);
 const target = ref(null);
@@ -14,6 +15,7 @@ function renderWidget() {
     widgetId = window.turnstile.render(target.value, {
         sitekey: props.siteKey,
         action: props.action,
+        appearance: props.appearance,
         callback: (token) => emit('token', token),
         'expired-callback': () => emit('token', ''),
         'error-callback': () => emit('token', ''),
@@ -59,5 +61,5 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div ref="target" class="min-h-[65px]"></div>
+    <div ref="target" :class="appearance === 'interaction-only' ? 'min-h-0' : 'min-h-[65px]'"></div>
 </template>

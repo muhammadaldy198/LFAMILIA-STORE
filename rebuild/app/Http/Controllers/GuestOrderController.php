@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\GuestOrderAccess;
 use App\Services\PaymentPresentationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -46,16 +47,62 @@ class GuestOrderController
             ->whereNull('orders.user_id')->where('orders.order_number', $orderNumber)
             ->where('orders.id', $request->session()->get('guest_order_id'))
             ->select('orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
-                'orders.created_at', 'orders.delivery_payload', 'products.name as product_name')->first();
+                'orders.created_at', 'orders.delivery_payload', 'products.name as product_name', 'products.slug as product_slug')->first();
 
         abort_unless($order, 404);
-        $order->delivery = is_string($order->delivery_payload)
+        $order->delivery = $order->status === 'SUCCESS' && is_string($order->delivery_payload)
             ? (json_decode($order->delivery_payload, true) ?: null) : null;
         unset($order->delivery_payload);
 
         return Inertia::render('Guest/OrderStatus', [
             'order' => $order,
             'payment' => $payments->forOrder((int) $order->id),
+            'events' => $this->publicEvents((int) $order->id),
+            'review' => DB::table('product_reviews')->where('order_id', $order->id)->first(['rating', 'body']),
         ]);
+    }
+
+    public function events(
+        Request $request,
+        string $orderNumber,
+        PaymentPresentationService $payments,
+    ): JsonResponse {
+        $order = DB::table('orders')
+            ->join('products', 'products.id', '=', 'orders.product_id')
+            ->whereNull('orders.user_id')->where('orders.order_number', $orderNumber)
+            ->where('orders.id', $request->session()->get('guest_order_id'))
+            ->select('orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
+                'orders.created_at', 'orders.delivery_payload', 'products.name as product_name', 'products.slug as product_slug')->first();
+
+        abort_unless($order, 404);
+        $delivery = is_string($order->delivery_payload)
+            ? (json_decode($order->delivery_payload, true) ?: null) : null;
+
+        return response()->json([
+            'order' => [
+                'order_number' => $order->order_number,
+                'status' => $order->status,
+                'total_idr' => (int) $order->total_idr,
+                'created_at' => $order->created_at,
+                'product_name' => $order->product_name,
+                'product_slug' => $order->product_slug,
+                'delivery' => $order->status === 'SUCCESS' ? $delivery : null,
+            ],
+            'payment' => $payments->forOrder((int) $order->id),
+            'events' => $this->publicEvents((int) $order->id),
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
+    private function publicEvents(int $orderId): array
+    {
+        return DB::table('order_events')->where('order_id', $orderId)
+            ->orderBy('id')->get(['id', 'event_type', 'from_status', 'to_status', 'created_at'])
+            ->map(fn ($event): array => [
+                'id' => (int) $event->id,
+                'event_type' => $event->event_type,
+                'from_status' => $event->from_status,
+                'to_status' => $event->to_status,
+                'created_at' => $event->created_at,
+            ])->all();
     }
 }

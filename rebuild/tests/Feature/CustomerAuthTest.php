@@ -5,18 +5,22 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class CustomerAuthTest extends TestCase
 {
     use DatabaseTransactions;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Queue::fake();
+    }
+
     public function test_customer_can_register_login_and_cannot_enter_admin_panel(): void
     {
-        Notification::fake();
-
         $this->post('/register', [
             'name' => 'Customer',
             'email' => 'CUSTOMER@example.test',
@@ -42,7 +46,6 @@ class CustomerAuthTest extends TestCase
 
     public function test_password_reset_changes_the_hash_with_a_valid_token(): void
     {
-        Notification::fake();
         $user = User::create([
             'name' => 'Customer',
             'email' => 'reset@example.test',

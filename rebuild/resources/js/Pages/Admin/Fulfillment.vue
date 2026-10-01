@@ -1,9 +1,11 @@
 <script setup>
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
 import { reactive } from 'vue';
 
 const props = defineProps({ attempts: Array });
+const page = usePage();
+const base = page.props.adminPanel?.base_path || '/admin';
 const forms = reactive({});
 
 function form(id) {
@@ -12,20 +14,20 @@ function form(id) {
 }
 
 function completeManual(id) {
-    router.post('/admin/fulfillment/' + id + '/complete', {
+    router.post(base + '/fulfillment/' + id + '/complete', {
         delivery_code: form(id).delivery_code || null,
         note: form(id).note || null,
     }, { preserveScroll: true });
 }
 
 function failManual(id) {
-    router.post('/admin/fulfillment/' + id + '/fail', {
+    router.post(base + '/fulfillment/' + id + '/fail', {
         reason: form(id).reason,
     }, { preserveScroll: true });
 }
 
 function retry(id) {
-    router.post('/admin/fulfillment/' + id + '/retry', {}, { preserveScroll: true });
+    router.post(base + '/fulfillment/' + id + '/retry', {}, { preserveScroll: true });
 }
 </script>
 
@@ -34,7 +36,7 @@ function retry(id) {
     <AdminShell>
         <div class="mx-auto max-w-7xl space-y-6">
             <div>
-                <Link href="/admin/panel" class="text-sm text-cyan-300">← Panel Admin</Link>
+                <Link :href="base+'/panel'" class="text-sm text-cyan-300">← Panel Admin</Link>
                 <h1 class="mt-2 text-3xl font-semibold">Fulfillment</h1>
                 <p class="mt-1 text-sm text-slate-400">Pending/unknown tidak boleh dipindah ke provider lain sebelum reconciliation memastikan transaksi sebelumnya gagal.</p>
             </div>

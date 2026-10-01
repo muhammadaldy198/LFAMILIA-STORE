@@ -55,8 +55,9 @@ class AdminPermissionService
             ['label' => 'Pesanan', 'href' => '/admin/orders', 'permission' => 'orders.view'],
             ['label' => 'Produk', 'href' => '/admin/catalog', 'permission' => 'catalog.manage'],
             ['label' => 'Manual', 'href' => '/admin/fulfillment', 'permission' => 'fulfillment.manage'],
-            ['label' => 'Banner & Konten', 'href' => '/admin/catalog#media', 'permission' => 'content.manage'],
+            ['label' => 'Banner & Konten', 'href' => '/admin/content', 'permission' => 'content.manage'],
             ['label' => 'Digiflazz', 'href' => '/admin/providers?provider=DIGIFLAZZ', 'permission' => 'providers.manage'],
+            ['label' => 'Validasi Akun', 'href' => '/admin/nickname-tools', 'permission' => null, 'super_only' => true],
             ['label' => 'Provider', 'href' => '/admin/providers', 'permission' => 'providers.manage'],
             ['label' => 'Pembayaran', 'href' => '/admin/payments', 'permission' => 'payments.manage'],
             ['label' => 'Pelanggan', 'href' => '/admin/customers', 'permission' => 'customers.view'],
@@ -71,13 +72,19 @@ class AdminPermissionService
         ];
 
         return collect($items)
-            ->map(fn (array $item): array => [...$item, 'super_only' => $item['super_only'] ?? false])
+            ->map(fn (array $item): array => [
+                ...$item,
+                'super_only' => $item['super_only'] ?? false,
+                'permissions' => $item['permissions'] ?? (isset($item['permission']) ? [$item['permission']] : []),
+            ])
             ->filter(function (array $item) use ($admin): bool {
                 if ($item['super_only']) {
                     return $admin?->role === 'SUPER_ADMIN';
                 }
 
-                return $this->allows($admin, $item['permission']);
-            })->values()->all();
+                return collect($item['permissions'])
+                    ->contains(fn (string $permission): bool => $this->allows($admin, $permission));
+            })
+            ->values()->all();
     }
 }

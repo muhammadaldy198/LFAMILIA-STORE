@@ -7,12 +7,18 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class CustomerAreaTest extends TestCase
 {
     use DatabaseTransactions;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Queue::fake();
+    }
 
     private function customer(string $email): User
     {
@@ -51,6 +57,31 @@ class CustomerAreaTest extends TestCase
         ]);
     }
 
+    public function test_member_delivery_is_hidden_until_success_and_closed_tickets_reject_replies(): void
+    {
+        $user = $this->customer('delivery-owner@example.test');
+        $orderId = $this->order($user, 'DELIVERY-900');
+        DB::table('orders')->where('id', $orderId)->update([
+            'status' => 'PROCESSING',
+            'delivery_payload' => json_encode(['code' => 'PRIVATE-RESULT']),
+        ]);
+        $this->actingAs($user, 'web')->get('/account/orders/'.$orderId)
+            ->assertOk()->assertInertia(fn ($page) => $page->where('order.delivery', null));
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'SUCCESS']);
+        $this->get('/account/orders/'.$orderId)
+            ->assertOk()->assertInertia(fn ($page) => $page->where('order.delivery.code', 'PRIVATE-RESULT'));
+
+        $ticket = SupportTicket::create([
+            'user_id' => $user->id,
+            'subject' => 'Closed request',
+            'message' => 'Initial message',
+        ]);
+        $ticket->forceFill(['status' => 'CLOSED'])->save();
+        $this->post('/account/tickets/'.$ticket->id.'/messages', ['message' => 'Late reply'])
+            ->assertStatus(422);
+        $this->assertSame(0, DB::table('support_ticket_messages')->where('support_ticket_id', $ticket->id)->count());
+    }
+
     public function test_account_wallet_tiers_and_orders_are_scoped_to_customer(): void
     {
         $owner = $this->customer('owner@example.test');
@@ -72,7 +103,6 @@ class CustomerAreaTest extends TestCase
 
     public function test_profile_password_and_deletion_checks(): void
     {
-        Notification::fake();
         $user = $this->customer('profile@example.test');
         $this->actingAs($user, 'web');
 

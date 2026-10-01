@@ -37,13 +37,14 @@ class CustomerOrderController
                 'products.name as product_name', 'product_packages.name as package_name')->first();
 
         abort_unless($record, 404);
-        $record->delivery = is_string($record->delivery_payload)
+        $record->delivery = $record->status === 'SUCCESS' && is_string($record->delivery_payload)
             ? (json_decode($record->delivery_payload, true) ?: null) : null;
         unset($record->delivery_payload);
 
         return Inertia::render('Customer/OrderDetail', [
             'order' => $record,
             'payment' => $payments->forOrder((int) $record->id),
+            'review' => DB::table('product_reviews')->where('order_id', $record->id)->first(['rating', 'body']),
         ]);
     }
 }

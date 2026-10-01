@@ -7,6 +7,7 @@ use App\Models\AdminUser;
 use App\Models\IntegrationCredential;
 use App\Models\User;
 use App\Services\AdminNotificationService;
+use App\Services\AdminPermissionService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -42,6 +43,29 @@ class AdminM9Test extends TestCase
         ]);
     }
 
+    public function test_admin_menu_includes_account_validation_and_no_staff_role(): void
+    {
+        $super = $this->superAdmin();
+        $menu = app(AdminPermissionService::class)->menu($super);
+
+        $this->assertSame([
+            'Dashboard', 'Pesanan', 'Produk', 'Manual', 'Banner & Konten', 'Digiflazz',
+            'Validasi Akun', 'Provider', 'Pembayaran', 'Pelanggan', 'Promo', 'Layanan Pelanggan', 'Laporan',
+            'Admin & Akses', 'Pengaturan', 'Integrasi', 'System Health', 'Audit Log',
+        ], collect($menu)->pluck('label')->all());
+        $this->assertCount(18, $menu);
+
+        $unsupported = AdminUser::create([
+            'name' => 'Unsupported Staff',
+            'email' => 'unsupported-staff-'.bin2hex(random_bytes(4)).'@example.test',
+            'password' => Hash::make('VeryStrongPassword123!'),
+            'role' => 'STAFF',
+            'permissions' => ['dashboard.view'],
+            'is_active' => true,
+        ]);
+        $this->assertFalse(app(AdminPermissionService::class)->allows($unsupported, 'dashboard.view'));
+    }
+
     public function test_admin_routes_are_permission_gated_and_super_admin_bypasses_permissions(): void
     {
         $admin = $this->admin(['dashboard.view', 'orders.view']);
@@ -50,6 +74,7 @@ class AdminM9Test extends TestCase
         $this->get('/admin/panel')->assertOk();
         $this->get('/admin/orders')->assertOk();
         $this->get('/admin/providers')->assertForbidden();
+        $this->get('/admin/nickname-tools')->assertForbidden();
         $this->get('/admin/integrations')->assertForbidden();
 
         auth('admin')->logout();
@@ -57,6 +82,7 @@ class AdminM9Test extends TestCase
         $this->actingAs($super, 'admin');
 
         $this->get('/admin/integrations')->assertOk();
+        $this->get('/admin/nickname-tools')->assertOk();
         $this->get('/admin/health')->assertOk();
         $this->get('/admin/audit')->assertOk();
     }
@@ -209,6 +235,7 @@ class AdminM9Test extends TestCase
 
     public function test_last_active_super_admin_cannot_be_disabled(): void
     {
+        AdminUser::where('role', 'SUPER_ADMIN')->update(['is_active' => false]);
         $super = $this->superAdmin();
         $this->actingAs($super, 'admin');
 

@@ -43,6 +43,10 @@ done
 for pair in \
   'APP_ENV=production' \
   'APP_DEBUG=false' \
+  'DB_CONNECTION=mysql' \
+  'CACHE_STORE=redis' \
+  'QUEUE_CONNECTION=redis' \
+  'SESSION_DRIVER=redis' \
   'SESSION_ENCRYPT=true' \
   'SESSION_SECURE_COOKIE=true'; do
   grep -Fqx "${pair}" "${ENV_FILE}" || { echo "Required setting missing: ${pair}" >&2; exit 1; }
@@ -59,6 +63,11 @@ cd "${APP_DIR}"
 
 mysql --defaults-extra-file="${MYSQL_DEFAULTS_FILE}" "${BACKUP_DATABASE_NAME}" \
   --batch --skip-column-names -e 'SELECT 1' | grep -Fxq '1'
+
+db_version="$(mysql --defaults-extra-file="${MYSQL_DEFAULTS_FILE}" \
+  --batch --skip-column-names -e 'SELECT VERSION()')"
+[[ "${db_version}" != *MariaDB* ]] || { echo "MariaDB is not allowed; LFAMILIA requires MySQL 8." >&2; exit 1; }
+[[ "${db_version}" =~ ^8\. ]] || { echo "MySQL 8.x is required; detected ${db_version}." >&2; exit 1; }
 
 if [[ -n "${REDIS_PASSWORD_FILE:-}" ]]; then
   [[ -r "${REDIS_PASSWORD_FILE}" ]] || { echo "Redis password file is not readable" >&2; exit 1; }

@@ -16,7 +16,7 @@ All secret files should be owned by root (or the dedicated service user that nee
 ## Deployment order
 
 1. Create the CloudPanel site and configure PHP 8.4.
-2. Install MySQL 8, Redis, Composer, Node/npm, and PHP extensions including `pdo_mysql` and `redis`.
+2. Install MySQL 8.x (8.0 or 8.4; MariaDB is not accepted for this PRD), Redis, Composer, Node/npm, and PHP extensions including `pdo_mysql` and `redis`.
 3. Clone this repository to the server and keep `main` as the production ref.
 4. Copy `production.env.example` to `rebuild/.env`, fill infrastructure values, and generate `APP_KEY`.
 5. Copy `ops.env.example` to `/etc/lfamilia/ops.env` and fill paths/user/backup storage settings.
@@ -34,6 +34,7 @@ This intentionally does not roll database migrations backward.
 
 ## Safety rules
 
+- Production preflight rejects MariaDB/non-MySQL-8 databases and requires Laravel cache, queue, and session to use Redis.
 - Deployment aborts on a dirty Git worktree.
 - Git updates use fast-forward only.
 - The application enters maintenance mode before dependency/build/schema changes.

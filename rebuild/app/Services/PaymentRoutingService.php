@@ -18,19 +18,28 @@ class PaymentRoutingService
             ->where('channels.supports_order', true)
             ->orderBy('channels.sort_order')
             ->get()
-            ->filter(function (object $channel) use ($user): bool {
+            ->filter(function (object $channel): bool {
                 try {
-                    $route = $this->resolve((string) $channel->code, false, 'order');
+                    $this->resolve((string) $channel->code, false, 'order');
+
+                    return true;
                 } catch (ValidationException) {
                     return false;
                 }
-
-                return $route['gateway_code'] !== 'WALLET' || $user !== null;
             })
-            ->map(fn (object $channel): array => [
-                'code' => (string) $channel->code,
-                'name' => (string) $channel->name,
-            ])->values()->all();
+            ->map(function (object $channel) use ($user): array {
+                $route = $this->resolve((string) $channel->code, false, 'order');
+
+                return [
+                    'code' => (string) $channel->code,
+                    'name' => (string) $channel->name,
+                    'group' => $this->publicGroup((string) $channel->code, (string) $channel->name),
+                    'description' => $this->publicDescription((string) $channel->code, (string) $channel->name),
+                    'fee_flat_idr' => (int) $channel->fee_flat_idr,
+                    'fee_percent_bps' => (int) $channel->fee_percent_bps,
+                    'available' => $route['gateway_code'] !== 'WALLET' || $user !== null,
+                ];
+            })->values()->all();
     }
 
     /**
@@ -172,6 +181,41 @@ class PaymentRoutingService
                 ? (json_decode($row->configuration, true) ?: [])
                 : ((array) $row->configuration),
         ];
+    }
+
+    private function publicGroup(string $code, string $name): string
+    {
+        $value = strtolower($code.' '.$name);
+        if (str_contains($value, 'wallet') || str_contains($value, 'saldo') || str_contains($value, 'cash')) {
+            return 'wallet';
+        }
+        if (str_contains($value, 'qris') || str_contains($value, 'qr')) {
+            return 'qris';
+        }
+        if (str_contains($value, 'va') || str_contains($value, 'virtual') || str_contains($value, 'bank')) {
+            return 'va';
+        }
+        if (str_contains($value, 'dana') || str_contains($value, 'ovo') || str_contains($value, 'gopay')
+            || str_contains($value, 'shopee') || str_contains($value, 'wallet')) {
+            return 'ewallet';
+        }
+        if (str_contains($value, 'alfamart') || str_contains($value, 'indomaret') || str_contains($value, 'retail')) {
+            return 'retail';
+        }
+
+        return 'other';
+    }
+
+    private function publicDescription(string $code, string $name): string
+    {
+        return match ($this->publicGroup($code, $name)) {
+            'wallet' => 'Bayar langsung menggunakan saldo akun LFAMILIA.',
+            'qris' => 'Scan QR menggunakan aplikasi pembayaran yang mendukung QRIS.',
+            'va' => 'Transfer melalui Virtual Account bank yang tersedia.',
+            'ewallet' => 'Bayar menggunakan dompet digital yang tersedia.',
+            'retail' => 'Bayar melalui gerai retail yang tersedia.',
+            default => 'Metode pembayaran tersedia untuk transaksi ini.',
+        };
     }
 
     public function fee(int $amountIdr, array $route): int

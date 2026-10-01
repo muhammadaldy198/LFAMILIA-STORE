@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ProductInputField extends Model
 {
-    protected $fillable = ['product_id', 'field_key', 'label', 'type', 'is_required', 'sort_order'];
+    protected $fillable = ['product_id', 'field_key', 'label', 'placeholder', 'type', 'is_required', 'sort_order'];
 
     protected function casts(): array
     {

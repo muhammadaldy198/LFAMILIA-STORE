@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\AdminPermissionService;
+use App\Services\StorefrontContentService;
 use App\Services\TurnstileService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,10 +19,28 @@ class HandleInertiaRequests extends Middleware
         $admin = $request->user('admin');
         $permissions = app(AdminPermissionService::class);
         $turnstile = app(TurnstileService::class);
+        $storefront = app(StorefrontContentService::class);
 
         return [
             ...parent::share($request),
             'status' => fn () => $request->session()->get('status'),
+            'auth' => function (): array {
+                $user = auth('web')->user();
+                if (! $user) {
+                    return ['user' => null];
+                }
+
+                $wallet = $user->wallet()->firstOrCreate([]);
+
+                return [
+                    'user' => [
+                        ...$user->only('id', 'name', 'email', 'phone', 'membership_tier_code', 'leaderboard_opt_in'),
+                        'email_verified' => $user->hasVerifiedEmail(),
+                        'balance_idr' => (int) $wallet->balance_idr,
+                    ],
+                ];
+            },
+            'storefront' => fn () => $storefront->shared(),
             'security' => function () use ($request, $turnstile): array {
                 $config = $turnstile->publicConfig();
                 $path = trim($request->path(), '/');
@@ -62,6 +81,7 @@ class HandleInertiaRequests extends Middleware
 
                 return [
                     'admin' => $admin->only('id', 'name', 'email', 'role'),
+                    'base_path' => '/admin',
                     'menu' => $permissions->menu($admin),
                     'can_notifications' => $permissions->allows($admin, 'notifications.view'),
                     'unread_notifications' => Schema::hasTable('admin_notifications')
