@@ -2868,5 +2868,35 @@
     "group": "Components/CustomerShell",
     "label": "Keterangan copyright footer",
     "default": "Produk dan merek dagang adalah milik pemegang hak masing-masing."
+  },
+  "legal.back": {
+    "group": "Pages/Content/Legal",
+    "label": "Kembali ke beranda",
+    "default": "Kembali ke beranda"
+  },
+  "legal.documentLabel": {
+    "group": "Pages/Content/Legal",
+    "label": "Dokumen hukum",
+    "default": "Dokumen hukum"
+  },
+  "legal.contents": {
+    "group": "Pages/Content/Legal",
+    "label": "Di halaman ini",
+    "default": "Di halaman ini"
+  },
+  "legal.helpTitle": {
+    "group": "Pages/Content/Legal",
+    "label": "Masih ada pertanyaan?",
+    "default": "Masih ada pertanyaan?"
+  },
+  "legal.helpBody": {
+    "group": "Pages/Content/Legal",
+    "label": "Hubungi tim bantuan melalui kanal resmi LFAMILIA.",
+    "default": "Hubungi tim bantuan melalui kanal resmi LFAMILIA."
+  },
+  "legal.helpAction": {
+    "group": "Pages/Content/Legal",
+    "label": "Hubungi kami",
+    "default": "Hubungi kami"
   }
 }
