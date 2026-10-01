@@ -28,7 +28,7 @@ M7 adds payment-channel pricing, gateway routing, payment creation, wallet settl
 - Callback verification uses Midtrans SHA-512 notification signature over order_id + status_code + gross_amount + server key.
 - Callback amount must match the immutable local payment amount.
 - Duplicate callbacks are stored/deduplicated by a stable event id.
-- settlement and accepted capture become PAID; expire becomes EXPIRED; deny/cancel/failure become FAILED; refund becomes REFUNDED.
+- settlement and accepted capture become PAID; expire becomes EXPIRED; cancel becomes CANCELLED; deny/failure become FAILED; refund becomes REFUNDED.
 
 ## DOKU Direct API
 
@@ -58,8 +58,8 @@ M7 adds payment-channel pricing, gateway routing, payment creation, wallet settl
 
 ## Payment state rules
 
-- PAID is monotonic: stale PENDING/FAILED callbacks cannot downgrade a paid transaction/order.
-- A late PAID callback for an already EXPIRED/FAILED order is recorded as PAYMENT_LATE_VERIFIED and does not automatically reopen or fulfill the order.
+- PAID is monotonic: stale PENDING/FAILED/CANCELLED callbacks cannot downgrade a paid transaction/order.
+- A late PAID callback for an already EXPIRED/FAILED/CANCELLED order is recorded as PAYMENT_LATE_VERIFIED and does not automatically reopen or fulfill the order.
 - Successful payment redeems a RESERVED voucher atomically.
 - Order expiry releases the voucher reservation.
 - Callback claims and state application are transactionally grouped so a processing failure does not permanently consume the callback id.
