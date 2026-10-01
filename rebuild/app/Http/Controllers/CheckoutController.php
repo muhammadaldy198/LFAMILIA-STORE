@@ -31,7 +31,8 @@ class CheckoutController
             ->firstOrFail();
         $input = $validator->validate($product, $data['customer_input']);
 
-        return response()->json($nickname->check($product, $input));
+        return response()->json($nickname->check($product, $input))
+            ->header('Cache-Control', 'no-store, private');
     }
 
     public function quote(Request $request, CheckoutService $checkout): JsonResponse
