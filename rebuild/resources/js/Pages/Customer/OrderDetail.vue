@@ -104,7 +104,7 @@ async function submitReview() {
                 <h2 class="text-lg font-semibold">Beri ulasan</h2>
                 <div class="grid gap-3 sm:grid-cols-[120px_1fr]">
                     <select v-model.number="reviewRating" class="rounded bg-slate-800 p-2"><option :value="5">5 ★</option><option :value="4">4 ★</option><option :value="3">3 ★</option><option :value="2">2 ★</option><option :value="1">1 ★</option></select>
-                    <textarea v-model="reviewBody" rows="3" maxlength="2000" placeholder="Bagaimana pengalaman transaksi kamu?" class="rounded bg-slate-800 p-2"></textarea>
+                    <textarea v-model="reviewBody" rows="3" maxlength="2000" placeholder="Ceritakan pengalaman transaksimu" class="rounded bg-slate-800 p-2"></textarea>
                 </div>
                 <button type="button" class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50" :disabled="busy || reviewBody.trim().length < 3" @click="submitReview">Kirim ulasan</button>
             </template>
