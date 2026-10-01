@@ -46,21 +46,21 @@ async function search(){
   else{detail.value=null;orders.value=data.orders||[];stopDetailPolling();}
  }catch(e){error.value=e.message||'Pesanan tidak ditemukan.'}finally{loading.value=false;}
 }
-async function openOrder(refId){
+async function openOrder(trackingToken){
  loading.value=true;error.value='';
- try{const data=await json('/orders/track/status/'+encodeURIComponent(refId));detail.value=data.order;mode.value='order';startDetailPolling();}
+ try{const data=await json('/orders/track/status',{method:'POST',body:JSON.stringify({tracking_token:trackingToken})});detail.value=data.order;mode.value='order';startDetailPolling();}
  catch(e){error.value=e.message||'Pesanan tidak ditemukan.'}finally{loading.value=false;}
 }
 async function refreshDetail(){
- if(!detail.value?.referenceId)return;
- try{const data=await json('/orders/track/status/'+encodeURIComponent(detail.value.referenceId));detail.value=data.order;if(terminal.value)stopDetailPolling();}catch{}
+ if(!detail.value?.trackingToken)return;
+ try{const data=await json('/orders/track/status',{method:'POST',body:JSON.stringify({tracking_token:detail.value.trackingToken})});detail.value=data.order;if(terminal.value)stopDetailPolling();}catch{}
 }
 async function refreshFeed(){
  try{const data=await json('/orders/track/feed');feed.value=data.transactions||feed.value;}catch{}
 }
 function startDetailPolling(){stopDetailPolling();if(!terminal.value)detailTimer=setInterval(refreshDetail,3000);}
 function stopDetailPolling(){if(detailTimer){clearInterval(detailTimer);detailTimer=null;}}
-async function copyInvoice(){if(!detail.value?.referenceId)return;await navigator.clipboard?.writeText(detail.value.referenceId);copied.value=true;setTimeout(()=>copied.value=false,1400);}
+async function copyInvoice(){if(!detail.value?.referenceId||detail.value?.referenceMasked)return;await navigator.clipboard?.writeText(detail.value.referenceId);copied.value=true;setTimeout(()=>copied.value=false,1400);}
 onMounted(()=>{feedTimer=setInterval(refreshFeed,15000);});
 onUnmounted(()=>{stopDetailPolling();if(feedTimer)clearInterval(feedTimer);});
 </script>
@@ -86,7 +86,7 @@ onUnmounted(()=>{stopDetailPolling();if(feedTimer)clearInterval(feedTimer);});
  <section v-if="orders.length" class="lf-container lf-track-results">
   <div class="lf-track-section-head"><div><p class="lf-eyebrow">RIWAYAT NOMOR</p><h2>Pesanan ditemukan</h2></div><span>{{orders.length}} transaksi</span></div>
   <div class="lf-track-order-list">
-   <button v-for="item in orders" :key="item.referenceId" @click="openOrder(item.referenceId)">
+   <button v-for="item in orders" :key="item.trackingToken" @click="openOrder(item.trackingToken)">
     <div><strong>{{item.maskedReferenceId}}</strong><small>{{item.productName}} · {{item.packageLabel}}</small></div>
     <div><b>{{money(item.total)}}</b><span :class="'status-'+item.status">{{statusMeta(item.status)[0]}}</span></div>
    </button>
@@ -103,7 +103,7 @@ onUnmounted(()=>{stopDetailPolling();if(feedTimer)clearInterval(feedTimer);});
    <div class="lf-track-summary">
     <div class="lf-track-invoice">
      <div><small>Nomor Invoice</small><strong>{{detail.referenceId}}</strong></div>
-     <button @click="copyInvoice">{{copied?'Tersalin':'Salin'}}</button>
+     <button v-if="!detail.referenceMasked" @click="copyInvoice">{{copied?'Tersalin':'Salin'}}</button><span v-else class="lf-track-protected">Terlindungi</span>
     </div>
     <div class="lf-track-status-card" :class="'tone-'+statusMeta(detail.fulfillmentStatus)[2]">
      <span></span><div><small>Status Pesanan</small><strong>{{statusMeta(detail.fulfillmentStatus)[0]}}</strong><p>{{statusMeta(detail.fulfillmentStatus)[1]}}</p></div>
