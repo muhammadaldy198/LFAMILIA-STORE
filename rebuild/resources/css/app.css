@@ -5658,3 +5658,24 @@
 }
 
 @media(max-width:639px){.lf-customer .lf-product-perks{position:static!important;margin-top:16px!important}.lf-customer .lf-product-identity-inner{padding-bottom:14px!important}}
+
+/* Independent desktop geometry; mobile retains the approved 36px controls. */
+@media(min-width:640px){
+ .lf-customer{--lf-ui-control-height:40px;--lf-ui-button-sm-height:40px}
+ .lf-customer input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+ .lf-customer select,
+ .lf-customer button:not(.lf-menu):not(.lf-support-trigger):not(.lf-account-menu-toggle):not(.lf-account-menu-close):not(.lf-drawer-close):not(:has(img)):not(:has(.lf-nominal-copy)):not(:has(.lf-voucher-copy)):not(:has(.lf-mobile-summary-copy)),
+ .lf-customer .lf-primary,.lf-customer .lf-secondary,
+ .lf-customer .lf-review-submit,.lf-customer .lf-order-button,
+ .lf-customer .lf-account-nav a,.lf-customer .lf-chip,
+ .lf-customer .lf-pages a,.lf-customer .lf-pages span{
+  height:40px!important;min-height:40px!important;
+ }
+ .lf-customer .lf-nominal-grid button,.lf-customer .lf-voucher-list button,
+ .lf-customer .lf-track-order-list button{
+  height:auto!important;min-height:40px!important;
+ }
+ .lf-customer textarea{min-height:112px!important}
+ .lf-customer table tr,.lf-customer table th,.lf-customer table td{height:40px}
+ .lf-customer table th,.lf-customer table td{padding-top:8px;padding-bottom:8px}
+}
