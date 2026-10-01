@@ -5610,3 +5610,49 @@
 .lf-customer .lf-track-order-list button,.lf-customer .lf-mobile-summary-toggle{
   height:auto!important;min-height:36px!important;
 }
+
+/* Shared customer typography baseline; reuse these roles for the future Admin pass.
+   Footer and nominal/price typography retain their separately approved dimensions. */
+.lf-customer{
+ --lf-type-page:24px;--lf-type-product:20px;--lf-type-heading:16px;
+ --lf-type-body:13px;--lf-type-label:12px;--lf-type-action:12px;--lf-type-note:11px;
+ --lf-ui-section-title:16px;--lf-ui-section-desc:13px;--lf-ui-field-label:12px;
+ --lf-ui-control-text:16px;--lf-ui-helper:11px;--lf-ui-button-sm:12px;--lf-ui-button-main:12px;
+}
+.lf-customer h1:not(.lf-footer *){font-size:var(--lf-type-page)!important;line-height:1.25!important}
+.lf-customer .lf-product-title h1{font-size:var(--lf-type-product)!important}
+.lf-customer h2:not(.lf-footer *),.lf-customer h3:not(.lf-footer *),
+.lf-customer .lf-account-card-head>strong{font-size:var(--lf-type-heading)!important;line-height:1.35!important}
+.lf-customer p:not(.lf-footer *):not(.lf-eyebrow):not(.lf-checkout-info-note):not(.lf-account-note),
+.lf-customer .lf-account-copy,.lf-customer .lf-account-empty,
+.lf-customer .lf-prose,.lf-customer .lf-faq-questions summary,
+.lf-customer .lf-account-main .text-xs,.lf-customer .lf-account-main .text-sm{
+ font-size:var(--lf-type-body)!important;line-height:1.6!important;
+}
+.lf-customer label:not(.lf-footer *){font-size:var(--lf-type-label)!important;line-height:1.4!important}
+.lf-customer input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.lf-customer select,.lf-customer textarea{font-size:16px!important}
+.lf-customer .lf-eyebrow,.lf-customer small:not(.lf-footer *),
+.lf-customer .lf-checkout-info-note,.lf-customer .lf-account-note,
+.lf-customer .lf-account-muted{font-size:var(--lf-type-note)!important;line-height:1.5!important}
+.lf-customer button:not(.lf-footer *):not(.lf-drawer-close):not(.lf-account-menu-close):not(.lf-nominal-grid *):not(.lf-support-trigger),
+.lf-customer .lf-primary,.lf-customer .lf-secondary,.lf-customer .lf-chip,
+.lf-customer .lf-account-nav a,.lf-customer .lf-account-nav button,
+.lf-customer .lf-nav a,.lf-customer .lf-drawer-nav a,.lf-customer .lf-pages a,.lf-customer .lf-pages span{
+ font-size:var(--lf-type-action)!important;
+}
+@media(min-width:640px){
+ .lf-customer{
+  --lf-type-page:28px;--lf-type-product:24px;--lf-type-heading:18px;
+  --lf-type-body:14px;--lf-type-label:13px;--lf-type-action:13px;--lf-type-note:12px;
+  --lf-ui-section-title:18px;--lf-ui-section-desc:14px;--lf-ui-field-label:13px;
+  --lf-ui-helper:12px;--lf-ui-button-sm:13px;--lf-ui-button-main:13px;
+ }
+ .lf-customer .lf-checkout-panel>header,.lf-customer .lf-panel-body{padding:16px!important}
+ .lf-customer .lf-order-summary,.lf-customer .lf-account-card,
+ .lf-customer .lf-result-panel,.lf-customer .lf-track-summary,
+ .lf-customer .lf-product-description,.lf-customer .lf-product-faq,
+ .lf-customer .lf-product-review-section{padding:20px!important}
+ .lf-customer .lf-auth-card{padding:24px!important}
+ .lf-customer .lf-checkout-grid,.lf-customer .lf-account-list{gap:16px!important}
+}
