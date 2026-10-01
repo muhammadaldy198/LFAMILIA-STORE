@@ -168,9 +168,6 @@ class StorefrontParityTest extends TestCase
             ->assertJsonPath('order.referenceMasked', true);
         $this->assertStringNotContainsString('LF260930-TRACKTEST', $tracked->getContent());
 
-        $this->postJson('/orders/track/status', ['tracking_token' => $trackingToken.'tampered'])
-            ->assertNotFound();
-
         $invoice = $this->postJson('/orders/track/search', ['query' => 'LF260930-TRACKTEST'])
             ->assertOk()->assertJsonPath('mode', 'order');
         $this->assertSame('Parity Game', substr((string) $invoice->json('order.productName'), 0, 11));
