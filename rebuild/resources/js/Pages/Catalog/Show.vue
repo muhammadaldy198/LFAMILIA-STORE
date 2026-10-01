@@ -70,7 +70,10 @@ const guestContactComplete = computed(() => props.customer || (
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.value.trim())
     && guestPhone.value.replace(/\D/g, '').length >= 8
 ));
-const canQuote = computed(() => Boolean(selectedPackage.value && paymentChannelCode.value && guestContactComplete.value));
+const selectedPaymentChannel = computed(() => (props.paymentChannels || []).find((channel) =>
+    channel.available !== false && channel.code === paymentChannelCode.value
+));
+const canQuote = computed(() => Boolean(selectedPackage.value && selectedPaymentChannel.value && guestContactComplete.value));
 const displayTotal = computed(() => quote.value?.total_idr ?? selectedPackage.value?.price_idr ?? 0);
 const isVoucherProduct = computed(() => String(props.product?.category_slug || '').toLowerCase() === 'voucher');
 const hasAccountStep = computed(() => !isVoucherProduct.value && (props.fields || []).length > 0);
@@ -83,6 +86,9 @@ const hasExternalPaymentOption = computed(() => paymentGroups.value.some((group)
 ));
 const hasWalletPaymentOption = computed(() => paymentGroups.value.some((group) =>
     group.key === 'wallet'
+));
+const hasAvailableWalletPaymentOption = computed(() => paymentGroups.value.some((group) =>
+    group.key === 'wallet' && group.items.some((item) => item.available !== false)
 ));
 const firstCheckoutError = computed(() => {
     for (const messages of Object.values(errors.value || {})) {
@@ -325,7 +331,7 @@ async function requestJson(url, options = {}) {
 function basePayload() {
     return {
         package_id: selectedPackage.value ? Number(selectedPackage.value.id) : null,
-        payment_channel_code: paymentChannelCode.value || null,
+        payment_channel_code: selectedPaymentChannel.value?.code || null,
         voucher_code: voucherCode.value.trim() || null,
         ...(props.customer ? {} : {
             guest_email: guestEmail.value.trim(),
@@ -388,7 +394,10 @@ function choosePackage(item) {
 }
 
 async function choosePayment(code) {
-    paymentChannelCode.value = code;
+    const channel = (props.paymentChannels || []).find((item) => item.code === code && item.available !== false);
+    if (!channel) return;
+
+    paymentChannelCode.value = channel.code;
     quote.value = null;
     if (canQuote.value) await loadQuote();
 }
@@ -679,7 +688,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             Belum ada metode pembayaran aktif.
                         </div>
                         <div v-else-if="!hasExternalPaymentOption" class="lf-payment-unavailable">
-                            Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi.
+                            <template v-if="customer && hasAvailableWalletPaymentOption">Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi.</template>
+                            <template v-else>Belum ada metode pembayaran yang dapat digunakan saat ini.</template>
                         </div>
                         <div
                             v-for="group in paymentGroups"

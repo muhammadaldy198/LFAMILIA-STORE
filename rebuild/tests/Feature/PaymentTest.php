@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\PaymentRoutingService;
 use App\Services\Payment\DokuSignature;
 use App\Services\PaymentStateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -711,4 +712,96 @@ class PaymentTest extends TestCase
         $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
         $this->assertSame(1, DB::table('audit_logs')->where('action', 'payment.manual.confirmed')->count());
     }
+
+    public function test_customer_cannot_override_internal_payment_route_or_gateway(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('manual_qris', 'MANUAL_QRIS', 500);
+
+        $payload = [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'voucher_code' => null,
+            'guest_email' => 'route-tamper@example.test',
+            'guest_phone' => '081234567890',
+            'payment_route_id' => 999999,
+            'payment_gateway_id' => 999999,
+            'gateway_code' => 'MIDTRANS',
+            'gateway_kind' => 'EXTERNAL',
+            'provider_channel' => 'forged-channel',
+        ];
+
+        $this->postJson('/checkout/quote', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'payment_route_id',
+                'payment_gateway_id',
+                'gateway_code',
+                'gateway_kind',
+                'provider_channel',
+            ]);
+
+        $orderPayload = $this->guestCheckout(
+            $catalog['package_id'],
+            'manual_qris',
+            'm7-route-tamper-order-0001'
+        ) + [
+            'payment_route_id' => 999999,
+            'payment_gateway_id' => 999999,
+            'gateway_code' => 'MIDTRANS',
+            'gateway_kind' => 'EXTERNAL',
+            'provider_channel' => 'forged-channel',
+        ];
+
+        $this->postJson('/checkout/orders', $orderPayload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'payment_route_id',
+                'payment_gateway_id',
+                'gateway_code',
+                'gateway_kind',
+                'provider_channel',
+            ]);
+
+        $this->assertSame(0, DB::table('orders')
+            ->where('idempotency_key', 'm7-route-tamper-order-0001')
+            ->count());
+    }
+
+    public function test_guest_wallet_is_visible_only_as_unavailable_and_cannot_be_quoted(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('saldo', 'WALLET');
+
+        $channels = app(PaymentRoutingService::class)->publicOrderChannels(null);
+        $wallet = collect($channels)->firstWhere('code', 'saldo');
+
+        $this->assertIsArray($wallet);
+        $this->assertFalse($wallet['available']);
+        $this->assertArrayNotHasKey('gateway_code', $wallet);
+        $this->assertArrayNotHasKey('route_id', $wallet);
+
+        $this->postJson('/checkout/quote', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'saldo',
+            'voucher_code' => null,
+            'guest_email' => 'guest-wallet@example.test',
+            'guest_phone' => '081234567890',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['payment_channel_code']);
+    }
+
+    public function test_maintenance_gateway_removes_channel_from_public_order_choices(): void
+    {
+        $this->route('manual_qris', 'MANUAL_QRIS');
+        DB::table('payment_gateways')->where('code', 'MANUAL_QRIS')->update([
+            'is_maintenance' => true,
+            'updated_at' => now(),
+        ]);
+
+        $channels = app(PaymentRoutingService::class)->publicOrderChannels(null);
+
+        $this->assertNull(collect($channels)->firstWhere('code', 'manual_qris'));
+    }
+
 }

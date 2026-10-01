@@ -31,8 +31,7 @@ class CheckoutController
             ->firstOrFail();
         $input = $validator->validate($product, $data['customer_input']);
 
-        return response()->json($nickname->check($product, $input))
-            ->header('Cache-Control', 'no-store, private');
+        return response()->json($nickname->check($product, $input));
     }
 
     public function quote(Request $request, CheckoutService $checkout): JsonResponse
@@ -55,6 +54,11 @@ class CheckoutController
             'provider_code' => ['prohibited'],
             'external_sku' => ['prohibited'],
             'buyer_sku_code' => ['prohibited'],
+            'payment_route_id' => ['prohibited'],
+            'payment_gateway_id' => ['prohibited'],
+            'gateway_code' => ['prohibited'],
+            'gateway_kind' => ['prohibited'],
+            'provider_channel' => ['prohibited'],
         ]);
 
         return response()->json($checkout->quote(
@@ -134,6 +138,11 @@ class CheckoutController
             'provider_code' => ['prohibited'],
             'external_sku' => ['prohibited'],
             'buyer_sku_code' => ['prohibited'],
+            'payment_route_id' => ['prohibited'],
+            'payment_gateway_id' => ['prohibited'],
+            'gateway_code' => ['prohibited'],
+            'gateway_kind' => ['prohibited'],
+            'provider_channel' => ['prohibited'],
         ]);
         $data['_correlation_id'] = (string) $request->attributes->get('correlation_id');
 
