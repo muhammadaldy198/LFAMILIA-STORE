@@ -39,7 +39,7 @@ const paymentResult = ref(null);
 const errors = ref({});
 const busy = ref('');
 const activeTab = ref('transaction');
-const idempotencyKey = ref(newIdempotencyKey());
+const idempotencyKey = ref('');
 const paymentIdempotencyKey = ref(newIdempotencyKey());
 const voucherOpen = ref(false);
 const vouchers = ref([]);
@@ -191,6 +191,42 @@ function newIdempotencyKey() {
     return globalThis.crypto?.randomUUID?.() || ('checkout-' + Date.now() + '-' + Math.random().toString(36).slice(2));
 }
 
+function checkoutAttemptStorageKey() {
+    return 'lfamilia:checkout-attempt:' + props.product.id;
+}
+
+function ensureCheckoutAttemptKey(signature) {
+    try {
+        const stored = JSON.parse(window.sessionStorage.getItem(checkoutAttemptStorageKey()) || 'null');
+        if (
+            stored?.signature === signature
+            && typeof stored?.key === 'string'
+            && /^[A-Za-z0-9:_-]{16,120}$/.test(stored.key)
+        ) {
+            idempotencyKey.value = stored.key;
+            return stored.key;
+        }
+
+        const key = newIdempotencyKey();
+        window.sessionStorage.setItem(checkoutAttemptStorageKey(), JSON.stringify({ signature, key }));
+        idempotencyKey.value = key;
+        return key;
+    } catch {
+        const key = newIdempotencyKey();
+        idempotencyKey.value = key;
+        return key;
+    }
+}
+
+function clearCheckoutAttempt() {
+    try {
+        window.sessionStorage.removeItem(checkoutAttemptStorageKey());
+    } catch {
+        // Storage can be unavailable in hardened/private browsers.
+    }
+    idempotencyKey.value = '';
+}
+
 function formatIdr(value) {
     return 'Rp ' + Number(value || 0).toLocaleString('id-ID');
 }
@@ -248,9 +284,13 @@ function confirmationStateSignature() {
 }
 
 function buildConfirmationSnapshot(currentQuote) {
+    const stateSignature = confirmationStateSignature();
+    const attemptKey = ensureCheckoutAttemptKey(stateSignature);
+
     return {
-        state_signature: confirmationStateSignature(),
+        state_signature: stateSignature,
         quote_signature: financialSummarySignature(currentQuote),
+        idempotency_key: attemptKey,
         quote: { ...currentQuote },
         customer_input: { ...customerInput },
         nickname: nicknameResult.value?.nickname || null,
@@ -618,30 +658,42 @@ async function createOrder() {
     checkoutResult.value = null;
     paymentResult.value = null;
     busy.value = 'order';
+
     try {
         checkoutResult.value = await requestJson('/checkout/orders', {
             method: 'POST',
             body: JSON.stringify({
                 ...basePayload(),
                 customer_input: { ...customerInput },
-                idempotency_key: idempotencyKey.value,
+                idempotency_key: confirmationSnapshot.value.idempotency_key,
                 turnstile_token: turnstileToken.value || null,
             }),
         });
-        quote.value = {
-            subtotal_idr: checkoutResult.value.subtotal_idr,
-            member_discount_idr: checkoutResult.value.member_discount_idr,
-            voucher_discount_idr: checkoutResult.value.voucher_discount_idr,
-            discount_idr: checkoutResult.value.discount_idr,
-            member_tier_code: checkoutResult.value.member_tier_code,
-            member_discount_bps: checkoutResult.value.member_discount_bps,
-            fee_idr: checkoutResult.value.fee_idr,
-            total_idr: checkoutResult.value.total_idr,
-            voucher_code: checkoutResult.value.voucher_code,
-            payment_channel_code: checkoutResult.value.payment_channel_code,
-        };
-        closeConfirmation();
+    } catch (error) {
+        errors.value = error.validation || { checkout: [error.message || 'Pesanan gagal dibuat.'] };
+        turnstile.value?.reset();
+        busy.value = '';
+        return;
+    }
 
+    quote.value = {
+        subtotal_idr: checkoutResult.value.subtotal_idr,
+        member_discount_idr: checkoutResult.value.member_discount_idr,
+        voucher_discount_idr: checkoutResult.value.voucher_discount_idr,
+        discount_idr: checkoutResult.value.discount_idr,
+        member_tier_code: checkoutResult.value.member_tier_code,
+        member_discount_bps: checkoutResult.value.member_discount_bps,
+        fee_idr: checkoutResult.value.fee_idr,
+        total_idr: checkoutResult.value.total_idr,
+        voucher_code: checkoutResult.value.voucher_code,
+        payment_channel_code: checkoutResult.value.payment_channel_code,
+    };
+    clearCheckoutAttempt();
+    closeConfirmation();
+    turnstile.value?.reset();
+
+    busy.value = 'payment';
+    try {
         paymentResult.value = await requestJson('/payments/orders/' + encodeURIComponent(checkoutResult.value.order_number), {
             method: 'POST',
             body: JSON.stringify({
@@ -651,10 +703,9 @@ async function createOrder() {
         });
 
         window.location.assign('/payment?invoice=' + encodeURIComponent(checkoutResult.value.order_number));
-    } catch (error) {
-        errors.value = error.validation || { checkout: [error.message || 'Pesanan atau pembayaran gagal dibuat.'] };
+    } catch {
+        window.location.assign('/payment?invoice=' + encodeURIComponent(checkoutResult.value.order_number) + '&resume=1');
     } finally {
-        turnstile.value?.reset();
         busy.value = '';
     }
 }

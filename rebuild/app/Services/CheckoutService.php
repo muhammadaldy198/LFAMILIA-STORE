@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -166,162 +167,174 @@ class CheckoutService
         $input = $this->inputValidator->validate($product, $data['customer_input']);
         $nickname = $this->nickname->check($product, $input);
 
-        $result = DB::transaction(function () use ($data, $user, $fingerprint, $input, $nickname): array {
-            $existing = DB::table('orders')->where('idempotency_key', $data['idempotency_key'])
-                ->lockForUpdate()->first();
-            if ($existing) {
-                return ['order' => $existing, 'created' => false];
-            }
+        try {
+            $result = DB::transaction(function () use ($data, $user, $fingerprint, $input, $nickname): array {
+                $existing = DB::table('orders')->where('idempotency_key', $data['idempotency_key'])
+                    ->lockForUpdate()->first();
+                if ($existing) {
+                    return ['order' => $existing, 'created' => false];
+                }
 
-            $price = $this->pricing->forPackage((int) $data['package_id'], true);
-            $lockedProduct = Product::with(['fields', 'category'])->findOrFail($price['product_id']);
-            $lockedInput = $this->inputValidator->validate($lockedProduct, $input);
-            $member = $user
-                ? $this->membership->discount($user, $price['subtotal_idr'])
-                : ['amount_idr' => 0, 'tier_code' => null, 'discount_bps' => 0, 'profile' => null];
-            $voucher = $this->voucher(
-                $data['voucher_code'] ?? null,
-                $price,
-                $user,
-                $data['guest_email'] ?? null,
-                $data['guest_phone'] ?? null,
-                true,
-                (int) $member['amount_idr']
-            );
-            $paymentRoute = $this->paymentRouting->resolve(
-                $data['payment_channel_code'],
-                true,
-                'order'
-            );
-            if ($paymentRoute['gateway_code'] === 'WALLET' && ! $user) {
-                throw ValidationException::withMessages([
-                    'payment_channel_code' => 'Saldo hanya tersedia untuk akun customer.',
-                ]);
-            }
+                $price = $this->pricing->forPackage((int) $data['package_id'], true);
+                $lockedProduct = Product::with(['fields', 'category'])->findOrFail($price['product_id']);
+                $lockedInput = $this->inputValidator->validate($lockedProduct, $input);
+                $member = $user
+                    ? $this->membership->discount($user, $price['subtotal_idr'])
+                    : ['amount_idr' => 0, 'tier_code' => null, 'discount_bps' => 0, 'profile' => null];
+                $voucher = $this->voucher(
+                    $data['voucher_code'] ?? null,
+                    $price,
+                    $user,
+                    $data['guest_email'] ?? null,
+                    $data['guest_phone'] ?? null,
+                    true,
+                    (int) $member['amount_idr']
+                );
+                $paymentRoute = $this->paymentRouting->resolve(
+                    $data['payment_channel_code'],
+                    true,
+                    'order'
+                );
+                if ($paymentRoute['gateway_code'] === 'WALLET' && ! $user) {
+                    throw ValidationException::withMessages([
+                        'payment_channel_code' => 'Saldo hanya tersedia untuk akun customer.',
+                    ]);
+                }
 
-            $discount = (int) $member['amount_idr'] + (int) $voucher['discount_idr'];
-            $chargeable = $price['subtotal_idr'] - $discount;
-            $fee = $this->paymentRouting->fee($chargeable, $paymentRoute);
-            $total = $chargeable + $fee;
-            if ($total <= 0) {
-                throw ValidationException::withMessages([
-                    'voucher_code' => 'Voucher menghasilkan total tidak valid.',
-                ]);
-            }
+                $discount = (int) $member['amount_idr'] + (int) $voucher['discount_idr'];
+                $chargeable = $price['subtotal_idr'] - $discount;
+                $fee = $this->paymentRouting->fee($chargeable, $paymentRoute);
+                $total = $chargeable + $fee;
+                if ($total <= 0) {
+                    throw ValidationException::withMessages([
+                        'voucher_code' => 'Voucher menghasilkan total tidak valid.',
+                    ]);
+                }
 
-            $reservationMinutes = max(5, min(120, (int) config('lfamilia.checkout_reservation_minutes', 30)));
-            $expiresAt = now()->addMinutes($reservationMinutes);
-            $correlationId = preg_match('/^[A-Za-z0-9._:-]{8,100}$/', (string) ($data['_correlation_id'] ?? ''))
-                ? (string) $data['_correlation_id']
-                : (string) Str::uuid();
-            $snapshot = [
-                'checkout_fingerprint' => $fingerprint,
-                'product' => [
-                    'id' => $price['product_id'],
-                    'name' => $price['product_name'],
-                    'slug' => $price['product_slug'],
-                    'category_id' => $price['category_id'],
-                    'category_name' => $price['category_name'],
-                    'fulfillment_mode' => $price['fulfillment_mode'],
-                ],
-                'package' => [
-                    'id' => $price['package_id'],
-                    'code' => $price['package_code'],
-                    'name' => $price['package_name'],
-                    'nominal_value' => $price['nominal_value'],
-                ],
-                'provider' => [
-                    'mapping_id' => $price['provider_mapping_id'],
-                    'code' => $price['provider_code'],
-                    'sku' => $price['provider_sku'],
-                    'cost_idr' => $price['cost_idr'],
-                    'max_price_idr' => $price['max_price_idr'],
-                ],
-                'pricing' => [
-                    'margin_percent' => $price['margin_percent'],
+                $reservationMinutes = max(5, min(120, (int) config('lfamilia.checkout_reservation_minutes', 30)));
+                $expiresAt = now()->addMinutes($reservationMinutes);
+                $correlationId = preg_match('/^[A-Za-z0-9._:-]{8,100}$/', (string) ($data['_correlation_id'] ?? ''))
+                    ? (string) $data['_correlation_id']
+                    : (string) Str::uuid();
+                $snapshot = [
+                    'checkout_fingerprint' => $fingerprint,
+                    'product' => [
+                        'id' => $price['product_id'],
+                        'name' => $price['product_name'],
+                        'slug' => $price['product_slug'],
+                        'category_id' => $price['category_id'],
+                        'category_name' => $price['category_name'],
+                        'fulfillment_mode' => $price['fulfillment_mode'],
+                    ],
+                    'package' => [
+                        'id' => $price['package_id'],
+                        'code' => $price['package_code'],
+                        'name' => $price['package_name'],
+                        'nominal_value' => $price['nominal_value'],
+                    ],
+                    'provider' => [
+                        'mapping_id' => $price['provider_mapping_id'],
+                        'code' => $price['provider_code'],
+                        'sku' => $price['provider_sku'],
+                        'cost_idr' => $price['cost_idr'],
+                        'max_price_idr' => $price['max_price_idr'],
+                    ],
+                    'pricing' => [
+                        'margin_percent' => $price['margin_percent'],
+                        'cost_idr' => $price['cost_idr'],
+                        'margin_idr' => $price['margin_idr'],
+                        'member_discount_idr' => (int) $member['amount_idr'],
+                        'voucher_discount_idr' => (int) $voucher['discount_idr'],
+                        'discount_idr' => $discount,
+                        'fee_idr' => $fee,
+                        'total_idr' => $total,
+                    ],
+                    'payment' => [
+                        'channel_id' => $paymentRoute['channel_id'],
+                        'channel_code' => $paymentRoute['channel_code'],
+                        'channel_name' => $paymentRoute['channel_name'],
+                        'route_id' => $paymentRoute['route_id'],
+                        'gateway_id' => $paymentRoute['gateway_id'],
+                        'gateway_code' => $paymentRoute['gateway_code'],
+                    ],
+                    'membership' => $user ? [
+                        'tier_code' => $member['tier_code'],
+                        'discount_bps' => (int) $member['discount_bps'],
+                        'discount_idr' => (int) $member['amount_idr'],
+                    ] : null,
+                    'voucher' => $voucher['snapshot'],
+                    'customer_input' => $lockedInput,
+                    'nickname' => $nickname,
+                ];
+
+                $orderId = DB::table('orders')->insertGetId([
+                    'order_number' => $this->orderNumber(),
+                    'user_id' => $user?->id,
+                    'guest_email' => $user ? null : Str::lower(trim((string) $data['guest_email'])),
+                    'guest_phone' => $user ? null : $this->normalizePhone((string) $data['guest_phone']),
+                    'product_id' => $price['product_id'],
+                    'product_package_id' => $price['package_id'],
+                    'provider_mapping_id' => $price['provider_mapping_id'],
+                    'voucher_id' => $voucher['voucher_id'],
+                    'payment_channel_id' => $paymentRoute['channel_id'],
+                    'payment_route_id' => $paymentRoute['route_id'],
+                    'status' => 'PENDING_PAYMENT',
+                    'currency' => 'IDR',
+                    'customer_input' => json_encode($lockedInput, JSON_THROW_ON_ERROR),
+                    'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR),
                     'cost_idr' => $price['cost_idr'],
                     'margin_idr' => $price['margin_idr'],
-                    'member_discount_idr' => (int) $member['amount_idr'],
-                    'voucher_discount_idr' => (int) $voucher['discount_idr'],
                     'discount_idr' => $discount,
                     'fee_idr' => $fee,
                     'total_idr' => $total,
-                ],
-                'payment' => [
-                    'channel_id' => $paymentRoute['channel_id'],
-                    'channel_code' => $paymentRoute['channel_code'],
-                    'channel_name' => $paymentRoute['channel_name'],
-                    'route_id' => $paymentRoute['route_id'],
-                    'gateway_id' => $paymentRoute['gateway_id'],
-                    'gateway_code' => $paymentRoute['gateway_code'],
-                ],
-                'membership' => $user ? [
-                    'tier_code' => $member['tier_code'],
-                    'discount_bps' => (int) $member['discount_bps'],
-                    'discount_idr' => (int) $member['amount_idr'],
-                ] : null,
-                'voucher' => $voucher['snapshot'],
-                'customer_input' => $lockedInput,
-                'nickname' => $nickname,
-            ];
-
-            $orderId = DB::table('orders')->insertGetId([
-                'order_number' => $this->orderNumber(),
-                'user_id' => $user?->id,
-                'guest_email' => $user ? null : Str::lower(trim((string) $data['guest_email'])),
-                'guest_phone' => $user ? null : $this->normalizePhone((string) $data['guest_phone']),
-                'product_id' => $price['product_id'],
-                'product_package_id' => $price['package_id'],
-                'provider_mapping_id' => $price['provider_mapping_id'],
-                'voucher_id' => $voucher['voucher_id'],
-                'payment_channel_id' => $paymentRoute['channel_id'],
-                'payment_route_id' => $paymentRoute['route_id'],
-                'status' => 'PENDING_PAYMENT',
-                'currency' => 'IDR',
-                'customer_input' => json_encode($lockedInput, JSON_THROW_ON_ERROR),
-                'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR),
-                'cost_idr' => $price['cost_idr'],
-                'margin_idr' => $price['margin_idr'],
-                'discount_idr' => $discount,
-                'fee_idr' => $fee,
-                'total_idr' => $total,
-                'idempotency_key' => $data['idempotency_key'],
-                'expires_at' => $expiresAt,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            if ($voucher['voucher_id']) {
-                DB::table('voucher_redemptions')->insert([
-                    'voucher_id' => $voucher['voucher_id'],
-                    'order_id' => $orderId,
-                    'user_id' => $user?->id,
-                    'guest_identifier_hash' => $user ? null : $this->guestIdentifier(
-                        (string) $data['guest_email'],
-                        (string) $data['guest_phone']
-                    ),
-                    'status' => 'RESERVED',
-                    'reserved_until' => $expiresAt,
+                    'idempotency_key' => $data['idempotency_key'],
+                    'expires_at' => $expiresAt,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+
+                if ($voucher['voucher_id']) {
+                    DB::table('voucher_redemptions')->insert([
+                        'voucher_id' => $voucher['voucher_id'],
+                        'order_id' => $orderId,
+                        'user_id' => $user?->id,
+                        'guest_identifier_hash' => $user ? null : $this->guestIdentifier(
+                            (string) $data['guest_email'],
+                            (string) $data['guest_phone']
+                        ),
+                        'status' => 'RESERVED',
+                        'reserved_until' => $expiresAt,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                DB::table('order_events')->insert([
+                    'order_id' => $orderId,
+                    'event_type' => 'ORDER_CREATED',
+                    'from_status' => null,
+                    'to_status' => 'PENDING_PAYMENT',
+                    'correlation_id' => $correlationId,
+                    'metadata' => json_encode(['source' => 'checkout'], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                ]);
+
+                return [
+                    'order' => DB::table('orders')->where('id', $orderId)->first(),
+                    'created' => true,
+                ];
+            }, 3);
+        } catch (QueryException $exception) {
+            $existing = DB::table('orders')
+                ->where('idempotency_key', $data['idempotency_key'])
+                ->first();
+
+            if (! $existing) {
+                throw $exception;
             }
 
-            DB::table('order_events')->insert([
-                'order_id' => $orderId,
-                'event_type' => 'ORDER_CREATED',
-                'from_status' => null,
-                'to_status' => 'PENDING_PAYMENT',
-                'correlation_id' => $correlationId,
-                'metadata' => json_encode(['source' => 'checkout'], JSON_THROW_ON_ERROR),
-                'created_at' => now(),
-            ]);
-
-            return [
-                'order' => DB::table('orders')->where('id', $orderId)->first(),
-                'created' => true,
-            ];
-        }, 3);
+            return $this->existingResult($existing, $fingerprint, $data['idempotency_key']);
+        }
 
         if (! $result['created']) {
             return $this->existingResult($result['order'], $fingerprint, $data['idempotency_key']);

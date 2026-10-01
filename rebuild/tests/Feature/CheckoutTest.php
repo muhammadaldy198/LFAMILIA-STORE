@@ -482,4 +482,71 @@ class CheckoutTest extends TestCase
         $scoped = collect($response->json('vouchers'))->firstWhere('code', 'SCOPEDOR');
         $this->assertSame(1500, $scoped['discount_idr']);
     }
+
+    public function test_final_order_submit_revalidates_current_nominal_payment_and_voucher_state(): void
+    {
+        $catalog = $this->catalog();
+
+        $voucherId = DB::table('vouchers')->insertGetId([
+            'code' => 'FINALCHECK',
+            'discount_type' => 'FIXED',
+            'discount_value' => 1000,
+            'minimum_total_idr' => 0,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $quotePayload = [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'voucher_code' => 'FINALCHECK',
+            'guest_email' => 'final-check@example.test',
+            'guest_phone' => '081234567890',
+        ];
+        $this->postJson('/checkout/quote', $quotePayload)->assertOk();
+
+        DB::table('vouchers')->where('id', $voucherId)->update([
+            'is_active' => false,
+            'updated_at' => now(),
+        ]);
+
+        $orderPayload = $this->guestPayload($catalog['package_id'], 'checkout-final-voucher-0001');
+        $orderPayload['voucher_code'] = 'FINALCHECK';
+        $orderPayload['guest_email'] = 'final-check@example.test';
+
+        $this->postJson('/checkout/orders', $orderPayload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['voucher_code']);
+        $this->assertDatabaseMissing('orders', ['idempotency_key' => 'checkout-final-voucher-0001']);
+
+        DB::table('vouchers')->where('id', $voucherId)->update([
+            'is_active' => true,
+            'updated_at' => now(),
+        ]);
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->update([
+            'is_active' => false,
+            'updated_at' => now(),
+        ]);
+
+        $orderPayload = $this->guestPayload($catalog['package_id'], 'checkout-final-nominal-0001');
+        $this->postJson('/checkout/orders', $orderPayload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['package_id']);
+        $this->assertDatabaseMissing('orders', ['idempotency_key' => 'checkout-final-nominal-0001']);
+
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->update([
+            'is_active' => true,
+            'updated_at' => now(),
+        ]);
+        DB::table('payment_routes')
+            ->where('payment_channel_id', DB::table('payment_channels')->where('code', 'manual_qris')->value('id'))
+            ->update(['is_active' => false, 'updated_at' => now()]);
+
+        $orderPayload = $this->guestPayload($catalog['package_id'], 'checkout-final-payment-0001');
+        $this->postJson('/checkout/orders', $orderPayload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['payment_channel_code']);
+        $this->assertDatabaseMissing('orders', ['idempotency_key' => 'checkout-final-payment-0001']);
+    }
 }

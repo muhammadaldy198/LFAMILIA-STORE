@@ -35,6 +35,8 @@ const qrString = computed(() => instructions.value.qr_string || null);
 const copiedInvoice = ref(false);
 const copiedPayment = ref(false);
 const openingPayment = ref(false);
+const startingPayment = ref(false);
+const paymentError = ref('');
 
 const paymentLabel = computed(() => {
     const code = String(props.payment?.channel_code || '').toLowerCase();
@@ -77,8 +79,68 @@ function openPayment() {
     window.location.assign(paymentUrl.value);
 }
 
+function paymentAttemptStorageKey() {
+    return 'lfamilia:payment-attempt:' + props.order.order_number;
+}
+
+function paymentAttemptKey() {
+    try {
+        const stored = window.sessionStorage.getItem(paymentAttemptStorageKey());
+        if (stored && /^[A-Za-z0-9:_-]{16,120}$/.test(stored)) return stored;
+
+        const key = globalThis.crypto?.randomUUID?.()
+            || ('payment-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+        window.sessionStorage.setItem(paymentAttemptStorageKey(), key);
+        return key;
+    } catch {
+        return globalThis.crypto?.randomUUID?.()
+            || ('payment-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    }
+}
+
+async function resumePayment() {
+    if (props.payment || paid.value || failed.value || startingPayment.value) return;
+
+    startingPayment.value = true;
+    paymentError.value = '';
+
+    try {
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const response = await fetch('/payments/orders/' + encodeURIComponent(props.order.order_number), {
+            method: 'POST',
+            cache: 'no-store',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token,
+            },
+            body: JSON.stringify({
+                idempotency_key: paymentAttemptKey(),
+                access_code: null,
+            }),
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(data.message || Object.values(data.errors || {})?.[0]?.[0] || 'Pembayaran belum dapat disiapkan.');
+        }
+
+        router.reload({ only: ['order', 'payment'], preserveScroll: true, preserveState: true });
+    } catch (error) {
+        paymentError.value = error.message || 'Pembayaran belum dapat disiapkan. Cek status sebelum mencoba lagi.';
+        router.reload({ only: ['order', 'payment'], preserveScroll: true, preserveState: true });
+    } finally {
+        startingPayment.value = false;
+    }
+}
+
 let poller;
 onMounted(() => {
+    const shouldResume = new URLSearchParams(window.location.search).get('resume') === '1';
+    if (shouldResume && !props.payment && !paid.value && !failed.value) {
+        void resumePayment();
+    }
+
     if (!paid.value && !failed.value) {
         poller = window.setInterval(() => {
             router.reload({ only: ['order', 'payment'], preserveScroll: true, preserveState: true });
@@ -176,7 +238,9 @@ onBeforeUnmount(() => {
                 <svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
                 <span>{{statusText}}</span>
             </div>
+            <p v-if="paymentError" class="mt-3 text-center text-[10px] font-semibold text-rose-300">{{paymentError}}</p>
 
+            <button v-if="!paid && !failed && !payment" type="button" :disabled="startingPayment" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="resumePayment">{{startingPayment ? 'Menyiapkan…' : 'Siapkan pembayaran'}}</button>
             <button v-if="!paid && !failed && paymentUrl" type="button" :disabled="openingPayment" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="openPayment">{{openingPayment ? 'Memproses…' : (settings.payButtonText || 'Bayar Sekarang')}}</button>
             <Link v-if="paid" :href="statusUrl" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006]">Lihat status pesanan</Link>
 
