@@ -5,6 +5,7 @@ import AccountShell from '../../Components/AccountShell.vue';
 const props = defineProps({ ticket: Object, messages: Array });
 const form = useForm({ message: '' });
 function reply() {
+    if (form.processing || props.ticket.status === 'CLOSED') return;
     form.post('/account/tickets/' + props.ticket.id + '/messages', {
         preserveScroll: true,
         onSuccess: () => form.reset(),
@@ -39,7 +40,7 @@ function reply() {
         <form v-if="ticket.status !== 'CLOSED'" class="mt-4 rounded-xl border border-slate-800 bg-slate-900 p-4" @submit.prevent="reply">
             <label class="text-sm font-semibold">Balas tiket<textarea v-model="form.message" required maxlength="5000" rows="4" class="mt-2 block w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm" placeholder="Masukkan balasan"></textarea></label>
             <div class="mt-3 flex justify-end"><button :disabled="form.processing" class="lf-primary">Kirim balasan</button></div>
-            <p v-if="form.errors.message" class="mt-2 text-sm text-red-300">{{form.errors.message}}</p>
+            <p role="alert" v-if="form.errors.message" class="mt-2 text-sm text-red-300">{{form.errors.message}}</p>
         </form>
         <p v-else class="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/45">Tiket sudah ditutup dan tidak menerima balasan baru.</p>
     </AccountShell>
