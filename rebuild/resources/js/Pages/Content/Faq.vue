@@ -33,8 +33,8 @@ const statuses=[
  </section>
 
  <section class="lf-container lf-faq-layout">
-  <div>
-   <p class="lf-eyebrow">PERTANYAAN UMUM</p><h2>Jawaban yang sering dicari</h2>
+  <div class="lf-faq-main">
+   <header class="lf-faq-list-heading"><p class="lf-eyebrow">PERTANYAAN UMUM</p><h2>Jawaban yang sering dicari</h2></header>
    <div class="lf-faq-list">
     <details v-for="faq in faqs" :key="faq.id" class="lf-faq">
      <summary><span>{{faq.question}}</span><b>+</b></summary><p>{{faq.answer}}</p>
