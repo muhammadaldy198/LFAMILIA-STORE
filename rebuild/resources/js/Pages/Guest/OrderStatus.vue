@@ -22,6 +22,7 @@ let timer=null;
 const terminal=computed(()=>['SUCCESS','FAILED','CANCELLED','EXPIRED','REFUND','REFUNDED'].includes(orderState.value.status));
 const manualQris=computed(()=>paymentState.value?.instructions?.kind==='manual_qris'
     || String(paymentState.value?.channel_code||'').toLowerCase().includes('manual'));
+const paymentUncertain=computed(()=>['UNKNOWN','CREATING'].includes(paymentState.value?.status));
 const statusLabel=s=>({
     PENDING_PAYMENT:'Menunggu Pembayaran',PENDING:'Menunggu Pembayaran',CREATING:'Menyiapkan Pembayaran',
     PAID:'Pembayaran Diterima',PROCESSING:'Sedang Diproses',SUCCESS:'Berhasil',FAILED:'Gagal',
@@ -37,7 +38,7 @@ const eventLabel=e=>{
         'fulfillment.started':'Pesanan diteruskan untuk diproses',
         'fulfillment.updated':'Proses pesanan diperbarui',
     };
-    return map[e.event_type]||String(e.event_type||'Pembaruan').replaceAll('_',' ').replaceAll('.',' · ');
+    return map[e.event_type]||'Status pesanan diperbarui';
 };
 const eventTime=v=>v?new Date(v).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'-';
 
@@ -106,10 +107,11 @@ onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
                 <section v-if="orderState.status==='PENDING_PAYMENT'" class="lf-order-payment">
                     <h2>Pembayaran</h2>
                     <p v-if="paymentState">Status: <strong>{{statusLabel(paymentState.status)}}</strong></p>
-                    <img v-if="paymentState?.instructions?.qr_url" :src="paymentState.instructions.qr_url" alt="QRIS pembayaran">
+                    <p v-if="paymentUncertain">Status pembayaran sedang dipastikan. Jangan membayar ulang.</p>
+                    <img v-if="!paymentUncertain&&paymentState?.instructions?.qr_url" :src="paymentState.instructions.qr_url" alt="QRIS pembayaran">
                     <p v-if="paymentState?.instructions?.va_number">Nomor VA: <strong>{{paymentState.instructions.va_number}}</strong></p>
                     <p v-if="paymentState?.instructions?.payment_code">Kode pembayaran: <strong>{{paymentState.instructions.payment_code}}</strong></p>
-                    <div v-if="manualQris&&paymentState" class="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3">
+                    <div v-if="manualQris&&paymentState&&!paymentUncertain" class="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3">
                         <strong class="text-[10px] text-amber-200">Menunggu verifikasi QRIS manual</strong>
                         <p class="mt-1 text-[9px] leading-4 text-white/45">Setelah membayar, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama.</p>
                     </div>
