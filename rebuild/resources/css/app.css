@@ -5516,3 +5516,15 @@
     bottom:122px!important;
   }
 }
+
+/* Visual audit: keep checkbox geometry separate from text inputs. */
+.lf-auth-card label:has(input[type="checkbox"]){display:flex;align-items:center;justify-content:flex-start;gap:8px}
+.lf-auth-card input[type="checkbox"]{width:16px;height:16px;min-height:16px;margin:0;padding:0;flex:0 0 16px;accent-color:var(--lf-lime)}
+.lf-customer .lf-product-title h1{white-space:normal!important;text-overflow:clip!important;overflow:visible!important;overflow-wrap:anywhere}
+@media(min-width:640px){
+  .lf-customer .lf-nominal-grid button{display:block}
+  .lf-customer .lf-nominal-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .lf-customer .lf-nominal-copy{flex:1;min-width:0}
+  .lf-customer .lf-nominal-copy strong{white-space:normal;overflow:visible;text-overflow:clip}
+  .lf-customer .lf-nominal-grid button>b{display:block;margin-top:8px}
+}
