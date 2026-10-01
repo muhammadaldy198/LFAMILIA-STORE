@@ -90,28 +90,14 @@ function clamp(value, min, max) {
 }
 
 function startSupportDrag(event) {
-    if (window.innerWidth > 640) {
+    if (window.innerWidth <= 640) {
+        supportPosition.value = null;
         supportOpen.value = !supportOpen.value;
+        event.preventDefault();
         return;
     }
 
-    const trigger = event.currentTarget;
-    const rect = trigger.getBoundingClientRect();
-    supportDrag = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        originX: rect.left,
-        originY: rect.top,
-        width: rect.width,
-        height: rect.height,
-        moved: false,
-    };
-
-    trigger.setPointerCapture?.(event.pointerId);
-    window.addEventListener('pointermove', moveSupportDrag, { passive: false });
-    window.addEventListener('pointerup', endSupportDrag, { once: true });
-    event.preventDefault();
+    supportOpen.value = !supportOpen.value;
 }
 
 function moveSupportDrag(event) {
