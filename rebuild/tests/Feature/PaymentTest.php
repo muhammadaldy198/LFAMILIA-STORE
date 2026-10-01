@@ -238,6 +238,76 @@ class PaymentTest extends TestCase
         $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $row->id)->value('status'));
     }
 
+    public function test_midtrans_cancel_stays_cancelled_and_stale_pending_cannot_reopen_order(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions') {
+                return Http::response([
+                    'token' => 'snap-token-cancel',
+                    'redirect_url' => 'https://sandbox.midtrans.test/cancel',
+                ]);
+            }
+
+            if (preg_match('#https://api\\.sandbox\\.midtrans\\.com/v2/(.+)/status$#', $request->url(), $matches)) {
+                return Http::response([
+                    'transaction_id' => 'midtrans-cancel-1',
+                    'transaction_status' => 'cancel',
+                    'status_code' => '202',
+                    'order_id' => rawurldecode($matches[1]),
+                    'gross_amount' => '11077.00',
+                    'fraud_status' => 'accept',
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'qris',
+            'm8-midtrans-cancel-order-0001'
+        ))->assertCreated();
+
+        $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'm8-midtrans-cancel-payment-0001',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk();
+
+        $payment = DB::table('payment_transactions')
+            ->where('idempotency_key', 'm8-midtrans-cancel-payment-0001')->firstOrFail();
+        $notification = [
+            'transaction_id' => 'midtrans-cancel-1',
+            'transaction_status' => 'cancel',
+            'status_code' => '202',
+            'order_id' => $payment->merchant_reference,
+            'gross_amount' => '11077.00',
+            'fraud_status' => 'accept',
+        ];
+        $notification['signature_key'] = hash('sha512',
+            $notification['order_id'].$notification['status_code'].$notification['gross_amount'].'server-test'
+        );
+
+        $this->postJson('/api/payments/midtrans/notification', $notification)
+            ->assertOk()->assertJsonPath('status', 'ok');
+
+        $this->assertSame('CANCELLED', DB::table('orders')->where('id', $payment->order_id)->value('status'));
+        $this->assertSame('CANCELLED', DB::table('payment_transactions')->where('id', $payment->id)->value('status'));
+        $this->assertSame(1, DB::table('order_events')
+            ->where('order_id', $payment->order_id)
+            ->where('event_type', 'PAYMENT_CANCELLED')->count());
+
+        $result = app(PaymentStateService::class)->apply((int) $payment->id, 'PENDING');
+        $this->assertSame('IGNORED_STALE', $result['result']);
+        $this->assertSame('CANCELLED', DB::table('orders')->where('id', $payment->order_id)->value('status'));
+    }
+
     public function test_midtrans_callback_cannot_override_server_status_challenge(): void
     {
         $catalog = $this->catalog();
