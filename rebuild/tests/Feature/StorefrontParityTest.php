@@ -9,6 +9,7 @@ use App\Models\ProductReview;
 use App\Models\User;
 use App\Services\PaymentRoutingService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -197,6 +198,7 @@ class StorefrontParityTest extends TestCase
 
     public function test_logged_customer_can_save_game_account_and_guest_success_order_can_review_once(): void
     {
+        $this->withoutMiddleware(ThrottleRequests::class);
         $catalog = $this->catalog();
         $user = User::create([
             'name' => 'Parity User',
