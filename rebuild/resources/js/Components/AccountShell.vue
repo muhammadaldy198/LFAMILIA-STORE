@@ -29,7 +29,7 @@ watch(()=>page.url,()=>{open.value=false});
     </div>
     <nav class="lf-account-nav">
      <Link v-for="x in links" :key="x.href" :href="x.href" :class="{active:$page.url.split('?')[0]===x.href}" @click="open=false">{{x.label}}</Link>
-     <button type="button" @click="router.post('/logout')">Keluar</button>
+     <button type="button" class="lf-account-logout" @click="router.post('/logout')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v16h5M14 8l4 4-4 4M8 12h10"/></svg><span>Keluar</span></button>
     </nav>
    </aside>
    <section class="lf-account-main space-y-4"><slot/></section>
