@@ -9,6 +9,7 @@ use App\Models\ProductReview;
 use App\Models\User;
 use App\Services\PaymentRoutingService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -193,6 +194,58 @@ class StorefrontParityTest extends TestCase
 
         $this->assertStringNotContainsString('DIGIFLAZZ', $response->getContent());
         $this->assertStringNotContainsString('PARITY-SKU', $response->getContent());
+    }
+
+
+    public function test_public_tracker_masks_refunds_and_keeps_internal_events_private(): void
+    {
+        $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.163']);
+        $catalog = $this->catalog();
+        $orderId = $this->guestOrder($catalog['product'], $catalog['package_id'], 'LF261001-REFUND01');
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'REFUND']);
+        DB::table('order_events')->insert([
+            'order_id' => $orderId,
+            'event_type' => 'DIGIFLAZZ_SECRET_SKU',
+            'from_status' => null,
+            'to_status' => null,
+            'metadata' => json_encode(['secret' => 'PRIVATE-RESULT']),
+            'created_at' => now(),
+        ]);
+
+        $search = $this->postJson('/orders/track/search', ['query' => '081234567890'])
+            ->assertOk()
+            ->assertJsonPath('orders.0.status', 'refunded')
+            ->assertJsonMissingPath('orders.0.referenceId');
+        $status = $this->postJson('/orders/track/status', [
+            'tracking_token' => $search->json('orders.0.trackingToken'),
+        ])->assertOk()
+            ->assertJsonPath('order.referenceMasked', true)
+            ->assertJsonPath('order.fulfillmentStatus', 'refunded')
+            ->assertJsonPath('order.paymentStatus', 'refunded')
+            ->assertJsonPath('order.events.0.label', 'Status pesanan diperbarui')
+            ->assertJsonPath('order.events.0.status', null);
+
+        foreach (['LF261001-REFUND01', 'guest@example.test', '081234567890', 'DIGIFLAZZ', 'SECRET_SKU', 'PRIVATE-RESULT', '123456'] as $privateValue) {
+            $this->assertStringNotContainsString($privateValue, $status->getContent());
+        }
+
+        $feed = $this->getJson('/orders/track/feed')->assertOk();
+        $this->assertSame('refunded', collect($feed->json('transactions'))
+            ->firstWhere('maskedReferenceId', 'LF261••••ND01')['status']);
+        $this->assertStringNotContainsString('LF261001-REFUND01', $feed->getContent());
+        $this->assertStringContainsString('no-store', $status->headers->get('Cache-Control'));
+    }
+
+    public function test_public_tracker_rejects_corrupted_tokens_and_empty_search_is_unambiguous(): void
+    {
+        $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.164']);
+        foreach (['corrupted-token', Crypt::encryptString('"scalar"'), Crypt::encryptString('null'), Crypt::encryptString('{"id":-1}')] as $token) {
+            $this->postJson('/orders/track/status', ['tracking_token' => $token])->assertNotFound();
+        }
+        $this->postJson('/orders/track/search', ['query' => '081111111111'])
+            ->assertOk()->assertJsonPath('mode', 'phone')->assertJsonPath('orders', []);
+        $this->postJson('/orders/track/search', ['query' => 'not-a-phone'])
+            ->assertUnprocessable();
     }
 
     public function test_logged_customer_can_save_game_account_and_guest_success_order_can_review_once(): void
