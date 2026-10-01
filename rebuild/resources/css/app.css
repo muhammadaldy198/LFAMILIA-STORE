@@ -5732,7 +5732,7 @@
 
 /* Shared customer heading and readable information weights. */
 .lf-customer.lf-customer.lf-customer{
- --lf-weight-title:700;--lf-weight-label:600;--lf-weight-information:500;
+ --lf-weight-title:700;--lf-weight-label:600;--lf-weight-information:400;
  --lf-faq-title:var(--lf-type-heading);
 }
 .lf-customer.lf-customer.lf-customer h1,
@@ -5768,3 +5768,11 @@
 .lf-customer.lf-customer.lf-customer .lf-faq-hero h1{
  font-size:var(--lf-type-page)!important;
 }
+
+/* Guest support uses the shared customer controls and panels. */
+.lf-guest-support-form{display:grid;gap:14px;margin:20px 0;padding:18px;border:1px solid var(--lf-line);border-radius:10px;background:var(--lf-panel)}
+.lf-guest-support-form label{display:grid;gap:6px}
+.lf-guest-support-form input,.lf-guest-support-form textarea{width:100%;border:1px solid var(--lf-line);border-radius:8px;padding:10px 12px;background:#080c12;color:#f5f8ff}
+.lf-guest-support-form form{display:grid;gap:12px}
+.lf-guest-support-message{padding:12px;border:1px solid var(--lf-line);border-radius:8px}
+.lf-guest-support-history{margin:24px 0}
