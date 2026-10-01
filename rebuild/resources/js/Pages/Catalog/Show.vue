@@ -163,9 +163,14 @@ function updateCheckoutBarVisibility() {
     }
 
     const main = document.querySelector('.lf-checkout-page');
+    const accountPanel = document.querySelector('.lf-checkout-account-panel');
     if (!main) return;
 
-    checkoutBarVisible.value = main.getBoundingClientRect().bottom > window.innerHeight + 8;
+    const mainStillActive = main.getBoundingClientRect().bottom > window.innerHeight + 8;
+    const accountCleared = !accountPanel
+        || accountPanel.getBoundingClientRect().bottom <= window.innerHeight - 128;
+
+    checkoutBarVisible.value = mainStillActive && accountCleared;
 }
 
 function newIdempotencyKey() {
