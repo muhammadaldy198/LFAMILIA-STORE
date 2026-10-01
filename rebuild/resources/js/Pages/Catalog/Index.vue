@@ -1,4 +1,7 @@
 <script setup>
+import { useCustomerPresentation } from '../../Composables/customerPresentation';
+const { customerText, sectionEnabled } = useCustomerPresentation();
+
 import {Head,Link,router,usePage} from '@inertiajs/vue3';
 import {computed,onMounted,onUnmounted,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
@@ -65,7 +68,7 @@ onUnmounted(()=>{
 </script>
 
 <template>
-    <Head title="LFAMILIA STORE" />
+    <Head :title="customerText(&quot;pages.catalog.index.attribute.title.adae0b8b&quot;, &quot;LFAMILIA STORE&quot;)" />
     <CustomerShell :logo-url="logoUrl">
         <main>
             <section v-if="activeBanner" class="lf-container lf-home-banner-wrap">
@@ -81,8 +84,8 @@ onUnmounted(()=>{
                         <img :src="activeBanner.desktop_url||activeBanner.mobile_url" :alt="activeBanner.title||'Banner LFAMILIA STORE'">
                     </picture>
                     <template v-if="visibleBanners.length>1">
-                        <button type="button" class="lf-banner-nav prev" aria-label="Banner sebelumnya" @click="bannerPrev">‹</button>
-                        <button type="button" class="lf-banner-nav next" aria-label="Banner berikutnya" @click="bannerNext">›</button>
+                        <button type="button" class="lf-banner-nav prev" :aria-label="customerText(&quot;pages.catalog.index.attribute.aria-label.d47450e2&quot;, &quot;Banner sebelumnya&quot;)" @click="bannerPrev">‹</button>
+                        <button type="button" class="lf-banner-nav next" :aria-label="customerText(&quot;pages.catalog.index.attribute.aria-label.ebfecd89&quot;, &quot;Banner berikutnya&quot;)" @click="bannerNext">›</button>
                         <div class="lf-banner-dots">
                             <button v-for="(_,i) in visibleBanners" :key="i" type="button" :class="{active:i===bannerIndex}" :aria-label="'Banner '+(i+1)" @click="bannerIndex=i"></button>
                         </div>
@@ -92,7 +95,7 @@ onUnmounted(()=>{
 
             <div v-if="popupOpen&&activePopup" class="lf-home-popup-backdrop" @click.self="closePopup">
                 <section class="lf-home-popup" role="dialog" aria-modal="true" :aria-label="activePopup.title">
-                    <button type="button" class="lf-home-popup-close" aria-label="Tutup pop-up" @click="closePopup">×</button>
+                    <button type="button" class="lf-home-popup-close" :aria-label="customerText(&quot;pages.catalog.index.attribute.aria-label.7b2bdb3a&quot;, &quot;Tutup pop-up&quot;)" @click="closePopup">{{ customerText("pages.catalog.index.520b4356", "×") }}</button>
                     <img v-if="activePopup.image_url" :src="activePopup.image_url" :alt="activePopup.title" class="lf-home-popup-image">
                     <div class="lf-home-popup-body">
                         <h2>{{activePopup.title}}</h2>
@@ -100,14 +103,14 @@ onUnmounted(()=>{
                     </div>
                     <label class="lf-home-popup-dismiss">
                         <input v-model="popupHideAgain" type="checkbox">
-                        <span>Jangan tampilkan lagi</span>
+                        <span>{{ customerText("pages.catalog.index.a3e6a372", "Jangan tampilkan lagi") }}</span>
                     </label>
                 </section>
             </div>
 
-            <section v-if="popular.length" class="lf-container lf-section pb-2">
-                <p class="lf-eyebrow">🔥 POPULER SEKARANG!</p>
-                <p class="lf-copy !mt-0">Berikut adalah beberapa produk yang paling populer saat ini.</p>
+            <section v-if="popular.length && sectionEnabled('popular')" class="lf-container lf-section pb-2">
+                <p class="lf-eyebrow">{{ customerText("pages.catalog.index.105b8350", "🔥 POPULER SEKARANG!") }}</p>
+                <p class="lf-copy !mt-0">{{ customerText("pages.catalog.index.74dab8e1", "Berikut adalah beberapa produk yang paling populer saat ini.") }}</p>
                 <div class="lf-popular">
                     <Link v-for="(x,i) in popular" :key="x.slug" :href="'/catalog/'+x.slug" class="lf-popular-card" :class="'tone-'+(i%8)">
                         <span class="lf-popular-art">
@@ -122,19 +125,19 @@ onUnmounted(()=>{
             <section id="produk" class="lf-container lf-section">
                 <div class="lf-browser-head">
                     <div>
-                        <p class="lf-eyebrow">OTOMATIS & MANUAL</p>
-                        <h1 class="lf-title">Pilih produk favoritmu</h1>
-                        <p class="lf-copy">Top up game, voucher, hiburan, pulsa, PLN, dan produk digital langsung dari halaman utama.</p>
+                        <p class="lf-eyebrow">{{ customerText("pages.catalog.index.50c425f9", "OTOMATIS & MANUAL") }}</p>
+                        <h1 class="lf-title">{{ customerText("pages.catalog.index.c79e09c7", "Pilih produk favoritmu") }}</h1>
+                        <p class="lf-copy">{{ customerText("pages.catalog.index.37d8d356", "Top up game, voucher, hiburan, pulsa, PLN, dan produk digital langsung dari halaman utama.") }}</p>
                     </div>
                     <form class="lf-search" @submit.prevent="submit">
                         <span aria-hidden="true">⌕</span>
-                        <input v-model="search" maxlength="80" placeholder="Cari game, voucher, pulsa, atau PLN">
+                        <input v-model="search" maxlength="80" :placeholder="customerText(&quot;pages.catalog.index.attribute.placeholder.6c55bcac&quot;, &quot;Cari game, voucher, pulsa, atau PLN&quot;)">
                     </form>
                 </div>
 
                 <nav class="lf-filters">
-                    <Link :href="q({category:'',mode:''})" class="lf-chip" :class="{active:!filters.category&&!filters.mode}">Semua</Link>
-                    <Link :href="q({category:'',mode:'manual'})" class="lf-chip" :class="{active:filters.mode==='manual'}">Produk Manual</Link>
+                    <Link :href="q({category:'',mode:''})" class="lf-chip" :class="{active:!filters.category&&!filters.mode}">{{ customerText("pages.catalog.index.4b93aea2", "Semua") }}</Link>
+                    <Link :href="q({category:'',mode:'manual'})" class="lf-chip" :class="{active:filters.mode==='manual'}">{{ customerText("pages.catalog.index.a182b386", "Produk Manual") }}</Link>
                     <Link v-for="c in categories" :key="c.slug" :href="q({category:c.slug,mode:''})" class="lf-chip" :class="{active:filters.category===c.slug}">
                         <img v-if="c.image_url" :src="c.image_url" alt="">{{c.name}}
                     </Link>
@@ -146,7 +149,7 @@ onUnmounted(()=>{
                         <span v-else class="lf-product-fallback"><strong>{{x.name}}</strong><small>{{x.category_name}}</small></span>
                     </Link>
                 </div>
-                <p v-else class="mt-6 text-center text-sm text-white/40">Produk tidak ditemukan.</p>
+                <p v-else class="mt-6 text-center text-sm text-white/40">{{ customerText("pages.catalog.index.3b98f425", "Produk tidak ditemukan.") }}</p>
 
                 <nav v-if="products.links?.length>3" class="lf-pages">
                     <template v-for="x in products.links" :key="x.label">
@@ -156,30 +159,30 @@ onUnmounted(()=>{
                 </nav>
             </section>
 
-            <section class="lf-steps">
+            <section v-if="sectionEnabled('tutorial')" class="lf-steps">
                 <div class="lf-container lf-section">
-                    <p class="lf-eyebrow">CARA TOP UP</p>
-                    <h2 class="lf-title">Empat langkah sederhana</h2>
+                    <p class="lf-eyebrow">{{ customerText("pages.catalog.index.cc62e9c4", "CARA TOP UP") }}</p>
+                    <h2 class="lf-title">{{ customerText("pages.catalog.index.f1a2a671", "Empat langkah sederhana") }}</h2>
                     <div class="lf-step-grid">
                         <article v-for="s in [['01','Pilih produk','Cari game atau produk digital yang kamu inginkan.'],['02','Isi data','Masukkan ID dan pilih nominal top up.'],['03','Bayar aman','Selesaikan pembayaran sesuai total pesanan.'],['04','Pesanan diproses','Pantau status menggunakan nomor pesanan.']]" :key="s[0]" class="lf-step">
-                            <span>{{s[0]}}</span><h3>{{s[1]}}</h3><p>{{s[2]}}</p>
+                            <span>{{s[0]}}</span><h3>{{customerText('tutorial.' + s[0] + '.title',s[1])}}</h3><p>{{customerText('tutorial.' + s[0] + '.body',s[2])}}</p>
                         </article>
                     </div>
                 </div>
             </section>
 
-            <section class="lf-news-home">
+            <section v-if="sectionEnabled('news')" class="lf-news-home">
                 <div class="lf-container lf-section">
-                    <p class="lf-eyebrow">LFAMILIA NEWS</p>
+                    <p class="lf-eyebrow">{{ customerText("pages.catalog.index.8422e105", "LFAMILIA NEWS") }}</p>
                     <h2 class="lf-title">{{storefront.homeNewsTitle||'LFAMILIA NEWS: INFO GAMING & UPDATE TERBARU'}}</h2>
                     <p class="lf-copy">{{storefront.homeNewsIntro||'Info gaming, promo, produk, dan pengumuman layanan.'}}</p>
                     <div class="lf-news-grid mt-5">
                         <template v-for="a in homeNews" :key="a.id">
                             <article v-if="a.is_preview" class="lf-news-card">
-                                <div class="lf-news-placeholder">LF</div>
+                                <div class="lf-news-placeholder">{{ customerText("pages.catalog.index.6ae24f17", "LF") }}</div>
                                 <div class="lf-news-overlay"></div>
                                 <div class="lf-news-body">
-                                    <small>PREVIEW</small>
+                                    <small>{{ customerText("pages.catalog.index.9c238977", "PREVIEW") }}</small>
                                     <h3>{{a.title}}</h3>
                                     <p>{{a.summary}}</p>
                                     <strong>{{a.source_label}}</strong>
@@ -187,7 +190,7 @@ onUnmounted(()=>{
                             </article>
                             <Link v-else :href="'/news/'+a.slug" class="lf-news-card">
                                 <img v-if="a.cover_url" :src="a.cover_url" alt="">
-                                <div v-else class="lf-news-placeholder">LF</div>
+                                <div v-else class="lf-news-placeholder">{{ customerText("pages.catalog.index.6ae24f17", "LF") }}</div>
                                 <div class="lf-news-overlay"></div>
                                 <div class="lf-news-body">
                                     <small>{{newsDate(a.published_at)}}</small>
@@ -198,14 +201,14 @@ onUnmounted(()=>{
                             </Link>
                         </template>
                     </div>
-                    <Link href="/news" class="lf-secondary mt-4">Lihat Semua Artikel</Link>
+                    <Link href="/news" class="lf-secondary mt-4">{{ customerText("pages.catalog.index.82d0793e", "Lihat Semua Artikel") }}</Link>
                 </div>
             </section>
 
-            <section v-if="reviews?.length" class="lf-home-reviews">
+            <section v-if="reviews?.length && sectionEnabled('reviews')" class="lf-home-reviews">
                 <div class="lf-container lf-section">
                     <div class="lf-home-review-head">
-                        <div><p class="lf-eyebrow">ULASAN PELANGGAN</p><h2 class="lf-title">Dipercaya oleh pembeli LFAMILIA</h2><p class="lf-copy">Ulasan terverifikasi dari transaksi yang sudah berhasil.</p></div>
+                        <div><p class="lf-eyebrow">{{ customerText("pages.catalog.index.edb1fc98", "ULASAN PELANGGAN") }}</p><h2 class="lf-title">{{ customerText("pages.catalog.index.a62dff1a", "Dipercaya oleh pembeli LFAMILIA") }}</h2><p class="lf-copy">{{ customerText("pages.catalog.index.d6cfd5b1", "Ulasan terverifikasi dari transaksi yang sudah berhasil.") }}</p></div>
                     </div>
                     <div class="lf-home-review-grid">
                         <article v-for="review in reviews" :key="review.id">

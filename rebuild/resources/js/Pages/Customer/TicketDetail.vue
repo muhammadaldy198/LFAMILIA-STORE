@@ -1,4 +1,7 @@
 <script setup>
+import { useCustomerPresentation } from '../../Composables/customerPresentation';
+const { customerText } = useCustomerPresentation();
+
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AccountShell from '../../Components/AccountShell.vue';
 
@@ -14,16 +17,16 @@ function reply() {
 </script>
 
 <template>
-    <Head title="Detail tiket" />
+    <Head :title="customerText(&quot;pages.customer.ticketdetail.attribute.title.5cca0fc9&quot;, &quot;Detail tiket&quot;)" />
     <AccountShell>
-        <Link href="/account/tickets" class="text-sm text-cyan-300">← Semua tiket</Link>
+        <Link href="/account/tickets" class="text-sm text-cyan-300">{{ customerText("pages.customer.ticketdetail.13da208b", "← Semua tiket") }}</Link>
         <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
             <div><h1 class="text-3xl font-semibold">Tiket #{{ ticket.id }}</h1><p class="mt-1 text-sm text-slate-400">{{ticket.status}} · {{ticket.created_at}}</p></div>
         </div>
 
         <section class="mt-5 space-y-3">
             <article class="rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Pesan awal</div>
+                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ customerText("pages.customer.ticketdetail.cb150ccd", "Pesan awal") }}</div>
                 <h2 class="mt-2 text-lg font-semibold">{{ ticket.subject }}</h2>
                 <p class="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-300">{{ ticket.message }}</p>
             </article>
@@ -38,10 +41,10 @@ function reply() {
         </section>
 
         <form v-if="ticket.status !== 'CLOSED'" class="mt-4 rounded-xl border border-slate-800 bg-slate-900 p-4" @submit.prevent="reply">
-            <label class="text-sm font-semibold">Balas tiket<textarea v-model="form.message" required maxlength="5000" rows="4" class="mt-2 block w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm" placeholder="Masukkan balasan"></textarea></label>
-            <div class="mt-3 flex justify-end"><button :disabled="form.processing" class="lf-primary">Kirim balasan</button></div>
+            <label class="text-sm font-semibold">{{ customerText("pages.customer.ticketdetail.c9b566cd", "Balas tiket") }}<textarea v-model="form.message" required maxlength="5000" rows="4" class="mt-2 block w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm" :placeholder="customerText(&quot;pages.customer.ticketdetail.attribute.placeholder.1def0e1e&quot;, &quot;Masukkan balasan&quot;)"></textarea></label>
+            <div class="mt-3 flex justify-end"><button :disabled="form.processing" class="lf-primary">{{ customerText("pages.customer.ticketdetail.91fff07f", "Kirim balasan") }}</button></div>
             <p role="alert" v-if="form.errors.message" class="mt-2 text-sm text-red-300">{{form.errors.message}}</p>
         </form>
-        <p v-else class="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/45">Tiket sudah ditutup dan tidak menerima balasan baru.</p>
+        <p v-else class="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/45">{{ customerText("pages.customer.ticketdetail.f83cdd6e", "Tiket sudah ditutup dan tidak menerima balasan baru.") }}</p>
     </AccountShell>
 </template>

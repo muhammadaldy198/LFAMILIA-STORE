@@ -1,4 +1,7 @@
 <script setup>
+import { useCustomerPresentation } from '../../Composables/customerPresentation';
+const { customerText } = useCustomerPresentation();
+
 import {Head,Link} from '@inertiajs/vue3';
 import {computed,onMounted,onUnmounted,ref} from 'vue';
 import {rupiah} from '../../lib/money';
@@ -82,15 +85,15 @@ onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
 </script>
 
 <template>
-<Head title="Status Pesanan"/>
+<Head :title="customerText(&quot;pages.guest.orderstatus.attribute.title.a17f89cb&quot;, &quot;Status Pesanan&quot;)"/>
 <CustomerShell>
     <main class="lf-container lf-order-status-page">
-        <Link href="/orders/check" class="lf-back">← Cek pesanan lain</Link>
+        <Link href="/orders/check" class="lf-back">{{ customerText("pages.guest.orderstatus.860516c2", "← Cek pesanan lain") }}</Link>
         <section class="lf-order-status-head">
             <div>
-                <p class="lf-eyebrow">STATUS TRANSAKSI</p>
+                <p class="lf-eyebrow">{{ customerText("pages.guest.orderstatus.31b95ca5", "STATUS TRANSAKSI") }}</p>
                 <h1>Pesanan {{orderState.order_number}}</h1>
-                <p>Log di bawah diperbarui otomatis dari server.</p>
+                <p>{{ customerText("pages.guest.orderstatus.fad6f05b", "Log di bawah diperbarui otomatis dari server.") }}</p>
             </div>
             <span class="lf-live-badge" :class="{done:terminal}"><i></i>{{terminal?'Status final':'LIVE'}}</span>
         </section>
@@ -98,48 +101,48 @@ onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
         <div class="lf-order-status-grid">
             <div class="space-y-3">
                 <section class="lf-order-info">
-                    <div><small>Produk</small><strong>{{orderState.product_name}}</strong></div>
-                    <div><small>Status</small><strong>{{statusLabel(orderState.status)}}</strong></div>
-                    <div><small>Total</small><strong>{{rupiah(orderState.total_idr)}}</strong></div>
-                    <div><small>Dibuat</small><strong>{{orderState.created_at}}</strong></div>
+                    <div><small>{{ customerText("pages.guest.orderstatus.ceb4d888", "Produk") }}</small><strong>{{orderState.product_name}}</strong></div>
+                    <div><small>{{ customerText("pages.guest.orderstatus.5ef20f", "Status") }}</small><strong>{{statusLabel(orderState.status)}}</strong></div>
+                    <div><small>{{ customerText("pages.guest.orderstatus.ad066d9d", "Total") }}</small><strong>{{rupiah(orderState.total_idr)}}</strong></div>
+                    <div><small>{{ customerText("pages.guest.orderstatus.e378eb96", "Dibuat") }}</small><strong>{{orderState.created_at}}</strong></div>
                 </section>
 
                 <section v-if="orderState.status==='PENDING_PAYMENT'" class="lf-order-payment">
-                    <h2>Pembayaran</h2>
-                    <p v-if="paymentState">Status: <strong>{{statusLabel(paymentState.status)}}</strong></p>
-                    <p v-if="paymentUncertain">Status pembayaran sedang dipastikan. Jangan membayar ulang.</p>
-                    <img v-if="!paymentUncertain&&paymentState?.instructions?.qr_url" :src="paymentState.instructions.qr_url" alt="QRIS pembayaran">
-                    <p v-if="paymentState?.instructions?.va_number">Nomor VA: <strong>{{paymentState.instructions.va_number}}</strong></p>
-                    <p v-if="paymentState?.instructions?.payment_code">Kode pembayaran: <strong>{{paymentState.instructions.payment_code}}</strong></p>
+                    <h2>{{ customerText("pages.guest.orderstatus.3527df23", "Pembayaran") }}</h2>
+                    <p v-if="paymentState">{{ customerText("pages.guest.orderstatus.ca77496f", "Status:") }} <strong>{{statusLabel(paymentState.status)}}</strong></p>
+                    <p v-if="paymentUncertain">{{ customerText("pages.guest.orderstatus.fc9d0f83", "Status pembayaran sedang dipastikan. Jangan membayar ulang.") }}</p>
+                    <img v-if="!paymentUncertain&&paymentState?.instructions?.qr_url" :src="paymentState.instructions.qr_url" :alt="customerText(&quot;pages.guest.orderstatus.attribute.alt.dfd028b8&quot;, &quot;QRIS pembayaran&quot;)">
+                    <p v-if="paymentState?.instructions?.va_number">{{ customerText("pages.guest.orderstatus.d5aec755", "Nomor VA:") }} <strong>{{paymentState.instructions.va_number}}</strong></p>
+                    <p v-if="paymentState?.instructions?.payment_code">{{ customerText("pages.guest.orderstatus.6af68bec", "Kode pembayaran:") }} <strong>{{paymentState.instructions.payment_code}}</strong></p>
                     <div v-if="manualQris&&paymentState&&!paymentUncertain" class="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3">
-                        <strong class="text-[10px] text-amber-200">Menunggu verifikasi QRIS manual</strong>
-                        <p class="mt-1 text-[9px] leading-4 text-white/45">Setelah membayar, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama.</p>
+                        <strong class="text-[10px] text-amber-200">{{ customerText("pages.guest.orderstatus.666bb8c9", "Menunggu verifikasi QRIS manual") }}</strong>
+                        <p class="mt-1 text-[9px] leading-4 text-white/45">{{ customerText("pages.guest.orderstatus.19bf8418", "Setelah membayar, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama.") }}</p>
                     </div>
-                    <Link :href="'/payment?invoice='+encodeURIComponent(orderState.order_number)" class="lf-primary mt-3">Lihat pembayaran</Link>
+                    <Link :href="'/payment?invoice='+encodeURIComponent(orderState.order_number)" class="lf-primary mt-3">{{ customerText("pages.guest.orderstatus.a548f73b", "Lihat pembayaran") }}</Link>
                     
                 </section>
 
                 <section v-if="orderState.status==='SUCCESS'&&orderState.delivery" class="lf-order-success">
-                    <h2>Hasil pesanan</h2>
-                    <p v-if="orderState.delivery.serial_number">Serial / SN: <strong>{{orderState.delivery.serial_number}}</strong></p>
-                    <p v-if="orderState.delivery.code">Kode / hasil: <strong>{{orderState.delivery.code}}</strong></p>
+                    <h2>{{ customerText("pages.guest.orderstatus.25ba9702", "Hasil pesanan") }}</h2>
+                    <p v-if="orderState.delivery.serial_number">{{ customerText("pages.guest.orderstatus.4fc61831", "Serial / SN:") }} <strong>{{orderState.delivery.serial_number}}</strong></p>
+                    <p v-if="orderState.delivery.code">{{ customerText("pages.guest.orderstatus.8f52a70a", "Kode / hasil:") }} <strong>{{orderState.delivery.code}}</strong></p>
                     <p v-if="orderState.delivery.note">{{orderState.delivery.note}}</p>
                 </section>
 
                 <section v-if="orderState.status==='SUCCESS'" class="lf-order-review">
                     <template v-if="reviewDone">
-                        <h2>Ulasan kamu</h2>
+                        <h2>{{ customerText("pages.guest.orderstatus.f93e4117", "Ulasan kamu") }}</h2>
                         <div class="lf-review-stars">{{'★'.repeat(reviewRating)}}{{'☆'.repeat(5-reviewRating)}}</div>
                         <p>{{reviewBody || 'Terima kasih sudah memberi ulasan.'}}</p>
                     </template>
                     <template v-else>
-                        <h2>Beri ulasan</h2>
-                        <p>Ulasan hanya tersedia untuk pesanan yang sudah berhasil.</p>
+                        <h2>{{ customerText("pages.guest.orderstatus.20c3ee9d", "Beri ulasan") }}</h2>
+                        <p>{{ customerText("pages.guest.orderstatus.e840ad58", "Ulasan hanya tersedia untuk pesanan yang sudah berhasil.") }}</p>
                         <div class="lf-order-review-form">
-                            <input v-model="reviewName" maxlength="100" placeholder="Masukkan nama tampilan (opsional)">
+                            <input v-model="reviewName" maxlength="100" :placeholder="customerText(&quot;pages.guest.orderstatus.attribute.placeholder.2fadcd07&quot;, &quot;Masukkan nama tampilan (opsional)&quot;)">
                             <select v-model.number="reviewRating"><option :value="5">5 ★</option><option :value="4">4 ★</option><option :value="3">3 ★</option><option :value="2">2 ★</option><option :value="1">1 ★</option></select>
-                            <textarea v-model="reviewBody" rows="3" maxlength="2000" placeholder="Ceritakan pengalaman transaksimu"></textarea>
-                            <button class="lf-primary" :disabled="busy||reviewBody.trim().length<3" @click="submitReview">Kirim Ulasan</button>
+                            <textarea v-model="reviewBody" rows="3" maxlength="2000" :placeholder="customerText(&quot;pages.guest.orderstatus.attribute.placeholder.98e9ee9&quot;, &quot;Ceritakan pengalaman transaksimu&quot;)"></textarea>
+                            <button class="lf-primary" :disabled="busy||reviewBody.trim().length<3" @click="submitReview">{{ customerText("pages.guest.orderstatus.c4ebe0bb", "Kirim Ulasan") }}</button>
                         </div>
                     </template>
                     <p v-if="reviewMessage" class="lf-review-message">{{reviewMessage}}</p>
@@ -147,14 +150,14 @@ onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
             </div>
 
             <aside class="lf-order-timeline">
-                <header><div><h2>Log Realtime</h2><p>{{refreshing?'Memperbarui...':'Sinkron otomatis'}}</p></div><button type="button" @click="refreshStatus">↻</button></header>
+                <header><div><h2>{{ customerText("pages.guest.orderstatus.67f44f0e", "Log Realtime") }}</h2><p>{{refreshing?'Memperbarui...':'Sinkron otomatis'}}</p></div><button type="button" @click="refreshStatus">↻</button></header>
                 <p v-if="errors.status" role="alert">{{errors.status[0]}}</p>
                 <ol>
                     <li v-for="event in timeline" :key="event.id">
                         <span></span>
                         <div><strong>{{eventLabel(event)}}</strong><small>{{eventTime(event.created_at)}}</small><p v-if="event.from_status&&event.to_status">{{statusLabel(event.from_status)}} → {{statusLabel(event.to_status)}}</p></div>
                     </li>
-                    <li v-if="!timeline.length"><span></span><div><strong>Pesanan tercatat</strong><small>Menunggu log transaksi berikutnya.</small></div></li>
+                    <li v-if="!timeline.length"><span></span><div><strong>{{ customerText("pages.guest.orderstatus.243a5ea5", "Pesanan tercatat") }}</strong><small>{{ customerText("pages.guest.orderstatus.97f7dab7", "Menunggu log transaksi berikutnya.") }}</small></div></li>
                 </ol>
             </aside>
         </div>

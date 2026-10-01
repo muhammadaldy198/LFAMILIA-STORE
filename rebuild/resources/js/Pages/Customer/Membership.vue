@@ -1,4 +1,7 @@
 <script setup>
+import { useCustomerPresentation } from '../../Composables/customerPresentation';
+const { customerText } = useCustomerPresentation();
+
 import { Head } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import AccountShell from '../../Components/AccountShell.vue';
@@ -21,25 +24,25 @@ function discount(tier){
 }
 </script>
 <template>
-<Head title="Membership"/>
+<Head :title="customerText(&quot;pages.customer.membership.attribute.title.fb25e0f9&quot;, &quot;Membership&quot;)"/>
 <AccountShell>
     <section class="lf-membership-hero">
         <div>
-            <p class="lf-eyebrow">MEMBERSHIP LFAMILIA</p>
+            <p class="lf-eyebrow">{{ customerText("pages.customer.membership.3bd46fd8", "MEMBERSHIP LFAMILIA") }}</p>
             <h1>{{currentCode}}</h1>
             <p>{{profile?.mode==='MANUAL'?'Tier ini ditetapkan oleh toko.':'Tier mengikuti total transaksi berhasil dan manfaat yang dikonfigurasi toko.'}}</p>
         </div>
         <div class="lf-membership-discount">
-            <span>Diskon member</span>
+            <span>{{ customerText("pages.customer.membership.2352a1f5", "Diskon member") }}</span>
             <strong>{{Number(profile?.discount_bps||0)>0?(Number(profile.discount_bps)/100).toLocaleString('id-ID',{maximumFractionDigits:2})+'%':'0%'}}</strong>
         </div>
     </section>
 
     <section class="lf-membership-progress">
         <div class="lf-membership-progress-head">
-            <div><small>Progress tier</small><strong>{{money(profile?.progress_idr)}}</strong></div>
+            <div><small>{{ customerText("pages.customer.membership.b121577a", "Progress tier") }}</small><strong>{{money(profile?.progress_idr)}}</strong></div>
             <div v-if="profile?.next_code" class="text-right"><small>Berikutnya {{profile.next_code}}</small><strong>Sisa {{money(profile.remaining_to_next_idr)}}</strong></div>
-            <div v-else class="text-right"><small>Tier berikutnya</small><strong>Level tertinggi / manual</strong></div>
+            <div v-else class="text-right"><small>{{ customerText("pages.customer.membership.6e5fc58f", "Tier berikutnya") }}</small><strong>{{ customerText("pages.customer.membership.75777733", "Level tertinggi / manual") }}</strong></div>
         </div>
         <div class="lf-membership-progress-bar"><span :style="{width:progressPercent+'%'}"></span></div>
         <p>Belanja berhasil: {{money(profile?.lifetime_spend_idr)}}<template v-if="profile?.progress_bonus_idr"> · Bonus progress: {{money(profile.progress_bonus_idr)}}</template></p>
@@ -47,10 +50,10 @@ function discount(tier){
 
     <section class="lf-membership-grid">
         <article v-for="tier in tiers" :key="tier.code" :class="{active:tier.code===currentCode}">
-            <div class="lf-membership-tier-head"><strong>{{tier.code}}</strong><span v-if="tier.code===currentCode">Tier kamu</span></div>
+            <div class="lf-membership-tier-head"><strong>{{tier.code}}</strong><span v-if="tier.code===currentCode">{{ customerText("pages.customer.membership.ca5f365d", "Tier kamu") }}</span></div>
             <dl>
-                <div><dt>Syarat</dt><dd>{{requirement(tier)}}</dd></div>
-                <div><dt>Diskon</dt><dd>{{discount(tier)}}</dd></div>
+                <div><dt>{{ customerText("pages.customer.membership.18a2de33", "Syarat") }}</dt><dd>{{requirement(tier)}}</dd></div>
+                <div><dt>{{ customerText("pages.customer.membership.7e8c4c8d", "Diskon") }}</dt><dd>{{discount(tier)}}</dd></div>
             </dl>
             <div v-if="tier.benefits && Object.keys(tier.benefits).filter(k=>k!=='discount_bps').length" class="lf-membership-benefits">
                 <p v-for="(value,key) in tier.benefits" v-show="key!=='discount_bps'" :key="key"><strong>{{String(key).replaceAll('_',' ')}}</strong><span>{{value}}</span></p>

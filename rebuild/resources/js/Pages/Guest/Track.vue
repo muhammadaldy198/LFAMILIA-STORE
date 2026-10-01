@@ -1,4 +1,7 @@
 <script setup>
+import { useCustomerPresentation } from '../../Composables/customerPresentation';
+const { customerText } = useCustomerPresentation();
+
 import {Head,Link} from '@inertiajs/vue3';
 import {computed,onMounted,onUnmounted,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
@@ -90,27 +93,27 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
 </script>
 
 <template>
-<Head title="Cek Pesanan"/>
+<Head :title="customerText(&quot;pages.guest.track.attribute.title.196596ce&quot;, &quot;Cek Pesanan&quot;)"/>
 <CustomerShell>
 <main class="lf-track-page">
  <section class="lf-container lf-track-hero">
   <div>
-   <p class="lf-eyebrow">PELACAKAN TRANSAKSI</p>
-   <h1>Cek status pesananmu</h1>
-   <p>Masukkan nomor invoice atau nomor WhatsApp yang dipakai saat checkout. Status diperbarui otomatis dari server.</p>
+   <p class="lf-eyebrow">{{ customerText("pages.guest.track.c6bebc5b", "PELACAKAN TRANSAKSI") }}</p>
+   <h1>{{ customerText("pages.guest.track.aa9778ee", "Cek status pesananmu") }}</h1>
+   <p>{{ customerText("pages.guest.track.ed2fdbf1", "Masukkan nomor invoice atau nomor WhatsApp yang dipakai saat checkout. Status diperbarui otomatis dari server.") }}</p>
   </div>
   <div class="lf-track-search">
    <svg viewBox="0 0 24 24"><path d="m21 21-4.3-4.3m1.3-5.7a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>
-   <input v-model="query" @keyup.enter="search" aria-label="Nomor invoice atau nomor WhatsApp" placeholder="Masukkan nomor invoice atau nomor WhatsApp">
+   <input v-model="query" @keyup.enter="search" :aria-label="customerText(&quot;pages.guest.track.attribute.aria-label.6395bd69&quot;, &quot;Nomor invoice atau nomor WhatsApp&quot;)" :placeholder="customerText(&quot;pages.guest.track.attribute.placeholder.e4947fc0&quot;, &quot;Masukkan nomor invoice atau nomor WhatsApp&quot;)">
    <button :disabled="loading" @click="search">{{loading?'Mencari...':'Periksa'}}</button>
   </div>
   <p v-if="error" role="alert" class="lf-track-error">{{error}}</p>
  </section>
 
- <p v-if="mode==='phone' && !orders.length && !loading && !error" class="lf-container lf-empty" role="status">Tidak ada pesanan untuk nomor WhatsApp ini. Periksa kembali nomor yang digunakan saat checkout.</p>
+ <p v-if="mode==='phone' && !orders.length && !loading && !error" class="lf-container lf-empty" role="status">{{ customerText("pages.guest.track.45250ba7", "Tidak ada pesanan untuk nomor WhatsApp ini. Periksa kembali nomor yang digunakan saat checkout.") }}</p>
 
  <section v-if="orders.length" class="lf-container lf-track-results">
-  <div class="lf-track-section-head"><div><p class="lf-eyebrow">RIWAYAT NOMOR</p><h2>Pesanan ditemukan</h2></div><span>{{orders.length}} transaksi</span></div>
+  <div class="lf-track-section-head"><div><p class="lf-eyebrow">{{ customerText("pages.guest.track.385a9fe9", "RIWAYAT NOMOR") }}</p><h2>{{ customerText("pages.guest.track.6a63c25b", "Pesanan ditemukan") }}</h2></div><span>{{orders.length}} transaksi</span></div>
   <div class="lf-track-order-list">
    <button v-for="item in orders" :key="item.trackingToken" :disabled="loading" @click="openOrder(item.trackingToken)">
     <div><strong>{{item.maskedReferenceId}}</strong><small>{{item.productName}} · {{item.packageLabel}}</small></div>
@@ -121,43 +124,43 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
 
  <section v-if="detail" class="lf-container lf-track-detail">
   <div class="lf-track-detail-head">
-   <div><p class="lf-eyebrow">DETAIL TRANSAKSI</p><h2>{{detail.productName}}</h2><p>{{detail.packageLabel}}</p></div>
+   <div><p class="lf-eyebrow">{{ customerText("pages.guest.track.dab1e3ee", "DETAIL TRANSAKSI") }}</p><h2>{{detail.productName}}</h2><p>{{detail.packageLabel}}</p></div>
    <span class="lf-live-badge" :class="{done:terminal}"><i></i>{{terminal?'STATUS FINAL':'LIVE'}}</span>
   </div>
 
   <div class="lf-track-grid">
    <div class="lf-track-summary">
     <div class="lf-track-invoice">
-     <div><small>Nomor Invoice</small><strong>{{detail.referenceId}}</strong></div>
-     <button v-if="!detail.referenceMasked" @click="copyInvoice">{{copied?'Tersalin':'Salin'}}</button><span v-else class="text-[8px] font-bold uppercase tracking-[0.08em] text-white/35">Terlindungi</span>
+     <div><small>{{ customerText("pages.guest.track.b8d5b0b7", "Nomor Invoice") }}</small><strong>{{detail.referenceId}}</strong></div>
+     <button v-if="!detail.referenceMasked" @click="copyInvoice">{{copied?'Tersalin':'Salin'}}</button><span v-else class="text-[8px] font-bold uppercase tracking-[0.08em] text-white/35">{{ customerText("pages.guest.track.cbd3ad32", "Terlindungi") }}</span>
     </div>
     <div class="lf-track-status-card" :class="'tone-'+statusMeta(detail.fulfillmentStatus)[2]">
-     <span></span><div><small>Status Pesanan</small><strong>{{statusMeta(detail.fulfillmentStatus)[0]}}</strong><p>{{statusMeta(detail.fulfillmentStatus)[1]}}</p></div>
+     <span></span><div><small>{{ customerText("pages.guest.track.a17f89cb", "Status Pesanan") }}</small><strong>{{statusMeta(detail.fulfillmentStatus)[0]}}</strong><p>{{statusMeta(detail.fulfillmentStatus)[1]}}</p></div>
     </div>
     <dl class="lf-track-meta">
-     <div><dt>Produk</dt><dd>{{detail.productName}}</dd></div>
-     <div><dt>Nominal</dt><dd>{{detail.packageLabel}}</dd></div>
-     <div><dt>Tujuan</dt><dd>{{detail.destination||'Disembunyikan'}}</dd></div>
-     <div><dt>Metode Pembayaran</dt><dd>{{detail.paymentMethod}}</dd></div>
-     <div><dt>Status Pembayaran</dt><dd>{{statusMeta(detail.paymentStatus)[0]}}</dd></div>
-     <div><dt>Total</dt><dd class="money">{{money(detail.total)}}</dd></div>
-     <div><dt>Dibuat</dt><dd>{{date(detail.createdAt)}}</dd></div>
-     <div><dt>Update</dt><dd>{{date(detail.updatedAt)}}</dd></div>
+     <div><dt>{{ customerText("pages.guest.track.ceb4d888", "Produk") }}</dt><dd>{{detail.productName}}</dd></div>
+     <div><dt>{{ customerText("pages.guest.track.a2defbe3", "Nominal") }}</dt><dd>{{detail.packageLabel}}</dd></div>
+     <div><dt>{{ customerText("pages.guest.track.65ca564", "Tujuan") }}</dt><dd>{{detail.destination||'Disembunyikan'}}</dd></div>
+     <div><dt>{{ customerText("pages.guest.track.443c0671", "Metode Pembayaran") }}</dt><dd>{{detail.paymentMethod}}</dd></div>
+     <div><dt>{{ customerText("pages.guest.track.da472e8b", "Status Pembayaran") }}</dt><dd>{{statusMeta(detail.paymentStatus)[0]}}</dd></div>
+     <div><dt>{{ customerText("pages.guest.track.ad066d9d", "Total") }}</dt><dd class="money">{{money(detail.total)}}</dd></div>
+     <div><dt>{{ customerText("pages.guest.track.e378eb96", "Dibuat") }}</dt><dd>{{date(detail.createdAt)}}</dd></div>
+     <div><dt>{{ customerText("pages.guest.track.6e230e94", "Update") }}</dt><dd>{{date(detail.updatedAt)}}</dd></div>
     </dl>
     <div class="lf-track-sensitive">
-     <strong>Butuh kode/hasil pesanan?</strong>
-     <p>Data sensitif hanya ditampilkan melalui halaman akses guest yang memakai kode akses, atau dari Riwayat Pesanan jika kamu login.</p>
-     <Link href="/login" class="lf-secondary">Masuk Akun</Link>
+     <strong>{{ customerText("pages.guest.track.ee28e295", "Butuh kode/hasil pesanan?") }}</strong>
+     <p>{{ customerText("pages.guest.track.84d645e7", "Data sensitif hanya ditampilkan melalui halaman akses guest yang memakai kode akses, atau dari Riwayat Pesanan jika kamu login.") }}</p>
+     <Link href="/login" class="lf-secondary">{{ customerText("pages.guest.track.da4f28f7", "Masuk Akun") }}</Link>
     </div>
    </div>
 
    <aside class="lf-track-timeline">
-    <header><div><h3>Log Realtime</h3><p>Sinkron setiap 15 detik</p></div><button :disabled="detailRefreshing" aria-label="Perbarui status pesanan" @click="refreshDetail">↻</button></header>
+    <header><div><h3>{{ customerText("pages.guest.track.67f44f0e", "Log Realtime") }}</h3><p>{{ customerText("pages.guest.track.cea3f93c", "Sinkron setiap 15 detik") }}</p></div><button :disabled="detailRefreshing" :aria-label="customerText(&quot;pages.guest.track.attribute.aria-label.76774c83&quot;, &quot;Perbarui status pesanan&quot;)" @click="refreshDetail">↻</button></header>
     <ol>
      <li v-for="event in detail.events" :key="event.id">
       <i></i><div><small>{{sourceLabel(event.source)}}</small><strong>{{event.label}}</strong><time>{{date(event.createdAt)}}</time></div>
      </li>
-     <li v-if="!detail.events?.length"><i></i><div><small>Sistem</small><strong>Pesanan tercatat</strong><time>Menunggu pembaruan berikutnya</time></div></li>
+     <li v-if="!detail.events?.length"><i></i><div><small>{{ customerText("pages.guest.track.59bb7a0c", "Sistem") }}</small><strong>{{ customerText("pages.guest.track.243a5ea5", "Pesanan tercatat") }}</strong><time>{{ customerText("pages.guest.track.1b9e33ac", "Menunggu pembaruan berikutnya") }}</time></div></li>
     </ol>
    </aside>
   </div>
@@ -165,13 +168,13 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
 
  <section class="lf-track-feed">
   <div class="lf-container">
-   <div class="lf-track-section-head"><div><p class="lf-eyebrow">TRANSAKSI TERBARU</p><h2>Aktivitas LFAMILIA</h2><p>Invoice dimasking untuk menjaga privasi pelanggan.</p></div><span class="lf-live-badge"><i></i>LIVE</span></div>
+   <div class="lf-track-section-head"><div><p class="lf-eyebrow">{{ customerText("pages.guest.track.8c613442", "TRANSAKSI TERBARU") }}</p><h2>{{ customerText("pages.guest.track.785e2064", "Aktivitas LFAMILIA") }}</h2><p>{{ customerText("pages.guest.track.4a372d30", "Invoice dimasking untuk menjaga privasi pelanggan.") }}</p></div><span class="lf-live-badge"><i></i>{{ customerText("pages.guest.track.45424caf", "LIVE") }}</span></div>
    <div class="lf-feed-table">
-    <div class="lf-feed-row lf-feed-head"><span>Invoice</span><span>Produk</span><span>Total</span><span>Status</span><span>Waktu</span></div>
+    <div class="lf-feed-row lf-feed-head"><span>{{ customerText("pages.guest.track.71ec87b0", "Invoice") }}</span><span>{{ customerText("pages.guest.track.ceb4d888", "Produk") }}</span><span>{{ customerText("pages.guest.track.ad066d9d", "Total") }}</span><span>{{ customerText("pages.guest.track.5ef20f", "Status") }}</span><span>{{ customerText("pages.guest.track.4293eacd", "Waktu") }}</span></div>
     <div v-for="item in feed" :key="item.maskedReferenceId+item.createdAt" class="lf-feed-row">
      <strong>{{item.maskedReferenceId}}</strong><span>{{item.productName}}<small>{{item.packageLabel}}</small></span><b>{{money(item.total)}}</b><em :class="'status-'+item.status">{{statusMeta(item.status)[0]}}</em><time>{{date(item.createdAt)}}</time>
     </div>
-    <div v-if="!feed.length" class="lf-empty">Belum ada transaksi untuk ditampilkan.</div>
+    <div v-if="!feed.length" class="lf-empty">{{ customerText("pages.guest.track.faa60eef", "Belum ada transaksi untuk ditampilkan.") }}</div>
    </div>
   </div>
  </section>

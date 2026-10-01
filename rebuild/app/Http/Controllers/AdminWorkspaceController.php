@@ -22,14 +22,16 @@ use Throwable;
 
 class AdminWorkspaceController
 {
-    public function orders(): Response
+    public function orders(Request $request): Response
     {
         return Inertia::render('Admin/Workspace', [
             'kind' => 'orders',
             'title' => 'Pesanan',
+            'filters' => ['q' => (string) $request->query('q', '')],
             'rows' => DB::table('orders')
                 ->join('products', 'products.id', '=', 'orders.product_id')
                 ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
+                ->when($request->filled('q'), fn ($query) => $query->where('orders.order_number', 'like', '%'.mb_substr((string) $request->query('q'), 0, 100).'%'))
                 ->orderByDesc('orders.id')->limit(150)
                 ->get([
                     'orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
@@ -75,14 +77,16 @@ class AdminWorkspaceController
         return back();
     }
 
-    public function customers(): Response
+    public function customers(Request $request): Response
     {
         return Inertia::render('Admin/Workspace', [
             'kind' => 'customers',
             'title' => 'Pelanggan',
+            'filters' => ['q' => (string) $request->query('q', '')],
             'rows' => DB::table('users')
                 ->leftJoin('wallets', 'wallets.user_id', '=', 'users.id')
                 ->whereNull('users.deleted_at')
+                ->when($request->filled('q'), fn ($query) => $query->where(fn ($q) => $q->where('users.name', 'like', '%'.mb_substr((string) $request->query('q'), 0, 100).'%')->orWhere('users.email', 'like', '%'.mb_substr((string) $request->query('q'), 0, 100).'%')))
                 ->orderByDesc('users.id')->limit(150)
                 ->get([
                     'users.id', 'users.name', 'users.email', 'users.phone',
@@ -467,7 +471,7 @@ class AdminWorkspaceController
         $tables = [
             'system_settings',
             'membership_tiers',
-            'product_categories',
+            'categories',
             'products',
             'product_packages',
             'providers',
@@ -479,6 +483,9 @@ class AdminWorkspaceController
             'home_banners',
             'faq_entries',
             'news_articles',
+            'content_pages',
+            'site_popups',
+            'store_assets',
         ];
 
         $payload = [
@@ -510,7 +517,7 @@ class AdminWorkspaceController
                     ->orderBy('key')
                     ->get($columns);
             } else {
-                $rows = DB::table($table)->orderBy('id')->get($columns);
+                $rows = DB::table($table)->orderBy($table === 'content_pages' ? 'key' : 'id')->get($columns);
             }
 
             $payload['data'][$table] = $rows;
@@ -546,7 +553,7 @@ class AdminWorkspaceController
             'instagram_url' => ['nullable', 'url:http,https', 'max:500'],
             'email' => ['nullable', 'email:rfc', 'max:255'],
             'discord_url' => ['nullable', 'url:http,https', 'max:500'],
-            'support_url' => ['nullable', 'url:http,https', 'max:500'],
+            'support_url' => ['nullable', 'string', 'max:500', 'regex:/^(\/(?!\/)|https?:\/\/)/i'],
             'business_hours' => ['nullable', 'string', 'max:500'],
         ]);
         $mapping = [

@@ -1,4 +1,7 @@
 <script setup>
+import { useCustomerPresentation } from '../../Composables/customerPresentation';
+const { customerText } = useCustomerPresentation();
+
 import {Head,Link} from '@inertiajs/vue3';
 import {computed,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
@@ -20,10 +23,10 @@ const magic=computed(()=>{const points=Math.min(200,Math.max(0,Number(magicPoint
 <Head :title="active.name+' Calculator'"/>
 <CustomerShell>
 <main class="lf-tools-page">
- <section class="lf-tools-hero"><div class="lf-container"><p class="lf-eyebrow">TOOLS LFAMILIA</p><h1>Kalkulator Game</h1><p>Hitung kebutuhan game dengan rumus yang sama seperti tools LFAMILIA sebelumnya.</p></div></section>
+ <section class="lf-tools-hero"><div class="lf-container"><p class="lf-eyebrow">{{ customerText("pages.content.tool.4b6166cb", "TOOLS LFAMILIA") }}</p><h1>{{ customerText("pages.content.tool.10394bed", "Kalkulator Game") }}</h1><p>{{ customerText("pages.content.tool.5ccd5c20", "Hitung kebutuhan game dengan rumus yang sama seperti tools LFAMILIA sebelumnya.") }}</p></div></section>
  <div class="lf-container lf-tools-layout">
   <aside class="lf-tools-nav">
-   <p>Semua Kalkulator</p>
+   <p>{{ customerText("pages.content.tool.e2b6ac16", "Semua Kalkulator") }}</p>
    <Link v-for="t in tools" :key="t.key" :href="'/tools/'+t.key" :class="{active:t.key===tool}"><span>{{t.icon}}</span><div><strong>{{t.name}}</strong><small>{{t.desc}}</small></div></Link>
   </aside>
 
@@ -32,33 +35,33 @@ const magic=computed(()=>{const points=Math.min(200,Math.max(0,Number(magicPoint
 
    <template v-if="tool==='win-rate'">
     <div class="lf-calc-fields">
-     <label>Total Pertandingan<input v-model.number="played" type="number" min="0"><small>Jumlah match yang sudah dimainkan.</small></label>
-     <label>Win Rate Sekarang (%)<input v-model.number="current" type="number" min="0" max="100" step=".01"></label>
-     <label>Target Win Rate (%)<input v-model.number="desired" type="number" min="0" max="99.99" step=".01"></label>
+     <label>{{ customerText("pages.content.tool.f03aca72", "Total Pertandingan") }}<input v-model.number="played" type="number" min="0"><small>{{ customerText("pages.content.tool.ed79a277", "Jumlah match yang sudah dimainkan.") }}</small></label>
+     <label>{{ customerText("pages.content.tool.d617b96f", "Win Rate Sekarang (%)") }}<input v-model.number="current" type="number" min="0" max="100" step=".01"></label>
+     <label>{{ customerText("pages.content.tool.a30d035a", "Target Win Rate (%)") }}<input v-model.number="desired" type="number" min="0" max="99.99" step=".01"></label>
     </div>
-    <div class="lf-calc-result"><small>Kemenangan beruntun yang dibutuhkan</small><strong>{{winNeeded}} Win</strong><p>Perkiraan total pertandingan setelah mencapai target: {{Number(played||0)+winNeeded}} match.</p></div>
+    <div class="lf-calc-result"><small>{{ customerText("pages.content.tool.7428ed33", "Kemenangan beruntun yang dibutuhkan") }}</small><strong>{{winNeeded}} Win</strong><p>Perkiraan total pertandingan setelah mencapai target: {{Number(played||0)+winNeeded}} match.</p></div>
    </template>
 
    <template v-else-if="tool==='zodiac'">
     <div class="lf-calc-fields">
-     <label>Poin Zodiac Sekarang<input v-model.number="zodiacPoints" type="number" min="0" max="100"></label>
-     <label>Diamond per Summon<input v-model.number="zodiacCost" type="number" min="0"></label>
-     <label>Rata-rata Poin / Summon<input v-model.number="zodiacAvg" type="number" min="1" max="5" step=".1"><small>Gunakan 1–5 sesuai estimasi kamu.</small></label>
+     <label>{{ customerText("pages.content.tool.4e4e8f7d", "Poin Zodiac Sekarang") }}<input v-model.number="zodiacPoints" type="number" min="0" max="100"></label>
+     <label>{{ customerText("pages.content.tool.b6f90e0f", "Diamond per Summon") }}<input v-model.number="zodiacCost" type="number" min="0"></label>
+     <label>{{ customerText("pages.content.tool.8e98b0e6", "Rata-rata Poin / Summon") }}<input v-model.number="zodiacAvg" type="number" min="1" max="5" step=".1"><small>{{ customerText("pages.content.tool.49d859fe", "Gunakan 1–5 sesuai estimasi kamu.") }}</small></label>
     </div>
-    <div class="lf-calc-result-grid"><div><small>Sisa poin</small><strong>{{zodiac.remaining}}</strong></div><div><small>Estimasi summon</small><strong>{{zodiac.draws}}</strong></div><div><small>Estimasi diamond</small><strong>{{zodiac.diamonds.toLocaleString('id-ID')}}</strong></div></div>
-    <div class="lf-calc-range"><span>Best case: <b>{{zodiac.best.toLocaleString('id-ID')}} diamond</b></span><span>Worst case: <b>{{zodiac.worst.toLocaleString('id-ID')}} diamond</b></span></div>
+    <div class="lf-calc-result-grid"><div><small>{{ customerText("pages.content.tool.3096b639", "Sisa poin") }}</small><strong>{{zodiac.remaining}}</strong></div><div><small>{{ customerText("pages.content.tool.e2b2d1a7", "Estimasi summon") }}</small><strong>{{zodiac.draws}}</strong></div><div><small>{{ customerText("pages.content.tool.d72c86f0", "Estimasi diamond") }}</small><strong>{{zodiac.diamonds.toLocaleString('id-ID')}}</strong></div></div>
+    <div class="lf-calc-range"><span>{{ customerText("pages.content.tool.9cd1fd1", "Best case:") }} <b>{{zodiac.best.toLocaleString('id-ID')}} diamond</b></span><span>{{ customerText("pages.content.tool.7aadb11e", "Worst case:") }} <b>{{zodiac.worst.toLocaleString('id-ID')}} diamond</b></span></div>
    </template>
 
    <template v-else>
     <div class="lf-calc-fields">
-     <label>Magic Point Sekarang<input v-model.number="magicPoints" type="number" min="0" max="200"></label>
-     <label>Harga 1 Draw<input v-model.number="magicSingle" type="number" min="0"></label>
-     <label>Harga 5 Draw<input v-model.number="magicFive" type="number" min="0"></label>
+     <label>{{ customerText("pages.content.tool.8a862850", "Magic Point Sekarang") }}<input v-model.number="magicPoints" type="number" min="0" max="200"></label>
+     <label>{{ customerText("pages.content.tool.c11c5f7b", "Harga 1 Draw") }}<input v-model.number="magicSingle" type="number" min="0"></label>
+     <label>{{ customerText("pages.content.tool.6a4010b7", "Harga 5 Draw") }}<input v-model.number="magicFive" type="number" min="0"></label>
     </div>
-    <div class="lf-calc-result"><small>Estimasi kombinasi termurah</small><strong>{{magic.best.toLocaleString('id-ID')}} Diamond</strong><p>{{magic.sets}}× paket 5 draw + {{magic.singles}}× single draw untuk menutup {{magic.remaining}} Magic Point.</p></div>
+    <div class="lf-calc-result"><small>{{ customerText("pages.content.tool.8c1c864f", "Estimasi kombinasi termurah") }}</small><strong>{{magic.best.toLocaleString('id-ID')}} Diamond</strong><p>{{magic.sets}}× paket 5 draw + {{magic.singles}}× single draw untuk menutup {{magic.remaining}} Magic Point.</p></div>
    </template>
 
-   <p class="lf-calc-note">Kalkulator ini hanya alat bantu estimasi. Harga, event, bonus, dan mekanisme game dapat berubah.</p>
+   <p class="lf-calc-note">{{ customerText("pages.content.tool.b9cda763", "Kalkulator ini hanya alat bantu estimasi. Harga, event, bonus, dan mekanisme game dapat berubah.") }}</p>
   </section>
  </div>
 </main>

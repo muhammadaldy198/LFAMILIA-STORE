@@ -39,6 +39,7 @@ class StorefrontContentService
             'homeNewsTitle' => $settings['store.home_news_title'] ?? 'LFAMILIA NEWS',
             'homeNewsIntro' => $settings['store.home_news_intro'] ?? 'Info gaming, promo, dan update terbaru.',
             'assets' => $assets,
+            'presentation' => app(CustomerPresentationService::class)->saved(),
         ];
     }
 

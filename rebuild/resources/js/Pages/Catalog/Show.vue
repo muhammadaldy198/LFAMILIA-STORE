@@ -1,4 +1,7 @@
 <script setup>
+import { useCustomerPresentation } from '../../Composables/customerPresentation';
+const { customerText } = useCustomerPresentation();
+
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import TurnstileWidget from '../../Components/TurnstileWidget.vue';
@@ -785,15 +788,15 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
             <div class="lf-product-perks">
                 <div>
                     <span><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
-                    <strong>Proses cepat</strong>
+                    <strong>{{ customerText("pages.catalog.show.ec3aa9dc", "Proses cepat") }}</strong>
                 </div>
                 <div>
                     <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3z"/><path d="m9 12 2 2 4-4"/></svg></span>
-                    <strong>Chat 24/7</strong>
+                    <strong>{{ customerText("pages.catalog.show.365fc5ed", "Chat 24/7") }}</strong>
                 </div>
                 <div>
                     <span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg></span>
-                    <strong>Pembayaran aman</strong>
+                    <strong>{{ customerText("pages.catalog.show.1b6840bc", "Pembayaran aman") }}</strong>
                 </div>
             </div>
         </div>
@@ -801,14 +804,14 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
 
     <div class="lf-container">
         <div class="lf-checkout-tabs">
-            <button type="button" :class="{active:activeTab==='transaction'}" @click="activeTab='transaction'">Transaksi</button>
-            <button type="button" :class="{active:activeTab==='details'}" @click="activeTab='details'">Keterangan</button>
+            <button type="button" :class="{active:activeTab==='transaction'}" @click="activeTab='transaction'">{{ customerText("pages.catalog.show.2b1e660d", "Transaksi") }}</button>
+            <button type="button" :class="{active:activeTab==='details'}" @click="activeTab='details'">{{ customerText("pages.catalog.show.f107e79f", "Keterangan") }}</button>
         </div>
 
         <div v-if="activeTab==='transaction'" class="lf-checkout-grid">
             <div class="lf-checkout-panels">
                 <section v-if="hasAccountStep" class="lf-checkout-panel lf-checkout-account-panel">
-                    <header><div><h2>Masukkan Data Akun</h2><p>Isi ID tujuan dengan benar. Nickname diperiksa otomatis jika didukung.</p></div></header>
+                    <header><div><h2>{{ customerText("pages.catalog.show.ec1c9711", "Masukkan Data Akun") }}</h2><p>{{ customerText("pages.catalog.show.b691e78b", "Isi ID tujuan dengan benar. Nickname diperiksa otomatis jika didukung.") }}</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-account-product-mobile">
                             <span class="lf-account-product-art">
@@ -817,13 +820,13 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             </span>
                             <div class="lf-account-product-copy">
                                 <strong>{{product.name}}</strong>
-                                <Link href="/#produk">Ganti produk</Link>
+                                <Link href="/#produk">{{ customerText("pages.catalog.show.f100ee83", "Ganti produk") }}</Link>
                             </div>
                         </div>
                         <label v-if="savedAccountItems.length" class="lf-saved-account-select">
-                            <span>Akun game tersimpan</span>
+                            <span>{{ customerText("pages.catalog.show.85989a9d", "Akun game tersimpan") }}</span>
                             <select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)">
-                                <option value="">Isi manual</option>
+                                <option value="">{{ customerText("pages.catalog.show.e9a9962a", "Isi manual") }}</option>
                                 <option v-for="saved in savedAccountItems" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option>
                             </select>
                         </label>
@@ -838,30 +841,30 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
 
                         <div v-if="product.nickname_check_enabled && busy==='nickname'" class="lf-nickname-state lf-nickname-loading">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/></svg>
-                            <span>Memeriksa ID dan Server…</span>
+                            <span>{{ customerText("pages.catalog.show.923fbe22", "Memeriksa ID dan Server…") }}</span>
                         </div>
                         <div v-else-if="nicknameResult?.verified" class="lf-nickname-state lf-nickname-success">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-                            <div><small>Akun ditemukan</small><strong>{{nicknameResult.nickname}}</strong><span v-if="nicknameResult.country">dari {{nicknameResult.country}}</span></div>
+                            <div><small>{{ customerText("pages.catalog.show.86a69022", "Akun ditemukan") }}</small><strong>{{nicknameResult.nickname}}</strong><span v-if="nicknameResult.country">dari {{nicknameResult.country}}</span></div>
                         </div>
                         <div v-else-if="nicknameResult?.warning" class="lf-nickname-state lf-nickname-error">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-                            <div><strong>Akun belum terverifikasi</strong><span>{{nicknameResult.warning}}</span></div>
+                            <div><strong>{{ customerText("pages.catalog.show.18d22dbd", "Akun belum terverifikasi") }}</strong><span>{{nicknameResult.warning}}</span></div>
                         </div>
                         <div v-else-if="product.nickname_check_enabled" class="lf-checkout-info-note">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
-                            <span>Nickname akan tampil otomatis setelah data akun yang diperlukan terisi.</span>
+                            <span>{{ customerText("pages.catalog.show.5b999fc2", "Nickname akan tampil otomatis setelah data akun yang diperlukan terisi.") }}</span>
                         </div>
                         <div v-else class="lf-checkout-info-note">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
-                            <span>Verifikasi nickname otomatis belum tersedia. Periksa kembali data sebelum membayar.</span>
+                            <span>{{ customerText("pages.catalog.show.a38dd539", "Verifikasi nickname otomatis belum tersedia. Periksa kembali data sebelum membayar.") }}</span>
                         </div>
 
                     </div>
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-nominal-panel">
-                    <header><div><h2>Pilih Nominal</h2><p>{{product.checkout_nominal_description || 'Pesanan diproses otomatis setelah pembayaran.'}}</p></div></header>
+                    <header><div><h2>{{ customerText("pages.catalog.show.75d5eb47", "Pilih Nominal") }}</h2><p>{{product.checkout_nominal_description || 'Pesanan diproses otomatis setelah pembayaran.'}}</p></div></header>
                     <div class="lf-panel-body lf-package-sections">
                         <section v-for="group in packageGroups" :key="group.name || 'all'">
                             <div v-if="group.name" class="lf-package-group-head"><h3>{{group.name}}</h3><span></span></div>
@@ -879,14 +882,14 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-payment-panel">
-                    <header><div><h2>Pilih Pembayaran</h2><p>Pilih metode pembayaran yang ingin digunakan.</p></div></header>
+                    <header><div><h2>{{ customerText("pages.catalog.show.c08763ef", "Pilih Pembayaran") }}</h2><p>{{ customerText("pages.catalog.show.e7920111", "Pilih metode pembayaran yang ingin digunakan.") }}</p></div></header>
                     <div class="lf-panel-body lf-payment-groups">
                         <div v-if="!paymentChannels?.length" class="lf-payment-unavailable">
-                            Belum ada metode pembayaran aktif.
+                            {{ customerText("pages.catalog.show.51de2747", "Belum ada metode pembayaran aktif.") }}
                         </div>
                         <div v-else-if="!hasExternalPaymentOption" class="lf-payment-unavailable">
-                            <template v-if="customer && hasAvailableWalletPaymentOption">Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi.</template>
-                            <template v-else>Belum ada metode pembayaran yang dapat digunakan saat ini.</template>
+                            <template v-if="customer && hasAvailableWalletPaymentOption">{{ customerText("pages.catalog.show.4bfa0eb", "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi.") }}</template>
+                            <template v-else>{{ customerText("pages.catalog.show.f4a728b6", "Belum ada metode pembayaran yang dapat digunakan saat ini.") }}</template>
                         </div>
                         <div
                             v-for="group in paymentGroups"
@@ -901,19 +904,19 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                 @click="choosePayment(group.items.find(x=>x.code===paymentChannelCode)?.code || group.items.find(x=>x.available!==false)?.code)"
                             >
                                 <span v-if="group.key==='wallet'" class="lf-payment-wallet-art">
-                                    <img :src="'/payment/lfamilia-cash.webp'" alt="LFAMILIA Cash">
+                                    <img :src="'/payment/lfamilia-cash.webp'" :alt="customerText(&quot;pages.catalog.show.attribute.alt.d8a0146d&quot;, &quot;LFAMILIA Cash&quot;)">
                                 </span>
                                 <span class="lf-payment-group-copy">
                                     <strong>{{group.title}}</strong>
                                     <small v-if="group.key==='wallet' && customer">Saldo {{formatIdr(customer.balance_idr)}}</small>
-                                    <small v-else-if="group.key==='wallet'">Masuk akun untuk memakai saldo</small>
+                                    <small v-else-if="group.key==='wallet'">{{ customerText("pages.catalog.show.994e335c", "Masuk akun untuk memakai saldo") }}</small>
                                     <small v-else>{{group.description}}</small>
                                 </span>
                                 <span v-if="group.items.some(x=>x.code===paymentChannelCode)" class="lf-payment-check"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></svg></span>
                             </button>
 
                             <div v-if="group.key!=='wallet'" class="lf-payment-brand-strip">
-                                <span v-if="group.key==='qris'">QRIS • DANA • ShopeePay</span>
+                                <span v-if="group.key==='qris'">{{ customerText("pages.catalog.show.c64a26ec", "QRIS • DANA • ShopeePay") }}</span>
                                 <template v-else>
                                     <span v-for="channel in group.items.slice(0,7)" :key="channel.code">{{channel.name}}</span>
                                 </template>
@@ -934,40 +937,40 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                     <span class="lf-payment-channel-copy">
                                         <strong>{{channel.name}}</strong>
                                         <small v-if="Number(channel.fee_percent_bps || 0) > 0 || Number(channel.fee_flat_idr || 0) > 0">
-                                            Fee <template v-if="Number(channel.fee_percent_bps || 0) > 0">{{(Number(channel.fee_percent_bps || 0) / 100).toLocaleString('id-ID', {maximumFractionDigits:2})}}%</template><template v-if="Number(channel.fee_percent_bps || 0) > 0 && Number(channel.fee_flat_idr || 0) > 0"> + </template><template v-if="Number(channel.fee_flat_idr || 0) > 0">{{formatIdr(channel.fee_flat_idr)}}</template>
+                                            {{ customerText("pages.catalog.show.228d43a3", "Fee") }} <template v-if="Number(channel.fee_percent_bps || 0) > 0">{{(Number(channel.fee_percent_bps || 0) / 100).toLocaleString('id-ID', {maximumFractionDigits:2})}}%</template><template v-if="Number(channel.fee_percent_bps || 0) > 0 && Number(channel.fee_flat_idr || 0) > 0"> + </template><template v-if="Number(channel.fee_flat_idr || 0) > 0">{{formatIdr(channel.fee_flat_idr)}}</template>
                                         </small>
                                     </span>
                                 </button>
                             </div>
                         </div>
-                        <p v-if="!customer && hasWalletPaymentOption" class="lf-payment-login-hint">Ingin membayar memakai saldo? <Link href="/login">Masuk atau daftar akun</Link>.</p>
+                        <p v-if="!customer && hasWalletPaymentOption" class="lf-payment-login-hint">{{ customerText("pages.catalog.show.f76c80cf", "Ingin membayar memakai saldo?") }} <Link href="/login">{{ customerText("pages.catalog.show.2f2a90b2", "Masuk atau daftar akun") }}</Link>.</p>
                     </div>
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-contact-panel">
-                    <header><div><h2>Data Pembeli</h2><p>Email dan WhatsApp digunakan untuk invoice serta status transaksi.</p></div></header>
+                    <header><div><h2>{{ customerText("pages.catalog.show.19af3a35", "Data Pembeli") }}</h2><p>{{ customerText("pages.catalog.show.1e6ddd4f", "Email dan WhatsApp digunakan untuk invoice serta status transaksi.") }}</p></div></header>
                     <div class="lf-panel-body">
                         <div v-if="!customer" class="lf-account-fields">
-                            <label><span>Email</span><input v-model="guestEmail" type="email" maxlength="255" placeholder="Contoh: nama@email.com"></label>
-                            <label><span>Nomor WhatsApp</span><input :value="guestPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="17" pattern="\\+?[0-9]{8,16}" placeholder="Contoh: 081234567890" @input="guestPhone=normalizeWhatsapp($event.target.value)"></label>
+                            <label><span>{{ customerText("pages.catalog.show.43352167", "Email") }}</span><input v-model="guestEmail" type="email" maxlength="255" :placeholder="customerText(&quot;pages.catalog.show.attribute.placeholder.f333f780&quot;, &quot;Contoh: nama@email.com&quot;)"></label>
+                            <label><span>{{ customerText("pages.catalog.show.8aa48a22", "Nomor WhatsApp") }}</span><input :value="guestPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="17" pattern="\\+?[0-9]{8,16}" :placeholder="customerText(&quot;pages.catalog.show.attribute.placeholder.a02514d1&quot;, &quot;Contoh: 081234567890&quot;)" @input="guestPhone=normalizeWhatsapp($event.target.value)"></label>
                         </div>
                         <div v-else class="lf-customer-checkout-note">
                             <span class="lf-account-avatar">{{customer.name?.slice(0,1)?.toUpperCase()}}</span>
                             <div><strong>{{customer.name}}</strong><small>{{customer.email}} · {{customer.phone || 'Nomor HP belum lengkap'}}</small></div>
                         </div>
-                        <p class="lf-contact-privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3z"/><path d="m9 12 2 2 4-4"/></svg><span>Kami hanya memakai kontak untuk invoice dan status transaksi.</span></p>
+                        <p class="lf-contact-privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3z"/><path d="m9 12 2 2 4-4"/></svg><span>{{ customerText("pages.catalog.show.efbf2ce0", "Kami hanya memakai kontak untuk invoice dan status transaksi.") }}</span></p>
                     </div>
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-promo-panel">
-                    <header><div><h2>Kode Promo</h2><p>Masukkan kode promo atau voucher diskon yang tersedia.</p></div></header>
+                    <header><div><h2>{{ customerText("pages.catalog.show.a2cdbf5b", "Kode Promo") }}</h2><p>{{ customerText("pages.catalog.show.98e0f6bb", "Masukkan kode promo atau voucher diskon yang tersedia.") }}</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-promo-input">
-                            <input :value="voucherCode" maxlength="100" placeholder="Masukkan kode promo" @input="updateVoucherInput($event.target.value)">
+                            <input :value="voucherCode" maxlength="100" :placeholder="customerText(&quot;pages.catalog.show.attribute.placeholder.1d49aca8&quot;, &quot;Masukkan kode promo&quot;)" @input="updateVoucherInput($event.target.value)">
                             <button type="button" :disabled="busy==='quote'||!canQuote" @click="loadQuote">{{busy==='quote'?'Memeriksa...':'Gunakan'}}</button>
                         </div>
-                        <button type="button" class="lf-available-promo" @click="openVoucherPicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9a3 3 0 0 0 0 6v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a3 3 0 0 0 0-6V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg><span>Pakai Voucher Yang Tersedia</span></button>
-                        <div v-if="quote?.voucher_code" class="lf-success-note">Voucher <strong>{{quote.voucher_code}}</strong> aktif · Hemat {{formatIdr(quote.voucher_discount_idr)}}</div>
+                        <button type="button" class="lf-available-promo" @click="openVoucherPicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9a3 3 0 0 0 0 6v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a3 3 0 0 0 0-6V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg><span>{{ customerText("pages.catalog.show.d64c85af", "Pakai Voucher Yang Tersedia") }}</span></button>
+                        <div v-if="quote?.voucher_code" class="lf-success-note">{{ customerText("pages.catalog.show.3fb6f639", "Voucher") }} <strong>{{quote.voucher_code}}</strong> aktif · Hemat {{formatIdr(quote.voucher_discount_idr)}}</div>
                     </div>
                 </section>
 
@@ -982,27 +985,27 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
 
                 <div v-if="Object.keys(errors).length" class="lf-checkout-errors lf-checkout-error-legacy">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-                    <span><strong>Periksa kembali checkout</strong><small>{{firstCheckoutError}}</small></span>
+                    <span><strong>{{ customerText("pages.catalog.show.e37b9457", "Periksa kembali checkout") }}</strong><small>{{firstCheckoutError}}</small></span>
                 </div>
 
             </div>
 
             <aside class="lf-order-summary">
-                <h2>Ringkasan Pesanan</h2>
+                <h2>{{ customerText("pages.catalog.show.e728eee3", "Ringkasan Pesanan") }}</h2>
                 <div class="lf-summary-product">
                     <img v-if="selectedPackage?.image_url || product.image_url" :src="selectedPackage?.image_url || product.image_url" :alt="product.name">
-                    <span v-else class="lf-mobile-package-fallback">LF</span>
+                    <span v-else class="lf-mobile-package-fallback">{{ customerText("pages.catalog.show.6ae24f17", "LF") }}</span>
                     <div><strong>{{product.name}}</strong><small>{{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : 'Pilih nominal'}}</small></div>
                 </div>
                 <dl>
-                    <div><dt>Harga</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
+                    <div><dt>{{ customerText("pages.catalog.show.724d11bc", "Harga") }}</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
                     <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd class="lf-discount">-{{formatIdr(quote.member_discount_idr)}}</dd></div>
-                    <div v-if="quote?.voucher_discount_idr"><dt>Diskon Voucher</dt><dd class="lf-discount">-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
-                    <div><dt>Biaya pembayaran</dt><dd>{{summaryFee===null ? '—' : formatIdr(summaryFee)}}</dd></div>
-                    <div class="total"><dt>Total</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
+                    <div v-if="quote?.voucher_discount_idr"><dt>{{ customerText("pages.catalog.show.6af5335f", "Diskon Voucher") }}</dt><dd class="lf-discount">-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
+                    <div><dt>{{ customerText("pages.catalog.show.c217fcd5", "Biaya pembayaran") }}</dt><dd>{{summaryFee===null ? '—' : formatIdr(summaryFee)}}</dd></div>
+                    <div class="total"><dt>{{ customerText("pages.catalog.show.ad066d9d", "Total") }}</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
                 </dl>
                 <button type="button" class="lf-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">{{busy==='order'?'Memproses...':'Pesan Sekarang'}}</button>
-                <p class="lf-summary-security">🔒 Harga dihitung server-side dan dikunci saat pesanan dibuat.</p>
+                <p class="lf-summary-security">{{ customerText("pages.catalog.show.22bd992a", "🔒 Harga dihitung server-side dan dikunci saat pesanan dibuat.") }}</p>
             </aside>
         </div>
 
@@ -1015,9 +1018,9 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
             <section class="lf-product-review-section lf-review-legacy">
                 <div class="lf-review-legacy-head">
                     <div>
-                        <p class="lf-eyebrow">PENILAIAN PELANGGAN</p>
-                        <h2>Ulasan & rating</h2>
-                        <p>Ulasan hanya dapat dibuat setelah pembelian berhasil. Akun dan pembeli guest sama-sama bisa memberi ulasan terverifikasi.</p>
+                        <p class="lf-eyebrow">{{ customerText("pages.catalog.show.cd75c0db", "PENILAIAN PELANGGAN") }}</p>
+                        <h2>{{ customerText("pages.catalog.show.d4d282c6", "Ulasan & rating") }}</h2>
+                        <p>{{ customerText("pages.catalog.show.c47f9331", "Ulasan hanya dapat dibuat setelah pembelian berhasil. Akun dan pembeli guest sama-sama bisa memberi ulasan terverifikasi.") }}</p>
                     </div>
                     <div class="lf-review-average">
                         <span>★</span>
@@ -1033,8 +1036,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
                             </span>
                             <div>
-                                <h3>Bagikan pengalamanmu</h3>
-                                <p>Pembelian dari akunmu akan diverifikasi otomatis.</p>
+                                <h3>{{ customerText("pages.catalog.show.c8372e3c", "Bagikan pengalamanmu") }}</h3>
+                                <p>{{ customerText("pages.catalog.show.a0486d80", "Pembelian dari akunmu akan diverifikasi otomatis.") }}</p>
                             </div>
                         </div>
 
@@ -1042,8 +1045,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             <button v-for="value in [1,2,3,4,5]" :key="value" type="button" :aria-label="value + ' bintang'" :class="{active:value<=reviewRating}" @click="reviewRating=value">★</button>
                         </div>
 
-                        <input v-model="reviewTitle" maxlength="100" placeholder="Masukkan judul singkat (opsional)">
-                        <textarea v-model="reviewBody" required minlength="5" maxlength="1200" placeholder="Ceritakan pengalaman transaksimu"></textarea>
+                        <input v-model="reviewTitle" maxlength="100" :placeholder="customerText(&quot;pages.catalog.show.attribute.placeholder.5f3aed05&quot;, &quot;Masukkan judul singkat (opsional)&quot;)">
+                        <textarea v-model="reviewBody" required minlength="5" maxlength="1200" :placeholder="customerText(&quot;pages.catalog.show.attribute.placeholder.98e9ee9&quot;, &quot;Ceritakan pengalaman transaksimu&quot;)"></textarea>
                         <p v-if="reviewMessage" class="lf-review-success">{{reviewMessage}}</p>
                         <p v-if="reviewError" class="lf-review-error">{{reviewError}}</p>
                         <button class="lf-review-submit" :disabled="reviewSaving">{{reviewSaving ? 'Menyimpan...' : 'Simpan ulasan'}}</button>
@@ -1054,11 +1057,11 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
                             </span>
                             <div>
-                                <h3>Ulasan guest tetap tersedia</h3>
-                                <p>Buka status pesanan memakai invoice + kode akses aman. Setelah pesanan Berhasil, formulir ulasan tersedia di halaman pesanan itu.</p>
+                                <h3>{{ customerText("pages.catalog.show.2f7670c2", "Ulasan guest tetap tersedia") }}</h3>
+                                <p>{{ customerText("pages.catalog.show.958a1e28", "Buka status pesanan memakai invoice + kode akses aman. Setelah pesanan Berhasil, formulir ulasan tersedia di halaman pesanan itu.") }}</p>
                             </div>
                         </div>
-                        <Link href="/orders/check" class="lf-review-submit lf-review-secure-link">Buka status pesanan</Link>
+                        <Link href="/orders/check" class="lf-review-submit lf-review-secure-link">{{ customerText("pages.catalog.show.19b24f16", "Buka status pesanan") }}</Link>
                     </div>
 
                     <div class="lf-review-list">
@@ -1068,7 +1071,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                     <strong>{{review.display_name}}</strong>
                                     <span v-if="review.verified_purchase" class="lf-review-verified">
                                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 12 2 2 4-4"/><path d="M12 2l2.1 2.1 3-.1.9 2.8 2.5 1.7-1 2.8 1 2.8-2.5 1.7-.9 2.8-3-.1L12 22l-2.1-2.1-3 .1-.9-2.8-2.5-1.7 1-2.8-1-2.8L6 7.2 6.9 4l3 .1z"/></svg>
-                                        Pembelian terverifikasi
+                                        {{ customerText("pages.catalog.show.5c206dfe", "Pembelian terverifikasi") }}
                                     </span>
                                 </div>
                                 <span class="lf-review-rating">★ {{review.rating}}</span>
@@ -1077,13 +1080,13 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             <p>{{review.body}}</p>
                             <time v-if="review.published_at || review.created_at">{{formatDateId(review.published_at || review.created_at)}}</time>
                         </article>
-                        <div v-if="!reviews?.length" class="lf-review-empty">Belum ada ulasan untuk produk ini.</div>
+                        <div v-if="!reviews?.length" class="lf-review-empty">{{ customerText("pages.catalog.show.97359d9e", "Belum ada ulasan untuk produk ini.") }}</div>
                     </div>
                 </div>
             </section>
 
             <article v-if="faqs?.length" class="lf-product-faq lf-product-faq-legacy">
-                <h2>Pertanyaan umum</h2>
+                <h2>{{ customerText("pages.catalog.show.cc3c98ca", "Pertanyaan umum") }}</h2>
                 <div>
                     <details v-for="faq in faqs.slice(0,4)" :key="faq.id">
                         <summary>{{faq.question}}</summary>
@@ -1100,33 +1103,33 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <button type="button" class="lf-mobile-summary-head" aria-expanded="true" @click="summaryOpen=false">
                     <span class="lf-mobile-summary-art">
                         <img v-if="selectedPackage?.image_url || product.image_url" :src="selectedPackage?.image_url || product.image_url" alt="">
-                        <span v-else class="lf-mobile-package-fallback">LF</span>
+                        <span v-else class="lf-mobile-package-fallback">{{ customerText("pages.catalog.show.6ae24f17", "LF") }}</span>
                     </span>
                     <span class="lf-mobile-summary-copy">
-                        <strong>Ringkasan pesanan</strong>
+                        <strong>{{ customerText("pages.catalog.show.eb589e83", "Ringkasan pesanan") }}</strong>
                         <small>{{product.name}} · {{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : 'Pilih nominal'}}</small>
                     </span>
                     <strong class="lf-mobile-summary-price">{{formatIdr(displayTotal)}}</strong>
                     <span class="lf-mobile-summary-chevron">⌄</span>
                 </button>
                 <dl class="lf-mobile-summary-lines">
-                    <div><dt>Harga Satuan</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
-                    <div><dt>Subtotal</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
+                    <div><dt>{{ customerText("pages.catalog.show.f95874", "Harga Satuan") }}</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
+                    <div><dt>{{ customerText("pages.catalog.show.d361488d", "Subtotal") }}</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
                     <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(quote.member_discount_idr)}}</dd></div>
-                    <div v-if="quote?.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
-                    <div><dt>Biaya Pembayaran</dt><dd>{{summaryFee===null ? '—' : formatIdr(summaryFee)}}</dd></div>
-                    <div class="total"><dt>Total Pembayaran</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
+                    <div v-if="quote?.voucher_discount_idr"><dt>{{ customerText("pages.catalog.show.6af5335f", "Diskon Voucher") }}</dt><dd>-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
+                    <div><dt>{{ customerText("pages.catalog.show.2688b9b5", "Biaya Pembayaran") }}</dt><dd>{{summaryFee===null ? '—' : formatIdr(summaryFee)}}</dd></div>
+                    <div class="total"><dt>{{ customerText("pages.catalog.show.18fcae49", "Total Pembayaran") }}</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
                 </dl>
             </div>
             <button v-else type="button" class="lf-mobile-summary-toggle" aria-expanded="false" @click="summaryOpen=true">
-                <span><strong>Ringkasan pesanan</strong><small>Ketuk untuk melihat rincian</small></span>
+                <span><strong>{{ customerText("pages.catalog.show.eb589e83", "Ringkasan pesanan") }}</strong><small>{{ customerText("pages.catalog.show.50fa1f6", "Ketuk untuk melihat rincian") }}</small></span>
                 <span><strong>{{formatIdr(displayTotal)}}</strong><b>⌃</b></span>
             </button>
             <button type="button" class="lf-mobile-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">
-                <template v-if="busy==='order'">Memproses...</template>
+                <template v-if="busy==='order'">{{ customerText("pages.catalog.show.aadacc10", "Memproses...") }}</template>
                 <template v-else>
                     <svg class="lf-mobile-order-lock" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-                    <span>Pesan Sekarang</span>
+                    <span>{{ customerText("pages.catalog.show.ca26b75a", "Pesan Sekarang") }}</span>
                 </template>
             </button>
         </div>
@@ -1136,19 +1139,19 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
         <div class="lf-product-notice-modal">
             <header>
                 <span>{{noticeIndex + 1}}/{{notices.length}}</span>
-                <button type="button" aria-label="Tutup informasi" @click="closeNotice">×</button>
+                <button type="button" :aria-label="customerText(&quot;pages.catalog.show.attribute.aria-label.e4840d5b&quot;, &quot;Tutup informasi&quot;)" @click="closeNotice">{{ customerText("pages.catalog.show.520b4356", "×") }}</button>
             </header>
             <div class="lf-product-notice-body">
                 <h2>{{formatNotice(notices[noticeIndex]?.title)}}</h2>
                 <p>{{formatNotice(notices[noticeIndex]?.body)}}</p>
                 <div v-if="notices.length > 1" class="lf-product-notice-actions">
-                    <button type="button" class="lf-secondary" :disabled="noticeIndex===0" @click="noticeIndex=Math.max(0,noticeIndex-1)">Sebelumnya</button>
-                    <button type="button" class="lf-primary" :disabled="noticeIndex===notices.length-1" @click="noticeIndex=Math.min(notices.length-1,noticeIndex+1)">Berikutnya</button>
+                    <button type="button" class="lf-secondary" :disabled="noticeIndex===0" @click="noticeIndex=Math.max(0,noticeIndex-1)">{{ customerText("pages.catalog.show.b3ddf62a", "Sebelumnya") }}</button>
+                    <button type="button" class="lf-primary" :disabled="noticeIndex===notices.length-1" @click="noticeIndex=Math.min(notices.length-1,noticeIndex+1)">{{ customerText("pages.catalog.show.c4f4ccf1", "Berikutnya") }}</button>
                 </div>
             </div>
             <label class="lf-product-notice-dismiss">
                 <input v-model="hideNotice" type="checkbox">
-                Jangan tampilkan lagi dalam 7 hari
+                {{ customerText("pages.catalog.show.d643d9c2", "Jangan tampilkan lagi dalam 7 hari") }}
             </label>
         </div>
     </div>
@@ -1157,12 +1160,12 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
         <div class="lf-voucher-modal lf-voucher-legacy">
             <header>
                 <div>
-                    <h2>Voucher Yang Tersedia</h2>
-                    <p>Pilih voucher untuk langsung menghitung diskon pada nominal pesananmu.</p>
+                    <h2>{{ customerText("pages.catalog.show.d3a9c781", "Voucher Yang Tersedia") }}</h2>
+                    <p>{{ customerText("pages.catalog.show.220bf04d", "Pilih voucher untuk langsung menghitung diskon pada nominal pesananmu.") }}</p>
                 </div>
-                <button type="button" aria-label="Tutup voucher" @click="voucherOpen=false">×</button>
+                <button type="button" :aria-label="customerText(&quot;pages.catalog.show.attribute.aria-label.51cf4131&quot;, &quot;Tutup voucher&quot;)" @click="voucherOpen=false">{{ customerText("pages.catalog.show.520b4356", "×") }}</button>
             </header>
-            <div v-if="voucherLoading" class="lf-voucher-state">Memuat voucher...</div>
+            <div v-if="voucherLoading" class="lf-voucher-state">{{ customerText("pages.catalog.show.a0485240", "Memuat voucher...") }}</div>
             <div v-else-if="voucherError" class="lf-voucher-state lf-voucher-error">{{voucherError}}</div>
             <div v-else-if="vouchers.length" class="lf-voucher-list">
                 <button
@@ -1181,7 +1184,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     </span>
                 </button>
             </div>
-            <div v-else class="lf-voucher-state">Belum ada voucher yang aktif saat ini.</div>
+            <div v-else class="lf-voucher-state">{{ customerText("pages.catalog.show.65666d29", "Belum ada voucher yang aktif saat ini.") }}</div>
         </div>
     </div>
 
@@ -1190,31 +1193,31 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
             <div class="lf-confirm-status-icon">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
             </div>
-            <h2>Konfirmasi Pesanan</h2>
+            <h2>{{ customerText("pages.catalog.show.e2da25fa", "Konfirmasi Pesanan") }}</h2>
             <p class="lf-confirm-copy">{{isVoucherProduct ? 'Pastikan produk, nominal, dan pembayaran yang kamu pilih sudah sesuai.' : 'Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai.'}}</p>
             <dl>
-                <div v-if="confirmationSnapshot.nickname"><dt>Username</dt><dd>{{confirmationSnapshot.nickname}}</dd></div>
+                <div v-if="confirmationSnapshot.nickname"><dt>{{ customerText("pages.catalog.show.1c08d4d9", "Username") }}</dt><dd>{{confirmationSnapshot.nickname}}</dd></div>
                 <div v-for="field in fields" :key="field.field_key"><dt>{{field.label}}</dt><dd>{{confirmationSnapshot.customer_input[field.field_key] || '-'}}</dd></div>
-                <div><dt>Item</dt><dd>{{confirmationSnapshot.item_name}}</dd></div>
-                <div><dt>Produk</dt><dd>{{confirmationSnapshot.product_name}}</dd></div>
-                <div><dt>Metode Pembayaran</dt><dd>{{confirmationSnapshot.payment_name}}</dd></div>
-                <div><dt>Email</dt><dd>{{confirmationSnapshot.email || '-'}}</dd></div>
-                <div><dt>WhatsApp</dt><dd>{{confirmationSnapshot.phone || '-'}}</dd></div>
-                <div v-if="confirmationSnapshot.voucher_code"><dt>Voucher</dt><dd>{{confirmationSnapshot.voucher_code}}</dd></div>
-                <div><dt>Subtotal</dt><dd>{{formatIdr(confirmationSnapshot.quote.subtotal_idr)}}</dd></div>
+                <div><dt>{{ customerText("pages.catalog.show.1f648006", "Item") }}</dt><dd>{{confirmationSnapshot.item_name}}</dd></div>
+                <div><dt>{{ customerText("pages.catalog.show.ceb4d888", "Produk") }}</dt><dd>{{confirmationSnapshot.product_name}}</dd></div>
+                <div><dt>{{ customerText("pages.catalog.show.443c0671", "Metode Pembayaran") }}</dt><dd>{{confirmationSnapshot.payment_name}}</dd></div>
+                <div><dt>{{ customerText("pages.catalog.show.43352167", "Email") }}</dt><dd>{{confirmationSnapshot.email || '-'}}</dd></div>
+                <div><dt>{{ customerText("pages.catalog.show.b1332787", "WhatsApp") }}</dt><dd>{{confirmationSnapshot.phone || '-'}}</dd></div>
+                <div v-if="confirmationSnapshot.voucher_code"><dt>{{ customerText("pages.catalog.show.3fb6f639", "Voucher") }}</dt><dd>{{confirmationSnapshot.voucher_code}}</dd></div>
+                <div><dt>{{ customerText("pages.catalog.show.d361488d", "Subtotal") }}</dt><dd>{{formatIdr(confirmationSnapshot.quote.subtotal_idr)}}</dd></div>
                 <div v-if="confirmationSnapshot.quote.member_discount_idr"><dt>Diskon {{confirmationSnapshot.quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(confirmationSnapshot.quote.member_discount_idr)}}</dd></div>
-                <div v-if="confirmationSnapshot.quote.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(confirmationSnapshot.quote.voucher_discount_idr)}}</dd></div>
-                <div><dt>Biaya Pembayaran</dt><dd>{{formatIdr(confirmationSnapshot.quote.fee_idr)}}</dd></div>
-                <div class="total"><dt>Total Bayar</dt><dd>{{formatIdr(confirmationSnapshot.quote.total_idr)}}</dd></div>
+                <div v-if="confirmationSnapshot.quote.voucher_discount_idr"><dt>{{ customerText("pages.catalog.show.6af5335f", "Diskon Voucher") }}</dt><dd>-{{formatIdr(confirmationSnapshot.quote.voucher_discount_idr)}}</dd></div>
+                <div><dt>{{ customerText("pages.catalog.show.2688b9b5", "Biaya Pembayaran") }}</dt><dd>{{formatIdr(confirmationSnapshot.quote.fee_idr)}}</dd></div>
+                <div class="total"><dt>{{ customerText("pages.catalog.show.212c4d6e", "Total Bayar") }}</dt><dd>{{formatIdr(confirmationSnapshot.quote.total_idr)}}</dd></div>
             </dl>
             <div v-if="errors.checkout?.length" class="lf-error">{{errors.checkout[0]}}</div>
             <label class="lf-confirm-agreement">
                 <input v-model="agreed" type="checkbox">
-                <span>Dengan melanjutkan, saya menyetujui syarat &amp; ketentuan yang berlaku.</span>
+                <span>{{ customerText("pages.catalog.show.69d0c398", "Dengan melanjutkan, saya menyetujui syarat & ketentuan yang berlaku.") }}</span>
             </label>
             <div class="lf-confirm-actions">
                 <button class="lf-primary" :disabled="Boolean(busy)||!agreed" @click="createOrder">{{busy==='order'?'Memproses...':busy==='quote'?'Memeriksa harga...':'Pesan Sekarang'}}</button>
-                <button class="lf-secondary" :disabled="Boolean(busy)" @click="closeConfirmation">Batalkan</button>
+                <button class="lf-secondary" :disabled="Boolean(busy)" @click="closeConfirmation">{{ customerText("pages.catalog.show.860fb10d", "Batalkan") }}</button>
             </div>
         </div>
     </div></main>

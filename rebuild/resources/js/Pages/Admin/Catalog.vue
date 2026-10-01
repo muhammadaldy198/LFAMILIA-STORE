@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
 import { computed, reactive, ref, watch } from 'vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
@@ -20,8 +20,16 @@ watch(() => props.categories, (items) => { categories.value = items.map((item) =
 watch(() => props.products, (items) => { products.value = cloneProducts(items); });
 watch(() => props.assets, (items) => { assets.value = items.map((item) => ({ ...item })); });
 
-const tab = ref('AUTO_PROVIDER');
-const visibleProducts = computed(() => products.value.filter((item) => item.fulfillment_mode === tab.value));
+const page = usePage();
+const initialSearch = new URLSearchParams(page.url.split('?')[1] || '').get('q') || '';
+const searchedProduct = products.value.find(item => item.name.toLowerCase().includes(initialSearch.toLowerCase()));
+const tab = ref(initialSearch && searchedProduct ? searchedProduct.fulfillment_mode : 'AUTO_PROVIDER');
+const catalogTab = ref('products'), catalogSearch = ref(initialSearch), catalogPage = ref(1);
+const catalogTabs = [['products','Produk'],['categories','Kategori'],['fields','Kolom Data Akun'],['media','Media Toko']];
+const matchingProducts = computed(() => products.value.filter(item => item.fulfillment_mode === tab.value && (!catalogSearch.value || [item.name,item.slug,...item.packages.map(p => p.name)].join(' ').toLowerCase().includes(catalogSearch.value.toLowerCase()))));
+const totalCatalogPages = computed(() => Math.max(1, Math.ceil(matchingProducts.value.length / 10)));
+const visibleProducts = computed(() => matchingProducts.value.slice((catalogPage.value - 1) * 10, catalogPage.value * 10));
+watch([tab,catalogSearch], () => {catalogPage.value = 1;});
 const categoryForm = useForm({ name: '', sort_order: 0 });
 const productForm = useForm({ category_id: '', name: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: 0, sort_order: 0 });
 const packageForm = useForm({ product_id: '', code: '', name: '', note: '', group_name: '', nominal_value: '', sort_order: 0, cost_idr: '' });
@@ -99,7 +107,8 @@ const deleteNotice = (notice) => {
             <div class="flex flex-wrap items-center justify-between gap-3"><div><Link href="/admin/panel" class="text-sm text-cyan-300">← Panel Admin</Link><h1 class="mt-2 text-3xl font-bold">Katalog & media</h1></div><Link href="/" class="text-sm text-cyan-300">Lihat katalog pelanggan</Link></div>
             <p class="text-sm text-slate-400">Produk baru tidak langsung aktif. SKU Digiflazz hanya masuk melalui sinkronisasi provider; pengaturan integrasi menyusul di M9.</p>
 
-            <section class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <nav class="lf-admin-tabs"><button v-for="[key,label] in catalogTabs" :key="key" type="button" :class="{active:catalogTab===key}" @click="catalogTab=key">{{label}}</button></nav>
+            <section v-show="catalogTab === 'categories'" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Kategori</h2>
                 <form class="flex flex-wrap items-end gap-3" @submit.prevent="categoryForm.post('/admin/catalog/categories', { onSuccess: () => categoryForm.reset() })">
                     <label class="text-sm">Nama kategori<input v-model="categoryForm.name" required class="mt-1 block rounded-md bg-slate-800 p-2"></label>
@@ -124,8 +133,8 @@ const deleteNotice = (notice) => {
                 </div>
             </section>
 
-            <section class="space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <h2 class="text-xl font-semibold">Produk</h2>
+            <section v-show="catalogTab === 'products'" class="space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <h2 class="text-xl font-semibold">Produk</h2><label class="block">Cari produk atau nominal<input v-model="catalogSearch" placeholder="Nama produk, slug, atau nominal"></label><nav class="flex items-center gap-3"><button type="button" :disabled="catalogPage <= 1" @click="catalogPage--">Sebelumnya</button><span>{{catalogPage}} / {{totalCatalogPages}} · {{matchingProducts.length}} produk</span><button type="button" :disabled="catalogPage >= totalCatalogPages" @click="catalogPage++">Berikutnya</button></nav>
                 <div class="flex gap-2"><button v-for="mode in ['AUTO_PROVIDER', 'MANUAL']" :key="mode" type="button" class="rounded-md px-4 py-2 text-sm" :class="tab === mode ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800'" @click="tab = mode">{{ mode === 'MANUAL' ? 'Produk Manual' : 'Produk Provider' }}</button></div>
                 <form class="grid gap-3 md:grid-cols-3" @submit.prevent="productForm.fulfillment_mode = tab; productForm.post('/admin/catalog/products', { onSuccess: () => productForm.reset() })">
                     <label class="text-sm">Kategori<select v-model="productForm.category_id" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="">Pilih kategori</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
@@ -231,7 +240,7 @@ const deleteNotice = (notice) => {
                 </div>
             </section>
 
-            <section class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <section v-show="catalogTab === 'fields'" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Field input produk</h2>
                 <p class="text-sm text-slate-400">Satu baris per field: kode|label|placeholder|tipe|wajib (1/0). Tipe: text, tel, email. Contoh: user_id|User ID|Contoh: 123456789|text|1. Format lama 4 kolom tetap diterima.</p>
                 <select v-model="fieldsProductId" class="w-full max-w-md rounded-md bg-slate-800 p-2"><option value="">Pilih produk</option><option v-for="item in products" :key="item.id" :value="item.id">{{ item.name }}</option></select>
@@ -240,7 +249,7 @@ const deleteNotice = (notice) => {
                 <button v-if="fieldsProductId" type="button" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950" @click="saveFields">Simpan field</button>
             </section>
 
-            <section id="media" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <section v-show="catalogTab === 'media'" id="media" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Media toko</h2>
                 <div v-for="asset in assets" :key="asset.id" class="space-y-2 border-t border-slate-800 pt-3">
                     <div class="flex flex-wrap items-end gap-3"><strong>{{ asset.key }}</strong><label class="flex gap-2 text-sm"><input v-model="asset.is_active" type="checkbox">Aktif</label><label v-if="asset.key.startsWith('banner')" class="text-sm">Tautan banner<input v-model="asset.target_url" type="url" class="mt-1 block rounded bg-slate-800 p-2"></label><button type="button" class="rounded bg-slate-700 px-3 py-2 text-sm" @click="saveAsset(asset)">Simpan</button></div>

@@ -1,0 +1,2872 @@
+{
+  "pages.account.32d4363a": {
+    "group": "Pages/Account",
+    "label": "Saldo",
+    "default": "Saldo"
+  },
+  "pages.account.517546c3": {
+    "group": "Pages/Account",
+    "label": "Pesanan",
+    "default": "Pesanan"
+  },
+  "pages.account.d26d34be": {
+    "group": "Pages/Account",
+    "label": "Tiket",
+    "default": "Tiket"
+  },
+  "pages.account.31d5aa63": {
+    "group": "Pages/Account",
+    "label": "Kelola profil",
+    "default": "Kelola profil"
+  },
+  "pages.catalog.show.ec3aa9dc": {
+    "group": "Pages/Catalog/Show",
+    "label": "Proses cepat",
+    "default": "Proses cepat"
+  },
+  "pages.catalog.show.365fc5ed": {
+    "group": "Pages/Catalog/Show",
+    "label": "Chat 24/7",
+    "default": "Chat 24/7"
+  },
+  "pages.catalog.show.1b6840bc": {
+    "group": "Pages/Catalog/Show",
+    "label": "Pembayaran aman",
+    "default": "Pembayaran aman"
+  },
+  "pages.catalog.show.2b1e660d": {
+    "group": "Pages/Catalog/Show",
+    "label": "Transaksi",
+    "default": "Transaksi"
+  },
+  "pages.catalog.show.f107e79f": {
+    "group": "Pages/Catalog/Show",
+    "label": "Keterangan",
+    "default": "Keterangan"
+  },
+  "pages.catalog.show.ec1c9711": {
+    "group": "Pages/Catalog/Show",
+    "label": "Masukkan Data Akun",
+    "default": "Masukkan Data Akun"
+  },
+  "pages.catalog.show.b691e78b": {
+    "group": "Pages/Catalog/Show",
+    "label": "Isi ID tujuan dengan benar. Nickname diperiksa otomatis jika didukung.",
+    "default": "Isi ID tujuan dengan benar. Nickname diperiksa otomatis jika didukung."
+  },
+  "pages.catalog.show.f100ee83": {
+    "group": "Pages/Catalog/Show",
+    "label": "Ganti produk",
+    "default": "Ganti produk"
+  },
+  "pages.catalog.show.85989a9d": {
+    "group": "Pages/Catalog/Show",
+    "label": "Akun game tersimpan",
+    "default": "Akun game tersimpan"
+  },
+  "pages.catalog.show.e9a9962a": {
+    "group": "Pages/Catalog/Show",
+    "label": "Isi manual",
+    "default": "Isi manual"
+  },
+  "pages.catalog.show.923fbe22": {
+    "group": "Pages/Catalog/Show",
+    "label": "Memeriksa ID dan Server…",
+    "default": "Memeriksa ID dan Server…"
+  },
+  "pages.catalog.show.86a69022": {
+    "group": "Pages/Catalog/Show",
+    "label": "Akun ditemukan",
+    "default": "Akun ditemukan"
+  },
+  "pages.catalog.show.18d22dbd": {
+    "group": "Pages/Catalog/Show",
+    "label": "Akun belum terverifikasi",
+    "default": "Akun belum terverifikasi"
+  },
+  "pages.catalog.show.5b999fc2": {
+    "group": "Pages/Catalog/Show",
+    "label": "Nickname akan tampil otomatis setelah data akun yang diperlukan terisi.",
+    "default": "Nickname akan tampil otomatis setelah data akun yang diperlukan terisi."
+  },
+  "pages.catalog.show.a38dd539": {
+    "group": "Pages/Catalog/Show",
+    "label": "Verifikasi nickname otomatis belum tersedia. Periksa kembali data sebelum membayar.",
+    "default": "Verifikasi nickname otomatis belum tersedia. Periksa kembali data sebelum membayar."
+  },
+  "pages.catalog.show.75d5eb47": {
+    "group": "Pages/Catalog/Show",
+    "label": "Pilih Nominal",
+    "default": "Pilih Nominal"
+  },
+  "pages.catalog.show.c08763ef": {
+    "group": "Pages/Catalog/Show",
+    "label": "Pilih Pembayaran",
+    "default": "Pilih Pembayaran"
+  },
+  "pages.catalog.show.e7920111": {
+    "group": "Pages/Catalog/Show",
+    "label": "Pilih metode pembayaran yang ingin digunakan.",
+    "default": "Pilih metode pembayaran yang ingin digunakan."
+  },
+  "pages.catalog.show.51de2747": {
+    "group": "Pages/Catalog/Show",
+    "label": "Belum ada metode pembayaran aktif.",
+    "default": "Belum ada metode pembayaran aktif."
+  },
+  "pages.catalog.show.4bfa0eb": {
+    "group": "Pages/Catalog/Show",
+    "label": "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi.",
+    "default": "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi."
+  },
+  "pages.catalog.show.f4a728b6": {
+    "group": "Pages/Catalog/Show",
+    "label": "Belum ada metode pembayaran yang dapat digunakan saat ini.",
+    "default": "Belum ada metode pembayaran yang dapat digunakan saat ini."
+  },
+  "pages.catalog.show.994e335c": {
+    "group": "Pages/Catalog/Show",
+    "label": "Masuk akun untuk memakai saldo",
+    "default": "Masuk akun untuk memakai saldo"
+  },
+  "pages.catalog.show.c64a26ec": {
+    "group": "Pages/Catalog/Show",
+    "label": "QRIS • DANA • ShopeePay",
+    "default": "QRIS • DANA • ShopeePay"
+  },
+  "pages.catalog.show.228d43a3": {
+    "group": "Pages/Catalog/Show",
+    "label": "Fee",
+    "default": "Fee"
+  },
+  "pages.catalog.show.f76c80cf": {
+    "group": "Pages/Catalog/Show",
+    "label": "Ingin membayar memakai saldo?",
+    "default": "Ingin membayar memakai saldo?"
+  },
+  "pages.catalog.show.2f2a90b2": {
+    "group": "Pages/Catalog/Show",
+    "label": "Masuk atau daftar akun",
+    "default": "Masuk atau daftar akun"
+  },
+  "pages.catalog.show.19af3a35": {
+    "group": "Pages/Catalog/Show",
+    "label": "Data Pembeli",
+    "default": "Data Pembeli"
+  },
+  "pages.catalog.show.1e6ddd4f": {
+    "group": "Pages/Catalog/Show",
+    "label": "Email dan WhatsApp digunakan untuk invoice serta status transaksi.",
+    "default": "Email dan WhatsApp digunakan untuk invoice serta status transaksi."
+  },
+  "pages.catalog.show.43352167": {
+    "group": "Pages/Catalog/Show",
+    "label": "Email",
+    "default": "Email"
+  },
+  "pages.catalog.show.8aa48a22": {
+    "group": "Pages/Catalog/Show",
+    "label": "Nomor WhatsApp",
+    "default": "Nomor WhatsApp"
+  },
+  "pages.catalog.show.efbf2ce0": {
+    "group": "Pages/Catalog/Show",
+    "label": "Kami hanya memakai kontak untuk invoice dan status transaksi.",
+    "default": "Kami hanya memakai kontak untuk invoice dan status transaksi."
+  },
+  "pages.catalog.show.a2cdbf5b": {
+    "group": "Pages/Catalog/Show",
+    "label": "Kode Promo",
+    "default": "Kode Promo"
+  },
+  "pages.catalog.show.98e0f6bb": {
+    "group": "Pages/Catalog/Show",
+    "label": "Masukkan kode promo atau voucher diskon yang tersedia.",
+    "default": "Masukkan kode promo atau voucher diskon yang tersedia."
+  },
+  "pages.catalog.show.d64c85af": {
+    "group": "Pages/Catalog/Show",
+    "label": "Pakai Voucher Yang Tersedia",
+    "default": "Pakai Voucher Yang Tersedia"
+  },
+  "pages.catalog.show.3fb6f639": {
+    "group": "Pages/Catalog/Show",
+    "label": "Voucher",
+    "default": "Voucher"
+  },
+  "pages.catalog.show.e37b9457": {
+    "group": "Pages/Catalog/Show",
+    "label": "Periksa kembali checkout",
+    "default": "Periksa kembali checkout"
+  },
+  "pages.catalog.show.e728eee3": {
+    "group": "Pages/Catalog/Show",
+    "label": "Ringkasan Pesanan",
+    "default": "Ringkasan Pesanan"
+  },
+  "pages.catalog.show.6ae24f17": {
+    "group": "Pages/Catalog/Show",
+    "label": "LF",
+    "default": "LF"
+  },
+  "pages.catalog.show.724d11bc": {
+    "group": "Pages/Catalog/Show",
+    "label": "Harga",
+    "default": "Harga"
+  },
+  "pages.catalog.show.6af5335f": {
+    "group": "Pages/Catalog/Show",
+    "label": "Diskon Voucher",
+    "default": "Diskon Voucher"
+  },
+  "pages.catalog.show.c217fcd5": {
+    "group": "Pages/Catalog/Show",
+    "label": "Biaya pembayaran",
+    "default": "Biaya pembayaran"
+  },
+  "pages.catalog.show.ad066d9d": {
+    "group": "Pages/Catalog/Show",
+    "label": "Total",
+    "default": "Total"
+  },
+  "pages.catalog.show.22bd992a": {
+    "group": "Pages/Catalog/Show",
+    "label": "🔒 Harga dihitung server-side dan dikunci saat pesanan dibuat.",
+    "default": "🔒 Harga dihitung server-side dan dikunci saat pesanan dibuat."
+  },
+  "pages.catalog.show.cd75c0db": {
+    "group": "Pages/Catalog/Show",
+    "label": "PENILAIAN PELANGGAN",
+    "default": "PENILAIAN PELANGGAN"
+  },
+  "pages.catalog.show.d4d282c6": {
+    "group": "Pages/Catalog/Show",
+    "label": "Ulasan & rating",
+    "default": "Ulasan & rating"
+  },
+  "pages.catalog.show.c47f9331": {
+    "group": "Pages/Catalog/Show",
+    "label": "Ulasan hanya dapat dibuat setelah pembelian berhasil. Akun dan pembeli guest sama-sama bisa memberi ulasan terverifikasi.",
+    "default": "Ulasan hanya dapat dibuat setelah pembelian berhasil. Akun dan pembeli guest sama-sama bisa memberi ulasan terverifikasi."
+  },
+  "pages.catalog.show.c8372e3c": {
+    "group": "Pages/Catalog/Show",
+    "label": "Bagikan pengalamanmu",
+    "default": "Bagikan pengalamanmu"
+  },
+  "pages.catalog.show.a0486d80": {
+    "group": "Pages/Catalog/Show",
+    "label": "Pembelian dari akunmu akan diverifikasi otomatis.",
+    "default": "Pembelian dari akunmu akan diverifikasi otomatis."
+  },
+  "pages.catalog.show.2f7670c2": {
+    "group": "Pages/Catalog/Show",
+    "label": "Ulasan guest tetap tersedia",
+    "default": "Ulasan guest tetap tersedia"
+  },
+  "pages.catalog.show.958a1e28": {
+    "group": "Pages/Catalog/Show",
+    "label": "Buka status pesanan memakai invoice + kode akses aman. Setelah pesanan Berhasil, formulir ulasan tersedia di halaman pesanan itu.",
+    "default": "Buka status pesanan memakai invoice + kode akses aman. Setelah pesanan Berhasil, formulir ulasan tersedia di halaman pesanan itu."
+  },
+  "pages.catalog.show.19b24f16": {
+    "group": "Pages/Catalog/Show",
+    "label": "Buka status pesanan",
+    "default": "Buka status pesanan"
+  },
+  "pages.catalog.show.5c206dfe": {
+    "group": "Pages/Catalog/Show",
+    "label": "Pembelian terverifikasi",
+    "default": "Pembelian terverifikasi"
+  },
+  "pages.catalog.show.97359d9e": {
+    "group": "Pages/Catalog/Show",
+    "label": "Belum ada ulasan untuk produk ini.",
+    "default": "Belum ada ulasan untuk produk ini."
+  },
+  "pages.catalog.show.cc3c98ca": {
+    "group": "Pages/Catalog/Show",
+    "label": "Pertanyaan umum",
+    "default": "Pertanyaan umum"
+  },
+  "pages.catalog.show.eb589e83": {
+    "group": "Pages/Catalog/Show",
+    "label": "Ringkasan pesanan",
+    "default": "Ringkasan pesanan"
+  },
+  "pages.catalog.show.f95874": {
+    "group": "Pages/Catalog/Show",
+    "label": "Harga Satuan",
+    "default": "Harga Satuan"
+  },
+  "pages.catalog.show.d361488d": {
+    "group": "Pages/Catalog/Show",
+    "label": "Subtotal",
+    "default": "Subtotal"
+  },
+  "pages.catalog.show.2688b9b5": {
+    "group": "Pages/Catalog/Show",
+    "label": "Biaya Pembayaran",
+    "default": "Biaya Pembayaran"
+  },
+  "pages.catalog.show.18fcae49": {
+    "group": "Pages/Catalog/Show",
+    "label": "Total Pembayaran",
+    "default": "Total Pembayaran"
+  },
+  "pages.catalog.show.50fa1f6": {
+    "group": "Pages/Catalog/Show",
+    "label": "Ketuk untuk melihat rincian",
+    "default": "Ketuk untuk melihat rincian"
+  },
+  "pages.catalog.show.aadacc10": {
+    "group": "Pages/Catalog/Show",
+    "label": "Memproses...",
+    "default": "Memproses..."
+  },
+  "pages.catalog.show.ca26b75a": {
+    "group": "Pages/Catalog/Show",
+    "label": "Pesan Sekarang",
+    "default": "Pesan Sekarang"
+  },
+  "pages.catalog.show.520b4356": {
+    "group": "Pages/Catalog/Show",
+    "label": "×",
+    "default": "×"
+  },
+  "pages.catalog.show.b3ddf62a": {
+    "group": "Pages/Catalog/Show",
+    "label": "Sebelumnya",
+    "default": "Sebelumnya"
+  },
+  "pages.catalog.show.c4f4ccf1": {
+    "group": "Pages/Catalog/Show",
+    "label": "Berikutnya",
+    "default": "Berikutnya"
+  },
+  "pages.catalog.show.d643d9c2": {
+    "group": "Pages/Catalog/Show",
+    "label": "Jangan tampilkan lagi dalam 7 hari",
+    "default": "Jangan tampilkan lagi dalam 7 hari"
+  },
+  "pages.catalog.show.d3a9c781": {
+    "group": "Pages/Catalog/Show",
+    "label": "Voucher Yang Tersedia",
+    "default": "Voucher Yang Tersedia"
+  },
+  "pages.catalog.show.220bf04d": {
+    "group": "Pages/Catalog/Show",
+    "label": "Pilih voucher untuk langsung menghitung diskon pada nominal pesananmu.",
+    "default": "Pilih voucher untuk langsung menghitung diskon pada nominal pesananmu."
+  },
+  "pages.catalog.show.a0485240": {
+    "group": "Pages/Catalog/Show",
+    "label": "Memuat voucher...",
+    "default": "Memuat voucher..."
+  },
+  "pages.catalog.show.65666d29": {
+    "group": "Pages/Catalog/Show",
+    "label": "Belum ada voucher yang aktif saat ini.",
+    "default": "Belum ada voucher yang aktif saat ini."
+  },
+  "pages.catalog.show.e2da25fa": {
+    "group": "Pages/Catalog/Show",
+    "label": "Konfirmasi Pesanan",
+    "default": "Konfirmasi Pesanan"
+  },
+  "pages.catalog.show.1c08d4d9": {
+    "group": "Pages/Catalog/Show",
+    "label": "Username",
+    "default": "Username"
+  },
+  "pages.catalog.show.1f648006": {
+    "group": "Pages/Catalog/Show",
+    "label": "Item",
+    "default": "Item"
+  },
+  "pages.catalog.show.ceb4d888": {
+    "group": "Pages/Catalog/Show",
+    "label": "Produk",
+    "default": "Produk"
+  },
+  "pages.catalog.show.443c0671": {
+    "group": "Pages/Catalog/Show",
+    "label": "Metode Pembayaran",
+    "default": "Metode Pembayaran"
+  },
+  "pages.catalog.show.b1332787": {
+    "group": "Pages/Catalog/Show",
+    "label": "WhatsApp",
+    "default": "WhatsApp"
+  },
+  "pages.catalog.show.212c4d6e": {
+    "group": "Pages/Catalog/Show",
+    "label": "Total Bayar",
+    "default": "Total Bayar"
+  },
+  "pages.catalog.show.69d0c398": {
+    "group": "Pages/Catalog/Show",
+    "label": "Dengan melanjutkan, saya menyetujui syarat & ketentuan yang berlaku.",
+    "default": "Dengan melanjutkan, saya menyetujui syarat & ketentuan yang berlaku."
+  },
+  "pages.catalog.show.860fb10d": {
+    "group": "Pages/Catalog/Show",
+    "label": "Batalkan",
+    "default": "Batalkan"
+  },
+  "pages.catalog.index.520b4356": {
+    "group": "Pages/Catalog/Index",
+    "label": "×",
+    "default": "×"
+  },
+  "pages.catalog.index.a3e6a372": {
+    "group": "Pages/Catalog/Index",
+    "label": "Jangan tampilkan lagi",
+    "default": "Jangan tampilkan lagi"
+  },
+  "pages.catalog.index.105b8350": {
+    "group": "Pages/Catalog/Index",
+    "label": "🔥 POPULER SEKARANG!",
+    "default": "🔥 POPULER SEKARANG!"
+  },
+  "pages.catalog.index.74dab8e1": {
+    "group": "Pages/Catalog/Index",
+    "label": "Berikut adalah beberapa produk yang paling populer saat ini.",
+    "default": "Berikut adalah beberapa produk yang paling populer saat ini."
+  },
+  "pages.catalog.index.50c425f9": {
+    "group": "Pages/Catalog/Index",
+    "label": "OTOMATIS & MANUAL",
+    "default": "OTOMATIS & MANUAL"
+  },
+  "pages.catalog.index.c79e09c7": {
+    "group": "Pages/Catalog/Index",
+    "label": "Pilih produk favoritmu",
+    "default": "Pilih produk favoritmu"
+  },
+  "pages.catalog.index.37d8d356": {
+    "group": "Pages/Catalog/Index",
+    "label": "Top up game, voucher, hiburan, pulsa, PLN, dan produk digital langsung dari halaman utama.",
+    "default": "Top up game, voucher, hiburan, pulsa, PLN, dan produk digital langsung dari halaman utama."
+  },
+  "pages.catalog.index.4b93aea2": {
+    "group": "Pages/Catalog/Index",
+    "label": "Semua",
+    "default": "Semua"
+  },
+  "pages.catalog.index.a182b386": {
+    "group": "Pages/Catalog/Index",
+    "label": "Produk Manual",
+    "default": "Produk Manual"
+  },
+  "pages.catalog.index.3b98f425": {
+    "group": "Pages/Catalog/Index",
+    "label": "Produk tidak ditemukan.",
+    "default": "Produk tidak ditemukan."
+  },
+  "pages.catalog.index.cc62e9c4": {
+    "group": "Pages/Catalog/Index",
+    "label": "CARA TOP UP",
+    "default": "CARA TOP UP"
+  },
+  "pages.catalog.index.f1a2a671": {
+    "group": "Pages/Catalog/Index",
+    "label": "Empat langkah sederhana",
+    "default": "Empat langkah sederhana"
+  },
+  "pages.catalog.index.8422e105": {
+    "group": "Pages/Catalog/Index",
+    "label": "LFAMILIA NEWS",
+    "default": "LFAMILIA NEWS"
+  },
+  "pages.catalog.index.6ae24f17": {
+    "group": "Pages/Catalog/Index",
+    "label": "LF",
+    "default": "LF"
+  },
+  "pages.catalog.index.9c238977": {
+    "group": "Pages/Catalog/Index",
+    "label": "PREVIEW",
+    "default": "PREVIEW"
+  },
+  "pages.catalog.index.82d0793e": {
+    "group": "Pages/Catalog/Index",
+    "label": "Lihat Semua Artikel",
+    "default": "Lihat Semua Artikel"
+  },
+  "pages.catalog.index.edb1fc98": {
+    "group": "Pages/Catalog/Index",
+    "label": "ULASAN PELANGGAN",
+    "default": "ULASAN PELANGGAN"
+  },
+  "pages.catalog.index.a62dff1a": {
+    "group": "Pages/Catalog/Index",
+    "label": "Dipercaya oleh pembeli LFAMILIA",
+    "default": "Dipercaya oleh pembeli LFAMILIA"
+  },
+  "pages.catalog.index.d6cfd5b1": {
+    "group": "Pages/Catalog/Index",
+    "label": "Ulasan terverifikasi dari transaksi yang sudah berhasil.",
+    "default": "Ulasan terverifikasi dari transaksi yang sudah berhasil."
+  },
+  "pages.guest.orderstatus.860516c2": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "← Cek pesanan lain",
+    "default": "← Cek pesanan lain"
+  },
+  "pages.guest.orderstatus.31b95ca5": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "STATUS TRANSAKSI",
+    "default": "STATUS TRANSAKSI"
+  },
+  "pages.guest.orderstatus.fad6f05b": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Log di bawah diperbarui otomatis dari server.",
+    "default": "Log di bawah diperbarui otomatis dari server."
+  },
+  "pages.guest.orderstatus.ceb4d888": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Produk",
+    "default": "Produk"
+  },
+  "pages.guest.orderstatus.5ef20f": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Status",
+    "default": "Status"
+  },
+  "pages.guest.orderstatus.ad066d9d": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Total",
+    "default": "Total"
+  },
+  "pages.guest.orderstatus.e378eb96": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Dibuat",
+    "default": "Dibuat"
+  },
+  "pages.guest.orderstatus.3527df23": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Pembayaran",
+    "default": "Pembayaran"
+  },
+  "pages.guest.orderstatus.ca77496f": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Status:",
+    "default": "Status:"
+  },
+  "pages.guest.orderstatus.fc9d0f83": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Status pembayaran sedang dipastikan. Jangan membayar ulang.",
+    "default": "Status pembayaran sedang dipastikan. Jangan membayar ulang."
+  },
+  "pages.guest.orderstatus.d5aec755": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Nomor VA:",
+    "default": "Nomor VA:"
+  },
+  "pages.guest.orderstatus.6af68bec": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Kode pembayaran:",
+    "default": "Kode pembayaran:"
+  },
+  "pages.guest.orderstatus.666bb8c9": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Menunggu verifikasi QRIS manual",
+    "default": "Menunggu verifikasi QRIS manual"
+  },
+  "pages.guest.orderstatus.19bf8418": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Setelah membayar, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama.",
+    "default": "Setelah membayar, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama."
+  },
+  "pages.guest.orderstatus.a548f73b": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Lihat pembayaran",
+    "default": "Lihat pembayaran"
+  },
+  "pages.guest.orderstatus.25ba9702": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Hasil pesanan",
+    "default": "Hasil pesanan"
+  },
+  "pages.guest.orderstatus.4fc61831": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Serial / SN:",
+    "default": "Serial / SN:"
+  },
+  "pages.guest.orderstatus.8f52a70a": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Kode / hasil:",
+    "default": "Kode / hasil:"
+  },
+  "pages.guest.orderstatus.f93e4117": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Ulasan kamu",
+    "default": "Ulasan kamu"
+  },
+  "pages.guest.orderstatus.20c3ee9d": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Beri ulasan",
+    "default": "Beri ulasan"
+  },
+  "pages.guest.orderstatus.e840ad58": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Ulasan hanya tersedia untuk pesanan yang sudah berhasil.",
+    "default": "Ulasan hanya tersedia untuk pesanan yang sudah berhasil."
+  },
+  "pages.guest.orderstatus.c4ebe0bb": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Kirim Ulasan",
+    "default": "Kirim Ulasan"
+  },
+  "pages.guest.orderstatus.67f44f0e": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Log Realtime",
+    "default": "Log Realtime"
+  },
+  "pages.guest.orderstatus.243a5ea5": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Pesanan tercatat",
+    "default": "Pesanan tercatat"
+  },
+  "pages.guest.orderstatus.97f7dab7": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Menunggu log transaksi berikutnya.",
+    "default": "Menunggu log transaksi berikutnya."
+  },
+  "pages.guest.track.c6bebc5b": {
+    "group": "Pages/Guest/Track",
+    "label": "PELACAKAN TRANSAKSI",
+    "default": "PELACAKAN TRANSAKSI"
+  },
+  "pages.guest.track.aa9778ee": {
+    "group": "Pages/Guest/Track",
+    "label": "Cek status pesananmu",
+    "default": "Cek status pesananmu"
+  },
+  "pages.guest.track.ed2fdbf1": {
+    "group": "Pages/Guest/Track",
+    "label": "Masukkan nomor invoice atau nomor WhatsApp yang dipakai saat checkout. Status diperbarui otomatis dari server.",
+    "default": "Masukkan nomor invoice atau nomor WhatsApp yang dipakai saat checkout. Status diperbarui otomatis dari server."
+  },
+  "pages.guest.track.45250ba7": {
+    "group": "Pages/Guest/Track",
+    "label": "Tidak ada pesanan untuk nomor WhatsApp ini. Periksa kembali nomor yang digunakan saat checkout.",
+    "default": "Tidak ada pesanan untuk nomor WhatsApp ini. Periksa kembali nomor yang digunakan saat checkout."
+  },
+  "pages.guest.track.385a9fe9": {
+    "group": "Pages/Guest/Track",
+    "label": "RIWAYAT NOMOR",
+    "default": "RIWAYAT NOMOR"
+  },
+  "pages.guest.track.6a63c25b": {
+    "group": "Pages/Guest/Track",
+    "label": "Pesanan ditemukan",
+    "default": "Pesanan ditemukan"
+  },
+  "pages.guest.track.dab1e3ee": {
+    "group": "Pages/Guest/Track",
+    "label": "DETAIL TRANSAKSI",
+    "default": "DETAIL TRANSAKSI"
+  },
+  "pages.guest.track.b8d5b0b7": {
+    "group": "Pages/Guest/Track",
+    "label": "Nomor Invoice",
+    "default": "Nomor Invoice"
+  },
+  "pages.guest.track.cbd3ad32": {
+    "group": "Pages/Guest/Track",
+    "label": "Terlindungi",
+    "default": "Terlindungi"
+  },
+  "pages.guest.track.a17f89cb": {
+    "group": "Pages/Guest/Track",
+    "label": "Status Pesanan",
+    "default": "Status Pesanan"
+  },
+  "pages.guest.track.ceb4d888": {
+    "group": "Pages/Guest/Track",
+    "label": "Produk",
+    "default": "Produk"
+  },
+  "pages.guest.track.a2defbe3": {
+    "group": "Pages/Guest/Track",
+    "label": "Nominal",
+    "default": "Nominal"
+  },
+  "pages.guest.track.65ca564": {
+    "group": "Pages/Guest/Track",
+    "label": "Tujuan",
+    "default": "Tujuan"
+  },
+  "pages.guest.track.443c0671": {
+    "group": "Pages/Guest/Track",
+    "label": "Metode Pembayaran",
+    "default": "Metode Pembayaran"
+  },
+  "pages.guest.track.da472e8b": {
+    "group": "Pages/Guest/Track",
+    "label": "Status Pembayaran",
+    "default": "Status Pembayaran"
+  },
+  "pages.guest.track.ad066d9d": {
+    "group": "Pages/Guest/Track",
+    "label": "Total",
+    "default": "Total"
+  },
+  "pages.guest.track.e378eb96": {
+    "group": "Pages/Guest/Track",
+    "label": "Dibuat",
+    "default": "Dibuat"
+  },
+  "pages.guest.track.6e230e94": {
+    "group": "Pages/Guest/Track",
+    "label": "Update",
+    "default": "Update"
+  },
+  "pages.guest.track.ee28e295": {
+    "group": "Pages/Guest/Track",
+    "label": "Butuh kode/hasil pesanan?",
+    "default": "Butuh kode/hasil pesanan?"
+  },
+  "pages.guest.track.84d645e7": {
+    "group": "Pages/Guest/Track",
+    "label": "Data sensitif hanya ditampilkan melalui halaman akses guest yang memakai kode akses, atau dari Riwayat Pesanan jika kamu login.",
+    "default": "Data sensitif hanya ditampilkan melalui halaman akses guest yang memakai kode akses, atau dari Riwayat Pesanan jika kamu login."
+  },
+  "pages.guest.track.da4f28f7": {
+    "group": "Pages/Guest/Track",
+    "label": "Masuk Akun",
+    "default": "Masuk Akun"
+  },
+  "pages.guest.track.67f44f0e": {
+    "group": "Pages/Guest/Track",
+    "label": "Log Realtime",
+    "default": "Log Realtime"
+  },
+  "pages.guest.track.cea3f93c": {
+    "group": "Pages/Guest/Track",
+    "label": "Sinkron setiap 15 detik",
+    "default": "Sinkron setiap 15 detik"
+  },
+  "pages.guest.track.59bb7a0c": {
+    "group": "Pages/Guest/Track",
+    "label": "Sistem",
+    "default": "Sistem"
+  },
+  "pages.guest.track.243a5ea5": {
+    "group": "Pages/Guest/Track",
+    "label": "Pesanan tercatat",
+    "default": "Pesanan tercatat"
+  },
+  "pages.guest.track.1b9e33ac": {
+    "group": "Pages/Guest/Track",
+    "label": "Menunggu pembaruan berikutnya",
+    "default": "Menunggu pembaruan berikutnya"
+  },
+  "pages.guest.track.8c613442": {
+    "group": "Pages/Guest/Track",
+    "label": "TRANSAKSI TERBARU",
+    "default": "TRANSAKSI TERBARU"
+  },
+  "pages.guest.track.785e2064": {
+    "group": "Pages/Guest/Track",
+    "label": "Aktivitas LFAMILIA",
+    "default": "Aktivitas LFAMILIA"
+  },
+  "pages.guest.track.4a372d30": {
+    "group": "Pages/Guest/Track",
+    "label": "Invoice dimasking untuk menjaga privasi pelanggan.",
+    "default": "Invoice dimasking untuk menjaga privasi pelanggan."
+  },
+  "pages.guest.track.45424caf": {
+    "group": "Pages/Guest/Track",
+    "label": "LIVE",
+    "default": "LIVE"
+  },
+  "pages.guest.track.71ec87b0": {
+    "group": "Pages/Guest/Track",
+    "label": "Invoice",
+    "default": "Invoice"
+  },
+  "pages.guest.track.5ef20f": {
+    "group": "Pages/Guest/Track",
+    "label": "Status",
+    "default": "Status"
+  },
+  "pages.guest.track.4293eacd": {
+    "group": "Pages/Guest/Track",
+    "label": "Waktu",
+    "default": "Waktu"
+  },
+  "pages.guest.track.faa60eef": {
+    "group": "Pages/Guest/Track",
+    "label": "Belum ada transaksi untuk ditampilkan.",
+    "default": "Belum ada transaksi untuk ditampilkan."
+  },
+  "pages.guest.lookup.2b1e660d": {
+    "group": "Pages/Guest/Lookup",
+    "label": "Transaksi",
+    "default": "Transaksi"
+  },
+  "pages.guest.lookup.764d836e": {
+    "group": "Pages/Guest/Lookup",
+    "label": "Cek pesanan",
+    "default": "Cek pesanan"
+  },
+  "pages.guest.lookup.cd39e9de": {
+    "group": "Pages/Guest/Lookup",
+    "label": "Cek pesanan guest",
+    "default": "Cek pesanan guest"
+  },
+  "pages.guest.lookup.5af7219f": {
+    "group": "Pages/Guest/Lookup",
+    "label": "Masukkan nomor pesanan dan kode akses yang diberikan saat checkout.",
+    "default": "Masukkan nomor pesanan dan kode akses yang diberikan saat checkout."
+  },
+  "pages.guest.lookup.372d3974": {
+    "group": "Pages/Guest/Lookup",
+    "label": "Nomor pesanan",
+    "default": "Nomor pesanan"
+  },
+  "pages.guest.lookup.dc8a08a1": {
+    "group": "Pages/Guest/Lookup",
+    "label": "Kode akses",
+    "default": "Kode akses"
+  },
+  "pages.guest.lookup.b5b011ec": {
+    "group": "Pages/Guest/Lookup",
+    "label": "Periksa",
+    "default": "Periksa"
+  },
+  "pages.guest.lookup.6eda8132": {
+    "group": "Pages/Guest/Lookup",
+    "label": "← Beranda",
+    "default": "← Beranda"
+  },
+  "pages.guest.lookup.5a7d0817": {
+    "group": "Pages/Guest/Lookup",
+    "label": "Masuk akun",
+    "default": "Masuk akun"
+  },
+  "pages.guest.support.b30960ff": {
+    "group": "Pages/Guest/Support",
+    "label": "PUSAT BANTUAN",
+    "default": "PUSAT BANTUAN"
+  },
+  "pages.guest.support.b0d8eb35": {
+    "group": "Pages/Guest/Support",
+    "label": "Bantuan tanpa akun",
+    "default": "Bantuan tanpa akun"
+  },
+  "pages.guest.support.d1eb5268": {
+    "group": "Pages/Guest/Support",
+    "label": "Buat tiket atau baca balasan untuk pesanan guest. Gunakan nomor invoice dan kode akses yang diberikan saat checkout.",
+    "default": "Buat tiket atau baca balasan untuk pesanan guest. Gunakan nomor invoice dan kode akses yang diberikan saat checkout."
+  },
+  "pages.guest.support.e85cc33c": {
+    "group": "Pages/Guest/Support",
+    "label": "Formulir bantuan",
+    "default": "Formulir bantuan"
+  },
+  "pages.guest.support.d031d757": {
+    "group": "Pages/Guest/Support",
+    "label": "Nomor invoice",
+    "default": "Nomor invoice"
+  },
+  "pages.guest.support.edc129b1": {
+    "group": "Pages/Guest/Support",
+    "label": "Kode akses pesanan",
+    "default": "Kode akses pesanan"
+  },
+  "pages.guest.support.88f08ced": {
+    "group": "Pages/Guest/Support",
+    "label": "Kode akses menjaga percakapan tetap pribadi. Jika kode hilang, hubungi tim melalui kanal resmi di halaman Hubungi Kami.",
+    "default": "Kode akses menjaga percakapan tetap pribadi. Jika kode hilang, hubungi tim melalui kanal resmi di halaman Hubungi Kami."
+  },
+  "pages.guest.support.35ad1ca1": {
+    "group": "Pages/Guest/Support",
+    "label": "Lihat tiket dan balasan",
+    "default": "Lihat tiket dan balasan"
+  },
+  "pages.guest.support.4bcccc29": {
+    "group": "Pages/Guest/Support",
+    "label": "Subjek",
+    "default": "Subjek"
+  },
+  "pages.guest.support.cbf45484": {
+    "group": "Pages/Guest/Support",
+    "label": "Pesan",
+    "default": "Pesan"
+  },
+  "pages.guest.support.c90e0db6": {
+    "group": "Pages/Guest/Support",
+    "label": "Kirim tiket",
+    "default": "Kirim tiket"
+  },
+  "pages.guest.support.e066336": {
+    "group": "Pages/Guest/Support",
+    "label": "Belum ada tiket untuk pesanan ini.",
+    "default": "Belum ada tiket untuk pesanan ini."
+  },
+  "pages.guest.support.11005ca7": {
+    "group": "Pages/Guest/Support",
+    "label": "Balasan",
+    "default": "Balasan"
+  },
+  "pages.guest.support.91fff07f": {
+    "group": "Pages/Guest/Support",
+    "label": "Kirim balasan",
+    "default": "Kirim balasan"
+  },
+  "pages.guest.support.a8b3bfd3": {
+    "group": "Pages/Guest/Support",
+    "label": "Hubungi Kami",
+    "default": "Hubungi Kami"
+  },
+  "pages.payment.show.6ae24f17": {
+    "group": "Pages/Payment/Show",
+    "label": "LF",
+    "default": "LF"
+  },
+  "pages.payment.show.497f244e": {
+    "group": "Pages/Payment/Show",
+    "label": "LFAMILIA",
+    "default": "LFAMILIA"
+  },
+  "pages.payment.show.70515d8e": {
+    "group": "Pages/Payment/Show",
+    "label": "STORE",
+    "default": "STORE"
+  },
+  "pages.payment.show.71ec87b0": {
+    "group": "Pages/Payment/Show",
+    "label": "Invoice",
+    "default": "Invoice"
+  },
+  "pages.payment.show.ceb4d888": {
+    "group": "Pages/Payment/Show",
+    "label": "Produk",
+    "default": "Produk"
+  },
+  "pages.payment.show.a2defbe3": {
+    "group": "Pages/Payment/Show",
+    "label": "Nominal",
+    "default": "Nominal"
+  },
+  "pages.payment.show.9eb68c25": {
+    "group": "Pages/Payment/Show",
+    "label": "Metode",
+    "default": "Metode"
+  },
+  "pages.payment.show.8269538b": {
+    "group": "Pages/Payment/Show",
+    "label": "Harga setelah promo",
+    "default": "Harga setelah promo"
+  },
+  "pages.payment.show.c217fcd5": {
+    "group": "Pages/Payment/Show",
+    "label": "Biaya pembayaran",
+    "default": "Biaya pembayaran"
+  },
+  "pages.payment.show.87378529": {
+    "group": "Pages/Payment/Show",
+    "label": "Total pembayaran",
+    "default": "Total pembayaran"
+  },
+  "pages.payment.show.deb02ada": {
+    "group": "Pages/Payment/Show",
+    "label": "Scan QRIS untuk membayar",
+    "default": "Scan QRIS untuk membayar"
+  },
+  "pages.payment.show.38ab038a": {
+    "group": "Pages/Payment/Show",
+    "label": "Gunakan aplikasi bank atau e-wallet yang mendukung QRIS.",
+    "default": "Gunakan aplikasi bank atau e-wallet yang mendukung QRIS."
+  },
+  "pages.payment.show.4772759d": {
+    "group": "Pages/Payment/Show",
+    "label": "Konfirmasi QRIS manual",
+    "default": "Konfirmasi QRIS manual"
+  },
+  "pages.payment.show.957f12a8": {
+    "group": "Pages/Payment/Show",
+    "label": "Setelah pembayaran dilakukan, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama.",
+    "default": "Setelah pembayaran dilakukan, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama."
+  },
+  "pages.payment.show.6f239bfe": {
+    "group": "Pages/Payment/Show",
+    "label": "QRIS",
+    "default": "QRIS"
+  },
+  "pages.payment.show.2fdc5653": {
+    "group": "Pages/Payment/Show",
+    "label": "Lihat status pesanan",
+    "default": "Lihat status pesanan"
+  },
+  "pages.customer.gameaccounts.3fa5187f": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "AKUN TERSIMPAN",
+    "default": "AKUN TERSIMPAN"
+  },
+  "pages.customer.gameaccounts.d90074a4": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Akun game",
+    "default": "Akun game"
+  },
+  "pages.customer.gameaccounts.c0867ef5": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Simpan User ID dan server agar dapat dipilih kembali saat checkout.",
+    "default": "Simpan User ID dan server agar dapat dipilih kembali saat checkout."
+  },
+  "pages.customer.gameaccounts.62ba1e98": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Data tetap diverifikasi lagi saat checkout bila game mendukung cek nickname.",
+    "default": "Data tetap diverifikasi lagi saat checkout bila game mendukung cek nickname."
+  },
+  "pages.customer.gameaccounts.d3f9bfa5": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Batal",
+    "default": "Batal"
+  },
+  "pages.customer.gameaccounts.c2762327": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Game",
+    "default": "Game"
+  },
+  "pages.customer.gameaccounts.582c7da3": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Pilih game",
+    "default": "Pilih game"
+  },
+  "pages.customer.gameaccounts.9087cd09": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Nama akun",
+    "default": "Nama akun"
+  },
+  "pages.customer.gameaccounts.b294433f": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Akun tersimpan",
+    "default": "Akun tersimpan"
+  },
+  "pages.customer.gameaccounts.c2c76cb1": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Edit",
+    "default": "Edit"
+  },
+  "pages.customer.gameaccounts.47b55d9e": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Hapus",
+    "default": "Hapus"
+  },
+  "pages.customer.gameaccounts.640980a": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Belum ada akun game tersimpan.",
+    "default": "Belum ada akun game tersimpan."
+  },
+  "pages.customer.ticketdetail.13da208b": {
+    "group": "Pages/Customer/TicketDetail",
+    "label": "← Semua tiket",
+    "default": "← Semua tiket"
+  },
+  "pages.customer.ticketdetail.cb150ccd": {
+    "group": "Pages/Customer/TicketDetail",
+    "label": "Pesan awal",
+    "default": "Pesan awal"
+  },
+  "pages.customer.ticketdetail.c9b566cd": {
+    "group": "Pages/Customer/TicketDetail",
+    "label": "Balas tiket",
+    "default": "Balas tiket"
+  },
+  "pages.customer.ticketdetail.91fff07f": {
+    "group": "Pages/Customer/TicketDetail",
+    "label": "Kirim balasan",
+    "default": "Kirim balasan"
+  },
+  "pages.customer.ticketdetail.f83cdd6e": {
+    "group": "Pages/Customer/TicketDetail",
+    "label": "Tiket sudah ditutup dan tidak menerima balasan baru.",
+    "default": "Tiket sudah ditutup dan tidak menerima balasan baru."
+  },
+  "pages.customer.wallet.32d4363a": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Saldo",
+    "default": "Saldo"
+  },
+  "pages.customer.wallet.d57dc459": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Saldo tersedia",
+    "default": "Saldo tersedia"
+  },
+  "pages.customer.wallet.1b8225c4": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Top up saldo",
+    "default": "Top up saldo"
+  },
+  "pages.customer.wallet.a2defbe3": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Nominal",
+    "default": "Nominal"
+  },
+  "pages.customer.wallet.60751a0": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Hitung total",
+    "default": "Hitung total"
+  },
+  "pages.customer.wallet.8879a24e": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Metode top up belum tersedia. Hubungi bantuan.",
+    "default": "Metode top up belum tersedia. Hubungi bantuan."
+  },
+  "pages.customer.wallet.2d62f6cc": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Jika status belum pasti, coba cek percobaan yang sama. Jangan membuat top up baru.",
+    "default": "Jika status belum pasti, coba cek percobaan yang sama. Jangan membuat top up baru."
+  },
+  "pages.customer.wallet.dbcf71f5": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Saldo masuk",
+    "default": "Saldo masuk"
+  },
+  "pages.customer.wallet.b6984ce9": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Biaya",
+    "default": "Biaya"
+  },
+  "pages.customer.wallet.4cb761ce": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Total bayar",
+    "default": "Total bayar"
+  },
+  "pages.customer.wallet.a86dd943": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Status pembayaran:",
+    "default": "Status pembayaran:"
+  },
+  "pages.customer.wallet.d5aec755": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Nomor VA:",
+    "default": "Nomor VA:"
+  },
+  "pages.customer.wallet.6eb1fae2": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Kode:",
+    "default": "Kode:"
+  },
+  "pages.customer.wallet.52741a92": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Buka pembayaran",
+    "default": "Buka pembayaran"
+  },
+  "pages.customer.wallet.6d61cbf3": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Riwayat saldo",
+    "default": "Riwayat saldo"
+  },
+  "pages.customer.wallet.88aeaea4": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Belum ada mutasi saldo.",
+    "default": "Belum ada mutasi saldo."
+  },
+  "pages.customer.wallet.b4082553": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Tanggal",
+    "default": "Tanggal"
+  },
+  "pages.customer.wallet.1c5a8d76": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Jenis",
+    "default": "Jenis"
+  },
+  "pages.customer.wallet.e2d8203d": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Perubahan",
+    "default": "Perubahan"
+  },
+  "pages.customer.wallet.89c777e5": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Saldo akhir",
+    "default": "Saldo akhir"
+  },
+  "pages.customer.orders.517546c3": {
+    "group": "Pages/Customer/Orders",
+    "label": "Pesanan",
+    "default": "Pesanan"
+  },
+  "pages.customer.orders.d195c58c": {
+    "group": "Pages/Customer/Orders",
+    "label": "Belum ada pesanan.",
+    "default": "Belum ada pesanan."
+  },
+  "pages.customer.membership.3bd46fd8": {
+    "group": "Pages/Customer/Membership",
+    "label": "MEMBERSHIP LFAMILIA",
+    "default": "MEMBERSHIP LFAMILIA"
+  },
+  "pages.customer.membership.2352a1f5": {
+    "group": "Pages/Customer/Membership",
+    "label": "Diskon member",
+    "default": "Diskon member"
+  },
+  "pages.customer.membership.b121577a": {
+    "group": "Pages/Customer/Membership",
+    "label": "Progress tier",
+    "default": "Progress tier"
+  },
+  "pages.customer.membership.6e5fc58f": {
+    "group": "Pages/Customer/Membership",
+    "label": "Tier berikutnya",
+    "default": "Tier berikutnya"
+  },
+  "pages.customer.membership.75777733": {
+    "group": "Pages/Customer/Membership",
+    "label": "Level tertinggi / manual",
+    "default": "Level tertinggi / manual"
+  },
+  "pages.customer.membership.ca5f365d": {
+    "group": "Pages/Customer/Membership",
+    "label": "Tier kamu",
+    "default": "Tier kamu"
+  },
+  "pages.customer.membership.18a2de33": {
+    "group": "Pages/Customer/Membership",
+    "label": "Syarat",
+    "default": "Syarat"
+  },
+  "pages.customer.membership.7e8c4c8d": {
+    "group": "Pages/Customer/Membership",
+    "label": "Diskon",
+    "default": "Diskon"
+  },
+  "pages.customer.notifications.66f6ee7d": {
+    "group": "Pages/Customer/Notifications",
+    "label": "AKTIVITAS",
+    "default": "AKTIVITAS"
+  },
+  "pages.customer.notifications.bd0ef076": {
+    "group": "Pages/Customer/Notifications",
+    "label": "Notifikasi transaksi",
+    "default": "Notifikasi transaksi"
+  },
+  "pages.customer.notifications.f52771b3": {
+    "group": "Pages/Customer/Notifications",
+    "label": "Ringkasan perubahan pesanan dan top up saldo terbaru dari akunmu.",
+    "default": "Ringkasan perubahan pesanan dan top up saldo terbaru dari akunmu."
+  },
+  "pages.customer.notifications.cdb11299": {
+    "group": "Pages/Customer/Notifications",
+    "label": "Belum ada notifikasi transaksi.",
+    "default": "Belum ada notifikasi transaksi."
+  },
+  "pages.customer.profile.8b01539f": {
+    "group": "Pages/Customer/Profile",
+    "label": "Profil",
+    "default": "Profil"
+  },
+  "pages.customer.profile.81176d44": {
+    "group": "Pages/Customer/Profile",
+    "label": "Data akun",
+    "default": "Data akun"
+  },
+  "pages.customer.profile.db175326": {
+    "group": "Pages/Customer/Profile",
+    "label": "Tampil di leaderboard",
+    "default": "Tampil di leaderboard"
+  },
+  "pages.customer.profile.8c806ec": {
+    "group": "Pages/Customer/Profile",
+    "label": "Jika aktif, hanya nama singkat yang ditampilkan. Email, telepon, dan data game tidak pernah ditampilkan.",
+    "default": "Jika aktif, hanya nama singkat yang ditampilkan. Email, telepon, dan data game tidak pernah ditampilkan."
+  },
+  "pages.customer.profile.1c30598a": {
+    "group": "Pages/Customer/Profile",
+    "label": "Kata sandi saat ini (wajib jika mengubah email)",
+    "default": "Kata sandi saat ini (wajib jika mengubah email)"
+  },
+  "pages.customer.profile.75b2c343": {
+    "group": "Pages/Customer/Profile",
+    "label": "Simpan profil",
+    "default": "Simpan profil"
+  },
+  "pages.customer.profile.71b0940a": {
+    "group": "Pages/Customer/Profile",
+    "label": "Kata sandi saat ini",
+    "default": "Kata sandi saat ini"
+  },
+  "pages.customer.profile.220845f7": {
+    "group": "Pages/Customer/Profile",
+    "label": "Kata sandi baru (minimal 12 karakter)",
+    "default": "Kata sandi baru (minimal 12 karakter)"
+  },
+  "pages.customer.profile.9c34c763": {
+    "group": "Pages/Customer/Profile",
+    "label": "Ulangi kata sandi",
+    "default": "Ulangi kata sandi"
+  },
+  "pages.customer.profile.3267a4ff": {
+    "group": "Pages/Customer/Profile",
+    "label": "Simpan kata sandi",
+    "default": "Simpan kata sandi"
+  },
+  "pages.customer.profile.55b19cad": {
+    "group": "Pages/Customer/Profile",
+    "label": "Hapus akun",
+    "default": "Hapus akun"
+  },
+  "pages.customer.profile.8b096118": {
+    "group": "Pages/Customer/Profile",
+    "label": "Akun dengan saldo, pesanan, top-up, atau tiket tidak dapat dihapus otomatis. Ketik HAPUS untuk melanjutkan.",
+    "default": "Akun dengan saldo, pesanan, top-up, atau tiket tidak dapat dihapus otomatis. Ketik HAPUS untuk melanjutkan."
+  },
+  "pages.customer.profile.ba90910e": {
+    "group": "Pages/Customer/Profile",
+    "label": "Konfirmasi",
+    "default": "Konfirmasi"
+  },
+  "pages.customer.profile.2a776cdb": {
+    "group": "Pages/Customer/Profile",
+    "label": "Kata sandi",
+    "default": "Kata sandi"
+  },
+  "pages.customer.codes.d0acb5f8": {
+    "group": "Pages/Customer/Codes",
+    "label": "PRODUK DIGITAL",
+    "default": "PRODUK DIGITAL"
+  },
+  "pages.customer.codes.1fa3a3ba": {
+    "group": "Pages/Customer/Codes",
+    "label": "Kode digital saya",
+    "default": "Kode digital saya"
+  },
+  "pages.customer.codes.7388bb65": {
+    "group": "Pages/Customer/Codes",
+    "label": "Kode hanya tampil dari pesanan berhasil yang memang menghasilkan serial atau voucher.",
+    "default": "Kode hanya tampil dari pesanan berhasil yang memang menghasilkan serial atau voucher."
+  },
+  "pages.customer.codes.5eb96a58": {
+    "group": "Pages/Customer/Codes",
+    "label": "TERKIRIM",
+    "default": "TERKIRIM"
+  },
+  "pages.customer.codes.ae3c46fd": {
+    "group": "Pages/Customer/Codes",
+    "label": "Belum ada kode digital yang terkirim.",
+    "default": "Belum ada kode digital yang terkirim."
+  },
+  "pages.customer.tickets.ec2ab35b": {
+    "group": "Pages/Customer/Tickets",
+    "label": "Tiket bantuan",
+    "default": "Tiket bantuan"
+  },
+  "pages.customer.tickets.9725b7d0": {
+    "group": "Pages/Customer/Tickets",
+    "label": "Buat tiket",
+    "default": "Buat tiket"
+  },
+  "pages.customer.tickets.4bcccc29": {
+    "group": "Pages/Customer/Tickets",
+    "label": "Subjek",
+    "default": "Subjek"
+  },
+  "pages.customer.tickets.396b932b": {
+    "group": "Pages/Customer/Tickets",
+    "label": "Pesanan (opsional)",
+    "default": "Pesanan (opsional)"
+  },
+  "pages.customer.tickets.fab263ff": {
+    "group": "Pages/Customer/Tickets",
+    "label": "Tanpa pesanan",
+    "default": "Tanpa pesanan"
+  },
+  "pages.customer.tickets.cbf45484": {
+    "group": "Pages/Customer/Tickets",
+    "label": "Pesan",
+    "default": "Pesan"
+  },
+  "pages.customer.tickets.c90e0db6": {
+    "group": "Pages/Customer/Tickets",
+    "label": "Kirim tiket",
+    "default": "Kirim tiket"
+  },
+  "pages.customer.tickets.1e3139df": {
+    "group": "Pages/Customer/Tickets",
+    "label": "Riwayat tiket",
+    "default": "Riwayat tiket"
+  },
+  "pages.customer.tickets.8efc1b8b": {
+    "group": "Pages/Customer/Tickets",
+    "label": "Belum ada tiket.",
+    "default": "Belum ada tiket."
+  },
+  "pages.customer.orderdetail.96c4caae": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "← Semua pesanan",
+    "default": "← Semua pesanan"
+  },
+  "pages.customer.orderdetail.ceb4d888": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Produk",
+    "default": "Produk"
+  },
+  "pages.customer.orderdetail.5ef20f": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Status",
+    "default": "Status"
+  },
+  "pages.customer.orderdetail.ad066d9d": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Total",
+    "default": "Total"
+  },
+  "pages.customer.orderdetail.e378eb96": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Dibuat",
+    "default": "Dibuat"
+  },
+  "pages.customer.orderdetail.144e2781": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Dibayar",
+    "default": "Dibayar"
+  },
+  "pages.customer.orderdetail.3527df23": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Pembayaran",
+    "default": "Pembayaran"
+  },
+  "pages.customer.orderdetail.ca77496f": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Status:",
+    "default": "Status:"
+  },
+  "pages.customer.orderdetail.d5aec755": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Nomor VA:",
+    "default": "Nomor VA:"
+  },
+  "pages.customer.orderdetail.6af68bec": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Kode pembayaran:",
+    "default": "Kode pembayaran:"
+  },
+  "pages.customer.orderdetail.2107d542": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Status pembayaran belum dapat dipastikan. Sistem tidak akan membuat pembayaran kedua otomatis.",
+    "default": "Status pembayaran belum dapat dipastikan. Sistem tidak akan membuat pembayaran kedua otomatis."
+  },
+  "pages.customer.orderdetail.a548f73b": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Lihat pembayaran",
+    "default": "Lihat pembayaran"
+  },
+  "pages.customer.orderdetail.25ba9702": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Hasil pesanan",
+    "default": "Hasil pesanan"
+  },
+  "pages.customer.orderdetail.4fc61831": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Serial / SN:",
+    "default": "Serial / SN:"
+  },
+  "pages.customer.orderdetail.8f52a70a": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Kode / hasil:",
+    "default": "Kode / hasil:"
+  },
+  "pages.customer.orderdetail.f93e4117": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Ulasan kamu",
+    "default": "Ulasan kamu"
+  },
+  "pages.customer.orderdetail.20c3ee9d": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Beri ulasan",
+    "default": "Beri ulasan"
+  },
+  "pages.customer.orderdetail.d790a39b": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Kirim ulasan",
+    "default": "Kirim ulasan"
+  },
+  "pages.customer.orderdetail.4bf02a1a": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Butuh bantuan? Buat tiket",
+    "default": "Butuh bantuan? Buat tiket"
+  },
+  "pages.content.tool.4b6166cb": {
+    "group": "Pages/Content/Tool",
+    "label": "TOOLS LFAMILIA",
+    "default": "TOOLS LFAMILIA"
+  },
+  "pages.content.tool.10394bed": {
+    "group": "Pages/Content/Tool",
+    "label": "Kalkulator Game",
+    "default": "Kalkulator Game"
+  },
+  "pages.content.tool.5ccd5c20": {
+    "group": "Pages/Content/Tool",
+    "label": "Hitung kebutuhan game dengan rumus yang sama seperti tools LFAMILIA sebelumnya.",
+    "default": "Hitung kebutuhan game dengan rumus yang sama seperti tools LFAMILIA sebelumnya."
+  },
+  "pages.content.tool.e2b6ac16": {
+    "group": "Pages/Content/Tool",
+    "label": "Semua Kalkulator",
+    "default": "Semua Kalkulator"
+  },
+  "pages.content.tool.f03aca72": {
+    "group": "Pages/Content/Tool",
+    "label": "Total Pertandingan",
+    "default": "Total Pertandingan"
+  },
+  "pages.content.tool.ed79a277": {
+    "group": "Pages/Content/Tool",
+    "label": "Jumlah match yang sudah dimainkan.",
+    "default": "Jumlah match yang sudah dimainkan."
+  },
+  "pages.content.tool.d617b96f": {
+    "group": "Pages/Content/Tool",
+    "label": "Win Rate Sekarang (%)",
+    "default": "Win Rate Sekarang (%)"
+  },
+  "pages.content.tool.a30d035a": {
+    "group": "Pages/Content/Tool",
+    "label": "Target Win Rate (%)",
+    "default": "Target Win Rate (%)"
+  },
+  "pages.content.tool.7428ed33": {
+    "group": "Pages/Content/Tool",
+    "label": "Kemenangan beruntun yang dibutuhkan",
+    "default": "Kemenangan beruntun yang dibutuhkan"
+  },
+  "pages.content.tool.4e4e8f7d": {
+    "group": "Pages/Content/Tool",
+    "label": "Poin Zodiac Sekarang",
+    "default": "Poin Zodiac Sekarang"
+  },
+  "pages.content.tool.b6f90e0f": {
+    "group": "Pages/Content/Tool",
+    "label": "Diamond per Summon",
+    "default": "Diamond per Summon"
+  },
+  "pages.content.tool.8e98b0e6": {
+    "group": "Pages/Content/Tool",
+    "label": "Rata-rata Poin / Summon",
+    "default": "Rata-rata Poin / Summon"
+  },
+  "pages.content.tool.49d859fe": {
+    "group": "Pages/Content/Tool",
+    "label": "Gunakan 1–5 sesuai estimasi kamu.",
+    "default": "Gunakan 1–5 sesuai estimasi kamu."
+  },
+  "pages.content.tool.3096b639": {
+    "group": "Pages/Content/Tool",
+    "label": "Sisa poin",
+    "default": "Sisa poin"
+  },
+  "pages.content.tool.e2b2d1a7": {
+    "group": "Pages/Content/Tool",
+    "label": "Estimasi summon",
+    "default": "Estimasi summon"
+  },
+  "pages.content.tool.d72c86f0": {
+    "group": "Pages/Content/Tool",
+    "label": "Estimasi diamond",
+    "default": "Estimasi diamond"
+  },
+  "pages.content.tool.9cd1fd1": {
+    "group": "Pages/Content/Tool",
+    "label": "Best case:",
+    "default": "Best case:"
+  },
+  "pages.content.tool.7aadb11e": {
+    "group": "Pages/Content/Tool",
+    "label": "Worst case:",
+    "default": "Worst case:"
+  },
+  "pages.content.tool.8a862850": {
+    "group": "Pages/Content/Tool",
+    "label": "Magic Point Sekarang",
+    "default": "Magic Point Sekarang"
+  },
+  "pages.content.tool.c11c5f7b": {
+    "group": "Pages/Content/Tool",
+    "label": "Harga 1 Draw",
+    "default": "Harga 1 Draw"
+  },
+  "pages.content.tool.6a4010b7": {
+    "group": "Pages/Content/Tool",
+    "label": "Harga 5 Draw",
+    "default": "Harga 5 Draw"
+  },
+  "pages.content.tool.8c1c864f": {
+    "group": "Pages/Content/Tool",
+    "label": "Estimasi kombinasi termurah",
+    "default": "Estimasi kombinasi termurah"
+  },
+  "pages.content.tool.b9cda763": {
+    "group": "Pages/Content/Tool",
+    "label": "Kalkulator ini hanya alat bantu estimasi. Harga, event, bonus, dan mekanisme game dapat berubah.",
+    "default": "Kalkulator ini hanya alat bantu estimasi. Harga, event, bonus, dan mekanisme game dapat berubah."
+  },
+  "pages.content.news.fb34663f": {
+    "group": "Pages/Content/News",
+    "label": "UPDATE TERBARU",
+    "default": "UPDATE TERBARU"
+  },
+  "pages.content.news.3350abb5": {
+    "group": "Pages/Content/News",
+    "label": "Berita LFAMILIA",
+    "default": "Berita LFAMILIA"
+  },
+  "pages.content.news.de2f9a25": {
+    "group": "Pages/Content/News",
+    "label": "Info produk, jadwal layanan, promo, dan pengumuman toko.",
+    "default": "Info produk, jadwal layanan, promo, dan pengumuman toko."
+  },
+  "pages.content.news.6ae24f17": {
+    "group": "Pages/Content/News",
+    "label": "LF",
+    "default": "LF"
+  },
+  "pages.content.news.9baf92e": {
+    "group": "Pages/Content/News",
+    "label": "Baca artikel →",
+    "default": "Baca artikel →"
+  },
+  "pages.content.news.c80f8d8c": {
+    "group": "Pages/Content/News",
+    "label": "Belum ada berita aktif.",
+    "default": "Belum ada berita aktif."
+  },
+  "pages.content.leaderboard.33d93ba7": {
+    "group": "Pages/Content/Leaderboard",
+    "label": "KOMUNITAS LFAMILIA",
+    "default": "KOMUNITAS LFAMILIA"
+  },
+  "pages.content.leaderboard.d54d76bb": {
+    "group": "Pages/Content/Leaderboard",
+    "label": "Leaderboard pelanggan",
+    "default": "Leaderboard pelanggan"
+  },
+  "pages.content.leaderboard.9693f087": {
+    "group": "Pages/Content/Leaderboard",
+    "label": "Peringkat memakai alias anonim; email, telepon, dan data game tidak ditampilkan.",
+    "default": "Peringkat memakai alias anonim; email, telepon, dan data game tidak ditampilkan."
+  },
+  "pages.content.leaderboard.43e591f9": {
+    "group": "Pages/Content/Leaderboard",
+    "label": "Bulan ini",
+    "default": "Bulan ini"
+  },
+  "pages.content.leaderboard.c8930ae0": {
+    "group": "Pages/Content/Leaderboard",
+    "label": "Sepanjang waktu",
+    "default": "Sepanjang waktu"
+  },
+  "pages.content.leaderboard.8aacad7d": {
+    "group": "Pages/Content/Leaderboard",
+    "label": "Belum ada peringkat.",
+    "default": "Belum ada peringkat."
+  },
+  "pages.content.article.845ba55d": {
+    "group": "Pages/Content/Article",
+    "label": "← Semua berita",
+    "default": "← Semua berita"
+  },
+  "pages.content.contact.b30960ff": {
+    "group": "Pages/Content/Contact",
+    "label": "PUSAT BANTUAN",
+    "default": "PUSAT BANTUAN"
+  },
+  "pages.content.contact.9eb9f69c": {
+    "group": "Pages/Content/Contact",
+    "label": "Hubungi tim LFAMILIA",
+    "default": "Hubungi tim LFAMILIA"
+  },
+  "pages.content.contact.f973d268": {
+    "group": "Pages/Content/Contact",
+    "label": "Gunakan kanal resmi di bawah. Sertakan nomor pesanan jika kendala berkaitan dengan transaksi.",
+    "default": "Gunakan kanal resmi di bawah. Sertakan nomor pesanan jika kendala berkaitan dengan transaksi."
+  },
+  "pages.content.contact.b1332787": {
+    "group": "Pages/Content/Contact",
+    "label": "WhatsApp",
+    "default": "WhatsApp"
+  },
+  "pages.content.contact.43352167": {
+    "group": "Pages/Content/Contact",
+    "label": "Email",
+    "default": "Email"
+  },
+  "pages.content.contact.f95701b": {
+    "group": "Pages/Content/Contact",
+    "label": "Instagram",
+    "default": "Instagram"
+  },
+  "pages.content.contact.a6a73152": {
+    "group": "Pages/Content/Contact",
+    "label": "Buka profil resmi",
+    "default": "Buka profil resmi"
+  },
+  "pages.content.contact.c839636f": {
+    "group": "Pages/Content/Contact",
+    "label": "Discord",
+    "default": "Discord"
+  },
+  "pages.content.contact.148aab67": {
+    "group": "Pages/Content/Contact",
+    "label": "Komunitas LFAMILIA",
+    "default": "Komunitas LFAMILIA"
+  },
+  "pages.content.contact.e85cc33c": {
+    "group": "Pages/Content/Contact",
+    "label": "Formulir bantuan",
+    "default": "Formulir bantuan"
+  },
+  "pages.content.legal.89e98bf2": {
+    "group": "Pages/Content/Legal",
+    "label": "INFORMASI LFAMILIA",
+    "default": "INFORMASI LFAMILIA"
+  },
+  "pages.content.status.beb73f55": {
+    "group": "Pages/Content/Status",
+    "label": "TRANSPARANSI LAYANAN",
+    "default": "TRANSPARANSI LAYANAN"
+  },
+  "pages.content.status.6ed40c18": {
+    "group": "Pages/Content/Status",
+    "label": "Status layanan LFAMILIA",
+    "default": "Status layanan LFAMILIA"
+  },
+  "pages.content.status.c0c6e3b6": {
+    "group": "Pages/Content/Status",
+    "label": "Lihat kondisi katalog, pembayaran, pemrosesan pesanan, dan layanan pelanggan sebelum atau sesudah bertransaksi.",
+    "default": "Lihat kondisi katalog, pembayaran, pemrosesan pesanan, dan layanan pelanggan sebelum atau sesudah bertransaksi."
+  },
+  "pages.content.status.86f48144": {
+    "group": "Pages/Content/Status",
+    "label": "Status diambil dari pemeriksaan aplikasi saat halaman dimuat.",
+    "default": "Status diambil dari pemeriksaan aplikasi saat halaman dimuat."
+  },
+  "pages.content.status.27d9ec0f": {
+    "group": "Pages/Content/Status",
+    "label": "Perbarui",
+    "default": "Perbarui"
+  },
+  "pages.content.status.d626f1c8": {
+    "group": "Pages/Content/Status",
+    "label": "Identitas merchant",
+    "default": "Identitas merchant"
+  },
+  "pages.content.promo.83c1ed60": {
+    "group": "Pages/Content/Promo",
+    "label": "PROMO",
+    "default": "PROMO"
+  },
+  "pages.content.promo.c3dd3d8a": {
+    "group": "Pages/Content/Promo",
+    "label": "Voucher aktif",
+    "default": "Voucher aktif"
+  },
+  "pages.content.promo.31c9f040": {
+    "group": "Pages/Content/Promo",
+    "label": "Gunakan kode yang tersedia pada panel Kode Promo di checkout.",
+    "default": "Gunakan kode yang tersedia pada panel Kode Promo di checkout."
+  },
+  "pages.content.promo.ae5fdfcd": {
+    "group": "Pages/Content/Promo",
+    "label": "Belum ada promo publik aktif.",
+    "default": "Belum ada promo publik aktif."
+  },
+  "pages.content.faq.5db3886": {
+    "group": "Pages/Content/Faq",
+    "label": "PUSAT BANTUAN LFAMILIA",
+    "default": "PUSAT BANTUAN LFAMILIA"
+  },
+  "pages.content.faq.8e1b9d5c": {
+    "group": "Pages/Content/Faq",
+    "label": "Ada yang bisa kami bantu?",
+    "default": "Ada yang bisa kami bantu?"
+  },
+  "pages.content.faq.d117983f": {
+    "group": "Pages/Content/Faq",
+    "label": "Temukan jawaban untuk pembayaran, proses top up, status pesanan, promo, akun, dan layanan LFAMILIA.",
+    "default": "Temukan jawaban untuk pembayaran, proses top up, status pesanan, promo, akun, dan layanan LFAMILIA."
+  },
+  "pages.content.faq.196596ce": {
+    "group": "Pages/Content/Faq",
+    "label": "Cek Pesanan",
+    "default": "Cek Pesanan"
+  },
+  "pages.content.faq.8e1cc50e": {
+    "group": "Pages/Content/Faq",
+    "label": "Hubungi Bantuan",
+    "default": "Hubungi Bantuan"
+  },
+  "pages.content.faq.c6b71ed6": {
+    "group": "Pages/Content/Faq",
+    "label": "PANDUAN STATUS",
+    "default": "PANDUAN STATUS"
+  },
+  "pages.content.faq.28854bad": {
+    "group": "Pages/Content/Faq",
+    "label": "Kenali status transaksi",
+    "default": "Kenali status transaksi"
+  },
+  "pages.content.faq.473cf76a": {
+    "group": "Pages/Content/Faq",
+    "label": "PERTANYAAN UMUM",
+    "default": "PERTANYAAN UMUM"
+  },
+  "pages.content.faq.bd857c3e": {
+    "group": "Pages/Content/Faq",
+    "label": "Jawaban yang sering dicari",
+    "default": "Jawaban yang sering dicari"
+  },
+  "pages.content.faq.af43d368": {
+    "group": "Pages/Content/Faq",
+    "label": "FAQ sedang diperbarui.",
+    "default": "FAQ sedang diperbarui."
+  },
+  "pages.content.faq.36453e67": {
+    "group": "Pages/Content/Faq",
+    "label": "MASIH BUTUH BANTUAN?",
+    "default": "MASIH BUTUH BANTUAN?"
+  },
+  "pages.content.faq.1bf22330": {
+    "group": "Pages/Content/Faq",
+    "label": "Tim LFAMILIA siap membantu.",
+    "default": "Tim LFAMILIA siap membantu."
+  },
+  "pages.content.faq.6556ac47": {
+    "group": "Pages/Content/Faq",
+    "label": "Sertakan nomor invoice saat menghubungi tim agar pengecekan transaksi lebih cepat.",
+    "default": "Sertakan nomor invoice saat menghubungi tim agar pengecekan transaksi lebih cepat."
+  },
+  "pages.content.faq.a8b3bfd3": {
+    "group": "Pages/Content/Faq",
+    "label": "Hubungi Kami",
+    "default": "Hubungi Kami"
+  },
+  "pages.content.faq.b64e6fbf": {
+    "group": "Pages/Content/Faq",
+    "label": "Lacak Pesanan",
+    "default": "Lacak Pesanan"
+  },
+  "pages.content.tools.57d99b55": {
+    "group": "Pages/Content/Tools",
+    "label": "LFAMILIA Tools",
+    "default": "LFAMILIA Tools"
+  },
+  "pages.content.tools.69c38ec2": {
+    "group": "Pages/Content/Tools",
+    "label": "Alat bantu untuk para gamer.",
+    "default": "Alat bantu untuk para gamer."
+  },
+  "pages.content.tools.81a7f514": {
+    "group": "Pages/Content/Tools",
+    "label": "Hitung kebutuhan game langsung dari satu tempat.",
+    "default": "Hitung kebutuhan game langsung dari satu tempat."
+  },
+  "pages.auth.verifyemail.7d1d4c9a": {
+    "group": "Pages/Auth/VerifyEmail",
+    "label": "Keamanan akun",
+    "default": "Keamanan akun"
+  },
+  "pages.auth.verifyemail.326bb634": {
+    "group": "Pages/Auth/VerifyEmail",
+    "label": "Verifikasi email",
+    "default": "Verifikasi email"
+  },
+  "pages.auth.verifyemail.3812230a": {
+    "group": "Pages/Auth/VerifyEmail",
+    "label": "Tautan verifikasi telah dikirim ke email Anda. Periksa kotak masuk, lalu buka tautan tersebut.",
+    "default": "Tautan verifikasi telah dikirim ke email Anda. Periksa kotak masuk, lalu buka tautan tersebut."
+  },
+  "pages.auth.verifyemail.d703d6d4": {
+    "group": "Pages/Auth/VerifyEmail",
+    "label": "Kirim ulang email",
+    "default": "Kirim ulang email"
+  },
+  "pages.auth.register.71ab59b4": {
+    "group": "Pages/Auth/Register",
+    "label": "Buat akun",
+    "default": "Buat akun"
+  },
+  "pages.auth.register.320d3706": {
+    "group": "Pages/Auth/Register",
+    "label": "Daftar LFAMILIA",
+    "default": "Daftar LFAMILIA"
+  },
+  "pages.auth.register.c9cff19d": {
+    "group": "Pages/Auth/Register",
+    "label": "Buat akun untuk saldo, riwayat pesanan, membership, dan layanan pelanggan.",
+    "default": "Buat akun untuk saldo, riwayat pesanan, membership, dan layanan pelanggan."
+  },
+  "pages.auth.register.1b5da681": {
+    "group": "Pages/Auth/Register",
+    "label": "Kata sandi (minimal 12 karakter)",
+    "default": "Kata sandi (minimal 12 karakter)"
+  },
+  "pages.auth.register.9c34c763": {
+    "group": "Pages/Auth/Register",
+    "label": "Ulangi kata sandi",
+    "default": "Ulangi kata sandi"
+  },
+  "pages.auth.register.497d73c5": {
+    "group": "Pages/Auth/Register",
+    "label": "Daftar dengan Google",
+    "default": "Daftar dengan Google"
+  },
+  "pages.auth.register.13c04f80": {
+    "group": "Pages/Auth/Register",
+    "label": "Sudah punya akun? Masuk",
+    "default": "Sudah punya akun? Masuk"
+  },
+  "pages.auth.login.830e118b": {
+    "group": "Pages/Auth/Login",
+    "label": "Selamat datang",
+    "default": "Selamat datang"
+  },
+  "pages.auth.login.a68168e3": {
+    "group": "Pages/Auth/Login",
+    "label": "Masuk LFAMILIA",
+    "default": "Masuk LFAMILIA"
+  },
+  "pages.auth.login.6a59b134": {
+    "group": "Pages/Auth/Login",
+    "label": "Masuk untuk melihat saldo, pesanan, membership, tiket, dan profilmu.",
+    "default": "Masuk untuk melihat saldo, pesanan, membership, tiket, dan profilmu."
+  },
+  "pages.auth.login.43352167": {
+    "group": "Pages/Auth/Login",
+    "label": "Email",
+    "default": "Email"
+  },
+  "pages.auth.login.2a776cdb": {
+    "group": "Pages/Auth/Login",
+    "label": "Kata sandi",
+    "default": "Kata sandi"
+  },
+  "pages.auth.login.dfa9069c": {
+    "group": "Pages/Auth/Login",
+    "label": "Ingat saya",
+    "default": "Ingat saya"
+  },
+  "pages.auth.login.81e6381a": {
+    "group": "Pages/Auth/Login",
+    "label": "Masuk dengan Google",
+    "default": "Masuk dengan Google"
+  },
+  "pages.auth.login.1c997073": {
+    "group": "Pages/Auth/Login",
+    "label": "Lupa password?",
+    "default": "Lupa password?"
+  },
+  "pages.auth.login.5e0b087f": {
+    "group": "Pages/Auth/Login",
+    "label": "Daftar",
+    "default": "Daftar"
+  },
+  "pages.auth.forgotpassword.36a0eb1": {
+    "group": "Pages/Auth/ForgotPassword",
+    "label": "Pemulihan akun",
+    "default": "Pemulihan akun"
+  },
+  "pages.auth.forgotpassword.84a59a52": {
+    "group": "Pages/Auth/ForgotPassword",
+    "label": "Atur ulang kata sandi",
+    "default": "Atur ulang kata sandi"
+  },
+  "pages.auth.forgotpassword.1d45e9c3": {
+    "group": "Pages/Auth/ForgotPassword",
+    "label": "Masukkan email akun LFAMILIA untuk menerima tautan reset.",
+    "default": "Masukkan email akun LFAMILIA untuk menerima tautan reset."
+  },
+  "pages.auth.forgotpassword.43352167": {
+    "group": "Pages/Auth/ForgotPassword",
+    "label": "Email",
+    "default": "Email"
+  },
+  "pages.auth.forgotpassword.38bcaaa5": {
+    "group": "Pages/Auth/ForgotPassword",
+    "label": "Kembali ke masuk",
+    "default": "Kembali ke masuk"
+  },
+  "pages.auth.completephone.478c7fe1": {
+    "group": "Pages/Auth/CompletePhone",
+    "label": "Lengkapi akun",
+    "default": "Lengkapi akun"
+  },
+  "pages.auth.completephone.a30deaad": {
+    "group": "Pages/Auth/CompletePhone",
+    "label": "Nomor telepon",
+    "default": "Nomor telepon"
+  },
+  "pages.auth.completephone.ba5de30b": {
+    "group": "Pages/Auth/CompletePhone",
+    "label": "Lengkapi nomor telepon untuk kontak pesanan sebelum memakai akun LFAMILIA.",
+    "default": "Lengkapi nomor telepon untuk kontak pesanan sebelum memakai akun LFAMILIA."
+  },
+  "pages.auth.resetpassword.7d1d4c9a": {
+    "group": "Pages/Auth/ResetPassword",
+    "label": "Keamanan akun",
+    "default": "Keamanan akun"
+  },
+  "pages.auth.resetpassword.db424161": {
+    "group": "Pages/Auth/ResetPassword",
+    "label": "Kata sandi baru",
+    "default": "Kata sandi baru"
+  },
+  "pages.auth.resetpassword.b4644f49": {
+    "group": "Pages/Auth/ResetPassword",
+    "label": "Gunakan minimal 12 karakter.",
+    "default": "Gunakan minimal 12 karakter."
+  },
+  "pages.auth.resetpassword.43352167": {
+    "group": "Pages/Auth/ResetPassword",
+    "label": "Email",
+    "default": "Email"
+  },
+  "pages.auth.resetpassword.9c34c763": {
+    "group": "Pages/Auth/ResetPassword",
+    "label": "Ulangi kata sandi",
+    "default": "Ulangi kata sandi"
+  },
+  "pages.auth.resetpassword.c3e824b3": {
+    "group": "Pages/Auth/ResetPassword",
+    "label": "Minta tautan baru",
+    "default": "Minta tautan baru"
+  },
+  "pages.auth.resetpassword.38bcaaa5": {
+    "group": "Pages/Auth/ResetPassword",
+    "label": "Kembali ke masuk",
+    "default": "Kembali ke masuk"
+  },
+  "components.customershell.6ae24f17": {
+    "group": "Components/CustomerShell",
+    "label": "LF",
+    "default": "LF"
+  },
+  "components.customershell.497f244e": {
+    "group": "Components/CustomerShell",
+    "label": "LFAMILIA",
+    "default": "LFAMILIA"
+  },
+  "components.customershell.70515d8e": {
+    "group": "Components/CustomerShell",
+    "label": "STORE",
+    "default": "STORE"
+  },
+  "components.customershell.d0853d5f": {
+    "group": "Components/CustomerShell",
+    "label": "Cari game atau voucher...",
+    "default": "Cari game atau voucher..."
+  },
+  "components.customershell.adae0b8b": {
+    "group": "Components/CustomerShell",
+    "label": "LFAMILIA STORE",
+    "default": "LFAMILIA STORE"
+  },
+  "components.customershell.c36f2f11": {
+    "group": "Components/CustomerShell",
+    "label": "Top up, kalkulator game, dan bantuan.",
+    "default": "Top up, kalkulator game, dan bantuan."
+  },
+  "components.customershell.520b4356": {
+    "group": "Components/CustomerShell",
+    "label": "×",
+    "default": "×"
+  },
+  "components.customershell.2e5a0e59": {
+    "group": "Components/CustomerShell",
+    "label": "Saldo LFAMILIA",
+    "default": "Saldo LFAMILIA"
+  },
+  "components.customershell.32d4363a": {
+    "group": "Components/CustomerShell",
+    "label": "Saldo",
+    "default": "Saldo"
+  },
+  "components.customershell.517546c3": {
+    "group": "Components/CustomerShell",
+    "label": "Pesanan",
+    "default": "Pesanan"
+  },
+  "components.customershell.d26d34be": {
+    "group": "Components/CustomerShell",
+    "label": "Tiket",
+    "default": "Tiket"
+  },
+  "components.customershell.8b01539f": {
+    "group": "Components/CustomerShell",
+    "label": "Profil",
+    "default": "Profil"
+  },
+  "components.customershell.bd76070b": {
+    "group": "Components/CustomerShell",
+    "label": "SELAMAT DATANG",
+    "default": "SELAMAT DATANG"
+  },
+  "components.customershell.8e3fd344": {
+    "group": "Components/CustomerShell",
+    "label": "Masuk untuk pengalaman lebih cepat",
+    "default": "Masuk untuk pengalaman lebih cepat"
+  },
+  "components.customershell.30cf56e3": {
+    "group": "Components/CustomerShell",
+    "label": "Simpan akun top up favorit, cek saldo, dan riwayat transaksi.",
+    "default": "Simpan akun top up favorit, cek saldo, dan riwayat transaksi."
+  },
+  "components.customershell.5f295534": {
+    "group": "Components/CustomerShell",
+    "label": "Masuk",
+    "default": "Masuk"
+  },
+  "components.customershell.5e0b087f": {
+    "group": "Components/CustomerShell",
+    "label": "Daftar",
+    "default": "Daftar"
+  },
+  "components.customershell.3a0625b1": {
+    "group": "Components/CustomerShell",
+    "label": "Layanan",
+    "default": "Layanan"
+  },
+  "components.customershell.277be53d": {
+    "group": "Components/CustomerShell",
+    "label": "Kalkulator",
+    "default": "Kalkulator"
+  },
+  "components.customershell.56c07293": {
+    "group": "Components/CustomerShell",
+    "label": "Informasi",
+    "default": "Informasi"
+  },
+  "components.customershell.6c564ecd": {
+    "group": "Components/CustomerShell",
+    "label": "Butuh bantuan?",
+    "default": "Butuh bantuan?"
+  },
+  "components.customershell.b1332787": {
+    "group": "Components/CustomerShell",
+    "label": "WhatsApp",
+    "default": "WhatsApp"
+  },
+  "components.customershell.c839636f": {
+    "group": "Components/CustomerShell",
+    "label": "Discord",
+    "default": "Discord"
+  },
+  "components.customershell.909407ff": {
+    "group": "Components/CustomerShell",
+    "label": "Komunitas & bantuan",
+    "default": "Komunitas & bantuan"
+  },
+  "components.customershell.43352167": {
+    "group": "Components/CustomerShell",
+    "label": "Email",
+    "default": "Email"
+  },
+  "components.customershell.a8b3bfd3": {
+    "group": "Components/CustomerShell",
+    "label": "Hubungi Kami",
+    "default": "Hubungi Kami"
+  },
+  "components.customershell.933a9618": {
+    "group": "Components/CustomerShell",
+    "label": "Lihat semua kanal bantuan",
+    "default": "Lihat semua kanal bantuan"
+  },
+  "components.customershell.2e15e52c": {
+    "group": "Components/CustomerShell",
+    "label": "Support Ticket",
+    "default": "Support Ticket"
+  },
+  "components.accountshell.7453c709": {
+    "group": "Components/AccountShell",
+    "label": "☰ Menu Akun",
+    "default": "☰ Menu Akun"
+  },
+  "components.accountshell.6ae24f17": {
+    "group": "Components/AccountShell",
+    "label": "LF",
+    "default": "LF"
+  },
+  "components.accountshell.2ea48fb9": {
+    "group": "Components/AccountShell",
+    "label": "AKUN LFAMILIA",
+    "default": "AKUN LFAMILIA"
+  },
+  "components.accountshell.d03c4dd9": {
+    "group": "Components/AccountShell",
+    "label": "CUSTOMER",
+    "default": "CUSTOMER"
+  },
+  "components.accountshell.520b4356": {
+    "group": "Components/AccountShell",
+    "label": "×",
+    "default": "×"
+  },
+  "components.accountshell.65c9b771": {
+    "group": "Components/AccountShell",
+    "label": "Keluar",
+    "default": "Keluar"
+  },
+  "navigation.desktopNav./\\#produk": {
+    "group": "Navigation/desktopNav",
+    "label": "Top Up",
+    "default": "Top Up"
+  },
+  "navigation.desktopNav./promo": {
+    "group": "Navigation/desktopNav",
+    "label": "Voucher",
+    "default": "Voucher"
+  },
+  "navigation.desktopNav./news": {
+    "group": "Navigation/desktopNav",
+    "label": "Berita",
+    "default": "Berita"
+  },
+  "navigation.desktopNav./leaderboard": {
+    "group": "Navigation/desktopNav",
+    "label": "Leaderboard",
+    "default": "Leaderboard"
+  },
+  "navigation.desktopNav./tools/win-rate": {
+    "group": "Navigation/desktopNav",
+    "label": "Kalkulator",
+    "default": "Kalkulator"
+  },
+  "navigation.desktopNav./orders/check": {
+    "group": "Navigation/desktopNav",
+    "label": "Transaksi",
+    "default": "Transaksi"
+  },
+  "navigation.drawerLinks./": {
+    "group": "Navigation/drawerLinks",
+    "label": "Beranda",
+    "default": "Beranda"
+  },
+  "navigation.drawerLinks./orders/check": {
+    "group": "Navigation/drawerLinks",
+    "label": "Cek Pesanan",
+    "default": "Cek Pesanan"
+  },
+  "navigation.drawerLinks./leaderboard": {
+    "group": "Navigation/drawerLinks",
+    "label": "Leaderboard",
+    "default": "Leaderboard"
+  },
+  "navigation.drawerLinks./tools/win-rate": {
+    "group": "Navigation/drawerLinks",
+    "label": "Kalkulator",
+    "default": "Kalkulator"
+  },
+  "navigation.drawerLinks./contact": {
+    "group": "Navigation/drawerLinks",
+    "label": "Hubungi Kami",
+    "default": "Hubungi Kami"
+  },
+  "navigation.drawerLinks./news": {
+    "group": "Navigation/drawerLinks",
+    "label": "Berita",
+    "default": "Berita"
+  },
+  "navigation.services./#produk": {
+    "group": "Navigation/services",
+    "label": "Top Up Game",
+    "default": "Top Up Game"
+  },
+  "navigation.services./promo": {
+    "group": "Navigation/services",
+    "label": "Promo",
+    "default": "Promo"
+  },
+  "navigation.services./orders/check": {
+    "group": "Navigation/services",
+    "label": "Cek Transaksi",
+    "default": "Cek Transaksi"
+  },
+  "navigation.services./contact": {
+    "group": "Navigation/services",
+    "label": "Hubungi Kami",
+    "default": "Hubungi Kami"
+  },
+  "navigation.calculators./tools/win-rate": {
+    "group": "Navigation/calculators",
+    "label": "Win Rate",
+    "default": "Win Rate"
+  },
+  "navigation.calculators./tools/zodiac": {
+    "group": "Navigation/calculators",
+    "label": "Zodiac",
+    "default": "Zodiac"
+  },
+  "navigation.calculators./tools/magic-wheel": {
+    "group": "Navigation/calculators",
+    "label": "Magic Wheel",
+    "default": "Magic Wheel"
+  },
+  "navigation.calculators./tools": {
+    "group": "Navigation/calculators",
+    "label": "Semua Alat",
+    "default": "Semua Alat"
+  },
+  "navigation.legal./faq": {
+    "group": "Navigation/legal",
+    "label": "Pertanyaan Umum",
+    "default": "Pertanyaan Umum"
+  },
+  "navigation.legal./privacy": {
+    "group": "Navigation/legal",
+    "label": "Kebijakan Privasi",
+    "default": "Kebijakan Privasi"
+  },
+  "navigation.legal./terms": {
+    "group": "Navigation/legal",
+    "label": "Syarat & Ketentuan",
+    "default": "Syarat & Ketentuan"
+  },
+  "navigation.legal./refund": {
+    "group": "Navigation/legal",
+    "label": "Kebijakan Pengembalian Dana",
+    "default": "Kebijakan Pengembalian Dana"
+  },
+  "navigation.account./account": {
+    "group": "Navigation/account",
+    "label": "Ringkasan",
+    "default": "Ringkasan"
+  },
+  "navigation.account./account/wallet": {
+    "group": "Navigation/account",
+    "label": "Saldo",
+    "default": "Saldo"
+  },
+  "navigation.account./account/orders": {
+    "group": "Navigation/account",
+    "label": "Pesanan",
+    "default": "Pesanan"
+  },
+  "navigation.account./account/codes": {
+    "group": "Navigation/account",
+    "label": "Kode",
+    "default": "Kode"
+  },
+  "navigation.account./account/game-accounts": {
+    "group": "Navigation/account",
+    "label": "Akun Game",
+    "default": "Akun Game"
+  },
+  "navigation.account./account/notifications": {
+    "group": "Navigation/account",
+    "label": "Notifikasi",
+    "default": "Notifikasi"
+  },
+  "navigation.account./account/membership": {
+    "group": "Navigation/account",
+    "label": "Membership",
+    "default": "Membership"
+  },
+  "navigation.account./account/tickets": {
+    "group": "Navigation/account",
+    "label": "Tiket",
+    "default": "Tiket"
+  },
+  "navigation.account./account/profile": {
+    "group": "Navigation/account",
+    "label": "Profil",
+    "default": "Profil"
+  },
+  "tutorial.01.title": {
+    "group": "Homepage/Tutorial",
+    "label": "Pilih produk",
+    "default": "Pilih produk"
+  },
+  "tutorial.01.body": {
+    "group": "Homepage/Tutorial",
+    "label": "Cari game atau produk digital yang kamu inginkan.",
+    "default": "Cari game atau produk digital yang kamu inginkan."
+  },
+  "tutorial.02.title": {
+    "group": "Homepage/Tutorial",
+    "label": "Isi data",
+    "default": "Isi data"
+  },
+  "tutorial.02.body": {
+    "group": "Homepage/Tutorial",
+    "label": "Masukkan ID dan pilih nominal top up.",
+    "default": "Masukkan ID dan pilih nominal top up."
+  },
+  "tutorial.03.title": {
+    "group": "Homepage/Tutorial",
+    "label": "Bayar aman",
+    "default": "Bayar aman"
+  },
+  "tutorial.03.body": {
+    "group": "Homepage/Tutorial",
+    "label": "Selesaikan pembayaran sesuai total pesanan.",
+    "default": "Selesaikan pembayaran sesuai total pesanan."
+  },
+  "tutorial.04.title": {
+    "group": "Homepage/Tutorial",
+    "label": "Pesanan diproses",
+    "default": "Pesanan diproses"
+  },
+  "tutorial.04.body": {
+    "group": "Homepage/Tutorial",
+    "label": "Pantau status menggunakan nomor pesanan.",
+    "default": "Pantau status menggunakan nomor pesanan."
+  },
+  "faq.status.01.title": {
+    "group": "FAQ/Panduan status",
+    "label": "Menunggu Pembayaran",
+    "default": "Menunggu Pembayaran"
+  },
+  "faq.status.01.body": {
+    "group": "FAQ/Panduan status",
+    "label": "Selesaikan pembayaran sesuai total dan kanal yang dipilih.",
+    "default": "Selesaikan pembayaran sesuai total dan kanal yang dipilih."
+  },
+  "faq.status.02.title": {
+    "group": "FAQ/Panduan status",
+    "label": "Sedang Diproses",
+    "default": "Sedang Diproses"
+  },
+  "faq.status.02.body": {
+    "group": "FAQ/Panduan status",
+    "label": "Pembayaran sudah diterima dan pesanan sedang diproses.",
+    "default": "Pembayaran sudah diterima dan pesanan sedang diproses."
+  },
+  "faq.status.03.title": {
+    "group": "FAQ/Panduan status",
+    "label": "Berhasil",
+    "default": "Berhasil"
+  },
+  "faq.status.03.body": {
+    "group": "FAQ/Panduan status",
+    "label": "Produk atau layanan sudah berhasil diproses.",
+    "default": "Produk atau layanan sudah berhasil diproses."
+  },
+  "faq.status.05.title": {
+    "group": "FAQ/Panduan status",
+    "label": "Kedaluwarsa",
+    "default": "Kedaluwarsa"
+  },
+  "faq.status.05.body": {
+    "group": "FAQ/Panduan status",
+    "label": "Waktu pembayaran berakhir. Periksa invoice sebelum membuat pesanan baru.",
+    "default": "Waktu pembayaran berakhir. Periksa invoice sebelum membuat pesanan baru."
+  },
+  "faq.status.06.title": {
+    "group": "FAQ/Panduan status",
+    "label": "Dibatalkan",
+    "default": "Dibatalkan"
+  },
+  "faq.status.06.body": {
+    "group": "FAQ/Panduan status",
+    "label": "Pesanan dibatalkan. Jika sudah membayar, hubungi bantuan dengan nomor invoice.",
+    "default": "Pesanan dibatalkan. Jika sudah membayar, hubungi bantuan dengan nomor invoice."
+  },
+  "faq.status.04.title": {
+    "group": "FAQ/Panduan status",
+    "label": "Gagal / Refund",
+    "default": "Gagal / Refund"
+  },
+  "faq.status.04.body": {
+    "group": "FAQ/Panduan status",
+    "label": "Jika transaksi gagal final, tim akan menangani sesuai kebijakan refund.",
+    "default": "Jika transaksi gagal final, tim akan menangani sesuai kebijakan refund."
+  },
+  "pages.account.attribute.title.682fab7a": {
+    "group": "Pages/Account",
+    "label": "Judul/tab: Akun",
+    "default": "Akun"
+  },
+  "pages.catalog.show.attribute.alt.d8a0146d": {
+    "group": "Pages/Catalog/Show",
+    "label": "Deskripsi gambar: LFAMILIA Cash",
+    "default": "LFAMILIA Cash"
+  },
+  "pages.catalog.show.attribute.placeholder.f333f780": {
+    "group": "Pages/Catalog/Show",
+    "label": "Placeholder: Contoh: nama@email.com",
+    "default": "Contoh: nama@email.com"
+  },
+  "pages.catalog.show.attribute.placeholder.a02514d1": {
+    "group": "Pages/Catalog/Show",
+    "label": "Placeholder: Contoh: 081234567890",
+    "default": "Contoh: 081234567890"
+  },
+  "pages.catalog.show.attribute.placeholder.1d49aca8": {
+    "group": "Pages/Catalog/Show",
+    "label": "Placeholder: Masukkan kode promo",
+    "default": "Masukkan kode promo"
+  },
+  "pages.catalog.show.attribute.placeholder.5f3aed05": {
+    "group": "Pages/Catalog/Show",
+    "label": "Placeholder: Masukkan judul singkat (opsional)",
+    "default": "Masukkan judul singkat (opsional)"
+  },
+  "pages.catalog.show.attribute.placeholder.98e9ee9": {
+    "group": "Pages/Catalog/Show",
+    "label": "Placeholder: Ceritakan pengalaman transaksimu",
+    "default": "Ceritakan pengalaman transaksimu"
+  },
+  "pages.catalog.show.attribute.aria-label.e4840d5b": {
+    "group": "Pages/Catalog/Show",
+    "label": "Label akses: Tutup informasi",
+    "default": "Tutup informasi"
+  },
+  "pages.catalog.show.attribute.aria-label.51cf4131": {
+    "group": "Pages/Catalog/Show",
+    "label": "Label akses: Tutup voucher",
+    "default": "Tutup voucher"
+  },
+  "pages.catalog.index.attribute.title.adae0b8b": {
+    "group": "Pages/Catalog/Index",
+    "label": "Judul/tab: LFAMILIA STORE",
+    "default": "LFAMILIA STORE"
+  },
+  "pages.catalog.index.attribute.aria-label.d47450e2": {
+    "group": "Pages/Catalog/Index",
+    "label": "Label akses: Banner sebelumnya",
+    "default": "Banner sebelumnya"
+  },
+  "pages.catalog.index.attribute.aria-label.ebfecd89": {
+    "group": "Pages/Catalog/Index",
+    "label": "Label akses: Banner berikutnya",
+    "default": "Banner berikutnya"
+  },
+  "pages.catalog.index.attribute.aria-label.7b2bdb3a": {
+    "group": "Pages/Catalog/Index",
+    "label": "Label akses: Tutup pop-up",
+    "default": "Tutup pop-up"
+  },
+  "pages.catalog.index.attribute.placeholder.6c55bcac": {
+    "group": "Pages/Catalog/Index",
+    "label": "Placeholder: Cari game, voucher, pulsa, atau PLN",
+    "default": "Cari game, voucher, pulsa, atau PLN"
+  },
+  "pages.guest.orderstatus.attribute.title.a17f89cb": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Judul/tab: Status Pesanan",
+    "default": "Status Pesanan"
+  },
+  "pages.guest.orderstatus.attribute.alt.dfd028b8": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Deskripsi gambar: QRIS pembayaran",
+    "default": "QRIS pembayaran"
+  },
+  "pages.guest.orderstatus.attribute.placeholder.2fadcd07": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Placeholder: Masukkan nama tampilan (opsional)",
+    "default": "Masukkan nama tampilan (opsional)"
+  },
+  "pages.guest.orderstatus.attribute.placeholder.98e9ee9": {
+    "group": "Pages/Guest/OrderStatus",
+    "label": "Placeholder: Ceritakan pengalaman transaksimu",
+    "default": "Ceritakan pengalaman transaksimu"
+  },
+  "pages.guest.track.attribute.title.196596ce": {
+    "group": "Pages/Guest/Track",
+    "label": "Judul/tab: Cek Pesanan",
+    "default": "Cek Pesanan"
+  },
+  "pages.guest.track.attribute.aria-label.6395bd69": {
+    "group": "Pages/Guest/Track",
+    "label": "Label akses: Nomor invoice atau nomor WhatsApp",
+    "default": "Nomor invoice atau nomor WhatsApp"
+  },
+  "pages.guest.track.attribute.placeholder.e4947fc0": {
+    "group": "Pages/Guest/Track",
+    "label": "Placeholder: Masukkan nomor invoice atau nomor WhatsApp",
+    "default": "Masukkan nomor invoice atau nomor WhatsApp"
+  },
+  "pages.guest.track.attribute.aria-label.76774c83": {
+    "group": "Pages/Guest/Track",
+    "label": "Label akses: Perbarui status pesanan",
+    "default": "Perbarui status pesanan"
+  },
+  "pages.guest.lookup.attribute.title.764d836e": {
+    "group": "Pages/Guest/Lookup",
+    "label": "Judul/tab: Cek pesanan",
+    "default": "Cek pesanan"
+  },
+  "pages.guest.support.attribute.title.f4fe7922": {
+    "group": "Pages/Guest/Support",
+    "label": "Judul/tab: Bantuan Guest",
+    "default": "Bantuan Guest"
+  },
+  "pages.payment.show.attribute.title.3527df23": {
+    "group": "Pages/Payment/Show",
+    "label": "Judul/tab: Pembayaran",
+    "default": "Pembayaran"
+  },
+  "pages.payment.show.attribute.alt.adae0b8b": {
+    "group": "Pages/Payment/Show",
+    "label": "Deskripsi gambar: LFAMILIA STORE",
+    "default": "LFAMILIA STORE"
+  },
+  "pages.payment.show.attribute.alt.dfd028b8": {
+    "group": "Pages/Payment/Show",
+    "label": "Deskripsi gambar: QRIS pembayaran",
+    "default": "QRIS pembayaran"
+  },
+  "pages.customer.gameaccounts.attribute.title.58d42884": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Judul/tab: Akun Game",
+    "default": "Akun Game"
+  },
+  "pages.customer.gameaccounts.attribute.placeholder.e8d07a66": {
+    "group": "Pages/Customer/GameAccounts",
+    "label": "Placeholder: Contoh: Mobile Legends Utama",
+    "default": "Contoh: Mobile Legends Utama"
+  },
+  "pages.customer.ticketdetail.attribute.title.5cca0fc9": {
+    "group": "Pages/Customer/TicketDetail",
+    "label": "Judul/tab: Detail tiket",
+    "default": "Detail tiket"
+  },
+  "pages.customer.ticketdetail.attribute.placeholder.1def0e1e": {
+    "group": "Pages/Customer/TicketDetail",
+    "label": "Placeholder: Masukkan balasan",
+    "default": "Masukkan balasan"
+  },
+  "pages.customer.wallet.attribute.title.32d4363a": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Judul/tab: Saldo",
+    "default": "Saldo"
+  },
+  "pages.customer.wallet.attribute.aria-label.9d63c7d7": {
+    "group": "Pages/Customer/Wallet",
+    "label": "Label akses: Halaman riwayat saldo",
+    "default": "Halaman riwayat saldo"
+  },
+  "pages.customer.orders.attribute.title.517546c3": {
+    "group": "Pages/Customer/Orders",
+    "label": "Judul/tab: Pesanan",
+    "default": "Pesanan"
+  },
+  "pages.customer.orders.attribute.aria-label.5819e517": {
+    "group": "Pages/Customer/Orders",
+    "label": "Label akses: Halaman pesanan",
+    "default": "Halaman pesanan"
+  },
+  "pages.customer.membership.attribute.title.fb25e0f9": {
+    "group": "Pages/Customer/Membership",
+    "label": "Judul/tab: Membership",
+    "default": "Membership"
+  },
+  "pages.customer.notifications.attribute.title.b4d63cec": {
+    "group": "Pages/Customer/Notifications",
+    "label": "Judul/tab: Notifikasi",
+    "default": "Notifikasi"
+  },
+  "pages.customer.profile.attribute.title.8b01539f": {
+    "group": "Pages/Customer/Profile",
+    "label": "Judul/tab: Profil",
+    "default": "Profil"
+  },
+  "pages.customer.codes.attribute.title.ba54136c": {
+    "group": "Pages/Customer/Codes",
+    "label": "Judul/tab: Kode Digital",
+    "default": "Kode Digital"
+  },
+  "pages.customer.tickets.attribute.title.ec2ab35b": {
+    "group": "Pages/Customer/Tickets",
+    "label": "Judul/tab: Tiket bantuan",
+    "default": "Tiket bantuan"
+  },
+  "pages.customer.tickets.attribute.aria-label.a837ddc2": {
+    "group": "Pages/Customer/Tickets",
+    "label": "Label akses: Halaman tiket",
+    "default": "Halaman tiket"
+  },
+  "pages.customer.orderdetail.attribute.title.eb50a134": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Judul/tab: Detail pesanan",
+    "default": "Detail pesanan"
+  },
+  "pages.customer.orderdetail.attribute.alt.dfd028b8": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Deskripsi gambar: QRIS pembayaran",
+    "default": "QRIS pembayaran"
+  },
+  "pages.customer.orderdetail.attribute.placeholder.98e9ee9": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Placeholder: Ceritakan pengalaman transaksimu",
+    "default": "Ceritakan pengalaman transaksimu"
+  },
+  "pages.content.news.attribute.title.5b8f784e": {
+    "group": "Pages/Content/News",
+    "label": "Judul/tab: Berita",
+    "default": "Berita"
+  },
+  "pages.content.leaderboard.attribute.title.c3359fcc": {
+    "group": "Pages/Content/Leaderboard",
+    "label": "Judul/tab: Leaderboard",
+    "default": "Leaderboard"
+  },
+  "pages.content.contact.attribute.title.a8b3bfd3": {
+    "group": "Pages/Content/Contact",
+    "label": "Judul/tab: Hubungi Kami",
+    "default": "Hubungi Kami"
+  },
+  "pages.content.status.attribute.title.cf6592b9": {
+    "group": "Pages/Content/Status",
+    "label": "Judul/tab: Status Layanan",
+    "default": "Status Layanan"
+  },
+  "pages.content.promo.attribute.title.45d1e7a0": {
+    "group": "Pages/Content/Promo",
+    "label": "Judul/tab: Promo",
+    "default": "Promo"
+  },
+  "pages.content.faq.attribute.title.4c104caa": {
+    "group": "Pages/Content/Faq",
+    "label": "Judul/tab: Pertanyaan Umum",
+    "default": "Pertanyaan Umum"
+  },
+  "pages.content.tools.attribute.title.57d99b55": {
+    "group": "Pages/Content/Tools",
+    "label": "Judul/tab: LFAMILIA Tools",
+    "default": "LFAMILIA Tools"
+  },
+  "pages.auth.verifyemail.attribute.title.326bb634": {
+    "group": "Pages/Auth/VerifyEmail",
+    "label": "Judul/tab: Verifikasi email",
+    "default": "Verifikasi email"
+  },
+  "pages.auth.register.attribute.title.5e0b087f": {
+    "group": "Pages/Auth/Register",
+    "label": "Judul/tab: Daftar",
+    "default": "Daftar"
+  },
+  "pages.auth.register.attribute.placeholder.d3d2f4b0": {
+    "group": "Pages/Auth/Register",
+    "label": "Placeholder: Minimal 12 karakter",
+    "default": "Minimal 12 karakter"
+  },
+  "pages.auth.register.attribute.placeholder.7cd33da1": {
+    "group": "Pages/Auth/Register",
+    "label": "Placeholder: Masukkan ulang kata sandi",
+    "default": "Masukkan ulang kata sandi"
+  },
+  "pages.auth.login.attribute.title.5f295534": {
+    "group": "Pages/Auth/Login",
+    "label": "Judul/tab: Masuk",
+    "default": "Masuk"
+  },
+  "pages.auth.login.attribute.placeholder.e0b6cfa6": {
+    "group": "Pages/Auth/Login",
+    "label": "Placeholder: Masukkan email",
+    "default": "Masukkan email"
+  },
+  "pages.auth.login.attribute.placeholder.18cb4bb4": {
+    "group": "Pages/Auth/Login",
+    "label": "Placeholder: Masukkan kata sandi",
+    "default": "Masukkan kata sandi"
+  },
+  "pages.auth.forgotpassword.attribute.title.1f8b9a21": {
+    "group": "Pages/Auth/ForgotPassword",
+    "label": "Judul/tab: Lupa kata sandi",
+    "default": "Lupa kata sandi"
+  },
+  "pages.auth.forgotpassword.attribute.placeholder.a06a6645": {
+    "group": "Pages/Auth/ForgotPassword",
+    "label": "Placeholder: Masukkan email akun",
+    "default": "Masukkan email akun"
+  },
+  "pages.auth.completephone.attribute.title.21930b90": {
+    "group": "Pages/Auth/CompletePhone",
+    "label": "Judul/tab: Lengkapi nomor telepon",
+    "default": "Lengkapi nomor telepon"
+  },
+  "pages.auth.completephone.attribute.placeholder.a02514d1": {
+    "group": "Pages/Auth/CompletePhone",
+    "label": "Placeholder: Contoh: 081234567890",
+    "default": "Contoh: 081234567890"
+  },
+  "pages.auth.resetpassword.attribute.title.db424161": {
+    "group": "Pages/Auth/ResetPassword",
+    "label": "Judul/tab: Kata sandi baru",
+    "default": "Kata sandi baru"
+  },
+  "pages.auth.resetpassword.attribute.placeholder.a06a6645": {
+    "group": "Pages/Auth/ResetPassword",
+    "label": "Placeholder: Masukkan email akun",
+    "default": "Masukkan email akun"
+  },
+  "pages.auth.resetpassword.attribute.placeholder.d3d2f4b0": {
+    "group": "Pages/Auth/ResetPassword",
+    "label": "Placeholder: Minimal 12 karakter",
+    "default": "Minimal 12 karakter"
+  },
+  "pages.auth.resetpassword.attribute.placeholder.7cd33da1": {
+    "group": "Pages/Auth/ResetPassword",
+    "label": "Placeholder: Masukkan ulang kata sandi",
+    "default": "Masukkan ulang kata sandi"
+  },
+  "components.customershell.attribute.aria-label.adae0b8b": {
+    "group": "Components/CustomerShell",
+    "label": "Label akses: LFAMILIA STORE",
+    "default": "LFAMILIA STORE"
+  },
+  "components.customershell.attribute.alt.adae0b8b": {
+    "group": "Components/CustomerShell",
+    "label": "Deskripsi gambar: LFAMILIA STORE",
+    "default": "LFAMILIA STORE"
+  },
+  "components.customershell.attribute.aria-label.4e933d91": {
+    "group": "Components/CustomerShell",
+    "label": "Label akses: Cari produk",
+    "default": "Cari produk"
+  },
+  "components.customershell.attribute.aria-label.70783293": {
+    "group": "Components/CustomerShell",
+    "label": "Label akses: Navigasi utama",
+    "default": "Navigasi utama"
+  },
+  "components.customershell.attribute.aria-label.9fa7b867": {
+    "group": "Components/CustomerShell",
+    "label": "Label akses: Buka menu",
+    "default": "Buka menu"
+  },
+  "components.customershell.attribute.aria-label.980d1dd6": {
+    "group": "Components/CustomerShell",
+    "label": "Label akses: Menu customer",
+    "default": "Menu customer"
+  },
+  "components.customershell.attribute.aria-label.f95701b": {
+    "group": "Components/CustomerShell",
+    "label": "Label akses: Instagram",
+    "default": "Instagram"
+  },
+  "components.customershell.attribute.aria-label.b1332787": {
+    "group": "Components/CustomerShell",
+    "label": "Label akses: WhatsApp",
+    "default": "WhatsApp"
+  },
+  "components.customershell.attribute.aria-label.43352167": {
+    "group": "Components/CustomerShell",
+    "label": "Label akses: Email",
+    "default": "Email"
+  },
+  "components.customershell.attribute.aria-label.c839636f": {
+    "group": "Components/CustomerShell",
+    "label": "Label akses: Discord",
+    "default": "Discord"
+  },
+  "components.accountshell.attribute.aria-label.8ab7199": {
+    "group": "Components/AccountShell",
+    "label": "Label akses: Tutup menu akun",
+    "default": "Tutup menu akun"
+  },
+  "layout.footer.copyright": {
+    "group": "Components/CustomerShell",
+    "label": "Keterangan copyright footer",
+    "default": "Produk dan merek dagang adalah milik pemegang hak masing-masing."
+  }
+}

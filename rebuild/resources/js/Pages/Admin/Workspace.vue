@@ -1,10 +1,11 @@
 <script setup>
-import { Head, router, useForm, usePage } from '@inertiajs/vue3';
-import { computed, reactive } from 'vue';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { computed, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 
 const props = defineProps({
     kind: String,
+    filters: Object,
     title: String,
     rows: { type: [Array, Object], default: () => [] },
     membershipTiers: { type: [Array, Object], default: () => [] },
@@ -21,6 +22,9 @@ const page = usePage();
 const base = computed(() => page.props.adminPanel?.base_path || '/admin');
 const isSuper = computed(() => page.props.adminPanel?.admin?.role === 'SUPER_ADMIN');
 const rows = reactive(Array.isArray(props.rows) ? props.rows.map((row) => ({ ...row })) : (props.rows?.data || []).map((row) => ({ ...row })));
+const searchQuery = ref(props.filters?.q || '');
+watch(() => props.rows, value => { rows.splice(0, rows.length, ...(Array.isArray(value) ? value : value?.data || []).map(row => ({...row}))); });
+const searchRows = () => router.get('/admin/' + (props.kind === 'orders' ? 'orders' : 'customers'), {q:searchQuery.value}, {preserveState:true});
 const popularProducts = reactive((props.popularProducts || []).map((row) => ({ ...row })));
 
 const voucherForm = useForm({
@@ -93,10 +97,11 @@ function adjustWallet(row) {
         <div class="space-y-6">
             <div><h1 class="text-3xl font-semibold">{{ title }}</h1></div>
 
+            <form v-if="kind === 'orders' || kind === 'customers'" class="lf-admin-filter-row" @submit.prevent="searchRows"><label>Cari {{kind === 'orders' ? 'nomor invoice' : 'nama/email pelanggan'}}<input v-model="searchQuery" maxlength="100"></label><div class="self-end"><button class="lf-admin-primary">Cari</button></div></form>
             <section v-if="kind === 'orders'" class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900 p-4">
                 <table class="w-full min-w-[850px] text-sm">
                     <thead class="text-left text-slate-400"><tr><th class="p-2">Order</th><th class="p-2">Produk</th><th class="p-2">Nominal</th><th class="p-2">Status</th><th class="p-2">Total</th><th class="p-2">Dibuat</th></tr></thead>
-                    <tbody><tr v-for="row in rows" :key="row.id" class="border-t border-slate-800"><td class="p-2">{{ row.order_number }}</td><td class="p-2">{{ row.product_name }}</td><td class="p-2">{{ row.package_name }}</td><td class="p-2">{{ row.status }}</td><td class="p-2">Rp{{ Number(row.total_idr).toLocaleString('id-ID') }}</td><td class="p-2">{{ row.created_at }}</td></tr></tbody>
+                    <tbody><tr v-for="row in rows" :key="row.id" class="border-t border-slate-800"><td class="p-2"><Link :href="'/admin/orders/' + row.id" class="text-blue-600 font-semibold">{{ row.order_number }}</Link></td><td class="p-2">{{ row.product_name }}</td><td class="p-2">{{ row.package_name }}</td><td class="p-2">{{ row.status }}</td><td class="p-2">Rp{{ Number(row.total_idr).toLocaleString('id-ID') }}</td><td class="p-2">{{ row.created_at }}</td></tr></tbody>
                 </table>
             </section>
 

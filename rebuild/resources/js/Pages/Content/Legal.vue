@@ -1,4 +1,7 @@
 <script setup>
+import { useCustomerPresentation } from '../../Composables/customerPresentation';
+const { customerText } = useCustomerPresentation();
+
 import { computed } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import CustomerShell from '../../Components/CustomerShell.vue';
@@ -21,7 +24,7 @@ const blocks = computed(() => {
 <CustomerShell>
 <main class="lf-container lf-content-page">
  <article class="lf-legal">
-  <p class="lf-eyebrow">INFORMASI LFAMILIA</p><h1 class="lf-title">{{ page.title }}</h1>
+  <p class="lf-eyebrow">{{ customerText("pages.content.legal.89e98bf2", "INFORMASI LFAMILIA") }}</p><h1 class="lf-title">{{ page.title }}</h1>
   <p class="lf-article-summary">{{ page.intro }}</p>
   <div class="lf-prose lf-legal-content">
    <template v-for="(block, i) in blocks" :key="i">

@@ -1,4 +1,7 @@
 <script setup>
+import { useCustomerPresentation } from '../../Composables/customerPresentation';
+const { customerText } = useCustomerPresentation();
+
 import { Head, useForm, usePage } from '@inertiajs/vue3';
 import AccountShell from '../../Components/AccountShell.vue';
 
@@ -18,54 +21,54 @@ const remove = () => {
 </script>
 
 <template>
-    <Head title="Profil" />
+    <Head :title="customerText(&quot;pages.customer.profile.attribute.title.8b01539f&quot;, &quot;Profil&quot;)" />
     <AccountShell>
-        <h1 class="text-3xl font-semibold">Profil</h1>
+        <h1 class="text-3xl font-semibold">{{ customerText("pages.customer.profile.8b01539f", "Profil") }}</h1>
         <p v-if="page.props.status" role="status" class="text-cyan-300">{{ page.props.status }}</p>
         <form class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5" @submit.prevent="updateProfile">
-            <h2 class="text-lg font-semibold">Data akun</h2>
+            <h2 class="text-lg font-semibold">{{ customerText("pages.customer.profile.81176d44", "Data akun") }}</h2>
             <label v-for="field in [{ key: 'name', label: 'Nama', type: 'text' }, { key: 'email', label: 'Email', type: 'email' }, { key: 'phone', label: 'Nomor HP', type: 'tel' }]" :key="field.key" class="block">{{ field.label }}
                 <input v-model="profile[field.key]" :type="field.type" required class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
                 <span v-if="profile.errors[field.key]" class="text-sm text-red-300">{{ profile.errors[field.key] }}</span>
             </label>
             <label class="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                <span><strong class="block text-sm">Tampil di leaderboard</strong><small class="mt-1 block text-xs text-slate-400">Jika aktif, hanya nama singkat yang ditampilkan. Email, telepon, dan data game tidak pernah ditampilkan.</small></span>
+                <span><strong class="block text-sm">{{ customerText("pages.customer.profile.db175326", "Tampil di leaderboard") }}</strong><small class="mt-1 block text-xs text-slate-400">{{ customerText("pages.customer.profile.8c806ec", "Jika aktif, hanya nama singkat yang ditampilkan. Email, telepon, dan data game tidak pernah ditampilkan.") }}</small></span>
                 <input v-model="profile.leaderboard_opt_in" type="checkbox" class="size-5 accent-lime-400">
             </label>
-            <label v-if="hasPassword" class="block">Kata sandi saat ini (wajib jika mengubah email)
+            <label v-if="hasPassword" class="block">{{ customerText("pages.customer.profile.1c30598a", "Kata sandi saat ini (wajib jika mengubah email)") }}
                 <input v-model="profile.current_password" type="password" autocomplete="current-password" class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
                 <span v-if="profile.errors.current_password" class="text-sm text-red-300">{{ profile.errors.current_password }}</span>
             </label>
-            <button :disabled="profile.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50">Simpan profil</button>
+            <button :disabled="profile.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50">{{ customerText("pages.customer.profile.75b2c343", "Simpan profil") }}</button>
         </form>
         <form class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5" @submit.prevent="updatePassword">
             <h2 class="text-lg font-semibold">{{ hasPassword ? 'Ubah kata sandi' : 'Buat kata sandi' }}</h2>
-            <label v-if="hasPassword" class="block">Kata sandi saat ini
+            <label v-if="hasPassword" class="block">{{ customerText("pages.customer.profile.71b0940a", "Kata sandi saat ini") }}
                 <input v-model="password.current_password" type="password" autocomplete="current-password" required class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
                 <span v-if="password.errors.current_password" class="text-sm text-red-300">{{ password.errors.current_password }}</span>
             </label>
-            <label class="block">Kata sandi baru (minimal 12 karakter)
+            <label class="block">{{ customerText("pages.customer.profile.220845f7", "Kata sandi baru (minimal 12 karakter)") }}
                 <input v-model="password.password" type="password" autocomplete="new-password" minlength="12" required class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
                 <span v-if="password.errors.password" class="text-sm text-red-300">{{ password.errors.password }}</span>
             </label>
-            <label class="block">Ulangi kata sandi
+            <label class="block">{{ customerText("pages.customer.profile.9c34c763", "Ulangi kata sandi") }}
                 <input v-model="password.password_confirmation" type="password" autocomplete="new-password" required class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
             </label>
-            <button :disabled="password.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50">Simpan kata sandi</button>
+            <button :disabled="password.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50">{{ customerText("pages.customer.profile.3267a4ff", "Simpan kata sandi") }}</button>
         </form>
         <form class="space-y-4 rounded-xl border border-red-900 bg-slate-900 p-5" @submit.prevent="remove">
-            <h2 class="text-lg font-semibold">Hapus akun</h2>
-            <p class="text-sm text-slate-400">Akun dengan saldo, pesanan, top-up, atau tiket tidak dapat dihapus otomatis. Ketik HAPUS untuk melanjutkan.</p>
-            <label class="block">Konfirmasi
+            <h2 class="text-lg font-semibold">{{ customerText("pages.customer.profile.55b19cad", "Hapus akun") }}</h2>
+            <p class="text-sm text-slate-400">{{ customerText("pages.customer.profile.8b096118", "Akun dengan saldo, pesanan, top-up, atau tiket tidak dapat dihapus otomatis. Ketik HAPUS untuk melanjutkan.") }}</p>
+            <label class="block">{{ customerText("pages.customer.profile.ba90910e", "Konfirmasi") }}
                 <input v-model="removal.confirmation" required class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
                 <span v-if="removal.errors.confirmation" class="text-sm text-red-300">{{ removal.errors.confirmation }}</span>
             </label>
-            <label v-if="hasPassword" class="block">Kata sandi
+            <label v-if="hasPassword" class="block">{{ customerText("pages.customer.profile.2a776cdb", "Kata sandi") }}
                 <input v-model="removal.password" type="password" autocomplete="current-password" required class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
                 <span v-if="removal.errors.password" class="text-sm text-red-300">{{ removal.errors.password }}</span>
             </label>
             <p v-if="removal.errors.account" class="text-sm text-red-300">{{ removal.errors.account }}</p>
-            <button :disabled="removal.processing" class="rounded-md bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-50">Hapus akun</button>
+            <button :disabled="removal.processing" class="rounded-md bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-50">{{ customerText("pages.customer.profile.55b19cad", "Hapus akun") }}</button>
         </form>
     </AccountShell>
 </template>

@@ -1,5 +1,5 @@
 <script setup>
-import { Head, router, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
@@ -14,6 +14,8 @@ const props = defineProps({
     reviews: Array,
     settings: Object,
 });
+const contentTab = ref('banners');
+const contentTabs = [['banners','Banner'],['popup','Pop-up'],['assets','Logo & Gambar'],['support','Kontak & Footer'],['news','Berita'],['reviews','Ulasan'],['faq','FAQ'],['legal','Kebijakan']];
 const page = usePage();
 const base = page.props.adminPanel?.base_path || '/admin';
 
@@ -151,7 +153,8 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 <p class="mt-2 text-sm text-slate-500">Kelola konten customer frontend tanpa mengubah source code.</p>
             </div>
 
-            <section class="rounded-xl border border-slate-200 bg-white p-5">
+            <nav class="lf-admin-tabs" aria-label="Konten toko"><button v-for="[key,label] in contentTabs" :key="key" type="button" :class="{active:contentTab===key}" @click="contentTab=key">{{label}}</button><Link :href="base + '/content/presentation'">Teks & Tampilan</Link></nav>
+            <section v-show="contentTab === 'banners'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h2 class="text-lg font-bold">Homepage Banner Carousel</h2>
@@ -204,7 +207,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </div>
             </section>
 
-            <section class="rounded-xl border border-slate-200 bg-white p-5">
+            <section v-show="contentTab === 'popup'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <div>
                     <h2 class="text-lg font-bold">Pop-up Homepage</h2>
                     <p class="mt-1 text-xs text-slate-500">Hanya 1 pop-up pengumuman. Muncul saat customer membuka homepage dan dapat disembunyikan lewat “Jangan tampilkan lagi”.</p>
@@ -237,7 +240,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </article>
             </section>
 
-            <section class="rounded-xl border border-slate-200 bg-white p-5">
+            <section v-show="contentTab === 'assets'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 class="text-lg font-bold">Branding & fallback assets</h2>
                 <p class="mt-1 text-xs text-slate-500">Logo, favicon, banner atas, popup, serta banner bawah/footer.</p>
                 <div class="mt-4 grid gap-4 lg:grid-cols-2">
@@ -257,7 +260,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </div>
             </section>
 
-            <section class="rounded-xl border border-slate-200 bg-white p-5">
+            <section v-show="contentTab === 'support'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 class="text-lg font-bold">Customer support & homepage text</h2>
                 <form class="mt-4 grid gap-3 md:grid-cols-2" @submit.prevent="settingsForm.put(base + '/content/settings')">
                     <label class="text-xs">Judul berita homepage<input v-model="settingsForm.home_news_title" class="mt-1 block w-full rounded border border-slate-200 p-2"></label>
@@ -279,7 +282,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </form>
             </section>
 
-            <section class="rounded-xl border border-slate-200 bg-white p-5">
+            <section v-show="contentTab === 'news'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 class="text-lg font-bold">Berita</h2>
                 <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="newsForm.post(base + '/content/news', { preserveScroll: true, onSuccess: () => newsForm.reset() })">
                     <input v-model="newsForm.title" required placeholder="Judul berita" class="rounded border border-slate-200 p-2 text-sm">
@@ -312,7 +315,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </div>
             </section>
 
-            <section class="rounded-xl border border-slate-200 bg-white p-5">
+            <section v-show="contentTab === 'reviews'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <div class="flex items-center justify-between gap-3"><div><h2 class="text-lg font-bold">Ulasan Pelanggan</h2><p class="mt-1 text-xs text-slate-500">Moderasi ulasan terverifikasi dari order sukses. Isi ulasan tidak diedit oleh Admin.</p></div><span class="rounded bg-slate-100 px-2 py-1 text-xs font-bold">{{reviews.length}} ulasan</span></div>
                 <div class="mt-4 overflow-x-auto rounded-lg border border-slate-200">
                     <table class="w-full min-w-[780px] text-left text-xs">
@@ -332,7 +335,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </div>
             </section>
 
-            <section class="rounded-xl border border-slate-200 bg-white p-5">
+            <section v-show="contentTab === 'faq'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 class="text-lg font-bold">FAQ / Pertanyaan umum</h2>
                 <form class="mt-4 grid gap-3 md:grid-cols-[1fr_120px_auto]" @submit.prevent="faqForm.post(base + '/content/faqs', { preserveScroll: true, onSuccess: () => faqForm.reset() })">
                     <input v-model="faqForm.question" required placeholder="Pertanyaan" class="rounded border border-slate-200 p-2 text-sm">
@@ -350,8 +353,8 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </div>
             </section>
 
-            <section class="rounded-xl border border-slate-200 bg-white p-5">
-                <h2 class="text-lg font-bold">Informasi / legal</h2>
+            <section v-show="contentTab === 'legal'" class="rounded-xl border border-slate-200 bg-white p-5">
+                <h2 class="text-lg font-bold">Informasi / legal</h2><p class="lf-admin-note">Gunakan ## di awal paragraf untuk judul bagian, dan - di awal paragraf untuk item daftar.</p>
                 <div class="mt-4 space-y-4">
                     <article v-for="item in pages" :key="item.key" class="rounded-lg border border-slate-200 p-4">
                         <strong class="text-xs uppercase text-slate-500">{{ item.key }}</strong>

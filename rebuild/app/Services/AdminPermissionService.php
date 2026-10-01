@@ -57,6 +57,7 @@ class AdminPermissionService
             ['label' => 'Manual', 'href' => '/admin/fulfillment', 'permission' => 'fulfillment.manage'],
             ['label' => 'Banner & Konten', 'href' => '/admin/content', 'permission' => 'content.manage'],
             ['label' => 'Digiflazz', 'href' => '/admin/providers?provider=DIGIFLAZZ', 'permission' => 'providers.manage'],
+            ['label' => 'Validasi Akun', 'href' => '/admin/nickname-tools', 'permission' => null, 'super_only' => true],
             ['label' => 'Provider', 'href' => '/admin/providers', 'permission' => 'providers.manage'],
             ['label' => 'Pembayaran', 'href' => '/admin/payments', 'permission' => 'payments.manage'],
             ['label' => 'Pelanggan', 'href' => '/admin/customers', 'permission' => 'customers.view'],

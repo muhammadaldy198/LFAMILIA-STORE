@@ -10,7 +10,10 @@ use App\Http\Controllers\AdminFulfillmentController;
 use App\Http\Controllers\AdminIntegrationController;
 use App\Http\Controllers\AdminNicknameController;
 use App\Http\Controllers\AdminNotificationController;
+use App\Http\Controllers\AdminOrderDetailController;
 use App\Http\Controllers\AdminPaymentController;
+use App\Http\Controllers\AdminPresentationController;
+use App\Http\Controllers\AdminSearchController;
 use App\Http\Controllers\AdminWorkspaceController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CheckoutController;
@@ -155,6 +158,7 @@ Route::middleware('guest:admin')->group(function (): void {
 });
 
 Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
+    Route::get('/admin/search', AdminSearchController::class)->middleware('throttle:admin-sensitive')->name('admin.search');
     Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 
     Route::get('/admin/panel', AdminDashboardController::class)
@@ -212,6 +216,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         });
 
     Route::middleware('admin.permission:content.manage')->group(function (): void {
+        Route::get('/admin/content/presentation', [AdminPresentationController::class, 'index'])->name('admin.content.presentation');
+        Route::put('/admin/content/presentation', [AdminPresentationController::class, 'update'])->name('admin.content.presentation.update');
         Route::get('/admin/content', [AdminContentController::class, 'index'])->name('admin.content');
         Route::put('/admin/content/settings', [AdminContentController::class, 'updateSettings'])->name('admin.content.settings');
         Route::post('/admin/content/banners', [AdminContentController::class, 'storeBanner'])->name('admin.content.banners.store');
@@ -241,6 +247,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::put('/admin/providers/{id}', [AdminWorkspaceController::class, 'updateProvider'])->name('admin.providers.update');
     });
 
+    Route::get('/admin/orders/{id}', AdminOrderDetailController::class)->middleware('admin.permission:orders.view')->name('admin.orders.show');
     Route::get('/admin/orders', [AdminWorkspaceController::class, 'orders'])
         ->middleware('admin.permission:orders.view')->name('admin.orders');
 

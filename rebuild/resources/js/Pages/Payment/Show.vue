@@ -1,4 +1,7 @@
 <script setup>
+import { useCustomerPresentation } from '../../Composables/customerPresentation';
+const { customerText } = useCustomerPresentation();
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import CustomerShell from '../../Components/CustomerShell.vue';
@@ -204,7 +207,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-<Head title="Pembayaran" />
+<Head :title="customerText(&quot;pages.payment.show.attribute.title.3527df23&quot;, &quot;Pembayaran&quot;)" />
 <CustomerShell>
 <main class="lf-payment-page mx-auto min-h-[76vh] max-w-xl px-4 py-8 sm:py-12" :style="{ '--payment-accent': accent }">
     <section class="lf-payment-card overflow-hidden rounded-xl border border-white/10 bg-[#0d1019] shadow-2xl">
@@ -212,15 +215,15 @@ onBeforeUnmount(() => {
         <div class="lf-payment-head border-b border-white/10 bg-gradient-to-br from-white/[0.035] via-transparent to-transparent p-5 sm:p-6">
             <div v-if="settings.showStoreBrand !== false" class="lf-payment-brand-row mb-5 flex items-center justify-between gap-4 border-b border-white/[0.07] pb-4">
                 <div class="lf-payment-brand">
-                    <img v-if="storeLogo" :src="storeLogo" alt="LFAMILIA STORE">
-                    <span v-else class="lf-payment-brand-fallback">LF</span>
+                    <img v-if="storeLogo" :src="storeLogo" :alt="customerText(&quot;pages.payment.show.attribute.alt.adae0b8b&quot;, &quot;LFAMILIA STORE&quot;)">
+                    <span v-else class="lf-payment-brand-fallback">{{ customerText("pages.payment.show.6ae24f17", "LF") }}</span>
                     <div>
-                        <strong>LFAMILIA</strong>
-                        <small>STORE</small>
+                        <strong>{{ customerText("pages.payment.show.497f244e", "LFAMILIA") }}</strong>
+                        <small>{{ customerText("pages.payment.show.70515d8e", "STORE") }}</small>
                     </div>
                 </div>
                 <button type="button" class="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-right" @click="copyValue(order.order_number,'invoice')">
-                    <span class="block text-[8px] font-bold uppercase tracking-[0.16em] text-white/35">Invoice</span>
+                    <span class="block text-[8px] font-bold uppercase tracking-[0.16em] text-white/35">{{ customerText("pages.payment.show.71ec87b0", "Invoice") }}</span>
                     <span class="mt-0.5 block max-w-40 truncate font-mono text-[10px] font-black text-[#b9ff35]">{{order.order_number}}</span>
                 </button>
             </div>
@@ -251,28 +254,28 @@ onBeforeUnmount(() => {
             </div>
 
             <dl v-if="settings.showOrderSummary !== false" class="mt-5 space-y-3 text-xs">
-                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">Produk</dt><dd class="max-w-[65%] text-right font-bold">{{order.product_name}}</dd></div>
-                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">Nominal</dt><dd class="max-w-[65%] text-right font-bold">{{order.package_name}}</dd></div>
-                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">Metode</dt><dd class="max-w-[65%] text-right font-bold">{{paymentLabel}}</dd></div>
+                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.ceb4d888", "Produk") }}</dt><dd class="max-w-[65%] text-right font-bold">{{order.product_name}}</dd></div>
+                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.a2defbe3", "Nominal") }}</dt><dd class="max-w-[65%] text-right font-bold">{{order.package_name}}</dd></div>
+                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.9eb68c25", "Metode") }}</dt><dd class="max-w-[65%] text-right font-bold">{{paymentLabel}}</dd></div>
                 <div class="h-px bg-white/[0.08]"></div>
-                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">Harga setelah promo</dt><dd class="font-bold">{{formatIdr(order.product_total_idr)}}</dd></div>
-                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">Biaya pembayaran</dt><dd class="font-bold">{{formatIdr(order.fee_idr)}}</dd></div>
-                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">Total pembayaran</dt><dd class="text-lg font-black text-[#b9ff35]">{{formatIdr(order.total_idr)}}</dd></div>
+                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.8269538b", "Harga setelah promo") }}</dt><dd class="font-bold">{{formatIdr(order.product_total_idr)}}</dd></div>
+                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.c217fcd5", "Biaya pembayaran") }}</dt><dd class="font-bold">{{formatIdr(order.fee_idr)}}</dd></div>
+                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.87378529", "Total pembayaran") }}</dt><dd class="text-lg font-black text-[#b9ff35]">{{formatIdr(order.total_idr)}}</dd></div>
             </dl>
 
             <div v-if="!terminal && !uncertain && qrUrl" class="mt-5 rounded-xl border border-white/10 bg-white p-4 text-center">
-                <img :src="qrUrl" alt="QRIS pembayaran" class="mx-auto h-auto w-full max-w-[220px]">
-                <p class="mt-3 text-[10px] font-black text-[#091006]">Scan QRIS untuk membayar</p>
-                <p class="mt-1 text-[8px] text-black/55">Gunakan aplikasi bank atau e-wallet yang mendukung QRIS.</p>
+                <img :src="qrUrl" :alt="customerText(&quot;pages.payment.show.attribute.alt.dfd028b8&quot;, &quot;QRIS pembayaran&quot;)" class="mx-auto h-auto w-full max-w-[220px]">
+                <p class="mt-3 text-[10px] font-black text-[#091006]">{{ customerText("pages.payment.show.deb02ada", "Scan QRIS untuk membayar") }}</p>
+                <p class="mt-1 text-[8px] text-black/55">{{ customerText("pages.payment.show.38ab038a", "Gunakan aplikasi bank atau e-wallet yang mendukung QRIS.") }}</p>
             </div>
 
             <div v-if="!terminal && !uncertain && manualQris && qrUrl" class="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3">
-                <strong class="text-[10px] text-amber-200">Konfirmasi QRIS manual</strong>
-                <p class="mt-1 text-[9px] leading-4 text-white/45">Setelah pembayaran dilakukan, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama.</p>
+                <strong class="text-[10px] text-amber-200">{{ customerText("pages.payment.show.4772759d", "Konfirmasi QRIS manual") }}</strong>
+                <p class="mt-1 text-[9px] leading-4 text-white/45">{{ customerText("pages.payment.show.957f12a8", "Setelah pembayaran dilakukan, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama.") }}</p>
             </div>
 
             <div v-if="!terminal && !uncertain && qrString && !qrUrl" class="mt-5 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                <p class="text-[9px] font-bold uppercase tracking-[0.14em] text-white/35">QRIS</p>
+                <p class="text-[9px] font-bold uppercase tracking-[0.14em] text-white/35">{{ customerText("pages.payment.show.6f239bfe", "QRIS") }}</p>
                 <div class="mt-2 flex items-center justify-between gap-3 rounded-lg bg-black/25 px-3 py-3">
                     <code class="break-all text-[10px] font-bold text-white">{{qrString}}</code>
                     <button type="button" class="shrink-0 text-[10px] font-bold text-[#b9ff35]" @click="copyValue(qrString,'payment')">{{copiedPayment ? 'Tersalin' : 'Salin'}}</button>
@@ -298,7 +301,7 @@ onBeforeUnmount(() => {
 
             <button v-if="canResume" type="button" :disabled="startingPayment || refreshingStatus" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="resumePayment">{{startingPayment ? 'Menyiapkan…' : 'Siapkan pembayaran'}}</button>
             <button v-if="!terminal && !uncertain && paymentUrl" type="button" :disabled="openingPayment" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="openPayment">{{openingPayment ? 'Memproses…' : (settings.payButtonText || 'Bayar Sekarang')}}</button>
-            <Link v-if="paid || latePaid || refunded" :href="statusUrl" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006]">Lihat status pesanan</Link>
+            <Link v-if="paid || latePaid || refunded" :href="statusUrl" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006]">{{ customerText("pages.payment.show.2fdc5653", "Lihat status pesanan") }}</Link>
 
             <div class="lf-payment-actions mt-3 grid grid-cols-2 gap-2">
                 <button type="button" class="h-10 rounded-lg border border-white/10 bg-white/[0.03] text-[10px] font-bold text-white" :disabled="refreshingStatus || startingPayment" @click="refreshStatus">{{settings.checkStatusButtonText || 'Cek status'}}</button>
