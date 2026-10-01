@@ -149,11 +149,27 @@ class StorefrontParityTest extends TestCase
         $catalog = $this->catalog();
         $this->guestOrder($catalog['product'], $catalog['package_id'], 'LF260930-TRACKTEST');
 
+        $trackingToken = null;
         foreach (['081234567890', '6281234567890', '+62 812-3456-7890'] as $phone) {
             $response = $this->postJson('/orders/track/search', ['query' => $phone])
-                ->assertOk()->assertJsonPath('mode', 'phone');
-            $this->assertSame('LF260930-TRACKTEST', $response->json('orders.0.referenceId'));
+                ->assertOk()
+                ->assertJsonPath('mode', 'phone')
+                ->assertJsonPath('orders.0.maskedReferenceId', 'LF260••••TEST')
+                ->assertJsonMissingPath('orders.0.referenceId');
+
+            $this->assertStringNotContainsString('LF260930-TRACKTEST', $response->getContent());
+            $trackingToken ??= $response->json('orders.0.trackingToken');
         }
+
+        $this->assertIsString($trackingToken);
+        $tracked = $this->postJson('/orders/track/status', ['tracking_token' => $trackingToken])
+            ->assertOk()
+            ->assertJsonPath('order.referenceId', 'LF260••••TEST')
+            ->assertJsonPath('order.referenceMasked', true);
+        $this->assertStringNotContainsString('LF260930-TRACKTEST', $tracked->getContent());
+
+        $this->postJson('/orders/track/status', ['tracking_token' => $trackingToken.'tampered'])
+            ->assertNotFound();
 
         $invoice = $this->postJson('/orders/track/search', ['query' => 'LF260930-TRACKTEST'])
             ->assertOk()->assertJsonPath('mode', 'order');
