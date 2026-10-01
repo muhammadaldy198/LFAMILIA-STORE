@@ -700,18 +700,18 @@
   .lf-action{font-size:9px!important}
 
   /* Drawer */
-  .lf-drawer-head strong{font-size:12px!important}
-  .lf-drawer-head p{font-size:8px!important}
-  .lf-drawer-account .lf-eyebrow{font-size:8px!important}
-  .lf-drawer-account h2{font-size:13px!important}
-  .lf-drawer-account>p:last-of-type{font-size:9px!important}
+  .lf-drawer-head strong{font-size:13px!important}
+  .lf-drawer-head p{font-size:9px!important}
+  .lf-drawer-account .lf-eyebrow{font-size:9px!important}
+  .lf-drawer-account h2{font-size:14px!important}
+  .lf-drawer-account>p:last-of-type{font-size:10px!important}
   .lf-drawer-account-actions .lf-primary,
-  .lf-drawer-account-actions .lf-secondary{font-size:9px!important}
-  .lf-drawer-profile strong{font-size:10px!important}
-  .lf-drawer-profile small{font-size:8px!important}
-  .lf-drawer-profile + .lf-primary{font-size:9px!important}
+  .lf-drawer-account-actions .lf-secondary{font-size:10px!important}
+  .lf-drawer-profile strong{font-size:11px!important}
+  .lf-drawer-profile small{font-size:9px!important}
+  .lf-drawer-profile + .lf-primary{font-size:10px!important}
   .lf-drawer-nav a,
-  .lf-drawer-nav a span{font-size:11px!important}
+  .lf-drawer-nav a span{font-size:12px!important}
 
   /* Floating support */
   .lf-support-panel header strong{font-size:14px!important}
@@ -1230,34 +1230,34 @@
   .lf-banner-dots{bottom:6px}
 
   /* Mobile type: one more step larger across the customer shell/home. */
-  .lf-brand-name{font-size:12px!important}
-  .lf-brand-sub{font-size:8px!important}
-  .lf-action{font-size:10px!important}
-  .lf-eyebrow{font-size:11px!important}
-  .lf-title{font-size:25px!important}
-  .lf-copy{font-size:12px!important}
-  .lf-popular-card strong{font-size:12px!important}
-  .lf-popular-card small{font-size:10px!important}
-  .lf-search input{font-size:12px!important}
-  .lf-chip{font-size:11px!important}
-  .lf-product-fallback strong{font-size:11px!important}
-  .lf-product-fallback small{font-size:9px!important}
-  .lf-step h3{font-size:12px!important}
-  .lf-step p{font-size:10px!important}
-  .lf-news-body small{font-size:9px!important}
-  .lf-news-body h3{font-size:17px!important}
-  .lf-news-body p{font-size:11px!important}
-  .lf-news-body strong{font-size:10px!important}
-  .lf-home-review-grid strong{font-size:12px!important}
-  .lf-home-review-grid span{font-size:10px!important}
-  .lf-home-review-grid p{font-size:11px!important}
-  .lf-home-review-grid a{font-size:10px!important}
-  .lf-help h2{font-size:20px!important}
-  .lf-help .lf-primary{font-size:11px!important}
-  .lf-footer-brand-column>p{font-size:12px!important}
-  .lf-footer-column h2{font-size:12px!important}
-  .lf-footer-column a{font-size:12px!important}
-  .lf-footer-copy{font-size:10px!important}
+  .lf-brand-name{font-size:13px!important}
+  .lf-brand-sub{font-size:9px!important}
+  .lf-action{font-size:11px!important}
+  .lf-eyebrow{font-size:12px!important}
+  .lf-title{font-size:26px!important}
+  .lf-copy{font-size:13px!important}
+  .lf-popular-card strong{font-size:13px!important}
+  .lf-popular-card small{font-size:11px!important}
+  .lf-search input{font-size:13px!important}
+  .lf-chip{font-size:12px!important}
+  .lf-product-fallback strong{font-size:12px!important}
+  .lf-product-fallback small{font-size:10px!important}
+  .lf-step h3{font-size:13px!important}
+  .lf-step p{font-size:11px!important}
+  .lf-news-body small{font-size:10px!important}
+  .lf-news-body h3{font-size:18px!important}
+  .lf-news-body p{font-size:12px!important}
+  .lf-news-body strong{font-size:11px!important}
+  .lf-home-review-grid strong{font-size:13px!important}
+  .lf-home-review-grid span{font-size:11px!important}
+  .lf-home-review-grid p{font-size:12px!important}
+  .lf-home-review-grid a{font-size:11px!important}
+  .lf-help h2{font-size:21px!important}
+  .lf-help .lf-primary{font-size:12px!important}
+  .lf-footer-brand-column>p{font-size:13px!important}
+  .lf-footer-column h2{font-size:13px!important}
+  .lf-footer-column a{font-size:13px!important}
+  .lf-footer-copy{font-size:11px!important}
 
   /* Support panel follows the floating trigger instead of being locked to center. */
   .lf-support-panel{
@@ -1280,10 +1280,10 @@
     top:58px!important;
     bottom:auto!important;
   }
-  .lf-support-panel header strong{font-size:15px!important}
-  .lf-support-panel header small{font-size:11px!important}
-  .lf-support-panel>div>a strong{font-size:13px!important}
-  .lf-support-panel>div>a small{font-size:11px!important}
+  .lf-support-panel header strong{font-size:16px!important}
+  .lf-support-panel header small{font-size:12px!important}
+  .lf-support-panel>div>a strong{font-size:14px!important}
+  .lf-support-panel>div>a small{font-size:12px!important}
 
   /* Popup proportions inspired by the old LFAMILIA flow / supplied reference. */
   .lf-home-popup-backdrop{
@@ -1393,7 +1393,7 @@
     margin:0!important;
     padding:0 34px;
     text-align:center;
-    font-size:15px!important;
+    font-size:16px!important;
     line-height:1.35!important;
     font-weight:900!important;
   }
@@ -1411,7 +1411,7 @@
     padding:10px 22px 18px!important;
     border-top:0!important;
     color:rgba(255,255,255,.78)!important;
-    font-size:10.5px!important;
+    font-size:11.5px!important;
     font-weight:800!important;
   }
   .lf-home-popup-dismiss input{
@@ -1498,7 +1498,7 @@
     margin:12px 0 0!important;
     white-space:pre-line!important;
     color:rgba(255,255,255,.78)!important;
-    font-size:12px!important;
+    font-size:13px!important;
     line-height:1.6!important;
   }
   .lf-home-popup-dismiss{
@@ -4885,15 +4885,16 @@
     border-radius:16px;
   }
   .lf-support-cta-inner h2{
-    font-size:20px;
+    font-size:21px;
   }
   .lf-support-cta-inner>div>p:last-child{
-    font-size:11px;
+    font-size:12px;
     line-height:1.65;
   }
   .lf-support-cta-button{
     width:100%;
     height:40px;
+    font-size:12px;
   }
 }
 
