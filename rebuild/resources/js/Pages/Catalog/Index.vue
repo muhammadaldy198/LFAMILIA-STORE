@@ -128,7 +128,7 @@ onUnmounted(()=>{
                     </div>
                     <form class="lf-search" @submit.prevent="submit">
                         <span aria-hidden="true">⌕</span>
-                        <input v-model="search" maxlength="80" placeholder="Cari game, voucher, pulsa, PLN...">
+                        <input v-model="search" maxlength="80" placeholder="Cari game, voucher, pulsa, atau PLN">
                     </form>
                 </div>
 
