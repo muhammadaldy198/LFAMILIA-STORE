@@ -5568,3 +5568,5 @@
  .lf-customer .lf-account-nav{display:grid;grid-template-columns:minmax(0,1fr);overflow:visible;margin-top:18px}
  .lf-customer .lf-account-nav a,.lf-customer .lf-account-nav button{width:100%;white-space:normal}
 }
+
+@media(max-width:639px){.lf-customer .lf-account-side{height:100dvh;min-height:100dvh;box-sizing:border-box;align-self:stretch}}
