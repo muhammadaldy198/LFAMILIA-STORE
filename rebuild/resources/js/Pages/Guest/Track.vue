@@ -76,7 +76,7 @@ onUnmounted(()=>{stopDetailPolling();if(feedTimer)clearInterval(feedTimer);});
   </div>
   <div class="lf-track-search">
    <svg viewBox="0 0 24 24"><path d="m21 21-4.3-4.3m1.3-5.7a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>
-   <input v-model="query" @keyup.enter="search" placeholder="Contoh: LF260930... atau 0812...">
+   <input v-model="query" @keyup.enter="search" placeholder="Contoh: LF260930 atau 081234567890">
    <button :disabled="loading" @click="search">{{loading?'Mencari...':'Periksa'}}</button>
   </div>
   <p v-if="error" class="lf-track-error">{{error}}</p>
