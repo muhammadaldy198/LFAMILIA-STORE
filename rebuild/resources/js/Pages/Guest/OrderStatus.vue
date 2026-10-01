@@ -138,9 +138,9 @@ onUnmounted(()=>{if(timer)clearInterval(timer);});
                         <h2>Beri ulasan</h2>
                         <p>Ulasan hanya tersedia untuk pesanan yang sudah berhasil.</p>
                         <div class="lf-order-review-form">
-                            <input v-model="reviewName" maxlength="100" placeholder="Nama tampilan (opsional)">
+                            <input v-model="reviewName" maxlength="100" placeholder="Masukkan nama tampilan (opsional)">
                             <select v-model.number="reviewRating"><option :value="5">5 ★</option><option :value="4">4 ★</option><option :value="3">3 ★</option><option :value="2">2 ★</option><option :value="1">1 ★</option></select>
-                            <textarea v-model="reviewBody" rows="3" maxlength="2000" placeholder="Bagaimana pengalaman transaksi kamu?"></textarea>
+                            <textarea v-model="reviewBody" rows="3" maxlength="2000" placeholder="Ceritakan pengalaman transaksimu"></textarea>
                             <button class="lf-primary" :disabled="busy||reviewBody.trim().length<3" @click="submitReview">Kirim Ulasan</button>
                         </div>
                     </template>
