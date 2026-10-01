@@ -5686,3 +5686,6 @@
  .lf-customer .lf-footer-column a,.lf-customer .lf-footer-brand-column>p{font-size:13px!important;line-height:1.6!important}
  .lf-customer .lf-footer-copy{font-size:11px!important;line-height:1.5!important}
 }
+
+/* Navigation remains left-aligned independently of global action-button geometry. */
+.lf-customer .lf-account-nav a,.lf-customer .lf-account-nav button,.lf-customer .lf-account-nav .lf-account-logout{justify-content:flex-start!important;text-align:left!important}
