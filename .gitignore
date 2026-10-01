@@ -5,3 +5,10 @@
 !/rebuild/.env.example
 /outputs/
 /work/
+
+# Laravel server-generated files and uploaded media
+/rebuild/public/storage
+/rebuild/storage/app/**
+/rebuild/storage/framework/testing/
+/rebuild/database/*.sqlite*
+/rebuild/.phpunit.result.cache
