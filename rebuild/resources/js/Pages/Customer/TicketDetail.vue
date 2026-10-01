@@ -37,7 +37,7 @@ function reply() {
         </section>
 
         <form v-if="ticket.status !== 'CLOSED'" class="mt-4 rounded-xl border border-slate-800 bg-slate-900 p-4" @submit.prevent="reply">
-            <label class="text-sm font-semibold">Balas tiket<textarea v-model="form.message" required maxlength="5000" rows="4" class="mt-2 block w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm" placeholder="Tulis balasan..."></textarea></label>
+            <label class="text-sm font-semibold">Balas tiket<textarea v-model="form.message" required maxlength="5000" rows="4" class="mt-2 block w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm" placeholder="Masukkan balasan"></textarea></label>
             <div class="mt-3 flex justify-end"><button :disabled="form.processing" class="lf-primary">Kirim balasan</button></div>
             <p v-if="form.errors.message" class="mt-2 text-sm text-red-300">{{form.errors.message}}</p>
         </form>
