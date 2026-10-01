@@ -5679,3 +5679,10 @@
  .lf-customer table tr,.lf-customer table th,.lf-customer table td{height:40px}
  .lf-customer table th,.lf-customer table td{padding-top:8px;padding-bottom:8px}
 }
+
+/* Approved desktop footer readability adjustment; mobile geometry is retained. */
+@media(min-width:640px){
+ .lf-customer .lf-footer-column h2{font-size:14px!important;line-height:1.4!important}
+ .lf-customer .lf-footer-column a,.lf-customer .lf-footer-brand-column>p{font-size:13px!important;line-height:1.6!important}
+ .lf-customer .lf-footer-copy{font-size:11px!important;line-height:1.5!important}
+}
