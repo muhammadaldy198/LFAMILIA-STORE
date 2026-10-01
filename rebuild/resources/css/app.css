@@ -5692,7 +5692,7 @@
 
 /* FAQ readability: shared sizing on the FAQ page and product FAQ sections. */
 .lf-customer.lf-customer.lf-customer{
- --lf-faq-title:22px;--lf-faq-question:18px;--lf-faq-answer:18px;
+ --lf-faq-title:22px;--lf-faq-question:16px;--lf-faq-answer:18px;
 }
 .lf-customer.lf-customer.lf-customer .lf-faq-hero h1,
 .lf-customer.lf-customer.lf-customer .lf-faq-layout h2,
@@ -5719,4 +5719,13 @@
  .lf-customer.lf-customer.lf-customer{
   --lf-faq-title:28px;--lf-faq-question:20px;--lf-faq-answer:20px;
  }
+}
+
+/* Place both desktop panels in the same grid row below the FAQ heading. */
+@media(min-width:901px){
+ .lf-faq-layout{grid-template-rows:auto auto;align-items:start}
+ .lf-faq-main{display:contents}
+ .lf-faq-list-heading{grid-column:1;grid-row:1}
+ .lf-faq-layout .lf-faq-list{grid-column:1;grid-row:2;margin-top:0}
+ .lf-faq-layout .lf-faq-help{grid-column:2;grid-row:2}
 }
