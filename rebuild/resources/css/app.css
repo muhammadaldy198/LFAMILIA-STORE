@@ -3259,7 +3259,7 @@
   .lf-promo-input{
     gap:6px!important;
   }
-  .lf-promo-input input{
+  .lf-checkout-promo-panel .lf-promo-input input{
     height:30.4px!important;
     min-height:30.4px!important;
     padding:3.2px 9.6px!important;
@@ -3273,10 +3273,10 @@
     text-transform:uppercase!important;
     font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace!important;
   }
-  .lf-promo-input input::placeholder{
+  .lf-checkout-promo-panel .lf-promo-input input::placeholder{
     color:rgba(235,242,255,.26)!important;
   }
-  .lf-promo-input input:focus{
+  .lf-checkout-promo-panel .lf-promo-input input:focus{
     border-color:var(--lf-blue)!important;
     box-shadow:0 0 0 3px rgba(24,119,255,.10)!important;
   }
