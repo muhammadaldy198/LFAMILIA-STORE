@@ -5322,7 +5322,12 @@
   font-size:var(--lf-ui-section-desc)!important;
 }
 .lf-customer .lf-review-submit{
+  width:100%!important;
   min-height:44px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-decoration:none!important;
   border:1px solid var(--lf-lime)!important;
   border-radius:8px!important;
   background:var(--lf-lime)!important;
