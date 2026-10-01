@@ -75,8 +75,8 @@ class CustomerAreaTest extends TestCase
             'user_id' => $user->id,
             'subject' => 'Closed request',
             'message' => 'Initial message',
-            'status' => 'CLOSED',
         ]);
+        $ticket->forceFill(['status' => 'CLOSED'])->save();
         $this->post('/account/tickets/'.$ticket->id.'/messages', ['message' => 'Late reply'])
             ->assertStatus(422);
         $this->assertSame(0, DB::table('support_ticket_messages')->where('support_ticket_id', $ticket->id)->count());
