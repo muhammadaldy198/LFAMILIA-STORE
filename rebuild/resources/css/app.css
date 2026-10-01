@@ -3258,6 +3258,12 @@
   /* Fixed mobile summary from data-lf-mobile-checkout. */
   .lf-mobile-checkout-bar{
     padding:6px 8px max(6px,env(safe-area-inset-bottom))!important;
+    transition:opacity .18s ease,transform .18s ease!important;
+  }
+  .lf-mobile-checkout-bar.is-hidden{
+    opacity:0!important;
+    pointer-events:none!important;
+    transform:translateY(100%)!important;
   }
   .lf-mobile-checkout-inner{
     max-width:576px!important;
@@ -4914,7 +4920,7 @@
   .lf-footer-main{
     padding-bottom:34px!important;
   }
-  .lf-customer:has(.lf-mobile-checkout-bar) .lf-footer{
+  .lf-customer:has(.lf-mobile-checkout-bar:not(.is-hidden)) .lf-footer{
     padding-bottom:96px!important;
   }
 }
@@ -4983,10 +4989,10 @@
 @media(min-width:1280px){.lf-footer-banner{height:116px!important}}
 
 @media(max-width:639px){
-  .lf-customer:has(.lf-mobile-checkout-bar) .lf-live-support{
+  .lf-customer:has(.lf-mobile-checkout-bar:not(.is-hidden)) .lf-live-support{
     bottom:112px!important;
   }
-  .lf-customer:has(.lf-mobile-checkout-bar) .lf-live-support.is-dragged{
+  .lf-customer:has(.lf-mobile-checkout-bar:not(.is-hidden)) .lf-live-support.is-dragged{
     bottom:auto!important;
   }
 }
