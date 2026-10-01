@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -205,7 +206,7 @@ class StorefrontParityTest extends TestCase
         DB::table('order_events')->insert([
             'order_id' => $orderId,
             'event_type' => 'DIGIFLAZZ_SECRET_SKU',
-            'correlation_id' => (string) \Illuminate\Support\Str::uuid(),
+            'correlation_id' => (string) Str::uuid(),
             'from_status' => null,
             'to_status' => null,
             'metadata' => json_encode(['secret' => 'PRIVATE-RESULT']),
