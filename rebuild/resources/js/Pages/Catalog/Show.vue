@@ -429,7 +429,16 @@ async function openVoucherPicker() {
     voucherLoading.value = true;
     voucherError.value = '';
     try {
-        const data = await requestJson('/checkout/vouchers?package_id=' + encodeURIComponent(selectedPackage.value.id));
+        const data = await requestJson('/checkout/vouchers', {
+            method: 'POST',
+            body: JSON.stringify({
+                package_id: selectedPackage.value.id,
+                ...(props.customer ? {} : {
+                    guest_email: guestEmail.value.trim() || null,
+                    guest_phone: guestPhone.value.trim() || null,
+                }),
+            }),
+        });
         vouchers.value = data.vouchers || [];
     } catch (error) {
         voucherError.value = error.message || 'Voucher gagal dimuat.';
@@ -770,7 +779,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             <button type="button" :disabled="busy==='quote'||!canQuote" @click="loadQuote">{{busy==='quote'?'Memeriksa...':'Gunakan'}}</button>
                         </div>
                         <button type="button" class="lf-available-promo" @click="openVoucherPicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9a3 3 0 0 0 0 6v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a3 3 0 0 0 0-6V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg><span>Pakai Voucher Yang Tersedia</span></button>
-                        <div v-if="quote?.voucher_code" class="lf-success-note">Voucher <strong>{{quote.voucher_code}}</strong> aktif · Hemat {{formatIdr(quote.discount_idr)}}</div>
+                        <div v-if="quote?.voucher_code" class="lf-success-note">Voucher <strong>{{quote.voucher_code}}</strong> aktif · Hemat {{formatIdr(quote.voucher_discount_idr)}}</div>
                     </div>
                 </section>
 
@@ -972,7 +981,6 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     v-for="voucher in vouchers"
                     :key="voucher.code"
                     type="button"
-                    :disabled="Number(selectedPackage?.price_idr || 0) < Number(voucher.minimum_total_idr || 0)"
                     @click="applyVoucher(voucher.code)"
                 >
                     <span class="lf-voucher-copy">
@@ -980,8 +988,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             <strong>Voucher {{voucher.code}}</strong>
                             <b>{{voucher.code}}</b>
                         </span>
-                        <small>{{voucher.discount_type==='PERCENT' ? 'Potongan '+voucher.discount_value+'%' : 'Potongan '+formatIdr(voucher.discount_value)}}</small>
-                        <em>Minimum {{formatIdr(voucher.minimum_total_idr)}}<template v-if="voucher.ends_at"> · Berlaku hingga {{formatDateId(voucher.ends_at)}}</template><template v-if="Number(selectedPackage?.price_idr || 0) < Number(voucher.minimum_total_idr || 0)"> · Belum memenuhi minimum</template></em>
+                        <small>Hemat {{formatIdr(voucher.discount_idr)}}<template v-if="voucher.discount_type==='PERCENT'"> · {{voucher.discount_value}}%</template></small>
+                        <em>Minimum {{formatIdr(voucher.minimum_total_idr)}}<template v-if="voucher.ends_at"> · Berlaku hingga {{formatDateId(voucher.ends_at)}}</template></em>
                     </span>
                 </button>
             </div>

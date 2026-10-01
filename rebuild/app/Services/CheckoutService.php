@@ -23,6 +23,79 @@ class CheckoutService
     ) {}
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function availableVouchers(
+        int $packageId,
+        ?User $user,
+        ?string $guestEmail,
+        ?string $guestPhone,
+    ): array {
+        $price = $this->pricing->forPackage($packageId);
+        $member = $user
+            ? $this->membership->discount($user, $price['subtotal_idr'])
+            : ['amount_idr' => 0, 'tier_code' => null, 'discount_bps' => 0, 'profile' => null];
+        $now = now();
+
+        $candidates = DB::table('vouchers')
+            ->where('is_active', true)
+            ->where('minimum_total_idr', '<=', $price['subtotal_idr'])
+            ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
+            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>=', $now))
+            ->where(function ($scope) use ($price): void {
+                $scope->where(function ($unscoped): void {
+                    $unscoped->whereNotExists(function ($sub): void {
+                        $sub->selectRaw('1')->from('voucher_products')
+                            ->whereColumn('voucher_products.voucher_id', 'vouchers.id');
+                    })->whereNotExists(function ($sub): void {
+                        $sub->selectRaw('1')->from('voucher_categories')
+                            ->whereColumn('voucher_categories.voucher_id', 'vouchers.id');
+                    });
+                })->orWhereExists(function ($sub) use ($price): void {
+                    $sub->selectRaw('1')->from('voucher_products')
+                        ->whereColumn('voucher_products.voucher_id', 'vouchers.id')
+                        ->where('voucher_products.product_id', $price['product_id']);
+                })->orWhereExists(function ($sub) use ($price): void {
+                    $sub->selectRaw('1')->from('voucher_categories')
+                        ->whereColumn('voucher_categories.voucher_id', 'vouchers.id')
+                        ->where('voucher_categories.category_id', $price['category_id']);
+                });
+            })
+            ->orderByDesc('discount_value')
+            ->get(['code', 'discount_type', 'discount_value', 'minimum_total_idr', 'ends_at']);
+
+        $available = [];
+        foreach ($candidates as $candidate) {
+            try {
+                $resolved = $this->voucher(
+                    (string) $candidate->code,
+                    $price,
+                    $user,
+                    $guestEmail,
+                    $guestPhone,
+                    false,
+                    (int) $member['amount_idr']
+                );
+            } catch (ValidationException) {
+                continue;
+            }
+
+            $available[] = [
+                'code' => (string) $candidate->code,
+                'discount_type' => (string) $candidate->discount_type,
+                'discount_value' => (int) $candidate->discount_value,
+                'discount_idr' => (int) $resolved['discount_idr'],
+                'minimum_total_idr' => (int) $candidate->minimum_total_idr,
+                'ends_at' => $candidate->ends_at,
+            ];
+        }
+
+        usort($available, fn (array $left, array $right): int => $right['discount_idr'] <=> $left['discount_idr']);
+
+        return array_slice($available, 0, 30);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function quote(

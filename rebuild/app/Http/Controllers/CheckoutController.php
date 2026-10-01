@@ -4,12 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Services\CheckoutInputValidator;
-use App\Services\CheckoutPricing;
 use App\Services\CheckoutService;
 use App\Services\NicknameService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class CheckoutController
 {
@@ -60,6 +58,14 @@ class CheckoutController
             'gateway_code' => ['prohibited'],
             'gateway_kind' => ['prohibited'],
             'provider_channel' => ['prohibited'],
+            'member_discount_idr' => ['prohibited'],
+            'member_tier_code' => ['prohibited'],
+            'member_discount_bps' => ['prohibited'],
+            'membership_tier_code' => ['prohibited'],
+            'membership_discount_idr' => ['prohibited'],
+            'voucher_id' => ['prohibited'],
+            'voucher_discount_idr' => ['prohibited'],
+            'voucher_redemption_id' => ['prohibited'],
         ]);
 
         return response()->json($checkout->quote(
@@ -72,48 +78,25 @@ class CheckoutController
         ));
     }
 
-    public function vouchers(Request $request, CheckoutPricing $pricing): JsonResponse
+    public function vouchers(Request $request, CheckoutService $checkout): JsonResponse
     {
-        $data = $request->validate(['package_id' => ['required', 'integer']]);
-        $price = $pricing->forPackage((int) $data['package_id']);
-        $now = now();
+        $guest = ! $request->user();
+        $data = $request->validate([
+            'package_id' => ['required', 'integer'],
+            'guest_email' => $guest ? ['nullable', 'email:rfc', 'max:255'] : ['prohibited'],
+            'guest_phone' => $guest
+                ? ['nullable', 'string', 'max:32', 'regex:/^[0-9+().\-\s]{6,32}$/']
+                : ['prohibited'],
+        ]);
 
-        $rows = DB::table('vouchers')
-            ->where('is_active', true)
-            ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
-            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>=', $now))
-            ->where(function ($query) use ($price): void {
-                $query->whereNotExists(function ($sub): void {
-                    $sub->selectRaw('1')->from('voucher_products')
-                        ->whereColumn('voucher_products.voucher_id', 'vouchers.id');
-                })->orWhereExists(function ($sub) use ($price): void {
-                    $sub->selectRaw('1')->from('voucher_products')
-                        ->whereColumn('voucher_products.voucher_id', 'vouchers.id')
-                        ->where('voucher_products.product_id', $price['product_id']);
-                });
-            })
-            ->where(function ($query) use ($price): void {
-                $query->whereNotExists(function ($sub): void {
-                    $sub->selectRaw('1')->from('voucher_categories')
-                        ->whereColumn('voucher_categories.voucher_id', 'vouchers.id');
-                })->orWhereExists(function ($sub) use ($price): void {
-                    $sub->selectRaw('1')->from('voucher_categories')
-                        ->whereColumn('voucher_categories.voucher_id', 'vouchers.id')
-                        ->where('voucher_categories.category_id', $price['category_id']);
-                });
-            })
-            ->orderByDesc('discount_value')->limit(30)
-            ->get(['code', 'discount_type', 'discount_value', 'minimum_total_idr', 'ends_at'])
-            ->map(fn (object $voucher): array => [
-                'code' => $voucher->code,
-                'discount_type' => $voucher->discount_type,
-                'discount_value' => (int) $voucher->discount_value,
-                'minimum_total_idr' => (int) $voucher->minimum_total_idr,
-                'ends_at' => $voucher->ends_at,
-            ])->values();
-
-        return response()->json(['vouchers' => $rows])
-            ->header('Cache-Control', 'no-store, private');
+        return response()->json([
+            'vouchers' => $checkout->availableVouchers(
+                (int) $data['package_id'],
+                $request->user(),
+                $data['guest_email'] ?? null,
+                $data['guest_phone'] ?? null,
+            ),
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     public function store(Request $request, CheckoutService $checkout): JsonResponse
@@ -144,6 +127,14 @@ class CheckoutController
             'gateway_code' => ['prohibited'],
             'gateway_kind' => ['prohibited'],
             'provider_channel' => ['prohibited'],
+            'member_discount_idr' => ['prohibited'],
+            'member_tier_code' => ['prohibited'],
+            'member_discount_bps' => ['prohibited'],
+            'membership_tier_code' => ['prohibited'],
+            'membership_discount_idr' => ['prohibited'],
+            'voucher_id' => ['prohibited'],
+            'voucher_discount_idr' => ['prohibited'],
+            'voucher_redemption_id' => ['prohibited'],
         ]);
         $data['_correlation_id'] = (string) $request->attributes->get('correlation_id');
 
