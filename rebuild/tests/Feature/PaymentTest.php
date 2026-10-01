@@ -167,14 +167,9 @@ class PaymentTest extends TestCase
         $catalog = $this->catalog();
         $this->route('manual_qris', 'MANUAL_QRIS', 500);
 
-        $assetId = DB::table('store_assets')->insertGetId([
-            'key' => 'manual_qris',
-            'target_url' => null,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $asset = StoreAsset::findOrFail($assetId);
+        $asset = StoreAsset::where('key', 'manual_qris')->firstOrFail();
+        $asset->forceFill(['is_active' => true])->save();
+        $asset->clearMediaCollection('image');
         $asset->addMedia(UploadedFile::fake()->image('manual-qris.png', 600, 600))
             ->toMediaCollection('image', config('media-library.disk_name', 'public'));
 
