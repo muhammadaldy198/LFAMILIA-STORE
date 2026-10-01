@@ -178,8 +178,8 @@ const deleteNotice = (notice) => {
                     </div>
                     <button type="button" class="rounded-md bg-slate-700 px-4 py-2 text-sm" @click="saveProduct(item)">Simpan produk</button>
                     <div class="grid gap-3 md:grid-cols-2">
-                        <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk / card</strong><p class="mt-1 text-[11px] text-slate-500">Patokan LFAMILIA lama: 600×900 (2:3). Homepage dan cover 3D checkout mengambil crop dari area tengah.</p><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
-                        <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Banner halaman produk</strong><p class="mt-1 text-[11px] text-slate-500">Patokan LFAMILIA lama: 1280×560. Letakkan subjek utama di tengah agar desktop/mobile aman.</p><div class="mt-2"><AdminMediaControl type="product" :id="item.id" collection="banner" :url="item.banner_url" /></div></div>
+                        <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk / card</strong><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
+                        <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Banner halaman produk</strong><div class="mt-2"><AdminMediaControl type="product" :id="item.id" collection="banner" :url="item.banner_url" /></div></div>
                     </div>
                     <div class="space-y-3 rounded-md border border-slate-200 bg-white p-4">
                         <div><h3 class="font-semibold">Notice produk</h3><p class="mt-1 text-xs text-slate-500">Informasi publik yang tampil di checkout, terpisah dari instruksi fulfillment internal.</p></div>
@@ -253,7 +253,7 @@ const deleteNotice = (notice) => {
                 <h2 class="text-xl font-semibold">Media toko</h2>
                 <div v-for="asset in assets" :key="asset.id" class="space-y-2 border-t border-slate-800 pt-3">
                     <div class="flex flex-wrap items-end gap-3"><strong>{{ asset.key }}</strong><label class="flex gap-2 text-sm"><input v-model="asset.is_active" type="checkbox">Aktif</label><label v-if="asset.key.startsWith('banner')" class="text-sm">Tautan banner<input v-model="asset.target_url" type="url" class="mt-1 block rounded bg-slate-800 p-2"></label><button type="button" class="rounded bg-slate-700 px-3 py-2 text-sm" @click="saveAsset(asset)">Simpan</button></div>
-                    <AdminMediaControl type="asset" :id="asset.id" :url="asset.image_url" />
+                    <AdminMediaControl type="asset" :asset-key="asset.key" :id="asset.id" :url="asset.image_url" />
                 </div>
             </section>
         </div>
