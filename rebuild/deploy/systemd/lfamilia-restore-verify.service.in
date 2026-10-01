@@ -7,7 +7,7 @@ Type=oneshot
 User=@@BACKUP_RUN_USER@@
 Group=@@BACKUP_RUN_GROUP@@
 Environment=OPS_ENV_FILE=/etc/lfamilia/ops.env
-ExecStart=/bin/bash @@APP_DIR@@/deploy/restore-verify.sh
+ExecStart=/bin/bash /usr/local/lib/lfamilia/restore-verify.sh
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
