@@ -5729,3 +5729,42 @@
  .lf-faq-layout .lf-faq-list{grid-column:1;grid-row:2;margin-top:0}
  .lf-faq-layout .lf-faq-help{grid-column:2;grid-row:2}
 }
+
+/* Shared customer heading and readable information weights. */
+.lf-customer.lf-customer.lf-customer{
+ --lf-weight-title:700;--lf-weight-label:600;--lf-weight-information:500;
+ --lf-faq-title:var(--lf-type-heading);
+}
+.lf-customer.lf-customer.lf-customer h1,
+.lf-customer.lf-customer.lf-customer .lf-title{
+ font-size:var(--lf-type-page)!important;font-weight:var(--lf-weight-title)!important;
+ line-height:1.3!important;letter-spacing:normal!important;
+}
+.lf-customer.lf-customer.lf-customer h2,
+.lf-customer.lf-customer.lf-customer h3,
+.lf-customer.lf-customer.lf-customer h4,
+.lf-customer.lf-customer.lf-customer .lf-account-card-head>strong{
+ font-size:var(--lf-type-heading)!important;font-weight:var(--lf-weight-title)!important;
+ line-height:1.4!important;letter-spacing:normal!important;
+}
+.lf-customer.lf-customer.lf-customer p:not(.lf-nominal-grid *),
+.lf-customer.lf-customer.lf-customer .lf-prose,
+.lf-customer.lf-customer.lf-customer small:not(.lf-nominal-grid *),
+.lf-customer.lf-customer.lf-customer .lf-copy,
+.lf-customer.lf-customer.lf-customer .lf-account-copy,
+.lf-customer.lf-customer.lf-customer .lf-account-note,
+.lf-customer.lf-customer.lf-customer .lf-account-muted,
+.lf-customer.lf-customer.lf-customer .lf-account-empty,
+.lf-customer.lf-customer.lf-customer .lf-footer a,
+.lf-customer.lf-customer.lf-customer .lf-footer-copy,
+.lf-customer.lf-customer.lf-customer table td{
+ font-weight:var(--lf-weight-information)!important;
+}
+.lf-customer.lf-customer.lf-customer summary,
+.lf-customer.lf-customer.lf-customer label,
+.lf-customer.lf-customer.lf-customer table th{
+ font-weight:var(--lf-weight-label)!important;
+}
+.lf-customer.lf-customer.lf-customer .lf-faq-hero h1{
+ font-size:var(--lf-type-page)!important;
+}
