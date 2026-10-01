@@ -71,16 +71,6 @@ const faqForm = useForm({
     question: '', answer: '', sort_order: 0, is_active: true,
 });
 
-const assetHint = (key) => ({
-    logo: 'Patokan aset LFAMILIA lama: 320×320 (1:1) · PNG/WebP transparan',
-    favicon: 'Rekomendasi 512×512 (1:1)',
-    banner_desktop: '1920×600 · fokus elemen penting di area tengah',
-    banner_mobile: '1320×600 · rasio 11:5 · mengikuti banner mobile storefront',
-    popup: 'Legacy fallback gambar. Pop-up homepage baru dikelola melalui bagian Pop-up Homepage di bawah.',
-    footer_banner_desktop: '2172×724 · rasio ±3:1',
-    footer_banner_mobile: '1200×400 · rasio 3:1',
-}[key] || 'Gunakan gambar tajam dengan ukuran file efisien.');
-
 const saveAsset = (asset) => router.put(base + '/catalog/assets/' + asset.id, {
     is_active: Boolean(asset.is_active),
     target_url: asset.target_url || null,
@@ -190,11 +180,11 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                         </div>
                         <div class="mt-3 grid gap-3 lg:grid-cols-2">
                             <div>
-                                <p class="mb-2 rounded bg-slate-50 px-3 py-2 text-[11px] text-slate-500">Desktop: patokan lama 1920×600. Frontend mengikuti rasio gambar, tidak memaksa tinggi tetap.</p>
+                                
                                 <AdminMediaControl type="banner" :id="item.id" collection="desktop" :url="item.desktop_url" />
                             </div>
                             <div>
-                                <p class="mb-2 rounded bg-slate-50 px-3 py-2 text-[11px] text-slate-500">Mobile: rekomendasi 1200×480 (2.5:1). Proporsi ini mengikuti referensi mobile agar banner lebih pendek dan tidak setinggi 16:9.</p>
+                                
                                 <AdminMediaControl type="banner" :id="item.id" collection="mobile" :url="item.mobile_url" />
                             </div>
                         </div>
@@ -253,8 +243,8 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                             Link ketika banner ditekan
                             <input v-model="asset.target_url" type="url" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="https://...">
                         </label>
-                        <p class="mt-3 rounded bg-slate-50 px-3 py-2 text-[11px] text-slate-500">{{ assetHint(asset.key) }}</p>
-                        <div class="mt-3"><AdminMediaControl type="asset" :id="asset.id" :url="asset.image_url" /></div>
+                        
+                        <div class="mt-3"><AdminMediaControl type="asset" :asset-key="asset.key" :id="asset.id" :url="asset.image_url" /></div>
                         <button type="button" class="mt-3 rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="saveAsset(asset)">Simpan</button>
                     </article>
                 </div>
