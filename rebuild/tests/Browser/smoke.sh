@@ -18,6 +18,8 @@ if [[ -z "${CHROME_BIN}" ]]; then
   exit 1
 fi
 
+php artisan cache:clear >/dev/null
+
 php tests/Browser/fixture.php >/tmp/lfamilia-browser-fixture.log
 
 php artisan serve --host=127.0.0.1 --port=8000 >"${LOG_FILE}" 2>&1 &
