@@ -47,6 +47,7 @@ const voucherLoading = ref(false);
 const voucherError = ref('');
 const confirmOpen = ref(false);
 const agreed = ref(false);
+const confirmationSnapshot = ref(null);
 const summaryOpen = ref(false);
 const checkoutBarVisible = ref(true);
 const noticeOpen = ref(false);
@@ -223,9 +224,64 @@ function currentQuoteSignature() {
     ]);
 }
 
+function financialSummarySignature(source = quote.value) {
+    if (!source) return '';
+
+    return JSON.stringify([
+        Number(source.subtotal_idr || 0),
+        Number(source.member_discount_idr || 0),
+        Number(source.voucher_discount_idr || 0),
+        Number(source.discount_idr || 0),
+        Number(source.fee_idr || 0),
+        Number(source.total_idr || 0),
+        source.member_tier_code || null,
+        source.voucher_code || null,
+        source.payment_channel_code || null,
+    ]);
+}
+
+function confirmationStateSignature() {
+    return JSON.stringify([
+        currentQuoteSignature(),
+        accountInputSignature(),
+    ]);
+}
+
+function buildConfirmationSnapshot(currentQuote) {
+    return {
+        state_signature: confirmationStateSignature(),
+        quote_signature: financialSummarySignature(currentQuote),
+        quote: { ...currentQuote },
+        customer_input: { ...customerInput },
+        nickname: nicknameResult.value?.nickname || null,
+        product_name: props.product.name,
+        item_name: selectedPackage.value ? nominalLabel(selectedPackage.value.name, props.product.name) : '-',
+        payment_code: selectedPaymentChannel.value?.code || null,
+        payment_name: selectedPaymentChannel.value?.name
+            || selectedPaymentChannel.value?.label
+            || selectedPaymentChannel.value?.code
+            || '-',
+        email: guestEmail.value.trim(),
+        phone: normalizeWhatsapp(guestPhone.value),
+        voucher_code: currentQuote?.voucher_code || null,
+    };
+}
+
+function closeConfirmation() {
+    confirmOpen.value = false;
+    agreed.value = false;
+    confirmationSnapshot.value = null;
+}
+
+function invalidateConfirmation() {
+    if (!confirmOpen.value && !confirmationSnapshot.value) return;
+    closeConfirmation();
+}
+
 function invalidateQuote() {
     quoteRequest += 1;
     quote.value = null;
+    invalidateConfirmation();
     if (busy.value === 'quote') busy.value = '';
 }
 
@@ -526,14 +582,39 @@ async function prepareOrder() {
     }
     const currentQuote = await loadQuote();
     if (!currentQuote) return;
+
+    confirmationSnapshot.value = buildConfirmationSnapshot(currentQuote);
     agreed.value = false;
     confirmOpen.value = true;
 }
 
 async function createOrder() {
-    if (!agreed.value) return;
-    confirmOpen.value = false;
+    if (!agreed.value || !confirmationSnapshot.value || busy.value) return;
+
     errors.value = {};
+
+    if (confirmationSnapshot.value.state_signature !== confirmationStateSignature()) {
+        closeConfirmation();
+        errors.value = { checkout: ['Data checkout berubah. Periksa kembali ringkasan sebelum membuat pesanan.'] };
+        return;
+    }
+
+    const freshQuote = await loadQuote();
+    if (!freshQuote) {
+        agreed.value = false;
+        return;
+    }
+
+    if (confirmationSnapshot.value.quote_signature !== financialSummarySignature(freshQuote)) {
+        confirmationSnapshot.value = buildConfirmationSnapshot(freshQuote);
+        agreed.value = false;
+        confirmOpen.value = true;
+        errors.value = {
+            checkout: ['Harga, promo, atau biaya pembayaran berubah. Periksa ringkasan terbaru lalu setujui kembali.'],
+        };
+        return;
+    }
+
     checkoutResult.value = null;
     paymentResult.value = null;
     busy.value = 'order';
@@ -559,6 +640,7 @@ async function createOrder() {
             voucher_code: checkoutResult.value.voucher_code,
             payment_channel_code: checkoutResult.value.payment_channel_code,
         };
+        closeConfirmation();
 
         paymentResult.value = await requestJson('/payments/orders/' + encodeURIComponent(checkoutResult.value.order_number), {
             method: 'POST',
@@ -618,6 +700,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
     accountValidationSignature.value = '';
     nicknameResult.value = null;
     selectedSavedId.value = '';
+    invalidateConfirmation();
     errors.value = withoutAccountErrors();
     if (busy.value === 'nickname') busy.value = '';
     if (nicknameAutoTimer) window.clearTimeout(nicknameAutoTimer);
@@ -978,8 +1061,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <dl class="lf-mobile-summary-lines">
                     <div><dt>Harga Satuan</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
                     <div><dt>Subtotal</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
-                    <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(quote.member_discount_idr)}}</dd></div>
-                    <div v-if="quote?.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
+                    <div v-if="confirmationSnapshot.quote.member_discount_idr"><dt>Diskon {{confirmationSnapshot.quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(confirmationSnapshot.quote.member_discount_idr)}}</dd></div>
+                    <div v-if="confirmationSnapshot.quote.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(confirmationSnapshot.quote.voucher_discount_idr)}}</dd></div>
                     <div><dt>Biaya Pembayaran</dt><dd>{{summaryFee===null ? '—' : formatIdr(summaryFee)}}</dd></div>
                     <div class="total"><dt>Total Pembayaran</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
                 </dl>
@@ -1051,32 +1134,36 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
         </div>
     </div>
 
-    <div v-if="confirmOpen" class="lf-modal-backdrop" @click.self="confirmOpen=false">
+    <div v-if="confirmOpen && confirmationSnapshot" class="lf-modal-backdrop" @click.self="closeConfirmation">
         <div class="lf-confirm-modal lf-confirm-legacy">
             <div class="lf-confirm-status-icon">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
             </div>
-            <h2>Buat Pesanan</h2>
+            <h2>Konfirmasi Pesanan</h2>
             <p class="lf-confirm-copy">{{isVoucherProduct ? 'Pastikan produk, nominal, dan pembayaran yang kamu pilih sudah sesuai.' : 'Pastikan data akun dan produk yang kamu pilih sudah valid dan sesuai.'}}</p>
             <dl>
-                <div v-if="nicknameResult?.nickname"><dt>Username</dt><dd>{{nicknameResult.nickname}}</dd></div>
-                <div v-for="field in fields" :key="field.field_key"><dt>{{field.label}}</dt><dd>{{customerInput[field.field_key] || '-'}}</dd></div>
-                <div><dt>Item</dt><dd>{{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : '-'}}</dd></div>
-                <div><dt>Produk</dt><dd>{{product.name}}</dd></div>
-                <div><dt>Payment</dt><dd>{{paymentGroups.find(group=>group.items.some(item=>item.code===paymentChannelCode))?.title || '-'}}</dd></div>
-                <div><dt>Subtotal</dt><dd>{{formatIdr(quote?.subtotal_idr)}}</dd></div>
+                <div v-if="confirmationSnapshot.nickname"><dt>Username</dt><dd>{{confirmationSnapshot.nickname}}</dd></div>
+                <div v-for="field in fields" :key="field.field_key"><dt>{{field.label}}</dt><dd>{{confirmationSnapshot.customer_input[field.field_key] || '-'}}</dd></div>
+                <div><dt>Item</dt><dd>{{confirmationSnapshot.item_name}}</dd></div>
+                <div><dt>Produk</dt><dd>{{confirmationSnapshot.product_name}}</dd></div>
+                <div><dt>Metode Pembayaran</dt><dd>{{confirmationSnapshot.payment_name}}</dd></div>
+                <div><dt>Email</dt><dd>{{confirmationSnapshot.email || '-'}}</dd></div>
+                <div><dt>WhatsApp</dt><dd>{{confirmationSnapshot.phone || '-'}}</dd></div>
+                <div v-if="confirmationSnapshot.voucher_code"><dt>Voucher</dt><dd>{{confirmationSnapshot.voucher_code}}</dd></div>
+                <div><dt>Subtotal</dt><dd>{{formatIdr(confirmationSnapshot.quote.subtotal_idr)}}</dd></div>
                 <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(quote.member_discount_idr)}}</dd></div>
                 <div v-if="quote?.voucher_discount_idr"><dt>Diskon Voucher</dt><dd>-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
-                <div><dt>Biaya Pembayaran</dt><dd>{{formatIdr(quote?.fee_idr)}}</dd></div>
-                <div class="total"><dt>Total Bayar</dt><dd>{{formatIdr(quote?.total_idr)}}</dd></div>
+                <div><dt>Biaya Pembayaran</dt><dd>{{formatIdr(confirmationSnapshot.quote.fee_idr)}}</dd></div>
+                <div class="total"><dt>Total Bayar</dt><dd>{{formatIdr(confirmationSnapshot.quote.total_idr)}}</dd></div>
             </dl>
+            <div v-if="errors.checkout?.length" class="lf-error">{{errors.checkout[0]}}</div>
             <label class="lf-confirm-agreement">
                 <input v-model="agreed" type="checkbox">
                 <span>Dengan melanjutkan, saya menyetujui syarat &amp; ketentuan yang berlaku.</span>
             </label>
             <div class="lf-confirm-actions">
-                <button class="lf-primary" :disabled="busy==='order'||!agreed" @click="createOrder">{{busy==='order'?'Memproses...':'Pesan Sekarang'}}</button>
-                <button class="lf-secondary" @click="confirmOpen=false">Batalkan</button>
+                <button class="lf-primary" :disabled="Boolean(busy)||!agreed" @click="createOrder">{{busy==='order'?'Memproses...':busy==='quote'?'Memeriksa harga...':'Pesan Sekarang'}}</button>
+                <button class="lf-secondary" :disabled="Boolean(busy)" @click="closeConfirmation">Batalkan</button>
             </div>
         </div>
     </div></main>
