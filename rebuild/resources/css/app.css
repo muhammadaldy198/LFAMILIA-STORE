@@ -2895,13 +2895,13 @@
     padding:16.8px 0 0 173.6px!important;
   }
   .lf-product-title h1{
-    font-size:16.64px!important;
+    font-size:17.64px!important;
     line-height:1.15!important;
     letter-spacing:.045em!important;
   }
   .lf-product-title p{
     margin-top:6.72px!important;
-    font-size:12.16px!important;
+    font-size:13.16px!important;
     line-height:1.15!important;
   }
   .lf-product-perks{
@@ -2912,7 +2912,7 @@
   }
   .lf-product-perks>div{
     gap:7.68px!important;
-    font-size:9.92px!important;
+    font-size:10.92px!important;
   }
   .lf-product-perks span,
   .lf-product-perks svg{
@@ -2937,7 +2937,7 @@
     min-height:27.2px!important;
     padding:0!important;
     border-radius:6px!important;
-    font-size:12px!important;
+    font-size:13px!important;
     line-height:16px!important;
   }
 
@@ -2974,15 +2974,15 @@
     height:26px!important;
     flex-basis:26px!important;
     border-radius:6px!important;
-    font-size:11px!important;
+    font-size:12px!important;
   }
   .lf-checkout-panel>header h2{
-    font-size:12px!important;
+    font-size:13px!important;
     line-height:16px!important;
   }
   .lf-checkout-panel>header p{
     margin-top:2px!important;
-    font-size:9px!important;
+    font-size:10px!important;
     line-height:16px!important;
   }
 
@@ -2997,8 +2997,8 @@
     flex-basis:36px!important;
     border-radius:6.4px!important;
   }
-  .lf-account-product-copy strong{font-size:11px!important}
-  .lf-account-product-copy a{margin-top:2px!important;font-size:9px!important}
+  .lf-account-product-copy strong{font-size:12px!important}
+  .lf-account-product-copy a{margin-top:2px!important;font-size:10px!important}
   .lf-saved-account-select{
     margin-bottom:12px!important;
     padding:10px!important;
@@ -3006,7 +3006,7 @@
   }
   .lf-saved-account-select>span{
     margin-bottom:6px!important;
-    font-size:10px!important;
+    font-size:11px!important;
   }
   .lf-saved-account-select select{
     height:28.8px!important;
@@ -3021,7 +3021,7 @@
   }
   .lf-checkout-account-panel .lf-account-fields label>span{
     margin-bottom:4px!important;
-    font-size:10.88px!important;
+    font-size:11.88px!important;
     line-height:15.2px!important;
   }
   .lf-checkout-account-panel .lf-account-fields input{
@@ -3042,7 +3042,7 @@
   }
   .lf-nickname-state{
     gap:10px!important;
-    font-size:10px!important;
+    font-size:11px!important;
   }
   .lf-nickname-state>svg{
     width:16px!important;
@@ -3051,7 +3051,7 @@
   }
   .lf-checkout-info-note{
     gap:5.6px!important;
-    font-size:9px!important;
+    font-size:10px!important;
     line-height:16px!important;
   }
   .lf-checkout-info-note>svg{
@@ -3072,7 +3072,7 @@
   }
   .lf-package-group-head h3{
     margin:0!important;
-    font-size:14px!important;
+    font-size:15px!important;
     font-weight:900!important;
   }
   .lf-package-group-head>span{
@@ -3103,7 +3103,7 @@
     padding-right:0!important;
   }
   .lf-nominal-copy strong{
-    font-size:11px!important;
+    font-size:12px!important;
     line-height:16px!important;
   }
   .lf-nominal-grid img{
@@ -3117,7 +3117,7 @@
     position:static!important;
     display:block!important;
     margin-top:8px!important;
-    font-size:10px!important;
+    font-size:11px!important;
     line-height:1!important;
   }
 
@@ -3139,8 +3139,8 @@
     flex-basis:32px!important;
     border-radius:6.4px!important;
   }
-  .lf-payment-group-copy strong{font-size:11px!important}
-  .lf-payment-group-copy small{margin-top:2px!important;font-size:9px!important}
+  .lf-payment-group-copy strong{font-size:12px!important}
+  .lf-payment-group-copy small{margin-top:2px!important;font-size:10px!important}
   .lf-payment-check{
     width:16px!important;
     height:16px!important;
@@ -3153,11 +3153,11 @@
   }
   .lf-payment-brand-strip>span{
     padding:2px 6px!important;
-    font-size:7px!important;
+    font-size:8px!important;
   }
   .lf-payment-brand-strip>span:only-child{
     padding:0!important;
-    font-size:9px!important;
+    font-size:10px!important;
   }
   .lf-payment-channel-grid{
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
@@ -3169,11 +3169,11 @@
     gap:5.6px!important;
     padding:5.6px 10px!important;
     border-radius:6.4px!important;
-    font-size:9px!important;
+    font-size:10px!important;
   }
   .lf-payment-login-hint{
     margin-top:10px!important;
-    font-size:9px!important;
+    font-size:10px!important;
   }
 
   /* Contact is one column on mobile in the live page. */
@@ -3183,7 +3183,7 @@
   }
   .lf-checkout-contact-panel .lf-account-fields label>span{
     margin-bottom:4px!important;
-    font-size:10.88px!important;
+    font-size:11.88px!important;
     line-height:15.2px!important;
   }
   .lf-checkout-contact-panel .lf-account-fields input{
@@ -3199,7 +3199,7 @@
     align-items:flex-start!important;
     gap:6px!important;
     margin-top:10px!important;
-    font-size:9px!important;
+    font-size:10px!important;
     line-height:16px!important;
   }
   .lf-contact-privacy svg{
@@ -3237,7 +3237,7 @@
     min-height:30.4px!important;
     padding:0 10.4px!important;
     border-radius:6px!important;
-    font-size:10px!important;
+    font-size:11px!important;
   }
   .lf-available-promo{
     display:inline-flex!important;
@@ -3283,19 +3283,19 @@
     flex-basis:36px!important;
     border-radius:6.4px!important;
   }
-  .lf-mobile-summary-copy strong{font-size:11px!important}
-  .lf-mobile-summary-copy small{font-size:9px!important}
-  .lf-mobile-summary-price{font-size:12px!important}
+  .lf-mobile-summary-copy strong{font-size:12px!important}
+  .lf-mobile-summary-copy small{font-size:10px!important}
+  .lf-mobile-summary-price{font-size:13px!important}
   .lf-mobile-summary-lines{
     gap:6px!important;
     padding:6px 10px!important;
-    font-size:9px!important;
+    font-size:10px!important;
   }
   .lf-mobile-order-button{
     min-height:34px!important;
     height:34px!important;
     border-radius:6px!important;
-    font-size:13px!important;
+    font-size:14px!important;
   }
 }
 
