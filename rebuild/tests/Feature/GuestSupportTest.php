@@ -12,6 +12,22 @@ class GuestSupportTest extends TestCase
 {
     use DatabaseTransactions;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.'.(1 + crc32($this->name()) % 200)]);
+    }
+
+    public function test_guest_support_limits_requests_from_the_same_ip(): void
+    {
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->post('/support/verify', ['order_number' => 'UNKNOWN', 'access_code' => str_repeat('x', 64)])
+                ->assertSessionHasErrors('order_number');
+        }
+        $this->post('/support/verify', ['order_number' => 'UNKNOWN', 'access_code' => str_repeat('x', 64)])
+            ->assertStatus(429);
+    }
+
     private function order(string $number): int
     {
         $category = DB::table('categories')->insertGetId(['name' => $number, 'slug' => strtolower($number)]);
