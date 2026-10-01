@@ -11,7 +11,7 @@ const timeline=ref([...(props.events||[])]);
 const errors=ref({});
 const busy=ref(false);
 const refreshing=ref(false);
-const paymentKey=ref(globalThis.crypto?.randomUUID?.()||('payment-'+Date.now()));
+let disposed=false;
 const reviewRating=ref(Number(props.review?.rating||5));
 const reviewBody=ref(props.review?.body||'');
 const reviewName=ref('');
@@ -19,7 +19,7 @@ const reviewDone=ref(Boolean(props.review));
 const reviewMessage=ref('');
 let timer=null;
 
-const terminal=computed(()=>['SUCCESS','FAILED','CANCELLED','EXPIRED','REFUNDED'].includes(orderState.value.status));
+const terminal=computed(()=>['SUCCESS','FAILED','CANCELLED','EXPIRED','REFUND','REFUNDED'].includes(orderState.value.status));
 const manualQris=computed(()=>paymentState.value?.instructions?.kind==='manual_qris'
     || String(paymentState.value?.channel_code||'').toLowerCase().includes('manual'));
 const statusLabel=s=>({
@@ -42,7 +42,7 @@ const eventLabel=e=>{
 const eventTime=v=>v?new Date(v).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'-';
 
 async function refreshStatus(){
-    if(refreshing.value)return;
+    if(disposed||refreshing.value||document.hidden)return;
     refreshing.value=true;
     try{
         const response=await fetch('/orders/guest/'+encodeURIComponent(orderState.value.order_number)+'/events',{
@@ -50,27 +50,15 @@ async function refreshStatus(){
         });
         if(!response.ok)return;
         const data=await response.json();
+        errors.value={};
+        if(disposed)return;
         orderState.value={...orderState.value,...(data.order||{})};
         paymentState.value=data.payment||paymentState.value;
         timeline.value=data.events||timeline.value;
         if(terminal.value&&timer){clearInterval(timer);timer=null;}
+    }catch{
+        errors.value={status:['Status belum dapat diperbarui. Coba cek lagi.']};
     }finally{refreshing.value=false;}
-}
-
-async function continuePayment(){
-    errors.value={};busy.value=true;
-    try{
-        const token=document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')||'';
-        const response=await fetch('/payments/orders/'+encodeURIComponent(orderState.value.order_number),{
-            method:'POST',headers:{Accept:'application/json','Content-Type':'application/json','X-CSRF-TOKEN':token},
-            body:JSON.stringify({idempotency_key:paymentKey.value}),
-        });
-        const data=await response.json().catch(()=>({}));
-        if(!response.ok){errors.value=data.errors||{payment:[data.message||'Pembayaran tidak dapat dilanjutkan.']};return;}
-        paymentState.value=data;
-        const redirect=data?.instructions?.redirect_url||data?.instructions?.payment_url;
-        if(redirect)window.location.assign(redirect);
-    }finally{busy.value=false;}
 }
 
 async function submitReview(){
@@ -88,8 +76,8 @@ async function submitReview(){
     }finally{busy.value=false;}
 }
 
-onMounted(()=>{refreshStatus();if(!terminal.value)timer=setInterval(refreshStatus,3500);});
-onUnmounted(()=>{if(timer)clearInterval(timer);});
+onMounted(()=>{refreshStatus();if(!terminal.value)timer=setInterval(refreshStatus,15000);});
+onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
 </script>
 
 <template>
@@ -125,8 +113,8 @@ onUnmounted(()=>{if(timer)clearInterval(timer);});
                         <strong class="text-[10px] text-amber-200">Menunggu verifikasi QRIS manual</strong>
                         <p class="mt-1 text-[9px] leading-4 text-white/45">Setelah membayar, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama.</p>
                     </div>
-                    <button v-if="!manualQris" class="lf-primary mt-3" :disabled="busy" @click="continuePayment">{{busy?'Memeriksa...':paymentState?'Lanjutkan pembayaran':'Bayar sekarang'}}</button>
-                    <p v-if="errors.payment" class="mt-2 text-[10px] text-red-300">{{errors.payment[0]}}</p>
+                    <Link :href="'/payment?invoice='+encodeURIComponent(orderState.order_number)" class="lf-primary mt-3">Lihat pembayaran</Link>
+                    
                 </section>
 
                 <section v-if="orderState.status==='SUCCESS'&&orderState.delivery" class="lf-order-success">
@@ -158,6 +146,7 @@ onUnmounted(()=>{if(timer)clearInterval(timer);});
 
             <aside class="lf-order-timeline">
                 <header><div><h2>Log Realtime</h2><p>{{refreshing?'Memperbarui...':'Sinkron otomatis'}}</p></div><button type="button" @click="refreshStatus">↻</button></header>
+                <p v-if="errors.status" role="alert">{{errors.status[0]}}</p>
                 <ol>
                     <li v-for="event in timeline" :key="event.id">
                         <span></span>
