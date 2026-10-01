@@ -5528,3 +5528,5 @@
   .lf-customer .lf-nominal-copy strong{white-space:normal;overflow:visible;text-overflow:clip}
   .lf-customer .lf-nominal-grid button>b{display:block;margin-top:8px}
 }
+
+@media(min-width:640px){.lf-customer .lf-product-perks{grid-column:2;min-width:0}}
