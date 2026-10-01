@@ -5570,3 +5570,19 @@
 }
 
 @media(max-width:639px){.lf-customer .lf-account-side{height:100dvh;min-height:100dvh;box-sizing:border-box;align-self:stretch}}
+
+/* Keep the 36px control content box tall enough for full text on every customer page. */
+.lf-customer input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.lf-customer select{
+  box-sizing:border-box!important;padding-top:0!important;padding-bottom:0!important;
+  padding-left:12px!important;line-height:normal!important;
+}
+.lf-customer select{padding-right:32px!important}
+.lf-customer .lf-account-nav a,.lf-customer .lf-account-nav button{
+  font-family:inherit!important;font-size:11px!important;line-height:16px!important;font-weight:750!important;
+}
+.lf-customer .lf-account-nav .lf-account-logout{
+  display:flex;align-items:center;gap:8px;color:#f87171!important;
+}
+.lf-account-logout svg{width:16px;height:16px;flex:0 0 16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.lf-customer .lf-account-nav .lf-account-logout:hover{background:rgba(248,113,113,.10)!important}
