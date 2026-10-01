@@ -564,7 +564,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                         </div>
                         <div v-else-if="product.nickname_check_enabled" class="lf-checkout-info-note">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
-                            <span>Nickname akan tampil otomatis setelah User ID dan Server yang diperlukan terisi.</span>
+                            <span>Nickname akan tampil otomatis setelah data akun yang diperlukan terisi.</span>
                         </div>
                         <div v-else class="lf-checkout-info-note">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
