@@ -31,6 +31,8 @@ const voucherCode = ref('');
 const paymentChannelCode = ref('');
 const quote = ref(null);
 const nicknameResult = ref(null);
+const accountValidationSignature = ref('');
+let accountValidationRequest = 0;
 const checkoutResult = ref(null);
 const paymentResult = ref(null);
 const errors = ref({});
@@ -226,6 +228,45 @@ function fieldError(key) {
     return errors.value['customer_input.' + key]?.[0];
 }
 
+function accountInputSignature() {
+    return JSON.stringify((props.fields || []).map((field) => [
+        field.field_key,
+        String(customerInput[field.field_key] || '').trim(),
+    ]));
+}
+
+function localAccountErrors() {
+    const validation = {};
+
+    for (const field of props.fields || []) {
+        const value = String(customerInput[field.field_key] || '').trim();
+        const key = 'customer_input.' + field.field_key;
+
+        if (field.is_required && value === '') {
+            validation[key] = [field.label + ' wajib diisi.'];
+            continue;
+        }
+        if (value === '') continue;
+        if (value.length > 255) {
+            validation[key] = [field.label + ' terlalu panjang.'];
+            continue;
+        }
+        if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+            validation[key] = [field.label + ' harus berupa email valid.'];
+            continue;
+        }
+        if (field.type === 'tel' && !/^[0-9+().\-\s]{6,32}$/.test(value)) {
+            validation[key] = [field.label + ' tidak valid.'];
+        }
+    }
+
+    return validation;
+}
+
+function withoutAccountErrors(source = errors.value) {
+    return Object.fromEntries(Object.entries(source || {}).filter(([key]) => !key.startsWith('customer_input.')));
+}
+
 async function submitReview() {
     reviewError.value = '';
     reviewMessage.value = '';
@@ -300,19 +341,41 @@ function chooseSavedAccount(id) {
 }
 
 async function checkNickname() {
-    if (isVoucherProduct.value || !requiredFieldsComplete.value) return;
-    errors.value = {};
+    if (isVoucherProduct.value || !hasAccountStep.value) return true;
+
+    const validation = localAccountErrors();
+    if (Object.keys(validation).length) {
+        accountValidationSignature.value = '';
+        nicknameResult.value = null;
+        errors.value = { ...withoutAccountErrors(), ...validation };
+        return false;
+    }
+
+    const signature = accountInputSignature();
+    const requestId = ++accountValidationRequest;
+    errors.value = withoutAccountErrors();
     nicknameResult.value = null;
     busy.value = 'nickname';
+
     try {
-        nicknameResult.value = await requestJson('/checkout/nickname', {
+        const result = await requestJson('/checkout/nickname', {
             method: 'POST',
             body: JSON.stringify({ product_id: props.product.id, customer_input: { ...customerInput } }),
         });
+
+        if (requestId !== accountValidationRequest || signature !== accountInputSignature()) return false;
+
+        nicknameResult.value = result;
+        accountValidationSignature.value = signature;
+        return true;
     } catch (error) {
-        errors.value = error.validation || {};
+        if (requestId !== accountValidationRequest || signature !== accountInputSignature()) return false;
+
+        accountValidationSignature.value = '';
+        errors.value = { ...withoutAccountErrors(), ...(error.validation || {}) };
+        return false;
     } finally {
-        busy.value = '';
+        if (requestId === accountValidationRequest && busy.value === 'nickname') busy.value = '';
     }
 }
 
@@ -372,10 +435,20 @@ async function applyVoucher(code) {
 
 async function prepareOrder() {
     errors.value = {};
-    if (!requiredFieldsComplete.value) {
-        errors.value = { checkout: ['Lengkapi data akun terlebih dahulu.'] };
-        return;
+
+    if (hasAccountStep.value) {
+        const validation = localAccountErrors();
+        if (Object.keys(validation).length) {
+            errors.value = validation;
+            return;
+        }
+
+        if (accountValidationSignature.value !== accountInputSignature()) {
+            const valid = await checkNickname();
+            if (!valid) return;
+        }
     }
+
     if (!selectedPackage.value) {
         errors.value = { package_id: ['Pilih nominal terlebih dahulu.'] };
         return;
@@ -387,10 +460,6 @@ async function prepareOrder() {
     if (!guestContactComplete.value) {
         errors.value = { guest_phone: ['Lengkapi email dan nomor WhatsApp dengan benar.'] };
         return;
-    }
-    if (!isVoucherProduct.value && props.product.nickname_check_enabled && !nicknameResult.value) {
-        await checkNickname();
-        if (!nicknameResult.value && Object.keys(errors.value).length) return;
     }
     const currentQuote = await loadQuote();
     if (!currentQuote) return;
@@ -471,8 +540,12 @@ watch([guestEmail, guestPhone], () => {
 
 let nicknameAutoTimer;
 watch(() => props.fields.map((field) => String(customerInput[field.field_key] || '')), () => {
+    accountValidationRequest += 1;
+    accountValidationSignature.value = '';
     nicknameResult.value = null;
     selectedSavedId.value = '';
+    errors.value = withoutAccountErrors();
+    if (busy.value === 'nickname') busy.value = '';
     if (nicknameAutoTimer) window.clearTimeout(nicknameAutoTimer);
     if (isVoucherProduct.value || !props.product.nickname_check_enabled || !requiredFieldsComplete.value) return;
     nicknameAutoTimer = window.setTimeout(() => {
