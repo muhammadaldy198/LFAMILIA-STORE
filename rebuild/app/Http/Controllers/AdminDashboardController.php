@@ -124,13 +124,20 @@ class AdminDashboardController
             'metrics' => $metrics, 'chart' => $chart, 'recentOrders' => $recent, 'topProducts' => $top,
             'activities' => $activities, 'integrations' => $integrations, 'digiflazzBalance' => $balance,
             'webhookReady' => str_starts_with((string) config('app.url'), 'https://'),
-            'lastSyncedAt' => ($finance || $canProviders) ? DB::table('digiflazz_catalog_items')->max('synced_at') : null,
+            'lastSyncedAt' => ($finance || $canProviders) ? $this->timestamp(DB::table('digiflazz_catalog_items')->max('synced_at')) : null,
             'notifications' => $canNotifications ? DB::table('admin_notifications as notifications')
                 ->leftJoin('admin_notification_reads as reads', function ($join) use ($admin): void {
                     $join->on('reads.admin_notification_id', '=', 'notifications.id')->where('reads.admin_user_id', '=', $admin->id);
                 })->orderByDesc('notifications.id')->limit(8)
-                ->get(['notifications.id', 'notifications.severity', 'notifications.title', 'notifications.message', 'reads.read_at', 'notifications.created_at']) : [],
+                ->get(['notifications.id', 'notifications.severity', 'notifications.title', 'notifications.message', 'reads.read_at', 'notifications.created_at'])->map(fn (object $row): array => [
+                    ...((array) $row), 'created_at' => $this->timestamp($row->created_at), 'read_at' => $this->timestamp($row->read_at),
+                ]) : [],
         ]);
+    }
+
+    private function timestamp(?string $value): ?string
+    {
+        return $value ? Carbon::parse($value, config('app.timezone', 'UTC'))->toIso8601String() : null;
     }
 
     private function balance(): array
