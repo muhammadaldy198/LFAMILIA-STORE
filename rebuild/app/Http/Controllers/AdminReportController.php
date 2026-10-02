@@ -199,10 +199,10 @@ class AdminReportController
     private function dailyRows(Carbon $from, Carbon $to, bool $finance): array
     {
         $select = [
-            "DATE(created_at) as day",
+            'DATE(created_at) as day',
             'COUNT(*) as orders_count',
-            "SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success_count",
-            "SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed_count",
+            'SUM(CASE WHEN status = \'SUCCESS\' THEN 1 ELSE 0 END) as success_count',
+            'SUM(CASE WHEN status = \'FAILED\' THEN 1 ELSE 0 END) as failed_count',
         ];
 
         if ($finance) {
@@ -250,7 +250,7 @@ class AdminReportController
                 'products.name',
                 'products.slug',
                 DB::raw('COUNT(*) as total_orders'),
-                DB::raw("SUM(CASE WHEN orders.status = 'SUCCESS' THEN 1 ELSE 0 END) as success_orders"),
+                DB::raw('SUM(CASE WHEN orders.status = \'SUCCESS\' THEN 1 ELSE 0 END) as success_orders'),
             ]);
 
         if ($finance) {
@@ -293,7 +293,7 @@ class AdminReportController
                 'categories.id',
                 'categories.name',
                 DB::raw('COUNT(*) as total_orders'),
-                DB::raw("SUM(CASE WHEN orders.status = 'SUCCESS' THEN 1 ELSE 0 END) as success_orders"),
+                DB::raw('SUM(CASE WHEN orders.status = \'SUCCESS\' THEN 1 ELSE 0 END) as success_orders'),
             ]);
 
         if ($finance) {
@@ -331,9 +331,9 @@ class AdminReportController
                 'providers.code',
                 'providers.display_name',
                 DB::raw('COUNT(*) as attempts_count'),
-                DB::raw("SUM(CASE WHEN attempts.status = 'SUCCESS' THEN 1 ELSE 0 END) as success_count"),
-                DB::raw("SUM(CASE WHEN attempts.status IN ('UNKNOWN','FAILED_CONFIRMED','BLOCKED','MANUAL_FAILED') THEN 1 ELSE 0 END) as errors_count"),
-                DB::raw("SUM(CASE WHEN attempts.status IN ('CREATED','SENDING','PENDING','UNKNOWN','BLOCKED','MANUAL_PENDING') THEN 1 ELSE 0 END) as pending_count"),
+                DB::raw('SUM(CASE WHEN attempts.status = \'SUCCESS\' THEN 1 ELSE 0 END) as success_count'),
+                DB::raw('SUM(CASE WHEN attempts.status IN (\'UNKNOWN\',\'FAILED_CONFIRMED\',\'BLOCKED\',\'MANUAL_FAILED\') THEN 1 ELSE 0 END) as errors_count'),
+                DB::raw('SUM(CASE WHEN attempts.status IN (\'CREATED\',\'SENDING\',\'PENDING\',\'UNKNOWN\',\'BLOCKED\',\'MANUAL_PENDING\') THEN 1 ELSE 0 END) as pending_count'),
             ])
             ->orderByDesc('attempts_count')->get()
             ->map(function (object $row): array {
