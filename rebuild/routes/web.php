@@ -20,6 +20,7 @@ use App\Http\Controllers\AdminPresentationController;
 use App\Http\Controllers\AdminPromotionController;
 use App\Http\Controllers\AdminProviderController;
 use App\Http\Controllers\AdminSearchController;
+use App\Http\Controllers\AdminSupportController;
 use App\Http\Controllers\AdminWorkspaceController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CheckoutController;
@@ -358,9 +359,10 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:support.manage')->prefix('admin/support')
         ->name('admin.support.')->group(function (): void {
-            Route::get('/', [AdminWorkspaceController::class, 'support'])->name('index');
-            Route::put('/quick-replies', [AdminWorkspaceController::class, 'quickReplies']);
-            Route::put('/{id}', [AdminWorkspaceController::class, 'updateSupport'])->name('update');
+            Route::get('/', [AdminSupportController::class, 'index'])->name('index');
+            Route::put('/quick-replies', [AdminSupportController::class, 'quickReplies'])
+                ->name('quick-replies.update');
+            Route::put('/{id}', [AdminSupportController::class, 'update'])->name('update');
         });
 
     Route::get('/admin/reports', [AdminWorkspaceController::class, 'reports'])

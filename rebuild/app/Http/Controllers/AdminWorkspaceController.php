@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminAuditService;
-use App\Services\TransactionalEmailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -11,7 +10,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,109 +18,6 @@ use Throwable;
 
 class AdminWorkspaceController
 {
-    public function support(): Response
-    {
-        $rows = DB::table('support_tickets as tickets')
-            ->leftJoin('users', 'users.id', '=', 'tickets.user_id')
-            ->leftJoin('orders', 'orders.id', '=', 'tickets.order_id')
-            ->orderByDesc('tickets.id')->limit(150)
-            ->get([
-                'tickets.id', 'tickets.user_id', 'tickets.subject', 'tickets.message', 'tickets.status',
-                'tickets.created_at', 'users.name as customer_name', 'users.email',
-                'orders.order_number', 'orders.guest_email',
-            ])->map(function (object $ticket): array {
-                return [
-                    ...((array) $ticket),
-                    'customer_name' => $ticket->customer_name ?? 'Guest',
-                    'email' => $ticket->email ?? $ticket->guest_email,
-                    'messages' => DB::table('support_ticket_messages as messages')
-                        ->leftJoin('users', 'users.id', '=', 'messages.user_id')
-                        ->leftJoin('admin_users', 'admin_users.id', '=', 'messages.admin_user_id')
-                        ->where('messages.support_ticket_id', $ticket->id)
-                        ->orderBy('messages.id')
-                        ->get([
-                            'messages.id', 'messages.sender_type', 'messages.message', 'messages.created_at',
-                            'users.name as customer_name', 'admin_users.name as admin_name',
-                        ])->values(),
-                ];
-            });
-
-        return Inertia::render('Admin/Workspace', [
-            'quickReplies' => json_decode((string) DB::table('system_settings')->where('key', 'support.quick_replies')->value('value'), true) ?? [],
-            'kind' => 'support',
-            'title' => 'Layanan Pelanggan',
-            'rows' => $rows,
-        ]);
-    }
-
-    public function quickReplies(Request $request, AdminAuditService $audit): RedirectResponse
-    {
-        $data = $request->validate(['replies' => ['present', 'array', 'max:30'], 'replies.*' => ['required', 'string', 'max:1000']]);
-        $before = DB::table('system_settings')->where('key', 'support.quick_replies')->value('value');
-        DB::table('system_settings')->updateOrInsert(['key' => 'support.quick_replies'], [
-            'value' => json_encode(array_values($data['replies'])), 'updated_at' => now(), 'created_at' => now(),
-            'updated_by_admin_id' => $request->user('admin')->id,
-        ]);
-        $audit->record($request, 'support.quick_replies.updated', 'system_setting', 'support.quick_replies', $before ? json_decode($before, true) : null, $data['replies']);
-
-        return back()->with('status', 'Balasan cepat disimpan.');
-    }
-
-    public function updateSupport(
-        Request $request,
-        int $id,
-        AdminAuditService $audit,
-        TransactionalEmailService $emails,
-    ): RedirectResponse {
-        $data = $request->validate([
-            'status' => ['required', Rule::in(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'])],
-            'reply' => ['nullable', 'string', 'max:5000'],
-        ]);
-        $before = DB::table('support_tickets')->where('id', $id)->first();
-        abort_unless($before, 404);
-
-        DB::transaction(function () use ($request, $id, $data): void {
-            DB::table('support_tickets')->where('id', $id)->update([
-                'status' => $data['status'],
-                'updated_at' => now(),
-            ]);
-            $reply = trim((string) ($data['reply'] ?? ''));
-            if ($reply !== '') {
-                DB::table('support_ticket_messages')->insert([
-                    'support_ticket_id' => $id,
-                    'sender_type' => 'ADMIN',
-                    'user_id' => null,
-                    'admin_user_id' => $request->user('admin')->id,
-                    'message' => $reply,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-        });
-
-        $reply = trim((string) ($data['reply'] ?? ''));
-        if ($reply !== '') {
-            $email = DB::table('support_tickets as tickets')
-                ->leftJoin('users', 'users.id', '=', 'tickets.user_id')
-                ->leftJoin('orders', 'orders.id', '=', 'tickets.order_id')
-                ->where('tickets.id', $id)->value(DB::raw('COALESCE(users.email, orders.guest_email)'));
-            if (is_string($email) && $email !== '') {
-                $emails->queue(
-                    $email,
-                    'Balasan tiket LFAMILIA #'.$id,
-                    'Tim LFAMILIA membalas tiket #'.$id.': '.$reply
-                );
-            }
-        }
-
-        $audit->record($request, 'support.updated', 'support_ticket', $id, (array) $before, [
-            'status' => $data['status'],
-            'replied' => $reply !== '',
-        ]);
-
-        return back();
-    }
-
     public function reports(Request $request): Response
     {
         $filters = $request->validate([

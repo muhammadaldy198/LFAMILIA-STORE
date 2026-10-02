@@ -15,7 +15,7 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 | Pembayaran | Metode pembayaran editable (nama/deskripsi/logo/biaya/urutan), gateway & maintenance, routing pesanan/top up khusus Super Admin, QRIS manual & konfirmasi, editor halaman pembayaran, transaksi dengan filter/pagination, callback URL, serta master toggle dan minimum top up saldo |
 | Pelanggan | Ringkasan pelanggan, search/filter/pagination, detail profil & autentikasi, membership otomatis/manual, Super Admin balance adjustment, order/ledger/top-up/ticket/saved-game history, serta safe empty-account cleanup |
 | Promo | Dedicated voucher workspace: nama/deskripsi, nominal/persen, maksimum diskon, minimum transaksi, kuota & limit pelanggan, jadwal, scope kategori/produk, search/filter/pagination, usage/reservation summary, safe delete, serta prioritas Populer Sekarang |
-| Layanan Pelanggan | Conversation/status/reply, editable quick replies |
+| Layanan Pelanggan | Dedicated support workspace: ringkasan status/sumber, search/filter/pagination, kategori tiket, detail percakapan, keterkaitan pesanan/pelanggan, penangan terakhir, status/reply, editable quick replies, email reply, dan notifikasi ulang saat pelanggan membalas |
 | Laporan | Date range, daily totals, best-selling products, provider error rate |
 | Admin & Akses | Super Admin/Admin, permissions, account status/password, last-owner protection |
 | Pengaturan | Store identity, contact/business hours, membership settings, safe configuration export |
@@ -46,6 +46,9 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 - Flash Sale tidak dipulihkan: keputusan storefront terbaru menggantinya dengan Populer Sekarang. Menu Promo menjadi satu sumber pengaturan prioritas populer agar tidak ganda dengan Produk.
 - Perubahan voucher mengunci row voucher; total kuota tidak boleh diturunkan di bawah pemakaian + reservasi aktif. Voucher ber-riwayat tidak dapat dihapus, hanya dinonaktifkan.
 - Maksimum diskon voucher dihitung server-side dan ikut masuk snapshot order sehingga perubahan promo berikutnya tidak menulis ulang harga order yang sudah dibuat.
+- Menu Layanan Pelanggan mempertahankan conversation history sebagai sumber balasan; field `staff_reply` lama tidak diduplikasi. Metadata lama `kind` dan `handled_by/handled_at` dipulihkan sebagai kategori tiket dan admin penangan terakhir.
+- Balasan customer maupun guest membuka kembali tiket menjadi OPEN dan menghasilkan Admin Notification agar percakapan lanjutan tidak terlewat. Tiket CLOSED tetap tidak dapat dibalas customer/guest.
+- Status lama `rejected` tidak dipertahankan sebagai state terpisah; lifecycle Laravel menggunakan OPEN → IN_PROGRESS → RESOLVED/CLOSED.
 - Live payment/provider transactions require configured integrations and a separate live test. HTTP fakes in regression tests do not prove external service health.
 
 ## Verification

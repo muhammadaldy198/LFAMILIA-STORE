@@ -41,6 +41,7 @@ class SupportTicketController
             'order_id' => $data['order_id'] ?? null,
             'subject' => $data['subject'],
             'message' => $data['message'],
+            'kind' => isset($data['order_id']) ? 'ORDER' : 'GENERAL',
         ]);
 
         $notifications->record(
@@ -82,16 +83,19 @@ class SupportTicketController
         ]);
     }
 
-    public function reply(Request $request, int $ticket): RedirectResponse
-    {
+    public function reply(
+        Request $request,
+        int $ticket,
+        AdminNotificationService $notifications,
+    ): RedirectResponse {
         $data = $request->validate([
             'message' => ['required', 'string', 'max:5000'],
         ]);
-        $record = SupportTicket::where('user_id', $request->user()->id)
-            ->whereKey($ticket)->firstOrFail();
-        abort_if($record->status === 'CLOSED', 422, 'Tiket sudah ditutup.');
+        $record = DB::transaction(function () use ($request, $ticket, $data): SupportTicket {
+            $record = SupportTicket::where('user_id', $request->user()->id)
+                ->whereKey($ticket)->lockForUpdate()->firstOrFail();
+            abort_if($record->status === 'CLOSED', 422, 'Tiket sudah ditutup.');
 
-        DB::transaction(function () use ($request, $record, $data): void {
             DB::table('support_ticket_messages')->insert([
                 'support_ticket_id' => $record->id,
                 'sender_type' => 'CUSTOMER',
@@ -102,7 +106,19 @@ class SupportTicketController
                 'updated_at' => now(),
             ]);
             $record->forceFill(['status' => 'OPEN'])->save();
-        });
+
+            return $record;
+        }, 3);
+
+        $notifications->record(
+            'support.ticket.replied',
+            'Balasan pelanggan pada tiket',
+            'Tiket #'.$record->id.' · '.$record->subject,
+            'INFO',
+            'support_ticket',
+            $record->id,
+            ['order_id' => $record->order_id]
+        );
 
         return back();
     }

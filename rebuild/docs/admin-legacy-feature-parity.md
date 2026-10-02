@@ -35,7 +35,7 @@ Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb
 | `session` | Guard admin dan role terpisah tersedia. |
 | `storefront` | Setara tanpa duplikasi: logo/footer/banner dan teks presentasi berada di Banner & Konten; nama toko, kontak, akun sosial, tautan bantuan, dan jam layanan tetap satu sumber di Pengaturan. |
 | `summary` | Sebagian: dashboard/laporan/health tersedia; perlu perbandingan metrik dan filter. |
-| `support` | Balasan/status/quick replies tersedia; perlu perbandingan detail modal/riwayat tiket. |
+| `support` | Setara+: daftar tiket, pencarian/filter/pagination, kategori lama (`kind`), customer/order context, handler & handled_at, status, detail riwayat percakapan, balasan, quick replies, email balasan, audit log, serta notifikasi saat customer/guest membalas ulang. `staff_reply` lama sengaja tidak digandakan karena conversation messages menjadi sumber riwayat. |
 | `team` | SUPER_ADMIN/ADMIN tersedia; STAFF dihapus sesuai instruksi terbaru, bukan regresi. Perlu perbandingan field hak akses. |
 | `vouchers` | Setara tanpa duplikasi: voucher diskon tetap di Promo, sedangkan stok kode produk lama dipindahkan ke nominal Produk sebagai Stok Kode Digital; kode terenkripsi dan hanya masuk delivery_payload setelah order berhasil. |
 | `wallet/proof` | Bukti top-up privat belum memiliki tampilan admin setara. |

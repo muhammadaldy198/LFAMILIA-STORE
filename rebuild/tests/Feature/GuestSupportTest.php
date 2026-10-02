@@ -54,6 +54,7 @@ class GuestSupportTest extends TestCase
         $ticket = DB::table('support_tickets')->where('order_id', $id)->first();
         $this->assertNotNull($ticket);
         $this->assertNull($ticket->user_id);
+        $this->assertSame('ORDER', $ticket->kind);
         DB::table('support_ticket_messages')->insert([
             'support_ticket_id' => $ticket->id, 'sender_type' => 'ADMIN',
             'message' => 'Sedang kami periksa.', 'created_at' => now(), 'updated_at' => now(),
@@ -65,6 +66,11 @@ class GuestSupportTest extends TestCase
             ->assertRedirect('/support');
         $this->assertDatabaseHas('support_ticket_messages', [
             'support_ticket_id' => $ticket->id, 'sender_type' => 'CUSTOMER', 'message' => 'Terima kasih.',
+        ]);
+        $this->assertDatabaseHas('admin_notifications', [
+            'event_type' => 'support.ticket.replied',
+            'target_type' => 'support_ticket',
+            'target_id' => (string) $ticket->id,
         ]);
         DB::table('support_tickets')->where('id', $ticket->id)->update(['status' => 'CLOSED']);
         $this->post('/support/'.$ticket->id.'/messages', ['message' => 'Balasan terlambat'])->assertStatus(422);

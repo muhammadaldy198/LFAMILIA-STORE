@@ -9,7 +9,6 @@ import { computed, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 
 const props = defineProps({
-    quickReplies:{type:Array,default:()=>[]},
     dailyReport:{type:Array,default:()=>[]}, providerReport:{type:Array,default:()=>[]},
     kind: String,
     filters: Object,
@@ -27,8 +26,6 @@ const isSuper = computed(() => page.props.adminPanel?.admin?.role === 'SUPER_ADM
 const rows = reactive(Array.isArray(props.rows) ? props.rows.map((row) => ({ ...row })) : (props.rows?.data || []).map((row) => ({ ...row })));
 const orderStatus=ref(props.filters?.status||'');
 const reportRange=reactive({from:props.filters?.from||'',to:props.filters?.to||''});
-const quickRepliesForm=useForm({replies:[...props.quickReplies]});
-const updateSupport=row=>router.put('/admin/support/'+row.id,{status:row.status,reply:row.quick_reply||null},{preserveScroll:true,onSuccess:()=>{row.quick_reply='';}});
 const searchQuery = ref(props.filters?.q || '');
 watch(() => props.rows, value => { rows.splice(0, rows.length, ...(Array.isArray(value) ? value : value?.data || []).map(row => ({...row}))); });
 const searchRows = () => router.get('/admin/orders', { q: searchQuery.value, status: orderStatus.value || undefined }, { preserveState: true });
@@ -64,35 +61,6 @@ function saveTier(tier) {
                     <TableHeader class="text-left text-slate-400"><TableRow><TableHead class="p-2">Order</TableHead><TableHead class="p-2">Produk</TableHead><TableHead class="p-2">Nominal</TableHead><TableHead class="p-2">Status</TableHead><TableHead class="p-2">Total</TableHead><TableHead class="p-2">Dibuat</TableHead></TableRow></TableHeader>
                     <TableBody><TableRow v-for="row in rows" :key="row.id" class="border-t border-slate-800"><TableCell class="p-2"><Link :href="'/admin/orders/' + row.id" class="text-blue-600 font-semibold">{{ row.order_number }}</Link></TableCell><TableCell class="p-2">{{ row.product_name }}</TableCell><TableCell class="p-2">{{ row.package_name }}</TableCell><TableCell class="p-2">{{ row.status }}</TableCell><TableCell class="p-2">Rp{{ Number(row.total_idr).toLocaleString('id-ID') }}</TableCell><TableCell class="p-2">{{ row.created_at }}</TableCell></TableRow></TableBody>
                 </Table>
-            </section>
-
-            <section v-else-if="kind === 'support'" class="space-y-3">
-                <form class="space-y-3 rounded-md border p-4" @submit.prevent="quickRepliesForm.put('/admin/support/quick-replies',{preserveScroll:true})">
-                    <h2 class="font-semibold">Balasan cepat</h2>
-                    <div v-for="(reply,index) in quickRepliesForm.replies" :key="index" class="flex flex-wrap gap-2"><Textarea v-model="quickRepliesForm.replies[index]" maxlength="1000" rows="2" class="min-w-0 flex-1"/><Button type="button" variant="outline" @click="quickRepliesForm.replies.splice(index,1)">Hapus</Button></div>
-                    <div class="flex flex-wrap gap-2"><Button type="button" variant="outline" :disabled="quickRepliesForm.replies.length>=30" @click="quickRepliesForm.replies.push('')">Tambah balasan cepat</Button><Button :disabled="quickRepliesForm.processing">Simpan balasan cepat</Button></div>
-                </form>
-                <div v-for="row in rows" :key="row.id" class="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                    <div class="flex flex-wrap justify-between gap-2"><strong>Tiket #{{row.id}} · {{ row.subject }}</strong><span class="text-xs text-slate-500">{{ row.customer_name }} · {{ row.order_number || 'tanpa order' }}</span></div>
-                    <div class="mt-3 rounded-lg bg-slate-950 p-3">
-                        <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Pesan awal pelanggan</p>
-                        <p class="mt-2 whitespace-pre-wrap text-sm text-slate-300">{{ row.message }}</p>
-                    </div>
-                    <div v-if="row.messages?.length" class="mt-3 space-y-2">
-                        <article v-for="message in row.messages" :key="message.id" class="rounded-lg border p-3" :class="message.sender_type==='ADMIN' ? 'border-cyan-900/60 bg-cyan-950/20' : 'border-slate-800 bg-slate-950/50'">
-                            <div class="flex justify-between gap-3 text-[10px] text-slate-500">
-                                <strong>{{message.sender_type==='ADMIN' ? (message.admin_name || 'Admin LFAMILIA') : (message.customer_name || row.customer_name)}}</strong>
-                                <span>{{message.created_at}}</span>
-                            </div>
-                            <p class="mt-2 whitespace-pre-wrap text-sm text-slate-300">{{message.message}}</p>
-                        </article>
-                    </div>
-                    <div class="mt-3 grid gap-2 md:grid-cols-[180px_minmax(0,1fr)_auto]">
-                        <select v-model="row.status" class="rounded bg-slate-800 p-2 text-sm"><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option></select>
-                        <div class="space-y-2"><select aria-label="Pilih balasan cepat" class="w-full rounded border p-2 text-sm" @change="row.quick_reply=$event.target.value"><option value="">Pilih balasan cepat</option><option v-for="(reply,index) in quickRepliesForm.replies.filter(r=>r.trim())" :key="index" :value="reply">{{reply.slice(0,80)}}</option></select><Textarea v-model="row.quick_reply" rows="2" class="rounded bg-slate-800 p-2 text-sm" placeholder="Balasan ke pelanggan (opsional)"></Textarea></div>
-                        <Button class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950" @click="updateSupport(row)">Simpan / Balas</Button>
-                    </div>
-                </div>
             </section>
 
             <template v-else-if="kind === 'reports'">

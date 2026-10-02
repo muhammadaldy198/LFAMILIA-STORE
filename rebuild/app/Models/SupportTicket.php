@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class SupportTicket extends Model
 {
-    protected $fillable = ['user_id', 'order_id', 'subject', 'message'];
+    protected $fillable = ['user_id', 'order_id', 'subject', 'message', 'kind'];
 
     public function user()
     {
