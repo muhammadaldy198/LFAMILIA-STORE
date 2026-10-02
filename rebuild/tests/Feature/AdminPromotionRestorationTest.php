@@ -239,7 +239,6 @@ class AdminPromotionRestorationTest extends TestCase
 
     public function test_reserved_capacity_cannot_be_invalidated_and_used_voucher_cannot_be_deleted(): void
     {
-        $this->login();
         $catalog = $this->catalog();
 
         $voucherId = DB::table('vouchers')->insertGetId([
@@ -268,6 +267,8 @@ class AdminPromotionRestorationTest extends TestCase
             '082222222222',
             'CAPACITY2'
         ))->assertCreated();
+
+        $this->login();
 
         $payload = [
             'code' => 'CAPACITY2',
