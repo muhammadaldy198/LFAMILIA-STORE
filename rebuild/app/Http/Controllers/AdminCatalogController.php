@@ -500,7 +500,7 @@ class AdminCatalogController
         return back();
     }
 
-    public function globalMargin(Request $request, CatalogAudit $audit): RedirectResponse
+    public function globalMargin(Request $request, \App\Services\AdminAuditService $audit): RedirectResponse
     {
         $data = $request->validate(['margin_percent' => ['required', 'numeric', 'min:0', 'max:1000']]);
         DB::transaction(function () use ($request, $data, $audit): void {
