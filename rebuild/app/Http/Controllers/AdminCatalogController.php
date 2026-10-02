@@ -115,7 +115,7 @@ class AdminCatalogController
                         ...$notice->only('id', 'title', 'body', 'sort_order', 'is_active'),
                     ])->all(),
                     'packages' => $product->packages->sortBy([
-                        ['nominal_value', 'asc'], ['sort_order', 'asc'],
+                        ['sort_order', 'asc'], ['nominal_value', 'asc'],
                     ])->values()->map(fn (ProductPackage $package): array => [
                         ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr'),
                         'image_url' => $package->getFirstMediaUrl('image'),

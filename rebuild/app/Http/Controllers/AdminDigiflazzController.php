@@ -34,8 +34,38 @@ class AdminDigiflazzController
             'brands' => DB::table('digiflazz_catalog_items')->distinct()->orderBy('brand')->pluck('brand'),
             'lastSyncedAt' => DB::table('digiflazz_catalog_items')->max('synced_at'),
             'mappingCount' => ProviderMapping::whereIn('provider_id', Provider::where('code', 'DIGIFLAZZ')->pluck('id'))->count(),
+            'autoSync' => (bool) (json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true),
             'providerActive' => (bool) Provider::where('code', 'DIGIFLAZZ')->value('is_active'),
         ]);
+    }
+
+    public function settings(Request $request, AdminAuditService $audit): RedirectResponse
+    {
+        $data = $request->validate(['enabled' => ['required', 'boolean']]);
+        $before = json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true;
+        DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.auto_sync'], [
+            'value' => json_encode($data['enabled']), 'updated_by_admin_id' => $request->user('admin')->id,
+            'updated_at' => now(),
+        ]);
+        $audit->record($request, 'digiflazz.auto_sync.updated', 'system_setting', 'digiflazz.auto_sync', ['enabled' => $before], $data);
+
+        return back()->with('status', 'Pengaturan sinkron otomatis disimpan.');
+    }
+
+    public function syncProduct(Request $request, Product $product, DigiflazzCatalogService $service, AdminAuditService $audit): RedirectResponse
+    {
+        abort_unless($product->fulfillment_mode === 'AUTO_PROVIDER', 422);
+        $skus = ProviderMapping::whereIn('product_package_id', $product->packages()->pluck('id'))
+            ->whereIn('provider_id', Provider::where('code', 'DIGIFLAZZ')->pluck('id'))
+            ->whereNotNull('external_sku')->pluck('external_sku')->unique();
+        if ($skus->isEmpty()) {
+            throw ValidationException::withMessages(['sync' => 'Produk belum memiliki mapping Digiflazz.']);
+        }
+        // One complete request also refreshes availability of removed SKUs atomically.
+        $count = $service->sync();
+        $audit->record($request, 'digiflazz.product.synced', 'product', $product->id, null, ['count' => $count, 'skus' => $skus->values()->all()]);
+
+        return back()->with('status', 'Harga dan ketersediaan nominal produk diperbarui.');
     }
 
     public function sync(Request $request, DigiflazzCatalogService $service, AdminAuditService $audit): RedirectResponse

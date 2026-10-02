@@ -9,6 +9,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 
 const props = defineProps({
+    cleanupSettings:{type:Object,default:()=>({})},
     quickReplies:{type:Array,default:()=>[]},
     dailyReport:{type:Array,default:()=>[]}, providerReport:{type:Array,default:()=>[]},
     kind: String,
@@ -25,6 +26,9 @@ const props = defineProps({
     voucherProducts: { type: Array, default: () => [] },
     popularProducts: { type: Array, default: () => [] },
 });
+const cleanupForm=useForm({enabled:props.cleanupSettings?.enabled??true,inactivity_days:props.cleanupSettings?.inactivity_days??30});
+const runCleanup=()=>{if(confirm('Hapus data pribadi akun kosong yang tidak aktif sesuai periode? Akun dengan saldo atau riwayat dilindungi.'))router.post('/admin/customers/cleanup/run',{}, {preserveScroll:true});};
+const deleteCustomer=row=>{if(confirm('Hapus akun kosong '+row.name+'? Akun dengan saldo atau riwayat tidak bisa dihapus.'))router.delete('/admin/customers/'+row.id,{preserveScroll:true});};
 const page = usePage();
 const base = computed(() => page.props.adminPanel?.base_path || '/admin');
 const isSuper = computed(() => page.props.adminPanel?.admin?.role === 'SUPER_ADMIN');
@@ -125,9 +129,10 @@ function adjustWallet(row) {
             </section>
 
             <section v-else-if="kind === 'customers'" class="space-y-3">
+                <form v-if="isSuper" class="rounded-xl border p-4 space-y-3" @submit.prevent="cleanupForm.put('/admin/customers/cleanup/settings',{preserveScroll:true})"><h2 class="font-semibold">Pembersihan akun kosong</h2><div class="flex flex-wrap items-end gap-3"><label class="flex items-center gap-2 text-sm"><input v-model="cleanupForm.enabled" type="checkbox">Jalankan otomatis setiap hari</label><label class="text-sm">Tidak aktif selama (hari)<Input v-model.number="cleanupForm.inactivity_days" type="number" min="7" max="365" class="mt-1"/></label><Button :disabled="cleanupForm.processing">Simpan pengaturan</Button><Button type="button" variant="outline" @click="runCleanup">Jalankan sekarang</Button></div><p class="text-xs text-slate-500">Terakhir: {{cleanupSettings.last_run_at||'Belum pernah'}} · {{cleanupSettings.last_deleted_count||0}} akun. Saldo, riwayat transaksi, top-up, ledger, dan tiket selalu dilindungi.</p></form>
                 <div v-for="row in rows" :key="row.id" class="rounded-xl border border-slate-800 bg-slate-900 p-4">
                     <div class="grid gap-3 md:grid-cols-5">
-                        <div class="md:col-span-2"><Link :href="'/admin/customers/'+row.id" class="font-semibold text-blue-600">{{ row.name }}</Link><p class="text-xs text-slate-400">{{ row.email || '-' }} · {{ row.phone || '-' }}</p></div>
+                        <div class="md:col-span-2"><Button v-if="isSuper" type="button" variant="outline" class="mb-2" @click="deleteCustomer(row)">Hapus akun kosong</Button><br><Link :href="'/admin/customers/'+row.id" class="font-semibold text-blue-600">{{ row.name }}</Link><p class="text-xs text-slate-400">{{ row.email || '-' }} · {{ row.phone || '-' }}</p></div>
                         <div><span class="text-xs text-slate-500">Saldo</span><div>Rp{{ Number(row.balance_idr || 0).toLocaleString('id-ID') }}</div></div>
                         <label class="text-xs">Membership<select v-model="row.membership_assignment" :disabled="!isSuper" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="AUTO">AUTO (berdasarkan transaksi)</option><option v-for="tier in membershipTiers" :key="tier" :value="tier">{{ tier }} (manual)</option></select><small class="mt-1 block text-[10px] text-slate-500">Aktif: {{row.membership_tier_code}} · Belanja Rp{{Number(row.lifetime_spend_idr||0).toLocaleString('id-ID')}}</small></label>
                         <Button v-if="isSuper" class="self-end rounded bg-slate-700 px-3 py-2 text-xs" @click="updateMembership(row)">Simpan tier</Button>

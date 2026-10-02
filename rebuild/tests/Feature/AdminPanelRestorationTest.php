@@ -267,4 +267,48 @@ class AdminPanelRestorationTest extends TestCase
         $this->put('/admin/support/quick-replies', ['replies' => ['Mohon sertakan invoice.']])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(['Mohon sertakan invoice.'], json_decode(DB::table('system_settings')->where('key', 'support.quick_replies')->value('value'), true));
     }
+    public function test_catalog_editor_preserves_custom_order_over_nominal_value(): void
+    {
+        $this->login();
+        $product = $this->product();
+        $first = $product->packages()->create(['code' => 'FIRST', 'name' => 'Large first', 'nominal_value' => 100, 'sort_order' => 0]);
+        $second = $product->packages()->create(['code' => 'SECOND', 'name' => 'Small second', 'nominal_value' => 1, 'sort_order' => 1]);
+        $this->get('/admin/catalog')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('products', fn ($products) => collect($products)->firstWhere('id', $product->id)['packages'][0]['id'] === $first->id));
+        $this->put('/admin/catalog/products/'.$product->id.'/packages/reorder', ['ids' => [$second->id, $first->id]])->assertRedirect()->assertSessionHasNoErrors();
+        $this->get('/admin/catalog')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('products', fn ($products) => collect($products)->firstWhere('id', $product->id)['packages'][0]['id'] === $second->id));
+    }
+
+    public function test_owner_controls_supplier_auto_sync_and_admin_without_permission_cannot(): void
+    {
+        $this->login();
+        $this->put('/admin/digiflazz/settings', ['enabled' => false])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertFalse(json_decode(DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value')));
+        $this->artisan('lfamilia:sync-digiflazz-catalog')->assertExitCode(0);
+        $this->login([], 'ADMIN');
+        $this->put('/admin/digiflazz/settings', ['enabled' => true])->assertForbidden();
+    }
+
+    public function test_cleanup_settings_and_execution_retain_accounts_with_history(): void
+    {
+        $this->login();
+        $this->put('/admin/customers/cleanup/settings', ['enabled' => false, 'inactivity_days' => 7])->assertRedirect()->assertSessionHasNoErrors();
+        $empty = User::create(['name' => 'Inactive empty', 'email' => 'empty-cleanup@example.test', 'created_at' => now()->subDays(10)]);
+        $funded = User::create(['name' => 'Inactive funded', 'email' => 'funded-cleanup@example.test', 'created_at' => now()->subDays(10)]);
+        DB::table('wallets')->insert(['user_id' => $funded->id, 'balance_idr' => 1000, 'version' => 0, 'created_at' => now(), 'updated_at' => now()]);
+        $service = app(\App\Services\CustomerCleanupService::class);
+        $this->assertSame(0, $service->run());
+        $this->assertNotNull(User::find($empty->id));
+        $this->post('/admin/customers/cleanup/run')->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertNull(User::find($empty->id));
+        $this->assertNotNull(User::find($funded->id));
+        $this->assertNull(User::withTrashed()->find($empty->id)->email);
+        $this->delete('/admin/customers/'.$funded->id)->assertSessionHasErrors('account');
+        $this->put('/admin/customers/cleanup/settings', ['enabled' => true, 'inactivity_days' => 6])->assertSessionHasErrors('inactivity_days');
+        $this->login([], 'ADMIN');
+        $this->post('/admin/customers/cleanup/run')->assertForbidden();
+        $this->delete('/admin/customers/'.$funded->id)->assertForbidden();
+    }
+
 }

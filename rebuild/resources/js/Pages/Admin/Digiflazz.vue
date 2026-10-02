@@ -7,8 +7,9 @@ import { Input } from '../../Components/ui/input';
 import { Card } from '../../Components/ui/card';
 import { Badge } from '../../Components/ui/badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
-const props=defineProps({items:Object,filters:Object,brands:Array,lastSyncedAt:String,mappingCount:Number,providerActive:Boolean});
+const props=defineProps({items:Object,filters:Object,brands:Array,lastSyncedAt:String,mappingCount:Number,providerActive:Boolean,autoSync:Boolean});
 const filters=ref({q:props.filters?.q||'',brand:props.filters?.brand||'',status:props.filters?.status||''});
+const autoSyncForm=useForm({enabled:props.autoSync});
 const syncForm=useForm({});
 const sync=id=>syncForm.transform(()=>id?{item_id:id}:{}).post('/admin/digiflazz/sync',{preserveScroll:true});
 const search=()=>router.get('/admin/providers',{provider:'DIGIFLAZZ',...filters.value},{preserveState:true});
@@ -17,6 +18,7 @@ const money=value=>'Rp'+Number(value||0).toLocaleString('id-ID');
 <template>
 <Head title="Digiflazz"/><AdminShell><div class="space-y-5">
 <header class="flex flex-wrap items-center justify-between gap-3"><div><h1>Digiflazz</h1><p class="text-sm text-slate-500">Sinkron terakhir: {{lastSyncedAt||'Belum pernah'}} · {{mappingCount}} mapping · Provider {{providerActive?'aktif':'nonaktif'}}</p></div><Button :disabled="syncForm.processing" @click="sync()">{{syncForm.processing?'Menyinkronkan…':'Sinkron daftar harga'}}</Button></header>
+<Card class="p-4"><form class="flex flex-wrap items-center gap-3" @submit.prevent="autoSyncForm.put('/admin/digiflazz/settings',{preserveScroll:true})"><label class="flex items-center gap-2 text-sm"><input v-model="autoSyncForm.enabled" type="checkbox">Sinkron harga otomatis setiap 15 menit</label><Button :disabled="autoSyncForm.processing">Simpan pengaturan</Button><p class="w-full text-xs text-slate-500">Margin khusus nominal dipertahankan. Sinkron hanya berjalan ketika credential Digiflazz aktif.</p></form></Card>
 <Card class="p-4"><form class="grid gap-3 md:grid-cols-4" @submit.prevent="search"><label class="text-sm">Cari produk / SKU / seller<Input v-model="filters.q" maxlength="100" class="mt-1"/></label><label class="text-sm">Brand<select v-model="filters.brand" class="mt-1 w-full rounded-md border p-2"><option value="">Semua brand</option><option v-for="brand in brands" :key="brand">{{brand}}</option></select></label><label class="text-sm">Status<select v-model="filters.status" class="mt-1 w-full rounded-md border p-2"><option value="">Semua</option><option value="active">Buyer & seller aktif</option><option value="attention">Perlu perhatian</option></select></label><Button class="self-end">Terapkan filter</Button></form></Card>
 <p class="text-sm text-slate-500">Data berasal dari daftar harga buyer Digiflazz. Kenaikan dari baseline ditandai; stok dan jadwal cut-off diperiksa saat checkout. Impor nominal tersedia di Produk → Edit → Nominal & Harga.</p>
 <Card class="overflow-hidden"><Table><TableHeader><TableRow><TableHead>Produk / SKU</TableHead><TableHead>Seller</TableHead><TableHead>Modal / baseline</TableHead><TableHead>Status</TableHead><TableHead>Stok / cut-off WIB</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody>

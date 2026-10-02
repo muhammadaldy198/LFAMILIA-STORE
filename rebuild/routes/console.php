@@ -5,16 +5,13 @@ use App\Jobs\ReconcileFulfillmentJob;
 use App\Jobs\SendFulfillmentJob;
 use App\Jobs\StartFulfillmentJob;
 use App\Models\AdminUser;
-use App\Models\User;
 use App\Services\AdminNotificationService;
-use App\Services\CustomerAccountDeletion;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 Artisan::command('lfamilia:bootstrap-super-admin', function (): int {
     if (AdminUser::where('role', 'SUPER_ADMIN')->exists()) {
@@ -52,26 +49,10 @@ Artisan::command('lfamilia:bootstrap-super-admin', function (): int {
     return 0;
 })->purpose('Bootstrap the first Super Admin without storing credentials in Git');
 
-Artisan::command('lfamilia:cleanup-empty-customers', function (CustomerAccountDeletion $deletion): void {
-    $cutoff = now()->subDays(30);
-    $count = 0;
-
-    User::query()->whereRaw('COALESCE(last_active_at, created_at) <= ?', [$cutoff])
-        ->chunkById(100, function ($users) use ($deletion, $cutoff, &$count): void {
-            foreach ($users as $user) {
-                try {
-                    $deletion->delete($user, $cutoff);
-                    if (User::withTrashed()->find($user->id)?->trashed()) {
-                        $count++;
-                    }
-                } catch (ValidationException) {
-                    // Balances, orders, top-ups, and tickets retain the account.
-                }
-            }
-        });
-
+Artisan::command('lfamilia:cleanup-empty-customers', function (\App\Services\CustomerCleanupService $cleanup): void {
+    $count = $cleanup->run();
     $this->info("Akun kosong yang dihapus: {$count}");
-})->purpose('Remove inactive empty accounts after 30 days, retaining accounts with obligations');
+})->purpose('Remove inactive empty accounts using owner-controlled retention settings');
 
 Schedule::command('lfamilia:cleanup-empty-customers')->dailyAt('03:30');
 
@@ -160,3 +141,28 @@ Schedule::call(function (): void {
             }
         });
 })->everyFiveMinutes()->name('lfamilia-stale-fulfillment-alert')->withoutOverlapping();
+
+Artisan::command('lfamilia:sync-digiflazz-catalog', function (\App\Services\DigiflazzCatalogService $catalog): int {
+    $enabled = json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true;
+    if (! $enabled || ! \App\Models\IntegrationCredential::where('code', 'digiflazz')->where('is_active', true)->exists()) {
+        $this->info('Sinkron otomatis nonaktif atau integrasi belum dikonfigurasi.');
+
+        return 0;
+    }
+    try {
+        $count = $catalog->sync();
+        DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.last_auto_sync'], [
+            'value' => json_encode(['at' => now()->toIso8601String(), 'count' => $count]), 'updated_at' => now(),
+        ]);
+        $this->info("SKU disinkronkan: {$count}");
+
+        return 0;
+    } catch (\Throwable $error) {
+        \Illuminate\Support\Facades\Log::warning('Automatic Digiflazz catalog sync failed.', ['exception_class' => $error::class]);
+        $this->error('Sinkron gagal; harga tersimpan dipertahankan. Periksa Integrasi dan coba sinkron manual.');
+
+        return 1;
+    }
+})->purpose('Refresh supplier costs and availability while preserving customer margin settings');
+
+Schedule::command('lfamilia:sync-digiflazz-catalog')->everyFifteenMinutes()->withoutOverlapping();

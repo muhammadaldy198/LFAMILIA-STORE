@@ -85,6 +85,7 @@ class AdminWorkspaceController
     public function customers(Request $request): Response
     {
         return Inertia::render('Admin/Workspace', [
+            'cleanupSettings' => app(\App\Services\CustomerCleanupService::class)->settings(),
             'kind' => 'customers',
             'title' => 'Pelanggan',
             'filters' => ['q' => (string) $request->query('q', '')],
@@ -107,6 +108,37 @@ class AdminWorkspaceController
                 ]),
             'membershipTiers' => DB::table('membership_tiers')->where('is_active', true)->orderBy('rank')->pluck('code'),
         ]);
+    }
+
+    public function cleanupSettings(Request $request, AdminAuditService $audit): RedirectResponse
+    {
+        $data = $request->validate(['enabled' => ['required', 'boolean'], 'inactivity_days' => ['required', 'integer', 'min:7', 'max:365']]);
+        $service = app(\App\Services\CustomerCleanupService::class);
+        $before = $service->settings();
+        DB::table('system_settings')->updateOrInsert(['key' => 'customers.cleanup'], [
+            'value' => json_encode([...$before, ...$data]), 'updated_by_admin_id' => $request->user('admin')->id,
+            'updated_at' => now(),
+        ]);
+        $audit->record($request, 'customer.cleanup.settings_updated', 'system_setting', 'customers.cleanup', $before, $data);
+
+        return back()->with('status', 'Pengaturan pembersihan akun disimpan.');
+    }
+
+    public function cleanup(Request $request, AdminAuditService $audit): RedirectResponse
+    {
+        $count = app(\App\Services\CustomerCleanupService::class)->run(true);
+        $audit->record($request, 'customer.cleanup.executed', 'user', 'empty-inactive', null, ['deleted' => $count]);
+
+        return back()->with('status', $count.' akun kosong dinonaktifkan dan data pribadinya dihapus.');
+    }
+
+    public function deleteCustomer(Request $request, int $userId, AdminAuditService $audit): RedirectResponse
+    {
+        $user = User::findOrFail($userId);
+        app(\App\Services\CustomerAccountDeletion::class)->delete($user);
+        $audit->record($request, 'customer.empty_account.deleted', 'user', $userId, null, ['deleted' => true]);
+
+        return redirect('/admin/customers')->with('status', 'Akun kosong dihapus. Akun dengan saldo atau riwayat dilindungi.');
     }
 
     public function customerDetail(int $userId): Response

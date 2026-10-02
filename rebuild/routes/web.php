@@ -208,6 +208,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         ->name('admin.catalog.')->group(function (): void {
             Route::put('/margin', [AdminCatalogController::class, 'globalMargin']);
             Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages']);
+            Route::post('/products/{product}/sync', [AdminDigiflazzController::class, 'syncProduct'])->middleware('throttle:admin-sensitive');
             Route::post('/products/{product}/import', [AdminDigiflazzController::class, 'import']);
             Route::post('/mappings/{mapping}/sync', [AdminDigiflazzController::class, 'syncMapping'])->middleware('throttle:admin-sensitive');
             Route::post('/categories', [AdminCatalogController::class, 'category'])->name('categories.store');
@@ -252,6 +253,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     });
 
     Route::middleware('admin.permission:providers.manage')->group(function (): void {
+        Route::put('/admin/digiflazz/settings', [AdminDigiflazzController::class, 'settings']);
         Route::post('/admin/digiflazz/sync', [AdminDigiflazzController::class, 'sync'])->middleware('throttle:admin-sensitive');
         Route::put('/admin/digiflazz/baseline/{id}', [AdminDigiflazzController::class, 'baseline']);
 
@@ -268,6 +270,9 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         ->middleware('admin.permission:customers.view')->name('admin.customers');
 
     Route::middleware('admin.super')->group(function (): void {
+        Route::put('/admin/customers/cleanup/settings', [AdminWorkspaceController::class, 'cleanupSettings']);
+        Route::post('/admin/customers/cleanup/run', [AdminWorkspaceController::class, 'cleanup'])->middleware('throttle:admin-sensitive');
+        Route::delete('/admin/customers/{userId}', [AdminWorkspaceController::class, 'deleteCustomer'])->middleware('throttle:admin-sensitive');
         Route::post('/admin/customers/{userId}/wallet', [AdminWorkspaceController::class, 'adjustWallet'])
             ->middleware('throttle:admin-sensitive')->name('admin.customers.wallet');
         Route::put('/admin/customers/{userId}/membership', [AdminWorkspaceController::class, 'updateMembership'])
