@@ -105,6 +105,8 @@ class AdminIntegrationController
             ];
         })->values();
 
+        $appUrl = rtrim((string) config('app.url'), '/');
+
         return Inertia::render('Admin/Integrations', [
             'integrations' => $integrations->all(),
             'summary' => [
@@ -117,6 +119,12 @@ class AdminIntegrationController
                     ->filter(fn (array $item): bool => $item['is_active'] && $item['health']['status'] !== 'HEALTHY')
                     ->count(),
                 'configuration_complete' => $integrations->where('required_complete', true)->count(),
+            ],
+            'callbackUrls' => [
+                'midtrans' => $appUrl.'/api/payments/midtrans/notification',
+                'doku' => $appUrl.'/api/payments/doku/notification',
+                'digiflazz' => $appUrl.'/api/fulfillment/digiflazz/webhook',
+                'google' => $appUrl.'/auth/google/callback',
             ],
         ]);
     }
