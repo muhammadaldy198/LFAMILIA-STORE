@@ -6,8 +6,11 @@ use App\Jobs\ReconcileFulfillmentJob;
 use App\Jobs\SendFulfillmentJob;
 use App\Models\AdminUser;
 use App\Services\AdminManualOrderService;
+use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -85,6 +88,35 @@ class AdminManualRestorationTest extends TestCase
         ]);
     }
 
+    private function addLaterInternalAttempt(int $orderId): int
+    {
+        $order = DB::table('orders')->where('id', $orderId)->firstOrFail();
+        $providerId = DB::table('providers')->where('code', 'VOUCHER_STOCK')->value('id');
+        $mappingId = DB::table('provider_mappings')->insertGetId([
+            'product_package_id' => $order->product_package_id,
+            'provider_id' => $providerId,
+            'external_sku' => 'stock-later-'.bin2hex(random_bytes(3)),
+            'cost_idr' => 9000,
+            'fulfillment_config' => json_encode(['stock_key' => 'manual-regression-later'], JSON_THROW_ON_ERROR),
+            'priority' => 80,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return DB::table('fulfillment_attempts')->insertGetId([
+            'order_id' => $orderId,
+            'provider_mapping_id' => $mappingId,
+            'provider_id' => $providerId,
+            'attempt_no' => 3,
+            'external_reference' => 'manual-regression-later-'.bin2hex(random_bytes(8)),
+            'status' => 'CREATED',
+            'correlation_id' => (string) Str::uuid(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     public function test_manual_workspace_shows_only_latest_attempt_with_human_labels_and_search(): void
     {
         $admin = $this->login();
@@ -150,6 +182,28 @@ class AdminManualRestorationTest extends TestCase
         $this->assertDatabaseHas('fulfillment_attempts', [
             'id' => $oldAttempt->id,
             'status' => 'BLOCKED',
+        ]);
+    }
+
+    public function test_stale_reconciliation_job_never_contacts_provider_after_newer_attempt_exists(): void
+    {
+        Http::swap(new Factory);
+        Http::fake();
+        $admin = $this->login();
+        $orderId = $this->order($admin, 'TARGET-RACE');
+        $digiflazzAttemptId = $this->addDigiflazzAttempt($orderId, 'UNKNOWN');
+        $laterAttemptId = $this->addLaterInternalAttempt($orderId);
+
+        app(FulfillmentService::class)->reconcileAttempt($digiflazzAttemptId);
+
+        Http::assertNothingSent();
+        $this->assertDatabaseHas('fulfillment_attempts', [
+            'id' => $digiflazzAttemptId,
+            'status' => 'UNKNOWN',
+        ]);
+        $this->assertDatabaseHas('fulfillment_attempts', [
+            'id' => $laterAttemptId,
+            'status' => 'CREATED',
         ]);
     }
 
