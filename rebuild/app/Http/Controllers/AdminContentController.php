@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -145,10 +146,8 @@ class AdminContentController
     public function storeNews(Request $request, AdminAuditService $audit): RedirectResponse
     {
         $data = $this->newsData($request);
-        $slug = Str::slug($data['slug'] ?: $data['title']);
-        if ($slug === '' || NewsArticle::where('slug', $slug)->exists()) {
-            return back()->withErrors(['slug' => 'Slug berita tidak valid atau sudah dipakai.']);
-        }
+        $slug = $this->newsSlug($data['slug'] ?: $data['title']);
+        $this->ensureNewsSlugAvailable($slug);
         $article = NewsArticle::create([...$data, 'slug' => $slug]);
         $audit->record($request, 'content.news.created', 'news_article', $article->id, null, $article->toArray());
 
@@ -157,8 +156,9 @@ class AdminContentController
 
     public function updateNews(Request $request, NewsArticle $news, AdminAuditService $audit): RedirectResponse
     {
-        $data = $this->newsData($request, $news->id);
-        $data['slug'] = Str::slug($data['slug'] ?: $data['title']);
+        $data = $this->newsData($request);
+        $data['slug'] = $this->newsSlug($data['slug'] ?: $data['title']);
+        $this->ensureNewsSlugAvailable($data['slug'], $news->id);
         $before = $news->toArray();
         $news->update($data);
         $audit->record($request, 'content.news.updated', 'news_article', $news->id, $before, $news->toArray());
@@ -302,7 +302,9 @@ class AdminContentController
         ]);
 
         if (! $data['show_desktop'] && ! $data['show_mobile']) {
-            abort(422, 'Pilih minimal satu tampilan banner.');
+            throw ValidationException::withMessages([
+                'show_desktop' => 'Pilih minimal tampilan desktop atau mobile.',
+            ]);
         }
 
         return $data;
@@ -327,10 +329,10 @@ class AdminContentController
         ];
     }
 
-    private function newsData(Request $request, ?int $ignoreId = null): array
+    private function newsData(Request $request): array
     {
         return $request->validate([
-            'slug' => ['nullable', 'string', 'max:180', Rule::unique('news_articles', 'slug')->ignore($ignoreId)],
+            'slug' => ['nullable', 'string', 'max:180'],
             'title' => ['required', 'string', 'max:255'],
             'summary' => ['nullable', 'string', 'max:2000'],
             'body' => ['nullable', 'string', 'max:30000'],
@@ -339,6 +341,31 @@ class AdminContentController
             'is_active' => ['required', 'boolean'],
             'published_at' => ['nullable', 'date'],
         ]);
+    }
+
+    private function newsSlug(string $value): string
+    {
+        $slug = Str::slug($value);
+        if ($slug === '') {
+            throw ValidationException::withMessages([
+                'slug' => 'Alamat berita tidak valid.',
+            ]);
+        }
+
+        return $slug;
+    }
+
+    private function ensureNewsSlugAvailable(string $slug, ?int $ignoreId = null): void
+    {
+        $exists = NewsArticle::where('slug', $slug)
+            ->when($ignoreId, fn ($query) => $query->whereKeyNot($ignoreId))
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'slug' => 'Alamat berita sudah dipakai.',
+            ]);
+        }
     }
 
     private function faqData(Request $request): array
