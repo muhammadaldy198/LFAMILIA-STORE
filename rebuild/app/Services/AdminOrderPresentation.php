@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 
 class AdminOrderPresentation
 {
+    private array $fieldLabels = [];
+
     public const STATUSES = [
         'PENDING_PAYMENT' => 'Menunggu pembayaran', 'PAID' => 'Pembayaran diterima',
         'PROCESSING' => 'Sedang diproses', 'SUCCESS' => 'Berhasil', 'FAILED' => 'Gagal',
@@ -59,7 +61,7 @@ class AdminOrderPresentation
     {
         $snapshot = $this->json($row->snapshot);
         $input = $this->json($row->customer_input);
-        $fields = DB::table('product_input_fields')->where('product_id', $row->product_id)->pluck('label', 'field_key');
+        $fields = $this->fieldLabels[$row->product_id] ??= DB::table('product_input_fields')->where('product_id', $row->product_id)->pluck('label', 'field_key')->all();
         $known = ['destination' => 'Tujuan', 'user_id' => 'ID pengguna', 'userId' => 'ID pengguna',
             'server_id' => 'ID server', 'serverId' => 'ID server', 'zone_id' => 'ID zona',
             'phone' => 'Nomor telepon', 'customer_no' => 'Nomor pelanggan', 'nickname' => 'Nama akun',

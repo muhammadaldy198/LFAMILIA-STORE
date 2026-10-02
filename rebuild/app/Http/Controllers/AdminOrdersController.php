@@ -25,7 +25,7 @@ class AdminOrdersController
             'provider' => ['nullable', 'string', 'max:40'],
             'payment' => ['nullable', 'string', 'max:80'],
             'from' => ['nullable', 'date_format:Y-m-d'],
-            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'to' => array_filter(['nullable', 'date_format:Y-m-d', $request->filled('from') ? 'after_or_equal:from' : null]),
             'per_page' => ['nullable', Rule::in([10, 25, 50, 100])],
         ]);
         $query = DB::table('orders')

@@ -30,7 +30,7 @@ class AdminOrderDetailController
                 'status_label' => $presentation->status($attempt->status),
                 'provider' => $attempt->code === 'MANUAL' ? 'Penanganan manual' : ($attempt->code ? ucfirst(strtolower($attempt->code)) : 'Belum ditentukan'),
                 'serial_number' => $attempt->serial_number,
-                'note' => $attempt->last_error ? 'Proses belum berhasil. Periksa pengaturan penyedia atau hubungi penyedia untuk memastikan hasilnya.' : null,
+                'note' => $attempt->status === 'MANUAL_FAILED' ? $attempt->last_error : ($attempt->last_error ? 'Proses belum berhasil. Periksa pengaturan penyedia atau hubungi penyedia untuk memastikan hasilnya.' : null),
                 'created_at' => $presentation->date($attempt->created_at), 'checked_at' => $presentation->date($attempt->last_checked_at),
                 'can_manual' => $canFulfill && $attempt->status === 'MANUAL_PENDING' && in_array($row->status, ['PAID', 'PROCESSING'], true),
                 'can_retry' => $canFulfill && ! in_array($row->status, ['SUCCESS', 'REFUND'], true)
