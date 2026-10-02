@@ -192,7 +192,7 @@ class AdminSupportRestorationTest extends TestCase
         ]);
         DB::table('support_tickets')->where('id', $ticket->id)->update(['status' => 'RESOLVED']);
 
-        $this->actingAs($user);
+        $this->actingAs($user, 'web');
         $this->post('/account/tickets/'.$ticket->id.'/messages', [
             'message' => 'Masalahnya muncul lagi.',
         ])->assertRedirect()->assertSessionHasNoErrors();
