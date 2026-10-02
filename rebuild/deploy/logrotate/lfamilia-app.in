@@ -1,0 +1,11 @@
+@@APP_DIR@@/storage/logs/*.log {
+    daily
+    maxsize 10M
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    su @@APP_USER@@ @@APP_GROUP@@
+}
