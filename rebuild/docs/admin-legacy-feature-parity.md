@@ -20,7 +20,7 @@ Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb
 | `integrations` | Credential terenkripsi/reveal/tes tersedia; perlu perbandingan semua profil field/env/mode lama. |
 | `media` | Upload gambar tersedia via media Spatie; detail optimasi gambar lama perlu dibandingkan. |
 | `members` | Sebagian: tier AUTO/manual dan saldo tersedia; penghapusan akun kosong dipulihkan; tier bonus/progress/edit profil belum lengkap. |
-| `nickname-tools` | Cek game/region/PLN tersedia; belum dites dengan credential live. |
+| `nickname-tools` | Setara+: cek game/region/PLN tersedia; status game aktif dipisahkan dari dukungan cek nickname. Tidak semua game dianggap mendukung nickname secara otomatis; dukungan, kebutuhan Server/Zone, dan cek region dikelola Super Admin. Belum dites dengan credential live. |
 | `orders` | Setara+: daftar/detail/filter/pagination, riwayat pembayaran dan penanganan, pesanan manual, ekspor pilihan, cek ulang pembayaran/proses, retry aman, serta kirim ulang hasil tersimpan tersedia. |
 | `payment-methods` | Sebagian: channel/fee/status/routing tersedia; tambah/hapus channel, logo/deskripsi/kelompok dan sinkron daftar lama belum lengkap. |
 | `payment-page` | Editor tampilan pembayaran tersedia; perlu perbandingan setiap field pengaturan lama. |
