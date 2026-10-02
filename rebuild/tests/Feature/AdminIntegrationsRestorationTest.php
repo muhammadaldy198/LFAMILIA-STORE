@@ -80,7 +80,11 @@ class AdminIntegrationsRestorationTest extends TestCase
             ->where('integrations.0.health.status', 'HEALTHY')
             ->where('integrations.0.fields.1.key', 'api_key')
             ->where('integrations.0.fields.1.value', null)
-            ->where('integrations.0.fields.1.configured', true));
+            ->where('integrations.0.fields.1.configured', true)
+            ->where('callbackUrls.midtrans', config('app.url').'/api/payments/midtrans/notification')
+            ->where('callbackUrls.doku', config('app.url').'/api/payments/doku/notification')
+            ->where('callbackUrls.digiflazz', config('app.url').'/api/fulfillment/digiflazz/webhook')
+            ->where('callbackUrls.google', config('app.url').'/auth/google/callback'));
 
         $this->assertStringNotContainsString('menu16-secret-api-key', $response->getContent());
     }
