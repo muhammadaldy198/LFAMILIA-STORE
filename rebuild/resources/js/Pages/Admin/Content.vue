@@ -50,12 +50,6 @@ const settingsForm = useForm({
     footer_description: props.settings?.['store.footer_description'] || '',
     home_news_title: props.settings?.['store.home_news_title'] || '',
     home_news_intro: props.settings?.['store.home_news_intro'] || '',
-    support_whatsapp: props.settings?.['store.support_whatsapp'] || '',
-    instagram_url: props.settings?.['store.instagram_url'] || '',
-    email: props.settings?.['store.email'] || '',
-    discord_url: props.settings?.['store.discord_url'] || '',
-    support_url: props.settings?.['store.support_url'] || '',
-    business_hours: props.settings?.['store.business_hours'] || '',
 });
 
 const bannerForm = useForm({
@@ -267,10 +261,10 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
             </section>
 
             <section v-show="contentTab === 'support'" class="rounded-xl border border-slate-200 bg-white p-5">
-                <h2 class="text-lg font-bold">Kontak, bantuan & footer</h2>
+                <h2 class="text-lg font-bold">Bantuan, berita & footer</h2>
+                <p class="mt-1 text-xs text-slate-500">Nomor kontak, akun sosial, tautan bantuan, dan jam layanan dikelola satu kali di menu Pengaturan.</p>
                 <form class="mt-4 grid gap-3 md:grid-cols-2" @submit.prevent="settingsForm.put(base + '/content/settings')">
                     <label class="text-xs">Judul berita halaman utama<Input v-model="settingsForm.home_news_title" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="text-xs">Jam layanan<Input v-model="settingsForm.business_hours" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
                     <label class="text-xs md:col-span-2">Pengantar berita halaman utama<Textarea v-model="settingsForm.home_news_intro" rows="2" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea></label>
                     <label class="flex items-center gap-2 text-xs md:col-span-2"><input v-model="settingsForm.support_cta_enabled" type="checkbox"> Blok bantuan menjelang footer aktif</label>
                     <label class="text-xs">Label kecil bantuan<Input v-model="settingsForm.support_cta_label" maxlength="80" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="BUTUH BANTUAN?" /></label>
@@ -278,11 +272,6 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                     <label class="text-xs md:col-span-2">Judul bantuan<Input v-model="settingsForm.support_cta_title" maxlength="180" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="Tim LFAMILIA siap membantu." /></label>
                     <label class="text-xs md:col-span-2">Deskripsi bantuan<Textarea v-model="settingsForm.support_cta_body" rows="2" maxlength="1000" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea></label>
                     <label class="text-xs md:col-span-2">Deskripsi footer<Textarea v-model="settingsForm.footer_description" rows="2" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea></label>
-                    <label class="text-xs">WhatsApp<Input v-model="settingsForm.support_whatsapp" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="text-xs">Email<Input v-model="settingsForm.email" type="email" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="text-xs">Instagram URL<Input v-model="settingsForm.instagram_url" type="url" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="text-xs">Discord URL<Input v-model="settingsForm.discord_url" type="url" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="text-xs">Tautan halaman bantuan<Input v-model="settingsForm.support_url" type="text" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
                     <label class="flex items-center gap-2 self-end text-xs"><input v-model="settingsForm.support_widget_enabled" type="checkbox"> Tombol bantuan mengambang aktif</label>
                     <div class="md:col-span-2"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Simpan konten umum</Button></div>
                 </form>
