@@ -17,7 +17,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Throwable;
 
 Artisan::command('lfamilia:bootstrap-super-admin', function (): int {
     if (AdminUser::where('role', 'SUPER_ADMIN')->exists()) {
@@ -171,7 +170,7 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
 
                 return 0;
             }
-        } catch (Throwable) {
+        } catch (\Throwable) {
             // Invalid historical timestamp is ignored so the next sync can repair the state.
         }
     }
