@@ -135,11 +135,14 @@ class CustomerAccountController
     {
         $wallet = Wallet::firstOrCreate(['user_id' => $request->user()->id]);
         $minimumRaw = DB::table('system_settings')->where('key', 'wallet.minimum_topup_idr')->value('value');
+        $enabledRaw = DB::table('system_settings')->where('key', 'wallet.topup_enabled')->value('value');
+        $topupEnabled = $enabledRaw === null ? true : (bool) json_decode((string) $enabledRaw, true);
 
         return Inertia::render('Customer/Wallet', [
             'balanceIdr' => (int) $wallet->balance_idr,
             'minimumTopupIdr' => max(1, (int) json_decode((string) $minimumRaw, true)),
-            'paymentChannels' => $paymentRouting->publicTopupChannels(),
+            'topupEnabled' => $topupEnabled,
+            'paymentChannels' => $topupEnabled ? $paymentRouting->publicTopupChannels() : [],
             'entries' => DB::table('wallet_ledger')->where('wallet_id', $wallet->id)
                 ->orderByDesc('id')->select('id', 'amount_idr', 'balance_after_idr', 'source', 'created_at')
                 ->paginate(10),

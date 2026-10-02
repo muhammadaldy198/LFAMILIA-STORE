@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PaymentChannel;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -13,12 +14,13 @@ class PaymentRoutingService
      */
     public function publicOrderChannels(?User $user): array
     {
-        return DB::table('payment_channels as channels')
-            ->where('channels.is_active', true)
-            ->where('channels.supports_order', true)
-            ->orderBy('channels.sort_order')
+        return PaymentChannel::query()
+            ->where('is_active', true)
+            ->where('supports_order', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->get()
-            ->filter(function (object $channel): bool {
+            ->filter(function (PaymentChannel $channel): bool {
                 try {
                     $this->resolve((string) $channel->code, false, 'order');
 
@@ -27,14 +29,15 @@ class PaymentRoutingService
                     return false;
                 }
             })
-            ->map(function (object $channel) use ($user): array {
+            ->map(function (PaymentChannel $channel) use ($user): array {
                 $route = $this->resolve((string) $channel->code, false, 'order');
 
                 return [
                     'code' => (string) $channel->code,
                     'name' => (string) $channel->name,
-                    'group' => $this->publicGroup((string) $channel->code, (string) $channel->name),
-                    'description' => $this->publicDescription((string) $channel->code, (string) $channel->name),
+                    'group' => $this->publicGroup((string) $channel->method),
+                    'description' => $channel->description ?: $this->defaultDescription((string) $channel->method),
+                    'logo_url' => $channel->getFirstMediaUrl('logo') ?: null,
                     'fee_flat_idr' => (int) $channel->fee_flat_idr,
                     'fee_percent_bps' => (int) $channel->fee_percent_bps,
                     'available' => $route['gateway_code'] !== 'WALLET' || $user !== null,
@@ -47,23 +50,28 @@ class PaymentRoutingService
      */
     public function publicTopupChannels(): array
     {
-        return DB::table('payment_channels as channels')
-            ->where('channels.is_active', true)
-            ->where('channels.supports_wallet_topup', true)
-            ->orderBy('channels.sort_order')
+        return PaymentChannel::query()
+            ->where('is_active', true)
+            ->where('supports_wallet_topup', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->get()
-            ->filter(function (object $channel): bool {
+            ->filter(function (PaymentChannel $channel): bool {
                 try {
                     $route = $this->resolve((string) $channel->code, false, 'topup');
 
-                    return ! in_array($route['gateway_code'], ['WALLET'], true);
+                    return ! in_array($route['gateway_code'], ['WALLET', 'MANUAL_QRIS'], true);
                 } catch (ValidationException) {
                     return false;
                 }
             })
-            ->map(fn (object $channel): array => [
+            ->map(fn (PaymentChannel $channel): array => [
                 'code' => (string) $channel->code,
                 'name' => (string) $channel->name,
+                'description' => $channel->description ?: $this->defaultDescription((string) $channel->method),
+                'logo_url' => $channel->getFirstMediaUrl('logo') ?: null,
+                'fee_flat_idr' => (int) $channel->fee_flat_idr,
+                'fee_percent_bps' => (int) $channel->fee_percent_bps,
             ])->values()->all();
     }
 
@@ -95,6 +103,9 @@ class PaymentRoutingService
             ->where('routes.is_active', true)
             ->where('gateways.is_active', true)
             ->where('gateways.is_maintenance', false)
+            ->when($purpose === 'order',
+                fn ($query) => $query->where('routes.supports_order', true),
+                fn ($query) => $query->where('routes.supports_wallet_topup', true))
             ->orderBy('routes.priority')
             ->orderBy('routes.id')
             ->select(
@@ -136,7 +147,7 @@ class PaymentRoutingService
     /**
      * @return array<string, mixed>
      */
-    public function byRouteId(int $routeId): array
+    public function byRouteId(int $routeId, string $purpose = 'order'): array
     {
         $row = DB::table('payment_routes as routes')
             ->join('payment_channels as channels', 'channels.id', '=', 'routes.payment_channel_id')
@@ -146,6 +157,13 @@ class PaymentRoutingService
             ->where('channels.is_active', true)
             ->where('gateways.is_active', true)
             ->where('gateways.is_maintenance', false)
+            ->when($purpose === 'order', function ($query): void {
+                $query->where('channels.supports_order', true)
+                    ->where('routes.supports_order', true);
+            }, function ($query): void {
+                $query->where('channels.supports_wallet_topup', true)
+                    ->where('routes.supports_wallet_topup', true);
+            })
             ->select(
                 'routes.id as route_id',
                 'routes.provider_channel',
@@ -183,41 +201,6 @@ class PaymentRoutingService
         ];
     }
 
-    private function publicGroup(string $code, string $name): string
-    {
-        $value = strtolower($code.' '.$name);
-        if (str_contains($value, 'wallet') || str_contains($value, 'saldo') || str_contains($value, 'cash')) {
-            return 'wallet';
-        }
-        if (str_contains($value, 'qris') || str_contains($value, 'qr')) {
-            return 'qris';
-        }
-        if (str_contains($value, 'va') || str_contains($value, 'virtual') || str_contains($value, 'bank')) {
-            return 'va';
-        }
-        if (str_contains($value, 'dana') || str_contains($value, 'ovo') || str_contains($value, 'gopay')
-            || str_contains($value, 'shopee') || str_contains($value, 'wallet')) {
-            return 'ewallet';
-        }
-        if (str_contains($value, 'alfamart') || str_contains($value, 'indomaret') || str_contains($value, 'retail')) {
-            return 'retail';
-        }
-
-        return 'other';
-    }
-
-    private function publicDescription(string $code, string $name): string
-    {
-        return match ($this->publicGroup($code, $name)) {
-            'wallet' => 'Bayar langsung menggunakan saldo akun LFAMILIA.',
-            'qris' => 'Scan QR menggunakan aplikasi pembayaran yang mendukung QRIS.',
-            'va' => 'Transfer melalui Virtual Account bank yang tersedia.',
-            'ewallet' => 'Bayar menggunakan dompet digital yang tersedia.',
-            'retail' => 'Bayar melalui gerai retail yang tersedia.',
-            default => 'Metode pembayaran tersedia untuk transaksi ini.',
-        };
-    }
-
     public function fee(int $amountIdr, array $route): int
     {
         if ($amountIdr <= 0) {
@@ -229,5 +212,29 @@ class PaymentRoutingService
         $percent = $bps === 0 ? 0 : intdiv(($amountIdr * $bps) + 9999, 10000);
 
         return $flat + $percent;
+    }
+
+    private function publicGroup(string $method): string
+    {
+        return match ($method) {
+            'WALLET' => 'wallet',
+            'QRIS' => 'qris',
+            'VIRTUAL_ACCOUNT' => 'va',
+            'EWALLET' => 'ewallet',
+            'RETAIL' => 'retail',
+            default => 'other',
+        };
+    }
+
+    private function defaultDescription(string $method): string
+    {
+        return match ($method) {
+            'WALLET' => 'Bayar langsung menggunakan saldo akun LFAMILIA.',
+            'QRIS' => 'Scan QR menggunakan aplikasi pembayaran yang mendukung QRIS.',
+            'VIRTUAL_ACCOUNT' => 'Transfer melalui Virtual Account bank yang tersedia.',
+            'EWALLET' => 'Bayar menggunakan dompet digital yang tersedia.',
+            'RETAIL' => 'Bayar melalui gerai retail yang tersedia.',
+            default => 'Metode pembayaran tersedia untuk transaksi ini.',
+        };
     }
 }

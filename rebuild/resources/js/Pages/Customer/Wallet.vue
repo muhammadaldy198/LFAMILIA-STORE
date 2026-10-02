@@ -10,6 +10,7 @@ import { rupiah } from '../../lib/money';
 const props = defineProps({
     balanceIdr: Number,
     minimumTopupIdr: Number,
+    topupEnabled: { type: Boolean, default: true },
     paymentChannels: Array,
     entries: Object,
 });
@@ -91,7 +92,7 @@ async function createTopup() {
             <strong class="mt-2 block text-3xl text-cyan-300">{{ rupiah(balanceIdr) }}</strong>
         </div>
 
-        <section class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
+        <section v-if="topupEnabled" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
             <div>
                 <h2 class="text-xl font-semibold">{{ customerText("pages.customer.wallet.1b8225c4", "Top up saldo") }}</h2>
                 <p class="text-sm text-slate-400">Minimum {{ rupiah(minimumTopupIdr) }}. Biaya metode pembayaran dihitung server.</p>
@@ -110,7 +111,7 @@ async function createTopup() {
                     class="rounded-lg border px-3 py-2 text-left text-sm"
                     :class="paymentChannelCode === channel.code ? 'border-cyan-400 bg-cyan-400/10' : 'border-slate-700 bg-slate-950'"
                     @click="paymentChannelCode = channel.code; quote = null"
-                >{{ channel.name }}</button>
+                ><span class="flex items-center gap-2"><img v-if="channel.logo_url" :src="channel.logo_url" :alt="channel.name" class="size-6 rounded object-contain"><span><strong class="block">{{ channel.name }}</strong><small v-if="channel.description" class="text-slate-400">{{ channel.description }}</small></span></span></button>
             </div>
             <span v-if="errors.payment_channel_code" class="text-xs text-red-300">{{ errors.payment_channel_code[0] }}</span>
 
@@ -134,6 +135,7 @@ async function createTopup() {
             <p v-if="errors.payment" class="text-sm text-red-300">{{ errors.payment[0] }}</p>
             <p v-if="errors.topup" class="text-sm text-red-300">{{ errors.topup[0] }}</p>
         </section>
+        <section v-else class="rounded-xl border border-slate-800 bg-slate-900 p-5"><h2 class="text-xl font-semibold">Top up saldo</h2><p class="mt-2 text-sm text-slate-400">Top up saldo sedang dinonaktifkan oleh toko.</p></section>
 
         <h2 class="text-xl font-semibold">{{ customerText("pages.customer.wallet.6d61cbf3", "Riwayat saldo") }}</h2>
         <p v-if="!entries.data.length" class="text-slate-400">{{ customerText("pages.customer.wallet.88aeaea4", "Belum ada mutasi saldo.") }}</p>
