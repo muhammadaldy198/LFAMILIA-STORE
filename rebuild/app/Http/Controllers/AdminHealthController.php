@@ -364,15 +364,23 @@ class AdminHealthController
             $status = $active
                 ? $this->normalizeStatus((string) ($stored['status'] ?? 'UNTESTED'))
                 : 'NOT_CONFIGURED';
+            $message = null;
 
-            if ($active && $status === 'HEALTHY'
-                && ($testedAt === null || Carbon::parse($testedAt)->lt($checkedAt->copy()->subMinutes(15)))) {
-                $status = 'STALE';
+            if ($active && $status === 'HEALTHY') {
+                $testedAtCarbon = $testedAt !== null ? Carbon::parse($testedAt) : null;
+
+                if ($testedAtCarbon === null || $testedAtCarbon->lt($checkedAt->copy()->subMinutes(15))) {
+                    $status = 'STALE';
+                } elseif ($testedAtCarbon->gt($checkedAt->copy()->addSeconds(60))) {
+                    $status = 'DEGRADED';
+                    $message = 'Waktu Tes Koneksi lebih maju dari waktu aplikasi.';
+                }
             }
 
             if ($active && in_array($code, ['midtrans', 'doku'], true)
                 && (bool) $maintenance->get(strtoupper($code), false)) {
                 $status = 'MAINTENANCE';
+                $message = null;
             }
 
             return [
@@ -381,7 +389,7 @@ class AdminHealthController
                 'group' => $definition['group'] ?? 'Lainnya',
                 'active' => $active,
                 'status' => $status,
-                'message' => $this->integrationMessage($status),
+                'message' => $message ?? $this->integrationMessage($status),
                 'tested_at' => $testedAt,
             ];
         })->values()->all();
