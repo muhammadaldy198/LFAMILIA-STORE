@@ -171,15 +171,54 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(2, $product->fields()->count());
     }
 
-    public function test_global_margin_updates_products_but_preserves_nominal_overrides(): void
+    public function test_global_margin_updates_only_automatic_products_and_preserves_manual_and_nominal_overrides(): void
     {
         $this->login();
         $product = $this->product();
+        $manual = $this->product('MANUAL');
+        $manual->update(['margin_percent' => 9]);
         $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'OVERRIDE', 'name' => 'Override', 'pricing_mode' => 'PERCENT', 'margin_percent' => 7]);
         $this->put('/admin/catalog/margin', ['margin_percent' => 15])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('15.0000', (string) $product->fresh()->margin_percent);
+        $this->assertSame('9.0000', (string) $manual->fresh()->margin_percent);
         $this->assertSame('7.0000', (string) $package->fresh()->margin_percent);
+        $this->assertSame(15.0, (float) json_decode(DB::table('system_settings')->where('key', 'catalog.default_margin_percent')->value('value'), true));
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.margin.global_updated']);
+    }
+
+    public function test_catalog_slugs_are_editable_and_handling_mode_changes_only_while_product_is_empty(): void
+    {
+        $this->login();
+        $category = Category::create([
+            'name' => 'Editable Category', 'slug' => 'editable-category', 'sort_order' => 90, 'is_active' => true,
+        ]);
+        $this->put('/admin/catalog/categories/'.$category->id, [
+            'name' => 'Kategori Bisa Diubah', 'slug' => 'kategori-bisa-diubah', 'sort_order' => 91, 'is_active' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('kategori-bisa-diubah', $category->fresh()->slug);
+
+        $this->post('/admin/catalog/products', [
+            'category_id' => $category->id, 'name' => 'Produk Editable', 'slug' => 'produk-custom',
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 11, 'sort_order' => 0,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $product = Product::where('slug', 'produk-custom')->firstOrFail();
+
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $category->id, 'name' => 'Produk Editable', 'slug' => 'produk-custom-baru',
+            'fulfillment_mode' => 'MANUAL', 'margin_percent' => 11, 'sort_order' => 0, 'is_active' => false,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('produk-custom-baru', $product->fresh()->slug);
+        $this->assertSame('MANUAL', $product->fresh()->fulfillment_mode);
+
+        $this->post('/admin/catalog/products/'.$product->id.'/packages', [
+            'code' => 'CUSTOM10', 'name' => 'Custom 10', 'sort_order' => 0, 'cost_idr' => 10000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $category->id, 'name' => 'Produk Editable', 'slug' => 'produk-custom-baru',
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 11, 'sort_order' => 0, 'is_active' => false,
+        ])->assertSessionHasErrors('fulfillment_mode');
+        $this->assertSame('MANUAL', $product->fresh()->fulfillment_mode);
     }
 
     public function test_fixed_sell_price_below_cost_is_rejected(): void
