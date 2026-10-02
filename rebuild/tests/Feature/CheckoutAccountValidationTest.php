@@ -272,5 +272,4 @@ class CheckoutAccountValidationTest extends TestCase
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['customer_input.user_id']);
     }
-
 }
