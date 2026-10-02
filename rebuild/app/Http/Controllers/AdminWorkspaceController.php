@@ -20,6 +20,7 @@ use Throwable;
 
 class AdminWorkspaceController
 {
+
     public function support(): Response
     {
         $rows = DB::table('support_tickets as tickets')
