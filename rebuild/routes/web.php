@@ -270,6 +270,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         ->middleware(['admin.permission:orders.view', 'admin.permission:payments.manage', 'throttle:10,1'])->name('admin.orders.check-payment');
     Route::post('/admin/orders/{id}/check-process', [AdminOrdersController::class, 'refreshFulfillment'])
         ->middleware(['admin.permission:orders.view', 'admin.permission:fulfillment.manage', 'throttle:10,1'])->name('admin.orders.check-process');
+    Route::post('/admin/orders/{id}/resend-delivery', [AdminOrdersController::class, 'resendDelivery'])
+        ->middleware(['admin.permission:orders.view', 'admin.permission:fulfillment.manage', 'throttle:10,1'])->name('admin.orders.resend-delivery');
     Route::get('/admin/orders/{id}', AdminOrderDetailController::class)->middleware('admin.permission:orders.view')->name('admin.orders.show');
     Route::get('/admin/orders', [AdminOrdersController::class, 'index'])
         ->middleware('admin.permission:orders.view')->name('admin.orders');
