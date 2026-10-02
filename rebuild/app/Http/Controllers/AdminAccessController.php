@@ -33,6 +33,7 @@ class AdminAccessController
         ];
 
         $admins = AdminUser::query()
+            ->whereIn('role', ['SUPER_ADMIN', 'ADMIN'])
             ->when($filters['q'] !== '', function ($query) use ($filters): void {
                 $like = '%'.$filters['q'].'%';
                 $query->where(function ($query) use ($like): void {
@@ -60,12 +61,14 @@ class AdminAccessController
                 'updated_at' => $admin->updated_at,
             ]);
 
+        $supportedAdmins = AdminUser::query()->whereIn('role', ['SUPER_ADMIN', 'ADMIN']);
+
         $summary = [
-            'total' => AdminUser::count(),
+            'total' => (clone $supportedAdmins)->count(),
             'super_admins' => AdminUser::where('role', 'SUPER_ADMIN')->count(),
             'admins' => AdminUser::where('role', 'ADMIN')->count(),
-            'active' => AdminUser::where('is_active', true)->count(),
-            'inactive' => AdminUser::where('is_active', false)->count(),
+            'active' => (clone $supportedAdmins)->where('is_active', true)->count(),
+            'inactive' => (clone $supportedAdmins)->where('is_active', false)->count(),
             'active_super_admins' => AdminUser::where('role', 'SUPER_ADMIN')->where('is_active', true)->count(),
         ];
 
@@ -151,7 +154,7 @@ class AdminAccessController
         if ($admin->role === 'SUPER_ADMIN'
             && ($data['role'] !== 'SUPER_ADMIN' || ! $data['is_active'])
             && AdminUser::where('role', 'SUPER_ADMIN')->where('is_active', true)
-                ->whereKeyNot($admin->id)->count() < 1) {
+                ->where('id', '!=', $admin->id)->count() < 1) {
             throw ValidationException::withMessages([
                 'role' => 'Super Admin aktif terakhir tidak boleh dinonaktifkan atau diturunkan.',
             ]);
@@ -191,7 +194,7 @@ class AdminAccessController
 
         if ($admin->role === 'SUPER_ADMIN'
             && AdminUser::where('role', 'SUPER_ADMIN')->where('is_active', true)
-                ->whereKeyNot($admin->id)->count() < 1) {
+                ->where('id', '!=', $admin->id)->count() < 1) {
             throw ValidationException::withMessages([
                 'admin' => 'Super Admin aktif terakhir tidak boleh dihapus.',
             ]);
@@ -223,7 +226,7 @@ class AdminAccessController
                 Rule::unique('admin_users', 'email')->ignore($admin?->id),
             ],
             'role' => ['required', Rule::in(['SUPER_ADMIN', 'ADMIN'])],
-            'permissions' => ['present', 'array', 'max:'.count($keys)],
+            'permissions' => ['array', 'max:'.count($keys)],
             'permissions.*' => [Rule::in($keys), 'distinct'],
             'is_active' => ['required', 'boolean'],
             'password' => [
