@@ -10,6 +10,7 @@ use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminDigiflazzController;
 use App\Http\Controllers\AdminFulfillmentController;
+use App\Http\Controllers\AdminHealthController;
 use App\Http\Controllers\AdminIntegrationController;
 use App\Http\Controllers\AdminNicknameController;
 use App\Http\Controllers\AdminNotificationController;
@@ -398,7 +399,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::post('/admin/integrations/{code}/test', [AdminIntegrationController::class, 'test'])
             ->middleware('throttle:admin-sensitive')->name('admin.integrations.test');
 
-        Route::get('/admin/health', [AdminWorkspaceController::class, 'health'])->name('admin.health');
+        Route::get('/admin/health', [AdminHealthController::class, 'index'])->name('admin.health');
         Route::get('/admin/audit', [AdminWorkspaceController::class, 'audit'])->name('admin.audit');
         Route::get('/admin/configuration/export', [AdminSettingsController::class, 'exportConfiguration'])
             ->middleware('throttle:admin-sensitive')->name('admin.configuration.export');
