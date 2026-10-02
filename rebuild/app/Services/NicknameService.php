@@ -40,7 +40,7 @@ class NicknameService
         }
 
         $game = NicknameGameCode::active()->where('code', $gameCode)->first();
-        if (! $game) {
+        if (! $game || ! $game->supports_nickname_check) {
             return $this->unsupported();
         }
 
