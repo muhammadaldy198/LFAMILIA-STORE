@@ -20,7 +20,7 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 | Admin & Akses | Dedicated shadcn workspace untuk Super Admin/Admin: search/filter/pagination, ringkasan role/status, tambah/edit/hapus akun, password/status, permission granular, last-owner/self-lockout protection, serta aktivitas Admin terbaru |
 | Pengaturan | Dedicated shadcn workspace: identitas toko, kontak & jam layanan, identitas merchant publik, membership tier dengan field non-JSON, dan safe configuration export khusus Super Admin |
 | Integrasi | Dedicated shadcn workspace khusus Super Admin: 9 profil integrasi, status tersimpan, kelengkapan field wajib, callback/redirect URL, kredensial terenkripsi, tampilkan kredensial dengan verifikasi password, Tes Koneksi, validasi input operasional, dan preservasi metadata lama |
-| System Health | App, DB, Redis, worker/scheduler, integrations |
+| System Health | Dedicated shadcn workspace khusus Super Admin: status aplikasi/MySQL/Redis/storage, heartbeat worker & scheduler, failed jobs, rekonsiliasi fulfillment, 9 integrasi, gateway maintenance, dan runtime non-secret tanpa menjalankan transaksi/provider probe |
 | Audit Log | Audited changes and pagination |
 
 ## Important behavior
@@ -57,6 +57,7 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 - Menu Pengaturan menjadi sumber tunggal untuk nama toko, tagline, kontak, tautan bantuan, jam layanan, dan identitas merchant. Logo/banner/footer/widget bantuan tetap di Banner & Konten agar tidak ada editor ganda.
 - Membership di Pengaturan menggunakan field minimum transaksi, diskon persen, manfaat tambahan, dan status aktif; metadata lama yang tidak dikenali tetap dipertahankan saat penyimpanan. Endpoint JSON lama tetap kompatibel untuk migrasi/test, tetapi tidak ditampilkan ke Admin.
 - Ekspor konfigurasi hanya Super Admin, mengecualikan credential/password/secret/token/key/signature/ciphertext, dan setiap unduhan tercatat di Audit Log.
+- System Health hanya membaca state internal dan hasil Tes Koneksi terakhir; halaman ini tidak menembak provider atau gateway secara otomatis. Heartbeat rusak/kedaluwarsa ditandai perlu diperiksa, failed job hanya ditampilkan sebagai jumlah, dan payload/exception job tidak dikirim ke UI.
 - Live payment/provider transactions require configured integrations and a separate live test. HTTP fakes in regression tests do not prove external service health.
 
 ## Verification
