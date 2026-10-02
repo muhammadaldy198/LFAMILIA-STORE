@@ -11,7 +11,8 @@ class AdminAuditService
     private const SECRET_KEYS = [
         'password', 'api_key', 'server_key', 'client_secret', 'secret_key',
         'access_token', 'private_key', 'bearer_token', 'webhook_secret',
-        'bot_token', 'client_id', 'authorization', 'cookie', 'set_cookie',
+        'bot_token', 'client_id', 'client_key', 'chat_id', 'webhook_url',
+        'authorization', 'cookie', 'set_cookie',
     ];
 
     public function record(
