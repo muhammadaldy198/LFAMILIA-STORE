@@ -96,6 +96,9 @@ class CheckoutAccountValidationTest extends TestCase
             'config_ciphertext' => [
                 'api_key' => 'test-secret',
                 'base_url' => 'https://nickname.example.test',
+                'nickname_path' => '/v1/check-nickname',
+                'region_path' => '/v1/check-region',
+                'pln_path' => '/v1/check-pln',
             ],
             'is_active' => true,
         ]);
@@ -138,6 +141,9 @@ class CheckoutAccountValidationTest extends TestCase
             'config_ciphertext' => [
                 'api_key' => 'test-secret',
                 'base_url' => 'https://nickname.example.test',
+                'nickname_path' => '/v1/check-nickname',
+                'region_path' => '/v1/check-region',
+                'pln_path' => '/v1/check-pln',
             ],
             'is_active' => true,
         ]);
