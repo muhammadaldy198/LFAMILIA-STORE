@@ -13,6 +13,7 @@ use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
 use App\Services\CatalogAudit;
 use App\Services\DigiflazzCatalogService;
+use App\Services\VoucherStockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ class AdminCatalogController
     public function index(): Response
     {
         $providers = Provider::all(['id', 'code', 'is_active'])->keyBy('id');
+        $stockCounts = app(VoucherStockService::class)->counts();
 
         return Inertia::render('Admin/Catalog', [
             'categories' => Category::orderBy('sort_order')->get()->map(fn (Category $category): array => [
@@ -56,6 +58,12 @@ class AdminCatalogController
                                 'max_price_idr', 'priority', 'is_active'),
                             'provider_code' => $providers->get($mapping->provider_id)?->code,
                             'customer_no_template' => data_get($mapping->fulfillment_config, 'customer_no_template'),
+                            'stock_key' => $providers->get($mapping->provider_id)?->code === 'VOUCHER_STOCK'
+                                ? data_get($mapping->fulfillment_config, 'stock_key') : null,
+                            'stock_counts' => $providers->get($mapping->provider_id)?->code === 'VOUCHER_STOCK'
+                                ? ($stockCounts[(string) data_get($mapping->fulfillment_config, 'stock_key', '')]
+                                    ?? ['available' => 0, 'reserved' => 0, 'delivered' => 0, 'void' => 0, 'total' => 0])
+                                : null,
                         ])->all(),
                     ])->all(),
                 ]),
@@ -543,6 +551,78 @@ class AdminCatalogController
         });
 
         return back();
+    }
+
+    public function voucherStock(
+        Request $request,
+        ProductPackage $package,
+        VoucherStockService $stock,
+        CatalogAudit $audit
+    ): RedirectResponse {
+        $product = $package->product()->firstOrFail();
+        if ($product->fulfillment_mode !== 'AUTO_PROVIDER') {
+            throw ValidationException::withMessages([
+                'stock_key' => 'Stok kode hanya dapat digunakan pada produk otomatis.',
+            ]);
+        }
+
+        $data = $request->validate([
+            'stock_key' => ['required', 'string', 'min:2', 'max:100'],
+            'cost_idr' => ['required', 'integer', 'min:1', 'max:1000000000'],
+            'priority' => ['required', 'integer', 'min:0', 'max:1000'],
+            'is_active' => ['required', 'boolean'],
+            'codes_text' => ['nullable', 'string', 'max:500000'],
+        ]);
+        $stockKey = $stock->normalizeKey($data['stock_key']);
+        $provider = Provider::where('code', 'VOUCHER_STOCK')->firstOrFail();
+        $result = ['received' => 0, 'imported' => 0, 'duplicates' => 0];
+
+        DB::transaction(function () use (
+            $request,
+            $package,
+            $provider,
+            $data,
+            $stockKey,
+            $stock,
+            $audit,
+            &$result
+        ): void {
+            $mapping = ProviderMapping::firstOrNew([
+                'product_package_id' => $package->id,
+                'provider_id' => $provider->id,
+            ]);
+            $before = $mapping->exists ? $mapping->toArray() : null;
+            $mapping->fill([
+                'external_sku' => 'stock-package-'.$package->id,
+                'cost_idr' => $data['cost_idr'],
+                'max_price_idr' => null,
+                'fulfillment_config' => ['stock_key' => $stockKey],
+                'priority' => $data['priority'],
+                'is_active' => $data['is_active'],
+            ])->save();
+
+            if (trim((string) ($data['codes_text'] ?? '')) !== '') {
+                $result = $stock->import($stockKey, (string) $data['codes_text']);
+            }
+
+            $audit->record(
+                $request,
+                'catalog.voucher_stock.updated',
+                'provider_mapping',
+                $mapping->id,
+                $before,
+                [
+                    'mapping' => $mapping->toArray(),
+                    'stock_import' => $result,
+                ]
+            );
+        }, 3);
+
+        $message = $result['received'] > 0
+            ? 'Stok kode tersimpan. '.$result['imported'].' kode baru, '.$result['duplicates'].' duplikat dilewati.'
+            : 'Pengaturan stok kode tersimpan.';
+
+        return back()->with('status', $message);
     }
 
     public function mapping(Request $request, ProviderMapping $mapping, CatalogAudit $audit): RedirectResponse
