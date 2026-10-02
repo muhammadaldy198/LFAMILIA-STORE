@@ -19,7 +19,7 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 | Laporan | Dedicated shadcn report workspace: preset/custom period, operational metrics, daily sales chart, order/payment/fulfillment status, top products/categories, provider performance/error rate, role-safe CSV export, and Super Admin-only finance metrics |
 | Admin & Akses | Dedicated shadcn workspace untuk Super Admin/Admin: search/filter/pagination, ringkasan role/status, tambah/edit/hapus akun, password/status, permission granular, last-owner/self-lockout protection, serta aktivitas Admin terbaru |
 | Pengaturan | Dedicated shadcn workspace: identitas toko, kontak & jam layanan, identitas merchant publik, membership tier dengan field non-JSON, dan safe configuration export khusus Super Admin |
-| Integrasi | Encrypted credentials, password-protected reveal, connection test, current XSRF cookie |
+| Integrasi | Dedicated shadcn workspace khusus Super Admin: 9 profil integrasi, status tersimpan, kelengkapan field wajib, kredensial terenkripsi, tampilkan kredensial dengan verifikasi password, Tes Koneksi, validasi input operasional, dan preservasi metadata lama |
 | System Health | App, DB, Redis, worker/scheduler, integrations |
 | Audit Log | Audited changes and pagination |
 
@@ -38,7 +38,8 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 - Customer memilih metode pembayaran, bukan gateway internal. Routing metode ke Midtrans/DOKU dikontrol Super Admin; nama gateway tidak diekspos ke customer.
 - Routing pesanan dan top up saldo dipisahkan agar satu metode dapat memakai gateway berbeda sesuai tujuan tanpa pilihan gateway di frontend.
 - Top up saldo memiliki master toggle; ketika OFF, daftar metode top up disembunyikan dan backend menolak quote/create.
-- Kredensial/secret tetap hanya disimpan di menu Integrasi dan ditolak dari konfigurasi routing.
+- Kredensial rahasia tetap hanya disimpan terenkripsi di menu Integrasi dan ditolak dari konfigurasi routing. Halaman normal hanya menerima status tersimpan, bukan nilainya; penampilan kredensial memerlukan password Super Admin dan dicatat ke Audit Log.
+- Menyimpan profil Integrasi mempertahankan metadata lama yang belum dikenali agar migrasi tidak menghapus konfigurasi provider sebelumnya. Field wajib, URL HTTPS, path endpoint, daftar email, dan hostname divalidasi server-side.
 - Menu Pelanggan memisahkan customer membership dari Admin RBAC; tier customer tetap BASIC → SILVER → GOLD → DIAMOND → PLATINUM → MAFIA sesuai konfigurasi membership aktif.
 - Penyesuaian saldo pelanggan hanya Super Admin, memakai wallet ledger, row lock, idempotency key, audit log, dan tidak boleh membuat saldo negatif.
 - Data sensitif akun game tersimpan tidak dibuka dari daftar/detail pelanggan; panel hanya menampilkan metadata operasional yang diperlukan.
