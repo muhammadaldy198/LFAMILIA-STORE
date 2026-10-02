@@ -116,7 +116,8 @@ class AdminProviderRestorationTest extends TestCase
         ]);
 
         $audit = DB::table('audit_logs')
-            ->where('admin_user_id', $admin->id)
+            ->where('actor_type', 'admin_user')
+            ->where('actor_id', (string) $admin->id)
             ->where('action', 'provider.updated')
             ->where('target_id', (string) $provider->id)
             ->latest('id')->first();
