@@ -4,6 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 return new class extends Migration
 {
@@ -85,6 +86,34 @@ return new class extends Migration
             $rows,
             array_keys($rows),
         ));
+
+        if (Schema::hasTable('products')) {
+            $legacyCodes = DB::table('products')
+                ->whereNotNull('nickname_game_code')
+                ->where('nickname_game_code', '<>', '')
+                ->get(['nickname_game_code', 'nickname_server_field_key'])
+                ->groupBy(fn ($row): string => strtolower(trim((string) $row->nickname_game_code)));
+
+            $nextOrder = count($rows);
+            foreach ($legacyCodes as $code => $products) {
+                if ($code === '' || DB::table('nickname_game_codes')->where('code', $code)->exists()) {
+                    continue;
+                }
+
+                DB::table('nickname_game_codes')->insert([
+                    'name' => Str::headline(str_replace('-', ' ', $code)),
+                    'code' => $code,
+                    'requires_server' => $products->contains(
+                        fn ($product): bool => trim((string) $product->nickname_server_field_key) !== ''
+                    ),
+                    'requires_region_check' => false,
+                    'is_active' => true,
+                    'sort_order' => $nextOrder++,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+        }
     }
 
     public function down(): void
