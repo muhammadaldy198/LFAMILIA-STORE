@@ -46,7 +46,6 @@ class CheckoutAccountValidationTest extends TestCase
         return $product;
     }
 
-
     private function enableNicknameSupport(string $code, array $overrides = []): void
     {
         NicknameGameCode::where('code', $code)->update([
