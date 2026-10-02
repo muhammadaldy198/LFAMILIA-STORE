@@ -20,7 +20,7 @@ class AdminSupportController
         'GENERAL' => 'Umum',
         'ORDER' => 'Pesanan',
         'PAYMENT' => 'Pembayaran',
-        'REFUND' => 'Refund',
+        'REFUND' => 'Pengembalian Dana',
         'COMPLAINT' => 'Komplain',
         'ACCOUNT' => 'Akun pelanggan',
         'OTHER' => 'Lainnya',
