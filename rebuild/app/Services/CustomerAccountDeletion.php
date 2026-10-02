@@ -30,6 +30,7 @@ class CustomerAccountDeletion
             }
 
             $user->tokens()->delete();
+            DB::table('saved_game_accounts')->where('user_id', $user->id)->delete();
             DB::table('password_reset_tokens')->where('email', $user->email)->delete();
             $user->forceFill([
                 'name' => 'Akun dihapus',
