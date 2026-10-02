@@ -187,7 +187,7 @@ class AdminSupportController
     ): RedirectResponse {
         $data = $request->validate([
             'status' => ['required', Rule::in(self::STATUSES)],
-            'kind' => ['required', Rule::in(array_keys(self::KINDS))],
+            'kind' => ['nullable', Rule::in(array_keys(self::KINDS))],
             'reply' => ['nullable', 'string', 'max:5000'],
         ]);
         $reply = trim((string) ($data['reply'] ?? ''));
@@ -198,9 +198,10 @@ class AdminSupportController
             abort_unless($ticket, 404);
 
             $before = (array) $ticket;
+            $kind = (string) ($data['kind'] ?? $ticket->kind ?? 'GENERAL');
             DB::table('support_tickets')->where('id', $id)->update([
                 'status' => $data['status'],
-                'kind' => $data['kind'],
+                'kind' => $kind,
                 'handled_by_admin_id' => $adminId,
                 'handled_at' => now(),
                 'updated_at' => now(),
@@ -220,7 +221,7 @@ class AdminSupportController
 
             return [$before, [
                 'status' => $data['status'],
-                'kind' => $data['kind'],
+                'kind' => $kind,
                 'handled_by_admin_id' => $adminId,
                 'replied' => $reply !== '',
             ]];
