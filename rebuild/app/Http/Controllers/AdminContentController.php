@@ -26,8 +26,6 @@ class AdminContentController
             'store.support_cta_label', 'store.support_cta_title', 'store.support_cta_body', 'store.support_cta_button',
             'store.footer_description',
             'store.home_news_title', 'store.home_news_intro',
-            'store.support_whatsapp', 'store.instagram_url', 'store.email',
-            'store.discord_url', 'store.support_url', 'store.business_hours',
         ];
         $settings = DB::table('system_settings')->whereIn('key', $settingsKeys)->pluck('value', 'key')
             ->map(fn ($value) => json_decode((string) $value, true));
@@ -253,12 +251,6 @@ class AdminContentController
             'footer_description' => ['nullable', 'string', 'max:1000'],
             'home_news_title' => ['nullable', 'string', 'max:255'],
             'home_news_intro' => ['nullable', 'string', 'max:1000'],
-            'support_whatsapp' => ['nullable', 'string', 'max:100'],
-            'instagram_url' => ['nullable', 'url:http,https', 'max:500'],
-            'email' => ['nullable', 'email:rfc', 'max:255'],
-            'discord_url' => ['nullable', 'url:http,https', 'max:500'],
-            'support_url' => ['nullable', 'string', 'max:500', 'regex:/^(\/(?!\/)|https?:\/\/)/i'],
-            'business_hours' => ['nullable', 'string', 'max:500'],
         ]);
         $map = [
             'store.support_widget_enabled' => (bool) $data['support_widget_enabled'],
@@ -270,12 +262,6 @@ class AdminContentController
             'store.footer_description' => $data['footer_description'] ?? '',
             'store.home_news_title' => $data['home_news_title'] ?? '',
             'store.home_news_intro' => $data['home_news_intro'] ?? '',
-            'store.support_whatsapp' => $data['support_whatsapp'] ?? '',
-            'store.instagram_url' => $data['instagram_url'] ?? '',
-            'store.email' => $data['email'] ?? '',
-            'store.discord_url' => $data['discord_url'] ?? '',
-            'store.support_url' => $data['support_url'] ?? '',
-            'store.business_hours' => $data['business_hours'] ?? '',
         ];
         foreach ($map as $key => $value) {
             DB::table('system_settings')->updateOrInsert(['key' => $key], [
