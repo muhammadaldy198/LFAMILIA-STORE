@@ -17,6 +17,7 @@ use App\Http\Controllers\AdminOrderDetailController;
 use App\Http\Controllers\AdminOrdersController;
 use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\AdminPresentationController;
+use App\Http\Controllers\AdminPromotionController;
 use App\Http\Controllers\AdminProviderController;
 use App\Http\Controllers\AdminSearchController;
 use App\Http\Controllers\AdminWorkspaceController;
@@ -347,11 +348,12 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:vouchers.manage')->prefix('admin/vouchers')
         ->name('admin.vouchers.')->group(function (): void {
-            Route::get('/', [AdminWorkspaceController::class, 'vouchers'])->name('index');
-            Route::post('/', [AdminWorkspaceController::class, 'storeVoucher'])->name('store');
-            Route::put('/popular/{productId}', [AdminWorkspaceController::class, 'updatePopularProduct'])
+            Route::get('/', [AdminPromotionController::class, 'index'])->name('index');
+            Route::post('/', [AdminPromotionController::class, 'store'])->name('store');
+            Route::put('/popular/{productId}', [AdminPromotionController::class, 'updatePopular'])
                 ->name('popular.update');
-            Route::put('/{id}', [AdminWorkspaceController::class, 'updateVoucher'])->name('update');
+            Route::put('/{id}', [AdminPromotionController::class, 'update'])->name('update');
+            Route::delete('/{id}', [AdminPromotionController::class, 'destroy'])->name('destroy');
         });
 
     Route::middleware('admin.permission:support.manage')->prefix('admin/support')
