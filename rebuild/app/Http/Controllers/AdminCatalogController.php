@@ -30,7 +30,7 @@ class AdminCatalogController
 
         return Inertia::render('Admin/Catalog', [
             'categories' => Category::orderBy('sort_order')->get()->map(fn (Category $category): array => [
-                ...$category->only('id', 'name', 'slug', 'sort_order', 'is_active'),
+                ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),
             ]),
             'products' => Product::with(['packages.mappings', 'fields', 'notices'])->orderBy('sort_order')->get()
@@ -71,9 +71,11 @@ class AdminCatalogController
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
+            'icon' => ['nullable', Rule::in(['gamepad', 'ticket', 'play', 'smartphone', 'zap', 'grid'])],
             'sort_order' => ['required', 'integer', 'min:0'],
         ]);
         $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['name']);
+        $data['icon'] = $data['icon'] ?? 'grid';
         if (! $data['slug']) {
             throw ValidationException::withMessages(['name' => 'Nama kategori tidak valid.']);
         }
@@ -95,10 +97,12 @@ class AdminCatalogController
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['sometimes', 'required', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
                 Rule::unique('categories', 'slug')->ignore($category->id)],
+            'icon' => ['sometimes', 'required', Rule::in(['gamepad', 'ticket', 'play', 'smartphone', 'zap', 'grid'])],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
         ]);
         $data['slug'] ??= $category->slug;
+        $data['icon'] ??= $category->icon;
 
         DB::transaction(function () use ($request, $category, $data, $audit): void {
             $before = $category->toArray();
