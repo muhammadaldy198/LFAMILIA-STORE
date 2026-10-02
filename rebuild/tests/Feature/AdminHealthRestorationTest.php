@@ -142,6 +142,37 @@ class AdminHealthRestorationTest extends TestCase
         $this->assertStringNotContainsString('stale-health-secret', $response->getContent());
     }
 
+    public function test_future_dated_healthy_integration_check_is_degraded(): void
+    {
+        $this->login();
+        DB::table('failed_jobs')->delete();
+        $this->setSetting('system.queue_worker_heartbeat', now()->toIso8601String());
+        $this->setSetting('system.scheduler_heartbeat', now()->toIso8601String());
+
+        IntegrationCredential::updateOrCreate(['code' => 'digiflazz'], [
+            'is_active' => true,
+            'config_ciphertext' => [
+                'username' => 'future-health-buyer',
+                'api_key' => 'future-health-secret',
+            ],
+        ]);
+        $this->setSetting('integration.health.digiflazz', [
+            'status' => 'HEALTHY',
+            'message' => 'Future healthy provider response',
+            'tested_at' => now()->addMinutes(5)->toIso8601String(),
+        ]);
+
+        $response = $this->get('/admin/health')->assertOk();
+
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('summary.overall', 'DEGRADED')
+            ->where('integrations.0.code', 'digiflazz')
+            ->where('integrations.0.status', 'DEGRADED')
+            ->where('integrations.0.message', 'Waktu Tes Koneksi lebih maju dari waktu aplikasi.'));
+
+        $this->assertStringNotContainsString('future-health-secret', $response->getContent());
+    }
+
     public function test_gateway_maintenance_overrides_stored_integration_health(): void
     {
         $this->login();
