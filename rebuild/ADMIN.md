@@ -53,7 +53,7 @@ SUPER_ADMIN-only operations include:
 - customer wallet adjustment
 - manual customer membership override
 
-Operational permissions cover order view, catalog/content, fulfillment, providers, payment operations, customers, vouchers, support, reports, settings and notifications.
+Operational permissions cover order view, catalog/content, fulfillment, providers, payment operations, customers, vouchers, support, reports, settings and notifications. Settings contains non-secret store/contact/merchant identity and membership configuration only; branding media/content remains in Banner & Konten and credentials remain in Integrasi.
 
 The final active SUPER_ADMIN cannot be disabled or demoted. The account currently being used also cannot deactivate, demote, or delete itself from the same session. Other Admin accounts may be deleted by SUPER_ADMIN; the deletion is audited and password material is never written to Audit Log.
 

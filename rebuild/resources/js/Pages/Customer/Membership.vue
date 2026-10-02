@@ -22,6 +22,15 @@ function discount(tier){
     const bps=Number(tier?.benefits?.discount_bps||0);
     return bps>0?(bps/100).toLocaleString('id-ID',{maximumFractionDigits:2})+'%':'–';
 }
+function benefitRows(tier){
+    const benefits=tier?.benefits||{};
+    const rows=[];
+    String(benefits.benefit_notes||'').split(/\r?\n/).map(v=>v.trim()).filter(Boolean)
+        .forEach(value=>rows.push({label:'Manfaat',value}));
+    Object.entries(benefits).filter(([key])=>!['discount_bps','benefit_notes'].includes(key))
+        .forEach(([key,value])=>rows.push({label:String(key).replaceAll('_',' '),value}));
+    return rows;
+}
 </script>
 <template>
 <Head :title="customerText(&quot;pages.customer.membership.attribute.title.fb25e0f9&quot;, &quot;Membership&quot;)"/>
@@ -55,8 +64,8 @@ function discount(tier){
                 <div><dt>{{ customerText("pages.customer.membership.18a2de33", "Syarat") }}</dt><dd>{{requirement(tier)}}</dd></div>
                 <div><dt>{{ customerText("pages.customer.membership.7e8c4c8d", "Diskon") }}</dt><dd>{{discount(tier)}}</dd></div>
             </dl>
-            <div v-if="tier.benefits && Object.keys(tier.benefits).filter(k=>k!=='discount_bps').length" class="lf-membership-benefits">
-                <p v-for="(value,key) in tier.benefits" v-show="key!=='discount_bps'" :key="key"><strong>{{String(key).replaceAll('_',' ')}}</strong><span>{{value}}</span></p>
+            <div v-if="benefitRows(tier).length" class="lf-membership-benefits">
+                <p v-for="(row,index) in benefitRows(tier)" :key="row.label + '-' + index"><strong>{{row.label}}</strong><span>{{row.value}}</span></p>
             </div>
         </article>
     </section>

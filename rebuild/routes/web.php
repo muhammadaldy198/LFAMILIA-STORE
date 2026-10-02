@@ -21,6 +21,7 @@ use App\Http\Controllers\AdminPromotionController;
 use App\Http\Controllers\AdminProviderController;
 use App\Http\Controllers\AdminReportController;
 use App\Http\Controllers\AdminSearchController;
+use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\AdminSupportController;
 use App\Http\Controllers\AdminWorkspaceController;
 use App\Http\Controllers\CatalogController;
@@ -373,9 +374,10 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     });
 
     Route::middleware('admin.permission:settings.manage')->group(function (): void {
-        Route::get('/admin/settings', [AdminWorkspaceController::class, 'settings'])->name('admin.settings');
-        Route::put('/admin/settings', [AdminWorkspaceController::class, 'updateSettings'])->name('admin.settings.update');
-        Route::put('/admin/settings/membership/{code}', [AdminWorkspaceController::class, 'updateTier'])
+        Route::get('/admin/settings', [AdminSettingsController::class, 'index'])->name('admin.settings');
+        Route::put('/admin/settings', [AdminSettingsController::class, 'updateStore'])
+            ->name('admin.settings.update');
+        Route::put('/admin/settings/membership/{code}', [AdminSettingsController::class, 'updateTier'])
             ->name('admin.settings.membership.update');
     });
 
@@ -398,7 +400,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
         Route::get('/admin/health', [AdminWorkspaceController::class, 'health'])->name('admin.health');
         Route::get('/admin/audit', [AdminWorkspaceController::class, 'audit'])->name('admin.audit');
-        Route::get('/admin/configuration/export', [AdminWorkspaceController::class, 'exportConfiguration'])
+        Route::get('/admin/configuration/export', [AdminSettingsController::class, 'exportConfiguration'])
             ->middleware('throttle:admin-sensitive')->name('admin.configuration.export');
 
     });
