@@ -40,9 +40,18 @@ class AdminOrderDetailController
         // Only the newest attempt can be acted upon.
         $attempts = $attempts->map(fn (array $attempt, int $index): array => [...$attempt,
             'can_manual' => $index === 0 && $attempt['can_manual'], 'can_retry' => $index === 0 && $attempt['can_retry']]);
+        $order = $presentation->row($row);
+        $deliveryCode = trim((string) ($order['delivery']['code'] ?? $order['delivery']['serial_number'] ?? ''));
+        $deliveryNote = trim((string) ($order['delivery']['note'] ?? ''));
+        $canResendDelivery = $canFulfill
+            && $row->status === 'SUCCESS'
+            && filter_var($order['buyer_email'] ?? null, FILTER_VALIDATE_EMAIL)
+            && ($deliveryCode !== '' || $deliveryNote !== '');
+
         return Inertia::render('Admin/OrderDetail', [
-            'order' => $presentation->row($row), 'attempts' => $attempts,
+            'order' => $order, 'attempts' => $attempts,
             'canViewCustomer' => $permissions->allows($request->user('admin'), 'customers.view'),
+            'canResendDelivery' => $canResendDelivery,
             'canCheckFulfillment' => $canFulfill && in_array($row->status, ['PAID', 'PROCESSING'], true)
                 && in_array($attempts->first()['status'] ?? '', ['PENDING', 'UNKNOWN', 'SENDING'], true),
             'payments' => DB::table('payment_transactions')->where('order_id', $id)->orderByDesc('id')
