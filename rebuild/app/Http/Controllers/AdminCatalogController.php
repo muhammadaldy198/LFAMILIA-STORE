@@ -153,7 +153,7 @@ class AdminCatalogController
             'slug' => ['nullable', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
             'sort_order' => ['required', 'integer', 'min:0'],
         ]);
-        $data['slug'] = $data['slug'] ?: Str::slug($data['name']);
+        $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['name']);
         if (! $data['slug']) {
             throw ValidationException::withMessages(['name' => 'Nama kategori tidak valid.']);
         }
@@ -373,7 +373,7 @@ class AdminCatalogController
             $product->clearMediaCollection('banner');
             $id = $product->id;
             $product->delete();
-            $audit->record($request, 'catalog.product.deleted', 'product', $id, $before, null);
+            $audit->record($request, 'catalog.product.deleted', 'product', $id, $before, []);
         });
 
         return redirect()->route('admin.catalog.index')->with('status', 'Produk berhasil dihapus.');
@@ -393,7 +393,7 @@ class AdminCatalogController
             $package->clearMediaCollection('image');
             $package->mappings()->delete();
             $package->delete();
-            $audit->record($request, 'catalog.package.deleted', 'product_package', $id, $before, null);
+            $audit->record($request, 'catalog.package.deleted', 'product_package', $id, $before, []);
         });
 
         return back()->with('status', 'Nominal berhasil dihapus.');
