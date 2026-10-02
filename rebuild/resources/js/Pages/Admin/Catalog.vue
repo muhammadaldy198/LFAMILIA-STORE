@@ -1,4 +1,6 @@
 <script setup>
+import { Card } from '../../Components/ui/card';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
@@ -28,6 +30,9 @@ const page = usePage();
 const initialSearch = new URLSearchParams(page.url.split('?')[1] || '').get('q') || '';
 const searchedProduct = products.value.find(item => item.name.toLowerCase().includes(initialSearch.toLowerCase()));
 const tab = ref(initialSearch && searchedProduct ? searchedProduct.fulfillment_mode : 'AUTO_PROVIDER');
+const selectedProductId = ref(null), editorTab = ref('info'), showCreateProduct = ref(false);
+const selectedProductItems = computed(() => products.value.filter(item => item.id === selectedProductId.value));
+const editProduct = item => { selectedProductId.value = item.id; editorTab.value = 'info'; };
 const catalogTab = ref('products'), catalogSearch = ref(initialSearch), catalogPage = ref(1);
 const catalogTabs = [['products','Produk'],['categories','Kategori'],['fields','Kolom Data Akun'],['media','Media Toko']];
 const matchingProducts = computed(() => products.value.filter(item => item.fulfillment_mode === tab.value && (!catalogSearch.value || [item.name,item.slug,...item.packages.map(p => p.name)].join(' ').toLowerCase().includes(catalogSearch.value.toLowerCase()))));
@@ -108,8 +113,8 @@ const deleteNotice = (notice) => {
     <Head title="Kelola katalog" />
     <AdminShell>
         <div class="mx-auto max-w-7xl space-y-8">
-            <div class="flex flex-wrap items-center justify-between gap-3"><div><Link href="/admin/panel" class="text-sm text-cyan-300">← Panel Admin</Link><h1 class="mt-2 text-3xl font-bold">Katalog & media</h1></div><Link href="/" class="text-sm text-cyan-300">Lihat katalog pelanggan</Link></div>
-            <p class="text-sm text-slate-400">Produk baru tidak langsung aktif. SKU Digiflazz hanya masuk melalui sinkronisasi provider; pengaturan integrasi menyusul di M9.</p>
+            <div class="flex flex-wrap items-center justify-between gap-3"><div><Link href="/admin/panel" class="text-sm text-cyan-300">← Panel Admin</Link><h1 class="mt-2 text-3xl font-bold">Produk</h1></div><Link href="/" class="text-sm text-cyan-300">Lihat katalog pelanggan</Link></div>
+            
 
             <nav class="lf-admin-tabs"><Button v-for="[key,label] in catalogTabs" :key="key" type="button" :class="{active:catalogTab===key}" @click="catalogTab=key">{{label}}</Button></nav>
             <section v-show="catalogTab === 'categories'" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
@@ -140,7 +145,8 @@ const deleteNotice = (notice) => {
             <section v-show="catalogTab === 'products'" class="space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Produk</h2><label class="block">Cari produk atau nominal<Input v-model="catalogSearch" placeholder="Nama produk, slug, atau nominal" /></label><nav class="flex items-center gap-3"><Button type="button" :disabled="catalogPage <= 1" @click="catalogPage--">Sebelumnya</Button><span>{{catalogPage}} / {{totalCatalogPages}} · {{matchingProducts.length}} produk</span><Button type="button" :disabled="catalogPage >= totalCatalogPages" @click="catalogPage++">Berikutnya</Button></nav>
                 <div class="flex gap-2"><Button v-for="mode in ['AUTO_PROVIDER', 'MANUAL']" :key="mode" type="button" class="rounded-md px-4 py-2 text-sm" :class="tab === mode ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800'" @click="tab = mode">{{ mode === 'MANUAL' ? 'Produk Manual' : 'Produk Provider' }}</Button></div>
-                <form class="grid gap-3 md:grid-cols-3" @submit.prevent="productForm.fulfillment_mode = tab; productForm.post('/admin/catalog/products', { onSuccess: () => productForm.reset() })">
+                <Button type="button" variant="outline" @click="showCreateProduct = !showCreateProduct">{{ showCreateProduct ? 'Tutup formulir' : 'Tambah produk' }}</Button>
+                <form v-if="showCreateProduct" class="grid gap-3 md:grid-cols-3" @submit.prevent="productForm.fulfillment_mode = tab; productForm.post('/admin/catalog/products', { onSuccess: () => productForm.reset() })">
                     <label class="text-sm">Kategori<select v-model="productForm.category_id" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="">Pilih kategori</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
                     <label class="text-sm">Nama produk<Input v-model="productForm.name" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
                     <label class="text-sm">Publisher<Input v-model="productForm.publisher" placeholder="Contoh: Moonton" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
@@ -155,7 +161,11 @@ const deleteNotice = (notice) => {
                     </template>
                     <div class="md:col-span-3"><Button :disabled="productForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah {{ tab === 'MANUAL' ? 'produk manual' : 'produk provider' }}</Button><p v-if="Object.keys(productForm.errors).length" class="mt-2 text-sm text-red-300">{{ Object.values(productForm.errors).join(' · ') }}</p></div>
                 </form>
-                <div v-for="item in visibleProducts" :key="item.id" class="space-y-4 border-t border-slate-700 pt-5">
+                <Table class="w-full"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Nominal</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id"><TableCell><strong>{{item.name}}</strong><small class="block">{{item.publisher}}</small></TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" @click="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk sesuai pencarian.</p>
+                <Card v-for="item in selectedProductItems" :key="item.id" class="space-y-4 p-4">
+                    <header class="flex items-center justify-between gap-3"><h2>Edit {{item.name}}</h2><Button type="button" variant="outline" @click="selectedProductId=null">Tutup</Button></header>
+                    <nav class="lf-admin-tabs"><Button type="button" variant="ghost" :class="{active:editorTab==='info'}" @click="editorTab='info'">Informasi</Button><Button type="button" variant="ghost" :class="{active:editorTab==='nominal'}" @click="editorTab='nominal'">Nominal & Harga</Button><Button type="button" variant="ghost" :class="{active:editorTab==='display'}" @click="editorTab='display'">Tampilan Produk</Button><Button type="button" variant="ghost" @click="fieldsProductId=String(item.id);catalogTab='fields'">Input Customer</Button></nav>
+                    <div v-show="editorTab==='info'" class="space-y-4">
                     <div class="grid gap-3 md:grid-cols-4">
                         <label class="text-sm">Nama<Input v-model="item.name" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
                         <label class="text-sm">Publisher<Input v-model="item.publisher" placeholder="Publisher / brand game" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
@@ -181,6 +191,8 @@ const deleteNotice = (notice) => {
                         </div>
                     </div>
                     <Button type="button" class="rounded-md bg-slate-700 px-4 py-2 text-sm" @click="saveProduct(item)">Simpan produk</Button>
+                    </div>
+                    <div v-show="editorTab==='display'" class="space-y-4">
                     <div class="grid gap-3 md:grid-cols-2">
                         <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk / card</strong><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
                         <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Banner halaman produk</strong><div class="mt-2"><AdminMediaControl type="product" :id="item.id" collection="banner" :url="item.banner_url" /></div></div>
@@ -203,7 +215,8 @@ const deleteNotice = (notice) => {
                         </div>
                     </div>
 
-                    <div class="space-y-3 rounded-md bg-slate-950 p-4">
+                    </div>
+                    <div v-show="editorTab==='nominal'" class="space-y-3 rounded-md bg-slate-950 p-4">
                         <h3 class="font-semibold">Nominal / paket</h3>
                         <div v-for="pack in item.packages" :key="pack.id" class="space-y-2 border-t border-slate-800 pt-3">
                             <div class="flex flex-wrap items-end gap-2">
@@ -241,7 +254,7 @@ const deleteNotice = (notice) => {
                             <span v-if="Object.keys(packageForm.errors).length" class="text-xs text-red-300">{{ Object.values(packageForm.errors).join(' · ') }}</span>
                         </form>
                     </div>
-                </div>
+                </Card>
             </section>
 
             <section v-show="catalogTab === 'fields'" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
