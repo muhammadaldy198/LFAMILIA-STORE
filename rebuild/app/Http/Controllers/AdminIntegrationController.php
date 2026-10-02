@@ -388,9 +388,9 @@ class AdminIntegrationController
             foreach ($items as $item) {
                 if (str_contains($item, '://')
                     || str_contains($item, '/')
-                    || ! preg_match('/^(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i', $item)) {
+                    || ! preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i', $item)) {
                     throw ValidationException::withMessages([
-                        'config.'.$key => 'Hostname harus ditulis tanpa http://, https://, atau path.',
+                        'config.'.$key => 'Hostname harus ditulis persis tanpa wildcard, http://, https://, atau path.',
                     ]);
                 }
             }
