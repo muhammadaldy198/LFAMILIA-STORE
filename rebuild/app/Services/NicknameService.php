@@ -39,7 +39,10 @@ class NicknameService
             return $this->unsupported();
         }
 
-        $game = NicknameGameCode::active()->where('code', $gameCode)->first();
+        $game = NicknameGameCode::active()
+            ->nicknameSupported()
+            ->where('code', $gameCode)
+            ->first();
         if (! $game) {
             return $this->unsupported();
         }
