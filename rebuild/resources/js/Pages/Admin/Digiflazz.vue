@@ -20,6 +20,7 @@ const props = defineProps({
     mappingCount: Number,
     providerActive: Boolean,
     autoSync: Boolean,
+    monitorSettings: Object,
     recentTransactions: Array,
     canSeeBalance: Boolean,
 });
@@ -33,7 +34,12 @@ const filters = reactive({
     scope: props.filters?.scope || 'mapped',
     per_page: props.filters?.per_page || 25,
 });
-const autoSyncForm = useForm({ enabled: props.autoSync });
+const autoSyncForm = useForm({
+    enabled: props.autoSync,
+    sync_interval_minutes: Number(props.monitorSettings?.sync_interval_minutes || 15),
+    low_stock_threshold: Number(props.monitorSettings?.low_stock_threshold || 5),
+    price_warning_percent: Number(props.monitorSettings?.price_warning_percent || 3),
+});
 const syncForm = useForm({});
 
 const money = value => value == null ? '—' : 'Rp' + Number(value).toLocaleString('id-ID');
@@ -150,19 +156,37 @@ function refresh() {
         </div>
 
         <Card class="p-4">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <form class="flex flex-wrap items-center gap-3" @submit.prevent="autoSyncForm.put('/admin/digiflazz/settings', { preserveScroll: true })">
-                    <label class="flex items-center gap-2 text-sm">
-                        <input v-model="autoSyncForm.enabled" type="checkbox" class="size-4">
-                        Sinkron harga otomatis setiap 15 menit
-                    </label>
-                    <Button size="sm" variant="outline" :disabled="autoSyncForm.processing">Simpan</Button>
-                </form>
-                <div class="text-right text-xs text-muted-foreground">
-                    <p>Digiflazz {{ providerActive ? 'aktif' : 'nonaktif' }} di menu Provider</p>
-                    <p>Sinkron terakhir: {{ date(lastSyncedAt) }}</p>
+            <form class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" @submit.prevent="autoSyncForm.put('/admin/digiflazz/settings', { preserveScroll: true })">
+                <label class="flex items-center gap-2 text-sm md:col-span-2 xl:col-span-1">
+                    <input v-model="autoSyncForm.enabled" type="checkbox" class="size-4">
+                    Sinkron harga otomatis
+                </label>
+                <label class="space-y-1">
+                    <span class="text-sm font-medium">Interval sinkron</span>
+                    <div class="flex items-center gap-2">
+                        <Input v-model.number="autoSyncForm.sync_interval_minutes" type="number" min="5" max="1440" step="5" />
+                        <span class="text-xs text-muted-foreground">menit</span>
+                    </div>
+                </label>
+                <label class="space-y-1">
+                    <span class="text-sm font-medium">Peringatan stok menipis</span>
+                    <Input v-model.number="autoSyncForm.low_stock_threshold" type="number" min="1" max="1000000" />
+                </label>
+                <label class="space-y-1">
+                    <span class="text-sm font-medium">Peringatan kenaikan harga</span>
+                    <div class="flex items-center gap-2">
+                        <Input v-model.number="autoSyncForm.price_warning_percent" type="number" min="0.1" max="100" step="0.1" />
+                        <span class="text-xs text-muted-foreground">%</span>
+                    </div>
+                </label>
+                <div class="flex flex-wrap items-end justify-between gap-3 md:col-span-2 xl:col-span-4">
+                    <Button size="sm" variant="outline" :disabled="autoSyncForm.processing">Simpan pengaturan monitor</Button>
+                    <div class="text-right text-xs text-muted-foreground">
+                        <p>Digiflazz {{ providerActive ? 'aktif' : 'nonaktif' }} di menu Provider</p>
+                        <p>Sinkron terakhir: {{ date(lastSyncedAt) }}</p>
+                    </div>
                 </div>
-            </div>
+            </form>
             <p class="mt-3 text-xs text-muted-foreground">Harga jual, margin, prioritas sumber, dan max price tetap dikelola di menu Produk. Credential tetap dikelola di Integrasi.</p>
         </Card>
 
