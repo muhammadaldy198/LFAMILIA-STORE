@@ -18,7 +18,7 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 | Layanan Pelanggan | Dedicated support workspace: ringkasan status/sumber, search/filter/pagination, kategori tiket, detail percakapan, keterkaitan pesanan/pelanggan, penangan terakhir, status/reply, editable quick replies, email reply, dan notifikasi ulang saat pelanggan membalas |
 | Laporan | Dedicated shadcn report workspace: preset/custom period, operational metrics, daily sales chart, order/payment/fulfillment status, top products/categories, provider performance/error rate, role-safe CSV export, and Super Admin-only finance metrics |
 | Admin & Akses | Dedicated shadcn workspace untuk Super Admin/Admin: search/filter/pagination, ringkasan role/status, tambah/edit/hapus akun, password/status, permission granular, last-owner/self-lockout protection, serta aktivitas Admin terbaru |
-| Pengaturan | Store identity, contact/business hours, membership settings, safe configuration export |
+| Pengaturan | Dedicated shadcn workspace: identitas toko, kontak & jam layanan, identitas merchant publik, membership tier dengan field non-JSON, dan safe configuration export khusus Super Admin |
 | Integrasi | Encrypted credentials, password-protected reveal, connection test, current XSRF cookie |
 | System Health | App, DB, Redis, worker/scheduler, integrations |
 | Audit Log | Audited changes and pagination |
@@ -53,6 +53,9 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 - Export CSV mengikuti pemisahan akses yang sama dan dicatat ke Audit Log. Laba kotor laporan menggunakan order snapshot (`total - fee - cost`, minimum nol), sehingga perubahan harga/provider berikutnya tidak mengubah histori order.
 - Menu Admin & Akses hanya menerima role `SUPER_ADMIN` dan `ADMIN` sesuai keputusan v1 terbaru; `STAFF` lama tidak dihidupkan kembali. Admin biasa memakai permission granular yang diperiksa server-side dan selalu mempertahankan Dashboard.
 - Akun yang sedang digunakan tidak dapat dinonaktifkan, diturunkan, atau dihapus dari sesi yang sama. Super Admin aktif terakhir tetap dilindungi. Tambah/edit/hapus akun dicatat di Audit Log tanpa menyimpan password mentah.
+- Menu Pengaturan menjadi sumber tunggal untuk nama toko, tagline, kontak, tautan bantuan, jam layanan, dan identitas merchant. Logo/banner/footer/widget bantuan tetap di Banner & Konten agar tidak ada editor ganda.
+- Membership di Pengaturan menggunakan field minimum transaksi, diskon persen, manfaat tambahan, dan status aktif; metadata lama yang tidak dikenali tetap dipertahankan saat penyimpanan. Endpoint JSON lama tetap kompatibel untuk migrasi/test, tetapi tidak ditampilkan ke Admin.
+- Ekspor konfigurasi hanya Super Admin, mengecualikan credential/password/secret/token/key/signature/ciphertext, dan setiap unduhan tercatat di Audit Log.
 - Live payment/provider transactions require configured integrations and a separate live test. HTTP fakes in regression tests do not prove external service health.
 
 ## Verification
