@@ -126,6 +126,19 @@ class AdminNicknameController
             }
         }
 
+        if ($gameCode->supports_nickname_check && ! $data['supports_nickname_check']) {
+            $validationUsage = DB::table('products')
+                ->where('nickname_game_code', $oldCode)
+                ->where('nickname_check_enabled', true)
+                ->count();
+
+            if ($validationUsage > 0) {
+                throw ValidationException::withMessages([
+                    'supports_nickname_check' => 'Cek nickname masih aktif pada '.$validationUsage.' produk. Matikan atau pindahkan validasi produk tersebut sebelum menonaktifkan dukungan nickname.',
+                ]);
+            }
+        }
+
         DB::transaction(function () use ($gameCode, $data, $oldCode): void {
             $gameCode->fill($data);
             $gameCode->save();
