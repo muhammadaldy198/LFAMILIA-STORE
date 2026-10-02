@@ -20,6 +20,7 @@ class WalletTopupService
      */
     public function quote(int $amountIdr, string $channelCode): array
     {
+        $this->assertEnabled();
         $minimum = $this->minimum();
         if ($amountIdr < $minimum) {
             throw ValidationException::withMessages([
@@ -99,6 +100,17 @@ class WalletTopupService
             ),
             'fingerprint' => $fingerprint,
         ];
+    }
+
+    private function assertEnabled(): void
+    {
+        $raw = DB::table('system_settings')->where('key', 'wallet.topup_enabled')->value('value');
+        $enabled = $raw === null ? true : (bool) json_decode((string) $raw, true);
+        if (! $enabled) {
+            throw ValidationException::withMessages([
+                'amount_idr' => 'Top up saldo sedang dinonaktifkan.',
+            ]);
+        }
     }
 
     private function minimum(): int
