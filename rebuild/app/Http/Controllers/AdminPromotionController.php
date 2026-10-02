@@ -41,7 +41,7 @@ class AdminPromotionController
         ];
 
         $now = now();
-        $redemptions = $this->redemptionCounts();
+        $redemptions = $this->redemptionCounts($now);
 
         $vouchers = DB::table('vouchers')
             ->leftJoinSub($redemptions, 'redemptions', 'redemptions.voucher_id', '=', 'vouchers.id')
@@ -114,7 +114,7 @@ class AdminPromotionController
             ]);
 
         $summaryRows = DB::table('vouchers')
-            ->leftJoinSub($this->redemptionCounts(), 'redemptions', 'redemptions.voucher_id', '=', 'vouchers.id')
+            ->leftJoinSub($this->redemptionCounts($now), 'redemptions', 'redemptions.voucher_id', '=', 'vouchers.id')
             ->get([
                 'vouchers.id', 'vouchers.is_active', 'vouchers.starts_at', 'vouchers.ends_at', 'vouchers.total_quota',
                 DB::raw('COALESCE(redemptions.used_count, 0) as used_count'),
@@ -334,13 +334,13 @@ class AdminPromotionController
         }
     }
 
-    private function redemptionCounts(): Builder
+    private function redemptionCounts(Carbon $now): Builder
     {
         return DB::table('voucher_redemptions')
             ->select('voucher_id')
             ->selectRaw("SUM(CASE WHEN status = 'REDEEMED' THEN 1 ELSE 0 END) as used_count")
-            ->selectRaw("SUM(CASE WHEN status = 'RESERVED' AND reserved_until > CURRENT_TIMESTAMP THEN 1 ELSE 0 END) as reserved_count")
-            ->selectRaw("SUM(CASE WHEN status = 'REDEEMED' OR (status = 'RESERVED' AND reserved_until > CURRENT_TIMESTAMP) THEN 1 ELSE 0 END) as active_count")
+            ->selectRaw("SUM(CASE WHEN status = 'RESERVED' AND reserved_until > ? THEN 1 ELSE 0 END) as reserved_count", [$now])
+            ->selectRaw("SUM(CASE WHEN status = 'REDEEMED' OR (status = 'RESERVED' AND reserved_until > ?) THEN 1 ELSE 0 END) as active_count", [$now])
             ->groupBy('voucher_id');
     }
 
