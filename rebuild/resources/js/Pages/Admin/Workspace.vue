@@ -9,14 +9,12 @@ import { computed, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 
 const props = defineProps({
-    cleanupSettings:{type:Object,default:()=>({})},
     quickReplies:{type:Array,default:()=>[]},
     dailyReport:{type:Array,default:()=>[]}, providerReport:{type:Array,default:()=>[]},
     kind: String,
     filters: Object,
     title: String,
     rows: { type: [Array, Object], default: () => [] },
-    membershipTiers: { type: [Array, Object], default: () => [] },
     report: { type: Object, default: () => ({}) },
     topProducts: { type: Array, default: () => [] },
     settings: { type: Object, default: () => ({}) },
@@ -26,9 +24,6 @@ const props = defineProps({
     voucherProducts: { type: Array, default: () => [] },
     popularProducts: { type: Array, default: () => [] },
 });
-const cleanupForm=useForm({enabled:props.cleanupSettings?.enabled??true,inactivity_days:props.cleanupSettings?.inactivity_days??30});
-const runCleanup=()=>{if(confirm('Hapus data pribadi akun kosong yang tidak aktif sesuai periode? Akun dengan saldo atau riwayat dilindungi.'))router.post('/admin/customers/cleanup/run',{}, {preserveScroll:true});};
-const deleteCustomer=row=>{if(confirm('Hapus akun kosong '+row.name+'? Akun dengan saldo atau riwayat tidak bisa dihapus.'))router.delete('/admin/customers/'+row.id,{preserveScroll:true});};
 const page = usePage();
 const base = computed(() => page.props.adminPanel?.base_path || '/admin');
 const isSuper = computed(() => page.props.adminPanel?.admin?.role === 'SUPER_ADMIN');
@@ -39,7 +34,7 @@ const quickRepliesForm=useForm({replies:[...props.quickReplies]});
 const updateSupport=row=>router.put('/admin/support/'+row.id,{status:row.status,reply:row.quick_reply||null},{preserveScroll:true,onSuccess:()=>{row.quick_reply='';}});
 const searchQuery = ref(props.filters?.q || '');
 watch(() => props.rows, value => { rows.splice(0, rows.length, ...(Array.isArray(value) ? value : value?.data || []).map(row => ({...row}))); });
-const searchRows = () => router.get('/admin/' + (props.kind === 'orders' ? 'orders' : 'customers'), {q:searchQuery.value,status:props.kind==='orders'?orderStatus.value:undefined}, {preserveState:true});
+const searchRows = () => router.get('/admin/orders', { q: searchQuery.value, status: orderStatus.value || undefined }, { preserveState: true });
 const popularProducts = reactive((props.popularProducts || []).map((row) => ({ ...row })));
 
 const voucherForm = useForm({
@@ -79,27 +74,12 @@ function saveVoucher(row) {
         is_active: Boolean(row.is_active),
     }, { preserveScroll: true });
 }
-function updateMembership(row) {
-    router.put('/admin/customers/' + row.id + '/membership', {
-        membership_tier_code: row.membership_assignment || 'AUTO',
-    }, { preserveScroll: true });
-}
 function saveTier(tier) {
     router.put('/admin/settings/membership/' + encodeURIComponent(tier.code), {
         is_active: Boolean(tier.is_active),
         requirements: typeof tier.requirements === 'string' ? tier.requirements : JSON.stringify(tier.requirements || {}, null, 2),
         benefits: typeof tier.benefits === 'string' ? tier.benefits : JSON.stringify(tier.benefits || {}, null, 2),
     }, { preserveScroll: true });
-}
-function adjustWallet(row) {
-    const amount = Number(row.adjust_amount || 0);
-    const reason = String(row.adjust_reason || '').trim();
-    if (!amount || !reason) return;
-    router.post('/admin/customers/' + row.id + '/wallet', {
-        amount_idr: amount,
-        reason,
-        idempotency_key: globalThis.crypto?.randomUUID?.() || ('admin-wallet-' + Date.now() + '-' + row.id),
-    }, { preserveScroll: true, onSuccess: () => { row.adjust_amount = ''; row.adjust_reason = ''; } });
 }
 </script>
 
@@ -109,29 +89,12 @@ function adjustWallet(row) {
         <div class="space-y-6">
             <div><h1 class="text-3xl font-semibold">{{ title }}</h1></div>
 
-            <form v-if="kind === 'orders' || kind === 'customers'" class="lf-admin-filter-row" @submit.prevent="searchRows"><label>Cari {{kind === 'orders' ? 'nomor invoice' : 'nama/email pelanggan'}}<Input v-model="searchQuery" maxlength="100" /></label><label v-if="kind==='orders'">Status<select v-model="orderStatus" class="mt-1 rounded border p-2"><option value="">Semua status</option><option v-for="status in ['PENDING_PAYMENT','PAID','PROCESSING','SUCCESS','FAILED','EXPIRED','CANCELLED']" :key="status">{{status}}</option></select></label><div class="self-end"><Button class="lf-admin-primary">Cari</Button></div></form>
+            <form v-if="kind === 'orders'" class="lf-admin-filter-row" @submit.prevent="searchRows"><label>Cari nomor invoice<Input v-model="searchQuery" maxlength="100" /></label><label>Status<select v-model="orderStatus" class="mt-1 rounded border p-2"><option value="">Semua status</option><option v-for="status in ['PENDING_PAYMENT','PAID','PROCESSING','SUCCESS','FAILED','EXPIRED','CANCELLED']" :key="status">{{status}}</option></select></label><div class="self-end"><Button class="lf-admin-primary">Cari</Button></div></form>
             <section v-if="kind === 'orders'" class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900 p-4">
                 <Table class="w-full min-w-[850px] text-sm">
                     <TableHeader class="text-left text-slate-400"><TableRow><TableHead class="p-2">Order</TableHead><TableHead class="p-2">Produk</TableHead><TableHead class="p-2">Nominal</TableHead><TableHead class="p-2">Status</TableHead><TableHead class="p-2">Total</TableHead><TableHead class="p-2">Dibuat</TableHead></TableRow></TableHeader>
                     <TableBody><TableRow v-for="row in rows" :key="row.id" class="border-t border-slate-800"><TableCell class="p-2"><Link :href="'/admin/orders/' + row.id" class="text-blue-600 font-semibold">{{ row.order_number }}</Link></TableCell><TableCell class="p-2">{{ row.product_name }}</TableCell><TableCell class="p-2">{{ row.package_name }}</TableCell><TableCell class="p-2">{{ row.status }}</TableCell><TableCell class="p-2">Rp{{ Number(row.total_idr).toLocaleString('id-ID') }}</TableCell><TableCell class="p-2">{{ row.created_at }}</TableCell></TableRow></TableBody>
                 </Table>
-            </section>
-
-            <section v-else-if="kind === 'customers'" class="space-y-3">
-                <form v-if="isSuper" class="rounded-xl border p-4 space-y-3" @submit.prevent="cleanupForm.put('/admin/customers/cleanup/settings',{preserveScroll:true})"><h2 class="font-semibold">Pembersihan akun kosong</h2><div class="flex flex-wrap items-end gap-3"><label class="flex items-center gap-2 text-sm"><input v-model="cleanupForm.enabled" type="checkbox">Jalankan otomatis setiap hari</label><label class="text-sm">Tidak aktif selama (hari)<Input v-model.number="cleanupForm.inactivity_days" type="number" min="7" max="365" class="mt-1"/></label><Button :disabled="cleanupForm.processing">Simpan pengaturan</Button><Button type="button" variant="outline" @click="runCleanup">Jalankan sekarang</Button></div><p class="text-xs text-slate-500">Terakhir: {{cleanupSettings.last_run_at||'Belum pernah'}} · {{cleanupSettings.last_deleted_count||0}} akun. Saldo, riwayat transaksi, top-up, ledger, dan tiket selalu dilindungi.</p></form>
-                <div v-for="row in rows" :key="row.id" class="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                    <div class="grid gap-3 md:grid-cols-5">
-                        <div class="md:col-span-2"><Button v-if="isSuper" type="button" variant="outline" class="mb-2" @click="deleteCustomer(row)">Hapus akun kosong</Button><br><Link :href="'/admin/customers/'+row.id" class="font-semibold text-blue-600">{{ row.name }}</Link><p class="text-xs text-slate-400">{{ row.email || '-' }} · {{ row.phone || '-' }}</p></div>
-                        <div><span class="text-xs text-slate-500">Saldo</span><div>Rp{{ Number(row.balance_idr || 0).toLocaleString('id-ID') }}</div></div>
-                        <label class="text-xs">Membership<select v-model="row.membership_assignment" :disabled="!isSuper" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="AUTO">AUTO (berdasarkan transaksi)</option><option v-for="tier in membershipTiers" :key="tier" :value="tier">{{ tier }} (manual)</option></select><small class="mt-1 block text-[10px] text-slate-500">Aktif: {{row.membership_tier_code}} · Belanja Rp{{Number(row.lifetime_spend_idr||0).toLocaleString('id-ID')}}</small></label>
-                        <Button v-if="isSuper" class="self-end rounded bg-slate-700 px-3 py-2 text-xs" @click="updateMembership(row)">Simpan tier</Button>
-                    </div>
-                    <div v-if="isSuper" class="mt-3 flex flex-wrap items-end gap-2 border-t border-slate-800 pt-3">
-                        <label class="text-xs">Penyesuaian saldo (+/-)<Input v-model="row.adjust_amount" type="number" class="mt-1 block rounded bg-slate-800 p-2" /></label>
-                        <label class="min-w-60 flex-1 text-xs">Alasan<Input v-model="row.adjust_reason" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
-                        <Button class="rounded bg-cyan-300 px-3 py-2 text-xs font-semibold text-slate-950" @click="adjustWallet(row)">Terapkan</Button>
-                    </div>
-                </div>
             </section>
 
             <section v-else-if="kind === 'vouchers'" class="space-y-5">
