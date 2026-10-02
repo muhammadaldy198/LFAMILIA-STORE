@@ -105,7 +105,7 @@ function selectTab(nextTab) {
     if (nextTab === 'region' && !regionCodes.value.some((item) => item.code === gameCode.value)) {
         gameCode.value = regionCodes.value[0]?.code || '';
     }
-    if (nextTab === 'game' && !activeCodes.value.some((item) => item.code === gameCode.value)) {
+    if (nextTab === 'game' && !nicknameCodes.value.some((item) => item.code === gameCode.value)) {
         gameCode.value = nicknameCodes.value[0]?.code || '';
     }
 }
@@ -226,8 +226,8 @@ async function saveCode() {
         editorOpen.value = false;
         resetEditor();
 
-        if (!activeCodes.value.some((item) => item.code === gameCode.value)) {
-            gameCode.value = activeCodes.value[0]?.code || '';
+        if (!nicknameCodes.value.some((item) => item.code === gameCode.value)) {
+            gameCode.value = nicknameCodes.value[0]?.code || '';
         }
     } catch (reason) {
         editorError.value = reason instanceof Error ? reason.message : 'Kode game tidak berhasil disimpan.';
@@ -249,7 +249,7 @@ async function deleteCode(item) {
         });
         codes.value = payload.game_codes || [];
         if (gameCode.value === item.code) {
-            gameCode.value = activeCodes.value[0]?.code || '';
+            gameCode.value = nicknameCodes.value[0]?.code || '';
         }
     } catch (reason) {
         editorError.value = reason instanceof Error ? reason.message : 'Kode game tidak berhasil dihapus.';
