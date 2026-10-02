@@ -315,5 +315,4 @@ class AdminAccountValidationRestorationTest extends TestCase
         $this->assertSame('free-fire', $product->nickname_game_code);
         $this->assertSame('zone_id', $product->nickname_server_field_key);
     }
-
 }
