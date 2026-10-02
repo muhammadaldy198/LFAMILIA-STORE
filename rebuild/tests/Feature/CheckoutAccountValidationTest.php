@@ -234,9 +234,7 @@ class CheckoutAccountValidationTest extends TestCase
             ->assertJsonPath('verified', true)
             ->assertJsonPath('nickname', 'ConfigDriven');
 
-        Http::assertSent(fn ($request): bool =>
-            $request->url() === 'https://nickname.example.test/custom/nickname'
-        );
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://nickname.example.test/custom/nickname');
     }
 
     public function test_supported_game_with_empty_nickname_is_rejected(): void
