@@ -37,6 +37,7 @@ class AdminCatalogController
                 'image_url' => $category->getFirstMediaUrl('image'),
             ]),
             'nicknameGameCodes' => NicknameGameCode::active()
+                ->nicknameSupported()
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get(['id', 'name', 'code', 'requires_server', 'requires_region_check']),
@@ -268,11 +269,12 @@ class AdminCatalogController
             }
 
             $nicknameGame = NicknameGameCode::active()
+                ->nicknameSupported()
                 ->where('code', $data['nickname_game_code'])
                 ->first();
             if (! $nicknameGame) {
                 throw ValidationException::withMessages([
-                    'nickname_game_code' => 'Pilih kode game aktif yang tersedia di menu Validasi Akun.',
+                    'nickname_game_code' => 'Pilih game aktif yang mendukung cek nickname di menu Validasi Akun.',
                 ]);
             }
 
