@@ -18,6 +18,11 @@ class CheckoutAccountValidationTest extends TestCase
     {
         $category = Category::where('slug', 'game')->firstOrFail();
 
+        if (($overrides['nickname_check_enabled'] ?? false) === true && ! empty($overrides['nickname_game_code'])) {
+            NicknameGameCode::where('code', $overrides['nickname_game_code'])
+                ->update(['supports_nickname_check' => true]);
+        }
+
         $product = Product::create([
             'category_id' => $category->id,
             'name' => 'Account Validation '.bin2hex(random_bytes(3)),
@@ -270,4 +275,37 @@ class CheckoutAccountValidationTest extends TestCase
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['customer_input.user_id']);
     }
+
+    public function test_game_without_nickname_support_skips_upstream_lookup(): void
+    {
+        NicknameGameCode::where('code', 'free-fire')->update([
+            'supports_nickname_check' => false,
+            'requires_server' => false,
+            'requires_region_check' => false,
+            'is_active' => true,
+        ]);
+
+        $product = $this->product([
+            'nickname_check_enabled' => true,
+            'nickname_game_code' => 'free-fire',
+            'nickname_user_field_key' => 'user_id',
+        ]);
+
+        NicknameGameCode::where('code', 'free-fire')->update([
+            'supports_nickname_check' => false,
+        ]);
+
+        Http::fake();
+
+        $this->postJson('/checkout/nickname', [
+            'product_id' => $product->id,
+            'customer_input' => ['user_id' => '123456', 'zone_id' => ''],
+        ])->assertOk()
+            ->assertJsonPath('supported', false)
+            ->assertJsonPath('verified', false)
+            ->assertJsonPath('nickname', null);
+
+        Http::assertNothingSent();
+    }
+
 }
