@@ -23,7 +23,7 @@ class AdminOrderDetailController
         return Inertia::render('Admin/OrderDetail', [
             'order' => $order,
             'customer' => $order->user_id ? DB::table('users')->where('id', $order->user_id)->first(['id', 'name', 'email', 'phone']) : null,
-            'payments' => DB::table('payments')->where('order_id', $id)->orderByDesc('id')->get(['id', 'status', 'amount_idr', 'created_at']),
+            'payments' => DB::table('payment_transactions')->where('order_id', $id)->orderByDesc('id')->get(['id', 'status', 'amount_idr', 'created_at']),
             'attempts' => DB::table('fulfillment_attempts as attempts')->join('providers', 'providers.id', '=', 'attempts.provider_id')
                 ->where('attempts.order_id', $id)->orderByDesc('attempts.id')->get(['attempts.id', 'attempts.status', 'attempts.attempt_no', 'attempts.last_error', 'attempts.created_at', 'providers.code']),
             'events' => DB::table('order_events')->where('order_id', $id)->orderByDesc('id')

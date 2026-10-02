@@ -160,6 +160,37 @@ class AdminPanelRestorationTest extends TestCase
         $this->put('/admin/support/quick-replies', ['replies' => ['Hello']])->assertForbidden();
     }
 
+    public function test_support_reply_is_saved_with_status_and_audit(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $this->login();
+        $user = \App\Models\User::create(['name' => 'Support User', 'email' => bin2hex(random_bytes(4)).'@example.test', 'password' => bcrypt('support-password-123'), 'membership_tier_code' => 'BASIC']);
+        $id = DB::table('support_tickets')->insertGetId(['user_id' => $user->id, 'subject' => 'Help', 'message' => 'Help me', 'status' => 'OPEN', 'created_at' => now(), 'updated_at' => now()]);
+        $this->put('/admin/support/'.$id, ['status' => 'IN_PROGRESS', 'reply' => 'Sedang kami periksa.'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('support_tickets', ['id' => $id, 'status' => 'IN_PROGRESS']);
+        $this->assertDatabaseHas('support_ticket_messages', ['support_ticket_id' => $id, 'sender_type' => 'ADMIN', 'message' => 'Sedang kami periksa.']);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'support.updated', 'target_id' => (string) $id]);
+    }
+
+    public function test_populated_order_and_customer_details_include_history(): void
+    {
+        $this->login();
+        $product = $this->product();
+        $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'HISTORY', 'name' => 'History']);
+        $user = \App\Models\User::create(['name' => 'History User', 'email' => bin2hex(random_bytes(4)).'@example.test', 'password' => bcrypt('history-password-123'), 'membership_tier_code' => 'BASIC']);
+        $id = DB::table('orders')->insertGetId([
+            'order_number' => 'HISTORY-'.bin2hex(random_bytes(4)), 'user_id' => $user->id,
+            'product_id' => $product->id, 'product_package_id' => $package->id,
+            'status' => 'SUCCESS', 'customer_input' => json_encode(['user_id' => '123']),
+            'snapshot' => '{}', 'cost_idr' => 10000, 'margin_idr' => 1000, 'total_idr' => 11000,
+            'idempotency_key' => bin2hex(random_bytes(20)), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('payment_transactions')->insert(['order_id' => $id, 'gateway_code' => 'MANUAL_QRIS', 'channel_code' => 'manual_qris',
+            'amount_idr' => 11000, 'status' => 'PAID', 'idempotency_key' => bin2hex(random_bytes(20)), 'created_at' => now(), 'updated_at' => now()]);
+        $this->get('/admin/orders/'.$id)->assertOk()->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page->component('Admin/OrderDetail')->has('payments', 1)->etc());
+        $this->get('/admin/customers/'.$user->id)->assertOk()->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page->component('Admin/CustomerDetail')->has('orders.data', 1)->etc());
+    }
+
     public function test_admin_activation_is_single_use_and_login_redirects_to_panel(): void
     {
         $admin = AdminUser::create(['name' => 'Activation', 'email' => 'activation-'.bin2hex(random_bytes(4)).'@example.test',
