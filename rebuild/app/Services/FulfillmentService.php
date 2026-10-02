@@ -15,6 +15,7 @@ class FulfillmentService
     public function __construct(
         private readonly DigiflazzClient $digiflazz,
         private readonly FulfillmentTargetBuilder $targetBuilder,
+        private readonly VoucherStockService $voucherStock,
         private readonly AdminNotificationService $notifications,
         private readonly TransactionalEmailService $emails,
     ) {}
@@ -120,6 +121,28 @@ class FulfillmentService
                 }
 
                 $config = $this->json($mapping->fulfillment_config);
+                if ($mapping->provider_code === 'VOUCHER_STOCK') {
+                    $stockKey = trim((string) data_get($config, 'stock_key', ''));
+                    $request = [
+                        'stock_key' => $stockKey,
+                        'ref_id' => (string) $attempt->external_reference,
+                    ];
+                    DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+                        'status' => 'SENDING',
+                        'request_payload' => json_encode($request, JSON_THROW_ON_ERROR),
+                        'last_error' => null,
+                        'last_checked_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    return [
+                        'attempt_id' => (int) $attempt->id,
+                        'provider_code' => 'VOUCHER_STOCK',
+                        'stock_key' => $stockKey,
+                        'request' => $request,
+                    ];
+                }
+
                 $customerInput = $this->json($order->customer_input);
                 $customerNo = $this->targetBuilder->customerNo($customerInput, $config);
                 $maxPrice = $this->maxPrice($snapshot);
@@ -139,7 +162,11 @@ class FulfillmentService
                     'updated_at' => now(),
                 ]);
 
-                return ['attempt_id' => (int) $attempt->id, 'request' => $request];
+                return [
+                    'attempt_id' => (int) $attempt->id,
+                    'provider_code' => 'DIGIFLAZZ',
+                    'request' => $request,
+                ];
             }, 3);
         } catch (ValidationException $exception) {
             $this->markBlocked($attemptId, $exception->getMessage());
@@ -148,6 +175,16 @@ class FulfillmentService
         }
 
         if ($context === null) {
+            return;
+        }
+
+        if ($context['provider_code'] === 'VOUCHER_STOCK') {
+            try {
+                $this->fulfillVoucherStock($context['attempt_id'], $context['stock_key']);
+            } catch (ValidationException $exception) {
+                $this->markBlocked($attemptId, $exception->getMessage());
+            }
+
             return;
         }
 
@@ -418,6 +455,70 @@ class FulfillmentService
         if ($sendAttemptId !== null) {
             SendFulfillmentJob::dispatch($sendAttemptId)->afterCommit();
         }
+    }
+
+    private function fulfillVoucherStock(int $attemptId, string $stockKey): void
+    {
+        DB::transaction(function () use ($attemptId, $stockKey): void {
+            $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)
+                ->lockForUpdate()->first();
+            if (! $attempt || $attempt->status === 'SUCCESS') {
+                return;
+            }
+            if (! in_array($attempt->status, ['SENDING', 'PENDING', 'UNKNOWN'], true)) {
+                throw ValidationException::withMessages([
+                    'fulfillment' => 'Status pemenuhan stok kode tidak dapat diproses.',
+                ]);
+            }
+
+            $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
+            if (! $order || ! in_array($order->status, ['PAID', 'PROCESSING'], true)) {
+                throw ValidationException::withMessages([
+                    'fulfillment' => 'Status order tidak dapat menerima stok kode.',
+                ]);
+            }
+
+            $claim = $this->voucherStock->claim((int) $order->id, $stockKey);
+            $delivery = ['code' => $claim['code']];
+
+            DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+                'status' => 'SUCCESS',
+                'provider_status' => 'success',
+                'serial_number' => 'STOCK-'.$claim['id'],
+                'response_payload' => json_encode([
+                    'stock_code_id' => $claim['id'],
+                    'stock_key' => $stockKey,
+                ], JSON_THROW_ON_ERROR),
+                'safe_to_failover' => false,
+                'last_error' => null,
+                'completed_at' => now(),
+                'last_checked_at' => now(),
+                'updated_at' => now(),
+            ]);
+            DB::table('orders')->where('id', $order->id)->update([
+                'status' => 'SUCCESS',
+                'delivery_payload' => json_encode($delivery, JSON_THROW_ON_ERROR),
+                'updated_at' => now(),
+            ]);
+            $this->voucherStock->markDelivered($claim['id'], (int) $order->id);
+            $this->event((int) $order->id, 'VOUCHER_STOCK_DELIVERED', $order->status, 'SUCCESS', [
+                'attempt_id' => $attempt->id,
+                'stock_code_id' => $claim['id'],
+            ]);
+            $this->notifications->record(
+                'fulfillment.stock.success',
+                'Kode digital terkirim',
+                'Order '.$order->order_number.' selesai dari stok kode.',
+                'INFO',
+                'order',
+                $order->id
+            );
+            $this->emails->queueForOrder(
+                (int) $order->id,
+                'Pesanan LFAMILIA berhasil',
+                'Order '.$order->order_number.' telah berhasil diproses.'
+            );
+        }, 3);
     }
 
     public function completeManual(int $attemptId, ?string $deliveryCode, ?string $note, int $adminId): void
@@ -709,11 +810,21 @@ class FulfillmentService
         if (! $mapping->is_active || ! $mapping->provider_active) {
             return 'Provider atau mapping sedang nonaktif.';
         }
-        if ($mapping->provider_code !== 'DIGIFLAZZ') {
-            return 'Adapter provider belum tersedia untuk mapping ini.';
+        if (! in_array($mapping->provider_code, ['DIGIFLAZZ', 'VOUCHER_STOCK'], true)) {
+            return 'Adapter penyedia belum tersedia untuk mapping ini.';
         }
         if (! is_string($mapping->external_sku) || trim($mapping->external_sku) === '') {
-            return 'SKU provider belum tersedia.';
+            return 'SKU penyedia belum tersedia.';
+        }
+        if ($mapping->provider_code === 'VOUCHER_STOCK') {
+            $config = $this->json($mapping->fulfillment_config);
+            $stockKey = trim((string) data_get($config, 'stock_key', ''));
+            if ($stockKey === '') {
+                return 'Kunci stok kode belum diatur.';
+            }
+            if (! $this->voucherStock->available($stockKey)) {
+                return 'Stok kode untuk nominal ini habis.';
+            }
         }
         if ($mapping->cost_idr === null || (int) $mapping->cost_idr <= 0) {
             return 'Harga provider tidak valid.';
