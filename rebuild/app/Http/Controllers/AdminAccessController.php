@@ -69,35 +69,36 @@ class AdminAccessController
             'active_super_admins' => AdminUser::where('role', 'SUPER_ADMIN')->where('is_active', true)->count(),
         ];
 
-        $recentActivities = DB::table('audit_logs')
-            ->leftJoin('admin_users as actors', function ($join): void {
-                $join->on(DB::raw('CAST(actors.id AS CHAR)'), '=', 'audit_logs.actor_id');
-            })
-            ->where('audit_logs.actor_type', 'admin_user')
+        $activityRows = DB::table('audit_logs')
+            ->where('actor_type', 'admin_user')
             ->where(function ($query): void {
-                $query->where('audit_logs.action', 'like', 'admin.%')
-                    ->orWhere('audit_logs.target_type', 'admin_user');
+                $query->where('action', 'like', 'admin.%')
+                    ->orWhere('target_type', 'admin_user');
             })
-            ->orderByDesc('audit_logs.id')
+            ->orderByDesc('id')
             ->limit(20)
             ->get([
-                'audit_logs.id',
-                'audit_logs.actor_id',
-                'audit_logs.actor_role',
-                'audit_logs.action',
-                'audit_logs.target_id',
-                'audit_logs.created_at',
-                'actors.name as actor_name',
-            ])
-            ->map(fn (object $row): array => [
-                'id' => (int) $row->id,
-                'actor_id' => $row->actor_id,
-                'actor_name' => $row->actor_name ?: 'Admin #'.$row->actor_id,
-                'actor_role' => $row->actor_role,
-                'action' => (string) $row->action,
-                'target_id' => $row->target_id,
-                'created_at' => $row->created_at,
-            ])->values();
+                'id',
+                'actor_id',
+                'actor_role',
+                'action',
+                'target_id',
+                'created_at',
+            ]);
+
+        $actorNames = AdminUser::query()
+            ->whereIn('id', $activityRows->pluck('actor_id')->filter()->map(fn ($id): int => (int) $id)->unique())
+            ->pluck('name', 'id');
+
+        $recentActivities = $activityRows->map(fn (object $row): array => [
+            'id' => (int) $row->id,
+            'actor_id' => $row->actor_id,
+            'actor_name' => $actorNames[(int) $row->actor_id] ?? 'Admin #'.$row->actor_id,
+            'actor_role' => $row->actor_role,
+            'action' => (string) $row->action,
+            'target_id' => $row->target_id,
+            'created_at' => $row->created_at,
+        ])->values();
 
         return Inertia::render('Admin/Access', [
             'admins' => $admins,
