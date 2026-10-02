@@ -8,7 +8,6 @@ use App\Models\IntegrationCredential;
 use App\Models\NicknameGameCode;
 use App\Models\Product;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
