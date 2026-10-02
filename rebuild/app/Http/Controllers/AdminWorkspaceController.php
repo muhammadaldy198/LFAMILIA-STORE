@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Services\AdminAuditService;
 use App\Services\CustomerAccountDeletion;
 use App\Services\CustomerCleanupService;
-use App\Services\DigiflazzCatalogService;
 use App\Services\MembershipService;
 use App\Services\TransactionalEmailService;
 use Illuminate\Http\JsonResponse;
