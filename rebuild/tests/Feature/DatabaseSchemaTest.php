@@ -19,13 +19,13 @@ class DatabaseSchemaTest extends TestCase
         );
 
         $this->assertSame(
-            ['DIGIFLAZZ', 'MANUAL'],
+            ['DIGIFLAZZ', 'MANUAL', 'VOUCHER_STOCK'],
             DB::table('providers')->orderBy('id')->pluck('code')->all()
         );
 
         $this->assertSame(
             [],
-            DB::table('providers')->whereNotIn('code', ['DIGIFLAZZ', 'MANUAL'])->pluck('code')->all()
+            DB::table('providers')->whereNotIn('code', ['DIGIFLAZZ', 'MANUAL', 'VOUCHER_STOCK'])->pluck('code')->all()
         );
     }
 
