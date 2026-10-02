@@ -170,7 +170,7 @@ class PaymentService
             throw ValidationException::withMessages(['payment' => 'Top up tidak dapat dibayar.']);
         }
 
-        $route = $this->routing->byRouteId((int) $topup->payment_route_id);
+        $route = $this->routing->byRouteId((int) $topup->payment_route_id, 'topup');
         if (in_array($route['gateway_code'], ['WALLET', 'MANUAL_QRIS'], true)) {
             throw ValidationException::withMessages(['payment' => 'Metode ini tidak dapat dipakai untuk top up saldo.']);
         }
