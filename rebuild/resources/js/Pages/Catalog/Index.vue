@@ -5,6 +5,7 @@ const { customerText, sectionEnabled } = useCustomerPresentation();
 import {Head,Link,router,usePage} from '@inertiajs/vue3';
 import {computed,onMounted,onUnmounted,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
+import CategoryIcon from '../../Components/CategoryIcon.vue';
 
 const p=defineProps({
     categories:Array,products:Object,popularProducts:Array,filters:Object,logoUrl:String,faviconUrl:String,
@@ -139,7 +140,9 @@ onUnmounted(()=>{
                     <Link :href="q({category:'',mode:''})" class="lf-chip" :class="{active:!filters.category&&!filters.mode}">{{ customerText("pages.catalog.index.4b93aea2", "Semua") }}</Link>
                     <Link :href="q({category:'',mode:'manual'})" class="lf-chip" :class="{active:filters.mode==='manual'}">{{ customerText("pages.catalog.index.a182b386", "Produk Manual") }}</Link>
                     <Link v-for="c in categories" :key="c.slug" :href="q({category:c.slug,mode:''})" class="lf-chip" :class="{active:filters.category===c.slug}">
-                        <img v-if="c.image_url" :src="c.image_url" alt="">{{c.name}}
+                        <img v-if="c.image_url" :src="c.image_url" alt="">
+                        <CategoryIcon v-else :name="c.icon" class="h-3.5 w-3.5 shrink-0" />
+                        {{c.name}}
                     </Link>
                 </nav>
 
