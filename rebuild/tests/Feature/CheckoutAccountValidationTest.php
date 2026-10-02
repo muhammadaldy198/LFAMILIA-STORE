@@ -307,5 +307,4 @@ class CheckoutAccountValidationTest extends TestCase
 
         Http::assertNothingSent();
     }
-
 }
