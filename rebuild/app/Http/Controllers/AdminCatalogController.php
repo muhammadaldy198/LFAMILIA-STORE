@@ -37,6 +37,7 @@ class AdminCatalogController
                 'image_url' => $category->getFirstMediaUrl('image'),
             ]),
             'nicknameGameCodes' => NicknameGameCode::active()
+                ->where('supports_nickname_check', true)
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get(['id', 'name', 'code', 'requires_server', 'requires_region_check']),
@@ -268,6 +269,7 @@ class AdminCatalogController
             }
 
             $nicknameGame = NicknameGameCode::active()
+                ->where('supports_nickname_check', true)
                 ->where('code', $data['nickname_game_code'])
                 ->first();
             if (! $nicknameGame) {
