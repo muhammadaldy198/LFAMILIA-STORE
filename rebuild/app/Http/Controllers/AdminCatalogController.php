@@ -302,6 +302,12 @@ class AdminCatalogController
             }
         }
 
+        if ($data['is_active'] && ! $product->packages()->exists()) {
+            throw ValidationException::withMessages([
+                'is_active' => 'Tambahkan minimal satu nominal sebelum produk diaktifkan.',
+            ]);
+        }
+
         if ($data['fulfillment_mode'] !== $product->fulfillment_mode
             && ($product->packages()->exists() || DB::table('orders')->where('product_id', $product->id)->exists())) {
             throw ValidationException::withMessages([
