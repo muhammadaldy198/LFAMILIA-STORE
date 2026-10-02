@@ -10,7 +10,7 @@ Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb
 |---|---|
 | `auth/setup` | Diganti: aktivasi satu kali dan password mandiri; login teruji. Bukan pendaftaran admin publik. |
 | `balances` | Sebagian: penyesuaian saldo pelanggan dan ledger tersedia; saldo operasional terpisah per admin belum tersedia. |
-| `categories` | Sebagian: tambah/ubah/hapus/status/urutan/gambar tersedia; pilihan ikon preset dan edit slug belum setara. |
+| `categories` | Setara+: tambah/ubah/hapus/status/urutan/gambar tersedia, slug dapat diedit, dan ikon preset lama dipakai sebagai cadangan jika gambar kategori kosong. |
 | `content` | Perlu perbandingan field: banner/popup/news tersedia; editor metadata dan upload tersedia. |
 | `customer-cleanup` | Dipulihkan di batch ini: toggle otomatis, periode 7–365 hari, jalankan sekarang, metadata terakhir; penghapusan akun kosong melindungi riwayat. |
 | `dashboard-integrations` | Sebagian: health/integrasi tersedia; perlu perbandingan widget dashboard lama. |
@@ -21,7 +21,7 @@ Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb
 | `media` | Upload gambar tersedia via media Spatie; detail optimasi gambar lama perlu dibandingkan. |
 | `members` | Sebagian: tier AUTO/manual dan saldo tersedia; penghapusan akun kosong dipulihkan; tier bonus/progress/edit profil belum lengkap. |
 | `nickname-tools` | Cek game/region/PLN tersedia; belum dites dengan credential live. |
-| `orders` | Sebagian: daftar/detail/filter/riwayat pembayaran dan fulfillment tersedia; create manual, ekspor pilihan, refresh pembayaran/provider di detail belum lengkap. |
+| `orders` | Setara+: daftar/detail/filter/pagination, riwayat pembayaran dan penanganan, pesanan manual, ekspor pilihan, cek ulang pembayaran/proses, retry aman, serta kirim ulang hasil tersimpan tersedia. |
 | `payment-methods` | Sebagian: channel/fee/status/routing tersedia; tambah/hapus channel, logo/deskripsi/kelompok dan sinkron daftar lama belum lengkap. |
 | `payment-page` | Editor tampilan pembayaran tersedia; perlu perbandingan setiap field pengaturan lama. |
 | `payment-routing` | Sebagian: routing prioritas tersedia; pilihan gateway top-up tunggal dan profil mode/env perlu dibandingkan. |
