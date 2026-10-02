@@ -139,9 +139,7 @@ function saveProvider(row) {
                     <h2 class="text-lg font-semibold">Daftar provider</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Nama tampilan, keterangan, urutan, dan status dapat diubah. Kode sistem tetap dikunci agar proses transaksi tidak rusak.</p>
                 </div>
-                <Link href="/admin/integrations">
-                    <Button variant="outline" size="sm">Buka Integrasi</Button>
-                </Link>
+                <Button variant="outline" size="sm" as-child><Link href="/admin/integrations">Buka Integrasi</Link></Button>
             </div>
 
             <div class="grid gap-3 xl:grid-cols-3">
@@ -251,7 +249,7 @@ function saveProvider(row) {
                 <div class="flex flex-wrap gap-2 md:col-span-2 xl:col-span-5">
                     <Button type="submit" size="sm">Terapkan</Button>
                     <Button type="button" size="sm" variant="outline" @click="reset">Reset</Button>
-                    <Link href="/admin/catalog"><Button type="button" size="sm" variant="outline">Kelola di Produk</Button></Link>
+                    <Button type="button" size="sm" variant="outline" as-child><Link href="/admin/catalog">Kelola di Produk</Link></Button>
                 </div>
             </form>
 
