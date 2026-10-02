@@ -59,6 +59,7 @@ class DigiflazzCatalogService
                     'seller_active' => $row['seller_product_status'],
                     'unlimited_stock' => $row['unlimited_stock'],
                     'stock' => max(0, (int) ($row['stock'] ?? 0)),
+                    'multi' => (bool) ($row['multi'] ?? false),
                     'start_cut_off' => preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/', (string) ($row['start_cut_off'] ?? '')) ? $row['start_cut_off'] : '00:00',
                     'end_cut_off' => preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/', (string) ($row['end_cut_off'] ?? '')) ? $row['end_cut_off'] : '00:00',
                     'description' => mb_substr((string) ($row['desc'] ?? ''), 0, 5000),
@@ -71,7 +72,11 @@ class DigiflazzCatalogService
                 foreach ($clean as $row) {
                     $existing = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', $row['buyer_sku_code'])->lockForUpdate()->first();
                     if ($existing) {
-                        DB::table('digiflazz_catalog_items')->where('id', $existing->id)->update($row);
+                        $update = $row;
+                        if ((string) $existing->seller_name !== (string) $row['seller_name']) {
+                            $update['baseline_price_idr'] = $row['price_idr'];
+                        }
+                        DB::table('digiflazz_catalog_items')->where('id', $existing->id)->update($update);
                     } else {
                         DB::table('digiflazz_catalog_items')->insert([...$row, 'baseline_price_idr' => $row['price_idr'], 'created_at' => now()]);
                     }
@@ -84,7 +89,7 @@ class DigiflazzCatalogService
                         DB::table('digiflazz_catalog_items')->insertOrIgnore([
                             'buyer_sku_code' => $missing->external_sku, 'product_name' => $missing->external_sku,
                             'price_idr' => max(1, (int) $missing->cost_idr), 'baseline_price_idr' => max(1, (int) $missing->cost_idr),
-                            'buyer_active' => false, 'seller_active' => false, 'unlimited_stock' => false,
+                            'buyer_active' => false, 'seller_active' => false, 'unlimited_stock' => false, 'multi' => false,
                             'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
                         ]);
                     }

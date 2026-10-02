@@ -9,6 +9,7 @@ use App\Models\IntegrationCredential;
 use App\Services\AdminNotificationService;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -153,6 +154,27 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
 
         return 0;
     }
+
+    $interval = max(5, min(1440, (int) (json_decode(
+        (string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync_interval_minutes')->value('value'),
+        true
+    ) ?? 15)));
+    $last = json_decode(
+        (string) DB::table('system_settings')->where('key', 'digiflazz.last_auto_sync')->value('value'),
+        true
+    );
+    if (is_array($last) && ! empty($last['at'])) {
+        try {
+            if (Carbon::parse($last['at'])->gt(now()->subMinutes($interval))) {
+                $this->info('Belum mencapai jadwal sinkron otomatis berikutnya.');
+
+                return 0;
+            }
+        } catch (Throwable) {
+            // Invalid historical timestamp is ignored so the next sync can repair the state.
+        }
+    }
+
     try {
         $count = $catalog->sync();
         DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.last_auto_sync'], [
@@ -169,4 +191,4 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
     }
 })->purpose('Refresh supplier costs and availability while preserving customer margin settings');
 
-Schedule::command('lfamilia:sync-digiflazz-catalog')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('lfamilia:sync-digiflazz-catalog')->everyFiveMinutes()->withoutOverlapping();

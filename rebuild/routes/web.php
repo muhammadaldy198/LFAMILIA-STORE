@@ -263,9 +263,11 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     });
 
     Route::middleware('admin.permission:providers.manage')->group(function (): void {
+        Route::get('/admin/digiflazz', [AdminDigiflazzController::class, 'index'])->name('admin.digiflazz');
         Route::put('/admin/digiflazz/settings', [AdminDigiflazzController::class, 'settings']);
         Route::post('/admin/digiflazz/sync', [AdminDigiflazzController::class, 'sync'])->middleware('throttle:admin-sensitive');
-        Route::put('/admin/digiflazz/baseline/{id}', [AdminDigiflazzController::class, 'baseline']);
+        Route::put('/admin/digiflazz/baseline/{id}', [AdminDigiflazzController::class, 'baseline'])
+            ->middleware('throttle:admin-sensitive');
 
         Route::get('/admin/providers', [AdminWorkspaceController::class, 'providers'])->name('admin.providers');
         Route::put('/admin/providers/{id}', [AdminWorkspaceController::class, 'updateProvider'])->name('admin.providers.update');

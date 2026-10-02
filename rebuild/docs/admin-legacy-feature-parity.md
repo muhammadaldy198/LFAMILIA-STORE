@@ -14,8 +14,8 @@ Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb
 | `content` | Setara+: banner desktop/mobile, urutan/status/tautan klik, satu pop-up tanpa tombol tambahan, berita, logo/gambar storefront, footer banner, teks bantuan/footer, dan upload media tersedia serta terhubung ke frontend. |
 | `customer-cleanup` | Dipulihkan di batch ini: toggle otomatis, periode 7–365 hari, jalankan sekarang, metadata terakhir; penghapusan akun kosong melindungi riwayat. |
 | `dashboard-integrations` | Sebagian: health/integrasi tersedia; perlu perbandingan widget dashboard lama. |
-| `digiflazz-monitor` | Sebagian: seller/price/baseline/stok/cutoff tersedia; kesehatan agregat, multi, deskripsi dan transaksi terbaru belum seluruhnya di monitor. |
-| `digiflazz-pricing` | Sebagian: sinkron otomatis/manual/per SKU/per produk, margin rupiah/persen tersedia; maxPrice khusus dan kontrol lama perlu dibandingkan. |
+| `digiflazz-monitor` | Setara+: status koneksi, saldo read-only Pemilik, ringkasan normal/peringatan/kritis, seller, modal/baseline, stok, cut-off, multi, deskripsi, filter kategori/produk/brand/kesehatan, pagination, dan transaksi terbaru tersedia. Ambang stok/harga dapat diubah dari panel. |
+| `digiflazz-pricing` | Setara tanpa duplikasi: sinkron otomatis/manual/per SKU/per produk tersedia; interval sinkron dapat diubah. Margin rupiah/persen/harga final serta max price nominal tetap dikelola di Produk sebagai satu sumber konfigurasi. |
 | `faqs` | Setara: tambah/edit/hapus, status aktif, jawaban, dan urutan tersedia serta dipakai halaman Pertanyaan Umum. |
 | `integrations` | Credential terenkripsi/reveal/tes tersedia; perlu perbandingan semua profil field/env/mode lama. |
 | `media` | Upload gambar tersedia via media Spatie; detail optimasi gambar lama perlu dibandingkan. |
