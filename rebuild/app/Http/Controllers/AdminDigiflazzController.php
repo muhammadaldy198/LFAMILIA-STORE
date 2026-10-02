@@ -7,6 +7,7 @@ use App\Models\ProductPackage;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Services\AdminAuditService;
+use App\Services\AdminDigiflazzMonitorService;
 use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
 use Illuminate\Http\RedirectResponse;
@@ -18,28 +19,181 @@ use Inertia\Response;
 
 class AdminDigiflazzController
 {
-    public function index(Request $request, DigiflazzCatalogService $service): Response
-    {
-        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'brand' => ['nullable', 'string', 'max:255'], 'status' => ['nullable', 'in:active,attention']]);
-        $items = DB::table('digiflazz_catalog_items')
-            ->when($filters['q'] ?? null, fn ($query, $q) => $query->where(fn ($nested) => $nested->where('product_name', 'like', '%'.$q.'%')->orWhere('buyer_sku_code', 'like', '%'.$q.'%')->orWhere('seller_name', 'like', '%'.$q.'%')))
-            ->when($filters['brand'] ?? null, fn ($query, $brand) => $query->where('brand', $brand))
-            ->when(($filters['status'] ?? '') === 'active', fn ($q) => $q->where('buyer_active', true)->where('seller_active', true)->where(fn ($q) => $q->where('unlimited_stock', true)->orWhere('stock', '>', 0)))
-            ->when(($filters['status'] ?? '') === 'attention', fn ($q) => $q->where(fn ($q) => $q->where('buyer_active', false)->orWhere('seller_active', false)->orWhere(fn ($q) => $q->where('unlimited_stock', false)->where('stock', 0))->orWhereColumn('price_idr', '>', 'baseline_price_idr')))
-            ->orderBy('brand')->orderBy('product_name')->paginate(25)->withQueryString()
-            ->through(fn (object $item): array => [...((array) $item), 'available' => $service->available($item)]);
+    public function index(
+        Request $request,
+        DigiflazzCatalogService $service,
+        AdminDigiflazzMonitorService $monitor,
+    ): Response {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'category' => ['nullable', 'string', 'max:255'],
+            'brand' => ['nullable', 'string', 'max:255'],
+            'product' => ['nullable', 'string', 'max:255'],
+            'health' => ['nullable', 'in:healthy,warning,critical'],
+            'scope' => ['nullable', 'in:mapped,all'],
+            'per_page' => ['nullable', 'integer', 'in:10,25,50,100'],
+        ]);
+        $filters = [
+            'q' => trim((string) ($filters['q'] ?? '')),
+            'category' => trim((string) ($filters['category'] ?? '')),
+            'brand' => trim((string) ($filters['brand'] ?? '')),
+            'product' => trim((string) ($filters['product'] ?? '')),
+            'health' => (string) ($filters['health'] ?? ''),
+            'scope' => (string) ($filters['scope'] ?? 'mapped'),
+            'per_page' => (int) ($filters['per_page'] ?? 25),
+        ];
+
+        $provider = Provider::where('code', 'DIGIFLAZZ')->first();
+        $providerId = $provider?->id;
+
+        $base = DB::table('digiflazz_catalog_items as items')
+            ->leftJoin('provider_mappings as mappings', function ($join) use ($providerId): void {
+                $join->on('mappings.external_sku', '=', 'items.buyer_sku_code');
+                if ($providerId) {
+                    $join->where('mappings.provider_id', '=', $providerId);
+                } else {
+                    $join->whereRaw('1 = 0');
+                }
+            })
+            ->leftJoin('product_packages as packages', 'packages.id', '=', 'mappings.product_package_id')
+            ->leftJoin('products', 'products.id', '=', 'packages.product_id')
+            ->when($filters['scope'] === 'mapped', fn ($query) => $query->whereNotNull('mappings.id'))
+            ->when($filters['q'] !== '', function ($query) use ($filters): void {
+                $like = '%'.$filters['q'].'%';
+                $query->where(function ($nested) use ($like): void {
+                    $nested->where('items.product_name', 'like', $like)
+                        ->orWhere('items.buyer_sku_code', 'like', $like)
+                        ->orWhere('items.seller_name', 'like', $like)
+                        ->orWhere('items.brand', 'like', $like)
+                        ->orWhere('products.name', 'like', $like)
+                        ->orWhere('packages.name', 'like', $like);
+                });
+            })
+            ->when($filters['category'] !== '', fn ($query) => $query->where('items.category', $filters['category']))
+            ->when($filters['brand'] !== '', fn ($query) => $query->where('items.brand', $filters['brand']))
+            ->when($filters['product'] !== '', function ($query) use ($filters): void {
+                $query->where(function ($nested) use ($filters): void {
+                    $nested->where('products.name', $filters['product'])
+                        ->orWhere(function ($catalog) use ($filters): void {
+                            $catalog->whereNull('products.id')->where('items.product_name', $filters['product']);
+                        });
+                });
+            });
+
+        $summaryRows = (clone $base)->get([
+            'items.buyer_active', 'items.seller_active', 'items.unlimited_stock', 'items.stock',
+            'items.start_cut_off', 'items.end_cut_off', 'items.price_idr', 'items.baseline_price_idr',
+        ]);
+        $summary = $monitor->summary($summaryRows);
+
+        $this->applyHealthFilter($base, $filters['health']);
+
+        $items = $base
+            ->orderByRaw('COALESCE(products.name, items.product_name)')
+            ->orderByRaw('COALESCE(packages.sort_order, 999999)')
+            ->orderBy('items.product_name')
+            ->select([
+                'items.*',
+                'mappings.id as mapping_id',
+                'mappings.is_active as mapping_active',
+                'packages.id as package_id',
+                'packages.name as local_package_name',
+                'products.id as product_id',
+                'products.name as local_product_name',
+            ])
+            ->paginate($filters['per_page'])
+            ->withQueryString()
+            ->through(function (object $item) use ($service, $monitor): array {
+                $health = $monitor->health($item);
+
+                return [
+                    ...((array) $item),
+                    ...$health,
+                    'available' => $service->available($item),
+                    'mapped' => $item->mapping_id !== null,
+                    'mapping_active' => (bool) $item->mapping_active,
+                    'multi' => (bool) ($item->multi ?? false),
+                    'buyer_active' => (bool) $item->buyer_active,
+                    'seller_active' => (bool) $item->seller_active,
+                    'unlimited_stock' => (bool) $item->unlimited_stock,
+                ];
+            });
+
+        $admin = $request->user('admin');
+        $connection = $monitor->connection($admin?->role === 'SUPER_ADMIN');
 
         return Inertia::render('Admin/Digiflazz', [
-            'items' => $items, 'filters' => $filters,
-            'brands' => DB::table('digiflazz_catalog_items')->distinct()->orderBy('brand')->pluck('brand'),
+            'items' => $items,
+            'filters' => $filters,
+            'categories' => DB::table('digiflazz_catalog_items')->where('category', '!=', '')->distinct()->orderBy('category')->pluck('category'),
+            'brands' => DB::table('digiflazz_catalog_items')->where('brand', '!=', '')->distinct()->orderBy('brand')->pluck('brand'),
+            'products' => (clone $base)->selectRaw('COALESCE(products.name, items.product_name) as name')->distinct()->orderBy('name')->pluck('name'),
+            'summary' => $summary,
+            'connection' => $connection,
             'lastSyncedAt' => DB::table('digiflazz_catalog_items')->max('synced_at'),
-            'mappingCount' => ProviderMapping::whereIn('provider_id', Provider::where('code', 'DIGIFLAZZ')->pluck('id'))->count(),
+            'mappingCount' => ProviderMapping::where('provider_id', $providerId ?: 0)->count(),
             'autoSync' => (bool) (json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true),
-            'providerActive' => (bool) Provider::where('code', 'DIGIFLAZZ')->value('is_active'),
+            'providerActive' => (bool) $provider?->is_active,
+            'recentTransactions' => $monitor->recentTransactions(),
+            'canSeeBalance' => $admin?->role === 'SUPER_ADMIN',
         ]);
     }
 
-    public function settings(Request $request, AdminAuditService $audit): RedirectResponse
+
+    private function applyHealthFilter($query, string $health): void
+    {
+        if ($health === '') {
+            return;
+        }
+
+        $critical = function ($nested): void {
+            $nested->where('items.buyer_active', false)
+                ->orWhere('items.seller_active', false)
+                ->orWhere(function ($stock): void {
+                    $stock->where('items.unlimited_stock', false)->where('items.stock', '<=', 0);
+                });
+        };
+        $warning = function ($nested): void {
+            $time = now('Asia/Jakarta')->format('H:i');
+            $nested->where(function ($stock): void {
+                $stock->where('items.unlimited_stock', false)
+                    ->whereBetween('items.stock', [1, 5]);
+            })->orWhereRaw('items.price_idr * 100 >= items.baseline_price_idr * 103')
+                ->orWhere(function ($cutoff) use ($time): void {
+                    $cutoff->whereColumn('items.start_cut_off', '!=', 'items.end_cut_off')
+                        ->where(function ($window) use ($time): void {
+                            $window->where(function ($normal) use ($time): void {
+                                $normal->whereColumn('items.start_cut_off', '<', 'items.end_cut_off')
+                                    ->where('items.start_cut_off', '<=', $time)
+                                    ->where('items.end_cut_off', '>', $time);
+                            })->orWhere(function ($wrap) use ($time): void {
+                                $wrap->whereColumn('items.start_cut_off', '>', 'items.end_cut_off')
+                                    ->where(function ($clock) use ($time): void {
+                                        $clock->where('items.start_cut_off', '<=', $time)
+                                            ->orWhere('items.end_cut_off', '>', $time);
+                                    });
+                            });
+                        });
+                });
+        };
+
+        if ($health === 'critical') {
+            $query->where($critical);
+
+            return;
+        }
+
+        $query->whereNot($critical);
+        if ($health === 'warning') {
+            $query->where($warning);
+
+            return;
+        }
+
+        $query->whereNot($warning);
+    }
+
+public function settings(Request $request, AdminAuditService $audit): RedirectResponse
     {
         $data = $request->validate(['enabled' => ['required', 'boolean']]);
         $before = json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true;
