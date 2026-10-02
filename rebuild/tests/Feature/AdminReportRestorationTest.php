@@ -169,7 +169,7 @@ class AdminReportRestorationTest extends TestCase
                 ->where('providerReport.0.attempts_count', 2)
                 ->where('providerReport.0.success_count', 1)
                 ->where('providerReport.0.errors_count', 1)
-                ->where('providerReport.0.error_rate', 50.0)
+                ->where('providerReport.0.error_rate', 50)
                 ->has('orderStatuses')
                 ->has('paymentStatuses')
                 ->has('fulfillmentStatuses'));
