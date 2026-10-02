@@ -6,6 +6,7 @@ use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
 use App\Http\Controllers\AdminCatalogMediaController;
 use App\Http\Controllers\AdminContentController;
+use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminDigiflazzController;
 use App\Http\Controllers\AdminFulfillmentController;
@@ -326,19 +327,25 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::get('/admin/orders', [AdminOrdersController::class, 'index'])
         ->middleware('admin.permission:orders.view')->name('admin.orders');
 
-    Route::get('/admin/customers/{userId}', [AdminWorkspaceController::class, 'customerDetail'])->middleware('admin.permission:customers.view');
-    Route::get('/admin/customers', [AdminWorkspaceController::class, 'customers'])
-        ->middleware('admin.permission:customers.view')->name('admin.customers');
+    Route::middleware('admin.permission:customers.view')->prefix('admin/customers')
+        ->name('admin.customers.')->group(function (): void {
+            Route::get('/', [AdminCustomerController::class, 'index'])->name('index');
+            Route::get('/{userId}', [AdminCustomerController::class, 'show'])->name('show');
+        });
 
-    Route::middleware('admin.super')->group(function (): void {
-        Route::put('/admin/customers/cleanup/settings', [AdminWorkspaceController::class, 'cleanupSettings']);
-        Route::post('/admin/customers/cleanup/run', [AdminWorkspaceController::class, 'cleanup'])->middleware('throttle:admin-sensitive');
-        Route::delete('/admin/customers/{userId}', [AdminWorkspaceController::class, 'deleteCustomer'])->middleware('throttle:admin-sensitive');
-        Route::post('/admin/customers/{userId}/wallet', [AdminWorkspaceController::class, 'adjustWallet'])
-            ->middleware('throttle:admin-sensitive')->name('admin.customers.wallet');
-        Route::put('/admin/customers/{userId}/membership', [AdminWorkspaceController::class, 'updateMembership'])
-            ->name('admin.customers.membership');
-    });
+    Route::middleware(['admin.permission:customers.view', 'admin.super'])->prefix('admin/customers')
+        ->name('admin.customers.')->group(function (): void {
+            Route::put('/cleanup/settings', [AdminCustomerController::class, 'cleanupSettings'])
+                ->name('cleanup.settings');
+            Route::post('/cleanup/run', [AdminCustomerController::class, 'cleanup'])
+                ->middleware('throttle:admin-sensitive')->name('cleanup.run');
+            Route::delete('/{userId}', [AdminCustomerController::class, 'destroy'])
+                ->middleware('throttle:admin-sensitive')->name('destroy');
+            Route::post('/{userId}/wallet', [AdminCustomerController::class, 'adjustWallet'])
+                ->middleware('throttle:admin-sensitive')->name('wallet');
+            Route::put('/{userId}/membership', [AdminCustomerController::class, 'updateMembership'])
+                ->middleware('throttle:admin-sensitive')->name('membership');
+        });
 
     Route::middleware('admin.permission:vouchers.manage')->prefix('admin/vouchers')
         ->name('admin.vouchers.')->group(function (): void {
