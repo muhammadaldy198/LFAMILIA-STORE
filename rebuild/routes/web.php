@@ -219,6 +219,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::put('/products/{product}', [AdminCatalogController::class, 'updateProduct'])->name('products.update');
             Route::delete('/products/{product}', [AdminCatalogController::class, 'destroyProduct'])->name('products.destroy');
             Route::post('/products/{product}/packages', [AdminCatalogController::class, 'package'])->name('packages.store');
+            Route::post('/packages/{package}/voucher-stock', [AdminCatalogController::class, 'voucherStock'])->name('packages.voucher-stock');
             Route::put('/packages/{package}', [AdminCatalogController::class, 'updatePackage'])->name('packages.update');
             Route::delete('/packages/{package}', [AdminCatalogController::class, 'destroyPackage'])->name('packages.destroy');
             Route::post('/packages/{package}/duplicate', [AdminCatalogController::class, 'duplicatePackage'])->name('packages.duplicate');
