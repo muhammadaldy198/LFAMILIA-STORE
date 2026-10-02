@@ -168,6 +168,15 @@ class AdminIntegrationsRestorationTest extends TestCase
                 'allowed_hostnames' => 'https://lfamiliastore.my.id/path',
             ],
         ])->assertSessionHasErrors('config.allowed_hostnames');
+
+        $this->put('/admin/integrations/turnstile', [
+            'is_active' => false,
+            'config' => [
+                'site_key' => 'site-key',
+                'secret_key' => 'secret-key',
+                'allowed_hostnames' => '*.lfamiliastore.my.id',
+            ],
+        ])->assertSessionHasErrors('config.allowed_hostnames');
     }
 
     public function test_connection_check_returns_timestamp_and_persists_health_without_secret_data(): void
