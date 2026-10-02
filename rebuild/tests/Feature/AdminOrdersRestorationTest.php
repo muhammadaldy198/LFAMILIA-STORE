@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\ReconcileFulfillmentJob;
+use App\Jobs\SendTransactionalEmailJob;
 use App\Jobs\StartFulfillmentJob;
 use App\Models\AdminUser;
 use App\Models\IntegrationCredential;
@@ -107,7 +108,8 @@ class AdminOrdersRestorationTest extends TestCase
         $this->post('/admin/fulfillment/'.$attempt->id.'/complete', ['delivery_code' => 'CODE-REGRESSION', 'note' => 'Sudah dikirim'])->assertRedirect();
         $this->get('/admin/orders/'.$id)->assertInertia(fn (Assert $page) => $page
             ->where('order.status_label', 'Berhasil')->where('order.delivery.code', 'CODE-REGRESSION')
-            ->where('attempts.0.can_manual', false)->where('attempts.0.can_retry', false));
+            ->where('attempts.0.can_manual', false)->where('attempts.0.can_retry', false)
+            ->where('canResendDelivery', true));
     }
 
     public function test_permissions_protect_write_actions_while_order_read_access_remains_available(): void
@@ -121,6 +123,7 @@ class AdminOrdersRestorationTest extends TestCase
         $this->post('/admin/orders/manual', $this->data())->assertForbidden();
         $this->post('/admin/orders/'.$id.'/check-payment')->assertForbidden();
         $this->post('/admin/orders/'.$id.'/check-process')->assertForbidden();
+        $this->post('/admin/orders/'.$id.'/resend-delivery')->assertForbidden();
         $this->login('ADMIN', ['dashboard.view']);
         $this->get('/admin/orders')->assertForbidden();
         $this->get('/admin/orders/export')->assertForbidden();
@@ -138,6 +141,33 @@ class AdminOrdersRestorationTest extends TestCase
         $this->post('/admin/fulfillment/'.$attempt->id.'/retry')->assertSessionHasErrors('fulfillment');
         $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $id)->count());
         $this->assertSame('UNKNOWN', DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('status'));
+    }
+
+    public function test_resend_delivery_queues_saved_result_without_reprocessing_provider(): void
+    {
+        $admin = $this->login();
+        $id = $this->order($admin);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $id)->first();
+        $this->post('/admin/fulfillment/'.$attempt->id.'/complete', [
+            'delivery_code' => 'VOUCHER-RESEND-123',
+            'note' => 'Gunakan satu kali.',
+        ])->assertRedirect();
+
+        $attemptCount = DB::table('fulfillment_attempts')->where('order_id', $id)->count();
+        Queue::fake();
+        Http::swap(new Factory);
+        Http::fake();
+
+        $this->post('/admin/orders/'.$id.'/resend-delivery')->assertRedirect();
+        Queue::assertPushed(SendTransactionalEmailJob::class, function (SendTransactionalEmailJob $job): bool {
+            return $job->recipient === 'orders@example.test'
+                && str_contains($job->subject, 'Hasil pesanan')
+                && str_contains($job->text, 'VOUCHER-RESEND-123')
+                && str_contains($job->text, 'Gunakan satu kali.');
+        });
+        $this->assertSame($attemptCount, DB::table('fulfillment_attempts')->where('order_id', $id)->count());
+        $this->assertSame('SUCCESS', DB::table('orders')->where('id', $id)->value('status'));
+        Http::assertNothingSent();
     }
 
     public function test_payment_check_rejects_wrong_reference_or_amount_and_applies_verified_results_once(): void
