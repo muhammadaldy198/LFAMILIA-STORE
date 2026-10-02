@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\NicknameGameCode;
+use App\Models\Product;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -15,10 +16,16 @@ class AdminNicknameToolsService
     ) {}
 
     /**
-     * @return array<int, array{id:int,name:string,code:string,requires_server:bool,requires_region_check:bool,is_active:bool,sort_order:int}>
+     * @return array<int, array{id:int,name:string,code:string,requires_server:bool,requires_region_check:bool,is_active:bool,sort_order:int,product_count:int}>
      */
     public function gameCodes(): array
     {
+        $usage = Product::query()
+            ->whereNotNull('nickname_game_code')
+            ->selectRaw('nickname_game_code, COUNT(*) as aggregate')
+            ->groupBy('nickname_game_code')
+            ->pluck('aggregate', 'nickname_game_code');
+
         return NicknameGameCode::query()
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -31,6 +38,7 @@ class AdminNicknameToolsService
                 'requires_region_check' => (bool) $item->requires_region_check,
                 'is_active' => (bool) $item->is_active,
                 'sort_order' => (int) $item->sort_order,
+                'product_count' => (int) ($usage[$item->code] ?? 0),
             ])->all();
     }
 
@@ -65,16 +73,13 @@ class AdminNicknameToolsService
     }
 
     /** @return array{nickname:string,region:string} */
-    public function checkRegion(string $userId, string $server): array
+    public function checkRegion(string $gameCode, string $userId, string $server): array
     {
-        $game = NicknameGameCode::active()
-            ->where('requires_region_check', true)
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->first();
-
-        if (! $game) {
-            throw new RuntimeException('Belum ada game aktif yang dikonfigurasi untuk pemeriksaan region.');
+        $game = $this->activeGame($gameCode);
+        if (! $game->requires_region_check) {
+            throw ValidationException::withMessages([
+                'game_code' => 'Game ini tidak dikonfigurasi untuk pemeriksaan region.',
+            ]);
         }
 
         $settings = $this->settings();
