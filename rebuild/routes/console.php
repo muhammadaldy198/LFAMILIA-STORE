@@ -5,10 +5,14 @@ use App\Jobs\ReconcileFulfillmentJob;
 use App\Jobs\SendFulfillmentJob;
 use App\Jobs\StartFulfillmentJob;
 use App\Models\AdminUser;
+use App\Models\IntegrationCredential;
 use App\Services\AdminNotificationService;
+use App\Services\CustomerCleanupService;
+use App\Services\DigiflazzCatalogService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -49,7 +53,7 @@ Artisan::command('lfamilia:bootstrap-super-admin', function (): int {
     return 0;
 })->purpose('Bootstrap the first Super Admin without storing credentials in Git');
 
-Artisan::command('lfamilia:cleanup-empty-customers', function (\App\Services\CustomerCleanupService $cleanup): void {
+Artisan::command('lfamilia:cleanup-empty-customers', function (CustomerCleanupService $cleanup): void {
     $count = $cleanup->run();
     $this->info("Akun kosong yang dihapus: {$count}");
 })->purpose('Remove inactive empty accounts using owner-controlled retention settings');
@@ -142,9 +146,9 @@ Schedule::call(function (): void {
         });
 })->everyFiveMinutes()->name('lfamilia-stale-fulfillment-alert')->withoutOverlapping();
 
-Artisan::command('lfamilia:sync-digiflazz-catalog', function (\App\Services\DigiflazzCatalogService $catalog): int {
+Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogService $catalog): int {
     $enabled = json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true;
-    if (! $enabled || ! \App\Models\IntegrationCredential::where('code', 'digiflazz')->where('is_active', true)->exists()) {
+    if (! $enabled || ! IntegrationCredential::where('code', 'digiflazz')->where('is_active', true)->exists()) {
         $this->info('Sinkron otomatis nonaktif atau integrasi belum dikonfigurasi.');
 
         return 0;
@@ -157,8 +161,8 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (\App\Services\Digi
         $this->info("SKU disinkronkan: {$count}");
 
         return 0;
-    } catch (\Throwable $error) {
-        \Illuminate\Support\Facades\Log::warning('Automatic Digiflazz catalog sync failed.', ['exception_class' => $error::class]);
+    } catch (Throwable $error) {
+        Log::warning('Automatic Digiflazz catalog sync failed.', ['exception_class' => $error::class]);
         $this->error('Sinkron gagal; harga tersimpan dipertahankan. Periksa Integrasi dan coba sinkron manual.');
 
         return 1;

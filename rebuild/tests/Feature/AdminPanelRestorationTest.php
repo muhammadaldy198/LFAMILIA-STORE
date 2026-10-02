@@ -11,6 +11,7 @@ use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Models\User;
 use App\Services\CheckoutPricing;
+use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
@@ -267,6 +268,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->put('/admin/support/quick-replies', ['replies' => ['Mohon sertakan invoice.']])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(['Mohon sertakan invoice.'], json_decode(DB::table('system_settings')->where('key', 'support.quick_replies')->value('value'), true));
     }
+
     public function test_catalog_editor_preserves_custom_order_over_nominal_value(): void
     {
         $this->login();
@@ -296,8 +298,8 @@ class AdminPanelRestorationTest extends TestCase
         $this->put('/admin/customers/cleanup/settings', ['enabled' => false, 'inactivity_days' => 7])->assertRedirect()->assertSessionHasNoErrors();
         $empty = User::create(['name' => 'Inactive empty', 'email' => 'empty-cleanup@example.test', 'created_at' => now()->subDays(10)]);
         $funded = User::create(['name' => 'Inactive funded', 'email' => 'funded-cleanup@example.test', 'created_at' => now()->subDays(10)]);
-        DB::table('wallets')->insert(['user_id' => $funded->id, 'balance_idr' => 1000, 'version' => 0, 'created_at' => now(), 'updated_at' => now()]);
-        $service = app(\App\Services\CustomerCleanupService::class);
+        DB::table('wallets')->where('user_id', $funded->id)->update(['balance_idr' => 1000]);
+        $service = app(CustomerCleanupService::class);
         $this->assertSame(0, $service->run());
         $this->assertNotNull(User::find($empty->id));
         $this->post('/admin/customers/cleanup/run')->assertRedirect()->assertSessionHasNoErrors();
@@ -310,5 +312,4 @@ class AdminPanelRestorationTest extends TestCase
         $this->post('/admin/customers/cleanup/run')->assertForbidden();
         $this->delete('/admin/customers/'.$funded->id)->assertForbidden();
     }
-
 }
