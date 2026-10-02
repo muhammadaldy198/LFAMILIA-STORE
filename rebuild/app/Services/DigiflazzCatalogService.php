@@ -65,6 +65,7 @@ class DigiflazzCatalogService
                     'synced_at' => now(), 'updated_at' => now(),
                 ];
             }
+
             return DB::transaction(function () use ($clean, $sku): int {
                 $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
                 foreach ($clean as $row) {
@@ -90,6 +91,7 @@ class DigiflazzCatalogService
                     DB::table('digiflazz_catalog_items')->whereNotIn('buyer_sku_code', array_column($clean, 'buyer_sku_code'))
                         ->update(['buyer_active' => false, 'seller_active' => false, 'updated_at' => now()]);
                 }
+
                 return count($clean);
             });
         } finally {
@@ -105,7 +107,10 @@ class DigiflazzCatalogService
         $start = $item->start_cut_off;
         $end = $item->end_cut_off;
         $time = now('Asia/Jakarta')->format('H:i');
-        if ($start === $end) return true;
+        if ($start === $end) {
+            return true;
+        }
+
         return ! ($start < $end ? ($time >= $start && $time < $end) : ($time >= $start || $time < $end));
     }
 }

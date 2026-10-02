@@ -28,6 +28,7 @@ class AdminDigiflazzController
             ->when(($filters['status'] ?? '') === 'attention', fn ($q) => $q->where(fn ($q) => $q->where('buyer_active', false)->orWhere('seller_active', false)->orWhere(fn ($q) => $q->where('unlimited_stock', false)->where('stock', 0))->orWhereColumn('price_idr', '>', 'baseline_price_idr')))
             ->orderBy('brand')->orderBy('product_name')->paginate(25)->withQueryString()
             ->through(fn (object $item): array => [...((array) $item), 'available' => $service->available($item)]);
+
         return Inertia::render('Admin/Digiflazz', [
             'items' => $items, 'filters' => $filters,
             'brands' => DB::table('digiflazz_catalog_items')->distinct()->orderBy('brand')->pluck('brand'),
@@ -43,6 +44,7 @@ class AdminDigiflazzController
         $sku = isset($data['item_id']) ? DB::table('digiflazz_catalog_items')->where('id', $data['item_id'])->value('buyer_sku_code') : null;
         $count = $service->sync($sku);
         $audit->record($request, 'digiflazz.catalog.synced', 'provider', 'DIGIFLAZZ', null, ['count' => $count, 'sku' => $sku]);
+
         return back()->with('status', $count.' SKU berhasil disinkronkan.');
     }
 
@@ -52,6 +54,7 @@ class AdminDigiflazzController
         $before = $mapping->toArray();
         $service->sync($mapping->external_sku);
         $audit->record($request, 'digiflazz.mapping.synced', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
+
         return back()->with('status', 'Harga nominal berhasil disinkronkan.');
     }
 
@@ -63,6 +66,7 @@ class AdminDigiflazzController
             DB::table('digiflazz_catalog_items')->where('id', $id)->update(['baseline_price_idr' => $item->price_idr, 'updated_at' => now()]);
             $audit->record($request, 'digiflazz.baseline.updated', 'digiflazz_catalog_item', $id, ['price_idr' => $item->baseline_price_idr], ['price_idr' => $item->price_idr]);
         });
+
         return back();
     }
 
@@ -98,6 +102,7 @@ class AdminDigiflazzController
                 $audit->record($request, 'catalog.package.imported', 'product_package', $package->id, null, $package->toArray());
             }
         }, 3);
+
         return back()->with('status', 'Nominal diimpor. Periksa input customer dan aktifkan nominal serta mapping untuk menjual.');
     }
 }

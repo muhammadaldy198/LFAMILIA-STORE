@@ -6,16 +6,21 @@ use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
-use App\Models\ProductInputField;
 use App\Models\ProductPackage;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
+use App\Models\User;
 use App\Services\CheckoutPricing;
 use App\Services\DigiflazzCatalogService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Factory;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
 class AdminPanelRestorationTest extends TestCase
@@ -55,19 +60,22 @@ class AdminPanelRestorationTest extends TestCase
         IntegrationCredential::updateOrCreate(['code' => 'digiflazz'], [
             'is_active' => true, 'config_ciphertext' => ['username' => 'test', 'api_key' => 'test', 'base_url' => 'https://digiflazz.test'],
         ]);
-        Http::swap(new \Illuminate\Http\Client\Factory());
+        Http::swap(new Factory);
         Http::fake(['https://digiflazz.test/v1/price-list' => Http::response(['data' => $rows])]);
     }
 
     public function test_sync_import_and_resync_preserve_baseline_and_inactive_import(): void
     {
-        $this->login(); $this->fakeCatalog([$this->row()]);
+        $this->login();
+        $this->fakeCatalog([$this->row()]);
         $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
         $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->first();
         $product = $this->product();
         $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$item->id], 'margin_percent' => 12])->assertRedirect()->assertSessionHasNoErrors();
-        $package = $product->packages()->firstOrFail(); $mapping = $package->mappings()->firstOrFail();
-        $this->assertFalse($package->is_active); $this->assertFalse($mapping->is_active);
+        $package = $product->packages()->firstOrFail();
+        $mapping = $package->mappings()->firstOrFail();
+        $this->assertFalse($package->is_active);
+        $this->assertFalse($mapping->is_active);
         $this->assertSame(10000, (int) $mapping->max_price_idr);
         $this->fakeCatalog([$this->row(['price' => 12000])]);
         $this->post('/admin/catalog/mappings/'.$mapping->id.'/sync')->assertRedirect()->assertSessionHasNoErrors();
@@ -79,7 +87,9 @@ class AdminPanelRestorationTest extends TestCase
 
     public function test_invalid_provider_response_is_atomic_and_does_not_reprice(): void
     {
-        $this->login(); $this->fakeCatalog([$this->row()]); app(DigiflazzCatalogService::class)->sync();
+        $this->login();
+        $this->fakeCatalog([$this->row()]);
+        app(DigiflazzCatalogService::class)->sync();
         $this->fakeCatalog([$this->row(['price' => 15000]), $this->row(['buyer_sku_code' => 'bad', 'price' => 0])]);
         $this->post('/admin/digiflazz/sync')->assertSessionHasErrors('sync');
         $this->assertSame(10000, (int) DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('price_idr'));
@@ -87,7 +97,9 @@ class AdminPanelRestorationTest extends TestCase
 
     public function test_unavailable_and_stale_skus_cannot_be_imported(): void
     {
-        $this->login(); $this->fakeCatalog([$this->row(['seller_product_status' => false])]); app(DigiflazzCatalogService::class)->sync();
+        $this->login();
+        $this->fakeCatalog([$this->row(['seller_product_status' => false])]);
+        app(DigiflazzCatalogService::class)->sync();
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $product = $this->product();
         $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$id], 'margin_percent' => 10])->assertSessionHasErrors('item_ids');
@@ -100,7 +112,8 @@ class AdminPanelRestorationTest extends TestCase
     {
         $product = $this->product();
         $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'R10', 'name' => '10', 'is_active' => true]);
-        $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail(); $provider->forceFill(['is_active' => true])->save();
+        $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
+        $provider->forceFill(['is_active' => true])->save();
         ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => $provider->id, 'external_sku' => 'restore-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true]);
         $pricing = app(CheckoutPricing::class);
         $this->assertSame(11000, $pricing->forPackage($package->id)['subtotal_idr']);
@@ -110,8 +123,10 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(10123, $pricing->forPackage($package->id)['subtotal_idr']);
         $package->update(['pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 15000]);
         $this->assertSame(15000, $pricing->forPackage($package->id)['subtotal_idr']);
-        $this->fakeCatalog([$this->row(['seller_product_status' => false])]); app(DigiflazzCatalogService::class)->sync();
-        $this->expectException(ValidationException::class); $pricing->forPackage($package->id);
+        $this->fakeCatalog([$this->row(['seller_product_status' => false])]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->expectException(ValidationException::class);
+        $pricing->forPackage($package->id);
     }
 
     public function test_cut_off_crossing_midnight_and_stock_are_checked(): void
@@ -129,7 +144,9 @@ class AdminPanelRestorationTest extends TestCase
 
     public function test_reorder_rejects_other_products_and_saves_exact_order(): void
     {
-        $this->login(); $product = $this->product(); $other = $this->product();
+        $this->login();
+        $product = $this->product();
+        $other = $this->product();
         $a = ProductPackage::create(['product_id' => $product->id, 'code' => 'A', 'name' => 'A', 'sort_order' => 0]);
         $b = ProductPackage::create(['product_id' => $product->id, 'code' => 'B', 'name' => 'B', 'sort_order' => 1]);
         $x = ProductPackage::create(['product_id' => $other->id, 'code' => 'X', 'name' => 'X']);
@@ -140,7 +157,8 @@ class AdminPanelRestorationTest extends TestCase
 
     public function test_fields_save_order_and_protect_nickname_references(): void
     {
-        $this->login(); $product = $this->product();
+        $this->login();
+        $product = $this->product();
         $fields = [
             ['field_key' => 'user_id', 'label' => 'User ID', 'placeholder' => '123', 'type' => 'text', 'is_required' => true],
             ['field_key' => 'zone_id', 'label' => 'Zone', 'placeholder' => '456', 'type' => 'text', 'is_required' => true],
@@ -154,7 +172,8 @@ class AdminPanelRestorationTest extends TestCase
 
     public function test_global_margin_updates_products_but_preserves_nominal_overrides(): void
     {
-        $this->login(); $product = $this->product();
+        $this->login();
+        $product = $this->product();
         $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'OVERRIDE', 'name' => 'Override', 'pricing_mode' => 'PERCENT', 'margin_percent' => 7]);
         $this->put('/admin/catalog/margin', ['margin_percent' => 15])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('15.0000', (string) $product->fresh()->margin_percent);
@@ -164,7 +183,8 @@ class AdminPanelRestorationTest extends TestCase
 
     public function test_fixed_sell_price_below_cost_is_rejected(): void
     {
-        $this->login(); $product = $this->product();
+        $this->login();
+        $product = $this->product();
         $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'FLOOR', 'name' => 'Floor']);
         ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'), 'external_sku' => 'floor-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => false]);
         $this->put('/admin/catalog/packages/'.$package->id, ['code' => 'FLOOR', 'name' => 'Floor', 'sort_order' => 0, 'is_active' => false,
@@ -178,7 +198,8 @@ class AdminPanelRestorationTest extends TestCase
         $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'GONE', 'name' => 'Gone', 'is_active' => true]);
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'), 'external_sku' => 'gone-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true]);
-        $this->fakeCatalog([$this->row()]); app(DigiflazzCatalogService::class)->sync();
+        $this->fakeCatalog([$this->row()]);
+        app(DigiflazzCatalogService::class)->sync();
         $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'gone-sku', 'buyer_active' => false]);
         $this->expectException(ValidationException::class);
         app(CheckoutPricing::class)->forPackage($package->id);
@@ -194,9 +215,9 @@ class AdminPanelRestorationTest extends TestCase
 
     public function test_support_reply_is_saved_with_status_and_audit(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
         $this->login();
-        $user = \App\Models\User::create(['name' => 'Support User', 'email' => bin2hex(random_bytes(4)).'@example.test', 'password' => bcrypt('support-password-123'), 'membership_tier_code' => 'BASIC']);
+        $user = User::create(['name' => 'Support User', 'email' => bin2hex(random_bytes(4)).'@example.test', 'password' => bcrypt('support-password-123'), 'membership_tier_code' => 'BASIC']);
         $id = DB::table('support_tickets')->insertGetId(['user_id' => $user->id, 'subject' => 'Help', 'message' => 'Help me', 'status' => 'OPEN', 'created_at' => now(), 'updated_at' => now()]);
         $this->put('/admin/support/'.$id, ['status' => 'IN_PROGRESS', 'reply' => 'Sedang kami periksa.'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('support_tickets', ['id' => $id, 'status' => 'IN_PROGRESS']);
@@ -209,7 +230,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->login();
         $product = $this->product();
         $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'HISTORY', 'name' => 'History']);
-        $user = \App\Models\User::create(['name' => 'History User', 'email' => bin2hex(random_bytes(4)).'@example.test', 'password' => bcrypt('history-password-123'), 'membership_tier_code' => 'BASIC']);
+        $user = User::create(['name' => 'History User', 'email' => bin2hex(random_bytes(4)).'@example.test', 'password' => bcrypt('history-password-123'), 'membership_tier_code' => 'BASIC']);
         $id = DB::table('orders')->insertGetId([
             'order_number' => 'HISTORY-'.bin2hex(random_bytes(4)), 'user_id' => $user->id,
             'product_id' => $product->id, 'product_package_id' => $package->id,
@@ -219,8 +240,8 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         DB::table('payment_transactions')->insert(['order_id' => $id, 'gateway_code' => 'MANUAL_QRIS', 'channel_code' => 'manual_qris',
             'amount_idr' => 11000, 'status' => 'PAID', 'idempotency_key' => bin2hex(random_bytes(20)), 'created_at' => now(), 'updated_at' => now()]);
-        $this->get('/admin/orders/'.$id)->assertOk()->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page->component('Admin/OrderDetail')->has('payments', 1)->etc());
-        $this->get('/admin/customers/'.$user->id)->assertOk()->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page->component('Admin/CustomerDetail')->has('orders.data', 1)->etc());
+        $this->get('/admin/orders/'.$id)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('Admin/OrderDetail')->has('payments', 1)->etc());
+        $this->get('/admin/customers/'.$user->id)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('Admin/CustomerDetail')->has('orders.data', 1)->etc());
     }
 
     public function test_admin_activation_is_single_use_and_login_redirects_to_panel(): void
@@ -229,11 +250,11 @@ class AdminPanelRestorationTest extends TestCase
             'password' => bcrypt('before-password-123'), 'role' => 'SUPER_ADMIN', 'is_active' => true]);
         $token = bin2hex(random_bytes(32));
         $key = 'admin_activation:'.hash('sha256', $token);
-        \Illuminate\Support\Facades\Cache::put($key, ['id' => $admin->id, 'password_fingerprint' => hash('sha256', $admin->password)], now()->addMinutes(30));
+        Cache::put($key, ['id' => $admin->id, 'password_fingerprint' => hash('sha256', $admin->password)], now()->addMinutes(30));
         $this->get('/admin/activate?token='.$token)->assertOk();
         $this->post('/admin/activate', ['token' => $token, 'password' => 'new-password-123', 'password_confirmation' => 'new-password-123'])
             ->assertRedirect('/admin/login')->assertSessionHasNoErrors();
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('new-password-123', $admin->fresh()->password));
+        $this->assertTrue(Hash::check('new-password-123', $admin->fresh()->password));
         $this->post('/admin/activate', ['token' => $token, 'password' => 'other-password-123', 'password_confirmation' => 'other-password-123'])->assertStatus(410);
         $this->post('/admin/login', ['email' => $admin->email, 'password' => 'new-password-123'])->assertRedirect('/admin/panel');
         $this->get('/admin/panel')->assertOk();

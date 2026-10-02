@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\AdminAuditService;
+use App\Services\DigiflazzCatalogService;
 use App\Services\MembershipService;
 use App\Services\TransactionalEmailService;
 use Illuminate\Http\JsonResponse;
@@ -46,7 +47,7 @@ class AdminWorkspaceController
     {
         $provider = strtoupper(trim((string) $request->query('provider', '')));
         if ($provider === 'DIGIFLAZZ') {
-            return app(AdminDigiflazzController::class)->index($request, app(\App\Services\DigiflazzCatalogService::class));
+            return app(AdminDigiflazzController::class)->index($request, app(DigiflazzCatalogService::class));
         }
 
         return Inertia::render('Admin/Workspace', [
@@ -111,6 +112,7 @@ class AdminWorkspaceController
     public function customerDetail(int $userId): Response
     {
         $user = User::findOrFail($userId);
+
         return Inertia::render('Admin/CustomerDetail', [
             'customer' => $user->only('id', 'name', 'email', 'phone', 'membership_tier_code', 'created_at'),
             'balanceIdr' => (int) ($user->wallet?->balance_idr ?? 0),
@@ -396,6 +398,7 @@ class AdminWorkspaceController
             'updated_by_admin_id' => $request->user('admin')->id,
         ]);
         $audit->record($request, 'support.quick_replies.updated', 'system_setting', 'support.quick_replies', $before ? json_decode($before, true) : null, $data['replies']);
+
         return back()->with('status', 'Balasan cepat disimpan.');
     }
 
@@ -462,6 +465,7 @@ class AdminWorkspaceController
         $from = Carbon::parse($filters['from'] ?? now()->subDays(6)->toDateString())->startOfDay();
         $to = Carbon::parse($filters['to'] ?? now()->toDateString())->endOfDay();
         $orders = fn () => DB::table('orders')->whereBetween('orders.created_at', [$from, $to]);
+
         return Inertia::render('Admin/Workspace', [
             'kind' => 'reports', 'title' => 'Laporan',
             'filters' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],

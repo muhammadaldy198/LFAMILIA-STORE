@@ -74,8 +74,11 @@ class CheckoutPricing
         }
 
         $mapping = $mappingQuery->get()->first(function (object $candidate): bool {
-            if ($candidate->provider_code !== 'DIGIFLAZZ') return true;
+            if ($candidate->provider_code !== 'DIGIFLAZZ') {
+                return true;
+            }
             $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', $candidate->external_sku)->first();
+
             return $item === null || app(DigiflazzCatalogService::class)->available($item);
         });
         if (! $mapping) {

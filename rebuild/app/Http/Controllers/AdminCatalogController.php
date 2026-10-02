@@ -10,7 +10,9 @@ use App\Models\ProductPackage;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Models\StoreAsset;
+use App\Services\AdminAuditService;
 use App\Services\CatalogAudit;
+use App\Services\DigiflazzCatalogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -127,7 +129,7 @@ class AdminCatalogController
                 ]),
             'defaultMargin' => json_decode((string) DB::table('system_settings')->where('key', 'catalog.default_margin_percent')->value('value'), true) ?? 0,
             'digiflazzItems' => DB::table('digiflazz_catalog_items')->orderBy('category')->orderBy('brand')->orderBy('product_name')->get()
-                ->map(fn (object $item): array => [...((array) $item), 'available' => app(\App\Services\DigiflazzCatalogService::class)->available($item),
+                ->map(fn (object $item): array => [...((array) $item), 'available' => app(DigiflazzCatalogService::class)->available($item),
                     'mapped' => ProviderMapping::where('external_sku', $item->buyer_sku_code)->whereIn('provider_id', Provider::where('code', 'DIGIFLAZZ')->pluck('id'))->exists()]),
             'assets' => StoreAsset::orderBy('id')->get()->map(fn (StoreAsset $asset): array => [
                 ...$asset->only('id', 'key', 'target_url', 'is_active'),
@@ -487,8 +489,10 @@ class AdminCatalogController
         DB::transaction(function () use ($product, $data, $request, $audit): void {
             $before = $product->packages()->lockForUpdate()->orderBy('sort_order')->pluck('id')->all();
             $ids = array_map('intval', $data['ids']);
-            $expected = $before; $actual = $ids;
-            sort($expected); sort($actual);
+            $expected = $before;
+            $actual = $ids;
+            sort($expected);
+            sort($actual);
             if ($expected !== $actual) {
                 throw ValidationException::withMessages(['ids' => 'Daftar nominal berubah. Muat ulang halaman.']);
             }
@@ -497,10 +501,11 @@ class AdminCatalogController
             }
             $audit->record($request, 'catalog.packages.reordered', 'product', $product->id, $before, $ids);
         });
+
         return back();
     }
 
-    public function globalMargin(Request $request, \App\Services\AdminAuditService $audit): RedirectResponse
+    public function globalMargin(Request $request, AdminAuditService $audit): RedirectResponse
     {
         $data = $request->validate(['margin_percent' => ['required', 'numeric', 'min:0', 'max:1000']]);
         DB::transaction(function () use ($request, $data, $audit): void {
@@ -511,6 +516,7 @@ class AdminCatalogController
             ]);
             $audit->record($request, 'catalog.margin.global_updated', 'product', 'all', $before, $data);
         });
+
         return back();
     }
 

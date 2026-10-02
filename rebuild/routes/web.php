@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\AdminAccessController;
+use App\Http\Controllers\AdminActivationController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
 use App\Http\Controllers\AdminCatalogMediaController;
 use App\Http\Controllers\AdminContentController;
 use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\AdminDigiflazzController;
 use App\Http\Controllers\AdminFulfillmentController;
 use App\Http\Controllers\AdminIntegrationController;
 use App\Http\Controllers\AdminNicknameController;
@@ -151,8 +153,8 @@ Route::redirect('/panel/login', '/admin/login', 302);
 Route::redirect('/panel/admin', '/admin/panel', 302);
 Route::redirect('/panel/admin/login', '/admin/login', 302);
 
-Route::get('/admin/activate', [\App\Http\Controllers\AdminActivationController::class, 'show'])->middleware('throttle:admin-login');
-Route::post('/admin/activate', [\App\Http\Controllers\AdminActivationController::class, 'store'])->middleware('throttle:admin-login');
+Route::get('/admin/activate', [AdminActivationController::class, 'show'])->middleware('throttle:admin-login');
+Route::post('/admin/activate', [AdminActivationController::class, 'store'])->middleware('throttle:admin-login');
 
 Route::middleware('guest:admin')->group(function (): void {
     Route::get('/admin/login', [AdminAuthController::class, 'show'])->name('admin.login');
@@ -206,8 +208,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         ->name('admin.catalog.')->group(function (): void {
             Route::put('/margin', [AdminCatalogController::class, 'globalMargin']);
             Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages']);
-            Route::post('/products/{product}/import', [\App\Http\Controllers\AdminDigiflazzController::class, 'import']);
-            Route::post('/mappings/{mapping}/sync', [\App\Http\Controllers\AdminDigiflazzController::class, 'syncMapping'])->middleware('throttle:admin-sensitive');
+            Route::post('/products/{product}/import', [AdminDigiflazzController::class, 'import']);
+            Route::post('/mappings/{mapping}/sync', [AdminDigiflazzController::class, 'syncMapping'])->middleware('throttle:admin-sensitive');
             Route::post('/categories', [AdminCatalogController::class, 'category'])->name('categories.store');
             Route::put('/categories/{category}', [AdminCatalogController::class, 'updateCategory'])->name('categories.update');
             Route::delete('/categories/{category}', [AdminCatalogController::class, 'destroyCategory'])->name('categories.destroy');
@@ -250,8 +252,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     });
 
     Route::middleware('admin.permission:providers.manage')->group(function (): void {
-        Route::post('/admin/digiflazz/sync', [\App\Http\Controllers\AdminDigiflazzController::class, 'sync'])->middleware('throttle:admin-sensitive');
-        Route::put('/admin/digiflazz/baseline/{id}', [\App\Http\Controllers\AdminDigiflazzController::class, 'baseline']);
+        Route::post('/admin/digiflazz/sync', [AdminDigiflazzController::class, 'sync'])->middleware('throttle:admin-sensitive');
+        Route::put('/admin/digiflazz/baseline/{id}', [AdminDigiflazzController::class, 'baseline']);
 
         Route::get('/admin/providers', [AdminWorkspaceController::class, 'providers'])->name('admin.providers');
         Route::put('/admin/providers/{id}', [AdminWorkspaceController::class, 'updateProvider'])->name('admin.providers.update');
