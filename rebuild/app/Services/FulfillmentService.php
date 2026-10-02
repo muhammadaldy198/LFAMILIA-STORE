@@ -214,6 +214,19 @@ class FulfillmentService
             return;
         }
 
+        $mapping = $this->mapping((int) $attempt->provider_mapping_id);
+        if ($mapping?->provider_code === 'VOUCHER_STOCK') {
+            $config = $this->json($mapping->fulfillment_config);
+            $stockKey = trim((string) data_get($config, 'stock_key', ''));
+            try {
+                $this->fulfillVoucherStock($attemptId, $stockKey);
+            } catch (ValidationException $exception) {
+                $this->markBlocked($attemptId, $exception->getMessage());
+            }
+
+            return;
+        }
+
         $request = $this->json($attempt->request_payload);
         if ($request === []) {
             $this->markUnknown($attemptId, 'Payload reconciliation tidak tersedia.');
