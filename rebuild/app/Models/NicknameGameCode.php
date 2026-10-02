@@ -10,6 +10,7 @@ class NicknameGameCode extends Model
     protected $fillable = [
         'name',
         'code',
+        'supports_nickname_check',
         'requires_server',
         'requires_region_check',
         'is_active',
@@ -19,6 +20,7 @@ class NicknameGameCode extends Model
     protected function casts(): array
     {
         return [
+            'supports_nickname_check' => 'boolean',
             'requires_server' => 'boolean',
             'requires_region_check' => 'boolean',
             'is_active' => 'boolean',
