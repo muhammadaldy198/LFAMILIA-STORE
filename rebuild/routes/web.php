@@ -19,6 +19,7 @@ use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\AdminPresentationController;
 use App\Http\Controllers\AdminPromotionController;
 use App\Http\Controllers\AdminProviderController;
+use App\Http\Controllers\AdminReportController;
 use App\Http\Controllers\AdminSearchController;
 use App\Http\Controllers\AdminSupportController;
 use App\Http\Controllers\AdminWorkspaceController;
@@ -365,8 +366,11 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::put('/{id}', [AdminSupportController::class, 'update'])->name('update');
         });
 
-    Route::get('/admin/reports', [AdminWorkspaceController::class, 'reports'])
-        ->middleware('admin.permission:reports.view')->name('admin.reports');
+    Route::middleware('admin.permission:reports.view')->group(function (): void {
+        Route::get('/admin/reports', [AdminReportController::class, 'index'])->name('admin.reports');
+        Route::get('/admin/reports/export', [AdminReportController::class, 'export'])
+            ->name('admin.reports.export');
+    });
 
     Route::middleware('admin.permission:settings.manage')->group(function (): void {
         Route::get('/admin/settings', [AdminWorkspaceController::class, 'settings'])->name('admin.settings');
