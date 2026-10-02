@@ -12,7 +12,6 @@ const props = defineProps({
     filters: Object,
     title: String,
     rows: { type: [Array, Object], default: () => [] },
-    checks: { type: Array, default: () => [] },
 });
 const rows = reactive(Array.isArray(props.rows) ? props.rows.map((row) => ({ ...row })) : (props.rows?.data || []).map((row) => ({ ...row })));
 const orderStatus=ref(props.filters?.status||'');
@@ -33,13 +32,6 @@ const searchRows = () => router.get('/admin/orders', { q: searchQuery.value, sta
                     <TableHeader class="text-left text-slate-400"><TableRow><TableHead class="p-2">Order</TableHead><TableHead class="p-2">Produk</TableHead><TableHead class="p-2">Nominal</TableHead><TableHead class="p-2">Status</TableHead><TableHead class="p-2">Total</TableHead><TableHead class="p-2">Dibuat</TableHead></TableRow></TableHeader>
                     <TableBody><TableRow v-for="row in rows" :key="row.id" class="border-t border-slate-800"><TableCell class="p-2"><Link :href="'/admin/orders/' + row.id" class="text-blue-600 font-semibold">{{ row.order_number }}</Link></TableCell><TableCell class="p-2">{{ row.product_name }}</TableCell><TableCell class="p-2">{{ row.package_name }}</TableCell><TableCell class="p-2">{{ row.status }}</TableCell><TableCell class="p-2">Rp{{ Number(row.total_idr).toLocaleString('id-ID') }}</TableCell><TableCell class="p-2">{{ row.created_at }}</TableCell></TableRow></TableBody>
                 </Table>
-            </section>
-
-            <section v-else-if="kind === 'health'" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <div v-for="check in checks" :key="check.name" class="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                    <div class="flex justify-between gap-3"><strong>{{ check.name }}</strong><span class="text-xs" :class="check.status === 'HEALTHY' ? 'text-emerald-300' : 'text-amber-200'">{{ check.status }}</span></div>
-                    <p class="mt-2 text-sm text-slate-400">{{ check.message }}</p>
-                </div>
             </section>
 
             <section v-else-if="kind === 'audit'" class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900 p-4">

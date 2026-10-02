@@ -93,6 +93,12 @@ M9 provides a non-transactional Test Koneksi action.
 
 The latest result is stored as non-secret system health state. Changing an integration resets its health to Degraded (or Not Configured when disabled).
 
+## System Health
+
+System Health is a dedicated Super Admin workspace. It reads application state only and does not execute payment/provider transactions or run provider probes automatically.
+
+It shows Laravel/PHP, MySQL, Redis, storage capacity, queue worker heartbeat, scheduler heartbeat, failed job count, stale fulfillment reconciliation count, all nine integration states, payment gateway maintenance state, and non-secret runtime configuration. Invalid/stale heartbeat values degrade safely instead of breaking the page. Integration messages are normalized before render so saved provider messages and credentials are not exposed.
+
 ## Notifications
 
 Business events create an admin_notifications record first. External delivery is queued after commit.
