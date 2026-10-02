@@ -248,6 +248,7 @@ class AdminCatalogController
                 Rule::unique('products', 'slug')->ignore($product->id)],
             'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
+            'fulfillment_mode' => ['sometimes', Rule::in(['AUTO_PROVIDER', 'MANUAL'])],
             'manual_instructions' => ['nullable', 'string', 'max:5000'],
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
@@ -296,7 +297,7 @@ class AdminCatalogController
                 ]);
             }
         }
-        if ($product->fulfillment_mode !== 'MANUAL') {
+        if ($data['fulfillment_mode'] !== 'MANUAL') {
             $data['manual_instructions'] = null;
             $data['manual_open_time'] = null;
             $data['manual_close_time'] = null;
