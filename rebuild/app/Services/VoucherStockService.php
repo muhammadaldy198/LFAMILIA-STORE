@@ -34,11 +34,7 @@ class VoucherStockService
             }
 
             $hash = $this->hash($code);
-            if (DB::table('voucher_stock_codes')->where('code_hash', $hash)->exists()) {
-                continue;
-            }
-
-            DB::table('voucher_stock_codes')->insert([
+            $imported += DB::table('voucher_stock_codes')->insertOrIgnore([
                 'stock_key' => $key,
                 'code_ciphertext' => Crypt::encryptString($code),
                 'code_hash' => $hash,
@@ -46,7 +42,6 @@ class VoucherStockService
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-            $imported++;
         }
 
         return [
