@@ -144,6 +144,27 @@ class AdminSettingsRestorationTest extends TestCase
                 ->where('merchant.address', 'Jakarta, Indonesia'));
     }
 
+    public function test_public_status_falls_back_to_store_name_when_legal_name_is_blank(): void
+    {
+        $this->login();
+
+        $this->put('/admin/settings', $this->storePayload([
+            'store_name' => 'LFAMILIA STORE FALLBACK',
+            'legal_name' => '   ',
+            'registration_id' => '',
+            'address' => '',
+        ]))
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->get('/status')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('merchant.legalName', 'LFAMILIA STORE FALLBACK')
+                ->where('merchant.registrationId', '')
+                ->where('merchant.address', ''));
+    }
+
     public function test_store_settings_validate_urls_and_support_link_server_side(): void
     {
         $this->login();
