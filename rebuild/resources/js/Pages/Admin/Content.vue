@@ -173,8 +173,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                     <Input v-model="bannerForm.title" required placeholder="Nama internal / alt banner" class="rounded border border-slate-200 p-2 text-sm" />
                     <Input v-model="bannerForm.cta_href" placeholder="Link klik, contoh /promo" class="rounded border border-slate-200 p-2 text-sm" />
                     <Input v-model.number="bannerForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm" />
-                    <Input v-model="bannerForm.subtitle" placeholder="Catatan internal (opsional)" class="rounded border border-slate-200 p-2 text-sm md:col-span-2" />
-                    <Input v-model="bannerForm.cta_label" placeholder="Label kecil bantuan internal (opsional)" class="rounded border border-slate-200 p-2 text-sm" />
+                    <Input v-model="bannerForm.subtitle" placeholder="Catatan internal (opsional)" class="rounded border border-slate-200 p-2 text-sm md:col-span-3" />
                     <label class="flex items-center gap-2 text-xs"><input v-model="bannerForm.show_desktop" type="checkbox"> Desktop</label>
                     <label class="flex items-center gap-2 text-xs"><input v-model="bannerForm.show_mobile" type="checkbox"> Mobile</label>
                     <label class="flex items-center gap-2 text-xs"><input v-model="bannerForm.is_active" type="checkbox"> Aktif</label>
@@ -187,8 +186,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                             <Input v-model="item.title" class="rounded border border-slate-200 p-2 text-sm" placeholder="Nama banner" />
                             <Input v-model="item.cta_href" class="rounded border border-slate-200 p-2 text-sm" placeholder="Link klik" />
                             <Input v-model.number="item.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" placeholder="Urutan" />
-                            <Input v-model="item.subtitle" class="rounded border border-slate-200 p-2 text-sm md:col-span-2" placeholder="Catatan internal" />
-                            <Input v-model="item.cta_label" class="rounded border border-slate-200 p-2 text-sm" placeholder="Label kecil bantuan" />
+                            <Input v-model="item.subtitle" class="rounded border border-slate-200 p-2 text-sm md:col-span-3" placeholder="Catatan internal" />
                         </div>
                         <div class="mt-3 flex flex-wrap gap-4">
                             <label class="flex items-center gap-2 text-xs"><input v-model="item.show_desktop" type="checkbox"> Desktop</label>
