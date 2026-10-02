@@ -154,7 +154,7 @@ function runCleanup() {
         </div>
 
         <Card class="p-4">
-            <form class="grid gap-3 md:grid-cols-2 xl:grid-cols-7" @submit.prevent="search">
+            <form class="grid gap-3 md:grid-cols-2 xl:grid-cols-8" @submit.prevent="search">
                 <label class="space-y-1 md:col-span-2">
                     <span class="text-sm font-medium">Cari pelanggan</span>
                     <Input v-model="filters.q" maxlength="100" placeholder="Nama, email, atau nomor telepon" />
@@ -198,7 +198,16 @@ function runCleanup() {
                         <option value="without_orders">Belum pernah memesan</option>
                     </select>
                 </label>
-                <div class="flex flex-wrap gap-2 md:col-span-2 xl:col-span-7">
+                <label class="space-y-1">
+                    <span class="text-sm font-medium">Baris</span>
+                    <select v-model.number="filters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                        <option :value="10">10</option>
+                        <option :value="25">25</option>
+                        <option :value="50">50</option>
+                        <option :value="100">100</option>
+                    </select>
+                </label>
+                <div class="flex flex-wrap gap-2 md:col-span-2 xl:col-span-8">
                     <Button type="submit" size="sm">Terapkan</Button>
                     <Button type="button" size="sm" variant="outline" @click="reset">Reset</Button>
                 </div>
