@@ -176,4 +176,26 @@ class AdminNicknameToolsTest extends TestCase
         $response->assertDontSee('must-not-leak-secret');
         $response->assertSee('validation.example.test');
     }
+
+    public function test_game_without_nickname_support_cannot_keep_server_or_region_rules(): void
+    {
+        $this->login();
+
+        $this->postJson('/admin/nickname-tools/game-codes', [
+            'name' => 'No Nickname Game',
+            'code' => 'no-nickname-game',
+            'supports_nickname_check' => false,
+            'requires_server' => true,
+            'requires_region_check' => true,
+            'is_active' => true,
+        ])->assertCreated();
+
+        $row = NicknameGameCode::where('code', 'no-nickname-game')->firstOrFail();
+
+        $this->assertFalse($row->supports_nickname_check);
+        $this->assertFalse($row->requires_server);
+        $this->assertFalse($row->requires_region_check);
+        $this->assertTrue($row->is_active);
+    }
+
 }
