@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminAccessController;
+use App\Http\Controllers\AdminAuditController;
 use App\Http\Controllers\AdminActivationController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
@@ -24,7 +25,6 @@ use App\Http\Controllers\AdminReportController;
 use App\Http\Controllers\AdminSearchController;
 use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\AdminSupportController;
-use App\Http\Controllers\AdminWorkspaceController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerAccountController;
@@ -400,7 +400,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             ->middleware('throttle:admin-sensitive')->name('admin.integrations.test');
 
         Route::get('/admin/health', [AdminHealthController::class, 'index'])->name('admin.health');
-        Route::get('/admin/audit', [AdminWorkspaceController::class, 'audit'])->name('admin.audit');
+        Route::get('/admin/audit', [AdminAuditController::class, 'index'])->name('admin.audit');
         Route::get('/admin/configuration/export', [AdminSettingsController::class, 'exportConfiguration'])
             ->middleware('throttle:admin-sensitive')->name('admin.configuration.export');
 
