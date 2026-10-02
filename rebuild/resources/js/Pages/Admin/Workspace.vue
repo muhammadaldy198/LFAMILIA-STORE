@@ -59,9 +59,6 @@ const settingsForm = useForm({
     business_hours: props.settings?.['store.business_hours'] || '',
 });
 
-function updateProvider(row) {
-    router.put('/admin/providers/' + row.id, { is_active: row.is_active }, { preserveScroll: true });
-}
 function savePopularProduct(row) {
     router.put('/admin/vouchers/popular/' + row.id, {
         popular: Boolean(row.popular),
@@ -118,14 +115,6 @@ function adjustWallet(row) {
                     <TableHeader class="text-left text-slate-400"><TableRow><TableHead class="p-2">Order</TableHead><TableHead class="p-2">Produk</TableHead><TableHead class="p-2">Nominal</TableHead><TableHead class="p-2">Status</TableHead><TableHead class="p-2">Total</TableHead><TableHead class="p-2">Dibuat</TableHead></TableRow></TableHeader>
                     <TableBody><TableRow v-for="row in rows" :key="row.id" class="border-t border-slate-800"><TableCell class="p-2"><Link :href="'/admin/orders/' + row.id" class="text-blue-600 font-semibold">{{ row.order_number }}</Link></TableCell><TableCell class="p-2">{{ row.product_name }}</TableCell><TableCell class="p-2">{{ row.package_name }}</TableCell><TableCell class="p-2">{{ row.status }}</TableCell><TableCell class="p-2">Rp{{ Number(row.total_idr).toLocaleString('id-ID') }}</TableCell><TableCell class="p-2">{{ row.created_at }}</TableCell></TableRow></TableBody>
                 </Table>
-            </section>
-
-            <section v-else-if="kind === 'providers'" class="grid gap-4 lg:grid-cols-2">
-                <div v-for="row in rows" :key="row.id" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
-                    <div class="flex items-center justify-between"><strong>{{ row.code }}</strong><span class="text-xs text-slate-500">{{ row.fulfillment_mode }}</span></div>
-                    <p class="mt-2 text-sm text-slate-400">Mapping {{ row.active_mapping_count }}/{{ row.mapping_count }} aktif.</p>
-                    <div class="mt-4 flex items-center gap-3"><label class="flex gap-2 text-sm"><input v-model="row.is_active" type="checkbox">Provider aktif</label><Button class="rounded bg-slate-700 px-3 py-2 text-xs" @click="updateProvider(row)">Simpan</Button></div>
-                </div>
             </section>
 
             <section v-else-if="kind === 'customers'" class="space-y-3">
