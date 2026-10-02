@@ -16,11 +16,18 @@ class AdminNicknameToolsService
     ) {}
 
     /**
-     * @return array<int, array{id:int,name:string,code:string,supports_nickname_check:bool,requires_server:bool,requires_region_check:bool,is_active:bool,sort_order:int,product_count:int}>
+     * @return array<int, array{id:int,name:string,code:string,supports_nickname_check:bool,requires_server:bool,requires_region_check:bool,is_active:bool,sort_order:int,product_count:int,nickname_product_count:int}>
      */
     public function gameCodes(): array
     {
         $usage = Product::query()
+            ->whereNotNull('nickname_game_code')
+            ->selectRaw('nickname_game_code, COUNT(*) as aggregate')
+            ->groupBy('nickname_game_code')
+            ->pluck('aggregate', 'nickname_game_code');
+
+        $nicknameUsage = Product::query()
+            ->where('nickname_check_enabled', true)
             ->whereNotNull('nickname_game_code')
             ->selectRaw('nickname_game_code, COUNT(*) as aggregate')
             ->groupBy('nickname_game_code')
@@ -40,6 +47,7 @@ class AdminNicknameToolsService
                 'is_active' => (bool) $item->is_active,
                 'sort_order' => (int) $item->sort_order,
                 'product_count' => (int) ($usage[$item->code] ?? 0),
+                'nickname_product_count' => (int) ($nicknameUsage[$item->code] ?? 0),
             ])->all();
     }
 
