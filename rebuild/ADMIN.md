@@ -23,17 +23,18 @@ The Admin panel exposes the PRD menu:
 4. Manual
 5. Banner & Konten
 6. Digiflazz
-7. Provider
-8. Pembayaran
-9. Pelanggan
-10. Promo
-11. Layanan Pelanggan
-12. Laporan
-13. Admin & Akses
-14. Pengaturan
-15. Integrasi
-16. System Health
-17. Audit Log
+7. Validasi Akun
+8. Provider
+9. Pembayaran
+10. Pelanggan
+11. Promo
+12. Layanan Pelanggan
+13. Laporan
+14. Admin & Akses
+15. Pengaturan
+16. Integrasi
+17. System Health
+18. Audit Log
 
 Notifications are available from the Admin header when the current Admin has notification permission.
 
@@ -75,7 +76,9 @@ Turnstile keys may be stored here, but Turnstile enforcement belongs to M10.
 
 Secret fields are never included in normal Inertia props. The UI only receives whether a secret is configured. A controlled reveal endpoint is SUPER_ADMIN-only and writes integration.secret.revealed to Audit Log.
 
-Blank secret fields on update preserve the existing encrypted value. Operational URLs must use HTTPS.
+Blank secret fields on update preserve the existing encrypted value. Unknown legacy profile metadata is also preserved so a normal save does not destroy older migration/provider options. Operational URLs must use HTTPS; endpoint paths, Admin email lists, and Turnstile hostnames are validated server-side.
+
+The workspace shows active/verified/attention summaries, required-field completeness, persisted health, and the last connection-test time. Secret values are never part of the normal Inertia payload.
 
 ## Connection checks
 
