@@ -108,7 +108,7 @@ class AdminHealthController
         }
 
         $integrations = $databaseHealthy
-            ? $this->integrationChecks($registry)
+            ? $this->integrationChecks($registry, $checkedAt)
             : collect($registry->all())->map(fn (array $definition, string $code): array => [
                 'code' => $code,
                 'name' => $definition['name'],
@@ -338,7 +338,7 @@ class AdminHealthController
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function integrationChecks(IntegrationRegistry $registry): array
+    private function integrationChecks(IntegrationRegistry $registry, Carbon $checkedAt): array
     {
         $definitions = $registry->all();
         $codes = array_keys($definitions);
@@ -355,14 +355,20 @@ class AdminHealthController
             ->whereIn('code', ['MIDTRANS', 'DOKU'])
             ->pluck('is_maintenance', 'code');
 
-        return collect($definitions)->map(function (array $definition, string $code) use ($records, $health, $maintenance): array {
+        return collect($definitions)->map(function (array $definition, string $code) use ($records, $health, $maintenance, $checkedAt): array {
             $active = (bool) ($records->get($code)?->is_active);
             $stored = json_decode((string) $health->get('integration.health.'.$code, '{}'), true);
             $stored = is_array($stored) ? $stored : [];
+            $testedAt = $this->safeTimestamp($stored['tested_at'] ?? null);
 
             $status = $active
                 ? $this->normalizeStatus((string) ($stored['status'] ?? 'UNTESTED'))
                 : 'NOT_CONFIGURED';
+
+            if ($active && $status === 'HEALTHY'
+                && ($testedAt === null || Carbon::parse($testedAt)->lt($checkedAt->copy()->subMinutes(15)))) {
+                $status = 'STALE';
+            }
 
             if ($active && in_array($code, ['midtrans', 'doku'], true)
                 && (bool) $maintenance->get(strtoupper($code), false)) {
@@ -376,7 +382,7 @@ class AdminHealthController
                 'active' => $active,
                 'status' => $status,
                 'message' => $this->integrationMessage($status),
-                'tested_at' => $this->safeTimestamp($stored['tested_at'] ?? null),
+                'tested_at' => $testedAt,
             ];
         })->values()->all();
     }
@@ -425,7 +431,7 @@ class AdminHealthController
         $status = strtoupper(trim($status));
 
         return in_array($status, [
-            'HEALTHY', 'DEGRADED', 'DOWN', 'NOT_CONFIGURED', 'UNTESTED', 'MAINTENANCE',
+            'HEALTHY', 'DEGRADED', 'DOWN', 'STALE', 'NOT_CONFIGURED', 'UNTESTED', 'MAINTENANCE',
         ], true) ? $status : 'UNTESTED';
     }
 
@@ -435,6 +441,7 @@ class AdminHealthController
             'HEALTHY' => 'Tes koneksi terakhir berhasil.',
             'DEGRADED' => 'Konfigurasi perlu diperiksa atau belum dapat diverifikasi penuh.',
             'DOWN' => 'Tes koneksi terakhir gagal.',
+            'STALE' => 'Tes koneksi terakhir sudah lebih dari 15 menit.',
             'MAINTENANCE' => 'Gateway sedang dalam mode maintenance.',
             'NOT_CONFIGURED' => 'Integrasi belum aktif.',
             default => 'Tes koneksi belum dijalankan.',
