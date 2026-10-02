@@ -197,5 +197,4 @@ class AdminNicknameToolsTest extends TestCase
         $this->assertFalse($row->requires_region_check);
         $this->assertTrue($row->is_active);
     }
-
 }
