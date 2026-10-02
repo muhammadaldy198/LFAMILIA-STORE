@@ -20,38 +20,104 @@ class AdminIntegrationController
 {
     public function index(IntegrationRegistry $registry): Response
     {
-        $records = IntegrationCredential::whereIn('code', array_keys($registry->all()))
+        $definitions = $registry->all();
+        $records = IntegrationCredential::whereIn('code', array_keys($definitions))
             ->get()->keyBy('code');
 
-        return Inertia::render('Admin/Integrations', [
-            'integrations' => collect($registry->all())->map(function (array $definition, string $code) use ($records): array {
-                $record = $records->get($code);
-                $config = is_array($record?->config_ciphertext) ? $record->config_ciphertext : [];
-                $fields = collect($definition['fields'])->map(function (array $field, string $key) use ($config): array {
-                    $secret = (bool) ($field['secret'] ?? false);
-                    $value = $config[$key] ?? null;
-                    $publicValue = ($field['type'] ?? null) === 'csv' && is_array($value)
-                        ? implode(', ', array_map('strval', $value))
-                        : $value;
+        $healthKeys = collect(array_keys($definitions))
+            ->map(fn (string $code): string => 'integration.health.'.$code)
+            ->all();
+        $healthStates = DB::table('system_settings')
+            ->whereIn('key', $healthKeys)
+            ->pluck('value', 'key')
+            ->map(function ($value): array {
+                $decoded = json_decode((string) $value, true);
 
-                    return [
-                        ...$field,
-                        'key' => $key,
-                        'value' => $secret ? null : $publicValue,
-                        'configured' => $secret
-                            ? (is_scalar($value) && trim((string) $value) !== '')
-                            : $value !== null && $value !== '',
-                    ];
-                })->values()->all();
+                return is_array($decoded) ? $decoded : [];
+            });
+
+        $integrations = collect($definitions)->map(function (array $definition, string $code) use ($records, $healthStates): array {
+            $record = $records->get($code);
+            $config = is_array($record?->config_ciphertext) ? $record->config_ciphertext : [];
+            $requiredTotal = 0;
+            $configuredRequired = 0;
+
+            $fields = collect($definition['fields'])->map(function (array $field, string $key) use (
+                $config,
+                &$requiredTotal,
+                &$configuredRequired
+            ): array {
+                $secret = (bool) ($field['secret'] ?? false);
+                $required = (bool) ($field['required'] ?? false);
+                $value = $config[$key] ?? null;
+                $configured = is_array($value)
+                    ? $value !== []
+                    : $value !== null && trim((string) $value) !== '';
+
+                if (($field['type'] ?? null) === 'boolean') {
+                    $configured = array_key_exists($key, $config);
+                }
+
+                if ($required) {
+                    $requiredTotal++;
+                    if ($configured) {
+                        $configuredRequired++;
+                    }
+                }
+
+                $publicValue = ($field['type'] ?? null) === 'csv' && is_array($value)
+                    ? implode(', ', array_map('strval', $value))
+                    : $value;
 
                 return [
-                    'code' => $code,
-                    'name' => $definition['name'],
-                    'note' => $definition['note'] ?? null,
-                    'is_active' => (bool) ($record?->is_active),
-                    'fields' => $fields,
+                    ...$field,
+                    'key' => $key,
+                    'value' => $secret ? null : $publicValue,
+                    'configured' => $configured,
                 ];
-            })->values()->all(),
+            })->values()->all();
+
+            $active = (bool) ($record?->is_active);
+            $storedHealth = $healthStates->get('integration.health.'.$code, []);
+            $status = $active
+                ? (string) ($storedHealth['status'] ?? 'UNTESTED')
+                : 'NOT_CONFIGURED';
+            $message = $active
+                ? (string) ($storedHealth['message'] ?? 'Belum pernah menjalankan Tes Koneksi.')
+                : 'Integrasi nonaktif.';
+
+            return [
+                'code' => $code,
+                'name' => $definition['name'],
+                'group' => $definition['group'] ?? 'Lainnya',
+                'description' => $definition['description'] ?? null,
+                'note' => $definition['note'] ?? null,
+                'is_active' => $active,
+                'fields' => $fields,
+                'required_total' => $requiredTotal,
+                'configured_required' => $configuredRequired,
+                'required_complete' => $requiredTotal === $configuredRequired,
+                'health' => [
+                    'status' => $status,
+                    'message' => $message,
+                    'tested_at' => $storedHealth['tested_at'] ?? null,
+                ],
+            ];
+        })->values();
+
+        return Inertia::render('Admin/Integrations', [
+            'integrations' => $integrations->all(),
+            'summary' => [
+                'total' => $integrations->count(),
+                'active' => $integrations->where('is_active', true)->count(),
+                'healthy' => $integrations
+                    ->filter(fn (array $item): bool => $item['is_active'] && $item['health']['status'] === 'HEALTHY')
+                    ->count(),
+                'attention' => $integrations
+                    ->filter(fn (array $item): bool => $item['is_active'] && $item['health']['status'] !== 'HEALTHY')
+                    ->count(),
+                'configuration_complete' => $integrations->where('required_complete', true)->count(),
+            ],
         ]);
     }
 
@@ -70,13 +136,16 @@ class AdminIntegrationController
         ]);
 
         $record = IntegrationCredential::firstOrNew(['code' => $code]);
+        $existing = is_array($record->config_ciphertext) ? $record->config_ciphertext : [];
         $before = [
             'code' => $code,
             'is_active' => (bool) $record->is_active,
-            'config_ciphertext' => is_array($record->config_ciphertext) ? $record->config_ciphertext : [],
+            'config_ciphertext' => $existing,
         ];
-        $existing = is_array($record->config_ciphertext) ? $record->config_ciphertext : [];
-        $config = [];
+
+        // Preserve unknown legacy metadata so saving a current field never destroys
+        // older provider options that are still needed during migration/regression.
+        $config = $existing;
 
         foreach ($definition['fields'] as $key => $field) {
             $type = $field['type'] ?? 'string';
@@ -88,51 +157,62 @@ class AdminIntegrationController
 
                 continue;
             }
+
             if ($type === 'csv') {
                 $items = is_array($incoming)
                     ? $incoming
                     : explode(',', (string) ($incoming ?? ''));
-                $config[$key] = array_values(array_unique(array_filter(
+                $items = array_values(array_unique(array_filter(
                     array_map(fn ($value): string => trim((string) $value), $items),
                     fn (string $value): bool => $value !== ''
                 )));
+
+                $this->validateCsvField($key, $items);
+                $config[$key] = $items;
 
                 continue;
             }
 
             $value = trim((string) ($incoming ?? ''));
-            if ($secret && $value === '' && isset($existing[$key])) {
-                $config[$key] = $existing[$key];
+
+            if ($secret && $value === '' && array_key_exists($key, $existing)) {
+                continue;
+            }
+
+            if ($value === '') {
+                unset($config[$key]);
 
                 continue;
             }
-            if ($value !== '') {
-                if (in_array($key, ['base_url', 'callback_url', 'webhook_url'], true)
-                    && ! str_starts_with(strtolower($value), 'https://')) {
-                    throw ValidationException::withMessages([
-                        'config.'.$key => 'URL integrasi wajib menggunakan HTTPS.',
-                    ]);
-                }
-                if (str_ends_with($key, '_path') && ! $this->validEndpointPath($value)) {
-                    throw ValidationException::withMessages([
-                        'config.'.$key => 'Path endpoint harus diawali / dan tidak boleh berupa URL penuh.',
-                    ]);
-                }
-                if ($key === 'from_email' && ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
-                    throw ValidationException::withMessages([
-                        'config.'.$key => 'Email pengirim tidak valid.',
-                    ]);
-                }
-                $config[$key] = $value;
+
+            if (in_array($key, ['base_url', 'callback_url', 'webhook_url'], true)
+                && ! str_starts_with(strtolower($value), 'https://')) {
+                throw ValidationException::withMessages([
+                    'config.'.$key => 'Alamat integrasi wajib menggunakan HTTPS.',
+                ]);
             }
+
+            if (str_ends_with($key, '_path') && ! $this->validEndpointPath($value)) {
+                throw ValidationException::withMessages([
+                    'config.'.$key => 'Path endpoint harus diawali / dan tidak boleh berupa URL penuh.',
+                ]);
+            }
+
+            if ($key === 'from_email' && ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                throw ValidationException::withMessages([
+                    'config.'.$key => 'Email pengirim tidak valid.',
+                ]);
+            }
+
+            $config[$key] = $value;
         }
 
         if ($data['is_active']) {
-            foreach ($this->requiredFields($code) as $required) {
+            foreach ($registry->requiredFields($code) as $required) {
                 $value = $config[$required] ?? null;
                 if ($value === null || $value === '' || $value === []) {
                     throw ValidationException::withMessages([
-                        'config.'.$required => 'Field ini wajib sebelum integrasi diaktifkan.',
+                        'config.'.$required => 'Field ini wajib dilengkapi sebelum integrasi diaktifkan.',
                     ]);
                 }
             }
@@ -141,12 +221,15 @@ class AdminIntegrationController
         $record->config_ciphertext = $config;
         $record->is_active = $data['is_active'];
         $record->save();
+
         DB::table('system_settings')->updateOrInsert(
             ['key' => 'integration.health.'.$code],
             [
                 'value' => json_encode([
                     'status' => $record->is_active ? 'DEGRADED' : 'NOT_CONFIGURED',
-                    'message' => $record->is_active ? 'Konfigurasi berubah; jalankan Tes Koneksi.' : 'Integrasi nonaktif.',
+                    'message' => $record->is_active
+                        ? 'Konfigurasi berubah. Jalankan Tes Koneksi untuk memverifikasi.'
+                        : 'Integrasi nonaktif.',
                     'tested_at' => null,
                 ], JSON_THROW_ON_ERROR),
                 'updated_by_admin_id' => $request->user('admin')->id,
@@ -161,7 +244,7 @@ class AdminIntegrationController
             'config_ciphertext' => $config,
         ]);
 
-        return back();
+        return back()->with('status', 'Pengaturan '.$definition['name'].' berhasil disimpan.');
     }
 
     public function reveal(
@@ -178,6 +261,7 @@ class AdminIntegrationController
             'password' => ['required', 'string', 'max:255'],
         ]);
         $admin = $request->user('admin');
+
         if (! $admin || ! Hash::check($data['password'], $admin->password)) {
             $audit->record(
                 $request,
@@ -214,41 +298,59 @@ class AdminIntegrationController
         AdminAuditService $audit,
         AdminNotificationService $notifications,
     ): JsonResponse {
-        abort_unless($registry->get($code), 404);
+        $definition = $registry->get($code);
+        abort_unless($definition, 404);
+
         $record = IntegrationCredential::where('code', $code)->first();
         $config = is_array($record?->config_ciphertext) ? $record->config_ciphertext : [];
-        $result = $connections->test($code, $config);
+
+        $missing = collect($registry->requiredFields($code))
+            ->filter(function (string $field) use ($config): bool {
+                $value = $config[$field] ?? null;
+
+                return $value === null || $value === '' || $value === [];
+            })
+            ->values();
+
+        $result = $missing->isNotEmpty()
+            ? [
+                'status' => 'NOT_CONFIGURED',
+                'message' => 'Lengkapi semua field wajib sebelum menjalankan Tes Koneksi.',
+            ]
+            : $connections->test($code, $config);
+
+        $health = [
+            ...$result,
+            'tested_at' => now()->toIso8601String(),
+        ];
+
         DB::table('system_settings')->updateOrInsert(
             ['key' => 'integration.health.'.$code],
             [
-                'value' => json_encode([
-                    ...$result,
-                    'tested_at' => now()->toIso8601String(),
-                ], JSON_THROW_ON_ERROR),
+                'value' => json_encode($health, JSON_THROW_ON_ERROR),
                 'updated_by_admin_id' => $request->user('admin')->id,
                 'updated_at' => now(),
                 'created_at' => now(),
             ]
         );
 
-        $audit->record($request, 'integration.connection.tested', 'integration_credential', $code, null, $result);
+        $audit->record($request, 'integration.connection.tested', 'integration_credential', $code, null, $health);
+
         if ($result['status'] === 'DOWN') {
             $notifications->record(
                 'integration.error',
                 'Integrasi bermasalah',
-                strtoupper($code).' gagal melewati Tes Koneksi.',
+                $definition['name'].' gagal melewati Tes Koneksi.',
                 'ERROR',
                 'integration_credential',
                 $code
             );
         }
 
-        return response()->json($result);
+        return response()->json($health)
+            ->header('Cache-Control', 'no-store, private');
     }
 
-    /**
-     * @return array<int, string>
-     */
     private function validEndpointPath(string $path): bool
     {
         return $path !== ''
@@ -259,19 +361,31 @@ class AdminIntegrationController
             && ! str_contains($path, '..');
     }
 
-    private function requiredFields(string $code): array
+    /**
+     * @param  array<int, string>  $items
+     */
+    private function validateCsvField(string $key, array $items): void
     {
-        return match ($code) {
-            'digiflazz' => ['username', 'api_key'],
-            'kokinpay' => ['api_key', 'base_url', 'nickname_path', 'region_path', 'pln_path'],
-            'midtrans' => ['server_key'],
-            'doku' => ['client_id', 'secret_key'],
-            'resend' => ['api_key', 'from_email'],
-            'google_oauth' => ['client_id', 'client_secret'],
-            'telegram' => ['bot_token', 'chat_id'],
-            'discord' => ['webhook_url'],
-            'turnstile' => ['site_key', 'secret_key'],
-            default => [],
-        };
+        if ($key === 'admin_recipients') {
+            foreach ($items as $item) {
+                if (! filter_var($item, FILTER_VALIDATE_EMAIL)) {
+                    throw ValidationException::withMessages([
+                        'config.'.$key => 'Daftar email penerima berisi alamat yang tidak valid.',
+                    ]);
+                }
+            }
+        }
+
+        if ($key === 'allowed_hostnames') {
+            foreach ($items as $item) {
+                if (str_contains($item, '://')
+                    || str_contains($item, '/')
+                    || ! preg_match('/^(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i', $item)) {
+                    throw ValidationException::withMessages([
+                        'config.'.$key => 'Hostname harus ditulis tanpa http://, https://, atau path.',
+                    ]);
+                }
+            }
+        }
     }
 }
