@@ -247,6 +247,17 @@ function supportHref(kind) {
 
     <slot />
 
+    <section v-if="!compactFooter && storefront.supportCtaEnabled !== false" class="lf-container lf-section">
+        <div class="lf-help">
+            <div>
+                <p class="lf-eyebrow">{{ storefront.supportCtaLabel || 'BUTUH BANTUAN?' }}</p>
+                <h2 class="lf-title">{{ storefront.supportCtaTitle || 'Tim LFAMILIA siap membantu.' }}</h2>
+                <p class="lf-copy">{{ storefront.supportCtaBody || 'Butuh bantuan memilih produk, pembayaran, atau mengecek status pesanan? Hubungi tim kami.' }}</p>
+            </div>
+            <Link :href="storefront.supportUrl || '/contact'" class="lf-primary">{{ storefront.supportCtaButton || 'Hubungi Kami' }}</Link>
+        </div>
+    </section>
+
     <footer v-if="!compactFooter" class="lf-footer">
         <div v-if="(footerDesktop || footerMobile) && sectionEnabled('footerBanner')" class="lf-footer-banner">
             <picture>
