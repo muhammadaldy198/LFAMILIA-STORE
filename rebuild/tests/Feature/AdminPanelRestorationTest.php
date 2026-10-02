@@ -96,6 +96,28 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(10000, (int) DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('price_idr'));
     }
 
+    public function test_digiflazz_import_respects_configured_product_tabs(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row(['type' => 'Weekly'])]);
+        app(DigiflazzCatalogService::class)->sync();
+
+        $product = $this->product();
+        $product->update(['package_tabs_enabled' => true, 'package_tabs' => ['Diamonds']]);
+        $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
+
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$id], 'margin_percent' => 10,
+        ])->assertSessionHasErrors('item_ids');
+        $this->assertSame(0, $product->packages()->count());
+
+        $product->update(['package_tabs' => ['Diamonds', 'Weekly']]);
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$id], 'margin_percent' => 10,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('Weekly', $product->packages()->firstOrFail()->group_name);
+    }
+
     public function test_unavailable_and_stale_skus_cannot_be_imported(): void
     {
         $this->login();
