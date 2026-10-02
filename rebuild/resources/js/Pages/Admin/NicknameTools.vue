@@ -185,6 +185,13 @@ function editCode(item) {
     editorOpen.value = true;
 }
 
+function syncNicknameSupportRules() {
+    if (!form.supports_nickname_check) {
+        form.requires_server = false;
+        form.requires_region_check = false;
+    }
+}
+
 function normalizeCodeInput() {
     form.code = form.code
         .toLowerCase()
@@ -457,7 +464,7 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
 
                 <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
-                        <input v-model="form.supports_nickname_check" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" @change="!form.supports_nickname_check && (form.requires_server=false, form.requires_region_check=false)" />
+                        <input v-model="form.supports_nickname_check" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" @change="syncNicknameSupportRules" />
                         Mendukung cek nickname
                     </label>
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
