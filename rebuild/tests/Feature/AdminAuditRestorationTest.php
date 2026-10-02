@@ -66,7 +66,10 @@ class AdminAuditRestorationTest extends TestCase
             'midtrans',
             [
                 'api_key' => 'legacy-api-secret',
-                'nested' => ['password' => 'legacy-password-secret'],
+                'nested' => [
+                    'password' => 'legacy-password-secret',
+                    'apiKey' => 'legacy-camel-api-secret',
+                ],
                 'mode' => 'sandbox',
             ],
             [
@@ -99,6 +102,7 @@ class AdminAuditRestorationTest extends TestCase
             ->where('logs.data.0.target_label', 'Integrasi')
             ->where('logs.data.0.before_state.api_key', '[REDACTED]')
             ->where('logs.data.0.before_state.nested.password', '[REDACTED]')
+            ->where('logs.data.0.before_state.nested.apiKey', '[REDACTED]')
             ->where('logs.data.0.before_state.mode', 'sandbox')
             ->where('logs.data.0.after_state.client_key', '[REDACTED]')
             ->where('logs.data.0.after_state.mode', 'production')
@@ -112,6 +116,7 @@ class AdminAuditRestorationTest extends TestCase
         $content = $response->getContent();
         $this->assertStringNotContainsString('legacy-api-secret', $content);
         $this->assertStringNotContainsString('legacy-password-secret', $content);
+        $this->assertStringNotContainsString('legacy-camel-api-secret', $content);
         $this->assertStringNotContainsString('legacy-client-secret', $content);
     }
 
