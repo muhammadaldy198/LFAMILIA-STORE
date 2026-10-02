@@ -511,7 +511,7 @@ if (activeCodes.value.length > 0) gameCode.value = activeCodes.value[0].code;
                                 <div class="flex justify-end gap-1.5">
                                     <Button type="button" variant="outline" class="h-8 px-2.5 text-[9px] font-bold" @click="copyCode(item.code)">{{ copied===item.code ? 'Tersalin' : 'Salin' }}</Button>
                                     <Button type="button" variant="outline" class="h-8 px-2.5 text-[9px] font-bold" @click="editCode(item)">Edit</Button>
-                                    <Button type="button" variant="outline" class="h-8 px-2.5 text-[9px] font-bold" :disabled="editorBusy" @click="toggleCode(item)">{{ item.is_active ? 'Nonaktifkan' : 'Aktifkan' }}</Button>
+                                    <Button type="button" variant="outline" class="h-8 px-2.5 text-[9px] font-bold" :disabled="editorBusy || (item.is_active && item.product_count>0)" :title="item.is_active && item.product_count>0 ? 'Masih digunakan produk' : ''" @click="toggleCode(item)">{{ item.is_active ? 'Nonaktifkan' : 'Aktifkan' }}</Button>
                                     <Button type="button" variant="outline" class="h-8 px-2.5 text-[9px] font-bold text-rose-600" :disabled="editorBusy || item.product_count>0" :title="item.product_count>0 ? 'Masih digunakan produk' : 'Hapus kode game'" @click="deleteCode(item)">Hapus</Button>
                                 </div>
                             </TableCell>
