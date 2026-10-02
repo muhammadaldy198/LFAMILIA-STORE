@@ -80,13 +80,14 @@ class AdminDigiflazzController
                 });
             });
 
+        $monitorSettings = $monitor->settings();
         $summaryRows = (clone $base)->get([
             'items.buyer_active', 'items.seller_active', 'items.unlimited_stock', 'items.stock',
             'items.start_cut_off', 'items.end_cut_off', 'items.price_idr', 'items.baseline_price_idr',
         ]);
-        $summary = $monitor->summary($summaryRows);
+        $summary = $monitor->summary($summaryRows, $monitorSettings);
 
-        $this->applyHealthFilter($base, $filters['health']);
+        $this->applyHealthFilter($base, $filters['health'], $monitorSettings);
 
         $items = $base
             ->orderByRaw('COALESCE(products.name, items.product_name)')
@@ -103,8 +104,8 @@ class AdminDigiflazzController
             ])
             ->paginate($filters['per_page'])
             ->withQueryString()
-            ->through(function (object $item) use ($service, $monitor): array {
-                $health = $monitor->health($item);
+            ->through(function (object $item) use ($service, $monitor, $monitorSettings): array {
+                $health = $monitor->health($item, $monitorSettings);
 
                 return [
                     ...((array) $item),
@@ -133,6 +134,7 @@ class AdminDigiflazzController
             'lastSyncedAt' => DB::table('digiflazz_catalog_items')->max('synced_at'),
             'mappingCount' => ProviderMapping::where('provider_id', $providerId ?: 0)->count(),
             'autoSync' => (bool) (json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true),
+            'monitorSettings' => $monitorSettings,
             'providerActive' => (bool) $provider?->is_active,
             'recentTransactions' => $monitor->recentTransactions(),
             'canSeeBalance' => $admin?->role === 'SUPER_ADMIN',
@@ -140,7 +142,7 @@ class AdminDigiflazzController
     }
 
 
-    private function applyHealthFilter($query, string $health): void
+    private function applyHealthFilter($query, string $health, array $settings): void
     {
         if ($health === '') {
             return;
@@ -153,12 +155,17 @@ class AdminDigiflazzController
                     $stock->where('items.unlimited_stock', false)->where('items.stock', '<=', 0);
                 });
         };
-        $warning = function ($nested): void {
+        $warning = function ($nested) use ($settings): void {
             $time = now('Asia/Jakarta')->format('H:i');
-            $nested->where(function ($stock): void {
+            $lowStockThreshold = (int) $settings['low_stock_threshold'];
+            $priceWarningPercent = (float) $settings['price_warning_percent'];
+            $nested->where(function ($stock) use ($lowStockThreshold): void {
                 $stock->where('items.unlimited_stock', false)
-                    ->whereBetween('items.stock', [1, 5]);
-            })->orWhereRaw('items.price_idr * 100 >= items.baseline_price_idr * 103')
+                    ->whereBetween('items.stock', [1, $lowStockThreshold]);
+            })->orWhereRaw(
+                'items.baseline_price_idr > 0 AND ((items.price_idr - items.baseline_price_idr) * 100) >= (items.baseline_price_idr * ?)',
+                [$priceWarningPercent]
+            )
                 ->orWhere(function ($cutoff) use ($time): void {
                     $cutoff->whereColumn('items.start_cut_off', '!=', 'items.end_cut_off')
                         ->where(function ($window) use ($time): void {
@@ -193,17 +200,38 @@ class AdminDigiflazzController
         $query->whereNot($warning);
     }
 
-    public function settings(Request $request, AdminAuditService $audit): RedirectResponse
-    {
-        $data = $request->validate(['enabled' => ['required', 'boolean']]);
-        $before = json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true;
-        DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.auto_sync'], [
-            'value' => json_encode($data['enabled']), 'updated_by_admin_id' => $request->user('admin')->id,
-            'updated_at' => now(),
+    public function settings(
+        Request $request,
+        AdminAuditService $audit,
+        AdminDigiflazzMonitorService $monitor,
+    ): RedirectResponse {
+        $data = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'sync_interval_minutes' => ['required', 'integer', 'min:5', 'max:1440', 'multiple_of:5'],
+            'low_stock_threshold' => ['required', 'integer', 'min:1', 'max:1000000'],
+            'price_warning_percent' => ['required', 'numeric', 'min:0.1', 'max:100'],
         ]);
-        $audit->record($request, 'digiflazz.auto_sync.updated', 'system_setting', 'digiflazz.auto_sync', ['enabled' => $before], $data);
+        $before = [
+            'enabled' => (bool) (json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true),
+            ...$monitor->settings(),
+        ];
+        $map = [
+            'digiflazz.auto_sync' => (bool) $data['enabled'],
+            'digiflazz.auto_sync_interval_minutes' => (int) $data['sync_interval_minutes'],
+            'digiflazz.low_stock_threshold' => (int) $data['low_stock_threshold'],
+            'digiflazz.price_warning_percent' => (float) $data['price_warning_percent'],
+        ];
+        foreach ($map as $key => $value) {
+            DB::table('system_settings')->updateOrInsert(['key' => $key], [
+                'value' => json_encode($value, JSON_THROW_ON_ERROR),
+                'updated_by_admin_id' => $request->user('admin')->id,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]);
+        }
+        $audit->record($request, 'digiflazz.monitor.settings_updated', 'system_setting', 'digiflazz', $before, $data);
 
-        return back()->with('status', 'Pengaturan sinkron otomatis disimpan.');
+        return back()->with('status', 'Pengaturan monitor dan sinkron otomatis disimpan.');
     }
 
     public function syncProduct(Request $request, Product $product, DigiflazzCatalogService $service, AdminAuditService $audit): RedirectResponse
