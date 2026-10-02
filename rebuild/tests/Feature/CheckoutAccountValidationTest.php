@@ -46,6 +46,15 @@ class CheckoutAccountValidationTest extends TestCase
         return $product;
     }
 
+
+    private function enableNicknameSupport(string $code, array $overrides = []): void
+    {
+        NicknameGameCode::where('code', $code)->update([
+            'supports_nickname_check' => true,
+            ...$overrides,
+        ]);
+    }
+
     public function test_account_validation_rejects_missing_required_field(): void
     {
         $product = $this->product();
@@ -70,6 +79,7 @@ class CheckoutAccountValidationTest extends TestCase
 
     public function test_mobile_legends_requires_server_zone_before_upstream_check(): void
     {
+        $this->enableNicknameSupport('mobile-legends');
         $product = $this->product([
             'nickname_check_enabled' => true,
             'nickname_game_code' => 'mobile-legends',
@@ -86,6 +96,7 @@ class CheckoutAccountValidationTest extends TestCase
 
     public function test_verified_account_response_is_private_and_provider_agnostic(): void
     {
+        $this->enableNicknameSupport('free-fire');
         $product = $this->product([
             'nickname_check_enabled' => true,
             'nickname_game_code' => 'free-fire',
@@ -131,6 +142,7 @@ class CheckoutAccountValidationTest extends TestCase
 
     public function test_verified_invalid_account_is_reported_on_the_user_id_field(): void
     {
+        $this->enableNicknameSupport('free-fire');
         $product = $this->product([
             'nickname_check_enabled' => true,
             'nickname_game_code' => 'free-fire',
@@ -162,7 +174,7 @@ class CheckoutAccountValidationTest extends TestCase
 
     public function test_server_requirement_is_read_from_editable_game_code_record(): void
     {
-        NicknameGameCode::where('code', 'free-fire')->update(['requires_server' => true]);
+        $this->enableNicknameSupport('free-fire', ['requires_server' => true]);
 
         $product = $this->product([
             'nickname_check_enabled' => true,
@@ -180,7 +192,7 @@ class CheckoutAccountValidationTest extends TestCase
 
     public function test_inactive_game_code_disables_upstream_validation_without_code_change(): void
     {
-        NicknameGameCode::where('code', 'free-fire')->update(['is_active' => false]);
+        $this->enableNicknameSupport('free-fire', ['is_active' => false]);
 
         $product = $this->product([
             'nickname_check_enabled' => true,
@@ -202,6 +214,7 @@ class CheckoutAccountValidationTest extends TestCase
 
     public function test_validation_uses_editable_endpoint_paths_from_integration_config(): void
     {
+        $this->enableNicknameSupport('free-fire');
         $product = $this->product([
             'nickname_check_enabled' => true,
             'nickname_game_code' => 'free-fire',
@@ -239,6 +252,7 @@ class CheckoutAccountValidationTest extends TestCase
 
     public function test_supported_game_with_empty_nickname_is_rejected(): void
     {
+        $this->enableNicknameSupport('free-fire');
         $product = $this->product([
             'nickname_check_enabled' => true,
             'nickname_game_code' => 'free-fire',
