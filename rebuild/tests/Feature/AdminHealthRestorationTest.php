@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\AdminUser;
 use App\Models\IntegrationCredential;
+use App\Services\AdminManualOrderService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -138,6 +140,94 @@ class AdminHealthRestorationTest extends TestCase
             ->where('integrations.3.message', 'Gateway sedang dalam mode maintenance.'));
 
         $this->assertStringNotContainsString('health-doku-secret', $response->getContent());
+    }
+
+
+    public function test_active_down_integration_makes_overall_health_down(): void
+    {
+        $this->login();
+        $this->setSetting('system.queue_worker_heartbeat', now()->toIso8601String());
+        $this->setSetting('system.scheduler_heartbeat', now()->toIso8601String());
+
+        IntegrationCredential::updateOrCreate(['code' => 'digiflazz'], [
+            'is_active' => true,
+            'config_ciphertext' => [
+                'username' => 'health-down-buyer',
+                'api_key' => 'health-down-secret',
+            ],
+        ]);
+        $this->setSetting('integration.health.digiflazz', [
+            'status' => 'DOWN',
+            'message' => 'Provider rejected secret health-down-secret',
+            'tested_at' => now()->toIso8601String(),
+        ]);
+
+        $response = $this->get('/admin/health')->assertOk();
+
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('summary.overall', 'DOWN')
+            ->where('integrations.0.code', 'digiflazz')
+            ->where('integrations.0.status', 'DOWN'));
+
+        $this->assertStringNotContainsString('health-down-secret', $response->getContent());
+    }
+
+    public function test_stale_fulfillment_count_only_uses_latest_attempt_per_order(): void
+    {
+        $admin = $this->login();
+
+        $orderId = app(AdminManualOrderService::class)->create([
+            'customer_name' => 'Health Customer',
+            'phone' => '081234567890',
+            'email' => 'health-customer@example.test',
+            'product_name' => 'Health Manual Product',
+            'package_name' => 'Health Manual Package',
+            'destination' => 'HEALTH-TARGET',
+            'total_idr' => 15000,
+            'note' => 'Health regression',
+            'payment_received' => true,
+            'idempotency_key' => (string) Str::uuid(),
+        ], (int) $admin->id);
+
+        $oldAttempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        DB::table('fulfillment_attempts')->where('id', $oldAttempt->id)->update([
+            'status' => 'UNKNOWN',
+            'updated_at' => now()->subMinutes(20),
+        ]);
+
+        $order = DB::table('orders')->where('id', $orderId)->firstOrFail();
+        $providerId = (int) DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $mappingId = DB::table('provider_mappings')->insertGetId([
+            'product_package_id' => $order->product_package_id,
+            'provider_id' => $providerId,
+            'external_sku' => 'health-latest-'.bin2hex(random_bytes(4)),
+            'cost_idr' => 10000,
+            'max_price_idr' => 10000,
+            'priority' => 50,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('fulfillment_attempts')->insert([
+            'order_id' => $orderId,
+            'provider_mapping_id' => $mappingId,
+            'provider_id' => $providerId,
+            'attempt_no' => 2,
+            'external_reference' => 'health-latest-'.bin2hex(random_bytes(8)),
+            'status' => 'CREATED',
+            'correlation_id' => (string) Str::uuid(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->get('/admin/health')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('summary.stale_fulfillment', 0)
+                ->where('checks.7.key', 'fulfillment')
+                ->where('checks.7.count', 0)
+                ->where('checks.7.status', 'HEALTHY'));
     }
 
     public function test_failed_jobs_are_reported_as_attention_without_exposing_job_payload(): void
