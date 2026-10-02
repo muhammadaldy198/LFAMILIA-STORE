@@ -181,7 +181,7 @@ const deleteNotice = (notice) => {
             </section>
 
             <Card class="p-4"><form class="flex flex-wrap items-end gap-3" @submit.prevent="applyGlobalMargin"><label class="text-sm">Margin global %<Input v-model.number="globalMarginForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/></label><Button :disabled="globalMarginForm.processing">Terapkan ke semua produk</Button></form></Card>
-            <section v-show="catalogTab === 'products'" class="space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <section v-show="catalogTab === 'products'" class="lf-admin-catalog-section space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Produk</h2><label class="block">Cari produk atau nominal<Input v-model="catalogSearch" placeholder="Nama produk, slug, atau nominal" /></label><nav class="flex items-center gap-3"><Button type="button" :disabled="catalogPage <= 1" @click="catalogPage--">Sebelumnya</Button><span>{{catalogPage}} / {{totalCatalogPages}} · {{matchingProducts.length}} produk</span><Button type="button" :disabled="catalogPage >= totalCatalogPages" @click="catalogPage++">Berikutnya</Button></nav>
                 <div class="flex gap-2"><Button v-for="mode in ['AUTO_PROVIDER', 'MANUAL']" :key="mode" type="button" class="rounded-md px-4 py-2 text-sm" :class="tab === mode ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800'" @click="tab = mode">{{ mode === 'MANUAL' ? 'Produk Manual' : 'Produk Provider' }}</Button></div>
                 <Button type="button" variant="outline" @click="showCreateProduct = !showCreateProduct">{{ showCreateProduct ? 'Tutup formulir' : 'Tambah produk' }}</Button>
@@ -255,7 +255,7 @@ const deleteNotice = (notice) => {
                     </div>
 
                     </div>
-                    <div v-show="editorTab==='nominal'" class="space-y-3 rounded-md bg-slate-950 p-4">
+                    <div v-show="editorTab==='nominal'" class="lf-admin-nominals space-y-3 rounded-md bg-slate-950 p-4">
                         <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="font-semibold">Nominal / paket</h3><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="showImport=!showImport">Impor nominal Digiflazz</Button></div>
                         <Card v-if="showImport && item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 p-4">
                             <h4 class="font-semibold">Pilih SKU untuk {{item.name}}</h4>
