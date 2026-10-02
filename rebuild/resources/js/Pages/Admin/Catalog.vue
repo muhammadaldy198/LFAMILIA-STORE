@@ -55,6 +55,7 @@ const visibleProducts = computed(() => {
     return matchingProducts.value.slice((catalogPage.value - 1) * size, catalogPage.value * size);
 });
 watch([tab,catalogSearch,catalogCategory,catalogStatus,catalogSort,catalogPageSize], () => {catalogPage.value = 1;});
+const resetCatalogFilters=()=>{catalogSearch.value='';catalogCategory.value='';catalogStatus.value='';catalogSort.value='CUSTOM';catalogPageSize.value=25;catalogPage.value=1;};
 const categoryForm = useForm({ name: '', slug: '', sort_order: 0 });
 const productForm = useForm({ category_id: '', name: '', slug: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: props.defaultMargin||0, sort_order: 0 });
 const globalMarginForm = useForm({margin_percent:props.defaultMargin||0});
@@ -225,6 +226,7 @@ const deleteNotice = (notice) => {
                         <label class="text-sm">Urutkan<select v-model="catalogSort" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="CUSTOM">Urutan toko</option><option value="NAME">Nama A–Z</option></select></label>
                         <label class="text-sm">Produk per halaman<select v-model.number="catalogPageSize" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option v-for="size in [10,25,50,100]" :key="size" :value="size">{{size}} produk</option></select></label>
                     </div>
+                    <div class="mt-3"><Button type="button" variant="outline" size="sm" @click="resetCatalogFilters">Hapus filter</Button></div>
                 </Card>
                 <Button type="button" variant="outline" @click="showCreateProduct = !showCreateProduct">{{ showCreateProduct ? 'Tutup formulir' : 'Tambah produk' }}</Button>
                 <form v-if="showCreateProduct" class="grid gap-3 md:grid-cols-3" @submit.prevent="productForm.fulfillment_mode = tab; productForm.post('/admin/catalog/products', { onSuccess: () => productForm.reset() })">
