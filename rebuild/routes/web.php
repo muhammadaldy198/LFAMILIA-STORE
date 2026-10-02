@@ -210,7 +210,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
         });
 
-
     Route::middleware(['admin.permission:payments.manage', 'admin.super'])->prefix('admin/payments')
         ->name('admin.payments.')->group(function (): void {
             Route::post('/channels/sync', [AdminPaymentController::class, 'syncChannels'])
