@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\NicknameGameCode;
 use App\Models\Product;
+use App\Services\NicknameService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -370,7 +371,7 @@ class AdminAccountValidationRestorationTest extends TestCase
 
         Http::fake();
 
-        $result = app(\App\Services\NicknameService::class)->check($product, ['user_id' => '12345678']);
+        $result = app(NicknameService::class)->check($product, ['user_id' => '12345678']);
 
         $this->assertFalse($result['supported']);
         $this->assertFalse($result['verified']);
