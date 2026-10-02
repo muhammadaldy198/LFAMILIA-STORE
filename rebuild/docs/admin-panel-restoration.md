@@ -11,7 +11,7 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 | Banner & Konten | Banner desktop/mobile, satu pop-up, logo & gambar storefront, blok bantuan/footer, news, moderasi reviews, FAQ, dan halaman kebijakan; kontak toko tetap di Pengaturan agar tidak ganda |
 | Digiflazz | Dedicated operational monitor, connection state, owner-only balance, normal/warning/critical summary, search/category/product/brand/health filters, mapped/all scope, stock, buyer/seller status, cut-off, multi, baseline, recent transactions, per-SKU/all sync, configurable auto-sync interval and warning thresholds |
 | Validasi Akun | Game codes, game nickname, MLBB region, PLN checks |
-| Provider | Provider activation |
+| Provider | Daftar provider dengan nama/keterangan/urutan/status yang dapat diubah, ringkasan kesehatan dan transaksi, serta inventaris mapping nominal tanpa menggandakan editor SKU/harga/margin di menu Produk |
 | Pembayaran | Manual QRIS and confirmation, page editor, gateway/channel fees/routing, minimum wallet topup |
 | Pelanggan | Search, pagination, membership, owner-only balance adjustments, order/ledger history |
 | Promo | Vouchers with scope/quota/dates, popular products |
