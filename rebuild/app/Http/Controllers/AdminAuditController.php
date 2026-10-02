@@ -56,6 +56,7 @@ class AdminAuditController
                 $like = '%'.$filters['q'].'%';
                 $query->where(function ($query) use ($like, $matchingActorIds): void {
                     $query->where('action', 'like', $like)
+                        ->orWhere('actor_id', 'like', $like)
                         ->orWhere('target_type', 'like', $like)
                         ->orWhere('target_id', 'like', $like)
                         ->orWhere('correlation_id', 'like', $like)
@@ -230,6 +231,7 @@ class AdminAuditController
             'faq' => 'Banner & Konten',
             'digiflazz' => 'Digiflazz',
             'nickname' => 'Validasi Akun',
+            'nickname_game_code' => 'Validasi Akun',
             'provider' => 'Provider',
             'payment' => 'Pembayaran',
             'customer' => 'Pelanggan',
@@ -267,6 +269,14 @@ class AdminAuditController
             'reordered' => 'diurutkan ulang',
             'uploaded' => 'diunggah',
             'tested' => 'dites',
+            'settings_updated' => 'pengaturan diperbarui',
+            'status_updated' => 'status diperbarui',
+            'margin_updated' => 'margin diperbarui',
+            'price_updated' => 'harga diperbarui',
+            'toggled' => 'diubah statusnya',
+            'activated' => 'diaktifkan',
+            'deactivated' => 'dinonaktifkan',
+            'replied' => 'dibalas',
             'sent' => 'dikirim',
             'resolved' => 'diselesaikan',
             'closed' => 'ditutup',
@@ -285,6 +295,13 @@ class AdminAuditController
             'game_code' => 'kode game',
             'quick_reply' => 'balasan cepat',
             'presentation' => 'tampilan',
+            'banner' => 'banner',
+            'media' => 'media',
+            'category' => 'kategori',
+            'mapping' => 'mapping provider',
+            'product' => 'produk',
+            'package' => 'nominal',
+            'store' => 'toko',
         ];
 
         $subject = collect($parts)
@@ -314,7 +331,11 @@ class AdminAuditController
             'voucher' => 'Voucher',
             'support_ticket' => 'Tiket Pelanggan',
             'integration' => 'Integrasi',
+            'integration_credential' => 'Integrasi',
             'settings' => 'Pengaturan',
+            'system_setting' => 'Pengaturan Sistem',
+            'home_banner' => 'Banner',
+            'nickname_game_code' => 'Kode Game',
             'membership_tier' => 'Membership',
             'report' => 'Laporan',
         ][$target] ?? ucwords(str_replace('_', ' ', $target));
