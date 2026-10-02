@@ -35,11 +35,26 @@ const selectedPackageId=ref(null);
 const selectedProductItems = computed(() => products.value.filter(item => item.id === selectedProductId.value));
 const editProduct = item => { selectedProductId.value = item.id; editorTab.value = 'info'; showImport.value=false; importForm.item_ids=[]; importForm.margin_percent=Number(item.margin_percent); selectedPackageId.value=null; };
 const catalogTab = ref('products'), catalogSearch = ref(initialSearch), catalogPage = ref(1);
+const catalogCategory = ref(''), catalogStatus = ref(''), catalogSort = ref('CUSTOM'), catalogPageSize = ref(25);
 const catalogTabs = [['products','Produk'],['categories','Kategori'],['fields','Kolom Data Akun'],['media','Media Toko']];
-const matchingProducts = computed(() => products.value.filter(item => item.fulfillment_mode === tab.value && (!catalogSearch.value || [item.name,item.slug,...item.packages.map(p => p.name)].join(' ').toLowerCase().includes(catalogSearch.value.toLowerCase()))));
-const totalCatalogPages = computed(() => Math.max(1, Math.ceil(matchingProducts.value.length / 10)));
-const visibleProducts = computed(() => matchingProducts.value.slice((catalogPage.value - 1) * 10, catalogPage.value * 10));
-watch([tab,catalogSearch], () => {catalogPage.value = 1;});
+const matchingProducts = computed(() => {
+    const term = catalogSearch.value.trim().toLowerCase();
+    const rows = products.value.filter(item =>
+        item.fulfillment_mode === tab.value
+        && (!catalogCategory.value || String(item.category_id) === String(catalogCategory.value))
+        && (!catalogStatus.value || (catalogStatus.value === 'ACTIVE' ? item.is_active : !item.is_active))
+        && (!term || [item.name,item.slug,item.publisher,...item.packages.map(p => p.name)].join(' ').toLowerCase().includes(term))
+    );
+    return [...rows].sort((a,b) => catalogSort.value === 'NAME'
+        ? a.name.localeCompare(b.name,'id-ID',{numeric:true,sensitivity:'base'})
+        : Number(a.sort_order||0)-Number(b.sort_order||0) || a.name.localeCompare(b.name,'id-ID',{numeric:true,sensitivity:'base'}));
+});
+const totalCatalogPages = computed(() => Math.max(1, Math.ceil(matchingProducts.value.length / Number(catalogPageSize.value))));
+const visibleProducts = computed(() => {
+    const size = Number(catalogPageSize.value);
+    return matchingProducts.value.slice((catalogPage.value - 1) * size, catalogPage.value * size);
+});
+watch([tab,catalogSearch,catalogCategory,catalogStatus,catalogSort,catalogPageSize], () => {catalogPage.value = 1;});
 const categoryForm = useForm({ name: '', slug: '', sort_order: 0 });
 const productForm = useForm({ category_id: '', name: '', slug: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: props.defaultMargin||0, sort_order: 0 });
 const globalMarginForm = useForm({margin_percent:props.defaultMargin||0});
@@ -201,8 +216,16 @@ const deleteNotice = (notice) => {
 
             <Card class="p-4"><form class="flex flex-wrap items-end gap-3" @submit.prevent="applyGlobalMargin"><label class="text-sm">Margin global produk otomatis (%)<Input v-model.number="globalMarginForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/></label><Button :disabled="globalMarginForm.processing">Terapkan margin otomatis</Button><p class="w-full text-xs text-muted-foreground">Produk manual dan nominal dengan pengaturan harga khusus tidak diubah.</p></form></Card>
             <section v-show="catalogTab === 'products'" class="lf-admin-catalog-section space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <h2 class="text-xl font-semibold">Produk</h2><label class="block">Cari produk atau nominal<Input v-model="catalogSearch" placeholder="Nama produk, slug, atau nominal" /></label><nav class="flex items-center gap-3"><Button type="button" :disabled="catalogPage <= 1" @click="catalogPage--">Sebelumnya</Button><span>{{catalogPage}} / {{totalCatalogPages}} · {{matchingProducts.length}} produk</span><Button type="button" :disabled="catalogPage >= totalCatalogPages" @click="catalogPage++">Berikutnya</Button></nav>
-                <div class="flex gap-2"><Button v-for="mode in ['AUTO_PROVIDER', 'MANUAL']" :key="mode" type="button" class="rounded-md px-4 py-2 text-sm" :class="tab === mode ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800'" @click="tab = mode">{{ mode === 'MANUAL' ? 'Produk Manual' : 'Produk Otomatis' }}</Button></div>
+                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-xl font-semibold">Produk</h2><p class="mt-1 text-sm text-muted-foreground">Kelola produk otomatis dan manual tanpa mengubah SKU penyedia dari sisi customer.</p></div><div class="flex gap-2"><Button v-for="mode in ['AUTO_PROVIDER', 'MANUAL']" :key="mode" type="button" :variant="tab===mode?'default':'outline'" @click="tab = mode">{{ mode === 'MANUAL' ? 'Produk Manual' : 'Produk Otomatis' }}</Button></div></div>
+                <Card class="p-4">
+                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                        <label class="text-sm xl:col-span-2">Cari produk atau nominal<Input v-model="catalogSearch" placeholder="Nama, alamat produk, merek, atau nominal" class="mt-1" /></label>
+                        <label class="text-sm">Kategori<select v-model="catalogCategory" class="order-select mt-1"><option value="">Semua kategori</option><option v-for="category in categories" :key="category.id" :value="category.id">{{category.name}}</option></select></label>
+                        <label class="text-sm">Status<select v-model="catalogStatus" class="order-select mt-1"><option value="">Semua status</option><option value="ACTIVE">Aktif</option><option value="INACTIVE">Nonaktif</option></select></label>
+                        <label class="text-sm">Urutkan<select v-model="catalogSort" class="order-select mt-1"><option value="CUSTOM">Urutan toko</option><option value="NAME">Nama A–Z</option></select></label>
+                        <label class="text-sm">Produk per halaman<select v-model.number="catalogPageSize" class="order-select mt-1"><option v-for="size in [10,25,50,100]" :key="size" :value="size">{{size}} produk</option></select></label>
+                    </div>
+                </Card>
                 <Button type="button" variant="outline" @click="showCreateProduct = !showCreateProduct">{{ showCreateProduct ? 'Tutup formulir' : 'Tambah produk' }}</Button>
                 <form v-if="showCreateProduct" class="grid gap-3 md:grid-cols-3" @submit.prevent="productForm.fulfillment_mode = tab; productForm.post('/admin/catalog/products', { onSuccess: () => productForm.reset() })">
                     <label class="text-sm">Kategori<select v-model="productForm.category_id" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="">Pilih kategori</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
@@ -220,7 +243,8 @@ const deleteNotice = (notice) => {
                     </template>
                     <div class="md:col-span-3"><Button :disabled="productForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah {{ tab === 'MANUAL' ? 'produk manual' : 'produk provider' }}</Button><p v-if="Object.keys(productForm.errors).length" class="mt-2 text-sm text-red-300">{{ Object.values(productForm.errors).join(' · ') }}</p></div>
                 </form>
-                <Table class="w-full"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Nominal</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id"><TableCell><strong>{{item.name}}</strong><small class="block">{{item.publisher}}</small></TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" @click="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk sesuai pencarian.</p>
+                <div class="overflow-x-auto"><Table class="min-w-[880px]"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Jenis</TableHead><TableHead>Nominal</TableHead><TableHead>Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id"><TableCell><strong>{{item.name}}</strong><small class="block text-muted-foreground">/{{item.slug}}<template v-if="item.publisher"> · {{item.publisher}}</template></small></TableCell><TableCell>{{categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori'}}</TableCell><TableCell>{{item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis'}}</TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>{{item.sort_order}}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" size="sm" @click="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table></div><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk yang sesuai dengan filter.</p>
+                <nav class="flex flex-wrap items-center justify-between gap-3"><span class="text-sm text-muted-foreground">{{matchingProducts.length}} produk · Halaman {{catalogPage}} dari {{totalCatalogPages}}</span><div class="flex gap-2"><Button type="button" variant="outline" :disabled="catalogPage <= 1" @click="catalogPage--">Sebelumnya</Button><Button type="button" variant="outline" :disabled="catalogPage >= totalCatalogPages" @click="catalogPage++">Berikutnya</Button></div></nav>
                 <Card v-for="item in selectedProductItems" :key="item.id" class="space-y-4 p-4">
                     <header class="flex flex-wrap items-center justify-between gap-3"><h2>Edit {{item.name}}</h2><div class="flex flex-wrap gap-2"><Button type="button" variant="destructive" @click="deleteProduct(item)">Hapus produk</Button><Button type="button" variant="outline" @click="selectedProductId=null">Tutup</Button></div></header>
                     <nav class="lf-admin-tabs"><Button type="button" variant="ghost" :class="{active:editorTab==='info'}" @click="editorTab='info'">Informasi</Button><Button type="button" variant="ghost" :class="{active:editorTab==='nominal'}" @click="editorTab='nominal'">Nominal & Harga</Button><Button type="button" variant="ghost" :class="{active:editorTab==='display'}" @click="editorTab='display'">Tampilan Produk</Button><Button type="button" variant="ghost" @click="fieldsProductId=String(item.id);catalogTab='fields'">Input Customer</Button><Button type="button" variant="ghost" :class="{active:editorTab==='fulfillment'}" @click="editorTab='fulfillment'">Fulfillment</Button></nav>
