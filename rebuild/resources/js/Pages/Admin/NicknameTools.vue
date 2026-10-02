@@ -41,6 +41,7 @@ const form = reactive({
     requires_region_check: false,
     is_active: true,
     sort_order: null,
+    nickname_product_count: 0,
 });
 
 const activeCodes = computed(() => codes.value.filter((item) => item.is_active && item.supports_nickname_check));
@@ -159,6 +160,7 @@ function resetEditor() {
     form.requires_region_check = false;
     form.is_active = true;
     form.sort_order = null;
+    form.nickname_product_count = 0;
     editorError.value = '';
     editorNotice.value = '';
 }
@@ -177,10 +179,16 @@ function editCode(item) {
     form.requires_region_check = item.requires_region_check;
     form.is_active = item.is_active;
     form.sort_order = item.sort_order;
+    form.nickname_product_count = item.nickname_product_count || 0;
     editorError.value = '';
-    editorNotice.value = item.product_count > 0
-        ? `Kode ini dipakai oleh ${item.product_count} produk. Jika kode diubah, produk terkait ikut diperbarui otomatis.`
-        : '';
+    const notices = [];
+    if (item.product_count > 0) {
+        notices.push(`Kode ini dipakai oleh ${item.product_count} produk. Jika kode diubah, produk terkait ikut diperbarui otomatis.`);
+    }
+    if (item.nickname_product_count > 0) {
+        notices.push(`Cek nickname sedang aktif pada ${item.nickname_product_count} produk. Matikan validasi pada produk terkait sebelum menonaktifkan dukungan nickname.`);
+    }
+    editorNotice.value = notices.join(' ');
     editorOpen.value = true;
 }
 
@@ -456,7 +464,7 @@ if (activeCodes.value.length > 0) gameCode.value = activeCodes.value[0].code;
 
                 <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
-                        <input v-model="form.supports_nickname_check" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" @change="!form.supports_nickname_check && (form.requires_server=false, form.requires_region_check=false)" />
+                        <input v-model="form.supports_nickname_check" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" :disabled="form.nickname_product_count > 0 && form.supports_nickname_check" @change="!form.supports_nickname_check && (form.requires_server=false, form.requires_region_check=false)" />
                         Mendukung cek nickname
                     </label>
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
@@ -526,7 +534,10 @@ if (activeCodes.value.length > 0) gameCode.value = activeCodes.value[0].code;
                                     {{ item.is_active ? 'Aktif' : 'Nonaktif' }}
                                 </span>
                             </TableCell>
-                            <TableCell class="px-3 py-2.5 text-[#52627a]">{{ item.product_count }}</TableCell>
+                            <TableCell class="px-3 py-2.5 text-[#52627a]">
+                                <span>{{ item.product_count }} total</span>
+                                <span v-if="item.nickname_product_count" class="block text-xs text-[#1769e8]">{{ item.nickname_product_count }} cek aktif</span>
+                            </TableCell>
                             <TableCell class="px-3 py-2.5">
                                 <div class="flex justify-end gap-1.5">
                                     <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold" @click="copyCode(item.code)">{{ copied===item.code ? 'Tersalin' : 'Salin' }}</Button>
