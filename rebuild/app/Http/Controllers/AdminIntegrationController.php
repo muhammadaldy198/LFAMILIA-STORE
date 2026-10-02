@@ -113,6 +113,11 @@ class AdminIntegrationController
                         'config.'.$key => 'URL integrasi wajib menggunakan HTTPS.',
                     ]);
                 }
+                if (str_ends_with($key, '_path') && ! $this->validEndpointPath($value)) {
+                    throw ValidationException::withMessages([
+                        'config.'.$key => 'Path endpoint harus diawali / dan tidak boleh berupa URL penuh.',
+                    ]);
+                }
                 if ($key === 'from_email' && ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
                     throw ValidationException::withMessages([
                         'config.'.$key => 'Email pengirim tidak valid.',
@@ -244,11 +249,21 @@ class AdminIntegrationController
     /**
      * @return array<int, string>
      */
+    private function validEndpointPath(string $path): bool
+    {
+        return $path !== ''
+            && mb_strlen($path) <= 255
+            && str_starts_with($path, '/')
+            && ! str_starts_with($path, '//')
+            && ! str_contains($path, '://')
+            && ! str_contains($path, '..');
+    }
+
     private function requiredFields(string $code): array
     {
         return match ($code) {
             'digiflazz' => ['username', 'api_key'],
-            'kokinpay' => ['api_key'],
+            'kokinpay' => ['api_key', 'base_url', 'nickname_path', 'region_path', 'pln_path'],
             'midtrans' => ['server_key'],
             'doku' => ['client_id', 'secret_key'],
             'resend' => ['api_key', 'from_email'],
