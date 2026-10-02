@@ -7,6 +7,7 @@ use App\Services\AdminAuditService;
 use App\Services\AdminOrderPresentation;
 use App\Services\AdminPermissionService;
 use App\Services\AdminManualOrderService;
+use App\Services\TransactionalEmailService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -150,6 +151,56 @@ class AdminOrdersController
         $id = $service->create($data, (int) $request->user('admin')->id);
         app(AdminAuditService::class)->record($request, 'order.manual.created', 'order', $id, null, ['order_id' => $id]);
         return redirect()->route('admin.orders.show', $id)->with('success', 'Pesanan manual berhasil dicatat.');
+    }
+
+    public function resendDelivery(Request $request, int $id, TransactionalEmailService $emails, AdminOrderPresentation $presentation)
+    {
+        $order = DB::table('orders')->where('id', $id)->first([
+            'id', 'order_number', 'status', 'delivery_payload', 'user_id', 'guest_email',
+        ]);
+        abort_unless($order, 404);
+
+        if ($order->status !== 'SUCCESS') {
+            throw ValidationException::withMessages([
+                'delivery' => 'Hasil pesanan hanya dapat dikirim ulang setelah pesanan berhasil.',
+            ]);
+        }
+
+        $delivery = $presentation->json($order->delivery_payload);
+        $code = trim((string) ($delivery['code'] ?? $delivery['serial_number'] ?? ''));
+        $note = trim((string) ($delivery['note'] ?? ''));
+        if ($code === '' && $note === '') {
+            throw ValidationException::withMessages([
+                'delivery' => 'Pesanan ini belum memiliki kode atau hasil pengiriman yang dapat dikirim ulang.',
+            ]);
+        }
+
+        $email = $order->user_id
+            ? DB::table('users')->where('id', $order->user_id)->value('email')
+            : $order->guest_email;
+        if (! is_string($email) || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw ValidationException::withMessages([
+                'delivery' => 'Email pelanggan belum tersedia atau tidak valid.',
+            ]);
+        }
+
+        $text = 'Pesanan '.$order->order_number.' telah berhasil diproses.';
+        if ($code !== '') {
+            $text .= "\n\nKode / hasil pengiriman:\n".$code;
+        }
+        if ($note !== '') {
+            $text .= "\n\nCatatan:\n".$note;
+        }
+        $text .= "\n\nSimpan informasi ini dengan aman.";
+
+        $emails->queue(strtolower($email), 'Hasil pesanan '.$order->order_number, $text);
+        app(AdminAuditService::class)->record($request, 'order.delivery.resent', 'order', $id, null, [
+            'email' => strtolower($email),
+            'has_code' => $code !== '',
+            'has_note' => $note !== '',
+        ]);
+
+        return back()->with('success', 'Hasil pesanan masuk antrean pengiriman email.');
     }
 
     public function refreshFulfillment(Request $request, int $id)
