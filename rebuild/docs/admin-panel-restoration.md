@@ -13,7 +13,7 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 | Validasi Akun | Game codes, game nickname, MLBB region, PLN checks |
 | Provider | Daftar provider dengan nama/keterangan/urutan/status yang dapat diubah, ringkasan kesehatan dan transaksi, serta inventaris mapping nominal tanpa menggandakan editor SKU/harga/margin di menu Produk |
 | Pembayaran | Metode pembayaran editable (nama/deskripsi/logo/biaya/urutan), gateway & maintenance, routing pesanan/top up khusus Super Admin, QRIS manual & konfirmasi, editor halaman pembayaran, transaksi dengan filter/pagination, callback URL, serta master toggle dan minimum top up saldo |
-| Pelanggan | Search, pagination, membership, owner-only balance adjustments, order/ledger history |
+| Pelanggan | Ringkasan pelanggan, search/filter/pagination, detail profil & autentikasi, membership otomatis/manual, Super Admin balance adjustment, order/ledger/top-up/ticket/saved-game history, serta safe empty-account cleanup |
 | Promo | Vouchers with scope/quota/dates, popular products |
 | Layanan Pelanggan | Conversation/status/reply, editable quick replies |
 | Laporan | Date range, daily totals, best-selling products, provider error rate |
@@ -39,6 +39,10 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 - Routing pesanan dan top up saldo dipisahkan agar satu metode dapat memakai gateway berbeda sesuai tujuan tanpa pilihan gateway di frontend.
 - Top up saldo memiliki master toggle; ketika OFF, daftar metode top up disembunyikan dan backend menolak quote/create.
 - Kredensial/secret tetap hanya disimpan di menu Integrasi dan ditolak dari konfigurasi routing.
+- Menu Pelanggan memisahkan customer membership dari Admin RBAC; tier customer tetap BASIC → SILVER → GOLD → DIAMOND → PLATINUM → MAFIA sesuai konfigurasi membership aktif.
+- Penyesuaian saldo pelanggan hanya Super Admin, memakai wallet ledger, row lock, idempotency key, audit log, dan tidak boleh membuat saldo negatif.
+- Data sensitif akun game tersimpan tidak dibuka dari daftar/detail pelanggan; panel hanya menampilkan metadata operasional yang diperlukan.
+- Penghapusan/pembersihan customer hanya berlaku untuk akun kosong; akun dengan saldo, ledger, order, top up, atau tiket dipertahankan.
 - Live payment/provider transactions require configured integrations and a separate live test. HTTP fakes in regression tests do not prove external service health.
 
 ## Verification
