@@ -230,6 +230,28 @@ class AdminHealthRestorationTest extends TestCase
                 ->where('checks.7.status', 'HEALTHY'));
     }
 
+
+    public function test_active_gateway_maintenance_is_reflected_in_overall_health_without_double_counting_integrations(): void
+    {
+        $this->login();
+        DB::table('failed_jobs')->delete();
+        $this->setSetting('system.queue_worker_heartbeat', now()->toIso8601String());
+        $this->setSetting('system.scheduler_heartbeat', now()->toIso8601String());
+
+        DB::table('payment_gateways')->where('code', 'MANUAL_QRIS')->update([
+            'is_active' => true,
+            'is_maintenance' => true,
+        ]);
+
+        $this->get('/admin/health')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('summary.overall', 'DEGRADED')
+                ->where('summary.attention', fn ($value): bool => (int) $value >= 1)
+                ->where('gateways.2.code', 'MANUAL_QRIS')
+                ->where('gateways.2.status', 'MAINTENANCE'));
+    }
+
     public function test_failed_jobs_are_reported_as_attention_without_exposing_job_payload(): void
     {
         $this->login();
