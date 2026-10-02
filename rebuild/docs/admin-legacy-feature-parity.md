@@ -30,7 +30,7 @@ Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb
 | `product-package-provider` | Setara+: sumber Digiflazz mendukung impor/sinkron/prioritas/max-price dan stok kode digital mendukung kunci stok, modal, prioritas, impor terenkripsi, ketersediaan, retry, serta delivery_payload sukses. |
 | `product-package-status` | Aktif/nonaktif nominal tersedia. |
 | `products` | Setara+: CRUD/status, slug, kategori, media, nominal, pricing, reorder/drag, hapus aman, duplikasi manual, tab nominal, initials/accent/instant, input pelanggan, nickname, jam manual, dan aktivasi aman tersedia. Pengaturan Populer tetap di menu Promo agar tidak duplikat. |
-| `promotions` | Sebagian: popular dan voucher discount tersedia; fungsi promosi lain perlu dipetakan. |
+| `promotions` | Setara sesuai keputusan terbaru: voucher lama (kode, nama, deskripsi, jenis/nilai, minimum, maksimum diskon, kuota, jadwal, status) dipulihkan dan ditambah scope kategori/produk, limit per pelanggan, reservasi atomik, filter/pagination, serta Populer Sekarang. Flash Sale lama sengaja tidak dipulihkan karena telah diganti Populer Sekarang. |
 | `reviews` | Setara: Admin hanya mengatur tampil/sembunyi ulasan terverifikasi; isi, rating, dan identitas ulasan tidak diedit. |
 | `session` | Guard admin dan role terpisah tersedia. |
 | `storefront` | Setara tanpa duplikasi: logo/footer/banner dan teks presentasi berada di Banner & Konten; nama toko, kontak, akun sosial, tautan bantuan, dan jam layanan tetap satu sumber di Pengaturan. |
