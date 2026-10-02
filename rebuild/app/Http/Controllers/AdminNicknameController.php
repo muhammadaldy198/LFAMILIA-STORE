@@ -247,6 +247,7 @@ class AdminNicknameController
                 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
                 Rule::unique('nickname_game_codes', 'code')->ignore($gameCode?->id),
             ],
+            'supports_nickname_check' => ['required', 'boolean'],
             'requires_server' => ['required', 'boolean'],
             'requires_region_check' => ['required', 'boolean'],
             'is_active' => ['required', 'boolean'],
@@ -255,8 +256,11 @@ class AdminNicknameController
 
         $data['name'] = trim($data['name']);
         $data['code'] = strtolower(trim($data['code']));
-        $data['requires_server'] = (bool) $data['requires_server'] || (bool) $data['requires_region_check'];
-        $data['requires_region_check'] = (bool) $data['requires_region_check'];
+        $data['supports_nickname_check'] = (bool) $data['supports_nickname_check'];
+        $data['requires_region_check'] = $data['supports_nickname_check']
+            && (bool) $data['requires_region_check'];
+        $data['requires_server'] = $data['supports_nickname_check']
+            && ((bool) $data['requires_server'] || $data['requires_region_check']);
         $data['is_active'] = (bool) $data['is_active'];
 
         return $data;
