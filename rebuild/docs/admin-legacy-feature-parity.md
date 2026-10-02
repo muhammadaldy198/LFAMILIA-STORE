@@ -11,12 +11,12 @@ Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb
 | `auth/setup` | Diganti: aktivasi satu kali dan password mandiri; login teruji. Bukan pendaftaran admin publik. |
 | `balances` | Sebagian: penyesuaian saldo pelanggan dan ledger tersedia; saldo operasional terpisah per admin belum tersedia. |
 | `categories` | Setara+: tambah/ubah/hapus/status/urutan/gambar tersedia, slug dapat diedit, dan ikon preset lama dipakai sebagai cadangan jika gambar kategori kosong. |
-| `content` | Perlu perbandingan field: banner/popup/news tersedia; editor metadata dan upload tersedia. |
+| `content` | Setara+: banner desktop/mobile, urutan/status/tautan klik, satu pop-up tanpa tombol tambahan, berita, logo/gambar storefront, footer banner, teks bantuan/footer, dan upload media tersedia serta terhubung ke frontend. |
 | `customer-cleanup` | Dipulihkan di batch ini: toggle otomatis, periode 7–365 hari, jalankan sekarang, metadata terakhir; penghapusan akun kosong melindungi riwayat. |
 | `dashboard-integrations` | Sebagian: health/integrasi tersedia; perlu perbandingan widget dashboard lama. |
 | `digiflazz-monitor` | Sebagian: seller/price/baseline/stok/cutoff tersedia; kesehatan agregat, multi, deskripsi dan transaksi terbaru belum seluruhnya di monitor. |
 | `digiflazz-pricing` | Sebagian: sinkron otomatis/manual/per SKU/per produk, margin rupiah/persen tersedia; maxPrice khusus dan kontrol lama perlu dibandingkan. |
-| `faqs` | CRUD FAQ tersedia; verifikasi per field diperlukan. |
+| `faqs` | Setara: tambah/edit/hapus, status aktif, jawaban, dan urutan tersedia serta dipakai halaman Pertanyaan Umum. |
 | `integrations` | Credential terenkripsi/reveal/tes tersedia; perlu perbandingan semua profil field/env/mode lama. |
 | `media` | Upload gambar tersedia via media Spatie; detail optimasi gambar lama perlu dibandingkan. |
 | `members` | Sebagian: tier AUTO/manual dan saldo tersedia; penghapusan akun kosong dipulihkan; tier bonus/progress/edit profil belum lengkap. |
@@ -31,9 +31,9 @@ Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb
 | `product-package-status` | Aktif/nonaktif nominal tersedia. |
 | `products` | Setara+: CRUD/status, slug, kategori, media, nominal, pricing, reorder/drag, hapus aman, duplikasi manual, tab nominal, initials/accent/instant, input pelanggan, nickname, jam manual, dan aktivasi aman tersedia. Pengaturan Populer tetap di menu Promo agar tidak duplikat. |
 | `promotions` | Sebagian: popular dan voucher discount tersedia; fungsi promosi lain perlu dipetakan. |
-| `reviews` | Moderasi ulasan tersedia; perlu perbandingan field/status. |
+| `reviews` | Setara: Admin hanya mengatur tampil/sembunyi ulasan terverifikasi; isi, rating, dan identitas ulasan tidak diedit. |
 | `session` | Guard admin dan role terpisah tersedia. |
-| `storefront` | Sebagian: pengaturan toko/kontak/logo/pages/presentation tersedia; perlu perbandingan semua field. |
+| `storefront` | Setara tanpa duplikasi: logo/footer/banner dan teks presentasi berada di Banner & Konten; nama toko, kontak, akun sosial, tautan bantuan, dan jam layanan tetap satu sumber di Pengaturan. |
 | `summary` | Sebagian: dashboard/laporan/health tersedia; perlu perbandingan metrik dan filter. |
 | `support` | Balasan/status/quick replies tersedia; perlu perbandingan detail modal/riwayat tiket. |
 | `team` | SUPER_ADMIN/ADMIN tersedia; STAFF dihapus sesuai instruksi terbaru, bukan regresi. Perlu perbandingan field hak akses. |

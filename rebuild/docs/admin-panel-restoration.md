@@ -8,7 +8,7 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 | Pesanan | Invoice search, status filter, pagination, detail, payment history, fulfillment history |
 | Produk | Categories, product editor, images/banner/notices, customer fields with preview, nominal table and editor, provider SKU import, individual sync, product/global margin, per-nominal percent/fixed/final price, drag order and mobile order buttons |
 | Manual | Antrean proses terbaru per pesanan, metrik, pencarian, filter, pagination, penanganan manual, hasil/kegagalan, pemeriksaan status, dan retry/failover aman |
-| Banner & Konten | Desktop/mobile banners, single popup, store artwork/contact/footer, news, reviews, FAQ, legal pages |
+| Banner & Konten | Banner desktop/mobile, satu pop-up, logo & gambar storefront, blok bantuan/footer, news, moderasi reviews, FAQ, dan halaman kebijakan; kontak toko tetap di Pengaturan agar tidak ganda |
 | Digiflazz | Cached buyer price list, search/brand/status filters, stock, buyer/seller status, cut-off, baseline, per-SKU/all sync |
 | Validasi Akun | Game codes, game nickname, MLBB region, PLN checks |
 | Provider | Provider activation |

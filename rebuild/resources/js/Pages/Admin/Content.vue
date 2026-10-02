@@ -20,7 +20,7 @@ const props = defineProps({
     settings: Object,
 });
 const contentTab = ref('banners');
-const contentTabs = [['banners','Banner'],['popup','Pop-up'],['assets','Logo & Gambar'],['support','Kontak & Footer'],['news','Berita'],['reviews','Ulasan'],['faq','FAQ'],['legal','Kebijakan']];
+const contentTabs = [['banners','Banner'],['popup','Pop-up'],['assets','Logo & Gambar'],['support','Bantuan & Footer'],['news','Berita'],['reviews','Ulasan'],['faq','Pertanyaan Umum'],['legal','Kebijakan']];
 const page = usePage();
 const base = page.props.adminPanel?.base_path || '/admin';
 
@@ -50,12 +50,6 @@ const settingsForm = useForm({
     footer_description: props.settings?.['store.footer_description'] || '',
     home_news_title: props.settings?.['store.home_news_title'] || '',
     home_news_intro: props.settings?.['store.home_news_intro'] || '',
-    support_whatsapp: props.settings?.['store.support_whatsapp'] || '',
-    instagram_url: props.settings?.['store.instagram_url'] || '',
-    email: props.settings?.['store.email'] || '',
-    discord_url: props.settings?.['store.discord_url'] || '',
-    support_url: props.settings?.['store.support_url'] || '',
-    business_hours: props.settings?.['store.business_hours'] || '',
 });
 
 const bannerForm = useForm({
@@ -100,7 +94,20 @@ const savePopup = (item) => router.put(base + '/content/popups/' + item.id, {
     dismiss_days: Number(item.dismiss_days || 0),
     is_active: Boolean(item.is_active),
 }, { preserveScroll: true });
-
+const deletePopup = (item) => {
+    if (confirm('Hapus pop-up ini?')) router.delete(base + '/content/popups/' + item.id, { preserveScroll: true });
+};
+const assetHasTarget = (key) => ['banner_desktop', 'banner_mobile'].includes(key);
+const assetLabel = (key) => ({
+    logo: 'Logo toko',
+    favicon: 'Favicon',
+    banner_desktop: 'Banner cadangan desktop',
+    banner_mobile: 'Banner cadangan mobile',
+    footer_banner_desktop: 'Gambar footer desktop',
+    footer_banner_mobile: 'Gambar footer mobile',
+    manual_qris: 'QRIS manual',
+    payment_header: 'Gambar halaman pembayaran',
+}[key] || key.replaceAll('_', ' '));
 
 const saveNews = (item) => router.put(base + '/content/news/' + item.id, {
     slug: item.slug || '',
@@ -145,15 +152,15 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
         <div class="space-y-6">
             <div>
                 <h1 class="text-3xl font-semibold">Banner & Konten</h1>
-                <p class="mt-2 text-sm text-slate-500">Kelola konten customer frontend tanpa mengubah source code.</p>
+                <p class="mt-2 text-sm text-slate-500">Kelola konten halaman pelanggan tanpa mengubah kode aplikasi.</p>
             </div>
 
             <nav class="lf-admin-tabs" aria-label="Konten toko"><Button v-for="[key,label] in contentTabs" :key="key" type="button" :class="{active:contentTab===key}" @click="contentTab=key">{{label}}</Button><Link :href="base + '/content/presentation'">Teks & Tampilan</Link></nav>
             <section v-show="contentTab === 'banners'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h2 class="text-lg font-bold">Homepage Banner Carousel</h2>
-                        <p class="mt-1 text-xs text-slate-500">Sama seperti LFAMILIA lama: multi-banner, urutan, desktop/mobile terpisah, link klik, aktif/nonaktif, auto-slide di customer frontend.</p>
+                        <h2 class="text-lg font-bold">Banner halaman utama</h2>
+                        <p class="mt-1 text-xs text-slate-500">Atur beberapa banner, urutan, gambar desktop/mobile, tujuan klik, serta status tampil. Banner aktif digunakan langsung di halaman pelanggan.</p>
                     </div>
                 </div>
 
@@ -161,8 +168,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                     <Input v-model="bannerForm.title" required placeholder="Nama internal / alt banner" class="rounded border border-slate-200 p-2 text-sm" />
                     <Input v-model="bannerForm.cta_href" placeholder="Link klik, contoh /promo" class="rounded border border-slate-200 p-2 text-sm" />
                     <Input v-model.number="bannerForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm" />
-                    <Input v-model="bannerForm.subtitle" placeholder="Catatan internal (opsional)" class="rounded border border-slate-200 p-2 text-sm md:col-span-2" />
-                    <Input v-model="bannerForm.cta_label" placeholder="Label CTA internal (opsional)" class="rounded border border-slate-200 p-2 text-sm" />
+                    <Input v-model="bannerForm.subtitle" placeholder="Catatan internal (opsional)" class="rounded border border-slate-200 p-2 text-sm md:col-span-3" />
                     <label class="flex items-center gap-2 text-xs"><input v-model="bannerForm.show_desktop" type="checkbox"> Desktop</label>
                     <label class="flex items-center gap-2 text-xs"><input v-model="bannerForm.show_mobile" type="checkbox"> Mobile</label>
                     <label class="flex items-center gap-2 text-xs"><input v-model="bannerForm.is_active" type="checkbox"> Aktif</label>
@@ -175,8 +181,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                             <Input v-model="item.title" class="rounded border border-slate-200 p-2 text-sm" placeholder="Nama banner" />
                             <Input v-model="item.cta_href" class="rounded border border-slate-200 p-2 text-sm" placeholder="Link klik" />
                             <Input v-model.number="item.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" placeholder="Urutan" />
-                            <Input v-model="item.subtitle" class="rounded border border-slate-200 p-2 text-sm md:col-span-2" placeholder="Catatan internal" />
-                            <Input v-model="item.cta_label" class="rounded border border-slate-200 p-2 text-sm" placeholder="Label CTA" />
+                            <Input v-model="item.subtitle" class="rounded border border-slate-200 p-2 text-sm md:col-span-3" placeholder="Catatan internal" />
                         </div>
                         <div class="mt-3 flex flex-wrap gap-4">
                             <label class="flex items-center gap-2 text-xs"><input v-model="item.show_desktop" type="checkbox"> Desktop</label>
@@ -198,14 +203,14 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                             <Button type="button" class="rounded bg-red-50 px-3 py-2 text-xs font-bold text-red-700" @click="deleteBanner(item)">Hapus</Button>
                         </div>
                     </article>
-                    <p v-if="!banners.length" class="rounded bg-slate-50 p-4 text-xs text-slate-500">Belum ada banner carousel. Selama kosong, frontend memakai banner legacy sebagai fallback.</p>
+                    <p v-if="!banners.length" class="rounded bg-slate-50 p-4 text-xs text-slate-500">Belum ada banner utama. Selama kosong, halaman pelanggan memakai gambar banner cadangan yang aktif.</p>
                 </div>
             </section>
 
             <section v-show="contentTab === 'popup'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <div>
-                    <h2 class="text-lg font-bold">Pop-up Homepage</h2>
-                    <p class="mt-1 text-xs text-slate-500">Hanya 1 pop-up pengumuman. Muncul saat customer membuka homepage dan dapat disembunyikan lewat “Jangan tampilkan lagi”.</p>
+                    <h2 class="text-lg font-bold">Pop-up halaman utama</h2>
+                    <p class="mt-1 text-xs text-slate-500">Hanya satu pop-up pengumuman. Muncul saat pelanggan membuka halaman utama dan dapat disembunyikan sesuai masa yang ditentukan.</p>
                 </div>
 
                 <form v-if="!popups.length" class="mt-4 grid gap-3" @submit.prevent="popupForm.post(base + '/content/popups', { preserveScroll: true })">
@@ -226,25 +231,26 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                         <label class="flex items-center gap-2 self-end pb-2 text-xs"><input v-model="popups[0].is_active" type="checkbox"> Aktif</label>
                     </div>
                     <div class="mt-3 rounded-lg bg-slate-50 p-3">
-                        <p class="mb-2 text-[11px] text-slate-500">Gambar pop-up opsional. Jika dipakai, tetap berada dalam satu panel pop-up dan dapat diganti tanpa ubah source code.</p>
+                        <p class="mb-2 text-[11px] text-slate-500">Gambar pop-up bersifat opsional dan dapat diganti dari panel ini.</p>
                         <AdminMediaControl type="popup" :id="popups[0].id" :url="popups[0].image_url" />
                     </div>
-                    <div class="mt-3">
+                    <div class="mt-3 flex flex-wrap gap-2">
                         <Button type="button" class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="savePopup(popups[0])">Simpan</Button>
+                        <Button type="button" variant="destructive" @click="deletePopup(popups[0])">Hapus pop-up</Button>
                     </div>
                 </article>
             </section>
 
             <section v-show="contentTab === 'assets'" class="rounded-xl border border-slate-200 bg-white p-5">
-                <h2 class="text-lg font-bold">Branding & fallback assets</h2>
-                <p class="mt-1 text-xs text-slate-500">Logo, favicon, banner atas, popup, serta banner bawah/footer.</p>
+                <h2 class="text-lg font-bold">Logo & gambar cadangan</h2>
+                <p class="mt-1 text-xs text-slate-500">Kelola logo, favicon, banner cadangan, gambar footer, dan aset tampilan lain yang digunakan toko.</p>
                 <div class="mt-4 grid gap-4 lg:grid-cols-2">
                     <article v-for="asset in assets" :key="asset.id" class="rounded-lg border border-slate-200 p-4">
                         <div class="flex flex-wrap items-center gap-3">
-                            <strong class="text-sm">{{ asset.key }}</strong>
+                            <strong class="text-sm">{{ assetLabel(asset.key) }}</strong>
                             <label class="flex items-center gap-2 text-xs"><input v-model="asset.is_active" type="checkbox"> Aktif</label>
                         </div>
-                        <label v-if="asset.key.includes('banner')" class="mt-3 block text-xs">
+                        <label v-if="assetHasTarget(asset.key)" class="mt-3 block text-xs">
                             Link ketika banner ditekan
                             <Input v-model="asset.target_url" type="url" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="https://..." />
                         </label>
@@ -256,23 +262,18 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
             </section>
 
             <section v-show="contentTab === 'support'" class="rounded-xl border border-slate-200 bg-white p-5">
-                <h2 class="text-lg font-bold">Customer support & homepage text</h2>
+                <h2 class="text-lg font-bold">Bantuan, berita & footer</h2>
+                <p class="mt-1 text-xs text-slate-500">Nomor kontak, akun sosial, tautan bantuan, dan jam layanan dikelola satu kali di menu Pengaturan.</p>
                 <form class="mt-4 grid gap-3 md:grid-cols-2" @submit.prevent="settingsForm.put(base + '/content/settings')">
-                    <label class="text-xs">Judul berita homepage<Input v-model="settingsForm.home_news_title" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="text-xs">Jam layanan<Input v-model="settingsForm.business_hours" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="text-xs md:col-span-2">Intro berita homepage<Textarea v-model="settingsForm.home_news_intro" rows="2" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea></label>
-                    <label class="flex items-center gap-2 text-xs md:col-span-2"><input v-model="settingsForm.support_cta_enabled" type="checkbox"> Blok bantuan/CTA menjelang footer aktif</label>
-                    <label class="text-xs">Label CTA<Input v-model="settingsForm.support_cta_label" maxlength="80" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="BUTUH BANTUAN?" /></label>
-                    <label class="text-xs">Teks tombol CTA<Input v-model="settingsForm.support_cta_button" maxlength="80" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="Hubungi Kami" /></label>
-                    <label class="text-xs md:col-span-2">Judul CTA<Input v-model="settingsForm.support_cta_title" maxlength="180" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="Tim LFAMILIA siap membantu." /></label>
-                    <label class="text-xs md:col-span-2">Deskripsi CTA<Textarea v-model="settingsForm.support_cta_body" rows="2" maxlength="1000" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea></label>
+                    <label class="text-xs">Judul berita halaman utama<Input v-model="settingsForm.home_news_title" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
+                    <label class="text-xs md:col-span-2">Pengantar berita halaman utama<Textarea v-model="settingsForm.home_news_intro" rows="2" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea></label>
+                    <label class="flex items-center gap-2 text-xs md:col-span-2"><input v-model="settingsForm.support_cta_enabled" type="checkbox"> Blok bantuan menjelang footer aktif</label>
+                    <label class="text-xs">Label kecil bantuan<Input v-model="settingsForm.support_cta_label" maxlength="80" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="BUTUH BANTUAN?" /></label>
+                    <label class="text-xs">Teks tombol bantuan<Input v-model="settingsForm.support_cta_button" maxlength="80" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="Hubungi Kami" /></label>
+                    <label class="text-xs md:col-span-2">Judul bantuan<Input v-model="settingsForm.support_cta_title" maxlength="180" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="Tim LFAMILIA siap membantu." /></label>
+                    <label class="text-xs md:col-span-2">Deskripsi bantuan<Textarea v-model="settingsForm.support_cta_body" rows="2" maxlength="1000" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea></label>
                     <label class="text-xs md:col-span-2">Deskripsi footer<Textarea v-model="settingsForm.footer_description" rows="2" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea></label>
-                    <label class="text-xs">WhatsApp<Input v-model="settingsForm.support_whatsapp" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="text-xs">Email<Input v-model="settingsForm.email" type="email" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="text-xs">Instagram URL<Input v-model="settingsForm.instagram_url" type="url" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="text-xs">Discord URL<Input v-model="settingsForm.discord_url" type="url" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="text-xs">Support URL<Input v-model="settingsForm.support_url" type="text" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="flex items-center gap-2 self-end text-xs"><input v-model="settingsForm.support_widget_enabled" type="checkbox"> Floating bantuan aktif</label>
+                    <label class="flex items-center gap-2 self-end text-xs"><input v-model="settingsForm.support_widget_enabled" type="checkbox"> Tombol bantuan mengambang aktif</label>
                     <div class="md:col-span-2"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Simpan konten umum</Button></div>
                 </form>
             </section>
@@ -303,7 +304,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                             <Input v-model="item.published_at" type="datetime-local" class="rounded border border-slate-200 p-2 text-sm" />
                             <label class="flex items-center gap-2 text-xs"><input v-model="item.is_active" type="checkbox"> Aktif</label>
                         </div>
-                        <p class="mt-3 rounded bg-slate-50 px-3 py-2 text-[11px] text-slate-500">Gambar berita: rekomendasi 1200×675 (16:9), fokus utama di tengah agar aman saat card di-crop.</p>
+                        <p class="mt-3 text-xs text-slate-500">Gunakan gambar berita dengan fokus utama di tengah agar tetap jelas pada berbagai ukuran layar.</p>
                         <div class="mt-3"><AdminMediaControl type="news" :id="item.id" :url="item.image_url" /></div>
                         <div class="mt-3 flex gap-2"><Button class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="saveNews(item)">Simpan</Button><Button class="rounded bg-red-50 px-3 py-2 text-xs font-bold text-red-700" @click="deleteNews(item)">Hapus</Button></div>
                     </article>
@@ -331,7 +332,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
             </section>
 
             <section v-show="contentTab === 'faq'" class="rounded-xl border border-slate-200 bg-white p-5">
-                <h2 class="text-lg font-bold">FAQ / Pertanyaan umum</h2>
+                <h2 class="text-lg font-bold">Pertanyaan umum</h2>
                 <form class="mt-4 grid gap-3 md:grid-cols-[1fr_120px_auto]" @submit.prevent="faqForm.post(base + '/content/faqs', { preserveScroll: true, onSuccess: () => faqForm.reset() })">
                     <Input v-model="faqForm.question" required placeholder="Pertanyaan" class="rounded border border-slate-200 p-2 text-sm" />
                     <Input v-model.number="faqForm.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" />
@@ -349,7 +350,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
             </section>
 
             <section v-show="contentTab === 'legal'" class="rounded-xl border border-slate-200 bg-white p-5">
-                <h2 class="text-lg font-bold">Informasi / legal</h2><p class="lf-admin-note">Gunakan ## di awal paragraf untuk judul bagian, dan - di awal paragraf untuk item daftar.</p>
+                <h2 class="text-lg font-bold">Kebijakan toko</h2><p class="lf-admin-note">Gunakan ## di awal paragraf untuk judul bagian, dan - di awal paragraf untuk item daftar.</p>
                 <div class="mt-4 space-y-4">
                     <article v-for="item in pages" :key="item.key" class="rounded-lg border border-slate-200 p-4">
                         <strong class="text-xs uppercase text-slate-500">{{ item.key }}</strong>

@@ -13,7 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -26,14 +26,15 @@ class AdminContentController
             'store.support_cta_label', 'store.support_cta_title', 'store.support_cta_body', 'store.support_cta_button',
             'store.footer_description',
             'store.home_news_title', 'store.home_news_intro',
-            'store.support_whatsapp', 'store.instagram_url', 'store.email',
-            'store.discord_url', 'store.support_url', 'store.business_hours',
         ];
         $settings = DB::table('system_settings')->whereIn('key', $settingsKeys)->pluck('value', 'key')
             ->map(fn ($value) => json_decode((string) $value, true));
 
         return Inertia::render('Admin/Content', [
-            'assets' => StoreAsset::where('key', '!=', 'popup')->orderBy('id')->get()->map(fn (StoreAsset $asset): array => [
+            'assets' => StoreAsset::whereIn('key', [
+                'logo', 'favicon', 'banner_desktop', 'banner_mobile',
+                'footer_banner_desktop', 'footer_banner_mobile',
+            ])->orderBy('id')->get()->map(fn (StoreAsset $asset): array => [
                 ...$asset->only('id', 'key', 'target_url', 'is_active'),
                 'image_url' => $asset->getFirstMediaUrl('image'),
             ]),
@@ -145,10 +146,8 @@ class AdminContentController
     public function storeNews(Request $request, AdminAuditService $audit): RedirectResponse
     {
         $data = $this->newsData($request);
-        $slug = Str::slug($data['slug'] ?: $data['title']);
-        if ($slug === '' || NewsArticle::where('slug', $slug)->exists()) {
-            return back()->withErrors(['slug' => 'Slug berita tidak valid atau sudah dipakai.']);
-        }
+        $slug = $this->newsSlug($data['slug'] ?: $data['title']);
+        $this->ensureNewsSlugAvailable($slug);
         $article = NewsArticle::create([...$data, 'slug' => $slug]);
         $audit->record($request, 'content.news.created', 'news_article', $article->id, null, $article->toArray());
 
@@ -157,8 +156,9 @@ class AdminContentController
 
     public function updateNews(Request $request, NewsArticle $news, AdminAuditService $audit): RedirectResponse
     {
-        $data = $this->newsData($request, $news->id);
-        $data['slug'] = Str::slug($data['slug'] ?: $data['title']);
+        $data = $this->newsData($request);
+        $data['slug'] = $this->newsSlug($data['slug'] ?: $data['title']);
+        $this->ensureNewsSlugAvailable($data['slug'], $news->id);
         $before = $news->toArray();
         $news->update($data);
         $audit->record($request, 'content.news.updated', 'news_article', $news->id, $before, $news->toArray());
@@ -251,12 +251,6 @@ class AdminContentController
             'footer_description' => ['nullable', 'string', 'max:1000'],
             'home_news_title' => ['nullable', 'string', 'max:255'],
             'home_news_intro' => ['nullable', 'string', 'max:1000'],
-            'support_whatsapp' => ['nullable', 'string', 'max:100'],
-            'instagram_url' => ['nullable', 'url:http,https', 'max:500'],
-            'email' => ['nullable', 'email:rfc', 'max:255'],
-            'discord_url' => ['nullable', 'url:http,https', 'max:500'],
-            'support_url' => ['nullable', 'string', 'max:500', 'regex:/^(\/(?!\/)|https?:\/\/)/i'],
-            'business_hours' => ['nullable', 'string', 'max:500'],
         ]);
         $map = [
             'store.support_widget_enabled' => (bool) $data['support_widget_enabled'],
@@ -268,12 +262,6 @@ class AdminContentController
             'store.footer_description' => $data['footer_description'] ?? '',
             'store.home_news_title' => $data['home_news_title'] ?? '',
             'store.home_news_intro' => $data['home_news_intro'] ?? '',
-            'store.support_whatsapp' => $data['support_whatsapp'] ?? '',
-            'store.instagram_url' => $data['instagram_url'] ?? '',
-            'store.email' => $data['email'] ?? '',
-            'store.discord_url' => $data['discord_url'] ?? '',
-            'store.support_url' => $data['support_url'] ?? '',
-            'store.business_hours' => $data['business_hours'] ?? '',
         ];
         foreach ($map as $key => $value) {
             DB::table('system_settings')->updateOrInsert(['key' => $key], [
@@ -302,7 +290,9 @@ class AdminContentController
         ]);
 
         if (! $data['show_desktop'] && ! $data['show_mobile']) {
-            abort(422, 'Pilih minimal satu tampilan banner.');
+            throw ValidationException::withMessages([
+                'show_desktop' => 'Pilih minimal tampilan desktop atau mobile.',
+            ]);
         }
 
         return $data;
@@ -327,10 +317,10 @@ class AdminContentController
         ];
     }
 
-    private function newsData(Request $request, ?int $ignoreId = null): array
+    private function newsData(Request $request): array
     {
         return $request->validate([
-            'slug' => ['nullable', 'string', 'max:180', Rule::unique('news_articles', 'slug')->ignore($ignoreId)],
+            'slug' => ['nullable', 'string', 'max:180'],
             'title' => ['required', 'string', 'max:255'],
             'summary' => ['nullable', 'string', 'max:2000'],
             'body' => ['nullable', 'string', 'max:30000'],
@@ -339,6 +329,31 @@ class AdminContentController
             'is_active' => ['required', 'boolean'],
             'published_at' => ['nullable', 'date'],
         ]);
+    }
+
+    private function newsSlug(string $value): string
+    {
+        $slug = Str::slug($value);
+        if ($slug === '') {
+            throw ValidationException::withMessages([
+                'slug' => 'Alamat berita tidak valid.',
+            ]);
+        }
+
+        return $slug;
+    }
+
+    private function ensureNewsSlugAvailable(string $slug, ?int $ignoreId = null): void
+    {
+        $exists = NewsArticle::where('slug', $slug)
+            ->when($ignoreId, fn ($query) => $query->whereKeyNot($ignoreId))
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'slug' => 'Alamat berita sudah dipakai.',
+            ]);
+        }
     }
 
     private function faqData(Request $request): array
