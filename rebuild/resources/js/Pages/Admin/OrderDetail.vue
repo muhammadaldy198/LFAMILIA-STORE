@@ -8,7 +8,7 @@ import { Badge } from '../../Components/ui/badge';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
-const props = defineProps({ order: Object, events: Array, payments: Array, attempts: Array, canViewCustomer: Boolean, canCheckFulfillment: Boolean });
+const props = defineProps({ order: Object, events: Array, payments: Array, attempts: Array, canViewCustomer: Boolean, canCheckFulfillment: Boolean, canResendDelivery: Boolean });
 const notice = ref('');
 const busy = ref(false);
 const action = ref(null);
@@ -21,12 +21,20 @@ const actions = {
     fail:{ title:'Nyatakan pesanan manual gagal', description:'Jelaskan alasan kegagalan. Tindakan ini tidak mengembalikan dana secara otomatis.', suffix:'fail' },
     retry:{ title:'Lanjutkan pengiriman', description:'Hanya pengiriman yang tertahan sebelum dikirim atau telah dikonfirmasi gagal yang dapat dilanjutkan. Pesanan yang belum pasti hasilnya harus diperiksa terlebih dahulu.', suffix:'retry' },
     payment:{ title:'Konfirmasi pembayaran QRIS manual', description:'Periksa mutasi rekening dan cocokkan nominal serta nomor pesanan sebelum melanjutkan.', suffix:'confirm' },
+    resend:{ title:'Kirim ulang hasil pesanan', description:'Kode atau hasil pengiriman yang sudah tersimpan akan dikirim lagi ke email pelanggan. Tindakan ini tidak memproses ulang pesanan ke penyedia.', suffix:null },
 };
 const heading = computed(() => action.value ? actions[action.value.type] : null);
+const whatsappUrl = computed(() => {
+    const digits = String(props.order.buyer_phone || '').replace(/\D/g, '');
+    if (!digits) return '';
+    const normalized = digits.startsWith('0') ? '62' + digits.slice(1) : (digits.startsWith('8') ? '62' + digits : digits);
+    const text = `Halo ${props.order.buyer_name || 'Pelanggan'}, kami menghubungi terkait pesanan ${props.order.order_number}.`;
+    return 'https://wa.me/' + normalized + '?text=' + encodeURIComponent(text);
+});
 function open(type,id) { form.reset(); form.clearErrors(); action.value={type,id}; actionOpen.value=true; }
 function submit() {
     if (!form.confirmed || !action.value) return;
-    const url = action.value.type==='payment' ? '/admin/payments/manual/'+action.value.id+'/confirm' : '/admin/fulfillment/'+action.value.id+'/'+heading.value.suffix;
+    const url = action.value.type==='payment' ? '/admin/payments/manual/'+action.value.id+'/confirm' : action.value.type==='resend' ? '/admin/orders/'+props.order.id+'/resend-delivery' : '/admin/fulfillment/'+action.value.id+'/'+heading.value.suffix;
     form.post(url, { preserveScroll:true, onSuccess:()=>{ actionOpen.value=false; notice.value='Tindakan berhasil disimpan.'; } });
 }
 function check(kind) {
@@ -49,7 +57,7 @@ async function copy(value) {
 <Head :title="'Pesanan '+order.order_number" />
 <AdminShell>
     <div class="flex flex-wrap items-start justify-between gap-3"><div class="min-w-0"><h1 class="break-all text-xl font-semibold sm:text-2xl">{{ order.order_number }}</h1><p class="mt-1 text-sm text-muted-foreground">Detail pesanan dan riwayat penanganan.</p></div><Button variant="outline" as-child><Link href="/admin/orders">Daftar pesanan</Link></Button></div>
-    <div class="my-4 flex flex-wrap gap-2"><Button variant="outline" size="sm" @click="copy(order.order_number)">Salin nomor pesanan</Button><Button variant="outline" size="sm" @click="refresh" :disabled="busy">{{ busy?'Memuat…':'Muat ulang detail' }}</Button><Button v-if="canCheckFulfillment" size="sm" @click="check('process')" :disabled="busy">Periksa proses pesanan</Button></div>
+    <div class="my-4 flex flex-wrap gap-2"><Button variant="outline" size="sm" @click="copy(order.order_number)">Salin nomor pesanan</Button><Button v-if="whatsappUrl" variant="outline" size="sm" as-child><a :href="whatsappUrl" target="_blank" rel="noopener noreferrer">Hubungi WhatsApp</a></Button><Button variant="outline" size="sm" @click="refresh" :disabled="busy">{{ busy?'Memuat…':'Muat ulang detail' }}</Button><Button v-if="canCheckFulfillment" size="sm" @click="check('process')" :disabled="busy">Periksa proses pesanan</Button></div>
     <p v-if="notice" role="status" class="mb-4 text-sm">{{ notice }}</p>
     <p v-for="(error,key) in $page.props.errors" :key="key" role="alert" class="mb-3 text-sm text-destructive">{{ error }}</p>
     <div class="grid items-start gap-4 lg:grid-cols-2">
@@ -57,7 +65,7 @@ async function copy(value) {
         <Card class="min-w-0 p-4 sm:p-5"><h2 class="font-semibold">Pelanggan dan tujuan</h2><dl class="mt-4 space-y-3"><div><dt class="text-sm text-muted-foreground">Nama pelanggan</dt><dd><Link v-if="order.customer_id && canViewCustomer" :href="'/admin/customers/'+order.customer_id" class="underline underline-offset-4">{{ order.buyer_name }}</Link><span v-else>{{ order.buyer_name }}</span></dd></div><div><dt class="text-sm text-muted-foreground">Nomor telepon / WhatsApp</dt><dd>{{ order.buyer_phone || 'Belum tersedia' }}</dd></div><div><dt class="text-sm text-muted-foreground">Email</dt><dd class="break-all">{{ order.buyer_email || 'Belum tersedia' }}</dd></div><div v-for="(target,index) in order.destinations" :key="index"><dt class="text-sm text-muted-foreground">{{ target.label }}</dt><dd class="break-all">{{ target.value }}</dd></div><div v-if="order.nickname"><dt class="text-sm text-muted-foreground">Nama akun</dt><dd>{{ order.nickname }}</dd></div></dl></Card>
     </div>
     <Card v-if="order.manual_note || (order.manual && order.manual_instructions)" class="mt-4 p-4"><h2 class="font-semibold">Catatan penanganan manual</h2><p v-if="order.manual_note" class="mt-3 whitespace-pre-wrap break-words text-sm">Catatan pembayaran: {{ order.manual_note }}</p><p v-if="order.manual_instructions" class="mt-3 whitespace-pre-wrap break-words text-sm">{{ order.manual_instructions }}</p></Card>
-    <Card v-if="Object.keys(order.delivery).length" class="mt-4 p-4"><h2 class="font-semibold">Hasil pengiriman</h2><p v-if="order.delivery.code || order.delivery.serial_number" class="mt-3 whitespace-pre-wrap break-all">{{ order.delivery.code || order.delivery.serial_number }}</p><p v-if="order.delivery.note" class="mt-3 whitespace-pre-wrap break-words">{{ order.delivery.note }}</p></Card>
+    <Card v-if="Object.keys(order.delivery).length" class="mt-4 p-4"><div class="flex flex-wrap items-start justify-between gap-3"><h2 class="font-semibold">Hasil pengiriman</h2><Button v-if="canResendDelivery" variant="outline" size="sm" @click="open('resend',order.id)">Kirim ulang ke email</Button></div><p v-if="order.delivery.code || order.delivery.serial_number" class="mt-3 whitespace-pre-wrap break-all">{{ order.delivery.code || order.delivery.serial_number }}</p><p v-if="order.delivery.note" class="mt-3 whitespace-pre-wrap break-words">{{ order.delivery.note }}</p><p v-if="canResendDelivery" class="mt-3 text-xs text-muted-foreground">Mengirim ulang hanya memakai hasil yang sudah tersimpan dan tidak mengulangi transaksi ke penyedia.</p></Card>
     <Card class="mt-4 min-w-0 p-4 sm:p-5"><h2 class="font-semibold">Riwayat pembayaran</h2><p v-if="!payments.length" class="mt-3 text-sm text-muted-foreground">{{ order.payment_method==='Pembayaran dicatat admin' ? 'Pembayaran pesanan ini dicatat langsung oleh admin.' : order.payment_method==='Saldo akun' ? 'Pembayaran menggunakan saldo akun.' : 'Belum ada transaksi pembayaran.' }}</p>
         <div class="mt-3 divide-y"><article v-for="payment in payments" :key="payment.id" class="flex flex-wrap items-start justify-between gap-3 py-3"><div class="min-w-0"><p class="font-medium">{{ payment.method }} · {{ money(payment.amount_idr) }}</p><Badge variant="secondary" class="mt-2 whitespace-normal">{{ payment.status_label }}</Badge><p class="mt-2 text-xs text-muted-foreground">Dibuat {{ date(payment.created_at) }}</p><p v-if="payment.verified_at" class="text-xs text-muted-foreground">Diverifikasi {{ date(payment.verified_at) }}</p></div><div class="flex flex-wrap gap-2"><Button v-if="payment.can_check" variant="outline" size="sm" :disabled="busy" @click="check('payment')">Periksa pembayaran</Button><Button v-if="payment.can_confirm" size="sm" @click="open('payment',payment.id)">Konfirmasi pembayaran</Button></div></article></div>
         <p class="mt-3 text-xs text-muted-foreground">Status pembayaran otomatis berubah setelah hasil yang sah diterima dari penyedia. Memuat ulang detail hanya menampilkan data terbaru yang sudah tersimpan.</p>
@@ -67,7 +75,7 @@ async function copy(value) {
     <Sheet v-model:open="actionOpen"><SheetContent class="w-full overflow-y-auto sm:max-w-lg"><SheetHeader><SheetTitle>{{ heading?.title }}</SheetTitle><SheetDescription>{{ heading?.description }}</SheetDescription></SheetHeader><form @submit.prevent="submit" class="mt-6 space-y-4">
         <template v-if="action?.type==='complete'"><label class="block space-y-1"><span class="text-sm font-medium">Kode / bukti pengiriman (jika ada)</span><Textarea v-model="form.delivery_code" maxlength="2000" :disabled="form.processing" /></label><label class="block space-y-1"><span class="text-sm font-medium">Catatan untuk pelanggan (opsional)</span><Textarea v-model="form.note" maxlength="4000" :disabled="form.processing" /></label></template>
         <label v-if="action?.type==='fail'" class="block space-y-1"><span class="text-sm font-medium">Alasan kegagalan</span><Textarea v-model="form.reason" required maxlength="4000" :disabled="form.processing" /></label>
-        <p v-if="action?.type==='payment'" class="font-semibold">Total pesanan: {{ money(order.total_idr) }}</p>
+        <p v-if="action?.type==='payment'" class="font-semibold">Total pesanan: {{ money(order.total_idr) }}</p><p v-if="action?.type==='resend'" class="text-sm">Email tujuan: <strong class="break-all">{{ order.buyer_email }}</strong></p>
         <label class="flex items-start gap-2 text-sm"><input v-model="form.confirmed" type="checkbox" required class="mt-1 size-4 shrink-0" :disabled="form.processing" /><span>Saya sudah memeriksa pesanan dan memastikan tindakan ini benar.</span></label>
         <p v-for="(error,key) in form.errors" :key="key" role="alert" class="text-sm text-destructive">{{ error }}</p>
         <div class="flex gap-2"><Button type="submit" :disabled="form.processing || !form.confirmed">{{ form.processing?'Menyimpan…':'Konfirmasi tindakan' }}</Button><Button type="button" variant="outline" :disabled="form.processing" @click="actionOpen=false">Batal</Button></div>
