@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\ReconcileFulfillmentJob;
+use App\Jobs\SendFulfillmentJob;
 use App\Jobs\SendTransactionalEmailJob;
 use App\Jobs\StartFulfillmentJob;
 use App\Models\AdminUser;
@@ -63,7 +64,9 @@ class AdminOrdersRestorationTest extends TestCase
         $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $order->id)->where('status', 'MANUAL_PENDING')->count());
         $this->assertSame(1, DB::table('order_events')->where('order_id', $order->id)->where('event_type', 'ADMIN_MANUAL_ORDER_CREATED')->count());
         $this->assertSame(0, DB::table('payment_transactions')->where('order_id', $order->id)->count());
-        Queue::assertNothingPushed();
+        Queue::assertNotPushed(StartFulfillmentJob::class);
+        Queue::assertNotPushed(SendFulfillmentJob::class);
+        Queue::assertNotPushed(ReconcileFulfillmentJob::class);
         Http::assertNothingSent();
         $this->post('/admin/orders/manual', [...$data, 'total_idr' => 16000])->assertSessionHasErrors('order');
         $this->post('/admin/orders/manual', [...$data, 'idempotency_key' => (string) \Illuminate\Support\Str::uuid(), 'payment_received' => false])->assertSessionHasErrors('payment_received');
