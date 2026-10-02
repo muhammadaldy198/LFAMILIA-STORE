@@ -66,6 +66,7 @@ class CheckoutPricing
                 'mappings.external_sku',
                 'mappings.cost_idr',
                 'mappings.max_price_idr',
+                'mappings.fulfillment_config',
                 'providers.code as provider_code'
             );
 
@@ -74,6 +75,14 @@ class CheckoutPricing
         }
 
         $mapping = $mappingQuery->get()->first(function (object $candidate): bool {
+            if ($candidate->provider_code === 'VOUCHER_STOCK') {
+                $config = is_string($candidate->fulfillment_config)
+                    ? (json_decode($candidate->fulfillment_config, true) ?: [])
+                    : (is_array($candidate->fulfillment_config) ? $candidate->fulfillment_config : []);
+                $stockKey = trim((string) ($config['stock_key'] ?? ''));
+
+                return $stockKey !== '' && app(VoucherStockService::class)->available($stockKey);
+            }
             if ($candidate->provider_code !== 'DIGIFLAZZ') {
                 return true;
             }

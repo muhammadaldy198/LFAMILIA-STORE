@@ -118,6 +118,15 @@ class AdminDigiflazzController
                 if (ProviderMapping::whereIn('provider_id', Provider::where('code', 'DIGIFLAZZ')->pluck('id'))->where('external_sku', $item->buyer_sku_code)->exists()) {
                     throw ValidationException::withMessages(['item_ids' => 'SKU '.$item->buyer_sku_code.' sudah dipakai nominal lain.']);
                 }
+                if ($product->package_tabs_enabled) {
+                    $group = trim((string) ($item->type ?? ''));
+                    $tabs = collect($product->package_tabs ?? []);
+                    if ($group === '' || ! $tabs->contains($group)) {
+                        throw ValidationException::withMessages([
+                            'item_ids' => 'Grup SKU '.$item->buyer_sku_code.' belum tersedia pada tab nominal produk. Tambahkan tab "'.($group ?: 'Tanpa grup').'" terlebih dahulu.',
+                        ]);
+                    }
+                }
                 $package = ProductPackage::create([
                     'product_id' => $product->id, 'code' => 'DF_'.substr(hash('sha256', $item->buyer_sku_code), 0, 20),
                     'name' => $item->product_name, 'group_name' => $item->type ?: null,

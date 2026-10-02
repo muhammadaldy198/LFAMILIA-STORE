@@ -112,8 +112,26 @@ const packageGroups = computed(() => {
         if (!groups.has(name)) groups.set(name, []);
         groups.get(name).push(item);
     }
-    return [...groups.entries()].map(([name, items]) => ({ name, items }));
+    const rows = [...groups.entries()].map(([name, items]) => ({ name, items }));
+    const configured = props.product?.package_tabs_enabled ? (props.product?.package_tabs || []) : [];
+    if (!configured.length) return rows;
+    return [...rows].sort((left, right) => {
+        const leftIndex = configured.indexOf(left.name);
+        const rightIndex = configured.indexOf(right.name);
+        return (leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex)
+            - (rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex);
+    });
 });
+const packageTabs = computed(() => props.product?.package_tabs_enabled
+    ? (props.product?.package_tabs || []).filter((name) => packageGroups.value.some((group) => group.name === name))
+    : []);
+const activePackageTab = ref(packageTabs.value[0] || '');
+watch(packageTabs, (tabs) => {
+    if (!tabs.includes(activePackageTab.value)) activePackageTab.value = tabs[0] || '';
+}, { immediate: true });
+const visiblePackageGroups = computed(() => packageTabs.value.length
+    ? packageGroups.value.filter((group) => group.name === activePackageTab.value)
+    : packageGroups.value);
 
 const paymentGroups = computed(() => {
     const labels = {
@@ -866,7 +884,10 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-nominal-panel">
                     <header><div><h2>{{ customerText("pages.catalog.show.75d5eb47", "Pilih Nominal") }}</h2><p>{{product.checkout_nominal_description || 'Pesanan diproses otomatis setelah pembayaran.'}}</p></div></header>
                     <div class="lf-panel-body lf-package-sections">
-                        <section v-for="group in packageGroups" :key="group.name || 'all'">
+                        <nav v-if="packageTabs.length" class="lf-filters mb-3">
+                            <button v-for="tabName in packageTabs" :key="tabName" type="button" class="lf-chip" :class="{active:activePackageTab===tabName}" @click="activePackageTab=tabName">{{tabName}}</button>
+                        </nav>
+                        <section v-for="group in visiblePackageGroups" :key="group.name || 'all'">
                             <div v-if="group.name" class="lf-package-group-head"><h3>{{group.name}}</h3><span></span></div>
                             <div class="lf-nominal-grid">
                                 <button v-for="item in group.items" :key="item.id" type="button" :disabled="!item.is_available" :class="{selected:selectedPackage && String(selectedPackage.id)===String(item.id)}" @click="choosePackage(item)">
