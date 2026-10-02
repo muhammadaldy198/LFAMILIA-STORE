@@ -18,38 +18,6 @@ use Throwable;
 
 class AdminWorkspaceController
 {
-    public function reports(Request $request): Response
-    {
-        $filters = $request->validate([
-            'from' => ['nullable', 'date_format:Y-m-d'], 'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
-        ]);
-        $from = Carbon::parse($filters['from'] ?? now()->subDays(6)->toDateString())->startOfDay();
-        $to = Carbon::parse($filters['to'] ?? now()->toDateString())->endOfDay();
-        $orders = fn () => DB::table('orders')->whereBetween('orders.created_at', [$from, $to]);
-
-        return Inertia::render('Admin/Workspace', [
-            'kind' => 'reports', 'title' => 'Laporan',
-            'filters' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],
-            'report' => [
-                'orders_total' => $orders()->count(),
-                'success_total' => $orders()->where('status', 'SUCCESS')->count(),
-                'revenue_total' => (int) $orders()->whereIn('status', ['PAID', 'PROCESSING', 'SUCCESS'])->sum('total_idr'),
-                'wallet_liability' => (int) DB::table('wallets')->sum('balance_idr'),
-                'provider_errors' => DB::table('fulfillment_attempts')->whereBetween('created_at', [$from, $to])
-                    ->whereIn('status', ['UNKNOWN', 'FAILED_CONFIRMED', 'BLOCKED', 'MANUAL_FAILED'])->count(),
-            ],
-            'topProducts' => $orders()->join('products', 'products.id', '=', 'orders.product_id')->where('orders.status', 'SUCCESS')
-                ->groupBy('products.id', 'products.name')->orderByDesc(DB::raw('COUNT(*)'))->limit(10)
-                ->get(['products.name', DB::raw('COUNT(*) as orders_count'), DB::raw('SUM(orders.total_idr) as revenue_idr')]),
-            'dailyReport' => $orders()->selectRaw("DATE(created_at) as day, COUNT(*) as orders_count, SUM(CASE WHEN status IN ('PAID','PROCESSING','SUCCESS') THEN total_idr ELSE 0 END) as revenue_idr")
-                ->groupByRaw('DATE(created_at)')->orderBy('day')->get(),
-            'providerReport' => DB::table('fulfillment_attempts as attempts')->join('providers', 'providers.id', '=', 'attempts.provider_id')
-                ->whereBetween('attempts.created_at', [$from, $to])->groupBy('providers.id', 'providers.code')
-                ->get(['providers.code', DB::raw('COUNT(*) as attempts_count'),
-                    DB::raw("SUM(CASE WHEN attempts.status IN ('UNKNOWN','FAILED_CONFIRMED','BLOCKED','MANUAL_FAILED') THEN 1 ELSE 0 END) as errors_count")]),
-        ]);
-    }
-
     public function settings(): Response
     {
         $keys = [
