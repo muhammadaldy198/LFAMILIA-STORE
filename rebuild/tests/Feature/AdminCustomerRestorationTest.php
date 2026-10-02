@@ -270,6 +270,44 @@ class AdminCustomerRestorationTest extends TestCase
             ->where('target_id', (string) $user->id)->count());
     }
 
+
+    public function test_empty_account_deletion_purges_saved_game_account_personal_data(): void
+    {
+        $this->login('SUPER_ADMIN');
+        $user = $this->customer();
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Deletion Product',
+            'slug' => 'deletion-product-'.bin2hex(random_bytes(4)),
+            'fulfillment_mode' => 'MANUAL',
+            'margin_percent' => 10,
+            'is_active' => true,
+        ]);
+
+        DB::table('saved_game_accounts')->insert([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'label' => 'Sensitive Account',
+            'customer_input' => json_encode(['password' => 'must-be-purged'], JSON_THROW_ON_ERROR),
+            'nickname' => 'DeleteMe',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->delete('/admin/customers/'.$user->id)
+            ->assertRedirect('/admin/customers')
+            ->assertSessionHasNoErrors();
+
+        $this->assertSoftDeleted('users', ['id' => $user->id]);
+        $this->assertSame(0, DB::table('saved_game_accounts')->where('user_id', $user->id)->count());
+
+        $deleted = User::withTrashed()->findOrFail($user->id);
+        $this->assertNull($deleted->email);
+        $this->assertNull($deleted->phone);
+        $this->assertNull($deleted->google_sub);
+    }
+
     public function test_customer_list_permission_remains_server_side(): void
     {
         $this->login('ADMIN', ['dashboard.view']);
