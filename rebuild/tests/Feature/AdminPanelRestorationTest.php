@@ -152,6 +152,38 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(2, $product->fields()->count());
     }
 
+    public function test_global_margin_updates_products_but_preserves_nominal_overrides(): void
+    {
+        $this->login(); $product = $this->product();
+        $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'OVERRIDE', 'name' => 'Override', 'pricing_mode' => 'PERCENT', 'margin_percent' => 7]);
+        $this->put('/admin/catalog/margin', ['margin_percent' => 15])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('15.0000', (string) $product->fresh()->margin_percent);
+        $this->assertSame('7.0000', (string) $package->fresh()->margin_percent);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.margin.global_updated']);
+    }
+
+    public function test_fixed_sell_price_below_cost_is_rejected(): void
+    {
+        $this->login(); $product = $this->product();
+        $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'FLOOR', 'name' => 'Floor']);
+        ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'), 'external_sku' => 'floor-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => false]);
+        $this->put('/admin/catalog/packages/'.$package->id, ['code' => 'FLOOR', 'name' => 'Floor', 'sort_order' => 0, 'is_active' => false,
+            'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 9000])->assertSessionHasErrors('sell_price_idr');
+        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
+    }
+
+    public function test_full_sync_blocks_mapped_skus_absent_from_response(): void
+    {
+        $product = $this->product();
+        $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'GONE', 'name' => 'Gone', 'is_active' => true]);
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'), 'external_sku' => 'gone-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true]);
+        $this->fakeCatalog([$this->row()]); app(DigiflazzCatalogService::class)->sync();
+        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'gone-sku', 'buyer_active' => false]);
+        $this->expectException(ValidationException::class);
+        app(CheckoutPricing::class)->forPackage($package->id);
+    }
+
     public function test_new_operations_are_permission_gated(): void
     {
         $this->login(['dashboard.view'], 'ADMIN');

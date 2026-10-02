@@ -33,7 +33,7 @@ const tab = ref(initialSearch && searchedProduct ? searchedProduct.fulfillment_m
 const selectedProductId = ref(null), editorTab = ref('info'), showCreateProduct = ref(false);
 const selectedPackageId=ref(null);
 const selectedProductItems = computed(() => products.value.filter(item => item.id === selectedProductId.value));
-const editProduct = item => { selectedProductId.value = item.id; editorTab.value = 'info'; showImport.value=false; importForm.item_ids=[]; selectedPackageId.value=null; };
+const editProduct = item => { selectedProductId.value = item.id; editorTab.value = 'info'; showImport.value=false; importForm.item_ids=[]; importForm.margin_percent=Number(item.margin_percent); selectedPackageId.value=null; };
 const catalogTab = ref('products'), catalogSearch = ref(initialSearch), catalogPage = ref(1);
 const catalogTabs = [['products','Produk'],['categories','Kategori'],['fields','Kolom Data Akun'],['media','Media Toko']];
 const matchingProducts = computed(() => products.value.filter(item => item.fulfillment_mode === tab.value && (!catalogSearch.value || [item.name,item.slug,...item.packages.map(p => p.name)].join(' ').toLowerCase().includes(catalogSearch.value.toLowerCase()))));
@@ -70,6 +70,7 @@ const previewPrice=(pack,item)=>{
  const price=pack.pricing_mode==='SELL_PRICE'?Number(pack.sell_price_idr):cost+(pack.pricing_mode==='FIXED'?Number(pack.margin_fixed_idr||0):Math.ceil(cost*Number(pack.pricing_mode==='PERCENT'?pack.margin_percent:item.margin_percent)/100));
  return 'Rp'+price.toLocaleString('id-ID')+(price<cost?' · di bawah modal':'');
 };
+watch(()=>props.defaultMargin,value=>{if(!productForm.isDirty)productForm.margin_percent=value;});
 const packageForm = useForm({ product_id: '', code: '', name: '', note: '', group_name: '', nominal_value: '', sort_order: 0, cost_idr: '' });
 const noticeDrafts = reactive({});
 const fieldsProductId = ref('');
