@@ -229,6 +229,41 @@ class AdminHealthRestorationTest extends TestCase
                 ->where('checks.7.status', 'HEALTHY'));
     }
 
+
+    public function test_reconciliation_poll_does_not_hide_old_unresolved_latest_attempt(): void
+    {
+        $admin = $this->login();
+
+        $orderId = app(AdminManualOrderService::class)->create([
+            'customer_name' => 'Health Pending Customer',
+            'phone' => '081234567891',
+            'email' => 'health-pending@example.test',
+            'product_name' => 'Health Pending Product',
+            'package_name' => 'Health Pending Package',
+            'destination' => 'HEALTH-PENDING',
+            'total_idr' => 16000,
+            'note' => 'Health pending regression',
+            'payment_received' => true,
+            'idempotency_key' => (string) Str::uuid(),
+        ], (int) $admin->id);
+
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+            'status' => 'PENDING',
+            'created_at' => now()->subMinutes(20),
+            'updated_at' => now(),
+            'last_checked_at' => now(),
+        ]);
+
+        $this->get('/admin/health')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('summary.stale_fulfillment', 1)
+                ->where('checks.7.key', 'fulfillment')
+                ->where('checks.7.count', 1)
+                ->where('checks.7.status', 'DEGRADED'));
+    }
+
     public function test_active_gateway_maintenance_is_reflected_in_overall_health_without_double_counting_integrations(): void
     {
         $this->login();
