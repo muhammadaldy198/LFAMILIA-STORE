@@ -385,6 +385,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             ->middleware('throttle:admin-sensitive')->name('admin.access.store');
         Route::put('/admin/access/{admin}', [AdminAccessController::class, 'update'])
             ->middleware('throttle:admin-sensitive')->name('admin.access.update');
+        Route::delete('/admin/access/{admin}', [AdminAccessController::class, 'destroy'])
+            ->middleware('throttle:admin-sensitive')->name('admin.access.destroy');
 
         Route::get('/admin/integrations', [AdminIntegrationController::class, 'index'])->name('admin.integrations');
         Route::put('/admin/integrations/{code}', [AdminIntegrationController::class, 'update'])
