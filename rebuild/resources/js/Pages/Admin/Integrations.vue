@@ -3,16 +3,20 @@ import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
 
 import { Head, router } from '@inertiajs/vue3';
-import { reactive } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 
 const props = defineProps({ integrations: Array });
-const items = reactive(props.integrations.map((item) => ({
+const selectedCode=ref(props.integrations[0]?.code||'');
+const toItem=item=>({
     ...item,
     result: null,
     reveal_password: '',
     config: Object.fromEntries(item.fields.map((field) => [field.key, field.value ?? (field.type === 'boolean' ? false : '')])),
-})));
+});
+const items=reactive(props.integrations.map(toItem));
+watch(()=>props.integrations,value=>{items.splice(0,items.length,...value.map(toItem));});
+const csrf=()=>decodeURIComponent(document.cookie.split('; ').find(value=>value.startsWith('XSRF-TOKEN='))?.slice(11)||'');
 
 function save(item) {
     router.put('/admin/integrations/' + item.code, {
@@ -22,10 +26,13 @@ function save(item) {
 }
 
 async function reveal(item, field) {
-    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    if(item.busy)return;item.busy=true;
+    try {
+    const token = csrf();
     const response = await fetch('/admin/integrations/' + encodeURIComponent(item.code) + '/reveal/' + encodeURIComponent(field.key), {
         method: 'POST',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+        credentials:'same-origin',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
         body: JSON.stringify({ password: item.reveal_password }),
     });
     const data = await response.json().catch(() => ({}));
@@ -37,15 +44,20 @@ async function reveal(item, field) {
     } else {
         item.result = { status: 'DOWN', message: data.errors?.password?.[0] || data.message || 'Reveal ditolak.' };
     }
+    } catch { item.result={status:'DOWN',message:'Koneksi terputus. Coba lagi.'}; } finally {item.busy=false;}
 }
 
 async function testConnection(item) {
-    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    if(item.busy)return;item.busy=true;
+    try {
+    const token = csrf();
     const response = await fetch('/admin/integrations/' + encodeURIComponent(item.code) + '/test', {
         method: 'POST',
-        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': token },
+        headers: { Accept: 'application/json', 'X-XSRF-TOKEN': token },
     });
-    item.result = await response.json().catch(() => ({ status: 'DOWN', message: 'Tes gagal.' }));
+    const result = await response.json().catch(() => ({ status: 'DOWN', message: 'Tes gagal.' }));
+    item.result=response.ok?result:{status:'DOWN',message:result.message||'Tes koneksi ditolak.'};
+    } catch {item.result={status:'DOWN',message:'Koneksi terputus. Coba lagi.'};} finally {item.busy=false;}
 }
 </script>
 
@@ -55,7 +67,8 @@ async function testConnection(item) {
         <div class="space-y-6">
             <div class="flex flex-wrap items-start justify-between gap-3"><div><h1 class="text-3xl font-semibold">Integrasi</h1><p class="text-sm text-slate-400">Secret terenkripsi di database dan tidak disimpan di GitHub.</p></div><a href="/admin/nickname-tools" class="rounded bg-slate-700 px-4 py-2 text-sm">Game Code & Test Nickname</a></div>
 
-            <section v-for="item in items" :key="item.code" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <nav class="lf-admin-tabs"><Button v-for="item in items" :key="item.code" type="button" variant="ghost" :class="{active:selectedCode===item.code}" @click="selectedCode=item.code">{{item.name}}</Button></nav>
+            <section v-for="item in items" v-show="selectedCode===item.code" :key="item.code" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div><h2 class="text-xl font-semibold">{{ item.name }}</h2><p v-if="item.note" class="mt-1 text-xs text-amber-200">{{ item.note }}</p></div>
                     <label class="flex gap-2 text-sm"><input v-model="item.is_active" type="checkbox">Aktif</label>
@@ -72,7 +85,7 @@ async function testConnection(item) {
                                 class="min-w-0 flex-1 rounded bg-slate-800 p-2"
                              />
                             <input v-else v-model="item.config[field.key]" type="checkbox" class="mt-2">
-                            <Button v-if="field.secret && field.configured" type="button" :disabled="!item.reveal_password" class="rounded bg-slate-700 px-3 py-2 text-xs disabled:opacity-40" @click="reveal(item, field)">Reveal</Button>
+                            <Button v-if="field.secret && field.configured" type="button" :disabled="item.busy||!item.reveal_password" class="rounded bg-slate-700 px-3 py-2 text-xs disabled:opacity-40" @click="reveal(item, field)">Reveal</Button>
                         </div>
                     </label>
                 </div>
@@ -82,7 +95,7 @@ async function testConnection(item) {
                 </label>
                 <div class="mt-4 flex flex-wrap gap-2">
                     <Button class="rounded bg-cyan-300 px-4 py-2 font-semibold text-slate-950" @click="save(item)">Simpan</Button>
-                    <Button class="rounded bg-slate-700 px-4 py-2 text-sm" @click="testConnection(item)">Tes Koneksi</Button>
+                    <Button class="rounded bg-slate-700 px-4 py-2 text-sm"  :disabled="item.busy" @click="testConnection(item)">{{item.busy ? 'Memeriksa…' : 'Tes Koneksi'}}</Button>
                 </div>
                 <p v-if="item.result" class="mt-3 text-sm" :class="item.result.status === 'HEALTHY' ? 'text-emerald-300' : 'text-amber-200'">{{ item.result.status }} · {{ item.result.message }}</p>
             </section>

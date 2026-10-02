@@ -3,11 +3,12 @@ import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
 
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { reactive } from 'vue';
+import { reactive, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 
 const props = defineProps({ admins: Array, permissions: Object });
 const admins = reactive(props.admins.map((item) => ({ ...item, password: '' })));
+watch(()=>props.admins,value=>admins.splice(0,admins.length,...value.map(item=>({...item,password:''}))));
 const form = useForm({ name: '', email: '', password: '', role: 'ADMIN', permissions: [], is_active: true });
 
 function save(admin) {
@@ -30,7 +31,7 @@ function save(admin) {
 
             <section class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Tambah Admin</h2>
-                <form class="mt-4 grid gap-3 md:grid-cols-2" @submit.prevent="form.post('/admin/access')">
+                <form class="mt-4 grid gap-3 md:grid-cols-2" @submit.prevent="form.post('/admin/access',{onSuccess:()=>form.reset()})">
                     <Input v-model="form.name" required placeholder="Nama" class="rounded bg-slate-800 p-2" />
                     <Input v-model="form.email" required type="email" placeholder="Email" class="rounded bg-slate-800 p-2" />
                     <Input v-model="form.password" required type="password" minlength="12" placeholder="Password minimal 12 karakter" class="rounded bg-slate-800 p-2" />

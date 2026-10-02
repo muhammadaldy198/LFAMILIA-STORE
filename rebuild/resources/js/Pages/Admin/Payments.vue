@@ -19,6 +19,8 @@ const props = defineProps({
     pageSettings: Object,
 });
 
+const paymentTab=ref('transactions');
+const paymentTabs=[['transactions','Transaksi & QRIS'],['page','Tampilan Pembayaran'],['gateways','Gateway'],['channels','Channel & Biaya'],['routing','Routing'],['wallet','Saldo']];
 const gateways = reactive(props.gateways.map((item) => ({ ...item })));
 const channels = reactive(props.channels.map((item) => ({ ...item })));
 const routes = reactive(props.routes.map((item) => ({
@@ -151,7 +153,8 @@ function toggleManualAsset() {
                 <Link href="/admin/panel" class="rounded-lg bg-slate-800 px-4 py-2 text-sm">Dashboard</Link>
             </div>
 
-            <section class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <nav class="lf-admin-tabs"><Button v-for="[key,label] in paymentTabs.filter(([key])=>canConfigure||['transactions','page'].includes(key))" :key="key" type="button" variant="ghost" :class="{active:paymentTab===key}" @click="paymentTab=key">{{label}}</Button></nav>
+            <section v-show="paymentTab==='transactions'" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">QRIS Manual</h2>
                 <div class="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
@@ -167,7 +170,7 @@ function toggleManualAsset() {
                 </div>
             </section>
 
-            <section class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <section v-show="paymentTab==='transactions'" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Menunggu konfirmasi manual</h2>
                 <p v-if="!manualPayments.length" class="mt-3 text-sm text-slate-400">Tidak ada pembayaran QRIS manual yang menunggu.</p>
                 <div v-else class="mt-3 overflow-x-auto">
@@ -186,7 +189,7 @@ function toggleManualAsset() {
                 </div>
             </section>
 
-            <section class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <section v-show="paymentTab==='page'" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div><h2 class="text-xl font-semibold">Tampilan Halaman Pembayaran</h2><p class="mt-1 text-sm text-slate-400">Editor customer payment page. Tidak mengubah routing gateway atau credential.</p></div>
                     <Button type="button" class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950" @click="savePaymentPage">Simpan tampilan</Button>
@@ -238,7 +241,7 @@ function toggleManualAsset() {
             </section>
 
             <template v-if="canConfigure">
-                <section class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <section v-show="paymentTab==='gateways'" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                     <h2 class="text-xl font-semibold">Gateway internal</h2>
                     <div class="mt-4 grid gap-3 md:grid-cols-2">
                         <div v-for="gateway in gateways" :key="gateway.id" class="rounded-lg border border-slate-700 p-4">
@@ -253,7 +256,7 @@ function toggleManualAsset() {
                     </div>
                 </section>
 
-                <section class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <section v-show="paymentTab==='channels'" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                     <h2 class="text-xl font-semibold">Channel & biaya</h2>
                     <div class="mt-4 space-y-3">
                         <div v-for="channel in channels" :key="channel.id" class="grid gap-2 rounded-lg border border-slate-700 p-3 md:grid-cols-7">
@@ -267,7 +270,7 @@ function toggleManualAsset() {
                     </div>
                 </section>
 
-                <section class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <section v-show="paymentTab==='routing'" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
                     <h2 class="text-xl font-semibold">Routing channel → gateway</h2>
                     <div class="grid gap-2 md:grid-cols-6">
                         <select v-model="routeForm.payment_channel_id" class="rounded bg-slate-800 p-2"><option value="">Channel</option><option v-for="c in channels" :key="c.id" :value="c.id">{{ c.name }}</option></select>
@@ -284,7 +287,7 @@ function toggleManualAsset() {
                     </div>
                 </section>
 
-                <section class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <section v-show="paymentTab==='wallet'" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                     <h2 class="text-xl font-semibold">Wallet</h2>
                     <label class="mt-3 block max-w-sm text-sm">Minimum top up
                         <Input v-model.number="minimumTopupIdr" type="number" min="1" class="mt-1 block w-full rounded bg-slate-800 p-2" />

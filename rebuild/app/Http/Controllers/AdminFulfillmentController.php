@@ -12,16 +12,18 @@ use Inertia\Response;
 
 class AdminFulfillmentController
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'status' => ['nullable', 'string', 'max:40']]);
         $attempts = DB::table('fulfillment_attempts as attempts')
             ->join('orders', 'orders.id', '=', 'attempts.order_id')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
             ->join('providers', 'providers.id', '=', 'attempts.provider_id')
+            ->when($filters['q'] ?? null, fn ($query, $q) => $query->where('orders.order_number', 'like', '%'.$q.'%'))
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('attempts.status', $status))
             ->orderByDesc('attempts.id')
-            ->limit(100)
-            ->get([
+            ->select([
                 'attempts.id', 'attempts.attempt_no', 'attempts.external_reference',
                 'attempts.status', 'attempts.provider_status', 'attempts.provider_rc',
                 'attempts.serial_number', 'attempts.price_idr', 'attempts.safe_to_failover',
@@ -30,7 +32,7 @@ class AdminFulfillmentController
                 'orders.snapshot', 'products.name as product_name',
                 'products.manual_instructions', 'product_packages.name as package_name',
                 'providers.code as provider_code',
-            ])->map(function (object $attempt): array {
+            ])->paginate(20)->withQueryString()->through(function (object $attempt): array {
                 $customerInput = json_decode((string) $attempt->customer_input, true) ?: [];
                 $snapshot = json_decode((string) $attempt->snapshot, true) ?: [];
 
@@ -58,7 +60,7 @@ class AdminFulfillmentController
                 ];
             });
 
-        return Inertia::render('Admin/Fulfillment', ['attempts' => $attempts]);
+        return Inertia::render('Admin/Fulfillment', ['attempts' => $attempts->items(), 'pagination' => $attempts, 'filters' => $filters]);
     }
 
     public function completeManual(

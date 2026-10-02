@@ -33,7 +33,7 @@ const selectedGame = computed(() => props.gameCodes.find((item) => item.code ===
 const requiresServer = computed(() => tab.value === 'region' || Boolean(selectedGame.value?.requires_server));
 
 function csrf() {
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    return decodeURIComponent(document.cookie.split('; ').find(value=>value.startsWith('XSRF-TOKEN='))?.slice(11)||'');
 }
 function resetResult() {
     result.value = null;
@@ -47,6 +47,7 @@ function clearForm() {
     resetResult();
 }
 async function runCheck() {
+    if(busy.value)return;
     resetResult();
     busy.value = true;
     try {
@@ -62,7 +63,7 @@ async function runCheck() {
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrf(),
+                'X-XSRF-TOKEN': csrf(),
             },
             body: JSON.stringify(body),
         });

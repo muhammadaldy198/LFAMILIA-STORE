@@ -41,7 +41,7 @@ const totalCatalogPages = computed(() => Math.max(1, Math.ceil(matchingProducts.
 const visibleProducts = computed(() => matchingProducts.value.slice((catalogPage.value - 1) * 10, catalogPage.value * 10));
 watch([tab,catalogSearch], () => {catalogPage.value = 1;});
 const categoryForm = useForm({ name: '', sort_order: 0 });
-const productForm = useForm({ category_id: '', name: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: 0, sort_order: 0 });
+const productForm = useForm({ category_id: '', name: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: props.defaultMargin||0, sort_order: 0 });
 const globalMarginForm = useForm({margin_percent:props.defaultMargin||0});
 const applyGlobalMargin=()=>{if(confirm('Terapkan margin ke semua produk? Margin khusus nominal tetap dipakai.'))globalMarginForm.put('/admin/catalog/margin',{preserveScroll:true});};
 const importForm = useForm({item_ids:[],margin_percent:10});

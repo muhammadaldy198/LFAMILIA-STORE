@@ -236,7 +236,7 @@ function adjustWallet(row) {
                     </div>
                     <div class="mt-3 grid gap-2 md:grid-cols-[180px_minmax(0,1fr)_auto]">
                         <select v-model="row.status" class="rounded bg-slate-800 p-2 text-sm"><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option></select>
-                        <div class="space-y-2"><select aria-label="Pilih balasan cepat" class="w-full rounded border p-2 text-sm" @change="row.quick_reply=$event.target.value"><option value="">Pilih balasan cepat</option><option v-for="reply in quickRepliesForm.replies.filter(r=>r.trim())" :key="reply" :value="reply">{{reply.slice(0,80)}}</option></select><Textarea v-model="row.quick_reply" rows="2" class="rounded bg-slate-800 p-2 text-sm" placeholder="Balasan ke pelanggan (opsional)"></Textarea></div>
+                        <div class="space-y-2"><select aria-label="Pilih balasan cepat" class="w-full rounded border p-2 text-sm" @change="row.quick_reply=$event.target.value"><option value="">Pilih balasan cepat</option><option v-for="(reply,index) in quickRepliesForm.replies.filter(r=>r.trim())" :key="index" :value="reply">{{reply.slice(0,80)}}</option></select><Textarea v-model="row.quick_reply" rows="2" class="rounded bg-slate-800 p-2 text-sm" placeholder="Balasan ke pelanggan (opsional)"></Textarea></div>
                         <Button class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950" @click="updateSupport(row)">Simpan / Balas</Button>
                     </div>
                 </div>

@@ -7,7 +7,8 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
 import { reactive } from 'vue';
 
-const props = defineProps({ attempts: Array });
+const props = defineProps({ attempts: Array, pagination:Object, filters:Object });
+const filterForm=reactive({q:props.filters?.q||'',status:props.filters?.status||''});
 const page = usePage();
 const base = page.props.adminPanel?.base_path || '/admin';
 const forms = reactive({});
@@ -45,6 +46,7 @@ function retry(id) {
                 <p class="mt-1 text-sm text-slate-400">Pending/unknown tidak boleh dipindah ke provider lain sebelum reconciliation memastikan transaksi sebelumnya gagal.</p>
             </div>
 
+            <form class="grid gap-3 md:grid-cols-3" @submit.prevent="router.get(base+'/fulfillment',filterForm)"><label class="text-sm">Invoice<Input v-model="filterForm.q" maxlength="100" class="mt-1"/></label><label class="text-sm">Status<select v-model="filterForm.status" class="mt-1 w-full rounded border p-2"><option value="">Semua status</option><option v-for="status in ['MANUAL_PENDING','MANUAL_FAILED','PENDING','UNKNOWN','BLOCKED','FAILED_CONFIRMED','SUCCESS']" :key="status">{{status}}</option></select></label><Button class="self-end">Terapkan filter</Button></form>
             <p v-if="!attempts.length" class="rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-400">Belum ada fulfillment attempt.</p>
 
             <section v-for="attempt in attempts" :key="attempt.id" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
@@ -94,6 +96,7 @@ function retry(id) {
                     Terkunci untuk reconciliation dengan reference yang sama. Failover tidak diizinkan.
                 </p>
             </section>
+            <nav v-if="pagination" class="flex flex-wrap gap-2" aria-label="Halaman proses pesanan"><Link v-for="link in pagination.links.filter(l=>l.url)" :key="link.label" :href="link.url" class="rounded border px-3 py-2 text-sm" v-html="link.label"/></nav>
         </div>
     </AdminShell>
 </template>
