@@ -71,7 +71,12 @@ class AdminReportRestorationTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        return compact('productId', 'packageId', 'mappingId', 'providerId');
+        return [
+            'product_id' => $productId,
+            'package_id' => $packageId,
+            'mapping_id' => $mappingId,
+            'provider_id' => $providerId,
+        ];
     }
 
     private function order(array $catalog, string $suffix, string $status, $createdAt, bool $paid = false): int
