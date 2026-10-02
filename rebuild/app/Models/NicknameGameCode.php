@@ -11,6 +11,7 @@ class NicknameGameCode extends Model
         'name',
         'code',
         'requires_server',
+        'requires_region_check',
         'is_active',
         'sort_order',
     ];
@@ -19,6 +20,7 @@ class NicknameGameCode extends Model
     {
         return [
             'requires_server' => 'boolean',
+            'requires_region_check' => 'boolean',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
