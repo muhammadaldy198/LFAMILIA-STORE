@@ -55,6 +55,7 @@ class AdminNicknameToolsTest extends TestCase
         $this->postJson('/admin/nickname-tools/game-codes', [
             'name' => 'Denied Game',
             'code' => 'denied-game',
+            'supports_nickname_check' => false,
             'requires_server' => false,
             'requires_region_check' => false,
             'is_active' => true,
@@ -70,6 +71,7 @@ class AdminNicknameToolsTest extends TestCase
         $created = $this->postJson('/admin/nickname-tools/game-codes', [
             'name' => 'Editable Game',
             'code' => 'editable-game',
+            'supports_nickname_check' => true,
             'requires_server' => false,
             'requires_region_check' => true,
             'is_active' => true,
@@ -85,6 +87,7 @@ class AdminNicknameToolsTest extends TestCase
         $this->putJson('/admin/nickname-tools/game-codes/'.$row->id, [
             'name' => 'Editable Game Baru',
             'code' => 'editable-game-baru',
+            'supports_nickname_check' => true,
             'requires_server' => false,
             'requires_region_check' => false,
             'is_active' => true,
