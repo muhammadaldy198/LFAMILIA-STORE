@@ -25,11 +25,11 @@ Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb
 | `payment-methods` | Sebagian: channel/fee/status/routing tersedia; tambah/hapus channel, logo/deskripsi/kelompok dan sinkron daftar lama belum lengkap. |
 | `payment-page` | Editor tampilan pembayaran tersedia; perlu perbandingan setiap field pengaturan lama. |
 | `payment-routing` | Sebagian: routing prioritas tersedia; pilihan gateway top-up tunggal dan profil mode/env perlu dibandingkan. |
-| `product-content` | Notice/deskripsi/media/jam manual tersedia; perlu perbandingan semua field. |
-| `product-input` | Editor field+nickname+template tersedia; shortcut Checkout Type ID/ID+Server perlu dibandingkan. |
-| `product-package-provider` | Mapping SKU/import/prioritas tersedia; voucher-stock dan delivery mode belum lengkap. |
+| `product-content` | Setara: deskripsi, pemberitahuan, media produk/banner/nominal, serta jam dan instruksi manual dikelola di editor Produk tanpa halaman duplikat. |
+| `product-input` | Setara+: editor kolom pelanggan generik menggantikan shortcut ID/ID+Server, dengan urutan, wajib/opsional, cek nickname, dan format tujuan yang tetap dapat diedit. |
+| `product-package-provider` | Setara+: sumber Digiflazz mendukung impor/sinkron/prioritas/max-price dan stok kode digital mendukung kunci stok, modal, prioritas, impor terenkripsi, ketersediaan, retry, serta delivery_payload sukses. |
 | `product-package-status` | Aktif/nonaktif nominal tersedia. |
-| `products` | Sebagian: CRUD create/update/status, nominal/import/pricing/reorder/media tersedia; hapus/duplikasi, section ordering, package tabs, initials/accent/instant belum lengkap. |
+| `products` | Setara+: CRUD/status, slug, kategori, media, nominal, pricing, reorder/drag, hapus aman, duplikasi manual, tab nominal, initials/accent/instant, input pelanggan, nickname, jam manual, dan aktivasi aman tersedia. Pengaturan Populer tetap di menu Promo agar tidak duplikat. |
 | `promotions` | Sebagian: popular dan voucher discount tersedia; fungsi promosi lain perlu dipetakan. |
 | `reviews` | Moderasi ulasan tersedia; perlu perbandingan field/status. |
 | `session` | Guard admin dan role terpisah tersedia. |
@@ -37,7 +37,7 @@ Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb
 | `summary` | Sebagian: dashboard/laporan/health tersedia; perlu perbandingan metrik dan filter. |
 | `support` | Balasan/status/quick replies tersedia; perlu perbandingan detail modal/riwayat tiket. |
 | `team` | SUPER_ADMIN/ADMIN tersedia; STAFF dihapus sesuai instruksi terbaru, bukan regresi. Perlu perbandingan field hak akses. |
-| `vouchers` | Voucher diskon tersedia; endpoint lama ini mengelola STOK KODE VOUCHER produk, termasuk reveal. Belum ada kesetaraan stok kode voucher. |
+| `vouchers` | Setara tanpa duplikasi: voucher diskon tetap di Promo, sedangkan stok kode produk lama dipindahkan ke nominal Produk sebagai Stok Kode Digital; kode terenkripsi dan hanya masuk delivery_payload setelah order berhasil. |
 | `wallet/proof` | Bukti top-up privat belum memiliki tampilan admin setara. |
 | `wallet` | Sebagian: minimum top-up dan saldo pelanggan tersedia; daftar top-up/pembayaran/ledger admin belum setara tab lama. |
 
