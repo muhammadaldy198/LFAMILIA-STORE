@@ -448,6 +448,9 @@ class CheckoutService
         $discount = $type === 'PERCENT'
             ? intdiv($afterMember * $value, 100)
             : $value;
+        if ($voucher->max_discount_idr !== null) {
+            $discount = min($discount, (int) $voucher->max_discount_idr);
+        }
         $discount = min($discount, max(0, $afterMember - 1));
 
         if ($discount <= 0) {
@@ -461,8 +464,10 @@ class CheckoutService
             'snapshot' => [
                 'id' => (int) $voucher->id,
                 'code' => (string) $voucher->code,
+                'name' => filled($voucher->name) ? (string) $voucher->name : (string) $voucher->code,
                 'discount_type' => $type,
                 'discount_value' => $value,
+                'max_discount_idr' => $voucher->max_discount_idr === null ? null : (int) $voucher->max_discount_idr,
             ],
         ];
     }

@@ -20,9 +20,6 @@ const props = defineProps({
     settings: { type: Object, default: () => ({}) },
     tiers: { type: Array, default: () => [] },
     checks: { type: Array, default: () => [] },
-    voucherCategories: { type: Array, default: () => [] },
-    voucherProducts: { type: Array, default: () => [] },
-    popularProducts: { type: Array, default: () => [] },
 });
 const page = usePage();
 const base = computed(() => page.props.adminPanel?.base_path || '/admin');
@@ -35,14 +32,6 @@ const updateSupport=row=>router.put('/admin/support/'+row.id,{status:row.status,
 const searchQuery = ref(props.filters?.q || '');
 watch(() => props.rows, value => { rows.splice(0, rows.length, ...(Array.isArray(value) ? value : value?.data || []).map(row => ({...row}))); });
 const searchRows = () => router.get('/admin/orders', { q: searchQuery.value, status: orderStatus.value || undefined }, { preserveState: true });
-const popularProducts = reactive((props.popularProducts || []).map((row) => ({ ...row })));
-
-const voucherForm = useForm({
-    code: '', discount_type: 'FIXED', discount_value: 1000, minimum_total_idr: 0,
-    total_quota: null, per_customer_limit: null, starts_at: null, ends_at: null,
-    product_ids: [], category_ids: [], is_active: false,
-});
-
 const settingsForm = useForm({
     store_name: props.settings?.['store.name'] || '',
     tagline: props.settings?.['store.tagline'] || '',
@@ -54,26 +43,6 @@ const settingsForm = useForm({
     business_hours: props.settings?.['store.business_hours'] || '',
 });
 
-function savePopularProduct(row) {
-    router.put('/admin/vouchers/popular/' + row.id, {
-        popular: Boolean(row.popular),
-    }, { preserveScroll: true });
-}
-function saveVoucher(row) {
-    router.put('/admin/vouchers/' + row.id, {
-        code: row.code,
-        discount_type: row.discount_type,
-        discount_value: Number(row.discount_value),
-        minimum_total_idr: Number(row.minimum_total_idr || 0),
-        total_quota: row.total_quota ? Number(row.total_quota) : null,
-        per_customer_limit: row.per_customer_limit ? Number(row.per_customer_limit) : null,
-        starts_at: row.starts_at || null,
-        ends_at: row.ends_at || null,
-        product_ids: (row.product_ids || []).map(Number),
-        category_ids: (row.category_ids || []).map(Number),
-        is_active: Boolean(row.is_active),
-    }, { preserveScroll: true });
-}
 function saveTier(tier) {
     router.put('/admin/settings/membership/' + encodeURIComponent(tier.code), {
         is_active: Boolean(tier.is_active),
@@ -95,79 +64,6 @@ function saveTier(tier) {
                     <TableHeader class="text-left text-slate-400"><TableRow><TableHead class="p-2">Order</TableHead><TableHead class="p-2">Produk</TableHead><TableHead class="p-2">Nominal</TableHead><TableHead class="p-2">Status</TableHead><TableHead class="p-2">Total</TableHead><TableHead class="p-2">Dibuat</TableHead></TableRow></TableHeader>
                     <TableBody><TableRow v-for="row in rows" :key="row.id" class="border-t border-slate-800"><TableCell class="p-2"><Link :href="'/admin/orders/' + row.id" class="text-blue-600 font-semibold">{{ row.order_number }}</Link></TableCell><TableCell class="p-2">{{ row.product_name }}</TableCell><TableCell class="p-2">{{ row.package_name }}</TableCell><TableCell class="p-2">{{ row.status }}</TableCell><TableCell class="p-2">Rp{{ Number(row.total_idr).toLocaleString('id-ID') }}</TableCell><TableCell class="p-2">{{ row.created_at }}</TableCell></TableRow></TableBody>
                 </Table>
-            </section>
-
-            <section v-else-if="kind === 'vouchers'" class="space-y-5">
-                <div class="rounded-xl border border-slate-800 bg-slate-900 p-5">
-                    <div class="flex flex-wrap items-end justify-between gap-3">
-                        <div>
-                            <h2 class="text-xl font-semibold">Populer Sekarang</h2>
-                            <p class="mt-1 text-xs text-slate-500">Produk bertanda populer diprioritaskan di homepage. Jika slot belum penuh, homepage melanjutkan dengan produk aktif berulasan terbanyak seperti repo LFAMILIA sebelumnya.</p>
-                        </div>
-                    </div>
-                    <div class="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                        <article v-for="product in popularProducts" :key="product.id" class="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 p-3">
-                            <div class="min-w-0">
-                                <strong class="block truncate text-sm">{{product.name}}</strong>
-                                <span class="text-[10px] text-slate-500">{{product.category_name}} · {{product.is_active ? 'Aktif' : 'Nonaktif'}}</span>
-                            </div>
-                            <label class="flex shrink-0 items-center gap-2 text-xs">
-                                <input v-model="product.popular" type="checkbox" @change="savePopularProduct(product)">
-                                Populer
-                            </label>
-                        </article>
-                    </div>
-                </div>
-                <form class="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-5 md:grid-cols-4" @submit.prevent="voucherForm.post('/admin/vouchers', { preserveScroll: true, onSuccess: () => voucherForm.reset() })">
-                    <Input v-model="voucherForm.code" required placeholder="Kode voucher" class="rounded bg-slate-800 p-2" />
-                    <select v-model="voucherForm.discount_type" class="rounded bg-slate-800 p-2"><option>FIXED</option><option>PERCENT</option></select>
-                    <Input v-model.number="voucherForm.discount_value" required type="number" min="1" placeholder="Nilai" class="rounded bg-slate-800 p-2" />
-                    <Input v-model.number="voucherForm.minimum_total_idr" type="number" min="0" placeholder="Minimum transaksi" class="rounded bg-slate-800 p-2" />
-                    <Input v-model.number="voucherForm.total_quota" type="number" min="1" placeholder="Total kuota" class="rounded bg-slate-800 p-2" />
-                    <Input v-model.number="voucherForm.per_customer_limit" type="number" min="1" placeholder="Limit/customer" class="rounded bg-slate-800 p-2" />
-                    <Input v-model="voucherForm.starts_at" type="datetime-local" class="rounded bg-slate-800 p-2" />
-                    <Input v-model="voucherForm.ends_at" type="datetime-local" class="rounded bg-slate-800 p-2" />
-                    <label class="text-xs md:col-span-2">Scope kategori <span class="text-slate-500">(kosong = semua)</span>
-                        <select v-model="voucherForm.category_ids" multiple class="mt-1 block min-h-28 w-full rounded bg-slate-800 p-2">
-                            <option v-for="category in voucherCategories" :key="category.id" :value="category.id">{{category.name}}</option>
-                        </select>
-                    </label>
-                    <label class="text-xs md:col-span-2">Scope produk <span class="text-slate-500">(kosong = semua)</span>
-                        <select v-model="voucherForm.product_ids" multiple class="mt-1 block min-h-28 w-full rounded bg-slate-800 p-2">
-                            <option v-for="product in voucherProducts" :key="product.id" :value="product.id">{{product.name}}</option>
-                        </select>
-                    </label>
-                    <label class="flex gap-2 text-sm"><input v-model="voucherForm.is_active" type="checkbox">Aktif</label>
-                    <Button class="rounded bg-cyan-300 px-4 py-2 font-semibold text-slate-950">Tambah voucher</Button>
-                    <p class="text-xs text-slate-500 md:col-span-4">Scope kategori/produk memakai logika OR: voucher berlaku bila produk atau kategorinya termasuk scope. Jika keduanya kosong, voucher berlaku global.</p>
-                </form>
-
-                <article v-for="row in rows" :key="row.id" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
-                    <div class="grid gap-2 md:grid-cols-4">
-                        <Input v-model="row.code" class="rounded bg-slate-800 p-2" placeholder="Kode" />
-                        <select v-model="row.discount_type" class="rounded bg-slate-800 p-2"><option>FIXED</option><option>PERCENT</option></select>
-                        <Input v-model.number="row.discount_value" type="number" min="1" class="rounded bg-slate-800 p-2" placeholder="Nilai" />
-                        <Input v-model.number="row.minimum_total_idr" type="number" min="0" class="rounded bg-slate-800 p-2" placeholder="Minimum transaksi" />
-                        <Input v-model.number="row.total_quota" type="number" min="1" class="rounded bg-slate-800 p-2" placeholder="Total kuota" />
-                        <Input v-model.number="row.per_customer_limit" type="number" min="1" class="rounded bg-slate-800 p-2" placeholder="Limit/customer" />
-                        <Input v-model="row.starts_at" type="datetime-local" class="rounded bg-slate-800 p-2" />
-                        <Input v-model="row.ends_at" type="datetime-local" class="rounded bg-slate-800 p-2" />
-                        <label class="text-xs md:col-span-2">Scope kategori
-                            <select v-model="row.category_ids" multiple class="mt-1 block min-h-24 w-full rounded bg-slate-800 p-2">
-                                <option v-for="category in voucherCategories" :key="category.id" :value="category.id">{{category.name}}</option>
-                            </select>
-                        </label>
-                        <label class="text-xs md:col-span-2">Scope produk
-                            <select v-model="row.product_ids" multiple class="mt-1 block min-h-24 w-full rounded bg-slate-800 p-2">
-                                <option v-for="product in voucherProducts" :key="product.id" :value="product.id">{{product.name}}</option>
-                            </select>
-                        </label>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <label class="flex items-center gap-2 text-sm"><input v-model="row.is_active" type="checkbox">Aktif</label>
-                        <Button class="rounded bg-slate-700 px-4 py-2 text-sm" @click="saveVoucher(row)">Simpan voucher</Button>
-                    </div>
-                </article>
             </section>
 
             <section v-else-if="kind === 'support'" class="space-y-3">
