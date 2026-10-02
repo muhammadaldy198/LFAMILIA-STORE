@@ -163,14 +163,14 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
         (string) DB::table('system_settings')->where('key', 'digiflazz.last_auto_sync')->value('value'),
         true
     );
-    if (is_array($last) && ! empty($last['at'])) {
+    if (is_array($last) && !empty($last['at'])) {
         try {
             if (Carbon::parse($last['at'])->gt(now()->subMinutes($interval))) {
                 $this->info('Belum mencapai jadwal sinkron otomatis berikutnya.');
 
                 return 0;
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Invalid historical timestamp is ignored so the next sync can repair the state.
         }
     }
