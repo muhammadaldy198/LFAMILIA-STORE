@@ -16,7 +16,7 @@ class AdminNicknameToolsService
     ) {}
 
     /**
-     * @return array<int, array{id:int,name:string,code:string,requires_server:bool,requires_region_check:bool,is_active:bool,sort_order:int,product_count:int}>
+     * @return array<int, array{id:int,name:string,code:string,supports_nickname_check:bool,requires_server:bool,requires_region_check:bool,is_active:bool,sort_order:int,product_count:int}>
      */
     public function gameCodes(): array
     {
@@ -34,6 +34,7 @@ class AdminNicknameToolsService
                 'id' => (int) $item->id,
                 'name' => $item->name,
                 'code' => $item->code,
+                'supports_nickname_check' => (bool) $item->supports_nickname_check,
                 'requires_server' => (bool) $item->requires_server,
                 'requires_region_check' => (bool) $item->requires_region_check,
                 'is_active' => (bool) $item->is_active,
@@ -131,6 +132,11 @@ class AdminNicknameToolsService
         if (! $game) {
             throw ValidationException::withMessages([
                 'game_code' => 'Kode game tidak tersedia atau sedang dinonaktifkan.',
+            ]);
+        }
+        if (! $game->supports_nickname_check) {
+            throw ValidationException::withMessages([
+                'game_code' => 'Game ini tidak mendukung cek nickname.',
             ]);
         }
 
