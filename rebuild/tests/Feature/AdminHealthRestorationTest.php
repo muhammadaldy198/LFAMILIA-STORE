@@ -111,6 +111,37 @@ class AdminHealthRestorationTest extends TestCase
                 ->where('checks.5.status', 'DEGRADED'));
     }
 
+    public function test_old_healthy_integration_check_is_marked_stale(): void
+    {
+        $this->login();
+        DB::table('failed_jobs')->delete();
+        $this->setSetting('system.queue_worker_heartbeat', now()->toIso8601String());
+        $this->setSetting('system.scheduler_heartbeat', now()->toIso8601String());
+
+        IntegrationCredential::updateOrCreate(['code' => 'digiflazz'], [
+            'is_active' => true,
+            'config_ciphertext' => [
+                'username' => 'stale-health-buyer',
+                'api_key' => 'stale-health-secret',
+            ],
+        ]);
+        $this->setSetting('integration.health.digiflazz', [
+            'status' => 'HEALTHY',
+            'message' => 'Old healthy provider response',
+            'tested_at' => now()->subMinutes(20)->toIso8601String(),
+        ]);
+
+        $response = $this->get('/admin/health')->assertOk();
+
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('summary.overall', 'DEGRADED')
+            ->where('integrations.0.code', 'digiflazz')
+            ->where('integrations.0.status', 'STALE')
+            ->where('integrations.0.message', 'Tes koneksi terakhir sudah lebih dari 15 menit.'));
+
+        $this->assertStringNotContainsString('stale-health-secret', $response->getContent());
+    }
+
     public function test_gateway_maintenance_overrides_stored_integration_health(): void
     {
         $this->login();
@@ -228,7 +259,6 @@ class AdminHealthRestorationTest extends TestCase
                 ->where('checks.7.count', 0)
                 ->where('checks.7.status', 'HEALTHY'));
     }
-
 
     public function test_reconciliation_poll_does_not_hide_old_unresolved_latest_attempt(): void
     {
