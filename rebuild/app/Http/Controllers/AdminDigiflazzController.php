@@ -89,6 +89,13 @@ class AdminDigiflazzController
 
         $this->applyHealthFilter($base, $filters['health'], $monitorSettings);
 
+        $productOptions = (clone $base)
+            ->reorder()
+            ->selectRaw('COALESCE(products.name, items.product_name) as name')
+            ->distinct()
+            ->orderBy('name')
+            ->pluck('name');
+
         $items = $base
             ->orderByRaw('COALESCE(products.name, items.product_name)')
             ->orderByRaw('COALESCE(packages.sort_order, 999999)')
@@ -128,7 +135,7 @@ class AdminDigiflazzController
             'filters' => $filters,
             'categories' => DB::table('digiflazz_catalog_items')->where('category', '!=', '')->distinct()->orderBy('category')->pluck('category'),
             'brands' => DB::table('digiflazz_catalog_items')->where('brand', '!=', '')->distinct()->orderBy('brand')->pluck('brand'),
-            'products' => (clone $base)->selectRaw('COALESCE(products.name, items.product_name) as name')->distinct()->orderBy('name')->pluck('name'),
+            'products' => $productOptions,
             'summary' => $summary,
             'connection' => $connection,
             'lastSyncedAt' => DB::table('digiflazz_catalog_items')->max('synced_at'),
@@ -207,19 +214,20 @@ class AdminDigiflazzController
     ): RedirectResponse {
         $data = $request->validate([
             'enabled' => ['required', 'boolean'],
-            'sync_interval_minutes' => ['required', 'integer', 'min:5', 'max:1440', 'multiple_of:5'],
-            'low_stock_threshold' => ['required', 'integer', 'min:1', 'max:1000000'],
-            'price_warning_percent' => ['required', 'numeric', 'min:0.1', 'max:100'],
+            'sync_interval_minutes' => ['sometimes', 'integer', 'min:5', 'max:1440', 'multiple_of:5'],
+            'low_stock_threshold' => ['sometimes', 'integer', 'min:1', 'max:1000000'],
+            'price_warning_percent' => ['sometimes', 'numeric', 'min:0.1', 'max:100'],
         ]);
+        $monitorSettings = $monitor->settings();
         $before = [
             'enabled' => (bool) (json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true),
-            ...$monitor->settings(),
+            ...$monitorSettings,
         ];
         $map = [
             'digiflazz.auto_sync' => (bool) $data['enabled'],
-            'digiflazz.auto_sync_interval_minutes' => (int) $data['sync_interval_minutes'],
-            'digiflazz.low_stock_threshold' => (int) $data['low_stock_threshold'],
-            'digiflazz.price_warning_percent' => (float) $data['price_warning_percent'],
+            'digiflazz.auto_sync_interval_minutes' => (int) ($data['sync_interval_minutes'] ?? $monitorSettings['sync_interval_minutes']),
+            'digiflazz.low_stock_threshold' => (int) ($data['low_stock_threshold'] ?? $monitorSettings['low_stock_threshold']),
+            'digiflazz.price_warning_percent' => (float) ($data['price_warning_percent'] ?? $monitorSettings['price_warning_percent']),
         ];
         foreach ($map as $key => $value) {
             DB::table('system_settings')->updateOrInsert(['key' => $key], [
