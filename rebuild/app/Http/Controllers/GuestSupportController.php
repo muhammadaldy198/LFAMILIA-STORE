@@ -55,6 +55,7 @@ class GuestSupportController
             'order_id' => $order->id,
             'subject' => $data['subject'],
             'message' => $data['message'],
+            'kind' => 'ORDER',
         ]);
         $notifications->record('support.ticket.created', 'Tiket guest baru',
             'Tiket #'.$ticket->id.' · '.$ticket->subject, 'INFO',
@@ -63,13 +64,16 @@ class GuestSupportController
         return redirect()->route('guest.support');
     }
 
-    public function reply(Request $request, int $ticket): RedirectResponse
-    {
+    public function reply(
+        Request $request,
+        int $ticket,
+        AdminNotificationService $notifications,
+    ): RedirectResponse {
         $data = $request->validate(['message' => ['required', 'string', 'max:5000']]);
         $order = DB::table('orders')->whereNull('user_id')
             ->where('id', $request->session()->get('guest_order_id'))->first(['id']);
         abort_unless($order, 404);
-        DB::transaction(function () use ($order, $ticket, $data): void {
+        $record = DB::transaction(function () use ($order, $ticket, $data): SupportTicket {
             $record = SupportTicket::whereNull('user_id')->where('order_id', $order->id)
                 ->whereKey($ticket)->lockForUpdate()->firstOrFail();
             abort_if($record->status === 'CLOSED', 422, 'Tiket sudah ditutup.');
@@ -79,7 +83,19 @@ class GuestSupportController
                 'message' => $data['message'], 'created_at' => now(), 'updated_at' => now(),
             ]);
             $record->forceFill(['status' => 'OPEN'])->save();
+
+            return $record;
         });
+
+        $notifications->record(
+            'support.ticket.replied',
+            'Balasan guest pada tiket',
+            'Tiket #'.$record->id.' · '.$record->subject,
+            'INFO',
+            'support_ticket',
+            $record->id,
+            ['order_id' => $record->order_id]
+        );
 
         return redirect()->route('guest.support');
     }
