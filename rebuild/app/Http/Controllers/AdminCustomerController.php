@@ -82,6 +82,9 @@ class AdminCustomerController
                 DB::raw("(SELECT COUNT(*) FROM orders o WHERE o.user_id = users.id AND o.status = 'SUCCESS') as successful_order_count"),
                 DB::raw("(SELECT COALESCE(SUM(o.total_idr),0) FROM orders o WHERE o.user_id=users.id AND o.status IN ('PAID','PROCESSING','SUCCESS')) as lifetime_spend_idr"),
                 DB::raw("(SELECT COUNT(*) FROM support_tickets st WHERE st.user_id = users.id AND st.status IN ('OPEN','IN_PROGRESS')) as open_ticket_count"),
+                DB::raw('(SELECT COUNT(*) FROM support_tickets st WHERE st.user_id = users.id) as ticket_count'),
+                DB::raw('(SELECT COUNT(*) FROM wallet_topups wt WHERE wt.user_id = users.id) as topup_count'),
+                DB::raw('(SELECT COUNT(*) FROM wallet_ledger wl WHERE wl.wallet_id = wallets.id) as ledger_count'),
                 DB::raw('(SELECT COUNT(*) FROM saved_game_accounts sga WHERE sga.user_id = users.id) as saved_account_count'),
             ]);
 
@@ -107,6 +110,11 @@ class AdminCustomerController
                 'lifetime_spend_idr' => (int) $row->lifetime_spend_idr,
                 'open_ticket_count' => (int) $row->open_ticket_count,
                 'saved_account_count' => (int) $row->saved_account_count,
+                'deletable' => (int) ($row->balance_idr ?? 0) === 0
+                    && (int) $row->order_count === 0
+                    && (int) $row->ticket_count === 0
+                    && (int) $row->topup_count === 0
+                    && (int) $row->ledger_count === 0,
                 'last_active_at' => $row->last_active_at,
                 'created_at' => $row->created_at,
             ]);
