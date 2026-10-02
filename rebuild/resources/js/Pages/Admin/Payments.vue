@@ -1,4 +1,9 @@
 <script setup>
+import { Button } from '../../Components/ui/button';
+import { Input } from '../../Components/ui/input';
+import { Textarea } from '../../Components/ui/textarea';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
 import { reactive, ref } from 'vue';
@@ -151,9 +156,9 @@ function toggleManualAsset() {
                     </div>
                     <div v-if="canConfigure" class="space-y-3">
                         <input type="file" accept="image/png,image/jpeg,image/webp" @change="uploadManualQris">
-                        <button type="button" class="rounded-lg bg-slate-700 px-4 py-2 text-sm" @click="toggleManualAsset">
+                        <Button type="button" class="rounded-lg bg-slate-700 px-4 py-2 text-sm" @click="toggleManualAsset">
                             {{ manualQrisAsset?.is_active ? 'Nonaktifkan QRIS' : 'Aktifkan QRIS' }}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </section>
@@ -162,44 +167,44 @@ function toggleManualAsset() {
                 <h2 class="text-xl font-semibold">Menunggu konfirmasi manual</h2>
                 <p v-if="!manualPayments.length" class="mt-3 text-sm text-slate-400">Tidak ada pembayaran QRIS manual yang menunggu.</p>
                 <div v-else class="mt-3 overflow-x-auto">
-                    <table class="w-full min-w-[650px] text-sm">
-                        <thead class="text-left text-slate-400"><tr><th class="p-2">Order</th><th class="p-2">Nominal</th><th class="p-2">Status</th><th class="p-2">Dibuat</th><th class="p-2">Aksi</th></tr></thead>
-                        <tbody>
-                            <tr v-for="payment in manualPayments" :key="payment.id" class="border-t border-slate-800">
-                                <td class="p-2">{{ payment.order_number }}</td>
-                                <td class="p-2">Rp{{ Number(payment.amount_idr).toLocaleString('id-ID') }}</td>
-                                <td class="p-2">{{ payment.status }}</td>
-                                <td class="p-2">{{ payment.created_at }}</td>
-                                <td class="p-2"><button class="rounded bg-emerald-300 px-3 py-2 font-semibold text-slate-950" @click="confirmManual(payment.id)">Konfirmasi dibayar</button></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <Table class="w-full min-w-[650px] text-sm">
+                        <TableHeader class="text-left text-slate-400"><TableRow><TableHead class="p-2">Order</TableHead><TableHead class="p-2">Nominal</TableHead><TableHead class="p-2">Status</TableHead><TableHead class="p-2">Dibuat</TableHead><TableHead class="p-2">Aksi</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            <TableRow v-for="payment in manualPayments" :key="payment.id" class="border-t border-slate-800">
+                                <TableCell class="p-2">{{ payment.order_number }}</TableCell>
+                                <TableCell class="p-2">Rp{{ Number(payment.amount_idr).toLocaleString('id-ID') }}</TableCell>
+                                <TableCell class="p-2">{{ payment.status }}</TableCell>
+                                <TableCell class="p-2">{{ payment.created_at }}</TableCell>
+                                <TableCell class="p-2"><Button class="rounded bg-emerald-300 px-3 py-2 font-semibold text-slate-950" @click="confirmManual(payment.id)">Konfirmasi dibayar</Button></TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
                 </div>
             </section>
 
             <section class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div><h2 class="text-xl font-semibold">Tampilan Halaman Pembayaran</h2><p class="mt-1 text-sm text-slate-400">Editor customer payment page. Tidak mengubah routing gateway atau credential.</p></div>
-                    <button type="button" class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950" @click="savePaymentPage">Simpan tampilan</button>
+                    <Button type="button" class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950" @click="savePaymentPage">Simpan tampilan</Button>
                 </div>
                 <div class="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
                     <div class="grid gap-3 md:grid-cols-2">
-                        <label class="text-xs">Accent HEX<input v-model="paymentPage.accentColor" maxlength="7" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <label class="text-xs">Teks kecil<input v-model="paymentPage.eyebrow" maxlength="60" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <label class="text-xs">Judul pending<input v-model="paymentPage.pendingTitle" maxlength="100" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <label class="text-xs">Judul berhasil<input v-model="paymentPage.paidTitle" maxlength="100" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <label class="text-xs">Judul gagal<input v-model="paymentPage.failedTitle" maxlength="100" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <label class="text-xs">Subtitle<input v-model="paymentPage.subtitle" maxlength="240" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <label class="text-xs">Judul notice invoice<input v-model="paymentPage.invoiceNoticeTitle" maxlength="120" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <label class="text-xs">Teks notice invoice<textarea v-model="paymentPage.invoiceNoticeText" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2"></textarea></label>
-                        <label class="text-xs">Status pending<textarea v-model="paymentPage.pendingStatusText" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2"></textarea></label>
-                        <label class="text-xs">Status berhasil<textarea v-model="paymentPage.paidStatusText" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2"></textarea></label>
-                        <label class="text-xs">Status gagal<textarea v-model="paymentPage.failedStatusText" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2"></textarea></label>
-                        <label class="text-xs">Tombol bayar<input v-model="paymentPage.payButtonText" maxlength="80" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <label class="text-xs">Tombol cek status<input v-model="paymentPage.checkStatusButtonText" maxlength="80" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <label class="text-xs">Tombol cek invoice<input v-model="paymentPage.checkInvoiceButtonText" maxlength="80" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <label class="text-xs">Teks bantuan<input v-model="paymentPage.supportText" maxlength="120" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <label class="text-xs">URL bantuan<input v-model="paymentPage.supportUrl" maxlength="500" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
+                        <label class="text-xs">Accent HEX<Input v-model="paymentPage.accentColor" maxlength="7" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-xs">Teks kecil<Input v-model="paymentPage.eyebrow" maxlength="60" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-xs">Judul pending<Input v-model="paymentPage.pendingTitle" maxlength="100" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-xs">Judul berhasil<Input v-model="paymentPage.paidTitle" maxlength="100" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-xs">Judul gagal<Input v-model="paymentPage.failedTitle" maxlength="100" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-xs">Subtitle<Input v-model="paymentPage.subtitle" maxlength="240" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-xs">Judul notice invoice<Input v-model="paymentPage.invoiceNoticeTitle" maxlength="120" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-xs">Teks notice invoice<Textarea v-model="paymentPage.invoiceNoticeText" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2"></Textarea></label>
+                        <label class="text-xs">Status pending<Textarea v-model="paymentPage.pendingStatusText" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2"></Textarea></label>
+                        <label class="text-xs">Status berhasil<Textarea v-model="paymentPage.paidStatusText" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2"></Textarea></label>
+                        <label class="text-xs">Status gagal<Textarea v-model="paymentPage.failedStatusText" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2"></Textarea></label>
+                        <label class="text-xs">Tombol bayar<Input v-model="paymentPage.payButtonText" maxlength="80" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-xs">Tombol cek status<Input v-model="paymentPage.checkStatusButtonText" maxlength="80" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-xs">Tombol cek invoice<Input v-model="paymentPage.checkInvoiceButtonText" maxlength="80" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-xs">Teks bantuan<Input v-model="paymentPage.supportText" maxlength="120" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-xs">URL bantuan<Input v-model="paymentPage.supportUrl" maxlength="500" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
                         <div class="md:col-span-2">
                             <label class="text-xs">Banner pembayaran<input type="file" accept="image/png,image/jpeg,image/webp" class="mt-1 block w-full text-sm" @change="uploadPaymentHeader"></label>
                             <p class="mt-1 text-[11px] text-slate-500">Disimpan sebagai media aplikasi. Tidak perlu hardcode URL.</p>
@@ -222,7 +227,7 @@ function toggleManualAsset() {
                                 <strong class="text-[10px] text-amber-200">{{ paymentPage.invoiceNoticeTitle }}</strong>
                                 <p class="mt-1 text-[9px] text-white/40">{{ paymentPage.invoiceNoticeText }}</p>
                             </div>
-                            <button class="mt-4 h-9 w-full rounded font-black text-slate-950" :style="{backgroundColor:paymentPage.accentColor}">{{ paymentPage.payButtonText }}</button>
+                            <Button class="mt-4 h-9 w-full rounded font-black text-slate-950" :style="{backgroundColor:paymentPage.accentColor}">{{ paymentPage.payButtonText }}</Button>
                         </div>
                     </div>
                 </div>
@@ -239,7 +244,7 @@ function toggleManualAsset() {
                                 <label><input v-model="gateway.is_active" type="checkbox"> Aktif</label>
                                 <label><input v-model="gateway.is_maintenance" type="checkbox"> Maintenance</label>
                             </div>
-                            <button class="mt-3 rounded bg-slate-700 px-3 py-2 text-sm" @click="saveGateway(gateway)">Simpan</button>
+                            <Button class="mt-3 rounded bg-slate-700 px-3 py-2 text-sm" @click="saveGateway(gateway)">Simpan</Button>
                         </div>
                     </div>
                 </section>
@@ -248,12 +253,12 @@ function toggleManualAsset() {
                     <h2 class="text-xl font-semibold">Channel & biaya</h2>
                     <div class="mt-4 space-y-3">
                         <div v-for="channel in channels" :key="channel.id" class="grid gap-2 rounded-lg border border-slate-700 p-3 md:grid-cols-7">
-                            <input v-model="channel.name" class="rounded bg-slate-800 p-2 md:col-span-2">
-                            <label class="text-xs">Fee tetap<input v-model.number="channel.fee_flat_idr" type="number" min="0" class="mt-1 w-full rounded bg-slate-800 p-2"></label>
-                            <label class="text-xs">Fee bps<input v-model.number="channel.fee_percent_bps" type="number" min="0" max="10000" class="mt-1 w-full rounded bg-slate-800 p-2"></label>
+                            <Input v-model="channel.name" class="rounded bg-slate-800 p-2 md:col-span-2" />
+                            <label class="text-xs">Fee tetap<Input v-model.number="channel.fee_flat_idr" type="number" min="0" class="mt-1 w-full rounded bg-slate-800 p-2" /></label>
+                            <label class="text-xs">Fee bps<Input v-model.number="channel.fee_percent_bps" type="number" min="0" max="10000" class="mt-1 w-full rounded bg-slate-800 p-2" /></label>
                             <label class="text-xs"><input v-model="channel.supports_order" type="checkbox"> Order</label>
                             <label class="text-xs"><input v-model="channel.supports_wallet_topup" type="checkbox"> Top up</label>
-                            <div class="flex items-center gap-2"><label class="text-xs"><input v-model="channel.is_active" type="checkbox"> Aktif</label><button class="rounded bg-slate-700 px-3 py-2 text-xs" @click="saveChannel(channel)">Simpan</button></div>
+                            <div class="flex items-center gap-2"><label class="text-xs"><input v-model="channel.is_active" type="checkbox"> Aktif</label><Button class="rounded bg-slate-700 px-3 py-2 text-xs" @click="saveChannel(channel)">Simpan</Button></div>
                         </div>
                     </div>
                 </section>
@@ -263,24 +268,24 @@ function toggleManualAsset() {
                     <div class="grid gap-2 md:grid-cols-6">
                         <select v-model="routeForm.payment_channel_id" class="rounded bg-slate-800 p-2"><option value="">Channel</option><option v-for="c in channels" :key="c.id" :value="c.id">{{ c.name }}</option></select>
                         <select v-model="routeForm.payment_gateway_id" class="rounded bg-slate-800 p-2"><option value="">Gateway</option><option v-for="g in gateways" :key="g.id" :value="g.id">{{ g.internal_name }}</option></select>
-                        <input v-model="routeForm.provider_channel" placeholder="Provider channel" class="rounded bg-slate-800 p-2">
-                        <input v-model.number="routeForm.priority" type="number" min="0" placeholder="Prioritas" class="rounded bg-slate-800 p-2">
+                        <Input v-model="routeForm.provider_channel" placeholder="Provider channel" class="rounded bg-slate-800 p-2" />
+                        <Input v-model.number="routeForm.priority" type="number" min="0" placeholder="Prioritas" class="rounded bg-slate-800 p-2" />
                         <label class="flex items-center gap-2 text-sm"><input v-model="routeForm.is_active" type="checkbox"> Aktif</label>
-                        <button class="rounded bg-cyan-300 px-3 py-2 font-semibold text-slate-950" @click="createRoute">Tambah route</button>
-                        <textarea v-model="routeForm.configuration" rows="3" placeholder='Configuration JSON tanpa credential' class="rounded bg-slate-800 p-2 md:col-span-6"></textarea>
+                        <Button class="rounded bg-cyan-300 px-3 py-2 font-semibold text-slate-950" @click="createRoute">Tambah route</Button>
+                        <Textarea v-model="routeForm.configuration" rows="3" placeholder='Configuration JSON tanpa credential' class="rounded bg-slate-800 p-2 md:col-span-6"></Textarea>
                     </div>
                     <div v-for="route in routes" :key="route.id" class="rounded-lg border border-slate-700 p-3">
-                        <div class="flex flex-wrap items-center gap-3 text-sm"><strong>{{ route.channel_code }}</strong><span>→</span><strong>{{ route.gateway_code }}</strong><input v-model="route.provider_channel" placeholder="provider channel" class="rounded bg-slate-800 p-2"><input v-model.number="route.priority" type="number" min="0" class="w-20 rounded bg-slate-800 p-2"><label><input v-model="route.is_active" type="checkbox"> Aktif</label><button class="rounded bg-slate-700 px-3 py-2" @click="saveRoute(route)">Simpan</button></div>
-                        <textarea v-model="route.configuration_text" rows="4" class="mt-2 w-full rounded bg-slate-800 p-2 font-mono text-xs" placeholder="Configuration JSON"></textarea>
+                        <div class="flex flex-wrap items-center gap-3 text-sm"><strong>{{ route.channel_code }}</strong><span>→</span><strong>{{ route.gateway_code }}</strong><Input v-model="route.provider_channel" placeholder="provider channel" class="rounded bg-slate-800 p-2" /><Input v-model.number="route.priority" type="number" min="0" class="w-20 rounded bg-slate-800 p-2" /><label><input v-model="route.is_active" type="checkbox"> Aktif</label><Button class="rounded bg-slate-700 px-3 py-2" @click="saveRoute(route)">Simpan</Button></div>
+                        <Textarea v-model="route.configuration_text" rows="4" class="mt-2 w-full rounded bg-slate-800 p-2 font-mono text-xs" placeholder="Configuration JSON"></Textarea>
                     </div>
                 </section>
 
                 <section class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                     <h2 class="text-xl font-semibold">Wallet</h2>
                     <label class="mt-3 block max-w-sm text-sm">Minimum top up
-                        <input v-model.number="minimumTopupIdr" type="number" min="1" class="mt-1 block w-full rounded bg-slate-800 p-2">
+                        <Input v-model.number="minimumTopupIdr" type="number" min="1" class="mt-1 block w-full rounded bg-slate-800 p-2" />
                     </label>
-                    <button class="mt-3 rounded bg-slate-700 px-4 py-2 text-sm" @click="saveSettings">Simpan</button>
+                    <Button class="mt-3 rounded bg-slate-700 px-4 py-2 text-sm" @click="saveSettings">Simpan</Button>
                 </section>
             </template>
         </div>

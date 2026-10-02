@@ -1,4 +1,8 @@
 <script setup>
+import { Button } from '../../Components/ui/button';
+import { Input } from '../../Components/ui/input';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+
 import { Head } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -96,7 +100,7 @@ async function copyCode(code) {
     <section class="overflow-hidden rounded-lg border border-[#e1e6ed] bg-white">
         <header class="border-b border-[#edf0f4] px-4 pt-3">
             <div class="flex gap-1 overflow-x-auto">
-                <button v-for="item in [
+                <Button v-for="item in [
                     ['game','Cek Game'],
                     ['region','Region MLBB'],
                     ['pln','PLN'],
@@ -106,7 +110,7 @@ async function copyCode(code) {
                     :class="tab===item[0] ? 'bg-[#1769e8] text-white' : 'text-[#62728a] hover:bg-[#f5f7fa]'"
                     @click="tab=item[0];resetResult()">
                     {{item[1]}}
-                </button>
+                </Button>
             </div>
         </header>
 
@@ -114,29 +118,29 @@ async function copyCode(code) {
             <div class="grid content-start gap-4 sm:grid-cols-2">
                 <label v-if="tab==='game'" class="text-[10px] font-bold text-[#52627a]">
                     Game Code
-                    <input v-model="gameCode" list="lf-game-codes" maxlength="100" placeholder="mobile-legends"
-                        class="mt-1 block h-10 w-full rounded-md border border-[#dfe5ed] bg-[#f8fafc] px-3 text-xs text-[#243653] outline-none focus:border-[#8cb6ef]">
+                    <Input v-model="gameCode" list="lf-game-codes" maxlength="100" placeholder="mobile-legends"
+                        class="mt-1 block h-10 w-full rounded-md border border-[#dfe5ed] bg-[#f8fafc] px-3 text-xs text-[#243653] outline-none focus:border-[#8cb6ef]" />
                     <datalist id="lf-game-codes"><option v-for="item in gameCodes" :key="item.code" :value="item.code">{{item.name}}</option></datalist>
                 </label>
 
                 <label v-if="tab!=='pln'" class="text-[10px] font-bold text-[#52627a]">
                     User ID
-                    <input v-model="userId" maxlength="80" placeholder="Masukkan User ID"
-                        class="mt-1 block h-10 w-full rounded-md border border-[#dfe5ed] bg-[#f8fafc] px-3 text-xs text-[#243653] outline-none focus:border-[#8cb6ef]">
+                    <Input v-model="userId" maxlength="80" placeholder="Masukkan User ID"
+                        class="mt-1 block h-10 w-full rounded-md border border-[#dfe5ed] bg-[#f8fafc] px-3 text-xs text-[#243653] outline-none focus:border-[#8cb6ef]" />
                 </label>
 
                 <label v-if="tab!=='pln'" class="text-[10px] font-bold text-[#52627a]">
                     Server / Zone
-                    <input v-model="server" maxlength="40" :placeholder="requiresServer ? 'Wajib diisi' : 'Opsional'"
-                        class="mt-1 block h-10 w-full rounded-md border border-[#dfe5ed] bg-[#f8fafc] px-3 text-xs text-[#243653] outline-none focus:border-[#8cb6ef]">
+                    <Input v-model="server" maxlength="40" :placeholder="requiresServer ? 'Wajib diisi' : 'Opsional'"
+                        class="mt-1 block h-10 w-full rounded-md border border-[#dfe5ed] bg-[#f8fafc] px-3 text-xs text-[#243653] outline-none focus:border-[#8cb6ef]" />
                     <small class="mt-1 block font-normal text-[#8b98aa]">{{requiresServer ? 'Wajib untuk pemeriksaan ini.' : 'Isi jika game memerlukan Server / Zone ID.'}}</small>
                 </label>
 
                 <label v-if="tab==='pln'" class="text-[10px] font-bold text-[#52627a] sm:col-span-2">
                     Nomor Meter / ID Pelanggan PLN
-                    <input :value="customerNumber" inputmode="numeric" maxlength="12" placeholder="11–12 angka"
+                    <Input :value="customerNumber" inputmode="numeric" maxlength="12" placeholder="11–12 angka"
                         class="mt-1 block h-10 w-full rounded-md border border-[#dfe5ed] bg-[#f8fafc] px-3 text-xs text-[#243653] outline-none focus:border-[#8cb6ef]"
-                        @input="customerNumber=$event.target.value.replace(/\D/g,'').slice(0,12)">
+                        @input="customerNumber=$event.target.value.replace(/\D/g,'').slice(0,12)" />
                 </label>
 
                 <div v-if="tab==='region' || gameCode==='mobile-legends'" class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[9px] leading-4 text-blue-800 sm:col-span-2">
@@ -144,12 +148,12 @@ async function copyCode(code) {
                 </div>
 
                 <div class="flex flex-wrap gap-2 border-t border-[#edf0f4] pt-4 sm:col-span-2">
-                    <button type="button" :disabled="busy" class="h-9 rounded-md bg-[#1769e8] px-4 text-[10px] font-bold text-white disabled:opacity-50" @click="runCheck">
+                    <Button type="button" :disabled="busy" class="h-9 rounded-md bg-[#1769e8] px-4 text-[10px] font-bold text-white disabled:opacity-50" @click="runCheck">
                         {{busy ? 'Memeriksa...' : 'Cek Data'}}
-                    </button>
-                    <button type="button" :disabled="busy" class="h-9 rounded-md border border-[#dfe5ed] bg-white px-4 text-[10px] font-bold text-[#52627a]" @click="clearForm">
+                    </Button>
+                    <Button type="button" :disabled="busy" class="h-9 rounded-md border border-[#dfe5ed] bg-white px-4 text-[10px] font-bold text-[#52627a]" @click="clearForm">
                         Bersihkan
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -180,22 +184,22 @@ async function copyCode(code) {
                     <h2 class="text-[11px] font-extrabold text-[#243653]">Daftar Kode Game</h2>
                     <p class="mt-0.5 text-[9px] text-[#8190a5]">Kode ini digunakan pada konfigurasi cek nickname produk.</p>
                 </div>
-                <input v-model="query" placeholder="Cari game atau kode..." class="h-9 w-full rounded-md border border-[#dfe5ed] bg-[#f8fafc] px-3 text-[10px] sm:w-[280px]">
+                <Input v-model="query" placeholder="Cari game atau kode..." class="h-9 w-full rounded-md border border-[#dfe5ed] bg-[#f8fafc] px-3 text-[10px] sm:w-[280px]" />
             </div>
             <div class="overflow-x-auto rounded-md border border-[#e1e6ed]">
-                <table class="min-w-[620px] w-full text-left text-[9px]">
-                    <thead class="bg-[#f8fafc] text-[#607089]">
-                        <tr><th class="px-3 py-2.5">Game</th><th class="px-3 py-2.5">Game Code</th><th class="px-3 py-2.5">Server / Zone</th><th class="px-3 py-2.5 text-right">Aksi</th></tr>
-                    </thead>
-                    <tbody class="divide-y divide-[#edf0f4] bg-white">
-                        <tr v-for="item in filteredCodes" :key="item.code">
-                            <td class="px-3 py-2.5 font-semibold text-[#34445f]">{{item.name}}</td>
-                            <td class="px-3 py-2.5 font-mono text-[#1769e8]">{{item.code}}</td>
-                            <td class="px-3 py-2.5"><span class="rounded-full px-2 py-1 text-[8px] font-bold" :class="item.requires_server ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'">{{item.requires_server ? 'Perlu' : 'Tidak'}}</span></td>
-                            <td class="px-3 py-2.5 text-right"><button type="button" class="rounded border border-[#dfe5ed] px-2.5 py-1.5 text-[9px] font-bold text-[#52627a]" @click="copyCode(item.code)">{{copied===item.code ? 'Tersalin' : 'Salin'}}</button></td>
-                        </tr>
-                    </tbody>
-                </table>
+                <Table class="min-w-[620px] w-full text-left text-[9px]">
+                    <TableHeader class="bg-[#f8fafc] text-[#607089]">
+                        <TableRow><TableHead class="px-3 py-2.5">Game</TableHead><TableHead class="px-3 py-2.5">Game Code</TableHead><TableHead class="px-3 py-2.5">Server / Zone</TableHead><TableHead class="px-3 py-2.5 text-right">Aksi</TableHead></TableRow>
+                    </TableHeader>
+                    <TableBody class="divide-y divide-[#edf0f4] bg-white">
+                        <TableRow v-for="item in filteredCodes" :key="item.code">
+                            <TableCell class="px-3 py-2.5 font-semibold text-[#34445f]">{{item.name}}</TableCell>
+                            <TableCell class="px-3 py-2.5 font-mono text-[#1769e8]">{{item.code}}</TableCell>
+                            <TableCell class="px-3 py-2.5"><span class="rounded-full px-2 py-1 text-[8px] font-bold" :class="item.requires_server ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'">{{item.requires_server ? 'Perlu' : 'Tidak'}}</span></TableCell>
+                            <TableCell class="px-3 py-2.5 text-right"><Button type="button" class="rounded border border-[#dfe5ed] px-2.5 py-1.5 text-[9px] font-bold text-[#52627a]" @click="copyCode(item.code)">{{copied===item.code ? 'Tersalin' : 'Salin'}}</Button></TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </div>
         </div>
     </section>

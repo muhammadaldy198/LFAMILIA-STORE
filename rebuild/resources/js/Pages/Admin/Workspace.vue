@@ -1,4 +1,9 @@
 <script setup>
+import { Button } from '../../Components/ui/button';
+import { Input } from '../../Components/ui/input';
+import { Textarea } from '../../Components/ui/textarea';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -97,19 +102,19 @@ function adjustWallet(row) {
         <div class="space-y-6">
             <div><h1 class="text-3xl font-semibold">{{ title }}</h1></div>
 
-            <form v-if="kind === 'orders' || kind === 'customers'" class="lf-admin-filter-row" @submit.prevent="searchRows"><label>Cari {{kind === 'orders' ? 'nomor invoice' : 'nama/email pelanggan'}}<input v-model="searchQuery" maxlength="100"></label><div class="self-end"><button class="lf-admin-primary">Cari</button></div></form>
+            <form v-if="kind === 'orders' || kind === 'customers'" class="lf-admin-filter-row" @submit.prevent="searchRows"><label>Cari {{kind === 'orders' ? 'nomor invoice' : 'nama/email pelanggan'}}<Input v-model="searchQuery" maxlength="100" /></label><div class="self-end"><Button class="lf-admin-primary">Cari</Button></div></form>
             <section v-if="kind === 'orders'" class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900 p-4">
-                <table class="w-full min-w-[850px] text-sm">
-                    <thead class="text-left text-slate-400"><tr><th class="p-2">Order</th><th class="p-2">Produk</th><th class="p-2">Nominal</th><th class="p-2">Status</th><th class="p-2">Total</th><th class="p-2">Dibuat</th></tr></thead>
-                    <tbody><tr v-for="row in rows" :key="row.id" class="border-t border-slate-800"><td class="p-2"><Link :href="'/admin/orders/' + row.id" class="text-blue-600 font-semibold">{{ row.order_number }}</Link></td><td class="p-2">{{ row.product_name }}</td><td class="p-2">{{ row.package_name }}</td><td class="p-2">{{ row.status }}</td><td class="p-2">Rp{{ Number(row.total_idr).toLocaleString('id-ID') }}</td><td class="p-2">{{ row.created_at }}</td></tr></tbody>
-                </table>
+                <Table class="w-full min-w-[850px] text-sm">
+                    <TableHeader class="text-left text-slate-400"><TableRow><TableHead class="p-2">Order</TableHead><TableHead class="p-2">Produk</TableHead><TableHead class="p-2">Nominal</TableHead><TableHead class="p-2">Status</TableHead><TableHead class="p-2">Total</TableHead><TableHead class="p-2">Dibuat</TableHead></TableRow></TableHeader>
+                    <TableBody><TableRow v-for="row in rows" :key="row.id" class="border-t border-slate-800"><TableCell class="p-2"><Link :href="'/admin/orders/' + row.id" class="text-blue-600 font-semibold">{{ row.order_number }}</Link></TableCell><TableCell class="p-2">{{ row.product_name }}</TableCell><TableCell class="p-2">{{ row.package_name }}</TableCell><TableCell class="p-2">{{ row.status }}</TableCell><TableCell class="p-2">Rp{{ Number(row.total_idr).toLocaleString('id-ID') }}</TableCell><TableCell class="p-2">{{ row.created_at }}</TableCell></TableRow></TableBody>
+                </Table>
             </section>
 
             <section v-else-if="kind === 'providers'" class="grid gap-4 lg:grid-cols-2">
                 <div v-for="row in rows" :key="row.id" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
                     <div class="flex items-center justify-between"><strong>{{ row.code }}</strong><span class="text-xs text-slate-500">{{ row.fulfillment_mode }}</span></div>
                     <p class="mt-2 text-sm text-slate-400">Mapping {{ row.active_mapping_count }}/{{ row.mapping_count }} aktif.</p>
-                    <div class="mt-4 flex items-center gap-3"><label class="flex gap-2 text-sm"><input v-model="row.is_active" type="checkbox">Provider aktif</label><button class="rounded bg-slate-700 px-3 py-2 text-xs" @click="updateProvider(row)">Simpan</button></div>
+                    <div class="mt-4 flex items-center gap-3"><label class="flex gap-2 text-sm"><input v-model="row.is_active" type="checkbox">Provider aktif</label><Button class="rounded bg-slate-700 px-3 py-2 text-xs" @click="updateProvider(row)">Simpan</Button></div>
                 </div>
             </section>
 
@@ -119,12 +124,12 @@ function adjustWallet(row) {
                         <div class="md:col-span-2"><strong>{{ row.name }}</strong><p class="text-xs text-slate-400">{{ row.email || '-' }} · {{ row.phone || '-' }}</p></div>
                         <div><span class="text-xs text-slate-500">Saldo</span><div>Rp{{ Number(row.balance_idr || 0).toLocaleString('id-ID') }}</div></div>
                         <label class="text-xs">Membership<select v-model="row.membership_assignment" :disabled="!isSuper" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="AUTO">AUTO (berdasarkan transaksi)</option><option v-for="tier in membershipTiers" :key="tier" :value="tier">{{ tier }} (manual)</option></select><small class="mt-1 block text-[10px] text-slate-500">Aktif: {{row.membership_tier_code}} · Belanja Rp{{Number(row.lifetime_spend_idr||0).toLocaleString('id-ID')}}</small></label>
-                        <button v-if="isSuper" class="self-end rounded bg-slate-700 px-3 py-2 text-xs" @click="updateMembership(row)">Simpan tier</button>
+                        <Button v-if="isSuper" class="self-end rounded bg-slate-700 px-3 py-2 text-xs" @click="updateMembership(row)">Simpan tier</Button>
                     </div>
                     <div v-if="isSuper" class="mt-3 flex flex-wrap items-end gap-2 border-t border-slate-800 pt-3">
-                        <label class="text-xs">Penyesuaian saldo (+/-)<input v-model="row.adjust_amount" type="number" class="mt-1 block rounded bg-slate-800 p-2"></label>
-                        <label class="min-w-60 flex-1 text-xs">Alasan<input v-model="row.adjust_reason" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <button class="rounded bg-cyan-300 px-3 py-2 text-xs font-semibold text-slate-950" @click="adjustWallet(row)">Terapkan</button>
+                        <label class="text-xs">Penyesuaian saldo (+/-)<Input v-model="row.adjust_amount" type="number" class="mt-1 block rounded bg-slate-800 p-2" /></label>
+                        <label class="min-w-60 flex-1 text-xs">Alasan<Input v-model="row.adjust_reason" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <Button class="rounded bg-cyan-300 px-3 py-2 text-xs font-semibold text-slate-950" @click="adjustWallet(row)">Terapkan</Button>
                     </div>
                 </div>
             </section>
@@ -151,14 +156,14 @@ function adjustWallet(row) {
                     </div>
                 </div>
                 <form class="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-5 md:grid-cols-4" @submit.prevent="voucherForm.post('/admin/vouchers', { preserveScroll: true, onSuccess: () => voucherForm.reset() })">
-                    <input v-model="voucherForm.code" required placeholder="Kode voucher" class="rounded bg-slate-800 p-2">
+                    <Input v-model="voucherForm.code" required placeholder="Kode voucher" class="rounded bg-slate-800 p-2" />
                     <select v-model="voucherForm.discount_type" class="rounded bg-slate-800 p-2"><option>FIXED</option><option>PERCENT</option></select>
-                    <input v-model.number="voucherForm.discount_value" required type="number" min="1" placeholder="Nilai" class="rounded bg-slate-800 p-2">
-                    <input v-model.number="voucherForm.minimum_total_idr" type="number" min="0" placeholder="Minimum transaksi" class="rounded bg-slate-800 p-2">
-                    <input v-model.number="voucherForm.total_quota" type="number" min="1" placeholder="Total kuota" class="rounded bg-slate-800 p-2">
-                    <input v-model.number="voucherForm.per_customer_limit" type="number" min="1" placeholder="Limit/customer" class="rounded bg-slate-800 p-2">
-                    <input v-model="voucherForm.starts_at" type="datetime-local" class="rounded bg-slate-800 p-2">
-                    <input v-model="voucherForm.ends_at" type="datetime-local" class="rounded bg-slate-800 p-2">
+                    <Input v-model.number="voucherForm.discount_value" required type="number" min="1" placeholder="Nilai" class="rounded bg-slate-800 p-2" />
+                    <Input v-model.number="voucherForm.minimum_total_idr" type="number" min="0" placeholder="Minimum transaksi" class="rounded bg-slate-800 p-2" />
+                    <Input v-model.number="voucherForm.total_quota" type="number" min="1" placeholder="Total kuota" class="rounded bg-slate-800 p-2" />
+                    <Input v-model.number="voucherForm.per_customer_limit" type="number" min="1" placeholder="Limit/customer" class="rounded bg-slate-800 p-2" />
+                    <Input v-model="voucherForm.starts_at" type="datetime-local" class="rounded bg-slate-800 p-2" />
+                    <Input v-model="voucherForm.ends_at" type="datetime-local" class="rounded bg-slate-800 p-2" />
                     <label class="text-xs md:col-span-2">Scope kategori <span class="text-slate-500">(kosong = semua)</span>
                         <select v-model="voucherForm.category_ids" multiple class="mt-1 block min-h-28 w-full rounded bg-slate-800 p-2">
                             <option v-for="category in voucherCategories" :key="category.id" :value="category.id">{{category.name}}</option>
@@ -170,20 +175,20 @@ function adjustWallet(row) {
                         </select>
                     </label>
                     <label class="flex gap-2 text-sm"><input v-model="voucherForm.is_active" type="checkbox">Aktif</label>
-                    <button class="rounded bg-cyan-300 px-4 py-2 font-semibold text-slate-950">Tambah voucher</button>
+                    <Button class="rounded bg-cyan-300 px-4 py-2 font-semibold text-slate-950">Tambah voucher</Button>
                     <p class="text-xs text-slate-500 md:col-span-4">Scope kategori/produk memakai logika OR: voucher berlaku bila produk atau kategorinya termasuk scope. Jika keduanya kosong, voucher berlaku global.</p>
                 </form>
 
                 <article v-for="row in rows" :key="row.id" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
                     <div class="grid gap-2 md:grid-cols-4">
-                        <input v-model="row.code" class="rounded bg-slate-800 p-2" placeholder="Kode">
+                        <Input v-model="row.code" class="rounded bg-slate-800 p-2" placeholder="Kode" />
                         <select v-model="row.discount_type" class="rounded bg-slate-800 p-2"><option>FIXED</option><option>PERCENT</option></select>
-                        <input v-model.number="row.discount_value" type="number" min="1" class="rounded bg-slate-800 p-2" placeholder="Nilai">
-                        <input v-model.number="row.minimum_total_idr" type="number" min="0" class="rounded bg-slate-800 p-2" placeholder="Minimum transaksi">
-                        <input v-model.number="row.total_quota" type="number" min="1" class="rounded bg-slate-800 p-2" placeholder="Total kuota">
-                        <input v-model.number="row.per_customer_limit" type="number" min="1" class="rounded bg-slate-800 p-2" placeholder="Limit/customer">
-                        <input v-model="row.starts_at" type="datetime-local" class="rounded bg-slate-800 p-2">
-                        <input v-model="row.ends_at" type="datetime-local" class="rounded bg-slate-800 p-2">
+                        <Input v-model.number="row.discount_value" type="number" min="1" class="rounded bg-slate-800 p-2" placeholder="Nilai" />
+                        <Input v-model.number="row.minimum_total_idr" type="number" min="0" class="rounded bg-slate-800 p-2" placeholder="Minimum transaksi" />
+                        <Input v-model.number="row.total_quota" type="number" min="1" class="rounded bg-slate-800 p-2" placeholder="Total kuota" />
+                        <Input v-model.number="row.per_customer_limit" type="number" min="1" class="rounded bg-slate-800 p-2" placeholder="Limit/customer" />
+                        <Input v-model="row.starts_at" type="datetime-local" class="rounded bg-slate-800 p-2" />
+                        <Input v-model="row.ends_at" type="datetime-local" class="rounded bg-slate-800 p-2" />
                         <label class="text-xs md:col-span-2">Scope kategori
                             <select v-model="row.category_ids" multiple class="mt-1 block min-h-24 w-full rounded bg-slate-800 p-2">
                                 <option v-for="category in voucherCategories" :key="category.id" :value="category.id">{{category.name}}</option>
@@ -197,7 +202,7 @@ function adjustWallet(row) {
                     </div>
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <label class="flex items-center gap-2 text-sm"><input v-model="row.is_active" type="checkbox">Aktif</label>
-                        <button class="rounded bg-slate-700 px-4 py-2 text-sm" @click="saveVoucher(row)">Simpan voucher</button>
+                        <Button class="rounded bg-slate-700 px-4 py-2 text-sm" @click="saveVoucher(row)">Simpan voucher</Button>
                     </div>
                 </article>
             </section>
@@ -220,8 +225,8 @@ function adjustWallet(row) {
                     </div>
                     <div class="mt-3 grid gap-2 md:grid-cols-[180px_minmax(0,1fr)_auto]">
                         <select v-model="row.status" class="rounded bg-slate-800 p-2 text-sm"><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option></select>
-                        <textarea v-model="row.quick_reply" rows="2" class="rounded bg-slate-800 p-2 text-sm" placeholder="Quick reply ke pelanggan (opsional)"></textarea>
-                        <button class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950" @click="updateSupport(row)">Simpan / Balas</button>
+                        <Textarea v-model="row.quick_reply" rows="2" class="rounded bg-slate-800 p-2 text-sm" placeholder="Quick reply ke pelanggan (opsional)"></Textarea>
+                        <Button class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950" @click="updateSupport(row)">Simpan / Balas</Button>
                     </div>
                 </div>
             </section>
@@ -240,23 +245,23 @@ function adjustWallet(row) {
                     <a href="/admin/configuration/export" class="rounded bg-slate-700 px-4 py-2 text-sm font-semibold text-white">Export JSON</a>
                 </section>
                 <form class="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-5 md:grid-cols-2" @submit.prevent="settingsForm.put('/admin/settings')">
-                    <label class="text-sm">Nama toko<input v-model="settingsForm.store_name" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                    <label class="text-sm">Tagline<input v-model="settingsForm.tagline" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                    <label class="text-sm">WhatsApp<input v-model="settingsForm.support_whatsapp" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                    <label class="text-sm">Instagram URL<input v-model="settingsForm.instagram_url" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                    <label class="text-sm">Email<input v-model="settingsForm.email" type="email" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                    <label class="text-sm">Discord URL<input v-model="settingsForm.discord_url" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                    <label class="text-sm">Support URL<input v-model="settingsForm.support_url" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                    <label class="text-sm">Jam layanan<input v-model="settingsForm.business_hours" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                    <button class="rounded bg-cyan-300 px-4 py-2 font-semibold text-slate-950">Simpan pengaturan</button>
+                    <label class="text-sm">Nama toko<Input v-model="settingsForm.store_name" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                    <label class="text-sm">Tagline<Input v-model="settingsForm.tagline" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                    <label class="text-sm">WhatsApp<Input v-model="settingsForm.support_whatsapp" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                    <label class="text-sm">Instagram URL<Input v-model="settingsForm.instagram_url" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                    <label class="text-sm">Email<Input v-model="settingsForm.email" type="email" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                    <label class="text-sm">Discord URL<Input v-model="settingsForm.discord_url" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                    <label class="text-sm">Support URL<Input v-model="settingsForm.support_url" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                    <label class="text-sm">Jam layanan<Input v-model="settingsForm.business_hours" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                    <Button class="rounded bg-cyan-300 px-4 py-2 font-semibold text-slate-950">Simpan pengaturan</Button>
                 </form>
                 <section class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
                     <h2 class="font-semibold">Membership tiers</h2>
                     <div v-for="tier in tiers" :key="tier.code" class="grid gap-2 border-t border-slate-800 pt-3 md:grid-cols-2">
                         <div class="md:col-span-2 flex items-center justify-between"><strong>{{ tier.rank }}. {{ tier.code }}</strong><label class="flex gap-2 text-sm"><input v-model="tier.is_active" type="checkbox">Aktif</label></div>
-                        <label class="text-xs">Requirements JSON<textarea v-model="tier.requirements" rows="4" class="mt-1 block w-full rounded bg-slate-800 p-2 font-mono"></textarea></label>
-                        <label class="text-xs">Benefits JSON<textarea v-model="tier.benefits" rows="4" class="mt-1 block w-full rounded bg-slate-800 p-2 font-mono"></textarea></label>
-                        <button class="rounded bg-slate-700 px-3 py-2 text-sm md:col-span-2" @click="saveTier(tier)">Simpan tier</button>
+                        <label class="text-xs">Requirements JSON<Textarea v-model="tier.requirements" rows="4" class="mt-1 block w-full rounded bg-slate-800 p-2 font-mono"></Textarea></label>
+                        <label class="text-xs">Benefits JSON<Textarea v-model="tier.benefits" rows="4" class="mt-1 block w-full rounded bg-slate-800 p-2 font-mono"></Textarea></label>
+                        <Button class="rounded bg-slate-700 px-3 py-2 text-sm md:col-span-2" @click="saveTier(tier)">Simpan tier</Button>
                     </div>
                 </section>
             </section>
@@ -269,10 +274,10 @@ function adjustWallet(row) {
             </section>
 
             <section v-else-if="kind === 'audit'" class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900 p-4">
-                <table class="w-full min-w-[1100px] text-xs">
-                    <thead class="text-left text-slate-400"><tr><th class="p-2">Waktu</th><th class="p-2">Actor</th><th class="p-2">Aksi</th><th class="p-2">Target</th><th class="p-2">Correlation</th><th class="p-2">IP</th></tr></thead>
-                    <tbody><tr v-for="row in rows" :key="row.id" class="border-t border-slate-800"><td class="p-2">{{ row.created_at }}</td><td class="p-2">{{ row.actor_role }} #{{ row.actor_id }}</td><td class="p-2">{{ row.action }}</td><td class="p-2">{{ row.target_type }} #{{ row.target_id }}</td><td class="p-2">{{ row.correlation_id }}</td><td class="p-2">{{ row.ip_address }}</td></tr></tbody>
-                </table>
+                <Table class="w-full min-w-[1100px] text-xs">
+                    <TableHeader class="text-left text-slate-400"><TableRow><TableHead class="p-2">Waktu</TableHead><TableHead class="p-2">Actor</TableHead><TableHead class="p-2">Aksi</TableHead><TableHead class="p-2">Target</TableHead><TableHead class="p-2">Correlation</TableHead><TableHead class="p-2">IP</TableHead></TableRow></TableHeader>
+                    <TableBody><TableRow v-for="row in rows" :key="row.id" class="border-t border-slate-800"><TableCell class="p-2">{{ row.created_at }}</TableCell><TableCell class="p-2">{{ row.actor_role }} #{{ row.actor_id }}</TableCell><TableCell class="p-2">{{ row.action }}</TableCell><TableCell class="p-2">{{ row.target_type }} #{{ row.target_id }}</TableCell><TableCell class="p-2">{{ row.correlation_id }}</TableCell><TableCell class="p-2">{{ row.ip_address }}</TableCell></TableRow></TableBody>
+                </Table>
             </section>
         </div>
     </AdminShell>

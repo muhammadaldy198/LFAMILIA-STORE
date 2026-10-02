@@ -1,4 +1,8 @@
 <script setup>
+import { Button } from '../../Components/ui/button';
+import { Input } from '../../Components/ui/input';
+import { Textarea } from '../../Components/ui/textarea';
+
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
 import { reactive } from 'vue';
@@ -68,23 +72,23 @@ function retry(id) {
                 <div v-if="attempt.status === 'MANUAL_PENDING'" class="space-y-3 border-t border-slate-800 pt-4">
                     <p v-if="attempt.manual_instructions" class="whitespace-pre-wrap text-sm text-slate-300">{{ attempt.manual_instructions }}</p>
                     <div class="grid gap-3 md:grid-cols-2">
-                        <label class="text-sm">Kode/hasil untuk customer<textarea v-model="form(attempt.id).delivery_code" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
-                        <label class="text-sm">Catatan customer<textarea v-model="form(attempt.id).note" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-sm">Kode/hasil untuk customer<Textarea v-model="form(attempt.id).delivery_code" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <label class="text-sm">Catatan customer<Textarea v-model="form(attempt.id).note" rows="2" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
                     </div>
-                    <button class="rounded bg-emerald-300 px-4 py-2 font-semibold text-slate-950" @click="completeManual(attempt.id)">Tandai berhasil</button>
+                    <Button class="rounded bg-emerald-300 px-4 py-2 font-semibold text-slate-950" @click="completeManual(attempt.id)">Tandai berhasil</Button>
                     <div class="flex flex-wrap items-end gap-2">
-                        <label class="min-w-64 flex-1 text-sm">Alasan gagal<input v-model="form(attempt.id).reason" class="mt-1 block w-full rounded bg-slate-800 p-2"></label>
-                        <button :disabled="!form(attempt.id).reason" class="rounded bg-red-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" @click="failManual(attempt.id)">Tandai gagal</button>
+                        <label class="min-w-64 flex-1 text-sm">Alasan gagal<Input v-model="form(attempt.id).reason" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                        <Button :disabled="!form(attempt.id).reason" class="rounded bg-red-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" @click="failManual(attempt.id)">Tandai gagal</Button>
                     </div>
                 </div>
 
-                <button
+                <Button
                     v-if="attempt.status === 'BLOCKED' || (attempt.status === 'FAILED_CONFIRMED' && attempt.safe_to_failover)"
                     class="rounded bg-cyan-300 px-4 py-2 font-semibold text-slate-950"
                     @click="retry(attempt.id)"
                 >
                     {{ attempt.status === 'BLOCKED' ? 'Coba lagi dengan aman' : 'Cari mapping failover aman' }}
-                </button>
+                </Button>
 
                 <p v-if="['PENDING', 'UNKNOWN', 'SENDING'].includes(attempt.status)" class="text-sm text-amber-200">
                     Terkunci untuk reconciliation dengan reference yang sama. Failover tidak diizinkan.

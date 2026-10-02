@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 @source '../js/**/*.vue';
 
 :root{--lime:#b9ff35;--lime2:#cfff72;--ink:#0b1320;--panel:#0d1019;--blue:#1769e8}
@@ -5967,4 +5968,46 @@
   width:100%!important;height:100%!important;min-height:0!important;
   max-height:none!important;aspect-ratio:auto!important;
   object-fit:cover!important;object-position:center!important;
+}
+
+/* shadcn-vue tokens are scoped to admin, including its portal navigation. */
+@theme inline {
+ --color-background:var(--background);--color-foreground:var(--foreground);
+ --color-primary:var(--primary);--color-primary-foreground:var(--primary-foreground);
+ --color-secondary:var(--secondary);--color-secondary-foreground:var(--secondary-foreground);
+ --color-muted:var(--muted);--color-muted-foreground:var(--muted-foreground);
+ --color-accent:var(--accent);--color-accent-foreground:var(--accent-foreground);
+ --color-card:var(--card);--color-card-foreground:var(--card-foreground);
+ --color-popover:var(--popover);--color-popover-foreground:var(--popover-foreground);
+ --color-border:var(--border);--color-input:var(--input);--color-ring:var(--ring);--color-destructive:var(--destructive);
+}
+.lf-admin,.lf-admin-auth,.lf-admin-mobile-navigation{
+ --background:#f4f7fb;--foreground:#243653;--primary:#1769e8;--primary-foreground:#fff;
+ --secondary:#edf4ff;--secondary-foreground:#243653;--muted:#f8fafc;--muted-foreground:#718198;
+ --accent:#edf4ff;--accent-foreground:#1769e8;--card:#fff;--card-foreground:#243653;
+ --popover:#fff;--popover-foreground:#243653;--border:#dfe5ed;--input:#dfe5ed;--ring:#1769e8;--destructive:#dc2626;
+}
+.lf-admin-content :is(form,section,article,.grid)>*{min-width:0}
+.lf-admin-content [data-slot=button]{white-space:normal;max-width:100%}
+.lf-admin-content select[multiple]{height:auto!important;min-height:112px!important;padding:8px 12px!important}
+.lf-admin-content [data-slot=table-container]{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.lf-admin-content [data-slot=table]{text-align:left}
+.lf-admin-mobile-navigation{width:min(300px,86vw)!important;max-width:300px!important;background:#112842!important;color:#fff;z-index:100!important;gap:0!important;padding:0!important;height:100dvh!important;overflow-y:auto}
+.lf-admin-mobile-navigation .lf-admin-brand{flex-shrink:0;padding-right:40px}
+.lf-admin-mobile-navigation .lf-admin-menu{min-height:0}
+.lf-admin-mobile-navigation .lf-admin-help{flex-shrink:0}
+[data-slot=sheet-overlay]{z-index:95!important}
+.lf-admin-auth{font-size:13px;line-height:1.6}
+.lf-admin-auth label{font-size:12px!important;font-weight:600!important}
+.lf-admin-auth input{font-size:16px!important;height:36px!important}
+.lf-admin-auth button{font-size:12px!important;min-height:36px!important}
+.lf-admin-auth h1{font-size:24px!important;font-weight:700!important}
+@media(min-width:640px){.lf-admin-auth{font-size:14px}.lf-admin-auth input,.lf-admin-auth button{min-height:40px!important}.lf-admin-auth h1{font-size:28px!important}}
+@media(max-width:639px){
+ .lf-admin-top{flex-wrap:nowrap}.lf-admin-search{min-width:0}.lf-admin-search input{min-width:0}
+ .lf-admin-content :is(.flex.items-end,.flex.items-center.justify-between){flex-wrap:wrap}
+ .lf-admin-content label.min-w-60{min-width:0;width:100%;flex-basis:100%}
+ .lf-admin-content [data-slot=button]{min-height:36px;height:auto}
+ .lf-admin-content .lf-admin-tabs{padding-bottom:4px}
+ .lf-admin-content :is(input,textarea,select){max-width:100%}
 }

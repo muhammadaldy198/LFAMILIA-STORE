@@ -1,4 +1,5 @@
 <script setup>
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "./ui/sheet";
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import AdminIcon from './AdminIcon.vue';
@@ -37,8 +38,14 @@ onUnmounted(() => { window.removeEventListener('keydown', shortcut);controller?.
 </script>
 <template>
 <div class="lf-admin">
- <div v-if="open" class="lf-admin-backdrop" @click="open=false"></div>
- <aside class="lf-admin-sidebar" :class="{open}" aria-label="Navigasi Admin">
+ <Sheet v-model:open="open"><SheetContent side="left" class="lf-admin-mobile-navigation"><SheetTitle class="sr-only">Navigasi Admin</SheetTitle><SheetDescription class="sr-only">Pilih menu pengelolaan toko.</SheetDescription>
+  <Link :href="base + '/panel'" class="lf-admin-brand"><span class="lf-admin-logo"><AdminIcon name="nickname" /></span><span><strong>{{ $page.props.storefront?.storeName || 'LFAMILIA' }} ADMIN</strong><small>{{ $page.props.storefront?.tagline || 'Top Up Game Solution' }}</small></span></Link>
+  
+  <nav class="lf-admin-menu"><Link v-for="item in panel.menu" :key="item.href" :href="item.href" :class="{active:active(item.href)}" @click="open=false"><AdminIcon :name="icon(item.href)" /><span>{{ item.label }}</span></Link></nav>
+  <div v-if="panel.menu.some(x => x.href === '/admin/support')" class="lf-admin-help"><strong>Butuh bantuan?</strong><p>Buka Layanan Pelanggan untuk melihat dan menangani tiket.</p><Link :href="base + '/support'">Pusat Bantuan</Link></div>
+  <div class="lf-admin-sidebar-footer">© {{ new Date().getFullYear() }} {{ $page.props.storefront?.storeName || 'LFAMILIA' }}</div>
+ </SheetContent></Sheet>
+ <aside class="lf-admin-sidebar" aria-label="Navigasi Admin">
   <Link :href="base + '/panel'" class="lf-admin-brand"><span class="lf-admin-logo"><AdminIcon name="nickname" /></span><span><strong>{{ $page.props.storefront?.storeName || 'LFAMILIA' }} ADMIN</strong><small>{{ $page.props.storefront?.tagline || 'Top Up Game Solution' }}</small></span></Link>
   <button type="button" class="lf-admin-drawer-close" aria-label="Tutup menu" @click="open=false"><AdminIcon name="close" /></button>
   <nav class="lf-admin-menu"><Link v-for="item in panel.menu" :key="item.href" :href="item.href" :class="{active:active(item.href)}" @click="open=false"><AdminIcon :name="icon(item.href)" /><span>{{ item.label }}</span></Link></nav>

@@ -1,4 +1,7 @@
 <script setup>
+import { Button } from '../../Components/ui/button';
+import { Input } from '../../Components/ui/input';
+
 import { Head, router } from '@inertiajs/vue3';
 import { reactive } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -61,25 +64,25 @@ async function testConnection(item) {
                     <label v-for="field in item.fields" :key="field.key" class="text-sm">
                         {{ field.label }}
                         <div class="mt-1 flex gap-2">
-                            <input
+                            <Input
                                 v-if="field.type !== 'boolean'"
                                 v-model="item.config[field.key]"
                                 :type="field.secret && !field.revealed ? 'password' : 'text'"
                                 :placeholder="field.secret && field.configured ? 'Tersimpan — kosongkan untuk mempertahankan' : ''"
                                 class="min-w-0 flex-1 rounded bg-slate-800 p-2"
-                            >
+                             />
                             <input v-else v-model="item.config[field.key]" type="checkbox" class="mt-2">
-                            <button v-if="field.secret && field.configured" type="button" :disabled="!item.reveal_password" class="rounded bg-slate-700 px-3 py-2 text-xs disabled:opacity-40" @click="reveal(item, field)">Reveal</button>
+                            <Button v-if="field.secret && field.configured" type="button" :disabled="!item.reveal_password" class="rounded bg-slate-700 px-3 py-2 text-xs disabled:opacity-40" @click="reveal(item, field)">Reveal</Button>
                         </div>
                     </label>
                 </div>
                 <label v-if="item.fields.some((field) => field.secret && field.configured)" class="mt-4 block max-w-md text-sm">
                     Password Super Admin untuk Reveal
-                    <input v-model="item.reveal_password" type="password" autocomplete="current-password" class="mt-1 block w-full rounded bg-slate-800 p-2" placeholder="Masukkan ulang password">
+                    <Input v-model="item.reveal_password" type="password" autocomplete="current-password" class="mt-1 block w-full rounded bg-slate-800 p-2" placeholder="Masukkan ulang password" />
                 </label>
                 <div class="mt-4 flex flex-wrap gap-2">
-                    <button class="rounded bg-cyan-300 px-4 py-2 font-semibold text-slate-950" @click="save(item)">Simpan</button>
-                    <button class="rounded bg-slate-700 px-4 py-2 text-sm" @click="testConnection(item)">Tes Koneksi</button>
+                    <Button class="rounded bg-cyan-300 px-4 py-2 font-semibold text-slate-950" @click="save(item)">Simpan</Button>
+                    <Button class="rounded bg-slate-700 px-4 py-2 text-sm" @click="testConnection(item)">Tes Koneksi</Button>
                 </div>
                 <p v-if="item.result" class="mt-3 text-sm" :class="item.result.status === 'HEALTHY' ? 'text-emerald-300' : 'text-amber-200'">{{ item.result.status }} · {{ item.result.message }}</p>
             </section>
