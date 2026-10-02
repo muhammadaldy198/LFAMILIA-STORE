@@ -22,6 +22,7 @@ const statusLabel = (status) => ({
     HEALTHY: 'Normal',
     DEGRADED: 'Perlu diperiksa',
     DOWN: 'Bermasalah',
+    STALE: 'Kedaluwarsa',
     MAINTENANCE: 'Maintenance',
     NOT_CONFIGURED: 'Nonaktif',
     UNTESTED: 'Belum dites',
