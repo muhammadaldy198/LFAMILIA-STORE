@@ -16,11 +16,18 @@ class AdminNicknameToolsService
     ) {}
 
     /**
-     * @return array<int, array{id:int,name:string,code:string,requires_server:bool,requires_region_check:bool,is_active:bool,sort_order:int,product_count:int}>
+     * @return array<int, array{id:int,name:string,code:string,supports_nickname_check:bool,requires_server:bool,requires_region_check:bool,is_active:bool,sort_order:int,product_count:int,nickname_product_count:int}>
      */
     public function gameCodes(): array
     {
         $usage = Product::query()
+            ->whereNotNull('nickname_game_code')
+            ->selectRaw('nickname_game_code, COUNT(*) as aggregate')
+            ->groupBy('nickname_game_code')
+            ->pluck('aggregate', 'nickname_game_code');
+
+        $nicknameUsage = Product::query()
+            ->where('nickname_check_enabled', true)
             ->whereNotNull('nickname_game_code')
             ->selectRaw('nickname_game_code, COUNT(*) as aggregate')
             ->groupBy('nickname_game_code')
@@ -34,11 +41,13 @@ class AdminNicknameToolsService
                 'id' => (int) $item->id,
                 'name' => $item->name,
                 'code' => $item->code,
+                'supports_nickname_check' => (bool) $item->supports_nickname_check,
                 'requires_server' => (bool) $item->requires_server,
                 'requires_region_check' => (bool) $item->requires_region_check,
                 'is_active' => (bool) $item->is_active,
                 'sort_order' => (int) $item->sort_order,
                 'product_count' => (int) ($usage[$item->code] ?? 0),
+                'nickname_product_count' => (int) ($nicknameUsage[$item->code] ?? 0),
             ])->all();
     }
 
@@ -124,13 +133,20 @@ class AdminNicknameToolsService
 
     private function activeGame(string $gameCode): NicknameGameCode
     {
+        $code = strtolower(trim($gameCode));
         $game = NicknameGameCode::active()
-            ->where('code', strtolower(trim($gameCode)))
+            ->where('code', $code)
             ->first();
 
         if (! $game) {
             throw ValidationException::withMessages([
                 'game_code' => 'Kode game tidak tersedia atau sedang dinonaktifkan.',
+            ]);
+        }
+
+        if (! $game->supports_nickname_check) {
+            throw ValidationException::withMessages([
+                'game_code' => 'Game ini tidak mendukung cek nickname.',
             ]);
         }
 
