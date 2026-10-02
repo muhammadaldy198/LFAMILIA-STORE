@@ -9,6 +9,7 @@ use App\Models\IntegrationCredential;
 use App\Services\AdminNotificationService;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 Artisan::command('lfamilia:bootstrap-super-admin', function (): int {
     if (AdminUser::where('role', 'SUPER_ADMIN')->exists()) {
@@ -164,12 +166,12 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
     );
     if (is_array($last) && ! empty($last['at'])) {
         try {
-            if (\Illuminate\Support\Carbon::parse($last['at'])->gt(now()->subMinutes($interval))) {
+            if (Carbon::parse($last['at'])->gt(now()->subMinutes($interval))) {
                 $this->info('Belum mencapai jadwal sinkron otomatis berikutnya.');
 
                 return 0;
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Invalid historical timestamp is ignored so the next sync can repair the state.
         }
     }
