@@ -7,7 +7,7 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 | Dashboard | Metrics, recent orders, notifications, global search |
 | Pesanan | Invoice search, status filter, pagination, detail, payment history, fulfillment history |
 | Produk | Categories, product editor, images/banner/notices, customer fields with preview, nominal table and editor, provider SKU import, individual sync, product/global margin, per-nominal percent/fixed/final price, drag order and mobile order buttons |
-| Manual | Invoice/status filter, pagination, delivery result, failure reason, safe retry |
+| Manual | Antrean proses terbaru per pesanan, metrik, pencarian, filter, pagination, penanganan manual, hasil/kegagalan, pemeriksaan status, dan retry/failover aman |
 | Banner & Konten | Desktop/mobile banners, single popup, store artwork/contact/footer, news, reviews, FAQ, legal pages |
 | Digiflazz | Cached buyer price list, search/brand/status filters, stock, buyer/seller status, cut-off, baseline, per-SKU/all sync |
 | Validasi Akun | Game codes, game nickname, MLBB region, PLN checks |
@@ -28,6 +28,8 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 - Imported nominal and mapping stay inactive until reviewed.
 - Sync takes SKU and modal from provider response, never from customer input. Max price equals synced modal.
 - Existing order snapshots are not rewritten by pricing or synchronization changes.
+- Menu Manual hanya mengizinkan tindakan pada proses terbaru setiap pesanan; proses lama ditolak untuk mencegah double fulfillment.
+- Pemeriksaan status transaksi tidak pasti memakai referensi proses yang sama dan tidak membuat transaksi baru.
 - Buyer/seller inactive, finite stock zero, missing SKU after full sync, and cut-off prevent checkout.
 - Fixed sell price below modal is rejected and is blocked at checkout if modal later rises.
 - Input keys used by nickname or delivery templates cannot be removed until their references are changed.
