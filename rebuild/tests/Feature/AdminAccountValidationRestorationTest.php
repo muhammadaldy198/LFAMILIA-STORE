@@ -53,6 +53,7 @@ class AdminAccountValidationRestorationTest extends TestCase
         $create = $this->postJson('/admin/nickname-tools/game-codes', [
             'name' => 'Dynamic Game',
             'code' => 'dynamic-game',
+            'supports_nickname_check' => true,
             'requires_server' => false,
             'requires_region_check' => true,
             'is_active' => true,
@@ -73,6 +74,7 @@ class AdminAccountValidationRestorationTest extends TestCase
         $this->putJson('/admin/nickname-tools/game-codes/'.$row->id, [
             'name' => 'Dynamic Game Updated',
             'code' => 'dynamic-game-v2',
+            'supports_nickname_check' => true,
             'requires_server' => true,
             'requires_region_check' => false,
             'is_active' => true,
@@ -93,6 +95,7 @@ class AdminAccountValidationRestorationTest extends TestCase
         $this->putJson('/admin/nickname-tools/game-codes/'.$row->id, [
             'name' => $row->name,
             'code' => $row->code,
+            'supports_nickname_check' => $row->supports_nickname_check,
             'requires_server' => $row->requires_server,
             'requires_region_check' => $row->requires_region_check,
             'is_active' => false,
@@ -114,6 +117,7 @@ class AdminAccountValidationRestorationTest extends TestCase
         $this->putJson('/admin/nickname-tools/game-codes/'.$row->id, [
             'name' => $row->name,
             'code' => $row->code,
+            'supports_nickname_check' => $row->supports_nickname_check,
             'requires_server' => $row->requires_server,
             'requires_region_check' => $row->requires_region_check,
             'is_active' => false,
@@ -234,6 +238,7 @@ class AdminAccountValidationRestorationTest extends TestCase
         $this->postJson('/admin/nickname-tools/game-codes', [
             'name' => 'Forbidden Game',
             'code' => 'forbidden-game',
+            'supports_nickname_check' => true,
             'requires_server' => false,
             'requires_region_check' => false,
             'is_active' => true,
@@ -315,4 +320,60 @@ class AdminAccountValidationRestorationTest extends TestCase
         $this->assertSame('free-fire', $product->nickname_game_code);
         $this->assertSame('zone_id', $product->nickname_server_field_key);
     }
+
+    public function test_active_game_without_nickname_support_skips_lookup_and_cannot_be_selected_for_product_validation(): void
+    {
+        $this->actingAs($this->superAdmin(), 'admin');
+
+        $game = NicknameGameCode::where('code', 'free-fire')->firstOrFail();
+        $game->update([
+            'supports_nickname_check' => false,
+            'requires_server' => false,
+            'requires_region_check' => false,
+            'is_active' => true,
+        ]);
+
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'No Nickname Support '.bin2hex(random_bytes(3)),
+            'slug' => 'no-nickname-support-'.bin2hex(random_bytes(4)),
+            'margin_percent' => 10,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'sort_order' => 0,
+            'is_active' => false,
+            'nickname_check_enabled' => true,
+            'nickname_game_code' => 'free-fire',
+            'nickname_user_field_key' => 'user_id',
+        ]);
+        $product->fields()->create([
+            'field_key' => 'user_id',
+            'label' => 'User ID',
+            'type' => 'text',
+            'is_required' => true,
+            'sort_order' => 0,
+        ]);
+
+        Http::fake();
+
+        $result = app(\App\Services\NicknameService::class)->check($product, ['user_id' => '12345678']);
+
+        $this->assertFalse($result['supported']);
+        $this->assertFalse($result['verified']);
+        Http::assertNothingSent();
+
+        $this->putJson('/admin/catalog/products/'.$product->id, [
+            'category_id' => $category->id,
+            'name' => $product->name,
+            'margin_percent' => 10,
+            'sort_order' => 0,
+            'is_active' => false,
+            'nickname_check_enabled' => true,
+            'nickname_game_code' => 'free-fire',
+            'nickname_user_field_key' => 'user_id',
+            'nickname_server_field_key' => null,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['nickname_game_code']);
+    }
+
 }
