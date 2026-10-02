@@ -135,9 +135,7 @@ class AdminPaymentController
                 'supports_order' => (bool) $route->supports_order,
                 'supports_wallet_topup' => (bool) $route->supports_wallet_topup,
                 'is_active' => (bool) $route->is_active,
-                'configuration' => is_string($route->configuration)
-                    ? (json_decode($route->configuration, true) ?: [])
-                    : ((array) ($route->configuration ?? [])),
+                'configuration' => $this->safeConfiguration($route->configuration),
             ]);
 
         $transactions = $this->transactionQuery($filters)
@@ -724,16 +722,47 @@ class AdminPaymentController
             throw ValidationException::withMessages(['configuration' => 'Konfigurasi lanjutan harus berupa objek JSON.']);
         }
 
-        $scan = strtolower(json_encode($data, JSON_THROW_ON_ERROR));
-        foreach (['secret', 'password', 'api_key', 'server_key', 'client_secret', 'access_token', 'private_key'] as $blocked) {
-            if (str_contains($scan, '"'.$blocked.'"')) {
-                throw ValidationException::withMessages([
-                    'configuration' => 'Kredensial sensitif harus disimpan di menu Integrasi, bukan routing pembayaran.',
-                ]);
+        if ($this->containsSensitiveConfigurationKey($data)) {
+            throw ValidationException::withMessages([
+                'configuration' => 'Kredensial sensitif harus disimpan di menu Integrasi, bukan routing pembayaran.',
+            ]);
+        }
+
+        return $data;
+    }
+
+    private function safeConfiguration(mixed $value): array
+    {
+        $data = is_string($value)
+            ? (json_decode($value, true) ?: [])
+            : ((array) ($value ?? []));
+
+        foreach ($data as $key => $item) {
+            if (preg_match('/(?:secret|password|api[_-]?key|server[_-]?key|client[_-]?secret|access[_-]?token|private[_-]?key)/i', (string) $key)) {
+                unset($data[$key]);
+
+                continue;
+            }
+            if (is_array($item)) {
+                $data[$key] = $this->safeConfiguration($item);
             }
         }
 
         return $data;
+    }
+
+    private function containsSensitiveConfigurationKey(array $data): bool
+    {
+        foreach ($data as $key => $item) {
+            if (preg_match('/(?:secret|password|api[_-]?key|server[_-]?key|client[_-]?secret|access[_-]?token|private[_-]?key)/i', (string) $key)) {
+                return true;
+            }
+            if (is_array($item) && $this->containsSensitiveConfigurationKey($item)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function transactionQuery(array $filters)
