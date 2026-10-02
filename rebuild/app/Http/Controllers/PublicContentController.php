@@ -164,10 +164,15 @@ class PublicContentController
         $settings = DB::table('system_settings')->whereIn('key', $keys)->pluck('value', 'key')
             ->map(fn ($value) => json_decode((string) $value, true));
 
+        $legalName = trim((string) ($settings['store.legal_name'] ?? ''));
+        if ($legalName === '') {
+            $legalName = trim((string) ($settings['store.name'] ?? ''));
+        }
+
         return Inertia::render('Content/Status', [
             'services' => $services,
             'merchant' => [
-                'legalName' => $settings['store.legal_name'] ?? $settings['store.name'] ?? '',
+                'legalName' => $legalName,
                 'registrationId' => $settings['store.registration_id'] ?? '',
                 'address' => $settings['store.address'] ?? '',
             ],
