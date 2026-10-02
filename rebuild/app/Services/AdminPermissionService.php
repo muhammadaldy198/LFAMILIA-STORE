@@ -11,7 +11,7 @@ class AdminPermissionService
         'orders.view' => 'Pesanan',
         'catalog.manage' => 'Produk & katalog',
         'content.manage' => 'Banner & konten',
-        'fulfillment.manage' => 'Manual & fulfillment',
+        'fulfillment.manage' => 'Penanganan manual',
         'providers.manage' => 'Digiflazz & provider',
         'payments.manage' => 'Pembayaran operasional',
         'customers.view' => 'Pelanggan',

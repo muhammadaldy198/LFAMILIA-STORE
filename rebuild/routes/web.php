@@ -197,9 +197,14 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::middleware('admin.permission:fulfillment.manage')->prefix('admin/fulfillment')
         ->name('admin.fulfillment.')->group(function (): void {
             Route::get('/', [AdminFulfillmentController::class, 'index'])->name('index');
-            Route::post('/{attemptId}/complete', [AdminFulfillmentController::class, 'completeManual'])->name('complete');
-            Route::post('/{attemptId}/fail', [AdminFulfillmentController::class, 'failManual'])->name('fail');
-            Route::post('/{attemptId}/retry', [AdminFulfillmentController::class, 'retry'])->name('retry');
+            Route::post('/{attemptId}/complete', [AdminFulfillmentController::class, 'completeManual'])
+                ->middleware('throttle:admin-sensitive')->name('complete');
+            Route::post('/{attemptId}/fail', [AdminFulfillmentController::class, 'failManual'])
+                ->middleware('throttle:admin-sensitive')->name('fail');
+            Route::post('/{attemptId}/reconcile', [AdminFulfillmentController::class, 'reconcile'])
+                ->middleware('throttle:admin-sensitive')->name('reconcile');
+            Route::post('/{attemptId}/retry', [AdminFulfillmentController::class, 'retry'])
+                ->middleware('throttle:admin-sensitive')->name('retry');
         });
 
     Route::get('/admin/catalog', [AdminCatalogController::class, 'index'])

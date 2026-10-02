@@ -213,6 +213,12 @@ class FulfillmentService
         if (! $attempt || ! in_array($attempt->status, ['PENDING', 'UNKNOWN', 'SENDING'], true)) {
             return;
         }
+        if (DB::table('fulfillment_attempts')
+            ->where('order_id', $attempt->order_id)
+            ->where('id', '>', $attempt->id)
+            ->exists()) {
+            return;
+        }
 
         $mapping = $this->mapping((int) $attempt->provider_mapping_id);
         if ($mapping?->provider_code === 'VOUCHER_STOCK') {
@@ -427,13 +433,14 @@ class FulfillmentService
             if (! $attempt) {
                 return null;
             }
+            $this->ensureLatestAttempt($attempt);
 
             if ($attempt->status === 'FAILED_CONFIRMED' && $attempt->safe_to_failover) {
                 return null;
             }
             if ($attempt->status !== 'BLOCKED') {
                 throw ValidationException::withMessages([
-                    'fulfillment' => 'Hanya attempt yang belum pernah dikirim dan berstatus BLOCKED yang dapat diulang.',
+                    'fulfillment' => 'Hanya proses tertahan yang belum terkirim yang dapat dicoba ulang.',
                 ]);
             }
 
@@ -467,6 +474,20 @@ class FulfillmentService
 
         if ($sendAttemptId !== null) {
             SendFulfillmentJob::dispatch($sendAttemptId)->afterCommit();
+        }
+    }
+
+    private function ensureLatestAttempt(object $attempt): void
+    {
+        $newerExists = DB::table('fulfillment_attempts')
+            ->where('order_id', $attempt->order_id)
+            ->where('id', '>', $attempt->id)
+            ->exists();
+
+        if ($newerExists) {
+            throw ValidationException::withMessages([
+                'fulfillment' => 'Proses ini sudah memiliki pembaruan yang lebih baru. Muat ulang halaman sebelum bertindak.',
+            ]);
         }
     }
 
@@ -541,13 +562,14 @@ class FulfillmentService
                 ->lockForUpdate()->first();
             if (! $attempt || $attempt->status !== 'MANUAL_PENDING') {
                 throw ValidationException::withMessages([
-                    'fulfillment' => 'Fulfillment manual tidak dalam status menunggu.',
+                    'fulfillment' => 'Penanganan manual tidak lagi dalam status menunggu.',
                 ]);
             }
+            $this->ensureLatestAttempt($attempt);
 
             $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
             if (! $order || ! in_array($order->status, ['PAID', 'PROCESSING'], true)) {
-                throw ValidationException::withMessages(['fulfillment' => 'Status order tidak dapat diselesaikan manual.']);
+                throw ValidationException::withMessages(['fulfillment' => 'Status pesanan tidak dapat diselesaikan secara manual.']);
             }
 
             $delivery = array_filter([
@@ -573,8 +595,8 @@ class FulfillmentService
             ]);
             $this->notifications->record(
                 'fulfillment.manual.success',
-                'Order manual berhasil',
-                'Order '.$order->order_number.' telah diselesaikan manual.',
+                'Pesanan manual berhasil',
+                'Pesanan '.$order->order_number.' telah diselesaikan secara manual.',
                 'INFO',
                 'order',
                 $order->id
@@ -594,13 +616,14 @@ class FulfillmentService
                 ->lockForUpdate()->first();
             if (! $attempt || $attempt->status !== 'MANUAL_PENDING') {
                 throw ValidationException::withMessages([
-                    'fulfillment' => 'Fulfillment manual tidak dalam status menunggu.',
+                    'fulfillment' => 'Penanganan manual tidak lagi dalam status menunggu.',
                 ]);
             }
+            $this->ensureLatestAttempt($attempt);
 
             $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
             if (! $order) {
-                throw ValidationException::withMessages(['fulfillment' => 'Order tidak ditemukan.']);
+                throw ValidationException::withMessages(['fulfillment' => 'Pesanan tidak ditemukan.']);
             }
 
             DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
@@ -619,8 +642,8 @@ class FulfillmentService
             ]);
             $this->notifications->record(
                 'fulfillment.manual.failed',
-                'Order manual gagal',
-                'Order '.$order->order_number.' ditandai gagal oleh Admin.',
+                'Pesanan manual gagal',
+                'Pesanan '.$order->order_number.' ditandai gagal oleh Admin.',
                 'ERROR',
                 'order',
                 $order->id
