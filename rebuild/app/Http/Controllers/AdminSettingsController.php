@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -169,9 +170,11 @@ class AdminSettingsController
 
         $data = $request->validate([
             'is_active' => ['required', 'boolean'],
-            'minimum_spend_idr' => ['required', 'integer', 'min:0', 'max:1000000000000'],
-            'discount_percent' => ['required', 'numeric', 'min:0', 'max:100', 'decimal:0,2'],
+            'minimum_spend_idr' => ['nullable', 'integer', 'min:0', 'max:1000000000000'],
+            'discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100', 'decimal:0,2'],
             'benefit_notes' => ['nullable', 'string', 'max:1000'],
+            'requirements' => ['nullable', 'string', 'max:10000'],
+            'benefits' => ['nullable', 'string', 'max:10000'],
         ]);
 
         $before = [
@@ -185,14 +188,31 @@ class AdminSettingsController
         $requirements = $before['requirements'];
         $benefits = $before['benefits'];
 
-        $requirements['minimum_spend_idr'] = (int) $data['minimum_spend_idr'];
-        $benefits['discount_bps'] = (int) round(((float) $data['discount_percent']) * 100);
-
-        $notes = trim((string) ($data['benefit_notes'] ?? ''));
-        if ($notes === '') {
-            unset($benefits['benefit_notes']);
+        if ($request->exists('requirements')) {
+            $requirements = $this->jsonPayload($data['requirements'] ?? null, 'requirements');
+        } elseif ($request->exists('minimum_spend_idr')) {
+            $requirements['minimum_spend_idr'] = (int) ($data['minimum_spend_idr'] ?? 0);
         } else {
-            $benefits['benefit_notes'] = $notes;
+            throw ValidationException::withMessages([
+                'minimum_spend_idr' => 'Minimum transaksi membership wajib dikirim.',
+            ]);
+        }
+
+        if ($request->exists('benefits')) {
+            $benefits = $this->jsonPayload($data['benefits'] ?? null, 'benefits');
+        } elseif ($request->exists('discount_percent') || $request->exists('benefit_notes')) {
+            $benefits['discount_bps'] = (int) round(((float) ($data['discount_percent'] ?? 0)) * 100);
+
+            $notes = trim((string) ($data['benefit_notes'] ?? ''));
+            if ($notes === '') {
+                unset($benefits['benefit_notes']);
+            } else {
+                $benefits['benefit_notes'] = $notes;
+            }
+        } else {
+            throw ValidationException::withMessages([
+                'discount_percent' => 'Diskon membership wajib dikirim.',
+            ]);
         }
 
         DB::table('membership_tiers')->where('id', $tier->id)->update([
@@ -300,6 +320,25 @@ class AdminSettingsController
             ],
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function jsonPayload(?string $value, string $field): array
+    {
+        if ($value === null || trim($value) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+        if (! is_array($decoded) || json_last_error() !== JSON_ERROR_NONE) {
+            throw ValidationException::withMessages([
+                $field => 'Format pengaturan lama tidak valid.',
+            ]);
+        }
+
+        return $decoded;
     }
 
     /**
