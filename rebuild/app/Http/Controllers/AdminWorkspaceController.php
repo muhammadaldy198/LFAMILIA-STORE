@@ -25,26 +25,6 @@ use Throwable;
 
 class AdminWorkspaceController
 {
-    public function orders(Request $request): Response
-    {
-        return Inertia::render('Admin/Workspace', [
-            'kind' => 'orders',
-            'title' => 'Pesanan',
-            'filters' => ['q' => (string) $request->query('q', ''), 'status' => (string) $request->query('status', '')],
-            'rows' => DB::table('orders')
-                ->join('products', 'products.id', '=', 'orders.product_id')
-                ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
-                ->when($request->filled('q'), fn ($query) => $query->where('orders.order_number', 'like', '%'.mb_substr((string) $request->query('q'), 0, 100).'%'))
-                ->when($request->filled('status'), fn ($query) => $query->where('orders.status', $request->query('status')))
-                ->orderByDesc('orders.id')
-                ->select([
-                    'orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
-                    'orders.paid_at', 'orders.created_at', 'products.name as product_name',
-                    'product_packages.name as package_name',
-                ])->paginate(25)->withQueryString(),
-        ]);
-    }
-
     public function providers(Request $request): Response
     {
         $provider = strtoupper(trim((string) $request->query('provider', '')));
