@@ -151,6 +151,9 @@ Route::redirect('/panel/login', '/admin/login', 302);
 Route::redirect('/panel/admin', '/admin/panel', 302);
 Route::redirect('/panel/admin/login', '/admin/login', 302);
 
+Route::get('/admin/activate', [\App\Http\Controllers\AdminActivationController::class, 'show'])->middleware('throttle:admin-login');
+Route::post('/admin/activate', [\App\Http\Controllers\AdminActivationController::class, 'store'])->middleware('throttle:admin-login');
+
 Route::middleware('guest:admin')->group(function (): void {
     Route::get('/admin/login', [AdminAuthController::class, 'show'])->name('admin.login');
     Route::post('/admin/login', [AdminAuthController::class, 'login'])
