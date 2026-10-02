@@ -13,9 +13,27 @@ return new class extends Migration
             $table->boolean('supports_nickname_check')->default(false)->after('code');
         });
 
-        // Existing rows came from the previous nickname-code registry, where
-        // presence in this table meant the game was supported for nickname checks.
-        DB::table('nickname_game_codes')->update(['supports_nickname_check' => true]);
+        // Do not assume every known game supports nickname checking.
+        // Preserve support only for game codes that were already used by products
+        // with nickname validation enabled before this migration.
+        if (Schema::hasTable('products')) {
+            $usedCodes = DB::table('products')
+                ->where('nickname_check_enabled', true)
+                ->whereNotNull('nickname_game_code')
+                ->where('nickname_game_code', '<>', '')
+                ->pluck('nickname_game_code')
+                ->map(fn ($code): string => strtolower(trim((string) $code)))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($usedCodes !== []) {
+                DB::table('nickname_game_codes')
+                    ->whereIn('code', $usedCodes)
+                    ->update(['supports_nickname_check' => true]);
+            }
+        }
     }
 
     public function down(): void
