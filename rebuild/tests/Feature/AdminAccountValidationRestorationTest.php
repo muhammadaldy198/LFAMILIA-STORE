@@ -72,6 +72,17 @@ class AdminAccountValidationRestorationTest extends TestCase
         $product = $this->productUsingCode('dynamic-game');
 
         $this->putJson('/admin/nickname-tools/game-codes/'.$row->id, [
+            'name' => $row->name,
+            'code' => $row->code,
+            'supports_nickname_check' => false,
+            'requires_server' => false,
+            'requires_region_check' => false,
+            'is_active' => true,
+            'sort_order' => $row->sort_order,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['supports_nickname_check']);
+
+        $this->putJson('/admin/nickname-tools/game-codes/'.$row->id, [
             'name' => 'Dynamic Game Updated',
             'code' => 'dynamic-game-v2',
             'supports_nickname_check' => true,
@@ -170,9 +181,11 @@ class AdminAccountValidationRestorationTest extends TestCase
         $this->actingAs($this->superAdmin(), 'admin');
 
         NicknameGameCode::where('code', 'mobile-legends')->update([
+            'supports_nickname_check' => true,
             'requires_region_check' => false,
         ]);
         NicknameGameCode::where('code', 'free-fire')->update([
+            'supports_nickname_check' => true,
             'requires_server' => true,
             'requires_region_check' => true,
         ]);
@@ -296,6 +309,7 @@ class AdminAccountValidationRestorationTest extends TestCase
             ->assertJsonValidationErrors(['nickname_game_code']);
 
         NicknameGameCode::where('code', 'free-fire')->update([
+            'supports_nickname_check' => true,
             'requires_server' => true,
             'requires_region_check' => false,
             'is_active' => true,
