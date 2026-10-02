@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\IntegrationCredential;
+use App\Models\NicknameGameCode;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -10,73 +10,53 @@ use Throwable;
 
 class AdminNicknameToolsService
 {
-    private const DEFAULT_BASE_URL = 'https://api.kokinpay.com';
+    public function __construct(
+        private readonly AccountValidationConfig $config,
+    ) {}
 
-    /** @var array<int, array{0:string,1:string,2:bool}> */
-    private const GAME_CODES = [
-        ['Mobile Legends', 'mobile-legends', true],
-        ['Free Fire', 'free-fire', false],
-        ['PUBG Mobile', 'pubg-mobile', false],
-        ['Call of Duty Mobile', 'call-of-duty-mobile', false],
-        ['Valorant', 'valorant', false],
-        ['Genshin Impact', 'genshin-impact', true],
-        ['Honor of Kings', 'honor-of-kings', false],
-        ['League of Legends: Wild Rift', 'league-of-legends-wild-rift', false],
-        ['Arena of Valor', 'arena-of-valor', false],
-        ['Point Blank', 'point-blank', false],
-        ['Free Fire Max', 'free-fire-max', false],
-        ['Whiteout Survival', 'whiteout-survival', false],
-        ['Honkai Impact 3', 'honkai-impact-3', false],
-        ['Honkai: Star Rail', 'honkai-star-rail', true],
-        ['Eggy Party', 'eggy-party', true],
-        ['Undawn', 'undawn', false],
-        ['Growtopia', 'growtopia', false],
-        ['League of Legends PC', 'league-of-legends-pc', false],
-        ['FC Mobile', 'fc-mobile', false],
-        ['Super Sus', 'super-sus', false],
-        ['Harry Potter: Magic Awakened', 'harry-potter-magic-awakened', true],
-        ['Revelation: Infinite Journey', 'revelation-infinite-journey', false],
-        ['MU Origin 3', 'mu-origin-3', false],
-        ['Sausage Man', 'sausage-man', false],
-        ['Speed Drifters', 'speed-drifters', false],
-        ['Tom and Jerry: Chase', 'tom-and-jerry-chase', true],
-        ['Teamfight Tactics Mobile', 'teamfight-tactics-mobile', false],
-        ['LifeAfter', 'lifeafter', true],
-        ['Laplace M', 'laplace-m', false],
-        ['Arena Breakout', 'arena-breakout', false],
-        ['Zenless Zone Zero', 'zenless-zone-zero', true],
-        ['AFK Journey', 'afk-journey', false],
-        ['Magic Chess Go Go', 'magic-chess-go-go', true],
-        ['Love and Deepspace', 'love-and-deepspace', false],
-        ['Pokemon Unite', 'pokemon-unite', false],
-        ['Dragon Raja', 'dragon-raja', false],
-        ['Football Master 2', 'football-master-2', false],
-        ['Garena Shell', 'garena-shell', false],
-        ['Goddess of Victory: Nikke', 'goddess-of-victory-nikke', true],
-        ['Metal Slug: Awakening', 'metal-slug-awakening', false],
-        ['Ragnarok M: Eternal Love', 'ragnarok-m-eternal-love', true],
-    ];
-
-    /** @return array<int, array{name:string,code:string,requires_server:bool}> */
+    /**
+     * @return array<int, array{id:int,name:string,code:string,requires_server:bool,requires_region_check:bool,is_active:bool,sort_order:int}>
+     */
     public function gameCodes(): array
     {
-        return array_map(fn (array $item): array => [
-            'name' => $item[0],
-            'code' => $item[1],
-            'requires_server' => $item[2],
-        ], self::GAME_CODES);
+        return NicknameGameCode::query()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (NicknameGameCode $item): array => [
+                'id' => (int) $item->id,
+                'name' => $item->name,
+                'code' => $item->code,
+                'requires_server' => (bool) $item->requires_server,
+                'requires_region_check' => (bool) $item->requires_region_check,
+                'is_active' => (bool) $item->is_active,
+                'sort_order' => (int) $item->sort_order,
+            ])->all();
     }
 
     /** @return array{nickname:string,region:?string} */
     public function checkGame(string $gameCode, string $userId, ?string $server = null): array
     {
-        $settings = $this->settings();
-        $nickname = $this->nickname($settings, $gameCode, $userId, $server);
+        $game = $this->activeGame($gameCode);
+        if ($game->requires_server && blank($server)) {
+            throw ValidationException::withMessages([
+                'server' => 'Server / Zone wajib diisi untuk game ini.',
+            ]);
+        }
 
-        if ($gameCode === 'mobile-legends') {
+        $settings = $this->settings();
+        $nickname = $this->nickname($settings, $game->code, $userId, $server);
+
+        if ($game->requires_region_check) {
+            if (blank($server)) {
+                throw ValidationException::withMessages([
+                    'server' => 'Server / Zone wajib diisi untuk pemeriksaan region.',
+                ]);
+            }
+
             $region = $this->region($settings, $userId, (string) $server);
             if ($region === null) {
-                throw new RuntimeException('Validasi Mobile Legends tidak mengembalikan region.');
+                throw new RuntimeException('Layanan validasi tidak mengembalikan region.');
             }
             $nickname['region'] = $region;
         }
@@ -87,11 +67,21 @@ class AdminNicknameToolsService
     /** @return array{nickname:string,region:string} */
     public function checkRegion(string $userId, string $server): array
     {
+        $game = NicknameGameCode::active()
+            ->where('requires_region_check', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->first();
+
+        if (! $game) {
+            throw new RuntimeException('Belum ada game aktif yang dikonfigurasi untuk pemeriksaan region.');
+        }
+
         $settings = $this->settings();
-        $nickname = $this->nickname($settings, 'mobile-legends', $userId, $server);
+        $nickname = $this->nickname($settings, $game->code, $userId, $server);
         $region = $this->region($settings, $userId, $server);
         if ($region === null) {
-            throw new RuntimeException('Validasi Mobile Legends tidak mengembalikan region.');
+            throw new RuntimeException('Layanan validasi tidak mengembalikan region.');
         }
 
         return ['nickname' => $nickname['nickname'], 'region' => $region];
@@ -100,9 +90,11 @@ class AdminNicknameToolsService
     public function checkPln(string $customerNumber): string
     {
         $settings = $this->settings();
-        $payload = $this->post($settings, '/v1/check-pln', [
-            'customer_number' => $customerNumber,
-        ]);
+        $payload = $this->post(
+            $this->config->endpoint($settings, 'pln_path'),
+            $settings['api_key'],
+            ['customer_number' => $customerNumber],
+        );
         $name = $this->firstString([
             data_get($payload, 'data.customer_name'),
             data_get($payload, 'data.name'),
@@ -114,32 +106,44 @@ class AdminNicknameToolsService
         return $name;
     }
 
-    /** @return array<string,mixed> */
+    /** @return array{api_key:string,base_url:string,nickname_path:string,region_path:string,pln_path:string} */
     private function settings(): array
     {
-        $profile = IntegrationCredential::where('code', 'kokinpay')
-            ->where('is_active', true)->first();
-        $settings = $profile?->config_ciphertext;
-        if (! is_array($settings) || empty($settings['api_key'])) {
-            throw new RuntimeException('API Key layanan Validasi Akun belum disimpan atau integrasi sedang nonaktif.');
+        $settings = $this->config->active();
+        if (! $settings) {
+            throw new RuntimeException('Konfigurasi Validasi Akun belum lengkap atau sedang nonaktif.');
         }
-        $base = rtrim((string) ($settings['base_url'] ?? self::DEFAULT_BASE_URL), '/');
-        if (! str_starts_with(strtolower($base), 'https://')) {
-            throw new RuntimeException('Base URL integrasi Validasi Akun harus menggunakan HTTPS.');
-        }
-        $settings['base_url'] = $base;
 
         return $settings;
+    }
+
+    private function activeGame(string $gameCode): NicknameGameCode
+    {
+        $game = NicknameGameCode::active()
+            ->where('code', strtolower(trim($gameCode)))
+            ->first();
+
+        if (! $game) {
+            throw ValidationException::withMessages([
+                'game_code' => 'Kode game tidak tersedia atau sedang dinonaktifkan.',
+            ]);
+        }
+
+        return $game;
     }
 
     /** @return array{nickname:string,region:?string} */
     private function nickname(array $settings, string $gameCode, string $userId, ?string $server): array
     {
-        $payload = $this->post($settings, '/v1/check-nickname', [
-            'id' => $userId,
-            'game_code' => $gameCode,
-            ...($server ? ['server' => $server] : []),
-        ]);
+        $payload = $this->post(
+            $this->config->endpoint($settings, 'nickname_path'),
+            $settings['api_key'],
+            [
+                'id' => $userId,
+                'game_code' => $gameCode,
+                ...($server ? ['server' => $server] : []),
+            ],
+        );
         $nickname = $this->firstString([
             data_get($payload, 'data.nickname'),
             data_get($payload, 'data.username'),
@@ -159,10 +163,11 @@ class AdminNicknameToolsService
 
     private function region(array $settings, string $userId, string $server): ?string
     {
-        $payload = $this->post($settings, '/v1/check-region', [
-            'id' => $userId,
-            'server' => $server,
-        ]);
+        $payload = $this->post(
+            $this->config->endpoint($settings, 'region_path'),
+            $settings['api_key'],
+            ['id' => $userId, 'server' => $server],
+        );
 
         return $this->firstString([
             data_get($payload, 'data.region'),
@@ -171,11 +176,11 @@ class AdminNicknameToolsService
     }
 
     /** @return array<string,mixed> */
-    private function post(array $settings, string $path, array $body): array
+    private function post(string $url, string $apiKey, array $body): array
     {
         try {
-            $response = Http::acceptJson()->timeout(8)->post($settings['base_url'].$path, [
-                'api_key' => trim((string) $settings['api_key']),
+            $response = Http::acceptJson()->timeout(8)->post($url, [
+                'api_key' => $apiKey,
                 ...$body,
             ]);
         } catch (Throwable) {
@@ -192,7 +197,7 @@ class AdminNicknameToolsService
             ]);
         }
         if (in_array($response->status(), [401, 403], true)) {
-            throw new RuntimeException($message ?: 'API Key layanan Validasi Akun ditolak.');
+            throw new RuntimeException($message ?: 'Credential layanan Validasi Akun ditolak.');
         }
         if (! $response->successful() || ! is_array($payload) || ($payload['status'] ?? null) !== true) {
             throw new RuntimeException($message ?: 'Layanan validasi sedang tidak tersedia.');
