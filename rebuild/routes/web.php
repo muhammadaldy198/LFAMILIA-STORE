@@ -13,6 +13,7 @@ use App\Http\Controllers\AdminIntegrationController;
 use App\Http\Controllers\AdminNicknameController;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\AdminOrderDetailController;
+use App\Http\Controllers\AdminOrdersController;
 use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\AdminPresentationController;
 use App\Http\Controllers\AdminSearchController;
@@ -261,8 +262,16 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::put('/admin/providers/{id}', [AdminWorkspaceController::class, 'updateProvider'])->name('admin.providers.update');
     });
 
+    Route::get('/admin/orders/export', [AdminOrdersController::class, 'export'])
+        ->middleware('admin.permission:orders.view')->name('admin.orders.export');
+    Route::post('/admin/orders/manual', [AdminOrdersController::class, 'manual'])
+        ->middleware(['admin.permission:orders.view', 'admin.permission:fulfillment.manage', 'admin.permission:payments.manage', 'throttle:30,1'])->name('admin.orders.manual');
+    Route::post('/admin/orders/{id}/check-payment', [AdminOrdersController::class, 'refreshPayment'])
+        ->middleware(['admin.permission:orders.view', 'admin.permission:payments.manage', 'throttle:10,1'])->name('admin.orders.check-payment');
+    Route::post('/admin/orders/{id}/check-process', [AdminOrdersController::class, 'refreshFulfillment'])
+        ->middleware(['admin.permission:orders.view', 'admin.permission:fulfillment.manage', 'throttle:10,1'])->name('admin.orders.check-process');
     Route::get('/admin/orders/{id}', AdminOrderDetailController::class)->middleware('admin.permission:orders.view')->name('admin.orders.show');
-    Route::get('/admin/orders', [AdminWorkspaceController::class, 'orders'])
+    Route::get('/admin/orders', [AdminOrdersController::class, 'index'])
         ->middleware('admin.permission:orders.view')->name('admin.orders');
 
     Route::get('/admin/customers/{userId}', [AdminWorkspaceController::class, 'customerDetail'])->middleware('admin.permission:customers.view');

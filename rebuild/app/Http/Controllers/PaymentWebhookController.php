@@ -42,7 +42,7 @@ class PaymentWebhookController
             ->where('merchant_reference', (string) $payload['order_id'])
             ->first();
         abort_unless($payment, 404);
-        abort_unless($this->amount($payload['gross_amount']) === (int) $payment->amount_idr, 422);
+        abort_unless(app(\App\Services\MidtransStatusVerification::class)->amount($payload['gross_amount']) === (int) $payment->amount_idr, 422);
 
         $eventId = hash('sha256', implode('|', [
             (string) ($payload['transaction_id'] ?? ''),
@@ -62,14 +62,14 @@ class PaymentWebhookController
         }
 
         abort_unless(hash_equals((string) $payment->merchant_reference, (string) $verified['order_id']), 422);
-        abort_unless($this->amount($verified['gross_amount']) === (int) $payment->amount_idr, 422);
+        abort_unless(app(\App\Services\MidtransStatusVerification::class)->amount($verified['gross_amount']) === (int) $payment->amount_idr, 422);
 
         $processed = DB::transaction(function () use ($payment, $eventId, $payload, $verified, $states): bool {
             if (! $this->claimCallback($payment->id, 'MIDTRANS', $eventId, $payload)) {
                 return false;
             }
 
-            $status = $this->midtransStatus($verified);
+            $status = app(\App\Services\MidtransStatusVerification::class)->status($verified);
             $result = $states->apply($payment->id, $status, [
                 'source' => 'midtrans_status_challenge',
                 'transaction_status' => $verified['transaction_status'],
@@ -120,7 +120,7 @@ class PaymentWebhookController
             ->where('merchant_reference', $merchantReference)
             ->first();
         abort_unless($payment, 404);
-        abort_unless($this->amount($amount) === (int) $payment->amount_idr, 422);
+        abort_unless(app(\App\Services\MidtransStatusVerification::class)->amount($amount) === (int) $payment->amount_idr, 422);
 
         $eventId = hash('sha256', $requestId);
         $processed = DB::transaction(function () use (
@@ -177,32 +177,4 @@ class PaymentWebhookController
             ->update(['result' => substr($result, 0, 40)]);
     }
 
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function midtransStatus(array $payload): string
-    {
-        $status = strtolower((string) $payload['transaction_status']);
-        $fraud = strtolower((string) ($payload['fraud_status'] ?? ''));
-
-        return match ($status) {
-            'settlement' => 'PAID',
-            'capture' => in_array($fraud, ['', 'accept'], true) ? 'PAID' : 'PENDING',
-            'expire' => 'EXPIRED',
-            'cancel' => 'CANCELLED',
-            'deny', 'failure' => 'FAILED',
-            'refund', 'partial_refund' => 'REFUNDED',
-            default => 'PENDING',
-        };
-    }
-
-    private function amount(mixed $value): int
-    {
-        $string = is_int($value) ? (string) $value : trim((string) $value);
-        if (! preg_match('/^(\d+)(?:\.0+)?$/', $string, $matches)) {
-            throw ValidationException::withMessages(['amount' => 'Nominal callback tidak valid.']);
-        }
-
-        return (int) $matches[1];
-    }
 }
