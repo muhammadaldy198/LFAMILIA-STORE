@@ -193,7 +193,7 @@ class AdminDigiflazzController
         $query->whereNot($warning);
     }
 
-public function settings(Request $request, AdminAuditService $audit): RedirectResponse
+    public function settings(Request $request, AdminAuditService $audit): RedirectResponse
     {
         $data = $request->validate(['enabled' => ['required', 'boolean']]);
         $before = json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true;
