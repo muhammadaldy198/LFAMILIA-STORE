@@ -19,7 +19,7 @@ Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb
 | `faqs` | Setara: tambah/edit/hapus, status aktif, jawaban, dan urutan tersedia serta dipakai halaman Pertanyaan Umum. |
 | `integrations` | Credential terenkripsi/reveal/tes tersedia; perlu perbandingan semua profil field/env/mode lama. |
 | `media` | Upload gambar tersedia via media Spatie; detail optimasi gambar lama perlu dibandingkan. |
-| `members` | Sebagian: tier AUTO/manual dan saldo tersedia; penghapusan akun kosong dipulihkan; tier bonus/progress/edit profil belum lengkap. |
+| `members` | Setara+ lintas menu: Customers menangani tier AUTO/manual, saldo, progress bonus, profil, dan cleanup; Pengaturan menangani konfigurasi BASIC → SILVER → GOLD → DIAMOND → PLATINUM → MAFIA dengan minimum transaksi, diskon, manfaat, status, audit, serta kompatibilitas payload JSON lama. |
 | `nickname-tools` | Cek game/region/PLN tersedia; belum dites dengan credential live. |
 | `orders` | Setara+: daftar/detail/filter/pagination, riwayat pembayaran dan penanganan, pesanan manual, ekspor pilihan, cek ulang pembayaran/proses, retry aman, serta kirim ulang hasil tersimpan tersedia. |
 | `payment-methods` | Sebagian: channel/fee/status/routing tersedia; tambah/hapus channel, logo/deskripsi/kelompok dan sinkron daftar lama belum lengkap. |
@@ -33,7 +33,7 @@ Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb
 | `promotions` | Setara sesuai keputusan terbaru: voucher lama (kode, nama, deskripsi, jenis/nilai, minimum, maksimum diskon, kuota, jadwal, status) dipulihkan dan ditambah scope kategori/produk, limit per pelanggan, reservasi atomik, filter/pagination, serta Populer Sekarang. Flash Sale lama sengaja tidak dipulihkan karena telah diganti Populer Sekarang. |
 | `reviews` | Setara: Admin hanya mengatur tampil/sembunyi ulasan terverifikasi; isi, rating, dan identitas ulasan tidak diedit. |
 | `session` | Guard admin dan role terpisah tersedia. |
-| `storefront` | Setara tanpa duplikasi: logo/footer/banner dan teks presentasi berada di Banner & Konten; nama toko, kontak, akun sosial, tautan bantuan, dan jam layanan tetap satu sumber di Pengaturan. |
+| `storefront` | Setara+ tanpa duplikasi: logo/footer/banner/widget bantuan dan teks presentasi berada di Banner & Konten; nama toko, tagline, kontak, akun sosial, tautan bantuan, jam layanan, serta identitas merchant publik berada di Pengaturan dan terhubung ke storefront/status page. |
 | `summary` | Setara+ untuk kebutuhan laporan: periode hari ini/7/30/90/semua/custom, grafik harian, total/berhasil/gagal/pending, status pembayaran & fulfillment, produk/kategori teratas, performa provider, CSV export, dan pemisahan finance Super Admin. Dashboard/health tetap pada menu masing-masing agar tidak duplikat. |
 | `support` | Setara+: daftar tiket, pencarian/filter/pagination, kategori lama (`kind`), customer/order context, handler & handled_at, status, detail riwayat percakapan, balasan, quick replies, email balasan, audit log, serta notifikasi saat customer/guest membalas ulang. `staff_reply` lama sengaja tidak digandakan karena conversation messages menjadi sumber riwayat. |
 | `team` | Setara+ sesuai keputusan terbaru: SUPER_ADMIN/ADMIN, status aktif, password, tambah/edit/hapus aman, ringkasan akun, last-login, activity audit, search/filter/pagination, dan permission granular server-side. STAFF lama tetap tidak dihidupkan sesuai instruksi terbaru. |
