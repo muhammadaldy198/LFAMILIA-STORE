@@ -412,7 +412,10 @@ class AdminCatalogController
             ]);
         }
 
-        $sourceMapping = $package->mappings()->whereHas('provider', fn ($query) => $query->where('code', 'MANUAL'))->first();
+        $manualProviderId = Provider::where('code', 'MANUAL')->value('id');
+        $sourceMapping = $manualProviderId
+            ? $package->mappings()->where('provider_id', $manualProviderId)->first()
+            : null;
         if (! $sourceMapping) {
             throw ValidationException::withMessages(['package' => 'Modal nominal manual belum tersedia.']);
         }
