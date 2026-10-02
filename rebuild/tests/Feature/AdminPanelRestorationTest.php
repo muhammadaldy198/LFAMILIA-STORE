@@ -326,11 +326,11 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->get('/')->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('products.data', fn ($products) => collect($products)->contains(fn ($row) =>
-                $row['slug'] === $product->slug
-                && $row['initials'] === 'RT'
-                && $row['accent_color'] === '#123456'
-                && $row['instant'] === true
+            ->where('products.data', fn ($products) => collect($products)->contains(
+                fn ($row) => $row['slug'] === $product->slug
+                    && $row['initials'] === 'RT'
+                    && $row['accent_color'] === '#123456'
+                    && $row['instant'] === true
             )));
 
         $this->get('/catalog/'.$product->slug)->assertInertia(fn (AssertableInertia $page) => $page
