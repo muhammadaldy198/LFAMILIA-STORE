@@ -241,4 +241,79 @@ class AdminAccountValidationRestorationTest extends TestCase
 
         $this->assertDatabaseMissing('nickname_game_codes', ['code' => 'forbidden-game']);
     }
+
+    public function test_product_editor_only_accepts_active_managed_game_codes_and_required_server_field(): void
+    {
+        $this->actingAs($this->superAdmin(), 'admin');
+
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Managed Validation Product '.bin2hex(random_bytes(3)),
+            'slug' => 'managed-validation-product-'.bin2hex(random_bytes(4)),
+            'margin_percent' => 10,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'sort_order' => 0,
+            'is_active' => false,
+        ]);
+        $product->fields()->createMany([
+            [
+                'field_key' => 'user_id',
+                'label' => 'User ID',
+                'type' => 'text',
+                'is_required' => true,
+                'sort_order' => 0,
+            ],
+            [
+                'field_key' => 'zone_id',
+                'label' => 'Server / Zone',
+                'type' => 'text',
+                'is_required' => true,
+                'sort_order' => 1,
+            ],
+        ]);
+
+        $basePayload = [
+            'category_id' => $category->id,
+            'name' => $product->name,
+            'margin_percent' => 10,
+            'sort_order' => 0,
+            'is_active' => false,
+            'nickname_check_enabled' => true,
+            'nickname_user_field_key' => 'user_id',
+        ];
+
+        $this->putJson('/admin/catalog/products/'.$product->id, [
+            ...$basePayload,
+            'nickname_game_code' => 'kode-yang-tidak-ada',
+            'nickname_server_field_key' => null,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['nickname_game_code']);
+
+        NicknameGameCode::where('code', 'free-fire')->update([
+            'requires_server' => true,
+            'requires_region_check' => false,
+            'is_active' => true,
+        ]);
+
+        $this->putJson('/admin/catalog/products/'.$product->id, [
+            ...$basePayload,
+            'nickname_game_code' => 'free-fire',
+            'nickname_server_field_key' => null,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['nickname_server_field_key']);
+
+        $this->put('/admin/catalog/products/'.$product->id, [
+            ...$basePayload,
+            'nickname_game_code' => 'free-fire',
+            'nickname_server_field_key' => 'zone_id',
+        ])->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $product->refresh();
+        $this->assertTrue($product->nickname_check_enabled);
+        $this->assertSame('free-fire', $product->nickname_game_code);
+        $this->assertSame('zone_id', $product->nickname_server_field_key);
+    }
+
 }
