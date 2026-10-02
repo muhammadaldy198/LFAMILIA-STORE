@@ -47,6 +47,27 @@ class AdminOrderPresentation
         return self::STATUSES[$status ?? ''] ?? 'Status belum tersedia';
     }
 
+    public function note(?string $message): ?string
+    {
+        if (! $message) {
+            return null;
+        }
+        return strtr(strip_tags($message), [
+            'Provider atau mapping sedang nonaktif.' => 'Penyedia atau pengaturan produk sedang tidak aktif.',
+            'Adapter provider belum tersedia untuk mapping ini.' => 'Penyedia untuk produk ini belum didukung.',
+            'SKU provider belum tersedia.' => 'Kode produk pada penyedia belum tersedia.',
+            'Harga provider tidak valid.' => 'Harga dari penyedia belum valid.',
+            'Harga provider melewati batas max_price order.' => 'Harga dari penyedia melebihi batas pesanan.',
+            'Provider request tidak dapat dipastikan.' => 'Hasil permintaan kepada penyedia belum dapat dipastikan.',
+            'Response provider tidak dapat diverifikasi.' => 'Hasil dari penyedia belum dapat diverifikasi.',
+            'Payload reconciliation tidak tersedia.' => 'Data untuk pemeriksaan pengiriman belum tersedia.',
+            'Integrasi provider belum siap untuk reconciliation.' => 'Koneksi penyedia belum siap untuk pemeriksaan.',
+            'Reconciliation provider belum dapat dipastikan.' => 'Hasil pemeriksaan penyedia belum dapat dipastikan.',
+            'Hasil reconciliation tidak dapat diverifikasi.' => 'Hasil pemeriksaan penyedia belum dapat diverifikasi.',
+            'Mode fulfillment order tidak didukung.' => 'Cara penanganan pesanan ini belum didukung.',
+        ]);
+    }
+
     public function date(?string $date): ?string
     {
         return $date ? Carbon::parse($date, 'UTC')->toIso8601String() : null;
@@ -94,6 +115,9 @@ class AdminOrderPresentation
             },
             'needs_attention' => (bool) ($row->needs_attention ?? false),
             'delivery' => $this->json($row->delivery_payload ?? null),
+            'manual_note' => $snapshot['manual_note'] ?? null,
+            'manual_instructions' => $row->manual_instructions ?? null,
+            'country' => data_get($snapshot, 'nickname.country'),
             'manual' => data_get($snapshot, 'product.fulfillment_mode') === 'MANUAL',
         ];
     }

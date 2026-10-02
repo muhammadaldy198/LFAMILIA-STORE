@@ -24,13 +24,14 @@ class AdminOrderDetailController
             ->leftJoin('providers', 'providers.id', '=', 'attempts.provider_id')
             ->where('attempts.order_id', $id)->orderByDesc('attempts.id')
             ->get(['attempts.id', 'attempts.status', 'attempts.attempt_no', 'attempts.serial_number',
-                'attempts.last_error', 'attempts.created_at', 'attempts.last_checked_at', 'attempts.safe_to_failover', 'providers.code'])
+                'attempts.last_error', 'attempts.response_payload', 'attempts.external_reference', 'attempts.provider_rc', 'attempts.created_at', 'attempts.last_checked_at', 'attempts.safe_to_failover', 'providers.code'])
             ->map(fn (object $attempt): array => [
                 'id' => $attempt->id, 'attempt_no' => $attempt->attempt_no, 'status' => $attempt->status,
                 'status_label' => $presentation->status($attempt->status),
                 'provider' => $attempt->code === 'MANUAL' ? 'Penanganan manual' : ($attempt->code ? ucfirst(strtolower($attempt->code)) : 'Belum ditentukan'),
                 'serial_number' => $attempt->serial_number,
-                'note' => $attempt->status === 'MANUAL_FAILED' ? $attempt->last_error : ($attempt->last_error ? 'Proses belum berhasil. Periksa pengaturan penyedia atau hubungi penyedia untuk memastikan hasilnya.' : null),
+                'note' => $presentation->note($attempt->last_error ?: data_get($presentation->json($attempt->response_payload), 'message')),
+                'reference' => $attempt->external_reference, 'result_code' => $attempt->provider_rc,
                 'created_at' => $presentation->date($attempt->created_at), 'checked_at' => $presentation->date($attempt->last_checked_at),
                 'can_manual' => $canFulfill && $attempt->status === 'MANUAL_PENDING' && in_array($row->status, ['PAID', 'PROCESSING'], true),
                 'can_retry' => $canFulfill && ! in_array($row->status, ['SUCCESS', 'REFUND'], true)
