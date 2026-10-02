@@ -208,6 +208,11 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::post('/page-settings/header', [AdminPaymentController::class, 'uploadPageHeader'])
                 ->name('page-settings.header');
 
+        });
+
+
+    Route::middleware(['admin.permission:payments.manage', 'admin.super'])->prefix('admin/payments')
+        ->name('admin.payments.')->group(function (): void {
             Route::post('/channels/sync', [AdminPaymentController::class, 'syncChannels'])
                 ->middleware('throttle:admin-sensitive')->name('channels.sync');
             Route::post('/channels', [AdminPaymentController::class, 'storeChannel'])
@@ -218,7 +223,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
                 ->middleware('throttle:admin-sensitive')->name('channels.destroy');
             Route::post('/channels/{id}/logo', [AdminPaymentController::class, 'uploadChannelLogo'])
                 ->middleware('throttle:admin-sensitive')->name('channels.logo');
-
             Route::put('/gateways/{id}', [AdminPaymentController::class, 'gateway'])
                 ->middleware('throttle:admin-sensitive')->name('gateways.update');
             Route::post('/routes', [AdminPaymentController::class, 'route'])
@@ -230,7 +234,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::put('/settings', [AdminPaymentController::class, 'settings'])
                 ->middleware('throttle:admin-sensitive')->name('settings.update');
         });
-
     Route::middleware('admin.permission:fulfillment.manage')->prefix('admin/fulfillment')
         ->name('admin.fulfillment.')->group(function (): void {
             Route::get('/', [AdminFulfillmentController::class, 'index'])->name('index');
