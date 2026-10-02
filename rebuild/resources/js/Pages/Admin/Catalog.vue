@@ -10,7 +10,7 @@ import AdminShell from '../../Components/AdminShell.vue';
 import { computed, reactive, ref, watch } from 'vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
 
-const props = defineProps({ categories: Array, products: Array, assets: Array, digiflazzItems: {type:Array,default:()=>[]}, defaultMargin:Number });
+const props = defineProps({ categories: Array, products: Array, digiflazzItems: {type:Array,default:()=>[]}, defaultMargin:Number });
 const cloneProducts = (items) => items.map((item) => ({
     ...item,
     packages: item.packages.map((pack) => ({
@@ -21,10 +21,8 @@ const cloneProducts = (items) => items.map((item) => ({
 }));
 const categories = ref(props.categories.map((item) => ({ ...item })));
 const products = ref(cloneProducts(props.products));
-const assets = ref(props.assets.map((item) => ({ ...item })));
 watch(() => props.categories, (items) => { categories.value = items.map((item) => ({ ...item })); });
 watch(() => props.products, (items) => { products.value = cloneProducts(items); });
-watch(() => props.assets, (items) => { assets.value = items.map((item) => ({ ...item })); });
 
 const page = usePage();
 const initialSearch = new URLSearchParams(page.url.split('?')[1] || '').get('q') || '';
@@ -36,7 +34,7 @@ const selectedProductItems = computed(() => products.value.filter(item => item.i
 const editProduct = item => { selectedProductId.value = item.id; editorTab.value = 'info'; showImport.value=false; importForm.item_ids=[]; importForm.margin_percent=Number(item.margin_percent); selectedPackageId.value=null; };
 const catalogTab = ref('products'), catalogSearch = ref(initialSearch), catalogPage = ref(1);
 const catalogCategory = ref(''), catalogStatus = ref(''), catalogSort = ref('CUSTOM'), catalogPageSize = ref(25);
-const catalogTabs = [['products','Produk'],['categories','Kategori'],['fields','Kolom Data Akun'],['media','Media Toko']];
+const catalogTabs = [['products','Produk'],['categories','Kategori'],['fields','Kolom Data Pelanggan']];
 const matchingProducts = computed(() => {
     const term = catalogSearch.value.trim().toLowerCase();
     const rows = products.value.filter(item =>
@@ -162,7 +160,6 @@ const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping
     ...(mapping.provider_code === 'MANUAL' ? { cost_idr: mapping.cost_idr } : {}),
     ...(mapping.provider_code === 'DIGIFLAZZ' ? { customer_no_template: mapping.customer_no_template || null } : {}),
 });
-const saveAsset = (asset) => router.put('/admin/catalog/assets/' + asset.id, { is_active: asset.is_active, target_url: asset.target_url || null });
 const noticeDraft = (productId) => noticeDrafts[productId] || (noticeDrafts[productId] = { title: '', body: '', sort_order: 0, is_active: true });
 const addNotice = (product) => {
     const draft = noticeDraft(product.id);
@@ -416,13 +413,7 @@ const deleteNotice = (notice) => {
                 </template>
             </section>
 
-            <section v-show="catalogTab === 'media'" id="media" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <h2 class="text-xl font-semibold">Media toko</h2>
-                <div v-for="asset in assets" :key="asset.id" class="space-y-2 border-t border-slate-800 pt-3">
-                    <div class="flex flex-wrap items-end gap-3"><strong>{{ asset.key }}</strong><label class="flex gap-2 text-sm"><input v-model="asset.is_active" type="checkbox">Aktif</label><label v-if="asset.key.startsWith('banner')" class="text-sm">Tautan banner<Input v-model="asset.target_url" type="url" class="mt-1 block rounded bg-slate-800 p-2" /></label><Button type="button" class="rounded bg-slate-700 px-3 py-2 text-sm" @click="saveAsset(asset)">Simpan</Button></div>
-                    <AdminMediaControl type="asset" :asset-key="asset.key" :id="asset.id" :url="asset.image_url" />
-                </div>
-            </section>
+
         </div>
     </AdminShell>
 </template>
