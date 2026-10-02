@@ -148,7 +148,6 @@ class AdminDigiflazzController
         ]);
     }
 
-
     private function applyHealthFilter($query, string $health, array $settings): void
     {
         if ($health === '') {
