@@ -21,7 +21,7 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 | Pengaturan | Dedicated shadcn workspace: identitas toko, kontak & jam layanan, identitas merchant publik, membership tier dengan field non-JSON, dan safe configuration export khusus Super Admin |
 | Integrasi | Dedicated shadcn workspace khusus Super Admin: 9 profil integrasi, status tersimpan, kelengkapan field wajib, callback/redirect URL, kredensial terenkripsi, tampilkan kredensial dengan verifikasi password, Tes Koneksi, validasi input operasional, dan preservasi metadata lama |
 | System Health | Dedicated shadcn workspace khusus Super Admin: status aplikasi/MySQL/Redis/storage, heartbeat worker & scheduler, failed jobs, rekonsiliasi fulfillment, 9 integrasi, gateway maintenance, dan runtime non-secret tanpa menjalankan transaksi/provider probe |
-| Audit Log | Audited changes and pagination |
+| Audit Log | Dedicated shadcn workspace khusus Super Admin: ringkasan, search/filter server-side, filter Admin/peran/aksi/target/tanggal, pagination, actor identity, before/after detail, correlation ID, IP/user-agent, serta read-time secret redaction tanpa edit/delete log |
 
 ## Important behavior
 

@@ -50,7 +50,14 @@ class AdminAuditService
         $array = (array) $value;
         foreach ($array as $key => $item) {
             $normalized = strtolower((string) $key);
+            $compact = preg_replace('/[^a-z0-9]/', '', $normalized) ?: $normalized;
+            $knownSecrets = array_map(
+                fn (string $secret): string => preg_replace('/[^a-z0-9]/', '', $secret) ?: $secret,
+                self::SECRET_KEYS,
+            );
+
             $array[$key] = in_array($normalized, self::SECRET_KEYS, true)
+                || collect($knownSecrets)->contains(fn (string $secret): bool => str_ends_with($compact, $secret))
                 || str_contains($normalized, 'password')
                 || str_contains($normalized, 'credential')
                 || str_contains($normalized, 'secret')
