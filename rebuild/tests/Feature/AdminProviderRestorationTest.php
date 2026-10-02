@@ -84,13 +84,12 @@ class AdminProviderRestorationTest extends TestCase
                 ->where('summary.mapping_active', fn ($value) => (int) $value >= 1));
 
         $this->get('/admin/catalog')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->where('products', fn ($products) => collect($products)->contains(fn ($item) =>
-                collect($item['packages'] ?? [])->contains(fn ($package) =>
-                    collect($package['mappings'] ?? [])->contains(fn ($mapping) =>
-                        ($mapping['provider_name'] ?? null) === 'Digiflazz Utama'
-                    )
-                )
-            )));
+            ->where('products', function ($products): bool {
+                return collect($products)
+                    ->flatMap(fn ($item) => $item['packages'] ?? [])
+                    ->flatMap(fn ($package) => $package['mappings'] ?? [])
+                    ->contains(fn ($mapping) => ($mapping['provider_name'] ?? null) === 'Digiflazz Utama');
+            }));
     }
 
     public function test_provider_settings_are_editable_audited_and_do_not_accept_credentials(): void
