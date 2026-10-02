@@ -298,6 +298,8 @@ class AdminPanelRestorationTest extends TestCase
         $this->put('/admin/customers/cleanup/settings', ['enabled' => false, 'inactivity_days' => 7])->assertRedirect()->assertSessionHasNoErrors();
         $empty = User::create(['name' => 'Inactive empty', 'email' => 'empty-cleanup@example.test', 'created_at' => now()->subDays(10)]);
         $funded = User::create(['name' => 'Inactive funded', 'email' => 'funded-cleanup@example.test', 'created_at' => now()->subDays(10)]);
+        $empty->forceFill(['created_at' => now()->subDays(10), 'last_active_at' => now()->subDays(10)])->save();
+        $funded->forceFill(['created_at' => now()->subDays(10), 'last_active_at' => now()->subDays(10)])->save();
         DB::table('wallets')->where('user_id', $funded->id)->update(['balance_idr' => 1000]);
         $service = app(CustomerCleanupService::class);
         $this->assertSame(0, $service->run());
