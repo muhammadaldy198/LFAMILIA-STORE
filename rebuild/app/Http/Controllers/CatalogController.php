@@ -30,7 +30,7 @@ class CatalogController
 
         $categories = Category::where('is_active', true)->orderBy('sort_order')->get()
             ->map(fn (Category $category): array => [
-                ...$category->only('name', 'slug'),
+                ...$category->only('name', 'slug', 'icon'),
                 'image_url' => $category->getFirstMediaUrl('image'),
             ]);
 
