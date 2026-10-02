@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\NicknameServiceUnavailable;
-use App\Models\IntegrationCredential;
+use App\Models\NicknameGameCode;
 use App\Models\Product;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
@@ -11,21 +11,9 @@ use Throwable;
 
 class NicknameService
 {
-    private const DEFAULT_BASE_URL = 'https://api.kokinpay.com';
-
-    private const SERVER_REQUIRED = [
-        'mobile-legends',
-        'genshin-impact',
-        'honkai-star-rail',
-        'eggy-party',
-        'harry-potter-magic-awakened',
-        'tom-and-jerry-chase',
-        'lifeafter',
-        'zenless-zone-zero',
-        'magic-chess-go-go',
-        'goddess-of-victory-nikke',
-        'ragnarok-m-eternal-love',
-    ];
+    public function __construct(
+        private readonly AccountValidationConfig $config,
+    ) {}
 
     /**
      * @param  array<string, string>  $input
@@ -41,52 +29,57 @@ class NicknameService
             return $this->unsupported();
         }
 
-        $gameCode = trim((string) $product->nickname_game_code);
+        $gameCode = strtolower(trim((string) $product->nickname_game_code));
         $userField = trim((string) $product->nickname_user_field_key);
         $serverField = trim((string) $product->nickname_server_field_key);
         $userId = trim((string) ($input[$userField] ?? ''));
         $server = $serverField !== '' ? trim((string) ($input[$serverField] ?? '')) : '';
 
         if ($gameCode === '' || $userField === '') {
-            return $this->warning('Nickname tidak berhasil diverifikasi. Silakan periksa kembali data akun sebelum melanjutkan.');
+            return $this->unsupported();
         }
+
+        $game = NicknameGameCode::active()->where('code', $gameCode)->first();
+        if (! $game) {
+            return $this->unsupported();
+        }
+
         if (mb_strlen($userId) < 2) {
             throw ValidationException::withMessages([
                 'customer_input.'.$userField => 'ID akun belum valid.',
             ]);
         }
-        if (in_array(strtolower($gameCode), self::SERVER_REQUIRED, true) && $server === '') {
+        if ($game->requires_server && $server === '') {
             throw ValidationException::withMessages([
                 'customer_input.'.($serverField ?: 'server') => 'Server / Zone ID wajib diisi.',
             ]);
         }
 
-        $profile = IntegrationCredential::where('code', 'kokinpay')
-            ->where('is_active', true)->first();
-        $settings = $profile?->config_ciphertext;
-        if (! is_array($settings) || empty($settings['api_key'])) {
-            return $this->warning('Nickname tidak berhasil diverifikasi karena layanan pengecekan sedang tidak tersedia. Pastikan ID sudah benar.');
-        }
-
-        $baseUrl = rtrim((string) ($settings['base_url'] ?? self::DEFAULT_BASE_URL), '/');
-        if (! str_starts_with(strtolower($baseUrl), 'https://')) {
+        $settings = $this->config->active();
+        if (! $settings) {
             return $this->warning('Nickname tidak berhasil diverifikasi karena layanan pengecekan sedang tidak tersedia. Pastikan ID sudah benar.');
         }
 
         try {
-            $nicknameData = $this->post($baseUrl.'/v1/check-nickname', [
-                'api_key' => trim((string) $settings['api_key']),
-                'id' => $userId,
-                'game_code' => $gameCode,
-                ...($server !== '' ? ['server' => $server] : []),
-            ], $userField);
+            $nicknameData = $this->post(
+                $this->config->endpoint($settings, 'nickname_path'),
+                [
+                    'api_key' => $settings['api_key'],
+                    'id' => $userId,
+                    'game_code' => $game->code,
+                    ...($server !== '' ? ['server' => $server] : []),
+                ],
+                $userField,
+            );
 
             $nickname = $this->firstString([
                 data_get($nicknameData, 'data.nickname'),
                 data_get($nicknameData, 'data.username'),
             ]);
             if (! $nickname) {
-                throw new NicknameServiceUnavailable;
+                throw ValidationException::withMessages([
+                    'customer_input.'.$userField => 'Nickname tidak ditemukan. Periksa kembali data akun.',
+                ]);
             }
 
             $country = $this->firstString([
@@ -94,18 +87,30 @@ class NicknameService
                 data_get($nicknameData, 'data.country'),
             ]);
 
-            if (strtolower($gameCode) === 'mobile-legends') {
-                $regionData = $this->post($baseUrl.'/v1/check-region', [
-                    'api_key' => trim((string) $settings['api_key']),
-                    'id' => $userId,
-                    'server' => $server,
-                ], $serverField ?: $userField);
+            if ($game->requires_region_check) {
+                if ($server === '') {
+                    throw ValidationException::withMessages([
+                        'customer_input.'.($serverField ?: 'server') => 'Server / Zone ID wajib diisi untuk pemeriksaan region.',
+                    ]);
+                }
+
+                $regionData = $this->post(
+                    $this->config->endpoint($settings, 'region_path'),
+                    [
+                        'api_key' => $settings['api_key'],
+                        'id' => $userId,
+                        'server' => $server,
+                    ],
+                    $serverField ?: $userField,
+                );
                 $country = $this->firstString([
                     data_get($regionData, 'data.region'),
                     data_get($regionData, 'data.country'),
                 ]);
                 if (! $country) {
-                    throw new NicknameServiceUnavailable;
+                    throw ValidationException::withMessages([
+                        'customer_input.'.($serverField ?: $userField) => 'Region akun tidak ditemukan. Periksa kembali Server / Zone.',
+                    ]);
                 }
             }
 
@@ -133,7 +138,7 @@ class NicknameService
             throw new NicknameServiceUnavailable;
         }
 
-        if (in_array($response->status(), [400, 404], true)) {
+        if (in_array($response->status(), [400, 404, 422], true)) {
             throw ValidationException::withMessages([
                 'customer_input.'.$field => 'ID, Server, atau kode game tidak valid.',
             ]);

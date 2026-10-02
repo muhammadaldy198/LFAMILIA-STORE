@@ -22,11 +22,15 @@ class IntegrationRegistry
                 ],
             ],
             'kokinpay' => [
-                'name' => 'Nickname Checker',
+                'name' => 'Validasi Akun',
                 'fields' => [
                     'api_key' => ['label' => 'API Key', 'secret' => true],
                     'base_url' => ['label' => 'Base URL', 'secret' => false],
+                    'nickname_path' => ['label' => 'Path cek nickname', 'secret' => false],
+                    'region_path' => ['label' => 'Path cek region', 'secret' => false],
+                    'pln_path' => ['label' => 'Path cek PLN', 'secret' => false],
                 ],
+                'note' => 'Base URL dan path endpoint dipakai oleh Cek Game, Region MLBB, PLN, serta validasi saat checkout. Semua nilai dapat diubah tanpa mengubah kode aplikasi.',
             ],
             'midtrans' => [
                 'name' => 'Midtrans Snap',

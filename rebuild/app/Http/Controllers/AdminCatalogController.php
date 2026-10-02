@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\NicknameGameCode;
 use App\Models\Product;
 use App\Models\ProductInputField;
 use App\Models\ProductNotice;
@@ -35,6 +36,10 @@ class AdminCatalogController
                 ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),
             ]),
+            'nicknameGameCodes' => NicknameGameCode::active()
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'requires_server', 'requires_region_check']),
             'products' => Product::with(['packages.mappings', 'fields', 'notices'])->orderBy('sort_order')->get()
                 ->map(fn (Product $product): array => [
                     ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
@@ -258,18 +263,33 @@ class AdminCatalogController
             $fieldKeys = $product->fields()->pluck('field_key')->all();
             if (empty($data['nickname_game_code']) || empty($data['nickname_user_field_key'])) {
                 throw ValidationException::withMessages([
-                    'nickname_game_code' => 'Game code dan field User ID wajib diisi ketika cek nickname aktif.',
+                    'nickname_game_code' => 'Kode game dan kolom User ID wajib dipilih ketika cek nickname aktif.',
                 ]);
             }
+
+            $nicknameGame = NicknameGameCode::active()
+                ->where('code', $data['nickname_game_code'])
+                ->first();
+            if (! $nicknameGame) {
+                throw ValidationException::withMessages([
+                    'nickname_game_code' => 'Pilih kode game aktif yang tersedia di menu Validasi Akun.',
+                ]);
+            }
+
             if (! in_array($data['nickname_user_field_key'], $fieldKeys, true)) {
                 throw ValidationException::withMessages([
-                    'nickname_user_field_key' => 'Field User ID harus memakai field produk yang tersedia.',
+                    'nickname_user_field_key' => 'Kolom User ID harus memakai kolom data pelanggan yang tersedia.',
+                ]);
+            }
+            if ($nicknameGame->requires_server && empty($data['nickname_server_field_key'])) {
+                throw ValidationException::withMessages([
+                    'nickname_server_field_key' => 'Game ini memerlukan kolom Server / Zone.',
                 ]);
             }
             if (! empty($data['nickname_server_field_key'])
                 && ! in_array($data['nickname_server_field_key'], $fieldKeys, true)) {
                 throw ValidationException::withMessages([
-                    'nickname_server_field_key' => 'Field Server harus memakai field produk yang tersedia.',
+                    'nickname_server_field_key' => 'Kolom Server / Zone harus memakai kolom data pelanggan yang tersedia.',
                 ]);
             }
         }

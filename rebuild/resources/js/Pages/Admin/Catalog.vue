@@ -10,7 +10,13 @@ import AdminShell from '../../Components/AdminShell.vue';
 import { computed, reactive, ref, watch } from 'vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
 
-const props = defineProps({ categories: Array, products: Array, digiflazzItems: {type:Array,default:()=>[]}, defaultMargin:Number });
+const props = defineProps({
+    categories: Array,
+    products: Array,
+    digiflazzItems: { type: Array, default: () => [] },
+    nicknameGameCodes: { type: Array, default: () => [] },
+    defaultMargin: Number,
+});
 const cloneProducts = (items) => items.map((item) => ({
     ...item,
     packages: item.packages.map((pack) => {
@@ -294,11 +300,19 @@ const deleteNotice = (notice) => {
                         <div class="space-y-3 rounded-md border border-slate-700 p-3 md:col-span-4">
                             <label class="flex items-center gap-2 text-sm"><input v-model="item.nickname_check_enabled" type="checkbox"> Aktifkan cek nickname</label>
                             <div v-if="item.nickname_check_enabled" class="grid gap-3 md:grid-cols-3">
-                                <label class="text-xs">Game code<Input v-model="item.nickname_game_code" placeholder="mobile-legends" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
-                                <label class="text-xs">Field User ID<select v-model="item.nickname_user_field_key" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="">Pilih field</option><option v-for="field in item.fields" :key="field.field_key" :value="field.field_key">{{ field.label }} ({{ field.field_key }})</option></select></label>
-                                <label class="text-xs">Field Server / Zone<select v-model="item.nickname_server_field_key" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="">Tidak dipakai</option><option v-for="field in item.fields" :key="field.field_key" :value="field.field_key">{{ field.label }} ({{ field.field_key }})</option></select></label>
+                                <label class="text-sm">
+                                    Kode game
+                                    <select v-model="item.nickname_game_code" class="mt-1 block h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-sm">
+                                        <option :value="null">Pilih kode game</option>
+                                        <option v-for="code in nicknameGameCodes" :key="code.id" :value="code.code">
+                                            {{ code.name }} · {{ code.code }}{{ code.requires_server ? ' · perlu Server / Zone' : '' }}
+                                        </option>
+                                    </select>
+                                </label>
+                                <label class="text-sm">Kolom User ID<select v-model="item.nickname_user_field_key" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="">Pilih field</option><option v-for="field in item.fields" :key="field.field_key" :value="field.field_key">{{ field.label }} ({{ field.field_key }})</option></select></label>
+                                <label class="text-sm">Kolom Server / Zone<select v-model="item.nickname_server_field_key" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="">Tidak dipakai</option><option v-for="field in item.fields" :key="field.field_key" :value="field.field_key">{{ field.label }} ({{ field.field_key }})</option></select></label>
                             </div>
-                            <p class="text-xs text-slate-500">Kredensial layanan cek nickname tetap dikelola di Integrasi; pelanggan tidak melihat nama penyedia.</p>
+                            <p class="text-xs text-slate-500">Kredensial layanan cek nickname tetap dikelola di Integrasi. Pelanggan tidak melihat nama penyedia.</p>
                         </div>
                     </div>
                     <Button type="button" class="rounded-md bg-slate-700 px-4 py-2 text-sm" @click="saveProduct(item)">Simpan produk</Button>
