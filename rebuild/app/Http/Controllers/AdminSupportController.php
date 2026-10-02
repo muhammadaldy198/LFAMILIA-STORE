@@ -151,14 +151,21 @@ class AdminSupportController
         $beforeRaw = DB::table('system_settings')->where('key', 'support.quick_replies')->value('value');
         $before = is_string($beforeRaw) ? json_decode($beforeRaw, true) : null;
 
-        DB::table('system_settings')->updateOrInsert(
-            ['key' => 'support.quick_replies'],
-            [
-                'value' => json_encode($replies, JSON_THROW_ON_ERROR),
-                'updated_at' => now(),
-                'updated_by_admin_id' => $request->user('admin')->id,
-            ]
-        );
+        $settings = DB::table('system_settings')->where('key', 'support.quick_replies');
+        $values = [
+            'value' => json_encode($replies, JSON_THROW_ON_ERROR),
+            'updated_at' => now(),
+            'updated_by_admin_id' => $request->user('admin')->id,
+        ];
+        if ($settings->exists()) {
+            $settings->update($values);
+        } else {
+            DB::table('system_settings')->insert([
+                'key' => 'support.quick_replies',
+                ...$values,
+                'created_at' => now(),
+            ]);
+        }
 
         $audit->record(
             $request,
