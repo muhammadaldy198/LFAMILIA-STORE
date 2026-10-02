@@ -222,7 +222,7 @@ class AdminCatalogController
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
             'sort_order' => ['required', 'integer', 'min:0'],
         ]);
-        $data['slug'] = $data['slug'] ?: Str::slug($data['name']);
+        $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['name']);
         if (! $data['slug']) {
             throw ValidationException::withMessages(['name' => 'Nama produk tidak valid.']);
         }
