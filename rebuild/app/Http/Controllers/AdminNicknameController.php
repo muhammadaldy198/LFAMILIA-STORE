@@ -37,12 +37,6 @@ class AdminNicknameController
                     'user_id' => ['required'],
                 ])->validate();
 
-                $requiresServer = collect($tools->gameCodes())
-                    ->firstWhere('code', $data['game_code'])['requires_server'] ?? false;
-                if ($requiresServer && blank($data['server'] ?? null)) {
-                    throw ValidationException::withMessages(['server' => 'Server / Zone wajib diisi untuk game ini.']);
-                }
-
                 $result = $tools->checkGame(
                     $data['game_code'],
                     $data['user_id'],
