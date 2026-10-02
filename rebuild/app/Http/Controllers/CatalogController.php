@@ -118,7 +118,7 @@ class CatalogController
         $packages = ProductPackage::where('product_id', $product->id)
             ->where('is_active', true)
             ->orderByRaw('nominal_value IS NULL')
-            ->orderBy('nominal_value')->orderBy('sort_order')->orderBy('id')->get()
+            ->orderBy('sort_order')->orderBy('nominal_value')->orderBy('id')->get()
             ->map(function (ProductPackage $package) use ($pricing): array {
                 try {
                     $quote = $pricing->forPackage($package->id);

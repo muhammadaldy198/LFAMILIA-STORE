@@ -27,23 +27,27 @@ class AdminWorkspaceController
         return Inertia::render('Admin/Workspace', [
             'kind' => 'orders',
             'title' => 'Pesanan',
-            'filters' => ['q' => (string) $request->query('q', '')],
+            'filters' => ['q' => (string) $request->query('q', ''), 'status' => (string) $request->query('status', '')],
             'rows' => DB::table('orders')
                 ->join('products', 'products.id', '=', 'orders.product_id')
                 ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
                 ->when($request->filled('q'), fn ($query) => $query->where('orders.order_number', 'like', '%'.mb_substr((string) $request->query('q'), 0, 100).'%'))
-                ->orderByDesc('orders.id')->limit(150)
-                ->get([
+                ->when($request->filled('status'), fn ($query) => $query->where('orders.status', $request->query('status')))
+                ->orderByDesc('orders.id')
+                ->select([
                     'orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
                     'orders.paid_at', 'orders.created_at', 'products.name as product_name',
                     'product_packages.name as package_name',
-                ]),
+                ])->paginate(25)->withQueryString(),
         ]);
     }
 
     public function providers(Request $request): Response
     {
         $provider = strtoupper(trim((string) $request->query('provider', '')));
+        if ($provider === 'DIGIFLAZZ') {
+            return app(AdminDigiflazzController::class)->index($request, app(\App\Services\DigiflazzCatalogService::class));
+        }
 
         return Inertia::render('Admin/Workspace', [
             'kind' => 'providers',
@@ -87,20 +91,33 @@ class AdminWorkspaceController
                 ->leftJoin('wallets', 'wallets.user_id', '=', 'users.id')
                 ->whereNull('users.deleted_at')
                 ->when($request->filled('q'), fn ($query) => $query->where(fn ($q) => $q->where('users.name', 'like', '%'.mb_substr((string) $request->query('q'), 0, 100).'%')->orWhere('users.email', 'like', '%'.mb_substr((string) $request->query('q'), 0, 100).'%')))
-                ->orderByDesc('users.id')->limit(150)
-                ->get([
+                ->orderByDesc('users.id')
+                ->select([
                     'users.id', 'users.name', 'users.email', 'users.phone',
                     'users.membership_tier_code', 'users.membership_mode',
                     'users.membership_override_code', 'users.membership_progress_bonus_idr',
                     'users.created_at', 'wallets.balance_idr',
                     DB::raw("(SELECT COALESCE(SUM(o.total_idr),0) FROM orders o WHERE o.user_id=users.id AND o.status IN ('PAID','PROCESSING','SUCCESS')) as lifetime_spend_idr"),
-                ])->map(fn (object $row): array => [
+                ])->paginate(25)->withQueryString()->through(fn (object $row): array => [
                     ...((array) $row),
                     'membership_assignment' => $row->membership_mode === 'MANUAL'
                         ? ($row->membership_override_code ?: $row->membership_tier_code)
                         : 'AUTO',
                 ]),
             'membershipTiers' => DB::table('membership_tiers')->where('is_active', true)->orderBy('rank')->pluck('code'),
+        ]);
+    }
+
+    public function customerDetail(int $userId): Response
+    {
+        $user = User::findOrFail($userId);
+        return Inertia::render('Admin/CustomerDetail', [
+            'customer' => $user->only('id', 'name', 'email', 'phone', 'membership_tier_code', 'created_at'),
+            'balanceIdr' => (int) ($user->wallet?->balance_idr ?? 0),
+            'orders' => DB::table('orders')->where('user_id', $userId)->orderByDesc('id')
+                ->select('id', 'order_number', 'status', 'total_idr', 'created_at')->paginate(20)->withQueryString(),
+            'ledger' => DB::table('wallet_ledger')->where('wallet_id', $user->wallet?->id)->orderByDesc('id')->limit(30)
+                ->get(['id', 'amount_idr', 'balance_after_idr', 'source', 'created_at']),
         ]);
     }
 
@@ -363,10 +380,23 @@ class AdminWorkspaceController
             });
 
         return Inertia::render('Admin/Workspace', [
+            'quickReplies' => json_decode((string) DB::table('system_settings')->where('key', 'support.quick_replies')->value('value'), true) ?? [],
             'kind' => 'support',
             'title' => 'Layanan Pelanggan',
             'rows' => $rows,
         ]);
+    }
+
+    public function quickReplies(Request $request, AdminAuditService $audit): RedirectResponse
+    {
+        $data = $request->validate(['replies' => ['present', 'array', 'max:30'], 'replies.*' => ['required', 'string', 'max:1000']]);
+        $before = DB::table('system_settings')->where('key', 'support.quick_replies')->value('value');
+        DB::table('system_settings')->updateOrInsert(['key' => 'support.quick_replies'], [
+            'value' => json_encode(array_values($data['replies'])), 'updated_at' => now(), 'created_at' => now(),
+            'updated_by_admin_id' => $request->user('admin')->id,
+        ]);
+        $audit->record($request, 'support.quick_replies.updated', 'system_setting', 'support.quick_replies', $before ? json_decode($before, true) : null, $data['replies']);
+        return back()->with('status', 'Balasan cepat disimpan.');
     }
 
     public function updateSupport(
@@ -404,7 +434,7 @@ class AdminWorkspaceController
         $reply = trim((string) ($data['reply'] ?? ''));
         if ($reply !== '') {
             $email = DB::table('support_tickets as tickets')
-                ->join('users', 'users.id', '=', 'tickets.user_id')
+                ->leftJoin('users', 'users.id', '=', 'tickets.user_id')
                 ->leftJoin('orders', 'orders.id', '=', 'tickets.order_id')
                 ->where('tickets.id', $id)->value(DB::raw('COALESCE(users.email, orders.guest_email)'));
             if (is_string($email) && $email !== '') {
@@ -424,26 +454,34 @@ class AdminWorkspaceController
         return back();
     }
 
-    public function reports(): Response
+    public function reports(Request $request): Response
     {
+        $filters = $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'], 'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+        ]);
+        $from = Carbon::parse($filters['from'] ?? now()->subDays(6)->toDateString())->startOfDay();
+        $to = Carbon::parse($filters['to'] ?? now()->toDateString())->endOfDay();
+        $orders = fn () => DB::table('orders')->whereBetween('orders.created_at', [$from, $to]);
         return Inertia::render('Admin/Workspace', [
-            'kind' => 'reports',
-            'title' => 'Laporan',
+            'kind' => 'reports', 'title' => 'Laporan',
+            'filters' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],
             'report' => [
-                'orders_total' => DB::table('orders')->count(),
-                'success_total' => DB::table('orders')->where('status', 'SUCCESS')->count(),
-                'revenue_total' => (int) DB::table('orders')->whereIn('status', ['PAID', 'PROCESSING', 'SUCCESS'])->sum('total_idr'),
+                'orders_total' => $orders()->count(),
+                'success_total' => $orders()->where('status', 'SUCCESS')->count(),
+                'revenue_total' => (int) $orders()->whereIn('status', ['PAID', 'PROCESSING', 'SUCCESS'])->sum('total_idr'),
                 'wallet_liability' => (int) DB::table('wallets')->sum('balance_idr'),
-                'provider_errors' => DB::table('fulfillment_attempts')
+                'provider_errors' => DB::table('fulfillment_attempts')->whereBetween('created_at', [$from, $to])
                     ->whereIn('status', ['UNKNOWN', 'FAILED_CONFIRMED', 'BLOCKED', 'MANUAL_FAILED'])->count(),
             ],
-            'topProducts' => DB::table('orders')
-                ->join('products', 'products.id', '=', 'orders.product_id')
-                ->where('orders.status', 'SUCCESS')
-                ->groupBy('products.id', 'products.name')
-                ->orderByDesc(DB::raw('COUNT(*)'))
-                ->limit(10)
+            'topProducts' => $orders()->join('products', 'products.id', '=', 'orders.product_id')->where('orders.status', 'SUCCESS')
+                ->groupBy('products.id', 'products.name')->orderByDesc(DB::raw('COUNT(*)'))->limit(10)
                 ->get(['products.name', DB::raw('COUNT(*) as orders_count'), DB::raw('SUM(orders.total_idr) as revenue_idr')]),
+            'dailyReport' => $orders()->selectRaw("DATE(created_at) as day, COUNT(*) as orders_count, SUM(CASE WHEN status IN ('PAID','PROCESSING','SUCCESS') THEN total_idr ELSE 0 END) as revenue_idr")
+                ->groupByRaw('DATE(created_at)')->orderBy('day')->get(),
+            'providerReport' => DB::table('fulfillment_attempts as attempts')->join('providers', 'providers.id', '=', 'attempts.provider_id')
+                ->whereBetween('attempts.created_at', [$from, $to])->groupBy('providers.id', 'providers.code')
+                ->get(['providers.code', DB::raw('COUNT(*) as attempts_count'),
+                    DB::raw("SUM(CASE WHEN attempts.status IN ('UNKNOWN','FAILED_CONFIRMED','BLOCKED','MANUAL_FAILED') THEN 1 ELSE 0 END) as errors_count")]),
         ]);
     }
 

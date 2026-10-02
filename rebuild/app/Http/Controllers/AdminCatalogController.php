@@ -38,7 +38,7 @@ class AdminCatalogController
                         ...$notice->only('id', 'title', 'body', 'sort_order', 'is_active'),
                     ])->all(),
                     'packages' => $product->packages->sortBy([
-                        ['nominal_value', 'asc'], ['sort_order', 'asc'],
+                        ['sort_order', 'asc'], ['nominal_value', 'asc'],
                     ])->values()->map(fn (ProductPackage $package): array => [
                         ...$package->only('id', 'name', 'note', 'group_name', 'is_active'),
                         'image_url' => $package->getFirstMediaUrl('image'),
@@ -115,7 +115,7 @@ class AdminCatalogController
                     'packages' => $product->packages->sortBy([
                         ['nominal_value', 'asc'], ['sort_order', 'asc'],
                     ])->values()->map(fn (ProductPackage $package): array => [
-                        ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active'),
+                        ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr'),
                         'image_url' => $package->getFirstMediaUrl('image'),
                         'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
                             ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
@@ -125,6 +125,10 @@ class AdminCatalogController
                         ])->all(),
                     ])->all(),
                 ]),
+            'defaultMargin' => json_decode((string) DB::table('system_settings')->where('key', 'catalog.default_margin_percent')->value('value'), true) ?? 0,
+            'digiflazzItems' => DB::table('digiflazz_catalog_items')->orderBy('category')->orderBy('brand')->orderBy('product_name')->get()
+                ->map(fn (object $item): array => [...((array) $item), 'available' => app(\App\Services\DigiflazzCatalogService::class)->available($item),
+                    'mapped' => ProviderMapping::where('external_sku', $item->buyer_sku_code)->whereIn('provider_id', Provider::where('code', 'DIGIFLAZZ')->pluck('id'))->exists()]),
             'assets' => StoreAsset::orderBy('id')->get()->map(fn (StoreAsset $asset): array => [
                 ...$asset->only('id', 'key', 'target_url', 'is_active'),
                 'image_url' => $asset->getFirstMediaUrl('image'),
@@ -341,8 +345,16 @@ class AdminCatalogController
             'nominal_value' => ['nullable', 'integer', 'min:0'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
+            'pricing_mode' => ['sometimes', Rule::in(['PRODUCT_MARGIN', 'PERCENT', 'FIXED', 'SELL_PRICE'])],
+            'margin_percent' => ['nullable', 'numeric', 'min:0', 'max:1000', 'required_if:pricing_mode,PERCENT'],
+            'margin_fixed_idr' => ['nullable', 'integer', 'min:0', 'max:1000000000', 'required_if:pricing_mode,FIXED'],
+            'sell_price_idr' => ['nullable', 'integer', 'min:1', 'max:1000000000', 'required_if:pricing_mode,SELL_PRICE'],
         ]);
 
+        if (($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'
+            && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) $package->mappings()->max('cost_idr')) {
+            throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
+        }
         DB::transaction(function () use ($request, $package, $data, $audit): void {
             $before = $package->toArray();
             $package->update($data);
@@ -384,13 +396,25 @@ class AdminCatalogController
     public function fields(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate([
-            'fields' => ['required', 'array', 'max:20'],
+            'fields' => ['present', 'array', 'max:20'],
             'fields.*.field_key' => ['required', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/', 'distinct'],
             'fields.*.label' => ['required', 'string', 'max:255'],
             'fields.*.placeholder' => ['nullable', 'string', 'max:255'],
             'fields.*.type' => ['required', Rule::in(['text', 'tel', 'email'])],
             'fields.*.is_required' => ['required', 'boolean'],
         ]);
+        $keys = array_column($data['fields'], 'field_key');
+        $references = [];
+        if ($product->nickname_check_enabled) {
+            $references = array_filter([$product->nickname_user_field_key, $product->nickname_server_field_key]);
+        }
+        foreach (ProviderMapping::whereIn('product_package_id', $product->packages()->pluck('id'))->get() as $mapping) {
+            preg_match_all('/\{\{([^}]+)\}\}/', (string) data_get($mapping->fulfillment_config, 'customer_no_template'), $matches);
+            $references = array_merge($references, $matches[1] ?? []);
+        }
+        if (array_diff($references, $keys)) {
+            throw ValidationException::withMessages(['fields' => 'Kode kolom masih dipakai cek nickname atau template pengiriman. Ubah pengaturan tersebut dahulu.']);
+        }
         DB::transaction(function () use ($request, $product, $data, $audit): void {
             $before = $product->fields()->get()->toArray();
             $product->fields()->delete();
@@ -454,6 +478,39 @@ class AdminCatalogController
                 $before, $mapping->toArray());
         });
 
+        return back();
+    }
+
+    public function reorderPackages(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
+    {
+        $data = $request->validate(['ids' => ['required', 'array', 'max:1000'], 'ids.*' => ['integer', 'distinct']]);
+        DB::transaction(function () use ($product, $data, $request, $audit): void {
+            $before = $product->packages()->lockForUpdate()->orderBy('sort_order')->pluck('id')->all();
+            $ids = array_map('intval', $data['ids']);
+            $expected = $before; $actual = $ids;
+            sort($expected); sort($actual);
+            if ($expected !== $actual) {
+                throw ValidationException::withMessages(['ids' => 'Daftar nominal berubah. Muat ulang halaman.']);
+            }
+            foreach ($ids as $order => $id) {
+                ProductPackage::where('id', $id)->update(['sort_order' => $order]);
+            }
+            $audit->record($request, 'catalog.packages.reordered', 'product', $product->id, $before, $ids);
+        });
+        return back();
+    }
+
+    public function globalMargin(Request $request, CatalogAudit $audit): RedirectResponse
+    {
+        $data = $request->validate(['margin_percent' => ['required', 'numeric', 'min:0', 'max:1000']]);
+        DB::transaction(function () use ($request, $data, $audit): void {
+            $before = Product::pluck('margin_percent', 'id')->all();
+            Product::query()->update(['margin_percent' => $data['margin_percent']]);
+            DB::table('system_settings')->updateOrInsert(['key' => 'catalog.default_margin_percent'], [
+                'value' => json_encode($data['margin_percent']), 'updated_at' => now(), 'created_at' => now(),
+            ]);
+            $audit->record($request, 'catalog.margin.global_updated', 'product', 'all', $before, $data);
+        });
         return back();
     }
 

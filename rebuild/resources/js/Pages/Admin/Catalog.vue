@@ -10,7 +10,7 @@ import AdminShell from '../../Components/AdminShell.vue';
 import { computed, reactive, ref, watch } from 'vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
 
-const props = defineProps({ categories: Array, products: Array, assets: Array });
+const props = defineProps({ categories: Array, products: Array, assets: Array, digiflazzItems: {type:Array,default:()=>[]}, defaultMargin:Number });
 const cloneProducts = (items) => items.map((item) => ({
     ...item,
     packages: item.packages.map((pack) => ({
@@ -32,7 +32,7 @@ const searchedProduct = products.value.find(item => item.name.toLowerCase().incl
 const tab = ref(initialSearch && searchedProduct ? searchedProduct.fulfillment_mode : 'AUTO_PROVIDER');
 const selectedProductId = ref(null), editorTab = ref('info'), showCreateProduct = ref(false);
 const selectedProductItems = computed(() => products.value.filter(item => item.id === selectedProductId.value));
-const editProduct = item => { selectedProductId.value = item.id; editorTab.value = 'info'; };
+const editProduct = item => { selectedProductId.value = item.id; editorTab.value = 'info'; showImport.value=false; importForm.item_ids=[]; };
 const catalogTab = ref('products'), catalogSearch = ref(initialSearch), catalogPage = ref(1);
 const catalogTabs = [['products','Produk'],['categories','Kategori'],['fields','Kolom Data Akun'],['media','Media Toko']];
 const matchingProducts = computed(() => products.value.filter(item => item.fulfillment_mode === tab.value && (!catalogSearch.value || [item.name,item.slug,...item.packages.map(p => p.name)].join(' ').toLowerCase().includes(catalogSearch.value.toLowerCase()))));
@@ -41,6 +41,34 @@ const visibleProducts = computed(() => matchingProducts.value.slice((catalogPage
 watch([tab,catalogSearch], () => {catalogPage.value = 1;});
 const categoryForm = useForm({ name: '', sort_order: 0 });
 const productForm = useForm({ category_id: '', name: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: 0, sort_order: 0 });
+const globalMarginForm = useForm({margin_percent:props.defaultMargin||0});
+const applyGlobalMargin=()=>{if(confirm('Terapkan margin ke semua produk? Margin khusus nominal tetap dipakai.'))globalMarginForm.put('/admin/catalog/margin',{preserveScroll:true});};
+const importForm = useForm({item_ids:[],margin_percent:10});
+const importSearch=ref(''),importBrand=ref(''),showImport=ref(false);
+const importPage=ref(1);
+const importBrands=computed(()=>[...new Set(props.digiflazzItems.map(i=>i.brand))].sort());
+const importMatches=computed(()=>props.digiflazzItems.filter(i=>!i.mapped && i.available && (!importBrand.value||i.brand===importBrand.value) && (!importSearch.value||[i.product_name,i.buyer_sku_code].join(' ').toLowerCase().includes(importSearch.value.toLowerCase()))));
+const importItems=computed(()=>importMatches.value.slice((importPage.value-1)*25,importPage.value*25));
+watch([importSearch,importBrand],()=>{importPage.value=1;});
+const draggedPackageId=ref(null);
+const reorderPackage=(item,index,direction)=>{
+ const target=index+direction;if(target<0||target>=item.packages.length)return;
+ const packageItem=item.packages.splice(index,1)[0];item.packages.splice(target,0,packageItem);
+ router.put('/admin/catalog/products/'+item.id+'/packages/reorder',{ids:item.packages.map(p=>p.id)},{preserveScroll:true});
+};
+const dropPackage=(item,index)=>{
+ const from=item.packages.findIndex(p=>p.id===draggedPackageId.value);
+ draggedPackageId.value=null;if(from<0||from===index)return;
+ const moved=item.packages.splice(from,1)[0];item.packages.splice(index,0,moved);
+ router.put('/admin/catalog/products/'+item.id+'/packages/reorder',{ids:item.packages.map(p=>p.id)},{preserveScroll:true});
+};
+const previewPrice=(pack,item)=>{
+ const mapping=[...pack.mappings].filter(m=>m.is_active).sort((a,b)=>a.priority-b.priority||a.cost_idr-b.cost_idr)[0]||pack.mappings[0];
+ if(!mapping?.cost_idr)return 'Belum ada modal';
+ const cost=Number(mapping.cost_idr);
+ const price=pack.pricing_mode==='SELL_PRICE'?Number(pack.sell_price_idr):cost+(pack.pricing_mode==='FIXED'?Number(pack.margin_fixed_idr||0):Math.ceil(cost*Number(pack.pricing_mode==='PERCENT'?pack.margin_percent:item.margin_percent)/100));
+ return 'Rp'+price.toLocaleString('id-ID')+(price<cost?' · di bawah modal':'');
+};
 const packageForm = useForm({ product_id: '', code: '', name: '', note: '', group_name: '', nominal_value: '', sort_order: 0, cost_idr: '' });
 const noticeDrafts = reactive({});
 const fieldsProductId = ref('');
@@ -93,6 +121,7 @@ const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
 const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
     code: pack.code, name: pack.name, note: pack.note || null, group_name: pack.group_name || null, nominal_value: pack.nominal_value,
     sort_order: pack.sort_order, is_active: pack.is_active,
+    pricing_mode:pack.pricing_mode||'PRODUCT_MARGIN',margin_percent:pack.margin_percent??null,margin_fixed_idr:pack.margin_fixed_idr??null,sell_price_idr:pack.sell_price_idr??null,
 });
 const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping.id, {
     priority: mapping.priority, is_active: mapping.is_active,
@@ -150,6 +179,7 @@ const deleteNotice = (notice) => {
                 </div>
             </section>
 
+            <Card class="p-4"><form class="flex flex-wrap items-end gap-3" @submit.prevent="applyGlobalMargin"><label class="text-sm">Margin global %<Input v-model.number="globalMarginForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/></label><Button :disabled="globalMarginForm.processing">Terapkan ke semua produk</Button></form></Card>
             <section v-show="catalogTab === 'products'" class="space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Produk</h2><label class="block">Cari produk atau nominal<Input v-model="catalogSearch" placeholder="Nama produk, slug, atau nominal" /></label><nav class="flex items-center gap-3"><Button type="button" :disabled="catalogPage <= 1" @click="catalogPage--">Sebelumnya</Button><span>{{catalogPage}} / {{totalCatalogPages}} · {{matchingProducts.length}} produk</span><Button type="button" :disabled="catalogPage >= totalCatalogPages" @click="catalogPage++">Berikutnya</Button></nav>
                 <div class="flex gap-2"><Button v-for="mode in ['AUTO_PROVIDER', 'MANUAL']" :key="mode" type="button" class="rounded-md px-4 py-2 text-sm" :class="tab === mode ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800'" @click="tab = mode">{{ mode === 'MANUAL' ? 'Produk Manual' : 'Produk Provider' }}</Button></div>
@@ -225,9 +255,19 @@ const deleteNotice = (notice) => {
 
                     </div>
                     <div v-show="editorTab==='nominal'" class="space-y-3 rounded-md bg-slate-950 p-4">
-                        <h3 class="font-semibold">Nominal / paket</h3>
-                        <div v-for="pack in item.packages" :key="pack.id" class="space-y-2 border-t border-slate-800 pt-3">
+                        <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="font-semibold">Nominal / paket</h3><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="showImport=!showImport">Impor nominal Digiflazz</Button></div>
+                        <Card v-if="showImport && item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 p-4">
+                            <h4 class="font-semibold">Pilih SKU untuk {{item.name}}</h4>
+                            <div class="grid gap-3 md:grid-cols-3"><label class="text-sm">Cari SKU<Input v-model="importSearch" class="mt-1"/></label><label class="text-sm">Brand<select v-model="importBrand" class="mt-1 block w-full rounded border p-2"><option value="">Semua brand</option><option v-for="brand in importBrands" :key="brand">{{brand}}</option></select></label><label class="text-sm">Margin nominal %<Input v-model.number="importForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/></label></div>
+                            <p class="text-xs text-slate-500">Hanya SKU tersedia yang belum dipakai. Nominal hasil impor nonaktif sampai diperiksa.</p>
+                            <label v-for="sku in importItems" :key="sku.id" class="flex items-start gap-3 rounded border p-2 text-sm"><input v-model="importForm.item_ids" type="checkbox" :value="sku.id"><span>{{sku.product_name}}<small class="block">{{sku.buyer_sku_code}} · Rp{{Number(sku.price_idr).toLocaleString('id-ID')}}</small></span></label>
+                            <p v-if="!importMatches.length" class="text-sm">Belum ada SKU. Sinkronkan dahulu lewat menu Digiflazz.</p>
+                            <div class="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" :disabled="importPage===1" @click="importPage--">Sebelumnya</Button><span class="text-sm">Halaman {{importPage}} / {{Math.max(1,Math.ceil(importMatches.length/25))}}</span><Button type="button" variant="outline" :disabled="importPage*25>=importMatches.length" @click="importPage++">Berikutnya</Button></div>
+                            <Button type="button" :disabled="importForm.processing||!importForm.item_ids.length" @click="importForm.post('/admin/catalog/products/'+item.id+'/import',{preserveScroll:true,onSuccess:()=>{importForm.item_ids=[];showImport=false;}})">Impor {{importForm.item_ids.length}} nominal</Button>
+                        </Card>
+                        <div v-for="(pack,packIndex) in item.packages" :key="pack.id" class="space-y-2 border-t border-slate-800 pt-3" draggable="true" @dragstart="draggedPackageId=pack.id" @dragover.prevent @drop.prevent="dropPackage(item,packIndex)">
                             <div class="flex flex-wrap items-end gap-2">
+                                <div class="flex gap-2"><Button type="button" variant="outline" :disabled="packIndex===0" @click="reorderPackage(item,packIndex,-1)">Naik</Button><Button type="button" variant="outline" :disabled="packIndex===item.packages.length-1" @click="reorderPackage(item,packIndex,1)">Turun</Button></div>
                                 <label class="text-xs">Kode internal<Input v-model="pack.code" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Nama nominal<Input v-model="pack.name" class="mt-1 block rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Badge<Input v-model="pack.note" maxlength="80" placeholder="Contoh: Populer" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
@@ -237,12 +277,19 @@ const deleteNotice = (notice) => {
                                 <label class="flex gap-2 text-xs"><input v-model="pack.is_active" type="checkbox">Aktif</label>
                                 <Button type="button" class="rounded bg-slate-700 px-3 py-2 text-xs" @click="savePackage(pack)">Simpan</Button>
                             </div>
+                            <div class="grid gap-3 md:grid-cols-3">
+                                <label class="text-xs">Mode harga<select v-model="pack.pricing_mode" class="mt-1 block w-full rounded border p-2"><option value="PRODUCT_MARGIN">Ikuti margin produk</option><option value="PERCENT">Margin persen nominal</option><option value="FIXED">Margin rupiah nominal</option><option value="SELL_PRICE">Harga jual tetap</option></select></label>
+                                <label v-if="pack.pricing_mode==='PERCENT'" class="text-xs">Margin %<Input v-model.number="pack.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/></label>
+                                <label v-if="pack.pricing_mode==='FIXED'" class="text-xs">Margin Rp<Input v-model.number="pack.margin_fixed_idr" type="number" min="0" class="mt-1"/></label>
+                                <label v-if="pack.pricing_mode==='SELL_PRICE'" class="text-xs">Harga jual Rp<Input v-model.number="pack.sell_price_idr" type="number" min="1" class="mt-1"/></label>
+                                <p class="self-center text-sm">Pratinjau harga: <strong>{{previewPrice(pack,item)}}</strong></p>
+                            </div>
                             <div class="rounded border border-slate-700 p-2">
                                 <p class="mb-2 text-[11px] text-slate-400">Gambar nominal: rekomendasi 512×512 (1:1), PNG/WebP transparan bila memungkinkan.</p>
                                 <AdminMediaControl type="package" :id="pack.id" :url="pack.image_url" />
                             </div>
                             <div v-for="mapping in pack.mappings" :key="mapping.id" class="flex flex-wrap items-end gap-2 text-xs text-slate-300">
-                                <span>{{ mapping.provider_code }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span></span>
+                                <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga nominal</Button><span>{{ mapping.provider_code }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span></span>
                                 <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                                 <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Template customer_no<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan placeholder field produk. Jika hanya satu field, boleh dikosongkan.</span></label>
                                 <label>Prioritas<Input v-model.number="mapping.priority" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>

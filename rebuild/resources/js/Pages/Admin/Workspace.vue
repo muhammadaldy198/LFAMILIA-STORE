@@ -9,6 +9,8 @@ import { computed, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 
 const props = defineProps({
+    quickReplies:{type:Array,default:()=>[]},
+    dailyReport:{type:Array,default:()=>[]}, providerReport:{type:Array,default:()=>[]},
     kind: String,
     filters: Object,
     title: String,
@@ -27,9 +29,13 @@ const page = usePage();
 const base = computed(() => page.props.adminPanel?.base_path || '/admin');
 const isSuper = computed(() => page.props.adminPanel?.admin?.role === 'SUPER_ADMIN');
 const rows = reactive(Array.isArray(props.rows) ? props.rows.map((row) => ({ ...row })) : (props.rows?.data || []).map((row) => ({ ...row })));
+const orderStatus=ref(props.filters?.status||'');
+const reportRange=reactive({from:props.filters?.from||'',to:props.filters?.to||''});
+const quickRepliesForm=useForm({replies:[...props.quickReplies]});
+const updateSupport=row=>router.put('/admin/support/'+row.id,{status:row.status,reply:row.quick_reply||null},{preserveScroll:true,onSuccess:()=>{row.quick_reply='';}});
 const searchQuery = ref(props.filters?.q || '');
 watch(() => props.rows, value => { rows.splice(0, rows.length, ...(Array.isArray(value) ? value : value?.data || []).map(row => ({...row}))); });
-const searchRows = () => router.get('/admin/' + (props.kind === 'orders' ? 'orders' : 'customers'), {q:searchQuery.value}, {preserveState:true});
+const searchRows = () => router.get('/admin/' + (props.kind === 'orders' ? 'orders' : 'customers'), {q:searchQuery.value,status:props.kind==='orders'?orderStatus.value:undefined}, {preserveState:true});
 const popularProducts = reactive((props.popularProducts || []).map((row) => ({ ...row })));
 
 const voucherForm = useForm({
@@ -102,7 +108,7 @@ function adjustWallet(row) {
         <div class="space-y-6">
             <div><h1 class="text-3xl font-semibold">{{ title }}</h1></div>
 
-            <form v-if="kind === 'orders' || kind === 'customers'" class="lf-admin-filter-row" @submit.prevent="searchRows"><label>Cari {{kind === 'orders' ? 'nomor invoice' : 'nama/email pelanggan'}}<Input v-model="searchQuery" maxlength="100" /></label><div class="self-end"><Button class="lf-admin-primary">Cari</Button></div></form>
+            <form v-if="kind === 'orders' || kind === 'customers'" class="lf-admin-filter-row" @submit.prevent="searchRows"><label>Cari {{kind === 'orders' ? 'nomor invoice' : 'nama/email pelanggan'}}<Input v-model="searchQuery" maxlength="100" /></label><label v-if="kind==='orders'">Status<select v-model="orderStatus" class="mt-1 rounded border p-2"><option value="">Semua status</option><option v-for="status in ['PENDING_PAYMENT','PAID','PROCESSING','SUCCESS','FAILED','EXPIRED','CANCELLED']" :key="status">{{status}}</option></select></label><div class="self-end"><Button class="lf-admin-primary">Cari</Button></div></form>
             <section v-if="kind === 'orders'" class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900 p-4">
                 <Table class="w-full min-w-[850px] text-sm">
                     <TableHeader class="text-left text-slate-400"><TableRow><TableHead class="p-2">Order</TableHead><TableHead class="p-2">Produk</TableHead><TableHead class="p-2">Nominal</TableHead><TableHead class="p-2">Status</TableHead><TableHead class="p-2">Total</TableHead><TableHead class="p-2">Dibuat</TableHead></TableRow></TableHeader>
@@ -121,7 +127,7 @@ function adjustWallet(row) {
             <section v-else-if="kind === 'customers'" class="space-y-3">
                 <div v-for="row in rows" :key="row.id" class="rounded-xl border border-slate-800 bg-slate-900 p-4">
                     <div class="grid gap-3 md:grid-cols-5">
-                        <div class="md:col-span-2"><strong>{{ row.name }}</strong><p class="text-xs text-slate-400">{{ row.email || '-' }} · {{ row.phone || '-' }}</p></div>
+                        <div class="md:col-span-2"><Link :href="'/admin/customers/'+row.id" class="font-semibold text-blue-600">{{ row.name }}</Link><p class="text-xs text-slate-400">{{ row.email || '-' }} · {{ row.phone || '-' }}</p></div>
                         <div><span class="text-xs text-slate-500">Saldo</span><div>Rp{{ Number(row.balance_idr || 0).toLocaleString('id-ID') }}</div></div>
                         <label class="text-xs">Membership<select v-model="row.membership_assignment" :disabled="!isSuper" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="AUTO">AUTO (berdasarkan transaksi)</option><option v-for="tier in membershipTiers" :key="tier" :value="tier">{{ tier }} (manual)</option></select><small class="mt-1 block text-[10px] text-slate-500">Aktif: {{row.membership_tier_code}} · Belanja Rp{{Number(row.lifetime_spend_idr||0).toLocaleString('id-ID')}}</small></label>
                         <Button v-if="isSuper" class="self-end rounded bg-slate-700 px-3 py-2 text-xs" @click="updateMembership(row)">Simpan tier</Button>
@@ -208,6 +214,11 @@ function adjustWallet(row) {
             </section>
 
             <section v-else-if="kind === 'support'" class="space-y-3">
+                <form class="space-y-3 rounded-md border p-4" @submit.prevent="quickRepliesForm.put('/admin/support/quick-replies',{preserveScroll:true})">
+                    <h2 class="font-semibold">Balasan cepat</h2>
+                    <div v-for="(reply,index) in quickRepliesForm.replies" :key="index" class="flex flex-wrap gap-2"><Textarea v-model="quickRepliesForm.replies[index]" maxlength="1000" rows="2" class="min-w-0 flex-1"/><Button type="button" variant="outline" @click="quickRepliesForm.replies.splice(index,1)">Hapus</Button></div>
+                    <div class="flex flex-wrap gap-2"><Button type="button" variant="outline" :disabled="quickRepliesForm.replies.length>=30" @click="quickRepliesForm.replies.push('')">Tambah balasan cepat</Button><Button :disabled="quickRepliesForm.processing">Simpan balasan cepat</Button></div>
+                </form>
                 <div v-for="row in rows" :key="row.id" class="rounded-xl border border-slate-800 bg-slate-900 p-4">
                     <div class="flex flex-wrap justify-between gap-2"><strong>Tiket #{{row.id}} · {{ row.subject }}</strong><span class="text-xs text-slate-500">{{ row.customer_name }} · {{ row.order_number || 'tanpa order' }}</span></div>
                     <div class="mt-3 rounded-lg bg-slate-950 p-3">
@@ -225,13 +236,16 @@ function adjustWallet(row) {
                     </div>
                     <div class="mt-3 grid gap-2 md:grid-cols-[180px_minmax(0,1fr)_auto]">
                         <select v-model="row.status" class="rounded bg-slate-800 p-2 text-sm"><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option></select>
-                        <Textarea v-model="row.quick_reply" rows="2" class="rounded bg-slate-800 p-2 text-sm" placeholder="Quick reply ke pelanggan (opsional)"></Textarea>
+                        <div class="space-y-2"><select aria-label="Pilih balasan cepat" class="w-full rounded border p-2 text-sm" @change="row.quick_reply=$event.target.value"><option value="">Pilih balasan cepat</option><option v-for="reply in quickRepliesForm.replies.filter(r=>r.trim())" :key="reply" :value="reply">{{reply.slice(0,80)}}</option></select><Textarea v-model="row.quick_reply" rows="2" class="rounded bg-slate-800 p-2 text-sm" placeholder="Balasan ke pelanggan (opsional)"></Textarea></div>
                         <Button class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950" @click="updateSupport(row)">Simpan / Balas</Button>
                     </div>
                 </div>
             </section>
 
             <template v-else-if="kind === 'reports'">
+                <form class="flex flex-wrap items-end gap-3" @submit.prevent="router.get('/admin/reports',reportRange)"><label class="text-sm">Dari<Input v-model="reportRange.from" type="date" class="mt-1"/></label><label class="text-sm">Sampai<Input v-model="reportRange.to" type="date" class="mt-1"/></label><Button>Tampilkan laporan</Button></form>
+                <section class="rounded-md border p-4"><h2 class="font-semibold">Transaksi per hari</h2><Table><TableHeader><TableRow><TableHead>Tanggal</TableHead><TableHead>Pesanan</TableHead><TableHead>Omzet</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="row in dailyReport" :key="row.day"><TableCell>{{row.day}}</TableCell><TableCell>{{row.orders_count}}</TableCell><TableCell>Rp{{Number(row.revenue_idr).toLocaleString('id-ID')}}</TableCell></TableRow></TableBody></Table></section>
+                <section class="rounded-md border p-4"><h2 class="font-semibold">Performa provider</h2><Table><TableHeader><TableRow><TableHead>Provider</TableHead><TableHead>Percobaan</TableHead><TableHead>Bermasalah</TableHead><TableHead>Error rate</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="row in providerReport" :key="row.code"><TableCell>{{row.code}}</TableCell><TableCell>{{row.attempts_count}}</TableCell><TableCell>{{row.errors_count}}</TableCell><TableCell>{{(100*Number(row.errors_count)/Math.max(1,Number(row.attempts_count))).toFixed(1)}}%</TableCell></TableRow></TableBody></Table></section>
                 <section class="grid gap-3 md:grid-cols-3"><div v-for="(value, key) in report" :key="key" class="rounded-xl border border-slate-800 bg-slate-900 p-4"><div class="text-xs uppercase text-slate-500">{{ key.replaceAll('_', ' ') }}</div><div class="mt-2 text-2xl font-semibold">{{ key.includes('revenue') || key.includes('wallet') ? 'Rp' + Number(value).toLocaleString('id-ID') : value }}</div></div></section>
                 <section class="rounded-xl border border-slate-800 bg-slate-900 p-5"><h2 class="font-semibold">Produk berhasil teratas</h2><div v-for="row in topProducts" :key="row.name" class="mt-3 flex justify-between border-t border-slate-800 pt-3 text-sm"><span>{{ row.name }}</span><span>{{ row.orders_count }} order · Rp{{ Number(row.revenue_idr).toLocaleString('id-ID') }}</span></div></section>
             </template>
@@ -279,6 +293,8 @@ function adjustWallet(row) {
                     <TableBody><TableRow v-for="row in rows" :key="row.id" class="border-t border-slate-800"><TableCell class="p-2">{{ row.created_at }}</TableCell><TableCell class="p-2">{{ row.actor_role }} #{{ row.actor_id }}</TableCell><TableCell class="p-2">{{ row.action }}</TableCell><TableCell class="p-2">{{ row.target_type }} #{{ row.target_id }}</TableCell><TableCell class="p-2">{{ row.correlation_id }}</TableCell><TableCell class="p-2">{{ row.ip_address }}</TableCell></TableRow></TableBody>
                 </Table>
             </section>
+            <p v-if="['orders','customers','support'].includes(kind)&&!rows.length" class="text-sm text-slate-500">Tidak ada data sesuai pencarian.</p>
+            <nav v-if="props.rows?.links" class="flex flex-wrap gap-2" aria-label="Halaman data"><template v-for="link in props.rows.links" :key="link.label"><Link v-if="link.url" :href="link.url" class="rounded-md border px-3 py-2 text-sm" :class="{'bg-slate-900 text-white':link.active}" v-html="link.label"/><span v-else class="px-3 py-2 text-sm text-slate-400" v-html="link.label"/></template></nav>
         </div>
     </AdminShell>
 </template>

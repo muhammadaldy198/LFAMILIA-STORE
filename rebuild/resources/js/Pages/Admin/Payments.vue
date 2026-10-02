@@ -6,7 +6,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
-import { reactive, ref } from 'vue';
+import { reactive, ref, watch } from 'vue';
 
 const props = defineProps({
     canConfigure: Boolean,
@@ -27,6 +27,9 @@ const routes = reactive(props.routes.map((item) => ({
         ? (typeof item.configuration === 'string' ? item.configuration : JSON.stringify(item.configuration, null, 2))
         : '',
 })));
+watch(()=>props.gateways,items=>gateways.splice(0,gateways.length,...items.map(i=>({...i}))));
+watch(()=>props.channels,items=>channels.splice(0,channels.length,...items.map(i=>({...i}))));
+watch(()=>props.routes,items=>routes.splice(0,routes.length,...items.map(i=>({...i,configuration_text:i.configuration?(typeof i.configuration==='string'?i.configuration:JSON.stringify(i.configuration,null,2)):''}))));
 const minimumTopupIdr = ref(props.minimumTopupIdr);
 const paymentPage = reactive({
     accentColor: props.pageSettings?.accentColor || '#b9ff35',
@@ -52,6 +55,7 @@ const paymentPage = reactive({
     showStatusBox: props.pageSettings?.showStatusBox !== false,
     showSupport: props.pageSettings?.showSupport !== false,
 });
+watch(()=>props.pageSettings,value=>Object.assign(paymentPage,value||{}));
 const routeForm = reactive({
     payment_channel_id: '',
     payment_gateway_id: '',

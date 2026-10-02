@@ -24,6 +24,8 @@ class CheckoutPricing
                 'packages.code as package_code',
                 'packages.name as package_name',
                 'packages.nominal_value',
+                'packages.pricing_mode', 'packages.margin_percent as package_margin_percent',
+                'packages.margin_fixed_idr', 'packages.sell_price_idr',
                 'products.id as product_id',
                 'products.name as product_name',
                 'products.slug as product_slug',
@@ -71,7 +73,11 @@ class CheckoutPricing
             $mappingQuery->lockForUpdate();
         }
 
-        $mapping = $mappingQuery->first();
+        $mapping = $mappingQuery->get()->first(function (object $candidate): bool {
+            if ($candidate->provider_code !== 'DIGIFLAZZ') return true;
+            $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', $candidate->external_sku)->first();
+            return $item === null || app(DigiflazzCatalogService::class)->available($item);
+        });
         if (! $mapping) {
             throw ValidationException::withMessages([
                 'package_id' => 'Nominal sedang tidak tersedia untuk checkout.',
@@ -79,7 +85,15 @@ class CheckoutPricing
         }
 
         $cost = (int) $mapping->cost_idr;
-        $margin = $this->margin($cost, (string) $context->margin_percent);
+        $percent = $context->pricing_mode === 'PERCENT' ? $context->package_margin_percent : $context->margin_percent;
+        $margin = match ($context->pricing_mode) {
+            'FIXED' => (int) $context->margin_fixed_idr,
+            'SELL_PRICE' => (int) $context->sell_price_idr - $cost,
+            default => $this->margin($cost, (string) $percent),
+        };
+        if ($margin < 0) {
+            throw ValidationException::withMessages(['package_id' => 'Harga jual nominal berada di bawah modal.']);
+        }
 
         return [
             'product_id' => (int) $context->product_id,

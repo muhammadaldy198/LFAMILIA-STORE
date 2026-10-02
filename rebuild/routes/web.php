@@ -204,6 +204,10 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:catalog.manage')->prefix('admin/catalog')
         ->name('admin.catalog.')->group(function (): void {
+            Route::put('/margin', [AdminCatalogController::class, 'globalMargin']);
+            Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages']);
+            Route::post('/products/{product}/import', [\App\Http\Controllers\AdminDigiflazzController::class, 'import']);
+            Route::post('/mappings/{mapping}/sync', [\App\Http\Controllers\AdminDigiflazzController::class, 'syncMapping'])->middleware('throttle:admin-sensitive');
             Route::post('/categories', [AdminCatalogController::class, 'category'])->name('categories.store');
             Route::put('/categories/{category}', [AdminCatalogController::class, 'updateCategory'])->name('categories.update');
             Route::delete('/categories/{category}', [AdminCatalogController::class, 'destroyCategory'])->name('categories.destroy');
@@ -246,6 +250,9 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     });
 
     Route::middleware('admin.permission:providers.manage')->group(function (): void {
+        Route::post('/admin/digiflazz/sync', [\App\Http\Controllers\AdminDigiflazzController::class, 'sync'])->middleware('throttle:admin-sensitive');
+        Route::put('/admin/digiflazz/baseline/{id}', [\App\Http\Controllers\AdminDigiflazzController::class, 'baseline']);
+
         Route::get('/admin/providers', [AdminWorkspaceController::class, 'providers'])->name('admin.providers');
         Route::put('/admin/providers/{id}', [AdminWorkspaceController::class, 'updateProvider'])->name('admin.providers.update');
     });
@@ -254,6 +261,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::get('/admin/orders', [AdminWorkspaceController::class, 'orders'])
         ->middleware('admin.permission:orders.view')->name('admin.orders');
 
+    Route::get('/admin/customers/{userId}', [AdminWorkspaceController::class, 'customerDetail'])->middleware('admin.permission:customers.view');
     Route::get('/admin/customers', [AdminWorkspaceController::class, 'customers'])
         ->middleware('admin.permission:customers.view')->name('admin.customers');
 
@@ -276,6 +284,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::middleware('admin.permission:support.manage')->prefix('admin/support')
         ->name('admin.support.')->group(function (): void {
             Route::get('/', [AdminWorkspaceController::class, 'support'])->name('index');
+            Route::put('/quick-replies', [AdminWorkspaceController::class, 'quickReplies']);
             Route::put('/{id}', [AdminWorkspaceController::class, 'updateSupport'])->name('update');
         });
 
