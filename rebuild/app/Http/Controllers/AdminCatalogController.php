@@ -139,10 +139,6 @@ class AdminCatalogController
             'digiflazzItems' => DB::table('digiflazz_catalog_items')->orderBy('category')->orderBy('brand')->orderBy('product_name')->get()
                 ->map(fn (object $item): array => [...((array) $item), 'available' => app(DigiflazzCatalogService::class)->available($item),
                     'mapped' => ProviderMapping::where('external_sku', $item->buyer_sku_code)->whereIn('provider_id', Provider::where('code', 'DIGIFLAZZ')->pluck('id'))->exists()]),
-            'assets' => StoreAsset::orderBy('id')->get()->map(fn (StoreAsset $asset): array => [
-                ...$asset->only('id', 'key', 'target_url', 'is_active'),
-                'image_url' => $asset->getFirstMediaUrl('image'),
-            ]),
         ]);
     }
 
