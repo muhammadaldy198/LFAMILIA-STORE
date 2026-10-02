@@ -185,20 +185,6 @@ class AdminAccountValidationRestorationTest extends TestCase
             'requires_region_check' => false,
         ]);
         NicknameGameCode::where('code', 'free-fire')->update([
-            'supports_nickname_check' => false,
-            'requires_server' => false,
-            'requires_region_check' => false,
-            'is_active' => true,
-        ]);
-
-        $this->putJson('/admin/catalog/products/'.$product->id, [
-            ...$basePayload,
-            'nickname_game_code' => 'free-fire',
-            'nickname_server_field_key' => null,
-        ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['nickname_game_code']);
-
-        NicknameGameCode::where('code', 'free-fire')->update([
             'supports_nickname_check' => true,
             'requires_server' => true,
             'requires_region_check' => true,
@@ -318,6 +304,20 @@ class AdminAccountValidationRestorationTest extends TestCase
         $this->putJson('/admin/catalog/products/'.$product->id, [
             ...$basePayload,
             'nickname_game_code' => 'kode-yang-tidak-ada',
+            'nickname_server_field_key' => null,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['nickname_game_code']);
+
+        NicknameGameCode::where('code', 'free-fire')->update([
+            'supports_nickname_check' => false,
+            'requires_server' => false,
+            'requires_region_check' => false,
+            'is_active' => true,
+        ]);
+
+        $this->putJson('/admin/catalog/products/'.$product->id, [
+            ...$basePayload,
+            'nickname_game_code' => 'free-fire',
             'nickname_server_field_key' => null,
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['nickname_game_code']);
