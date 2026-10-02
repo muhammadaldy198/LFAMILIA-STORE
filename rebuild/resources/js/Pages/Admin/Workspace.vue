@@ -250,7 +250,7 @@ function saveTier(tier) {
                     <TableBody><TableRow v-for="row in rows" :key="row.id" class="border-t border-slate-800"><TableCell class="p-2">{{ row.created_at }}</TableCell><TableCell class="p-2">{{ row.actor_role }} #{{ row.actor_id }}</TableCell><TableCell class="p-2">{{ row.action }}</TableCell><TableCell class="p-2">{{ row.target_type }} #{{ row.target_id }}</TableCell><TableCell class="p-2">{{ row.correlation_id }}</TableCell><TableCell class="p-2">{{ row.ip_address }}</TableCell></TableRow></TableBody>
                 </Table>
             </section>
-            <p v-if="['orders','customers','support'].includes(kind)&&!rows.length" class="text-sm text-slate-500">Tidak ada data sesuai pencarian.</p>
+            <p v-if="['orders','support'].includes(kind)&&!rows.length" class="text-sm text-slate-500">Tidak ada data sesuai pencarian.</p>
             <nav v-if="props.rows?.links" class="flex flex-wrap gap-2" aria-label="Halaman data"><template v-for="link in props.rows.links" :key="link.label"><Link v-if="link.url" :href="link.url" class="rounded-md border px-3 py-2 text-sm" :class="{'bg-slate-900 text-white':link.active}" v-html="link.label"/><span v-else class="px-3 py-2 text-sm text-slate-400" v-html="link.label"/></template></nav>
         </div>
     </AdminShell>
