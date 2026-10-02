@@ -111,7 +111,20 @@ class AdminNicknameController
     ): JsonResponse {
         $before = $gameCode->toArray();
         $data = $this->validatedGameCode($request, $gameCode);
+        $data['sort_order'] = $data['sort_order'] ?? $gameCode->sort_order;
         $oldCode = $gameCode->code;
+
+        if ($gameCode->is_active && ! $data['is_active']) {
+            $usage = DB::table('products')
+                ->where('nickname_game_code', $oldCode)
+                ->count();
+
+            if ($usage > 0) {
+                throw ValidationException::withMessages([
+                    'is_active' => 'Kode game masih digunakan oleh '.$usage.' produk. Pindahkan atau nonaktifkan validasi pada produk terkait sebelum menonaktifkan kode game.',
+                ]);
+            }
+        }
 
         DB::transaction(function () use ($gameCode, $data, $oldCode): void {
             $gameCode->fill($data);
