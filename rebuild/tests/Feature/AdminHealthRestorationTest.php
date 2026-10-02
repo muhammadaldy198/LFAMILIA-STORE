@@ -142,7 +142,6 @@ class AdminHealthRestorationTest extends TestCase
         $this->assertStringNotContainsString('health-doku-secret', $response->getContent());
     }
 
-
     public function test_active_down_integration_makes_overall_health_down(): void
     {
         $this->login();
@@ -230,7 +229,6 @@ class AdminHealthRestorationTest extends TestCase
                 ->where('checks.7.status', 'HEALTHY'));
     }
 
-
     public function test_active_gateway_maintenance_is_reflected_in_overall_health_without_double_counting_integrations(): void
     {
         $this->login();
@@ -250,6 +248,35 @@ class AdminHealthRestorationTest extends TestCase
                 ->where('summary.attention', fn ($value): bool => (int) $value >= 1)
                 ->where('gateways.2.code', 'MANUAL_QRIS')
                 ->where('gateways.2.status', 'MAINTENANCE'));
+    }
+
+    public function test_active_external_gateway_with_inactive_credentials_is_degraded(): void
+    {
+        $this->login();
+        DB::table('failed_jobs')->delete();
+        $this->setSetting('system.queue_worker_heartbeat', now()->toIso8601String());
+        $this->setSetting('system.scheduler_heartbeat', now()->toIso8601String());
+
+        IntegrationCredential::updateOrCreate(['code' => 'doku'], [
+            'is_active' => false,
+            'config_ciphertext' => [
+                'client_id' => 'inactive-health-client',
+                'secret_key' => 'inactive-health-secret',
+            ],
+        ]);
+        DB::table('payment_gateways')->where('code', 'DOKU')->update([
+            'is_active' => true,
+            'is_maintenance' => false,
+        ]);
+
+        $response = $this->get('/admin/health')->assertOk();
+
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('summary.overall', 'DEGRADED')
+            ->where('gateways.1.code', 'DOKU')
+            ->where('gateways.1.status', 'DEGRADED'));
+
+        $this->assertStringNotContainsString('inactive-health-secret', $response->getContent());
     }
 
     public function test_failed_jobs_are_reported_as_attention_without_exposing_job_payload(): void
