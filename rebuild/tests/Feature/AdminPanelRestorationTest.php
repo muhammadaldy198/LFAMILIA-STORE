@@ -305,7 +305,7 @@ class AdminPanelRestorationTest extends TestCase
         $product = $this->product('MANUAL');
         $product->update(['is_active' => false]);
         $provider = Provider::where('code', 'MANUAL')->firstOrFail();
-        $provider->update(['is_active' => true]);
+        $provider->forceFill(['is_active' => true])->save();
 
         foreach ([['A', 'Diamond 10', 'Diamonds', 10000], ['B', 'Weekly Pass', 'Pass', 20000]] as [$code, $name, $group, $cost]) {
             $package = ProductPackage::create([
