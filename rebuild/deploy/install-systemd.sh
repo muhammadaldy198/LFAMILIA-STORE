@@ -64,6 +64,10 @@ for name in   lfamilia-queue.service   lfamilia-scheduler.service   lfamilia-hea
   render "${TEMPLATE_DIR}/${name}.in" "/etc/systemd/system/${name}"
 done
 
+if command -v logrotate >/dev/null 2>&1; then
+  render "${APP_DIR}/deploy/logrotate/lfamilia-app.in" /etc/logrotate.d/lfamilia-app
+fi
+
 systemctl daemon-reload
 systemctl enable   lfamilia-queue.service   lfamilia-scheduler.service   lfamilia-healthcheck.timer   lfamilia-backup.timer   lfamilia-restore-verify.timer
 
