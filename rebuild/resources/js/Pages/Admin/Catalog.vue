@@ -44,25 +44,33 @@ const productForm = useForm({ category_id: '', name: '', publisher: '', descript
 const packageForm = useForm({ product_id: '', code: '', name: '', note: '', group_name: '', nominal_value: '', sort_order: 0, cost_idr: '' });
 const noticeDrafts = reactive({});
 const fieldsProductId = ref('');
-const fieldsText = ref('');
-watch(fieldsProductId, (id) => {
-    const product = products.value.find((item) => String(item.id) === String(id));
-    fieldsText.value = product?.fields.map((field) => [field.field_key, field.label, field.placeholder || '', field.type, field.is_required ? '1' : '0'].join('|')).join('\n') ?? '';
-});
+const fieldRows = ref([]);
 const fieldsError = ref('');
-const saveFields = () => {
-    const fields = fieldsText.value.trim() ? fieldsText.value.trim().split('\n').map((line) => {
-        const parts = line.split('|').map((part) => part.trim());
-        const [field_key, label] = parts;
-        const legacyFourColumns = parts.length === 4;
-        const placeholder = legacyFourColumns ? '' : (parts[2] || '');
-        const type = legacyFourColumns ? parts[2] : parts[3];
-        const required = legacyFourColumns ? parts[3] : parts[4];
-        return { field_key, label, placeholder: placeholder || null, type, is_required: required === '1' };
-    }) : [];
+const fieldsSaving = ref(false);
+watch(fieldsProductId, (id) => {
+    const product = products.value.find(item => String(item.id) === String(id));
+    fieldRows.value = (product?.fields || []).map(field => ({
+        field_key: field.field_key, label: field.label, placeholder: field.placeholder || '',
+        type: field.type, is_required: Boolean(field.is_required),
+    }));
     fieldsError.value = '';
-    router.put('/admin/catalog/products/' + fieldsProductId.value + '/fields', { fields }, {
-        onError: (errors) => { fieldsError.value = Object.values(errors).join(' · '); },
+});
+const addField = () => fieldRows.value.push({ field_key: '', label: '', placeholder: '', type: 'text', is_required: true });
+const moveField = (index, direction) => {
+    const target = index + direction;
+    if (target < 0 || target >= fieldRows.value.length) return;
+    const row = fieldRows.value.splice(index, 1)[0];
+    fieldRows.value.splice(target, 0, row);
+};
+const saveFields = () => {
+    fieldsError.value = '';
+    fieldsSaving.value = true;
+    router.put('/admin/catalog/products/' + fieldsProductId.value + '/fields', {
+        fields: fieldRows.value.map(field => ({ ...field, field_key: field.field_key.trim(), label: field.label.trim(), placeholder: field.placeholder.trim() || null })),
+    }, {
+        preserveScroll: true,
+        onError: errors => { fieldsError.value = Object.values(errors).join(' · '); },
+        onFinish: () => { fieldsSaving.value = false; },
     });
 };
 const saveCategory = (item) => router.put('/admin/catalog/categories/' + item.id, { name: item.name, sort_order: item.sort_order, is_active: item.is_active });
@@ -259,11 +267,35 @@ const deleteNotice = (notice) => {
 
             <section v-show="catalogTab === 'fields'" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Field input produk</h2>
-                <p class="text-sm text-slate-400">Satu baris per field: kode|label|placeholder|tipe|wajib (1/0). Tipe: text, tel, email. Contoh: user_id|User ID|Contoh: 123456789|text|1. Format lama 4 kolom tetap diterima.</p>
-                <select v-model="fieldsProductId" class="w-full max-w-md rounded-md bg-slate-800 p-2"><option value="">Pilih produk</option><option v-for="item in products" :key="item.id" :value="item.id">{{ item.name }}</option></select>
-                <Textarea v-if="fieldsProductId" v-model="fieldsText" rows="5" aria-label="Daftar field input" class="block w-full rounded-md bg-slate-800 p-3 font-mono text-sm" />
-                <p v-if="fieldsError" class="text-sm text-red-300">{{ fieldsError }}</p>
-                <Button v-if="fieldsProductId" type="button" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950" @click="saveFields">Simpan field</Button>
+                <p class="text-sm text-slate-400">Atur kolom yang diisi customer saat membeli produk. Urutan kolom mengikuti daftar di bawah.</p>
+                <label class="block text-sm">Produk<select v-model="fieldsProductId" class="mt-1 w-full max-w-md rounded-md bg-slate-800 p-2"><option value="">Pilih produk</option><option v-for="item in products" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
+                <template v-if="fieldsProductId">
+                    <Card v-for="(field, index) in fieldRows" :key="index" class="space-y-3 p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <strong>Kolom {{ index + 1 }}</strong>
+                            <div class="flex flex-wrap gap-2">
+                                <Button type="button" variant="outline" :disabled="index===0" :aria-label="'Naikkan kolom '+(index+1)" @click="moveField(index,-1)">Naik</Button>
+                                <Button type="button" variant="outline" :disabled="index===fieldRows.length-1" :aria-label="'Turunkan kolom '+(index+1)" @click="moveField(index,1)">Turun</Button>
+                                <Button type="button" variant="destructive" @click="fieldRows.splice(index,1)">Hapus</Button>
+                            </div>
+                        </div>
+                        <div class="grid gap-3 md:grid-cols-2">
+                            <label class="text-sm">Label customer<Input v-model="field.label" maxlength="255" placeholder="Contoh: User ID" class="mt-1" /></label>
+                            <label class="text-sm">Kode kolom<Input v-model="field.field_key" maxlength="80" placeholder="Contoh: user_id" class="mt-1" /><span class="mt-1 block text-xs text-slate-500">Huruf kecil, angka, dan garis bawah. Kode dipakai oleh cek nickname dan template pengiriman.</span></label>
+                            <label class="text-sm">Contoh isian<Input v-model="field.placeholder" maxlength="255" placeholder="Contoh: 123456789" class="mt-1" /></label>
+                            <label class="text-sm">Jenis isian<select v-model="field.type" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="text">Teks / ID</option><option value="tel">Nomor telepon</option><option value="email">Email</option></select></label>
+                            <label class="flex items-center gap-2 text-sm"><input v-model="field.is_required" type="checkbox"> Wajib diisi</label>
+                        </div>
+                    </Card>
+                    <Button type="button" variant="outline" :disabled="fieldRows.length>=20" @click="addField">Tambah kolom</Button>
+                    <Card class="space-y-3 p-4">
+                        <h3 class="font-semibold">Pratinjau input customer</h3>
+                        <p v-if="!fieldRows.length" class="text-sm text-slate-500">Belum ada kolom.</p>
+                        <label v-for="(field,index) in fieldRows" :key="index" class="block text-sm">{{ field.label || 'Label kolom' }}{{ field.is_required ? ' *' : '' }}<Input :type="field.type" :placeholder="field.placeholder" disabled class="mt-1" /></label>
+                    </Card>
+                    <p v-if="fieldsError" role="alert" class="text-sm text-red-600">{{ fieldsError }}</p>
+                    <Button type="button" :disabled="fieldsSaving" @click="saveFields">{{ fieldsSaving ? 'Menyimpan…' : 'Simpan kolom' }}</Button>
+                </template>
             </section>
 
             <section v-show="catalogTab === 'media'" id="media" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
