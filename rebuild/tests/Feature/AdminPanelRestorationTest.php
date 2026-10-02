@@ -221,6 +221,47 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame('MANUAL', $product->fresh()->fulfillment_mode);
     }
 
+    public function test_manual_nominal_can_be_duplicated_and_catalog_deletes_protect_order_history(): void
+    {
+        $this->login();
+        $product = $this->product('MANUAL');
+        $provider = Provider::where('code', 'MANUAL')->firstOrFail();
+        $package = ProductPackage::create([
+            'product_id' => $product->id, 'code' => 'MANUAL10', 'name' => 'Manual 10',
+            'group_name' => 'Manual', 'sort_order' => 0, 'is_active' => false,
+        ]);
+        ProviderMapping::create([
+            'product_package_id' => $package->id, 'provider_id' => $provider->id,
+            'cost_idr' => 9000, 'priority' => 0, 'is_active' => false,
+        ]);
+
+        $this->post('/admin/catalog/packages/'.$package->id.'/duplicate')->assertRedirect()->assertSessionHasNoErrors();
+        $copy = $product->packages()->where('id', '!=', $package->id)->firstOrFail();
+        $this->assertFalse($copy->is_active);
+        $this->assertStringContainsString('Salinan', $copy->name);
+        $this->assertSame(9000, (int) $copy->mappings()->firstOrFail()->cost_idr);
+        $this->assertFalse($copy->mappings()->firstOrFail()->is_active);
+
+        $this->delete('/admin/catalog/packages/'.$copy->id)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertNull(ProductPackage::find($copy->id));
+
+        $orderId = DB::table('orders')->insertGetId([
+            'order_number' => 'CATALOG-GUARD-'.bin2hex(random_bytes(4)),
+            'product_id' => $product->id, 'product_package_id' => $package->id,
+            'status' => 'PENDING_PAYMENT', 'customer_input' => '{}', 'snapshot' => '{}',
+            'cost_idr' => 9000, 'margin_idr' => 0, 'total_idr' => 9000,
+            'idempotency_key' => bin2hex(random_bytes(20)), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->delete('/admin/catalog/packages/'.$package->id)->assertSessionHasErrors('package');
+        $this->delete('/admin/catalog/products/'.$product->id)->assertSessionHasErrors('product');
+        $this->assertNotNull(ProductPackage::find($package->id));
+        $this->assertNotNull(Product::find($product->id));
+        DB::table('orders')->where('id', $orderId)->delete();
+
+        $this->delete('/admin/catalog/products/'.$product->id)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertNull(Product::find($product->id));
+    }
+
     public function test_product_display_controls_and_package_tabs_are_configurable_and_reach_customer_frontend(): void
     {
         $this->login();

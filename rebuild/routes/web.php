@@ -217,8 +217,11 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::delete('/categories/{category}', [AdminCatalogController::class, 'destroyCategory'])->name('categories.destroy');
             Route::post('/products', [AdminCatalogController::class, 'product'])->name('products.store');
             Route::put('/products/{product}', [AdminCatalogController::class, 'updateProduct'])->name('products.update');
+            Route::delete('/products/{product}', [AdminCatalogController::class, 'destroyProduct'])->name('products.destroy');
             Route::post('/products/{product}/packages', [AdminCatalogController::class, 'package'])->name('packages.store');
             Route::put('/packages/{package}', [AdminCatalogController::class, 'updatePackage'])->name('packages.update');
+            Route::delete('/packages/{package}', [AdminCatalogController::class, 'destroyPackage'])->name('packages.destroy');
+            Route::post('/packages/{package}/duplicate', [AdminCatalogController::class, 'duplicatePackage'])->name('packages.duplicate');
             Route::put('/products/{product}/fields', [AdminCatalogController::class, 'fields'])->name('fields.update');
             Route::post('/products/{product}/notices', [AdminCatalogController::class, 'storeNotice'])->name('notices.store');
             Route::put('/notices/{notice}', [AdminCatalogController::class, 'updateNotice'])->name('notices.update');

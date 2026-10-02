@@ -357,6 +357,104 @@ class AdminCatalogController
         return back();
     }
 
+    public function destroyProduct(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
+    {
+        if (DB::table('orders')->where('product_id', $product->id)->exists()) {
+            throw ValidationException::withMessages([
+                'product' => 'Produk memiliki riwayat pesanan dan tidak boleh dihapus. Nonaktifkan produk jika tidak ingin ditampilkan.',
+            ]);
+        }
+
+        DB::transaction(function () use ($request, $product, $audit): void {
+            $before = $product->toArray();
+            $packages = $product->packages()->with('mappings')->get();
+            foreach ($packages as $package) {
+                $package->clearMediaCollection('image');
+                $package->mappings()->delete();
+                $package->delete();
+            }
+            $product->clearMediaCollection('image');
+            $product->clearMediaCollection('banner');
+            $id = $product->id;
+            $product->delete();
+            $audit->record($request, 'catalog.product.deleted', 'product', $id, $before, null);
+        });
+
+        return redirect()->route('admin.catalog.index')->with('status', 'Produk berhasil dihapus.');
+    }
+
+    public function destroyPackage(Request $request, ProductPackage $package, CatalogAudit $audit): RedirectResponse
+    {
+        if (DB::table('orders')->where('product_package_id', $package->id)->exists()) {
+            throw ValidationException::withMessages([
+                'package' => 'Nominal memiliki riwayat pesanan dan tidak boleh dihapus. Nonaktifkan nominal jika tidak ingin dijual.',
+            ]);
+        }
+
+        DB::transaction(function () use ($request, $package, $audit): void {
+            $before = $package->toArray();
+            $id = $package->id;
+            $package->clearMediaCollection('image');
+            $package->mappings()->delete();
+            $package->delete();
+            $audit->record($request, 'catalog.package.deleted', 'product_package', $id, $before, null);
+        });
+
+        return back()->with('status', 'Nominal berhasil dihapus.');
+    }
+
+    public function duplicatePackage(Request $request, ProductPackage $package, CatalogAudit $audit): RedirectResponse
+    {
+        $product = $package->product()->firstOrFail();
+        if ($product->fulfillment_mode !== 'MANUAL') {
+            throw ValidationException::withMessages([
+                'package' => 'Nominal otomatis tidak disalin agar SKU penyedia tidak terduplikasi. Gunakan Impor nominal Digiflazz untuk menambah nominal otomatis.',
+            ]);
+        }
+
+        $sourceMapping = $package->mappings()->whereHas('provider', fn ($query) => $query->where('code', 'MANUAL'))->first();
+        if (! $sourceMapping) {
+            throw ValidationException::withMessages(['package' => 'Modal nominal manual belum tersedia.']);
+        }
+
+        DB::transaction(function () use ($request, $product, $package, $sourceMapping, $audit): void {
+            $baseCode = substr($package->code.'_COPY', 0, 70);
+            $copyNumber = 1;
+            do {
+                $code = $baseCode.'_'.$copyNumber++;
+            } while (ProductPackage::where('product_id', $product->id)->where('code', $code)->exists());
+
+            $copy = $product->packages()->create([
+                'code' => $code,
+                'name' => $package->name.' (Salinan)',
+                'note' => $package->note,
+                'group_name' => $package->group_name,
+                'nominal_value' => $package->nominal_value,
+                'sort_order' => ((int) $product->packages()->max('sort_order')) + 1,
+                'is_active' => false,
+                'pricing_mode' => $package->pricing_mode,
+                'margin_percent' => $package->margin_percent,
+                'margin_fixed_idr' => $package->margin_fixed_idr,
+                'sell_price_idr' => $package->sell_price_idr,
+            ]);
+            $mapping = $copy->mappings()->create([
+                'provider_id' => $sourceMapping->provider_id,
+                'external_sku' => null,
+                'cost_idr' => $sourceMapping->cost_idr,
+                'max_price_idr' => null,
+                'priority' => $sourceMapping->priority,
+                'is_active' => false,
+            ]);
+            if ($media = $package->getFirstMedia('image')) {
+                $media->copy($copy, 'image');
+            }
+            $audit->record($request, 'catalog.package.duplicated', 'product_package', $copy->id,
+                ['source_id' => $package->id], ['package' => $copy->toArray(), 'mapping' => $mapping->toArray()]);
+        });
+
+        return back()->with('status', 'Salinan nominal dibuat dalam keadaan nonaktif.');
+    }
+
     public function package(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate([

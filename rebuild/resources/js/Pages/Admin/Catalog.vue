@@ -109,6 +109,20 @@ const deleteCategory = (item) => {
         router.delete('/admin/catalog/categories/' + item.id, { preserveScroll: true });
     }
 };
+const deleteProduct = (item) => {
+    if (confirm('Hapus produk "' + item.name + '"? Produk yang memiliki riwayat pesanan akan ditolak oleh sistem.')) {
+        router.delete('/admin/catalog/products/' + item.id, { preserveScroll: true, onSuccess: () => { selectedProductId.value = null; } });
+    }
+};
+const deletePackage = (pack) => {
+    if (confirm('Hapus nominal "' + pack.name + '"? Nominal yang pernah dipesan tidak dapat dihapus.')) {
+        router.delete('/admin/catalog/packages/' + pack.id, { preserveScroll: true, onSuccess: () => { selectedPackageId.value = null; } });
+    }
+};
+const duplicatePackage = (item, pack) => {
+    if (item.fulfillment_mode !== 'MANUAL') return;
+    router.post('/admin/catalog/packages/' + pack.id + '/duplicate', {}, { preserveScroll: true });
+};
 const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
     category_id: item.category_id, name: item.name, slug: item.slug, publisher: item.publisher || '', description: item.description,
     fulfillment_mode: item.fulfillment_mode, initials: item.initials || null, accent_color: item.accent_color || null,
@@ -208,7 +222,7 @@ const deleteNotice = (notice) => {
                 </form>
                 <Table class="w-full"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Nominal</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id"><TableCell><strong>{{item.name}}</strong><small class="block">{{item.publisher}}</small></TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" @click="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk sesuai pencarian.</p>
                 <Card v-for="item in selectedProductItems" :key="item.id" class="space-y-4 p-4">
-                    <header class="flex items-center justify-between gap-3"><h2>Edit {{item.name}}</h2><Button type="button" variant="outline" @click="selectedProductId=null">Tutup</Button></header>
+                    <header class="flex flex-wrap items-center justify-between gap-3"><h2>Edit {{item.name}}</h2><div class="flex flex-wrap gap-2"><Button type="button" variant="destructive" @click="deleteProduct(item)">Hapus produk</Button><Button type="button" variant="outline" @click="selectedProductId=null">Tutup</Button></div></header>
                     <nav class="lf-admin-tabs"><Button type="button" variant="ghost" :class="{active:editorTab==='info'}" @click="editorTab='info'">Informasi</Button><Button type="button" variant="ghost" :class="{active:editorTab==='nominal'}" @click="editorTab='nominal'">Nominal & Harga</Button><Button type="button" variant="ghost" :class="{active:editorTab==='display'}" @click="editorTab='display'">Tampilan Produk</Button><Button type="button" variant="ghost" @click="fieldsProductId=String(item.id);catalogTab='fields'">Input Customer</Button><Button type="button" variant="ghost" :class="{active:editorTab==='fulfillment'}" @click="editorTab='fulfillment'">Fulfillment</Button></nav>
                     <div v-show="editorTab==='info'" class="space-y-4">
                     <div class="grid gap-3 md:grid-cols-4">
@@ -291,7 +305,7 @@ const deleteNotice = (notice) => {
                                 <TableCell><strong>{{pack.name}}</strong><p class="text-xs text-slate-500">{{pack.group_name||'-'}}</p></TableCell>
                                 <TableCell><p v-for="mapping in pack.mappings" :key="mapping.id" class="text-xs">{{mapping.external_sku||'Manual'}} · Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</p></TableCell>
                                 <TableCell>{{previewPrice(pack,item)}}</TableCell><TableCell>{{pack.is_active?'Aktif':'Nonaktif'}}</TableCell>
-                                <TableCell><div class="flex flex-wrap gap-2"><Button type="button" variant="outline" @click="selectedPackageId=pack.id">Edit nominal</Button><Button type="button" variant="outline" :disabled="index===0" @click="reorderPackage(item,index,-1)">Naik</Button><Button type="button" variant="outline" :disabled="index===item.packages.length-1" @click="reorderPackage(item,index,1)">Turun</Button></div></TableCell>
+                                <TableCell><div class="flex flex-wrap gap-2"><Button type="button" variant="outline" @click="selectedPackageId=pack.id">Edit nominal</Button><Button v-if="item.fulfillment_mode==='MANUAL'" type="button" variant="outline" @click="duplicatePackage(item,pack)">Salin</Button><Button type="button" variant="outline" :disabled="index===0" @click="reorderPackage(item,index,-1)">Naik</Button><Button type="button" variant="outline" :disabled="index===item.packages.length-1" @click="reorderPackage(item,index,1)">Turun</Button><Button type="button" variant="destructive" @click="deletePackage(pack)">Hapus</Button></div></TableCell>
                             </TableRow>
                         </TableBody></Table>
                         <p v-if="!item.packages.length" class="text-sm text-slate-500">Belum ada nominal. Tambahkan manual atau impor dari Digiflazz.</p>
