@@ -55,6 +55,7 @@ class AdminPanelRestorationTest extends TestCase
         IntegrationCredential::updateOrCreate(['code' => 'digiflazz'], [
             'is_active' => true, 'config_ciphertext' => ['username' => 'test', 'api_key' => 'test', 'base_url' => 'https://digiflazz.test'],
         ]);
+        Http::swap(new \Illuminate\Http\Client\Factory());
         Http::fake(['https://digiflazz.test/v1/price-list' => Http::response(['data' => $rows])]);
     }
 
@@ -99,7 +100,7 @@ class AdminPanelRestorationTest extends TestCase
     {
         $product = $this->product();
         $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'R10', 'name' => '10', 'is_active' => true]);
-        $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail(); $provider->update(['is_active' => true]);
+        $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail(); $provider->forceFill(['is_active' => true])->save();
         ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => $provider->id, 'external_sku' => 'restore-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true]);
         $pricing = app(CheckoutPricing::class);
         $this->assertSame(11000, $pricing->forPackage($package->id)['subtotal_idr']);
@@ -146,7 +147,7 @@ class AdminPanelRestorationTest extends TestCase
         ];
         $this->put('/admin/catalog/products/'.$product->id.'/fields', ['fields' => $fields])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(['user_id', 'zone_id'], $product->fields()->orderBy('sort_order')->pluck('field_key')->all());
-        $product->update(['nickname_check_enabled' => true, 'nickname_user_field_key' => 'user_id', 'nickname_server_field_key' => 'zone_id']);
+        $product->update(['nickname_check_enabled' => true, 'nickname_game_code' => 'mobile-legends', 'nickname_user_field_key' => 'user_id', 'nickname_server_field_key' => 'zone_id']);
         $this->put('/admin/catalog/products/'.$product->id.'/fields', ['fields' => [$fields[0]]])->assertSessionHasErrors('fields');
         $this->assertSame(2, $product->fields()->count());
     }
@@ -157,6 +158,22 @@ class AdminPanelRestorationTest extends TestCase
         $this->post('/admin/digiflazz/sync')->assertForbidden();
         $this->put('/admin/catalog/margin', ['margin_percent' => 10])->assertForbidden();
         $this->put('/admin/support/quick-replies', ['replies' => ['Hello']])->assertForbidden();
+    }
+
+    public function test_admin_activation_is_single_use_and_login_redirects_to_panel(): void
+    {
+        $admin = AdminUser::create(['name' => 'Activation', 'email' => 'activation-'.bin2hex(random_bytes(4)).'@example.test',
+            'password' => bcrypt('before-password-123'), 'role' => 'SUPER_ADMIN', 'is_active' => true]);
+        $token = bin2hex(random_bytes(32));
+        $key = 'admin_activation:'.hash('sha256', $token);
+        \Illuminate\Support\Facades\Cache::put($key, ['id' => $admin->id, 'password_fingerprint' => hash('sha256', $admin->password)], now()->addMinutes(30));
+        $this->get('/admin/activate?token='.$token)->assertOk();
+        $this->post('/admin/activate', ['token' => $token, 'password' => 'new-password-123', 'password_confirmation' => 'new-password-123'])
+            ->assertRedirect('/admin/login')->assertSessionHasNoErrors();
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('new-password-123', $admin->fresh()->password));
+        $this->post('/admin/activate', ['token' => $token, 'password' => 'other-password-123', 'password_confirmation' => 'other-password-123'])->assertStatus(410);
+        $this->post('/admin/login', ['email' => $admin->email, 'password' => 'new-password-123'])->assertRedirect('/admin/panel');
+        $this->get('/admin/panel')->assertOk();
     }
 
     public function test_reports_and_quick_reply_configuration_are_functional(): void
