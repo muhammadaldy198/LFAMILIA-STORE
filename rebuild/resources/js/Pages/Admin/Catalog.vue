@@ -54,7 +54,8 @@ const visibleProducts = computed(() => {
 });
 watch([tab,catalogSearch,catalogCategory,catalogStatus,catalogSort,catalogPageSize], () => {catalogPage.value = 1;});
 const resetCatalogFilters=()=>{catalogSearch.value='';catalogCategory.value='';catalogStatus.value='';catalogSort.value='CUSTOM';catalogPageSize.value=25;catalogPage.value=1;};
-const categoryForm = useForm({ name: '', slug: '', sort_order: 0 });
+const categoryIconOptions=[['gamepad','Game'],['ticket','Voucher'],['play','Entertainment'],['smartphone','Pulsa / Data'],['zap','PLN / Listrik'],['grid','Umum']];
+const categoryForm = useForm({ name: '', slug: '', icon: 'grid', sort_order: 0 });
 const productForm = useForm({ category_id: '', name: '', slug: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: props.defaultMargin||0, sort_order: 0 });
 const globalMarginForm = useForm({margin_percent:props.defaultMargin||0});
 const applyGlobalMargin=()=>{if(confirm('Terapkan margin global ke semua produk otomatis? Produk manual dan margin khusus nominal tidak akan diubah.'))globalMarginForm.put('/admin/catalog/margin',{preserveScroll:true});};
@@ -117,7 +118,7 @@ const saveFields = () => {
         onFinish: () => { fieldsSaving.value = false; },
     });
 };
-const saveCategory = (item) => router.put('/admin/catalog/categories/' + item.id, { name: item.name, slug: item.slug, sort_order: item.sort_order, is_active: item.is_active });
+const saveCategory = (item) => router.put('/admin/catalog/categories/' + item.id, { name: item.name, slug: item.slug, icon: item.icon || 'grid', sort_order: item.sort_order, is_active: item.is_active });
 const deleteCategory = (item) => {
     if (confirm('Hapus kategori "' + item.name + '"? Kategori yang masih memiliki produk tidak akan bisa dihapus.')) {
         router.delete('/admin/catalog/categories/' + item.id, { preserveScroll: true });
@@ -190,6 +191,7 @@ const deleteNotice = (notice) => {
                 <form class="flex flex-wrap items-end gap-3" @submit.prevent="categoryForm.post('/admin/catalog/categories', { onSuccess: () => categoryForm.reset() })">
                     <label class="text-sm">Nama kategori<Input v-model="categoryForm.name" required class="mt-1 block rounded-md bg-slate-800 p-2" /></label>
                     <label class="text-sm">Alamat kategori<Input v-model="categoryForm.slug" placeholder="Otomatis dari nama jika kosong" class="mt-1 block rounded-md bg-slate-800 p-2" /></label>
+                    <label class="text-sm">Ikon fallback<select v-model="categoryForm.icon" class="mt-1 block rounded-md bg-slate-800 p-2"><option v-for="[value,label] in categoryIconOptions" :key="value" :value="value">{{label}}</option></select></label>
                     <label class="text-sm">Urutan<Input v-model.number="categoryForm.sort_order" type="number" min="0" required class="mt-1 block w-24 rounded-md bg-slate-800 p-2" /></label>
                     <Button :disabled="categoryForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah</Button>
                     <span v-if="categoryForm.errors.name" class="text-sm text-red-300">{{ categoryForm.errors.name }}</span>
@@ -198,11 +200,12 @@ const deleteNotice = (notice) => {
                     <div class="flex flex-wrap items-end gap-3">
                         <label class="text-sm">Nama<Input v-model="item.name" class="mt-1 block rounded-md bg-slate-800 p-2" /></label>
                         <label class="text-sm">Alamat kategori<Input v-model="item.slug" class="mt-1 block rounded-md bg-slate-800 p-2" /></label>
+                        <label class="text-sm">Ikon fallback<select v-model="item.icon" class="mt-1 block rounded-md bg-slate-800 p-2"><option v-for="[value,label] in categoryIconOptions" :key="value" :value="value">{{label}}</option></select></label>
                         <label class="text-sm">Urutan<Input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-24 rounded-md bg-slate-800 p-2" /></label>
                         <label class="flex gap-2 text-sm"><input v-model="item.is_active" type="checkbox">Aktif</label>
                         <Button type="button" class="rounded-md bg-slate-700 px-3 py-2 text-sm" @click="saveCategory(item)">Simpan</Button>
                         <Button type="button" class="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" @click="deleteCategory(item)">Hapus</Button>
-                        <span class="text-xs text-slate-500">Alamat publik: /{{ item.slug }}</span>
+                        <span class="text-xs text-slate-500">Alamat publik: /{{ item.slug }} · ikon dipakai jika gambar kategori kosong.</span>
                     </div>
                     <div class="rounded-md border border-slate-200 p-3">
                         <strong class="text-xs">Gambar kategori</strong>
