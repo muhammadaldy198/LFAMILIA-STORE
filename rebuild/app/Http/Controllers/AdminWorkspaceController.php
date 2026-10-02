@@ -25,45 +25,6 @@ use Throwable;
 
 class AdminWorkspaceController
 {
-    public function providers(Request $request): Response
-    {
-        $provider = strtoupper(trim((string) $request->query('provider', '')));
-        if ($provider === 'DIGIFLAZZ') {
-            return app(AdminDigiflazzController::class)->index($request, app(DigiflazzCatalogService::class));
-        }
-
-        return Inertia::render('Admin/Workspace', [
-            'kind' => 'providers',
-            'title' => $provider === 'DIGIFLAZZ' ? 'Digiflazz' : 'Provider',
-            'rows' => DB::table('providers')
-                ->when($provider !== '', fn ($query) => $query->where('code', $provider))
-                ->orderBy('id')->get()
-                ->map(function (object $row): array {
-                    return [
-                        ...((array) $row),
-                        'mapping_count' => DB::table('provider_mappings')->where('provider_id', $row->id)->count(),
-                        'active_mapping_count' => DB::table('provider_mappings')
-                            ->where('provider_id', $row->id)->where('is_active', true)->count(),
-                    ];
-                }),
-        ]);
-    }
-
-    public function updateProvider(Request $request, int $id, AdminAuditService $audit): RedirectResponse
-    {
-        $data = $request->validate(['is_active' => ['required', 'boolean']]);
-        $before = DB::table('providers')->where('id', $id)->first();
-        abort_unless($before, 404);
-
-        DB::table('providers')->where('id', $id)->update([
-            'is_active' => $data['is_active'],
-            'updated_at' => now(),
-        ]);
-        $audit->record($request, 'provider.updated', 'provider', $id, (array) $before, $data);
-
-        return back();
-    }
-
     public function customers(Request $request): Response
     {
         return Inertia::render('Admin/Workspace', [
