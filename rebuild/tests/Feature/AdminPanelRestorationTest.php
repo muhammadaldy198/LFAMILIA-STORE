@@ -425,6 +425,93 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(1, DB::table('voucher_stock_codes')->where('stock_key', 'digital.kode-10')->where('status', 'AVAILABLE')->count());
     }
 
+    public function test_voucher_stock_reconciliation_stays_local_after_interrupted_send(): void
+    {
+        Queue::fake();
+        Http::swap(new Factory);
+        Http::fake();
+        $this->login();
+        $product = $this->product();
+        $package = ProductPackage::create([
+            'product_id' => $product->id,
+            'code' => 'STOCKREC',
+            'name' => 'Kode Recovery',
+            'sort_order' => 0,
+            'is_active' => true,
+        ]);
+
+        $this->post('/admin/catalog/packages/'.$package->id.'/voucher-stock', [
+            'stock_key' => 'digital.recovery',
+            'cost_idr' => 6000,
+            'priority' => 0,
+            'is_active' => true,
+            'codes_text' => 'RECOVERY-CODE-001',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $mapping = ProviderMapping::where('product_package_id', $package->id)
+            ->where('provider_id', Provider::where('code', 'VOUCHER_STOCK')->value('id'))
+            ->firstOrFail();
+        $snapshot = [
+            'product' => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'fulfillment_mode' => 'AUTO_PROVIDER',
+            ],
+            'package' => ['id' => $package->id, 'name' => $package->name],
+            'provider' => [
+                'mapping_id' => $mapping->id,
+                'code' => 'VOUCHER_STOCK',
+                'sku' => $mapping->external_sku,
+                'cost_idr' => 6000,
+                'max_price_idr' => null,
+            ],
+            'pricing' => ['cost_idr' => 6000, 'total_idr' => 6600],
+            'customer_input' => [],
+        ];
+        $orderId = DB::table('orders')->insertGetId([
+            'order_number' => 'STOCK-REC-'.bin2hex(random_bytes(5)),
+            'product_id' => $product->id,
+            'product_package_id' => $package->id,
+            'provider_mapping_id' => $mapping->id,
+            'status' => 'PAID',
+            'currency' => 'IDR',
+            'customer_input' => '{}',
+            'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR),
+            'cost_idr' => 6000,
+            'margin_idr' => 600,
+            'discount_idr' => 0,
+            'fee_idr' => 0,
+            'total_idr' => 6600,
+            'idempotency_key' => bin2hex(random_bytes(20)),
+            'paid_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+            'status' => 'SENDING',
+            'request_payload' => json_encode([
+                'stock_key' => 'digital.recovery',
+                'ref_id' => $attempt->external_reference,
+            ], JSON_THROW_ON_ERROR),
+        ]);
+
+        $service->reconcileAttempt((int) $attempt->id);
+
+        $order = DB::table('orders')->where('id', $orderId)->firstOrFail();
+        $delivery = json_decode((string) $order->delivery_payload, true);
+        $this->assertSame('SUCCESS', $order->status);
+        $this->assertSame('RECOVERY-CODE-001', $delivery['code']);
+        $this->assertDatabaseHas('voucher_stock_codes', [
+            'order_id' => $orderId,
+            'status' => 'DELIVERED',
+        ]);
+        Http::assertNothingSent();
+    }
+
     public function test_fixed_sell_price_below_cost_is_rejected(): void
     {
         $this->login();
