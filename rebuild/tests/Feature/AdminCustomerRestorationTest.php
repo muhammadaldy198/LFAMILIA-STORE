@@ -270,7 +270,6 @@ class AdminCustomerRestorationTest extends TestCase
             ->where('target_id', (string) $user->id)->count());
     }
 
-
     public function test_empty_account_deletion_purges_saved_game_account_personal_data(): void
     {
         $this->login('SUPER_ADMIN');
