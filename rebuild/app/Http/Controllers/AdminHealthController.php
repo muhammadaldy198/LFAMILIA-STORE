@@ -386,19 +386,34 @@ class AdminHealthController
      */
     private function gatewayChecks(): array
     {
+        $credentialStates = DB::table('integration_credentials')
+            ->whereIn('code', ['midtrans', 'doku'])
+            ->pluck('is_active', 'code');
+
         return DB::table('payment_gateways')
             ->orderBy('id')
             ->get(['code', 'internal_name', 'kind', 'is_active', 'is_maintenance'])
-            ->map(function (object $gateway): array {
+            ->map(function (object $gateway) use ($credentialStates): array {
+                $active = (bool) $gateway->is_active;
+                $integrationCode = match (strtoupper((string) $gateway->code)) {
+                    'MIDTRANS' => 'midtrans',
+                    'DOKU' => 'doku',
+                    default => null,
+                };
+                $credentialsActive = $integrationCode === null
+                    || (bool) $credentialStates->get($integrationCode, false);
+
                 $status = (bool) $gateway->is_maintenance
                     ? 'MAINTENANCE'
-                    : ((bool) $gateway->is_active ? 'HEALTHY' : 'NOT_CONFIGURED');
+                    : (! $active
+                        ? 'NOT_CONFIGURED'
+                        : ($credentialsActive ? 'HEALTHY' : 'DEGRADED'));
 
                 return [
                     'code' => (string) $gateway->code,
                     'name' => (string) $gateway->internal_name,
                     'kind' => (string) $gateway->kind,
-                    'active' => (bool) $gateway->is_active,
+                    'active' => $active,
                     'maintenance' => (bool) $gateway->is_maintenance,
                     'status' => $status,
                 ];
