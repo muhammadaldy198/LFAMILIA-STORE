@@ -413,7 +413,7 @@ async function copy(value) {
                 <Card class="min-w-0 p-4">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div><h2 class="text-lg font-semibold">Metode Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Nama, deskripsi, logo, biaya, urutan, penggunaan, dan status dapat dikelola dari sini.</p></div>
-                        <div class="flex flex-wrap gap-2"><Button size="sm" variant="outline" @click="syncChannels">Pulihkan metode bawaan</Button><Button size="sm" @click="openCreateChannel">Tambah metode</Button></div>
+                        <div v-if="isSuperAdmin" class="flex flex-wrap gap-2"><Button size="sm" variant="outline" @click="syncChannels">Pulihkan metode bawaan</Button><Button size="sm" @click="openCreateChannel">Tambah metode</Button></div>
                     </div>
 
                     <div class="mt-4 overflow-x-auto">
@@ -426,7 +426,7 @@ async function copy(value) {
                                     <TableCell><span v-if="Number(channel.fee_percent_bps || 0)">{{ (Number(channel.fee_percent_bps) / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 }) }}%</span><span v-if="Number(channel.fee_percent_bps || 0) && Number(channel.fee_flat_idr || 0)"> + </span><span v-if="Number(channel.fee_flat_idr || 0)">{{ money(channel.fee_flat_idr) }}</span><span v-if="!Number(channel.fee_percent_bps || 0) && !Number(channel.fee_flat_idr || 0)">Rp0</span></TableCell>
                                     <TableCell><div class="flex flex-wrap gap-1"><Badge :variant="channel.available_order ? 'secondary' : 'outline'">Pesanan {{ channel.available_order ? 'siap' : 'belum siap' }}</Badge><Badge v-if="channel.supports_wallet_topup" :variant="channel.available_topup ? 'secondary' : 'outline'">Top up {{ channel.available_topup ? 'siap' : 'belum siap' }}</Badge></div></TableCell>
                                     <TableCell><Badge :variant="channel.is_active ? 'secondary' : 'outline'">{{ channel.is_active ? 'Aktif' : 'Nonaktif' }}</Badge></TableCell>
-                                    <TableCell class="text-right"><div class="flex justify-end gap-2"><Button size="sm" variant="outline" @click="openEditChannel(channel)">Edit</Button><Button size="sm" variant="outline" @click="deleteChannel(channel)">Hapus</Button></div></TableCell>
+                                    <TableCell class="text-right"><div v-if="isSuperAdmin" class="flex justify-end gap-2"><Button size="sm" variant="outline" @click="openEditChannel(channel)">Edit</Button><Button size="sm" variant="outline" @click="deleteChannel(channel)">Hapus</Button></div><span v-else class="text-xs text-muted-foreground">Lihat saja</span></TableCell>
                                 </TableRow>
                                 <TableRow v-if="!channels.length"><TableCell colspan="6" class="py-10 text-center text-muted-foreground">Belum ada metode pembayaran.</TableCell></TableRow>
                             </TableBody>
@@ -436,9 +436,9 @@ async function copy(value) {
 
                 <div class="space-y-4">
                     <Card class="p-4">
-                        <div class="flex items-start justify-between gap-3"><div><h2 class="font-semibold">Top Up Saldo</h2><p class="mt-1 text-xs text-muted-foreground">Customer hanya melihat metode yang routing top up-nya aktif.</p></div><label class="flex items-center gap-2 text-sm"><input v-model="walletSettings.topup_enabled" type="checkbox" class="size-4">Aktif</label></div>
-                        <label class="mt-4 block space-y-1"><span class="text-sm font-medium">Minimum top up</span><Input v-model.number="walletSettings.minimum_topup_idr" type="number" min="1" max="100000000" /></label>
-                        <Button class="mt-3 w-full" size="sm" @click="saveWalletSettings">Simpan top up saldo</Button>
+                        <div class="flex items-start justify-between gap-3"><div><h2 class="font-semibold">Top Up Saldo</h2><p class="mt-1 text-xs text-muted-foreground">Customer hanya melihat metode yang routing top up-nya aktif.</p></div><label class="flex items-center gap-2 text-sm"><input v-model="walletSettings.topup_enabled" type="checkbox" class="size-4" :disabled="!isSuperAdmin">Aktif</label></div>
+                        <label class="mt-4 block space-y-1"><span class="text-sm font-medium">Minimum top up</span><Input v-model.number="walletSettings.minimum_topup_idr" type="number" min="1" max="100000000" :disabled="!isSuperAdmin" /></label>
+                        <Button v-if="isSuperAdmin" class="mt-3 w-full" size="sm" @click="saveWalletSettings">Simpan top up saldo</Button><p v-else class="mt-3 text-xs text-muted-foreground">Pengaturan top up hanya dapat diubah Super Admin.</p>
                     </Card>
 
                     <Card class="p-4">
@@ -481,23 +481,23 @@ async function copy(value) {
                     <div v-for="gateway in gateways" :key="gateway.id" class="rounded-md border p-3">
                         <div class="flex items-start justify-between gap-2"><Badge :variant="['HEALTHY','INTERNAL'].includes(gateway.health?.status) ? 'secondary' : 'outline'">{{ healthLabel(gateway.health?.status) }}</Badge><span class="text-[11px] text-muted-foreground">{{ gateway.code }}</span></div>
                         <p class="mt-2 min-h-8 text-xs text-muted-foreground">{{ gateway.health?.message }}</p>
-                        <label class="mt-3 block space-y-1"><span class="text-xs font-medium">Nama internal</span><Input v-model="gateway.internal_name" maxlength="100" /></label>
-                        <label class="mt-3 block space-y-1"><span class="text-xs font-medium">Urutan</span><Input v-model.number="gateway.sort_order" type="number" min="0" max="9999" /></label>
-                        <div class="mt-3 space-y-2 text-sm"><label class="flex items-center gap-2"><input v-model="gateway.is_active" type="checkbox" class="size-4">Aktif</label><label class="flex items-center gap-2"><input v-model="gateway.is_maintenance" type="checkbox" class="size-4">Maintenance</label></div>
+                        <label class="mt-3 block space-y-1"><span class="text-xs font-medium">Nama internal</span><Input v-model="gateway.internal_name" maxlength="100" :disabled="!isSuperAdmin" /></label>
+                        <label class="mt-3 block space-y-1"><span class="text-xs font-medium">Urutan</span><Input v-model.number="gateway.sort_order" type="number" min="0" max="9999" :disabled="!isSuperAdmin" /></label>
+                        <div class="mt-3 space-y-2 text-sm"><label class="flex items-center gap-2"><input v-model="gateway.is_active" type="checkbox" class="size-4" :disabled="!isSuperAdmin">Aktif</label><label class="flex items-center gap-2"><input v-model="gateway.is_maintenance" type="checkbox" class="size-4" :disabled="!isSuperAdmin">Maintenance</label></div>
                         <p v-if="!gateway.credential_configured && gateway.kind === 'EXTERNAL'" class="mt-2 text-xs text-amber-600">Kredensial belum aktif.</p>
-                        <Button class="mt-3 w-full" size="sm" variant="outline" @click="saveGateway(gateway)">Simpan gateway</Button>
+                        <Button v-if="isSuperAdmin" class="mt-3 w-full" size="sm" variant="outline" @click="saveGateway(gateway)">Simpan gateway</Button>
                     </div>
                 </div>
             </Card>
 
             <Card class="p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Routing Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Customer memilih metode. Sistem menentukan gateway berdasarkan routing aktif dan prioritas.</p></div><Button size="sm" variant="outline" @click="showAdvancedRouting = !showAdvancedRouting">{{ showAdvancedRouting ? 'Tutup pengaturan' : 'Atur routing' }}</Button></div>
+                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Routing Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Customer memilih metode. Sistem menentukan gateway berdasarkan routing aktif dan prioritas.</p></div><Button v-if="isSuperAdmin" size="sm" variant="outline" @click="showAdvancedRouting = !showAdvancedRouting">{{ showAdvancedRouting ? 'Tutup pengaturan' : 'Atur routing' }}</Button></div>
                 <div class="mt-4 overflow-x-auto">
                     <Table><TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Gateway</TableHead><TableHead>Pesanan</TableHead><TableHead>Top up</TableHead><TableHead>Prioritas</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                     <TableBody><TableRow v-for="row in routes" :key="row.id"><TableCell>{{ row.channel_name }}</TableCell><TableCell>{{ row.gateway_name }}</TableCell><TableCell>{{ row.supports_order ? 'Ya' : 'Tidak' }}</TableCell><TableCell>{{ row.supports_wallet_topup ? 'Ya' : 'Tidak' }}</TableCell><TableCell>{{ row.priority }}</TableCell><TableCell><Badge :variant="row.is_active ? 'secondary' : 'outline'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge></TableCell></TableRow><TableRow v-if="!routes.length"><TableCell colspan="6" class="py-8 text-center text-muted-foreground">Belum ada routing pembayaran.</TableCell></TableRow></TableBody></Table>
                 </div>
 
-                <div v-if="showAdvancedRouting" class="mt-4 space-y-4 border-t pt-4">
+                <div v-if="showAdvancedRouting && isSuperAdmin" class="mt-4 space-y-4 border-t pt-4">
                     <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                         <label class="space-y-1"><span class="text-sm font-medium">Metode</span><select v-model="routeForm.payment_channel_id" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Pilih metode</option><option v-for="channel in channels" :key="channel.id" :value="channel.id">{{ channel.name }}</option></select></label>
                         <label class="space-y-1"><span class="text-sm font-medium">Gateway</span><select v-model="routeForm.payment_gateway_id" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Pilih gateway</option><option v-for="gateway in gateways" :key="gateway.id" :value="gateway.id">{{ gateway.internal_name }}</option></select></label>
