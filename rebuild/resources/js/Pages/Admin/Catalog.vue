@@ -13,10 +13,21 @@ import AdminMediaControl from '../../Components/AdminMediaControl.vue';
 const props = defineProps({ categories: Array, products: Array, digiflazzItems: {type:Array,default:()=>[]}, defaultMargin:Number });
 const cloneProducts = (items) => items.map((item) => ({
     ...item,
-    packages: item.packages.map((pack) => ({
-        ...pack,
-        mappings: pack.mappings.map((mapping) => ({ ...mapping })),
-    })),
+    packages: item.packages.map((pack) => {
+        const mappings = pack.mappings.map((mapping) => ({ ...mapping }));
+        const stock = mappings.find((mapping) => mapping.provider_code === 'VOUCHER_STOCK');
+        return {
+            ...pack,
+            mappings,
+            stock_form: {
+                stock_key: stock?.stock_key || '',
+                cost_idr: stock?.cost_idr || '',
+                priority: stock?.priority || 0,
+                is_active: Boolean(stock?.is_active),
+                codes_text: '',
+            },
+        };
+    }),
     notices: (item.notices || []).map((notice) => ({ ...notice })),
 }));
 const categories = ref(props.categories.map((item) => ({ ...item })));
@@ -161,6 +172,19 @@ const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping
     ...(mapping.provider_code === 'MANUAL' ? { cost_idr: mapping.cost_idr } : {}),
     ...(mapping.provider_code === 'DIGIFLAZZ' ? { customer_no_template: mapping.customer_no_template || null } : {}),
 });
+const providerLabel = (code) => code === 'DIGIFLAZZ' ? 'Digiflazz' : code === 'MANUAL' ? 'Manual' : code === 'VOUCHER_STOCK' ? 'Stok Kode' : code;
+const stockMapping = (pack) => pack.mappings.find((mapping) => mapping.provider_code === 'VOUCHER_STOCK');
+const saveVoucherStock = (pack) => router.post('/admin/catalog/packages/' + pack.id + '/voucher-stock', {
+    stock_key: pack.stock_form.stock_key,
+    cost_idr: Number(pack.stock_form.cost_idr || 0),
+    priority: Number(pack.stock_form.priority || 0),
+    is_active: Boolean(pack.stock_form.is_active),
+    codes_text: pack.stock_form.codes_text || null,
+}, {
+    preserveScroll: true,
+    onSuccess: () => { pack.stock_form.codes_text = ''; },
+});
+
 const noticeDraft = (productId) => noticeDrafts[productId] || (noticeDrafts[productId] = { title: '', body: '', sort_order: 0, is_active: true });
 const addNotice = (product) => {
     const draft = noticeDraft(product.id);
@@ -279,7 +303,7 @@ const deleteNotice = (notice) => {
                     </div>
                     <Button type="button" class="rounded-md bg-slate-700 px-4 py-2 text-sm" @click="saveProduct(item)">Simpan produk</Button>
                     </div>
-                    <div v-show="editorTab==='fulfillment'" class="space-y-4"><h3 class="font-semibold">Penanganan {{item.fulfillment_mode==='MANUAL'?'manual':'otomatis'}}</h3><p class="text-sm text-slate-500">Instruksi dan jam layanan dikelola pada Informasi. Mapping SKU, prioritas, modal, dan template tujuan dikelola per nominal.</p><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="router.post('/admin/catalog/products/'+item.id+'/sync',{}, {preserveScroll:true})">Sinkron semua nominal produk</Button><Table><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Penyedia / SKU</TableHead><TableHead>Status koneksi</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="pack in item.packages" :key="pack.id"><TableCell>{{pack.name}}</TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{mapping.provider_code}} · {{mapping.external_sku||'Manual'}}</p></TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{mapping.is_active?'Aktif':'Nonaktif'}} · prioritas {{mapping.priority}}</p></TableCell><TableCell><Button type="button" variant="outline" @click="selectedPackageId=pack.id;editorTab='nominal'">Kelola penyedia</Button></TableCell></TableRow></TableBody></Table></div>
+                    <div v-show="editorTab==='fulfillment'" class="space-y-4"><h3 class="font-semibold">Penanganan {{item.fulfillment_mode==='MANUAL'?'manual':'otomatis'}}</h3><p class="text-sm text-slate-500">Instruksi dan jam layanan dikelola pada Informasi. Mapping SKU, prioritas, modal, dan template tujuan dikelola per nominal.</p><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="router.post('/admin/catalog/products/'+item.id+'/sync',{}, {preserveScroll:true})">Sinkron semua nominal produk</Button><Table><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Penyedia / SKU</TableHead><TableHead>Status koneksi</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="pack in item.packages" :key="pack.id"><TableCell>{{pack.name}}</TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{providerLabel(mapping.provider_code)}} · {{mapping.provider_code==='VOUCHER_STOCK' ? (mapping.stock_key||'-') : (mapping.external_sku||'Manual')}}</p></TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{mapping.is_active?'Aktif':'Nonaktif'}} · prioritas {{mapping.priority}}</p></TableCell><TableCell><Button type="button" variant="outline" @click="selectedPackageId=pack.id;editorTab='nominal'">Kelola penyedia</Button></TableCell></TableRow></TableBody></Table></div>
                     <div v-show="editorTab==='display'" class="space-y-4">
                     <div class="grid gap-3 md:grid-cols-2">
                         <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk / card</strong><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
@@ -359,13 +383,33 @@ const deleteNotice = (notice) => {
                                 <p class="mb-2 text-[11px] text-slate-400">Gambar nominal: rekomendasi 512×512 (1:1), PNG/WebP transparan bila memungkinkan.</p>
                                 <AdminMediaControl type="package" :id="pack.id" :url="pack.image_url" />
                             </div>
-                            <div v-for="mapping in pack.mappings" :key="mapping.id" class="flex flex-wrap items-end gap-2 text-xs text-slate-300">
-                                <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga nominal</Button><span>{{ mapping.provider_code }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span></span>
+                            <div v-for="mapping in pack.mappings.filter((entry) => entry.provider_code !== 'VOUCHER_STOCK')" :key="mapping.id" class="flex flex-wrap items-end gap-2 text-xs text-slate-300">
+                                <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga nominal</Button><span>{{ providerLabel(mapping.provider_code) }}<span v-if="mapping.external_sku && mapping.provider_code!=='VOUCHER_STOCK'"> · {{ mapping.external_sku }}</span></span>
                                 <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                                 <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Format ID tujuan ke penyedia<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan kode kolom di dalam {{ }}. Jika produk hanya memiliki satu kolom tujuan, bagian ini boleh dikosongkan.</span></label>
                                 <label>Prioritas<Input v-model.number="mapping.priority" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
                                 <label class="flex gap-2"><input v-model="mapping.is_active" type="checkbox">Aktif</label>
                                 <Button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan penyedia</Button>
+                            </div>
+                            <div v-if="item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 rounded-md border border-slate-700 p-3">
+                                <div>
+                                    <h4 class="font-semibold">Stok Kode Digital</h4>
+                                    <p class="mt-1 text-xs text-slate-400">Untuk voucher, lisensi, atau serial yang dikirim otomatis dari stok internal. Kode disimpan terenkripsi dan baru ditampilkan setelah pesanan sukses.</p>
+                                </div>
+                                <div class="grid gap-3 md:grid-cols-4">
+                                    <label class="text-xs">Kunci stok<Input v-model="pack.stock_form.stock_key" maxlength="100" placeholder="contoh: netflix-1bulan" class="mt-1" /></label>
+                                    <label class="text-xs">Modal Rp<Input v-model.number="pack.stock_form.cost_idr" type="number" min="1" class="mt-1" /></label>
+                                    <label class="text-xs">Prioritas<Input v-model.number="pack.stock_form.priority" type="number" min="0" max="1000" class="mt-1" /></label>
+                                    <label class="flex items-center gap-2 self-end pb-2 text-xs"><input v-model="pack.stock_form.is_active" type="checkbox"> Aktif untuk checkout</label>
+                                </div>
+                                <div v-if="stockMapping(pack)?.stock_counts" class="flex flex-wrap gap-4 text-xs text-slate-300">
+                                    <span>Tersedia <strong>{{ stockMapping(pack).stock_counts.available }}</strong></span>
+                                    <span>Dipesan <strong>{{ stockMapping(pack).stock_counts.reserved }}</strong></span>
+                                    <span>Terkirim <strong>{{ stockMapping(pack).stock_counts.delivered }}</strong></span>
+                                    <span>Total <strong>{{ stockMapping(pack).stock_counts.total }}</strong></span>
+                                </div>
+                                <label class="block text-xs">Impor kode baru (satu kode per baris)<Textarea v-model="pack.stock_form.codes_text" rows="5" class="mt-1" placeholder="KODE-001&#10;KODE-002&#10;KODE-003" /></label>
+                                <Button type="button" variant="outline" @click="saveVoucherStock(pack)">Simpan pengaturan & impor kode</Button>
                             </div>
                         </div>
                         <form class="flex flex-wrap items-end gap-2 border-t border-slate-800 pt-3" @submit.prevent="packageForm.post('/admin/catalog/products/' + item.id + '/packages', { onSuccess: () => packageForm.reset() })">
