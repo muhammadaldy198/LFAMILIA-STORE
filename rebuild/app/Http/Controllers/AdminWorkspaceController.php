@@ -203,12 +203,12 @@ class AdminWorkspaceController
             'kind' => 'vouchers',
             'title' => 'Promo & Voucher',
             'rows' => $rows,
-            'voucherCategories' => DB::table('product_categories')->orderBy('sort_order')->orderBy('name')
+            'voucherCategories' => DB::table('categories')->orderBy('sort_order')->orderBy('name')
                 ->get(['id', 'name']),
             'voucherProducts' => DB::table('products')->orderBy('sort_order')->orderBy('name')
                 ->get(['id', 'name', 'category_id']),
             'popularProducts' => DB::table('products as products')
-                ->join('product_categories as categories', 'categories.id', '=', 'products.category_id')
+                ->join('categories as categories', 'categories.id', '=', 'products.category_id')
                 ->orderByDesc('products.popular')->orderBy('products.sort_order')->orderBy('products.name')
                 ->get([
                     'products.id', 'products.name', 'products.popular', 'products.is_active',
@@ -733,7 +733,7 @@ class AdminWorkspaceController
             'product_ids' => ['array', 'max:500'],
             'product_ids.*' => ['integer', Rule::exists('products', 'id')],
             'category_ids' => ['array', 'max:100'],
-            'category_ids.*' => ['integer', Rule::exists('product_categories', 'id')],
+            'category_ids.*' => ['integer', Rule::exists('categories', 'id')],
             'is_active' => ['required', 'boolean'],
         ]);
     }
