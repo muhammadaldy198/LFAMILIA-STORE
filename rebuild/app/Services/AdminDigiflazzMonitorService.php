@@ -9,6 +9,23 @@ use Illuminate\Support\Facades\Http;
 
 class AdminDigiflazzMonitorService
 {
+    public function settings(): array
+    {
+        $stored = DB::table('system_settings')
+            ->whereIn('key', [
+                'digiflazz.auto_sync_interval_minutes',
+                'digiflazz.low_stock_threshold',
+                'digiflazz.price_warning_percent',
+            ])
+            ->pluck('value', 'key');
+
+        return [
+            'sync_interval_minutes' => max(5, min(1440, (int) (json_decode((string) $stored->get('digiflazz.auto_sync_interval_minutes'), true) ?? 15))),
+            'low_stock_threshold' => max(1, min(1000000, (int) (json_decode((string) $stored->get('digiflazz.low_stock_threshold'), true) ?? 5))),
+            'price_warning_percent' => max(0.1, min(100, (float) (json_decode((string) $stored->get('digiflazz.price_warning_percent'), true) ?? 3))),
+        ];
+    }
+
     public function connection(bool $includeBalance): array
     {
         $record = IntegrationCredential::where('code', 'digiflazz')->first();
@@ -73,8 +90,11 @@ class AdminDigiflazzMonitorService
         })];
     }
 
-    public function health(object $item): array
+    public function health(object $item, ?array $settings = null): array
     {
+        $settings ??= $this->settings();
+        $lowStockThreshold = (int) $settings['low_stock_threshold'];
+        $priceWarningPercent = (float) $settings['price_warning_percent'];
         $critical = [];
         $warning = [];
 
@@ -87,7 +107,7 @@ class AdminDigiflazzMonitorService
         if (! (bool) $item->unlimited_stock && (int) $item->stock <= 0) {
             $critical[] = 'Stok seller habis.';
         }
-        if ($critical === [] && ! (bool) $item->unlimited_stock && (int) $item->stock <= 5) {
+        if ($critical === [] && ! (bool) $item->unlimited_stock && (int) $item->stock <= $lowStockThreshold) {
             $warning[] = 'Stok menipis: '.(int) $item->stock.' tersisa.';
         }
         if ($critical === [] && $this->insideCutoff((string) $item->start_cut_off, (string) $item->end_cut_off)) {
@@ -98,7 +118,7 @@ class AdminDigiflazzMonitorService
         $price = (int) $item->price_idr;
         if ($critical === [] && $baseline > 0 && $price > $baseline) {
             $increase = (($price - $baseline) / $baseline) * 100;
-            if ($increase >= 3) {
+            if ($increase >= $priceWarningPercent) {
                 $warning[] = 'Harga naik '.number_format($increase, 1, ',', '.').'% dari baseline.';
             }
         }
@@ -109,12 +129,13 @@ class AdminDigiflazzMonitorService
         ];
     }
 
-    public function summary(iterable $items): array
+    public function summary(iterable $items, ?array $settings = null): array
     {
+        $settings ??= $this->settings();
         $summary = ['total' => 0, 'healthy' => 0, 'warning' => 0, 'critical' => 0];
         foreach ($items as $item) {
             $summary['total']++;
-            $summary[$this->health($item)['health']]++;
+            $summary[$this->health($item, $settings)['health']]++;
         }
 
         return $summary;
