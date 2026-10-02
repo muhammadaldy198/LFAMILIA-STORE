@@ -143,9 +143,11 @@ The Resend API key and sender address are read only from the encrypted Integrasi
 
 ## Audit
 
-Sensitive M9 actions use Audit Log with actor, role, action, target, IP, user agent and correlation ID. Audit payloads redact password/key/secret/token/signature material.
+Audit Log is a dedicated read-only shadcn workspace available only to Super Admin. It provides server-side search/filtering, actor identity, role/action/target/date filters, pagination, correlation ID, IP address, user agent, and before/after change detail.
 
-Credential reveal records which field was revealed, never the secret value itself.
+Sensitive actions use Audit Log with actor, role, action, target, IP, user agent and correlation ID. Audit payloads redact password/key/secret/token/signature material when written and are sanitized again when read so legacy rows cannot bypass current redaction rules. Legacy camelCase or prefixed key names such as `apiKey` and `midtrans_client_key` are redacted too. Scalar text payloads are not rendered back to the browser.
+
+Credential reveal records which field was revealed, never the secret value itself. Audit rows have no edit/delete action in the Admin panel.
 
 ## Customer and commercial operations
 
