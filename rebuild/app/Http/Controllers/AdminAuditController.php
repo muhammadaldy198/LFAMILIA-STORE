@@ -16,6 +16,11 @@ class AdminAuditController
 {
     public function index(Request $request, AdminAuditService $audit): Response
     {
+        $dateToRules = ['nullable', 'date_format:Y-m-d'];
+        if ($request->filled('date_from')) {
+            $dateToRules[] = 'after_or_equal:date_from';
+        }
+
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'actor_id' => ['nullable', 'integer', 'min:1'],
@@ -23,7 +28,7 @@ class AdminAuditController
             'action' => ['nullable', 'string', 'max:100'],
             'target_type' => ['nullable', 'string', 'max:80'],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
-            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            'date_to' => $dateToRules,
             'per_page' => ['nullable', 'integer', Rule::in([25, 50, 100])],
         ]);
 
@@ -69,7 +74,11 @@ class AdminAuditController
             })
             ->when($filters['actor_id'] !== null, fn ($query) => $query->where('actor_type', 'admin_user')
                 ->where('actor_id', (string) $filters['actor_id']))
-            ->when($filters['role'] === 'SYSTEM', fn ($query) => $query->whereNull('actor_id'))
+            ->when($filters['role'] === 'SYSTEM', fn ($query) => $query->where(function ($query): void {
+                $query->whereNull('actor_id')
+                    ->orWhereNull('actor_type')
+                    ->orWhere('actor_type', '!=', 'admin_user');
+            }))
             ->when(in_array($filters['role'], ['SUPER_ADMIN', 'ADMIN'], true), fn ($query) => $query->where('actor_role', $filters['role']))
             ->when($filters['action'] !== '', fn ($query) => $query->where('action', $filters['action']))
             ->when($filters['target_type'] !== '', fn ($query) => $query->where('target_type', $filters['target_type']))
@@ -109,15 +118,16 @@ class AdminAuditController
 
         $logs->through(function (object $row) use ($actorNames, $audit): array {
             $actorId = is_numeric($row->actor_id) ? (int) $row->actor_id : null;
-            $actor = $actorId !== null ? $actorNames->get($actorId) : null;
+            $systemActor = $row->actor_type !== 'admin_user' || $actorId === null;
+            $actor = ! $systemActor && $actorId !== null ? $actorNames->get($actorId) : null;
 
             return [
                 'id' => (int) $row->id,
                 'actor' => [
-                    'id' => $actorId,
-                    'name' => $actor?->name ?? ($actorId !== null ? 'Admin #'.$actorId : 'Sistem'),
-                    'email' => $actor?->email,
-                    'role' => $row->actor_role ?: ($actorId === null ? 'SYSTEM' : null),
+                    'id' => $systemActor ? null : $actorId,
+                    'name' => $systemActor ? 'Sistem' : ($actor?->name ?? 'Admin #'.$actorId),
+                    'email' => $systemActor ? null : $actor?->email,
+                    'role' => $systemActor ? 'SYSTEM' : $row->actor_role,
                 ],
                 'action' => (string) $row->action,
                 'action_label' => $this->actionLabel((string) $row->action),
