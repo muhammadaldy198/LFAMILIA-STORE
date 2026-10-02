@@ -220,10 +220,10 @@ const deleteNotice = (notice) => {
                 <Card class="p-4">
                     <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                         <label class="text-sm xl:col-span-2">Cari produk atau nominal<Input v-model="catalogSearch" placeholder="Nama, alamat produk, merek, atau nominal" class="mt-1" /></label>
-                        <label class="text-sm">Kategori<select v-model="catalogCategory" class="order-select mt-1"><option value="">Semua kategori</option><option v-for="category in categories" :key="category.id" :value="category.id">{{category.name}}</option></select></label>
-                        <label class="text-sm">Status<select v-model="catalogStatus" class="order-select mt-1"><option value="">Semua status</option><option value="ACTIVE">Aktif</option><option value="INACTIVE">Nonaktif</option></select></label>
-                        <label class="text-sm">Urutkan<select v-model="catalogSort" class="order-select mt-1"><option value="CUSTOM">Urutan toko</option><option value="NAME">Nama A–Z</option></select></label>
-                        <label class="text-sm">Produk per halaman<select v-model.number="catalogPageSize" class="order-select mt-1"><option v-for="size in [10,25,50,100]" :key="size" :value="size">{{size}} produk</option></select></label>
+                        <label class="text-sm">Kategori<select v-model="catalogCategory" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="">Semua kategori</option><option v-for="category in categories" :key="category.id" :value="category.id">{{category.name}}</option></select></label>
+                        <label class="text-sm">Status<select v-model="catalogStatus" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="">Semua status</option><option value="ACTIVE">Aktif</option><option value="INACTIVE">Nonaktif</option></select></label>
+                        <label class="text-sm">Urutkan<select v-model="catalogSort" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="CUSTOM">Urutan toko</option><option value="NAME">Nama A–Z</option></select></label>
+                        <label class="text-sm">Produk per halaman<select v-model.number="catalogPageSize" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option v-for="size in [10,25,50,100]" :key="size" :value="size">{{size}} produk</option></select></label>
                     </div>
                 </Card>
                 <Button type="button" variant="outline" @click="showCreateProduct = !showCreateProduct">{{ showCreateProduct ? 'Tutup formulir' : 'Tambah produk' }}</Button>
@@ -241,7 +241,7 @@ const deleteNotice = (notice) => {
                         <label class="text-sm">Jam tutup<Input v-model="productForm.manual_close_time" type="time" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
                         <label class="text-sm">Zona waktu<select v-model="productForm.manual_timezone" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="Asia/Jakarta">WIB — Asia/Jakarta</option><option value="Asia/Makassar">WITA — Asia/Makassar</option><option value="Asia/Jayapura">WIT — Asia/Jayapura</option></select></label>
                     </template>
-                    <div class="md:col-span-3"><Button :disabled="productForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah {{ tab === 'MANUAL' ? 'produk manual' : 'produk provider' }}</Button><p v-if="Object.keys(productForm.errors).length" class="mt-2 text-sm text-red-300">{{ Object.values(productForm.errors).join(' · ') }}</p></div>
+                    <div class="md:col-span-3"><Button :disabled="productForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah {{ tab === 'MANUAL' ? 'produk manual' : 'produk otomatis' }}</Button><p v-if="Object.keys(productForm.errors).length" class="mt-2 text-sm text-red-300">{{ Object.values(productForm.errors).join(' · ') }}</p></div>
                 </form>
                 <div class="overflow-x-auto"><Table class="min-w-[880px]"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Jenis</TableHead><TableHead>Nominal</TableHead><TableHead>Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id"><TableCell><strong>{{item.name}}</strong><small class="block text-muted-foreground">/{{item.slug}}<template v-if="item.publisher"> · {{item.publisher}}</template></small></TableCell><TableCell>{{categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori'}}</TableCell><TableCell>{{item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis'}}</TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>{{item.sort_order}}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" size="sm" @click="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table></div><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk yang sesuai dengan filter.</p>
                 <nav class="flex flex-wrap items-center justify-between gap-3"><span class="text-sm text-muted-foreground">{{matchingProducts.length}} produk · Halaman {{catalogPage}} dari {{totalCatalogPages}}</span><div class="flex gap-2"><Button type="button" variant="outline" :disabled="catalogPage <= 1" @click="catalogPage--">Sebelumnya</Button><Button type="button" variant="outline" :disabled="catalogPage >= totalCatalogPages" @click="catalogPage++">Berikutnya</Button></div></nav>
@@ -295,7 +295,7 @@ const deleteNotice = (notice) => {
                         <Button type="button" variant="outline" @click="saveProduct(item)">Simpan tampilan produk</Button>
                     </Card>
                     <div class="space-y-3 rounded-md border border-slate-200 bg-white p-4">
-                        <div><h3 class="font-semibold">Notice produk</h3><p class="mt-1 text-xs text-slate-500">Informasi publik yang tampil di checkout, terpisah dari instruksi fulfillment internal.</p></div>
+                        <div><h3 class="font-semibold">Notice produk</h3><p class="mt-1 text-xs text-slate-500">Informasi publik yang tampil saat pelanggan melakukan pembelian, terpisah dari instruksi penanganan internal.</p></div>
                         <article v-for="notice in item.notices" :key="notice.id" class="grid gap-2 rounded border border-slate-200 p-3 md:grid-cols-[1fr_110px_auto]">
                             <Input v-model="notice.title" class="rounded border border-slate-200 p-2 text-xs" placeholder="Judul" />
                             <Input v-model.number="notice.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-xs" placeholder="Urutan" />
@@ -360,7 +360,7 @@ const deleteNotice = (notice) => {
                             <div v-for="mapping in pack.mappings" :key="mapping.id" class="flex flex-wrap items-end gap-2 text-xs text-slate-300">
                                 <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga nominal</Button><span>{{ mapping.provider_code }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span></span>
                                 <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
-                                <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Template customer_no<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan placeholder field produk. Jika hanya satu field, boleh dikosongkan.</span></label>
+                                <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Format ID tujuan ke penyedia<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan kode kolom di dalam {{ }}. Jika produk hanya memiliki satu kolom tujuan, bagian ini boleh dikosongkan.</span></label>
                                 <label>Prioritas<Input v-model.number="mapping.priority" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
                                 <label class="flex gap-2"><input v-model="mapping.is_active" type="checkbox">Aktif</label>
                                 <Button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan penyedia</Button>
@@ -382,8 +382,8 @@ const deleteNotice = (notice) => {
             </section>
 
             <section v-show="catalogTab === 'fields'" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <h2 class="text-xl font-semibold">Field input produk</h2>
-                <p class="text-sm text-slate-400">Atur kolom yang diisi customer saat membeli produk. Urutan kolom mengikuti daftar di bawah.</p>
+                <h2 class="text-xl font-semibold">Kolom data pelanggan</h2>
+                <p class="text-sm text-slate-400">Atur data yang wajib atau opsional diisi pelanggan saat membeli produk. Urutan di halaman pelanggan mengikuti daftar di bawah.</p>
                 <label class="block text-sm">Produk<select v-model="fieldsProductId" class="mt-1 w-full max-w-md rounded-md bg-slate-800 p-2"><option value="">Pilih produk</option><option v-for="item in products" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
                 <template v-if="fieldsProductId">
                     <Card v-for="(field, index) in fieldRows" :key="index" class="space-y-3 p-4">
@@ -396,7 +396,7 @@ const deleteNotice = (notice) => {
                             </div>
                         </div>
                         <div class="grid gap-3 md:grid-cols-2">
-                            <label class="text-sm">Label customer<Input v-model="field.label" maxlength="255" placeholder="Contoh: User ID" class="mt-1" /></label>
+                            <label class="text-sm">Nama kolom<Input v-model="field.label" maxlength="255" placeholder="Contoh: User ID" class="mt-1" /></label>
                             <label class="text-sm">Kode kolom<Input v-model="field.field_key" maxlength="80" placeholder="Contoh: user_id" class="mt-1" /><span class="mt-1 block text-xs text-slate-500">Huruf kecil, angka, dan garis bawah. Kode dipakai oleh cek nickname dan template pengiriman.</span></label>
                             <label class="text-sm">Contoh isian<Input v-model="field.placeholder" maxlength="255" placeholder="Contoh: 123456789" class="mt-1" /></label>
                             <label class="text-sm">Jenis isian<select v-model="field.type" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="text">Teks / ID</option><option value="tel">Nomor telepon</option><option value="email">Email</option></select></label>
@@ -405,7 +405,7 @@ const deleteNotice = (notice) => {
                     </Card>
                     <Button type="button" variant="outline" :disabled="fieldRows.length>=20" @click="addField">Tambah kolom</Button>
                     <Card class="space-y-3 p-4">
-                        <h3 class="font-semibold">Pratinjau input customer</h3>
+                        <h3 class="font-semibold">Pratinjau isian pelanggan</h3>
                         <p v-if="!fieldRows.length" class="text-sm text-slate-500">Belum ada kolom.</p>
                         <label v-for="(field,index) in fieldRows" :key="index" class="block text-sm">{{ field.label || 'Label kolom' }}{{ field.is_required ? ' *' : '' }}<Input :type="field.type" :placeholder="field.placeholder" disabled class="mt-1" /></label>
                     </Card>
