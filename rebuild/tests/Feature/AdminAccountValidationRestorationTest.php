@@ -389,5 +389,4 @@ class AdminAccountValidationRestorationTest extends TestCase
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['nickname_game_code']);
     }
-
 }
