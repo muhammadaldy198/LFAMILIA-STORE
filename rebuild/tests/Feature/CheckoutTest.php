@@ -199,7 +199,13 @@ class CheckoutTest extends TestCase
         ]);
         IntegrationCredential::create([
             'code' => 'kokinpay',
-            'config_ciphertext' => ['api_key' => 'test-secret', 'base_url' => 'https://kokinpay.invalid'],
+            'config_ciphertext' => [
+                'api_key' => 'test-secret',
+                'base_url' => 'https://kokinpay.invalid',
+                'nickname_path' => '/v1/check-nickname',
+                'region_path' => '/v1/check-region',
+                'pln_path' => '/v1/check-pln',
+            ],
             'is_active' => true,
         ]);
         Http::fake(['https://kokinpay.invalid/*' => Http::response(['status' => false], 503)]);
@@ -230,7 +236,13 @@ class CheckoutTest extends TestCase
         ]);
         IntegrationCredential::create([
             'code' => 'kokinpay',
-            'config_ciphertext' => ['api_key' => 'test-secret', 'base_url' => 'https://kokinpay.invalid'],
+            'config_ciphertext' => [
+                'api_key' => 'test-secret',
+                'base_url' => 'https://kokinpay.invalid',
+                'nickname_path' => '/v1/check-nickname',
+                'region_path' => '/v1/check-region',
+                'pln_path' => '/v1/check-pln',
+            ],
             'is_active' => true,
         ]);
         Http::fake(['https://kokinpay.invalid/*' => Http::response(['status' => false], 400)]);
