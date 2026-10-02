@@ -20,7 +20,7 @@ const props = defineProps({
     settings: Object,
 });
 const contentTab = ref('banners');
-const contentTabs = [['banners','Banner'],['popup','Pop-up'],['assets','Logo & Gambar'],['support','Kontak & Footer'],['news','Berita'],['reviews','Ulasan'],['faq','FAQ'],['legal','Kebijakan']];
+const contentTabs = [['banners','Banner'],['popup','Pop-up'],['assets','Logo & Gambar'],['support','Bantuan & Footer'],['news','Berita'],['reviews','Ulasan'],['faq','Pertanyaan Umum'],['legal','Kebijakan']];
 const page = usePage();
 const base = page.props.adminPanel?.base_path || '/admin';
 
@@ -97,6 +97,7 @@ const savePopup = (item) => router.put(base + '/content/popups/' + item.id, {
 const deletePopup = (item) => {
     if (confirm('Hapus pop-up ini?')) router.delete(base + '/content/popups/' + item.id, { preserveScroll: true });
 };
+const assetHasTarget = (key) => ['banner_desktop', 'banner_mobile'].includes(key);
 const assetLabel = (key) => ({
     logo: 'Logo toko',
     favicon: 'Favicon',
@@ -208,7 +209,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
 
             <section v-show="contentTab === 'popup'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <div>
-                    <h2 class="text-lg font-bold">Pop-up Homepage</h2>
+                    <h2 class="text-lg font-bold">Pop-up halaman utama</h2>
                     <p class="mt-1 text-xs text-slate-500">Hanya satu pop-up pengumuman. Muncul saat pelanggan membuka halaman utama dan dapat disembunyikan sesuai masa yang ditentukan.</p>
                 </div>
 
@@ -249,7 +250,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                             <strong class="text-sm">{{ assetLabel(asset.key) }}</strong>
                             <label class="flex items-center gap-2 text-xs"><input v-model="asset.is_active" type="checkbox"> Aktif</label>
                         </div>
-                        <label v-if="asset.key.includes('banner')" class="mt-3 block text-xs">
+                        <label v-if="assetHasTarget(asset.key)" class="mt-3 block text-xs">
                             Link ketika banner ditekan
                             <Input v-model="asset.target_url" type="url" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="https://..." />
                         </label>
