@@ -52,6 +52,7 @@ class AdminOrderPresentation
         if (! $message) {
             return null;
         }
+
         return strtr(strip_tags($message), [
             'Provider atau mapping sedang nonaktif.' => 'Penyedia atau pengaturan produk sedang tidak aktif.',
             'Adapter provider belum tersedia untuk mapping ini.' => 'Penyedia untuk produk ini belum didukung.',
@@ -96,6 +97,7 @@ class AdminOrderPresentation
         $provider = data_get($snapshot, 'provider.code') ?: ($row->provider_code ?? null);
         $channel = data_get($snapshot, 'payment.channel_name') ?: ($row->channel_name ?? null);
         $channelCode = data_get($snapshot, 'payment.channel_code');
+
         return [
             'id' => (int) $row->id, 'order_number' => $row->order_number,
             'status' => $row->status, 'status_label' => $this->status($row->status),

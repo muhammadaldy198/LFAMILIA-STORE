@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\IntegrationCredential;
+use App\Services\MidtransStatusVerification;
 use App\Services\Payment\DokuSignature;
 use App\Services\Payment\MidtransGateway;
 use App\Services\PaymentStateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class PaymentWebhookController
 {
@@ -42,7 +42,7 @@ class PaymentWebhookController
             ->where('merchant_reference', (string) $payload['order_id'])
             ->first();
         abort_unless($payment, 404);
-        abort_unless(app(\App\Services\MidtransStatusVerification::class)->amount($payload['gross_amount']) === (int) $payment->amount_idr, 422);
+        abort_unless(app(MidtransStatusVerification::class)->amount($payload['gross_amount']) === (int) $payment->amount_idr, 422);
 
         $eventId = hash('sha256', implode('|', [
             (string) ($payload['transaction_id'] ?? ''),
@@ -62,14 +62,14 @@ class PaymentWebhookController
         }
 
         abort_unless(hash_equals((string) $payment->merchant_reference, (string) $verified['order_id']), 422);
-        abort_unless(app(\App\Services\MidtransStatusVerification::class)->amount($verified['gross_amount']) === (int) $payment->amount_idr, 422);
+        abort_unless(app(MidtransStatusVerification::class)->amount($verified['gross_amount']) === (int) $payment->amount_idr, 422);
 
         $processed = DB::transaction(function () use ($payment, $eventId, $payload, $verified, $states): bool {
             if (! $this->claimCallback($payment->id, 'MIDTRANS', $eventId, $payload)) {
                 return false;
             }
 
-            $status = app(\App\Services\MidtransStatusVerification::class)->status($verified);
+            $status = app(MidtransStatusVerification::class)->status($verified);
             $result = $states->apply($payment->id, $status, [
                 'source' => 'midtrans_status_challenge',
                 'transaction_status' => $verified['transaction_status'],
@@ -120,7 +120,7 @@ class PaymentWebhookController
             ->where('merchant_reference', $merchantReference)
             ->first();
         abort_unless($payment, 404);
-        abort_unless(app(\App\Services\MidtransStatusVerification::class)->amount($amount) === (int) $payment->amount_idr, 422);
+        abort_unless(app(MidtransStatusVerification::class)->amount($amount) === (int) $payment->amount_idr, 422);
 
         $eventId = hash('sha256', $requestId);
         $processed = DB::transaction(function () use (
@@ -176,5 +176,4 @@ class PaymentWebhookController
             ->where('event_id', $eventId)
             ->update(['result' => substr($result, 0, 40)]);
     }
-
 }

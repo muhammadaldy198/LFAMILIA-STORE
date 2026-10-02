@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Jobs\ReconcileFulfillmentJob;
 use App\Services\AdminAuditService;
+use App\Services\AdminManualOrderService;
 use App\Services\AdminOrderPresentation;
 use App\Services\AdminPermissionService;
-use App\Services\AdminManualOrderService;
+use App\Services\MidtransStatusVerification;
+use App\Services\Payment\MidtransGateway;
+use App\Services\PaymentStateService;
 use App\Services\TransactionalEmailService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
@@ -72,6 +75,7 @@ class AdminOrdersController
                 $query->where('orders.created_at', $operator, $boundary->utc());
             }
         }
+
         return $query;
     }
 
@@ -85,6 +89,7 @@ class AdminOrdersController
         $permissions = app(AdminPermissionService::class);
         $canManage = $permissions->allows($request->user('admin'), 'fulfillment.manage');
         $canPay = $permissions->allows($request->user('admin'), 'payments.manage');
+
         return Inertia::render('Admin/Orders', [
             'orders' => $rows, 'filters' => $request->only(['q', 'status', 'provider', 'payment', 'from', 'to', 'per_page']),
             'metrics' => [
@@ -116,6 +121,7 @@ class AdminOrdersController
         if ($request->has('selected')) {
             $query->whereIn('orders.id', $request->input('selected', []));
         }
+
         return response()->streamDownload(function () use ($query, $presentation): void {
             $stream = fopen('php://output', 'w');
             fwrite($stream, "\xEF\xBB\xBF");
@@ -150,6 +156,7 @@ class AdminOrdersController
         ], ['payment_received.accepted' => 'Pastikan pembayaran benar-benar sudah diterima.']);
         $id = $service->create($data, (int) $request->user('admin')->id);
         app(AdminAuditService::class)->record($request, 'order.manual.created', 'order', $id, null, ['order_id' => $id]);
+
         return redirect()->route('admin.orders.show', $id)->with('success', 'Pesanan manual berhasil dicatat.');
     }
 
@@ -213,6 +220,7 @@ class AdminOrdersController
         }
         ReconcileFulfillmentJob::dispatch((int) $attempt->id);
         app(AdminAuditService::class)->record($request, 'order.fulfillment.checked', 'order', $id, null, ['attempt_id' => $attempt->id]);
+
         return back()->with('success', 'Pemeriksaan dijadwalkan. Muat ulang detail untuk melihat hasilnya.');
     }
 
@@ -224,19 +232,20 @@ class AdminOrdersController
             throw ValidationException::withMessages(['payment' => 'Pembayaran ini tidak memerlukan pemeriksaan langsung. Pembayaran otomatis diperbarui setelah konfirmasi penyedia diterima.']);
         }
         try {
-            $verified = app(\App\Services\Payment\MidtransGateway::class)->status((string) $payment->merchant_reference);
+            $verified = app(MidtransGateway::class)->status((string) $payment->merchant_reference);
         } catch (\RuntimeException) {
             throw ValidationException::withMessages(['payment' => 'Penyedia pembayaran belum dapat dihubungi. Status pesanan tidak diubah. Coba lagi nanti.']);
         }
-        $verification = app(\App\Services\MidtransStatusVerification::class);
+        $verification = app(MidtransStatusVerification::class);
         if (! hash_equals((string) $payment->merchant_reference, (string) $verified['order_id'])
             || $verification->amount($verified['gross_amount']) !== (int) $payment->amount_idr) {
             throw ValidationException::withMessages(['payment' => 'Hasil pemeriksaan tidak sesuai dengan pesanan. Status pembayaran tidak diubah.']);
         }
-        $result = app(\App\Services\PaymentStateService::class)->apply((int) $payment->id, $verification->status($verified), [
+        $result = app(PaymentStateService::class)->apply((int) $payment->id, $verification->status($verified), [
             'source' => 'admin_status_check', 'admin_id' => $request->user('admin')->id,
         ]);
         app(AdminAuditService::class)->record($request, 'order.payment.checked', 'order', $id, null, $result);
+
         return back()->with('success', 'Status pembayaran sudah diperiksa.');
     }
 }

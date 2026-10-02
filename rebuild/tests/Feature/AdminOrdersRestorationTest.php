@@ -14,6 +14,7 @@ use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -39,7 +40,7 @@ class AdminOrdersRestorationTest extends TestCase
             'customer_name' => '=CUSTOMER', 'phone' => '081234567890', 'email' => 'orders@example.test',
             'product_name' => 'Produk saat dibeli', 'package_name' => 'Paket khusus',
             'destination' => 'TARGET-REGRESSION', 'total_idr' => 15000, 'note' => 'Pembayaran diterima di toko',
-            'payment_received' => true, 'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
+            'payment_received' => true, 'idempotency_key' => (string) Str::uuid(),
         ];
     }
 
@@ -69,7 +70,7 @@ class AdminOrdersRestorationTest extends TestCase
         Queue::assertNotPushed(ReconcileFulfillmentJob::class);
         Http::assertNothingSent();
         $this->post('/admin/orders/manual', [...$data, 'total_idr' => 16000])->assertSessionHasErrors('order');
-        $this->post('/admin/orders/manual', [...$data, 'idempotency_key' => (string) \Illuminate\Support\Str::uuid(), 'payment_received' => false])->assertSessionHasErrors('payment_received');
+        $this->post('/admin/orders/manual', [...$data, 'idempotency_key' => (string) Str::uuid(), 'payment_received' => false])->assertSessionHasErrors('payment_received');
     }
 
     public function test_search_snapshot_filters_wib_dates_and_csv_selection_match_the_list(): void
@@ -182,7 +183,7 @@ class AdminOrdersRestorationTest extends TestCase
         $paymentId = DB::table('payment_transactions')->insertGetId([
             'order_id' => $id, 'gateway_code' => 'MIDTRANS', 'channel_code' => 'QRIS', 'amount_idr' => 15000,
             'status' => 'PENDING', 'merchant_reference' => 'CHECK-ORDER-REGRESSION',
-            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(), 'created_at' => now(), 'updated_at' => now(),
+            'idempotency_key' => (string) Str::uuid(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         IntegrationCredential::updateOrCreate(['code' => 'midtrans'], ['is_active' => true, 'config_ciphertext' => ['server_key' => 'regression-fixture-only', 'is_production' => false]]);
         Queue::fake();

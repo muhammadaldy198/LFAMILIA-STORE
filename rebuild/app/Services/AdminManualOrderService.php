@@ -25,6 +25,7 @@ class AdminManualOrderService
                 if (! hash_equals($snapshot['manual_request_hash'] ?? '', $fingerprint)) {
                     throw ValidationException::withMessages(['order' => 'Permintaan ini sudah digunakan untuk pesanan berbeda. Buka formulir baru.']);
                 }
+
                 return (int) $existing->id;
             }
             // Private references satisfy catalog foreign keys without offering these ad-hoc orders in the shop.
@@ -64,6 +65,7 @@ class AdminManualOrderService
                 'created_at' => now(),
             ]);
             app(FulfillmentService::class)->startOrder($id);
+
             return $id;
         }, 3);
     }

@@ -182,6 +182,4 @@ jobs:
         run: bash tests/Browser/smoke.sh
 
       - name: Check PHP style
-        run: |
-          vendor/bin/pint
-          git diff -- app/Http/Controllers/AdminOrdersController.php app/Http/Controllers/PaymentWebhookController.php app/Services/AdminManualOrderService.php app/Services/AdminOrderPresentation.php app/Services/MidtransStatusVerification.php tests/Feature/AdminOrdersRestorationTest.php
+        run: vendor/bin/pint --test

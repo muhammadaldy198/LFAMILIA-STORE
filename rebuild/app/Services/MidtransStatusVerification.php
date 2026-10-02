@@ -10,6 +10,7 @@ class MidtransStatusVerification
     {
         $status = strtolower((string) $payload['transaction_status']);
         $fraud = strtolower((string) ($payload['fraud_status'] ?? ''));
+
         return match ($status) {
             'settlement' => 'PAID',
             'capture' => in_array($fraud, ['', 'accept'], true) ? 'PAID' : 'PENDING',
@@ -26,6 +27,7 @@ class MidtransStatusVerification
         if (! preg_match('/^(\\d+)(?:\\.0+)?$/', $string, $matches)) {
             throw ValidationException::withMessages(['payment' => 'Nominal pembayaran tidak dapat diverifikasi.']);
         }
+
         return (int) $matches[1];
     }
 }
