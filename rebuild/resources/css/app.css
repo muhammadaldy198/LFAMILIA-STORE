@@ -5960,3 +5960,11 @@
 .lf-admin-content .text-emerald-300,.lf-admin-content .text-green-300{color:#047857!important}
 .lf-admin-content .text-amber-200{color:#a16207!important}
 .lf-admin-content button.bg-slate-700{background:#f8fafc!important;border:1px solid #dfe5ed;color:#26364f!important}
+
+/* Footer artwork follows the visible customer slot, independent of source dimensions. */
+.lf-customer .lf-footer-banner img{
+  left:0!important;top:0!important;transform:none!important;
+  width:100%!important;height:100%!important;min-height:0!important;
+  max-height:none!important;aspect-ratio:auto!important;
+  object-fit:cover!important;object-position:center!important;
+}
