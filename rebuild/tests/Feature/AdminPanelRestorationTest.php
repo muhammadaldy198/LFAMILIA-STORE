@@ -221,6 +221,21 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame('MANUAL', $product->fresh()->fulfillment_mode);
     }
 
+    public function test_product_cannot_be_activated_without_any_nominal(): void
+    {
+        $this->login();
+        $product = $this->product();
+        $product->update(['is_active' => false]);
+
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $product->category_id, 'name' => $product->name, 'slug' => $product->slug,
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10,
+            'sort_order' => 0, 'is_active' => true,
+        ])->assertSessionHasErrors('is_active');
+
+        $this->assertFalse($product->fresh()->is_active);
+    }
+
     public function test_manual_nominal_can_be_duplicated_and_catalog_deletes_protect_order_history(): void
     {
         $this->login();
