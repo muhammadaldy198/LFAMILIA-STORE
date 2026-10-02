@@ -213,6 +213,12 @@ class FulfillmentService
         if (! $attempt || ! in_array($attempt->status, ['PENDING', 'UNKNOWN', 'SENDING'], true)) {
             return;
         }
+        if (DB::table('fulfillment_attempts')
+            ->where('order_id', $attempt->order_id)
+            ->where('id', '>', $attempt->id)
+            ->exists()) {
+            return;
+        }
 
         $mapping = $this->mapping((int) $attempt->provider_mapping_id);
         if ($mapping?->provider_code === 'VOUCHER_STOCK') {
