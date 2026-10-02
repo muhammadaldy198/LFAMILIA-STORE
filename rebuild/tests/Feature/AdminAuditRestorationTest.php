@@ -164,6 +164,69 @@ class AdminAuditRestorationTest extends TestCase
         $this->assertSame(30, DB::table('audit_logs')->count());
     }
 
+    public function test_end_date_filter_works_without_a_start_date(): void
+    {
+        DB::table('audit_logs')->delete();
+        $owner = $this->login();
+
+        $this->insertAudit(
+            $owner,
+            'provider.updated',
+            'provider',
+            'old',
+            null,
+            ['name' => 'Old'],
+            now()->subDays(2)->format('Y-m-d H:i:s'),
+        );
+        $this->insertAudit(
+            $owner,
+            'provider.updated',
+            'provider',
+            'today',
+            null,
+            ['name' => 'Today'],
+            now()->format('Y-m-d H:i:s'),
+        );
+
+        $this->get('/admin/audit?date_to='.now()->subDay()->format('Y-m-d'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('logs.total', 1)
+                ->where('logs.data.0.target_id', 'old')
+                ->where('filters.date_from', '')
+                ->where('filters.date_to', now()->subDay()->format('Y-m-d')));
+    }
+
+    public function test_system_actor_role_is_normalized_and_filterable(): void
+    {
+        DB::table('audit_logs')->delete();
+        $this->login();
+
+        DB::table('audit_logs')->insert([
+            'actor_type' => 'system',
+            'actor_id' => null,
+            'actor_role' => 'PROVIDER_SYNC',
+            'action' => 'digiflazz.product.synced',
+            'target_type' => 'product',
+            'target_id' => '77',
+            'before' => null,
+            'after' => json_encode(['count' => 3], JSON_THROW_ON_ERROR),
+            'ip_address' => null,
+            'user_agent' => null,
+            'correlation_id' => 'system-provider-sync-test',
+            'created_at' => now(),
+        ]);
+
+        $this->get('/admin/audit?role=SYSTEM')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('logs.total', 1)
+                ->where('logs.data.0.actor.name', 'Sistem')
+                ->where('logs.data.0.actor.role', 'SYSTEM')
+                ->where('logs.data.0.actor.id', null)
+                ->where('filters.role', 'SYSTEM'));
+    }
+
     public function test_legacy_scalar_text_payload_is_not_rendered_back_to_browser(): void
     {
         DB::table('audit_logs')->delete();
