@@ -201,7 +201,7 @@ class AdminCatalogController
         $id = $category->id;
         $category->clearMediaCollection('image');
         $category->delete();
-        $audit->record($request, 'catalog.category.deleted', 'category', $id, $before, null);
+        $audit->record($request, 'catalog.category.deleted', 'category', $id, $before, []);
 
         return back();
     }
