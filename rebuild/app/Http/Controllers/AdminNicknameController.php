@@ -234,7 +234,7 @@ class AdminNicknameController
     }
 
     /**
-     * @return array{name:string,code:string,requires_server:bool,requires_region_check:bool,is_active:bool,sort_order?:int}
+     * @return array{name:string,code:string,supports_nickname_check:bool,requires_server:bool,requires_region_check:bool,is_active:bool,sort_order?:int}
      */
     private function validatedGameCode(Request $request, ?NicknameGameCode $gameCode = null): array
     {
