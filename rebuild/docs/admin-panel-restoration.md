@@ -12,7 +12,7 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 | Digiflazz | Dedicated operational monitor, connection state, owner-only balance, normal/warning/critical summary, search/category/product/brand/health filters, mapped/all scope, stock, buyer/seller status, cut-off, multi, baseline, recent transactions, per-SKU/all sync, configurable auto-sync interval and warning thresholds |
 | Validasi Akun | Game codes, game nickname, MLBB region, PLN checks |
 | Provider | Daftar provider dengan nama/keterangan/urutan/status yang dapat diubah, ringkasan kesehatan dan transaksi, serta inventaris mapping nominal tanpa menggandakan editor SKU/harga/margin di menu Produk |
-| Pembayaran | Manual QRIS and confirmation, page editor, gateway/channel fees/routing, minimum wallet topup |
+| Pembayaran | Metode pembayaran editable (nama/deskripsi/logo/biaya/urutan), gateway & maintenance, routing pesanan/top up khusus Super Admin, QRIS manual & konfirmasi, editor halaman pembayaran, transaksi dengan filter/pagination, callback URL, serta master toggle dan minimum top up saldo |
 | Pelanggan | Search, pagination, membership, owner-only balance adjustments, order/ledger history |
 | Promo | Vouchers with scope/quota/dates, popular products |
 | Layanan Pelanggan | Conversation/status/reply, editable quick replies |
@@ -35,6 +35,10 @@ The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile
 - Input keys used by nickname or delivery templates cannot be removed until their references are changed.
 - Provider responses expose buyer catalog data; seller rating/SLA and marketplace seller selection are not provided by this endpoint and are not fabricated.
 - Activation links are time-limited and single-use; the owner selects a password. No public self-registration grants admin privileges.
+- Customer memilih metode pembayaran, bukan gateway internal. Routing metode ke Midtrans/DOKU dikontrol Super Admin; nama gateway tidak diekspos ke customer.
+- Routing pesanan dan top up saldo dipisahkan agar satu metode dapat memakai gateway berbeda sesuai tujuan tanpa pilihan gateway di frontend.
+- Top up saldo memiliki master toggle; ketika OFF, daftar metode top up disembunyikan dan backend menolak quote/create.
+- Kredensial/secret tetap hanya disimpan di menu Integrasi dan ditolak dari konfigurasi routing.
 - Live payment/provider transactions require configured integrations and a separate live test. HTTP fakes in regression tests do not prove external service health.
 
 ## Verification
