@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\CheckoutPricing;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
+use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Cache;
@@ -338,6 +339,90 @@ class AdminPanelRestorationTest extends TestCase
             ->where('product.package_tabs', ['Pass', 'Diamonds'])
             ->where('packages.0.group_name', 'Diamonds')
             ->where('packages.1.group_name', 'Pass'));
+    }
+
+    public function test_voucher_stock_is_editable_encrypted_and_delivered_once(): void
+    {
+        Queue::fake();
+        $this->login();
+        $product = $this->product();
+        $package = ProductPackage::create([
+            'product_id' => $product->id,
+            'code' => 'STOCK10',
+            'name' => 'Kode Digital 10',
+            'sort_order' => 0,
+            'is_active' => true,
+        ]);
+
+        $this->post('/admin/catalog/packages/'.$package->id.'/voucher-stock', [
+            'stock_key' => 'digital.kode-10',
+            'cost_idr' => 5000,
+            'priority' => 0,
+            'is_active' => true,
+            'codes_text' => "SECRET-CODE-001\nSECRET-CODE-002\nSECRET-CODE-001",
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $provider = Provider::where('code', 'VOUCHER_STOCK')->firstOrFail();
+        $mapping = ProviderMapping::where('product_package_id', $package->id)
+            ->where('provider_id', $provider->id)
+            ->firstOrFail();
+        $this->assertSame('digital.kode-10', data_get($mapping->fulfillment_config, 'stock_key'));
+        $this->assertSame(2, DB::table('voucher_stock_codes')->where('stock_key', 'digital.kode-10')->count());
+        $this->assertSame(2, DB::table('voucher_stock_codes')->where('status', 'AVAILABLE')->count());
+        $this->assertDatabaseMissing('voucher_stock_codes', ['code_ciphertext' => 'SECRET-CODE-001']);
+
+        $quote = app(CheckoutPricing::class)->forPackage($package->id);
+        $this->assertSame('VOUCHER_STOCK', $quote['provider_code']);
+
+        $snapshot = [
+            'product' => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'fulfillment_mode' => 'AUTO_PROVIDER',
+            ],
+            'package' => ['id' => $package->id, 'name' => $package->name],
+            'provider' => [
+                'mapping_id' => $mapping->id,
+                'code' => 'VOUCHER_STOCK',
+                'sku' => $mapping->external_sku,
+                'cost_idr' => 5000,
+                'max_price_idr' => null,
+            ],
+            'pricing' => ['cost_idr' => 5000, 'total_idr' => 5500],
+            'customer_input' => [],
+        ];
+        $orderId = DB::table('orders')->insertGetId([
+            'order_number' => 'STOCK-'.bin2hex(random_bytes(6)),
+            'product_id' => $product->id,
+            'product_package_id' => $package->id,
+            'provider_mapping_id' => $mapping->id,
+            'status' => 'PAID',
+            'currency' => 'IDR',
+            'customer_input' => '{}',
+            'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR),
+            'cost_idr' => 5000,
+            'margin_idr' => 500,
+            'discount_idr' => 0,
+            'fee_idr' => 0,
+            'total_idr' => 5500,
+            'idempotency_key' => bin2hex(random_bytes(20)),
+            'paid_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $service->sendAttempt((int) $attempt->id);
+        $service->sendAttempt((int) $attempt->id);
+
+        $order = DB::table('orders')->where('id', $orderId)->first();
+        $delivery = json_decode((string) $order->delivery_payload, true);
+        $this->assertSame('SUCCESS', $order->status);
+        $this->assertContains($delivery['code'], ['SECRET-CODE-001', 'SECRET-CODE-002']);
+        $this->assertSame(1, DB::table('voucher_stock_codes')->where('order_id', $orderId)->where('status', 'DELIVERED')->count());
+        $this->assertSame(1, DB::table('voucher_stock_codes')->where('stock_key', 'digital.kode-10')->where('status', 'AVAILABLE')->count());
     }
 
     public function test_fixed_sell_price_below_cost_is_rejected(): void
