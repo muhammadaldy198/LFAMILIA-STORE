@@ -10,9 +10,11 @@ import { Input } from '../../Components/ui/input';
 const props = defineProps({
     integrations: { type: Array, default: () => [] },
     summary: { type: Object, default: () => ({}) },
+    callbackUrls: { type: Object, default: () => ({}) },
 });
 
 const selectedCode = ref(props.integrations[0]?.code || '');
+const copiedCallback = ref('');
 
 const toItem = (item) => ({
     ...item,
@@ -62,6 +64,19 @@ const testedAt = (value) => {
     if (Number.isNaN(date.getTime())) return 'Waktu tes tidak tersedia';
     return 'Terakhir dites ' + date.toLocaleString('id-ID');
 };
+
+async function copyCallback(key, value) {
+    if (!value) return;
+    try {
+        await navigator.clipboard.writeText(value);
+        copiedCallback.value = key;
+        window.setTimeout(() => {
+            if (copiedCallback.value === key) copiedCallback.value = '';
+        }, 1800);
+    } catch {
+        copiedCallback.value = '';
+    }
+}
 
 function save(item) {
     router.put('/admin/integrations/' + encodeURIComponent(item.code), {
@@ -182,6 +197,35 @@ async function testConnection(item) {
                     <p class="mt-2 text-2xl font-semibold">{{ completeCount }}/{{ items.length }}</p>
                 </Card>
             </div>
+
+            <Card class="p-4">
+                <div>
+                    <h2 class="text-lg font-semibold">Callback & Redirect</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Gunakan alamat berikut pada dashboard provider terkait. Nilai mengikuti alamat aplikasi saat ini dan tidak berisi kredensial.
+                    </p>
+                </div>
+                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                    <div
+                        v-for="(value, key) in callbackUrls"
+                        :key="key"
+                        class="rounded-md border p-3"
+                    >
+                        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {{ key === 'midtrans' ? 'Midtrans Notification'
+                                : key === 'doku' ? 'DOKU Notification'
+                                : key === 'digiflazz' ? 'Digiflazz Webhook'
+                                : 'Google OAuth Callback' }}
+                        </p>
+                        <div class="mt-2 flex items-center gap-2">
+                            <code class="min-w-0 flex-1 break-all text-xs">{{ value }}</code>
+                            <Button type="button" size="sm" variant="outline" @click="copyCallback(key, value)">
+                                {{ copiedCallback === key ? 'Tersalin' : 'Salin' }}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </Card>
 
             <nav class="flex max-w-full gap-1 overflow-x-auto rounded-lg border p-1" aria-label="Daftar integrasi">
                 <Button
