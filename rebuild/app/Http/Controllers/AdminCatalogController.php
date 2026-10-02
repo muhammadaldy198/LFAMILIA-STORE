@@ -57,7 +57,7 @@ class AdminCatalogController
         $data = $request->validate([
             'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
-            'fulfillment_mode' => ['required', Rule::in(['AUTO_PROVIDER', 'MANUAL'])],
+            'fulfillment_mode' => ['sometimes', Rule::in(['AUTO_PROVIDER', 'MANUAL'])],
             'manual_instructions' => ['nullable', 'string', 'max:5000'],
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
@@ -166,11 +166,13 @@ class AdminCatalogController
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
+            'slug' => ['sometimes', 'required', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
                 Rule::unique('categories', 'slug')->ignore($category->id)],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
         ]);
+        $data['slug'] ??= $category->slug;
+
         DB::transaction(function () use ($request, $category, $data, $audit): void {
             $before = $category->toArray();
             $category->update($data);
@@ -242,7 +244,7 @@ class AdminCatalogController
         $data = $request->validate([
             'category_id' => ['required', 'integer', Rule::exists('categories', 'id')],
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
+            'slug' => ['sometimes', 'required', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
                 Rule::unique('products', 'slug')->ignore($product->id)],
             'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
@@ -258,6 +260,9 @@ class AdminCatalogController
             'nickname_user_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
             'nickname_server_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
         ]);
+        $data['slug'] ??= $product->slug;
+        $data['fulfillment_mode'] ??= $product->fulfillment_mode;
+
         if ($data['fulfillment_mode'] !== $product->fulfillment_mode
             && ($product->packages()->exists() || DB::table('orders')->where('product_id', $product->id)->exists())) {
             throw ValidationException::withMessages([
