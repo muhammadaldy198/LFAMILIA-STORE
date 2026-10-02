@@ -91,11 +91,11 @@ class SupportTicketController
         $data = $request->validate([
             'message' => ['required', 'string', 'max:5000'],
         ]);
-        $record = SupportTicket::where('user_id', $request->user()->id)
-            ->whereKey($ticket)->firstOrFail();
-        abort_if($record->status === 'CLOSED', 422, 'Tiket sudah ditutup.');
+        $record = DB::transaction(function () use ($request, $ticket, $data): SupportTicket {
+            $record = SupportTicket::where('user_id', $request->user()->id)
+                ->whereKey($ticket)->lockForUpdate()->firstOrFail();
+            abort_if($record->status === 'CLOSED', 422, 'Tiket sudah ditutup.');
 
-        DB::transaction(function () use ($request, $record, $data): void {
             DB::table('support_ticket_messages')->insert([
                 'support_ticket_id' => $record->id,
                 'sender_type' => 'CUSTOMER',
@@ -106,7 +106,9 @@ class SupportTicketController
                 'updated_at' => now(),
             ]);
             $record->forceFill(['status' => 'OPEN'])->save();
-        });
+
+            return $record;
+        }, 3);
 
         $notifications->record(
             'support.ticket.replied',
