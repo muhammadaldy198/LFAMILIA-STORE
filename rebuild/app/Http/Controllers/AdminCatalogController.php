@@ -256,6 +256,12 @@ class AdminCatalogController
             'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'fulfillment_mode' => ['sometimes', Rule::in(['AUTO_PROVIDER', 'MANUAL'])],
+            'initials' => ['nullable', 'string', 'max:4'],
+            'accent_color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'instant' => ['sometimes', 'boolean'],
+            'package_tabs_enabled' => ['sometimes', 'boolean'],
+            'package_tabs' => ['sometimes', 'array', 'max:20'],
+            'package_tabs.*' => ['required', 'string', 'min:1', 'max:60'],
             'manual_instructions' => ['nullable', 'string', 'max:5000'],
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
@@ -336,16 +342,6 @@ class AdminCatalogController
             $data['manual_timezone'] = 'Asia/Jakarta';
         } else {
             $data['manual_timezone'] = ($data['manual_timezone'] ?? null) ?: 'Asia/Jakarta';
-        }
-
-        if ($product->package_tabs_enabled) {
-            $group = trim((string) ($data['group_name'] ?? ''));
-            $tabs = collect($product->package_tabs ?? []);
-            if ($group === '' || ! $tabs->contains($group)) {
-                throw ValidationException::withMessages([
-                    'group_name' => 'Pilih grup yang tersedia pada tab nominal produk.',
-                ]);
-            }
         }
 
         DB::transaction(function () use ($request, $product, $data, $audit): void {
@@ -471,6 +467,16 @@ class AdminCatalogController
             'cost_idr' => [$product->fulfillment_mode === 'MANUAL' ? 'required' : 'nullable',
                 'integer', 'min:0'],
         ]);
+
+        if ($product->package_tabs_enabled) {
+            $group = trim((string) ($data['group_name'] ?? ''));
+            $tabs = collect($product->package_tabs ?? []);
+            if ($group === '' || ! $tabs->contains($group)) {
+                throw ValidationException::withMessages([
+                    'group_name' => 'Pilih grup yang tersedia pada tab nominal produk.',
+                ]);
+            }
+        }
 
         DB::transaction(function () use ($request, $product, $data, $audit): void {
             $package = $product->packages()->create([
