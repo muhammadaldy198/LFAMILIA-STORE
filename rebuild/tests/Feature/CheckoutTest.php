@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\IntegrationCredential;
+use App\Models\NicknameGameCode;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -22,6 +23,12 @@ class CheckoutTest extends TestCase
     private function catalog(array $productOverrides = []): array
     {
         $category = Category::where('slug', 'game')->firstOrFail();
+
+        if (($productOverrides['nickname_check_enabled'] ?? false) === true && ! empty($productOverrides['nickname_game_code'])) {
+            NicknameGameCode::where('code', $productOverrides['nickname_game_code'])
+                ->update(['supports_nickname_check' => true]);
+        }
+
         DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         DB::table('payment_gateways')->where('code', 'MANUAL_QRIS')->update(['is_active' => true]);
         DB::table('payment_channels')->where('code', 'manual_qris')->update(['is_active' => true]);
