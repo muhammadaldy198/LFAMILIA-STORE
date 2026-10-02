@@ -221,6 +221,47 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame('MANUAL', $product->fresh()->fulfillment_mode);
     }
 
+    public function test_product_display_controls_and_package_tabs_are_configurable_and_reach_customer_frontend(): void
+    {
+        $this->login();
+        $product = $this->product('MANUAL');
+        $product->update(['is_active' => false]);
+        $provider = Provider::where('code', 'MANUAL')->firstOrFail();
+        $provider->update(['is_active' => true]);
+
+        foreach ([['A', 'Diamond 10', 'Diamonds', 10000], ['B', 'Weekly Pass', 'Pass', 20000]] as [$code, $name, $group, $cost]) {
+            $package = ProductPackage::create([
+                'product_id' => $product->id, 'code' => $code, 'name' => $name,
+                'group_name' => $group, 'sort_order' => $code === 'A' ? 0 : 1, 'is_active' => true,
+            ]);
+            ProviderMapping::create([
+                'product_package_id' => $package->id, 'provider_id' => $provider->id,
+                'cost_idr' => $cost, 'priority' => 0, 'is_active' => true,
+            ]);
+        }
+
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $product->category_id, 'name' => $product->name, 'slug' => $product->slug,
+            'fulfillment_mode' => 'MANUAL', 'margin_percent' => 10, 'sort_order' => 0, 'is_active' => true,
+            'initials' => 'RT', 'accent_color' => '#123456', 'instant' => true,
+            'package_tabs_enabled' => true, 'package_tabs' => ['Pass', 'Diamonds'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->get('/')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('products.data', fn ($products) => collect($products)->contains(fn ($row) =>
+                $row['slug'] === $product->slug
+                && $row['initials'] === 'RT'
+                && $row['accent_color'] === '#123456'
+                && $row['instant'] === true
+            )));
+
+        $this->get('/catalog/'.$product->slug)->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('product.package_tabs_enabled', true)
+            ->where('product.package_tabs', ['Pass', 'Diamonds'])
+            ->where('packages.0.group_name', 'Diamonds')
+            ->where('packages.1.group_name', 'Pass'));
+    }
+
     public function test_fixed_sell_price_below_cost_is_rejected(): void
     {
         $this->login();

@@ -44,7 +44,7 @@ class CatalogController
             ->orderBy('sort_order')->orderBy('name')->paginate(24)
             ->withQueryString()
             ->through(fn (Product $product): array => [
-                ...$product->only('name', 'slug'),
+                ...$product->only('name', 'slug', 'initials', 'accent_color', 'instant'),
                 'category_name' => $product->category->name,
                 'category_slug' => $product->category->slug,
                 'image_url' => $product->getFirstMediaUrl('image'),
@@ -62,7 +62,7 @@ class CatalogController
             ->limit(8)
             ->get()
             ->map(fn (Product $product): array => [
-                ...$product->only('name', 'slug', 'popular'),
+                ...$product->only('name', 'slug', 'popular', 'initials', 'accent_color', 'instant'),
                 'category_name' => $product->category->name,
                 'category_slug' => $product->category->slug,
                 'image_url' => $product->getFirstMediaUrl('image'),
@@ -159,7 +159,8 @@ class CatalogController
 
         return Inertia::render('Catalog/Show', [
             'product' => [
-                ...$product->only('id', 'name', 'publisher', 'slug', 'description', 'nickname_check_enabled'),
+                ...$product->only('id', 'name', 'publisher', 'slug', 'description', 'nickname_check_enabled',
+                    'package_tabs_enabled', 'package_tabs'),
                 'category_name' => $product->category->name,
                 'category_slug' => $product->category->slug,
                 'image_url' => $product->getFirstMediaUrl('image'),

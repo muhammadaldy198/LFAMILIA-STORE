@@ -111,7 +111,9 @@ const deleteCategory = (item) => {
 };
 const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
     category_id: item.category_id, name: item.name, slug: item.slug, publisher: item.publisher || '', description: item.description,
-    fulfillment_mode: item.fulfillment_mode, manual_instructions: item.manual_instructions, manual_open_time: item.manual_open_time || null,
+    fulfillment_mode: item.fulfillment_mode, initials: item.initials || null, accent_color: item.accent_color || null,
+    instant: Boolean(item.instant), package_tabs_enabled: Boolean(item.package_tabs_enabled), package_tabs: item.package_tabs || [],
+    manual_instructions: item.manual_instructions, manual_open_time: item.manual_open_time || null,
     manual_close_time: item.manual_close_time || null, manual_timezone: item.manual_timezone || 'Asia/Jakarta',
     margin_percent: item.margin_percent,
     sort_order: item.sort_order, is_active: item.is_active,
@@ -243,6 +245,17 @@ const deleteNotice = (notice) => {
                         <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk / card</strong><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
                         <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Banner halaman produk</strong><div class="mt-2"><AdminMediaControl type="product" :id="item.id" collection="banner" :url="item.banner_url" /></div></div>
                     </div>
+                    <Card class="space-y-3 p-4">
+                        <div><h3 class="font-semibold">Tampilan tanpa gambar & tab nominal</h3><p class="mt-1 text-xs text-muted-foreground">Pengaturan ini langsung dipakai customer frontend, bukan sekadar catatan admin.</p></div>
+                        <div class="grid gap-3 md:grid-cols-2">
+                            <label class="text-sm">Inisial fallback<Input v-model="item.initials" maxlength="4" placeholder="Contoh: ML" class="mt-1" /></label>
+                            <label class="text-sm">Warna aksen fallback<Input v-model="item.accent_color" maxlength="7" placeholder="#1769e8" class="mt-1" /></label>
+                            <label class="flex items-center gap-2 text-sm"><input v-model="item.instant" type="checkbox"> Tampilkan label Instan</label>
+                            <label class="flex items-center gap-2 text-sm"><input v-model="item.package_tabs_enabled" type="checkbox"> Gunakan tab untuk grup nominal</label>
+                            <label v-if="item.package_tabs_enabled" class="text-sm md:col-span-2">Urutan tab nominal<Input :model-value="(item.package_tabs||[]).join(', ')" placeholder="Contoh: Diamonds, Weekly Pass" class="mt-1" @change="item.package_tabs=String($event.target.value).split(',').map(v=>v.trim()).filter(Boolean)" /><span class="mt-1 block text-xs text-muted-foreground">Pisahkan dengan koma. Nama harus sama dengan Grup / Tabel pada nominal.</span></label>
+                        </div>
+                        <Button type="button" variant="outline" @click="saveProduct(item)">Simpan tampilan produk</Button>
+                    </Card>
                     <div class="space-y-3 rounded-md border border-slate-200 bg-white p-4">
                         <div><h3 class="font-semibold">Notice produk</h3><p class="mt-1 text-xs text-slate-500">Informasi publik yang tampil di checkout, terpisah dari instruksi fulfillment internal.</p></div>
                         <article v-for="notice in item.notices" :key="notice.id" class="grid gap-2 rounded border border-slate-200 p-3 md:grid-cols-[1fr_110px_auto]">

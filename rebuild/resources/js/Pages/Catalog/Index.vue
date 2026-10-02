@@ -115,7 +115,7 @@ onUnmounted(()=>{
                     <Link v-for="(x,i) in popular" :key="x.slug" :href="'/catalog/'+x.slug" class="lf-popular-card" :class="'tone-'+(i%8)">
                         <span class="lf-popular-art">
                             <img v-if="x.image_url" :src="x.image_url" :alt="x.name">
-                            <span v-else>{{initial(x.name)}}</span>
+                            <span v-else :style="x.accent_color?{background:x.accent_color}:undefined">{{x.initials||initial(x.name)}}</span>
                         </span>
                         <span class="min-w-0"><strong>{{x.name}}</strong><small>{{x.category_name}}</small></span>
                     </Link>
@@ -146,7 +146,8 @@ onUnmounted(()=>{
                 <div v-if="products.data.length" class="lf-products">
                     <Link v-for="x in products.data" :key="x.slug" :href="'/catalog/'+x.slug" class="lf-product">
                         <img v-if="x.image_url" :src="x.image_url" :alt="x.name">
-                        <span v-else class="lf-product-fallback"><strong>{{x.name}}</strong><small>{{x.category_name}}</small></span>
+                        <span v-else class="lf-product-fallback" :style="x.accent_color?{background:x.accent_color}:undefined"><strong>{{x.initials||x.name}}</strong><small>{{x.category_name}}</small></span>
+                        <span v-if="x.instant" class="absolute right-2 top-2 z-10 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">Instan</span>
                     </Link>
                 </div>
                 <p v-else class="mt-6 text-center text-sm text-white/40">{{ customerText("pages.catalog.index.3b98f425", "Produk tidak ditemukan.") }}</p>

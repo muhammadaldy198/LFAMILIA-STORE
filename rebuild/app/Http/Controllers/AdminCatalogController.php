@@ -58,6 +58,12 @@ class AdminCatalogController
             'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'fulfillment_mode' => ['sometimes', Rule::in(['AUTO_PROVIDER', 'MANUAL'])],
+            'initials' => ['nullable', 'string', 'max:4'],
+            'accent_color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'instant' => ['sometimes', 'boolean'],
+            'package_tabs_enabled' => ['sometimes', 'boolean'],
+            'package_tabs' => ['sometimes', 'array', 'max:20'],
+            'package_tabs.*' => ['required', 'string', 'min:1', 'max:60'],
             'manual_instructions' => ['nullable', 'string', 'max:5000'],
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
@@ -106,6 +112,7 @@ class AdminCatalogController
             'products' => Product::with(['packages.mappings', 'fields', 'notices'])->orderBy('sort_order')->get()
                 ->map(fn (Product $product): array => [
                     ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
+                        'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
                         'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active',
                         'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
                         'nickname_server_field_key'),
@@ -263,6 +270,31 @@ class AdminCatalogController
         ]);
         $data['slug'] ??= $product->slug;
         $data['fulfillment_mode'] ??= $product->fulfillment_mode;
+        $data['package_tabs_enabled'] ??= $product->package_tabs_enabled;
+        $data['package_tabs'] ??= $product->package_tabs ?? [];
+
+        $tabs = collect($data['package_tabs'])->map(fn ($tab) => trim((string) $tab))
+            ->filter()->values();
+        if ($tabs->map(fn (string $tab): string => mb_strtolower($tab))->unique()->count() !== $tabs->count()) {
+            throw ValidationException::withMessages(['package_tabs' => 'Nama tab nominal tidak boleh duplikat.']);
+        }
+        $data['package_tabs'] = $tabs->all();
+
+        if ($data['package_tabs_enabled']) {
+            if ($tabs->isEmpty()) {
+                throw ValidationException::withMessages(['package_tabs' => 'Tambahkan minimal satu nama tab nominal.']);
+            }
+            $groups = $product->packages()->pluck('group_name')->map(fn ($group) => trim((string) $group));
+            if ($groups->contains('')) {
+                throw ValidationException::withMessages(['package_tabs' => 'Semua nominal harus memiliki grup sebelum tab nominal diaktifkan.']);
+            }
+            $missing = $groups->filter(fn (string $group): bool => ! $tabs->contains($group))->unique()->values();
+            if ($missing->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'package_tabs' => 'Grup nominal belum tercantum sebagai tab: '.$missing->implode(', ').'.',
+                ]);
+            }
+        }
 
         if ($data['fulfillment_mode'] !== $product->fulfillment_mode
             && ($product->packages()->exists() || DB::table('orders')->where('product_id', $product->id)->exists())) {
@@ -304,6 +336,16 @@ class AdminCatalogController
             $data['manual_timezone'] = 'Asia/Jakarta';
         } else {
             $data['manual_timezone'] = ($data['manual_timezone'] ?? null) ?: 'Asia/Jakarta';
+        }
+
+        if ($product->package_tabs_enabled) {
+            $group = trim((string) ($data['group_name'] ?? ''));
+            $tabs = collect($product->package_tabs ?? []);
+            if ($group === '' || ! $tabs->contains($group)) {
+                throw ValidationException::withMessages([
+                    'group_name' => 'Pilih grup yang tersedia pada tab nominal produk.',
+                ]);
+            }
         }
 
         DB::transaction(function () use ($request, $product, $data, $audit): void {
@@ -375,6 +417,17 @@ class AdminCatalogController
             'margin_fixed_idr' => ['nullable', 'integer', 'min:0', 'max:1000000000', 'required_if:pricing_mode,FIXED'],
             'sell_price_idr' => ['nullable', 'integer', 'min:1', 'max:1000000000', 'required_if:pricing_mode,SELL_PRICE'],
         ]);
+
+        $product = $package->product()->firstOrFail();
+        if ($product->package_tabs_enabled) {
+            $group = trim((string) ($data['group_name'] ?? $package->group_name ?? ''));
+            $tabs = collect($product->package_tabs ?? []);
+            if ($group === '' || ! $tabs->contains($group)) {
+                throw ValidationException::withMessages([
+                    'group_name' => 'Pilih grup yang tersedia pada tab nominal produk.',
+                ]);
+            }
+        }
 
         if (($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'
             && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) $package->mappings()->max('cost_idr')) {
