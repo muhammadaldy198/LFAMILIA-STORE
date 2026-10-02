@@ -139,7 +139,7 @@ class AdminAuditController
                 'ip_address' => $row->ip_address,
                 'user_agent' => $row->user_agent ? mb_substr((string) $row->user_agent, 0, 500) : null,
                 'correlation_id' => (string) $row->correlation_id,
-                'created_at' => $row->created_at,
+                'created_at' => Carbon::parse($row->created_at, config('app.timezone', 'UTC'))->toIso8601String(),
             ];
         });
 
