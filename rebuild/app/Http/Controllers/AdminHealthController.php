@@ -132,16 +132,29 @@ class AdminHealthController
             ->filter(fn (array $item): bool => $item['active'] && $item['status'] !== 'HEALTHY')
             ->count();
 
+        // Midtrans/DOKU maintenance is already represented by their active integration
+        // row. Count only gateway problems that are not already represented there so
+        // the summary stays actionable without double-counting the same condition.
+        $activeIntegrationCodes = collect($integrations)
+            ->filter(fn (array $item): bool => $item['active'])
+            ->map(fn (array $item): string => strtoupper((string) $item['code']))
+            ->all();
+        $gatewayAttention = collect($gateways)
+            ->filter(fn (array $gateway): bool => $gateway['active']
+                && $gateway['status'] !== 'HEALTHY'
+                && ! in_array(strtoupper((string) $gateway['code']), $activeIntegrationCodes, true))
+            ->count();
+
         $overall = $critical > 0
             ? 'DOWN'
-            : ($attention > 0 || $integrationAttention > 0 ? 'DEGRADED' : 'HEALTHY');
+            : ($attention > 0 || $integrationAttention > 0 || $gatewayAttention > 0 ? 'DEGRADED' : 'HEALTHY');
 
         return Inertia::render('Admin/Health', [
             'summary' => [
                 'overall' => $overall,
                 'healthy_core' => collect($checks)->where('status', 'HEALTHY')->count(),
                 'core_total' => count($checks),
-                'attention' => $attention + $integrationAttention,
+                'attention' => $attention + $integrationAttention + $gatewayAttention,
                 'failed_jobs' => $failedJobs,
                 'stale_fulfillment' => $staleFulfillment,
             ],
