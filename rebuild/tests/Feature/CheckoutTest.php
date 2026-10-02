@@ -191,6 +191,10 @@ class CheckoutTest extends TestCase
 
     public function test_nickname_service_outage_warns_but_does_not_block_checkout(): void
     {
+        DB::table('nickname_game_codes')
+            ->where('code', 'mobile-legends')
+            ->update(['supports_nickname_check' => true]);
+
         $catalog = $this->catalog([
             'nickname_check_enabled' => true,
             'nickname_game_code' => 'mobile-legends',
@@ -229,6 +233,10 @@ class CheckoutTest extends TestCase
 
     public function test_verified_invalid_nickname_is_rejected(): void
     {
+        DB::table('nickname_game_codes')
+            ->where('code', 'free-fire')
+            ->update(['supports_nickname_check' => true]);
+
         $catalog = $this->catalog([
             'nickname_check_enabled' => true,
             'nickname_game_code' => 'free-fire',
