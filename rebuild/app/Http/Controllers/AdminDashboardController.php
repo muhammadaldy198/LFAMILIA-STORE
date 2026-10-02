@@ -59,7 +59,7 @@ class AdminDashboardController
         if ($finance) {
             $offset = Carbon::now($dbZone)->format('P');
             $dateSql = "DATE(CONVERT_TZ(orders.created_at, ?, '+07:00'))";
-            $daily = $period()->selectRaw($dateSql." AS day, COUNT(*) AS orders, SUM(CASE WHEN paid_at IS NOT NULL THEN total_idr ELSE 0 END) AS revenue_idr", [$offset])
+            $daily = $period()->selectRaw($dateSql.' AS day, COUNT(*) AS orders, SUM(CASE WHEN paid_at IS NOT NULL THEN total_idr ELSE 0 END) AS revenue_idr', [$offset])
                 ->groupBy('day')->get()->keyBy('day');
             for ($i = 0; $i < $days; $i++) {
                 $day = $first->copy()->addDays($i)->toDateString();

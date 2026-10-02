@@ -40,7 +40,7 @@ class AdminDashboardRestorationTest extends TestCase
             'order_number' => 'DASH-'.bin2hex(random_bytes(6)), 'product_id' => $product->id,
             'product_package_id' => $package->id, 'status' => $status, 'currency' => 'IDR',
             'customer_input' => '{}', 'snapshot' => json_encode(['product_name' => 'Snapshot Game', 'package_name' => 'Snapshot Diamonds', 'buyer_name' => 'Dashboard Guest']),
-            'cost_idr' => 9000, 'margin_idr' => 1000, 'total_idr' => $total,
+            'cost_idr' => $total - 1000, 'margin_idr' => 1000, 'total_idr' => $total,
             'paid_at' => in_array($status, ['SUCCESS', 'PAID', 'PROCESSING']) ? $createdAt : null,
             'idempotency_key' => bin2hex(random_bytes(16)), 'created_at' => $createdAt, 'updated_at' => $createdAt,
         ]);
