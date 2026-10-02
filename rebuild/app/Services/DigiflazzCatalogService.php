@@ -78,6 +78,15 @@ class DigiflazzCatalogService
                         ->update(['cost_idr' => $row['price_idr'], 'max_price_idr' => $row['price_idr'], 'updated_at' => now()]);
                 }
                 if ($sku === null) {
+                    foreach (DB::table('provider_mappings')->where('provider_id', $providerId)->whereNotNull('external_sku')
+                        ->whereNotIn('external_sku', array_column($clean, 'buyer_sku_code'))->get() as $missing) {
+                        DB::table('digiflazz_catalog_items')->insertOrIgnore([
+                            'buyer_sku_code' => $missing->external_sku, 'product_name' => $missing->external_sku,
+                            'price_idr' => max(1, (int) $missing->cost_idr), 'baseline_price_idr' => max(1, (int) $missing->cost_idr),
+                            'buyer_active' => false, 'seller_active' => false, 'unlimited_stock' => false,
+                            'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+                        ]);
+                    }
                     DB::table('digiflazz_catalog_items')->whereNotIn('buyer_sku_code', array_column($clean, 'buyer_sku_code'))
                         ->update(['buyer_active' => false, 'seller_active' => false, 'updated_at' => now()]);
                 }

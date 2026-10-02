@@ -90,7 +90,11 @@ class AdminDigiflazzController
                     'sort_order' => $order++, 'is_active' => false,
                     'pricing_mode' => 'PERCENT', 'margin_percent' => $data['margin_percent'],
                 ]);
-                $importer->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr);
+                try {
+                    $importer->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr);
+                } catch (\InvalidArgumentException $exception) {
+                    throw ValidationException::withMessages(['item_ids' => $exception->getMessage()]);
+                }
                 $audit->record($request, 'catalog.package.imported', 'product_package', $package->id, null, $package->toArray());
             }
         }, 3);

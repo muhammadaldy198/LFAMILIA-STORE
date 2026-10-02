@@ -31,8 +31,9 @@ const initialSearch = new URLSearchParams(page.url.split('?')[1] || '').get('q')
 const searchedProduct = products.value.find(item => item.name.toLowerCase().includes(initialSearch.toLowerCase()));
 const tab = ref(initialSearch && searchedProduct ? searchedProduct.fulfillment_mode : 'AUTO_PROVIDER');
 const selectedProductId = ref(null), editorTab = ref('info'), showCreateProduct = ref(false);
+const selectedPackageId=ref(null);
 const selectedProductItems = computed(() => products.value.filter(item => item.id === selectedProductId.value));
-const editProduct = item => { selectedProductId.value = item.id; editorTab.value = 'info'; showImport.value=false; importForm.item_ids=[]; };
+const editProduct = item => { selectedProductId.value = item.id; editorTab.value = 'info'; showImport.value=false; importForm.item_ids=[]; selectedPackageId.value=null; };
 const catalogTab = ref('products'), catalogSearch = ref(initialSearch), catalogPage = ref(1);
 const catalogTabs = [['products','Produk'],['categories','Kategori'],['fields','Kolom Data Akun'],['media','Media Toko']];
 const matchingProducts = computed(() => products.value.filter(item => item.fulfillment_mode === tab.value && (!catalogSearch.value || [item.name,item.slug,...item.packages.map(p => p.name)].join(' ').toLowerCase().includes(catalogSearch.value.toLowerCase()))));
@@ -265,9 +266,19 @@ const deleteNotice = (notice) => {
                             <div class="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" :disabled="importPage===1" @click="importPage--">Sebelumnya</Button><span class="text-sm">Halaman {{importPage}} / {{Math.max(1,Math.ceil(importMatches.length/25))}}</span><Button type="button" variant="outline" :disabled="importPage*25>=importMatches.length" @click="importPage++">Berikutnya</Button></div>
                             <Button type="button" :disabled="importForm.processing||!importForm.item_ids.length" @click="importForm.post('/admin/catalog/products/'+item.id+'/import',{preserveScroll:true,onSuccess:()=>{importForm.item_ids=[];showImport=false;}})">Impor {{importForm.item_ids.length}} nominal</Button>
                         </Card>
-                        <div v-for="(pack,packIndex) in item.packages" :key="pack.id" class="space-y-2 border-t border-slate-800 pt-3" draggable="true" @dragstart="draggedPackageId=pack.id" @dragover.prevent @drop.prevent="dropPackage(item,packIndex)">
+                        <Table><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>SKU / Modal</TableHead><TableHead>Harga jual</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody>
+                            <TableRow v-for="(pack,index) in item.packages" :key="pack.id" draggable="true" @dragstart="draggedPackageId=pack.id" @dragover.prevent @drop.prevent="dropPackage(item,index)">
+                                <TableCell><strong>{{pack.name}}</strong><p class="text-xs text-slate-500">{{pack.group_name||'-'}}</p></TableCell>
+                                <TableCell><p v-for="mapping in pack.mappings" :key="mapping.id" class="text-xs">{{mapping.external_sku||'Manual'}} · Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</p></TableCell>
+                                <TableCell>{{previewPrice(pack,item)}}</TableCell><TableCell>{{pack.is_active?'Aktif':'Nonaktif'}}</TableCell>
+                                <TableCell><div class="flex flex-wrap gap-2"><Button type="button" variant="outline" @click="selectedPackageId=pack.id">Edit nominal</Button><Button type="button" variant="outline" :disabled="index===0" @click="reorderPackage(item,index,-1)">Naik</Button><Button type="button" variant="outline" :disabled="index===item.packages.length-1" @click="reorderPackage(item,index,1)">Turun</Button></div></TableCell>
+                            </TableRow>
+                        </TableBody></Table>
+                        <p v-if="!item.packages.length" class="text-sm text-slate-500">Belum ada nominal. Tambahkan manual atau impor dari Digiflazz.</p>
+                        <div v-for="(pack,packIndex) in item.packages" v-show="selectedPackageId===pack.id" :key="pack.id" class="space-y-2 border-t border-slate-800 pt-3" draggable="true" @dragstart="draggedPackageId=pack.id" @dragover.prevent @drop.prevent="dropPackage(item,packIndex)">
                             <div class="flex flex-wrap items-end gap-2">
                                 <div class="flex gap-2"><Button type="button" variant="outline" :disabled="packIndex===0" @click="reorderPackage(item,packIndex,-1)">Naik</Button><Button type="button" variant="outline" :disabled="packIndex===item.packages.length-1" @click="reorderPackage(item,packIndex,1)">Turun</Button></div>
+                                <Button type="button" variant="outline" @click="selectedPackageId=null">Tutup editor nominal</Button>
                                 <label class="text-xs">Kode internal<Input v-model="pack.code" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Nama nominal<Input v-model="pack.name" class="mt-1 block rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Badge<Input v-model="pack.note" maxlength="80" placeholder="Contoh: Populer" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
