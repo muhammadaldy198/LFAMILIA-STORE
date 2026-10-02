@@ -21,7 +21,6 @@ class AdminSupportRestorationTest extends TestCase
         $admin = AdminUser::create([
             'name' => 'Support Admin',
             'email' => bin2hex(random_bytes(8)).'@example.test',
-            'phone' => '08'.random_int(1000000000, 9999999999),
             'password' => Hash::make('support-restoration-password'),
             'role' => $role,
             'permissions' => $role === 'SUPER_ADMIN' ? null : $permissions,
@@ -37,6 +36,7 @@ class AdminSupportRestorationTest extends TestCase
         return User::create([
             'name' => $name,
             'email' => bin2hex(random_bytes(8)).'@example.test',
+            'phone' => '081234567890',
             'password' => Hash::make('customer-support-password'),
             'membership_tier_code' => 'BASIC',
         ]);
