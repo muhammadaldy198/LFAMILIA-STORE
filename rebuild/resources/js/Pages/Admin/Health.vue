@@ -34,6 +34,12 @@ const statusVariant = (status) => {
     return 'outline';
 };
 
+const gatewayKindLabel = (kind) => ({
+    EXTERNAL: 'Eksternal',
+    MANUAL: 'Manual',
+    INTERNAL: 'Internal',
+}[kind] || kind || '—');
+
 const overallLabel = computed(() => statusLabel(props.summary?.overall));
 
 const formatDate = (value) => {
@@ -188,7 +194,7 @@ function refresh() {
                                         <strong class="text-sm">{{ gateway.name }}</strong>
                                         <p class="text-xs text-muted-foreground">{{ gateway.code }}</p>
                                     </TableCell>
-                                    <TableCell>{{ gateway.kind }}</TableCell>
+                                    <TableCell>{{ gatewayKindLabel(gateway.kind) }}</TableCell>
                                     <TableCell>
                                         <Badge :variant="statusVariant(gateway.status)">{{ statusLabel(gateway.status) }}</Badge>
                                     </TableCell>
