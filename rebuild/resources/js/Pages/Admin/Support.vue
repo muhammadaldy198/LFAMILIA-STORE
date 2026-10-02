@@ -141,7 +141,7 @@ function saveQuickReplies() {
             <div>
                 <h1 class="text-2xl font-semibold">Layanan Pelanggan</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Tangani tiket bantuan, komplain, pembayaran, refund, pesanan, dan percakapan pelanggan dari satu tempat.
+                    Tangani tiket bantuan, komplain, pembayaran, pengembalian dana, pesanan, dan percakapan pelanggan dari satu tempat.
                 </p>
             </div>
             <div class="flex gap-2">
