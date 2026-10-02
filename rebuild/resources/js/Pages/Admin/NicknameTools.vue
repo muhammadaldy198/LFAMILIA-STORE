@@ -36,13 +36,14 @@ const reorderBusy = ref(false);
 const form = reactive({
     name: '',
     code: '',
+    supports_nickname_check: false,
     requires_server: false,
     requires_region_check: false,
     is_active: true,
     sort_order: null,
 });
 
-const activeCodes = computed(() => codes.value.filter((item) => item.is_active));
+const activeCodes = computed(() => codes.value.filter((item) => item.is_active && item.supports_nickname_check));
 const regionCodes = computed(() => activeCodes.value.filter((item) => item.requires_region_check));
 const selectedGame = computed(() => codes.value.find((item) => item.code === gameCode.value) || null);
 const requiresServer = computed(() => Boolean(selectedGame.value?.requires_server));
@@ -153,6 +154,7 @@ function resetEditor() {
     editingId.value = null;
     form.name = '';
     form.code = '';
+    form.supports_nickname_check = false;
     form.requires_server = false;
     form.requires_region_check = false;
     form.is_active = true;
@@ -170,6 +172,7 @@ function editCode(item) {
     editingId.value = item.id;
     form.name = item.name;
     form.code = item.code;
+    form.supports_nickname_check = item.supports_nickname_check;
     form.requires_server = item.requires_server;
     form.requires_region_check = item.requires_region_check;
     form.is_active = item.is_active;
@@ -195,7 +198,12 @@ async function saveCode() {
     editorBusy.value = true;
     editorError.value = '';
 
-    if (form.requires_region_check) form.requires_server = true;
+    if (!form.supports_nickname_check) {
+        form.requires_server = false;
+        form.requires_region_check = false;
+    } else if (form.requires_region_check) {
+        form.requires_server = true;
+    }
 
     try {
         const payload = await requestJson(
@@ -205,6 +213,7 @@ async function saveCode() {
                 body: JSON.stringify({
                     name: form.name.trim(),
                     code: form.code.trim(),
+                    supports_nickname_check: form.supports_nickname_check,
                     requires_server: form.requires_server,
                     requires_region_check: form.requires_region_check,
                     is_active: form.is_active,
@@ -259,6 +268,7 @@ async function toggleCode(item) {
             body: JSON.stringify({
                 name: item.name,
                 code: item.code,
+                supports_nickname_check: item.supports_nickname_check,
                 requires_server: item.requires_server,
                 requires_region_check: item.requires_region_check,
                 is_active: !item.is_active,
@@ -374,7 +384,7 @@ if (activeCodes.value.length > 0) gameCode.value = activeCodes.value[0].code;
                 </label>
 
                 <div v-if="tab==='region'" class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-4 text-blue-800 sm:col-span-2">
-                    Hanya game aktif yang ditandai “Perlu cek region” yang tersedia pada pemeriksaan ini.
+                    Hanya game aktif yang mendukung cek nickname dan ditandai “Perlu cek region” yang tersedia pada pemeriksaan ini.
                 </div>
 
                 <div class="flex flex-wrap gap-2 border-t border-[#edf0f4] pt-4 sm:col-span-2">
@@ -444,13 +454,17 @@ if (activeCodes.value.length > 0) gameCode.value = activeCodes.value[0].code;
                     </label>
                 </div>
 
-                <div class="mt-3 grid gap-2 sm:grid-cols-3">
+                <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
-                        <input v-model="form.requires_server" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" :disabled="form.requires_region_check" />
+                        <input v-model="form.supports_nickname_check" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" @change="!form.supports_nickname_check && (form.requires_server=false, form.requires_region_check=false)" />
+                        Mendukung cek nickname
+                    </label>
+                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
+                        <input v-model="form.requires_server" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" :disabled="!form.supports_nickname_check || form.requires_region_check" />
                         Wajib Server / Zone
                     </label>
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
-                        <input v-model="form.requires_region_check" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" @change="form.requires_server = form.requires_server || form.requires_region_check" />
+                        <input v-model="form.requires_region_check" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" :disabled="!form.supports_nickname_check" @change="form.requires_server = form.requires_server || form.requires_region_check" />
                         Perlu cek region
                     </label>
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
@@ -474,6 +488,7 @@ if (activeCodes.value.length > 0) gameCode.value = activeCodes.value[0].code;
                             <TableHead class="w-[92px] px-3 py-2.5">Urutan</TableHead>
                             <TableHead class="px-3 py-2.5">Game</TableHead>
                             <TableHead class="px-3 py-2.5">Kode Game</TableHead>
+                            <TableHead class="px-3 py-2.5">Cek Nickname</TableHead>
                             <TableHead class="px-3 py-2.5">Server / Zone</TableHead>
                             <TableHead class="px-3 py-2.5">Region</TableHead>
                             <TableHead class="px-3 py-2.5">Status</TableHead>
@@ -491,6 +506,11 @@ if (activeCodes.value.length > 0) gameCode.value = activeCodes.value[0].code;
                             </TableCell>
                             <TableCell class="px-3 py-2.5 font-semibold text-[#34445f]">{{ item.name }}</TableCell>
                             <TableCell class="px-3 py-2.5 font-mono text-[#1769e8]">{{ item.code }}</TableCell>
+                            <TableCell class="px-3 py-2.5">
+                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.supports_nickname_check ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'">
+                                    {{ item.supports_nickname_check ? 'Didukung' : 'Tidak didukung' }}
+                                </span>
+                            </TableCell>
                             <TableCell class="px-3 py-2.5">
                                 <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.requires_server ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'">
                                     {{ item.requires_server ? 'Wajib' : 'Tidak' }}
@@ -517,7 +537,7 @@ if (activeCodes.value.length > 0) gameCode.value = activeCodes.value[0].code;
                             </TableCell>
                         </TableRow>
                         <TableRow v-if="filteredCodes.length===0">
-                            <TableCell colspan="8" class="px-4 py-10 text-center text-sm text-[#8190a5]">Tidak ada kode game yang cocok.</TableCell>
+                            <TableCell colspan="9" class="px-4 py-10 text-center text-sm text-[#8190a5]">Tidak ada kode game yang cocok.</TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
