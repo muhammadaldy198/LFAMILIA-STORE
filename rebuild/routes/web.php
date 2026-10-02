@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Controllers\AdminAccessController;
-use App\Http\Controllers\AdminAuditController;
 use App\Http\Controllers\AdminActivationController;
+use App\Http\Controllers\AdminAuditController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
 use App\Http\Controllers\AdminCatalogMediaController;
