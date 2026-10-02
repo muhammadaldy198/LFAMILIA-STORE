@@ -28,7 +28,7 @@ class AdminCatalogController
 {
     public function index(): Response
     {
-        $providers = Provider::all(['id', 'code', 'is_active'])->keyBy('id');
+        $providers = Provider::all(['id', 'code', 'display_name', 'is_active'])->keyBy('id');
         $stockCounts = app(VoucherStockService::class)->counts();
 
         return Inertia::render('Admin/Catalog', [
@@ -63,6 +63,7 @@ class AdminCatalogController
                             ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
                                 'max_price_idr', 'priority', 'is_active'),
                             'provider_code' => $providers->get($mapping->provider_id)?->code,
+                            'provider_name' => $providers->get($mapping->provider_id)?->display_name ?: $providers->get($mapping->provider_id)?->code,
                             'customer_no_template' => data_get($mapping->fulfillment_config, 'customer_no_template'),
                             'stock_key' => $providers->get($mapping->provider_id)?->code === 'VOUCHER_STOCK'
                                 ? data_get($mapping->fulfillment_config, 'stock_key') : null,

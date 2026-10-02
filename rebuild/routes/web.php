@@ -16,6 +16,7 @@ use App\Http\Controllers\AdminOrderDetailController;
 use App\Http\Controllers\AdminOrdersController;
 use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\AdminPresentationController;
+use App\Http\Controllers\AdminProviderController;
 use App\Http\Controllers\AdminSearchController;
 use App\Http\Controllers\AdminWorkspaceController;
 use App\Http\Controllers\CatalogController;
@@ -277,8 +278,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::put('/admin/digiflazz/baseline/{id}', [AdminDigiflazzController::class, 'baseline'])
             ->middleware('throttle:admin-sensitive');
 
-        Route::get('/admin/providers', [AdminWorkspaceController::class, 'providers'])->name('admin.providers');
-        Route::put('/admin/providers/{id}', [AdminWorkspaceController::class, 'updateProvider'])->name('admin.providers.update');
+        Route::get('/admin/providers', [AdminProviderController::class, 'index'])->name('admin.providers');
+        Route::put('/admin/providers/{provider}', [AdminProviderController::class, 'update'])->name('admin.providers.update');
     });
 
     Route::get('/admin/orders/export', [AdminOrdersController::class, 'export'])
