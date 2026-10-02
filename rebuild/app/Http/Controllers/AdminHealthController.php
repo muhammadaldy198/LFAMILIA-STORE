@@ -123,7 +123,10 @@ class AdminHealthController
         $failedJobs = collect($checks)->firstWhere('key', 'failed_jobs')['count'] ?? null;
         $staleFulfillment = collect($checks)->firstWhere('key', 'fulfillment')['count'] ?? null;
 
-        $critical = collect($checks)->where('status', 'DOWN')->count();
+        $critical = collect($checks)->where('status', 'DOWN')->count()
+            + collect($integrations)
+                ->filter(fn (array $item): bool => $item['active'] && $item['status'] === 'DOWN')
+                ->count();
         $attention = collect($checks)->whereIn('status', ['DEGRADED', 'DOWN', 'UNKNOWN'])->count();
         $integrationAttention = collect($integrations)
             ->filter(fn (array $item): bool => $item['active'] && $item['status'] !== 'HEALTHY')
@@ -285,9 +288,14 @@ class AdminHealthController
     private function fulfillmentCheck(Carbon $checkedAt): array
     {
         try {
-            $count = DB::table('fulfillment_attempts')
-                ->whereIn('status', ['PENDING', 'UNKNOWN', 'SENDING'])
-                ->where('updated_at', '<=', $checkedAt->copy()->subMinutes(15))
+            $latestIds = DB::table('fulfillment_attempts')
+                ->selectRaw('MAX(id) AS id')
+                ->groupBy('order_id');
+
+            $count = DB::table('fulfillment_attempts as attempts')
+                ->joinSub($latestIds, 'latest_attempts', fn ($join) => $join->on('latest_attempts.id', '=', 'attempts.id'))
+                ->whereIn('attempts.status', ['PENDING', 'UNKNOWN', 'SENDING'])
+                ->where('attempts.updated_at', '<=', $checkedAt->copy()->subMinutes(15))
                 ->count();
         } catch (Throwable) {
             return [
