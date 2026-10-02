@@ -26,10 +26,10 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('support_tickets', function (Blueprint $table): void {
+            $table->dropForeign(['handled_by_admin_id']);
             $table->dropIndex(['kind', 'status', 'updated_at']);
             $table->dropIndex(['handled_by_admin_id', 'updated_at']);
-            $table->dropConstrainedForeignId('handled_by_admin_id');
-            $table->dropColumn(['kind', 'handled_at']);
+            $table->dropColumn(['kind', 'handled_by_admin_id', 'handled_at']);
         });
     }
 };
