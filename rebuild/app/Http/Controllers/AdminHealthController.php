@@ -308,7 +308,7 @@ class AdminHealthController
             $count = DB::table('fulfillment_attempts as attempts')
                 ->joinSub($latestIds, 'latest_attempts', fn ($join) => $join->on('latest_attempts.id', '=', 'attempts.id'))
                 ->whereIn('attempts.status', ['PENDING', 'UNKNOWN', 'SENDING'])
-                ->where('attempts.updated_at', '<=', $checkedAt->copy()->subMinutes(15))
+                ->where('attempts.created_at', '<=', $checkedAt->copy()->subMinutes(15))
                 ->count();
         } catch (Throwable) {
             return [
@@ -329,7 +329,7 @@ class AdminHealthController
             'message' => $count === 0
                 ? 'Tidak ada proses tidak pasti yang melewati 15 menit.'
                 : $count.' proses perlu rekonsiliasi.',
-            'detail' => 'PENDING / UNKNOWN / SENDING lebih dari 15 menit.',
+            'detail' => 'Attempt terbaru PENDING / UNKNOWN / SENDING dibuat lebih dari 15 menit lalu.',
             'count' => $count,
             'checked_at' => $checkedAt->toIso8601String(),
         ];
