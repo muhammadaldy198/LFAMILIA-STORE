@@ -45,9 +45,41 @@ class AccountValidationConfig
         ];
     }
 
+    /**
+     * @return array{is_active:bool,is_configured:bool,base_url:?string,nickname_path:?string,region_path:?string,pln_path:?string}
+     */
+    public function summary(): array
+    {
+        $record = IntegrationCredential::where('code', 'kokinpay')->first();
+        $config = is_array($record?->config_ciphertext) ? $record->config_ciphertext : [];
+
+        return [
+            'is_active' => (bool) $record?->is_active,
+            'is_configured' => $this->active() !== null,
+            'base_url' => $this->safeUrl($config['base_url'] ?? null),
+            'nickname_path' => $this->safePath($config['nickname_path'] ?? null),
+            'region_path' => $this->safePath($config['region_path'] ?? null),
+            'pln_path' => $this->safePath($config['pln_path'] ?? null),
+        ];
+    }
+
     public function endpoint(array $config, string $pathKey): string
     {
         return $config['base_url'].$config[$pathKey];
+    }
+
+    private function safeUrl(mixed $value): ?string
+    {
+        $url = rtrim(trim((string) $value), '/');
+
+        return str_starts_with(strtolower($url), 'https://') ? $url : null;
+    }
+
+    private function safePath(mixed $value): ?string
+    {
+        $path = trim((string) $value);
+
+        return $this->validPath($path) ? $path : null;
     }
 
     private function validPath(string $path): bool
