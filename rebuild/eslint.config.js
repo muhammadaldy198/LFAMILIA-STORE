@@ -18,6 +18,11 @@ export default [
       },
     },
     rules: {
+      // Inertia page names and shadcn-style primitives intentionally use single-word filenames.
+      'vue/multi-word-component-names': 'off',
+      // Existing shadcn-style wrapper components intentionally receive v-html through attr fallthrough.
+      'vue/no-v-text-v-html-on-component': 'off',
+      'no-empty': ['error', { allowEmptyCatch: true }],
       'no-duplicate-imports': 'error',
       'no-unused-vars': ['error', {
         argsIgnorePattern: '^_',
