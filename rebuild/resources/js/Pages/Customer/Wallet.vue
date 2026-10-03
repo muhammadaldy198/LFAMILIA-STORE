@@ -145,6 +145,6 @@ async function createTopup() {
                 <tbody><tr v-for="entry in entries.data" :key="entry.id" class="border-t border-slate-800"><td class="p-3">{{ entry.created_at }}</td><td class="p-3">{{ entry.source }}</td><td class="p-3">{{ rupiah(entry.amount_idr) }}</td><td class="p-3">{{ rupiah(entry.balance_after_idr) }}</td></tr></tbody>
             </table>
         </div>
-        <nav :aria-label="customerText(&quot;pages.customer.wallet.attribute.aria-label.9d63c7d7&quot;, &quot;Halaman riwayat saldo&quot;)" class="flex flex-wrap gap-2"><Link v-for="link in entries.links" :key="link.label" :href="link.url || '#'" class="rounded-md px-3 py-2 text-sm" :class="link.active ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-200'" :aria-disabled="!link.url" v-html="link.label" /></nav>
+        <nav :aria-label="customerText(&quot;pages.customer.wallet.attribute.aria-label.9d63c7d7&quot;, &quot;Halaman riwayat saldo&quot;)" class="flex flex-wrap gap-2"><Link v-for="link in entries.links" :key="link.label" :href="link.url || '#'" class="rounded-md px-3 py-2 text-sm" :class="link.active ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-200'" :aria-disabled="!link.url"><span v-html="link.label" /></Link></nav>
     </AccountShell>
 </template>

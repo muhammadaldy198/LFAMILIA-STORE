@@ -308,9 +308,7 @@ function saveProvider(row) {
                         'rounded-md border px-3 py-1.5 text-sm',
                         link.active ? 'bg-primary text-primary-foreground' : 'bg-background',
                         !link.url ? 'pointer-events-none opacity-40' : '',
-                    ]"
-                    v-html="link.label"
-                />
+                    ]"><span v-html="link.label" /></Link>
             </div>
         </Card>
     </div>
