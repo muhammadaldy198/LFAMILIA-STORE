@@ -85,9 +85,6 @@ const displayTotal = computed(() => quote.value?.total_idr ?? summarySubtotal.va
 const isVoucherProduct = computed(() => String(props.product?.category_slug || '').toLowerCase() === 'voucher');
 const hasAccountStep = computed(() => !isVoucherProduct.value && (props.fields || []).length > 0);
 const nominalStep = computed(() => hasAccountStep.value ? 2 : 1);
-const paymentStep = computed(() => nominalStep.value + 1);
-const contactStep = computed(() => nominalStep.value + 2);
-const promoStep = computed(() => nominalStep.value + 3);
 const hasExternalPaymentOption = computed(() => paymentGroups.value.some((group) =>
     group.key !== 'wallet' && group.items.some((item) => item.available !== false)
 ));
