@@ -44,15 +44,9 @@ watch(() => props.gateways, (items) => {
     gateways.splice(0, gateways.length, ...items.map((item) => ({ ...item })));
 }, { deep: true });
 
-const routes = reactive(props.routes.map((item) => ({
-    ...item,
-    configuration_text: item.configuration ? JSON.stringify(item.configuration, null, 2) : '',
-})));
+const routes = reactive(props.routes.map((item) => ({ ...item })));
 watch(() => props.routes, (items) => {
-    routes.splice(0, routes.length, ...items.map((item) => ({
-        ...item,
-        configuration_text: item.configuration ? JSON.stringify(item.configuration, null, 2) : '',
-    })));
+    routes.splice(0, routes.length, ...items.map((item) => ({ ...item })));
 }, { deep: true });
 
 const walletSettings = reactive({
@@ -96,17 +90,6 @@ const channelLogoPreview = ref('');
 const selectedTransaction = ref(null);
 const showAdvancedRouting = ref(false);
 const saving = ref('');
-
-const routeForm = reactive({
-    payment_channel_id: '',
-    payment_gateway_id: '',
-    provider_channel: '',
-    configuration: '',
-    priority: 0,
-    supports_order: true,
-    supports_wallet_topup: false,
-    is_active: false,
-});
 
 const methodLabel = (value) => ({
     QRIS: 'QRIS',
@@ -297,45 +280,13 @@ function saveWalletSettings() {
     }, { preserveScroll: true });
 }
 
-function createRoute() {
-    router.post('/admin/payments/routes', {
-        payment_channel_id: Number(routeForm.payment_channel_id),
-        payment_gateway_id: Number(routeForm.payment_gateway_id),
-        provider_channel: routeForm.provider_channel || null,
-        configuration: routeForm.configuration || null,
-        priority: Number(routeForm.priority || 0),
-        supports_order: Boolean(routeForm.supports_order),
-        supports_wallet_topup: Boolean(routeForm.supports_wallet_topup),
-        is_active: Boolean(routeForm.is_active),
-    }, {
-        preserveScroll: true,
-        onSuccess: () => Object.assign(routeForm, {
-            payment_channel_id: '',
-            payment_gateway_id: '',
-            provider_channel: '',
-            configuration: '',
-            priority: 0,
-            supports_order: true,
-            supports_wallet_topup: false,
-            is_active: false,
-        }),
-    });
-}
-
 function saveRoute(row) {
     router.put('/admin/payments/routes/' + row.id, {
-        provider_channel: row.provider_channel || null,
-        configuration: row.configuration_text || null,
         priority: Number(row.priority || 0),
         supports_order: Boolean(row.supports_order),
         supports_wallet_topup: Boolean(row.supports_wallet_topup),
         is_active: Boolean(row.is_active),
     }, { preserveScroll: true });
-}
-
-function deleteRoute(row) {
-    if (!window.confirm('Hapus routing ' + row.channel_name + ' → ' + row.gateway_name + '?')) return;
-    router.delete('/admin/payments/routes/' + row.id, { preserveScroll: true });
 }
 
 function uploadManualQris(event) {
@@ -499,26 +450,16 @@ async function copy(value) {
                 </div>
 
                 <div v-if="showAdvancedRouting && isSuperAdmin" class="mt-4 space-y-4 border-t pt-4">
-                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <label class="space-y-1"><span class="text-sm font-medium">Metode</span><select v-model="routeForm.payment_channel_id" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Pilih metode</option><option v-for="channel in channels" :key="channel.id" :value="channel.id">{{ channel.name }}</option></select></label>
-                        <label class="space-y-1"><span class="text-sm font-medium">Gateway</span><select v-model="routeForm.payment_gateway_id" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Pilih gateway</option><option v-for="gateway in gateways" :key="gateway.id" :value="gateway.id">{{ gateway.internal_name }}</option></select></label>
-                        <label class="space-y-1"><span class="text-sm font-medium">Kode channel gateway</span><Input v-model="routeForm.provider_channel" maxlength="100" placeholder="opsional" /></label>
-                        <label class="space-y-1"><span class="text-sm font-medium">Prioritas</span><Input v-model.number="routeForm.priority" type="number" min="0" max="9999" /></label>
-                        <div class="space-y-2 rounded-md border p-3"><label class="flex items-center gap-2 text-sm"><input v-model="routeForm.supports_order" type="checkbox" class="size-4">Untuk pesanan</label><label class="flex items-center gap-2 text-sm"><input v-model="routeForm.supports_wallet_topup" type="checkbox" class="size-4">Untuk top up</label><label class="flex items-center gap-2 text-sm"><input v-model="routeForm.is_active" type="checkbox" class="size-4">Aktif</label></div>
-                        <label class="space-y-1 md:col-span-2 xl:col-span-3"><span class="text-sm font-medium">Konfigurasi lanjutan</span><Textarea v-model="routeForm.configuration" rows="4" placeholder='JSON tanpa secret, misalnya {"enabled_payments":["gopay"]}' /><span class="text-xs text-muted-foreground">Credential/API key/secret tidak boleh disimpan di sini.</span></label>
-                    </div>
-                    <div class="flex justify-end"><Button :disabled="!routeForm.payment_channel_id || !routeForm.payment_gateway_id" @click="createRoute">Tambah routing</Button></div>
-
+                    <p class="rounded-md border p-3 text-sm text-muted-foreground">Endpoint, kode channel provider, signature, dan struktur request/response ditentukan oleh source code. Panel ini hanya mengatur penggunaan routing yang sudah didukung aplikasi.</p>
                     <div class="space-y-3">
                         <div v-for="row in routes" :key="'edit-' + row.id" class="grid gap-3 rounded-md border p-3 md:grid-cols-2 xl:grid-cols-6">
-                            <div><p class="text-sm font-medium">{{ row.channel_name }}</p><p class="text-xs text-muted-foreground">{{ row.gateway_name }}</p></div>
-                            <label class="space-y-1"><span class="text-xs font-medium">Kode gateway</span><Input v-model="row.provider_channel" maxlength="100" /></label>
+                            <div class="xl:col-span-2"><p class="text-sm font-medium">{{ row.channel_name }}</p><p class="text-xs text-muted-foreground">{{ row.gateway_name }}</p></div>
                             <label class="space-y-1"><span class="text-xs font-medium">Prioritas</span><Input v-model.number="row.priority" type="number" min="0" max="9999" /></label>
                             <div class="space-y-2 text-sm"><label class="flex items-center gap-2"><input v-model="row.supports_order" type="checkbox" class="size-4">Pesanan</label><label class="flex items-center gap-2"><input v-model="row.supports_wallet_topup" type="checkbox" class="size-4">Top up</label></div>
                             <div class="space-y-2 text-sm"><label class="flex items-center gap-2"><input v-model="row.is_active" type="checkbox" class="size-4">Aktif</label></div>
-                            <div class="flex items-end justify-end gap-2"><Button size="sm" variant="outline" @click="saveRoute(row)">Simpan</Button><Button size="sm" variant="outline" @click="deleteRoute(row)">Hapus</Button></div>
-                            <label class="space-y-1 md:col-span-2 xl:col-span-6"><span class="text-xs font-medium">Konfigurasi lanjutan</span><Textarea v-model="row.configuration_text" rows="3" /></label>
+                            <div class="flex items-end justify-end"><Button size="sm" variant="outline" @click="saveRoute(row)">Simpan</Button></div>
                         </div>
+                        <p v-if="!routes.length" class="rounded-md border p-3 text-sm text-muted-foreground">Belum ada routing yang didukung source code.</p>
                     </div>
                 </div>
             </Card>
