@@ -289,6 +289,76 @@ class AdminDigiflazzController
         return back();
     }
 
+    public function attachSource(Request $request, ProductPackage $package, DigiflazzCatalogService $service, DigiflazzCatalogImport $importer, AdminAuditService $audit): RedirectResponse
+    {
+        abort_unless($package->product->fulfillment_mode === 'AUTO_PROVIDER', 422);
+
+        $data = $request->validate([
+            'item_id' => ['required', 'integer', 'exists:digiflazz_catalog_items,id'],
+        ]);
+
+        DB::transaction(function () use ($request, $package, $service, $importer, $audit, $data): void {
+            $item = DB::table('digiflazz_catalog_items')->where('id', $data['item_id'])->lockForUpdate()->firstOrFail();
+            if (! $service->available($item) || now()->diffInHours($item->synced_at, true) > 24) {
+                throw ValidationException::withMessages([
+                    'item_id' => 'SKU tidak tersedia atau data lebih dari 24 jam. Sinkronkan Digiflazz dahulu.',
+                ]);
+            }
+
+            $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
+            $existing = ProviderMapping::where('provider_id', $provider->id)
+                ->where('external_sku', $item->buyer_sku_code)
+                ->lockForUpdate()
+                ->first();
+            if ($existing) {
+                throw ValidationException::withMessages([
+                    'item_id' => $existing->product_package_id === $package->id
+                        ? 'SKU ini sudah menjadi sumber fulfillment nominal tersebut.'
+                        : 'SKU ini sudah digunakan oleh nominal lain.',
+                ]);
+            }
+
+            try {
+                $mapping = $importer->upsert(
+                    $package,
+                    (string) $item->buyer_sku_code,
+                    (int) $item->price_idr,
+                    (int) $item->price_idr
+                );
+            } catch (\InvalidArgumentException $exception) {
+                throw ValidationException::withMessages(['item_id' => $exception->getMessage()]);
+            }
+
+            $priority = (int) ProviderMapping::where('product_package_id', $package->id)
+                ->whereKeyNot($mapping->id)
+                ->max('priority') + 1;
+            $primaryConfig = ProviderMapping::where('product_package_id', $package->id)
+                ->where('provider_id', $provider->id)
+                ->whereKeyNot($mapping->id)
+                ->orderBy('priority')
+                ->value('fulfillment_config');
+
+            $before = $mapping->toArray();
+            $mapping->update([
+                'priority' => $priority,
+                'is_active' => false,
+                'fulfillment_config' => is_string($primaryConfig)
+                    ? json_decode($primaryConfig, true)
+                    : $primaryConfig,
+            ]);
+            $audit->record(
+                $request,
+                'catalog.fulfillment_source.attached',
+                'provider_mapping',
+                $mapping->id,
+                $before,
+                $mapping->toArray()
+            );
+        }, 3);
+
+        return back()->with('status', 'Sumber fulfillment ditambahkan dalam keadaan nonaktif. Periksa prioritas, format tujuan, dan batas harga sebelum mengaktifkannya.');
+    }
+
     public function import(Request $request, Product $product, DigiflazzCatalogService $service, DigiflazzCatalogImport $importer, AdminAuditService $audit): RedirectResponse
     {
         abort_unless($product->fulfillment_mode === 'AUTO_PROVIDER', 422);
