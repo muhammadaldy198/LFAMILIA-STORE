@@ -48,36 +48,41 @@ class WalletTopupService
             $user->id, $amountIdr, $channelCode,
         ]));
 
-        $existing = DB::table('wallet_topups')->where('idempotency_key', $idempotencyKey)->first();
-        if ($existing) {
-            if (! hash_equals((string) $existing->request_fingerprint, $fingerprint)) {
-                throw new HttpException(409, 'Idempotency key top up sudah digunakan untuk permintaan berbeda.');
+        $wallet = Wallet::firstOrCreate(['user_id' => $user->id]);
+
+        $topup = DB::transaction(function () use ($user, $wallet, $amountIdr, $channelCode, $idempotencyKey, $fingerprint): object {
+            DB::table('wallets')->where('id', $wallet->id)->lockForUpdate()->firstOrFail();
+
+            $existing = DB::table('wallet_topups')
+                ->where('idempotency_key', $idempotencyKey)
+                ->lockForUpdate()
+                ->first();
+            if ($existing) {
+                if (! hash_equals((string) $existing->request_fingerprint, $fingerprint)) {
+                    throw new HttpException(409, 'Idempotency key top up sudah digunakan untuk permintaan berbeda.');
+                }
+
+                return $existing;
             }
 
-            return [
-                'topup_id' => (int) $existing->id,
-                'payment' => $this->payments->startTopup(
-                    $existing,
-                    'payment-'.$idempotencyKey,
-                    $user->name,
-                    $user->email,
-                    (string) $user->phone
-                ),
-            ];
-        }
+            $this->assertEnabled(true);
+            $minimum = $this->minimum(true);
+            if ($amountIdr < $minimum) {
+                throw ValidationException::withMessages([
+                    'amount_idr' => 'Minimum top up saldo Rp'.number_format($minimum, 0, ',', '.').'.',
+                ]);
+            }
 
-        $quote = $this->quote($amountIdr, $channelCode);
-        $route = $this->routing->resolve($channelCode, true, 'topup');
-        $wallet = Wallet::firstOrCreate(['user_id' => $user->id]);
-        $topup = DB::transaction(function () use ($user, $wallet, $amountIdr, $quote, $route, $idempotencyKey, $fingerprint): object {
+            $route = $this->routing->resolve($channelCode, true, 'topup');
+            $fee = $this->routing->fee($amountIdr, $route);
             $id = DB::table('wallet_topups')->insertGetId([
                 'wallet_id' => $wallet->id,
                 'user_id' => $user->id,
                 'payment_channel_id' => $route['channel_id'],
                 'payment_route_id' => $route['route_id'],
                 'amount_idr' => $amountIdr,
-                'fee_idr' => $quote['fee_idr'],
-                'total_idr' => $quote['total_idr'],
+                'fee_idr' => $fee,
+                'total_idr' => $amountIdr + $fee,
                 'status' => 'PENDING_PAYMENT',
                 'idempotency_key' => $idempotencyKey,
                 'request_fingerprint' => $fingerprint,
@@ -86,8 +91,12 @@ class WalletTopupService
                 'updated_at' => now(),
             ]);
 
-            return DB::table('wallet_topups')->where('id', $id)->first();
+            return DB::table('wallet_topups')->where('id', $id)->firstOrFail();
         }, 3);
+
+        if (! hash_equals((string) $topup->request_fingerprint, $fingerprint)) {
+            throw new HttpException(409, 'Idempotency key top up sudah digunakan untuk permintaan berbeda.');
+        }
 
         return [
             'topup_id' => (int) $topup->id,
@@ -102,9 +111,13 @@ class WalletTopupService
         ];
     }
 
-    private function assertEnabled(): void
+    private function assertEnabled(bool $lock = false): void
     {
-        $raw = DB::table('system_settings')->where('key', 'wallet.topup_enabled')->value('value');
+        $query = DB::table('system_settings')->where('key', 'wallet.topup_enabled');
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+        $raw = $query->value('value');
         $enabled = $raw === null ? true : (bool) json_decode((string) $raw, true);
         if (! $enabled) {
             throw ValidationException::withMessages([
@@ -113,9 +126,13 @@ class WalletTopupService
         }
     }
 
-    private function minimum(): int
+    private function minimum(bool $lock = false): int
     {
-        $raw = DB::table('system_settings')->where('key', 'wallet.minimum_topup_idr')->value('value');
+        $query = DB::table('system_settings')->where('key', 'wallet.minimum_topup_idr');
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+        $raw = $query->value('value');
         if (is_string($raw)) {
             $decoded = json_decode($raw, true);
 
