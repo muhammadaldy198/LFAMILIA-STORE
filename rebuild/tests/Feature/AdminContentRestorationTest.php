@@ -194,6 +194,7 @@ class AdminContentRestorationTest extends TestCase
             ->where('storefront.supportWhatsapp', '081234567890')
             ->where('storefront.supportEmail', 'support@example.test'));
     }
+
     public function test_content_page_checkbox_payload_uses_real_booleans(): void
     {
         $this->login();
@@ -218,5 +219,4 @@ class AdminContentRestorationTest extends TestCase
                     && $items->get('refund')['is_active'] === false;
             }));
     }
-
 }
