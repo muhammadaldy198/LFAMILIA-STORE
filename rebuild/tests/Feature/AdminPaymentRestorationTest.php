@@ -212,6 +212,46 @@ class AdminPaymentRestorationTest extends TestCase
         $this->assertArrayNotHasKey('gateway_code', $publicTopup);
     }
 
+    public function test_admin_payment_topup_readiness_requires_gateway_credentials(): void
+    {
+        $this->login('SUPER_ADMIN');
+
+        DB::table('payment_channels')->where('code', 'virtual_account')->update([
+            'is_active' => true,
+            'supports_wallet_topup' => true,
+            'updated_at' => now(),
+        ]);
+        $gateway = DB::table('payment_gateways')->where('code', 'DOKU')->firstOrFail();
+        DB::table('payment_gateways')->where('id', $gateway->id)->update([
+            'is_active' => true,
+            'is_maintenance' => false,
+            'updated_at' => now(),
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'doku'], [
+            'config_ciphertext' => [],
+            'is_active' => true,
+        ]);
+
+        $channelId = DB::table('payment_channels')->where('code', 'virtual_account')->value('id');
+        DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $gateway->id)
+            ->update([
+                'supports_wallet_topup' => true,
+                'is_active' => true,
+                'updated_at' => now(),
+            ]);
+
+        $this->get('/admin/payments')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('channels', function ($channels): bool {
+                    $channel = collect($channels)->firstWhere('code', 'virtual_account');
+
+                    return is_array($channel) && $channel['available_topup'] === false;
+                }));
+    }
+
     public function test_sync_restores_repo_owned_route_protocol_without_overwriting_operational_state(): void
     {
         $this->login('SUPER_ADMIN');
