@@ -191,6 +191,22 @@ class AdminPaymentController
                 'is_active' => (bool) $manualAsset->is_active,
                 'image_url' => $manualAsset->getFirstMediaUrl('image'),
             ] : null,
+            'refundReviews' => DB::table('wallet_topups as topups')
+                ->join('wallets', 'wallets.id', '=', 'topups.wallet_id')
+                ->join('users', 'users.id', '=', 'topups.user_id')
+                ->where('topups.status', 'REFUND_REVIEW')
+                ->orderBy('topups.created_at')
+                ->limit(100)
+                ->get([
+                    'topups.id',
+                    'topups.amount_idr',
+                    'topups.total_idr',
+                    'topups.created_at',
+                    'users.id as user_id',
+                    'users.name as customer_name',
+                    'users.email as customer_email',
+                    'wallets.balance_idr',
+                ]),
             'manualPayments' => DB::table('payment_transactions as payments')
                 ->join('orders', 'orders.id', '=', 'payments.order_id')
                 ->where('payments.gateway_code', 'MANUAL_QRIS')
@@ -560,6 +576,32 @@ class AdminPaymentController
         $this->audit($request, 'payment.manual_qris.updated', 'store_asset', $asset->id, $before, $data);
 
         return back()->with('status', $data['is_active'] ? 'QRIS manual diaktifkan.' : 'QRIS manual dinonaktifkan.');
+    }
+
+    public function resolveTopupRefund(
+        Request $request,
+        int $topupId,
+        PaymentStateService $states,
+    ): RedirectResponse {
+        $before = DB::table('wallet_topups')->where('id', $topupId)->first();
+        abort_unless($before, 404);
+
+        $result = $states->resolveTopupRefundReview(
+            $topupId,
+            (int) $request->user('admin')->id
+        );
+        $after = DB::table('wallet_topups')->where('id', $topupId)->first();
+
+        $this->audit(
+            $request,
+            'wallet.topup_refund.resolved',
+            'wallet_topup',
+            $topupId,
+            (array) $before,
+            $after ? (array) $after : $result
+        );
+
+        return back()->with('status', 'Refund top up telah direkonsiliasi.');
     }
 
     public function confirmManual(Request $request, int $paymentId, PaymentStateService $states): RedirectResponse
