@@ -10,7 +10,7 @@ source "${OPS_ENV_FILE}"
 : "${APP_SUBDIR:?APP_SUBDIR is required}"
 : "${PHP_BIN:?PHP_BIN is required}"
 : "${COMPOSER_BIN:?COMPOSER_BIN is required}"
-: "${NPM_BIN:?NPM_BIN is required}"
+: "${NPM_BIN:?NPM_BIN is required}"\n: "${PHP_FPM_SERVICE:?PHP_FPM_SERVICE is required}"
 : "${ROLLBACK_REF:?ROLLBACK_REF is required}"
 [[ "${CONFIRM_ROLLBACK:-}" == "ROLLBACK_SOURCE_ONLY" ]]   || { echo "Set CONFIRM_ROLLBACK=ROLLBACK_SOURCE_ONLY" >&2; exit 1; }
 
@@ -45,6 +45,7 @@ GIT_CONFIG_VALUE_0="${REPO_DIR}" \
 "${PHP_BIN}" artisan config:cache
 "${PHP_BIN}" artisan view:cache
 "${PHP_BIN}" artisan queue:restart
+systemctl restart "${PHP_FPM_SERVICE}"
 systemctl restart lfamilia-queue.service lfamilia-scheduler.service
 
 "${PHP_BIN}" artisan up

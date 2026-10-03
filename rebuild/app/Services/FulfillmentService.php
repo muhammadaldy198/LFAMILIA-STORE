@@ -14,6 +14,7 @@ class FulfillmentService
 {
     public function __construct(
         private readonly DigiflazzClient $digiflazz,
+        private readonly DigiflazzCatalogService $digiflazzCatalog,
         private readonly FulfillmentTargetBuilder $targetBuilder,
         private readonly VoucherStockService $voucherStock,
         private readonly AdminNotificationService $notifications,
@@ -678,23 +679,12 @@ class FulfillmentService
             $attemptedMappings = DB::table('fulfillment_attempts')
                 ->where('order_id', $order->id)->pluck('provider_mapping_id');
 
-            $mapping = DB::table('provider_mappings as mappings')
-                ->join('providers', 'providers.id', '=', 'mappings.provider_id')
-                ->where('mappings.product_package_id', $order->product_package_id)
-                ->where('mappings.is_active', true)
-                ->where('providers.is_active', true)
-                ->where('providers.fulfillment_mode', 'AUTO_PROVIDER')
-                ->where('providers.code', 'DIGIFLAZZ')
-                ->whereNotNull('mappings.external_sku')
-                ->whereNotNull('mappings.cost_idr')
-                ->where('mappings.cost_idr', '>', 0)
-                ->where('mappings.cost_idr', '<=', $maxPrice)
-                ->whereNotIn('mappings.id', $attemptedMappings)
-                ->orderBy('mappings.priority')
-                ->orderBy('mappings.cost_idr')
-                ->orderBy('mappings.id')
-                ->select('mappings.*', 'providers.code as provider_code', 'providers.is_active as provider_active')
-                ->first();
+            $mapping = $this->nextSafeDigiflazzMapping(
+                (int) $order->product_package_id,
+                $attemptedMappings->map(fn ($id): int => (int) $id)->all(),
+                $snapshot,
+                $maxPrice,
+            );
 
             if (! $mapping) {
                 DB::table('orders')->where('id', $order->id)->update([
@@ -812,23 +802,12 @@ class FulfillmentService
             ->where('order_id', $order->id)
             ->pluck('provider_mapping_id');
 
-        $mapping = DB::table('provider_mappings as mappings')
-            ->join('providers', 'providers.id', '=', 'mappings.provider_id')
-            ->where('mappings.product_package_id', $order->product_package_id)
-            ->where('mappings.is_active', true)
-            ->where('providers.is_active', true)
-            ->where('providers.fulfillment_mode', 'AUTO_PROVIDER')
-            ->where('providers.code', 'DIGIFLAZZ')
-            ->whereNotNull('mappings.external_sku')
-            ->whereNotNull('mappings.cost_idr')
-            ->where('mappings.cost_idr', '>', 0)
-            ->where('mappings.cost_idr', '<=', $maxPrice)
-            ->whereNotIn('mappings.id', $attemptedMappings)
-            ->orderBy('mappings.priority')
-            ->orderBy('mappings.cost_idr')
-            ->orderBy('mappings.id')
-            ->select('mappings.*', 'providers.code as provider_code', 'providers.is_active as provider_active')
-            ->first();
+        $mapping = $this->nextSafeDigiflazzMapping(
+            (int) $order->product_package_id,
+            $attemptedMappings->map(fn ($id): int => (int) $id)->all(),
+            $snapshot,
+            $maxPrice,
+        );
 
         if (! $mapping) {
             return null;
@@ -884,6 +863,40 @@ class FulfillmentService
     }
 
     /**
+     * @param  array<int, int>  $attemptedMappingIds
+     * @param  array<string, mixed>  $snapshot
+     */
+    private function nextSafeDigiflazzMapping(
+        int $packageId,
+        array $attemptedMappingIds,
+        array $snapshot,
+        int $maxPrice,
+    ): ?object {
+        $candidates = DB::table('provider_mappings as mappings')
+            ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+            ->where('mappings.product_package_id', $packageId)
+            ->where('mappings.is_active', true)
+            ->where('providers.is_active', true)
+            ->where('providers.fulfillment_mode', 'AUTO_PROVIDER')
+            ->where('providers.code', 'DIGIFLAZZ')
+            ->whereNotNull('mappings.external_sku')
+            ->whereNotNull('mappings.cost_idr')
+            ->where('mappings.cost_idr', '>', 0)
+            ->where('mappings.cost_idr', '<=', $maxPrice)
+            ->when($attemptedMappingIds !== [], fn ($query) => $query->whereNotIn('mappings.id', $attemptedMappingIds))
+            ->orderBy('mappings.priority')
+            ->orderBy('mappings.cost_idr')
+            ->orderBy('mappings.id')
+            ->select('mappings.*', 'providers.code as provider_code', 'providers.is_active as provider_active')
+            ->lockForUpdate()
+            ->get();
+
+        return $candidates->first(
+            fn (object $candidate): bool => $this->mappingBlockReason($candidate, $snapshot) === null
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $snapshot
      */
     private function mappingBlockReason(object $mapping, array $snapshot): ?string
@@ -896,6 +909,14 @@ class FulfillmentService
         }
         if (! is_string($mapping->external_sku) || trim($mapping->external_sku) === '') {
             return 'SKU penyedia belum tersedia.';
+        }
+        if ($mapping->provider_code === 'DIGIFLAZZ') {
+            $item = DB::table('digiflazz_catalog_items')
+                ->where('buyer_sku_code', $mapping->external_sku)
+                ->first();
+            if ($item && ! $this->digiflazzCatalog->available($item)) {
+                return 'SKU Digiflazz sedang nonaktif, stok habis, atau cut-off.';
+            }
         }
         if ($mapping->provider_code === 'VOUCHER_STOCK') {
             $config = $this->json($mapping->fulfillment_config);
