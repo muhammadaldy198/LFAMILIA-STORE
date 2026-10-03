@@ -10,7 +10,7 @@ source "${OPS_ENV_FILE}"
 : "${APP_SUBDIR:?APP_SUBDIR is required}"
 : "${PHP_BIN:?PHP_BIN is required}"
 : "${COMPOSER_BIN:?COMPOSER_BIN is required}"
-: "${NPM_BIN:?NPM_BIN is required}"
+: "${NPM_BIN:?NPM_BIN is required}"\n: "${PHP_FPM_SERVICE:?PHP_FPM_SERVICE is required}"
 : "${MYSQL_DEFAULTS_FILE:?MYSQL_DEFAULTS_FILE is required}"
 : "${MYSQL_ADMIN_DEFAULTS_FILE:?MYSQL_ADMIN_DEFAULTS_FILE is required}"
 : "${BACKUP_DATABASE_NAME:?BACKUP_DATABASE_NAME is required}"
@@ -28,9 +28,12 @@ ENV_FILE="${APP_DIR}/.env"
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || { echo "Missing command: $1" >&2; exit 1; }
 }
-for cmd in git curl mysql mysqldump redis-cli openssl sha256sum tar; do
+for cmd in git curl mysql mysqldump redis-cli openssl sha256sum tar systemctl; do
   require_cmd "${cmd}"
 done
+
+systemctl cat "${PHP_FPM_SERVICE}" >/dev/null 2>&1 \
+  || { echo "PHP-FPM service not found: ${PHP_FPM_SERVICE}" >&2; exit 1; }
 
 "${PHP_BIN}" -r 'exit(version_compare(PHP_VERSION, "8.4.0", ">=") ? 0 : 1);' \
   || { echo "PHP 8.4+ is required" >&2; exit 1; }
