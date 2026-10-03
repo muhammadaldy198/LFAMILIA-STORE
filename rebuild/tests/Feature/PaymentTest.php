@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -783,7 +784,7 @@ class PaymentTest extends TestCase
         try {
             $states->resolveTopupRefundReview($topupId, 42);
             $this->fail('Refund review must not create a negative wallet balance.');
-        } catch (\Illuminate\Validation\ValidationException $exception) {
+        } catch (ValidationException $exception) {
             $this->assertArrayHasKey('refund', $exception->errors());
         }
 
@@ -1149,6 +1150,7 @@ class PaymentTest extends TestCase
         $this->assertSame(500, (int) $persisted->fee_idr);
         $this->assertSame(10500, (int) $persisted->total_idr);
     }
+
     public function test_external_create_claim_prevents_duplicate_gateway_request_from_stale_payment_object(): void
     {
         $catalog = $this->catalog();
@@ -1276,5 +1278,4 @@ class PaymentTest extends TestCase
 
         $this->assertNull(collect($channels)->firstWhere('code', 'qris'));
     }
-
 }
