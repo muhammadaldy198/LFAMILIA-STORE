@@ -67,8 +67,10 @@ for key in users orders product_packages paid_total_idr; do
   [[ "${expected[$key]}" == "${actual[$key]}" ]]     || { echo "Restore verification mismatch for ${key}" >&2; exit 1; }
 done
 
-if [[ -n "${BACKUP_RCLONE_REMOTE:-}" ]]; then
+if [[ "${BACKUP_REQUIRE_REMOTE:-true}" == "true" ]]; then
   command -v rclone >/dev/null 2>&1 || { echo "rclone is required for remote verification" >&2; exit 1; }
+  : "${BACKUP_RCLONE_REMOTE:?BACKUP_RCLONE_REMOTE is required}"
+  [[ -r "${RCLONE_CONFIG:?RCLONE_CONFIG is required}" ]] || { echo "rclone config is not readable" >&2; exit 1; }
   rclone --config "${RCLONE_CONFIG}" lsf "${BACKUP_RCLONE_REMOTE%/}"     --include "$(basename "${latest}")" | grep -Fq "$(basename "${latest}")"
 fi
 
