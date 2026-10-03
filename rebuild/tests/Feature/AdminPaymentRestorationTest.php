@@ -278,7 +278,7 @@ class AdminPaymentRestorationTest extends TestCase
         $this->post('/admin/payments/routes', [
             'payment_channel_id' => $route->payment_channel_id,
             'payment_gateway_id' => $route->payment_gateway_id,
-        ])->assertStatus(405);
+        ])->assertNotFound();
 
         $this->delete('/admin/payments/routes/'.$route->id)->assertStatus(405);
     }
