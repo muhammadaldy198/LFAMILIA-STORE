@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\AdminUser;
+use App\Models\Category;
 use App\Models\HomeBanner;
 use App\Models\NewsArticle;
+use App\Models\Product;
 use App\Models\SitePopup;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
