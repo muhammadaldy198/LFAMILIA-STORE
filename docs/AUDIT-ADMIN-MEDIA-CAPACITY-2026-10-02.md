@@ -1,5 +1,7 @@
 > **HISTORICAL SNAPSHOT:** Dokumen ini merekam audit/restoration pada tanggal pembuatannya. Gunakan `rebuild/ADMIN.md`, `rebuild/ARCHITECTURE.md`, dan kode `main` sebagai sumber status current. Jangan menganggap gap/label milestone di snapshot ini masih berlaku tanpa verifikasi ulang.
 
+> **HISTORICAL SNAPSHOT:** Dokumen ini merekam audit/restoration pada tanggal pembuatannya. Gunakan `rebuild/ADMIN.md`, `rebuild/ARCHITECTURE.md`, dan kode `main` sebagai sumber status current. Jangan menganggap gap/label milestone di snapshot ini masih berlaku tanpa verifikasi ulang.
+
 # Audit admin, konten legal, media, dan kapasitas VPS
 
 Tanggal: 2 Oktober 2026 (WIB). Website: https://lfamiliastore.my.id.
