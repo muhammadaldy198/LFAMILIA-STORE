@@ -65,7 +65,10 @@ class AdminContentController
                     'product_reviews.body', 'product_reviews.is_active', 'product_reviews.published_at',
                     'products.name as product_name', 'products.slug as product_slug',
                 ]),
-            'pages' => DB::table('content_pages')->orderBy('key')->get(),
+            'pages' => DB::table('content_pages')->orderBy('key')->get()->map(fn (object $page): array => [
+                ...(array) $page,
+                'is_active' => (bool) $page->is_active,
+            ]),
             'settings' => collect($settingsKeys)->mapWithKeys(fn (string $key): array => [$key => $settings[$key] ?? '']),
         ]);
     }
