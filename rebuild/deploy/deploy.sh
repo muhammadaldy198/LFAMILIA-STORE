@@ -11,7 +11,8 @@ source "${OPS_ENV_FILE}"
 : "${REPO_REF:?REPO_REF is required}"
 : "${PHP_BIN:?PHP_BIN is required}"
 : "${COMPOSER_BIN:?COMPOSER_BIN is required}"
-: "${NPM_BIN:?NPM_BIN is required}"\n: "${PHP_FPM_SERVICE:?PHP_FPM_SERVICE is required}"
+: "${NPM_BIN:?NPM_BIN is required}"
+: "${PHP_FPM_SERVICE:?PHP_FPM_SERVICE is required}"
 
 APP_DIR="${REPO_DIR%/}/${APP_SUBDIR}"
 DEPLOY_DIR="${APP_DIR}/deploy"
@@ -39,7 +40,7 @@ GIT_CONFIG_COUNT=1 \
 GIT_CONFIG_KEY_0=safe.directory \
 GIT_CONFIG_VALUE_0="${REPO_DIR}" \
 "${COMPOSER_BIN}" install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-progress
-"${NPM_BIN}" ci
+HUSKY=0 "${NPM_BIN}" ci
 "${NPM_BIN}" run build
 
 "${PHP_BIN}" artisan route:clear

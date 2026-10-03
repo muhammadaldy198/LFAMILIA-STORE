@@ -842,11 +842,13 @@ For documentation-only work, verify that runtime source files were not changed.
 
 ## 39. Local/pre-commit tooling boundary
 
-Pre-commit hooks and local guardrail tooling are separate work.
+Local developer guardrails now use Husky from `rebuild/`, with the detailed behavior documented in `rebuild/TESTING.md`.
 
-Do not install Husky, lint-staged, Git hooks, or new local hook frameworks unless a task explicitly scopes that work.
+Pre-commit must stay staged-file focused and fast. Pre-push may run project-wide static/build/style checks, but full MySQL/Redis regression and browser smoke remain GitHub CI responsibilities.
 
-Do not alter CI merely because this CLAUDE.md exists.
+Local hooks are not a security boundary: they can be bypassed with `--no-verify` or `HUSKY=0`. Never weaken or remove required CI because a local hook exists.
+
+CI/production dependency installation must not require Git hook installation. Production deployment uses `HUSKY=0`; do not make provider credentials or production secrets prerequisites for code-quality hooks.
 
 ## 40. Completion standard
 
