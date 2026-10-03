@@ -449,9 +449,9 @@ async function copy(value) {
             </Card>
 
             <Card class="p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Routing Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Customer memilih metode. Sistem menentukan gateway berdasarkan routing aktif dan prioritas.</p></div><Button v-if="isSuperAdmin" size="sm" variant="outline" @click="showAdvancedRouting = !showAdvancedRouting">{{ showAdvancedRouting ? 'Tutup pengaturan' : 'Atur routing' }}</Button></div>
+                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Routing Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Customer memilih metode. Sistem menentukan gateway berdasarkan routing aktif dan urutan gateway.</p></div><Button v-if="isSuperAdmin" size="sm" variant="outline" @click="showAdvancedRouting = !showAdvancedRouting">{{ showAdvancedRouting ? 'Tutup pengaturan' : 'Atur routing' }}</Button></div>
                 <div class="mt-4 overflow-x-auto">
-                    <Table><TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Gateway</TableHead><TableHead>Pesanan</TableHead><TableHead>Top up</TableHead><TableHead>Prioritas</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                    <Table><TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Gateway</TableHead><TableHead>Pesanan</TableHead><TableHead>Top up</TableHead><TableHead>Urutan Gateway</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                     <TableBody><TableRow v-for="row in routes" :key="row.id"><TableCell>{{ row.channel_name }}</TableCell><TableCell>{{ row.gateway_name }}</TableCell><TableCell>{{ row.supports_order ? 'Ya' : 'Tidak' }}</TableCell><TableCell>{{ row.supports_wallet_topup ? 'Ya' : 'Tidak' }}</TableCell><TableCell>{{ row.priority }}</TableCell><TableCell><Badge :variant="row.is_active ? 'secondary' : 'outline'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge></TableCell></TableRow><TableRow v-if="!routes.length"><TableCell colspan="6" class="py-8 text-center text-muted-foreground">Belum ada routing pembayaran.</TableCell></TableRow></TableBody></Table>
                 </div>
 
@@ -460,7 +460,7 @@ async function copy(value) {
                     <div class="space-y-3">
                         <div v-for="row in routes" :key="'edit-' + row.id" class="grid gap-3 rounded-md border p-3 md:grid-cols-2 xl:grid-cols-6">
                             <div class="xl:col-span-2"><p class="text-sm font-medium">{{ row.channel_name }}</p><p class="text-xs text-muted-foreground">{{ row.gateway_name }}</p></div>
-                            <label class="space-y-1"><span class="text-xs font-medium">Prioritas</span><Input v-model.number="row.priority" type="number" min="0" max="9999" /></label>
+                            <label class="space-y-1"><span class="text-xs font-medium">Urutan Gateway</span><Input v-model.number="row.priority" type="number" min="0" max="9999" /><span class="block text-[11px] text-muted-foreground">Angka lebih kecil digunakan lebih dahulu. Contoh: 10 sebelum 20.</span></label>
                             <div class="space-y-2 text-sm"><label class="flex items-center gap-2"><input v-model="row.supports_order" type="checkbox" class="size-4">Pesanan</label><label class="flex items-center gap-2"><input v-model="row.supports_wallet_topup" type="checkbox" class="size-4">Top up</label></div>
                             <div class="space-y-2 text-sm"><label class="flex items-center gap-2"><input v-model="row.is_active" type="checkbox" class="size-4">Aktif</label></div>
                             <div class="flex items-end justify-end"><Button size="sm" variant="outline" @click="saveRoute(row)">Simpan</Button></div>
