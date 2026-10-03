@@ -40,6 +40,7 @@ GIT_CONFIG_VALUE_0="${REPO_DIR}" \
 "${COMPOSER_BIN}" install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-progress
 "${NPM_BIN}" ci
 "${NPM_BIN}" run build
+"${PHP_BIN}" artisan route:clear
 "${PHP_BIN}" artisan config:clear
 "${PHP_BIN}" artisan config:cache
 "${PHP_BIN}" artisan view:cache
