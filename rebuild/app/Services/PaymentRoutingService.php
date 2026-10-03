@@ -244,7 +244,7 @@ class PaymentRoutingService
     }
 
     /**
-     * @param array<int, string> $keys
+     * @param  array<int, string>  $keys
      */
     private function credentialHasKeys(string $credentialCode, array $keys): bool
     {
