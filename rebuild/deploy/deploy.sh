@@ -11,7 +11,7 @@ source "${OPS_ENV_FILE}"
 : "${REPO_REF:?REPO_REF is required}"
 : "${PHP_BIN:?PHP_BIN is required}"
 : "${COMPOSER_BIN:?COMPOSER_BIN is required}"
-: "${NPM_BIN:?NPM_BIN is required}"
+: "${NPM_BIN:?NPM_BIN is required}"\n: "${PHP_FPM_SERVICE:?PHP_FPM_SERVICE is required}"
 
 APP_DIR="${REPO_DIR%/}/${APP_SUBDIR}"
 DEPLOY_DIR="${APP_DIR}/deploy"
@@ -50,6 +50,7 @@ GIT_CONFIG_VALUE_0="${REPO_DIR}" \
 "${PHP_BIN}" artisan view:cache
 "${PHP_BIN}" artisan queue:restart
 
+systemctl restart "${PHP_FPM_SERVICE}"
 systemctl restart lfamilia-queue.service
 systemctl restart lfamilia-scheduler.service
 systemctl start lfamilia-healthcheck.timer lfamilia-backup.timer lfamilia-restore-verify.timer
