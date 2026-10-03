@@ -119,8 +119,6 @@ class AdminPaymentController
                 'routes.id',
                 'routes.payment_channel_id',
                 'routes.payment_gateway_id',
-                'routes.provider_channel',
-                'routes.configuration',
                 'routes.priority',
                 'routes.supports_order',
                 'routes.supports_wallet_topup',
@@ -135,7 +133,6 @@ class AdminPaymentController
                 'supports_order' => (bool) $route->supports_order,
                 'supports_wallet_topup' => (bool) $route->supports_wallet_topup,
                 'is_active' => (bool) $route->is_active,
-                'configuration' => $this->safeConfiguration($route->configuration),
             ]);
 
         $transactions = $this->transactionQuery($filters)
@@ -386,51 +383,14 @@ class AdminPaymentController
         return back()->with('status', 'Pengaturan gateway disimpan.');
     }
 
-    public function route(Request $request): RedirectResponse
-    {
-        $data = $this->routeData($request);
-        $this->validateRoutePurpose($data);
-
-        if (DB::table('payment_routes')
-            ->where('payment_channel_id', $data['payment_channel_id'])
-            ->where('payment_gateway_id', $data['payment_gateway_id'])
-            ->exists()) {
-            throw ValidationException::withMessages([
-                'payment_gateway_id' => 'Routing metode ke gateway tersebut sudah ada.',
-            ]);
-        }
-
-        $configuration = $this->configuration($data['configuration'] ?? null);
-        $id = DB::table('payment_routes')->insertGetId([
-            'payment_channel_id' => $data['payment_channel_id'],
-            'payment_gateway_id' => $data['payment_gateway_id'],
-            'provider_channel' => $data['provider_channel'] ?: null,
-            'configuration' => $configuration === null ? null : json_encode($configuration, JSON_THROW_ON_ERROR),
-            'priority' => $data['priority'],
-            'supports_order' => $data['supports_order'],
-            'supports_wallet_topup' => $data['supports_wallet_topup'],
-            'is_active' => $data['is_active'],
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $this->audit($request, 'payment.route.created', 'payment_route', $id, null, [
-            ...$data, 'configuration' => $configuration,
-        ]);
-
-        return back()->with('status', 'Routing pembayaran ditambahkan.');
-    }
-
     public function updateRoute(Request $request, int $id): RedirectResponse
     {
         $before = DB::table('payment_routes')->where('id', $id)->first();
         abort_unless($before, 404);
 
-        $data = $this->routeData($request, false, (int) $before->payment_channel_id);
+        $data = $this->routeData($request, (int) $before->payment_channel_id);
         $this->validateRoutePurpose($data);
-        $configuration = $this->configuration($data['configuration'] ?? null);
         $after = [
-            'provider_channel' => $data['provider_channel'] ?: null,
-            'configuration' => $configuration === null ? null : json_encode($configuration, JSON_THROW_ON_ERROR),
             'priority' => $data['priority'],
             'supports_order' => $data['supports_order'],
             'supports_wallet_topup' => $data['supports_wallet_topup'],
@@ -438,32 +398,9 @@ class AdminPaymentController
             'updated_at' => now(),
         ];
         DB::table('payment_routes')->where('id', $id)->update($after);
-        $this->audit($request, 'payment.route.updated', 'payment_route', $id, (array) $before, [
-            ...$after, 'configuration' => $configuration,
-        ]);
+        $this->audit($request, 'payment.route.updated', 'payment_route', $id, (array) $before, $after);
 
         return back()->with('status', 'Routing pembayaran disimpan.');
-    }
-
-    public function destroyRoute(Request $request, int $id): RedirectResponse
-    {
-        $route = DB::table('payment_routes')->where('id', $id)->first();
-        abort_unless($route, 404);
-
-        $used = DB::table('orders')->where('payment_route_id', $id)->exists()
-            || DB::table('wallet_topups')->where('payment_route_id', $id)->exists()
-            || DB::table('payment_transactions')->where('payment_route_id', $id)->exists();
-
-        if ($used) {
-            throw ValidationException::withMessages([
-                'route' => 'Routing ini sudah memiliki riwayat transaksi. Nonaktifkan saja agar data lama tetap utuh.',
-            ]);
-        }
-
-        DB::table('payment_routes')->where('id', $id)->delete();
-        $this->audit($request, 'payment.route.deleted', 'payment_route', $id, (array) $route, []);
-
-        return back()->with('status', 'Routing pembayaran dihapus.');
     }
 
     public function settings(Request $request): RedirectResponse
@@ -661,25 +598,15 @@ class AdminPaymentController
         ]);
     }
 
-    private function routeData(Request $request, bool $creating = true, ?int $channelId = null): array
+    private function routeData(Request $request, int $channelId): array
     {
-        $rules = [
-            'provider_channel' => ['nullable', 'string', 'max:100'],
-            'configuration' => ['nullable', 'string', 'max:20000'],
+        $data = $request->validate([
             'priority' => ['required', 'integer', 'min:0', 'max:9999'],
             'supports_order' => ['required', 'boolean'],
             'supports_wallet_topup' => ['required', 'boolean'],
             'is_active' => ['required', 'boolean'],
-        ];
-        if ($creating) {
-            $rules['payment_channel_id'] = ['required', 'integer', Rule::exists('payment_channels', 'id')];
-            $rules['payment_gateway_id'] = ['required', 'integer', Rule::exists('payment_gateways', 'id')];
-        }
-
-        $data = $request->validate($rules);
-        if (! $creating) {
-            $data['payment_channel_id'] = $channelId;
-        }
+        ]);
+        $data['payment_channel_id'] = $channelId;
 
         return $data;
     }
@@ -705,64 +632,6 @@ class AdminPaymentController
                 'supports_wallet_topup' => 'Metode ini tidak diaktifkan untuk top up saldo.',
             ]);
         }
-    }
-
-    private function configuration(?string $json): ?array
-    {
-        if ($json === null || trim($json) === '') {
-            return null;
-        }
-
-        try {
-            $data = json_decode($json, true, 64, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            throw ValidationException::withMessages(['configuration' => 'Konfigurasi lanjutan harus memakai format JSON yang valid.']);
-        }
-        if (! is_array($data)) {
-            throw ValidationException::withMessages(['configuration' => 'Konfigurasi lanjutan harus berupa objek JSON.']);
-        }
-
-        if ($this->containsSensitiveConfigurationKey($data)) {
-            throw ValidationException::withMessages([
-                'configuration' => 'Kredensial sensitif harus disimpan di menu Integrasi, bukan routing pembayaran.',
-            ]);
-        }
-
-        return $data;
-    }
-
-    private function safeConfiguration(mixed $value): array
-    {
-        $data = is_string($value)
-            ? (json_decode($value, true) ?: [])
-            : ((array) ($value ?? []));
-
-        foreach ($data as $key => $item) {
-            if (preg_match('/(?:secret|password|api[_-]?key|server[_-]?key|client[_-]?secret|access[_-]?token|private[_-]?key)/i', (string) $key)) {
-                unset($data[$key]);
-
-                continue;
-            }
-            if (is_array($item)) {
-                $data[$key] = $this->safeConfiguration($item);
-            }
-        }
-
-        return $data;
-    }
-
-    private function containsSensitiveConfigurationKey(array $data): bool
-    {
-        foreach ($data as $key => $item) {
-            if (preg_match('/(?:secret|password|api[_-]?key|server[_-]?key|client[_-]?secret|access[_-]?token|private[_-]?key)/i', (string) $key)) {
-                return true;
-            }
-            if (is_array($item) && $this->containsSensitiveConfigurationKey($item)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function transactionQuery(array $filters)
