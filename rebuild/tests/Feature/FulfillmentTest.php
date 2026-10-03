@@ -326,6 +326,115 @@ class FulfillmentTest extends TestCase
         $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
     }
 
+    public function test_confirmed_failure_skips_unavailable_backup_before_queuing_next_safe_source(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+
+        $unavailableId = DB::table('provider_mappings')->insertGetId([
+            'product_package_id' => $catalog['package_id'],
+            'provider_id' => $providerId,
+            'external_sku' => 'DF-BACKUP-OOS',
+            'cost_idr' => 10500,
+            'max_price_idr' => 12000,
+            'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}']),
+            'priority' => 2,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $safeId = DB::table('provider_mappings')->insertGetId([
+            'product_package_id' => $catalog['package_id'],
+            'provider_id' => $providerId,
+            'external_sku' => 'DF-BACKUP-SAFE',
+            'cost_idr' => 11000,
+            'max_price_idr' => 12000,
+            'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}']),
+            'priority' => 3,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('digiflazz_catalog_items')->insert([
+            [
+                'buyer_sku_code' => 'DF-BACKUP-OOS',
+                'product_name' => 'Backup OOS',
+                'category' => 'Games',
+                'brand' => 'Test',
+                'type' => 'Diamonds',
+                'seller_name' => 'Seller OOS',
+                'price_idr' => 10500,
+                'baseline_price_idr' => 10500,
+                'buyer_active' => true,
+                'seller_active' => true,
+                'unlimited_stock' => false,
+                'stock' => 0,
+                'start_cut_off' => '00:00',
+                'end_cut_off' => '00:00',
+                'synced_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'buyer_sku_code' => 'DF-BACKUP-SAFE',
+                'product_name' => 'Backup safe',
+                'category' => 'Games',
+                'brand' => 'Test',
+                'type' => 'Diamonds',
+                'seller_name' => 'Seller Safe',
+                'price_idr' => 11000,
+                'baseline_price_idr' => 11000,
+                'buyer_active' => true,
+                'seller_active' => true,
+                'unlimited_stock' => true,
+                'stock' => 0,
+                'start_cut_off' => '00:00',
+                'end_cut_off' => '00:00',
+                'synced_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $orderId = $this->paidOrder($catalog);
+        Http::fake(function ($request) {
+            $payload = $request->data();
+
+            return Http::response(['data' => [
+                'ref_id' => $payload['ref_id'],
+                'customer_no' => $payload['customer_no'],
+                'buyer_sku_code' => $payload['buyer_sku_code'],
+                'message' => 'Gagal definitif',
+                'status' => 'Gagal',
+                'rc' => '44',
+                'sn' => '',
+                'price' => 10000,
+            ]]);
+        });
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $service->sendAttempt((int) $first->id);
+
+        $this->assertSame(0, DB::table('fulfillment_attempts')
+            ->where('order_id', $orderId)
+            ->where('provider_mapping_id', $unavailableId)
+            ->count());
+
+        $next = DB::table('fulfillment_attempts')
+            ->where('order_id', $orderId)
+            ->where('provider_mapping_id', $safeId)
+            ->first();
+        $this->assertNotNull($next);
+        $this->assertSame('CREATED', $next->status);
+        $this->assertSame(2, (int) $next->attempt_no);
+        Queue::assertPushed(SendFulfillmentJob::class, fn ($job) => $job->attemptId === (int) $next->id);
+    }
+
     public function test_unusable_primary_source_is_skipped_before_any_provider_send(): void
     {
         Queue::fake();
