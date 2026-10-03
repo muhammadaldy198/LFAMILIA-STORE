@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AdminUser;
+use App\Models\IntegrationCredential;
 use App\Services\PaymentRoutingService;
 use App\Services\WalletTopupService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -168,6 +169,14 @@ class AdminPaymentRestorationTest extends TestCase
             'is_active' => true,
             'is_maintenance' => false,
             'updated_at' => now(),
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'doku'], [
+            'config_ciphertext' => ['client_id' => 'client-test', 'secret_key' => 'secret-test'],
+            'is_active' => true,
         ]);
 
         $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
