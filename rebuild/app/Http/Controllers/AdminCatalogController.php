@@ -13,6 +13,7 @@ use App\Models\ProviderMapping;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
 use App\Services\CatalogAudit;
+use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
 use App\Services\VoucherStockService;
 use Illuminate\Http\RedirectResponse;
@@ -646,6 +647,108 @@ class AdminCatalogController
             : 'Pengaturan stok kode tersimpan.';
 
         return back()->with('status', $message);
+    }
+
+    public function addDigiflazzMapping(
+        Request $request,
+        ProductPackage $package,
+        DigiflazzCatalogImport $importer,
+        CatalogAudit $audit,
+    ): RedirectResponse {
+        $product = $package->product()->firstOrFail();
+        if ($product->fulfillment_mode !== 'AUTO_PROVIDER') {
+            throw ValidationException::withMessages([
+                'item_id' => 'Route Digiflazz hanya dapat ditambahkan ke produk otomatis.',
+            ]);
+        }
+
+        $data = $request->validate([
+            'item_id' => ['required', 'integer', Rule::exists('digiflazz_catalog_items', 'id')],
+            'priority' => ['required', 'integer', 'min:0', 'max:1000'],
+            'is_active' => ['required', 'boolean'],
+            'customer_no_template' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $item = DB::table('digiflazz_catalog_items')->where('id', $data['item_id'])->firstOrFail();
+        $template = trim((string) ($data['customer_no_template'] ?? ''));
+        $fieldKeys = $product->fields()->pluck('field_key')->all();
+
+        preg_match_all('/\{\{([^}]+)\}\}/', $template, $matches);
+        foreach ($matches[1] ?? [] as $fieldKey) {
+            if (! preg_match('/^[a-z][a-z0-9_]*$/', $fieldKey)
+                || ! in_array($fieldKey, $fieldKeys, true)) {
+                throw ValidationException::withMessages([
+                    'customer_no_template' => 'Placeholder {{'.$fieldKey.'}} tidak cocok dengan field produk.',
+                ]);
+            }
+        }
+
+        if ($data['is_active'] && count($fieldKeys) > 1 && $template === '') {
+            throw ValidationException::withMessages([
+                'customer_no_template' => 'Template customer_no wajib untuk produk dengan lebih dari satu field.',
+            ]);
+        }
+
+        $mapping = null;
+        DB::transaction(function () use ($request, $package, $item, $data, $template, $importer, $audit, &$mapping): void {
+            try {
+                $mapping = $importer->upsert(
+                    $package,
+                    (string) $item->buyer_sku_code,
+                    (int) $item->price_idr,
+                    (int) $item->price_idr,
+                );
+            } catch (\InvalidArgumentException $exception) {
+                throw ValidationException::withMessages([
+                    'item_id' => $exception->getMessage(),
+                ]);
+            }
+
+            $before = $mapping->toArray();
+            $mapping->update([
+                'priority' => (int) $data['priority'],
+                'is_active' => (bool) $data['is_active'],
+                'fulfillment_config' => $template === ''
+                    ? null : ['customer_no_template' => $template],
+            ]);
+
+            $audit->record(
+                $request,
+                'catalog.mapping.route_added',
+                'provider_mapping',
+                $mapping->id,
+                $before,
+                $mapping->fresh()->toArray(),
+            );
+        }, 3);
+
+        return back()->with('status', 'Sumber Digiflazz ditambahkan ke nominal.');
+    }
+
+    public function destroyMapping(Request $request, ProviderMapping $mapping, CatalogAudit $audit): RedirectResponse
+    {
+        $provider = Provider::findOrFail($mapping->provider_id);
+        abort_unless($provider->code === 'DIGIFLAZZ', 404);
+
+        if ($mapping->is_active) {
+            throw ValidationException::withMessages([
+                'mapping' => 'Nonaktifkan sumber terlebih dahulu sebelum menghapusnya.',
+            ]);
+        }
+
+        if (DB::table('fulfillment_attempts')->where('provider_mapping_id', $mapping->id)->exists()
+            || DB::table('orders')->where('provider_mapping_id', $mapping->id)->exists()) {
+            throw ValidationException::withMessages([
+                'mapping' => 'Sumber ini sudah pernah dipakai transaksi. Nonaktifkan saja agar riwayat tetap utuh.',
+            ]);
+        }
+
+        $before = $mapping->toArray();
+        $id = $mapping->id;
+        $mapping->delete();
+        $audit->record($request, 'catalog.mapping.deleted', 'provider_mapping', $id, $before, null);
+
+        return back()->with('status', 'Sumber Digiflazz dihapus dari nominal.');
     }
 
     public function mapping(Request $request, ProviderMapping $mapping, CatalogAudit $audit): RedirectResponse
