@@ -14,7 +14,7 @@ on:
       - '.github/workflows/validate-rebuild.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   foundation:
@@ -64,7 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Enforce Laravel-only repository shape
         run: |
@@ -112,20 +112,13 @@ jobs:
             exit 1
           fi
 
-      - name: Refresh frontend lockfile for Stage 2 branch
-        if: github.ref == 'refs/heads/rebuild/tahap-2-frontend-static-analysis' && github.event_name == 'push' && github.actor != 'github-actions[bot]'
-        run: |
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          if ! git diff --quiet -- package-lock.json; then
-            git config user.name github-actions[bot]
-            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add package-lock.json
-            git commit -m "chore(frontend): refresh static-analysis lockfile"
-            git push origin HEAD:rebuild/tahap-2-frontend-static-analysis
-          fi
-
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Frontend static analysis
+        run: |
+          npm run lint
+          npm run check
 
       - name: Configure test app
         run: |
