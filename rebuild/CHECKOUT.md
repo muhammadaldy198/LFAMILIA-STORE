@@ -1,20 +1,45 @@
-# Checkout (M6)
+# Checkout
 
-- Checkout consumes the configurable product input fields from M5. Unknown fields, missing required fields, malformed email/phone values, inactive products/packages, and packages without an active eligible provider mapping are rejected server-side.
-- Customer-visible prices are calculated only from server-side provider cost plus product margin. The browser cannot submit cost, margin, discount, fee, total, provider mapping/code, external SKU, or buyer SKU. M6 uses a zero payment fee because payment-channel routing and fees are introduced in M7; M7 must feed the selected channel fee into this same server-side pricing path before new external-payment orders are created.
-- Provider selection is internal and provider-agnostic: the active mapping with the lowest priority, then lowest eligible cost, is selected. A mapping whose cost already exceeds max_price is not eligible. Internal provider/SKU/cost data is stored only in the order snapshot and is never returned by the public quote/catalog endpoints.
-- Voucher validation supports FIXED and PERCENT discounts, active dates, minimum transaction, total quota, per-customer limit, product/category scope, and positive-total enforcement. Order creation locks the voucher row and writes the RESERVED redemption in the same database transaction, so concurrent checkouts cannot oversubscribe quota.
-- Every order stores immutable commercial and customer-input snapshots. Order creation writes an ORDER_CREATED event with a correlation ID. Orders start at PENDING_PAYMENT and reserve voucher capacity until the configurable checkout expiry; M7 owns payment creation/state transitions.
-- Checkout creation requires a client-generated idempotency key but binds it to a server-computed request fingerprint. Reusing the same key and payload returns the same order. Reusing the key for different checkout data returns HTTP 409. Guest access codes are deterministic per order/idempotency key so an idempotent retry returns the same access code instead of rotating it.
-- Guest checkout requires email and phone and never creates a wallet. Registered customers use their account identity and must already have a phone.
-- Nickname verification is KokinPay-compatible but reads credentials only from encrypted integration_credentials (code: kokinpay). Product nickname mapping fields are schema-backed in M6; operational management of game-code/field mapping and integration credentials is completed in M9.
-- A verified invalid ID/server response is rejected. Configuration outages, authentication failures, timeouts, and upstream service failures return a neutral warning and do not block checkout, matching the PRD fallback requirement. The customer never sees the nickname provider name.
-- Stage 7.1 validates the exact current account-input signature before the confirmation modal. Field-level errors are shown per configured input, stale nickname responses are ignored if ID/Server changes while a request is in flight, and order creation still repeats the same server-side validation so frontend state is never trusted as proof of validity.
-- Stage 7.2 treats package ID as the only customer-selectable nominal reference. Availability and price are recalculated server-side from active product/package/provider mapping state, unavailable deep links are never preselected, and public catalog/quote payloads do not expose provider mapping, cost, max-price, or SKU fields.
-- Stage 7.3 allows the customer to submit only a public payment channel. Internal route/gateway identifiers and provider-channel overrides are explicitly prohibited, unavailable channels cannot become frontend selected state, guest wallet remains visible only as a login prompt and is rejected by quote/order APIs, and gateway maintenance removes affected channels from public choices.
-- Stage 7.4 recalculates membership and voucher discounts only on the server. Membership/voucher discount fields and IDs from the browser are prohibited, voucher discounts stack after the membership discount, voucher reservations remain atomic, and the voucher picker now reuses checkout eligibility rules for product/category scope, minimum transaction, quota, and per-customer usage. Guest identifiers for picker eligibility are sent in the POST body rather than the URL.
-- Stage 7.5 uses one server financial summary for subtotal, membership discount, voucher discount, total discount, payment fee, and final total. Once a quote exists, desktop/mobile/confirmation summaries render those backend values instead of the page-load package price; editing a voucher invalidates the old quote immediately; and the create-order response repeats only the persisted safe summary so a payment-init failure cannot leave stale line items on screen.
-- Stage 7.6 freezes the final confirmation modal into a snapshot of the validated account data, selected nominal, public payment channel, contact data, voucher, and backend financial summary. Any relevant customer-side state change invalidates that confirmation. On the final click the frontend refreshes the backend quote; if subtotal, discounts, fee, total, voucher, tier, or payment channel changed, consent is cleared and the customer must review and approve the updated summary again before an order can be submitted.
-- Stage 7.7 makes order submission recoverable and idempotent across double clicks, request timeouts, and page refreshes. The checkout attempt key is kept in session storage and bound to the confirmed checkout signature until an order response is known; MySQL's unique order key is backed by duplicate-race recovery; final order creation recalculates and revalidates nominal, account input, voucher, membership, and payment routing inside the transaction; and once an order exists, any payment-init failure moves the customer to the existing invoice/payment flow instead of allowing a second order. The payment page can resume a missing payment transaction for that existing invoice using the payment service's own idempotency protections.
-- Stage 7.8 adds final regression coverage for the entire customer checkout chain. CI seeds a test-only checkout product and renders the real product page with headless Chromium in desktop (1440x1000) and mobile (390x844) viewports, while a dedicated Laravel feature regression walks a guest through product page -> server quote -> idempotent order -> fake Midtrans payment initialization -> authorized payment page and asserts the same server amount snapshot throughout. No production seed data or live gateway calls are used.
-- Public checkout endpoints are rate-limited. Broader rate-limit/Turnstile/security hardening remains M10.
+Checkout adalah server-authoritative. Browser tidak dipercaya sebagai sumber cost, margin, discount, fee, total, provider mapping, external SKU, atau payment gateway.
+
+## Flow
+
+1. Load product/package dan field customer yang aktif.
+2. Validasi customer input dan nickname bila checker tersedia/configured.
+3. Pilih package/nominal.
+4. Customer memilih payment channel publik.
+5. Backend resolve provider mapping dan payment route.
+6. Backend hitung membership + voucher + payment fee.
+7. Customer mengonfirmasi ringkasan server.
+8. Backend membuat order secara idempotent di MySQL transaction.
+9. Order menyimpan snapshot dan masuk `PENDING_PAYMENT`.
+10. Payment flow dilanjutkan untuk order yang sama.
+
+## Idempotency
+
+Checkout menerima idempotency key dan membuat fingerprint dari actor, package, channel, voucher, dan customer input. Key yang sama dengan fingerprint sama mengembalikan order yang sudah ada; key sama untuk checkout berbeda ditolak.
+
+Unique constraint MySQL menjadi proteksi tambahan terhadap race.
+
+## Pricing/snapshot
+
+Di dalam transaction, backend mengunci/revalidasi package/provider mapping, customer input, membership, voucher, dan payment route lalu menghitung:
+
+- provider cost;
+- margin;
+- membership discount;
+- voucher discount;
+- payment fee;
+- final total.
+
+Snapshot order menyimpan product/package/provider/payment/pricing/membership/voucher/customer input yang dipakai saat order dibuat. Harga order tidak berubah hanya karena setting katalog/provider berubah kemudian.
+
+Voucher reservation dibuat secara atomic dan mengikuti quota/per-customer/scope/period/minimum rule.
+
+## Payment routing boundary
+
+Customer hanya mengirim `payment_channel_code`. Backend yang memilih gateway/route. Gateway internal tidak boleh dipilih atau dipaksa customer.
+
+Guest tidak dapat memilih wallet. Channel unavailable/maintenance/not-ready tidak boleh menghasilkan route checkout.
+
+Lihat [PAYMENT.md](PAYMENT.md) untuk state dan callback, serta [FULFILLMENT.md](FULFILLMENT.md) untuk provider attempt.
