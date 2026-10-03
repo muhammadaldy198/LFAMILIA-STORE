@@ -194,4 +194,29 @@ class AdminContentRestorationTest extends TestCase
             ->where('storefront.supportWhatsapp', '081234567890')
             ->where('storefront.supportEmail', 'support@example.test'));
     }
+    public function test_content_page_checkbox_payload_uses_real_booleans(): void
+    {
+        $this->login();
+
+        DB::table('content_pages')->where('key', 'terms')->update([
+            'is_active' => 1,
+            'updated_at' => now(),
+        ]);
+        DB::table('content_pages')->where('key', 'refund')->update([
+            'is_active' => 0,
+            'updated_at' => now(),
+        ]);
+
+        $this->get('/admin/content')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Content')
+            ->where('pages', function ($pages): bool {
+                $items = collect($pages)->keyBy('key');
+
+                return $items->has('terms')
+                    && $items->has('refund')
+                    && $items->get('terms')['is_active'] === true
+                    && $items->get('refund')['is_active'] === false;
+            }));
+    }
+
 }
