@@ -755,7 +755,7 @@ class AdminCatalogController
     {
         $provider = Provider::findOrFail($mapping->provider_id);
         $data = $request->validate([
-            'priority' => ['required', 'integer', 'min:0'],
+            'priority' => ['required', 'integer', 'min:0', 'max:1000'],
             'is_active' => ['required', 'boolean'],
             'cost_idr' => [$provider->code === 'MANUAL' ? 'required' : 'prohibited', 'integer', 'min:0'],
             'customer_no_template' => [$provider->code === 'DIGIFLAZZ' ? 'nullable' : 'prohibited', 'string', 'max:500'],
