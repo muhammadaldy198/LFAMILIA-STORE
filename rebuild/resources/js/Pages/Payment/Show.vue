@@ -207,7 +207,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-<Head :title="customerText(&quot;pages.payment.show.attribute.title.3527df23&quot;, &quot;Pembayaran&quot;)" />
+<Head :title="customerText('pages.payment.show.attribute.title.3527df23', 'Pembayaran')" />
 <CustomerShell>
 <main class="lf-payment-page mx-auto min-h-[76vh] max-w-xl px-4 py-8 sm:py-12" :style="{ '--payment-accent': accent }">
     <section class="lf-payment-card overflow-hidden rounded-xl border border-white/10 bg-[#0d1019] shadow-2xl">
@@ -215,7 +215,7 @@ onBeforeUnmount(() => {
         <div class="lf-payment-head border-b border-white/10 bg-gradient-to-br from-white/[0.035] via-transparent to-transparent p-5 sm:p-6">
             <div v-if="settings.showStoreBrand !== false" class="lf-payment-brand-row mb-5 flex items-center justify-between gap-4 border-b border-white/[0.07] pb-4">
                 <div class="lf-payment-brand">
-                    <img v-if="storeLogo" :src="storeLogo" :alt="customerText(&quot;pages.payment.show.attribute.alt.adae0b8b&quot;, &quot;LFAMILIA STORE&quot;)">
+                    <img v-if="storeLogo" :src="storeLogo" :alt="customerText('pages.payment.show.attribute.alt.adae0b8b', 'LFAMILIA STORE')">
                     <span v-else class="lf-payment-brand-fallback">{{ customerText("pages.payment.show.6ae24f17", "LF") }}</span>
                     <div>
                         <strong>{{ customerText("pages.payment.show.497f244e", "LFAMILIA") }}</strong>
@@ -264,7 +264,7 @@ onBeforeUnmount(() => {
             </dl>
 
             <div v-if="!terminal && !uncertain && qrUrl" class="mt-5 rounded-xl border border-white/10 bg-white p-4 text-center">
-                <img :src="qrUrl" :alt="customerText(&quot;pages.payment.show.attribute.alt.dfd028b8&quot;, &quot;QRIS pembayaran&quot;)" class="mx-auto h-auto w-full max-w-[220px]">
+                <img :src="qrUrl" :alt="customerText('pages.payment.show.attribute.alt.dfd028b8', 'QRIS pembayaran')" class="mx-auto h-auto w-full max-w-[220px]">
                 <p class="mt-3 text-[10px] font-black text-[#091006]">{{ customerText("pages.payment.show.deb02ada", "Scan QRIS untuk membayar") }}</p>
                 <p class="mt-1 text-[8px] text-black/55">{{ customerText("pages.payment.show.38ab038a", "Gunakan aplikasi bank atau e-wallet yang mendukung QRIS.") }}</p>
             </div>

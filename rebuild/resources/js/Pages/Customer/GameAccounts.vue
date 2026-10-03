@@ -94,7 +94,7 @@ async function remove(account) {
 </script>
 
 <template>
-<Head :title="customerText(&quot;pages.customer.gameaccounts.attribute.title.58d42884&quot;, &quot;Akun Game&quot;)" />
+<Head :title="customerText('pages.customer.gameaccounts.attribute.title.58d42884', 'Akun Game')" />
 <AccountShell>
     <div><p class="lf-eyebrow">{{ customerText("pages.customer.gameaccounts.3fa5187f", "AKUN TERSIMPAN") }}</p><h1 class="lf-account-title">{{ customerText("pages.customer.gameaccounts.d90074a4", "Akun game") }}</h1><p class="lf-account-copy">{{ customerText("pages.customer.gameaccounts.c0867ef5", "Simpan User ID dan server agar dapat dipilih kembali saat checkout.") }}</p></div>
 
@@ -113,7 +113,7 @@ async function remove(account) {
                     <option v-for="product in products" :key="product.id" :value="String(product.id)">{{product.name}}</option>
                 </select>
             </label>
-            <label class="text-xs">{{ customerText("pages.customer.gameaccounts.9087cd09", "Nama akun") }}<input v-model="label" maxlength="100" :placeholder="customerText(&quot;pages.customer.gameaccounts.attribute.placeholder.e8d07a66&quot;, &quot;Contoh: Mobile Legends Utama&quot;)" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3"></label>
+            <label class="text-xs">{{ customerText("pages.customer.gameaccounts.9087cd09", "Nama akun") }}<input v-model="label" maxlength="100" :placeholder="customerText('pages.customer.gameaccounts.attribute.placeholder.e8d07a66', 'Contoh: Mobile Legends Utama')" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3"></label>
             <label v-for="field in fields" :key="field.field_key" class="text-xs">
                 {{field.label}}
                 <input v-model="values[field.field_key]" :type="field.type || 'text'" :required="field.is_required" :placeholder="field.placeholder || ''" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3">

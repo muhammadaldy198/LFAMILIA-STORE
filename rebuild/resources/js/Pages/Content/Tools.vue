@@ -13,7 +13,7 @@ const tools = [
 </script>
 
 <template>
-<Head :title="customerText(&quot;pages.content.tools.attribute.title.57d99b55&quot;, &quot;LFAMILIA Tools&quot;)"/>
+<Head :title="customerText('pages.content.tools.attribute.title.57d99b55', 'LFAMILIA Tools')"/>
 <CustomerShell>
 <main class="lf-tools-index">
     <section class="lf-container">

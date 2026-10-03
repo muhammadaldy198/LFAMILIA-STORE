@@ -10,7 +10,7 @@ defineProps({ customer: Object, balanceIdr: Number, orderCount: Number, ticketCo
 </script>
 
 <template>
-    <Head :title="customerText(&quot;pages.account.attribute.title.682fab7a&quot;, &quot;Akun&quot;)" />
+    <Head :title="customerText('pages.account.attribute.title.682fab7a', 'Akun')" />
     <AccountShell>
         <div>
             <h1 class="text-3xl font-semibold">Halo, {{ customer.name }}</h1>

@@ -17,7 +17,7 @@ function reply() {
 </script>
 
 <template>
-    <Head :title="customerText(&quot;pages.customer.ticketdetail.attribute.title.5cca0fc9&quot;, &quot;Detail tiket&quot;)" />
+    <Head :title="customerText('pages.customer.ticketdetail.attribute.title.5cca0fc9', 'Detail tiket')" />
     <AccountShell>
         <Link href="/account/tickets" class="text-sm text-cyan-300">{{ customerText("pages.customer.ticketdetail.13da208b", "← Semua tiket") }}</Link>
         <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
@@ -41,7 +41,7 @@ function reply() {
         </section>
 
         <form v-if="ticket.status !== 'CLOSED'" class="mt-4 rounded-xl border border-slate-800 bg-slate-900 p-4" @submit.prevent="reply">
-            <label class="text-sm font-semibold">{{ customerText("pages.customer.ticketdetail.c9b566cd", "Balas tiket") }}<textarea v-model="form.message" required maxlength="5000" rows="4" class="mt-2 block w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm" :placeholder="customerText(&quot;pages.customer.ticketdetail.attribute.placeholder.1def0e1e&quot;, &quot;Masukkan balasan&quot;)"></textarea></label>
+            <label class="text-sm font-semibold">{{ customerText("pages.customer.ticketdetail.c9b566cd", "Balas tiket") }}<textarea v-model="form.message" required maxlength="5000" rows="4" class="mt-2 block w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm" :placeholder="customerText('pages.customer.ticketdetail.attribute.placeholder.1def0e1e', 'Masukkan balasan')"></textarea></label>
             <div class="mt-3 flex justify-end"><button :disabled="form.processing" class="lf-primary">{{ customerText("pages.customer.ticketdetail.91fff07f", "Kirim balasan") }}</button></div>
             <p role="alert" v-if="form.errors.message" class="mt-2 text-sm text-red-300">{{form.errors.message}}</p>
         </form>

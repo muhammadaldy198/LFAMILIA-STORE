@@ -921,7 +921,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                 @click="choosePayment(group.items.find(x=>x.code===paymentChannelCode)?.code || group.items.find(x=>x.available!==false)?.code)"
                             >
                                 <span v-if="group.key==='wallet'" class="lf-payment-wallet-art">
-                                    <img :src="'/payment/lfamilia-cash.webp'" :alt="customerText(&quot;pages.catalog.show.attribute.alt.d8a0146d&quot;, &quot;LFAMILIA Cash&quot;)">
+                                    <img :src="'/payment/lfamilia-cash.webp'" :alt="customerText('pages.catalog.show.attribute.alt.d8a0146d', 'LFAMILIA Cash')">
                                 </span>
                                 <span class="lf-payment-group-copy">
                                     <strong>{{group.title}}</strong>
@@ -968,8 +968,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <header><div><h2>{{ customerText("pages.catalog.show.19af3a35", "Data Pembeli") }}</h2><p>{{ customerText("pages.catalog.show.1e6ddd4f", "Email dan WhatsApp digunakan untuk invoice serta status transaksi.") }}</p></div></header>
                     <div class="lf-panel-body">
                         <div v-if="!customer" class="lf-account-fields">
-                            <label><span>{{ customerText("pages.catalog.show.43352167", "Email") }}</span><input v-model="guestEmail" type="email" maxlength="255" :placeholder="customerText(&quot;pages.catalog.show.attribute.placeholder.f333f780&quot;, &quot;Contoh: nama@email.com&quot;)"></label>
-                            <label><span>{{ customerText("pages.catalog.show.8aa48a22", "Nomor WhatsApp") }}</span><input :value="guestPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="17" pattern="\\+?[0-9]{8,16}" :placeholder="customerText(&quot;pages.catalog.show.attribute.placeholder.a02514d1&quot;, &quot;Contoh: 081234567890&quot;)" @input="guestPhone=normalizeWhatsapp($event.target.value)"></label>
+                            <label><span>{{ customerText("pages.catalog.show.43352167", "Email") }}</span><input v-model="guestEmail" type="email" maxlength="255" :placeholder="customerText('pages.catalog.show.attribute.placeholder.f333f780', 'Contoh: nama@email.com')"></label>
+                            <label><span>{{ customerText("pages.catalog.show.8aa48a22", "Nomor WhatsApp") }}</span><input :value="guestPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="17" pattern="\\+?[0-9]{8,16}" :placeholder="customerText('pages.catalog.show.attribute.placeholder.a02514d1', 'Contoh: 081234567890')" @input="guestPhone=normalizeWhatsapp($event.target.value)"></label>
                         </div>
                         <div v-else class="lf-customer-checkout-note">
                             <span class="lf-account-avatar">{{customer.name?.slice(0,1)?.toUpperCase()}}</span>
@@ -983,7 +983,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <header><div><h2>{{ customerText("pages.catalog.show.a2cdbf5b", "Kode Promo") }}</h2><p>{{ customerText("pages.catalog.show.98e0f6bb", "Masukkan kode promo atau voucher diskon yang tersedia.") }}</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-promo-input">
-                            <input :value="voucherCode" maxlength="100" :placeholder="customerText(&quot;pages.catalog.show.attribute.placeholder.1d49aca8&quot;, &quot;Masukkan kode promo&quot;)" @input="updateVoucherInput($event.target.value)">
+                            <input :value="voucherCode" maxlength="100" :placeholder="customerText('pages.catalog.show.attribute.placeholder.1d49aca8', 'Masukkan kode promo')" @input="updateVoucherInput($event.target.value)">
                             <button type="button" :disabled="busy==='quote'||!canQuote" @click="loadQuote">{{busy==='quote'?'Memeriksa...':'Gunakan'}}</button>
                         </div>
                         <button type="button" class="lf-available-promo" @click="openVoucherPicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9a3 3 0 0 0 0 6v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a3 3 0 0 0 0-6V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg><span>{{ customerText("pages.catalog.show.d64c85af", "Pakai Voucher Yang Tersedia") }}</span></button>
@@ -1062,8 +1062,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             <button v-for="value in [1,2,3,4,5]" :key="value" type="button" :aria-label="value + ' bintang'" :class="{active:value<=reviewRating}" @click="reviewRating=value">★</button>
                         </div>
 
-                        <input v-model="reviewTitle" maxlength="100" :placeholder="customerText(&quot;pages.catalog.show.attribute.placeholder.5f3aed05&quot;, &quot;Masukkan judul singkat (opsional)&quot;)">
-                        <textarea v-model="reviewBody" required minlength="5" maxlength="1200" :placeholder="customerText(&quot;pages.catalog.show.attribute.placeholder.98e9ee9&quot;, &quot;Ceritakan pengalaman transaksimu&quot;)"></textarea>
+                        <input v-model="reviewTitle" maxlength="100" :placeholder="customerText('pages.catalog.show.attribute.placeholder.5f3aed05', 'Masukkan judul singkat (opsional)')">
+                        <textarea v-model="reviewBody" required minlength="5" maxlength="1200" :placeholder="customerText('pages.catalog.show.attribute.placeholder.98e9ee9', 'Ceritakan pengalaman transaksimu')"></textarea>
                         <p v-if="reviewMessage" class="lf-review-success">{{reviewMessage}}</p>
                         <p v-if="reviewError" class="lf-review-error">{{reviewError}}</p>
                         <button class="lf-review-submit" :disabled="reviewSaving">{{reviewSaving ? 'Menyimpan...' : 'Simpan ulasan'}}</button>
@@ -1156,7 +1156,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
         <div class="lf-product-notice-modal">
             <header>
                 <span>{{noticeIndex + 1}}/{{notices.length}}</span>
-                <button type="button" :aria-label="customerText(&quot;pages.catalog.show.attribute.aria-label.e4840d5b&quot;, &quot;Tutup informasi&quot;)" @click="closeNotice">{{ customerText("pages.catalog.show.520b4356", "×") }}</button>
+                <button type="button" :aria-label="customerText('pages.catalog.show.attribute.aria-label.e4840d5b', 'Tutup informasi')" @click="closeNotice">{{ customerText("pages.catalog.show.520b4356", "×") }}</button>
             </header>
             <div class="lf-product-notice-body">
                 <h2>{{formatNotice(notices[noticeIndex]?.title)}}</h2>
@@ -1180,7 +1180,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <h2>{{ customerText("pages.catalog.show.d3a9c781", "Voucher Yang Tersedia") }}</h2>
                     <p>{{ customerText("pages.catalog.show.220bf04d", "Pilih voucher untuk langsung menghitung diskon pada nominal pesananmu.") }}</p>
                 </div>
-                <button type="button" :aria-label="customerText(&quot;pages.catalog.show.attribute.aria-label.51cf4131&quot;, &quot;Tutup voucher&quot;)" @click="voucherOpen=false">{{ customerText("pages.catalog.show.520b4356", "×") }}</button>
+                <button type="button" :aria-label="customerText('pages.catalog.show.attribute.aria-label.51cf4131', 'Tutup voucher')" @click="voucherOpen=false">{{ customerText("pages.catalog.show.520b4356", "×") }}</button>
             </header>
             <div v-if="voucherLoading" class="lf-voucher-state">{{ customerText("pages.catalog.show.a0485240", "Memuat voucher...") }}</div>
             <div v-else-if="voucherError" class="lf-voucher-state lf-voucher-error">{{voucherError}}</div>
