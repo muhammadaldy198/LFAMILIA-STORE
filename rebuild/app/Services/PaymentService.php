@@ -158,56 +158,98 @@ class PaymentService
         if (! is_string($channelCode) || $channelCode === '') {
             throw ValidationException::withMessages(['payment' => 'Metode top up tidak valid.']);
         }
+
         $fingerprint = hash('sha256', implode('|', [
             'topup', $topup->id, $channelCode, $topup->payment_route_id, $topup->total_idr,
         ]));
+
         $payment = $this->findExisting($idempotencyKey, $fingerprint);
         if ($payment) {
             return $this->publicResult($payment);
         }
 
-        if ($topup->status !== 'PENDING_PAYMENT') {
-            throw ValidationException::withMessages(['payment' => 'Top up tidak dapat dibayar.']);
-        }
+        $result = DB::transaction(function () use ($topup, $idempotencyKey, $fingerprint): array {
+            $lockedTopup = DB::table('wallet_topups')->where('id', $topup->id)
+                ->lockForUpdate()->first();
+            if (! $lockedTopup || ! $lockedTopup->payment_route_id || ! $lockedTopup->payment_channel_id) {
+                throw ValidationException::withMessages(['payment' => 'Top up tidak dapat dibayar.']);
+            }
+            if ($lockedTopup->status !== 'PENDING_PAYMENT') {
+                throw ValidationException::withMessages(['payment' => 'Top up tidak dapat dibayar.']);
+            }
 
-        $route = $this->routing->byRouteId((int) $topup->payment_route_id, 'topup');
-        if (in_array($route['gateway_code'], ['WALLET', 'MANUAL_QRIS'], true)) {
-            throw ValidationException::withMessages(['payment' => 'Metode ini tidak dapat dipakai untuk top up saldo.']);
-        }
+            $existing = DB::table('payment_transactions')
+                ->where('idempotency_key', $idempotencyKey)
+                ->lockForUpdate()->first();
+            if ($existing) {
+                return ['payment' => $existing, 'topup' => $lockedTopup, 'route' => null];
+            }
 
-        $payment = DB::transaction(function () use ($topup, $route, $idempotencyKey, $fingerprint): object {
+            $existingTopupPayment = DB::table('payment_transactions')
+                ->where('wallet_topup_id', $lockedTopup->id)
+                ->where('status', '<>', 'REJECTED')
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
+            if ($existingTopupPayment) {
+                return ['payment' => $existingTopupPayment, 'topup' => $lockedTopup, 'route' => null];
+            }
+
+            $route = $this->routing->byRouteId((int) $lockedTopup->payment_route_id, 'topup', true);
+            if (in_array($route['gateway_code'], ['WALLET', 'MANUAL_QRIS'], true)) {
+                throw ValidationException::withMessages(['payment' => 'Metode ini tidak dapat dipakai untuk top up saldo.']);
+            }
+
             $id = DB::table('payment_transactions')->insertGetId([
                 'order_id' => null,
-                'wallet_topup_id' => $topup->id,
+                'wallet_topup_id' => $lockedTopup->id,
                 'payment_route_id' => $route['route_id'],
                 'gateway_code' => $route['gateway_code'],
                 'channel_code' => $route['channel_code'],
-                'amount_idr' => $topup->total_idr,
+                'amount_idr' => $lockedTopup->total_idr,
                 'status' => 'CREATING',
                 'request_fingerprint' => $fingerprint,
                 'idempotency_key' => $idempotencyKey,
-                'expires_at' => $topup->expires_at,
+                'expires_at' => $lockedTopup->expires_at,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
             DB::table('payment_transactions')->where('id', $id)->update([
-                'merchant_reference' => $this->merchantReference('TOP', (string) $topup->id, $id),
+                'merchant_reference' => $this->merchantReference('TOP', (string) $lockedTopup->id, $id),
                 'updated_at' => now(),
             ]);
 
-            return DB::table('payment_transactions')->where('id', $id)->first();
+            return [
+                'payment' => DB::table('payment_transactions')->where('id', $id)->first(),
+                'topup' => $lockedTopup,
+                'route' => $route,
+            ];
         }, 3);
 
+        $payment = $result['payment'];
+        if (! hash_equals((string) $payment->request_fingerprint, $fingerprint)) {
+            if ((int) $payment->wallet_topup_id === (int) $topup->id) {
+                return $this->publicResult($payment);
+            }
+
+            throw new HttpException(409, 'Idempotency key pembayaran sudah dipakai untuk transaksi berbeda.');
+        }
+
+        if ($result['route'] === null || $payment->status !== 'CREATING') {
+            return $this->publicResult($payment);
+        }
+
+        $lockedTopup = $result['topup'];
         $target = (object) [
-            'user_id' => $topup->user_id,
+            'user_id' => $lockedTopup->user_id,
             'guest_email' => $customerEmail,
             'guest_phone' => $customerPhone,
-            'total_idr' => $topup->total_idr,
-            'expires_at' => $topup->expires_at,
+            'total_idr' => $lockedTopup->total_idr,
+            'expires_at' => $lockedTopup->expires_at,
             'customer_name' => $customerName,
         ];
 
-        return $this->createExternal($payment, $target, $route);
+        return $this->createExternal($payment, $target, $result['route']);
     }
 
     private function findExisting(string $idempotencyKey, string $fingerprint): ?object
