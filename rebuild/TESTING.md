@@ -102,7 +102,7 @@ npm run guard:push
 npm run test:hooks
 ```
 
-`npm run test:hooks` adalah smoke test terkontrol untuk PHP syntax failure, ESLint failure, conflict marker, forbidden `.env`, secret pattern, valid commit, dan entrypoint pre-push. CI memasang hook secara eksplisit hanya untuk smoke ini.
+`npm run test:hooks` adalah smoke test terkontrol untuk PHP syntax failure, ESLint failure, partial-staging/index validation, conflict marker, forbidden `.env`, secret pattern, valid commit, dan entrypoint pre-push. Demi keselamatan developer, smoke test menolak berjalan bila working tree/index sudah kotor dan memulihkan identitas Git lokal setelah selesai. CI memasang hook secara eksplisit hanya untuk smoke ini.
 
 Local hook dapat dilewati dengan `--no-verify` atau `HUSKY=0`; karena itu hook bukan security boundary. GitHub CI tetap authority/gate sebelum merge.
 
