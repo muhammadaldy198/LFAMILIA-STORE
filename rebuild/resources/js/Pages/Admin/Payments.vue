@@ -19,6 +19,7 @@ const props = defineProps({
     summary: { type: Object, default: () => ({}) },
     walletSettings: { type: Object, default: () => ({}) },
     manualQrisAsset: Object,
+    refundReviews: { type: Array, default: () => [] },
     manualPayments: { type: Array, default: () => [] },
     pageSettings: { type: Object, default: () => ({}) },
     callbackUrls: { type: Object, default: () => ({}) },
@@ -44,15 +45,9 @@ watch(() => props.gateways, (items) => {
     gateways.splice(0, gateways.length, ...items.map((item) => ({ ...item })));
 }, { deep: true });
 
-const routes = reactive(props.routes.map((item) => ({
-    ...item,
-    configuration_text: item.configuration ? JSON.stringify(item.configuration, null, 2) : '',
-})));
+const routes = reactive(props.routes.map((item) => ({ ...item })));
 watch(() => props.routes, (items) => {
-    routes.splice(0, routes.length, ...items.map((item) => ({
-        ...item,
-        configuration_text: item.configuration ? JSON.stringify(item.configuration, null, 2) : '',
-    })));
+    routes.splice(0, routes.length, ...items.map((item) => ({ ...item })));
 }, { deep: true });
 
 const walletSettings = reactive({
@@ -97,17 +92,6 @@ const selectedTransaction = ref(null);
 const showAdvancedRouting = ref(false);
 const saving = ref('');
 
-const routeForm = reactive({
-    payment_channel_id: '',
-    payment_gateway_id: '',
-    provider_channel: '',
-    configuration: '',
-    priority: 0,
-    supports_order: true,
-    supports_wallet_topup: false,
-    is_active: false,
-});
-
 const methodLabel = (value) => ({
     QRIS: 'QRIS',
     VIRTUAL_ACCOUNT: 'Virtual Account',
@@ -119,6 +103,7 @@ const methodLabel = (value) => ({
 
 const statusLabel = (value) => ({
     CREATING: 'Menyiapkan',
+    SENDING: 'Mengirim permintaan',
     PENDING: 'Menunggu',
     UNKNOWN: 'Belum pasti',
     PAID: 'Dibayar',
@@ -296,45 +281,13 @@ function saveWalletSettings() {
     }, { preserveScroll: true });
 }
 
-function createRoute() {
-    router.post('/admin/payments/routes', {
-        payment_channel_id: Number(routeForm.payment_channel_id),
-        payment_gateway_id: Number(routeForm.payment_gateway_id),
-        provider_channel: routeForm.provider_channel || null,
-        configuration: routeForm.configuration || null,
-        priority: Number(routeForm.priority || 0),
-        supports_order: Boolean(routeForm.supports_order),
-        supports_wallet_topup: Boolean(routeForm.supports_wallet_topup),
-        is_active: Boolean(routeForm.is_active),
-    }, {
-        preserveScroll: true,
-        onSuccess: () => Object.assign(routeForm, {
-            payment_channel_id: '',
-            payment_gateway_id: '',
-            provider_channel: '',
-            configuration: '',
-            priority: 0,
-            supports_order: true,
-            supports_wallet_topup: false,
-            is_active: false,
-        }),
-    });
-}
-
 function saveRoute(row) {
     router.put('/admin/payments/routes/' + row.id, {
-        provider_channel: row.provider_channel || null,
-        configuration: row.configuration_text || null,
         priority: Number(row.priority || 0),
         supports_order: Boolean(row.supports_order),
         supports_wallet_topup: Boolean(row.supports_wallet_topup),
         is_active: Boolean(row.is_active),
     }, { preserveScroll: true });
-}
-
-function deleteRoute(row) {
-    if (!window.confirm('Hapus routing ' + row.channel_name + ' → ' + row.gateway_name + '?')) return;
-    router.delete('/admin/payments/routes/' + row.id, { preserveScroll: true });
 }
 
 function uploadManualQris(event) {
@@ -356,6 +309,11 @@ function toggleManualQris() {
 function confirmManual(id) {
     if (!window.confirm('Konfirmasi bahwa pembayaran QRIS manual ini benar-benar sudah diterima?')) return;
     router.post('/admin/payments/manual/' + id + '/confirm', {}, { preserveScroll: true });
+}
+
+function resolveRefundReview(topup) {
+    if (!window.confirm('Rekonsiliasi refund ini dari saldo pelanggan? Dana hanya dipotong jika saldo mencukupi.')) return;
+    router.post('/admin/payments/refund-reviews/' + topup.id + '/resolve', {}, { preserveScroll: true });
 }
 
 function savePaymentPage() {
@@ -498,26 +456,16 @@ async function copy(value) {
                 </div>
 
                 <div v-if="showAdvancedRouting && isSuperAdmin" class="mt-4 space-y-4 border-t pt-4">
-                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <label class="space-y-1"><span class="text-sm font-medium">Metode</span><select v-model="routeForm.payment_channel_id" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Pilih metode</option><option v-for="channel in channels" :key="channel.id" :value="channel.id">{{ channel.name }}</option></select></label>
-                        <label class="space-y-1"><span class="text-sm font-medium">Gateway</span><select v-model="routeForm.payment_gateway_id" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Pilih gateway</option><option v-for="gateway in gateways" :key="gateway.id" :value="gateway.id">{{ gateway.internal_name }}</option></select></label>
-                        <label class="space-y-1"><span class="text-sm font-medium">Kode channel gateway</span><Input v-model="routeForm.provider_channel" maxlength="100" placeholder="opsional" /></label>
-                        <label class="space-y-1"><span class="text-sm font-medium">Prioritas</span><Input v-model.number="routeForm.priority" type="number" min="0" max="9999" /></label>
-                        <div class="space-y-2 rounded-md border p-3"><label class="flex items-center gap-2 text-sm"><input v-model="routeForm.supports_order" type="checkbox" class="size-4">Untuk pesanan</label><label class="flex items-center gap-2 text-sm"><input v-model="routeForm.supports_wallet_topup" type="checkbox" class="size-4">Untuk top up</label><label class="flex items-center gap-2 text-sm"><input v-model="routeForm.is_active" type="checkbox" class="size-4">Aktif</label></div>
-                        <label class="space-y-1 md:col-span-2 xl:col-span-3"><span class="text-sm font-medium">Konfigurasi lanjutan</span><Textarea v-model="routeForm.configuration" rows="4" placeholder='JSON tanpa secret, misalnya {"enabled_payments":["gopay"]}' /><span class="text-xs text-muted-foreground">Credential/API key/secret tidak boleh disimpan di sini.</span></label>
-                    </div>
-                    <div class="flex justify-end"><Button :disabled="!routeForm.payment_channel_id || !routeForm.payment_gateway_id" @click="createRoute">Tambah routing</Button></div>
-
+                    <p class="rounded-md border p-3 text-sm text-muted-foreground">Endpoint, kode channel provider, signature, dan struktur request/response ditentukan oleh source code. Panel ini hanya mengatur penggunaan routing yang sudah didukung aplikasi.</p>
                     <div class="space-y-3">
                         <div v-for="row in routes" :key="'edit-' + row.id" class="grid gap-3 rounded-md border p-3 md:grid-cols-2 xl:grid-cols-6">
-                            <div><p class="text-sm font-medium">{{ row.channel_name }}</p><p class="text-xs text-muted-foreground">{{ row.gateway_name }}</p></div>
-                            <label class="space-y-1"><span class="text-xs font-medium">Kode gateway</span><Input v-model="row.provider_channel" maxlength="100" /></label>
+                            <div class="xl:col-span-2"><p class="text-sm font-medium">{{ row.channel_name }}</p><p class="text-xs text-muted-foreground">{{ row.gateway_name }}</p></div>
                             <label class="space-y-1"><span class="text-xs font-medium">Prioritas</span><Input v-model.number="row.priority" type="number" min="0" max="9999" /></label>
                             <div class="space-y-2 text-sm"><label class="flex items-center gap-2"><input v-model="row.supports_order" type="checkbox" class="size-4">Pesanan</label><label class="flex items-center gap-2"><input v-model="row.supports_wallet_topup" type="checkbox" class="size-4">Top up</label></div>
                             <div class="space-y-2 text-sm"><label class="flex items-center gap-2"><input v-model="row.is_active" type="checkbox" class="size-4">Aktif</label></div>
-                            <div class="flex items-end justify-end gap-2"><Button size="sm" variant="outline" @click="saveRoute(row)">Simpan</Button><Button size="sm" variant="outline" @click="deleteRoute(row)">Hapus</Button></div>
-                            <label class="space-y-1 md:col-span-2 xl:col-span-6"><span class="text-xs font-medium">Konfigurasi lanjutan</span><Textarea v-model="row.configuration_text" rows="3" /></label>
+                            <div class="flex items-end justify-end"><Button size="sm" variant="outline" @click="saveRoute(row)">Simpan</Button></div>
                         </div>
+                        <p v-if="!routes.length" class="rounded-md border p-3 text-sm text-muted-foreground">Belum ada routing yang didukung source code.</p>
                     </div>
                 </div>
             </Card>
@@ -579,7 +527,7 @@ async function copy(value) {
                 <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Transaksi Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Riwayat pembayaran pesanan dan top up saldo. Data payload rahasia tidak ditampilkan.</p></div></div>
                 <form class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="searchTransactions">
                     <label class="space-y-1 md:col-span-2"><span class="text-sm font-medium">Cari</span><Input v-model="filters.q" maxlength="100" placeholder="Invoice, referensi, nama, email, atau WhatsApp" /></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Status</span><select v-model="filters.status" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Semua status</option><option value="CREATING">Menyiapkan</option><option value="PENDING">Menunggu</option><option value="UNKNOWN">Belum pasti</option><option value="PAID">Dibayar</option><option value="FAILED">Gagal</option><option value="EXPIRED">Kedaluwarsa</option><option value="CANCELLED">Dibatalkan</option><option value="REJECTED">Ditolak</option><option value="REFUNDED">Dikembalikan</option></select></label>
+                    <label class="space-y-1"><span class="text-sm font-medium">Status</span><select v-model="filters.status" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Semua status</option><option value="CREATING">Menyiapkan</option><option value="SENDING">Mengirim permintaan</option><option value="PENDING">Menunggu</option><option value="UNKNOWN">Belum pasti</option><option value="PAID">Dibayar</option><option value="FAILED">Gagal</option><option value="EXPIRED">Kedaluwarsa</option><option value="CANCELLED">Dibatalkan</option><option value="REJECTED">Ditolak</option><option value="REFUNDED">Dikembalikan</option></select></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Sumber</span><select v-model="filters.source" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Semua</option><option value="order">Pesanan</option><option value="topup">Top up saldo</option></select></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Metode</span><select v-model.number="filters.channel" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option :value="0">Semua metode</option><option v-for="channel in channels" :key="channel.id" :value="channel.id">{{ channel.name }}</option></select></label>
                     <div class="flex flex-wrap gap-2 md:col-span-2 xl:col-span-5"><Button type="submit" size="sm">Terapkan</Button><Button type="button" size="sm" variant="outline" @click="resetTransactions">Reset</Button></div>
@@ -601,6 +549,28 @@ async function copy(value) {
                     </TableBody></Table>
                 </div>
                 <div v-if="transactions.links?.length > 3" class="mt-4 flex flex-wrap gap-1"><Link v-for="link in transactions.links" :key="link.label" :href="link.url || '#'" preserve-scroll :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']" v-html="link.label" /></div>
+            </Card>
+
+            <Card v-if="refundReviews.length" class="mt-4 p-4">
+                <h2 class="text-lg font-semibold">Refund Top Up Perlu Rekonsiliasi</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Gateway sudah mengembalikan pembayaran, tetapi saldo yang pernah dikreditkan sudah terpakai. Belanja dengan saldo dibatasi sampai kewajiban ini selesai.</p>
+                <div class="mt-4 space-y-2">
+                    <div v-for="topup in refundReviews" :key="'refund-' + topup.id" class="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
+                        <div>
+                            <strong class="text-sm">{{ topup.customer_name }}</strong>
+                            <p class="text-xs text-muted-foreground">{{ topup.customer_email }} · Top up #{{ topup.id }}</p>
+                            <p class="mt-1 text-xs">Refund: {{ money(topup.amount_idr) }} · Saldo saat ini: {{ money(topup.balance_idr) }}</p>
+                        </div>
+                        <Button
+                            v-if="isSuperAdmin"
+                            size="sm"
+                            :disabled="Number(topup.balance_idr) < Number(topup.amount_idr)"
+                            @click="resolveRefundReview(topup)"
+                        >
+                            {{ Number(topup.balance_idr) >= Number(topup.amount_idr) ? 'Selesaikan refund' : 'Saldo belum cukup' }}
+                        </Button>
+                    </div>
+                </div>
             </Card>
 
             <Card v-if="manualPayments.length" class="mt-4 p-4">

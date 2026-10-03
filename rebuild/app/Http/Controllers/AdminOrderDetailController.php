@@ -60,7 +60,7 @@ class AdminOrderDetailController
                     'id' => $payment->id, 'status_label' => $presentation->status($payment->status),
                     'amount_idr' => $payment->amount_idr, 'method' => $payment->gateway_code === 'MANUAL_QRIS' ? 'QRIS manual' : ucfirst(strtolower($payment->gateway_code)),
                     'created_at' => $presentation->date($payment->created_at), 'verified_at' => $presentation->date($payment->verified_at),
-                    'can_confirm' => $canPay && $payment->gateway_code === 'MANUAL_QRIS' && in_array($payment->status, ['CREATING', 'PENDING'], true),
+                    'can_confirm' => $canPay && $payment->gateway_code === 'MANUAL_QRIS' && in_array($payment->status, ['CREATING', 'SENDING', 'PENDING'], true),
                     'can_check' => $canPay && $payment->gateway_code === 'MIDTRANS' && in_array($payment->status, ['PENDING', 'CREATING'], true),
                 ]),
             'events' => DB::table('order_events')->where('order_id', $id)->orderByDesc('id')->get(['id', 'event_type', 'from_status', 'to_status', 'created_at'])

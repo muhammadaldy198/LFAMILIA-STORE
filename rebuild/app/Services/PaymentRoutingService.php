@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\IntegrationCredential;
 use App\Models\PaymentChannel;
 use App\Models\User;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -97,12 +99,14 @@ class PaymentRoutingService
             ]);
         }
 
+        $unavailableGateways = $this->unavailableExternalGatewayCodes();
         $routeQuery = DB::table('payment_routes as routes')
             ->join('payment_gateways as gateways', 'gateways.id', '=', 'routes.payment_gateway_id')
             ->where('routes.payment_channel_id', $channel->id)
             ->where('routes.is_active', true)
             ->where('gateways.is_active', true)
             ->where('gateways.is_maintenance', false)
+            ->when($unavailableGateways !== [], fn ($query) => $query->whereNotIn('gateways.code', $unavailableGateways))
             ->when($purpose === 'order',
                 fn ($query) => $query->where('routes.supports_order', true),
                 fn ($query) => $query->where('routes.supports_wallet_topup', true))
@@ -147,9 +151,10 @@ class PaymentRoutingService
     /**
      * @return array<string, mixed>
      */
-    public function byRouteId(int $routeId, string $purpose = 'order'): array
+    public function byRouteId(int $routeId, string $purpose = 'order', bool $lock = false): array
     {
-        $row = DB::table('payment_routes as routes')
+        $unavailableGateways = $this->unavailableExternalGatewayCodes();
+        $query = DB::table('payment_routes as routes')
             ->join('payment_channels as channels', 'channels.id', '=', 'routes.payment_channel_id')
             ->join('payment_gateways as gateways', 'gateways.id', '=', 'routes.payment_gateway_id')
             ->where('routes.id', $routeId)
@@ -157,6 +162,7 @@ class PaymentRoutingService
             ->where('channels.is_active', true)
             ->where('gateways.is_active', true)
             ->where('gateways.is_maintenance', false)
+            ->when($unavailableGateways !== [], fn ($query) => $query->whereNotIn('gateways.code', $unavailableGateways))
             ->when($purpose === 'order', function ($query): void {
                 $query->where('channels.supports_order', true)
                     ->where('routes.supports_order', true);
@@ -176,7 +182,11 @@ class PaymentRoutingService
                 'gateways.id as gateway_id',
                 'gateways.code as gateway_code',
                 'gateways.kind as gateway_kind'
-            )->first();
+            );
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+        $row = $query->first();
 
         if (! $row) {
             throw ValidationException::withMessages([
@@ -212,6 +222,54 @@ class PaymentRoutingService
         $percent = $bps === 0 ? 0 : intdiv(($amountIdr * $bps) + 9999, 10000);
 
         return $flat + $percent;
+    }
+
+    public function gatewayReady(string $gatewayCode): bool
+    {
+        return match (strtoupper($gatewayCode)) {
+            'MIDTRANS' => $this->credentialHasKeys('midtrans', ['server_key']),
+            'DOKU' => $this->credentialHasKeys('doku', ['client_id', 'secret_key']),
+            default => true,
+        };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function unavailableExternalGatewayCodes(): array
+    {
+        return array_values(array_filter(
+            ['MIDTRANS', 'DOKU'],
+            fn (string $code): bool => ! $this->gatewayReady($code)
+        ));
+    }
+
+    /**
+     * @param  array<int, string>  $keys
+     */
+    private function credentialHasKeys(string $credentialCode, array $keys): bool
+    {
+        $credential = IntegrationCredential::where('code', $credentialCode)
+            ->where('is_active', true)
+            ->first();
+
+        try {
+            $config = $credential?->config_ciphertext;
+        } catch (DecryptException) {
+            return false;
+        }
+
+        if (! is_array($config)) {
+            return false;
+        }
+
+        foreach ($keys as $key) {
+            if (! isset($config[$key]) || ! is_string($config[$key]) || trim($config[$key]) === '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function publicGroup(string $method): string

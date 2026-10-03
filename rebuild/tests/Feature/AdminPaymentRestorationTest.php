@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AdminUser;
+use App\Models\IntegrationCredential;
 use App\Services\PaymentRoutingService;
 use App\Services\WalletTopupService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -67,12 +68,9 @@ class AdminPaymentRestorationTest extends TestCase
                 ->has('summary')
                 ->where('walletSettings.topup_enabled', fn ($value) => is_bool($value))
                 ->where('routes', function ($routes): bool {
-                    return collect($routes)->every(function ($route): bool {
-                        $json = json_encode($route['configuration'] ?? [], JSON_THROW_ON_ERROR);
-
-                        return ! str_contains($json, 'client_secret')
-                            && ! str_contains($json, 'never-render-this-secret');
-                    });
+                    return collect($routes)->every(fn ($route): bool => ! array_key_exists('configuration', $route)
+                        && ! array_key_exists('provider_channel', $route)
+                    );
                 }));
     }
 
@@ -96,11 +94,8 @@ class AdminPaymentRestorationTest extends TestCase
             'is_active' => true,
         ])->assertForbidden();
 
-        $this->post('/admin/payments/routes', [
-            'payment_channel_id' => $channel->id,
-            'payment_gateway_id' => $gateway->id,
-            'provider_channel' => 'qris',
-            'configuration' => null,
+        $route = DB::table('payment_routes')->firstOrFail();
+        $this->put('/admin/payments/routes/'.$route->id, [
             'priority' => 0,
             'supports_order' => true,
             'supports_wallet_topup' => false,
@@ -158,7 +153,7 @@ class AdminPaymentRestorationTest extends TestCase
 
     public function test_order_and_wallet_topup_can_route_same_method_to_different_gateways(): void
     {
-        DB::table('payment_channels')->where('code', 'qris')->update([
+        DB::table('payment_channels')->where('code', 'virtual_account')->update([
             'is_active' => true,
             'supports_order' => true,
             'supports_wallet_topup' => true,
@@ -169,45 +164,47 @@ class AdminPaymentRestorationTest extends TestCase
             'is_maintenance' => false,
             'updated_at' => now(),
         ]);
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'doku'], [
+            'config_ciphertext' => ['client_id' => 'client-test', 'secret_key' => 'secret-test'],
+            'is_active' => true,
+        ]);
 
-        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $channelId = DB::table('payment_channels')->where('code', 'virtual_account')->value('id');
         $midtransId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
         $dokuId = DB::table('payment_gateways')->where('code', 'DOKU')->value('id');
 
-        DB::table('payment_routes')->insert([
-            [
-                'payment_channel_id' => $channelId,
-                'payment_gateway_id' => $midtransId,
-                'provider_channel' => 'qris',
-                'configuration' => null,
+        DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $midtransId)
+            ->update([
                 'priority' => 0,
                 'supports_order' => true,
                 'supports_wallet_topup' => false,
                 'is_active' => true,
-                'created_at' => now(),
                 'updated_at' => now(),
-            ],
-            [
-                'payment_channel_id' => $channelId,
-                'payment_gateway_id' => $dokuId,
-                'provider_channel' => 'qris',
-                'configuration' => null,
+            ]);
+        DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $dokuId)
+            ->update([
                 'priority' => 0,
                 'supports_order' => false,
                 'supports_wallet_topup' => true,
                 'is_active' => true,
-                'created_at' => now(),
                 'updated_at' => now(),
-            ],
-        ]);
+            ]);
 
         $routing = app(PaymentRoutingService::class);
 
-        $this->assertSame('MIDTRANS', $routing->resolve('qris', false, 'order')['gateway_code']);
-        $this->assertSame('DOKU', $routing->resolve('qris', false, 'topup')['gateway_code']);
+        $this->assertSame('MIDTRANS', $routing->resolve('virtual_account', false, 'order')['gateway_code']);
+        $this->assertSame('DOKU', $routing->resolve('virtual_account', false, 'topup')['gateway_code']);
 
-        $publicOrder = collect($routing->publicOrderChannels(null))->firstWhere('code', 'qris');
-        $publicTopup = collect($routing->publicTopupChannels())->firstWhere('code', 'qris');
+        $publicOrder = collect($routing->publicOrderChannels(null))->firstWhere('code', 'virtual_account');
+        $publicTopup = collect($routing->publicTopupChannels())->firstWhere('code', 'virtual_account');
 
         $this->assertIsArray($publicOrder);
         $this->assertIsArray($publicTopup);
@@ -215,31 +212,138 @@ class AdminPaymentRestorationTest extends TestCase
         $this->assertArrayNotHasKey('gateway_code', $publicTopup);
     }
 
-    public function test_sensitive_route_configuration_is_rejected(): void
+    public function test_sync_restores_repo_owned_route_protocol_without_overwriting_operational_state(): void
     {
         $this->login('SUPER_ADMIN');
 
-        $channel = DB::table('payment_channels')->where('code', 'qris')->firstOrFail();
-        $gateway = DB::table('payment_gateways')->where('code', 'MIDTRANS')->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $gatewayId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
+        $route = DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $gatewayId)
+            ->firstOrFail();
 
-        $this->from('/admin/payments')->post('/admin/payments/routes', [
-            'payment_channel_id' => $channel->id,
-            'payment_gateway_id' => $gateway->id,
-            'provider_channel' => 'qris',
-            'configuration' => json_encode([
-                'nested' => ['client_secret' => 'do-not-store'],
-            ], JSON_THROW_ON_ERROR),
-            'priority' => 0,
+        DB::table('payment_routes')->where('id', $route->id)->update([
+            'provider_channel' => 'tampered',
+            'configuration' => json_encode(['enabled_payments' => ['credit_card']], JSON_THROW_ON_ERROR),
+            'priority' => 77,
+            'supports_order' => false,
+            'supports_wallet_topup' => true,
+            'is_active' => true,
+            'updated_at' => now(),
+        ]);
+
+        $this->post('/admin/payments/channels/sync')
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $saved = DB::table('payment_routes')->where('id', $route->id)->firstOrFail();
+        $this->assertNull($saved->provider_channel);
+        $this->assertSame(
+            ['enabled_payments' => ['other_qris']],
+            json_decode((string) $saved->configuration, true, 512, JSON_THROW_ON_ERROR)
+        );
+        $this->assertSame(77, (int) $saved->priority);
+        $this->assertFalse((bool) $saved->supports_order);
+        $this->assertTrue((bool) $saved->supports_wallet_topup);
+        $this->assertTrue((bool) $saved->is_active);
+    }
+
+    public function test_super_admin_cannot_edit_payment_protocol_fields_from_panel(): void
+    {
+        $this->login('SUPER_ADMIN');
+
+        $route = DB::table('payment_routes')->firstOrFail();
+        DB::table('payment_routes')->where('id', $route->id)->update([
+            'provider_channel' => 'repo-owned-channel',
+            'configuration' => json_encode(['repo_owned' => true], JSON_THROW_ON_ERROR),
+            'updated_at' => now(),
+        ]);
+
+        $this->from('/admin/payments')->put('/admin/payments/routes/'.$route->id, [
+            'provider_channel' => 'admin-overwrite-attempt',
+            'configuration' => json_encode(['client_secret' => 'must-never-be-written'], JSON_THROW_ON_ERROR),
+            'priority' => 7,
             'supports_order' => true,
             'supports_wallet_topup' => false,
             'is_active' => true,
         ])->assertRedirect('/admin/payments')
-            ->assertSessionHasErrors(['configuration']);
+            ->assertSessionHasNoErrors();
 
-        $this->assertSame(0, DB::table('payment_routes')
-            ->where('payment_channel_id', $channel->id)
-            ->where('payment_gateway_id', $gateway->id)
-            ->count());
+        $saved = DB::table('payment_routes')->where('id', $route->id)->firstOrFail();
+        $this->assertSame('repo-owned-channel', $saved->provider_channel);
+        $this->assertSame(['repo_owned' => true], json_decode((string) $saved->configuration, true, 512, JSON_THROW_ON_ERROR));
+        $this->assertSame(7, (int) $saved->priority);
+
+        $this->post('/admin/payments/routes', [
+            'payment_channel_id' => $route->payment_channel_id,
+            'payment_gateway_id' => $route->payment_gateway_id,
+        ])->assertNotFound();
+
+        $this->delete('/admin/payments/routes/'.$route->id)->assertStatus(405);
+    }
+
+    public function test_gateway_cannot_be_enabled_with_incomplete_credentials(): void
+    {
+        $this->login('SUPER_ADMIN');
+
+        $gateway = DB::table('payment_gateways')->where('code', 'MIDTRANS')->firstOrFail();
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => [],
+            'is_active' => true,
+        ]);
+
+        $this->from('/admin/payments')->put('/admin/payments/gateways/'.$gateway->id, [
+            'internal_name' => $gateway->internal_name,
+            'sort_order' => (int) $gateway->sort_order,
+            'is_active' => true,
+            'is_maintenance' => false,
+        ])->assertRedirect('/admin/payments')
+            ->assertSessionHasErrors(['is_active']);
+
+        $this->assertFalse((bool) DB::table('payment_gateways')->where('id', $gateway->id)->value('is_active'));
+
+        $credential = IntegrationCredential::where('code', 'midtrans')->firstOrFail();
+        $credential->forceFill([
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ])->save();
+
+        $this->from('/admin/payments')->put('/admin/payments/gateways/'.$gateway->id, [
+            'internal_name' => $gateway->internal_name,
+            'sort_order' => (int) $gateway->sort_order,
+            'is_active' => true,
+            'is_maintenance' => false,
+        ])->assertRedirect('/admin/payments')
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue((bool) DB::table('payment_gateways')->where('id', $gateway->id)->value('is_active'));
+    }
+
+    public function test_corrupt_gateway_ciphertext_fails_closed_instead_of_crashing(): void
+    {
+        $this->login('SUPER_ADMIN');
+
+        DB::table('integration_credentials')->updateOrInsert(
+            ['code' => 'midtrans'],
+            [
+                'config_ciphertext' => 'not-a-valid-encrypted-payload',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+
+        $gateway = DB::table('payment_gateways')->where('code', 'MIDTRANS')->firstOrFail();
+        $this->from('/admin/payments')->put('/admin/payments/gateways/'.$gateway->id, [
+            'internal_name' => $gateway->internal_name,
+            'sort_order' => (int) $gateway->sort_order,
+            'is_active' => true,
+            'is_maintenance' => false,
+        ])->assertRedirect('/admin/payments')
+            ->assertSessionHasErrors(['is_active']);
+
+        $this->assertFalse((bool) DB::table('payment_gateways')->where('id', $gateway->id)->value('is_active'));
     }
 
     public function test_wallet_topup_master_switch_is_enforced_by_backend(): void

@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\IntegrationCredential;
 use App\Models\PaymentChannel;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
 use App\Services\PaymentPageSettingsService;
+use App\Services\PaymentRouteCatalogService;
+use App\Services\PaymentRoutingService;
 use App\Services\PaymentStateService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,12 +19,12 @@ use Inertia\Response;
 
 class AdminPaymentController
 {
-    public function index(Request $request, PaymentPageSettingsService $pageSettings): Response
+    public function index(Request $request, PaymentPageSettingsService $pageSettings, PaymentRoutingService $routing): Response
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', Rule::in([
-                'CREATING', 'PENDING', 'UNKNOWN', 'PAID', 'FAILED', 'EXPIRED',
+                'CREATING', 'SENDING', 'PENDING', 'UNKNOWN', 'PAID', 'FAILED', 'EXPIRED',
                 'CANCELLED', 'REJECTED', 'REFUNDED',
             ])],
             'source' => ['nullable', Rule::in(['order', 'topup'])],
@@ -38,9 +39,6 @@ class AdminPaymentController
             'per_page' => (int) ($filters['per_page'] ?? 25),
         ];
 
-        $configured = IntegrationCredential::whereIn('code', ['midtrans', 'doku'])
-            ->get(['code', 'is_active'])->keyBy('code');
-
         $gateways = DB::table('payment_gateways')->orderBy('sort_order')->orderBy('id')->get()
             ->map(fn (object $gateway): array => [
                 'id' => (int) $gateway->id,
@@ -50,11 +48,7 @@ class AdminPaymentController
                 'sort_order' => (int) $gateway->sort_order,
                 'is_active' => (bool) $gateway->is_active,
                 'is_maintenance' => (bool) $gateway->is_maintenance,
-                'credential_configured' => match ($gateway->code) {
-                    'MIDTRANS' => (bool) ($configured->get('midtrans')?->is_active),
-                    'DOKU' => (bool) ($configured->get('doku')?->is_active),
-                    default => true,
-                },
+                'credential_configured' => $routing->gatewayReady((string) $gateway->code),
                 'health' => $this->gatewayHealth((string) $gateway->code),
                 'active_route_count' => DB::table('payment_routes')
                     ->where('payment_gateway_id', $gateway->id)
@@ -62,7 +56,7 @@ class AdminPaymentController
             ]);
 
         $channels = PaymentChannel::query()->orderBy('sort_order')->orderBy('id')->get()
-            ->map(function (PaymentChannel $channel): array {
+            ->map(function (PaymentChannel $channel) use ($routing): array {
                 $routes = DB::table('payment_routes as routes')
                     ->join('payment_gateways as gateways', 'gateways.id', '=', 'routes.payment_gateway_id')
                     ->where('routes.payment_channel_id', $channel->id)
@@ -101,6 +95,8 @@ class AdminPaymentController
                             && (bool) $route->supports_order
                             && (bool) $route->gateway_active
                             && ! (bool) $route->gateway_maintenance
+                            && $routing->gatewayReady((string) $route->gateway_code)
+                            && $routing->gatewayReady((string) $route->gateway_code)
                     ),
                     'available_topup' => (bool) $channel->is_active && $routes->contains(
                         fn (object $route): bool => (bool) $route->is_active
@@ -119,8 +115,6 @@ class AdminPaymentController
                 'routes.id',
                 'routes.payment_channel_id',
                 'routes.payment_gateway_id',
-                'routes.provider_channel',
-                'routes.configuration',
                 'routes.priority',
                 'routes.supports_order',
                 'routes.supports_wallet_topup',
@@ -135,7 +129,6 @@ class AdminPaymentController
                 'supports_order' => (bool) $route->supports_order,
                 'supports_wallet_topup' => (bool) $route->supports_wallet_topup,
                 'is_active' => (bool) $route->is_active,
-                'configuration' => $this->safeConfiguration($route->configuration),
             ]);
 
         $transactions = $this->transactionQuery($filters)
@@ -180,7 +173,7 @@ class AdminPaymentController
                 'total' => $total,
                 'paid' => (clone $paid)->count(),
                 'paid_amount_idr' => (int) ((clone $paid)->sum('amount_idr') ?? 0),
-                'pending' => (clone $summaryBase)->whereIn('status', ['CREATING', 'PENDING', 'UNKNOWN'])->count(),
+                'pending' => (clone $summaryBase)->whereIn('status', ['CREATING', 'SENDING', 'PENDING', 'UNKNOWN'])->count(),
                 'failed' => (clone $summaryBase)->whereIn('status', ['FAILED', 'EXPIRED', 'CANCELLED', 'REJECTED'])->count(),
                 'refunded' => (clone $summaryBase)->where('status', 'REFUNDED')->count(),
             ],
@@ -194,6 +187,22 @@ class AdminPaymentController
                 'is_active' => (bool) $manualAsset->is_active,
                 'image_url' => $manualAsset->getFirstMediaUrl('image'),
             ] : null,
+            'refundReviews' => DB::table('wallet_topups as topups')
+                ->join('wallets', 'wallets.id', '=', 'topups.wallet_id')
+                ->join('users', 'users.id', '=', 'topups.user_id')
+                ->where('topups.status', 'REFUND_REVIEW')
+                ->orderBy('topups.created_at')
+                ->limit(100)
+                ->get([
+                    'topups.id',
+                    'topups.amount_idr',
+                    'topups.total_idr',
+                    'topups.created_at',
+                    'users.id as user_id',
+                    'users.name as customer_name',
+                    'users.email as customer_email',
+                    'wallets.balance_idr',
+                ]),
             'manualPayments' => DB::table('payment_transactions as payments')
                 ->join('orders', 'orders.id', '=', 'payments.order_id')
                 ->where('payments.gateway_code', 'MANUAL_QRIS')
@@ -274,7 +283,7 @@ class AdminPaymentController
         return back()->with('status', 'Logo metode pembayaran diperbarui.');
     }
 
-    public function syncChannels(Request $request): RedirectResponse
+    public function syncChannels(Request $request, PaymentRouteCatalogService $routeCatalog): RedirectResponse
     {
         $presets = [
             [
@@ -340,14 +349,18 @@ class AdminPaymentController
         }
 
         $this->ensureInternalRoutes();
-        $this->audit($request, 'payment.channels.synced', 'payment_channel', 0, null, ['created' => $created]);
+        $routes = $routeCatalog->sync();
+        $this->audit($request, 'payment.channels.synced', 'payment_channel', 0, null, [
+            'created_channels' => $created,
+            'route_catalog' => $routes,
+        ]);
 
-        return back()->with('status', $created > 0
-            ? $created.' metode bawaan ditambahkan dalam keadaan nonaktif.'
-            : 'Metode bawaan sudah lengkap.');
+        return back()->with('status', $created > 0 || $routes['created'] > 0
+            ? $created.' metode dan '.$routes['created'].' routing bawaan ditambahkan dalam keadaan nonaktif.'
+            : 'Metode dan routing bawaan sudah sinkron dengan source code.');
     }
 
-    public function gateway(Request $request, int $id): RedirectResponse
+    public function gateway(Request $request, int $id, PaymentRoutingService $routing): RedirectResponse
     {
         $data = $request->validate([
             'internal_name' => ['required', 'string', 'min:2', 'max:100'],
@@ -359,15 +372,9 @@ class AdminPaymentController
         abort_unless($before, 404);
 
         if ($data['is_active']) {
-            $credentialCode = match ($before->code) {
-                'MIDTRANS' => 'midtrans',
-                'DOKU' => 'doku',
-                default => null,
-            };
-            if ($credentialCode !== null
-                && ! IntegrationCredential::where('code', $credentialCode)->where('is_active', true)->exists()) {
+            if (! $routing->gatewayReady((string) $before->code)) {
                 throw ValidationException::withMessages([
-                    'is_active' => 'Aktifkan kredensial gateway di menu Integrasi terlebih dahulu.',
+                    'is_active' => 'Lengkapi dan aktifkan kredensial gateway di menu Integrasi terlebih dahulu.',
                 ]);
             }
             if ($before->code === 'MANUAL_QRIS') {
@@ -386,51 +393,14 @@ class AdminPaymentController
         return back()->with('status', 'Pengaturan gateway disimpan.');
     }
 
-    public function route(Request $request): RedirectResponse
-    {
-        $data = $this->routeData($request);
-        $this->validateRoutePurpose($data);
-
-        if (DB::table('payment_routes')
-            ->where('payment_channel_id', $data['payment_channel_id'])
-            ->where('payment_gateway_id', $data['payment_gateway_id'])
-            ->exists()) {
-            throw ValidationException::withMessages([
-                'payment_gateway_id' => 'Routing metode ke gateway tersebut sudah ada.',
-            ]);
-        }
-
-        $configuration = $this->configuration($data['configuration'] ?? null);
-        $id = DB::table('payment_routes')->insertGetId([
-            'payment_channel_id' => $data['payment_channel_id'],
-            'payment_gateway_id' => $data['payment_gateway_id'],
-            'provider_channel' => $data['provider_channel'] ?: null,
-            'configuration' => $configuration === null ? null : json_encode($configuration, JSON_THROW_ON_ERROR),
-            'priority' => $data['priority'],
-            'supports_order' => $data['supports_order'],
-            'supports_wallet_topup' => $data['supports_wallet_topup'],
-            'is_active' => $data['is_active'],
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $this->audit($request, 'payment.route.created', 'payment_route', $id, null, [
-            ...$data, 'configuration' => $configuration,
-        ]);
-
-        return back()->with('status', 'Routing pembayaran ditambahkan.');
-    }
-
     public function updateRoute(Request $request, int $id): RedirectResponse
     {
         $before = DB::table('payment_routes')->where('id', $id)->first();
         abort_unless($before, 404);
 
-        $data = $this->routeData($request, false, (int) $before->payment_channel_id);
+        $data = $this->routeData($request, (int) $before->payment_channel_id);
         $this->validateRoutePurpose($data);
-        $configuration = $this->configuration($data['configuration'] ?? null);
         $after = [
-            'provider_channel' => $data['provider_channel'] ?: null,
-            'configuration' => $configuration === null ? null : json_encode($configuration, JSON_THROW_ON_ERROR),
             'priority' => $data['priority'],
             'supports_order' => $data['supports_order'],
             'supports_wallet_topup' => $data['supports_wallet_topup'],
@@ -438,32 +408,9 @@ class AdminPaymentController
             'updated_at' => now(),
         ];
         DB::table('payment_routes')->where('id', $id)->update($after);
-        $this->audit($request, 'payment.route.updated', 'payment_route', $id, (array) $before, [
-            ...$after, 'configuration' => $configuration,
-        ]);
+        $this->audit($request, 'payment.route.updated', 'payment_route', $id, (array) $before, $after);
 
         return back()->with('status', 'Routing pembayaran disimpan.');
-    }
-
-    public function destroyRoute(Request $request, int $id): RedirectResponse
-    {
-        $route = DB::table('payment_routes')->where('id', $id)->first();
-        abort_unless($route, 404);
-
-        $used = DB::table('orders')->where('payment_route_id', $id)->exists()
-            || DB::table('wallet_topups')->where('payment_route_id', $id)->exists()
-            || DB::table('payment_transactions')->where('payment_route_id', $id)->exists();
-
-        if ($used) {
-            throw ValidationException::withMessages([
-                'route' => 'Routing ini sudah memiliki riwayat transaksi. Nonaktifkan saja agar data lama tetap utuh.',
-            ]);
-        }
-
-        DB::table('payment_routes')->where('id', $id)->delete();
-        $this->audit($request, 'payment.route.deleted', 'payment_route', $id, (array) $route, []);
-
-        return back()->with('status', 'Routing pembayaran dihapus.');
     }
 
     public function settings(Request $request): RedirectResponse
@@ -625,6 +572,32 @@ class AdminPaymentController
         return back()->with('status', $data['is_active'] ? 'QRIS manual diaktifkan.' : 'QRIS manual dinonaktifkan.');
     }
 
+    public function resolveTopupRefund(
+        Request $request,
+        int $topupId,
+        PaymentStateService $states,
+    ): RedirectResponse {
+        $before = DB::table('wallet_topups')->where('id', $topupId)->first();
+        abort_unless($before, 404);
+
+        $result = $states->resolveTopupRefundReview(
+            $topupId,
+            (int) $request->user('admin')->id
+        );
+        $after = DB::table('wallet_topups')->where('id', $topupId)->first();
+
+        $this->audit(
+            $request,
+            'wallet.topup_refund.resolved',
+            'wallet_topup',
+            $topupId,
+            (array) $before,
+            $after ? (array) $after : $result
+        );
+
+        return back()->with('status', 'Refund top up telah direkonsiliasi.');
+    }
+
     public function confirmManual(Request $request, int $paymentId, PaymentStateService $states): RedirectResponse
     {
         $payment = DB::table('payment_transactions')->where('id', $paymentId)->firstOrFail();
@@ -661,25 +634,15 @@ class AdminPaymentController
         ]);
     }
 
-    private function routeData(Request $request, bool $creating = true, ?int $channelId = null): array
+    private function routeData(Request $request, int $channelId): array
     {
-        $rules = [
-            'provider_channel' => ['nullable', 'string', 'max:100'],
-            'configuration' => ['nullable', 'string', 'max:20000'],
+        $data = $request->validate([
             'priority' => ['required', 'integer', 'min:0', 'max:9999'],
             'supports_order' => ['required', 'boolean'],
             'supports_wallet_topup' => ['required', 'boolean'],
             'is_active' => ['required', 'boolean'],
-        ];
-        if ($creating) {
-            $rules['payment_channel_id'] = ['required', 'integer', Rule::exists('payment_channels', 'id')];
-            $rules['payment_gateway_id'] = ['required', 'integer', Rule::exists('payment_gateways', 'id')];
-        }
-
-        $data = $request->validate($rules);
-        if (! $creating) {
-            $data['payment_channel_id'] = $channelId;
-        }
+        ]);
+        $data['payment_channel_id'] = $channelId;
 
         return $data;
     }
@@ -705,64 +668,6 @@ class AdminPaymentController
                 'supports_wallet_topup' => 'Metode ini tidak diaktifkan untuk top up saldo.',
             ]);
         }
-    }
-
-    private function configuration(?string $json): ?array
-    {
-        if ($json === null || trim($json) === '') {
-            return null;
-        }
-
-        try {
-            $data = json_decode($json, true, 64, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            throw ValidationException::withMessages(['configuration' => 'Konfigurasi lanjutan harus memakai format JSON yang valid.']);
-        }
-        if (! is_array($data)) {
-            throw ValidationException::withMessages(['configuration' => 'Konfigurasi lanjutan harus berupa objek JSON.']);
-        }
-
-        if ($this->containsSensitiveConfigurationKey($data)) {
-            throw ValidationException::withMessages([
-                'configuration' => 'Kredensial sensitif harus disimpan di menu Integrasi, bukan routing pembayaran.',
-            ]);
-        }
-
-        return $data;
-    }
-
-    private function safeConfiguration(mixed $value): array
-    {
-        $data = is_string($value)
-            ? (json_decode($value, true) ?: [])
-            : ((array) ($value ?? []));
-
-        foreach ($data as $key => $item) {
-            if (preg_match('/(?:secret|password|api[_-]?key|server[_-]?key|client[_-]?secret|access[_-]?token|private[_-]?key)/i', (string) $key)) {
-                unset($data[$key]);
-
-                continue;
-            }
-            if (is_array($item)) {
-                $data[$key] = $this->safeConfiguration($item);
-            }
-        }
-
-        return $data;
-    }
-
-    private function containsSensitiveConfigurationKey(array $data): bool
-    {
-        foreach ($data as $key => $item) {
-            if (preg_match('/(?:secret|password|api[_-]?key|server[_-]?key|client[_-]?secret|access[_-]?token|private[_-]?key)/i', (string) $key)) {
-                return true;
-            }
-            if (is_array($item) && $this->containsSensitiveConfigurationKey($item)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function transactionQuery(array $filters)
@@ -823,12 +728,12 @@ class AdminPaymentController
             return ['status' => 'INTERNAL', 'message' => 'Diproses oleh sistem internal LFAMILIA.'];
         }
 
-        $key = $code === 'MIDTRANS' ? 'midtrans' : 'doku';
-        $active = IntegrationCredential::where('code', $key)->where('is_active', true)->exists();
-        if (! $active) {
-            return ['status' => 'NOT_CONFIGURED', 'message' => 'Kredensial belum aktif di menu Integrasi.'];
+        $routing = app(PaymentRoutingService::class);
+        if (! $routing->gatewayReady($code)) {
+            return ['status' => 'NOT_CONFIGURED', 'message' => 'Kredensial belum lengkap/aktif di menu Integrasi.'];
         }
 
+        $key = $code === 'MIDTRANS' ? 'midtrans' : 'doku';
         $stored = DB::table('system_settings')->where('key', 'integration.health.'.$key)->value('value');
         $health = is_string($stored) ? (json_decode($stored, true) ?: []) : [];
         $status = strtoupper((string) ($health['status'] ?? 'UNTESTED'));

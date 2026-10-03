@@ -19,12 +19,15 @@ DEPLOY_DIR="${APP_DIR}/deploy"
 bash "${DEPLOY_DIR}/preflight.sh"
 
 cd "${REPO_DIR}"
-[[ -z "$(git status --porcelain)" ]] || { echo "Repository has uncommitted changes" >&2; exit 1; }
-previous_sha="$(git rev-parse HEAD)"
-git fetch --prune origin "${REPO_REF}"
-git checkout "${REPO_REF}"
-git merge --ff-only "origin/${REPO_REF}"
-target_sha="$(git rev-parse HEAD)"
+git_repo() {
+  git -c "safe.directory=${REPO_DIR}" "$@"
+}
+[[ -z "$(git_repo status --porcelain)" ]] || { echo "Repository has uncommitted changes" >&2; exit 1; }
+previous_sha="$(git_repo rev-parse HEAD)"
+git_repo fetch --prune origin "${REPO_REF}"
+git_repo checkout "${REPO_REF}"
+git_repo merge --ff-only "origin/${REPO_REF}"
+target_sha="$(git_repo rev-parse HEAD)"
 
 cd "${APP_DIR}"
 "${PHP_BIN}" artisan down --retry=60 --refresh=15

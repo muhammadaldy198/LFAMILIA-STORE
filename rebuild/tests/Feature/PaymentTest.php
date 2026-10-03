@@ -11,6 +11,7 @@ use App\Models\StoreAsset;
 use App\Models\User;
 use App\Services\Payment\DokuSignature;
 use App\Services\PaymentRoutingService;
+use App\Services\PaymentService;
 use App\Services\PaymentStateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -626,6 +628,54 @@ class PaymentTest extends TestCase
             ->where('idempotency_key', 'm11-wallet-low-payment-0001')->value('status'));
     }
 
+    public function test_wallet_checkout_is_blocked_while_topup_refund_review_is_open(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('saldo', 'WALLET');
+
+        $user = User::create([
+            'name' => 'Refund Hold Buyer',
+            'email' => 'refund-hold@example.test',
+            'phone' => '081234567895',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        DB::table('wallets')->where('id', $wallet->id)->update(['balance_idr' => 50000]);
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        DB::table('wallet_topups')->insert([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'REFUND_REVIEW',
+            'idempotency_key' => 'refund-hold-topup-0001',
+            'request_fingerprint' => hash('sha256', 'refund-hold-topup'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'saldo',
+            'customer_input' => ['user_id' => '777777'],
+            'voucher_code' => null,
+            'idempotency_key' => 'refund-hold-order-0001',
+        ])->assertCreated();
+
+        $this->actingAs($user)->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'refund-hold-payment-0001',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['payment']);
+
+        $this->assertSame(50000, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
+        $this->assertSame(0, DB::table('wallet_ledger')
+            ->where('wallet_id', $wallet->id)
+            ->where('source', 'CHECKOUT')
+            ->count());
+    }
+
     public function test_wallet_topup_paid_callback_credit_is_idempotent_and_fee_is_not_credited(): void
     {
         $user = User::create([
@@ -678,6 +728,86 @@ class PaymentTest extends TestCase
         $this->assertSame(1, DB::table('wallet_ledger')->where('source', 'REFUND')->count());
         $this->assertSame('REFUNDED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
         $this->assertSame('REFUNDED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+    }
+
+    public function test_refunded_topup_with_spent_balance_enters_review_and_can_be_reconciled_safely(): void
+    {
+        $user = User::create([
+            'name' => 'Refund Review Buyer',
+            'email' => 'refund-review@example.test',
+            'phone' => '081234567894',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+
+        $topupId = DB::table('wallet_topups')->insertGetId([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'PENDING_PAYMENT',
+            'idempotency_key' => 'refund-review-topup-0001',
+            'request_fingerprint' => hash('sha256', 'refund-review-topup'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'wallet_topup_id' => $topupId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'merchant_reference' => 'REFUND-REVIEW-TEST-1',
+            'amount_idr' => 10700,
+            'status' => 'PENDING',
+            'idempotency_key' => 'refund-review-payment-0001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $states = app(PaymentStateService::class);
+        $states->apply($paymentId, 'PAID');
+        DB::table('wallets')->where('id', $wallet->id)->update([
+            'balance_idr' => 3000,
+            'updated_at' => now(),
+        ]);
+
+        $result = $states->apply($paymentId, 'REFUNDED');
+        $this->assertSame('REFUND_REVIEW', $result['status']);
+        $this->assertSame('REFUND_REVIEW', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+        $this->assertSame('REFUNDED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame(0, DB::table('wallet_ledger')
+            ->where('idempotency_key', 'wallet-topup-refund:'.$paymentId)->count());
+
+        try {
+            $states->resolveTopupRefundReview($topupId, 42);
+            $this->fail('Refund review must not create a negative wallet balance.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('refund', $exception->errors());
+        }
+
+        DB::table('wallets')->where('id', $wallet->id)->update([
+            'balance_idr' => 10000,
+            'updated_at' => now(),
+        ]);
+        $resolved = $states->resolveTopupRefundReview($topupId, 42);
+
+        $this->assertSame('REFUNDED', $resolved['status']);
+        $this->assertSame(0, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
+        $this->assertSame('REFUNDED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+        $ledger = DB::table('wallet_ledger')
+            ->where('idempotency_key', 'wallet-topup-refund:'.$paymentId)
+            ->firstOrFail();
+        $this->assertSame(-10000, (int) $ledger->amount_idr);
+        $this->assertSame('admin_user', $ledger->actor_type);
+        $this->assertSame('42', $ledger->actor_id);
+
+        $again = $states->resolveTopupRefundReview($topupId, 42);
+        $this->assertSame('ALREADY_REFUNDED', $again['result']);
+        $this->assertSame(1, DB::table('wallet_ledger')
+            ->where('idempotency_key', 'wallet-topup-refund:'.$paymentId)->count());
     }
 
     public function test_expired_payment_closes_order_releases_voucher_and_late_paid_does_not_reopen(): void
@@ -1019,5 +1149,133 @@ class PaymentTest extends TestCase
         $this->assertSame(1000, (int) $persisted->discount_idr);
         $this->assertSame(500, (int) $persisted->fee_idr);
         $this->assertSame(10500, (int) $persisted->total_idr);
+    }
+
+    public function test_external_create_claim_prevents_duplicate_gateway_request_from_stale_payment_object(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+
+        Http::fake([
+            'https://app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
+                'token' => 'snap-token-single-claim',
+                'redirect_url' => 'https://sandbox.midtrans.test/single-claim',
+            ]),
+        ]);
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'qris',
+            'audit-single-claim-order-0001'
+        ))->assertCreated();
+
+        $order = DB::table('orders')
+            ->where('order_number', $checkout->json('order_number'))
+            ->firstOrFail();
+
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'order_id' => $order->id,
+            'wallet_topup_id' => null,
+            'payment_route_id' => $routeId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'amount_idr' => $order->total_idr,
+            'status' => 'CREATING',
+            'request_fingerprint' => hash('sha256', 'audit-single-claim'),
+            'idempotency_key' => 'audit-single-claim-payment-0001',
+            'expires_at' => $order->expires_at,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('payment_transactions')->where('id', $paymentId)->update([
+            'merchant_reference' => 'PAY-AUDIT-'.$paymentId,
+            'updated_at' => now(),
+        ]);
+
+        $stalePayment = DB::table('payment_transactions')->where('id', $paymentId)->firstOrFail();
+        $route = app(PaymentRoutingService::class)->byRouteId($routeId);
+        $service = app(PaymentService::class);
+        $method = new \ReflectionMethod($service, 'createExternal');
+        $method->setAccessible(true);
+
+        $first = $method->invoke($service, $stalePayment, $order, $route);
+        $second = $method->invoke($service, $stalePayment, $order, $route);
+
+        $this->assertSame('PENDING', $first['status']);
+        $this->assertSame('PENDING', $second['status']);
+        Http::assertSentCount(1);
+    }
+
+    public function test_fast_paid_callback_during_create_is_not_downgraded_by_late_create_response(): void
+    {
+        Queue::fake();
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+
+        Http::fake(function ($request) {
+            if ($request->url() !== 'https://app.sandbox.midtrans.com/snap/v1/transactions') {
+                return Http::response([], 404);
+            }
+
+            $merchantReference = (string) data_get($request->data(), 'transaction_details.order_id');
+            $payment = DB::table('payment_transactions')
+                ->where('merchant_reference', $merchantReference)
+                ->firstOrFail();
+
+            app(PaymentStateService::class)->apply((int) $payment->id, 'PAID', [
+                'source' => 'test_fast_callback',
+            ]);
+
+            return Http::response([
+                'token' => 'snap-token-fast-callback',
+                'redirect_url' => 'https://sandbox.midtrans.test/fast-callback',
+            ]);
+        });
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'qris',
+            'audit-fast-callback-order-0001'
+        ))->assertCreated();
+
+        $response = $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'audit-fast-callback-payment-0001',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk();
+
+        $response->assertJsonPath('status', 'PAID')
+            ->assertJsonPath('instructions.token', 'snap-token-fast-callback');
+
+        $payment = DB::table('payment_transactions')
+            ->where('idempotency_key', 'audit-fast-callback-payment-0001')
+            ->firstOrFail();
+        $this->assertSame('PAID', $payment->status);
+    }
+
+    public function test_public_channel_is_hidden_when_external_gateway_credentials_are_not_ready(): void
+    {
+        $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $midtransGatewayId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
+        DB::table('payment_routes')->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', '<>', $midtransGatewayId)
+            ->update(['is_active' => false, 'updated_at' => now()]);
+
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => [],
+            'is_active' => true,
+        ]);
+
+        $channels = app(PaymentRoutingService::class)->publicOrderChannels(null);
+
+        $this->assertNull(collect($channels)->firstWhere('code', 'qris'));
     }
 }
