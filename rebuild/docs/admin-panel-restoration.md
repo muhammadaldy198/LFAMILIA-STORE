@@ -1,3 +1,5 @@
+> **HISTORICAL SNAPSHOT:** Dokumen ini merekam audit/restoration pada tanggal pembuatannya. Gunakan `rebuild/ADMIN.md`, `rebuild/ARCHITECTURE.md`, dan kode `main` sebagai sumber status current. Jangan menganggap gap/label milestone di snapshot ini masih berlaku tanpa verifikasi ulang.
+
 # Admin panel restoration — 2026-10-02
 
 The Laravel/Vue admin uses shadcn-vue controls and an accessible Sheet on mobile. Customer-facing controls and design remain separate.
