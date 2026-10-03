@@ -40,7 +40,7 @@ async function submitReview() {
 </script>
 
 <template>
-    <Head :title="customerText(&quot;pages.customer.orderdetail.attribute.title.eb50a134&quot;, &quot;Detail pesanan&quot;)" />
+    <Head :title="customerText('pages.customer.orderdetail.attribute.title.eb50a134', 'Detail pesanan')" />
     <AccountShell>
         <Link href="/account/orders" class="text-sm text-cyan-300">{{ customerText("pages.customer.orderdetail.96c4caae", "← Semua pesanan") }}</Link>
         <h1 class="text-3xl font-semibold">Pesanan {{ order.order_number }}</h1>
@@ -55,7 +55,7 @@ async function submitReview() {
         <section v-if="order.status === 'PENDING_PAYMENT'" class="space-y-3 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-5">
             <h2 class="text-lg font-semibold">{{ customerText("pages.customer.orderdetail.3527df23", "Pembayaran") }}</h2>
             <p v-if="paymentState" class="text-sm">{{ customerText("pages.customer.orderdetail.ca77496f", "Status:") }} <strong>{{ paymentState.status }}</strong><span v-if="paymentState.channel_name"> · {{ paymentState.channel_name }}</span></p>
-            <img v-if="paymentState?.status === 'PENDING' && paymentState?.instructions?.qr_url" :src="paymentState.instructions.qr_url" :alt="customerText(&quot;pages.customer.orderdetail.attribute.alt.dfd028b8&quot;, &quot;QRIS pembayaran&quot;)" class="max-h-72 rounded-lg bg-white p-2">
+            <img v-if="paymentState?.status === 'PENDING' && paymentState?.instructions?.qr_url" :src="paymentState.instructions.qr_url" :alt="customerText('pages.customer.orderdetail.attribute.alt.dfd028b8', 'QRIS pembayaran')" class="max-h-72 rounded-lg bg-white p-2">
             <p v-if="paymentState?.status === 'PENDING' && paymentState?.instructions?.va_number" class="text-sm">{{ customerText("pages.customer.orderdetail.d5aec755", "Nomor VA:") }} <strong>{{ paymentState.instructions.va_number }}</strong></p>
             <p v-if="paymentState?.status === 'PENDING' && paymentState?.instructions?.payment_code" class="text-sm">{{ customerText("pages.customer.orderdetail.6af68bec", "Kode pembayaran:") }} <strong>{{ paymentState.instructions.payment_code }}</strong></p>
             <p v-if="paymentState?.status === 'UNKNOWN'" class="text-sm text-amber-200">{{ customerText("pages.customer.orderdetail.2107d542", "Status pembayaran belum dapat dipastikan. Sistem tidak akan membuat pembayaran kedua otomatis.") }}</p>
@@ -80,7 +80,7 @@ async function submitReview() {
                 <h2 class="text-lg font-semibold">{{ customerText("pages.customer.orderdetail.20c3ee9d", "Beri ulasan") }}</h2>
                 <div class="grid gap-3 sm:grid-cols-[120px_1fr]">
                     <select v-model.number="reviewRating" class="rounded bg-slate-800 p-2"><option :value="5">5 ★</option><option :value="4">4 ★</option><option :value="3">3 ★</option><option :value="2">2 ★</option><option :value="1">1 ★</option></select>
-                    <textarea v-model="reviewBody" rows="3" maxlength="2000" :placeholder="customerText(&quot;pages.customer.orderdetail.attribute.placeholder.98e9ee9&quot;, &quot;Ceritakan pengalaman transaksimu&quot;)" class="rounded bg-slate-800 p-2"></textarea>
+                    <textarea v-model="reviewBody" rows="3" maxlength="2000" :placeholder="customerText('pages.customer.orderdetail.attribute.placeholder.98e9ee9', 'Ceritakan pengalaman transaksimu')" class="rounded bg-slate-800 p-2"></textarea>
                 </div>
                 <button type="button" class="rounded bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50" :disabled="busy || reviewBody.trim().length < 3" @click="submitReview">{{ customerText("pages.customer.orderdetail.d790a39b", "Kirim ulasan") }}</button>
             </template>

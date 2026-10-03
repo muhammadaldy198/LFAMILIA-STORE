@@ -15,7 +15,7 @@ const statuses=[
 ];
 </script>
 <template>
-<Head :title="customerText(&quot;pages.content.faq.attribute.title.4c104caa&quot;, &quot;Pertanyaan Umum&quot;)"/>
+<Head :title="customerText('pages.content.faq.attribute.title.4c104caa', 'Pertanyaan Umum')"/>
 <CustomerShell>
 <main class="lf-faq-page">
  <section class="lf-faq-hero">

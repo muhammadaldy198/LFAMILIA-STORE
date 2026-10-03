@@ -14,7 +14,7 @@ const verify = () => { if (!form.processing) form.post('/support/verify', { onSu
 const reply = id => { const f = replyForm(id); if (!f.processing) f.post('/support/' + id + '/messages', { onSuccess: () => f.reset() }); };
 </script>
 <template>
-<Head :title="customerText(&quot;pages.guest.support.attribute.title.f4fe7922&quot;, &quot;Bantuan Guest&quot;)" />
+<Head :title="customerText('pages.guest.support.attribute.title.f4fe7922', 'Bantuan Guest')" />
 <CustomerShell>
 <main class="lf-container lf-content-page">
  <p class="lf-eyebrow">{{ customerText("pages.guest.support.b30960ff", "PUSAT BANTUAN") }}</p><h1>{{ customerText("pages.guest.support.b0d8eb35", "Bantuan tanpa akun") }}</h1>
