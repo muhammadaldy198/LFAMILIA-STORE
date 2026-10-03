@@ -9,7 +9,7 @@ on:
       - '.github/workflows/refresh-frontend-lock.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   refresh:
@@ -21,10 +21,15 @@ jobs:
           node-version: '22'
       - name: Refresh package lock
         run: cd rebuild && npm install --package-lock-only --ignore-scripts
-      - name: Emit package lock
+      - name: Commit package lock
         shell: bash
         run: |
-          echo 'LOCKFILE_BEGIN'
-          base64 -w0 rebuild/package-lock.json
-          echo
-          echo 'LOCKFILE_END'
+          if git diff --quiet -- rebuild/package-lock.json; then
+            echo 'package-lock.json already current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add rebuild/package-lock.json
+          git commit -m 'chore(frontend): refresh package lock for supported ESLint'
+          git push origin HEAD:${GITHUB_REF_NAME}
