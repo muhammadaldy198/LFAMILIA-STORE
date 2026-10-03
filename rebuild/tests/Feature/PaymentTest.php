@@ -681,6 +681,86 @@ class PaymentTest extends TestCase
         $this->assertSame('REFUNDED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
     }
 
+    public function test_refunded_topup_with_spent_balance_enters_review_and_can_be_reconciled_safely(): void
+    {
+        $user = User::create([
+            'name' => 'Refund Review Buyer',
+            'email' => 'refund-review@example.test',
+            'phone' => '081234567894',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+
+        $topupId = DB::table('wallet_topups')->insertGetId([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'PENDING_PAYMENT',
+            'idempotency_key' => 'refund-review-topup-0001',
+            'request_fingerprint' => hash('sha256', 'refund-review-topup'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'wallet_topup_id' => $topupId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'merchant_reference' => 'REFUND-REVIEW-TEST-1',
+            'amount_idr' => 10700,
+            'status' => 'PENDING',
+            'idempotency_key' => 'refund-review-payment-0001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $states = app(PaymentStateService::class);
+        $states->apply($paymentId, 'PAID');
+        DB::table('wallets')->where('id', $wallet->id)->update([
+            'balance_idr' => 3000,
+            'updated_at' => now(),
+        ]);
+
+        $result = $states->apply($paymentId, 'REFUNDED');
+        $this->assertSame('REFUND_REVIEW', $result['status']);
+        $this->assertSame('REFUND_REVIEW', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+        $this->assertSame('REFUNDED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame(0, DB::table('wallet_ledger')
+            ->where('idempotency_key', 'wallet-topup-refund:'.$paymentId)->count());
+
+        try {
+            $states->resolveTopupRefundReview($topupId, 42);
+            $this->fail('Refund review must not create a negative wallet balance.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('refund', $exception->errors());
+        }
+
+        DB::table('wallets')->where('id', $wallet->id)->update([
+            'balance_idr' => 10000,
+            'updated_at' => now(),
+        ]);
+        $resolved = $states->resolveTopupRefundReview($topupId, 42);
+
+        $this->assertSame('REFUNDED', $resolved['status']);
+        $this->assertSame(0, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
+        $this->assertSame('REFUNDED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+        $ledger = DB::table('wallet_ledger')
+            ->where('idempotency_key', 'wallet-topup-refund:'.$paymentId)
+            ->firstOrFail();
+        $this->assertSame(-10000, (int) $ledger->amount_idr);
+        $this->assertSame('admin_user', $ledger->actor_type);
+        $this->assertSame('42', $ledger->actor_id);
+
+        $again = $states->resolveTopupRefundReview($topupId, 42);
+        $this->assertSame('ALREADY_REFUNDED', $again['result']);
+        $this->assertSame(1, DB::table('wallet_ledger')
+            ->where('idempotency_key', 'wallet-topup-refund:'.$paymentId)->count());
+    }
+
     public function test_expired_payment_closes_order_releases_voucher_and_late_paid_does_not_reopen(): void
     {
         $catalog = $this->catalog();
