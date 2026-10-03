@@ -14,7 +14,7 @@ on:
       - '.github/workflows/validate-rebuild.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   foundation:
@@ -194,25 +194,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: true
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: rebuild/package-lock.json
-
-      - name: Refresh checker lockfile
-        if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
-        run: |
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          if ! git diff --quiet -- package-lock.json; then
-            git config user.name github-actions[bot]
-            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add package-lock.json
-            git commit -m "chore(frontend): refresh JS checker lockfile"
-            git push origin HEAD:rebuild/tahap-2-frontend-static-analysis
-          fi
 
       - name: Install frontend dependencies
         run: npm ci
