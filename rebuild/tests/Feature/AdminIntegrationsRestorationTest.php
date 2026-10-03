@@ -89,6 +89,59 @@ class AdminIntegrationsRestorationTest extends TestCase
         $this->assertStringNotContainsString('menu16-secret-api-key', $response->getContent());
     }
 
+    public function test_boolean_integration_fields_are_normalized_for_checkboxes(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'midtrans',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'server_key' => 'server-secret',
+                'is_production' => 1,
+            ],
+        ]);
+
+        $this->get('/admin/integrations')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Integrations')
+            ->where('integrations', function ($integrations): bool {
+                $midtrans = collect($integrations)->firstWhere('code', 'midtrans');
+                $production = collect($midtrans['fields'] ?? [])->firstWhere('key', 'is_production');
+
+                return is_array($production) && $production['value'] === true;
+            }));
+    }
+
+    public function test_corrupt_integration_ciphertext_can_be_repaired_from_panel(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        DB::table('integration_credentials')->insert([
+            'code' => 'midtrans',
+            'config_ciphertext' => 'invalid-encrypted-payload',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->get('/admin/integrations')->assertOk();
+
+        $this->put('/admin/integrations/midtrans', [
+            'is_active' => true,
+            'config' => [
+                'server_key' => 'repaired-server-key',
+                'client_key' => '',
+                'is_production' => false,
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $credential = IntegrationCredential::where('code', 'midtrans')->firstOrFail();
+        $this->assertSame('repaired-server-key', $credential->config_ciphertext['server_key']);
+        $this->assertFalse($credential->config_ciphertext['is_production']);
+    }
+
     public function test_update_preserves_blank_secrets_and_unknown_legacy_metadata(): void
     {
         $admin = $this->loginSuperAdmin();
