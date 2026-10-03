@@ -1,10 +1,35 @@
-# Product/catalog (M5)
+# Product, catalog & media
 
-- Catalog hierarchy: category → product → nominal/package → provider mapping. Initial categories: Game, Pulsa, Paket Data, PLN, Voucher, Entertainment, and PPOB lainnya. No E-wallet catalog category is seeded; Super Admin can create categories without schema changes.
-- New products and packages start inactive. Public browsing only returns active categories, products, and packages, sorted by nominal value (then manual order), never by cost or provider price. Product input fields are data-driven; checkout will consume them in M6.
-- Products use AUTO_PROVIDER or MANUAL. Manual products have internal package IDs/codes and an internal fulfillment instruction. A manual package automatically gets an inactive Manual provider mapping. Manual products have their own admin/customer tab, without being limited to a game.
-- Digiflazz SKU enters only via DigiflazzCatalogImport from a trusted sync. There is no public or admin request field to set external_sku. Import and provider credential UI are integrated in M8/M9. Provider cost and mapping priority are never sent to the public catalog.
-- Spatie Media Library v11 provides single-file image collections for categories, products (cover and banner), packages, and store assets (logo, favicon, desktop/mobile banner, popup). Upload is Super Admin-only, JPEG/PNG/WebP and 5 MB maximum. Storage disk is configured with MEDIA_DISK (Spatie default: public); the deployment will need a public storage link or compatible object storage in M12.
-- M5 Super Admin catalog page manages categories, products, packages, input fields, manual mapping cost, mapping activation/priority, and images. Changes write audit logs. Full admin permissions, Digiflazz sync and content workflows are expanded in M9.
-- Active logo, favicon, desktop/mobile banners, and popup media are read by the customer catalog. Banner links are configurable from Super Admin; an inactive asset is not shown. The final storefront design and content are refined in later milestones.
-- M5 deliberately exposes no checkout or price calculation. M6 will validate active mappings and compute a positive final customer price on the server; M7 handles payment. The home/catalog design will be refined with actual brand media and checkout in later milestones.
+## Model katalog
+
+Struktur bisnis:
+
+`Category → Product → ProductPackage/nominal → Provider Mapping`
+
+Public catalog hanya menawarkan entity yang aktif dan eligible. Field customer per product bersifat data-driven.
+
+Produk menggunakan fulfillment mode otomatis atau manual. Manual product tidak dibatasi pada Roblox.
+
+## Provider mapping
+
+Satu package dapat mempunyai beberapa provider mappings. Mapping menyimpan antara lain provider, external SKU, cost, max price, priority, active state, dan fulfillment configuration.
+
+Untuk selection, angka `priority` lebih kecil didahulukan. Provider/mapping internal, cost, external SKU, dan ranking tidak menjadi input customer.
+
+Digiflazz SKU masuk melalui trusted catalog/import/sync flow. Customer tidak dapat menentukan `buyer_sku_code`.
+
+## Pricing
+
+Server menghitung cost + margin sesuai pricing mode dan menolak sell price di bawah modal. Checkout membuat snapshot sehingga perubahan katalog, cost, margin, atau provider berikutnya tidak menulis ulang transaksi lama.
+
+## Media
+
+Spatie Media Library dipakai untuk image collections produk/kategori/package dan store assets seperti logo, favicon, banner desktop/mobile, popup, serta asset yang memang didukung model.
+
+Storage disk adalah konfigurasi runtime. Repository tidak boleh menyimpan production media dump atau credential object storage.
+
+## Admin ownership
+
+Produk/kategori/nominal, urutan, media, provider mappings, Digiflazz catalog/sync, dan pricing dikelola melalui workspace Admin yang sesuai. Secret provider tetap berada di Integrasi, bukan di Produk.
+
+Untuk checkout dan safe fulfillment lihat [CHECKOUT.md](CHECKOUT.md) dan [FULFILLMENT.md](FULFILLMENT.md).
