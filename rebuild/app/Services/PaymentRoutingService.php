@@ -223,26 +223,46 @@ class PaymentRoutingService
         return $flat + $percent;
     }
 
+    public function gatewayReady(string $gatewayCode): bool
+    {
+        return match (strtoupper($gatewayCode)) {
+            'MIDTRANS' => $this->credentialHasKeys('midtrans', ['server_key']),
+            'DOKU' => $this->credentialHasKeys('doku', ['client_id', 'secret_key']),
+            default => true,
+        };
+    }
+
     /**
      * @return array<int, string>
      */
     private function unavailableExternalGatewayCodes(): array
     {
-        $unavailable = [];
+        return array_values(array_filter(
+            ['MIDTRANS', 'DOKU'],
+            fn (string $code): bool => ! $this->gatewayReady($code)
+        ));
+    }
 
-        $midtrans = IntegrationCredential::where('code', 'midtrans')->where('is_active', true)->first();
-        $midtransConfig = $midtrans?->config_ciphertext;
-        if (! is_array($midtransConfig) || empty($midtransConfig['server_key'])) {
-            $unavailable[] = 'MIDTRANS';
+    /**
+     * @param array<int, string> $keys
+     */
+    private function credentialHasKeys(string $credentialCode, array $keys): bool
+    {
+        $credential = IntegrationCredential::where('code', $credentialCode)
+            ->where('is_active', true)
+            ->first();
+        $config = $credential?->config_ciphertext;
+        if (! is_array($config)) {
+            return false;
         }
 
-        $doku = IntegrationCredential::where('code', 'doku')->where('is_active', true)->first();
-        $dokuConfig = $doku?->config_ciphertext;
-        if (! is_array($dokuConfig) || empty($dokuConfig['client_id']) || empty($dokuConfig['secret_key'])) {
-            $unavailable[] = 'DOKU';
+        foreach ($keys as $key) {
+            if (! isset($config[$key]) || ! is_string($config[$key]) || trim($config[$key]) === '') {
+                return false;
+            }
         }
 
-        return $unavailable;
+        return true;
     }
 
     private function publicGroup(string $method): string
