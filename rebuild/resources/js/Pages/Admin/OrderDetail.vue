@@ -5,7 +5,6 @@ import AdminShell from '../../Components/AdminShell.vue';
 import { Card } from '../../Components/ui/card';
 import { Button } from '../../Components/ui/button';
 import { Badge } from '../../Components/ui/badge';
-import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
 const props = defineProps({ order: Object, events: Array, payments: Array, attempts: Array, canViewCustomer: Boolean, canCheckFulfillment: Boolean, canResendDelivery: Boolean });
