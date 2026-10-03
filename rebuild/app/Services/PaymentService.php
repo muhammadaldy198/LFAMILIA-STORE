@@ -306,22 +306,34 @@ class PaymentService
                 default => throw ValidationException::withMessages(['payment' => 'Gateway pembayaran tidak didukung.']),
             };
         } catch (ValidationException $exception) {
-            DB::table('payment_transactions')
+            $rejected = DB::table('payment_transactions')
                 ->where('id', $payment->id)
                 ->where('status', 'SENDING')
                 ->update([
                     'status' => 'REJECTED',
                     'updated_at' => now(),
                 ]);
+            if ($rejected !== 1) {
+                return $this->publicResult(
+                    DB::table('payment_transactions')->where('id', $payment->id)->firstOrFail()
+                );
+            }
+
             throw $exception;
         } catch (RuntimeException $exception) {
-            DB::table('payment_transactions')
+            $unknown = DB::table('payment_transactions')
                 ->where('id', $payment->id)
                 ->where('status', 'SENDING')
                 ->update([
                     'status' => 'UNKNOWN',
                     'updated_at' => now(),
                 ]);
+            if ($unknown !== 1) {
+                return $this->publicResult(
+                    DB::table('payment_transactions')->where('id', $payment->id)->firstOrFail()
+                );
+            }
+
             throw ValidationException::withMessages([
                 'payment' => 'Status pembuatan pembayaran belum dapat dipastikan. Jangan ulangi pembayaran; periksa status transaksi.',
             ]);
