@@ -186,7 +186,6 @@ jobs:
       - name: Check PHP style
         run: vendor/bin/pint --test
 
-  # Stage 2: lint, Vue SFC static/type checking, and production build must all pass.
   frontend-static:
     runs-on: ubuntu-latest
     defaults:
