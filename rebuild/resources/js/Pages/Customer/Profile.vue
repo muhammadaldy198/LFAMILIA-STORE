@@ -21,7 +21,7 @@ const remove = () => {
 </script>
 
 <template>
-    <Head :title="customerText(&quot;pages.customer.profile.attribute.title.8b01539f&quot;, &quot;Profil&quot;)" />
+    <Head :title="customerText('pages.customer.profile.attribute.title.8b01539f', 'Profil')" />
     <AccountShell>
         <h1 class="text-3xl font-semibold">{{ customerText("pages.customer.profile.8b01539f", "Profil") }}</h1>
         <p v-if="page.props.status" role="status" class="text-cyan-300">{{ page.props.status }}</p>

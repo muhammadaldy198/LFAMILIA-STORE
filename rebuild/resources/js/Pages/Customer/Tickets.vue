@@ -12,7 +12,7 @@ const submit = () => { if (!form.processing) form.post('/account/tickets', { onS
 </script>
 
 <template>
-    <Head :title="customerText(&quot;pages.customer.tickets.attribute.title.ec2ab35b&quot;, &quot;Tiket bantuan&quot;)" />
+    <Head :title="customerText('pages.customer.tickets.attribute.title.ec2ab35b', 'Tiket bantuan')" />
     <AccountShell>
         <h1 class="text-3xl font-semibold">{{ customerText("pages.customer.tickets.ec2ab35b", "Tiket bantuan") }}</h1>
         <form class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5" @submit.prevent="submit">
@@ -41,6 +41,6 @@ const submit = () => { if (!form.processing) form.post('/account/tickets', { onS
             <Link :href="'/account/tickets/' + ticket.id" class="font-semibold text-cyan-300 hover:underline">#{{ ticket.id }} · {{ ticket.subject }}</Link>
             <p class="mt-1 text-sm text-slate-400">{{ ticket.status }} · {{ ticket.created_at }}</p>
         </div>
-        <nav :aria-label="customerText(&quot;pages.customer.tickets.attribute.aria-label.a837ddc2&quot;, &quot;Halaman tiket&quot;)" class="flex flex-wrap gap-2"><Link v-for="link in tickets.links" :key="link.label" :href="link.url || '#'" class="rounded-md px-3 py-2 text-sm" :class="link.active ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-200'" :aria-disabled="!link.url"><span v-html="link.label" /></Link></nav>
+        <nav :aria-label="customerText('pages.customer.tickets.attribute.aria-label.a837ddc2', 'Halaman tiket')" class="flex flex-wrap gap-2"><Link v-for="link in tickets.links" :key="link.label" :href="link.url || '#'" class="rounded-md px-3 py-2 text-sm" :class="link.active ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-200'" :aria-disabled="!link.url"><span v-html="link.label" /></Link></nav>
     </AccountShell>
 </template>
