@@ -68,8 +68,7 @@ class AdminPaymentRestorationTest extends TestCase
                 ->has('summary')
                 ->where('walletSettings.topup_enabled', fn ($value) => is_bool($value))
                 ->where('routes', function ($routes): bool {
-                    return collect($routes)->every(fn ($route): bool =>
-                        ! array_key_exists('configuration', $route)
+                    return collect($routes)->every(fn ($route): bool => ! array_key_exists('configuration', $route)
                         && ! array_key_exists('provider_channel', $route)
                     );
                 }));
