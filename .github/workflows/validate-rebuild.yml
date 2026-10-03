@@ -14,7 +14,7 @@ on:
       - '.github/workflows/validate-rebuild.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   foundation:
@@ -110,6 +110,18 @@ jobs:
           if git -C .. grep -n -E "(api_key|server_key|client_secret|secret_key|access_token|bot_token)[[:space:]]*=>[[:space:]]*['\"][^$]" -- 'rebuild/app/**' 'rebuild/config/**' 'rebuild/routes/**' 'rebuild/resources/**'; then
             echo "Possible hardcoded secret detected."
             exit 1
+          fi
+
+      - name: Refresh frontend lockfile for Stage 2 branch
+        if: github.ref == 'refs/heads/rebuild/tahap-2-frontend-static-analysis' && github.event_name == 'push' && github.actor != 'github-actions[bot]'
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          if ! git diff --quiet -- package-lock.json; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add package-lock.json
+            git commit -m "chore(frontend): refresh static-analysis lockfile"
+            git push origin HEAD:rebuild/tahap-2-frontend-static-analysis
           fi
 
       - name: Install frontend dependencies
