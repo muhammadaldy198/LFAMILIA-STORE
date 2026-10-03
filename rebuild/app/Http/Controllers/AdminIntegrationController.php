@@ -11,6 +11,7 @@ use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -154,10 +155,12 @@ class AdminIntegrationController
         ]);
 
         $record = IntegrationCredential::firstOrNew(['code' => $code]);
+        $configWasUnreadable = false;
         try {
             $storedConfig = $record->config_ciphertext;
         } catch (DecryptException) {
             $storedConfig = null;
+            $configWasUnreadable = true;
         }
         $existing = is_array($storedConfig) ? $storedConfig : [];
         $before = [
@@ -241,9 +244,18 @@ class AdminIntegrationController
             }
         }
 
-        $record->config_ciphertext = $config;
-        $record->is_active = $data['is_active'];
-        $record->save();
+        if ($configWasUnreadable && $record->exists) {
+            DB::table('integration_credentials')->where('id', $record->id)->update([
+                'config_ciphertext' => Crypt::encryptString(json_encode($config, JSON_THROW_ON_ERROR)),
+                'is_active' => (bool) $data['is_active'],
+                'updated_at' => now(),
+            ]);
+            $record = IntegrationCredential::findOrFail($record->id);
+        } else {
+            $record->config_ciphertext = $config;
+            $record->is_active = $data['is_active'];
+            $record->save();
+        }
 
         DB::table('system_settings')->updateOrInsert(
             ['key' => 'integration.health.'.$code],
