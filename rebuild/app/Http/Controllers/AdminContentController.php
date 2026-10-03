@@ -64,8 +64,8 @@ class AdminContentController
                     'product_reviews.id', 'product_reviews.display_name', 'product_reviews.rating',
                     'product_reviews.body', 'product_reviews.is_active', 'product_reviews.published_at',
                     'products.name as product_name', 'products.slug as product_slug',
-                ])->map(fn (object $review): array => [
-                    ...(array) $review,
+                ])->map(fn (ProductReview $review): array => [
+                    ...$review->toArray(),
                     'is_active' => (bool) $review->is_active,
                 ]),
             'pages' => DB::table('content_pages')->orderBy('key')->get()->map(fn (object $page): array => [
