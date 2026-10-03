@@ -50,6 +50,12 @@ vendor/bin/pint --test
 
 Smoke browser: `bash tests/Browser/smoke.sh` pada environment test yang siap.
 
+## Local development guardrails
+
+Setelah `npm ci`, Husky memasang pre-commit dan pre-push hook pada working copy developer. Pre-commit hanya memeriksa staged files; pre-push menjalankan lint, Vue static check, production build, PHP syntax, dan Pint. Detail rule, manual command, serta smoke test ada di [TESTING.md](TESTING.md).
+
+CI tetap wajib sebelum merge. Hook lokal dapat dilewati dan tidak digunakan sebagai security boundary production.
+
 ## Dokumentasi
 
 Lihat `ARCHITECTURE.md`, `DATABASE.md`, `AUTH.md`, `PRODUCT.md`, `CHECKOUT.md`, `PAYMENT.md`, `FULFILLMENT.md`, `ADMIN.md`, `SECURITY.md`, `TESTING.md`, dan `deploy/README.md`.
