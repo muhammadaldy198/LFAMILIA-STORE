@@ -42,6 +42,7 @@ GIT_CONFIG_VALUE_0="${REPO_DIR}" \
 "${NPM_BIN}" ci
 "${NPM_BIN}" run build
 
+"${PHP_BIN}" artisan route:clear
 "${PHP_BIN}" artisan config:clear
 "${PHP_BIN}" artisan migrate --force --no-interaction
 "${PHP_BIN}" artisan storage:link --no-interaction || true
