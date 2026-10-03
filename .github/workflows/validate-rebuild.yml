@@ -173,6 +173,7 @@ jobs:
           BACKUP_DIR=/tmp/lfamilia-ci-backups
           BACKUP_RETENTION_DAYS=7
           BACKUP_REQUIRE_REMOTE=false
+          BACKUP_RCLONE_REMOTE=disabled-placeholder
           EOF
           OPS_ENV_FILE=/tmp/lfamilia-ci-etc/ops.env bash deploy/backup.sh
           OPS_ENV_FILE=/tmp/lfamilia-ci-etc/ops.env bash deploy/restore-verify.sh
