@@ -27,9 +27,17 @@ function must(command, args, options = {}) {
     return result;
 }
 
+const initialStatus = must('git', ['status', '--porcelain', '--untracked-files=all']).stdout.trim();
+if (initialStatus !== '') {
+    console.error('Hook smoke requires a clean working tree and index; no files were changed.');
+    process.exit(1);
+}
+
 const base = must('git', ['rev-parse', 'HEAD']).stdout.trim();
-must('git', ['config', 'user.name', 'LFAMILIA Hook Smoke']);
-must('git', ['config', 'user.email', 'hook-smoke@invalid.local']);
+const previousName = run('git', ['config', '--local', '--get', 'user.name']).stdout?.trim() || null;
+const previousEmail = run('git', ['config', '--local', '--get', 'user.email']).stdout?.trim() || null;
+must('git', ['config', '--local', 'user.name', 'LFAMILIA Hook Smoke']);
+must('git', ['config', '--local', 'user.email', 'hook-smoke@invalid.local']);
 
 const temporary = [
     'rebuild/app/__HookSmokeBad.php',
@@ -52,13 +60,17 @@ function cleanup() {
     }
 }
 
-function expectBlocked(label, file, content, force = false) {
+function expectBlocked(label, file, content, force = false, workingTreeReplacement = null) {
     cleanup();
     const absolute = path.join(repoRoot, file);
     fs.mkdirSync(path.dirname(absolute), { recursive: true });
     fs.writeFileSync(absolute, content);
 
     must('git', ['add', ...(force ? ['-f'] : []), file]);
+    if (workingTreeReplacement !== null) {
+        fs.writeFileSync(absolute, workingTreeReplacement);
+    }
+
     const result = run('git', ['commit', '-m', 'hook smoke: ' + label]);
     if (result.status === 0) {
         throw new Error(label + ' was not blocked');
@@ -71,13 +83,17 @@ try {
     expectBlocked(
         'PHP syntax error',
         'rebuild/app/__HookSmokeBad.php',
-        '<?php\nfunction hook_smoke( {\n'
+        '<?php\nfunction hook_smoke( {\n',
+        false,
+        '<?php\n\nreturn true;\n'
     );
 
     expectBlocked(
         'ESLint error',
         'rebuild/resources/js/__HookSmokeLint.js',
-        'const hookSmokeUnused = 1;\n'
+        'const hookSmokeUnused = 1;\n',
+        false,
+        'export const hookSmokeValid = 1;\n'
     );
 
     expectBlocked(
@@ -132,5 +148,17 @@ try {
 } catch (error) {
     cleanup();
     console.error(error.message);
-    process.exit(1);
+    process.exitCode = 1;
+} finally {
+    cleanup();
+    if (previousName === null) {
+        run('git', ['config', '--local', '--unset', 'user.name']);
+    } else {
+        must('git', ['config', '--local', 'user.name', previousName]);
+    }
+    if (previousEmail === null) {
+        run('git', ['config', '--local', '--unset', 'user.email']);
+    } else {
+        must('git', ['config', '--local', 'user.email', previousEmail]);
+    }
 }
