@@ -97,7 +97,7 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
 </script>
 
 <template>
-<Head :title="customerText(&quot;pages.guest.track.attribute.title.196596ce&quot;, &quot;Cek Pesanan&quot;)"/>
+<Head :title="customerText('pages.guest.track.attribute.title.196596ce', 'Cek Pesanan')"/>
 <CustomerShell>
 <main class="lf-track-page">
  <section class="lf-container lf-track-hero">
@@ -108,7 +108,7 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
   </div>
   <div class="lf-track-search">
    <svg viewBox="0 0 24 24"><path d="m21 21-4.3-4.3m1.3-5.7a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>
-   <input v-model="query" @keyup.enter="search" :aria-label="customerText(&quot;pages.guest.track.attribute.aria-label.6395bd69&quot;, &quot;Nomor invoice atau nomor WhatsApp&quot;)" :placeholder="customerText(&quot;pages.guest.track.attribute.placeholder.e4947fc0&quot;, &quot;Masukkan nomor invoice atau nomor WhatsApp&quot;)">
+   <input v-model="query" @keyup.enter="search" :aria-label="customerText('pages.guest.track.attribute.aria-label.6395bd69', 'Nomor invoice atau nomor WhatsApp')" :placeholder="customerText('pages.guest.track.attribute.placeholder.e4947fc0', 'Masukkan nomor invoice atau nomor WhatsApp')">
    <button :disabled="loading" @click="search">{{loading?'Mencari...':'Periksa'}}</button>
   </div>
   <p v-if="error" role="alert" class="lf-track-error">{{error}}</p>
@@ -159,7 +159,7 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
    </div>
 
    <aside class="lf-track-timeline">
-    <header><div><h3>{{ customerText("pages.guest.track.67f44f0e", "Log Realtime") }}</h3><p>{{ customerText("pages.guest.track.cea3f93c", "Sinkron setiap 15 detik") }}</p></div><button :disabled="detailRefreshing" :aria-label="customerText(&quot;pages.guest.track.attribute.aria-label.76774c83&quot;, &quot;Perbarui status pesanan&quot;)" @click="refreshDetail">↻</button></header>
+    <header><div><h3>{{ customerText("pages.guest.track.67f44f0e", "Log Realtime") }}</h3><p>{{ customerText("pages.guest.track.cea3f93c", "Sinkron setiap 15 detik") }}</p></div><button :disabled="detailRefreshing" :aria-label="customerText('pages.guest.track.attribute.aria-label.76774c83', 'Perbarui status pesanan')" @click="refreshDetail">↻</button></header>
     <ol>
      <li v-for="event in detail.events" :key="event.id">
       <i></i><div><small>{{sourceLabel(event.source)}}</small><strong>{{event.label}}</strong><time>{{date(event.createdAt)}}</time></div>
