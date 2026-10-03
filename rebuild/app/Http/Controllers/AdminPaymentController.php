@@ -6,6 +6,7 @@ use App\Models\PaymentChannel;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
 use App\Services\PaymentPageSettingsService;
+use App\Services\PaymentRouteCatalogService;
 use App\Services\PaymentRoutingService;
 use App\Services\PaymentStateService;
 use Illuminate\Http\RedirectResponse;
@@ -282,7 +283,7 @@ class AdminPaymentController
         return back()->with('status', 'Logo metode pembayaran diperbarui.');
     }
 
-    public function syncChannels(Request $request): RedirectResponse
+    public function syncChannels(Request $request, PaymentRouteCatalogService $routeCatalog): RedirectResponse
     {
         $presets = [
             [
@@ -348,11 +349,15 @@ class AdminPaymentController
         }
 
         $this->ensureInternalRoutes();
-        $this->audit($request, 'payment.channels.synced', 'payment_channel', 0, null, ['created' => $created]);
+        $routes = $routeCatalog->sync();
+        $this->audit($request, 'payment.channels.synced', 'payment_channel', 0, null, [
+            'created_channels' => $created,
+            'route_catalog' => $routes,
+        ]);
 
-        return back()->with('status', $created > 0
-            ? $created.' metode bawaan ditambahkan dalam keadaan nonaktif.'
-            : 'Metode bawaan sudah lengkap.');
+        return back()->with('status', $created > 0 || $routes['created'] > 0
+            ? $created.' metode dan '.$routes['created'].' routing bawaan ditambahkan dalam keadaan nonaktif.'
+            : 'Metode dan routing bawaan sudah sinkron dengan source code.');
     }
 
     public function gateway(Request $request, int $id, PaymentRoutingService $routing): RedirectResponse
