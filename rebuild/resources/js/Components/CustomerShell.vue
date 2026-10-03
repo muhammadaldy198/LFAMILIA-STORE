@@ -36,7 +36,7 @@ const emailHref = computed(() => storefront.value.supportEmail ? 'mailto:' + sto
 const ticketHref = computed(() => logged.value ? '/account/tickets' : '/support');
 
 const desktopNav = [
-    ['/\#produk', 'Top Up'],
+    ['/#produk', 'Top Up'],
     ['/promo', 'Voucher'],
     ['/news', 'Berita'],
     ['/leaderboard', 'Leaderboard'],
@@ -145,13 +145,6 @@ function endSupportDrag(event) {
     if (!moved) supportOpen.value = !supportOpen.value;
 }
 
-function supportHref(kind) {
-    if (kind === 'wa') return whatsapp.value || '/contact';
-    if (kind === 'ig') return storefront.value.instagramUrl || '/contact';
-    if (kind === 'email') return emailHref.value || '/contact';
-    if (kind === 'discord') return storefront.value.discordUrl || '/contact';
-    return ticketHref.value;
-}
 </script>
 
 <template>
