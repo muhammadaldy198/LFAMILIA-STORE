@@ -229,6 +229,21 @@ class PaymentService
             return $this->publicResult($payment);
         }
 
+        $claimed = DB::table('payment_transactions')
+            ->where('id', $payment->id)
+            ->where('status', 'CREATING')
+            ->update([
+                'status' => 'SENDING',
+                'updated_at' => now(),
+            ]);
+
+        if ($claimed !== 1) {
+            return $this->publicResult(
+                DB::table('payment_transactions')->where('id', $payment->id)->firstOrFail()
+            );
+        }
+
+        $payment = DB::table('payment_transactions')->where('id', $payment->id)->firstOrFail();
         $user = $target->user_id ? DB::table('users')->where('id', $target->user_id)->first() : null;
         $context = [
             'merchant_reference' => $payment->merchant_reference,
@@ -249,16 +264,22 @@ class PaymentService
                 default => throw ValidationException::withMessages(['payment' => 'Gateway pembayaran tidak didukung.']),
             };
         } catch (ValidationException $exception) {
-            DB::table('payment_transactions')->where('id', $payment->id)->update([
-                'status' => 'REJECTED',
-                'updated_at' => now(),
-            ]);
+            DB::table('payment_transactions')
+                ->where('id', $payment->id)
+                ->where('status', 'SENDING')
+                ->update([
+                    'status' => 'REJECTED',
+                    'updated_at' => now(),
+                ]);
             throw $exception;
         } catch (RuntimeException $exception) {
-            DB::table('payment_transactions')->where('id', $payment->id)->update([
-                'status' => 'UNKNOWN',
-                'updated_at' => now(),
-            ]);
+            DB::table('payment_transactions')
+                ->where('id', $payment->id)
+                ->where('status', 'SENDING')
+                ->update([
+                    'status' => 'UNKNOWN',
+                    'updated_at' => now(),
+                ]);
             throw ValidationException::withMessages([
                 'payment' => 'Status pembuatan pembayaran belum dapat dipastikan. Jangan ulangi pembayaran; periksa status transaksi.',
             ]);
@@ -266,7 +287,6 @@ class PaymentService
 
         DB::table('payment_transactions')->where('id', $payment->id)->update([
             'external_reference' => $result['external_reference'],
-            'status' => $result['status'],
             'public_payload' => $result['public_payload'] === null
                 ? null : json_encode($result['public_payload'], JSON_THROW_ON_ERROR),
             'gateway_payload' => $result['gateway_payload'] === null
@@ -274,7 +294,15 @@ class PaymentService
             'updated_at' => now(),
         ]);
 
-        if ($route['gateway_code'] === 'MANUAL_QRIS' && $result['status'] === 'PENDING' && $payment->order_id !== null) {
+        $statusUpdated = DB::table('payment_transactions')
+            ->where('id', $payment->id)
+            ->where('status', 'SENDING')
+            ->update([
+                'status' => $result['status'],
+                'updated_at' => now(),
+            ]);
+
+        if ($statusUpdated === 1 && $route['gateway_code'] === 'MANUAL_QRIS' && $result['status'] === 'PENDING' && $payment->order_id !== null) {
             $orderNumber = DB::table('orders')->where('id', $payment->order_id)->value('order_number');
             $this->notifications->record(
                 'payment.manual_qris.pending',
@@ -299,9 +327,14 @@ class PaymentService
             ? (json_decode($payment->public_payload, true) ?: [])
             : ((array) ($payment->public_payload ?? []));
 
+        $status = (string) $payment->status;
+        if ($status === 'SENDING') {
+            $status = 'CREATING';
+        }
+
         return [
             'payment_id' => (int) $payment->id,
-            'status' => (string) $payment->status,
+            'status' => $status,
             'channel_code' => (string) $payment->channel_code,
             'amount_idr' => (int) $payment->amount_idr,
             'instructions' => $payload,
