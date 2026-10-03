@@ -1,9 +1,27 @@
-# Customer (M4)
+# Customer account & guest
 
-- Account routes require a customer session and a phone. Profile changes, password changes, account deletion, wallet balance/ledger, tier, own order list/detail, and own support tickets are implemented.
-- New customers get a zero-balance wallet. Existing customers obtain one on first account/API access. No customer-facing route credits or debits a wallet. Payment-verified top-ups, refund and checkout debits belong to M6/M7.
-- Tier order and settings come from membership_tiers. Requirements and benefits are data, not hardcoded thresholds. Tier changes and Super Admin audit controls belong to M9.
-- Guest order access uses a 64-character random code stored only as a SHA-256 hash. The code is returned once by GuestOrderAccess::issue($orderId), to be called by guest checkout in M6. The guest submits order number plus code via POST; a session then authorizes only that order status. No token is put into the URL. Guest has no wallet.
-- Customer order history and status use existing orders. Checkout and order creation are M6. Support ticket creation/list/detail is live for registered customers; admin responses and ticket operations belong to M9.
-- Self-delete anonymizes and soft-deletes accounts only if zero balance and no ledger entries, top-ups, orders, or tickets. The scheduled 30-day cleanup uses the same checks and rechecks activity inside the locked transaction. Historical business records remain protected.
-- Guest reviews and signed review eligibility are introduced with fulfilled orders/reviews in later milestones.
+## Registered customer
+
+Area account yang diimplementasikan mencakup profile, password/account actions, wallet dan ledger, membership tier, riwayat/detail order, support ticket, serta saved game account sesuai route/controller aktual.
+
+Wallet customer dibuat/diambil server-side dan tidak boleh negatif. Perubahan saldo operasional menggunakan ledger dan transaction/locking; customer tidak dapat mengubah saldo dengan mengirim nominal arbitrer.
+
+Membership memakai tabel/config tier dan tetap terpisah dari Admin RBAC:
+
+BASIC → SILVER → GOLD → DIAMOND → PLATINUM → MAFIA.
+
+## Guest
+
+Guest checkout didukung di website. Guest tidak mempunyai wallet. Akses status order guest memakai identifier/access mechanism server-side dan data guest tidak boleh diekspos dari lookup publik.
+
+Support guest tersedia. Review produk/order menggunakan eligibility yang berasal dari order, bukan isi review yang dibuat sistem.
+
+## Lifecycle
+
+Self-delete/cleanup hanya boleh berjalan pada kondisi aman yang diperiksa backend. Business record yang diperlukan untuk transaksi/audit tidak boleh dihapus hanya karena customer meminta penghapusan profile.
+
+## Security
+
+Sensitive saved-game data tidak boleh dibocorkan pada list Admin/customer yang tidak memerlukan nilainya. Endpoint account dan support menggunakan auth/rate limit sesuai implementasi.
+
+Untuk auth detail lihat [AUTH.md](AUTH.md); untuk wallet/payment lihat [PAYMENT.md](PAYMENT.md).
