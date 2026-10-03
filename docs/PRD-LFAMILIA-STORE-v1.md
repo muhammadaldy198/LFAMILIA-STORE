@@ -1,3 +1,7 @@
+> **STATUS DOKUMEN:** PRD ini adalah requirement produk. Ia bukan laporan status implementasi per 2026-10-04. Untuk kondisi kode/runtime aktual lihat `rebuild/README.md` dan `rebuild/ARCHITECTURE.md`. Milestone/checklist yang belum dicentang di PRD tidak boleh dipakai untuk menyimpulkan fitur tersebut belum ada tanpa verifikasi kode.
+
+> **STATUS DOKUMEN:** PRD ini adalah requirement produk. Ia bukan laporan status implementasi per 2026-10-04. Untuk kondisi kode/runtime aktual lihat `rebuild/README.md` dan `rebuild/ARCHITECTURE.md`. Milestone/checklist yang belum dicentang di PRD tidak boleh dipakai untuk menyimpulkan fitur tersebut belum ada tanpa verifikasi kode.
+
 # LFAMILIA STORE
 ## PRODUCT REQUIREMENTS DOCUMENT (PRD)
 ### MASTER v1.0 — Laravel + CloudPanel + VPS

@@ -1,3 +1,7 @@
+> **HISTORICAL SNAPSHOT:** Dokumen ini merekam audit/restoration pada tanggal pembuatannya. Gunakan `rebuild/ADMIN.md`, `rebuild/ARCHITECTURE.md`, dan kode `main` sebagai sumber status current. Jangan menganggap gap/label milestone di snapshot ini masih berlaku tanpa verifikasi ulang.
+
+> **HISTORICAL SNAPSHOT:** Dokumen ini merekam audit/restoration pada tanggal pembuatannya. Gunakan `rebuild/ADMIN.md`, `rebuild/ARCHITECTURE.md`, dan kode `main` sebagai sumber status current. Jangan menganggap gap/label milestone di snapshot ini masih berlaku tanpa verifikasi ulang.
+
 # Menu 1 — Dashboard
 
 Baseline: 45eb340740ef0a72c02eed5fd3933a8bb7d5c176, components/admin-overview.tsx dan app/api/admin/summary/route.ts.

@@ -1,45 +1,128 @@
-# M12 Production Deployment
+# Production deployment & operations
 
-This directory is the production deployment baseline for the Laravel 12 / PHP 8.4 / MySQL 8 / Redis rebuild.
+Runtime production adalah Laravel 12 / PHP 8.4 / MySQL 8 / Redis di VPS dengan Nginx/CloudPanel. Production source ref adalah `main`.
 
-## Server-side files that are never committed
+## Server-only configuration
 
-- `rebuild/.env`: Laravel infrastructure configuration only. Provider/payment credentials remain managed through Super Admin -> Integrasi.
-- `/etc/lfamilia/ops.env`: deployment paths, service users, health URLs, backup policy and paths.
-- `/etc/lfamilia/mysql-backup.cnf`: least-privilege MySQL backup credentials.
-- `/etc/lfamilia/mysql-admin.cnf`: MySQL credentials allowed to create/drop only the temporary restore-verification database.
-- `/etc/lfamilia/backup.pass`: strong backup encryption passphrase.
-- `/etc/lfamilia/rclone.conf`: external/object-storage credentials when rclone requires them.
+File berikut tidak boleh di-commit:
 
-All secret files should be owned by root (or the dedicated service user that needs them) and mode `0600`.
+- `rebuild/.env` — Laravel/infrastructure bootstrap config.
+- `/etc/lfamilia/ops.env` — deploy paths, service names, health URLs, backup policy/path.
+- MySQL backup/admin client config.
+- backup encryption passphrase file.
+- rclone config bila remote backup dipakai.
 
-## Deployment order
+Provider/application credential yang dikelola aplikasi tetap di Super Admin → Integrasi, bukan di deploy env/source.
 
-1. Create the CloudPanel site and configure PHP 8.4.
-2. Install MySQL 8.x (8.0 or 8.4; MariaDB is not accepted for this PRD), Redis, Composer, Node/npm, and PHP extensions including `pdo_mysql` and `redis`.
-3. Clone this repository to the server and keep `main` as the production ref.
-4. Copy `production.env.example` to `rebuild/.env`, fill infrastructure values, and generate `APP_KEY`.
-5. Copy `ops.env.example` to `/etc/lfamilia/ops.env` and fill paths/user/backup storage settings.
-6. Configure the CloudPanel vhost to point to `rebuild/public`; keep CloudPanel's generated PHP-FPM block.
-7. Configure Cloudflare apex/`www` proxy and Full (strict) TLS so the public health URL can reach this VPS.
-8. Run `bash deploy/install-systemd.sh` as root.
-9. Run `bash deploy/preflight.sh`.
-10. Run `bash deploy/deploy.sh`.
-11. Re-run `bash deploy/healthcheck.sh` and verify backup/restore timers.
+## Deployment runbook
+
+Urutan operasional yang aman:
+
+1. Pastikan PR sudah merged ke `main` dan CI hijau.
+2. Jalankan encrypted database backup dengan `bash deploy/backup.sh`.
+3. Pastikan backup berhasil sebelum perubahan runtime.
+4. Jalankan `bash deploy/preflight.sh`.
+5. Jalankan `bash deploy/deploy.sh`.
+6. Jalankan/konfirmasi `bash deploy/healthcheck.sh`.
+7. Periksa queue/scheduler dan error log bila healthcheck gagal.
+
+**Catatan aktual:** `deploy.sh` memanggil `preflight.sh`, tetapi tidak otomatis memanggil `backup.sh`. Karena itu backup-before-deploy adalah kewajiban runbook/operator, bukan safety net otomatis di script.
+
+## Apa yang dilakukan deploy.sh
+
+Script:
+
+- menolak dirty Git worktree;
+- fetch + checkout production ref;
+- fast-forward-only ke origin;
+- masuk maintenance mode;
+- Composer install production;
+- `npm ci` + production build;
+- clear route/config;
+- `php artisan migrate --force`;
+- memastikan storage link;
+- config/view cache;
+- queue restart;
+- restart PHP-FPM, queue, scheduler;
+- memastikan timer healthcheck/backup/restore-verification aktif;
+- keluar maintenance;
+- menjalankan healthcheck.
+
+Deployment gagal meninggalkan aplikasi dalam maintenance mode agar half-upgraded runtime tidak disajikan.
+
+## Preflight
+
+`deploy/preflight.sh` memverifikasi file ops/env, executable yang diperlukan, PHP 8.4+, PHP extensions, production Laravel settings, Composer config, MySQL connectivity/version, Redis localhost connectivity, backup prerequisites, dan service PHP-FPM.
+
+MariaDB ditolak; target runtime adalah MySQL 8.
+
+## Healthcheck
+
+`deploy/healthcheck.sh` memeriksa:
+
+- readiness melalui public/Cloudflare URL;
+- readiness langsung ke origin dengan Host header;
+- `lfamilia-queue.service`;
+- `lfamilia-scheduler.service`.
+
+Production audit 2026-10-04 menunjukkan healthcheck timer/service terakhir sukses dan queue/scheduler aktif.
+
+## Backup
+
+`deploy/backup.sh`:
+
+- membuat consistent MySQL dump;
+- menambahkan metadata count/financial sanity fields;
+- membuat tar archive;
+- mengenkripsi archive dengan AES-256-CBC + PBKDF2;
+- membuat SHA-256 sidecar;
+- menerapkan retention;
+- dapat menyalin encrypted archive/checksum ke rclone remote bila `BACKUP_REQUIRE_REMOTE=true`.
+
+Production audit 2026-10-04: backup timer aktif, last service result sukses, retention 7 hari, tetapi `BACKUP_REQUIRE_REMOTE=false`. Jadi dokumentasi **tidak boleh mengklaim external/object-storage backup sedang aktif**.
+
+### Media
+
+Script `backup.sh` saat ini membackup **database + metadata**, bukan seluruh media filesystem. Media harus dilindungi oleh backup filesystem/VPS/storage terpisah sebelum dianggap recoverable. Jangan menyatakan media sudah tercakup oleh encrypted DB backup.
+
+## Restore verification
+
+`deploy/restore-verify.sh`:
+
+- memilih encrypted backup terbaru;
+- memverifikasi checksum;
+- decrypt/extract ke temp directory;
+- membuat database verifikasi sementara;
+- restore dump;
+- membandingkan metadata penting;
+- menghapus database sementara;
+- memverifikasi keberadaan remote copy bila remote backup diwajibkan.
+
+Script ini **tidak melakukan overwrite database production**. Production restore tetap tindakan recovery eksplisit yang harus mempertimbangkan downtime, database target, dan media state.
+
+Production restore-verification timer aktif dan hasil service terakhir yang diperiksa sukses.
 
 ## Source rollback
 
-Use `ROLLBACK_REF=<known-good-sha> CONFIRM_ROLLBACK=ROLLBACK_SOURCE_ONLY bash deploy/rollback-source.sh`.
-This intentionally does not roll database migrations backward.
+```bash
+ROLLBACK_REF=<known-good-sha> \
+CONFIRM_ROLLBACK=ROLLBACK_SOURCE_ONLY \
+bash deploy/rollback-source.sh
+```
 
-## Safety rules
+Source rollback:
 
-- Production preflight rejects MariaDB/non-MySQL-8 databases and requires Laravel cache, queue, and session to use Redis.
-- Deployment aborts on a dirty Git worktree.
-- Git updates use fast-forward only.
-- The application enters maintenance mode before dependency/build/schema changes.
-- A failed deploy intentionally leaves maintenance mode enabled instead of serving a half-upgraded application.
-- Database migrations run with `--force`; schema rollback is never automated during source rollback.
-- Queue and scheduler are restarted only after dependencies, build and migrations succeed.
-- Health is checked through both the Cloudflare/public path and the local origin path.
-- Live provider/payment credentials must never be copied into this repository.
+- checkout commit yang ditentukan;
+- reinstall production dependencies/build/cache;
+- restart PHP-FPM/queue/scheduler;
+- healthcheck.
+
+**Database migrations sengaja tidak di-rollback otomatis.** Commit rollback harus kompatibel dengan schema yang sudah berjalan atau recovery database harus direncanakan terpisah.
+
+## Systemd
+
+`deploy/install-systemd.sh` dan templates di `deploy/systemd/` mengelola queue, scheduler, backup, restore verification, dan healthcheck services/timers sesuai config server.
+
+## Secret safety
+
+Jangan menaruh DB password, backup passphrase, rclone secret, APP_KEY, provider token, private key, atau origin credential di Markdown/Git.

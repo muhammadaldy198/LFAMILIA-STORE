@@ -1,6 +1,8 @@
-# Customer and future Admin typography baseline
+# Customer typography baseline
 
-Approved 2026-10-02. Apply to customer now; reuse for Admin in a later pass.
+Approved customer-facing baseline from 2026-10-02. Nilai ini tetap menjadi referensi visual customer ketika sesuai dengan CSS/komponen aktual; ia bukan kontrak untuk memaksa setiap komponen ke ukuran yang sama.
+
+Admin panel sekarang mempunyai styling/shadcn workspace sendiri dan **bukan “future Admin pass”**. Untuk status Admin gunakan `rebuild/ADMIN.md` dan komponen/CSS aktual.
 
 | Role | Mobile | Desktop |
 | --- | --- | --- |
@@ -13,4 +15,8 @@ Approved 2026-10-02. Apply to customer now; reuse for Admin in a later pass.
 | Button/menu | 12px | 13px |
 | Helper/metadata | 11px | 12px |
 
-Controls are 36px high on mobile and 40px on desktop (from 640px). Table rows use the corresponding minimum height; textareas start at 96px on mobile and 112px on desktop. Nominal names and prices keep separate approved scales. Mobile footer typography and geometry remain locked. Desktop footer text was explicitly unlocked for readability: group headings 14px, links/description 13px, copyright 11px. Banner assets/dimensions remain unchanged. Desktop panels use slightly larger padding (checkout 16px, general cards 20px, auth 24px). Content cards may grow to fit their content; do not force full panels into a 36px height.
+Customer controls menggunakan target 36px pada mobile dan 40px pada desktop ketika komponen mengikuti baseline global. Textarea dimulai lebih tinggi; nominal name/price dapat mempunyai scale khusus.
+
+Footer desktop mempunyai typography sendiri untuk readability. Banner/media dimensions dan component-specific responsive rules tetap mengikuti CSS/komponen aktual.
+
+Jangan memakai dokumen ini untuk menimpa business behavior atau memaksa seluruh Admin shadcn control mengikuti ukuran customer.

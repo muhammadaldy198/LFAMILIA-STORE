@@ -1,20 +1,57 @@
-# LFAMILIA STORE — rebuild v1
+# LFAMILIA STORE — Laravel runtime
 
-Isolated M1 runtime following [PRD v1](../docs/PRD-LFAMILIA-STORE-v1.md). This is a foundation, not a live store. The existing production runtime in the repository is not replaced by this directory.
+Direktori `rebuild/` adalah runtime aplikasi LFAMILIA STORE yang aktif. Narasi lama bahwa direktori ini hanya “M1 foundation” sudah tidak berlaku.
 
-Requirements: PHP 8.4 with pdo_mysql and phpredis, Composer 2, Node 22+, MySQL 8, Redis.
+## Stack
+
+- Laravel 12 / PHP 8.4
+- Vue 3 / Inertia.js v2 / TailwindCSS v4
+- MySQL 8
+- Redis untuk cache, queue, dan session
+- Nginx pada VPS/CloudPanel
+- Fortify + Sanctum
+- Spatie Media Library
+
+Versi dependency yang lebih detail harus dibaca dari `composer.json`, `composer.lock`, `package.json`, dan `package-lock.json`.
+
+## Struktur runtime
+
+- Customer frontend: Vue/Inertia di `resources/js`, dilayani Laravel.
+- Admin panel: route `/admin`, Vue/Inertia, authorization server-side.
+- Backend: Laravel controllers, services, jobs, middleware, dan scheduler.
+- Database: satu database bisnis MySQL 8 melalui Laravel migrations.
+- Cache/queue/session: Redis.
+- Media: Spatie Media Library, storage sesuai konfigurasi server.
+- Edge: Cloudflare di depan Nginx.
+- Deployment: `deploy/`.
+
+Flow dan boundary ada di [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Status implementasi
+
+Kode repository sudah mencakup auth customer/Admin, katalog, checkout, voucher/membership, payment routing, wallet/top-up, Manual QRIS, callback/reconciliation, fulfillment Digiflazz/manual/stok kode, customer support, admin panel, audit log, system health, security middleware, backup/restore tooling, dan CI.
+
+**Kode integrasi tersedia tidak sama dengan credential production sudah dikonfigurasi atau live E2E provider sudah lolos.** Credential provider dikelola melalui Super Admin → Integrasi.
+
+## Pengembangan
 
 ```bash
-cd rebuild
 composer install
 npm ci
 cp .env.example .env
-# Set DB_* and REDIS_* locally. Never commit .env.
 php artisan key:generate
 php artisan migrate
+npm run lint
+npm run check
 npm run build
-php artisan test
-php artisan serve
+vendor/bin/phpunit
+vendor/bin/pint --test
 ```
 
-The homepage is an Inertia/Vue foundation screen. `/up` checks Laravel boot; `/health/ready` checks MySQL and Redis. M2 adds the business schema. Auth, catalog, payments, fulfillment, and admin are not implemented in M1. No provider credentials belong in this directory; integration secrets will be encrypted in the database and managed through Super Admin → Integrasi in a later milestone.
+Smoke browser: `bash tests/Browser/smoke.sh` pada environment test yang siap.
+
+## Dokumentasi
+
+Lihat `ARCHITECTURE.md`, `DATABASE.md`, `AUTH.md`, `PRODUCT.md`, `CHECKOUT.md`, `PAYMENT.md`, `FULFILLMENT.md`, `ADMIN.md`, `SECURITY.md`, `TESTING.md`, dan `deploy/README.md`.
+
+Jangan menyimpan credential, `.env`, backup passphrase, private key, payment token, atau production dump di repository.
