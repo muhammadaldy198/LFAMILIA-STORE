@@ -138,6 +138,8 @@ jobs:
           grep -Fq 'BACKUP_REQUIRE_REMOTE=true' deploy/ops.env.example
           grep -Fq 'SESSION_SECURE_COOKIE=true' deploy/production.env.example
           grep -Fq 'TRUSTED_PROXIES=*' deploy/production.env.example
+          grep -Fq 'artisan route:clear' deploy/deploy.sh
+          grep -Fq 'artisan route:clear' deploy/rollback-source.sh
 
       - name: Validate schema and assets
         run: |
