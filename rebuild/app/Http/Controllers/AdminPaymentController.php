@@ -96,13 +96,13 @@ class AdminPaymentController
                             && (bool) $route->gateway_active
                             && ! (bool) $route->gateway_maintenance
                             && $routing->gatewayReady((string) $route->gateway_code)
-                            && $routing->gatewayReady((string) $route->gateway_code)
                     ),
                     'available_topup' => (bool) $channel->is_active && $routes->contains(
                         fn (object $route): bool => (bool) $route->is_active
                             && (bool) $route->supports_wallet_topup
                             && (bool) $route->gateway_active
                             && ! (bool) $route->gateway_maintenance
+                            && $routing->gatewayReady((string) $route->gateway_code)
                     ),
                 ];
             })->values();
