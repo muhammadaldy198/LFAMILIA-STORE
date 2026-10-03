@@ -21,7 +21,7 @@ function formatDate(value) {
 </script>
 
 <template>
-<Head :title="customerText(&quot;pages.content.status.attribute.title.cf6592b9&quot;, &quot;Status Layanan&quot;)" />
+<Head :title="customerText('pages.content.status.attribute.title.cf6592b9', 'Status Layanan')" />
 <CustomerShell>
 <main class="lf-container min-h-[70vh] py-10 sm:py-14">
     <p class="lf-eyebrow">{{ customerText("pages.content.status.beb73f55", "TRANSPARANSI LAYANAN") }}</p>

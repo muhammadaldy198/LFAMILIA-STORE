@@ -85,7 +85,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
 </script>
 
 <template>
-<Head :title="customerText(&quot;pages.guest.orderstatus.attribute.title.a17f89cb&quot;, &quot;Status Pesanan&quot;)"/>
+<Head :title="customerText('pages.guest.orderstatus.attribute.title.a17f89cb', 'Status Pesanan')"/>
 <CustomerShell>
     <main class="lf-container lf-order-status-page">
         <Link href="/orders/check" class="lf-back">{{ customerText("pages.guest.orderstatus.860516c2", "← Cek pesanan lain") }}</Link>
@@ -111,7 +111,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
                     <h2>{{ customerText("pages.guest.orderstatus.3527df23", "Pembayaran") }}</h2>
                     <p v-if="paymentState">{{ customerText("pages.guest.orderstatus.ca77496f", "Status:") }} <strong>{{statusLabel(paymentState.status)}}</strong></p>
                     <p v-if="paymentUncertain">{{ customerText("pages.guest.orderstatus.fc9d0f83", "Status pembayaran sedang dipastikan. Jangan membayar ulang.") }}</p>
-                    <img v-if="!paymentUncertain&&paymentState?.instructions?.qr_url" :src="paymentState.instructions.qr_url" :alt="customerText(&quot;pages.guest.orderstatus.attribute.alt.dfd028b8&quot;, &quot;QRIS pembayaran&quot;)">
+                    <img v-if="!paymentUncertain&&paymentState?.instructions?.qr_url" :src="paymentState.instructions.qr_url" :alt="customerText('pages.guest.orderstatus.attribute.alt.dfd028b8', 'QRIS pembayaran')">
                     <p v-if="paymentState?.instructions?.va_number">{{ customerText("pages.guest.orderstatus.d5aec755", "Nomor VA:") }} <strong>{{paymentState.instructions.va_number}}</strong></p>
                     <p v-if="paymentState?.instructions?.payment_code">{{ customerText("pages.guest.orderstatus.6af68bec", "Kode pembayaran:") }} <strong>{{paymentState.instructions.payment_code}}</strong></p>
                     <div v-if="manualQris&&paymentState&&!paymentUncertain" class="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3">
@@ -139,9 +139,9 @@ onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
                         <h2>{{ customerText("pages.guest.orderstatus.20c3ee9d", "Beri ulasan") }}</h2>
                         <p>{{ customerText("pages.guest.orderstatus.e840ad58", "Ulasan hanya tersedia untuk pesanan yang sudah berhasil.") }}</p>
                         <div class="lf-order-review-form">
-                            <input v-model="reviewName" maxlength="100" :placeholder="customerText(&quot;pages.guest.orderstatus.attribute.placeholder.2fadcd07&quot;, &quot;Masukkan nama tampilan (opsional)&quot;)">
+                            <input v-model="reviewName" maxlength="100" :placeholder="customerText('pages.guest.orderstatus.attribute.placeholder.2fadcd07', 'Masukkan nama tampilan (opsional)')">
                             <select v-model.number="reviewRating"><option :value="5">5 ★</option><option :value="4">4 ★</option><option :value="3">3 ★</option><option :value="2">2 ★</option><option :value="1">1 ★</option></select>
-                            <textarea v-model="reviewBody" rows="3" maxlength="2000" :placeholder="customerText(&quot;pages.guest.orderstatus.attribute.placeholder.98e9ee9&quot;, &quot;Ceritakan pengalaman transaksimu&quot;)"></textarea>
+                            <textarea v-model="reviewBody" rows="3" maxlength="2000" :placeholder="customerText('pages.guest.orderstatus.attribute.placeholder.98e9ee9', 'Ceritakan pengalaman transaksimu')"></textarea>
                             <button class="lf-primary" :disabled="busy||reviewBody.trim().length<3" @click="submitReview">{{ customerText("pages.guest.orderstatus.c4ebe0bb", "Kirim Ulasan") }}</button>
                         </div>
                     </template>

@@ -69,7 +69,7 @@ onUnmounted(()=>{
 </script>
 
 <template>
-    <Head :title="customerText(&quot;pages.catalog.index.attribute.title.adae0b8b&quot;, &quot;LFAMILIA STORE&quot;)" />
+    <Head :title="customerText('pages.catalog.index.attribute.title.adae0b8b', 'LFAMILIA STORE')" />
     <CustomerShell :logo-url="logoUrl">
         <main>
             <section v-if="activeBanner" class="lf-container lf-home-banner-wrap">
@@ -85,8 +85,8 @@ onUnmounted(()=>{
                         <img :src="activeBanner.desktop_url||activeBanner.mobile_url" :alt="activeBanner.title||'Banner LFAMILIA STORE'">
                     </picture>
                     <template v-if="visibleBanners.length>1">
-                        <button type="button" class="lf-banner-nav prev" :aria-label="customerText(&quot;pages.catalog.index.attribute.aria-label.d47450e2&quot;, &quot;Banner sebelumnya&quot;)" @click="bannerPrev">‹</button>
-                        <button type="button" class="lf-banner-nav next" :aria-label="customerText(&quot;pages.catalog.index.attribute.aria-label.ebfecd89&quot;, &quot;Banner berikutnya&quot;)" @click="bannerNext">›</button>
+                        <button type="button" class="lf-banner-nav prev" :aria-label="customerText('pages.catalog.index.attribute.aria-label.d47450e2', 'Banner sebelumnya')" @click="bannerPrev">‹</button>
+                        <button type="button" class="lf-banner-nav next" :aria-label="customerText('pages.catalog.index.attribute.aria-label.ebfecd89', 'Banner berikutnya')" @click="bannerNext">›</button>
                         <div class="lf-banner-dots">
                             <button v-for="(_,i) in visibleBanners" :key="i" type="button" :class="{active:i===bannerIndex}" :aria-label="'Banner '+(i+1)" @click="bannerIndex=i"></button>
                         </div>
@@ -96,7 +96,7 @@ onUnmounted(()=>{
 
             <div v-if="popupOpen&&activePopup" class="lf-home-popup-backdrop" @click.self="closePopup">
                 <section class="lf-home-popup" role="dialog" aria-modal="true" :aria-label="activePopup.title">
-                    <button type="button" class="lf-home-popup-close" :aria-label="customerText(&quot;pages.catalog.index.attribute.aria-label.7b2bdb3a&quot;, &quot;Tutup pop-up&quot;)" @click="closePopup">{{ customerText("pages.catalog.index.520b4356", "×") }}</button>
+                    <button type="button" class="lf-home-popup-close" :aria-label="customerText('pages.catalog.index.attribute.aria-label.7b2bdb3a', 'Tutup pop-up')" @click="closePopup">{{ customerText("pages.catalog.index.520b4356", "×") }}</button>
                     <img v-if="activePopup.image_url" :src="activePopup.image_url" :alt="activePopup.title" class="lf-home-popup-image">
                     <div class="lf-home-popup-body">
                         <h2>{{activePopup.title}}</h2>
@@ -132,7 +132,7 @@ onUnmounted(()=>{
                     </div>
                     <form class="lf-search" @submit.prevent="submit">
                         <span aria-hidden="true">⌕</span>
-                        <input v-model="search" maxlength="80" :placeholder="customerText(&quot;pages.catalog.index.attribute.placeholder.6c55bcac&quot;, &quot;Cari game, voucher, pulsa, atau PLN&quot;)">
+                        <input v-model="search" maxlength="80" :placeholder="customerText('pages.catalog.index.attribute.placeholder.6c55bcac', 'Cari game, voucher, pulsa, atau PLN')">
                     </form>
                 </div>
 

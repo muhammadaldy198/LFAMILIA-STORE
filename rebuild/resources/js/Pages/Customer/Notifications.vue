@@ -8,7 +8,7 @@ defineProps({ items: Array });
 const when=v=>v?new Date(v).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'}):'-';
 </script>
 <template>
-<Head :title="customerText(&quot;pages.customer.notifications.attribute.title.b4d63cec&quot;, &quot;Notifikasi&quot;)" />
+<Head :title="customerText('pages.customer.notifications.attribute.title.b4d63cec', 'Notifikasi')" />
 <AccountShell>
     <div><p class="lf-eyebrow">{{ customerText("pages.customer.notifications.66f6ee7d", "AKTIVITAS") }}</p><h1 class="lf-account-title">{{ customerText("pages.customer.notifications.bd0ef076", "Notifikasi transaksi") }}</h1><p class="lf-account-copy">{{ customerText("pages.customer.notifications.f52771b3", "Ringkasan perubahan pesanan dan top up saldo terbaru dari akunmu.") }}</p></div>
     <div v-if="items?.length" class="lf-account-list">

@@ -15,7 +15,7 @@ async function copy(item) {
 }
 </script>
 <template>
-<Head :title="customerText(&quot;pages.customer.codes.attribute.title.ba54136c&quot;, &quot;Kode Digital&quot;)" />
+<Head :title="customerText('pages.customer.codes.attribute.title.ba54136c', 'Kode Digital')" />
 <AccountShell>
     <div><p class="lf-eyebrow">{{ customerText("pages.customer.codes.d0acb5f8", "PRODUK DIGITAL") }}</p><h1 class="lf-account-title">{{ customerText("pages.customer.codes.1fa3a3ba", "Kode digital saya") }}</h1><p class="lf-account-copy">{{ customerText("pages.customer.codes.7388bb65", "Kode hanya tampil dari pesanan berhasil yang memang menghasilkan serial atau voucher.") }}</p></div>
     <div v-if="items?.length" class="lf-account-list">

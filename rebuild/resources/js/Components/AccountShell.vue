@@ -28,7 +28,7 @@ watch(()=>page.url,()=>{open.value=false});
    <aside id="customer-account-menu" class="lf-account-side" :class="{'is-open':open}" @keydown.esc="open=false">
     <div class="lf-account-menu-heading">
      <div class="lf-brand"><span class="lf-brand-mark">{{ customerText("components.accountshell.6ae24f17", "LF") }}</span><span><strong class="lf-brand-name">{{ customerText("components.accountshell.2ea48fb9", "AKUN LFAMILIA") }}</strong><span class="lf-brand-sub">{{ customerText("components.accountshell.d03c4dd9", "CUSTOMER") }}</span></span></div>
-     <button type="button" class="lf-account-menu-close" :aria-label="customerText(&quot;components.accountshell.attribute.aria-label.8ab7199&quot;, &quot;Tutup menu akun&quot;)" @click="open=false">{{ customerText("components.accountshell.520b4356", "×") }}</button>
+     <button type="button" class="lf-account-menu-close" :aria-label="customerText('components.accountshell.attribute.aria-label.8ab7199', 'Tutup menu akun')" @click="open=false">{{ customerText("components.accountshell.520b4356", "×") }}</button>
     </div>
     <nav class="lf-account-nav">
      <Link v-for="x in links" :key="x.href" :href="x.href" :class="{active:$page.url.split('?')[0]===x.href}" @click="open=false">{{ customerText('navigation.account.' + x.href, x.label) }}</Link>

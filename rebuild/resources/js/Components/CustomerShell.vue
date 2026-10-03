@@ -157,8 +157,8 @@ function endSupportDrag(event) {
 
     <header class="lf-header">
         <div class="lf-container lf-header-inner">
-            <Link href="/" class="lf-brand" :aria-label="customerText(&quot;components.customershell.attribute.aria-label.adae0b8b&quot;, &quot;LFAMILIA STORE&quot;)">
-                <img v-if="logo || logoUrl" :src="logo || logoUrl" :alt="customerText(&quot;components.customershell.attribute.alt.adae0b8b&quot;, &quot;LFAMILIA STORE&quot;)" class="lf-brand-logo">
+            <Link href="/" class="lf-brand" :aria-label="customerText('components.customershell.attribute.aria-label.adae0b8b', 'LFAMILIA STORE')">
+                <img v-if="logo || logoUrl" :src="logo || logoUrl" :alt="customerText('components.customershell.attribute.alt.adae0b8b', 'LFAMILIA STORE')" class="lf-brand-logo">
                 <span v-else class="lf-brand-mark">{{ customerText("components.customershell.6ae24f17", "LF") }}</span>
                 <span class="lf-brand-copy">
                     <strong class="lf-brand-name">{{ customerText("components.customershell.497f244e", "LFAMILIA") }}</strong>
@@ -166,12 +166,12 @@ function endSupportDrag(event) {
                 </span>
             </Link>
 
-            <Link href="/#produk" class="lf-header-search" :aria-label="customerText(&quot;components.customershell.attribute.aria-label.4e933d91&quot;, &quot;Cari produk&quot;)">
+            <Link href="/#produk" class="lf-header-search" :aria-label="customerText('components.customershell.attribute.aria-label.4e933d91', 'Cari produk')">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>
                 <span>{{ customerText("components.customershell.d0853d5f", "Cari game atau voucher...") }}</span>
             </Link>
 
-            <nav class="lf-nav" :aria-label="customerText(&quot;components.customershell.attribute.aria-label.70783293&quot;, &quot;Navigasi utama&quot;)">
+            <nav class="lf-nav" :aria-label="customerText('components.customershell.attribute.aria-label.70783293', 'Navigasi utama')">
                 <Link v-for="[href,label] in desktopNav" :key="href" :href="href">{{ customerText('navigation.desktopNav.' + href, label) }}</Link>
             </nav>
 
@@ -180,10 +180,10 @@ function endSupportDrag(event) {
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0"/></svg>
                     {{accountLabel}}
                 </Link>
-                <Link href="/#produk" class="lf-search-mobile" :aria-label="customerText(&quot;components.customershell.attribute.aria-label.4e933d91&quot;, &quot;Cari produk&quot;)">
+                <Link href="/#produk" class="lf-search-mobile" :aria-label="customerText('components.customershell.attribute.aria-label.4e933d91', 'Cari produk')">
                     <svg viewBox="0 0 24 24"><path d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>
                 </Link>
-                <button type="button" class="lf-menu" :aria-label="customerText(&quot;components.customershell.attribute.aria-label.9fa7b867&quot;, &quot;Buka menu&quot;)" :aria-expanded="open" @click="openDrawer">
+                <button type="button" class="lf-menu" :aria-label="customerText('components.customershell.attribute.aria-label.9fa7b867', 'Buka menu')" :aria-expanded="open" @click="openDrawer">
                     <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
                 </button>
             </div>
@@ -191,7 +191,7 @@ function endSupportDrag(event) {
     </header>
 
     <div v-if="open" class="lf-overlay" @click="closeDrawer"></div>
-    <aside class="lf-drawer" :class="{open}" :aria-label="customerText(&quot;components.customershell.attribute.aria-label.980d1dd6&quot;, &quot;Menu customer&quot;)">
+    <aside class="lf-drawer" :class="{open}" :aria-label="customerText('components.customershell.attribute.aria-label.980d1dd6', 'Menu customer')">
         <div class="lf-drawer-head">
             <div><strong>{{ customerText("components.customershell.adae0b8b", "LFAMILIA STORE") }}</strong><p>{{ customerText("components.customershell.c36f2f11", "Top up, kalkulator game, dan bantuan.") }}</p></div>
             <button type="button" class="lf-drawer-close" @click="closeDrawer">{{ customerText("components.customershell.520b4356", "×") }}</button>
@@ -255,29 +255,29 @@ function endSupportDrag(event) {
         <div v-if="(footerDesktop || footerMobile) && sectionEnabled('footerBanner')" class="lf-footer-banner">
             <picture>
                 <source v-if="footerMobile" media="(max-width:639px)" :srcset="footerMobile">
-                <img :src="footerDesktop || footerMobile" :alt="customerText(&quot;components.customershell.attribute.alt.adae0b8b&quot;, &quot;LFAMILIA STORE&quot;)">
+                <img :src="footerDesktop || footerMobile" :alt="customerText('components.customershell.attribute.alt.adae0b8b', 'LFAMILIA STORE')">
             </picture>
         </div>
 
         <div class="lf-container lf-footer-main">
             <div class="lf-footer-brand-column">
                 <Link href="/" class="lf-brand">
-                    <img v-if="logo || logoUrl" :src="logo || logoUrl" :alt="customerText(&quot;components.customershell.attribute.alt.adae0b8b&quot;, &quot;LFAMILIA STORE&quot;)" class="lf-footer-logo">
+                    <img v-if="logo || logoUrl" :src="logo || logoUrl" :alt="customerText('components.customershell.attribute.alt.adae0b8b', 'LFAMILIA STORE')" class="lf-footer-logo">
                     <span v-else class="lf-brand-mark">{{ customerText("components.customershell.6ae24f17", "LF") }}</span>
                     <span class="lf-brand-copy"><strong class="lf-brand-name">{{ customerText("components.customershell.497f244e", "LFAMILIA") }}</strong><span class="lf-brand-sub">{{ customerText("components.customershell.70515d8e", "STORE") }}</span></span>
                 </Link>
                 <p>{{storefront.footerDescription || storefront.tagline || 'Top up favoritmu, sat set tanpa ribet.'}}</p>
                 <div class="lf-socials">
-                    <a v-if="storefront.instagramUrl" class="social-instagram" :href="storefront.instagramUrl" target="_blank" rel="noreferrer" :aria-label="customerText(&quot;components.customershell.attribute.aria-label.f95701b&quot;, &quot;Instagram&quot;)">
+                    <a v-if="storefront.instagramUrl" class="social-instagram" :href="storefront.instagramUrl" target="_blank" rel="noreferrer" :aria-label="customerText('components.customershell.attribute.aria-label.f95701b', 'Instagram')">
                         <svg class="lf-brand-social-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm0 2A3.75 3.75 0 0 0 4 7.75v8.5A3.75 3.75 0 0 0 7.75 20h8.5A3.75 3.75 0 0 0 20 16.25v-8.5A3.75 3.75 0 0 0 16.25 4h-8.5Zm8.96 1.5a1.29 1.29 0 1 1 0 2.58 1.29 1.29 0 0 1 0-2.58ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>
                     </a>
-                    <a v-if="whatsapp" class="social-whatsapp" :href="whatsapp" target="_blank" rel="noreferrer" :aria-label="customerText(&quot;components.customershell.attribute.aria-label.b1332787&quot;, &quot;WhatsApp&quot;)">
+                    <a v-if="whatsapp" class="social-whatsapp" :href="whatsapp" target="_blank" rel="noreferrer" :aria-label="customerText('components.customershell.attribute.aria-label.b1332787', 'WhatsApp')">
                         <svg class="lf-brand-social-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
                     </a>
-                    <a v-if="emailHref" class="social-email" :href="emailHref" :aria-label="customerText(&quot;components.customershell.attribute.aria-label.43352167&quot;, &quot;Email&quot;)">
+                    <a v-if="emailHref" class="social-email" :href="emailHref" :aria-label="customerText('components.customershell.attribute.aria-label.43352167', 'Email')">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
                     </a>
-                    <a v-if="storefront.discordUrl" class="social-discord" :href="storefront.discordUrl" target="_blank" rel="noreferrer" :aria-label="customerText(&quot;components.customershell.attribute.aria-label.c839636f&quot;, &quot;Discord&quot;)">
+                    <a v-if="storefront.discordUrl" class="social-discord" :href="storefront.discordUrl" target="_blank" rel="noreferrer" :aria-label="customerText('components.customershell.attribute.aria-label.c839636f', 'Discord')">
                         <svg class="lf-brand-social-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.37a19.8 19.8 0 00-4.885-1.515.074.074 0 00-.079.037c-.211.375-.445.865-.608 1.25a15.4 15.4 0 00-5.487 0c-.164-.394-.406-.875-.618-1.25a.077.077 0 00-.078-.037A19.74 19.74 0 003.677 4.37a.07.07 0 00-.032.028C.533 9.046-.319 13.58.1 18.058a.082.082 0 00.031.056c2.053 1.507 4.041 2.422 5.993 3.029a.077.077 0 00.084-.028c.462-.63.873-1.295 1.226-1.994a.077.077 0 00-.042-.106 12.3 12.3 0 01-1.872-.892.077.077 0 01-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 01.078-.01c3.927 1.793 8.18 1.793 12.061 0a.073.073 0 01.079.01c.12.099.246.198.373.292a.077.077 0 01-.007.128c-.598.343-1.22.644-1.873.891a.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.077.077 0 00.084.029c1.961-.607 3.95-1.522 6.002-3.03a.082.082 0 00.032-.055c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.029ZM8.02 15.331c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.211 0 2.176 1.095 2.157 2.419 0 1.333-.956 2.419-2.157 2.419Zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.095 2.157 2.419 0 1.333-.946 2.419-2.157 2.419Z"/></svg>
                     </a>
                 </div>
