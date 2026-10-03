@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
@@ -13,6 +14,13 @@ $app = require __DIR__.'/../../bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
 DB::transaction(function (): void {
+    AdminUser::updateOrCreate(['email' => 'browser-admin@example.test'], [
+        'name' => 'Browser Admin',
+        'password' => Hash::make('Browser-admin-password-123'),
+        'role' => 'SUPER_ADMIN',
+        'is_active' => true,
+    ]);
+
     User::updateOrCreate(['email' => 'browser-account@example.test'], [
         'name' => 'Browser Account',
         'phone' => '081234567890',
