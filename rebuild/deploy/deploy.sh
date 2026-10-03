@@ -34,6 +34,10 @@ cd "${APP_DIR}"
 maintenance=1
 trap 'if [[ "${maintenance:-0}" == 1 ]]; then echo "Deployment failed; application remains in maintenance mode." >&2; echo "Previous SHA: ${previous_sha:-unknown}" >&2; fi' EXIT
 
+COMPOSER_ALLOW_SUPERUSER=1 \
+GIT_CONFIG_COUNT=1 \
+GIT_CONFIG_KEY_0=safe.directory \
+GIT_CONFIG_VALUE_0="${REPO_DIR}" \
 "${COMPOSER_BIN}" install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-progress
 "${NPM_BIN}" ci
 "${NPM_BIN}" run build
