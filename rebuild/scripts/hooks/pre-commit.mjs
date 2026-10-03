@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -43,6 +44,16 @@ function stagedSize(file) {
 
     const size = Number.parseInt(result.stdout.trim(), 10);
     return Number.isFinite(size) ? size : null;
+}
+
+function stagedContent(file) {
+    const result = run('git', ['show', ':' + file], { encoding: null });
+    if (result.error || result.status !== 0) {
+        console.error('Unable to read staged content for ' + file + '.');
+        process.exit(1);
+    }
+
+    return result.stdout;
 }
 
 function addedLines(file) {
@@ -211,14 +222,6 @@ const phpFiles = files
     .filter((file) => file.startsWith('rebuild/') && file.endsWith('.php'))
     .map((file) => file.slice('rebuild/'.length));
 
-for (const file of phpFiles) {
-    const result = run('php', ['-l', file], { cwd: appDir, stdio: 'inherit' });
-    if (result.error || result.status !== 0) {
-        console.error('PHP syntax guard failed for ' + file + '.');
-        process.exit(1);
-    }
-}
-
 if (phpFiles.length > 0) {
     const pint = path.join(appDir, 'vendor', 'bin', 'pint');
     if (!fs.existsSync(pint)) {
@@ -226,13 +229,30 @@ if (phpFiles.length > 0) {
         process.exit(1);
     }
 
-    const result = run('php', ['vendor/bin/pint', '--test', ...phpFiles], {
-        cwd: appDir,
-        stdio: 'inherit',
-    });
-    if (result.error || result.status !== 0) {
-        console.error('Pint check failed for staged PHP files.');
-        process.exit(1);
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lfamilia-precommit-'));
+    try {
+        for (const file of phpFiles) {
+            const staged = stagedContent('rebuild/' + file);
+            const tempFile = path.join(tempDir, path.basename(file));
+            fs.writeFileSync(tempFile, staged);
+
+            const syntax = run('php', ['-l', tempFile], { cwd: appDir, stdio: 'inherit' });
+            if (syntax.error || syntax.status !== 0) {
+                console.error('PHP syntax guard failed for staged content: ' + file + '.');
+                process.exit(1);
+            }
+
+            const style = run('php', ['vendor/bin/pint', '--test', tempFile], {
+                cwd: appDir,
+                stdio: 'inherit',
+            });
+            if (style.error || style.status !== 0) {
+                console.error('Pint check failed for staged content: ' + file + '.');
+                process.exit(1);
+            }
+        }
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
     }
 }
 
@@ -247,13 +267,24 @@ if (frontendFiles.length > 0) {
         process.exit(1);
     }
 
-    const result = run(process.execPath, [eslint, '--max-warnings=0', ...frontendFiles], {
-        cwd: appDir,
-        stdio: 'inherit',
-    });
-    if (result.error || result.status !== 0) {
-        console.error('ESLint failed for staged frontend files.');
-        process.exit(1);
+    for (const file of frontendFiles) {
+        const staged = stagedContent('rebuild/' + file);
+        const result = spawnSync(
+            process.execPath,
+            [eslint, '--max-warnings=0', '--stdin', '--stdin-filename', file],
+            {
+                cwd: appDir,
+                input: staged,
+                encoding: 'utf8',
+                maxBuffer,
+                stdio: ['pipe', 'inherit', 'inherit'],
+                env: process.env,
+            }
+        );
+        if (result.error || result.status !== 0) {
+            console.error('ESLint failed for staged content: ' + file + '.');
+            process.exit(1);
+        }
     }
 }
 
