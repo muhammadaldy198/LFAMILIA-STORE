@@ -68,12 +68,10 @@ class AdminPaymentRestorationTest extends TestCase
                 ->has('summary')
                 ->where('walletSettings.topup_enabled', fn ($value) => is_bool($value))
                 ->where('routes', function ($routes): bool {
-                    return collect($routes)->every(function ($route): bool {
-                        $json = json_encode($route['configuration'] ?? [], JSON_THROW_ON_ERROR);
-
-                        return ! str_contains($json, 'client_secret')
-                            && ! str_contains($json, 'never-render-this-secret');
-                    });
+                    return collect($routes)->every(fn ($route): bool =>
+                        ! array_key_exists('configuration', $route)
+                        && ! array_key_exists('provider_channel', $route)
+                    );
                 }));
     }
 
@@ -97,11 +95,8 @@ class AdminPaymentRestorationTest extends TestCase
             'is_active' => true,
         ])->assertForbidden();
 
-        $this->post('/admin/payments/routes', [
-            'payment_channel_id' => $channel->id,
-            'payment_gateway_id' => $gateway->id,
-            'provider_channel' => 'qris',
-            'configuration' => null,
+        $route = DB::table('payment_routes')->firstOrFail();
+        $this->put('/admin/payments/routes/'.$route->id, [
             'priority' => 0,
             'supports_order' => true,
             'supports_wallet_topup' => false,
@@ -224,31 +219,38 @@ class AdminPaymentRestorationTest extends TestCase
         $this->assertArrayNotHasKey('gateway_code', $publicTopup);
     }
 
-    public function test_sensitive_route_configuration_is_rejected(): void
+    public function test_super_admin_cannot_edit_payment_protocol_fields_from_panel(): void
     {
         $this->login('SUPER_ADMIN');
 
-        $channel = DB::table('payment_channels')->where('code', 'qris')->firstOrFail();
-        $gateway = DB::table('payment_gateways')->where('code', 'MIDTRANS')->firstOrFail();
+        $route = DB::table('payment_routes')->firstOrFail();
+        DB::table('payment_routes')->where('id', $route->id)->update([
+            'provider_channel' => 'repo-owned-channel',
+            'configuration' => json_encode(['repo_owned' => true], JSON_THROW_ON_ERROR),
+            'updated_at' => now(),
+        ]);
 
-        $this->from('/admin/payments')->post('/admin/payments/routes', [
-            'payment_channel_id' => $channel->id,
-            'payment_gateway_id' => $gateway->id,
-            'provider_channel' => 'qris',
-            'configuration' => json_encode([
-                'nested' => ['client_secret' => 'do-not-store'],
-            ], JSON_THROW_ON_ERROR),
-            'priority' => 0,
+        $this->from('/admin/payments')->put('/admin/payments/routes/'.$route->id, [
+            'provider_channel' => 'admin-overwrite-attempt',
+            'configuration' => json_encode(['client_secret' => 'must-never-be-written'], JSON_THROW_ON_ERROR),
+            'priority' => 7,
             'supports_order' => true,
             'supports_wallet_topup' => false,
             'is_active' => true,
         ])->assertRedirect('/admin/payments')
-            ->assertSessionHasErrors(['configuration']);
+            ->assertSessionHasNoErrors();
 
-        $this->assertSame(0, DB::table('payment_routes')
-            ->where('payment_channel_id', $channel->id)
-            ->where('payment_gateway_id', $gateway->id)
-            ->count());
+        $saved = DB::table('payment_routes')->where('id', $route->id)->firstOrFail();
+        $this->assertSame('repo-owned-channel', $saved->provider_channel);
+        $this->assertSame(['repo_owned' => true], json_decode((string) $saved->configuration, true, 512, JSON_THROW_ON_ERROR));
+        $this->assertSame(7, (int) $saved->priority);
+
+        $this->post('/admin/payments/routes', [
+            'payment_channel_id' => $route->payment_channel_id,
+            'payment_gateway_id' => $route->payment_gateway_id,
+        ])->assertNotFound();
+
+        $this->delete('/admin/payments/routes/'.$route->id)->assertNotFound();
     }
 
     public function test_wallet_topup_master_switch_is_enforced_by_backend(): void
