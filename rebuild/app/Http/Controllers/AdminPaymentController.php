@@ -23,7 +23,7 @@ class AdminPaymentController
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', Rule::in([
-                'CREATING', 'PENDING', 'UNKNOWN', 'PAID', 'FAILED', 'EXPIRED',
+                'CREATING', 'SENDING', 'PENDING', 'UNKNOWN', 'PAID', 'FAILED', 'EXPIRED',
                 'CANCELLED', 'REJECTED', 'REFUNDED',
             ])],
             'source' => ['nullable', Rule::in(['order', 'topup'])],
@@ -180,7 +180,7 @@ class AdminPaymentController
                 'total' => $total,
                 'paid' => (clone $paid)->count(),
                 'paid_amount_idr' => (int) ((clone $paid)->sum('amount_idr') ?? 0),
-                'pending' => (clone $summaryBase)->whereIn('status', ['CREATING', 'PENDING', 'UNKNOWN'])->count(),
+                'pending' => (clone $summaryBase)->whereIn('status', ['CREATING', 'SENDING', 'PENDING', 'UNKNOWN'])->count(),
                 'failed' => (clone $summaryBase)->whereIn('status', ['FAILED', 'EXPIRED', 'CANCELLED', 'REJECTED'])->count(),
                 'refunded' => (clone $summaryBase)->where('status', 'REFUNDED')->count(),
             ],
