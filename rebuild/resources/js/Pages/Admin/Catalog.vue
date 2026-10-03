@@ -193,6 +193,16 @@ const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping
     ...(mapping.provider_code === 'DIGIFLAZZ' ? { customer_no_template: mapping.customer_no_template || null } : {}),
 });
 const providerLabel = (mapping) => mapping.provider_name || mapping.provider_code || 'Provider';
+const fulfillmentRole = (pack, mapping) => {
+    if (!mapping.is_active) return 'Nonaktif';
+    const active = [...pack.mappings]
+        .filter((entry) => entry.provider_code === mapping.provider_code && entry.is_active)
+        .sort((a, b) => Number(a.priority || 0) - Number(b.priority || 0)
+            || Number(a.cost_idr || 0) - Number(b.cost_idr || 0)
+            || Number(a.id) - Number(b.id));
+    const index = active.findIndex((entry) => Number(entry.id) === Number(mapping.id));
+    return index <= 0 ? 'Utama' : 'Cadangan ' + index;
+};
 const stockMapping = (pack) => pack.mappings.find((mapping) => mapping.provider_code === 'VOUCHER_STOCK');
 const saveVoucherStock = (pack) => router.post('/admin/catalog/packages/' + pack.id + '/voucher-stock', {
     stock_key: pack.stock_form.stock_key,
@@ -414,11 +424,11 @@ const deleteNotice = (notice) => {
                             <div class="space-y-2 rounded-md border border-slate-800 p-3">
                                 <div><h4 class="text-sm font-semibold">Prioritas fulfillment</h4><p class="mt-1 text-[11px] text-slate-500">Angka lebih kecil dipakai lebih dulu. Sistem hanya pindah ke sumber berikutnya setelah kegagalan definitif. Pending, proses, timeout, atau status tidak pasti wajib direkonsiliasi dan tidak boleh langsung failover.</p></div>
                                 <div v-for="mapping in [...pack.mappings.filter((entry) => entry.provider_code !== 'VOUCHER_STOCK')].sort((a,b)=>Number(a.priority)-Number(b.priority)||Number(a.cost_idr||0)-Number(b.cost_idr||0))" :key="mapping.id" class="flex flex-wrap items-end gap-2 rounded border border-slate-800 p-2 text-xs text-slate-300">
-                                    <span class="min-w-40"><strong>Prioritas {{ mapping.priority }}</strong><br>{{ providerLabel(mapping) }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span><br><span class="text-slate-500">Modal Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</span></span>
+                                    <span class="min-w-40"><strong>{{ fulfillmentRole(pack, mapping) }} · Prioritas {{ mapping.priority }}</strong><br>{{ providerLabel(mapping) }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span><br><span class="text-slate-500">Modal Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</span></span>
                                     <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga</Button>
                                     <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                                     <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Format ID tujuan<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan kode kolom di dalam {{ }}.</span></label>
-                                    <label>Prioritas<Input v-model.number="mapping.priority" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
+                                    <label>Prioritas<Input v-model.number="mapping.priority" type="number" min="0" max="1000" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
                                     <label class="flex gap-2"><input v-model="mapping.is_active" type="checkbox">Aktif</label>
                                     <Button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan sumber</Button>
                                 </div>
