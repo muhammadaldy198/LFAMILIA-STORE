@@ -14,6 +14,7 @@ class FulfillmentService
 {
     public function __construct(
         private readonly DigiflazzClient $digiflazz,
+        private readonly DigiflazzCatalogService $digiflazzCatalog,
         private readonly FulfillmentTargetBuilder $targetBuilder,
         private readonly VoucherStockService $voucherStock,
         private readonly AdminNotificationService $notifications,
@@ -684,7 +685,7 @@ class FulfillmentService
                 ->where('mappings.is_active', true)
                 ->where('providers.is_active', true)
                 ->where('providers.fulfillment_mode', 'AUTO_PROVIDER')
-                ->where('providers.code', 'DIGIFLAZZ')
+                ->whereIn('providers.code', ['DIGIFLAZZ', 'VOUCHER_STOCK'])
                 ->whereNotNull('mappings.external_sku')
                 ->whereNotNull('mappings.cost_idr')
                 ->where('mappings.cost_idr', '>', 0)
@@ -694,7 +695,9 @@ class FulfillmentService
                 ->orderBy('mappings.cost_idr')
                 ->orderBy('mappings.id')
                 ->select('mappings.*', 'providers.code as provider_code', 'providers.is_active as provider_active')
-                ->first();
+                ->lockForUpdate()
+                ->get()
+                ->first(fn (object $candidate): bool => $this->mappingBlockReason($candidate, $snapshot) === null);
 
             if (! $mapping) {
                 DB::table('orders')->where('id', $order->id)->update([
@@ -851,6 +854,17 @@ class FulfillmentService
         }
         if (! is_string($mapping->external_sku) || trim($mapping->external_sku) === '') {
             return 'SKU penyedia belum tersedia.';
+        }
+        if ($mapping->provider_code === 'DIGIFLAZZ') {
+            $item = DB::table('digiflazz_catalog_items')
+                ->where('buyer_sku_code', $mapping->external_sku)
+                ->first();
+            if (! $item) {
+                return 'SKU Digiflazz belum tersedia di katalog tersinkron.';
+            }
+            if (! $this->digiflazzCatalog->available($item)) {
+                return 'SKU Digiflazz sedang nonaktif, habis, atau cut-off.';
+            }
         }
         if ($mapping->provider_code === 'VOUCHER_STOCK') {
             $config = $this->json($mapping->fulfillment_config);
