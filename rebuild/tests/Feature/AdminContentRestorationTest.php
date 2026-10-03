@@ -197,6 +197,73 @@ class AdminContentRestorationTest extends TestCase
             ->where('storefront.supportEmail', 'support@example.test'));
     }
 
+    public function test_review_checkbox_payload_uses_real_booleans(): void
+    {
+        $this->login();
+
+        $category = Category::create([
+            'name' => 'Review category '.bin2hex(random_bytes(3)),
+            'slug' => 'review-category-'.bin2hex(random_bytes(4)),
+            'sort_order' => 0,
+            'is_active' => true,
+        ]);
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Review product '.bin2hex(random_bytes(3)),
+            'slug' => 'review-product-'.bin2hex(random_bytes(4)),
+            'fulfillment_mode' => 'MANUAL',
+            'margin_percent' => 0,
+            'sort_order' => 0,
+            'is_active' => true,
+        ]);
+        $package = $product->packages()->create([
+            'code' => 'REV'.bin2hex(random_bytes(3)),
+            'name' => 'Review package',
+            'nominal_value' => 1,
+            'sort_order' => 0,
+            'is_active' => true,
+        ]);
+        $orderId = DB::table('orders')->insertGetId([
+            'order_number' => 'REVIEW-'.bin2hex(random_bytes(6)),
+            'guest_email' => 'review@example.test',
+            'guest_phone' => '081234567896',
+            'product_id' => $product->id,
+            'product_package_id' => $package->id,
+            'status' => 'SUCCESS',
+            'currency' => 'IDR',
+            'customer_input' => json_encode(['user_id' => '123456'], JSON_THROW_ON_ERROR),
+            'snapshot' => json_encode([], JSON_THROW_ON_ERROR),
+            'cost_idr' => 1000,
+            'margin_idr' => 0,
+            'discount_idr' => 0,
+            'fee_idr' => 0,
+            'total_idr' => 1000,
+            'idempotency_key' => 'review-order-'.bin2hex(random_bytes(8)),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('product_reviews')->insert([
+            'order_id' => $orderId,
+            'product_id' => $product->id,
+            'user_id' => null,
+            'display_name' => 'Aktif',
+            'rating' => 5,
+            'body' => 'Review aktif',
+            'is_active' => 1,
+            'published_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->get('/admin/content')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Content')
+            ->where('reviews', function ($reviews): bool {
+                $review = collect($reviews)->firstWhere('display_name', 'Aktif');
+
+                return is_array($review) && $review['is_active'] === true;
+            }));
+    }
+
     public function test_content_page_checkbox_payload_uses_real_booleans(): void
     {
         $this->login();
