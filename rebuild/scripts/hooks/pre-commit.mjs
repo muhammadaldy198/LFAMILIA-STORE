@@ -65,7 +65,7 @@ function forbiddenReason(file) {
         return 'environment file';
     }
 
-    if (/\.(?:p12|pfx)$/i.test(base) || /^(?:id_rsa|id_dsa|id_ecdsa|id_ed25519)$/i.test(base)) {
+    if (/\.(?:key|p12|pfx)$/i.test(base) || /^(?:id_rsa|id_dsa|id_ecdsa|id_ed25519)$/i.test(base)) {
         return 'private credential/key file';
     }
 
@@ -169,7 +169,7 @@ for (const file of files) {
             break;
         }
 
-        const assignment = line.match(/(?:^|[\s,{[(])['"]?(password|api_key|server_key|client_secret|secret_key|access_token|bot_token|webhook_secret|private_key)['"]?\s*(?:=>|:|=)\s*['"\x60]([^'"\x60\r\n]{8,})['"\x60]/i);
+        const assignment = line.match(/(?:^|[\s,{[(])['"]?(password|api_key|server_key|client_key|client_secret|secret_key|merchant_key|merchant_secret|access_token|bot_token|webhook_secret|private_key)['"]?\s*(?:=>|:|=)\s*['"\x60]([^'"\x60\r\n]{8,})['"\x60]/i);
         if (assignment && !placeholderValue(assignment[2])) {
             addFinding(file, 'possible hardcoded ' + assignment[1].toLowerCase());
             break;
