@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\IntegrationCredential;
 use App\Models\PaymentChannel;
 use App\Models\User;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -251,7 +252,13 @@ class PaymentRoutingService
         $credential = IntegrationCredential::where('code', $credentialCode)
             ->where('is_active', true)
             ->first();
-        $config = $credential?->config_ciphertext;
+
+        try {
+            $config = $credential?->config_ciphertext;
+        } catch (DecryptException) {
+            return false;
+        }
+
         if (! is_array($config)) {
             return false;
         }
