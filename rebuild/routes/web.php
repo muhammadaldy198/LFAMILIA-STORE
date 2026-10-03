@@ -230,12 +230,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
                 ->middleware('throttle:admin-sensitive')->name('channels.logo');
             Route::put('/gateways/{id}', [AdminPaymentController::class, 'gateway'])
                 ->middleware('throttle:admin-sensitive')->name('gateways.update');
-            Route::post('/routes', [AdminPaymentController::class, 'route'])
-                ->middleware('throttle:admin-sensitive')->name('routes.store');
             Route::put('/routes/{id}', [AdminPaymentController::class, 'updateRoute'])
                 ->middleware('throttle:admin-sensitive')->name('routes.update');
-            Route::delete('/routes/{id}', [AdminPaymentController::class, 'destroyRoute'])
-                ->middleware('throttle:admin-sensitive')->name('routes.destroy');
             Route::put('/settings', [AdminPaymentController::class, 'settings'])
                 ->middleware('throttle:admin-sensitive')->name('settings.update');
         });
