@@ -200,7 +200,7 @@ function deleteEmpty() {
                         </TableBody>
                     </Table>
                 </div>
-                <div v-if="orders.links?.length > 3" class="mt-4 flex flex-wrap gap-1"><Link v-for="link in orders.links" :key="link.label" :href="link.url || '#'" preserve-scroll :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']" v-html="link.label" /></div>
+                <div v-if="orders.links?.length > 3" class="mt-4 flex flex-wrap gap-1"><Link v-for="link in orders.links" :key="link.label" :href="link.url || '#'" preserve-scroll :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']"><span v-html="link.label" /></Link></div>
             </Card>
         </template>
 

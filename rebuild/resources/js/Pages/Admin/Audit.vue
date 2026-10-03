@@ -300,9 +300,9 @@ const toggleDetail = (id) => {
                 <nav v-if="logs?.links?.length > 3" class="flex flex-wrap gap-2 border-t p-4" aria-label="Halaman Audit Log">
                     <template v-for="link in logs.links" :key="link.label">
                         <Button v-if="link.url" :variant="link.active ? 'default' : 'outline'" size="sm" as-child>
-                            <Link :href="link.url" preserve-state v-html="link.label" />
+                            <Link :href="link.url" preserve-state><span v-html="link.label" /></Link>
                         </Button>
-                        <Button v-else variant="outline" size="sm" disabled v-html="link.label" />
+                        <Button v-else variant="outline" size="sm" disabled><span v-html="link.label" /></Button>
                     </template>
                 </nav>
             </Card>

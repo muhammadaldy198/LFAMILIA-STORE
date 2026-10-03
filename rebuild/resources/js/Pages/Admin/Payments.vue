@@ -548,7 +548,7 @@ async function copy(value) {
                         <TableRow v-if="!transactions.data?.length"><TableCell colspan="7" class="py-10 text-center text-muted-foreground">Belum ada transaksi yang sesuai filter.</TableCell></TableRow>
                     </TableBody></Table>
                 </div>
-                <div v-if="transactions.links?.length > 3" class="mt-4 flex flex-wrap gap-1"><Link v-for="link in transactions.links" :key="link.label" :href="link.url || '#'" preserve-scroll :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']" v-html="link.label" /></div>
+                <div v-if="transactions.links?.length > 3" class="mt-4 flex flex-wrap gap-1"><Link v-for="link in transactions.links" :key="link.label" :href="link.url || '#'" preserve-scroll :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']"><span v-html="link.label" /></Link></div>
             </Card>
 
             <Card v-if="refundReviews.length" class="mt-4 p-4">
