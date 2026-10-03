@@ -8,7 +8,6 @@ import AccountShell from '../../Components/AccountShell.vue';
 
 const props=defineProps({currentCode:String,profile:Object,tiers:Array});
 const money=value=>'Rp'+Number(value||0).toLocaleString('id-ID');
-const current=computed(()=>props.tiers.find(t=>t.code===props.currentCode)||null);
 const progressPercent=computed(()=>{
     const target=Number(props.profile?.next_target_idr||0);
     if(!target)return 100;
