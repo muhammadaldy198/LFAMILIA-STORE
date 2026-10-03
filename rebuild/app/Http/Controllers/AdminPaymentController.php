@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\IntegrationCredential;
 use App\Models\PaymentChannel;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
