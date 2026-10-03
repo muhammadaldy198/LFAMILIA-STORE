@@ -131,6 +131,48 @@ class AdminDigiflazzRestorationTest extends TestCase
         ], $overrides);
     }
 
+    public function test_admin_can_attach_alternate_digiflazz_source_to_existing_nominal(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('primary-sku');
+        $primary = ProviderMapping::where('product_package_id', $catalog['package']->id)->firstOrFail();
+        $primary->update([
+            'priority' => 0,
+            'fulfillment_config' => ['customer_no_template' => '{{user_id}}'],
+        ]);
+
+        $itemId = DB::table('digiflazz_catalog_items')->insertGetId([
+            'buyer_sku_code' => 'alternate-sku',
+            'product_name' => 'Nominal alternatif',
+            'category' => 'Games',
+            'brand' => 'Alternate',
+            'type' => 'Umum',
+            'seller_name' => 'Seller B',
+            'price_idr' => 10500,
+            'baseline_price_idr' => 10500,
+            'buyer_active' => true,
+            'seller_active' => true,
+            'unlimited_stock' => true,
+            'stock' => 0,
+            'multi' => false,
+            'start_cut_off' => '00:00',
+            'end_cut_off' => '00:00',
+            'synced_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->post('/admin/catalog/packages/'.$catalog['package']->id.'/sources/digiflazz', [
+            'item_id' => $itemId,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $alternate = ProviderMapping::where('external_sku', 'alternate-sku')->firstOrFail();
+        $this->assertSame($catalog['package']->id, $alternate->product_package_id);
+        $this->assertSame(1, $alternate->priority);
+        $this->assertFalse($alternate->is_active);
+        $this->assertSame('{{user_id}}', data_get($alternate->fulfillment_config, 'customer_no_template'));
+    }
+
     public function test_digiflazz_has_a_dedicated_menu_and_health_summary_with_filters(): void
     {
         $admin = $this->login();

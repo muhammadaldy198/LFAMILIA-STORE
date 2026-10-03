@@ -72,9 +72,9 @@ class FulfillmentService
 
             $blockReason = $this->mappingBlockReason($mapping, $snapshot);
             if ($blockReason !== null) {
-                $this->blockedWithoutSend($order, $mapping, $blockReason);
+                $blocked = $this->blockedWithoutSend($order, $mapping, $blockReason);
 
-                return null;
+                return $this->nextUnsentAttempt($order, $blocked, $snapshot);
             }
 
             $attempt = $this->createAttempt($order, $mapping, 'CREATED');
@@ -795,12 +795,57 @@ class FulfillmentService
         ]);
     }
 
-    private function blockedWithoutSend(object $order, object $mapping, string $reason): void
+    private function blockedWithoutSend(object $order, object $mapping, string $reason): object
     {
         $attempt = $this->createAttempt($order, $mapping, 'BLOCKED', $reason);
         $this->event((int) $order->id, 'FULFILLMENT_BLOCKED', $order->status, $order->status, [
             'attempt_id' => $attempt->id,
         ]);
+
+        return $attempt;
+    }
+
+    private function nextUnsentAttempt(object $order, object $blockedAttempt, array $snapshot): ?int
+    {
+        $maxPrice = $this->maxPrice($snapshot);
+        $attemptedMappings = DB::table('fulfillment_attempts')
+            ->where('order_id', $order->id)
+            ->pluck('provider_mapping_id');
+
+        $mapping = DB::table('provider_mappings as mappings')
+            ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+            ->where('mappings.product_package_id', $order->product_package_id)
+            ->where('mappings.is_active', true)
+            ->where('providers.is_active', true)
+            ->where('providers.fulfillment_mode', 'AUTO_PROVIDER')
+            ->where('providers.code', 'DIGIFLAZZ')
+            ->whereNotNull('mappings.external_sku')
+            ->whereNotNull('mappings.cost_idr')
+            ->where('mappings.cost_idr', '>', 0)
+            ->where('mappings.cost_idr', '<=', $maxPrice)
+            ->whereNotIn('mappings.id', $attemptedMappings)
+            ->orderBy('mappings.priority')
+            ->orderBy('mappings.cost_idr')
+            ->orderBy('mappings.id')
+            ->select('mappings.*', 'providers.code as provider_code', 'providers.is_active as provider_active')
+            ->first();
+
+        if (! $mapping) {
+            return null;
+        }
+
+        $next = $this->createAttempt($order, $mapping, 'CREATED');
+        DB::table('orders')->where('id', $order->id)->update([
+            'status' => 'PROCESSING',
+            'updated_at' => now(),
+        ]);
+        $this->event((int) $order->id, 'FULFILLMENT_SOURCE_SKIPPED', $order->status, 'PROCESSING', [
+            'from_attempt_id' => $blockedAttempt->id,
+            'attempt_id' => $next->id,
+            'reason' => $blockedAttempt->last_error,
+        ]);
+
+        return (int) $next->id;
     }
 
     private function createAttempt(object $order, object $mapping, string $status, ?string $error = null): object

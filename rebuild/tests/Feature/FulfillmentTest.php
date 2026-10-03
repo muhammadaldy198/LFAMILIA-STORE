@@ -326,6 +326,38 @@ class FulfillmentTest extends TestCase
         $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
     }
 
+    public function test_unusable_primary_source_is_skipped_before_any_provider_send(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog(cost: 10000, maxPrice: 12000);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $secondId = DB::table('provider_mappings')->insertGetId([
+            'product_package_id' => $catalog['package_id'],
+            'provider_id' => $providerId,
+            'external_sku' => 'DF-SAFE-BACKUP',
+            'cost_idr' => 11000,
+            'max_price_idr' => 12000,
+            'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}']),
+            'priority' => 2,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $orderId = $this->paidOrder($catalog);
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->update(['is_active' => false]);
+
+        app(FulfillmentService::class)->startOrder($orderId);
+
+        $attempts = DB::table('fulfillment_attempts')->where('order_id', $orderId)
+            ->orderBy('attempt_no')->get();
+        $this->assertCount(2, $attempts);
+        $this->assertSame('BLOCKED', $attempts[0]->status);
+        $this->assertSame($secondId, (int) $attempts[1]->provider_mapping_id);
+        $this->assertSame('CREATED', $attempts[1]->status);
+        Http::assertNothingSent();
+    }
+
     public function test_price_above_order_guard_blocks_before_provider_request(): void
     {
         Queue::fake();
