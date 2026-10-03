@@ -16,10 +16,13 @@ source "${OPS_ENV_FILE}"
 
 APP_DIR="${REPO_DIR%/}/${APP_SUBDIR}"
 cd "${REPO_DIR}"
-[[ -z "$(git status --porcelain)" ]] || { echo "Repository has uncommitted changes" >&2; exit 1; }
+git_repo() {
+  git -c "safe.directory=${REPO_DIR}" "$@"
+}
+[[ -z "$(git_repo status --porcelain)" ]] || { echo "Repository has uncommitted changes" >&2; exit 1; }
 
-git fetch --all --tags --prune
-git cat-file -e "${ROLLBACK_REF}^{commit}" 2>/dev/null   || { echo "ROLLBACK_REF is not a valid commit" >&2; exit 1; }
+git_repo fetch --all --tags --prune
+git_repo cat-file -e "${ROLLBACK_REF}^{commit}" 2>/dev/null   || { echo "ROLLBACK_REF is not a valid commit" >&2; exit 1; }
 
 cd "${APP_DIR}"
 "${PHP_BIN}" artisan down --retry=60 --refresh=15
@@ -27,9 +30,13 @@ maintenance=1
 trap 'if [[ "${maintenance:-0}" == 1 ]]; then echo "Rollback failed; application remains in maintenance mode." >&2; fi' EXIT
 
 cd "${REPO_DIR}"
-git checkout --detach "${ROLLBACK_REF}"
+git_repo checkout --detach "${ROLLBACK_REF}"
 cd "${APP_DIR}"
 
+COMPOSER_ALLOW_SUPERUSER=1 \
+GIT_CONFIG_COUNT=1 \
+GIT_CONFIG_KEY_0=safe.directory \
+GIT_CONFIG_VALUE_0="${REPO_DIR}" \
 "${COMPOSER_BIN}" install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-progress
 "${NPM_BIN}" ci
 "${NPM_BIN}" run build
@@ -44,5 +51,5 @@ maintenance=0
 trap - EXIT
 bash "${APP_DIR}/deploy/healthcheck.sh"
 
-echo "Source rollback completed at $(git -C "${REPO_DIR}" rev-parse HEAD)."
+echo "Source rollback completed at $(git_repo -C "${REPO_DIR}" rev-parse HEAD)."
 echo "Database migrations were intentionally NOT rolled back."

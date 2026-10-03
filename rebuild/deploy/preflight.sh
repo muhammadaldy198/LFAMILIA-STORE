@@ -58,6 +58,10 @@ grep -Eq '^APP_TRUSTED_HOSTS=.+$' "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is 
 grep -Eq '^TRUSTED_PROXIES=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
 
 cd "${APP_DIR}"
+COMPOSER_ALLOW_SUPERUSER=1 \
+GIT_CONFIG_COUNT=1 \
+GIT_CONFIG_KEY_0=safe.directory \
+GIT_CONFIG_VALUE_0="${REPO_DIR}" \
 "${COMPOSER_BIN}" validate --strict
 "${NPM_BIN}" --version >/dev/null
 
