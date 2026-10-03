@@ -38,6 +38,7 @@ const temporary = [
     'rebuild/.env.production',
     'rebuild/__hook_secret.txt',
     'rebuild/__hook_valid.md',
+    'rebuild/app/__HookSmokeValid.php',
 ];
 
 function cleanup() {
@@ -92,7 +93,7 @@ try {
         true
     );
 
-    const secretText = 'client_' + 'secret = "' + 'not-a-real-production-token-123456' + '"\n';
+    const secretText = 'client_' + 'secret = "' + 'opaque-value-938475938475938475' + '"\n';
     expectBlocked(
         'secret pattern',
         'rebuild/__hook_secret.txt',
@@ -104,6 +105,15 @@ try {
     must('git', ['add', 'rebuild/__hook_valid.md']);
     must('git', ['commit', '-m', 'hook smoke: valid staged file']);
     console.log('PASS commit: valid staged file');
+
+    cleanup();
+    fs.writeFileSync(
+        path.join(repoRoot, 'rebuild/app/__HookSmokeValid.php'),
+        '<?php\n\nreturn true;\n'
+    );
+    must('git', ['add', 'rebuild/app/__HookSmokeValid.php']);
+    must('git', ['commit', '-m', 'hook smoke: valid PHP staged file']);
+    console.log('PASS commit: valid PHP staged file');
 
     cleanup();
     const prePush = run('sh', ['rebuild/.husky/pre-push'], { stdio: 'inherit' });
