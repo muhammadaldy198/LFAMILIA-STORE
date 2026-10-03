@@ -10,7 +10,7 @@ const props = defineProps({ registry: Object, fields: Object, sections: Object, 
 const base = usePage().props.adminPanel?.base_path || '/admin';
 const tab = ref('text'), query = ref(''), group = ref('');
 const groups = computed(() => [...new Set(Object.values(props.registry).map(x => x.group))]);
-const entries = computed(() => Object.entries(props.registry).filter(([key, item]) =>
+const entries = computed(() => Object.entries(props.registry).filter(([, item]) =>
     (!group.value || item.group === group.value) && (!query.value || (item.label + ' ' + item.group).toLowerCase().includes(query.value.toLowerCase()))));
 const form = useForm({
     text: { ...props.presentation.text },
