@@ -153,7 +153,7 @@ class AdminPaymentRestorationTest extends TestCase
 
     public function test_order_and_wallet_topup_can_route_same_method_to_different_gateways(): void
     {
-        DB::table('payment_channels')->where('code', 'qris')->update([
+        DB::table('payment_channels')->where('code', 'virtual_account')->update([
             'is_active' => true,
             'supports_order' => true,
             'supports_wallet_topup' => true,
@@ -173,49 +173,80 @@ class AdminPaymentRestorationTest extends TestCase
             'is_active' => true,
         ]);
 
-        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $channelId = DB::table('payment_channels')->where('code', 'virtual_account')->value('id');
         $midtransId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
         $dokuId = DB::table('payment_gateways')->where('code', 'DOKU')->value('id');
 
-        DB::table('payment_routes')->insert([
-            [
-                'payment_channel_id' => $channelId,
-                'payment_gateway_id' => $midtransId,
-                'provider_channel' => 'qris',
-                'configuration' => null,
+        DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $midtransId)
+            ->update([
                 'priority' => 0,
                 'supports_order' => true,
                 'supports_wallet_topup' => false,
                 'is_active' => true,
-                'created_at' => now(),
                 'updated_at' => now(),
-            ],
-            [
-                'payment_channel_id' => $channelId,
-                'payment_gateway_id' => $dokuId,
-                'provider_channel' => 'qris',
-                'configuration' => null,
+            ]);
+        DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $dokuId)
+            ->update([
                 'priority' => 0,
                 'supports_order' => false,
                 'supports_wallet_topup' => true,
                 'is_active' => true,
-                'created_at' => now(),
                 'updated_at' => now(),
-            ],
-        ]);
+            ]);
 
         $routing = app(PaymentRoutingService::class);
 
-        $this->assertSame('MIDTRANS', $routing->resolve('qris', false, 'order')['gateway_code']);
-        $this->assertSame('DOKU', $routing->resolve('qris', false, 'topup')['gateway_code']);
+        $this->assertSame('MIDTRANS', $routing->resolve('virtual_account', false, 'order')['gateway_code']);
+        $this->assertSame('DOKU', $routing->resolve('virtual_account', false, 'topup')['gateway_code']);
 
-        $publicOrder = collect($routing->publicOrderChannels(null))->firstWhere('code', 'qris');
-        $publicTopup = collect($routing->publicTopupChannels())->firstWhere('code', 'qris');
+        $publicOrder = collect($routing->publicOrderChannels(null))->firstWhere('code', 'virtual_account');
+        $publicTopup = collect($routing->publicTopupChannels())->firstWhere('code', 'virtual_account');
 
         $this->assertIsArray($publicOrder);
         $this->assertIsArray($publicTopup);
         $this->assertArrayNotHasKey('gateway_code', $publicOrder);
         $this->assertArrayNotHasKey('gateway_code', $publicTopup);
+    }
+
+    public function test_sync_restores_repo_owned_route_protocol_without_overwriting_operational_state(): void
+    {
+        $this->login('SUPER_ADMIN');
+
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $gatewayId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
+        $route = DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $gatewayId)
+            ->firstOrFail();
+
+        DB::table('payment_routes')->where('id', $route->id)->update([
+            'provider_channel' => 'tampered',
+            'configuration' => json_encode(['enabled_payments' => ['credit_card']], JSON_THROW_ON_ERROR),
+            'priority' => 77,
+            'supports_order' => false,
+            'supports_wallet_topup' => true,
+            'is_active' => true,
+            'updated_at' => now(),
+        ]);
+
+        $this->post('/admin/payments/channels/sync')
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $saved = DB::table('payment_routes')->where('id', $route->id)->firstOrFail();
+        $this->assertNull($saved->provider_channel);
+        $this->assertSame(
+            ['enabled_payments' => ['other_qris']],
+            json_decode((string) $saved->configuration, true, 512, JSON_THROW_ON_ERROR)
+        );
+        $this->assertSame(77, (int) $saved->priority);
+        $this->assertFalse((bool) $saved->supports_order);
+        $this->assertTrue((bool) $saved->supports_wallet_topup);
+        $this->assertTrue((bool) $saved->is_active);
     }
 
     public function test_super_admin_cannot_edit_payment_protocol_fields_from_panel(): void
