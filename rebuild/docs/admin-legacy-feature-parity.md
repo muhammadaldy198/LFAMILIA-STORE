@@ -1,3 +1,5 @@
+> **HISTORICAL SNAPSHOT:** Dokumen ini merekam audit/restoration pada tanggal pembuatannya. Gunakan `rebuild/ADMIN.md`, `rebuild/ARCHITECTURE.md`, dan kode `main` sebagai sumber status current. Jangan menganggap gap/label milestone di snapshot ini masih berlaku tanpa verifikasi ulang.
+
 # Audit kesetaraan panel admin lama
 
 Tanggal: 2 Oktober 2026 (WIB). Baseline lama: `45eb340740ef0a72c02eed5fd3933a8bb7d5c176`. Panel sebelum audit: `3bef00eb1aa4299151e1243809e9498c3456a7a3`.
