@@ -34,6 +34,8 @@ export default [
                 },
             ],
             'vue/no-unused-vars': 'error',
+            // Inertia pages and shadcn-style primitives intentionally use single-word component names.
+            'vue/multi-word-component-names': 'off',
             'vue/require-explicit-emits': 'error',
         },
     },

@@ -122,11 +122,15 @@ function paymentAttemptKey() {
     try {
         const stored = window.sessionStorage.getItem(storageKey);
         if (stored && /^[A-Za-z0-9:_-]{16,120}$/.test(stored)) key = stored;
-    } catch {}
+    } catch {
+        // Session storage can be unavailable in privacy-restricted browser contexts.
+    }
     key ||= globalThis.crypto?.randomUUID?.()
         || ('payment-' + Date.now() + '-' + Math.random().toString(36).slice(2));
     attemptKeys.set(storageKey, key);
-    try { window.sessionStorage.setItem(storageKey, key); } catch {}
+    try { window.sessionStorage.setItem(storageKey, key); } catch {
+        // The idempotency key remains valid in memory when session storage is unavailable.
+    }
     return key;
 }
 

@@ -79,11 +79,15 @@ async function refreshDetail(){
   const data=await json('/orders/track/status',{method:'POST',body:JSON.stringify({tracking_token:token})});
   if(disposed||version!==selectionVersion||detail.value?.trackingToken!==token)return;
   detail.value=data.order;if(terminal.value)stopDetailPolling();
- }catch{}finally{detailRefreshing.value=false;}
+ }catch{
+  // Polling failures are transient; keep the last known status and retry on the next interval.
+ }finally{detailRefreshing.value=false;}
 }
 async function refreshFeed(){
  if(disposed||document.hidden)return;
- try{const data=await json('/orders/track/feed');feed.value=data.transactions||feed.value;}catch{}
+ try{const data=await json('/orders/track/feed');feed.value=data.transactions||feed.value;}catch{
+  // Feed refresh is best-effort; keep the current feed until the next poll succeeds.
+ }
 }
 function startDetailPolling(){stopDetailPolling();if(!terminal.value)detailTimer=setInterval(refreshDetail,15000);}
 function stopDetailPolling(){if(detailTimer){clearInterval(detailTimer);detailTimer=null;}}
