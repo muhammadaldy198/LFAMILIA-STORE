@@ -112,14 +112,6 @@ jobs:
             exit 1
           fi
 
-      - name: Generate Tahap 2 frontend lockfile
-        run: |
-          npm install --package-lock-only --ignore-scripts
-          echo '__LFAMILIA_T2_LOCK_BEGIN__'
-          base64 -w0 package-lock.json
-          echo
-          echo '__LFAMILIA_T2_LOCK_END__'
-
       - name: Install frontend dependencies
         run: npm ci
 
