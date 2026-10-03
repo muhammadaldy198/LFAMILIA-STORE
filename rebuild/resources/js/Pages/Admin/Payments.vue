@@ -19,6 +19,7 @@ const props = defineProps({
     summary: { type: Object, default: () => ({}) },
     walletSettings: { type: Object, default: () => ({}) },
     manualQrisAsset: Object,
+    refundReviews: { type: Array, default: () => [] },
     manualPayments: { type: Array, default: () => [] },
     pageSettings: { type: Object, default: () => ({}) },
     callbackUrls: { type: Object, default: () => ({}) },
@@ -310,6 +311,11 @@ function confirmManual(id) {
     router.post('/admin/payments/manual/' + id + '/confirm', {}, { preserveScroll: true });
 }
 
+function resolveRefundReview(topup) {
+    if (!window.confirm('Rekonsiliasi refund ini dari saldo pelanggan? Dana hanya dipotong jika saldo mencukupi.')) return;
+    router.post('/admin/payments/refund-reviews/' + topup.id + '/resolve', {}, { preserveScroll: true });
+}
+
 function savePaymentPage() {
     router.put('/admin/payments/page-settings', { ...paymentPage }, { preserveScroll: true });
 }
@@ -543,6 +549,28 @@ async function copy(value) {
                     </TableBody></Table>
                 </div>
                 <div v-if="transactions.links?.length > 3" class="mt-4 flex flex-wrap gap-1"><Link v-for="link in transactions.links" :key="link.label" :href="link.url || '#'" preserve-scroll :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']" v-html="link.label" /></div>
+            </Card>
+
+            <Card v-if="refundReviews.length" class="mt-4 p-4">
+                <h2 class="text-lg font-semibold">Refund Top Up Perlu Rekonsiliasi</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Gateway sudah mengembalikan pembayaran, tetapi saldo yang pernah dikreditkan sudah terpakai. Belanja dengan saldo dibatasi sampai kewajiban ini selesai.</p>
+                <div class="mt-4 space-y-2">
+                    <div v-for="topup in refundReviews" :key="'refund-' + topup.id" class="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
+                        <div>
+                            <strong class="text-sm">{{ topup.customer_name }}</strong>
+                            <p class="text-xs text-muted-foreground">{{ topup.customer_email }} · Top up #{{ topup.id }}</p>
+                            <p class="mt-1 text-xs">Refund: {{ money(topup.amount_idr) }} · Saldo saat ini: {{ money(topup.balance_idr) }}</p>
+                        </div>
+                        <Button
+                            v-if="isSuperAdmin"
+                            size="sm"
+                            :disabled="Number(topup.balance_idr) < Number(topup.amount_idr)"
+                            @click="resolveRefundReview(topup)"
+                        >
+                            {{ Number(topup.balance_idr) >= Number(topup.amount_idr) ? 'Selesaikan refund' : 'Saldo belum cukup' }}
+                        </Button>
+                    </div>
+                </div>
             </Card>
 
             <Card v-if="manualPayments.length" class="mt-4 p-4">
