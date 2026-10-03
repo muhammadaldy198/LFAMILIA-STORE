@@ -7,6 +7,7 @@ use App\Services\AdminAuditService;
 use App\Services\AdminNotificationService;
 use App\Services\IntegrationConnectionService;
 use App\Services\IntegrationRegistry;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,7 +39,12 @@ class AdminIntegrationController
 
         $integrations = collect($definitions)->map(function (array $definition, string $code) use ($records, $healthStates): array {
             $record = $records->get($code);
-            $config = is_array($record?->config_ciphertext) ? $record->config_ciphertext : [];
+            try {
+                $storedConfig = $record?->config_ciphertext;
+            } catch (DecryptException) {
+                $storedConfig = null;
+            }
+            $config = is_array($storedConfig) ? $storedConfig : [];
             $requiredTotal = 0;
             $configuredRequired = 0;
 
@@ -65,9 +71,13 @@ class AdminIntegrationController
                     }
                 }
 
-                $publicValue = ($field['type'] ?? null) === 'csv' && is_array($value)
-                    ? implode(', ', array_map('strval', $value))
-                    : $value;
+                $publicValue = match ($field['type'] ?? null) {
+                    'csv' => is_array($value)
+                        ? implode(', ', array_map('strval', $value))
+                        : (string) ($value ?? ''),
+                    'boolean' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+                    default => $value,
+                };
 
                 return [
                     ...$field,
@@ -144,7 +154,12 @@ class AdminIntegrationController
         ]);
 
         $record = IntegrationCredential::firstOrNew(['code' => $code]);
-        $existing = is_array($record->config_ciphertext) ? $record->config_ciphertext : [];
+        try {
+            $storedConfig = $record->config_ciphertext;
+        } catch (DecryptException) {
+            $storedConfig = null;
+        }
+        $existing = is_array($storedConfig) ? $storedConfig : [];
         $before = [
             'code' => $code,
             'is_active' => (bool) $record->is_active,
