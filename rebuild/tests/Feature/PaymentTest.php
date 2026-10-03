@@ -11,6 +11,7 @@ use App\Models\StoreAsset;
 use App\Models\User;
 use App\Services\Payment\DokuSignature;
 use App\Services\PaymentRoutingService;
+use App\Services\PaymentService;
 use App\Services\PaymentStateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -1020,4 +1021,132 @@ class PaymentTest extends TestCase
         $this->assertSame(500, (int) $persisted->fee_idr);
         $this->assertSame(10500, (int) $persisted->total_idr);
     }
+    public function test_external_create_claim_prevents_duplicate_gateway_request_from_stale_payment_object(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+
+        Http::fake([
+            'https://app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
+                'token' => 'snap-token-single-claim',
+                'redirect_url' => 'https://sandbox.midtrans.test/single-claim',
+            ]),
+        ]);
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'qris',
+            'audit-single-claim-order-0001'
+        ))->assertCreated();
+
+        $order = DB::table('orders')
+            ->where('order_number', $checkout->json('order_number'))
+            ->firstOrFail();
+
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'order_id' => $order->id,
+            'wallet_topup_id' => null,
+            'payment_route_id' => $routeId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'amount_idr' => $order->total_idr,
+            'status' => 'CREATING',
+            'request_fingerprint' => hash('sha256', 'audit-single-claim'),
+            'idempotency_key' => 'audit-single-claim-payment-0001',
+            'expires_at' => $order->expires_at,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('payment_transactions')->where('id', $paymentId)->update([
+            'merchant_reference' => 'PAY-AUDIT-'.$paymentId,
+            'updated_at' => now(),
+        ]);
+
+        $stalePayment = DB::table('payment_transactions')->where('id', $paymentId)->firstOrFail();
+        $route = app(PaymentRoutingService::class)->byRouteId($routeId);
+        $service = app(PaymentService::class);
+        $method = new \ReflectionMethod($service, 'createExternal');
+        $method->setAccessible(true);
+
+        $first = $method->invoke($service, $stalePayment, $order, $route);
+        $second = $method->invoke($service, $stalePayment, $order, $route);
+
+        $this->assertSame('PENDING', $first['status']);
+        $this->assertSame('PENDING', $second['status']);
+        Http::assertSentCount(1);
+    }
+
+    public function test_fast_paid_callback_during_create_is_not_downgraded_by_late_create_response(): void
+    {
+        Queue::fake();
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+
+        Http::fake(function ($request) {
+            if ($request->url() !== 'https://app.sandbox.midtrans.com/snap/v1/transactions') {
+                return Http::response([], 404);
+            }
+
+            $merchantReference = (string) data_get($request->data(), 'transaction_details.order_id');
+            $payment = DB::table('payment_transactions')
+                ->where('merchant_reference', $merchantReference)
+                ->firstOrFail();
+
+            app(PaymentStateService::class)->apply((int) $payment->id, 'PAID', [
+                'source' => 'test_fast_callback',
+            ]);
+
+            return Http::response([
+                'token' => 'snap-token-fast-callback',
+                'redirect_url' => 'https://sandbox.midtrans.test/fast-callback',
+            ]);
+        });
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'qris',
+            'audit-fast-callback-order-0001'
+        ))->assertCreated();
+
+        $response = $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'audit-fast-callback-payment-0001',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk();
+
+        $response->assertJsonPath('status', 'PAID')
+            ->assertJsonPath('instructions.token', 'snap-token-fast-callback');
+
+        $payment = DB::table('payment_transactions')
+            ->where('idempotency_key', 'audit-fast-callback-payment-0001')
+            ->firstOrFail();
+        $this->assertSame('PAID', $payment->status);
+    }
+
+    public function test_public_channel_is_hidden_when_external_gateway_credentials_are_not_ready(): void
+    {
+        $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $midtransGatewayId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
+        DB::table('payment_routes')->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', '<>', $midtransGatewayId)
+            ->update(['is_active' => false, 'updated_at' => now()]);
+
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => [],
+            'is_active' => true,
+        ]);
+
+        $channels = app(PaymentRoutingService::class)->publicOrderChannels(null);
+
+        $this->assertNull(collect($channels)->firstWhere('code', 'qris'));
+    }
+
 }
