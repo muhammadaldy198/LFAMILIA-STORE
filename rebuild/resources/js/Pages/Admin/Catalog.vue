@@ -177,7 +177,57 @@ const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping
     priority: mapping.priority, is_active: mapping.is_active,
     ...(mapping.provider_code === 'MANUAL' ? { cost_idr: mapping.cost_idr } : {}),
     ...(mapping.provider_code === 'DIGIFLAZZ' ? { customer_no_template: mapping.customer_no_template || null } : {}),
+}, { preserveScroll: true });
+const routeDrafts = reactive({});
+const nextDigiflazzPriority = (pack) => {
+    const rows = pack.mappings.filter((mapping) => mapping.provider_code === 'DIGIFLAZZ');
+    return rows.length ? Math.max(...rows.map((mapping) => Number(mapping.priority || 0))) + 1 : 0;
+};
+const routeDraft = (pack) => routeDrafts[pack.id] || (routeDrafts[pack.id] = {
+    search: '',
+    item_id: '',
+    priority: nextDigiflazzPriority(pack),
+    is_active: false,
+    customer_no_template: pack.mappings.find((mapping) => mapping.provider_code === 'DIGIFLAZZ')?.customer_no_template || '',
 });
+const digiflazzCandidates = (pack) => {
+    const term = routeDraft(pack).search.trim().toLowerCase();
+    return props.digiflazzItems
+        .filter((item) => !item.mapped)
+        .filter((item) => !term || [item.product_name, item.buyer_sku_code, item.seller_name, item.brand]
+            .join(' ').toLowerCase().includes(term))
+        .slice(0, 25);
+};
+const mappingRole = (pack, mapping) => {
+    if (mapping.provider_code !== 'DIGIFLAZZ') return '';
+    const rows = pack.mappings
+        .filter((entry) => entry.provider_code === 'DIGIFLAZZ' && entry.is_active)
+        .sort((a, b) => Number(a.priority || 0) - Number(b.priority || 0)
+            || Number(a.cost_idr || 0) - Number(b.cost_idr || 0)
+            || Number(a.id) - Number(b.id));
+    const index = rows.findIndex((entry) => Number(entry.id) === Number(mapping.id));
+    if (index < 0) return 'Nonaktif';
+    return index === 0 ? 'Utama' : 'Cadangan ' + index;
+};
+const addDigiflazzRoute = (pack) => {
+    const draft = routeDraft(pack);
+    if (!draft.item_id) return;
+    router.post('/admin/catalog/packages/' + pack.id + '/digiflazz-mappings', {
+        item_id: Number(draft.item_id),
+        priority: Number(draft.priority || 0),
+        is_active: Boolean(draft.is_active),
+        customer_no_template: draft.customer_no_template || null,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => { delete routeDrafts[pack.id]; },
+    });
+};
+const deleteDigiflazzRoute = (mapping) => {
+    if (mapping.is_active) return;
+    if (confirm('Hapus sumber Digiflazz ini dari nominal? Sumber yang pernah dipakai transaksi akan tetap ditolak oleh sistem.')) {
+        router.delete('/admin/catalog/mappings/' + mapping.id, { preserveScroll: true });
+    }
+};
 const providerLabel = (mapping) => mapping.provider_name || mapping.provider_code || 'Provider';
 const stockMapping = (pack) => pack.mappings.find((mapping) => mapping.provider_code === 'VOUCHER_STOCK');
 const saveVoucherStock = (pack) => router.post('/admin/catalog/packages/' + pack.id + '/voucher-stock', {
@@ -397,13 +447,36 @@ const deleteNotice = (notice) => {
                                 <p class="mb-2 text-[11px] text-slate-400">Gambar nominal: rekomendasi 512×512 (1:1), PNG/WebP transparan bila memungkinkan.</p>
                                 <AdminMediaControl type="package" :id="pack.id" :url="pack.image_url" />
                             </div>
-                            <div v-for="mapping in pack.mappings.filter((entry) => entry.provider_code !== 'VOUCHER_STOCK')" :key="mapping.id" class="flex flex-wrap items-end gap-2 text-xs text-slate-300">
-                                <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga nominal</Button><span>{{ providerLabel(mapping) }}<span v-if="mapping.external_sku && mapping.provider_code!=='VOUCHER_STOCK'"> · {{ mapping.external_sku }}</span></span>
-                                <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
-                                <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Format ID tujuan ke penyedia<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan kode kolom di dalam {{ }}. Jika produk hanya memiliki satu kolom tujuan, bagian ini boleh dikosongkan.</span></label>
-                                <label>Prioritas<Input v-model.number="mapping.priority" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
-                                <label class="flex gap-2"><input v-model="mapping.is_active" type="checkbox">Aktif</label>
-                                <Button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan penyedia</Button>
+                            <div v-for="mapping in pack.mappings.filter((entry) => entry.provider_code !== 'VOUCHER_STOCK')" :key="mapping.id" class="rounded-md border border-slate-700 p-3 text-xs text-slate-300">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <strong>{{ providerLabel(mapping) }}</strong>
+                                    <span v-if="mapping.external_sku && mapping.provider_code!=='VOUCHER_STOCK'" class="font-mono">{{ mapping.external_sku }}</span>
+                                    <span v-if="mapping.provider_code==='DIGIFLAZZ'" class="rounded border border-slate-600 px-2 py-0.5">{{ mappingRole(pack, mapping) }}</span>
+                                    <span v-if="mapping.provider_code==='DIGIFLAZZ'">Modal Rp{{ Number(mapping.cost_idr || 0).toLocaleString('id-ID') }}</span>
+                                </div>
+                                <div class="mt-3 flex flex-wrap items-end gap-2">
+                                    <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga nominal</Button>
+                                    <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
+                                    <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72 flex-1">Format ID tujuan ke penyedia<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan kode kolom di dalam {{ }}. Jika produk hanya memiliki satu kolom tujuan, bagian ini boleh dikosongkan.</span></label>
+                                    <label>Prioritas<Input v-model.number="mapping.priority" type="number" min="0" max="1000" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
+                                    <label class="flex gap-2 pb-2"><input v-model="mapping.is_active" type="checkbox">Aktif</label>
+                                    <Button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan sumber</Button>
+                                    <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="destructive" :disabled="mapping.is_active" @click="deleteDigiflazzRoute(mapping)">Hapus sumber</Button>
+                                </div>
+                            </div>
+                            <div v-if="item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 rounded-md border border-dashed border-slate-700 p-3">
+                                <div>
+                                    <h4 class="font-semibold">Tambah sumber Digiflazz cadangan</h4>
+                                    <p class="mt-1 text-xs text-slate-400">Satu nominal dapat memiliki beberapa SKU. Sistem memilih prioritas terendah yang tersedia dan hanya pindah setelah kegagalan provider dikonfirmasi. Pending, timeout, atau status tidak pasti tidak pernah memicu failover.</p>
+                                </div>
+                                <div class="grid gap-3 md:grid-cols-2">
+                                    <label class="text-xs">Cari SKU / seller<Input v-model="routeDraft(pack).search" placeholder="Nama produk, SKU, seller, brand" class="mt-1" /></label>
+                                    <label class="text-xs">SKU Digiflazz<select v-model="routeDraft(pack).item_id" class="mt-1 block w-full rounded border p-2"><option value="">Pilih SKU</option><option v-for="sku in digiflazzCandidates(pack)" :key="sku.id" :value="sku.id">{{ sku.product_name }} · {{ sku.buyer_sku_code }} · {{ sku.seller_name || 'Seller' }} · Rp{{ Number(sku.price_idr).toLocaleString('id-ID') }}{{ sku.available ? '' : ' · tidak tersedia' }}</option></select></label>
+                                    <label class="text-xs">Prioritas<Input v-model.number="routeDraft(pack).priority" type="number" min="0" max="1000" class="mt-1" /><span class="mt-1 block text-[11px] text-slate-500">Angka lebih kecil dipilih lebih dahulu.</span></label>
+                                    <label class="flex items-center gap-2 self-end pb-2 text-xs"><input v-model="routeDraft(pack).is_active" type="checkbox"> Aktifkan sebagai kandidat fulfillment</label>
+                                    <label class="text-xs md:col-span-2">Format ID tujuan ke penyedia<Input v-model="routeDraft(pack).customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1" /></label>
+                                </div>
+                                <Button type="button" variant="outline" :disabled="!routeDraft(pack).item_id" @click="addDigiflazzRoute(pack)">Tambah sumber</Button>
                             </div>
                             <div v-if="item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 rounded-md border border-slate-700 p-3">
                                 <div>
