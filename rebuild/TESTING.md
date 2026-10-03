@@ -1,39 +1,91 @@
-# M11 Testing Gate
+# Testing & CI
 
-M11 is a regression milestone. It does not change checkout, payment, fulfillment, wallet, or Admin business rules unless a test exposes a defect.
+Dokumen ini mencatat gate yang benar-benar tersedia di repository. Jangan menyebut Playwright/Cypress karena project tidak menggunakannya.
 
-## Required gates
+## Frontend
 
-- Full Laravel feature/API suite on MySQL 8 + Redis.
-- Production frontend build.
-- PHP syntax and Pint.
-- Composer audit and repository secret guardrails.
-- Migration apply / rollback / re-apply.
-- Headless browser smoke against the built Inertia application.
-- Critical abuse and state-machine regression coverage.
+Dari `rebuild/`:
 
-## PRD coverage matrix
+```bash
+npm ci
+npm run lint
+npm run check
+npm run build
+```
 
-| PRD risk / scope | Regression coverage |
-|---|---|
-| Functional customer flows | CatalogTest, CustomerAreaTest, GuestOrderTest, browser smoke |
-| Authentication / RBAC | CustomerAuthTest, AdminAuthTest, AdminM9Test, SecurityM10Test |
-| API authorization | CustomerAuthTest Sanctum coverage and protected account/Admin routes |
-| Manipulated price / provider / SKU | CheckoutTest::test_client_price_provider_and_sku_are_rejected |
-| Illegal Rp0 order | DatabaseSchemaTest::test_zero_total_order_is_rejected_by_mysql |
-| Voucher double use / quota | CheckoutTest::test_voucher_is_reserved_atomically_and_quota_cannot_be_reused |
-| Duplicate order | Checkout idempotency and idempotency-fingerprint conflict tests |
-| Duplicate payment | PaymentTest payment-key and wallet idempotency tests |
-| Insufficient / negative wallet | PaymentTest M11 insufficient-balance regression + wallet schema invariants |\n| Wallet race condition | WalletConcurrencyM11Test runs two simultaneous debits against one MySQL wallet row and requires exactly one winner |
-| Fake / replayed payment callback | PaymentTest + SecurityM10Test |
-| Late callback / final-state downgrade | PaymentTest expired/late and stale callback tests |
-| Duplicate fulfillment | FulfillmentTest single-attempt and webhook idempotency tests |
-| Provider timeout / unknown | FulfillmentTest timeout + reconciliation test |
-| Unsafe failover | FulfillmentTest pending/unknown and confirmed-failure tests |
-| Browser customer smoke | tests/Browser/smoke.sh: home, login, register, guest order lookup |
-| Browser Admin smoke | tests/Browser/smoke.sh: Admin login |
-| Secret leakage / hardcoded credentials | validate-rebuild security guardrails + SecurityM10Test |
+`lint` menjalankan ESLint pada Vue/JavaScript. `check` menjalankan `vue-tsc --noEmit` dengan `jsconfig.json`. Project tidak dimigrasikan penuh ke TypeScript hanya demi static checking.
 
-## M11 boundary
+## PHP/Laravel
 
-Production DNS, Cloudflare, Nginx, SSL, queue workers, scheduler and backup deployment are M12. M11 validates the repository and application behavior before deployment.
+```bash
+find app bootstrap config public routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
+vendor/bin/phpunit
+vendor/bin/pint --test
+composer audit --no-interaction
+```
+
+Tests menggunakan MySQL 8 + Redis di CI, bukan SQLite sebagai pengganti behavior database production.
+
+## Schema/migration
+
+GitHub Actions menjalankan:
+
+```bash
+php artisan migrate --force
+php artisan migrate:rollback --step=10 --force
+php artisan migrate --force
+```
+
+CI juga memvalidasi Laravel config cache/clear.
+
+## Browser smoke
+
+```bash
+bash tests/Browser/smoke.sh
+```
+
+Smoke menggunakan headless Chromium tooling di repository untuk customer dan Admin flow yang didefinisikan test. Ini bukan Playwright/Cypress.
+
+## Security/secret guardrails
+
+Workflow memeriksa:
+
+- Composer audit;
+- tracked `.env`;
+- tracked private-key material;
+- pola hardcoded secret pada source/config/routes/resources;
+- Laravel config cache;
+- syntax deployment shell scripts;
+- required deployment assets.
+
+Fixture browser/test hanya boleh berisi credential disposable untuk environment test; tidak boleh berisi credential production.
+
+## Deployment validation
+
+CI memeriksa file deploy, menjalankan encrypted backup + restore verification pada DB CI, serta build/test/lint/style gate.
+
+`deploy/healthcheck.sh` digunakan pada server untuk memverifikasi public edge readiness, local origin readiness, queue worker, dan scheduler.
+
+## GitHub Actions
+
+Workflow aktif: `.github/workflows/validate-rebuild.yml`.
+
+Job utama mencakup:
+
+- Laravel-only repository shape;
+- PHP 8.4 setup;
+- MySQL 8 + Redis;
+- Composer validate/install/audit;
+- PHP syntax;
+- config cache;
+- deployment assets;
+- migration rollback/reapply;
+- frontend build;
+- encrypted backup/restore verification;
+- PHPUnit;
+- browser smoke;
+- Pint.
+
+Job `frontend-static` menjalankan npm install, ESLint, Vue SFC static check, dan production build.
+
+Pull request tidak boleh di-merge bila required checks gagal.
