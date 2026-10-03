@@ -7,6 +7,7 @@ use App\Models\PaymentChannel;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
 use App\Services\PaymentPageSettingsService;
+use App\Services\PaymentRoutingService;
 use App\Services\PaymentStateService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ use Inertia\Response;
 
 class AdminPaymentController
 {
-    public function index(Request $request, PaymentPageSettingsService $pageSettings): Response
+    public function index(Request $request, PaymentPageSettingsService $pageSettings, PaymentRoutingService $routing): Response
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
@@ -38,9 +39,6 @@ class AdminPaymentController
             'per_page' => (int) ($filters['per_page'] ?? 25),
         ];
 
-        $configured = IntegrationCredential::whereIn('code', ['midtrans', 'doku'])
-            ->get(['code', 'is_active'])->keyBy('code');
-
         $gateways = DB::table('payment_gateways')->orderBy('sort_order')->orderBy('id')->get()
             ->map(fn (object $gateway): array => [
                 'id' => (int) $gateway->id,
@@ -50,11 +48,7 @@ class AdminPaymentController
                 'sort_order' => (int) $gateway->sort_order,
                 'is_active' => (bool) $gateway->is_active,
                 'is_maintenance' => (bool) $gateway->is_maintenance,
-                'credential_configured' => match ($gateway->code) {
-                    'MIDTRANS' => (bool) ($configured->get('midtrans')?->is_active),
-                    'DOKU' => (bool) ($configured->get('doku')?->is_active),
-                    default => true,
-                },
+                'credential_configured' => $routing->gatewayReady((string) $gateway->code),
                 'health' => $this->gatewayHealth((string) $gateway->code),
                 'active_route_count' => DB::table('payment_routes')
                     ->where('payment_gateway_id', $gateway->id)
@@ -62,7 +56,7 @@ class AdminPaymentController
             ]);
 
         $channels = PaymentChannel::query()->orderBy('sort_order')->orderBy('id')->get()
-            ->map(function (PaymentChannel $channel): array {
+            ->map(function (PaymentChannel $channel) use ($routing): array {
                 $routes = DB::table('payment_routes as routes')
                     ->join('payment_gateways as gateways', 'gateways.id', '=', 'routes.payment_gateway_id')
                     ->where('routes.payment_channel_id', $channel->id)
@@ -101,6 +95,8 @@ class AdminPaymentController
                             && (bool) $route->supports_order
                             && (bool) $route->gateway_active
                             && ! (bool) $route->gateway_maintenance
+                            && $routing->gatewayReady((string) $route->gateway_code)
+                            && $routing->gatewayReady((string) $route->gateway_code)
                     ),
                     'available_topup' => (bool) $channel->is_active && $routes->contains(
                         fn (object $route): bool => (bool) $route->is_active
@@ -360,7 +356,7 @@ class AdminPaymentController
             : 'Metode bawaan sudah lengkap.');
     }
 
-    public function gateway(Request $request, int $id): RedirectResponse
+    public function gateway(Request $request, int $id, PaymentRoutingService $routing): RedirectResponse
     {
         $data = $request->validate([
             'internal_name' => ['required', 'string', 'min:2', 'max:100'],
@@ -372,15 +368,9 @@ class AdminPaymentController
         abort_unless($before, 404);
 
         if ($data['is_active']) {
-            $credentialCode = match ($before->code) {
-                'MIDTRANS' => 'midtrans',
-                'DOKU' => 'doku',
-                default => null,
-            };
-            if ($credentialCode !== null
-                && ! IntegrationCredential::where('code', $credentialCode)->where('is_active', true)->exists()) {
+            if (! $routing->gatewayReady((string) $before->code)) {
                 throw ValidationException::withMessages([
-                    'is_active' => 'Aktifkan kredensial gateway di menu Integrasi terlebih dahulu.',
+                    'is_active' => 'Lengkapi dan aktifkan kredensial gateway di menu Integrasi terlebih dahulu.',
                 ]);
             }
             if ($before->code === 'MANUAL_QRIS') {
@@ -734,12 +724,12 @@ class AdminPaymentController
             return ['status' => 'INTERNAL', 'message' => 'Diproses oleh sistem internal LFAMILIA.'];
         }
 
-        $key = $code === 'MIDTRANS' ? 'midtrans' : 'doku';
-        $active = IntegrationCredential::where('code', $key)->where('is_active', true)->exists();
-        if (! $active) {
-            return ['status' => 'NOT_CONFIGURED', 'message' => 'Kredensial belum aktif di menu Integrasi.'];
+        $routing = app(PaymentRoutingService::class);
+        if (! $routing->gatewayReady($code)) {
+            return ['status' => 'NOT_CONFIGURED', 'message' => 'Kredensial belum lengkap/aktif di menu Integrasi.'];
         }
 
+        $key = $code === 'MIDTRANS' ? 'midtrans' : 'doku';
         $stored = DB::table('system_settings')->where('key', 'integration.health.'.$key)->value('value');
         $health = is_string($stored) ? (json_decode($stored, true) ?: []) : [];
         $status = strtoupper((string) ($health['status'] ?? 'UNTESTED'));
