@@ -627,6 +627,54 @@ class PaymentTest extends TestCase
             ->where('idempotency_key', 'm11-wallet-low-payment-0001')->value('status'));
     }
 
+    public function test_wallet_checkout_is_blocked_while_topup_refund_review_is_open(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('saldo', 'WALLET');
+
+        $user = User::create([
+            'name' => 'Refund Hold Buyer',
+            'email' => 'refund-hold@example.test',
+            'phone' => '081234567895',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        DB::table('wallets')->where('id', $wallet->id)->update(['balance_idr' => 50000]);
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        DB::table('wallet_topups')->insert([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'REFUND_REVIEW',
+            'idempotency_key' => 'refund-hold-topup-0001',
+            'request_fingerprint' => hash('sha256', 'refund-hold-topup'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'saldo',
+            'customer_input' => ['user_id' => '777777'],
+            'voucher_code' => null,
+            'idempotency_key' => 'refund-hold-order-0001',
+        ])->assertCreated();
+
+        $this->actingAs($user)->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'refund-hold-payment-0001',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['payment']);
+
+        $this->assertSame(50000, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
+        $this->assertSame(0, DB::table('wallet_ledger')
+            ->where('wallet_id', $wallet->id)
+            ->where('source', 'CHECKOUT')
+            ->count());
+    }
+
     public function test_wallet_topup_paid_callback_credit_is_idempotent_and_fee_is_not_credited(): void
     {
         $user = User::create([
