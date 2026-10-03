@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\IntegrationCredential;
 use App\Models\PaymentChannel;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -97,12 +98,14 @@ class PaymentRoutingService
             ]);
         }
 
+        $unavailableGateways = $this->unavailableExternalGatewayCodes();
         $routeQuery = DB::table('payment_routes as routes')
             ->join('payment_gateways as gateways', 'gateways.id', '=', 'routes.payment_gateway_id')
             ->where('routes.payment_channel_id', $channel->id)
             ->where('routes.is_active', true)
             ->where('gateways.is_active', true)
             ->where('gateways.is_maintenance', false)
+            ->when($unavailableGateways !== [], fn ($query) => $query->whereNotIn('gateways.code', $unavailableGateways))
             ->when($purpose === 'order',
                 fn ($query) => $query->where('routes.supports_order', true),
                 fn ($query) => $query->where('routes.supports_wallet_topup', true))
@@ -147,9 +150,10 @@ class PaymentRoutingService
     /**
      * @return array<string, mixed>
      */
-    public function byRouteId(int $routeId, string $purpose = 'order'): array
+    public function byRouteId(int $routeId, string $purpose = 'order', bool $lock = false): array
     {
-        $row = DB::table('payment_routes as routes')
+        $unavailableGateways = $this->unavailableExternalGatewayCodes();
+        $query = DB::table('payment_routes as routes')
             ->join('payment_channels as channels', 'channels.id', '=', 'routes.payment_channel_id')
             ->join('payment_gateways as gateways', 'gateways.id', '=', 'routes.payment_gateway_id')
             ->where('routes.id', $routeId)
@@ -157,6 +161,7 @@ class PaymentRoutingService
             ->where('channels.is_active', true)
             ->where('gateways.is_active', true)
             ->where('gateways.is_maintenance', false)
+            ->when($unavailableGateways !== [], fn ($query) => $query->whereNotIn('gateways.code', $unavailableGateways))
             ->when($purpose === 'order', function ($query): void {
                 $query->where('channels.supports_order', true)
                     ->where('routes.supports_order', true);
@@ -176,7 +181,11 @@ class PaymentRoutingService
                 'gateways.id as gateway_id',
                 'gateways.code as gateway_code',
                 'gateways.kind as gateway_kind'
-            )->first();
+            );
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+        $row = $query->first();
 
         if (! $row) {
             throw ValidationException::withMessages([
@@ -212,6 +221,28 @@ class PaymentRoutingService
         $percent = $bps === 0 ? 0 : intdiv(($amountIdr * $bps) + 9999, 10000);
 
         return $flat + $percent;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function unavailableExternalGatewayCodes(): array
+    {
+        $unavailable = [];
+
+        $midtrans = IntegrationCredential::where('code', 'midtrans')->where('is_active', true)->first();
+        $midtransConfig = $midtrans?->config_ciphertext;
+        if (! is_array($midtransConfig) || empty($midtransConfig['server_key'])) {
+            $unavailable[] = 'MIDTRANS';
+        }
+
+        $doku = IntegrationCredential::where('code', 'doku')->where('is_active', true)->first();
+        $dokuConfig = $doku?->config_ciphertext;
+        if (! is_array($dokuConfig) || empty($dokuConfig['client_id']) || empty($dokuConfig['secret_key'])) {
+            $unavailable[] = 'DOKU';
+        }
+
+        return $unavailable;
     }
 
     private function publicGroup(string $method): string
