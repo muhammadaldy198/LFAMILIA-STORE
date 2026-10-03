@@ -113,7 +113,19 @@ jobs:
           fi
 
       - name: Install frontend dependencies
+        env:
+          HUSKY: 0
         run: npm ci
+
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
+
+      - name: Validate local Git hooks
+        env:
+          LFAMILIA_ENABLE_HOOKS: '1'
+        run: |
+          npm run prepare
+          npm run test:hooks
 
       - name: Configure test app
         run: |
@@ -204,6 +216,8 @@ jobs:
           cache-dependency-path: rebuild/package-lock.json
 
       - name: Install frontend dependencies
+        env:
+          HUSKY: 0
         run: npm ci
 
       - name: Lint Vue and JavaScript
