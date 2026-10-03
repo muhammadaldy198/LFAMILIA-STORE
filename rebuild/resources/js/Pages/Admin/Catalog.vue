@@ -83,6 +83,20 @@ const importBrands=computed(()=>[...new Set(props.digiflazzItems.map(i=>i.brand)
 const importMatches=computed(()=>props.digiflazzItems.filter(i=>!i.mapped && i.available && (!importBrand.value||i.brand===importBrand.value) && (!importSearch.value||[i.product_name,i.buyer_sku_code].join(' ').toLowerCase().includes(importSearch.value.toLowerCase()))));
 const importItems=computed(()=>importMatches.value.slice((importPage.value-1)*25,importPage.value*25));
 watch([importSearch,importBrand],()=>{importPage.value=1;});
+const sourceSearch=reactive({});
+const sourceCandidates=(pack)=>{
+    const term=String(sourceSearch[pack.id]||'').trim().toLowerCase();
+    if(!term)return [];
+    return props.digiflazzItems
+        .filter(item=>!item.mapped&&item.available&&[item.product_name,item.buyer_sku_code,item.brand,item.seller_name].filter(Boolean).join(' ').toLowerCase().includes(term))
+        .slice(0,12);
+};
+const attachSource=(pack,item)=>{
+    router.post('/admin/catalog/packages/'+pack.id+'/sources/digiflazz',{item_id:item.id},{
+        preserveScroll:true,
+        onSuccess:()=>{sourceSearch[pack.id]='';},
+    });
+};
 const draggedPackageId=ref(null);
 const reorderPackage=(item,index,direction)=>{
  const target=index+direction;if(target<0||target>=item.packages.length)return;
@@ -397,13 +411,27 @@ const deleteNotice = (notice) => {
                                 <p class="mb-2 text-[11px] text-slate-400">Gambar nominal: rekomendasi 512×512 (1:1), PNG/WebP transparan bila memungkinkan.</p>
                                 <AdminMediaControl type="package" :id="pack.id" :url="pack.image_url" />
                             </div>
-                            <div v-for="mapping in pack.mappings.filter((entry) => entry.provider_code !== 'VOUCHER_STOCK')" :key="mapping.id" class="flex flex-wrap items-end gap-2 text-xs text-slate-300">
-                                <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga nominal</Button><span>{{ providerLabel(mapping) }}<span v-if="mapping.external_sku && mapping.provider_code!=='VOUCHER_STOCK'"> · {{ mapping.external_sku }}</span></span>
-                                <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
-                                <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Format ID tujuan ke penyedia<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan kode kolom di dalam {{ }}. Jika produk hanya memiliki satu kolom tujuan, bagian ini boleh dikosongkan.</span></label>
-                                <label>Prioritas<Input v-model.number="mapping.priority" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
-                                <label class="flex gap-2"><input v-model="mapping.is_active" type="checkbox">Aktif</label>
-                                <Button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan penyedia</Button>
+                            <div class="space-y-2 rounded-md border border-slate-800 p-3">
+                                <div><h4 class="text-sm font-semibold">Prioritas fulfillment</h4><p class="mt-1 text-[11px] text-slate-500">Angka lebih kecil dipakai lebih dulu. Sistem hanya pindah ke sumber berikutnya setelah kegagalan definitif. Pending, proses, timeout, atau status tidak pasti wajib direkonsiliasi dan tidak boleh langsung failover.</p></div>
+                                <div v-for="mapping in [...pack.mappings.filter((entry) => entry.provider_code !== 'VOUCHER_STOCK')].sort((a,b)=>Number(a.priority)-Number(b.priority)||Number(a.cost_idr||0)-Number(b.cost_idr||0))" :key="mapping.id" class="flex flex-wrap items-end gap-2 rounded border border-slate-800 p-2 text-xs text-slate-300">
+                                    <span class="min-w-40"><strong>Prioritas {{ mapping.priority }}</strong><br>{{ providerLabel(mapping) }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span><br><span class="text-slate-500">Modal Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</span></span>
+                                    <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga</Button>
+                                    <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
+                                    <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Format ID tujuan<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan kode kolom di dalam {{ }}.</span></label>
+                                    <label>Prioritas<Input v-model.number="mapping.priority" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
+                                    <label class="flex gap-2"><input v-model="mapping.is_active" type="checkbox">Aktif</label>
+                                    <Button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan sumber</Button>
+                                </div>
+                                <div v-if="item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-2 border-t border-slate-800 pt-3">
+                                    <label class="text-xs">Tambah sumber Digiflazz alternatif<Input v-model="sourceSearch[pack.id]" placeholder="Cari nama, SKU, merek, atau seller" class="mt-1" /></label>
+                                    <div v-if="sourceCandidates(pack).length" class="max-h-56 overflow-y-auto rounded border border-slate-800">
+                                        <button v-for="candidate in sourceCandidates(pack)" :key="candidate.id" type="button" class="flex w-full items-center justify-between gap-3 border-b border-slate-800 px-3 py-2 text-left text-xs last:border-b-0 hover:bg-slate-900" @click="attachSource(pack,candidate)">
+                                            <span><strong>{{candidate.product_name}}</strong><small class="block text-slate-500">{{candidate.buyer_sku_code}} · {{candidate.brand||'-'}} · {{candidate.seller_name||'Seller Digiflazz'}}</small></span>
+                                            <span class="whitespace-nowrap">Rp{{Number(candidate.price_idr||0).toLocaleString('id-ID')}}</span>
+                                        </button>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500">Sumber baru selalu ditambahkan nonaktif dan di prioritas paling belakang. Periksa kesetaraan nominal, format tujuan, harga, lalu aktifkan secara manual.</p>
+                                </div>
                             </div>
                             <div v-if="item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 rounded-md border border-slate-700 p-3">
                                 <div>
