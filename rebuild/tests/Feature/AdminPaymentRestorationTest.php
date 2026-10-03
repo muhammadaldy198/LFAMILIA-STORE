@@ -252,6 +252,42 @@ class AdminPaymentRestorationTest extends TestCase
         $this->delete('/admin/payments/routes/'.$route->id)->assertNotFound();
     }
 
+    public function test_gateway_cannot_be_enabled_with_incomplete_credentials(): void
+    {
+        $this->login('SUPER_ADMIN');
+
+        $gateway = DB::table('payment_gateways')->where('code', 'MIDTRANS')->firstOrFail();
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => [],
+            'is_active' => true,
+        ]);
+
+        $this->from('/admin/payments')->put('/admin/payments/gateways/'.$gateway->id, [
+            'internal_name' => $gateway->internal_name,
+            'sort_order' => (int) $gateway->sort_order,
+            'is_active' => true,
+            'is_maintenance' => false,
+        ])->assertRedirect('/admin/payments')
+            ->assertSessionHasErrors(['is_active']);
+
+        $this->assertFalse((bool) DB::table('payment_gateways')->where('id', $gateway->id)->value('is_active'));
+
+        IntegrationCredential::where('code', 'midtrans')->update([
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+
+        $this->from('/admin/payments')->put('/admin/payments/gateways/'.$gateway->id, [
+            'internal_name' => $gateway->internal_name,
+            'sort_order' => (int) $gateway->sort_order,
+            'is_active' => true,
+            'is_maintenance' => false,
+        ])->assertRedirect('/admin/payments')
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue((bool) DB::table('payment_gateways')->where('id', $gateway->id)->value('is_active'));
+    }
+
     public function test_wallet_topup_master_switch_is_enforced_by_backend(): void
     {
         DB::table('system_settings')->updateOrInsert(
