@@ -1,73 +1,64 @@
-# Payment (M7)
+# Payment, routing & wallet safety
 
-M7 adds payment-channel pricing, gateway routing, payment creation, wallet settlement, Manual QRIS and verified callbacks. Fulfillment is intentionally not started here; M8 consumes only orders whose payment state has already become PAID.
+## Gateway/channel model
 
-## Customer contract
+Customer memilih **payment channel** publik. Gateway internal dipilih backend.
 
-- The customer selects only a payment channel such as QRIS, Virtual Account, E-Wallet, QRIS Manual or Saldo LFAMILIA.
-- Internal gateway names and gateway credentials are never returned by public catalog, checkout, payment or order-status responses.
-- The server resolves channel → route → gateway and freezes that route inside the order snapshot.
-- Payment-channel fees are calculated by the backend before order creation. The immutable order total is cost + margin - voucher discount + payment fee.
-- Client-supplied price, fee, gateway, provider code, provider SKU and total remain prohibited.
+Implementasi mempunyai gateway registry untuk Midtrans, DOKU, Manual QRIS, dan LFAMILIA Wallet. Dukungan kode tidak berarti gateway eksternal sudah live-configured.
 
-## Payment creation and idempotency
+`PaymentRoutingService` hanya memilih route yang:
 
-- An order is created in PENDING_PAYMENT with a frozen payment channel, route, fee and expiry.
-- Payment creation creates the local payment_transactions row before any external request.
-- A repeated idempotency key returns the same local payment transaction.
-- Once an order has a non-REJECTED payment attempt, a different idempotency key cannot create another payment for that same order.
-- A deterministic create rejection is stored as REJECTED and may be retried with a new key after configuration is corrected.
-- A timeout, transport failure, 5xx or unverified response is stored as UNKNOWN. UNKNOWN is never blindly retried against the gateway; the same order returns the existing uncertain payment until reconciliation.
-- Payment gateway redirect/return pages are never treated as proof of payment.
+- channel aktif;
+- route aktif;
+- gateway aktif;
+- gateway tidak maintenance;
+- mendukung purpose `order` atau `topup`;
+- gateway eksternal mempunyai credential readiness yang diperlukan.
 
-## Midtrans Snap
+Candidate diurutkan dengan `payment_routes.priority` kecil lebih dahulu, lalu ID. Priority 10 didahulukan dari 20.
 
-- Credential source: encrypted integration_credentials row with code midtrans.
-- Required secret: server_key. is_production controls sandbox vs production Snap endpoint.
-- Create uses server-side Basic Auth and the frozen merchant reference / gross amount.
-- Callback verification uses Midtrans SHA-512 notification signature over order_id + status_code + gross_amount + server key.
-- Callback amount must match the immutable local payment amount.
-- Duplicate callbacks are stored/deduplicated by a stable event id.
-- settlement and accepted capture become PAID; expire becomes EXPIRED; cancel becomes CANCELLED; deny/failure become FAILED; refund becomes REFUNDED.
+**Route selection sebelum external request bukan failover sesudah request.** Jika request eksternal sudah diklaim/dikirim dan hasilnya tidak pasti, transaksi dapat masuk `UNKNOWN`. Jangan membuat payment kedua sebagai recovery otomatis.
 
-## DOKU Direct API
+## Payment creation idempotency
 
-- Credential source: encrypted integration_credentials row with code doku.
-- Required secrets: client_id and secret_key. Optional base_url defaults to sandbox.
-- M7 implements the DOKU Non-SNAP HMACSHA256 request signature using Client-Id, Request-Id, Request-Timestamp, Request-Target and SHA-256 Digest.
-- The DOKU response signature is verified with Response-Timestamp before public payment instructions are accepted.
-- Each route provides an api_path and may provide a request_template and whitelisted public_paths. This keeps DOKU channel-specific payloads configurable without placing credentials in route settings or source code.
-- Callback verification uses the raw request body and notification request target. Client-Id, signature and amount must match.
-- Only safe payment instructions (payment URL/code, VA number or QR string) may reach the customer response.
+Order dan wallet top-up memakai payment idempotency key + request fingerprint. Key untuk request yang berbeda ditolak. Untuk satu order/top-up, service juga mencari existing non-rejected payment agar double-create tidak terjadi.
+
+Lifecycle internal creation mencakup `CREATING` dan `SENDING`; public response menyembunyikan detail internal yang tidak diperlukan.
+
+## State machine
+
+`PaymentStateService` menerima status provider tervalidasi: `PENDING`, `PAID`, `FAILED`, `CANCELLED`, `EXPIRED`, `REFUNDED`.
+
+Proteksi final/stale antara lain:
+
+- `REFUNDED` tidak dibuka kembali;
+- `PAID` tidak didowngrade selain flow refund;
+- payment yang sudah FAILED/CANCELLED/EXPIRED tidak dikembalikan ke PENDING oleh callback lama;
+- late PAID setelah order terminal tidak otomatis memproses ulang order; masuk review path;
+- amount callback harus cocok dengan amount lokal.
+
+Redirect browser bukan bukti paid.
+
+## Callback authority
+
+Midtrans dan DOKU webhook handler melakukan verifikasi yang diimplementasikan sebelum memanggil state transition. Callback dicatat dengan event/payload hash dan unique provider event identity untuk idempotency/replay protection.
+
+Detail signature/challenge ada di [SECURITY.md](SECURITY.md).
+
+## Wallet
+
+Pembayaran order dengan wallet dan credit/refund top-up memakai MySQL transaction + `lockForUpdate` pada payment/order/topup/wallet yang relevan.
+
+Wallet ledger menyimpan amount, balance before/after, source, reference, actor, timestamp, dan idempotency key. Ledger idempotency mencegah credit/debit yang sama diterapkan dua kali.
+
+Saldo tidak boleh menjadi negatif. Refund top-up yang tidak dapat langsung direverse karena saldo sudah terpakai masuk `REFUND_REVIEW`, bukan memaksa saldo negatif.
 
 ## Manual QRIS
 
-- The QR image is the store_assets entry manual_qris and is managed through the existing media system.
-- Manual QRIS is invisible to customers until its gateway, channel and asset are active.
-- Creating payment returns the configured LFAMILIA QR image and leaves the order PENDING_PAYMENT.
-- ADMIN or SUPER_ADMIN may confirm a pending Manual QRIS payment. The action is audit-logged.
-- Confirmation changes the order to PAID only. M8 owns manual/automatic fulfillment.
+Manual QRIS hanya tersedia bila gateway/channel/asset terkait aktif. Create payment menampilkan asset QRIS terkonfigurasi dan order tetap menunggu verifikasi.
 
-## Wallet and wallet top-up
+Konfirmasi pembayaran dilakukan melalui action Admin yang diizinkan dan diaudit. Konfirmasi hanya mengubah payment/order ke paid; fulfillment tetap memakai flow fulfillment yang sama.
 
-- The saldo channel is registered-customer only.
-- Order payment locks the wallet row, rejects insufficient balance, writes one ledger debit and marks the order PAID in the same transaction.
-- Wallet top-up uses external payment channels only. Minimum top-up is stored in system_settings and defaults to Rp10.000.
-- A verified top-up callback credits only the requested balance amount; payment-channel fees are not credited.
-- Wallet credit/debit uses idempotency keys and row locking so retries do not double-settle.
+## Gateway credential
 
-## Payment state rules
-
-- PAID is monotonic: stale PENDING/FAILED/CANCELLED callbacks cannot downgrade a paid transaction/order.
-- A late PAID callback for an already EXPIRED/FAILED/CANCELLED order is recorded as PAYMENT_LATE_VERIFIED and does not automatically reopen or fulfill the order.
-- Successful payment redeems a RESERVED voucher atomically.
-- Order expiry releases the voucher reservation.
-- Callback claims and state application are transactionally grouped so a processing failure does not permanently consume the callback id.
-
-## Administration boundary
-
-M7 includes only the operational Payment workspace needed to configure gateway/channel activation, maintenance, channel fees, channel routing, minimum wallet top-up and Manual QRIS confirmation. Integration-secret editing, broader permissions, notifications and the complete Admin workspace remain M9. No production credential is stored in GitHub.
-
-## M8 boundary
-
-M7 never creates a fulfillment attempt and never calls Digiflazz. M8 must consume the PAID state idempotently and must preserve the no-double-fulfillment / reconciliation rules from the PRD.
+Provider/payment secret dikelola melalui Super Admin → Integrasi dan disimpan terenkripsi. Jangan hardcode server key/client secret di route config atau Markdown.
