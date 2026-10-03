@@ -119,6 +119,7 @@ const methodLabel = (value) => ({
 
 const statusLabel = (value) => ({
     CREATING: 'Menyiapkan',
+    SENDING: 'Mengirim permintaan',
     PENDING: 'Menunggu',
     UNKNOWN: 'Belum pasti',
     PAID: 'Dibayar',
@@ -579,7 +580,7 @@ async function copy(value) {
                 <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Transaksi Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Riwayat pembayaran pesanan dan top up saldo. Data payload rahasia tidak ditampilkan.</p></div></div>
                 <form class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="searchTransactions">
                     <label class="space-y-1 md:col-span-2"><span class="text-sm font-medium">Cari</span><Input v-model="filters.q" maxlength="100" placeholder="Invoice, referensi, nama, email, atau WhatsApp" /></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Status</span><select v-model="filters.status" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Semua status</option><option value="CREATING">Menyiapkan</option><option value="PENDING">Menunggu</option><option value="UNKNOWN">Belum pasti</option><option value="PAID">Dibayar</option><option value="FAILED">Gagal</option><option value="EXPIRED">Kedaluwarsa</option><option value="CANCELLED">Dibatalkan</option><option value="REJECTED">Ditolak</option><option value="REFUNDED">Dikembalikan</option></select></label>
+                    <label class="space-y-1"><span class="text-sm font-medium">Status</span><select v-model="filters.status" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Semua status</option><option value="CREATING">Menyiapkan</option><option value="SENDING">Mengirim permintaan</option><option value="PENDING">Menunggu</option><option value="UNKNOWN">Belum pasti</option><option value="PAID">Dibayar</option><option value="FAILED">Gagal</option><option value="EXPIRED">Kedaluwarsa</option><option value="CANCELLED">Dibatalkan</option><option value="REJECTED">Ditolak</option><option value="REFUNDED">Dikembalikan</option></select></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Sumber</span><select v-model="filters.source" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Semua</option><option value="order">Pesanan</option><option value="topup">Top up saldo</option></select></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Metode</span><select v-model.number="filters.channel" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option :value="0">Semua metode</option><option v-for="channel in channels" :key="channel.id" :value="channel.id">{{ channel.name }}</option></select></label>
                     <div class="flex flex-wrap gap-2 md:col-span-2 xl:col-span-5"><Button type="submit" size="sm">Terapkan</Button><Button type="button" size="sm" variant="outline" @click="resetTransactions">Reset</Button></div>
