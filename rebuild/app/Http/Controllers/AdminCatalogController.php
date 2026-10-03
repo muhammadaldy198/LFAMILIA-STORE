@@ -746,7 +746,7 @@ class AdminCatalogController
         $before = $mapping->toArray();
         $id = $mapping->id;
         $mapping->delete();
-        $audit->record($request, 'catalog.mapping.deleted', 'provider_mapping', $id, $before, null);
+        $audit->record($request, 'catalog.mapping.deleted', 'provider_mapping', $id, $before, []);
 
         return back()->with('status', 'Sumber Digiflazz dihapus dari nominal.');
     }
