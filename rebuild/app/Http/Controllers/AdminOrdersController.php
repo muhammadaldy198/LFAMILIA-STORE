@@ -228,7 +228,7 @@ class AdminOrdersController
     {
         $payment = DB::table('payment_transactions')->where('order_id', $id)->orderByDesc('id')->first();
         abort_unless(DB::table('orders')->where('id', $id)->exists(), 404);
-        if (! $payment || $payment->gateway_code !== 'MIDTRANS' || ! in_array($payment->status, ['PENDING', 'CREATING'], true)) {
+        if (! $payment || $payment->gateway_code !== 'MIDTRANS' || ! in_array($payment->status, ['PENDING', 'CREATING', 'SENDING'], true)) {
             throw ValidationException::withMessages(['payment' => 'Pembayaran ini tidak memerlukan pemeriksaan langsung. Pembayaran otomatis diperbarui setelah konfirmasi penyedia diterima.']);
         }
         try {
