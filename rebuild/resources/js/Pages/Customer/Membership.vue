@@ -32,7 +32,7 @@ function benefitRows(tier){
 }
 </script>
 <template>
-<Head :title="customerText(&quot;pages.customer.membership.attribute.title.fb25e0f9&quot;, &quot;Membership&quot;)"/>
+<Head :title="customerText('pages.customer.membership.attribute.title.fb25e0f9', 'Membership')"/>
 <AccountShell>
     <section class="lf-membership-hero">
         <div>
