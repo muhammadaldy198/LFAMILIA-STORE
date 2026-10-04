@@ -49,7 +49,7 @@ try {
         for(const path of accountPages)await inspect(path,width);
     }
     await navigate('/admin/login');
-    const adminLogin=await evaluate(`(async()=>{const token=document.querySelector('meta[name="csrf-token"]').content;const response=await fetch('/admin/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':token},body:JSON.stringify({email:'browser-admin@example.test',password:'Browser-admin-password-123'})});return response.status;})()`);
+    const adminLogin=await evaluate(`(async()=>{const token=document.querySelector('meta[name="csrf-token"]').content;const response=await fetch('/admin/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':token},body:JSON.stringify({email:'browser-admin@example.test',password:'Browser-admin-test-password-123'})});return response.status;})()`);
     if(adminLogin!==200&&adminLogin!==204)throw Error('Admin fixture login failed: '+adminLogin);
     const adminPages=['/admin/panel','/admin/orders','/admin/catalog','/admin/content','/admin/digiflazz','/admin/providers','/admin/payments','/admin/customers','/admin/vouchers','/admin/support','/admin/reports','/admin/settings','/admin/integrations'];
     for(const width of [390,1440]){

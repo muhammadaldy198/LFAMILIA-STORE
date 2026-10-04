@@ -1,4 +1,5 @@
 <script setup>
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -6,7 +7,7 @@ import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../Components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../Components/ui/table';
 
 const props = defineProps({
     logs: { type: Object, default: () => ({ data: [], links: [] }) },
@@ -103,7 +104,7 @@ const toggleDetail = (id) => {
                 </Button>
             </header>
 
-            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div class="lf-admin-summary ">
                 <Card class="p-4">
                     <p class="text-xs text-muted-foreground">Total log</p>
                     <p class="mt-2 text-2xl font-semibold">{{ Number(summary.total || 0).toLocaleString('id-ID') }}</p>
@@ -210,7 +211,7 @@ const toggleDetail = (id) => {
                 </div>
 
                 <div class="overflow-x-auto">
-                    <Table class="min-w-[1040px]">
+                    <AdminResponsiveTable :mobile-columns="[2,3,0,5]" class="min-w-[1040px]">
                         <TableHeader>
                             <TableRow>
                                 <TableHead class="w-[15%]">Waktu</TableHead>
@@ -294,7 +295,7 @@ const toggleDetail = (id) => {
                                 </TableCell>
                             </TableRow>
                         </TableBody>
-                    </Table>
+                    </AdminResponsiveTable>
                 </div>
 
                 <nav v-if="logs?.links?.length > 3" class="flex flex-wrap gap-2 border-t p-4" aria-label="Halaman Audit Log">

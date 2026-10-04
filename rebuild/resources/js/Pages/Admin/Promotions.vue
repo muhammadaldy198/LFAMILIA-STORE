@@ -1,13 +1,15 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { reactive, ref } from 'vue';
+import { nextTick, reactive, ref } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 
 const props = defineProps({
     filters: { type: Object, default: () => ({}) },
@@ -126,6 +128,7 @@ function openCreate() {
         is_active: true,
     });
     editorOpen.value = true;
+    nextTick(() => document.getElementById('promotions-editor')?.scrollIntoView({ block: 'start' }));
 }
 
 function openEdit(row) {
@@ -148,6 +151,7 @@ function openEdit(row) {
         is_active: Boolean(row.is_active),
     });
     editorOpen.value = true;
+    nextTick(() => document.getElementById('promotions-editor')?.scrollIntoView({ block: 'start' }));
 }
 
 function closeEditor() {
@@ -222,7 +226,7 @@ function discountLabel(row) {
             </div>
         </header>
 
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div class="lf-admin-summary ">
             <Card class="p-4"><p class="text-xs text-muted-foreground">Total voucher</p><p class="mt-2 text-2xl font-semibold">{{ summary.total_vouchers || 0 }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Voucher aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.active_vouchers || 0 }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Terpakai</p><p class="mt-2 text-2xl font-semibold">{{ summary.used_count || 0 }}</p></Card>
@@ -231,7 +235,7 @@ function discountLabel(row) {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Populer & aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.active_popular_products || 0 }}</p></Card>
         </div>
 
-        <nav class="flex max-w-full gap-1 overflow-x-auto rounded-lg border p-1">
+        <nav class="lf-admin-tabs">
             <Button type="button" :variant="section === 'vouchers' ? 'secondary' : 'ghost'" class="shrink-0" @click="section = 'vouchers'">Voucher Diskon</Button>
             <Button type="button" :variant="section === 'popular' ? 'secondary' : 'ghost'" class="shrink-0" @click="section = 'popular'">Populer Sekarang</Button>
         </nav>
@@ -277,7 +281,7 @@ function discountLabel(row) {
 
             <Card class="min-w-0 p-4">
                 <div class="overflow-x-auto">
-                    <Table>
+                    <AdminResponsiveTable :mobile-columns="[0,1,6,7]">
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Voucher</TableHead>
@@ -318,13 +322,13 @@ function discountLabel(row) {
                                     <div class="flex justify-end gap-1">
                                         <Button size="sm" variant="outline" @click="openEdit(row)">Edit</Button>
                                         <Button size="sm" variant="outline" @click="quickToggle(row)">{{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}</Button>
-                                        <Button size="sm" variant="ghost" @click="deleteVoucher(row)">Hapus</Button>
+                                        <Button size="sm" variant="destructive" @click="deleteVoucher(row)">Hapus</Button>
                                     </div>
                                 </TableCell>
                             </TableRow>
                             <TableRow v-if="!vouchers.data?.length"><TableCell colspan="8" class="py-10 text-center text-muted-foreground">Tidak ada voucher sesuai filter.</TableCell></TableRow>
                         </TableBody>
-                    </Table>
+                    </AdminResponsiveTable>
                 </div>
 
                 <div v-if="vouchers.links?.length > 3" class="mt-4 flex flex-wrap gap-1">
@@ -382,7 +386,7 @@ function discountLabel(row) {
                     Produk bertanda populer didahulukan di homepage. Jika slot belum penuh, storefront melanjutkan dengan produk aktif yang memiliki ulasan terbanyak. Status produk tetap dikelola dari menu Produk.
                 </div>
                 <div class="overflow-x-auto">
-                    <Table>
+                    <AdminResponsiveTable :mobile-columns="[0,2,3,4,5]">
                         <TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Nominal</TableHead><TableHead>Status Produk</TableHead><TableHead>Prioritas</TableHead><TableHead class="text-right">Aksi</TableHead></TableRow></TableHeader>
                         <TableBody>
                             <TableRow v-for="product in popularProducts.data" :key="product.id">
@@ -400,7 +404,7 @@ function discountLabel(row) {
                             </TableRow>
                             <TableRow v-if="!popularProducts.data?.length"><TableCell colspan="6" class="py-10 text-center text-muted-foreground">Tidak ada produk sesuai filter.</TableCell></TableRow>
                         </TableBody>
-                    </Table>
+                    </AdminResponsiveTable>
                 </div>
 
                 <div v-if="popularProducts.links?.length > 3" class="mt-4 flex flex-wrap gap-1">
@@ -416,7 +420,7 @@ function discountLabel(row) {
             </Card>
         </template>
 
-        <Card v-if="editorOpen" class="p-4">
+        <Card v-if="editorOpen" id="promotions-editor" class="p-4">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 class="text-lg font-semibold">{{ editingId ? 'Edit Voucher' : 'Tambah Voucher' }}</h2>
@@ -437,7 +441,7 @@ function discountLabel(row) {
                     <label class="space-y-1"><span class="text-sm font-medium">Limit per pelanggan</span><Input v-model.number="voucherForm.per_customer_limit" type="number" min="1" placeholder="Tanpa batas" /></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Mulai</span><Input v-model="voucherForm.starts_at" type="datetime-local" /><span class="text-xs text-muted-foreground">Kosong = langsung.</span></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Berakhir</span><Input v-model="voucherForm.ends_at" type="datetime-local" /><span v-if="voucherForm.errors.ends_at" class="text-xs text-destructive">{{ voucherForm.errors.ends_at }}</span></label>
-                    <label class="flex items-center gap-2 self-end rounded-md border px-3 py-2 text-sm"><input v-model="voucherForm.is_active" type="checkbox" class="size-4">Voucher aktif</label>
+                    <label class="flex items-center gap-2 self-end rounded-md border px-3 py-2 text-sm"><AdminSwitch v-model="voucherForm.is_active" />Voucher aktif</label>
                 </div>
 
                 <label class="block space-y-1">

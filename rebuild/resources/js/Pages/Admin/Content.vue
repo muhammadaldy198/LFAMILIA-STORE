@@ -1,8 +1,10 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
@@ -165,28 +167,28 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </div>
 
                 <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="bannerForm.post(base + '/content/banners', { preserveScroll: true, onSuccess: () => bannerForm.reset() })">
-                    <Input v-model="bannerForm.title" required placeholder="Nama internal / alt banner" class="rounded border border-slate-200 p-2 text-sm" />
-                    <Input v-model="bannerForm.cta_href" placeholder="Link klik, contoh /promo" class="rounded border border-slate-200 p-2 text-sm" />
-                    <Input v-model.number="bannerForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm" />
-                    <Input v-model="bannerForm.subtitle" placeholder="Catatan internal (opsional)" class="rounded border border-slate-200 p-2 text-sm md:col-span-3" />
-                    <label class="flex items-center gap-2 text-xs"><input v-model="bannerForm.show_desktop" type="checkbox"> Desktop</label>
-                    <label class="flex items-center gap-2 text-xs"><input v-model="bannerForm.show_mobile" type="checkbox"> Mobile</label>
-                    <label class="flex items-center gap-2 text-xs"><input v-model="bannerForm.is_active" type="checkbox"> Aktif</label>
+                    <label class="lf-admin-field "><span>Judul</span><Input v-model="bannerForm.title" required placeholder="Nama internal / alt banner" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="bannerForm.errors.title" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.title }}</span></label>
+                    <label class="lf-admin-field "><span>Tautan tujuan</span><Input v-model="bannerForm.cta_href" placeholder="Link klik, contoh /promo" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="bannerForm.errors.cta_href" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.cta_href }}</span></label>
+                    <label class="lf-admin-field "><span>Urutan</span><Input v-model.number="bannerForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="bannerForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.sort_order }}</span></label>
+                    <label class="lf-admin-field md:col-span-3"><span>Subjudul</span><Input v-model="bannerForm.subtitle" placeholder="Catatan internal (opsional)" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="bannerForm.errors.subtitle" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.subtitle }}</span></label>
+                    <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="bannerForm.show_desktop" /> Desktop</label>
+                    <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="bannerForm.show_mobile" /> Mobile</label>
+                    <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="bannerForm.is_active" /> Aktif</label>
                     <div class="md:col-span-3"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah Banner</Button></div>
                 </form>
 
                 <div class="mt-5 space-y-4">
                     <article v-for="item in banners" :key="item.id" class="rounded-lg border border-slate-200 p-4">
                         <div class="grid gap-2 md:grid-cols-3">
-                            <Input v-model="item.title" class="rounded border border-slate-200 p-2 text-sm" placeholder="Nama banner" />
-                            <Input v-model="item.cta_href" class="rounded border border-slate-200 p-2 text-sm" placeholder="Link klik" />
-                            <Input v-model.number="item.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" placeholder="Urutan" />
-                            <Input v-model="item.subtitle" class="rounded border border-slate-200 p-2 text-sm md:col-span-3" placeholder="Catatan internal" />
+                            <label class="lf-admin-field "><span>Judul</span><Input v-model="item.title" class="rounded border border-slate-200 p-2 text-sm" placeholder="Nama banner" /></label>
+                            <label class="lf-admin-field "><span>Tautan tujuan</span><Input v-model="item.cta_href" class="rounded border border-slate-200 p-2 text-sm" placeholder="Link klik" /></label>
+                            <label class="lf-admin-field "><span>Urutan</span><Input v-model.number="item.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" placeholder="Urutan" /></label>
+                            <label class="lf-admin-field md:col-span-3"><span>Subjudul</span><Input v-model="item.subtitle" class="rounded border border-slate-200 p-2 text-sm" placeholder="Catatan internal" /></label>
                         </div>
                         <div class="mt-3 flex flex-wrap gap-4">
-                            <label class="flex items-center gap-2 text-xs"><input v-model="item.show_desktop" type="checkbox"> Desktop</label>
-                            <label class="flex items-center gap-2 text-xs"><input v-model="item.show_mobile" type="checkbox"> Mobile</label>
-                            <label class="flex items-center gap-2 text-xs"><input v-model="item.is_active" type="checkbox"> Aktif</label>
+                            <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="item.show_desktop" /> Desktop</label>
+                            <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="item.show_mobile" /> Mobile</label>
+                            <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="item.is_active" /> Aktif</label>
                         </div>
                         <div class="mt-3 grid gap-3 lg:grid-cols-2">
                             <div>
@@ -214,21 +216,21 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </div>
 
                 <form v-if="!popups.length" class="mt-4 grid gap-3" @submit.prevent="popupForm.post(base + '/content/popups', { preserveScroll: true })">
-                    <Input v-model="popupForm.title" required placeholder="Judul pop-up" class="rounded border border-slate-200 p-2 text-sm" />
-                    <Textarea v-model="popupForm.body" required rows="5" placeholder="Isi pengumuman" class="rounded border border-slate-200 p-2 text-sm"></Textarea>
+                    <label class="lf-admin-field "><span>Judul</span><Input v-model="popupForm.title" required placeholder="Judul pop-up" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="popupForm.errors.title" role="alert" class="text-sm font-normal text-destructive">{{ popupForm.errors.title }}</span></label>
+                    <label class="lf-admin-field "><span>Isi</span><Textarea v-model="popupForm.body" required rows="5" placeholder="Isi pengumuman" class="rounded border border-slate-200 p-2 text-sm"></Textarea><span v-if="popupForm.errors.body" role="alert" class="text-sm font-normal text-destructive">{{ popupForm.errors.body }}</span></label>
                     <div class="grid gap-3 sm:grid-cols-2">
-                        <label class="text-xs">Jangan tampil lagi selama (hari)<Input v-model.number="popupForm.dismiss_days" type="number" min="0" max="365" class="mt-1 w-full rounded border border-slate-200 p-2 text-sm" /></label>
-                        <label class="flex items-center gap-2 self-end pb-2 text-xs"><input v-model="popupForm.is_active" type="checkbox"> Aktif</label>
+                        <label class="text-xs">Jangan tampil lagi selama (hari)<Input v-model.number="popupForm.dismiss_days" type="number" min="0" max="365" class="mt-1 w-full rounded border border-slate-200 p-2 text-sm" /><span v-if="popupForm.errors.dismiss_days" role="alert" class="text-sm font-normal text-destructive">{{ popupForm.errors.dismiss_days }}</span></label>
+                        <label class="flex items-center gap-2 self-end pb-2 text-xs"><AdminSwitch v-model="popupForm.is_active" /> Aktif</label>
                     </div>
                     <div><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Simpan Pop-up</Button></div>
                 </form>
 
                 <article v-else class="mt-4 rounded-lg border border-slate-200 p-4">
-                    <Input v-model="popups[0].title" class="w-full rounded border border-slate-200 p-2 text-sm" placeholder="Judul pop-up" />
-                    <Textarea v-model="popups[0].body" rows="5" class="mt-3 w-full rounded border border-slate-200 p-2 text-sm" placeholder="Isi pengumuman"></Textarea>
+                    <label class="lf-admin-field "><span>Judul</span><Input v-model="popups[0].title" class="w-full rounded border border-slate-200 p-2 text-sm" placeholder="Judul pop-up" /></label>
+                    <label class="lf-admin-field "><span>Isi</span><Textarea v-model="popups[0].body" rows="5" class="mt-3 w-full rounded border border-slate-200 p-2 text-sm" placeholder="Isi pengumuman"></Textarea></label>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
                         <label class="text-xs">Jangan tampil lagi selama (hari)<Input v-model.number="popups[0].dismiss_days" type="number" min="0" max="365" class="mt-1 w-full rounded border border-slate-200 p-2 text-sm" /></label>
-                        <label class="flex items-center gap-2 self-end pb-2 text-xs"><input v-model="popups[0].is_active" type="checkbox"> Aktif</label>
+                        <label class="flex items-center gap-2 self-end pb-2 text-xs"><AdminSwitch v-model="popups[0].is_active" /> Aktif</label>
                     </div>
                     <div class="mt-3 rounded-lg bg-slate-50 p-3">
                         <p class="mb-2 text-[11px] text-slate-500">Gambar pop-up bersifat opsional dan dapat diganti dari panel ini.</p>
@@ -248,7 +250,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                     <article v-for="asset in assets" :key="asset.id" class="rounded-lg border border-slate-200 p-4">
                         <div class="flex flex-wrap items-center gap-3">
                             <strong class="text-sm">{{ assetLabel(asset.key) }}</strong>
-                            <label class="flex items-center gap-2 text-xs"><input v-model="asset.is_active" type="checkbox"> Aktif</label>
+                            <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="asset.is_active" /> Aktif</label>
                         </div>
                         <label v-if="assetHasTarget(asset.key)" class="mt-3 block text-xs">
                             Link ketika banner ditekan
@@ -265,15 +267,15 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 <h2 class="text-lg font-bold">Bantuan, berita & footer</h2>
                 <p class="mt-1 text-xs text-slate-500">Nomor kontak, akun sosial, tautan bantuan, dan jam layanan dikelola satu kali di menu Pengaturan.</p>
                 <form class="mt-4 grid gap-3 md:grid-cols-2" @submit.prevent="settingsForm.put(base + '/content/settings')">
-                    <label class="text-xs">Judul berita halaman utama<Input v-model="settingsForm.home_news_title" class="mt-1 block w-full rounded border border-slate-200 p-2" /></label>
-                    <label class="text-xs md:col-span-2">Pengantar berita halaman utama<Textarea v-model="settingsForm.home_news_intro" rows="2" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea></label>
-                    <label class="flex items-center gap-2 text-xs md:col-span-2"><input v-model="settingsForm.support_cta_enabled" type="checkbox"> Blok bantuan menjelang footer aktif</label>
-                    <label class="text-xs">Label kecil bantuan<Input v-model="settingsForm.support_cta_label" maxlength="80" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="BUTUH BANTUAN?" /></label>
-                    <label class="text-xs">Teks tombol bantuan<Input v-model="settingsForm.support_cta_button" maxlength="80" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="Hubungi Kami" /></label>
-                    <label class="text-xs md:col-span-2">Judul bantuan<Input v-model="settingsForm.support_cta_title" maxlength="180" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="Tim LFAMILIA siap membantu." /></label>
-                    <label class="text-xs md:col-span-2">Deskripsi bantuan<Textarea v-model="settingsForm.support_cta_body" rows="2" maxlength="1000" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea></label>
-                    <label class="text-xs md:col-span-2">Deskripsi footer<Textarea v-model="settingsForm.footer_description" rows="2" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea></label>
-                    <label class="flex items-center gap-2 self-end text-xs"><input v-model="settingsForm.support_widget_enabled" type="checkbox"> Tombol bantuan mengambang aktif</label>
+                    <label class="text-xs">Judul berita halaman utama<Input v-model="settingsForm.home_news_title" class="mt-1 block w-full rounded border border-slate-200 p-2" /><span v-if="settingsForm.errors.home_news_title" role="alert" class="text-sm font-normal text-destructive">{{ settingsForm.errors.home_news_title }}</span></label>
+                    <label class="text-xs md:col-span-2">Pengantar berita halaman utama<Textarea v-model="settingsForm.home_news_intro" rows="2" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea><span v-if="settingsForm.errors.home_news_intro" role="alert" class="text-sm font-normal text-destructive">{{ settingsForm.errors.home_news_intro }}</span></label>
+                    <label class="flex items-center gap-2 text-xs md:col-span-2"><AdminSwitch v-model="settingsForm.support_cta_enabled" /> Blok bantuan menjelang footer aktif</label>
+                    <label class="text-xs">Label kecil bantuan<Input v-model="settingsForm.support_cta_label" maxlength="80" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="BUTUH BANTUAN?" /><span v-if="settingsForm.errors.support_cta_label" role="alert" class="text-sm font-normal text-destructive">{{ settingsForm.errors.support_cta_label }}</span></label>
+                    <label class="text-xs">Teks tombol bantuan<Input v-model="settingsForm.support_cta_button" maxlength="80" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="Hubungi Kami" /><span v-if="settingsForm.errors.support_cta_button" role="alert" class="text-sm font-normal text-destructive">{{ settingsForm.errors.support_cta_button }}</span></label>
+                    <label class="text-xs md:col-span-2">Judul bantuan<Input v-model="settingsForm.support_cta_title" maxlength="180" class="mt-1 block w-full rounded border border-slate-200 p-2" placeholder="Tim LFAMILIA siap membantu." /><span v-if="settingsForm.errors.support_cta_title" role="alert" class="text-sm font-normal text-destructive">{{ settingsForm.errors.support_cta_title }}</span></label>
+                    <label class="text-xs md:col-span-2">Deskripsi bantuan<Textarea v-model="settingsForm.support_cta_body" rows="2" maxlength="1000" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea><span v-if="settingsForm.errors.support_cta_body" role="alert" class="text-sm font-normal text-destructive">{{ settingsForm.errors.support_cta_body }}</span></label>
+                    <label class="text-xs md:col-span-2">Deskripsi footer<Textarea v-model="settingsForm.footer_description" rows="2" class="mt-1 block w-full rounded border border-slate-200 p-2"></Textarea><span v-if="settingsForm.errors.footer_description" role="alert" class="text-sm font-normal text-destructive">{{ settingsForm.errors.footer_description }}</span></label>
+                    <label class="flex items-center gap-2 self-end text-xs"><AdminSwitch v-model="settingsForm.support_widget_enabled" /> Tombol bantuan mengambang aktif</label>
                     <div class="md:col-span-2"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Simpan konten umum</Button></div>
                 </form>
             </section>
@@ -281,28 +283,28 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
             <section v-show="contentTab === 'news'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 class="text-lg font-bold">Berita</h2>
                 <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="newsForm.post(base + '/content/news', { preserveScroll: true, onSuccess: () => newsForm.reset() })">
-                    <Input v-model="newsForm.title" required placeholder="Judul berita" class="rounded border border-slate-200 p-2 text-sm" />
-                    <Input v-model="newsForm.slug" placeholder="Slug (opsional)" class="rounded border border-slate-200 p-2 text-sm" />
-                    <Input v-model="newsForm.source_label" placeholder="Sumber/label" class="rounded border border-slate-200 p-2 text-sm" />
-                    <Textarea v-model="newsForm.summary" rows="2" placeholder="Ringkasan" class="rounded border border-slate-200 p-2 text-sm md:col-span-3"></Textarea>
-                    <Textarea v-model="newsForm.body" rows="5" placeholder="Isi berita" class="rounded border border-slate-200 p-2 text-sm md:col-span-3"></Textarea>
-                    <Input v-model.number="newsForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm" />
-                    <Input v-model="newsForm.published_at" type="datetime-local" class="rounded border border-slate-200 p-2 text-sm" />
-                    <label class="flex items-center gap-2 text-xs"><input v-model="newsForm.is_active" type="checkbox"> Aktif</label>
+                    <label class="lf-admin-field "><span>Judul</span><Input v-model="newsForm.title" required placeholder="Judul berita" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="newsForm.errors.title" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.title }}</span></label>
+                    <label class="lf-admin-field "><span>Alamat publik</span><Input v-model="newsForm.slug" placeholder="Slug (opsional)" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="newsForm.errors.slug" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.slug }}</span></label>
+                    <label class="lf-admin-field "><span>Sumber berita</span><Input v-model="newsForm.source_label" placeholder="Sumber/label" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="newsForm.errors.source_label" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.source_label }}</span></label>
+                    <label class="lf-admin-field md:col-span-3"><span>Ringkasan</span><Textarea v-model="newsForm.summary" rows="2" placeholder="Ringkasan" class="rounded border border-slate-200 p-2 text-sm"></Textarea><span v-if="newsForm.errors.summary" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.summary }}</span></label>
+                    <label class="lf-admin-field md:col-span-3"><span>Isi</span><Textarea v-model="newsForm.body" rows="5" placeholder="Isi berita" class="rounded border border-slate-200 p-2 text-sm"></Textarea><span v-if="newsForm.errors.body" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.body }}</span></label>
+                    <label class="lf-admin-field "><span>Urutan</span><Input v-model.number="newsForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="newsForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.sort_order }}</span></label>
+                    <label class="lf-admin-field "><span>Tanggal publikasi</span><Input v-model="newsForm.published_at" type="datetime-local" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="newsForm.errors.published_at" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.published_at }}</span></label>
+                    <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="newsForm.is_active" /> Aktif</label>
                     <div class="md:col-span-3"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah berita</Button></div>
                 </form>
 
                 <div class="mt-5 space-y-4">
                     <article v-for="item in news" :key="item.id" class="rounded-lg border border-slate-200 p-4">
                         <div class="grid gap-2 md:grid-cols-3">
-                            <Input v-model="item.title" class="rounded border border-slate-200 p-2 text-sm" />
-                            <Input v-model="item.slug" class="rounded border border-slate-200 p-2 text-sm" />
-                            <Input v-model="item.source_label" class="rounded border border-slate-200 p-2 text-sm" />
-                            <Textarea v-model="item.summary" rows="2" class="rounded border border-slate-200 p-2 text-sm md:col-span-3"></Textarea>
-                            <Textarea v-model="item.body" rows="4" class="rounded border border-slate-200 p-2 text-sm md:col-span-3"></Textarea>
-                            <Input v-model.number="item.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" />
-                            <Input v-model="item.published_at" type="datetime-local" class="rounded border border-slate-200 p-2 text-sm" />
-                            <label class="flex items-center gap-2 text-xs"><input v-model="item.is_active" type="checkbox"> Aktif</label>
+                            <label class="lf-admin-field "><span>Judul</span><Input v-model="item.title" class="rounded border border-slate-200 p-2 text-sm" /></label>
+                            <label class="lf-admin-field "><span>Alamat publik</span><Input v-model="item.slug" class="rounded border border-slate-200 p-2 text-sm" /></label>
+                            <label class="lf-admin-field "><span>Sumber berita</span><Input v-model="item.source_label" class="rounded border border-slate-200 p-2 text-sm" /></label>
+                            <label class="lf-admin-field md:col-span-3"><span>Ringkasan</span><Textarea v-model="item.summary" rows="2" class="rounded border border-slate-200 p-2 text-sm"></Textarea></label>
+                            <label class="lf-admin-field md:col-span-3"><span>Isi</span><Textarea v-model="item.body" rows="4" class="rounded border border-slate-200 p-2 text-sm"></Textarea></label>
+                            <label class="lf-admin-field "><span>Urutan</span><Input v-model.number="item.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" /></label>
+                            <label class="lf-admin-field "><span>Tanggal publikasi</span><Input v-model="item.published_at" type="datetime-local" class="rounded border border-slate-200 p-2 text-sm" /></label>
+                            <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="item.is_active" /> Aktif</label>
                         </div>
                         <p class="mt-3 text-xs text-slate-500">Gunakan gambar berita dengan fokus utama di tengah agar tetap jelas pada berbagai ukuran layar.</p>
                         <div class="mt-3"><AdminMediaControl type="news" :id="item.id" :url="item.image_url" /></div>
@@ -314,7 +316,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
             <section v-show="contentTab === 'reviews'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <div class="flex items-center justify-between gap-3"><div><h2 class="text-lg font-bold">Ulasan Pelanggan</h2><p class="mt-1 text-xs text-slate-500">Moderasi ulasan terverifikasi dari order sukses. Isi ulasan tidak diedit oleh Admin.</p></div><span class="rounded bg-slate-100 px-2 py-1 text-xs font-bold">{{reviews.length}} ulasan</span></div>
                 <div class="mt-4 overflow-x-auto rounded-lg border border-slate-200">
-                    <Table class="w-full min-w-[780px] text-left text-xs">
+                    <AdminResponsiveTable :mobile-columns="[0,1,2,4,5]" class="w-full min-w-[780px] text-left text-xs">
                         <TableHeader class="bg-slate-50 text-slate-500"><TableRow><TableHead class="p-3">Pelanggan</TableHead><TableHead class="p-3">Produk</TableHead><TableHead class="p-3">Rating</TableHead><TableHead class="p-3">Ulasan</TableHead><TableHead class="p-3">Status</TableHead><TableHead class="p-3">Aksi</TableHead></TableRow></TableHeader>
                         <TableBody>
                             <TableRow v-for="item in reviews" :key="item.id" class="border-t border-slate-200">
@@ -322,29 +324,29 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                                 <TableCell class="p-3">{{item.product_name}}</TableCell>
                                 <TableCell class="p-3 text-amber-500">{{'★'.repeat(item.rating)}}{{'☆'.repeat(5-item.rating)}}</TableCell>
                                 <TableCell class="max-w-[360px] p-3 text-slate-600">{{item.body}}</TableCell>
-                                <TableCell class="p-3"><label class="flex items-center gap-2"><input v-model="item.is_active" type="checkbox"> Tampil</label></TableCell>
+                                <TableCell class="p-3"><label class="flex items-center gap-2"><AdminSwitch v-model="item.is_active" /> Tampil</label></TableCell>
                                 <TableCell class="p-3"><Button type="button" class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="saveReview(item)">Simpan</Button></TableCell>
                             </TableRow>
                             <TableRow v-if="!reviews.length"><TableCell colspan="6" class="p-6 text-center text-slate-400">Belum ada ulasan.</TableCell></TableRow>
                         </TableBody>
-                    </Table>
+                    </AdminResponsiveTable>
                 </div>
             </section>
 
             <section v-show="contentTab === 'faq'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 class="text-lg font-bold">Pertanyaan umum</h2>
                 <form class="mt-4 grid gap-3 md:grid-cols-[1fr_120px_auto]" @submit.prevent="faqForm.post(base + '/content/faqs', { preserveScroll: true, onSuccess: () => faqForm.reset() })">
-                    <Input v-model="faqForm.question" required placeholder="Pertanyaan" class="rounded border border-slate-200 p-2 text-sm" />
-                    <Input v-model.number="faqForm.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" />
-                    <label class="flex items-center gap-2 text-xs"><input v-model="faqForm.is_active" type="checkbox"> Aktif</label>
-                    <Textarea v-model="faqForm.answer" required rows="3" placeholder="Jawaban" class="rounded border border-slate-200 p-2 text-sm md:col-span-3"></Textarea>
+                    <label class="lf-admin-field "><span>Pertanyaan</span><Input v-model="faqForm.question" required placeholder="Pertanyaan" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="faqForm.errors.question" role="alert" class="text-sm font-normal text-destructive">{{ faqForm.errors.question }}</span></label>
+                    <label class="lf-admin-field "><span>Urutan</span><Input v-model.number="faqForm.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="faqForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ faqForm.errors.sort_order }}</span></label>
+                    <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="faqForm.is_active" /> Aktif</label>
+                    <label class="lf-admin-field md:col-span-3"><span>Jawaban</span><Textarea v-model="faqForm.answer" required rows="3" placeholder="Jawaban" class="rounded border border-slate-200 p-2 text-sm"></Textarea><span v-if="faqForm.errors.answer" role="alert" class="text-sm font-normal text-destructive">{{ faqForm.errors.answer }}</span></label>
                     <div class="md:col-span-3"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah FAQ</Button></div>
                 </form>
                 <div class="mt-5 space-y-3">
                     <article v-for="item in faqs" :key="item.id" class="rounded-lg border border-slate-200 p-4">
-                        <Input v-model="item.question" class="w-full rounded border border-slate-200 p-2 text-sm" />
-                        <Textarea v-model="item.answer" rows="3" class="mt-2 w-full rounded border border-slate-200 p-2 text-sm"></Textarea>
-                        <div class="mt-2 flex flex-wrap items-center gap-3"><label class="text-xs">Urutan <Input v-model.number="item.sort_order" type="number" min="0" class="ml-1 w-20 rounded border border-slate-200 p-1" /></label><label class="flex items-center gap-2 text-xs"><input v-model="item.is_active" type="checkbox"> Aktif</label><Button class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="saveFaq(item)">Simpan</Button><Button class="rounded bg-red-50 px-3 py-2 text-xs font-bold text-red-700" @click="deleteFaq(item)">Hapus</Button></div>
+                        <label class="lf-admin-field "><span>Pertanyaan</span><Input v-model="item.question" class="w-full rounded border border-slate-200 p-2 text-sm" /></label>
+                        <label class="lf-admin-field "><span>Jawaban</span><Textarea v-model="item.answer" rows="3" class="mt-2 w-full rounded border border-slate-200 p-2 text-sm"></Textarea></label>
+                        <div class="mt-2 flex flex-wrap items-center gap-3"><label class="text-xs">Urutan <Input v-model.number="item.sort_order" type="number" min="0" class="ml-1 w-20 rounded border border-slate-200 p-1" /></label><label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="item.is_active" /> Aktif</label><Button class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="saveFaq(item)">Simpan</Button><Button class="rounded bg-red-50 px-3 py-2 text-xs font-bold text-red-700" @click="deleteFaq(item)">Hapus</Button></div>
                     </article>
                 </div>
             </section>
@@ -354,10 +356,10 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 <div class="mt-4 space-y-4">
                     <article v-for="item in pages" :key="item.key" class="rounded-lg border border-slate-200 p-4">
                         <strong class="text-xs uppercase text-slate-500">{{ item.key }}</strong>
-                        <Input v-model="item.title" class="mt-2 w-full rounded border border-slate-200 p-2 text-sm" />
-                        <Textarea v-model="item.intro" rows="2" class="mt-2 w-full rounded border border-slate-200 p-2 text-sm"></Textarea>
-                        <Textarea v-model="item.body" rows="7" class="mt-2 w-full rounded border border-slate-200 p-2 text-sm"></Textarea>
-                        <div class="mt-2 flex gap-3"><label class="flex items-center gap-2 text-xs"><input v-model="item.is_active" type="checkbox"> Aktif</label><Button class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="savePage(item)">Simpan</Button></div>
+                        <label class="lf-admin-field "><span>Judul</span><Input v-model="item.title" class="mt-2 w-full rounded border border-slate-200 p-2 text-sm" /></label>
+                        <label class="lf-admin-field mt-2"><span>Pengantar</span><Textarea v-model="item.intro" rows="2" class="w-full rounded border border-slate-200 p-2 text-sm"></Textarea></label>
+                        <label class="lf-admin-field "><span>Isi</span><Textarea v-model="item.body" rows="7" class="mt-2 w-full rounded border border-slate-200 p-2 text-sm"></Textarea></label>
+                        <div class="mt-2 flex gap-3"><label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="item.is_active" /> Aktif</label><Button class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="savePage(item)">Simpan</Button></div>
                     </article>
                 </div>
             </section>

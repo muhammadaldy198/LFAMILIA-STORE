@@ -1,4 +1,5 @@
 <script setup>
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, router } from '@inertiajs/vue3';
 import { computed, reactive } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -6,7 +7,7 @@ import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 
 const props = defineProps({
     canViewFinance: Boolean,
@@ -141,7 +142,7 @@ function statusLabel(status) {
             </form>
         </Card>
 
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+        <div class="lf-admin-summary ">
             <Card class="p-4"><p class="text-xs text-muted-foreground">Total pesanan</p><p class="mt-2 text-2xl font-semibold">{{ number(metrics.orders_total) }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Berhasil</p><p class="mt-2 text-2xl font-semibold">{{ number(metrics.success_total) }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Menunggu bayar</p><p class="mt-2 text-2xl font-semibold">{{ number(metrics.pending_payment_total) }}</p></Card>
@@ -152,7 +153,7 @@ function statusLabel(status) {
             <Card v-if="canViewFinance" class="p-4"><p class="text-xs text-muted-foreground">Laba kotor</p><p class="mt-2 text-xl font-semibold">{{ money(metrics.gross_profit_idr) }}</p></Card>
         </div>
 
-        <div v-if="canViewFinance" class="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div v-if="canViewFinance" class="lf-admin-summary ">
             <Card class="p-4"><p class="text-xs text-muted-foreground">Diskon terpakai</p><p class="mt-2 text-lg font-semibold">{{ money(metrics.discount_idr) }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Biaya pembayaran</p><p class="mt-2 text-lg font-semibold">{{ money(metrics.payment_fee_idr) }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Top up saldo dibayar</p><p class="mt-2 text-lg font-semibold">{{ money(metrics.paid_topup_idr) }}</p></Card>
@@ -220,7 +221,7 @@ function statusLabel(status) {
                 <p class="mt-1 text-sm text-muted-foreground">Urutan berdasarkan pesanan berhasil, lalu jumlah pesanan.</p>
             </div>
             <div class="mt-4 overflow-x-auto">
-                <Table>
+                <AdminResponsiveTable :mobile-columns="canViewFinance?[1,2,3,4]:[1,2,3]">
                     <TableHeader>
                         <TableRow>
                             <TableHead>#</TableHead>
@@ -244,15 +245,15 @@ function statusLabel(status) {
                         </TableRow>
                         <TableRow v-if="!topProducts.length"><TableCell :colspan="canViewFinance ? 7 : 4" class="py-10 text-center text-muted-foreground">Belum ada data produk.</TableCell></TableRow>
                     </TableBody>
-                </Table>
+                </AdminResponsiveTable>
             </div>
         </Card>
 
-        <div class="grid gap-4 xl:grid-cols-2">
+        <div class="lf-admin-summary ">
             <Card class="min-w-0 p-4">
                 <h2 class="text-lg font-semibold">Kategori Teratas</h2>
                 <div class="mt-4 overflow-x-auto">
-                    <Table>
+                    <AdminResponsiveTable :mobile-columns="canViewFinance?[0,1,3]:[0,1,2]">
                         <TableHeader><TableRow><TableHead>Kategori</TableHead><TableHead class="text-right">Pesanan</TableHead><TableHead class="text-right">Berhasil</TableHead><TableHead v-if="canViewFinance" class="text-right">Omzet</TableHead></TableRow></TableHeader>
                         <TableBody>
                             <TableRow v-for="row in topCategories" :key="row.id">
@@ -263,7 +264,7 @@ function statusLabel(status) {
                             </TableRow>
                             <TableRow v-if="!topCategories.length"><TableCell :colspan="canViewFinance ? 4 : 3" class="py-10 text-center text-muted-foreground">Belum ada data kategori.</TableCell></TableRow>
                         </TableBody>
-                    </Table>
+                    </AdminResponsiveTable>
                 </div>
             </Card>
 
@@ -271,7 +272,7 @@ function statusLabel(status) {
                 <h2 class="text-lg font-semibold">Performa Provider</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Error rate dihitung dari attempt gagal/bermasalah dibanding seluruh attempt periode ini.</p>
                 <div class="mt-4 overflow-x-auto">
-                    <Table>
+                    <AdminResponsiveTable :mobile-columns="[0,1,2,5]">
                         <TableHeader><TableRow><TableHead>Provider</TableHead><TableHead class="text-right">Percobaan</TableHead><TableHead class="text-right">Berhasil</TableHead><TableHead class="text-right">Perlu ditangani</TableHead><TableHead class="text-right">Error</TableHead><TableHead class="text-right">Error rate</TableHead></TableRow></TableHeader>
                         <TableBody>
                             <TableRow v-for="row in providerReport" :key="row.id + '-' + row.code">
@@ -284,7 +285,7 @@ function statusLabel(status) {
                             </TableRow>
                             <TableRow v-if="!providerReport.length"><TableCell colspan="6" class="py-10 text-center text-muted-foreground">Belum ada aktivitas provider.</TableCell></TableRow>
                         </TableBody>
-                    </Table>
+                    </AdminResponsiveTable>
                 </div>
             </Card>
         </div>

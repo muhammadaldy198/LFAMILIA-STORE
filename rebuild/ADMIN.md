@@ -68,3 +68,15 @@ Credential disimpan pada `integration_credentials.config_ciphertext` dengan encr
 ## Data sensitif
 
 Jangan menaruh password, API credential, private token, payment signature, raw saved-game secret, atau ciphertext di audit payload/UI biasa. Export configuration normal harus mengecualikan secret.
+
+## UI Admin dan workspace produk
+
+Design system Admin berada di `resources/css/admin.css` dan dibatasi pada shell Admin. Kontrol mobile 36 px, desktop 40 px; sidebar desktop 240 px, topbar 56 px. `AdminResponsiveTable` memakai slot/handler tabel yang sama, dengan kolom prioritas eksplisit di mobile dan informasi sekunder dalam Detail. Checkbox tetap untuk pilihan jamak/konfirmasi; boolean memakai `AdminSwitch`.
+
+Produk menggunakan workspace penuh dengan URL `/admin/catalog?edit=<id>`. Daftar ditutup selama editor aktif. Lima tab: Informasi, Nominal & Harga, Tampilan Produk, Data Pelanggan, Penanganan. Nominal dirender 25 per halaman dan form detail hanya untuk nominal terpilih. Reorder desktop dan tombol naik/turun tetap tersedia. Backend catalog masih mengirim seluruh catalog sebagaimana sebelumnya; pagination server catalog adalah pekerjaan terpisah.
+
+Pembayaran memisahkan Channel, Gateway, Routing, QRIS Manual, Top Up Saldo, Tampilan Halaman, dan Transaksi. Detail pelanggan memisahkan Profil, Tier, Pesanan, Saldo & Top Up, Tiket, serta Akun Game. Semua request, authorization, konfirmasi saldo, ledger, status integrasi dan credential preservation tetap melalui backend existing.
+
+Media menggunakan endpoint Spatie existing. Gambar terpilih dapat dipratinjau sebelum unggah, error unggahan tampil di tempat, dan hapus meminta konfirmasi. Upload favicon otomatis mengaktifkan asset dan memperbarui link favicon Admin/storefront melalui shared props existing.
+
+Audit source/history dan rencana komponen dicatat di `ADMIN-UI-AUDIT.md`.

@@ -1,4 +1,5 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { reactive } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -125,7 +126,7 @@ function refresh() {
             </div>
         </header>
 
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div class="lf-admin-summary">
             <Card class="p-4">
                 <p class="text-xs text-muted-foreground">Koneksi</p>
                 <p class="mt-2 font-semibold">{{ connectionLabel(connection?.status) }}</p>
@@ -156,9 +157,10 @@ function refresh() {
         </div>
 
         <Card class="p-4">
+            <details><summary class="cursor-pointer font-semibold">Pengaturan monitor & sinkron otomatis</summary>
             <form class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" @submit.prevent="autoSyncForm.put('/admin/digiflazz/settings', { preserveScroll: true })">
                 <label class="flex items-center gap-2 text-sm md:col-span-2 xl:col-span-1">
-                    <input v-model="autoSyncForm.enabled" type="checkbox" class="size-4">
+                    <AdminSwitch v-model="autoSyncForm.enabled" />
                     Sinkron harga otomatis
                 </label>
                 <label class="space-y-1">
@@ -188,22 +190,30 @@ function refresh() {
                 </div>
             </form>
             <p class="mt-3 text-xs text-muted-foreground">Harga jual, margin, prioritas sumber, dan max price tetap dikelola di menu Produk. Credential tetap dikelola di Integrasi.</p>
+            </details>
         </Card>
 
         <Card class="p-4">
-            <form class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" @submit.prevent="search">
-                <label class="space-y-1 sm:col-span-2">
+            <form class="grid grid-cols-2 gap-3 md:grid-cols-4" @submit.prevent="search">
+<label class="space-y-1 col-span-2 md:col-span-1">
                     <span class="text-sm font-medium">Cari</span>
                     <Input v-model="filters.q" maxlength="100" placeholder="Produk, nominal, SKU, seller, atau brand" />
                 </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Tampilan</span>
-                    <select v-model="filters.scope" class="digiflazz-select">
-                        <option value="mapped">SKU yang terhubung</option>
-                        <option value="all">Semua daftar harga</option>
+<label class="space-y-1">
+                    <span class="text-sm font-medium">Kategori</span>
+                    <select v-model="filters.category" class="digiflazz-select">
+                        <option value="">Semua kategori</option>
+                        <option v-for="category in categories" :key="category" :value="category">{{ category }}</option>
                     </select>
                 </label>
-                <label class="space-y-1">
+<label class="space-y-1">
+                    <span class="text-sm font-medium">Produk</span>
+                    <select v-model="filters.product" class="digiflazz-select">
+                        <option value="">Semua produk</option>
+                        <option v-for="product in products" :key="product" :value="product">{{ product }}</option>
+                    </select>
+                </label>
+<label class="space-y-1">
                     <span class="text-sm font-medium">Kesehatan</span>
                     <select v-model="filters.health" class="digiflazz-select">
                         <option value="">Semua status</option>
@@ -212,37 +222,27 @@ function refresh() {
                         <option value="critical">Kritis</option>
                     </select>
                 </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Kategori</span>
-                    <select v-model="filters.category" class="digiflazz-select">
-                        <option value="">Semua kategori</option>
-                        <option v-for="category in categories" :key="category" :value="category">{{ category }}</option>
+                <details class="col-span-2 md:col-span-4"><summary class="cursor-pointer text-sm font-medium">Filter lanjutan</summary><div class="mt-3 grid gap-3 sm:grid-cols-3"><label class="space-y-1">
+                    <span class="text-sm font-medium">Tampilan</span>
+                    <select v-model="filters.scope" class="digiflazz-select">
+                        <option value="mapped">SKU yang terhubung</option>
+                        <option value="all">Semua daftar harga</option>
                     </select>
                 </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Produk</span>
-                    <select v-model="filters.product" class="digiflazz-select">
-                        <option value="">Semua produk</option>
-                        <option v-for="product in products" :key="product" :value="product">{{ product }}</option>
-                    </select>
-                </label>
-                <label class="space-y-1">
+<label class="space-y-1">
                     <span class="text-sm font-medium">Brand</span>
                     <select v-model="filters.brand" class="digiflazz-select">
                         <option value="">Semua brand</option>
                         <option v-for="brand in brands" :key="brand" :value="brand">{{ brand }}</option>
                     </select>
                 </label>
-                <label class="space-y-1">
+<label class="space-y-1">
                     <span class="text-sm font-medium">Baris per halaman</span>
                     <select v-model="filters.per_page" class="digiflazz-select">
                         <option v-for="size in [10,25,50,100]" :key="size" :value="size">{{ size }} SKU</option>
                     </select>
-                </label>
-                <div class="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-4">
-                    <Button :disabled="syncForm.processing">Terapkan filter</Button>
-                    <Button type="button" variant="outline" @click="reset">Hapus filter</Button>
-                </div>
+                </label></div></details>
+                <div class="col-span-2 flex gap-2 md:col-span-4"><Button :disabled="syncForm.processing">Terapkan filter</Button><Button type="button" variant="outline" @click="reset">Hapus filter</Button></div>
             </form>
         </Card>
 
@@ -303,7 +303,7 @@ function refresh() {
                         <TableRow>
                             <TableHead class="w-[23%]">Produk / nominal</TableHead>
                             <TableHead class="w-[15%]">SKU / seller</TableHead>
-                            <TableHead class="w-[18%]">Modal / baseline</TableHead>
+                            <TableHead class="w-[18%] text-right">Modal / baseline</TableHead>
                             <TableHead class="w-[16%]">Stok / cut-off</TableHead>
                             <TableHead class="w-[18%]">Status</TableHead>
                             <TableHead class="w-[10%]">Aksi</TableHead>
@@ -322,7 +322,7 @@ function refresh() {
                                 <p class="mt-2 text-sm">{{ item.seller_name || 'Seller tidak tersedia' }}</p>
                                 <p class="mt-1 text-xs text-muted-foreground">{{ item.multi ? 'Mendukung transaksi bersamaan' : 'Transaksi berurutan' }}</p>
                             </TableCell>
-                            <TableCell class="align-top">
+                            <TableCell class="align-top text-right">
                                 <strong>{{ money(item.price_idr) }}</strong>
                                 <p class="mt-1 text-xs text-muted-foreground">Baseline {{ money(item.baseline_price_idr) }}</p>
                                 <p v-if="Number(item.price_idr) > Number(item.baseline_price_idr)" class="mt-2 text-xs">

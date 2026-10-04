@@ -1,4 +1,5 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -88,6 +89,7 @@ function closeAttempt() {
 
 function completeManual() {
     if (!selected.value || busy.value) return;
+    if (!window.confirm('Tandai pesanan ini berhasil? Pastikan hasil sudah diterima pelanggan.')) return;
     busy.value = true;
     router.post('/admin/fulfillment/' + selected.value.id + '/complete', {
         delivery_code: form.delivery_code || null,
@@ -101,6 +103,7 @@ function completeManual() {
 
 function failManual() {
     if (!selected.value || busy.value || !form.reason.trim()) return;
+    if (!window.confirm('Tandai pesanan ini gagal? Tindakan ini tidak mengembalikan dana secara otomatis.')) return;
     busy.value = true;
     router.post('/admin/fulfillment/' + selected.value.id + '/fail', {
         reason: form.reason,
@@ -123,6 +126,7 @@ function reconcile() {
 
 function retry() {
     if (!selected.value || busy.value) return;
+    if (!window.confirm('Lanjutkan pengiriman pesanan ini? Pastikan hasil pemeriksaan penyedia telah ditinjau.')) return;
     busy.value = true;
     router.post('/admin/fulfillment/' + selected.value.id + '/retry', {}, {
         preserveScroll: true,
@@ -157,7 +161,7 @@ onUnmounted(() => clearInterval(timer));
         <Button variant="outline" as-child><Link href="/admin/orders">Buka Pesanan</Link></Button>
     </div>
 
-    <div class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div class="lf-admin-summary mt-5">
         <Card v-for="metric in metrics" :key="metric.label" class="min-w-0 p-4">
             <p class="text-sm text-muted-foreground">{{ metric.label }}</p>
             <p class="mt-2 text-2xl font-semibold">{{ Number(metric.value).toLocaleString('id-ID') }}</p>
@@ -202,7 +206,7 @@ onUnmounted(() => clearInterval(timer));
     <div class="my-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-3">
             <Button variant="outline" :disabled="busy || selected" @click="refresh">{{ busy ? 'Memuat…' : 'Muat ulang' }}</Button>
-            <label class="flex items-center gap-2 text-sm"><input v-model="auto" type="checkbox" class="size-4" />Perbarui otomatis setiap 30 detik</label>
+            <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="auto" />Perbarui otomatis setiap 30 detik</label>
         </div>
         <p class="text-xs text-muted-foreground">Terakhir diperbarui: {{ date(updatedAt) }}</p>
     </div>
@@ -255,14 +259,14 @@ onUnmounted(() => clearInterval(timer));
         </div>
 
         <div class="divide-y md:hidden">
-            <article v-for="attempt in attempts.data" :key="attempt.id" class="min-w-0 space-y-3 p-4">
+            <article v-for="attempt in attempts.data" :key="attempt.id" class="min-w-0 space-y-2 px-4 py-3">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0"><strong class="block break-all text-sm">{{ attempt.order_number }}</strong><p class="mt-1 text-xs text-muted-foreground">{{ date(attempt.created_at) }}</p></div>
                     <Badge variant="secondary" class="max-w-[48%] shrink-0 whitespace-normal">{{ attempt.status_label }}</Badge>
                 </div>
                 <div><p class="font-medium">{{ attempt.product_name }}</p><p class="text-sm">{{ attempt.package_name }}</p></div>
-                <p class="text-sm">{{ attempt.buyer_name }}<span v-if="attempt.buyer_phone" class="block">{{ attempt.buyer_phone }}</span></p>
-                <p v-for="(target,index) in attempt.destinations" :key="index" class="break-all text-sm">{{ target.label }}: {{ target.value }}</p>
+                <details class="lf-admin-record-details"><summary>Kontak & tujuan</summary><div class="space-y-2 py-2">                <p class="text-sm">{{ attempt.buyer_name }}<span v-if="attempt.buyer_phone" class="block">{{ attempt.buyer_phone }}</span></p>
+                <p v-for="(target,index) in attempt.destinations" :key="index" class="break-all text-sm">{{ target.label }}: {{ target.value }}</p></div></details>
                 <div class="flex flex-wrap items-end justify-between gap-3">
                     <div><p class="text-sm">{{ attempt.source }}</p><p class="text-xs text-muted-foreground">Pesanan: {{ attempt.order_status_label }}</p><p v-if="attempt.last_error" class="mt-1 text-xs text-amber-700">{{ attempt.last_error }}</p></div>
                     <Button size="sm" variant="outline" @click="openAttempt(attempt)">{{ attempt.can_complete || attempt.can_fail || attempt.can_reconcile || attempt.can_retry ? 'Tangani' : 'Lihat' }}</Button>

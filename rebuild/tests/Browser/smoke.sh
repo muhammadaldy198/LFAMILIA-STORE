@@ -7,7 +7,8 @@ SERVER_PID=""
 
 cleanup() {
   if [[ -n "${SERVER_PID}" ]]; then
-    kill "${SERVER_PID}" 2>/dev/null || true
+    kill -- "-${SERVER_PID}" 2>/dev/null || true
+    wait "${SERVER_PID}" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
@@ -19,10 +20,11 @@ if [[ -z "${CHROME_BIN}" ]]; then
 fi
 
 php artisan cache:clear >/dev/null
+php artisan storage:link >/dev/null
 
 php tests/Browser/fixture.php >/tmp/lfamilia-browser-fixture.log
 
-php artisan serve --host=127.0.0.1 --port=8000 >"${LOG_FILE}" 2>&1 &
+setsid php artisan serve --no-reload --host=127.0.0.1 --port=8000 >"${LOG_FILE}" 2>&1 &
 SERVER_PID=$!
 
 for attempt in {1..30}; do
@@ -75,5 +77,6 @@ assert_page "/catalog/browser-checkout-game" "Ringkasan pesanan" 390 844
 assert_page "/catalog/browser-checkout-game" "Pakai Voucher" 390 844
 
 node tests/Browser/responsive.mjs "$CHROME_BIN"
+node tests/Browser/admin-ui.mjs "$CHROME_BIN"
 
 echo "M11 browser smoke passed."

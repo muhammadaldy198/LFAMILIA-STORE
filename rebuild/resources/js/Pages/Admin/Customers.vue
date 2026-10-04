@@ -1,12 +1,14 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { reactive, ref } from 'vue';
+import { nextTick, reactive, ref } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 
 const props = defineProps({
     isSuperAdmin: Boolean,
@@ -68,6 +70,7 @@ function reset() {
 }
 
 function openEditor(row) {
+    nextTick(()=>document.getElementById('customer-editor')?.scrollIntoView({block:'start'}));
     editor.value = {
         ...row,
         membership_assignment: row.membership_assignment || 'AUTO',
@@ -144,7 +147,7 @@ function runCleanup() {
             <Button variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
         </header>
 
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div class="lf-admin-summary ">
             <Card class="p-4"><p class="text-xs text-muted-foreground">Total pelanggan</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.total || 0).toLocaleString('id-ID') }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Baru 30 hari</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.new_30d || 0).toLocaleString('id-ID') }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Email terverifikasi</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.verified || 0).toLocaleString('id-ID') }}</p></Card>
@@ -154,19 +157,25 @@ function runCleanup() {
         </div>
 
         <Card class="p-4">
-            <form class="grid gap-3 md:grid-cols-2 xl:grid-cols-8" @submit.prevent="search">
-                <label class="space-y-1 md:col-span-2">
+            <form class="grid grid-cols-2 gap-3 md:grid-cols-4" @submit.prevent="search"><label class="space-y-1 col-span-2">
                     <span class="text-sm font-medium">Cari pelanggan</span>
                     <Input v-model="filters.q" maxlength="100" placeholder="Nama, email, atau nomor telepon" />
                 </label>
-                <label class="space-y-1">
+<label class="space-y-1">
                     <span class="text-sm font-medium">Membership</span>
                     <select v-model="filters.tier" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                         <option value="">Semua tier</option>
                         <option v-for="tier in membershipTiers" :key="tier.code" :value="tier.code">{{ tier.code }}</option>
                     </select>
                 </label>
-                <label class="space-y-1">
+<label class="space-y-1">
+                    <span class="text-sm font-medium">Verifikasi email</span>
+                    <select v-model="filters.verification" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                        <option value="">Semua</option>
+                        <option value="verified">Terverifikasi</option>
+                        <option value="unverified">Belum terverifikasi</option>
+                    </select>
+                </label><details class="col-span-2 md:col-span-4"><summary class="cursor-pointer text-sm font-medium">Filter lanjutan</summary><div class="mt-3 grid gap-3 sm:grid-cols-2"><label class="space-y-1">
                     <span class="text-sm font-medium">Mode membership</span>
                     <select v-model="filters.membership_mode" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                         <option value="">Semua mode</option>
@@ -174,15 +183,7 @@ function runCleanup() {
                         <option value="MANUAL">Manual</option>
                     </select>
                 </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Verifikasi email</span>
-                    <select v-model="filters.verification" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                        <option value="">Semua</option>
-                        <option value="verified">Terverifikasi</option>
-                        <option value="unverified">Belum terverifikasi</option>
-                    </select>
-                </label>
-                <label class="space-y-1">
+<label class="space-y-1">
                     <span class="text-sm font-medium">Aktivitas</span>
                     <select v-model="filters.activity" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                         <option value="">Semua</option>
@@ -190,7 +191,7 @@ function runCleanup() {
                         <option value="inactive_30d">Tidak aktif 30 hari</option>
                     </select>
                 </label>
-                <label class="space-y-1">
+<label class="space-y-1">
                     <span class="text-sm font-medium">Pesanan</span>
                     <select v-model="filters.orders" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                         <option value="">Semua</option>
@@ -198,7 +199,7 @@ function runCleanup() {
                         <option value="without_orders">Belum pernah memesan</option>
                     </select>
                 </label>
-                <label class="space-y-1">
+<label class="space-y-1">
                     <span class="text-sm font-medium">Baris</span>
                     <select v-model.number="filters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                         <option :value="10">10</option>
@@ -206,17 +207,12 @@ function runCleanup() {
                         <option :value="50">50</option>
                         <option :value="100">100</option>
                     </select>
-                </label>
-                <div class="flex flex-wrap gap-2 md:col-span-2 xl:col-span-8">
-                    <Button type="submit" size="sm">Terapkan</Button>
-                    <Button type="button" size="sm" variant="outline" @click="reset">Reset</Button>
-                </div>
-            </form>
+                </label></div></details><div class="col-span-2 flex gap-2 md:col-span-4"><Button type="submit" size="sm">Terapkan</Button><Button type="button" size="sm" variant="outline" @click="reset">Hapus filter</Button></div></form>
         </Card>
 
         <Card class="min-w-0 p-4">
             <div class="overflow-x-auto">
-                <Table>
+                <AdminResponsiveTable :mobile-columns="[0,1,2,4,6,7]">
                     <TableHeader>
                         <TableRow>
                             <TableHead>Pelanggan</TableHead>
@@ -270,7 +266,7 @@ function runCleanup() {
                             <TableCell colspan="8" class="py-10 text-center text-muted-foreground">Tidak ada pelanggan sesuai filter.</TableCell>
                         </TableRow>
                     </TableBody>
-                </Table>
+                </AdminResponsiveTable>
             </div>
 
             <div v-if="customers.links?.length > 3" class="mt-4 flex flex-wrap gap-1">
@@ -289,7 +285,7 @@ function runCleanup() {
             </div>
         </Card>
 
-        <Card v-if="editor && isSuperAdmin" class="p-4">
+        <Card v-if="editor && isSuperAdmin" id="customer-editor" class="p-4">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 class="text-lg font-semibold">Atur pelanggan · {{ editor.name }}</h2>
@@ -336,7 +332,7 @@ function runCleanup() {
                 <Badge variant="outline">Super Admin</Badge>
             </div>
             <div class="mt-4 flex flex-wrap items-end gap-3">
-                <label class="flex items-center gap-2 text-sm"><input v-model="cleanup.enabled" type="checkbox" class="size-4">Jalankan otomatis setiap hari</label>
+                <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="cleanup.enabled" />Jalankan otomatis setiap hari</label>
                 <label class="space-y-1"><span class="text-sm font-medium">Tidak aktif selama</span><div class="flex items-center gap-2"><Input v-model.number="cleanup.inactivity_days" type="number" min="7" max="365" class="w-28" /><span class="text-sm">hari</span></div></label>
                 <Button size="sm" @click="saveCleanup">Simpan pengaturan</Button>
                 <Button size="sm" variant="outline" @click="runCleanup">Jalankan sekarang</Button>

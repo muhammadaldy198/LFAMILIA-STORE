@@ -1,10 +1,12 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 
 const props = defineProps({
     gameCodes: { type: Array, default: () => [] },
@@ -335,18 +337,18 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
 
     <section class="overflow-hidden rounded-lg border border-[#e1e6ed] bg-white">
         <header class="border-b border-[#edf0f4] px-4 pt-3">
-            <div class="flex gap-1 overflow-x-auto">
+            <nav class="lf-admin-tabs" aria-label="Validasi akun">
                 <Button
                     v-for="item in [['game','Cek Game'],['region','Cek Region'],['pln','PLN'],['codes','Kode Game']]"
                     :key="item[0]"
                     type="button"
-                    class="h-9 shrink-0 rounded-t-md px-3 text-sm font-bold transition"
-                    :class="tab===item[0] ? 'bg-[#1769e8] text-white' : 'text-[#62728a] hover:bg-[#f5f7fa]'"
+                    class="shrink-0"
+                    :variant="tab===item[0] ? 'secondary' : 'ghost'"
                     @click="selectTab(item[0])"
                 >
                     {{ item[1] }}
                 </Button>
-            </div>
+            </nav>
         </header>
 
         <div v-if="tab!=='codes'" class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -432,7 +434,7 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                     <p class="mt-1 text-xs text-[#8190a5]">Game aktif tidak otomatis mendukung cek nickname. Dukungan nickname, Server / Zone, region, status, dan urutan diatur terpisah.</p>
                 </div>
                 <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-                    <Input v-model="query" placeholder="Cari game atau kode..." class="h-9 w-full text-sm sm:w-[280px]" />
+                    <Input aria-label="Cari game atau kode" v-model="query" placeholder="Cari game atau kode..." class="h-9 w-full text-sm sm:w-[280px]" />
                     <Button type="button" class="h-9 bg-[#1769e8] px-4 text-sm font-bold text-white" @click="createCode">Tambah Kode Game</Button>
                 </div>
             </div>
@@ -464,19 +466,19 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
 
                 <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
-                        <input v-model="form.supports_nickname_check" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" @change="syncNicknameSupportRules" />
+                        <AdminSwitch v-model="form.supports_nickname_check" @update:model-value="syncNicknameSupportRules" />
                         Mendukung cek nickname
                     </label>
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
-                        <input v-model="form.requires_server" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" :disabled="!form.supports_nickname_check || form.requires_region_check" />
+                        <AdminSwitch v-model="form.requires_server" :disabled="!form.supports_nickname_check || form.requires_region_check" />
                         Wajib Server / Zone
                     </label>
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
-                        <input v-model="form.requires_region_check" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" :disabled="!form.supports_nickname_check" @change="form.requires_server = form.requires_server || form.requires_region_check" />
+                        <AdminSwitch v-model="form.requires_region_check" :disabled="!form.supports_nickname_check" @update:model-value="form.requires_server = form.requires_server || form.requires_region_check" />
                         Perlu cek region
                     </label>
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
-                        <input v-model="form.is_active" type="checkbox" class="h-4 w-4 rounded border-[#cbd5e1]" />
+                        <AdminSwitch v-model="form.is_active" />
                         Aktif
                     </label>
                 </div>
@@ -490,7 +492,7 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
             </div>
 
             <div class="overflow-x-auto rounded-md border border-[#e1e6ed]">
-                <Table class="min-w-[980px] w-full text-left text-xs">
+                <AdminResponsiveTable :mobile-columns="[1,3,6,8]" class="min-w-[980px] w-full text-left text-xs">
                     <TableHeader class="bg-[#f8fafc] text-[#607089]">
                         <TableRow>
                             <TableHead class="w-[92px] px-3 py-2.5">Urutan</TableHead>
@@ -508,8 +510,8 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                         <TableRow v-for="item in filteredCodes" :key="item.id" :class="{ 'opacity-60': !item.is_active }">
                             <TableCell class="px-3 py-2.5">
                                 <div class="flex gap-1">
-                                    <Button type="button" variant="outline" class="h-7 w-7 p-0 text-xs" :disabled="reorderBusy || codes[0]?.id===item.id || query.trim()!==''" @click="moveCode(item,-1)">↑</Button>
-                                    <Button type="button" variant="outline" class="h-7 w-7 p-0 text-xs" :disabled="reorderBusy || codes[codes.length-1]?.id===item.id || query.trim()!==''" @click="moveCode(item,1)">↓</Button>
+                                    <Button type="button" variant="outline" class="h-9 w-9 p-0 text-xs" :disabled="reorderBusy || codes[0]?.id===item.id || query.trim()!==''" aria-label="Pindahkan game ke atas" @click="moveCode(item,-1)">↑</Button>
+                                    <Button type="button" variant="outline" class="h-9 w-9 p-0 text-xs" :disabled="reorderBusy || codes[codes.length-1]?.id===item.id || query.trim()!==''" aria-label="Pindahkan game ke bawah" @click="moveCode(item,1)">↓</Button>
                                 </div>
                             </TableCell>
                             <TableCell class="px-3 py-2.5 font-semibold text-[#34445f]">{{ item.name }}</TableCell>
@@ -548,7 +550,7 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                             <TableCell colspan="9" class="px-4 py-10 text-center text-sm text-[#8190a5]">Tidak ada kode game yang cocok.</TableCell>
                         </TableRow>
                     </TableBody>
-                </Table>
+                </AdminResponsiveTable>
             </div>
             <p v-if="query.trim()" class="mt-2 text-xs text-[#8b98aa]">Kosongkan pencarian untuk mengubah urutan.</p>
         </div>

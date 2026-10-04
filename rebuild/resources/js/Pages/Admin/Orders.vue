@@ -1,4 +1,5 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -71,7 +72,7 @@ onUnmounted(() => clearInterval(timer));
         <Button v-if="canCreateManual" @click="openManual">Catat pesanan manual</Button>
     </div>
     <p v-if="notice" role="status" class="mt-3 text-sm">{{ notice }}</p>
-    <div class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+    <div class="lf-admin-summary mt-5">
         <Card v-for="metric in metrics" :key="metric.label" class="min-w-0 p-4"><p class="text-sm text-muted-foreground">{{ metric.label }}</p><p class="mt-2 text-2xl font-semibold">{{ Number(metric.value).toLocaleString('id-ID') }}</p></Card>
     </div>
     <Card class="mt-5 p-4">
@@ -89,7 +90,7 @@ onUnmounted(() => clearInterval(timer));
         <p class="mt-3 text-xs text-muted-foreground">Ringkasan mengikuti filter yang diterapkan. Tanggal menggunakan waktu Indonesia Barat.</p>
     </Card>
     <div class="my-4 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-3"><Button variant="outline" @click="refresh" :disabled="busy">{{ busy ? 'Memuat…' : 'Muat ulang' }}</Button><label class="flex items-center gap-2 text-sm"><input v-model="auto" type="checkbox" class="size-4" />Perbarui otomatis setiap 30 detik</label></div>
+        <div class="flex flex-wrap items-center gap-3"><Button variant="outline" @click="refresh" :disabled="busy">{{ busy ? 'Memuat…' : 'Muat ulang' }}</Button><label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="auto" />Perbarui otomatis setiap 30 detik</label></div>
         <Button variant="outline" as-child><a :href="exportUrl">Unduh hasil filter</a></Button>
         <p class="w-full text-xs text-muted-foreground">Terakhir diperbarui: {{ date(updatedAt) }}. Pembaruan otomatis berhenti sementara saat formulir diisi atau pesanan dipilih.</p>
     </div>
@@ -104,17 +105,17 @@ onUnmounted(() => clearInterval(timer));
                     <TableCell class="break-words">{{ row.buyer_name }}<p class="mt-1 text-xs text-muted-foreground break-all">{{ row.buyer_phone || row.buyer_email || 'Kontak belum tersedia' }}</p></TableCell>
                     <TableCell class="break-words"><strong class="font-medium">{{ row.product_name }}</strong><p class="text-sm">{{ row.package_name }}</p><p v-for="(target,index) in row.destinations" :key="index" class="mt-1 text-xs text-muted-foreground break-all">{{ target.label }}: {{ target.value }}</p><p v-if="row.nickname" class="text-xs">Nama akun: {{ row.nickname }}</p></TableCell>
                     <TableCell class="break-words"><strong>{{ money(row.total_idr) }}</strong><p class="text-xs">{{ row.payment_method }}</p><p class="mt-1 text-xs text-muted-foreground">{{ row.provider }}</p></TableCell>
-                    <TableCell class="break-words"><Badge variant="secondary" class="whitespace-normal">{{ row.status_label }}</Badge><p v-if="row.needs_attention" class="mt-2 text-xs text-amber-700">Perlu perhatian</p></TableCell>
+                    <TableCell class="break-words"><Badge variant="outline" class="mb-1">{{row.paid_at?'Pembayaran diterima':'Pembayaran belum diterima'}}</Badge><Badge variant="secondary" class="whitespace-normal">{{ row.status_label }}</Badge><p v-if="row.needs_attention" class="mt-2 text-xs text-amber-700">Perlu perhatian</p></TableCell>
                     <TableCell><Button variant="outline" size="sm" as-child><Link :href="'/admin/orders/'+row.id">Lihat</Link></Button></TableCell>
                 </TableRow></TableBody>
             </Table>
         </div>
-        <div class="divide-y md:hidden"><article v-for="row in orders.data" :key="row.id" class="min-w-0 space-y-3 p-4">
-            <div class="flex items-start justify-between gap-3"><label class="flex min-w-0 items-start gap-2"><input v-model="selected" type="checkbox" :value="row.id" :aria-label="'Pilih '+row.order_number" class="mt-1 size-4 shrink-0" /><span class="break-all text-sm font-semibold">{{ row.order_number }}</span></label><Badge variant="secondary" class="shrink-0 max-w-[45%] whitespace-normal">{{ row.status_label }}</Badge></div>
-            <p class="text-xs text-muted-foreground">{{ date(row.created_at) }}</p><div class="break-words"><p class="font-medium">{{ row.product_name }}</p><p class="text-sm">{{ row.package_name }}</p></div>
-            <p class="break-words text-sm">{{ row.buyer_name }}<span v-if="row.buyer_phone" class="block">{{ row.buyer_phone }}</span></p>
-            <p v-for="(target,index) in row.destinations" :key="index" class="break-all text-sm">{{ target.label }}: {{ target.value }}</p><p v-if="row.nickname" class="text-sm">Nama akun: {{ row.nickname }}</p>
-            <div class="flex flex-wrap items-start justify-between gap-2"><div><p class="font-semibold">{{ money(row.total_idr) }}</p><p class="text-xs">{{ row.payment_method }} · {{ row.provider }}</p><p v-if="row.needs_attention" class="mt-1 text-xs text-amber-700">Perlu perhatian</p></div><div class="flex gap-2"><Button size="sm" variant="ghost" @click="copy(row.order_number)">Salin</Button><Button size="sm" variant="outline" as-child><Link :href="'/admin/orders/'+row.id">Lihat detail</Link></Button></div></div>
+        <div class="divide-y md:hidden"><article v-for="row in orders.data" :key="row.id" class="min-w-0 px-4 py-3">
+            <div class="flex items-start justify-between gap-3"><label class="flex min-w-0 items-start gap-2"><input v-model="selected" type="checkbox" :value="row.id" :aria-label="'Pilih '+row.order_number" class="size-4 shrink-0" /><span class="break-all text-sm font-semibold">{{row.order_number}}</span></label><Badge variant="secondary" class="max-w-[45%] shrink-0">{{row.status_label}}</Badge></div>
+            <div class="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2"><div class="min-w-0"><strong class="block break-words">{{row.product_name}}</strong><p class="text-xs text-muted-foreground">{{row.package_name}} · {{row.buyer_name}}</p></div><div class="text-right"><strong class="block">{{money(row.total_idr)}}</strong><span class="text-xs" :class="row.paid_at?'text-emerald-700':'text-amber-700'">{{row.paid_at?'Dibayar':'Belum diterima'}}</span></div></div>
+            <div class="mt-2 flex items-center justify-between gap-2"><time class="text-xs text-muted-foreground">{{date(row.created_at)}}</time><Button size="sm" variant="outline" as-child><Link :href="'/admin/orders/'+row.id">Detail pesanan</Link></Button></div>
+            <p v-if="row.needs_attention" class="mt-1 text-xs text-amber-700">Perlu perhatian</p>
+            <details class="lf-admin-record-details"><summary>Kontak & tujuan</summary><div class="space-y-2 py-2"><p class="break-all">{{row.buyer_phone||row.buyer_email||'Kontak belum tersedia'}}</p><p v-for="(target,index) in row.destinations" :key="index" class="break-all">{{target.label}}: {{target.value}}</p><p v-if="row.nickname">Nama akun: {{row.nickname}}</p><p class="text-xs text-muted-foreground">{{row.payment_method}} · {{row.provider}}</p><Button size="sm" variant="ghost" @click="copy(row.order_number)">Salin nomor pesanan</Button></div></details>
         </article></div>
         <p v-if="!orders.data.length" class="p-8 text-center text-sm text-muted-foreground">Tidak ada pesanan yang sesuai. Coba ubah atau hapus filter.</p>
         <div class="flex flex-wrap items-center justify-between gap-3 border-t p-4"><p class="text-sm text-muted-foreground">{{ orders.from || 0 }}–{{ orders.to || 0 }} dari {{ orders.total }} pesanan · Halaman {{ orders.current_page }} dari {{ orders.last_page }}</p><div class="flex gap-2"><Button variant="outline" size="sm" :disabled="!orders.prev_page_url || busy" @click="router.get(orders.prev_page_url, {}, { preserveState:true, preserveScroll:true, onSuccess:()=>selected=[] })">Sebelumnya</Button><Button variant="outline" size="sm" :disabled="!orders.next_page_url || busy" @click="router.get(orders.next_page_url, {}, { preserveState:true, preserveScroll:true, onSuccess:()=>selected=[] })">Berikutnya</Button></div></div>
