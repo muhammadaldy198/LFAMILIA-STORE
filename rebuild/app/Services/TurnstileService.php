@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\IntegrationCredential;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -11,6 +10,8 @@ use Illuminate\Validation\ValidationException;
 
 class TurnstileService
 {
+    public function __construct(private readonly IntegrationRuntimeConfig $runtime) {}
+
     /**
      * @return array{enabled:bool,site_key:?string}
      */
@@ -99,11 +100,8 @@ class TurnstileService
             return null;
         }
 
-        $credential = IntegrationCredential::where('code', 'turnstile')
-            ->where('is_active', true)
-            ->first();
-        $config = $credential?->config_ciphertext;
+        $resolved = $this->runtime->resolve('turnstile');
 
-        return is_array($config) ? $config : null;
+        return isset($resolved['config']) && is_array($resolved['config']) ? $resolved['config'] : null;
     }
 }
