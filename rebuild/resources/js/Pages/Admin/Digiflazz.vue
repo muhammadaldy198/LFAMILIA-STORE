@@ -247,57 +247,53 @@ function refresh() {
         </Card>
 
         <Card class="overflow-hidden">
-            <div class="grid divide-y md:hidden">
-                <article v-for="item in items.data" :key="item.id" class="min-w-0 p-4">
-                    <div class="flex min-w-0 items-start justify-between gap-3">
+            <div class="divide-y md:hidden">
+                <details v-for="item in items.data" :key="item.id" class="group">
+                    <summary class="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3">
                         <div class="min-w-0">
-                            <strong class="block break-words text-sm">{{ item.local_product_name || item.product_name }}</strong>
-                            <p class="mt-1 break-words text-sm">{{ item.local_package_name || item.product_name }}</p>
-                            <p class="mt-1 break-words text-xs text-muted-foreground">{{ item.category || 'Tanpa kategori' }} · {{ item.brand || 'Tanpa brand' }}</p>
+                            <strong class="block truncate text-sm">{{ item.local_product_name || item.product_name }}</strong>
+                            <p class="mt-0.5 truncate text-xs text-muted-foreground">{{ item.local_package_name || item.product_name }} · {{ item.buyer_sku_code }}</p>
                         </div>
-                        <Badge class="shrink-0" :variant="healthVariant(item.health)">{{ healthLabel(item.health) }}</Badge>
-                    </div>
-
-                    <div class="mt-3 grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                        <div class="min-w-0">
-                            <p class="text-xs font-medium text-muted-foreground">SKU</p>
-                            <p class="mt-1 break-all font-mono text-xs">{{ item.buyer_sku_code }}</p>
+                        <div class="text-right">
+                            <strong class="block whitespace-nowrap text-sm">{{ money(item.price_idr) }}</strong>
+                            <span class="mt-1 inline-flex items-center gap-2">
+                                <Badge :variant="healthVariant(item.health)">{{ healthLabel(item.health) }}</Badge>
+                                <span class="text-xs text-muted-foreground group-open:hidden">Detail</span>
+                                <span class="hidden text-xs text-muted-foreground group-open:inline">Tutup</span>
+                            </span>
                         </div>
-                        <div class="min-w-0">
-                            <p class="text-xs font-medium text-muted-foreground">Modal</p>
-                            <strong class="mt-1 block break-words">{{ money(item.price_idr) }}</strong>
-                            <p class="mt-1 break-words text-xs text-muted-foreground">Baseline {{ money(item.baseline_price_idr) }}</p>
+                    </summary>
+                    <div class="border-t bg-muted/10 px-4 py-3">
+                        <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                            <div class="min-w-0">
+                                <dt class="font-medium text-muted-foreground">Seller</dt>
+                                <dd class="mt-1 break-words text-sm">{{ item.seller_name || 'Seller tidak tersedia' }}</dd>
+                                <dd class="mt-0.5 text-muted-foreground">{{ item.multi ? 'Transaksi bersamaan' : 'Transaksi berurutan' }}</dd>
+                            </div>
+                            <div class="min-w-0">
+                                <dt class="font-medium text-muted-foreground">Stok / cut-off</dt>
+                                <dd class="mt-1 break-words text-sm">{{ item.unlimited_stock ? 'Tidak terbatas' : Number(item.stock).toLocaleString('id-ID') + ' tersisa' }}</dd>
+                                <dd class="mt-0.5 text-muted-foreground">{{ item.start_cut_off === item.end_cut_off ? 'Tanpa cut-off' : item.start_cut_off + '–' + item.end_cut_off + ' WIB' }}</dd>
+                            </div>
+                            <div class="min-w-0">
+                                <dt class="font-medium text-muted-foreground">Baseline</dt>
+                                <dd class="mt-1 text-sm">{{ money(item.baseline_price_idr) }}</dd>
+                                <dd v-if="Number(item.price_idr) > Number(item.baseline_price_idr)" class="mt-0.5 text-muted-foreground">Naik {{ money(Number(item.price_idr) - Number(item.baseline_price_idr)) }}</dd>
+                            </div>
+                            <div class="min-w-0">
+                                <dt class="font-medium text-muted-foreground">Status mapping</dt>
+                                <dd class="mt-1 text-sm">{{ item.mapped ? 'Terhubung' : 'Belum diimpor' }}</dd>
+                                <dd class="mt-0.5 text-muted-foreground">Produk {{ item.buyer_active ? 'aktif' : 'nonaktif' }} · Seller {{ item.seller_active ? 'aktif' : 'nonaktif' }}</dd>
+                                <dd v-if="item.mapped" class="mt-0.5 text-muted-foreground">Mapping {{ item.mapping_active ? 'aktif' : 'nonaktif' }}</dd>
+                            </div>
+                        </dl>
+                        <p v-if="item.alert_reason" class="mt-3 border-t pt-3 text-xs text-muted-foreground">{{ item.alert_reason }}</p>
+                        <div class="mt-3 flex gap-2 border-t pt-3">
+                            <Button class="flex-1" size="sm" variant="outline" :disabled="syncForm.processing" @click="sync(item.id)">Sinkron SKU</Button>
+                            <Button class="flex-1" size="sm" variant="outline" @click="baseline(item.id)">Jadikan baseline</Button>
                         </div>
-                        <div class="min-w-0">
-                            <p class="text-xs font-medium text-muted-foreground">Seller</p>
-                            <p class="mt-1 break-words">{{ item.seller_name || 'Seller tidak tersedia' }}</p>
-                            <p class="mt-1 break-words text-xs text-muted-foreground">{{ item.multi ? 'Transaksi bersamaan' : 'Transaksi berurutan' }}</p>
-                        </div>
-                        <div class="min-w-0">
-                            <p class="text-xs font-medium text-muted-foreground">Stok / cut-off</p>
-                            <p class="mt-1 break-words">{{ item.unlimited_stock ? 'Tidak terbatas' : Number(item.stock).toLocaleString('id-ID') + ' tersisa' }}</p>
-                            <p class="mt-1 break-words text-xs text-muted-foreground">{{ item.start_cut_off === item.end_cut_off ? 'Tanpa cut-off' : item.start_cut_off + '–' + item.end_cut_off + ' WIB' }}</p>
-                        </div>
                     </div>
-
-                    <div class="mt-3 rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
-                        <p v-if="item.alert_reason" class="break-words">{{ item.alert_reason }}</p>
-                        <p :class="{ 'mt-1': item.alert_reason }">Produk {{ item.buyer_active ? 'aktif' : 'nonaktif' }} · Seller {{ item.seller_active ? 'aktif' : 'nonaktif' }}</p>
-                        <p v-if="item.mapped" class="mt-1">Mapping {{ item.mapping_active ? 'aktif' : 'nonaktif' }}</p>
-                    </div>
-
-                    <div class="mt-3 flex items-center justify-between gap-3">
-                        <Badge variant="outline">{{ item.mapped ? 'Terhubung' : 'Belum diimpor' }}</Badge>
-                        <p v-if="Number(item.price_idr) > Number(item.baseline_price_idr)" class="text-right text-xs">
-                            Naik {{ money(Number(item.price_idr) - Number(item.baseline_price_idr)) }}
-                        </p>
-                    </div>
-
-                    <div class="mt-3 grid gap-2">
-                        <Button class="w-full" size="sm" variant="outline" :disabled="syncForm.processing" @click="sync(item.id)">Sinkron SKU</Button>
-                        <Button class="w-full" size="sm" variant="outline" @click="baseline(item.id)">Jadikan baseline</Button>
-                    </div>
-                </article>
+                </details>
                 <div v-if="!items.data.length" class="px-4 py-10 text-center text-sm text-muted-foreground">Tidak ada SKU yang sesuai dengan filter.</div>
             </div>
 
@@ -371,30 +367,20 @@ function refresh() {
                 <p class="mt-1 text-xs text-muted-foreground">Ringkasan operasional. Riwayat dan tindakan lengkap tetap berada di menu Pesanan dan Manual.</p>
             </div>
 
-            <div class="grid divide-y md:hidden">
-                <article v-for="row in recentTransactions" :key="row.id" class="min-w-0 p-4">
+            <div class="divide-y md:hidden">
+                <div v-for="row in recentTransactions" :key="row.id" class="px-4 py-3">
                     <div class="flex min-w-0 items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <Link :href="'/admin/orders/' + row.order_id" class="break-words font-medium underline-offset-4 hover:underline">{{ row.order_number }}</Link>
-                            <p class="mt-1 break-words text-sm">{{ row.product_name }}</p>
-                            <p class="break-words text-xs text-muted-foreground">{{ row.package_name }}</p>
+                            <Link :href="'/admin/orders/' + row.order_id" class="block truncate font-medium underline-offset-4 hover:underline">{{ row.order_number }}</Link>
+                            <p class="mt-0.5 truncate text-sm">{{ row.product_name }} · {{ row.package_name }}</p>
+                            <p class="mt-1 text-xs text-muted-foreground">{{ date(row.created_at) }}</p>
                         </div>
                         <Badge class="shrink-0" variant="secondary">{{ row.status_label }}</Badge>
                     </div>
-                    <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
-                        <div>
-                            <p class="font-medium text-muted-foreground">Waktu</p>
-                            <p class="mt-1 break-words text-foreground">{{ date(row.created_at) }}</p>
-                        </div>
-                        <div>
-                            <p class="font-medium text-muted-foreground">Provider</p>
-                            <p class="mt-1 break-words text-foreground">{{ row.provider_status || '—' }}</p>
-                        </div>
-                    </div>
-                    <div class="mt-3 rounded-md border bg-muted/20 p-3 text-sm">
-                        <p class="break-words">{{ row.message || '—' }}</p>
-                    </div>
-                </article>
+                    <p v-if="row.provider_status || row.message" class="mt-2 border-t pt-2 text-xs text-muted-foreground">
+                        {{ row.provider_status || 'Provider' }}<template v-if="row.message"> · {{ row.message }}</template>
+                    </p>
+                </div>
                 <div v-if="!recentTransactions.length" class="px-4 py-8 text-center text-sm text-muted-foreground">Belum ada transaksi Digiflazz.</div>
             </div>
 
