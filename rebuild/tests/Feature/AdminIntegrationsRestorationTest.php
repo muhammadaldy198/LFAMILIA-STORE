@@ -156,10 +156,10 @@ class AdminIntegrationsRestorationTest extends TestCase
 
         app(MidtransGateway::class)->status('ORDER-ENV-1');
 
-        Http::assertSent(fn ($request): bool =>
-            str_starts_with($request->url(), 'https://api.sandbox.midtrans.com/')
-            && $request->hasHeader('Authorization', 'Basic '.base64_encode('sandbox-key:'))
-        );
+        Http::assertSent(fn ($request): bool => str_starts_with(
+            $request->url(),
+            'https://api.sandbox.midtrans.com/'
+        ) && $request->hasHeader('Authorization', 'Basic '.base64_encode('sandbox-key:')));
     }
 
     public function test_blank_secret_preserves_selected_profile_and_explicit_clear_removes_it(): void
@@ -262,11 +262,9 @@ class AdminIntegrationsRestorationTest extends TestCase
             'max_price' => 10000,
         ]);
 
-        Http::assertSent(fn ($request): bool =>
-            $request->url() === 'https://digiflazz.fixture.test/v1/transaction'
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://digiflazz.fixture.test/v1/transaction'
             && $request['testing'] === true
-            && $request['cb_url'] === 'https://lfamilia.example.test/api/fulfillment/digiflazz/webhook'
-        );
+            && $request['cb_url'] === 'https://lfamilia.example.test/api/fulfillment/digiflazz/webhook');
     }
 
     public function test_regular_admin_cannot_read_or_mutate_integration_credentials(): void
