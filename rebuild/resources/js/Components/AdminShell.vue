@@ -22,6 +22,9 @@ const icon = href => {
 };
 let controller;
 let searchRequest = 0;
+const dismissSearch = () => { ++searchRequest;controller?.abort();results.value=[];searchError.value='';searching.value=false; };
+const outsideSearch = event => { if(event.target instanceof Element && !event.target.closest('.lf-admin-search')) dismissSearch(); };
+watch([open,accountOpen,notificationOpen], values => { if(values.some(Boolean)) dismissSearch(); });
 const search = async () => {
  const request = ++searchRequest;
  controller?.abort();
@@ -34,13 +37,13 @@ const search = async () => {
   if (!response.ok) throw new Error('Pencarian belum dapat dimuat.');
   const data = await response.json();
   if (request === searchRequest) results.value = data.results || [];
- } catch (error) { if(error.name !== 'AbortError') searchError.value = error.message; }
+ } catch (error) { if(request === searchRequest && error.name !== 'AbortError') searchError.value = error.message; }
  finally { if (request === searchRequest) searching.value = false; }
 };
-const shortcut = event => { if((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k'){event.preventDefault();searchInput.value?.focus();} if(event.key === 'Escape'){open.value=false;results.value=[];accountOpen.value=false;notificationOpen.value=false;} };
-watch(() => page.url, () => { open.value=false;results.value=[];accountOpen.value=false;notificationOpen.value=false; });
-onMounted(() => window.addEventListener('keydown', shortcut));
-onUnmounted(() => { window.removeEventListener('keydown', shortcut);controller?.abort(); });
+const shortcut = event => { if((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k'){event.preventDefault();searchInput.value?.focus();} if(event.key === 'Escape'){open.value=false;dismissSearch();accountOpen.value=false;notificationOpen.value=false;} };
+watch(() => page.url, () => { open.value=false;dismissSearch();accountOpen.value=false;notificationOpen.value=false; });
+onMounted(() => {window.addEventListener('keydown', shortcut);window.addEventListener('click', outsideSearch);});
+onUnmounted(() => { window.removeEventListener('keydown', shortcut);window.removeEventListener('click', outsideSearch);controller?.abort(); });
 </script>
 <template>
 <Head>
@@ -67,7 +70,7 @@ onUnmounted(() => { window.removeEventListener('keydown', shortcut);controller?.
  <div class="lf-admin-body">
   <header class="lf-admin-top">
    <button type="button" class="lf-admin-toggle" aria-label="Buka menu Admin" :aria-expanded="open" @click="open=true"><AdminIcon name="menu" /></button>
-   <form class="lf-admin-search" @submit.prevent="search"><AdminIcon name="search" /><input ref="searchInput" v-model="query" placeholder="Cari di Admin…" aria-label="Pencarian Admin" @input="results=[];searchError=''"><button type="submit" :disabled="searching">Cari</button><kbd>Ctrl K</kbd>
+   <form class="lf-admin-search" @submit.prevent="search"><AdminIcon name="search" /><input ref="searchInput" v-model="query" placeholder="Cari di Admin…" aria-label="Pencarian Admin" @input="dismissSearch"><button type="submit" :disabled="searching">Cari</button><kbd>Ctrl K</kbd>
     <div v-if="results.length || searchError" class="lf-admin-search-results"><p v-if="searchError" role="alert">{{ searchError }}</p><Link v-for="(result, i) in results" :key="i" :href="result.href"><strong>{{result.title}}</strong><small>{{result.detail}}</small></Link></div>
    </form>
    <div class="lf-admin-top-actions">

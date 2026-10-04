@@ -52,3 +52,14 @@ Pola yang diambil: lima tab produk, detail nominal terpisah, summary strip monit
 ## Gate per bagian
 
 Mobile: 360, 390, 412, 430px; desktop: 1024, 1280, 1440, 1920px. Gate utama 390×844, 430×932, 1024×768, 1440×900. Browser actual Laravel routes pada fixture lokal; cek overflow, nama panjang, angka besar, tab/editor/nominal/drawer, keyboard dan scroll lock. Lint, vue-tsc, build, PHPUnit MySQL 8/Redis, Pint, security scan dan CI tetap wajib. Deploy hanya sesudah gate dan mengikuti `deploy/README.md`.
+
+## Hasil verifikasi lokal
+
+- Semua kelompok menu melewati gate 390×844, 430×932, 1024×768, 1440×900 secara bertahap.
+- Audit seluruh route/tab Admin pada delapan viewport: 693 pemeriksaan lolos. Nama panjang, modal internal scroll, angka modal Rp2,599 miliar, empty state, row Detail, tab dan editor produk diuji dengan data sintetis.
+- `bash tests/Browser/smoke.sh` lolos dalam runtime PHP 8.4/MySQL 8/Redis/Chromium terisolasi; termasuk 80 pemeriksaan responsive existing dan suite Admin delapan viewport. Perubahan akhir dismiss pencarian diuji lagi pada empat viewport; label switch terukur 36 px di mobile dan dapat ditekan untuk mengubah state.
+- Laravel: 293 tes / 3.197 assertion; lint, vue-tsc, build, PHP syntax, Pint, Composer audit dan npm audit lolos. Guard staged tetap aktif untuk commit.
+- Favicon diunggah melalui form nyata, otomatis aktif, dan URL Admin sama dengan storefront. Dialog pembatalan fulfillment tidak mengirim POST.
+- Tidak ada controller, service transaksi, migration, credential production, atau dependency runtime baru di diff. Pagination server yang sudah tersedia dipertahankan; keterbatasan payload catalog existing dijelaskan di ADMIN.md.
+
+Hasil ini berasal dari fixture lokal/testing, bukan verifikasi production. Deployment wajib mengikuti runbook setelah CI hijau dan merge; koneksi Remote Desktop Commander diperlukan.

@@ -129,3 +129,21 @@ Job utama mencakup:
 Job `frontend-static` menjalankan npm install, ESLint, Vue SFC static check, dan production build.
 
 Pull request tidak boleh di-merge bila required checks gagal.
+
+## Regresi UI Admin
+
+`bash tests/Browser/smoke.sh` juga menjalankan `admin-ui.mjs` pada route Laravel aktual dengan fixture lokal/testing. Script menyiapkan storage link untuk pengujian media, mempertahankan ENV CI dengan `serve --no-reload`, dan memakai `setsid` (util-linux) agar cleanup menghentikan seluruh proses server. Matrix: 360×800, 390×844, 412×915, 430×932, 1024×768, 1280×800, 1440×900, 1920×1080.
+
+Suite memeriksa overflow halaman/kontrol, gambar rusak, tabel desktop yang terlihat di mobile, exception Vue, semua tab utama, editor produk/nominal, data pelanggan, detail pesanan/tiket, drawer full-height, focus trap dan scroll lock dialog, serta unggah favicon melalui form yang sebenarnya. Aksi keuangan/provider tidak dikirim. Fixture menolak environment selain local/testing, memakai data sintetis, mencegah HTTP eksternal, dan memalsukan queue saat seeding.
+
+Setelah app test sudah berjalan di port 8000, pemeriksaan kelompok dapat dijalankan terpisah:
+
+```bash
+node tests/Browser/admin-ui.mjs /usr/bin/chromium product
+node tests/Browser/admin-ui.mjs /usr/bin/chromium payments
+# Kelompok lain: shell, digiflazz, orders, customers, content, operations, settings.
+# Tanpa kelompok: seluruh menu pada delapan viewport.
+ADMIN_UI_SCREENSHOTS=/tmp/lfamilia-admin-shots node tests/Browser/admin-ui.mjs /usr/bin/chromium
+```
+
+Kelompok memakai empat viewport gate (390/430/1024/1440). Screenshot opsional hanya boleh menggunakan fixture sintetis. Suite menggunakan CDP pada port 9228; jalankan satu suite Admin pada satu waktu dan setelah production build selesai. Suite customer existing tetap menjadi gate terpisah.
