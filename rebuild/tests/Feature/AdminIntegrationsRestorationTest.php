@@ -156,10 +156,8 @@ class AdminIntegrationsRestorationTest extends TestCase
 
         app(MidtransGateway::class)->status('ORDER-ENV-1');
 
-        Http::assertSent(fn ($request): bool => str_starts_with(
-            $request->url(),
-            'https://api.sandbox.midtrans.com/'
-        ) && $request->hasHeader('Authorization', 'Basic '.base64_encode('sandbox-key:')));
+        Http::assertSent(fn ($request): bool => str_starts_with($request->url(), 'https://api.sandbox.midtrans.com/')
+            && $request->hasHeader('Authorization', 'Basic '.base64_encode('sandbox-key:')));
     }
 
     public function test_blank_secret_preserves_selected_profile_and_explicit_clear_removes_it(): void
