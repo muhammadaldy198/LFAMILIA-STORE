@@ -16,18 +16,50 @@ const props = defineProps({
 const selectedCode = ref(props.integrations[0]?.code || '');
 const copiedCallback = ref('');
 
-const toItem = (item) => ({
-    ...item,
-    result: null,
-    busy: false,
-    reveal_password: '',
-    config: Object.fromEntries(
-        item.fields.map((field) => [
+const editableProfile = (profile = {}) => {
+    const fields = (profile.fields || []).map((field) => ({ ...field }));
+
+    return {
+        fields,
+        config: Object.fromEntries(fields.map((field) => [
             field.key,
             field.value ?? (field.type === 'boolean' ? false : ''),
-        ]),
-    ),
-});
+        ])),
+        clear_secrets: [],
+        required_total: profile.required_total ?? 0,
+        configured_required: profile.configured_required ?? 0,
+        required_complete: Boolean(profile.required_complete),
+    };
+};
+
+const toItem = (item) => {
+    const profileCache = {};
+    Object.entries(item.environment_profiles || {}).forEach(([environment, profile]) => {
+        profileCache[environment] = editableProfile(profile);
+    });
+
+    const selected = item.environment && profileCache[item.environment]
+        ? profileCache[item.environment]
+        : editableProfile({
+            fields: item.fields,
+            required_total: item.required_total,
+            configured_required: item.configured_required,
+            required_complete: item.required_complete,
+        });
+
+    return {
+        ...item,
+        result: null,
+        busy: false,
+        profile_cache: profileCache,
+        fields: selected.fields,
+        config: selected.config,
+        clear_secrets: selected.clear_secrets,
+        required_total: selected.required_total,
+        configured_required: selected.configured_required,
+        required_complete: selected.required_complete,
+    };
+};
 
 const items = reactive(props.integrations.map(toItem));
 
@@ -65,6 +97,49 @@ const testedAt = (value) => {
     return 'Terakhir dites ' + date.toLocaleString('id-ID');
 };
 
+const selectedEnvironment = (item) => item.environment_options?.find(
+    (option) => option.value === item.environment,
+) || null;
+
+function switchEnvironment(item, event) {
+    const next = event.target.value;
+    if (!next || next === item.environment) return;
+
+    if (item.credential_scope === 'per_environment') {
+        item.profile_cache[item.environment] = {
+            fields: item.fields,
+            config: { ...item.config },
+            clear_secrets: [...item.clear_secrets],
+            required_total: item.required_total,
+            configured_required: item.configured_required,
+            required_complete: item.required_complete,
+        };
+
+        const target = item.profile_cache[next];
+        if (target) {
+            item.fields = target.fields.map((field) => ({ ...field }));
+            item.config = { ...target.config };
+            item.clear_secrets = [...target.clear_secrets];
+            item.required_total = target.required_total;
+            item.configured_required = target.configured_required;
+            item.required_complete = target.required_complete;
+        }
+    }
+
+    item.environment = next;
+    item.result = null;
+}
+
+function toggleClearSecret(item, key) {
+    const index = item.clear_secrets.indexOf(key);
+    if (index >= 0) {
+        item.clear_secrets.splice(index, 1);
+    } else {
+        item.clear_secrets.push(key);
+        item.config[key] = '';
+    }
+}
+
 async function copyCallback(key, value) {
     if (!value) return;
     try {
@@ -81,49 +156,10 @@ async function copyCallback(key, value) {
 function save(item) {
     router.put('/admin/integrations/' + encodeURIComponent(item.code), {
         is_active: Boolean(item.is_active),
+        environment: item.environment,
         config: item.config,
+        clear_secrets: item.clear_secrets,
     }, { preserveScroll: true });
-}
-
-async function reveal(item, field) {
-    if (item.busy) return;
-    item.busy = true;
-
-    try {
-        const response = await fetch(
-            '/admin/integrations/' + encodeURIComponent(item.code) + '/reveal/' + encodeURIComponent(field.key),
-            {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-XSRF-TOKEN': csrf(),
-                },
-                body: JSON.stringify({ password: item.reveal_password }),
-            },
-        );
-        const data = await response.json().catch(() => ({}));
-
-        if (response.ok) {
-            item.config[field.key] = data.value || '';
-            field.revealed = true;
-            item.reveal_password = '';
-            item.result = {
-                status: 'OK',
-                message: 'Kredensial ditampilkan setelah verifikasi password.',
-            };
-        } else {
-            item.result = {
-                status: 'DOWN',
-                message: data.errors?.password?.[0] || data.message || 'Kredensial tidak dapat ditampilkan.',
-            };
-        }
-    } catch {
-        item.result = { status: 'DOWN', message: 'Koneksi terputus. Coba lagi.' };
-    } finally {
-        item.busy = false;
-    }
 }
 
 async function testConnection(item) {
@@ -167,7 +203,7 @@ async function testConnection(item) {
                 <div>
                     <h1 class="text-2xl font-semibold">Integrasi</h1>
                     <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                        Kelola koneksi layanan eksternal dari satu tempat. Kredensial rahasia disimpan terenkripsi dan tidak ditanam di repo.
+                        Kelola provider, environment, dan credential dari satu tempat. Secret disimpan terenkripsi dan tidak pernah dikirim kembali ke browser.
                     </p>
                 </div>
                 <Button variant="outline" as-child>
@@ -193,7 +229,7 @@ async function testConnection(item) {
                     <p class="mt-2 text-2xl font-semibold">{{ attentionCount }}</p>
                 </Card>
                 <Card class="col-span-2 p-4 md:col-span-1">
-                    <p class="text-xs text-muted-foreground">Field wajib lengkap</p>
+                    <p class="text-xs text-muted-foreground">Credential wajib lengkap</p>
                     <p class="mt-2 text-2xl font-semibold">{{ completeCount }}/{{ items.length }}</p>
                 </Card>
             </div>
@@ -202,7 +238,7 @@ async function testConnection(item) {
                 <div>
                     <h2 class="text-lg font-semibold">Callback & Redirect</h2>
                     <p class="mt-1 text-sm text-muted-foreground">
-                        Gunakan alamat berikut pada dashboard provider terkait. Nilai mengikuti alamat aplikasi saat ini dan tidak berisi kredensial.
+                        URL ini berasal dari alamat aplikasi canonical. Endpoint callback adalah bagian protocol aplikasi dan tidak dapat diedit dari panel.
                     </p>
                 </div>
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
@@ -251,15 +287,25 @@ async function testConnection(item) {
                         <div class="flex flex-wrap items-center gap-2">
                             <h2 class="text-xl font-semibold">{{ item.name }}</h2>
                             <Badge variant="outline">{{ item.group }}</Badge>
-                            <Badge :variant="statusVariant(item.health?.status)">
-                                {{ statusLabel(item.health?.status) }}
+                            <Badge :variant="item.is_active ? 'secondary' : 'outline'">
+                                {{ item.is_active ? 'Aktif' : 'Nonaktif' }}
+                            </Badge>
+                            <Badge
+                                v-if="selectedEnvironment(item)"
+                                :variant="selectedEnvironment(item)?.live ? 'destructive' : 'outline'"
+                            >
+                                {{ selectedEnvironment(item)?.label }}
+                            </Badge>
+                            <Badge variant="outline">{{ item.credential_status }}</Badge>
+                            <Badge :variant="item.readiness?.status === 'READY' ? 'secondary' : 'outline'">
+                                {{ item.readiness?.label }}
                             </Badge>
                         </div>
                         <p v-if="item.description" class="mt-2 text-sm text-muted-foreground">
                             {{ item.description }}
                         </p>
                         <p class="mt-1 text-xs text-muted-foreground">
-                            {{ item.configured_required }}/{{ item.required_total }} field wajib tersimpan ·
+                            {{ item.configured_required }}/{{ item.required_total }} credential wajib tersimpan ·
                             {{ testedAt(item.health?.tested_at) }}
                         </p>
                     </div>
@@ -268,6 +314,44 @@ async function testConnection(item) {
                         <input v-model="item.is_active" type="checkbox" class="size-4">
                         Integrasi aktif
                     </label>
+                </div>
+
+                <div
+                    v-if="item.environment_options?.length"
+                    class="mt-5 grid gap-3 rounded-md border p-4 md:grid-cols-[minmax(0,260px)_1fr]"
+                >
+                    <label class="space-y-1.5">
+                        <span class="text-sm font-medium">Environment</span>
+                        <select
+                            :value="item.environment"
+                            class="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                            @change="switchEnvironment(item, $event)"
+                        >
+                            <option
+                                v-for="option in item.environment_options"
+                                :key="option.value"
+                                :value="option.value"
+                            >
+                                {{ option.label }}
+                            </option>
+                        </select>
+                    </label>
+                    <div class="text-sm text-muted-foreground">
+                        <p>{{ selectedEnvironment(item)?.description }}</p>
+                        <p v-if="item.credential_scope === 'per_environment'" class="mt-1">
+                            Credential environment ini terisolasi. Backend tidak akan memakai credential environment lain sebagai fallback.
+                        </p>
+                        <p v-else class="mt-1">
+                            Credential akun dipakai bersama; mode request mengikuti environment yang dipilih.
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    v-else-if="item.environment_note"
+                    class="mt-4 rounded-md border p-3 text-sm text-muted-foreground"
+                >
+                    {{ item.environment_note }}
                 </div>
 
                 <div
@@ -283,16 +367,19 @@ async function testConnection(item) {
                             <span class="flex flex-wrap items-center gap-2 text-sm font-medium">
                                 {{ field.label }}
                                 <span v-if="field.required" class="text-xs text-destructive">Wajib</span>
-                                <Badge v-if="field.secret && field.configured" variant="outline">Tersimpan</Badge>
+                                <Badge v-if="field.secret && field.configured" variant="outline">
+                                    {{ item.clear_secrets.includes(field.key) ? 'Akan dihapus' : 'Tersimpan' }}
+                                </Badge>
                             </span>
 
-                            <div class="flex gap-2">
+                            <div class="flex flex-wrap gap-2">
                                 <Input
                                     v-model="item.config[field.key]"
-                                    :type="field.secret && !field.revealed ? 'password' : 'text'"
-                                    :autocomplete="field.secret ? 'off' : undefined"
+                                    :type="field.secret ? 'password' : 'text'"
+                                    :autocomplete="field.secret ? 'new-password' : undefined"
+                                    :disabled="field.secret && item.clear_secrets.includes(field.key)"
                                     :placeholder="field.secret && field.configured
-                                        ? 'Kosongkan jika tidak ingin mengubah'
+                                        ? 'Kosong = pertahankan, isi = ganti'
                                         : ''"
                                     class="min-w-0 flex-1"
                                 />
@@ -300,10 +387,9 @@ async function testConnection(item) {
                                     v-if="field.secret && field.configured"
                                     type="button"
                                     variant="outline"
-                                    :disabled="item.busy || !item.reveal_password"
-                                    @click="reveal(item, field)"
+                                    @click="toggleClearSecret(item, field.key)"
                                 >
-                                    Tampilkan
+                                    {{ item.clear_secrets.includes(field.key) ? 'Batalkan hapus' : 'Hapus credential' }}
                                 </Button>
                             </div>
 
@@ -325,24 +411,6 @@ async function testConnection(item) {
                             <input v-model="item.config[field.key]" type="checkbox" class="mt-1 size-4">
                         </label>
                     </template>
-                </div>
-
-                <div
-                    v-if="item.fields.some((field) => field.secret && field.configured)"
-                    class="mt-5 max-w-lg rounded-md border p-3"
-                >
-                    <label class="space-y-1.5">
-                        <span class="text-sm font-medium">Password Super Admin</span>
-                        <Input
-                            v-model="item.reveal_password"
-                            type="password"
-                            autocomplete="current-password"
-                            placeholder="Diperlukan hanya untuk melihat kredensial tersimpan"
-                        />
-                        <span class="block text-xs text-muted-foreground">
-                            Menampilkan kredensial dicatat ke Audit Log. Password tidak disimpan bersama konfigurasi.
-                        </span>
-                    </label>
                 </div>
 
                 <div class="mt-5 flex flex-wrap gap-2">
