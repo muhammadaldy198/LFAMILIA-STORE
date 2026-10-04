@@ -19,7 +19,7 @@ class IntegrationConnectionService
                 'digiflazz' => $this->digiflazz($config),
                 'resend' => $this->resend($config),
                 'midtrans' => $this->midtrans($config, $environment),
-                'telegram' => $this->telegram($config),
+                'telegram' => $this->telegram($config, $environment),
                 'discord' => $this->discord($config),
                 default => ['status' => 'DEGRADED', 'message' => 'Konfigurasi tersimpan, tetapi integrasi ini tidak memiliki probe non-transaksional universal.'],
             };
@@ -75,14 +75,17 @@ class IntegrationConnectionService
             : ['status' => 'HEALTHY', 'message' => 'Credential Midtrans diterima endpoint status.'];
     }
 
-    private function telegram(array $config): array
+    private function telegram(array $config, ?string $environment): array
     {
         $token = trim((string) ($config['bot_token'] ?? ''));
         if ($token === '') {
             return ['status' => 'NOT_CONFIGURED', 'message' => 'Bot token belum diisi.'];
         }
+        if (! in_array($environment, ['test', 'production'], true)) {
+            return ['status' => 'NOT_CONFIGURED', 'message' => 'Environment Telegram belum valid.'];
+        }
         $response = Http::acceptJson()->timeout(8)
-            ->get('https://api.telegram.org/bot'.rawurlencode($token).'/getMe');
+            ->get($this->runtime->telegramBotBase((string) $environment, $token).'/getMe');
 
         return $response->successful() && $response->json('ok') === true
             ? ['status' => 'HEALTHY', 'message' => 'Bot Telegram terverifikasi.']
