@@ -1,4 +1,5 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
@@ -47,7 +48,7 @@ const restoreTypography = () => {
    <div class="lf-admin-typography-grid"><div><h2>Mobile</h2><label v-for="[key, field] in Object.entries(fields)" :key="key">{{ field.label }}<Input v-model.number="form.typography.mobile[key]" type="number" :min="field.min" :max="field.max" :step="field.step || 1" required /></label></div><div><h2>Desktop</h2><label v-for="[key, field] in Object.entries(fields)" :key="key">{{ field.label }}<Input v-model.number="form.typography.desktop[key]" type="number" :min="field.min" :max="field.max" :step="field.step || 1" required /></label></div></div>
    <Button type="button" class="lf-admin-button" @click="restoreTypography">Kembalikan ukuran bawaan</Button>
   </section>
-  <section v-else><h2>Bagian Homepage</h2><label v-for="[key, label] in Object.entries(sections)" :key="key" class="lf-admin-switch-field"><input v-model="form.sections[key]" type="checkbox">{{ label }}</label><p class="lf-admin-note">Banner dan pop-up memiliki tombol aktif masing-masing di Banner & Konten.</p></section>
+  <section v-else><h2>Bagian Homepage</h2><label v-for="[key, label] in Object.entries(sections)" :key="key" class="lf-admin-switch-field"><AdminSwitch v-model="form.sections[key]" />{{ label }}</label><p class="lf-admin-note">Banner dan pop-up memiliki tombol aktif masing-masing di Banner & Konten.</p></section>
   <div class="lf-admin-save-bar"><Button class="lf-admin-primary" :disabled="form.processing">{{ form.processing ? 'Menyimpan…' : 'Simpan Perubahan' }}</Button><a href="/" target="_blank" rel="noreferrer" class="lf-admin-button">Lihat Toko</a></div>
  </form>
 </AdminShell>

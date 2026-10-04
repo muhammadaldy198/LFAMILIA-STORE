@@ -1,33 +1,34 @@
 <script setup>
+import { computed, onUnmounted, ref } from 'vue';
 import { mediaRecommendation } from '../Composables/mediaRecommendations';
 import { router, useForm, usePage } from '@inertiajs/vue3';
-
+import { Button } from './ui/button';
+import AdminIcon from './AdminIcon.vue';
 const props = defineProps({ type: String, assetKey: String, id: Number, collection: { type: String, default: 'image' }, url: String });
 const page = usePage();
 const base = page.props.adminPanel?.base_path || '/admin';
 const form = useForm({ image: null, collection: props.collection });
-const collectionLabel = () => ({
-    image: '',
-    banner: 'banner',
-    desktop: 'desktop',
-    mobile: 'mobile',
-}[props.collection] || props.collection);
-const upload = () => form.post(base + '/catalog/media/' + props.type + '/' + props.id, { forceFormData: true, onSuccess: () => form.reset('image') });
-const remove = () => router.delete(base + '/catalog/media/' + props.type + '/' + props.id, { data: { collection: props.collection } });
+const fileInput = ref(null), preview = ref('');
+const wide = computed(() => ['banner','news','popup'].includes(props.type) || ['banner','desktop','mobile'].includes(props.collection) || props.assetKey?.includes('banner'));
+const selectImage = event => {
+    if (preview.value) URL.revokeObjectURL(preview.value);
+    form.image = event.target.files?.[0] || null;
+    preview.value = form.image ? URL.createObjectURL(form.image) : '';
+};
+const resetImage = () => { form.reset('image'); if (fileInput.value) fileInput.value.value = ''; if (preview.value) URL.revokeObjectURL(preview.value); preview.value = ''; };
+const upload = () => form.post(base + '/catalog/media/' + props.type + '/' + props.id, { forceFormData: true, preserveScroll: true, onSuccess: resetImage });
+const remove = () => { if (window.confirm('Hapus gambar ini dari toko?')) router.delete(base + '/catalog/media/' + props.type + '/' + props.id, { data: { collection: props.collection }, preserveScroll: true }); };
+onUnmounted(() => { if (preview.value) URL.revokeObjectURL(preview.value); });
 </script>
-
 <template>
-    <div class="space-y-2 rounded-md border border-slate-800 p-3">
-        <p class="text-sm text-slate-400">Gambar {{ collectionLabel() }}</p>
+    <div class="space-y-3">
+        <div class="lf-admin-media-preview" :data-wide="wide"><img v-if="preview || url" :src="preview || url" alt="Pratinjau gambar"><AdminIcon v-else name="content" class="size-6 text-muted-foreground" /></div>
         <p class="lf-admin-note">{{ mediaRecommendation(type, collection, assetKey || '') }}</p>
-        <img v-if="url" :src="url" alt="Gambar saat ini" class="h-20 max-w-full rounded object-contain">
         <form class="flex flex-wrap items-end gap-2" @submit.prevent="upload">
-            <label class="text-sm">Unggah JPEG/PNG/WebP (maks. 5 MB)
-                <input type="file" accept="image/jpeg,image/png,image/webp" required class="mt-1 block max-w-56 text-xs" @input="form.image = $event.target.files[0]">
-            </label>
-            <button :disabled="form.processing" class="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">Unggah</button>
+            <label class="lf-admin-field min-w-0 flex-1"><span>Gambar JPEG/PNG/WebP · maks. 5 MB</span><input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" required :disabled="form.processing" class="block w-full min-w-0 text-sm" @change="selectImage"></label>
+            <Button :disabled="form.processing || !form.image">{{form.processing?'Mengunggah…':'Unggah gambar'}}</Button>
         </form>
-        <span v-if="form.errors.image" class="text-sm text-red-300">{{ form.errors.image }}</span>
-        <button v-if="url" type="button" class="text-sm text-red-300 underline" @click="remove">Hapus gambar</button>
+        <p v-if="form.errors.image" role="alert" class="text-sm text-destructive">{{ form.errors.image }}</p>
+        <Button v-if="url" type="button" variant="outline" :disabled="form.processing" @click="remove">Hapus gambar</Button>
     </div>
 </template>

@@ -37,7 +37,7 @@ export default defineComponent({
             return h('div', { class: 'lf-admin-record-list' }, rows.map((row, rowIndex) => {
                 const cells = children(row);
                 if (cells.length === 1 && Number(cells[0].props?.colspan) > 1) {
-                    return h('p', { class: 'lf-admin-empty', key: row.key ?? rowIndex }, children(cells[0]));
+                    return h('div', { class: 'lf-admin-empty', key: row.key ?? rowIndex }, children(cells[0]));
                 }
                 const priority = props.mobileColumns.filter(index => cells[index]);
                 const secondary = cells.map((cell, index) => ({ cell, index })).filter(({ index }) => !priority.includes(index));
