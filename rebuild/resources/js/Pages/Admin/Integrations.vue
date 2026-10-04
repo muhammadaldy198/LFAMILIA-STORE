@@ -1,4 +1,5 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -232,7 +233,7 @@ async function testConnection(item) {
                 </Button>
             </header>
 
-            <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <div class="lf-admin-summary ">
                 <Card class="p-4">
                     <p class="text-xs text-muted-foreground">Total integrasi</p>
                     <p class="mt-2 text-2xl font-semibold">{{ summary.total ?? items.length }}</p>
@@ -255,18 +256,16 @@ async function testConnection(item) {
                 </Card>
             </div>
 
-            <Card class="p-4">
-                <div>
-                    <h2 class="text-lg font-semibold">Callback & Redirect</h2>
+            <Card class="p-4"><details>
+                    <summary class="cursor-pointer font-semibold">Callback & Redirect</summary>
                     <p class="mt-1 text-sm text-muted-foreground">
                         URL ini berasal dari alamat aplikasi canonical. Endpoint callback adalah bagian protocol aplikasi dan tidak dapat diedit dari panel.
                     </p>
-                </div>
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
                     <div
                         v-for="(value, key) in callbackUrls"
                         :key="key"
-                        class="rounded-md border p-3"
+                        class="p-3"
                     >
                         <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             {{ key === 'midtrans' ? 'Midtrans Notification'
@@ -282,9 +281,9 @@ async function testConnection(item) {
                         </div>
                     </div>
                 </div>
-            </Card>
+            </details></Card>
 
-            <nav class="flex max-w-full gap-1 overflow-x-auto rounded-lg border p-1" aria-label="Daftar integrasi">
+            <nav class="lf-admin-tabs" aria-label="Daftar integrasi">
                 <Button
                     v-for="item in items"
                     :key="item.code"
@@ -332,31 +331,31 @@ async function testConnection(item) {
                     </div>
 
                     <label class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium">
-                        <input v-model="item.is_active" type="checkbox" class="size-4">
+                        <AdminSwitch v-model="item.is_active" />
                         Integrasi aktif
                     </label>
                 </div>
 
-                <div class="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    <div class="rounded-md border p-3">
+                <div class="lf-admin-readiness mt-5">
+                    <div class="p-3">
                         <p class="text-xs text-muted-foreground">Credential</p>
                         <p class="mt-1 text-sm font-medium">
-                            {{ item.required_complete ? 'Configured' : 'Credential Missing' }}
+                            {{ item.required_complete ? 'Tersimpan lengkap' : 'Belum lengkap' }}
                         </p>
                     </div>
-                    <div class="rounded-md border p-3">
-                        <p class="text-xs text-muted-foreground">Connection</p>
+                    <div class="p-3">
+                        <p class="text-xs text-muted-foreground">Koneksi</p>
                         <p class="mt-1 text-sm font-medium">
                             {{ item.connection?.label || statusLabel(item.health?.status) }}
                         </p>
                     </div>
-                    <div class="rounded-md border p-3">
+                    <div class="p-3">
                         <p class="text-xs text-muted-foreground">Callback</p>
                         <p class="mt-1 text-sm font-medium">
                             {{ item.callback?.label || 'Belum diketahui' }}
                         </p>
                     </div>
-                    <div class="rounded-md border p-3">
+                    <div class="p-3">
                         <p class="text-xs text-muted-foreground">E2E</p>
                         <p class="mt-1 text-sm font-medium">{{ item.e2e?.label || 'DEFERRED TO TAHAP 9' }}</p>
                     </div>
@@ -367,7 +366,7 @@ async function testConnection(item) {
                     class="mt-5 grid gap-3 rounded-md border p-4 md:grid-cols-[minmax(0,260px)_1fr]"
                 >
                     <label class="space-y-1.5">
-                        <span class="text-sm font-medium">Environment</span>
+                        <span class="text-sm font-medium">Lingkungan</span>
                         <select
                             :value="item.environment"
                             class="h-9 w-full rounded-md border bg-background px-3 text-sm"
@@ -383,6 +382,7 @@ async function testConnection(item) {
                         </select>
                     </label>
                     <div class="text-sm text-muted-foreground">
+                        <p v-if="selectedEnvironment(item)?.live" role="status" class="mb-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 font-medium text-destructive">Mode Production aktif. Pastikan kredensial yang disimpan ditujukan untuk layanan produksi.</p>
                         <p>{{ selectedEnvironment(item)?.description }}</p>
                         <p v-if="item.credential_scope === 'per_environment'" class="mt-1">
                             Credential environment ini terisolasi. Backend tidak akan memakai credential environment lain sebagai fallback.
@@ -454,7 +454,7 @@ async function testConnection(item) {
                                     {{ field.help }}
                                 </span>
                             </span>
-                            <input v-model="item.config[field.key]" type="checkbox" class="mt-1 size-4">
+                            <AdminSwitch v-model="item.config[field.key]" />
                         </label>
                     </template>
                 </div>

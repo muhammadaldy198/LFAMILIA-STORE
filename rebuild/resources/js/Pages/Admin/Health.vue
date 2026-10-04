@@ -1,11 +1,12 @@
 <script setup>
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../Components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../Components/ui/table';
 
 const props = defineProps({
     summary: { type: Object, default: () => ({}) },
@@ -88,7 +89,7 @@ function refresh() {
                 </div>
             </header>
 
-            <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <div class="lf-admin-summary ">
                 <Card class="p-4">
                     <p class="text-xs text-muted-foreground">Komponen normal</p>
                     <p class="mt-2 text-2xl font-semibold">{{ summary.healthy_core ?? 0 }}/{{ summary.core_total ?? checks.length }}</p>
@@ -144,7 +145,7 @@ function refresh() {
                 </div>
 
                 <div class="mt-4 overflow-x-auto rounded-md border">
-                    <Table class="min-w-[760px]">
+                    <AdminResponsiveTable :mobile-columns="[0,2,3]" class="min-w-[760px]">
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Integrasi</TableHead>
@@ -168,7 +169,7 @@ function refresh() {
                                 <TableCell class="max-w-sm text-xs text-muted-foreground">{{ item.message }}</TableCell>
                             </TableRow>
                         </TableBody>
-                    </Table>
+                    </AdminResponsiveTable>
                 </div>
             </Card>
 
@@ -181,7 +182,7 @@ function refresh() {
                         </p>
                     </div>
                     <div class="mt-4 overflow-x-auto rounded-md border">
-                        <Table class="min-w-[560px]">
+                        <AdminResponsiveTable :mobile-columns="[0,1,2]" class="min-w-[560px]">
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Gateway</TableHead>
@@ -206,7 +207,7 @@ function refresh() {
                                     </TableCell>
                                 </TableRow>
                             </TableBody>
-                        </Table>
+                        </AdminResponsiveTable>
                     </div>
                 </Card>
 

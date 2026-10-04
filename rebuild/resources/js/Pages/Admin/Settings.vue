@@ -1,4 +1,5 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -69,7 +70,7 @@ function saveTier(tier) {
             <Button variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
         </header>
 
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div class="lf-admin-summary ">
             <Card class="p-4">
                 <p class="text-xs text-muted-foreground">Tier aktif</p>
                 <p class="mt-2 text-2xl font-semibold">{{ summary.active_tiers || 0 }}/{{ summary.total_tiers || 0 }}</p>
@@ -88,7 +89,7 @@ function saveTier(tier) {
             </Card>
         </div>
 
-        <nav class="flex max-w-full gap-1 overflow-x-auto rounded-lg border p-1">
+        <nav class="lf-admin-tabs">
             <Button type="button" :variant="tab === 'store' ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = 'store'">Toko & Kontak</Button>
             <Button type="button" :variant="tab === 'membership' ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = 'membership'">Membership</Button>
             <Button v-if="canExport" type="button" :variant="tab === 'export' ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = 'export'">Ekspor</Button>
@@ -199,7 +200,7 @@ function saveTier(tier) {
                 </div>
             </Card>
 
-            <div class="grid gap-4 xl:grid-cols-2">
+            <div class="lf-admin-summary ">
                 <Card v-for="tier in tiers" :key="tier.code" class="p-4">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -212,7 +213,7 @@ function saveTier(tier) {
                             </p>
                         </div>
                         <label class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-                            <input v-model="tier.is_active" type="checkbox" class="size-4">
+                            <AdminSwitch v-model="tier.is_active" />
                             Aktif
                         </label>
                     </div>

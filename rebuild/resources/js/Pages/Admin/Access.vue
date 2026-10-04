@@ -1,12 +1,14 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { computed, reactive, ref } from 'vue';
+import { computed, nextTick, reactive, ref } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 
 const props = defineProps({
     admins: { type: Object, default: () => ({ data: [], links: [] }) },
@@ -78,6 +80,7 @@ function openCreate() {
         is_active: true,
     });
     editorOpen.value = true;
+    nextTick(() => document.getElementById('access-editor')?.scrollIntoView({ block: 'start' }));
 }
 
 function openEdit(admin) {
@@ -92,6 +95,7 @@ function openEdit(admin) {
         is_active: Boolean(admin.is_active),
     });
     editorOpen.value = true;
+    nextTick(() => document.getElementById('access-editor')?.scrollIntoView({ block: 'start' }));
 }
 
 function closeEditor() {
@@ -157,7 +161,7 @@ function togglePermission(key, checked) {
             </div>
         </header>
 
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div class="lf-admin-summary ">
             <Card class="p-4"><p class="text-xs text-muted-foreground">Total akun</p><p class="mt-2 text-2xl font-semibold">{{ summary.total || 0 }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Super Admin</p><p class="mt-2 text-2xl font-semibold">{{ summary.super_admins || 0 }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Admin</p><p class="mt-2 text-2xl font-semibold">{{ summary.admins || 0 }}</p></Card>
@@ -204,7 +208,7 @@ function togglePermission(key, checked) {
         <div class="grid gap-4 xl:grid-cols-[minmax(0,2fr)_360px]">
             <Card class="min-w-0 p-4">
                 <div class="overflow-x-auto">
-                    <Table>
+                    <AdminResponsiveTable :mobile-columns="[0,1,2,6]">
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Akun</TableHead>
@@ -234,7 +238,7 @@ function togglePermission(key, checked) {
                                 <TableCell class="text-right">
                                     <div class="flex justify-end gap-1">
                                         <Button size="sm" variant="outline" @click="openEdit(admin)">Edit</Button>
-                                        <Button size="sm" variant="ghost" :disabled="Number(admin.id) === Number(currentAdminId)" @click="remove(admin)">Hapus</Button>
+                                        <Button size="sm" variant="destructive" :disabled="Number(admin.id) === Number(currentAdminId)" @click="remove(admin)">Hapus</Button>
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -242,7 +246,7 @@ function togglePermission(key, checked) {
                                 <TableCell colspan="7" class="py-10 text-center text-muted-foreground">Tidak ada akun sesuai filter.</TableCell>
                             </TableRow>
                         </TableBody>
-                    </Table>
+                    </AdminResponsiveTable>
                 </div>
 
                 <div v-if="admins.links?.length > 3" class="mt-4 flex flex-wrap gap-1">
@@ -280,7 +284,7 @@ function togglePermission(key, checked) {
             </Card>
         </div>
 
-        <Card v-if="editorOpen" class="p-4">
+        <Card v-if="editorOpen" id="access-editor" class="p-4">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 class="text-lg font-semibold">{{ editingId ? 'Edit Akun Admin' : 'Tambah Akun Admin' }}</h2>
@@ -319,7 +323,7 @@ function togglePermission(key, checked) {
                 </div>
 
                 <label class="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-                    <input v-model="form.is_active" type="checkbox" class="size-4" :disabled="isEditingSelf">
+                    <AdminSwitch v-model="form.is_active" :disabled="isEditingSelf" />
                     Akun aktif
                 </label>
 
@@ -372,7 +376,7 @@ function togglePermission(key, checked) {
                 <Button variant="outline" size="sm" as-child><Link href="/admin/audit">Buka Audit Log</Link></Button>
             </div>
             <div class="mt-4 overflow-x-auto">
-                <Table>
+                <AdminResponsiveTable :mobile-columns="[3,1,0]">
                     <TableHeader><TableRow><TableHead>Waktu</TableHead><TableHead>Pelaku</TableHead><TableHead>Role</TableHead><TableHead>Aktivitas</TableHead><TableHead>Target</TableHead></TableRow></TableHeader>
                     <TableBody>
                         <TableRow v-for="activity in recentActivities" :key="activity.id">
@@ -384,7 +388,7 @@ function togglePermission(key, checked) {
                         </TableRow>
                         <TableRow v-if="!recentActivities.length"><TableCell colspan="5" class="py-10 text-center text-muted-foreground">Belum ada aktivitas pengelolaan Admin.</TableCell></TableRow>
                     </TableBody>
-                </Table>
+                </AdminResponsiveTable>
             </div>
         </Card>
     </div>

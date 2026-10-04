@@ -1,4 +1,5 @@
 <script setup>
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -7,7 +8,7 @@ import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 
 const props = defineProps({
     filters: { type: Object, default: () => ({}) },
@@ -152,7 +153,7 @@ function saveQuickReplies() {
             </div>
         </header>
 
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+        <div class="lf-admin-summary ">
             <Card class="p-4"><p class="text-xs text-muted-foreground">Total tiket</p><p class="mt-2 text-2xl font-semibold">{{ summary.total || 0 }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Menunggu</p><p class="mt-2 text-2xl font-semibold">{{ summary.open || 0 }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Diproses</p><p class="mt-2 text-2xl font-semibold">{{ summary.in_progress || 0 }}</p></Card>
@@ -173,7 +174,7 @@ function saveQuickReplies() {
 
             <form class="mt-4 space-y-3" @submit.prevent="saveQuickReplies">
                 <div v-for="(reply, index) in quickRepliesForm.replies" :key="index" class="flex items-start gap-2">
-                    <Textarea v-model="quickRepliesForm.replies[index]" maxlength="1000" rows="2" :placeholder="'Balasan cepat ' + (index + 1)" class="min-w-0 flex-1" />
+                    <Textarea :aria-label="'Balasan cepat ' + (index + 1)" v-model="quickRepliesForm.replies[index]" maxlength="1000" rows="2" :placeholder="'Balasan cepat ' + (index + 1)" class="min-w-0 flex-1" />
                     <Button type="button" size="sm" variant="outline" @click="quickRepliesForm.replies.splice(index, 1)">Hapus</Button>
                 </div>
                 <p v-if="quickRepliesForm.errors.replies" class="text-sm text-destructive">{{ quickRepliesForm.errors.replies }}</p>
@@ -324,7 +325,7 @@ function saveQuickReplies() {
 
         <Card class="min-w-0 p-4">
             <div class="overflow-x-auto">
-                <Table>
+                <AdminResponsiveTable :mobile-columns="[0,1,6,7]">
                     <TableHeader>
                         <TableRow>
                             <TableHead>Tiket</TableHead>
@@ -367,7 +368,7 @@ function saveQuickReplies() {
                             <TableCell colspan="8" class="py-10 text-center text-muted-foreground">Tidak ada tiket sesuai filter.</TableCell>
                         </TableRow>
                     </TableBody>
-                </Table>
+                </AdminResponsiveTable>
             </div>
 
             <div v-if="tickets.links?.length > 3" class="mt-4 flex flex-wrap gap-1">

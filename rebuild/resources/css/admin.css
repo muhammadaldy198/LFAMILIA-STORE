@@ -31,6 +31,7 @@
 .lf-admin-content.lf-admin-content :is(input,textarea,select){font-size:14px!important}
 .lf-admin-content.lf-admin-content :is(input[type=checkbox],input[type=radio]){appearance:auto;width:18px;height:18px;accent-color:var(--primary);cursor:pointer}
 .lf-admin-content.lf-admin-content label:has(input[type=checkbox]){min-height:36px;align-items:center}
+.lf-admin-content.lf-admin-content label:has(.lf-admin-switch){min-height:var(--lf-admin-control);cursor:pointer}
 .lf-admin-content.lf-admin-content :is(button,input,select,textarea,a,summary):focus-visible,.lf-admin :is(a,button):focus-visible,.lf-admin-mobile-navigation :is(a,button):focus-visible{outline:2px solid var(--ring);outline-offset:3px}
 .lf-admin-content.lf-admin-content button:disabled{cursor:not-allowed}
 .lf-admin-content.lf-admin-content [data-slot=card]{gap:0;border-radius:8px;padding-block:0;box-shadow:none;background:#fff}

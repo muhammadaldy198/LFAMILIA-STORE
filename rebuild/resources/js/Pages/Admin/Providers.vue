@@ -1,4 +1,6 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -6,7 +8,7 @@ import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 
 const props = defineProps({
     providers: { type: Array, default: () => [] },
@@ -100,7 +102,7 @@ function saveProvider(row) {
             <Button variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
         </header>
 
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div class="lf-admin-summary ">
             <Card class="p-4">
                 <p class="text-xs text-muted-foreground">Provider aktif</p>
                 <p class="mt-2 text-2xl font-semibold">{{ summary.provider_active || 0 }}</p>
@@ -155,7 +157,7 @@ function saveProvider(row) {
                             </p>
                         </div>
                         <label class="flex shrink-0 items-center gap-2 text-sm">
-                            <input v-model="row.is_active" type="checkbox" class="size-4">
+                            <AdminSwitch v-model="row.is_active" />
                             Aktif
                         </label>
                     </div>
@@ -254,7 +256,7 @@ function saveProvider(row) {
             </form>
 
             <div class="mt-4 overflow-x-auto">
-                <Table>
+                <AdminResponsiveTable :mobile-columns="[0,1,4,7]">
                     <TableHeader>
                         <TableRow>
                             <TableHead>Produk</TableHead>
@@ -295,7 +297,7 @@ function saveProvider(row) {
                             <TableCell colspan="8" class="py-10 text-center text-muted-foreground">Belum ada mapping yang sesuai filter.</TableCell>
                         </TableRow>
                     </TableBody>
-                </Table>
+                </AdminResponsiveTable>
             </div>
 
             <div v-if="mappings.links?.length > 3" class="mt-4 flex flex-wrap gap-1">
