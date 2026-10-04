@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\IntegrationCredential;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -10,6 +9,8 @@ use Illuminate\Validation\ValidationException;
 
 class DigiflazzCatalogService
 {
+    public function __construct(private readonly IntegrationRuntimeConfig $runtime) {}
+
     public function sync(?string $sku = null): int
     {
         $lock = Cache::lock('digiflazz.catalog.sync', 60);
@@ -17,14 +18,12 @@ class DigiflazzCatalogService
             throw ValidationException::withMessages(['sync' => 'Sinkronisasi masih berjalan.']);
         }
         try {
-            $config = IntegrationCredential::where('code', 'digiflazz')->where('is_active', true)->first()?->config_ciphertext;
+            $resolved = $this->runtime->resolve('digiflazz');
+            $config = $resolved['config'] ?? [];
             if (! is_array($config) || empty($config['username']) || empty($config['api_key'])) {
                 throw ValidationException::withMessages(['sync' => 'Lengkapi dan aktifkan Digiflazz di Integrasi.']);
             }
-            $url = rtrim($config['base_url'] ?? 'https://api.digiflazz.com', '/');
-            if (! str_starts_with($url, 'https://')) {
-                throw ValidationException::withMessages(['sync' => 'Endpoint Digiflazz harus HTTPS.']);
-            }
+            $url = $this->runtime->digiflazzApiBase($config);
             try {
                 $response = Http::acceptJson()->timeout(20)->post($url.'/v1/price-list', [
                     'cmd' => 'prepaid', 'username' => $config['username'],
