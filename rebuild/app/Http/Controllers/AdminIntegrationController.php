@@ -241,6 +241,16 @@ class AdminIntegrationController
             $profiles = $runtime->profiles($code, $existing);
             $target = $profiles[$environment] ?? [];
             $target = $this->applyFields($definition, $target, $data['config'], $clearSecrets);
+            if ($code === 'digiflazz') {
+                unset(
+                    $target['testing'],
+                    $target['is_production'],
+                    $target['environment'],
+                    $target['profiles'],
+                    $target['base_url'],
+                    $target['callback_url']
+                );
+            }
             $profiles[$environment] = $target;
 
             $config = $this->preserveUnknownMetadata($definition, $existing);
