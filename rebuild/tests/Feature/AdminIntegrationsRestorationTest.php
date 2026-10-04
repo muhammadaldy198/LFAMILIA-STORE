@@ -674,4 +674,69 @@ class AdminIntegrationsRestorationTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    public function test_digiflazz_ip_whitelist_failure_is_manual_action_not_invalid_credential(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'digiflazz',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'test',
+                'profiles' => [
+                    'test' => [
+                        'username' => 'buyer-test',
+                        'api_key' => 'development-key',
+                    ],
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.digiflazz.com/v1/cek-saldo' => Http::response([
+                'data' => [
+                    'rc' => '45',
+                    'message' => 'IP Anda tidak kami kenali',
+                ],
+            ]),
+        ]);
+
+        $this->postJson('/admin/integrations/digiflazz/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DEGRADED',
+                'reason' => 'IP_WHITELIST_REQUIRED',
+                'verified' => false,
+                'environment' => 'test',
+            ]);
+    }
+
+    public function test_resend_sending_only_scope_is_not_mislabeled_invalid(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'resend',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'api_key' => 'sending-only-key',
+                'from_email' => 'owner@example.test',
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.resend.com/domains*' => Http::response([], 403),
+        ]);
+
+        $this->postJson('/admin/integrations/resend/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DEGRADED',
+                'reason' => 'PERMISSION_LIMITED',
+                'verified' => false,
+            ]);
+    }
 }
