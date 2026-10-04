@@ -519,7 +519,7 @@ class AdminIntegrationsRestorationTest extends TestCase
                 return $digiflazz['callback']['required'] === true
                     && $digiflazz['callback']['ready'] === false
                     && $digiflazz['callback']['status'] === 'ACTION_REQUIRED'
-                    && $digiflazz['e2e_status'] === 'DEFERRED TO TAHAP 9';
+                    && $digiflazz['e2e']['label'] === 'DEFERRED TO TAHAP 9';
             })
         );
 
@@ -573,7 +573,7 @@ class AdminIntegrationsRestorationTest extends TestCase
                 $resend = collect($integrations)->firstWhere('code', 'resend');
 
                 return $resend['health']['status'] === 'HEALTHY'
-                    && $resend['connection_verified'] === false
+                    && $resend['connection']['status'] === 'UNVERIFIED'
                     && $resend['health']['verified'] === false;
             })
         );
