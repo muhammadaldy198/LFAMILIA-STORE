@@ -206,21 +206,35 @@ class IntegrationRegistry
                 'name' => 'Notifikasi Telegram',
                 'group' => 'Notifikasi',
                 'description' => 'Pengiriman notifikasi operasional Admin melalui bot Telegram.',
-                'environment_note' => 'Bot API yang digunakan tidak mempunyai selector Sandbox/Production terpisah di backend LFAMILIA.',
+                'default_environment' => 'test',
+                'credential_scope' => 'per_environment',
+                'environments' => [
+                    'test' => [
+                        'label' => 'TEST',
+                        'live' => false,
+                        'description' => 'Menggunakan bot/token Telegram Test Environment dan path Bot API /test/.',
+                    ],
+                    'production' => [
+                        'label' => 'PRODUCTION — DATA NYATA',
+                        'live' => true,
+                        'description' => 'Menggunakan bot/token Telegram Production untuk notifikasi nyata.',
+                    ],
+                ],
                 'fields' => [
                     'bot_token' => [
                         'label' => 'Token bot',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Token bot Telegram.',
+                        'help' => 'Token bot untuk environment yang sedang dipilih.',
                     ],
                     'chat_id' => [
                         'label' => 'ID chat',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'ID chat tujuan notifikasi.',
+                        'help' => 'ID chat tujuan pada environment yang sedang dipilih.',
                     ],
                 ],
+                'note' => 'Telegram Test Environment terpisah dari Production sehingga bot, token, user, dan chat tidak boleh saling fallback.',
             ],
             'discord' => [
                 'name' => 'Notifikasi Discord',
