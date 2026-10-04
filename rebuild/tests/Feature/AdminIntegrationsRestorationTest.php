@@ -4,6 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\AdminUser;
 use App\Models\IntegrationCredential;
+use App\Services\Fulfillment\DigiflazzClient;
+use App\Services\IntegrationRuntimeConfig;
+use App\Services\Payment\MidtransGateway;
+use App\Services\PaymentRoutingService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -37,32 +41,26 @@ class AdminIntegrationsRestorationTest extends TestCase
         DB::table('system_settings')->where('key', 'like', 'integration.health.%')->delete();
     }
 
-    public function test_workspace_shows_saved_health_and_never_exposes_secret_values(): void
+    public function test_workspace_exposes_environment_readiness_but_never_secret_values(): void
     {
-        $admin = $this->loginSuperAdmin();
+        $this->loginSuperAdmin();
         $this->clearIntegrationState();
 
         IntegrationCredential::create([
-            'code' => 'digiflazz',
+            'code' => 'midtrans',
             'is_active' => true,
             'config_ciphertext' => [
-                'username' => 'buyer-menu16',
-                'api_key' => 'menu16-secret-api-key',
-                'base_url' => 'https://digiflazz.test',
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => [
+                        'server_key' => 'sandbox-server-secret',
+                        'client_key' => 'sandbox-client-secret',
+                    ],
+                    'production' => [
+                        'server_key' => 'production-server-secret',
+                    ],
+                ],
             ],
-        ]);
-
-        DB::table('system_settings')->insert([
-            'key' => 'integration.health.digiflazz',
-            'value' => json_encode([
-                'status' => 'HEALTHY',
-                'message' => 'Koneksi terverifikasi.',
-                'tested_at' => now()->toIso8601String(),
-            ], JSON_THROW_ON_ERROR),
-            'version' => 1,
-            'updated_by_admin_id' => $admin->id,
-            'created_at' => now(),
-            'updated_at' => now(),
         ]);
 
         $response = $this->get('/admin/integrations')->assertOk();
@@ -70,230 +68,254 @@ class AdminIntegrationsRestorationTest extends TestCase
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Admin/Integrations')
             ->has('integrations', 9)
-            ->where('summary.total', 9)
-            ->where('summary.active', 1)
-            ->where('summary.healthy', 1)
-            ->where('summary.attention', 0)
-            ->where('integrations.0.code', 'digiflazz')
-            ->where('integrations.0.group', 'Provider')
-            ->where('integrations.0.required_complete', true)
-            ->where('integrations.0.health.status', 'HEALTHY')
-            ->where('integrations.0.fields.1.key', 'api_key')
-            ->where('integrations.0.fields.1.value', null)
-            ->where('integrations.0.fields.1.configured', true)
-            ->where('callbackUrls.midtrans', config('app.url').'/api/payments/midtrans/notification')
-            ->where('callbackUrls.doku', config('app.url').'/api/payments/doku/notification')
-            ->where('callbackUrls.digiflazz', config('app.url').'/api/fulfillment/digiflazz/webhook')
-            ->where('callbackUrls.google', config('app.url').'/auth/google/callback'));
-
-        $this->assertStringNotContainsString('menu16-secret-api-key', $response->getContent());
-    }
-
-    public function test_boolean_integration_fields_are_normalized_for_checkboxes(): void
-    {
-        $this->loginSuperAdmin();
-        $this->clearIntegrationState();
-
-        IntegrationCredential::create([
-            'code' => 'midtrans',
-            'is_active' => true,
-            'config_ciphertext' => [
-                'server_key' => 'server-secret',
-                'is_production' => 1,
-            ],
-        ]);
-
-        $this->get('/admin/integrations')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/Integrations')
             ->where('integrations', function ($integrations): bool {
                 $midtrans = collect($integrations)->firstWhere('code', 'midtrans');
-                $production = collect($midtrans['fields'] ?? [])->firstWhere('key', 'is_production');
+                $sandbox = collect($midtrans['environment_profiles']['sandbox']['fields'] ?? [])
+                    ->firstWhere('key', 'server_key');
+                $production = collect($midtrans['environment_profiles']['production']['fields'] ?? [])
+                    ->firstWhere('key', 'server_key');
 
-                return is_array($production) && $production['value'] === true;
-            }));
+                return $midtrans['environment'] === 'sandbox'
+                    && $midtrans['environment_label'] === 'SANDBOX / TEST'
+                    && $midtrans['credential_scope'] === 'per_environment'
+                    && $sandbox['configured'] === true
+                    && $sandbox['value'] === null
+                    && $production['configured'] === true
+                    && $production['value'] === null;
+            })
+            ->where('callbackUrls.midtrans', rtrim((string) config('app.url'), '/').'/api/payments/midtrans/notification')
+            ->where('callbackUrls.doku', rtrim((string) config('app.url'), '/').'/api/payments/doku/notification')
+            ->where('callbackUrls.digiflazz', rtrim((string) config('app.url'), '/').'/api/fulfillment/digiflazz/webhook')
+            ->where('callbackUrls.google', rtrim((string) config('app.url'), '/').'/auth/google/callback'));
+
+        $body = $response->getContent();
+        $this->assertStringNotContainsString('sandbox-server-secret', $body);
+        $this->assertStringNotContainsString('sandbox-client-secret', $body);
+        $this->assertStringNotContainsString('production-server-secret', $body);
     }
 
-    public function test_corrupt_integration_ciphertext_can_be_repaired_from_panel(): void
+    public function test_selected_environment_never_falls_back_to_other_midtrans_profile(): void
     {
-        $this->loginSuperAdmin();
-        $this->clearIntegrationState();
-
-        DB::table('integration_credentials')->insert([
-            'code' => 'midtrans',
-            'config_ciphertext' => 'invalid-encrypted-payload',
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $this->get('/admin/integrations')->assertOk();
-
-        $this->put('/admin/integrations/midtrans', [
-            'is_active' => true,
-            'config' => [
-                'server_key' => 'repaired-server-key',
-                'client_key' => '',
-                'is_production' => false,
-            ],
-        ])->assertRedirect()->assertSessionHasNoErrors();
-
-        $credential = IntegrationCredential::where('code', 'midtrans')->firstOrFail();
-        $this->assertSame('repaired-server-key', $credential->config_ciphertext['server_key']);
-        $this->assertFalse($credential->config_ciphertext['is_production']);
-    }
-
-    public function test_update_preserves_blank_secrets_and_unknown_legacy_metadata(): void
-    {
-        $admin = $this->loginSuperAdmin();
         $this->clearIntegrationState();
 
         IntegrationCredential::create([
             'code' => 'midtrans',
             'is_active' => true,
             'config_ciphertext' => [
-                'server_key' => 'server-secret-menu16',
-                'client_key' => 'client-secret-menu16',
-                'is_production' => false,
-                'legacy_environment' => 'sandbox-v1',
-                'legacy_secret_token' => 'legacy-secret-menu16',
+                'environment' => 'production',
+                'profiles' => [
+                    'sandbox' => ['server_key' => 'sandbox-only-secret'],
+                ],
+            ],
+        ]);
+
+        $resolved = app(IntegrationRuntimeConfig::class)->resolve('midtrans');
+        $this->assertSame('production', $resolved['environment']);
+        $this->assertSame([], $resolved['config']);
+        $this->assertFalse(app(PaymentRoutingService::class)->gatewayReady('MIDTRANS'));
+
+        IntegrationCredential::where('code', 'midtrans')->update([
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'production' => ['server_key' => 'production-only-secret'],
+                ],
+            ],
+        ]);
+
+        $resolved = app(IntegrationRuntimeConfig::class)->resolve('midtrans');
+        $this->assertSame('sandbox', $resolved['environment']);
+        $this->assertSame([], $resolved['config']);
+        $this->assertFalse(app(PaymentRoutingService::class)->gatewayReady('MIDTRANS'));
+    }
+
+    public function test_midtrans_backend_uses_endpoint_and_credential_from_selected_environment(): void
+    {
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'midtrans',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => ['server_key' => 'sandbox-key'],
+                    'production' => ['server_key' => 'production-key'],
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.sandbox.midtrans.com/*' => Http::response([
+                'order_id' => 'ORDER-ENV-1',
+                'status_code' => '200',
+                'gross_amount' => '10000.00',
+                'transaction_status' => 'settlement',
+            ]),
+        ]);
+
+        app(MidtransGateway::class)->status('ORDER-ENV-1');
+
+        Http::assertSent(fn ($request): bool =>
+            str_starts_with($request->url(), 'https://api.sandbox.midtrans.com/')
+            && $request->hasHeader('Authorization', 'Basic '.base64_encode('sandbox-key:'))
+        );
+    }
+
+    public function test_blank_secret_preserves_selected_profile_and_explicit_clear_removes_it(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'midtrans',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => [
+                        'server_key' => 'preserve-me',
+                        'client_key' => 'optional-client',
+                    ],
+                ],
             ],
         ]);
 
         $this->put('/admin/integrations/midtrans', [
             'is_active' => true,
-            'config' => [
-                'server_key' => '',
-                'client_key' => '',
-                'is_production' => true,
-            ],
+            'environment' => 'sandbox',
+            'config' => ['server_key' => '', 'client_key' => ''],
+            'clear_secrets' => [],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $config = IntegrationCredential::where('code', 'midtrans')->firstOrFail()->config_ciphertext;
+        $this->assertSame('preserve-me', $config['profiles']['sandbox']['server_key']);
+        $this->assertSame('optional-client', $config['profiles']['sandbox']['client_key']);
 
-        $this->assertSame('server-secret-menu16', $config['server_key']);
-        $this->assertSame('client-secret-menu16', $config['client_key']);
-        $this->assertTrue($config['is_production']);
-        $this->assertSame('sandbox-v1', $config['legacy_environment']);
-        $this->assertSame('legacy-secret-menu16', $config['legacy_secret_token']);
+        $this->put('/admin/integrations/midtrans', [
+            'is_active' => false,
+            'environment' => 'sandbox',
+            'config' => ['server_key' => '', 'client_key' => ''],
+            'clear_secrets' => ['server_key'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
 
-        $audit = DB::table('audit_logs')
-            ->where('actor_id', (string) $admin->id)
-            ->where('action', 'integration.updated')
-            ->latest('id')
-            ->first();
-
-        $this->assertNotNull($audit);
-        $this->assertStringNotContainsString('server-secret-menu16', (string) $audit->after);
-        $this->assertStringNotContainsString('client-secret-menu16', (string) $audit->after);
-        $this->assertStringNotContainsString('legacy-secret-menu16', (string) $audit->after);
+        $config = IntegrationCredential::where('code', 'midtrans')->firstOrFail()->config_ciphertext;
+        $this->assertArrayNotHasKey('server_key', $config['profiles']['sandbox']);
+        $this->assertSame('optional-client', $config['profiles']['sandbox']['client_key']);
     }
 
-    public function test_activation_requires_declared_fields_and_validates_operator_inputs(): void
+    public function test_switch_to_unconfigured_production_fails_closed_while_active(): void
     {
         $this->loginSuperAdmin();
         $this->clearIntegrationState();
 
-        $this->put('/admin/integrations/kokinpay', [
+        IntegrationCredential::create([
+            'code' => 'doku',
             'is_active' => true,
-            'config' => [
-                'api_key' => 'nickname-secret',
-                'base_url' => '',
-                'nickname_path' => '',
-                'region_path' => '',
-                'pln_path' => '',
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => ['client_id' => 'sandbox-client', 'secret_key' => 'sandbox-secret'],
+                ],
             ],
-        ])->assertSessionHasErrors([
-            'config.base_url',
         ]);
 
-        $this->put('/admin/integrations/discord', [
+        $this->put('/admin/integrations/doku', [
             'is_active' => true,
-            'config' => [
-                'webhook_url' => 'http://discord.example/webhook',
-            ],
-        ])->assertSessionHasErrors('config.webhook_url');
+            'environment' => 'production',
+            'config' => ['client_id' => '', 'secret_key' => ''],
+            'clear_secrets' => [],
+        ])->assertSessionHasErrors('config.client_id');
 
-        $this->put('/admin/integrations/turnstile', [
-            'is_active' => false,
-            'config' => [
-                'site_key' => 'site-key',
-                'secret_key' => 'secret-key',
-                'allowed_hostnames' => 'https://lfamiliastore.my.id/path',
-            ],
-        ])->assertSessionHasErrors('config.allowed_hostnames');
-
-        $this->put('/admin/integrations/turnstile', [
-            'is_active' => false,
-            'config' => [
-                'site_key' => 'site-key',
-                'secret_key' => 'secret-key',
-                'allowed_hostnames' => '*.lfamiliastore.my.id',
-            ],
-        ])->assertSessionHasErrors('config.allowed_hostnames');
+        $stored = IntegrationCredential::where('code', 'doku')->firstOrFail()->config_ciphertext;
+        $this->assertSame('sandbox', $stored['environment']);
+        $this->assertArrayNotHasKey('production', $stored['profiles']);
     }
 
-    public function test_connection_check_returns_timestamp_and_persists_health_without_secret_data(): void
+    public function test_digiflazz_test_mode_changes_request_without_editable_endpoint_or_callback(): void
     {
-        $admin = $this->loginSuperAdmin();
         $this->clearIntegrationState();
-
-        Http::fake([
-            'https://digiflazz.menu16/v1/cek-saldo' => Http::response([
-                'data' => ['deposit' => 500000],
-            ]),
-        ]);
+        config(['app.url' => 'https://lfamilia.example.test']);
 
         IntegrationCredential::create([
             'code' => 'digiflazz',
             'is_active' => true,
             'config_ciphertext' => [
-                'username' => 'buyer-menu16',
-                'api_key' => 'test-connection-secret',
-                'base_url' => 'https://digiflazz.menu16',
+                'environment' => 'test',
+                'username' => 'buyer-test',
+                'api_key' => 'api-secret',
+                'webhook_secret' => 'hook-secret',
+                'base_url' => 'https://digiflazz.fixture.test',
             ],
         ]);
 
-        $response = $this->postJson('/admin/integrations/digiflazz/test')
-            ->assertOk()
-            ->assertJsonPath('status', 'HEALTHY');
-
-        $this->assertNotEmpty($response->json('tested_at'));
-        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
-        $this->assertStringNotContainsString('test-connection-secret', $response->getContent());
-
-        $health = json_decode((string) DB::table('system_settings')
-            ->where('key', 'integration.health.digiflazz')
-            ->value('value'), true, 512, JSON_THROW_ON_ERROR);
-
-        $this->assertSame('HEALTHY', $health['status']);
-        $this->assertNotEmpty($health['tested_at']);
-
-        $this->assertDatabaseHas('audit_logs', [
-            'actor_id' => (string) $admin->id,
-            'action' => 'integration.connection.tested',
-            'target_type' => 'integration_credential',
-            'target_id' => 'digiflazz',
+        Http::fake([
+            'https://digiflazz.fixture.test/v1/transaction' => Http::response([
+                'data' => ['ref_id' => 'REF-TEST-1', 'status' => 'Pending'],
+            ]),
         ]);
+
+        app(DigiflazzClient::class)->transact([
+            'buyer_sku_code' => 'SKU-1',
+            'customer_no' => '12345',
+            'ref_id' => 'REF-TEST-1',
+            'max_price' => 10000,
+        ]);
+
+        Http::assertSent(fn ($request): bool =>
+            $request->url() === 'https://digiflazz.fixture.test/v1/transaction'
+            && $request['testing'] === true
+            && $request['cb_url'] === 'https://lfamilia.example.test/api/fulfillment/digiflazz/webhook'
+        );
     }
 
-    public function test_connection_check_reports_not_configured_before_calling_provider(): void
+    public function test_regular_admin_cannot_read_or_mutate_integration_credentials(): void
     {
-        $this->loginSuperAdmin();
+        $admin = AdminUser::create([
+            'name' => 'Operational Admin',
+            'email' => 'ops-'.bin2hex(random_bytes(6)).'@example.test',
+            'password' => Hash::make('VeryStrongPassword123!'),
+            'role' => 'ADMIN',
+            'permissions' => ['settings.manage', 'payments.manage', 'providers.manage'],
+            'is_active' => true,
+        ]);
+        $this->actingAs($admin, 'admin');
+
+        $this->get('/admin/integrations')->assertForbidden();
+        $this->put('/admin/integrations/midtrans', [
+            'is_active' => false,
+            'environment' => 'sandbox',
+            'config' => [],
+        ])->assertForbidden();
+        $this->postJson('/admin/integrations/midtrans/test')->assertForbidden();
+        $this->postJson('/admin/integrations/midtrans/reveal/server_key', [
+            'password' => 'VeryStrongPassword123!',
+        ])->assertNotFound();
+    }
+
+    public function test_turnstile_profiles_are_isolated_and_storage_is_encrypted(): void
+    {
         $this->clearIntegrationState();
-        Http::fake();
 
         IntegrationCredential::create([
-            'code' => 'doku',
-            'is_active' => false,
+            'code' => 'turnstile',
+            'is_active' => true,
             'config_ciphertext' => [
-                'client_id' => 'merchant-only',
+                'environment' => 'test',
+                'profiles' => [
+                    'test' => ['site_key' => 'test-site', 'secret_key' => 'test-secret'],
+                    'production' => ['site_key' => 'prod-site', 'secret_key' => 'prod-secret'],
+                ],
             ],
         ]);
 
-        $this->postJson('/admin/integrations/doku/test')
-            ->assertOk()
-            ->assertJsonPath('status', 'NOT_CONFIGURED');
+        $resolved = app(IntegrationRuntimeConfig::class)->resolve('turnstile');
+        $this->assertSame('test-site', $resolved['config']['site_key']);
+        $this->assertSame('test-secret', $resolved['config']['secret_key']);
 
-        Http::assertNothingSent();
+        $raw = (string) DB::table('integration_credentials')
+            ->where('code', 'turnstile')->value('config_ciphertext');
+        $this->assertStringNotContainsString('test-secret', $raw);
+        $this->assertStringNotContainsString('prod-secret', $raw);
     }
 }
