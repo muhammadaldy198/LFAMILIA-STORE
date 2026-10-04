@@ -15,7 +15,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -101,6 +100,7 @@ class AdminIntegrationController
                 $active,
                 $currentProfile['required_complete'],
                 $status,
+                $healthMatchesEnvironment ? (bool) ($storedHealth['verified'] ?? false) : false,
                 $message,
                 $healthMatchesEnvironment ? ($storedHealth['tested_at'] ?? null) : null,
                 $healthMatchesEnvironment ? ($storedHealth['reason'] ?? null) : null,
@@ -149,7 +149,7 @@ class AdminIntegrationController
                     'status' => $status,
                     'message' => $message,
                     'reason' => $healthMatchesEnvironment ? ($storedHealth['reason'] ?? null) : null,
-                    'verified' => $healthMatchesEnvironment ? (bool) ($storedHealth['verified'] ?? ($status === 'HEALTHY')) : false,
+                    'verified' => $healthMatchesEnvironment ? (bool) ($storedHealth['verified'] ?? false) : false,
                     'tested_at' => $healthMatchesEnvironment ? ($storedHealth['tested_at'] ?? null) : null,
                 ],
             ];
@@ -443,13 +443,15 @@ class AdminIntegrationController
     /**
      * @param  array<string,mixed>  $definition
      * @param  array<string,mixed>  $config
-     * @return array{status:string,label:string,message:string,url:?string}
+     * @return array{required:bool,ready:bool,status:string,label:string,message:string,url:?string}
      */
     private function callbackReadiness(array $definition, array $config, bool $active): array
     {
         $callback = $definition['callback'] ?? null;
         if (! is_array($callback)) {
             return [
+                'required' => false,
+                'ready' => true,
                 'status' => 'NOT_REQUIRED',
                 'label' => 'Tidak diperlukan',
                 'message' => 'Integrasi ini tidak memerlukan callback/redirect aplikasi.',
@@ -478,6 +480,8 @@ class AdminIntegrationController
 
         if (! $active) {
             return [
+                'required' => true,
+                'ready' => false,
                 'status' => 'NOT_READY',
                 'label' => 'Belum siap',
                 'message' => 'Integrasi nonaktif.',
@@ -486,6 +490,8 @@ class AdminIntegrationController
         }
         if (! $route || $url === null) {
             return [
+                'required' => true,
+                'ready' => false,
                 'status' => 'NOT_READY',
                 'label' => 'Belum siap',
                 'message' => 'Route callback/redirect belum tersedia.',
@@ -494,6 +500,8 @@ class AdminIntegrationController
         }
         if (! str_starts_with(strtolower($appUrl), 'https://')) {
             return [
+                'required' => true,
+                'ready' => false,
                 'status' => 'NOT_READY',
                 'label' => 'Belum siap',
                 'message' => 'Canonical application URL wajib HTTPS.',
@@ -502,6 +510,8 @@ class AdminIntegrationController
         }
         if ($protectedBySessionAuth) {
             return [
+                'required' => true,
+                'ready' => false,
                 'status' => 'NOT_READY',
                 'label' => 'Belum siap',
                 'message' => 'Route callback tidak boleh dilindungi autentikasi customer/Admin.',
@@ -510,6 +520,8 @@ class AdminIntegrationController
         }
         if ($missing->isNotEmpty()) {
             return [
+                'required' => true,
+                'ready' => false,
                 'status' => 'NOT_READY',
                 'label' => 'Credential Missing',
                 'message' => 'Credential verifikasi callback/redirect belum lengkap.',
@@ -518,6 +530,8 @@ class AdminIntegrationController
         }
 
         return [
+            'required' => true,
+            'ready' => true,
             'status' => 'READY',
             'label' => 'Callback Ready',
             'message' => 'URL HTTPS, route, middleware, dan credential verifikasi callback siap.',
@@ -532,13 +546,15 @@ class AdminIntegrationController
         bool $active,
         bool $credentialComplete,
         string $status,
+        bool $verified,
         string $message,
         mixed $testedAt,
         mixed $reason,
     ): array {
         $connectionStatus = match (true) {
             ! $active, ! $credentialComplete, $status === 'NOT_CONFIGURED' => 'NOT_CONFIGURED',
-            $status === 'HEALTHY' => 'VERIFIED',
+            $status === 'HEALTHY' && $verified => 'VERIFIED',
+            $status === 'HEALTHY' => 'UNVERIFIED',
             $status === 'DOWN' => 'FAILED',
             $status === 'DEGRADED' => 'UNVERIFIED',
             default => 'NOT_TESTED',
@@ -682,55 +698,6 @@ class AdminIntegrationController
         ];
 
         return collect($existing)->except($reserved)->all();
-    }
-
-    /**
-     * @param  array<string,mixed>  $definition
-     * @param  array{required_complete:bool}  $profile
-     * @param  array<string,mixed>  $config
-     * @return array{required:bool,ready:bool,status:string,url:?string,message:string}
-     */
-    private function callbackReadiness(array $definition, array $profile, array $config): array
-    {
-        $callback = $definition['callback'] ?? null;
-        if (! is_array($callback)) {
-            return [
-                'required' => false,
-                'ready' => true,
-                'status' => 'NOT_REQUIRED',
-                'url' => null,
-                'message' => 'Integrasi ini tidak membutuhkan callback/redirect aplikasi.',
-            ];
-        }
-
-        $routeName = trim((string) ($callback['route'] ?? ''));
-        $url = $routeName !== '' && Route::has($routeName)
-            ? $this->canonicalRouteUrl($routeName)
-            : null;
-        $httpsReady = is_string($url) && str_starts_with(strtolower($url), 'https://');
-
-        $requiredFields = is_array($callback['required_fields'] ?? null)
-            ? $callback['required_fields']
-            : [];
-        $credentialsReady = collect($requiredFields)->every(function ($field) use ($config): bool {
-            $value = $config[(string) $field] ?? null;
-
-            return $value !== null && $value !== '' && $value !== [];
-        });
-
-        $ready = $httpsReady && $credentialsReady;
-
-        return [
-            'required' => true,
-            'ready' => $ready,
-            'status' => $ready ? 'READY' : 'ACTION_REQUIRED',
-            'url' => $url,
-            'message' => ! $httpsReady
-                ? 'Callback/redirect canonical belum tersedia melalui HTTPS.'
-                : ($credentialsReady
-                    ? 'Route callback tersedia melalui HTTPS dan kebutuhan verifikasi backend sudah dikonfigurasi.'
-                    : 'Route callback tersedia, tetapi credential verifikasi callback belum lengkap.'),
-        ];
     }
 
     private function canonicalRouteUrl(string $routeName): string
