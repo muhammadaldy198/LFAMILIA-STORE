@@ -14,6 +14,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -48,6 +49,7 @@ class AdminIntegrationController
             } catch (DecryptException) {
                 $storedConfig = null;
             }
+
             $stored = is_array($storedConfig) ? $storedConfig : [];
             $environment = $runtime->selectedEnvironment($code, $stored);
             $environments = $registry->environments($code);
@@ -62,9 +64,10 @@ class AdminIntegrationController
                 }
             }
 
+            $currentConfig = $runtime->profile($code, $stored, $environment);
             $currentProfile = $environment !== null && isset($profiles[$environment])
                 ? $profiles[$environment]
-                : $this->presentProfile($definition, $runtime->profile($code, $stored, $environment));
+                : $this->presentProfile($definition, $currentConfig);
 
             $active = (bool) ($record?->is_active);
             $storedHealth = $healthStates->get('integration.health.'.$code, []);
@@ -93,11 +96,21 @@ class AdminIntegrationController
             )->values()->all();
             $selectedMetadata = $environment !== null ? ($environments[$environment] ?? []) : [];
 
-            $readiness = ! $active
-                ? ['status' => 'INACTIVE', 'label' => 'Nonaktif']
-                : ($currentProfile['required_complete']
-                    ? ['status' => 'READY', 'label' => 'Konfigurasi siap']
-                    : ['status' => 'INCOMPLETE', 'label' => 'Belum dikonfigurasi']);
+            $connection = $this->connectionReadiness(
+                $active,
+                $currentProfile['required_complete'],
+                $status,
+                $message,
+                $healthMatchesEnvironment ? ($storedHealth['tested_at'] ?? null) : null,
+                $healthMatchesEnvironment ? ($storedHealth['reason'] ?? null) : null,
+            );
+            $callback = $this->callbackReadiness($definition, $currentConfig, $active);
+            $readiness = $this->overallReadiness(
+                $active,
+                $currentProfile['required_complete'],
+                $connection,
+                $callback,
+            );
 
             return [
                 'code' => $code,
@@ -120,10 +133,22 @@ class AdminIntegrationController
                 'credential_status' => $currentProfile['required_complete']
                     ? 'Credential configured'
                     : 'Belum dikonfigurasi',
+                'credential' => [
+                    'status' => $currentProfile['required_complete'] ? 'CONFIGURED' : 'MISSING',
+                    'label' => $currentProfile['required_complete'] ? 'Configured' : 'Credential Missing',
+                ],
+                'connection' => $connection,
+                'callback' => $callback,
+                'e2e' => [
+                    'status' => 'DEFERRED',
+                    'label' => 'DEFERRED TO TAHAP 9',
+                ],
                 'readiness' => $readiness,
                 'health' => [
                     'status' => $status,
                     'message' => $message,
+                    'reason' => $healthMatchesEnvironment ? ($storedHealth['reason'] ?? null) : null,
+                    'verified' => $healthMatchesEnvironment ? (bool) ($storedHealth['verified'] ?? ($status === 'HEALTHY')) : false,
                     'tested_at' => $healthMatchesEnvironment ? ($storedHealth['tested_at'] ?? null) : null,
                 ],
             ];
@@ -137,10 +162,10 @@ class AdminIntegrationController
                 'total' => $integrations->count(),
                 'active' => $integrations->where('is_active', true)->count(),
                 'healthy' => $integrations
-                    ->filter(fn (array $item): bool => $item['is_active'] && $item['health']['status'] === 'HEALTHY')
+                    ->filter(fn (array $item): bool => $item['is_active'] && $item['connection']['status'] === 'VERIFIED')
                     ->count(),
                 'attention' => $integrations
-                    ->filter(fn (array $item): bool => $item['is_active'] && $item['health']['status'] !== 'HEALTHY')
+                    ->filter(fn (array $item): bool => $item['is_active'] && $item['connection']['status'] !== 'VERIFIED')
                     ->count(),
                 'configuration_complete' => $integrations->where('required_complete', true)->count(),
             ],
@@ -265,10 +290,12 @@ class AdminIntegrationController
             ['key' => 'integration.health.'.$code],
             [
                 'value' => json_encode([
-                    'status' => $record->is_active ? 'DEGRADED' : 'NOT_CONFIGURED',
+                    'status' => $record->is_active ? 'UNTESTED' : 'NOT_CONFIGURED',
                     'message' => $record->is_active
-                        ? 'Konfigurasi atau environment berubah. Verifikasi koneksi sebelum digunakan.'
+                        ? 'Konfigurasi atau environment berubah. Jalankan Tes Koneksi untuk memverifikasi.'
                         : 'Integrasi nonaktif.',
+                    'reason' => $record->is_active ? 'CONFIG_CHANGED' : 'INACTIVE',
+                    'verified' => false,
                     'environment' => $environment,
                     'tested_at' => null,
                 ], JSON_THROW_ON_ERROR),
@@ -319,6 +346,8 @@ class AdminIntegrationController
             ? [
                 'status' => 'NOT_CONFIGURED',
                 'message' => 'Lengkapi credential wajib untuk environment yang dipilih sebelum menjalankan Tes Koneksi.',
+                'reason' => 'CREDENTIAL_MISSING',
+                'verified' => false,
             ]
             : $connections->test($code, $config, $environment);
 
@@ -410,6 +439,156 @@ class AdminIntegrationController
             'configured_required' => $configuredRequired,
             'required_complete' => $requiredTotal === $configuredRequired,
         ];
+    }
+
+    /**
+     * @param  array<string,mixed>  $definition
+     * @param  array<string,mixed>  $config
+     * @return array{status:string,label:string,message:string,url:?string}
+     */
+    private function callbackReadiness(array $definition, array $config, bool $active): array
+    {
+        $callback = $definition['callback'] ?? null;
+        if (! is_array($callback)) {
+            return [
+                'status' => 'NOT_REQUIRED',
+                'label' => 'Tidak diperlukan',
+                'message' => 'Integrasi ini tidak memerlukan callback/redirect aplikasi.',
+                'url' => null,
+            ];
+        }
+
+        $routeName = (string) ($callback['route'] ?? '');
+        $route = $routeName !== '' ? Route::getRoutes()->getByName($routeName) : null;
+        $appUrl = rtrim((string) config('app.url'), '/');
+        $path = $route ? parse_url(route($routeName), PHP_URL_PATH) : null;
+        $url = is_string($path) && $path !== '' ? $appUrl.$path : null;
+
+        $missing = collect($callback['required_fields'] ?? [])
+            ->filter(function ($field) use ($config): bool {
+                $value = $config[(string) $field] ?? null;
+
+                return $value === null || $value === '' || $value === [];
+            })->values();
+
+        $middleware = $route?->gatherMiddleware() ?? [];
+        $protectedBySessionAuth = collect($middleware)->contains(
+            fn ($item): bool => is_string($item)
+                && (str_starts_with($item, 'auth:') || str_starts_with($item, 'admin.'))
+        );
+
+        if (! $active) {
+            return [
+                'status' => 'NOT_READY',
+                'label' => 'Belum siap',
+                'message' => 'Integrasi nonaktif.',
+                'url' => $url,
+            ];
+        }
+        if (! $route || $url === null) {
+            return [
+                'status' => 'NOT_READY',
+                'label' => 'Belum siap',
+                'message' => 'Route callback/redirect belum tersedia.',
+                'url' => $url,
+            ];
+        }
+        if (! str_starts_with(strtolower($appUrl), 'https://')) {
+            return [
+                'status' => 'NOT_READY',
+                'label' => 'Belum siap',
+                'message' => 'Canonical application URL wajib HTTPS.',
+                'url' => $url,
+            ];
+        }
+        if ($protectedBySessionAuth) {
+            return [
+                'status' => 'NOT_READY',
+                'label' => 'Belum siap',
+                'message' => 'Route callback tidak boleh dilindungi autentikasi customer/Admin.',
+                'url' => $url,
+            ];
+        }
+        if ($missing->isNotEmpty()) {
+            return [
+                'status' => 'NOT_READY',
+                'label' => 'Credential Missing',
+                'message' => 'Credential verifikasi callback/redirect belum lengkap.',
+                'url' => $url,
+            ];
+        }
+
+        return [
+            'status' => 'READY',
+            'label' => 'Callback Ready',
+            'message' => 'URL HTTPS, route, middleware, dan credential verifikasi callback siap.',
+            'url' => $url,
+        ];
+    }
+
+    /**
+     * @return array{status:string,label:string,message:string,tested_at:mixed,reason:mixed}
+     */
+    private function connectionReadiness(
+        bool $active,
+        bool $credentialComplete,
+        string $status,
+        string $message,
+        mixed $testedAt,
+        mixed $reason,
+    ): array {
+        $connectionStatus = match (true) {
+            ! $active, ! $credentialComplete, $status === 'NOT_CONFIGURED' => 'NOT_CONFIGURED',
+            $status === 'HEALTHY' => 'VERIFIED',
+            $status === 'DOWN' => 'FAILED',
+            $status === 'DEGRADED' => 'UNVERIFIED',
+            default => 'NOT_TESTED',
+        };
+
+        $label = match ($connectionStatus) {
+            'VERIFIED' => 'Connection Verified',
+            'FAILED' => 'Koneksi bermasalah',
+            'UNVERIFIED' => 'Belum dapat diverifikasi',
+            'NOT_CONFIGURED' => 'Belum dikonfigurasi',
+            default => 'Belum dites',
+        };
+
+        return [
+            'status' => $connectionStatus,
+            'label' => $label,
+            'message' => $message,
+            'tested_at' => $testedAt,
+            'reason' => $reason,
+        ];
+    }
+
+    /**
+     * @param  array<string,mixed>  $connection
+     * @param  array<string,mixed>  $callback
+     * @return array{status:string,label:string}
+     */
+    private function overallReadiness(
+        bool $active,
+        bool $credentialComplete,
+        array $connection,
+        array $callback,
+    ): array {
+        if (! $active) {
+            return ['status' => 'INACTIVE', 'label' => 'Nonaktif'];
+        }
+        if (! $credentialComplete) {
+            return ['status' => 'INCOMPLETE', 'label' => 'Credential Missing'];
+        }
+        if (($callback['status'] ?? null) === 'NOT_READY') {
+            return ['status' => 'BLOCKED', 'label' => 'Callback belum siap'];
+        }
+
+        return match ($connection['status'] ?? null) {
+            'VERIFIED' => ['status' => 'READY_FOR_E2E', 'label' => 'Siap untuk E2E'],
+            'FAILED' => ['status' => 'BLOCKED', 'label' => 'Koneksi bermasalah'],
+            'UNVERIFIED' => ['status' => 'CONFIGURED', 'label' => 'Configured — E2E belum diverifikasi'],
+            default => ['status' => 'CONFIGURED_UNTESTED', 'label' => 'Configured — belum dites'],
+        };
     }
 
     /**
