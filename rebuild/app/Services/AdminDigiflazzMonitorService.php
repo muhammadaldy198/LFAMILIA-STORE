@@ -2,13 +2,14 @@
 
 namespace App\Services;
 
-use App\Models\IntegrationCredential;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 class AdminDigiflazzMonitorService
 {
+    public function __construct(private readonly IntegrationRuntimeConfig $runtime) {}
+
     public function settings(): array
     {
         $stored = DB::table('system_settings')
@@ -28,10 +29,9 @@ class AdminDigiflazzMonitorService
 
     public function connection(bool $includeBalance): array
     {
-        $record = IntegrationCredential::where('code', 'digiflazz')->first();
-        $config = $record?->config_ciphertext ?? [];
-        $configured = (bool) $record?->is_active
-            && is_array($config)
+        $resolved = $this->runtime->resolve('digiflazz');
+        $config = $resolved['config'] ?? [];
+        $configured = is_array($config)
             && trim((string) ($config['username'] ?? '')) !== ''
             && trim((string) ($config['api_key'] ?? '')) !== '';
 
@@ -59,10 +59,7 @@ class AdminDigiflazzMonitorService
 
         return [...$result, ...Cache::remember($key, 60, function () use ($config): array {
             try {
-                $base = rtrim((string) ($config['base_url'] ?? 'https://api.digiflazz.com'), '/');
-                if (! str_starts_with(strtolower($base), 'https://')) {
-                    return ['status' => 'DOWN', 'message' => 'Endpoint Digiflazz harus HTTPS.', 'balance_idr' => null, 'balance_checked_at' => now()->toIso8601String()];
-                }
+                $base = $this->runtime->digiflazzApiBase($config);
                 $response = Http::acceptJson()->timeout(2)->connectTimeout(1)->post($base.'/v1/cek-saldo', [
                     'cmd' => 'deposit',
                     'username' => $config['username'],
