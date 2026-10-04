@@ -1,12 +1,13 @@
 <script setup>
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "./ui/sheet";
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import AdminIcon from './AdminIcon.vue';
 const page = usePage(), open = ref(false), query = ref(''), results = ref([]), searching = ref(false), searchError = ref(''), searchInput = ref(null), accountOpen = ref(false), notificationOpen = ref(false);
 const panel = computed(() => page.props.adminPanel || { menu: [] });
 const base = computed(() => panel.value.base_path || '/admin');
 const initial = computed(() => String(panel.value.admin?.name || 'A').slice(0,1).toUpperCase());
+const favicon = computed(() => page.props.storefront?.assets?.favicon?.url || '');
 const active = href => {
  const [path, query] = href.split('?');
  if (query) return page.url === href;
@@ -37,6 +38,11 @@ onMounted(() => window.addEventListener('keydown', shortcut));
 onUnmounted(() => { window.removeEventListener('keydown', shortcut);controller?.abort(); });
 </script>
 <template>
+<Head>
+ <link v-if="favicon" rel="icon" :href="favicon">
+ <link v-if="favicon" rel="shortcut icon" :href="favicon">
+ <link v-if="favicon" rel="apple-touch-icon" :href="favicon">
+</Head>
 <div class="lf-admin">
  <Sheet v-model:open="open"><SheetContent side="left" class="lf-admin-mobile-navigation"><SheetTitle class="sr-only">Navigasi Admin</SheetTitle><SheetDescription class="sr-only">Pilih menu pengelolaan toko.</SheetDescription>
   <Link :href="base + '/panel'" class="lf-admin-brand"><span class="lf-admin-logo"><AdminIcon name="nickname" /></span><span><strong>{{ $page.props.storefront?.storeName || 'LFAMILIA' }} ADMIN</strong><small>{{ $page.props.storefront?.tagline || 'Top Up Game Solution' }}</small></span></Link>

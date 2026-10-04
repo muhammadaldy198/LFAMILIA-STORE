@@ -256,6 +256,28 @@ class CatalogTest extends TestCase
         $this->assertSame('second.png', $product->fresh()->getFirstMedia('image')->file_name);
     }
 
+    public function test_uploaded_favicon_is_activated_and_shared_immediately(): void
+    {
+        Storage::fake('public');
+        $this->actingAs($this->admin(), 'admin');
+
+        $favicon = StoreAsset::where('key', 'favicon')->firstOrFail();
+        $favicon->update(['is_active' => false]);
+
+        $this->post('/admin/catalog/media/asset/'.$favicon->id, [
+            'collection' => 'image',
+            'image' => UploadedFile::fake()->image('favicon-new.png', 512, 512),
+        ])->assertRedirect();
+
+        $favicon = $favicon->fresh();
+        $this->assertTrue($favicon->is_active);
+        $this->assertSame('favicon-new.png', $favicon->getFirstMedia('image')->file_name);
+
+        $this->get('/')->assertInertia(fn (Assert $page) => $page
+            ->where('storefront.assets.favicon.url', $favicon->getFirstMediaUrl('image'))
+            ->etc());
+    }
+
     public function test_unavailable_nominal_cannot_be_preselected_from_deep_link(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();

@@ -43,8 +43,15 @@ class AdminCatalogMediaController
         $model = $this->target($type, $id);
         $media = $model->addMediaFromRequest('image')
             ->toMediaCollection($data['collection'], config('media-library.disk_name', 'public'));
+
+        if ($model instanceof StoreAsset && $model->key === 'favicon' && ! $model->is_active) {
+            $model->update(['is_active' => true]);
+        }
+
         $audit->record($request, 'catalog.media.uploaded', $type, $id, null, [
-            'media_id' => $media->id, 'collection' => $data['collection'],
+            'media_id' => $media->id,
+            'collection' => $data['collection'],
+            'asset_activated' => $model instanceof StoreAsset && $model->key === 'favicon',
         ]);
 
         return back();
