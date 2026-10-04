@@ -578,4 +578,100 @@ class AdminIntegrationsRestorationTest extends TestCase
             })
         );
     }
+
+    public function test_digiflazz_credentials_are_isolated_between_test_and_production(): void
+    {
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'digiflazz',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'production',
+                'profiles' => [
+                    'test' => [
+                        'username' => 'buyer-test',
+                        'api_key' => 'development-key-only',
+                    ],
+                ],
+            ],
+        ]);
+
+        $resolved = app(IntegrationRuntimeConfig::class)->resolve('digiflazz');
+        $this->assertSame('production', $resolved['environment']);
+        $this->assertSame([], $resolved['config']);
+    }
+
+    public function test_turnstile_test_mode_uses_safe_siteverify_dummy_token(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'turnstile',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'test',
+                'profiles' => [
+                    'test' => [
+                        'site_key' => 'test-site-key',
+                        'secret_key' => 'test-secret-key',
+                    ],
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([
+                'success' => true,
+                'hostname' => 'localhost',
+            ]),
+        ]);
+
+        $this->postJson('/admin/integrations/turnstile/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'HEALTHY',
+                'reason' => 'VERIFIED_SAFE_PROBE',
+                'verified' => true,
+                'environment' => 'test',
+            ]);
+
+        Http::assertSent(function ($request): bool {
+            return $request->url() === 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+                && $request['secret'] === 'test-secret-key'
+                && $request['response'] === 'XXXX.DUMMY.TOKEN.XXXX';
+        });
+    }
+
+    public function test_turnstile_production_connection_test_never_uses_dummy_token(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'turnstile',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'production',
+                'profiles' => [
+                    'production' => [
+                        'site_key' => 'production-site-key',
+                        'secret_key' => 'production-secret-key',
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->postJson('/admin/integrations/turnstile/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DEGRADED',
+                'reason' => 'SAFE_PROBE_UNAVAILABLE',
+                'verified' => false,
+                'environment' => 'production',
+            ]);
+
+        Http::assertNothingSent();
+    }
 }
