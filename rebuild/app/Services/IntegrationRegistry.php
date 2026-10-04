@@ -45,8 +45,13 @@ class IntegrationRegistry
                         'label' => 'Rahasia webhook',
                         'secret' => true,
                         'required' => false,
-                        'help' => 'Dipakai bila callback Digiflazz dikunci dengan rahasia tambahan.',
+                        'help' => 'Diperlukan agar callback Digiflazz dapat diverifikasi oleh backend.',
                     ],
+                ],
+                'callback' => [
+                    'label' => 'Digiflazz Webhook',
+                    'route' => 'api.fulfillment.digiflazz.webhook',
+                    'required_fields' => ['webhook_secret'],
                 ],
                 'note' => 'Digiflazz memakai endpoint API yang sama. Mode Development/Test diterapkan melalui parameter testing resmi pada request transaksi.',
             ],
@@ -121,6 +126,11 @@ class IntegrationRegistry
                         'help' => 'Kunci client untuk environment yang sedang dipilih bila dibutuhkan oleh flow Snap.',
                     ],
                 ],
+                'callback' => [
+                    'label' => 'Midtrans Notification',
+                    'route' => 'api.payments.midtrans.notification',
+                    'required_fields' => ['server_key'],
+                ],
             ],
             'doku' => [
                 'name' => 'DOKU Direct API',
@@ -153,6 +163,11 @@ class IntegrationRegistry
                         'required' => true,
                         'help' => 'Kunci penandatanganan request untuk environment yang sedang dipilih.',
                     ],
+                ],
+                'callback' => [
+                    'label' => 'DOKU Notification',
+                    'route' => 'api.payments.doku.notification',
+                    'required_fields' => ['client_id', 'secret_key'],
                 ],
             ],
             'resend' => [
@@ -200,6 +215,11 @@ class IntegrationRegistry
                         'required' => true,
                         'help' => 'Client Secret OAuth Google. Hanya digunakan backend.',
                     ],
+                ],
+                'callback' => [
+                    'label' => 'Google OAuth Callback',
+                    'route' => 'google.callback',
+                    'required_fields' => ['client_id', 'client_secret'],
                 ],
             ],
             'telegram' => [
