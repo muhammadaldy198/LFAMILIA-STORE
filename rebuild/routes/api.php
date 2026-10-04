@@ -19,9 +19,12 @@ Route::middleware(['auth:sanctum', 'throttle:api-account'])->get('/account', fun
 });
 
 Route::post('/payments/midtrans/notification', [PaymentWebhookController::class, 'midtrans'])
-    ->middleware('throttle:payment-webhook');
+    ->middleware('throttle:payment-webhook')
+    ->name('api.payments.midtrans.notification');
 Route::post('/payments/doku/notification', [PaymentWebhookController::class, 'doku'])
-    ->middleware('throttle:payment-webhook');
+    ->middleware('throttle:payment-webhook')
+    ->name('api.payments.doku.notification');
 
 Route::post('/fulfillment/digiflazz/webhook', [FulfillmentWebhookController::class, 'digiflazz'])
-    ->middleware('throttle:fulfillment-webhook');
+    ->middleware('throttle:fulfillment-webhook')
+    ->name('api.fulfillment.digiflazz.webhook');

@@ -105,7 +105,7 @@ class AdminM9Test extends TestCase
         $credential = IntegrationCredential::where('code', 'digiflazz')->firstOrFail();
         $this->assertTrue($credential->is_active);
         $this->assertSame('test', $credential->config_ciphertext['environment']);
-        $this->assertSame('secret-api-key', $credential->config_ciphertext['api_key']);
+        $this->assertSame('secret-api-key', $credential->config_ciphertext['profiles']['test']['api_key']);
 
         $audit = DB::table('audit_logs')->where('action', 'integration.updated')->latest('id')->first();
         $this->assertNotNull($audit);

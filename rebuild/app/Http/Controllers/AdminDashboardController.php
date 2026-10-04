@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\IntegrationCredential;
 use App\Services\AdminPermissionService;
 use App\Services\IntegrationRegistry;
+use App\Services\IntegrationRuntimeConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -15,6 +16,8 @@ use Inertia\Response;
 
 class AdminDashboardController
 {
+    public function __construct(private readonly IntegrationRuntimeConfig $runtime) {}
+
     public function __invoke(Request $request, AdminPermissionService $permissions, IntegrationRegistry $registry): Response
     {
         $data = $request->validate(['range' => ['nullable', 'in:today,7d,30d,90d']]);
@@ -142,24 +145,26 @@ class AdminDashboardController
 
     private function balance(): array
     {
-        $record = IntegrationCredential::where('code', 'digiflazz')->first();
-        if (! $record?->is_active) {
+        $resolved = $this->runtime->resolve('digiflazz');
+        $config = $resolved['config'] ?? [];
+        if (! is_array($config)
+            || trim((string) ($config['username'] ?? '')) === ''
+            || trim((string) ($config['api_key'] ?? '')) === '') {
             return ['amount_idr' => null, 'checked_at' => null, 'status' => 'NOT_CONFIGURED'];
         }
-        $config = $record->config_ciphertext ?? [];
-        if (empty($config['username']) || empty($config['api_key'])) {
-            return ['amount_idr' => null, 'checked_at' => null, 'status' => 'NOT_CONFIGURED'];
-        }
-        $key = 'admin.dashboard.digiflazz_balance.'.hash('sha256', json_encode($config));
+
+        $key = 'admin.dashboard.digiflazz_balance.'.hash('sha256', json_encode([
+            'environment' => $resolved['environment'] ?? null,
+            'username' => $config['username'],
+        ]));
 
         return Cache::remember($key, 60, function () use ($config): array {
             try {
-                $base = rtrim($config['base_url'] ?? 'https://api.digiflazz.com', '/');
-                if (! str_starts_with($base, 'https://')) {
-                    return ['amount_idr' => null, 'checked_at' => null, 'status' => 'DOWN'];
-                }
+                $base = $this->runtime->digiflazzApiBase($config);
                 $response = Http::acceptJson()->timeout(2)->connectTimeout(1)->post($base.'/v1/cek-saldo', [
-                    'cmd' => 'deposit', 'username' => $config['username'], 'sign' => md5($config['username'].$config['api_key'].'depo'),
+                    'cmd' => 'deposit',
+                    'username' => $config['username'],
+                    'sign' => md5($config['username'].$config['api_key'].'depo'),
                 ]);
                 $amount = $response->json('data.deposit');
                 if ($response->successful() && is_numeric($amount) && (float) $amount >= 0) {

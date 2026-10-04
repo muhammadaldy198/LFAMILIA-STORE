@@ -349,4 +349,392 @@ class AdminIntegrationsRestorationTest extends TestCase
         $this->assertStringNotContainsString('test-secret', $raw);
         $this->assertStringNotContainsString('prod-secret', $raw);
     }
+
+    public function test_safe_probe_success_persists_verified_status_without_exposing_secret(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'midtrans',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => ['server_key' => 'sandbox-midtrans-secret'],
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.sandbox.midtrans.com/*' => Http::response([
+                'status_code' => '404',
+                'status_message' => 'Transaction does not exist.',
+            ], 404),
+        ]);
+
+        $response = $this->postJson('/admin/integrations/midtrans/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'HEALTHY',
+                'reason' => 'VERIFIED_SAFE_PROBE',
+                'verified' => true,
+                'environment' => 'sandbox',
+            ]);
+
+        $this->assertStringNotContainsString('sandbox-midtrans-secret', $response->getContent());
+
+        $saved = json_decode((string) DB::table('system_settings')
+            ->where('key', 'integration.health.midtrans')->value('value'), true);
+
+        $this->assertSame('HEALTHY', $saved['status']);
+        $this->assertTrue($saved['verified']);
+        $this->assertSame('VERIFIED_SAFE_PROBE', $saved['reason']);
+        $this->assertArrayNotHasKey('server_key', $saved);
+    }
+
+    public function test_invalid_credential_and_provider_unavailable_are_distinct(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'midtrans',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => ['server_key' => 'invalid-midtrans-secret'],
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.sandbox.midtrans.com/*' => Http::sequence()
+                ->push([], 401)
+                ->push([], 503),
+        ]);
+
+        $this->postJson('/admin/integrations/midtrans/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DOWN',
+                'message' => 'Credential tidak valid.',
+                'reason' => 'INVALID_CREDENTIAL',
+                'verified' => false,
+            ]);
+
+        $this->postJson('/admin/integrations/midtrans/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DOWN',
+                'reason' => 'PROVIDER_UNAVAILABLE',
+                'verified' => false,
+            ]);
+    }
+
+    public function test_transport_timeout_is_reported_as_provider_unavailable_without_raw_exception(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'resend',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'api_key' => 'resend-timeout-secret',
+                'from_email' => 'owner@example.test',
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.resend.com/*' => Http::failedConnection('sensitive transport detail'),
+        ]);
+
+        $response = $this->postJson('/admin/integrations/resend/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DOWN',
+                'reason' => 'PROVIDER_UNAVAILABLE',
+                'verified' => false,
+            ]);
+
+        $this->assertStringNotContainsString('sensitive transport detail', $response->getContent());
+        $this->assertStringNotContainsString('resend-timeout-secret', $response->getContent());
+    }
+
+    public function test_integrations_without_safe_probe_never_claim_connection_verified(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'doku',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => [
+                        'client_id' => 'sandbox-client-id',
+                        'secret_key' => 'sandbox-doku-secret',
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->postJson('/admin/integrations/doku/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DEGRADED',
+                'reason' => 'SAFE_PROBE_UNAVAILABLE',
+                'verified' => false,
+                'environment' => 'sandbox',
+            ]);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_callback_readiness_requires_https_route_and_verification_credential(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+        config(['app.url' => 'https://lfamilia.example.test']);
+
+        IntegrationCredential::create([
+            'code' => 'digiflazz',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'test',
+                'username' => 'buyer-test',
+                'api_key' => 'api-secret',
+            ],
+        ]);
+
+        $this->get('/admin/integrations')->assertOk()->assertInertia(
+            fn (Assert $page) => $page->where('integrations', function ($integrations): bool {
+                $digiflazz = collect($integrations)->firstWhere('code', 'digiflazz');
+
+                return $digiflazz['callback']['required'] === true
+                    && $digiflazz['callback']['ready'] === false
+                    && $digiflazz['callback']['status'] === 'NOT_READY'
+                    && $digiflazz['e2e']['label'] === 'DEFERRED TO TAHAP 9';
+            })
+        );
+
+        $credential = IntegrationCredential::where('code', 'digiflazz')->firstOrFail();
+        $config = $credential->config_ciphertext;
+        $config['webhook_secret'] = 'callback-secret';
+        $credential->config_ciphertext = $config;
+        $credential->save();
+
+        $response = $this->get('/admin/integrations')->assertOk();
+
+        $response->assertInertia(fn (Assert $page) => $page->where('integrations', function ($integrations): bool {
+            $digiflazz = collect($integrations)->firstWhere('code', 'digiflazz');
+
+            return $digiflazz['callback']['ready'] === true
+                && $digiflazz['callback']['status'] === 'READY'
+                && $digiflazz['callback']['url'] === 'https://lfamilia.example.test/api/fulfillment/digiflazz/webhook';
+        }));
+
+        $this->assertStringNotContainsString('callback-secret', $response->getContent());
+    }
+
+    public function test_connection_verified_is_false_until_safe_probe_succeeds(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+        config(['app.url' => 'https://lfamilia.example.test']);
+
+        IntegrationCredential::create([
+            'code' => 'resend',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'api_key' => 'resend-secret',
+                'from_email' => 'owner@example.test',
+            ],
+        ]);
+
+        DB::table('system_settings')->insert([
+            'key' => 'integration.health.resend',
+            'value' => json_encode([
+                'status' => 'HEALTHY',
+                'message' => 'legacy healthy',
+                'tested_at' => now()->toIso8601String(),
+            ], JSON_THROW_ON_ERROR),
+            'updated_at' => now(),
+            'created_at' => now(),
+        ]);
+
+        $this->get('/admin/integrations')->assertOk()->assertInertia(
+            fn (Assert $page) => $page->where('integrations', function ($integrations): bool {
+                $resend = collect($integrations)->firstWhere('code', 'resend');
+
+                return $resend['health']['status'] === 'HEALTHY'
+                    && $resend['connection']['status'] === 'UNVERIFIED'
+                    && $resend['health']['verified'] === false;
+            })
+        );
+    }
+
+    public function test_digiflazz_credentials_are_isolated_between_test_and_production(): void
+    {
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'digiflazz',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'production',
+                'profiles' => [
+                    'test' => [
+                        'username' => 'buyer-test',
+                        'api_key' => 'development-key-only',
+                    ],
+                ],
+            ],
+        ]);
+
+        $resolved = app(IntegrationRuntimeConfig::class)->resolve('digiflazz');
+        $this->assertSame('production', $resolved['environment']);
+        $this->assertSame([], $resolved['config']);
+    }
+
+    public function test_turnstile_test_mode_uses_safe_siteverify_dummy_token(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'turnstile',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'test',
+                'profiles' => [
+                    'test' => [
+                        'site_key' => 'test-site-key',
+                        'secret_key' => 'test-secret-key',
+                    ],
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([
+                'success' => true,
+                'hostname' => 'localhost',
+            ]),
+        ]);
+
+        $this->postJson('/admin/integrations/turnstile/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'HEALTHY',
+                'reason' => 'VERIFIED_SAFE_PROBE',
+                'verified' => true,
+                'environment' => 'test',
+            ]);
+
+        Http::assertSent(function ($request): bool {
+            return $request->url() === 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+                && $request['secret'] === 'test-secret-key'
+                && $request['response'] === 'XXXX.DUMMY.TOKEN.XXXX';
+        });
+    }
+
+    public function test_turnstile_production_connection_test_never_uses_dummy_token(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'turnstile',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'production',
+                'profiles' => [
+                    'production' => [
+                        'site_key' => 'production-site-key',
+                        'secret_key' => 'production-secret-key',
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->postJson('/admin/integrations/turnstile/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DEGRADED',
+                'reason' => 'SAFE_PROBE_UNAVAILABLE',
+                'verified' => false,
+                'environment' => 'production',
+            ]);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_digiflazz_ip_whitelist_failure_is_manual_action_not_invalid_credential(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'digiflazz',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'test',
+                'profiles' => [
+                    'test' => [
+                        'username' => 'buyer-test',
+                        'api_key' => 'development-key',
+                    ],
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.digiflazz.com/v1/cek-saldo' => Http::response([
+                'data' => [
+                    'rc' => '45',
+                    'message' => 'IP Anda tidak kami kenali',
+                ],
+            ]),
+        ]);
+
+        $this->postJson('/admin/integrations/digiflazz/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DEGRADED',
+                'reason' => 'IP_WHITELIST_REQUIRED',
+                'verified' => false,
+                'environment' => 'test',
+            ]);
+    }
+
+    public function test_resend_sending_only_scope_is_not_mislabeled_invalid(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'resend',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'api_key' => 'sending-only-key',
+                'from_email' => 'owner@example.test',
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.resend.com/domains*' => Http::response([], 403),
+        ]);
+
+        $this->postJson('/admin/integrations/resend/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DEGRADED',
+                'reason' => 'PERMISSION_LIMITED',
+                'verified' => false,
+            ]);
+    }
 }
