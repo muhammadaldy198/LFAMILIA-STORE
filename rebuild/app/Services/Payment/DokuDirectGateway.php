@@ -2,7 +2,7 @@
 
 namespace App\Services\Payment;
 
-use App\Models\IntegrationCredential;
+use App\Services\IntegrationRuntimeConfig;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -10,7 +10,10 @@ use RuntimeException;
 
 class DokuDirectGateway
 {
-    public function __construct(\n        private readonly DokuSignature $signature,\n        private readonly IntegrationRuntimeConfig $runtime,\n    ) {}
+    public function __construct(
+        private readonly DokuSignature $signature,
+        private readonly IntegrationRuntimeConfig $runtime,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $context
