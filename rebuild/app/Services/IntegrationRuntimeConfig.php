@@ -144,6 +144,13 @@ class IntegrationRuntimeConfig
         return true;
     }
 
+    public function telegramBotBase(string $environment, string $token): string
+    {
+        $base = 'https://api.telegram.org/bot'.rawurlencode($token);
+
+        return $environment === 'test' ? $base.'/test' : $base;
+    }
+
     public function midtransApiBase(string $environment): string
     {
         return $environment === 'production'
@@ -220,7 +227,7 @@ class IntegrationRuntimeConfig
                 'https://api.doku.com'
             ) ? 'production' : 'sandbox',
             'digiflazz' => (bool) ($stored['testing'] ?? false) ? 'test' : 'production',
-            'turnstile' => 'production',
+            'turnstile', 'telegram' => 'production',
             default => null,
         };
     }
