@@ -4,7 +4,6 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '../../Components/ui/sheet';
 
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -300,28 +299,11 @@ const deleteNotice = (notice) => {
                     </template>
                     <div class="md:col-span-3"><Button :disabled="productForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah {{ tab === 'MANUAL' ? 'produk manual' : 'produk otomatis' }}</Button><p v-if="Object.keys(productForm.errors).length" class="mt-2 text-sm text-red-300">{{ Object.values(productForm.errors).join(' · ') }}</p></div>
                 </form>
-                <div class="divide-y border-y border-slate-200 md:hidden">
-                    <button v-for="item in visibleProducts" :key="item.id" type="button" class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-1 py-3 text-left" @click="editProduct(item)">
-                        <span class="min-w-0">
-                            <strong class="block truncate text-sm">{{ item.name }}</strong>
-                            <small class="mt-0.5 block truncate text-muted-foreground">{{ categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori' }}<template v-if="item.publisher"> · {{ item.publisher }}</template></small>
-                            <small class="mt-1 block text-muted-foreground">{{ item.packages.length }} nominal · {{ item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis' }}</small>
-                        </span>
-                        <span class="text-right">
-                            <span class="block text-xs font-semibold" :class="item.is_active ? 'text-emerald-700' : 'text-slate-500'">{{ item.is_active ? 'Aktif' : 'Nonaktif' }}</span>
-                            <span class="mt-1 block text-xs font-medium text-primary">Edit →</span>
-                        </span>
-                    </button>
-                </div>
-                <div class="hidden overflow-x-auto md:block"><Table class="min-w-[880px]"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Jenis</TableHead><TableHead>Nominal</TableHead><TableHead>Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id"><TableCell><strong>{{item.name}}</strong><small class="block text-muted-foreground">/{{item.slug}}<template v-if="item.publisher"> · {{item.publisher}}</template></small></TableCell><TableCell>{{categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori'}}</TableCell><TableCell>{{item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis'}}</TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>{{item.sort_order}}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" size="sm" @click="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table></div><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk yang sesuai dengan filter.</p>
+                <div class="overflow-x-auto"><Table class="min-w-[880px]"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Jenis</TableHead><TableHead>Nominal</TableHead><TableHead>Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id"><TableCell><strong>{{item.name}}</strong><small class="block text-muted-foreground">/{{item.slug}}<template v-if="item.publisher"> · {{item.publisher}}</template></small></TableCell><TableCell>{{categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori'}}</TableCell><TableCell>{{item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis'}}</TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>{{item.sort_order}}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" size="sm" @click="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table></div><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk yang sesuai dengan filter.</p>
                 <nav class="flex flex-wrap items-center justify-between gap-3"><span class="text-sm text-muted-foreground">{{matchingProducts.length}} produk · Halaman {{catalogPage}} dari {{totalCatalogPages}}</span><div class="flex gap-2"><Button type="button" variant="outline" :disabled="catalogPage <= 1" @click="catalogPage--">Sebelumnya</Button><Button type="button" variant="outline" :disabled="catalogPage >= totalCatalogPages" @click="catalogPage++">Berikutnya</Button></div></nav>
-                <Sheet :open="selectedProductId !== null" @update:open="value => { if (!value) selectedProductId = null }">
-                    <SheetContent side="right" class="lf-admin-content !w-full !max-w-none gap-0 overflow-y-auto p-4 sm:!w-[min(94vw,1120px)] sm:p-6">
-                        <SheetTitle class="sr-only">Editor produk</SheetTitle>
-                        <SheetDescription class="sr-only">Kelola informasi, nominal, tampilan, data pelanggan, dan penanganan produk.</SheetDescription>
-                        <div v-for="item in selectedProductItems" :key="item.id" class="space-y-4">
-                    <header class="flex flex-wrap items-center justify-between gap-3 border-b pb-4 pr-8"><div><p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Editor Produk</p><h2 class="mt-1 text-xl font-semibold">{{item.name}}</h2></div><div class="flex flex-wrap gap-2"><Button type="button" variant="destructive" size="sm" @click="deleteProduct(item)">Hapus</Button><Button type="button" variant="outline" size="sm" @click="selectedProductId=null">Selesai</Button></div></header>
-                    <nav class="lf-admin-tabs sticky top-0 z-20 -mx-4 flex overflow-x-auto border-b bg-background px-4 py-2 sm:-mx-6 sm:px-6"><Button type="button" variant="ghost" :class="{active:editorTab==='info'}" @click="editorTab='info'">Informasi</Button><Button type="button" variant="ghost" :class="{active:editorTab==='nominal'}" @click="editorTab='nominal'">Nominal & Harga</Button><Button type="button" variant="ghost" :class="{active:editorTab==='display'}" @click="editorTab='display'">Tampilan Produk</Button><Button type="button" variant="ghost" @click="fieldsProductId=String(item.id);catalogTab='fields'">Data Pelanggan</Button><Button type="button" variant="ghost" :class="{active:editorTab==='fulfillment'}" @click="editorTab='fulfillment'">Penanganan</Button></nav>
+                <Card v-for="item in selectedProductItems" :key="item.id" class="space-y-4 p-4">
+                    <header class="flex flex-wrap items-center justify-between gap-3"><h2>Edit {{item.name}}</h2><div class="flex flex-wrap gap-2"><Button type="button" variant="destructive" @click="deleteProduct(item)">Hapus produk</Button><Button type="button" variant="outline" @click="selectedProductId=null">Tutup</Button></div></header>
+                    <nav class="lf-admin-tabs"><Button type="button" variant="ghost" :class="{active:editorTab==='info'}" @click="editorTab='info'">Informasi</Button><Button type="button" variant="ghost" :class="{active:editorTab==='nominal'}" @click="editorTab='nominal'">Nominal & Harga</Button><Button type="button" variant="ghost" :class="{active:editorTab==='display'}" @click="editorTab='display'">Tampilan Produk</Button><Button type="button" variant="ghost" @click="fieldsProductId=String(item.id);catalogTab='fields'">Data Pelanggan</Button><Button type="button" variant="ghost" :class="{active:editorTab==='fulfillment'}" @click="editorTab='fulfillment'">Penanganan</Button></nav>
                     <div v-show="editorTab==='info'" class="space-y-4">
                     <div class="grid gap-3 md:grid-cols-4">
                         <label class="text-sm">Nama<Input v-model="item.name" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
@@ -494,9 +476,7 @@ const deleteNotice = (notice) => {
                             <span v-if="Object.keys(packageForm.errors).length" class="text-xs text-red-300">{{ Object.values(packageForm.errors).join(' · ') }}</span>
                         </form>
                     </div>
-                        </div>
-                    </SheetContent>
-                </Sheet>
+                </Card>
             </section>
 
             <section v-show="catalogTab === 'fields'" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
