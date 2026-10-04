@@ -220,6 +220,12 @@ class IntegrationRuntimeConfig
      */
     private function legacyEnvironment(string $code, array $stored): ?string
     {
+        $storedEnvironment = strtolower(trim((string) ($stored['environment'] ?? '')));
+        $environments = $this->registry->environments($code);
+        if ($storedEnvironment !== '' && array_key_exists($storedEnvironment, $environments)) {
+            return $storedEnvironment;
+        }
+
         return match ($code) {
             'midtrans' => (bool) ($stored['is_production'] ?? false) ? 'production' : 'sandbox',
             'doku' => str_starts_with(
