@@ -349,4 +349,233 @@ class AdminIntegrationsRestorationTest extends TestCase
         $this->assertStringNotContainsString('test-secret', $raw);
         $this->assertStringNotContainsString('prod-secret', $raw);
     }
+
+    public function test_safe_probe_success_persists_verified_status_without_exposing_secret(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'midtrans',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => ['server_key' => 'sandbox-midtrans-secret'],
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.sandbox.midtrans.com/*' => Http::response([
+                'status_code' => '404',
+                'status_message' => 'Transaction does not exist.',
+            ], 404),
+        ]);
+
+        $response = $this->postJson('/admin/integrations/midtrans/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'HEALTHY',
+                'reason' => 'VERIFIED_SAFE_PROBE',
+                'verified' => true,
+                'environment' => 'sandbox',
+            ]);
+
+        $this->assertStringNotContainsString('sandbox-midtrans-secret', $response->getContent());
+
+        $saved = json_decode((string) DB::table('system_settings')
+            ->where('key', 'integration.health.midtrans')->value('value'), true);
+
+        $this->assertSame('HEALTHY', $saved['status']);
+        $this->assertTrue($saved['verified']);
+        $this->assertSame('VERIFIED_SAFE_PROBE', $saved['reason']);
+        $this->assertArrayNotHasKey('server_key', $saved);
+    }
+
+    public function test_invalid_credential_and_provider_unavailable_are_distinct(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'midtrans',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => ['server_key' => 'invalid-midtrans-secret'],
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.sandbox.midtrans.com/*' => Http::response([], 401),
+        ]);
+
+        $this->postJson('/admin/integrations/midtrans/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DOWN',
+                'message' => 'Credential tidak valid.',
+                'reason' => 'INVALID_CREDENTIAL',
+                'verified' => false,
+            ]);
+
+        Http::fake([
+            'https://api.sandbox.midtrans.com/*' => Http::response([], 503),
+        ]);
+
+        $this->postJson('/admin/integrations/midtrans/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DOWN',
+                'reason' => 'PROVIDER_UNAVAILABLE',
+                'verified' => false,
+            ]);
+    }
+
+    public function test_transport_timeout_is_reported_as_provider_unavailable_without_raw_exception(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'resend',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'api_key' => 'resend-timeout-secret',
+                'from_email' => 'owner@example.test',
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.resend.com/*' => Http::failedConnection('sensitive transport detail'),
+        ]);
+
+        $response = $this->postJson('/admin/integrations/resend/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DOWN',
+                'reason' => 'PROVIDER_UNAVAILABLE',
+                'verified' => false,
+            ]);
+
+        $this->assertStringNotContainsString('sensitive transport detail', $response->getContent());
+        $this->assertStringNotContainsString('resend-timeout-secret', $response->getContent());
+    }
+
+    public function test_integrations_without_safe_probe_never_claim_connection_verified(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'doku',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => [
+                        'client_id' => 'sandbox-client-id',
+                        'secret_key' => 'sandbox-doku-secret',
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->postJson('/admin/integrations/doku/test')
+            ->assertOk()
+            ->assertJson([
+                'status' => 'DEGRADED',
+                'reason' => 'SAFE_PROBE_UNAVAILABLE',
+                'verified' => false,
+                'environment' => 'sandbox',
+            ]);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_callback_readiness_requires_https_route_and_verification_credential(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+        config(['app.url' => 'https://lfamilia.example.test']);
+
+        IntegrationCredential::create([
+            'code' => 'digiflazz',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'test',
+                'username' => 'buyer-test',
+                'api_key' => 'api-secret',
+            ],
+        ]);
+
+        $this->get('/admin/integrations')->assertOk()->assertInertia(
+            fn (Assert $page) => $page->where('integrations', function ($integrations): bool {
+                $digiflazz = collect($integrations)->firstWhere('code', 'digiflazz');
+
+                return $digiflazz['callback']['required'] === true
+                    && $digiflazz['callback']['ready'] === false
+                    && $digiflazz['callback']['status'] === 'ACTION_REQUIRED'
+                    && $digiflazz['e2e_status'] === 'DEFERRED TO TAHAP 9';
+            })
+        );
+
+        $credential = IntegrationCredential::where('code', 'digiflazz')->firstOrFail();
+        $config = $credential->config_ciphertext;
+        $config['webhook_secret'] = 'callback-secret';
+        $credential->config_ciphertext = $config;
+        $credential->save();
+
+        $response = $this->get('/admin/integrations')->assertOk();
+
+        $response->assertInertia(fn (Assert $page) => $page->where('integrations', function ($integrations): bool {
+            $digiflazz = collect($integrations)->firstWhere('code', 'digiflazz');
+
+            return $digiflazz['callback']['ready'] === true
+                && $digiflazz['callback']['status'] === 'READY'
+                && $digiflazz['callback']['url'] === 'https://lfamilia.example.test/api/fulfillment/digiflazz/webhook';
+        }));
+
+        $this->assertStringNotContainsString('callback-secret', $response->getContent());
+    }
+
+    public function test_connection_verified_is_false_until_safe_probe_succeeds(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+        config(['app.url' => 'https://lfamilia.example.test']);
+
+        IntegrationCredential::create([
+            'code' => 'resend',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'api_key' => 'resend-secret',
+                'from_email' => 'owner@example.test',
+            ],
+        ]);
+
+        DB::table('system_settings')->insert([
+            'key' => 'integration.health.resend',
+            'value' => json_encode([
+                'status' => 'HEALTHY',
+                'message' => 'legacy healthy',
+                'tested_at' => now()->toIso8601String(),
+            ], JSON_THROW_ON_ERROR),
+            'updated_at' => now(),
+            'created_at' => now(),
+        ]);
+
+        $this->get('/admin/integrations')->assertOk()->assertInertia(
+            fn (Assert $page) => $page->where('integrations', function ($integrations): bool {
+                $resend = collect($integrations)->firstWhere('code', 'resend');
+
+                return $resend['health']['status'] === 'HEALTHY'
+                    && $resend['connection_verified'] === false
+                    && $resend['health']['verified'] === false;
+            })
+        );
+    }
 }
