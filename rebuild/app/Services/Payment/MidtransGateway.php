@@ -2,35 +2,34 @@
 
 namespace App\Services\Payment;
 
-use App\Models\IntegrationCredential;
+use App\Services\IntegrationRuntimeConfig;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class MidtransGateway
 {
+    public function __construct(private readonly IntegrationRuntimeConfig $runtime) {}
+
     /**
      * @return array<string, mixed>
      */
     public function status(string $merchantReference): array
     {
-        $credential = IntegrationCredential::where('code', 'midtrans')->where('is_active', true)->first();
-        $config = $credential?->config_ciphertext;
-        if (! is_array($config) || empty($config['server_key'])) {
+        $resolved = $this->runtime->resolve('midtrans');
+        $config = $resolved['config'] ?? [];
+        $environment = (string) ($resolved['environment'] ?? '');
+
+        if (! is_array($config) || empty($config['server_key']) || ! in_array($environment, ['sandbox', 'production'], true)) {
             throw new RuntimeException('MIDTRANS_STATUS_UNAVAILABLE');
         }
-
-        $production = (bool) ($config['is_production'] ?? false);
-        $baseUrl = $production
-            ? 'https://api.midtrans.com'
-            : 'https://api.sandbox.midtrans.com';
 
         try {
             $response = Http::acceptJson()
                 ->withBasicAuth((string) $config['server_key'], '')
                 ->connectTimeout(2)
                 ->timeout(4)
-                ->get($baseUrl.'/v2/'.rawurlencode($merchantReference).'/status');
+                ->get($this->runtime->midtransApiBase($environment).'/v2/'.rawurlencode($merchantReference).'/status');
         } catch (\Throwable $exception) {
             throw new RuntimeException('MIDTRANS_STATUS_UNAVAILABLE', previous: $exception);
         }
@@ -59,16 +58,15 @@ class MidtransGateway
      */
     public function create(array $context): array
     {
-        $credential = IntegrationCredential::where('code', 'midtrans')->where('is_active', true)->first();
-        $config = $credential?->config_ciphertext;
-        if (! is_array($config) || empty($config['server_key'])) {
+        $resolved = $this->runtime->resolve('midtrans');
+        $config = $resolved['config'] ?? [];
+        $environment = (string) ($resolved['environment'] ?? '');
+
+        if (! is_array($config) || empty($config['server_key']) || ! in_array($environment, ['sandbox', 'production'], true)) {
             throw ValidationException::withMessages(['payment' => 'Metode pembayaran sedang tidak tersedia.']);
         }
 
-        $production = (bool) ($config['is_production'] ?? false);
-        $url = $production
-            ? 'https://app.midtrans.com/snap/v1/transactions'
-            : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
+        $url = $this->runtime->midtransSnapBase($environment).'/snap/v1/transactions';
 
         $payload = [
             'transaction_details' => [
