@@ -293,6 +293,41 @@ class AdminIntegrationsRestorationTest extends TestCase
         ])->assertNotFound();
     }
 
+    public function test_telegram_test_environment_is_separate_and_never_falls_back(): void
+    {
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'telegram',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'test',
+                'profiles' => [
+                    'test' => ['bot_token' => '111:test-token', 'chat_id' => 'test-chat'],
+                ],
+            ],
+        ]);
+
+        $resolved = app(IntegrationRuntimeConfig::class)->resolve('telegram');
+        $this->assertSame('test', $resolved['environment']);
+        $this->assertSame('111:test-token', $resolved['config']['bot_token']);
+        $this->assertStringEndsWith('/test', app(IntegrationRuntimeConfig::class)
+            ->telegramBotBase('test', '111:test-token'));
+
+        $credential = IntegrationCredential::where('code', 'telegram')->firstOrFail();
+        $credential->config_ciphertext = [
+            'environment' => 'production',
+            'profiles' => [
+                'test' => ['bot_token' => '111:test-token', 'chat_id' => 'test-chat'],
+            ],
+        ];
+        $credential->save();
+
+        $resolved = app(IntegrationRuntimeConfig::class)->resolve('telegram');
+        $this->assertSame('production', $resolved['environment']);
+        $this->assertSame([], $resolved['config']);
+    }
+
     public function test_turnstile_profiles_are_isolated_and_storage_is_encrypted(): void
     {
         $this->clearIntegrationState();
