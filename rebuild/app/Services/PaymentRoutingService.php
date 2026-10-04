@@ -2,15 +2,15 @@
 
 namespace App\Services;
 
-use App\Models\IntegrationCredential;
 use App\Models\PaymentChannel;
 use App\Models\User;
-use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class PaymentRoutingService
 {
+    public function __construct(private readonly IntegrationRuntimeConfig $runtime) {}
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -249,15 +249,8 @@ class PaymentRoutingService
      */
     private function credentialHasKeys(string $credentialCode, array $keys): bool
     {
-        $credential = IntegrationCredential::where('code', $credentialCode)
-            ->where('is_active', true)
-            ->first();
-
-        try {
-            $config = $credential?->config_ciphertext;
-        } catch (DecryptException) {
-            return false;
-        }
+        $resolved = $this->runtime->resolve($credentialCode);
+        $config = $resolved['config'] ?? [];
 
         if (! is_array($config)) {
             return false;
