@@ -71,8 +71,8 @@ watch(() => props.integrations, (value) => {
 });
 
 const activeCount = computed(() => items.filter((item) => item.is_active).length);
-const healthyCount = computed(() => items.filter((item) => item.is_active && item.health?.status === 'HEALTHY').length);
-const attentionCount = computed(() => items.filter((item) => item.is_active && item.health?.status !== 'HEALTHY').length);
+const healthyCount = computed(() => items.filter((item) => item.is_active && item.connection?.status === 'VERIFIED').length);
+const attentionCount = computed(() => items.filter((item) => item.is_active && item.connection?.status !== 'VERIFIED').length);
 const completeCount = computed(() => items.filter((item) => item.required_complete).length);
 
 const csrf = () => decodeURIComponent(
@@ -184,7 +184,29 @@ async function testConnection(item) {
 
         if (response.ok) {
             item.health = result;
-            item.connection_verified = result.verified === true;
+            item.connection = {
+                status: result.verified === true
+                    ? 'VERIFIED'
+                    : result.status === 'DOWN'
+                        ? 'FAILED'
+                        : result.status === 'DEGRADED'
+                            ? 'UNVERIFIED'
+                            : result.status === 'NOT_CONFIGURED'
+                                ? 'NOT_CONFIGURED'
+                                : 'NOT_TESTED',
+                label: result.verified === true
+                    ? 'Connection Verified'
+                    : result.status === 'DOWN'
+                        ? 'Koneksi bermasalah'
+                        : result.status === 'DEGRADED'
+                            ? 'Belum dapat diverifikasi'
+                            : result.status === 'NOT_CONFIGURED'
+                                ? 'Belum dikonfigurasi'
+                                : 'Belum dites',
+                message: result.message,
+                tested_at: result.tested_at,
+                reason: result.reason,
+            };
         }
     } catch {
         item.result = { status: 'DOWN', message: 'Koneksi terputus. Coba lagi.' };
@@ -325,22 +347,18 @@ async function testConnection(item) {
                     <div class="rounded-md border p-3">
                         <p class="text-xs text-muted-foreground">Connection</p>
                         <p class="mt-1 text-sm font-medium">
-                            {{ item.connection_verified ? 'Connection Verified' : statusLabel(item.health?.status) }}
+                            {{ item.connection?.label || statusLabel(item.health?.status) }}
                         </p>
                     </div>
                     <div class="rounded-md border p-3">
                         <p class="text-xs text-muted-foreground">Callback</p>
                         <p class="mt-1 text-sm font-medium">
-                            {{ item.callback?.status === 'READY'
-                                ? 'Callback Ready'
-                                : item.callback?.status === 'NOT_REQUIRED'
-                                    ? 'Tidak diperlukan'
-                                    : 'Manual Action Required' }}
+                            {{ item.callback?.label || 'Belum diketahui' }}
                         </p>
                     </div>
                     <div class="rounded-md border p-3">
                         <p class="text-xs text-muted-foreground">E2E</p>
-                        <p class="mt-1 text-sm font-medium">{{ item.e2e_status }}</p>
+                        <p class="mt-1 text-sm font-medium">{{ item.e2e?.label || 'DEFERRED TO TAHAP 9' }}</p>
                     </div>
                 </div>
 
