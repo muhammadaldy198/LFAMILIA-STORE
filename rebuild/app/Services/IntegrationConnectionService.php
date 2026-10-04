@@ -63,9 +63,6 @@ class IntegrationConnectionService
                 'sign' => md5($username.$key.'depo'),
             ]);
 
-        if ($this->isAuthenticationFailure($response)) {
-            return $this->invalidCredential();
-        }
         if ($this->isProviderUnavailable($response)) {
             return $this->unavailable();
         }
@@ -74,7 +71,20 @@ class IntegrationConnectionService
             return $this->verified('Credential Digiflazz terverifikasi melalui pengecekan saldo non-transaksional.');
         }
 
-        return $this->invalidCredential('Credential Digiflazz tidak dapat diverifikasi oleh endpoint akun.');
+        $responseCode = (string) ($response->json('data.rc') ?? $response->json('rc') ?? '');
+        if ($responseCode === '45') {
+            return $this->unverified(
+                'Credential Digiflazz belum dapat diverifikasi karena IP VPS belum dikenali provider.',
+                'IP_WHITELIST_REQUIRED'
+            );
+        }
+        if (in_array($responseCode, ['41', '42'], true) || $this->isAuthenticationFailure($response)) {
+            return $this->invalidCredential('Credential Digiflazz tidak valid.');
+        }
+
+        return $this->unverified(
+            'Endpoint Digiflazz merespons, tetapi credential belum dapat dibuktikan dengan aman.'
+        );
     }
 
     /**
@@ -93,8 +103,14 @@ class IntegrationConnectionService
             ->timeout(8)
             ->get('https://api.resend.com/domains', ['limit' => 1]);
 
-        if ($this->isAuthenticationFailure($response)) {
+        if ($response->status() === 401) {
             return $this->invalidCredential();
+        }
+        if ($response->status() === 403) {
+            return $this->unverified(
+                'API key Resend dikonfigurasi, tetapi endpoint domain menolak scope ini. Sending-only key tidak dapat diverifikasi tanpa mengirim email.',
+                'PERMISSION_LIMITED'
+            );
         }
         if ($this->isProviderUnavailable($response)) {
             return $this->unavailable();
@@ -102,7 +118,7 @@ class IntegrationConnectionService
 
         return $response->successful()
             ? $this->verified('Credential Resend terverifikasi melalui endpoint domain.')
-            : $this->invalidCredential('Credential Resend tidak dapat diverifikasi.');
+            : $this->unverified('Credential Resend belum dapat diverifikasi dengan probe non-pengiriman.');
     }
 
     /**
@@ -262,12 +278,12 @@ class IntegrationConnectionService
     }
 
     /** @return array{status:string,message:string,reason:string,verified:bool} */
-    private function unverified(string $message): array
+    private function unverified(string $message, string $reason = 'SAFE_PROBE_UNAVAILABLE'): array
     {
         return [
             'status' => 'DEGRADED',
             'message' => $message,
-            'reason' => 'SAFE_PROBE_UNAVAILABLE',
+            'reason' => $reason,
             'verified' => false,
         ];
     }
