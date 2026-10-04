@@ -1,14 +1,16 @@
 <script setup>
+import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Card } from '../../Components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '../../Components/ui/sheet';
+import AdminCustomerFields from '../../Components/AdminCustomerFields.vue';
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
 
 const props = defineProps({
@@ -46,10 +48,16 @@ const page = usePage();
 const initialSearch = new URLSearchParams(page.url.split('?')[1] || '').get('q') || '';
 const searchedProduct = products.value.find(item => item.name.toLowerCase().includes(initialSearch.toLowerCase()));
 const tab = ref(initialSearch && searchedProduct ? searchedProduct.fulfillment_mode : 'AUTO_PROVIDER');
-const selectedProductId = ref(null), editorTab = ref('info'), showCreateProduct = ref(false);
-const selectedPackageId=ref(null);
+const editorIdFromUrl = () => { const id=Number(new URLSearchParams(page.url.split('?')[1] || '').get('edit')); return products.value.some(item=>item.id===id) ? id : null; };
+const selectedProductId = ref(editorIdFromUrl()), editorTab = ref('info'), showCreateProduct = ref(false);
+const selectedPackageId=ref(null), savingProduct=ref(false), showCreatePackage=ref(false), nominalPage=ref(1);
+const visiblePackages = item => item.packages.slice((nominalPage.value-1)*25,nominalPage.value*25);
+watch(selectedProductId,()=>{nominalPage.value=1;});
+const editPackage = id => {selectedPackageId.value=id;nextTick(()=>document.getElementById('nominal-'+id)?.scrollIntoView({block:'start'}));};
+const closeProduct = () => { const params=new URLSearchParams(page.url.split('?')[1] || '');params.delete('edit');router.push({url:'/admin/catalog'+(params.size?'?'+params.toString():''),preserveState:true,preserveScroll:false}); };
+watch(()=>page.url,()=>{selectedProductId.value=editorIdFromUrl();});
 const selectedProductItems = computed(() => products.value.filter(item => item.id === selectedProductId.value));
-const editProduct = item => { selectedProductId.value = item.id; editorTab.value = 'info'; showImport.value=false; importForm.item_ids=[]; importForm.margin_percent=Number(item.margin_percent); selectedPackageId.value=null; };
+const editProduct = item => { selectedProductId.value = item.id; editorTab.value = 'info'; showImport.value=false; importForm.item_ids=[]; importForm.margin_percent=Number(item.margin_percent); selectedPackageId.value=null; const params=new URLSearchParams(page.url.split('?')[1] || '');params.set('edit',String(item.id));router.push({url:'/admin/catalog?'+params.toString(),preserveState:true,preserveScroll:false}); };
 const catalogTab = ref('products'), catalogSearch = ref(initialSearch), catalogPage = ref(1);
 const catalogCategory = ref(''), catalogStatus = ref(''), catalogSort = ref('CUSTOM'), catalogPageSize = ref(25);
 const catalogTabs = [['products','Produk'],['categories','Kategori'],['fields','Kolom Data Pelanggan']];
@@ -182,7 +190,7 @@ const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
     nickname_game_code: item.nickname_game_code || null,
     nickname_user_field_key: item.nickname_user_field_key || null,
     nickname_server_field_key: item.nickname_server_field_key || null,
-});
+}, {preserveScroll:true,onStart:()=>{savingProduct.value=true;},onFinish:()=>{savingProduct.value=false;}});
 const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
     code: pack.code, name: pack.name, note: pack.note || null, group_name: pack.group_name || null, nominal_value: pack.nominal_value,
     sort_order: pack.sort_order, is_active: pack.is_active,
@@ -237,6 +245,7 @@ const deleteNotice = (notice) => {
     <Head title="Kelola katalog" />
     <AdminShell>
         <div class="mx-auto max-w-7xl space-y-8">
+            <template v-if="selectedProductId === null">
             <div class="flex flex-wrap items-center justify-between gap-3"><div><Link href="/admin/panel" class="text-sm text-cyan-300">← Panel Admin</Link><h1 class="mt-2 text-3xl font-bold">Produk</h1></div><Link href="/" class="text-sm text-cyan-300">Lihat katalog pelanggan</Link></div>
             
 
@@ -257,7 +266,7 @@ const deleteNotice = (notice) => {
                         <label class="text-sm">Alamat kategori<Input v-model="item.slug" class="mt-1 block rounded-md bg-slate-800 p-2" /></label>
                         <label class="text-sm">Ikon cadangan<select v-model="item.icon" class="mt-1 block rounded-md bg-slate-800 p-2"><option v-for="[value,label] in categoryIconOptions" :key="value" :value="value">{{label}}</option></select></label>
                         <label class="text-sm">Urutan<Input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-24 rounded-md bg-slate-800 p-2" /></label>
-                        <label class="flex gap-2 text-sm"><input v-model="item.is_active" type="checkbox">Aktif</label>
+                        <label class="flex gap-2 text-sm"><AdminSwitch v-model="item.is_active" />Aktif</label>
                         <Button type="button" class="rounded-md bg-slate-700 px-3 py-2 text-sm" @click="saveCategory(item)">Simpan</Button>
                         <Button type="button" class="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" @click="deleteCategory(item)">Hapus</Button>
                         <span class="text-xs text-slate-500">Alamat publik: /{{ item.slug }} · ikon dipakai jika gambar kategori kosong.</span>
@@ -315,13 +324,23 @@ const deleteNotice = (notice) => {
                 </div>
                 <div class="hidden overflow-x-auto md:block"><Table class="min-w-[880px]"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Jenis</TableHead><TableHead>Nominal</TableHead><TableHead>Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id"><TableCell><strong>{{item.name}}</strong><small class="block text-muted-foreground">/{{item.slug}}<template v-if="item.publisher"> · {{item.publisher}}</template></small></TableCell><TableCell>{{categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori'}}</TableCell><TableCell>{{item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis'}}</TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>{{item.sort_order}}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" size="sm" @click="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table></div><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk yang sesuai dengan filter.</p>
                 <nav class="flex flex-wrap items-center justify-between gap-3"><span class="text-sm text-muted-foreground">{{matchingProducts.length}} produk · Halaman {{catalogPage}} dari {{totalCatalogPages}}</span><div class="flex gap-2"><Button type="button" variant="outline" :disabled="catalogPage <= 1" @click="catalogPage--">Sebelumnya</Button><Button type="button" variant="outline" :disabled="catalogPage >= totalCatalogPages" @click="catalogPage++">Berikutnya</Button></div></nav>
-                <Sheet :open="selectedProductId !== null" @update:open="value => { if (!value) selectedProductId = null }">
-                    <SheetContent side="right" class="lf-admin-content !w-full !max-w-none gap-0 overflow-y-auto p-4 sm:!w-[min(94vw,1120px)] sm:p-6">
-                        <SheetTitle class="sr-only">Editor produk</SheetTitle>
-                        <SheetDescription class="sr-only">Kelola informasi, nominal, tampilan, data pelanggan, dan penanganan produk.</SheetDescription>
+
+            </section>
+
+            <section v-show="catalogTab === 'fields'" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <h2 class="text-xl font-semibold">Kolom data pelanggan</h2>
+                <p class="text-sm text-slate-400">Atur data yang wajib atau opsional diisi pelanggan saat membeli produk. Urutan di halaman pelanggan mengikuti daftar di bawah.</p>
+                <label class="block text-sm">Produk<select v-model="fieldsProductId" class="mt-1 w-full max-w-md rounded-md bg-slate-800 p-2"><option value="">Pilih produk</option><option v-for="item in products" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
+                <template v-if="fieldsProductId">
+<AdminCustomerFields :rows="fieldRows" :error="fieldsError" :saving="fieldsSaving" @move="moveField" @remove="index=>fieldRows.splice(index,1)" @add="addField" @save="saveFields" />
+                </template>
+            </section>
+
+            </template>
+            <section v-else class="lf-admin-workspace" aria-label="Editor produk">
                         <div v-for="item in selectedProductItems" :key="item.id" class="space-y-4">
-                    <header class="flex flex-wrap items-center justify-between gap-3 border-b pb-4 pr-8"><div><p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Editor Produk</p><h2 class="mt-1 text-xl font-semibold">{{item.name}}</h2></div><div class="flex flex-wrap gap-2"><Button type="button" variant="destructive" size="sm" @click="deleteProduct(item)">Hapus</Button><Button type="button" variant="outline" size="sm" @click="selectedProductId=null">Selesai</Button></div></header>
-                    <nav class="lf-admin-tabs sticky top-0 z-20 -mx-4 flex overflow-x-auto border-b bg-background px-4 py-2 sm:-mx-6 sm:px-6"><Button type="button" variant="ghost" :class="{active:editorTab==='info'}" @click="editorTab='info'">Informasi</Button><Button type="button" variant="ghost" :class="{active:editorTab==='nominal'}" @click="editorTab='nominal'">Nominal & Harga</Button><Button type="button" variant="ghost" :class="{active:editorTab==='display'}" @click="editorTab='display'">Tampilan Produk</Button><Button type="button" variant="ghost" @click="fieldsProductId=String(item.id);catalogTab='fields'">Data Pelanggan</Button><Button type="button" variant="ghost" :class="{active:editorTab==='fulfillment'}" @click="editorTab='fulfillment'">Penanganan</Button></nav>
+                    <header class="flex flex-wrap items-center justify-between gap-3 border-b pb-4 pr-8"><div><p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Editor Produk</p><h1 class="mt-1 text-xl font-semibold">{{item.name}}</h1></div><div class="flex flex-wrap gap-2"><Button type="button" variant="destructive" size="sm" @click="deleteProduct(item)">Hapus</Button><Button type="button" variant="outline" size="sm" @click="closeProduct">Kembali ke produk</Button></div></header>
+                    <nav class="lf-admin-tabs"><Button type="button" variant="ghost" :class="{active:editorTab==='info'}" @click="editorTab='info'">Informasi</Button><Button type="button" variant="ghost" :class="{active:editorTab==='nominal'}" @click="editorTab='nominal'">Nominal & Harga</Button><Button type="button" variant="ghost" :class="{active:editorTab==='display'}" @click="editorTab='display'">Tampilan Produk</Button><Button type="button" variant="ghost" :class="{active:editorTab==='fields'}" @click="fieldsProductId=String(item.id);editorTab='fields'">Data Pelanggan</Button><Button type="button" variant="ghost" :class="{active:editorTab==='fulfillment'}" @click="editorTab='fulfillment'">Penanganan</Button></nav>
                     <div v-show="editorTab==='info'" class="space-y-4">
                     <div class="grid gap-3 md:grid-cols-4">
                         <label class="text-sm">Nama<Input v-model="item.name" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
@@ -332,7 +351,7 @@ const deleteNotice = (notice) => {
                         <label class="text-sm">Margin produk (%)<Input v-model.number="item.margin_percent" type="number" step="0.0001" min="0" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
                         <label class="text-sm">Urutan<Input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
                         <label class="text-sm md:col-span-3">Deskripsi<Textarea v-model="item.description" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
-                        <label class="flex items-center gap-2 text-sm"><input v-model="item.is_active" type="checkbox"> Produk aktif</label>
+                        <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="item.is_active" /> Produk aktif</label>
                         <label v-if="item.fulfillment_mode === 'MANUAL'" class="text-sm md:col-span-4">Instruksi internal<Textarea v-model="item.manual_instructions" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
                         <template v-if="item.fulfillment_mode === 'MANUAL'">
                             <label class="text-sm">Jam buka<Input v-model="item.manual_open_time" type="time" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
@@ -340,7 +359,7 @@ const deleteNotice = (notice) => {
                             <label class="text-sm">Zona waktu<select v-model="item.manual_timezone" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="Asia/Jakarta">WIB — Asia/Jakarta</option><option value="Asia/Makassar">WITA — Asia/Makassar</option><option value="Asia/Jayapura">WIT — Asia/Jayapura</option></select></label>
                         </template>
                         <div class="space-y-3 rounded-md border border-slate-700 p-3 md:col-span-4">
-                            <label class="flex items-center gap-2 text-sm"><input v-model="item.nickname_check_enabled" type="checkbox"> Aktifkan cek nickname</label>
+                            <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="item.nickname_check_enabled" /> Aktifkan cek nickname</label>
                             <div v-if="item.nickname_check_enabled" class="grid gap-3 md:grid-cols-3">
                                 <label class="text-sm">
                                     Kode game
@@ -357,9 +376,10 @@ const deleteNotice = (notice) => {
                             <p class="text-xs text-slate-500">Kredensial layanan cek nickname tetap dikelola di Integrasi. Pelanggan tidak melihat nama penyedia.</p>
                         </div>
                     </div>
-                    <Button type="button" class="rounded-md bg-slate-700 px-4 py-2 text-sm" @click="saveProduct(item)">Simpan produk</Button>
+
                     </div>
-                    <div v-show="editorTab==='fulfillment'" class="space-y-4"><h3 class="font-semibold">Penanganan {{item.fulfillment_mode==='MANUAL'?'manual':'otomatis'}}</h3><p class="text-sm text-slate-500">Instruksi dan jam layanan dikelola pada Informasi. Sumber pemenuhan, prioritas, modal, dan format tujuan dikelola per nominal.</p><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="router.post('/admin/catalog/products/'+item.id+'/sync',{}, {preserveScroll:true})">Sinkron semua nominal produk</Button><Table><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / kode</TableHead><TableHead>Status koneksi</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="pack in item.packages" :key="pack.id"><TableCell>{{pack.name}}</TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{providerLabel(mapping)}} · {{mapping.provider_code==='VOUCHER_STOCK' ? (mapping.stock_key||'-') : (mapping.external_sku||'Manual')}}</p></TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{mapping.is_active?'Aktif':'Nonaktif'}} · prioritas {{mapping.priority}}</p></TableCell><TableCell><Button type="button" variant="outline" @click="selectedPackageId=pack.id;editorTab='nominal'">Kelola sumber</Button></TableCell></TableRow></TableBody></Table></div>
+                    <div v-if="editorTab==='fields'" class="space-y-3"><h3>Data Pelanggan</h3><p class="text-muted-foreground">Atur data yang diminta saat pelanggan membeli produk ini.</p><AdminCustomerFields :rows="fieldRows" :error="fieldsError" :saving="fieldsSaving" @move="moveField" @remove="index=>fieldRows.splice(index,1)" @add="addField" @save="saveFields" /></div>
+                    <div v-show="editorTab==='fulfillment'" class="space-y-4"><h3 class="font-semibold">Penanganan {{item.fulfillment_mode==='MANUAL'?'manual':'otomatis'}}</h3><p class="text-sm text-slate-500">Instruksi dan jam layanan dikelola pada Informasi. Sumber pemenuhan, prioritas, modal, dan format tujuan dikelola per nominal.</p><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="router.post('/admin/catalog/products/'+item.id+'/sync',{}, {preserveScroll:true})">Sinkron semua nominal produk</Button><AdminResponsiveTable :mobile-columns="[0,2,3]"><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / kode</TableHead><TableHead>Status koneksi</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="pack in visiblePackages(item)" :key="pack.id"><TableCell>{{pack.name}}</TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{providerLabel(mapping)}} · {{mapping.provider_code==='VOUCHER_STOCK' ? (mapping.stock_key||'-') : (mapping.external_sku||'Manual')}}</p></TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{mapping.is_active?'Aktif':'Nonaktif'}} · prioritas {{mapping.priority}}</p></TableCell><TableCell><Button type="button" variant="outline" @click="selectedPackageId=pack.id;editorTab='nominal'">Kelola sumber</Button></TableCell></TableRow></TableBody></AdminResponsiveTable></div>
                     <div v-show="editorTab==='display'" class="space-y-4">
                     <div class="grid gap-3 md:grid-cols-2">
                         <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk / card</strong><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
@@ -370,25 +390,25 @@ const deleteNotice = (notice) => {
                         <div class="grid gap-3 md:grid-cols-2">
                             <label class="text-sm">Inisial cadangan<Input v-model="item.initials" maxlength="4" placeholder="Contoh: ML" class="mt-1" /></label>
                             <label class="text-sm">Warna aksen cadangan<Input v-model="item.accent_color" maxlength="7" placeholder="#1769e8" class="mt-1" /></label>
-                            <label class="flex items-center gap-2 text-sm"><input v-model="item.instant" type="checkbox"> Tampilkan label Instan</label>
-                            <label class="flex items-center gap-2 text-sm"><input v-model="item.package_tabs_enabled" type="checkbox"> Gunakan tab untuk grup nominal</label>
+                            <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="item.instant" /> Tampilkan label Instan</label>
+                            <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="item.package_tabs_enabled" /> Gunakan tab untuk grup nominal</label>
                             <label v-if="item.package_tabs_enabled" class="text-sm md:col-span-2">Urutan tab nominal<Input :model-value="(item.package_tabs||[]).join(', ')" placeholder="Contoh: Diamonds, Weekly Pass" class="mt-1" @change="item.package_tabs=String($event.target.value).split(',').map(v=>v.trim()).filter(Boolean)" /><span class="mt-1 block text-xs text-muted-foreground">Pisahkan dengan koma. Nama harus sama dengan Grup / Tabel pada nominal.</span></label>
                         </div>
-                        <Button type="button" variant="outline" @click="saveProduct(item)">Simpan tampilan produk</Button>
+
                     </Card>
                     <div class="space-y-3 rounded-md border border-slate-200 bg-white p-4">
                         <div><h3 class="font-semibold">Pemberitahuan produk</h3><p class="mt-1 text-xs text-slate-500">Informasi publik yang tampil saat pelanggan melakukan pembelian, terpisah dari instruksi penanganan internal.</p></div>
                         <article v-for="notice in item.notices" :key="notice.id" class="grid gap-2 rounded border border-slate-200 p-3 md:grid-cols-[1fr_110px_auto]">
                             <Input v-model="notice.title" class="rounded border border-slate-200 p-2 text-xs" placeholder="Judul" />
                             <Input v-model.number="notice.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-xs" placeholder="Urutan" />
-                            <label class="flex items-center gap-2 text-xs"><input v-model="notice.is_active" type="checkbox"> Aktif</label>
+                            <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="notice.is_active" /> Aktif</label>
                             <Textarea v-model="notice.body" rows="2" class="rounded border border-slate-200 p-2 text-xs md:col-span-3" placeholder="Isi pemberitahuan"></Textarea>
                             <div class="flex gap-2 md:col-span-3"><Button type="button" class="rounded bg-slate-800 px-3 py-2 text-xs text-white" @click="saveNotice(notice)">Simpan</Button><Button type="button" class="rounded bg-red-50 px-3 py-2 text-xs font-semibold text-red-700" @click="deleteNotice(notice)">Hapus</Button></div>
                         </article>
                         <div class="grid gap-2 rounded border border-dashed border-slate-300 p-3 md:grid-cols-[1fr_110px_auto]">
                             <Input v-model="noticeDraft(item.id).title" class="rounded border border-slate-200 p-2 text-xs" placeholder="Judul notice baru" />
                             <Input v-model.number="noticeDraft(item.id).sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-xs" placeholder="Urutan" />
-                            <label class="flex items-center gap-2 text-xs"><input v-model="noticeDraft(item.id).is_active" type="checkbox"> Aktif</label>
+                            <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="noticeDraft(item.id).is_active" /> Aktif</label>
                             <Textarea v-model="noticeDraft(item.id).body" rows="2" class="rounded border border-slate-200 p-2 text-xs md:col-span-3" placeholder="Informasi yang dilihat pelanggan"></Textarea>
                             <Button type="button" class="w-fit rounded bg-[#1769e8] px-3 py-2 text-xs font-bold text-white md:col-span-3" @click="addNotice(item)">Tambah pemberitahuan</Button>
                         </div>
@@ -406,26 +426,27 @@ const deleteNotice = (notice) => {
                             <div class="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" :disabled="importPage===1" @click="importPage--">Sebelumnya</Button><span class="text-sm">Halaman {{importPage}} / {{Math.max(1,Math.ceil(importMatches.length/25))}}</span><Button type="button" variant="outline" :disabled="importPage*25>=importMatches.length" @click="importPage++">Berikutnya</Button></div>
                             <Button type="button" :disabled="importForm.processing||!importForm.item_ids.length" @click="importForm.post('/admin/catalog/products/'+item.id+'/import',{preserveScroll:true,onSuccess:()=>{importForm.item_ids=[];showImport=false;}})">Impor {{importForm.item_ids.length}} nominal</Button>
                         </Card>
-                        <Table><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / Modal</TableHead><TableHead>Harga jual</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody>
-                            <TableRow v-for="(pack,index) in item.packages" :key="pack.id" draggable="true" @dragstart="draggedPackageId=pack.id" @dragover.prevent @drop.prevent="dropPackage(item,index)">
-                                <TableCell><strong>{{pack.name}}</strong><p class="text-xs text-slate-500">{{pack.group_name||'-'}}</p></TableCell>
+                        <AdminResponsiveTable :mobile-columns="[0,2,5,6]"><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / Modal</TableHead><TableHead class="text-right">Harga jual</TableHead><TableHead>Margin</TableHead><TableHead class="text-right">Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody>
+                            <TableRow v-for="(pack,index) in visiblePackages(item)" :key="pack.id" draggable="true" @dragstart="draggedPackageId=pack.id" @dragover.prevent @drop.prevent="dropPackage(item,(nominalPage-1)*25+index)">
+                                <TableCell><div class="flex items-center gap-2"><img v-if="pack.image_url" :src="pack.image_url" alt="" class="size-8 shrink-0 object-contain"><strong>{{pack.name}}</strong></div><p class="text-xs text-slate-500">{{pack.group_name||'-'}}</p></TableCell>
                                 <TableCell><p v-for="mapping in pack.mappings" :key="mapping.id" class="text-xs">{{ providerLabel(mapping) }}<span v-if="mapping.provider_code==='VOUCHER_STOCK'"> · {{ mapping.stock_key || '-' }}</span><span v-else-if="mapping.external_sku"> · {{ mapping.external_sku }}</span> · Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</p></TableCell>
-                                <TableCell>{{previewPrice(pack,item)}}</TableCell><TableCell>{{pack.is_active?'Aktif':'Nonaktif'}}</TableCell>
-                                <TableCell><div class="flex flex-wrap gap-2"><Button type="button" variant="outline" @click="selectedPackageId=pack.id">Edit nominal</Button><Button v-if="item.fulfillment_mode==='MANUAL'" type="button" variant="outline" @click="duplicatePackage(item,pack)">Salin</Button><Button type="button" variant="outline" :disabled="index===0" @click="reorderPackage(item,index,-1)">Naik</Button><Button type="button" variant="outline" :disabled="index===item.packages.length-1" @click="reorderPackage(item,index,1)">Turun</Button><Button type="button" variant="destructive" @click="deletePackage(pack)">Hapus</Button></div></TableCell>
+                                <TableCell class="text-right">{{previewPrice(pack,item)}}</TableCell><TableCell>{{pack.pricing_mode==='SELL_PRICE'?'Harga tetap':pack.pricing_mode==='FIXED'?'Rp'+Number(pack.margin_fixed_idr||0).toLocaleString('id-ID'):(pack.pricing_mode==='PERCENT'?pack.margin_percent:item.margin_percent)+'%'}}</TableCell><TableCell class="text-right">{{pack.sort_order}}</TableCell><TableCell>{{pack.is_active?'Aktif':'Nonaktif'}}</TableCell>
+                                <TableCell><div class="flex flex-wrap gap-2"><Button type="button" variant="outline" @click="editPackage(pack.id)">Edit nominal</Button></div></TableCell>
                             </TableRow>
-                        </TableBody></Table>
+                        </TableBody></AdminResponsiveTable>
+                        <nav v-if="item.packages.length>25" class="flex flex-wrap items-center justify-between gap-2" aria-label="Halaman nominal"><span>{{item.packages.length}} nominal · Halaman {{nominalPage}} / {{Math.ceil(item.packages.length/25)}}</span><div class="flex gap-2"><Button type="button" variant="outline" :disabled="nominalPage<=1" @click="nominalPage--">Sebelumnya</Button><Button type="button" variant="outline" :disabled="nominalPage*25>=item.packages.length" @click="nominalPage++">Berikutnya</Button></div></nav>
                         <p v-if="!item.packages.length" class="text-sm text-slate-500">Belum ada nominal. Tambahkan manual atau impor dari Digiflazz.</p>
-                        <div v-for="(pack,packIndex) in item.packages" v-show="selectedPackageId===pack.id" :key="pack.id" class="space-y-2 border-t border-slate-800 pt-3" draggable="true" @dragstart="draggedPackageId=pack.id" @dragover.prevent @drop.prevent="dropPackage(item,packIndex)">
+                        <div v-for="pack in item.packages.filter(pack=>pack.id===selectedPackageId)" :key="pack.id" :id="'nominal-'+pack.id" class="space-y-2 border-t border-slate-800 pt-3" draggable="true" @dragstart="draggedPackageId=pack.id" @dragover.prevent @drop.prevent="dropPackage(item,item.packages.findIndex(p=>p.id===pack.id))">
                             <div class="flex flex-wrap items-end gap-2">
-                                <div class="flex gap-2"><Button type="button" variant="outline" :disabled="packIndex===0" @click="reorderPackage(item,packIndex,-1)">Naik</Button><Button type="button" variant="outline" :disabled="packIndex===item.packages.length-1" @click="reorderPackage(item,packIndex,1)">Turun</Button></div>
-                                <Button type="button" variant="outline" @click="selectedPackageId=null">Tutup editor nominal</Button>
+                                <div class="flex gap-2"><Button type="button" variant="outline" :disabled="item.packages.findIndex(p=>p.id===pack.id)===0" @click="reorderPackage(item,item.packages.findIndex(p=>p.id===pack.id),-1)">Naik</Button><Button type="button" variant="outline" :disabled="item.packages.findIndex(p=>p.id===pack.id)===item.packages.length-1" @click="reorderPackage(item,item.packages.findIndex(p=>p.id===pack.id),1)">Turun</Button></div>
+                                <Button type="button" variant="outline" @click="selectedPackageId=null">Tutup editor nominal</Button><Button v-if="item.fulfillment_mode==='MANUAL'" type="button" variant="outline" @click="duplicatePackage(item,pack)">Salin nominal</Button><Button type="button" variant="destructive" @click="deletePackage(pack)">Hapus nominal</Button>
                                 <label class="text-xs">Kode internal<Input v-model="pack.code" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Nama nominal<Input v-model="pack.name" class="mt-1 block rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Badge<Input v-model="pack.note" maxlength="80" placeholder="Contoh: Populer" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Grup / Tabel<select v-if="item.package_tabs_enabled" v-model="pack.group_name" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="">Pilih tab</option><option v-for="tabName in item.package_tabs||[]" :key="tabName" :value="tabName">{{tabName}}</option></select><Input v-else v-model="pack.group_name" placeholder="Contoh: Diamonds" class="mt-1 block rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Nilai nominal<Input v-model.number="pack.nominal_value" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Urutan<Input v-model.number="pack.sort_order" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
-                                <label class="flex gap-2 text-xs"><input v-model="pack.is_active" type="checkbox">Aktif</label>
+                                <label class="flex gap-2 text-xs"><AdminSwitch v-model="pack.is_active" />Aktif</label>
                                 <Button type="button" class="rounded bg-slate-700 px-3 py-2 text-xs" @click="savePackage(pack)">Simpan</Button>
                             </div>
                             <div class="grid gap-3 md:grid-cols-3">
@@ -447,7 +468,7 @@ const deleteNotice = (notice) => {
                                     <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                                     <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Format ID tujuan<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan kode kolom di dalam {{ }}.</span></label>
                                     <label>Prioritas<Input v-model.number="mapping.priority" type="number" min="0" max="1000" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
-                                    <label class="flex gap-2"><input v-model="mapping.is_active" type="checkbox">Aktif</label>
+                                    <label class="flex gap-2"><AdminSwitch v-model="mapping.is_active" />Aktif</label>
                                     <Button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan sumber</Button>
                                 </div>
                                 <div v-if="item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-2 border-t border-slate-800 pt-3">
@@ -470,7 +491,7 @@ const deleteNotice = (notice) => {
                                     <label class="text-xs">Kunci stok<Input v-model="pack.stock_form.stock_key" maxlength="100" placeholder="contoh: netflix-1bulan" class="mt-1" /></label>
                                     <label class="text-xs">Modal Rp<Input v-model.number="pack.stock_form.cost_idr" type="number" min="1" class="mt-1" /></label>
                                     <label class="text-xs">Prioritas<Input v-model.number="pack.stock_form.priority" type="number" min="0" max="1000" class="mt-1" /></label>
-                                    <label class="flex items-center gap-2 self-end pb-2 text-xs"><input v-model="pack.stock_form.is_active" type="checkbox"> Aktif untuk checkout</label>
+                                    <label class="flex items-center gap-2 self-end pb-2 text-xs"><AdminSwitch v-model="pack.stock_form.is_active" /> Aktif untuk checkout</label>
                                 </div>
                                 <div v-if="stockMapping(pack)?.stock_counts" class="flex flex-wrap gap-4 text-xs text-slate-300">
                                     <span>Tersedia <strong>{{ stockMapping(pack).stock_counts.available }}</strong></span>
@@ -482,7 +503,8 @@ const deleteNotice = (notice) => {
                                 <Button type="button" variant="outline" @click="saveVoucherStock(pack)">Simpan pengaturan & impor kode</Button>
                             </div>
                         </div>
-                        <form class="flex flex-wrap items-end gap-2 border-t border-slate-800 pt-3" @submit.prevent="packageForm.post('/admin/catalog/products/' + item.id + '/packages', { onSuccess: () => packageForm.reset() })">
+                        <Button type="button" variant="outline" @click="showCreatePackage=!showCreatePackage">{{showCreatePackage?'Tutup formulir':'Tambah nominal'}}</Button>
+                        <form v-if="showCreatePackage" class="flex flex-wrap items-end gap-2 border-t border-slate-800 pt-3" @submit.prevent="packageForm.post('/admin/catalog/products/' + item.id + '/packages', { onSuccess: () => packageForm.reset() })">
                             <label class="text-xs">Kode internal<Input v-model="packageForm.code" required class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                             <label class="text-xs">Nama nominal<Input v-model="packageForm.name" required class="mt-1 block rounded bg-slate-800 p-2" /></label>
                             <label class="text-xs">Badge<Input v-model="packageForm.note" maxlength="80" placeholder="Contoh: Populer" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
@@ -494,44 +516,9 @@ const deleteNotice = (notice) => {
                             <span v-if="Object.keys(packageForm.errors).length" class="text-xs text-red-300">{{ Object.values(packageForm.errors).join(' · ') }}</span>
                         </form>
                     </div>
+                    <div class="lf-admin-workspace-actions"><Button type="button" variant="outline" @click="closeProduct">Kembali</Button><Button v-if="editorTab==='info'||editorTab==='display'" type="button" :disabled="savingProduct" @click="saveProduct(item)">{{savingProduct?'Menyimpan…':'Simpan produk'}}</Button><Button v-if="editorTab==='fields'" type="button" :disabled="fieldsSaving" @click="saveFields">{{fieldsSaving?'Menyimpan…':'Simpan data pelanggan'}}</Button></div>
                         </div>
-                    </SheetContent>
-                </Sheet>
             </section>
-
-            <section v-show="catalogTab === 'fields'" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <h2 class="text-xl font-semibold">Kolom data pelanggan</h2>
-                <p class="text-sm text-slate-400">Atur data yang wajib atau opsional diisi pelanggan saat membeli produk. Urutan di halaman pelanggan mengikuti daftar di bawah.</p>
-                <label class="block text-sm">Produk<select v-model="fieldsProductId" class="mt-1 w-full max-w-md rounded-md bg-slate-800 p-2"><option value="">Pilih produk</option><option v-for="item in products" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
-                <template v-if="fieldsProductId">
-                    <Card v-for="(field, index) in fieldRows" :key="index" class="space-y-3 p-4">
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                            <strong>Kolom {{ index + 1 }}</strong>
-                            <div class="flex flex-wrap gap-2">
-                                <Button type="button" variant="outline" :disabled="index===0" :aria-label="'Naikkan kolom '+(index+1)" @click="moveField(index,-1)">Naik</Button>
-                                <Button type="button" variant="outline" :disabled="index===fieldRows.length-1" :aria-label="'Turunkan kolom '+(index+1)" @click="moveField(index,1)">Turun</Button>
-                                <Button type="button" variant="destructive" @click="fieldRows.splice(index,1)">Hapus</Button>
-                            </div>
-                        </div>
-                        <div class="grid gap-3 md:grid-cols-2">
-                            <label class="text-sm">Nama kolom<Input v-model="field.label" maxlength="255" placeholder="Contoh: User ID" class="mt-1" /></label>
-                            <label class="text-sm">Kode kolom<Input v-model="field.field_key" maxlength="80" placeholder="Contoh: user_id" class="mt-1" /><span class="mt-1 block text-xs text-slate-500">Huruf kecil, angka, dan garis bawah. Kode dipakai oleh cek nickname dan template pengiriman.</span></label>
-                            <label class="text-sm">Contoh isian<Input v-model="field.placeholder" maxlength="255" placeholder="Contoh: 123456789" class="mt-1" /></label>
-                            <label class="text-sm">Jenis isian<select v-model="field.type" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="text">Teks / ID</option><option value="tel">Nomor telepon</option><option value="email">Email</option></select></label>
-                            <label class="flex items-center gap-2 text-sm"><input v-model="field.is_required" type="checkbox"> Wajib diisi</label>
-                        </div>
-                    </Card>
-                    <Button type="button" variant="outline" :disabled="fieldRows.length>=20" @click="addField">Tambah kolom</Button>
-                    <Card class="space-y-3 p-4">
-                        <h3 class="font-semibold">Pratinjau isian pelanggan</h3>
-                        <p v-if="!fieldRows.length" class="text-sm text-slate-500">Belum ada kolom.</p>
-                        <label v-for="(field,index) in fieldRows" :key="index" class="block text-sm">{{ field.label || 'Label kolom' }}{{ field.is_required ? ' *' : '' }}<Input :type="field.type" :placeholder="field.placeholder" disabled class="mt-1" /></label>
-                    </Card>
-                    <p v-if="fieldsError" role="alert" class="text-sm text-red-600">{{ fieldsError }}</p>
-                    <Button type="button" :disabled="fieldsSaving" @click="saveFields">{{ fieldsSaving ? 'Menyimpan…' : 'Simpan kolom' }}</Button>
-                </template>
-            </section>
-
 
         </div>
     </AdminShell>

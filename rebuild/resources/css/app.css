@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import './admin.css';
 @source '../js/**/*.vue';
 
 :root{--lime:#b9ff35;--lime2:#cfff72;--ink:#0b1320;--panel:#0d1019;--blue:#1769e8}
@@ -6013,7 +6014,7 @@
 }
 
 /* Keep mobile admin controls readable inside horizontally scrolling tables. */
-.lf-admin-content [data-slot=table]{min-width:520px}
+
 .lf-admin-content [data-slot=table] :is(button,[data-slot=button]){white-space:nowrap;overflow-wrap:normal;word-break:normal;max-width:none;flex-shrink:0}
 .lf-admin-content [data-slot=button]{overflow-wrap:normal;word-break:normal}
 .lf-admin-content [data-slot=card]{border-color:var(--border);box-shadow:none}
