@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\IntegrationCredential;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -10,6 +9,8 @@ use Throwable;
 
 class ExternalNotificationService
 {
+    public function __construct(private readonly IntegrationRuntimeConfig $runtime) {}
+
     public function deliver(int $notificationId): void
     {
         $notification = DB::table('admin_notifications')->where('id', $notificationId)->first();
@@ -31,14 +32,19 @@ class ExternalNotificationService
 
     private function telegram(int $id, string $text): ?bool
     {
-        $config = $this->config('telegram');
-        if (! $config || empty($config['bot_token']) || empty($config['chat_id'])) {
+        $resolved = $this->runtime->resolve('telegram');
+        $config = $resolved['config'] ?? [];
+        $environment = (string) ($resolved['environment'] ?? '');
+        if (! is_array($config)
+            || ! in_array($environment, ['test', 'production'], true)
+            || empty($config['bot_token'])
+            || empty($config['chat_id'])) {
             return null;
         }
 
-        return $this->attempt($id, 'telegram', (string) $config['chat_id'], function () use ($config, $text) {
+        return $this->attempt($id, 'telegram', (string) $config['chat_id'], function () use ($config, $environment, $text) {
             return Http::acceptJson()->timeout(8)->post(
-                'https://api.telegram.org/bot'.(string) $config['bot_token'].'/sendMessage',
+                $this->runtime->telegramBotBase($environment, (string) $config['bot_token']).'/sendMessage',
                 ['chat_id' => (string) $config['chat_id'], 'text' => $text]
             );
         });
@@ -121,9 +127,8 @@ class ExternalNotificationService
 
     private function config(string $code): ?array
     {
-        $record = IntegrationCredential::where('code', $code)->where('is_active', true)->first();
-        $config = $record?->config_ciphertext;
+        $resolved = $this->runtime->resolve($code);
 
-        return is_array($config) ? $config : null;
+        return isset($resolved['config']) && is_array($resolved['config']) ? $resolved['config'] : null;
     }
 }

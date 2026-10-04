@@ -2,26 +2,25 @@
 
 namespace App\Services\Fulfillment;
 
-use App\Models\IntegrationCredential;
+use App\Services\IntegrationRuntimeConfig;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class DigiflazzClient
 {
+    public function __construct(private readonly IntegrationRuntimeConfig $runtime) {}
+
     /**
      * @param  array<string, mixed>  $request
      * @return array<string, mixed>
      */
     public function transact(array $request): array
     {
-        $config = $this->config();
-        $baseUrl = rtrim((string) ($config['base_url'] ?? 'https://api.digiflazz.com'), '/');
-        if (! str_starts_with(strtolower($baseUrl), 'https://')) {
-            throw ValidationException::withMessages([
-                'fulfillment' => 'Konfigurasi endpoint provider tidak valid.',
-            ]);
-        }
+        $resolved = $this->resolved();
+        $config = $resolved['config'];
+        $environment = $resolved['environment'];
+        $baseUrl = $this->runtime->digiflazzApiBase($config);
 
         $payload = [
             'username' => (string) $config['username'],
@@ -34,13 +33,11 @@ class DigiflazzClient
                 (string) $request['ref_id']
             ),
             'max_price' => (int) $request['max_price'],
+            'cb_url' => rtrim((string) config('app.url'), '/').'/api/fulfillment/digiflazz/webhook',
         ];
 
-        if ((bool) ($config['testing'] ?? false)) {
+        if ($environment === 'test') {
             $payload['testing'] = true;
-        }
-        if (! empty($config['callback_url'])) {
-            $payload['cb_url'] = (string) $config['callback_url'];
         }
 
         try {
@@ -68,8 +65,8 @@ class DigiflazzClient
 
     public function webhookSecret(): string
     {
-        $config = $this->config();
-        $secret = trim((string) ($config['webhook_secret'] ?? ''));
+        $resolved = $this->resolved();
+        $secret = trim((string) ($resolved['config']['webhook_secret'] ?? ''));
         if ($secret === '') {
             throw ValidationException::withMessages([
                 'fulfillment' => 'Webhook provider belum dikonfigurasi.',
@@ -80,15 +77,16 @@ class DigiflazzClient
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{environment:string,config:array<string,mixed>}
      */
-    private function config(): array
+    private function resolved(): array
     {
-        $credential = IntegrationCredential::where('code', 'digiflazz')
-            ->where('is_active', true)->first();
-        $config = $credential?->config_ciphertext;
+        $resolved = $this->runtime->resolve('digiflazz');
+        $config = $resolved['config'] ?? [];
+        $environment = (string) ($resolved['environment'] ?? '');
 
         if (! is_array($config)
+            || ! in_array($environment, ['test', 'production'], true)
             || trim((string) ($config['username'] ?? '')) === ''
             || trim((string) ($config['api_key'] ?? '')) === '') {
             throw ValidationException::withMessages([
@@ -96,6 +94,6 @@ class DigiflazzClient
             ]);
         }
 
-        return $config;
+        return ['environment' => $environment, 'config' => $config];
     }
 }

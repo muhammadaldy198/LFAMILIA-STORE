@@ -6,18 +6,20 @@ use Illuminate\Support\Facades\Http;
 
 class IntegrationConnectionService
 {
+    public function __construct(private readonly IntegrationRuntimeConfig $runtime) {}
+
     /**
      * @param  array<string, mixed>  $config
      * @return array{status:string,message:string}
      */
-    public function test(string $code, array $config): array
+    public function test(string $code, array $config, ?string $environment = null): array
     {
         try {
             return match ($code) {
                 'digiflazz' => $this->digiflazz($config),
                 'resend' => $this->resend($config),
-                'midtrans' => $this->midtrans($config),
-                'telegram' => $this->telegram($config),
+                'midtrans' => $this->midtrans($config, $environment),
+                'telegram' => $this->telegram($config, $environment),
                 'discord' => $this->discord($config),
                 default => ['status' => 'DEGRADED', 'message' => 'Konfigurasi tersimpan, tetapi integrasi ini tidak memiliki probe non-transaksional universal.'],
             };
@@ -34,8 +36,7 @@ class IntegrationConnectionService
             return ['status' => 'NOT_CONFIGURED', 'message' => 'Username/API key belum lengkap.'];
         }
 
-        $base = rtrim((string) ($config['base_url'] ?? 'https://api.digiflazz.com'), '/');
-        $response = Http::acceptJson()->timeout(8)->post($base.'/v1/cek-saldo', [
+        $response = Http::acceptJson()->timeout(8)->post($this->runtime->digiflazzApiBase($config).'/v1/cek-saldo', [
             'cmd' => 'deposit',
             'username' => $username,
             'sign' => md5($username.$key.'depo'),
@@ -59,30 +60,32 @@ class IntegrationConnectionService
             : ['status' => 'DOWN', 'message' => 'Resend menolak credential.'];
     }
 
-    private function midtrans(array $config): array
+    private function midtrans(array $config, ?string $environment): array
     {
-        if (empty($config['server_key'])) {
-            return ['status' => 'NOT_CONFIGURED', 'message' => 'Server key belum diisi.'];
+        if (empty($config['server_key']) || ! in_array($environment, ['sandbox', 'production'], true)) {
+            return ['status' => 'NOT_CONFIGURED', 'message' => 'Server key/environment belum lengkap.'];
         }
-        $base = ! empty($config['is_production'])
-            ? 'https://api.midtrans.com'
-            : 'https://api.sandbox.midtrans.com';
+
         $response = Http::withBasicAuth((string) $config['server_key'], '')
-            ->acceptJson()->timeout(8)->get($base.'/v2/LFAMILIA-CONNECTION-CHECK/status');
+            ->acceptJson()->timeout(8)
+            ->get($this->runtime->midtransApiBase((string) $environment).'/v2/LFAMILIA-CONNECTION-CHECK/status');
 
         return $response->status() === 401 || $response->serverError()
             ? ['status' => 'DOWN', 'message' => 'Midtrans menolak credential atau tidak dapat dijangkau.']
             : ['status' => 'HEALTHY', 'message' => 'Credential Midtrans diterima endpoint status.'];
     }
 
-    private function telegram(array $config): array
+    private function telegram(array $config, ?string $environment): array
     {
         $token = trim((string) ($config['bot_token'] ?? ''));
         if ($token === '') {
             return ['status' => 'NOT_CONFIGURED', 'message' => 'Bot token belum diisi.'];
         }
+        if (! in_array($environment, ['test', 'production'], true)) {
+            return ['status' => 'NOT_CONFIGURED', 'message' => 'Environment Telegram belum valid.'];
+        }
         $response = Http::acceptJson()->timeout(8)
-            ->get('https://api.telegram.org/bot'.rawurlencode($token).'/getMe');
+            ->get($this->runtime->telegramBotBase((string) $environment, $token).'/getMe');
 
         return $response->successful() && $response->json('ok') === true
             ? ['status' => 'HEALTHY', 'message' => 'Bot Telegram terverifikasi.']

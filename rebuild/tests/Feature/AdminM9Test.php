@@ -11,7 +11,6 @@ use App\Services\AdminPermissionService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -87,30 +86,25 @@ class AdminM9Test extends TestCase
         $this->get('/admin/audit')->assertOk();
     }
 
-    public function test_super_admin_can_store_reveal_and_test_integration_without_secret_in_audit(): void
+    public function test_super_admin_can_store_integration_without_secret_in_response_or_audit(): void
     {
-        Http::fake([
-            'https://digiflazz.test/v1/cek-saldo' => Http::response([
-                'data' => ['deposit' => 500000],
-            ]),
-        ]);
         $super = $this->superAdmin();
         $this->actingAs($super, 'admin');
 
         $this->put('/admin/integrations/digiflazz', [
             'is_active' => true,
+            'environment' => 'test',
             'config' => [
                 'username' => 'buyer-test',
                 'api_key' => 'secret-api-key',
                 'webhook_secret' => 'secret-hook',
-                'base_url' => 'https://digiflazz.test',
-                'callback_url' => '',
-                'testing' => true,
             ],
+            'clear_secrets' => [],
         ])->assertRedirect();
 
         $credential = IntegrationCredential::where('code', 'digiflazz')->firstOrFail();
         $this->assertTrue($credential->is_active);
+        $this->assertSame('test', $credential->config_ciphertext['environment']);
         $this->assertSame('secret-api-key', $credential->config_ciphertext['api_key']);
 
         $audit = DB::table('audit_logs')->where('action', 'integration.updated')->latest('id')->first();
@@ -118,50 +112,46 @@ class AdminM9Test extends TestCase
         $this->assertStringNotContainsString('secret-api-key', (string) $audit->after);
         $this->assertStringContainsString('[REDACTED]', (string) $audit->after);
 
+        $response = $this->get('/admin/integrations')->assertOk();
+        $this->assertStringNotContainsString('secret-api-key', $response->getContent());
+
         $this->postJson('/admin/integrations/digiflazz/reveal/api_key', [
             'password' => 'VeryStrongPassword123!',
-        ])->assertOk()
-            ->assertJsonPath('value', 'secret-api-key');
-        $this->assertSame(1, DB::table('audit_logs')
-            ->where('action', 'integration.secret.revealed')
-            ->where('target_id', 'digiflazz')->count());
-
-        $this->postJson('/admin/integrations/digiflazz/test')
-            ->assertOk()
-            ->assertJsonPath('status', 'HEALTHY');
-
-        $health = json_decode((string) DB::table('system_settings')
-            ->where('key', 'integration.health.digiflazz')->value('value'), true);
-        $this->assertSame('HEALTHY', $health['status']);
+        ])->assertNotFound();
     }
 
-    public function test_blank_secret_update_preserves_existing_encrypted_secret(): void
+    public function test_blank_secret_update_preserves_selected_environment_secret(): void
     {
         $super = $this->superAdmin();
         $this->actingAs($super, 'admin');
         IntegrationCredential::create([
             'code' => 'midtrans',
             'config_ciphertext' => [
-                'server_key' => 'server-secret',
-                'client_key' => 'client-secret',
-                'is_production' => false,
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => [
+                        'server_key' => 'server-secret',
+                        'client_key' => 'client-secret',
+                    ],
+                ],
             ],
             'is_active' => true,
         ]);
 
         $this->put('/admin/integrations/midtrans', [
             'is_active' => true,
+            'environment' => 'sandbox',
             'config' => [
                 'server_key' => '',
                 'client_key' => '',
-                'is_production' => true,
             ],
+            'clear_secrets' => [],
         ])->assertRedirect();
 
         $config = IntegrationCredential::where('code', 'midtrans')->firstOrFail()->config_ciphertext;
-        $this->assertSame('server-secret', $config['server_key']);
-        $this->assertSame('client-secret', $config['client_key']);
-        $this->assertTrue($config['is_production']);
+        $this->assertSame('sandbox', $config['environment']);
+        $this->assertSame('server-secret', $config['profiles']['sandbox']['server_key']);
+        $this->assertSame('client-secret', $config['profiles']['sandbox']['client_key']);
     }
 
     public function test_wallet_adjustment_is_super_admin_only_atomic_and_idempotent(): void

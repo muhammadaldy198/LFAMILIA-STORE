@@ -2,7 +2,7 @@
 
 namespace App\Services\Payment;
 
-use App\Models\IntegrationCredential;
+use App\Services\IntegrationRuntimeConfig;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -10,7 +10,10 @@ use RuntimeException;
 
 class DokuDirectGateway
 {
-    public function __construct(private readonly DokuSignature $signature) {}
+    public function __construct(
+        private readonly DokuSignature $signature,
+        private readonly IntegrationRuntimeConfig $runtime,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $context
@@ -18,9 +21,13 @@ class DokuDirectGateway
      */
     public function create(array $context): array
     {
-        $credential = IntegrationCredential::where('code', 'doku')->where('is_active', true)->first();
-        $config = $credential?->config_ciphertext;
-        if (! is_array($config) || empty($config['client_id']) || empty($config['secret_key'])) {
+        $resolved = $this->runtime->resolve('doku');
+        $config = $resolved['config'] ?? [];
+        $environment = (string) ($resolved['environment'] ?? '');
+        if (! is_array($config)
+            || empty($config['client_id'])
+            || empty($config['secret_key'])
+            || ! in_array($environment, ['sandbox', 'production'], true)) {
             throw ValidationException::withMessages(['payment' => 'Metode pembayaran sedang tidak tersedia.']);
         }
 
@@ -30,10 +37,7 @@ class DokuDirectGateway
             throw ValidationException::withMessages(['payment' => 'Konfigurasi metode pembayaran belum lengkap.']);
         }
 
-        $baseUrl = rtrim((string) ($config['base_url'] ?? 'https://api-sandbox.doku.com'), '/');
-        if (! str_starts_with(strtolower($baseUrl), 'https://')) {
-            throw ValidationException::withMessages(['payment' => 'Konfigurasi metode pembayaran tidak valid.']);
-        }
+        $baseUrl = $this->runtime->dokuApiBase($environment, $config);
 
         $payload = $this->payload($context);
         $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
