@@ -30,9 +30,7 @@ class IntegrationConnectionService
                 'google_oauth' => $this->unverified(
                     'Credential Google OAuth dikonfigurasi. Validasi client dan redirect memerlukan alur OAuth pengguna dan ditunda ke Tahap 9.'
                 ),
-                'turnstile' => $this->unverified(
-                    'Credential Turnstile dikonfigurasi. Verifikasi server sudah tersedia; challenge browser success/failure ditunda ke Tahap 9.'
-                ),
+                'turnstile' => $this->turnstile($config, $environment),
                 'telegram' => $this->telegram($config, $environment),
                 'discord' => $this->discord($config),
                 default => $this->unverified(
@@ -142,6 +140,45 @@ class IntegrationConnectionService
         return $this->unverified(
             'Endpoint Midtrans merespons, tetapi penerimaan credential tidak dapat dibuktikan dengan aman.'
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @return array{status:string,message:string,reason:string,verified:bool}
+     */
+    private function turnstile(array $config, ?string $environment): array
+    {
+        $siteKey = trim((string) ($config['site_key'] ?? ''));
+        $secret = trim((string) ($config['secret_key'] ?? ''));
+        if ($siteKey === '' || $secret === '' || ! in_array($environment, ['test', 'production'], true)) {
+            return $this->notConfigured('Site Key/Secret Key/environment Turnstile belum lengkap.');
+        }
+
+        if ($environment !== 'test') {
+            return $this->unverified(
+                'Credential Turnstile Production dikonfigurasi. Production secret tidak dapat diuji dengan dummy token; challenge browser ditunda ke Tahap 9.'
+            );
+        }
+
+        $response = Http::asForm()
+            ->acceptJson()
+            ->connectTimeout(3)
+            ->timeout(8)
+            ->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+                'secret' => $secret,
+                'response' => 'XXXX.DUMMY.TOKEN.XXXX',
+            ]);
+
+        if ($this->isProviderUnavailable($response)) {
+            return $this->unavailable();
+        }
+
+        $payload = $response->json();
+        if ($response->successful() && is_array($payload) && ($payload['success'] ?? false) === true) {
+            return $this->verified('Credential Turnstile Test terverifikasi melalui Siteverify dengan dummy token resmi.');
+        }
+
+        return $this->invalidCredential('Credential Turnstile Test tidak valid atau tidak cocok dengan mode Test.');
     }
 
     /**
