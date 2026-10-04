@@ -393,8 +393,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::get('/admin/integrations', [AdminIntegrationController::class, 'index'])->name('admin.integrations');
         Route::put('/admin/integrations/{code}', [AdminIntegrationController::class, 'update'])
             ->middleware('throttle:admin-sensitive')->name('admin.integrations.update');
-        Route::post('/admin/integrations/{code}/reveal/{field}', [AdminIntegrationController::class, 'reveal'])
-            ->middleware('throttle:secret-reveal')->name('admin.integrations.reveal');
         Route::post('/admin/integrations/{code}/test', [AdminIntegrationController::class, 'test'])
             ->middleware('throttle:admin-sensitive')->name('admin.integrations.test');
 
