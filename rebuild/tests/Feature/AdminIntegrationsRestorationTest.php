@@ -410,7 +410,9 @@ class AdminIntegrationsRestorationTest extends TestCase
         ]);
 
         Http::fake([
-            'https://api.sandbox.midtrans.com/*' => Http::response([], 401),
+            'https://api.sandbox.midtrans.com/*' => Http::sequence()
+                ->push([], 401)
+                ->push([], 503),
         ]);
 
         $this->postJson('/admin/integrations/midtrans/test')
@@ -421,10 +423,6 @@ class AdminIntegrationsRestorationTest extends TestCase
                 'reason' => 'INVALID_CREDENTIAL',
                 'verified' => false,
             ]);
-
-        Http::fake([
-            'https://api.sandbox.midtrans.com/*' => Http::response([], 503),
-        ]);
 
         $this->postJson('/admin/integrations/midtrans/test')
             ->assertOk()
@@ -518,7 +516,7 @@ class AdminIntegrationsRestorationTest extends TestCase
 
                 return $digiflazz['callback']['required'] === true
                     && $digiflazz['callback']['ready'] === false
-                    && $digiflazz['callback']['status'] === 'ACTION_REQUIRED'
+                    && $digiflazz['callback']['status'] === 'NOT_READY'
                     && $digiflazz['e2e']['label'] === 'DEFERRED TO TAHAP 9';
             })
         );
