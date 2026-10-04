@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\IntegrationCredential;
+use App\Services\IntegrationRuntimeConfig;
 use App\Services\MidtransStatusVerification;
 use App\Services\Payment\DokuSignature;
 use App\Services\Payment\MidtransGateway;
@@ -17,11 +17,12 @@ class PaymentWebhookController
         Request $request,
         PaymentStateService $states,
         MidtransGateway $midtrans,
+        IntegrationRuntimeConfig $runtime,
     ): JsonResponse {
         $payload = $request->json()->all();
         $resolved = $runtime->resolve('midtrans');
         $config = $resolved['config'] ?? [];
-        if (! is_array($config) || empty($config['server_key'])) {
+        if (!is_array($config) || empty($config['server_key'])) {
             abort(503, 'Payment verification unavailable.');
         }
 
@@ -82,13 +83,18 @@ class PaymentWebhookController
         return response()->json(['status' => $processed ? 'ok' : 'duplicate']);
     }
 
-    public function doku(Request $request, DokuSignature $signature, PaymentStateService $states): JsonResponse
+    public function doku(
+        Request $request,
+        DokuSignature $signature,
+        PaymentStateService $states,
+        IntegrationRuntimeConfig $runtime,
+    ): JsonResponse
     {
         $raw = $request->getContent();
         $payload = $request->json()->all();
         $resolved = $runtime->resolve('doku');
         $config = $resolved['config'] ?? [];
-        if (! is_array($config) || empty($config['client_id']) || empty($config['secret_key'])) {
+        if (!is_array($config) || empty($config['client_id']) || empty($config['secret_key'])) {
             abort(503, 'Payment verification unavailable.');
         }
 
