@@ -14,6 +14,20 @@ class IntegrationRegistry
                 'name' => 'Digiflazz',
                 'group' => 'Provider',
                 'description' => 'Kredensial transaksi dan sinkronisasi produk Digiflazz.',
+                'default_environment' => 'test',
+                'credential_scope' => 'shared',
+                'environments' => [
+                    'test' => [
+                        'label' => 'DEVELOPMENT / TEST',
+                        'live' => false,
+                        'description' => 'Menggunakan parameter testing resmi Digiflazz pada endpoint API yang sama.',
+                    ],
+                    'production' => [
+                        'label' => 'PRODUCTION — TRANSAKSI/DATA NYATA',
+                        'live' => true,
+                        'description' => 'Request tanpa parameter testing; transaksi dapat diproses nyata oleh provider.',
+                    ],
+                ],
                 'fields' => [
                     'username' => [
                         'label' => 'Username Digiflazz',
@@ -25,7 +39,7 @@ class IntegrationRegistry
                         'label' => 'API Key',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Kunci API buyer. Nilai tidak pernah dikirim ke halaman pelanggan.',
+                        'help' => 'Kunci API buyer. Nilai lama tidak pernah dikirim kembali ke browser.',
                     ],
                     'webhook_secret' => [
                         'label' => 'Rahasia webhook',
@@ -33,31 +47,14 @@ class IntegrationRegistry
                         'required' => false,
                         'help' => 'Dipakai bila callback Digiflazz dikunci dengan rahasia tambahan.',
                     ],
-                    'base_url' => [
-                        'label' => 'Alamat API',
-                        'secret' => false,
-                        'required' => false,
-                        'help' => 'Alamat dasar API Digiflazz. Wajib HTTPS bila diisi.',
-                    ],
-                    'callback_url' => [
-                        'label' => 'Alamat callback',
-                        'secret' => false,
-                        'required' => false,
-                        'help' => 'Alamat callback yang didaftarkan ke provider. Wajib HTTPS bila diisi.',
-                    ],
-                    'testing' => [
-                        'label' => 'Mode pengujian',
-                        'secret' => false,
-                        'required' => false,
-                        'type' => 'boolean',
-                        'help' => 'Aktifkan hanya saat menggunakan alur pengujian provider.',
-                    ],
                 ],
+                'note' => 'Digiflazz memakai endpoint API yang sama. Mode Development/Test diterapkan melalui parameter testing resmi pada request transaksi.',
             ],
             'kokinpay' => [
                 'name' => 'Validasi Akun',
                 'group' => 'Validasi',
                 'description' => 'API pengecekan nickname, region MLBB, dan pelanggan PLN.',
+                'environment_note' => 'Environment terpisah tidak diaktifkan karena capability sandbox/test resmi untuk API yang digunakan belum terverifikasi.',
                 'fields' => [
                     'api_key' => [
                         'label' => 'API Key',
@@ -96,25 +93,32 @@ class IntegrationRegistry
                 'name' => 'Midtrans Snap',
                 'group' => 'Pembayaran',
                 'description' => 'Kredensial Midtrans untuk pembuatan pembayaran dan verifikasi notifikasi.',
+                'default_environment' => 'sandbox',
+                'credential_scope' => 'per_environment',
+                'environments' => [
+                    'sandbox' => [
+                        'label' => 'SANDBOX / TEST',
+                        'live' => false,
+                        'description' => 'Menggunakan endpoint dan credential Sandbox Midtrans.',
+                    ],
+                    'production' => [
+                        'label' => 'PRODUCTION — TRANSAKSI/DATA NYATA',
+                        'live' => true,
+                        'description' => 'Menggunakan endpoint dan credential Production Midtrans.',
+                    ],
+                ],
                 'fields' => [
                     'server_key' => [
                         'label' => 'Server Key',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Kunci server Midtrans. Hanya digunakan backend.',
+                        'help' => 'Kunci server untuk environment yang sedang dipilih. Hanya digunakan backend.',
                     ],
                     'client_key' => [
                         'label' => 'Client Key',
                         'secret' => true,
                         'required' => false,
-                        'help' => 'Kunci client bila dibutuhkan oleh flow Snap.',
-                    ],
-                    'is_production' => [
-                        'label' => 'Gunakan mode produksi',
-                        'secret' => false,
-                        'required' => false,
-                        'type' => 'boolean',
-                        'help' => 'Nonaktif berarti lingkungan sandbox.',
+                        'help' => 'Kunci client untuk environment yang sedang dipilih bila dibutuhkan oleh flow Snap.',
                     ],
                 ],
             ],
@@ -122,24 +126,32 @@ class IntegrationRegistry
                 'name' => 'DOKU Direct API',
                 'group' => 'Pembayaran',
                 'description' => 'Kredensial DOKU Direct API untuk channel yang dirutekan melalui DOKU.',
+                'default_environment' => 'sandbox',
+                'credential_scope' => 'per_environment',
+                'environments' => [
+                    'sandbox' => [
+                        'label' => 'SANDBOX / TEST',
+                        'live' => false,
+                        'description' => 'Menggunakan endpoint dan credential Sandbox DOKU.',
+                    ],
+                    'production' => [
+                        'label' => 'PRODUCTION — TRANSAKSI/DATA NYATA',
+                        'live' => true,
+                        'description' => 'Menggunakan endpoint dan credential Production DOKU.',
+                    ],
+                ],
                 'fields' => [
                     'client_id' => [
                         'label' => 'Client ID',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Identitas merchant DOKU.',
+                        'help' => 'Identitas merchant untuk environment yang sedang dipilih.',
                     ],
                     'secret_key' => [
                         'label' => 'Secret Key',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Kunci penandatanganan request DOKU. Hanya digunakan backend.',
-                    ],
-                    'base_url' => [
-                        'label' => 'Alamat API',
-                        'secret' => false,
-                        'required' => false,
-                        'help' => 'Alamat dasar DOKU Direct API. Wajib HTTPS bila diisi.',
+                        'help' => 'Kunci penandatanganan request untuk environment yang sedang dipilih.',
                     ],
                 ],
             ],
@@ -147,6 +159,7 @@ class IntegrationRegistry
                 'name' => 'Resend Email',
                 'group' => 'Email',
                 'description' => 'Pengiriman email transaksi dan notifikasi operasional.',
+                'environment_note' => 'Resend tidak memakai endpoint Sandbox/Production terpisah pada integrasi ini. Pisahkan domain/team atau credential bila diperlukan secara operasional.',
                 'fields' => [
                     'api_key' => [
                         'label' => 'API Key',
@@ -173,6 +186,7 @@ class IntegrationRegistry
                 'name' => 'Google OAuth',
                 'group' => 'Akun pelanggan',
                 'description' => 'Login dan pendaftaran pelanggan menggunakan akun Google.',
+                'environment_note' => 'Status Testing/Production OAuth dikelola di Google Cloud, bukan dengan endpoint backend terpisah. Karena itu panel tidak membuat selector environment palsu.',
                 'fields' => [
                     'client_id' => [
                         'label' => 'Client ID',
@@ -192,6 +206,7 @@ class IntegrationRegistry
                 'name' => 'Notifikasi Telegram',
                 'group' => 'Notifikasi',
                 'description' => 'Pengiriman notifikasi operasional Admin melalui bot Telegram.',
+                'environment_note' => 'Bot API yang digunakan tidak mempunyai selector Sandbox/Production terpisah di backend LFAMILIA.',
                 'fields' => [
                     'bot_token' => [
                         'label' => 'Token bot',
@@ -211,6 +226,7 @@ class IntegrationRegistry
                 'name' => 'Notifikasi Discord',
                 'group' => 'Notifikasi',
                 'description' => 'Pengiriman notifikasi operasional Admin melalui webhook Discord.',
+                'environment_note' => 'Webhook Discord yang digunakan tidak mempunyai selector Sandbox/Production terpisah.',
                 'fields' => [
                     'webhook_url' => [
                         'label' => 'Alamat webhook',
@@ -224,18 +240,32 @@ class IntegrationRegistry
                 'name' => 'Cloudflare Turnstile',
                 'group' => 'Keamanan',
                 'description' => 'Proteksi bot untuk form publik dan login yang terdeteksi mencurigakan.',
+                'default_environment' => 'test',
+                'credential_scope' => 'per_environment',
+                'environments' => [
+                    'test' => [
+                        'label' => 'TEST',
+                        'live' => false,
+                        'description' => 'Gunakan site key dan secret key pengujian Turnstile.',
+                    ],
+                    'production' => [
+                        'label' => 'PRODUCTION — DATA NYATA',
+                        'live' => true,
+                        'description' => 'Gunakan widget dan credential Turnstile milik hostname produksi.',
+                    ],
+                ],
                 'fields' => [
                     'site_key' => [
                         'label' => 'Site Key',
                         'secret' => false,
                         'required' => true,
-                        'help' => 'Kunci publik widget Turnstile.',
+                        'help' => 'Kunci publik widget Turnstile untuk environment yang sedang dipilih.',
                     ],
                     'secret_key' => [
                         'label' => 'Secret Key',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Kunci verifikasi server Turnstile.',
+                        'help' => 'Kunci verifikasi server Turnstile untuk environment yang sedang dipilih.',
                     ],
                     'allowed_hostnames' => [
                         'label' => 'Hostname yang diizinkan',
@@ -245,7 +275,7 @@ class IntegrationRegistry
                         'help' => 'Pisahkan beberapa hostname dengan koma. Jangan sertakan http:// atau https://.',
                     ],
                 ],
-                'note' => 'Turnstile digunakan pada alur publik yang dilindungi sesuai konfigurasi keamanan aplikasi.',
+                'note' => 'Test dan Production memakai credential terpisah. Backend hanya membaca profile dari environment yang dipilih.',
             ],
         ];
     }
@@ -283,5 +313,20 @@ class IntegrationRegistry
         return collect($definition['fields'])
             ->filter(fn (array $field): bool => (bool) ($field['required'] ?? false))
             ->keys()->values()->all();
+    }
+
+    /**
+     * @return array<string,array<string,mixed>>
+     */
+    public function environments(string $code): array
+    {
+        $environments = $this->get($code)['environments'] ?? [];
+
+        return is_array($environments) ? $environments : [];
+    }
+
+    public function credentialsArePerEnvironment(string $code): bool
+    {
+        return ($this->get($code)['credential_scope'] ?? 'shared') === 'per_environment';
     }
 }
