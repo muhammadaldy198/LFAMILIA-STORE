@@ -217,7 +217,7 @@ class SecurityM10Test extends TestCase
         );
     }
 
-    public function test_secret_reveal_requires_super_admin_password(): void
+    public function test_secret_reveal_endpoint_is_not_exposed(): void
     {
         $admin = AdminUser::create([
             'name' => 'Super Security',
@@ -235,17 +235,11 @@ class SecurityM10Test extends TestCase
 
         $this->postJson('/admin/integrations/midtrans/reveal/server_key', [
             'password' => 'wrong-password',
-        ])->assertUnprocessable()
-            ->assertJsonMissing(['value' => 'midtrans-secret-test']);
+        ])->assertNotFound();
 
-        $response = $this->postJson('/admin/integrations/midtrans/reveal/server_key', [
+        $this->postJson('/admin/integrations/midtrans/reveal/server_key', [
             'password' => 'VeryStrongPassword123!',
-        ])->assertOk()
-            ->assertJsonPath('value', 'midtrans-secret-test');
-        $this->assertStringContainsString(
-            'no-store',
-            (string) $response->headers->get('Cache-Control')
-        );
+        ])->assertNotFound();
     }
 
     public function test_audit_redacts_nested_sensitive_fields(): void
