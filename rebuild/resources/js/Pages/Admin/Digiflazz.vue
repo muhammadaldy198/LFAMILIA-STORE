@@ -247,7 +247,61 @@ function refresh() {
         </Card>
 
         <Card class="overflow-hidden">
-            <div class="overflow-x-auto">
+            <div class="grid divide-y md:hidden">
+                <article v-for="item in items.data" :key="item.id" class="min-w-0 p-4">
+                    <div class="flex min-w-0 items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <strong class="block break-words text-sm">{{ item.local_product_name || item.product_name }}</strong>
+                            <p class="mt-1 break-words text-sm">{{ item.local_package_name || item.product_name }}</p>
+                            <p class="mt-1 break-words text-xs text-muted-foreground">{{ item.category || 'Tanpa kategori' }} · {{ item.brand || 'Tanpa brand' }}</p>
+                        </div>
+                        <Badge class="shrink-0" :variant="healthVariant(item.health)">{{ healthLabel(item.health) }}</Badge>
+                    </div>
+
+                    <div class="mt-3 grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                        <div class="min-w-0">
+                            <p class="text-xs font-medium text-muted-foreground">SKU</p>
+                            <p class="mt-1 break-all font-mono text-xs">{{ item.buyer_sku_code }}</p>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-medium text-muted-foreground">Modal</p>
+                            <strong class="mt-1 block break-words">{{ money(item.price_idr) }}</strong>
+                            <p class="mt-1 break-words text-xs text-muted-foreground">Baseline {{ money(item.baseline_price_idr) }}</p>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-medium text-muted-foreground">Seller</p>
+                            <p class="mt-1 break-words">{{ item.seller_name || 'Seller tidak tersedia' }}</p>
+                            <p class="mt-1 break-words text-xs text-muted-foreground">{{ item.multi ? 'Transaksi bersamaan' : 'Transaksi berurutan' }}</p>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-medium text-muted-foreground">Stok / cut-off</p>
+                            <p class="mt-1 break-words">{{ item.unlimited_stock ? 'Tidak terbatas' : Number(item.stock).toLocaleString('id-ID') + ' tersisa' }}</p>
+                            <p class="mt-1 break-words text-xs text-muted-foreground">{{ item.start_cut_off === item.end_cut_off ? 'Tanpa cut-off' : item.start_cut_off + '–' + item.end_cut_off + ' WIB' }}</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+                        <p v-if="item.alert_reason" class="break-words">{{ item.alert_reason }}</p>
+                        <p :class="{ 'mt-1': item.alert_reason }">Produk {{ item.buyer_active ? 'aktif' : 'nonaktif' }} · Seller {{ item.seller_active ? 'aktif' : 'nonaktif' }}</p>
+                        <p v-if="item.mapped" class="mt-1">Mapping {{ item.mapping_active ? 'aktif' : 'nonaktif' }}</p>
+                    </div>
+
+                    <div class="mt-3 flex items-center justify-between gap-3">
+                        <Badge variant="outline">{{ item.mapped ? 'Terhubung' : 'Belum diimpor' }}</Badge>
+                        <p v-if="Number(item.price_idr) > Number(item.baseline_price_idr)" class="text-right text-xs">
+                            Naik {{ money(Number(item.price_idr) - Number(item.baseline_price_idr)) }}
+                        </p>
+                    </div>
+
+                    <div class="mt-3 grid gap-2">
+                        <Button class="w-full" size="sm" variant="outline" :disabled="syncForm.processing" @click="sync(item.id)">Sinkron SKU</Button>
+                        <Button class="w-full" size="sm" variant="outline" @click="baseline(item.id)">Jadikan baseline</Button>
+                    </div>
+                </article>
+                <div v-if="!items.data.length" class="px-4 py-10 text-center text-sm text-muted-foreground">Tidak ada SKU yang sesuai dengan filter.</div>
+            </div>
+
+            <div class="hidden overflow-x-auto md:block">
                 <Table class="min-w-[1100px] table-fixed">
                     <TableHeader>
                         <TableRow>
@@ -302,11 +356,11 @@ function refresh() {
                     </TableBody>
                 </Table>
             </div>
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t p-4">
+            <div class="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between">
                 <p class="text-sm text-muted-foreground">{{ items.from || 0 }}–{{ items.to || 0 }} dari {{ items.total }} SKU · Halaman {{ items.current_page }} dari {{ items.last_page }}</p>
-                <div class="flex gap-2">
-                    <Button variant="outline" size="sm" :disabled="!items.prev_page_url" @click="router.get(items.prev_page_url, {}, { preserveState:true, preserveScroll:true })">Sebelumnya</Button>
-                    <Button variant="outline" size="sm" :disabled="!items.next_page_url" @click="router.get(items.next_page_url, {}, { preserveState:true, preserveScroll:true })">Berikutnya</Button>
+                <div class="grid grid-cols-2 gap-2 sm:flex">
+                    <Button class="w-full sm:w-auto" variant="outline" size="sm" :disabled="!items.prev_page_url" @click="router.get(items.prev_page_url, {}, { preserveState:true, preserveScroll:true })">Sebelumnya</Button>
+                    <Button class="w-full sm:w-auto" variant="outline" size="sm" :disabled="!items.next_page_url" @click="router.get(items.next_page_url, {}, { preserveState:true, preserveScroll:true })">Berikutnya</Button>
                 </div>
             </div>
         </Card>
@@ -316,7 +370,35 @@ function refresh() {
                 <h2 class="font-semibold">Transaksi Digiflazz terbaru</h2>
                 <p class="mt-1 text-xs text-muted-foreground">Ringkasan operasional. Riwayat dan tindakan lengkap tetap berada di menu Pesanan dan Manual.</p>
             </div>
-            <div class="overflow-x-auto">
+
+            <div class="grid divide-y md:hidden">
+                <article v-for="row in recentTransactions" :key="row.id" class="min-w-0 p-4">
+                    <div class="flex min-w-0 items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <Link :href="'/admin/orders/' + row.order_id" class="break-words font-medium underline-offset-4 hover:underline">{{ row.order_number }}</Link>
+                            <p class="mt-1 break-words text-sm">{{ row.product_name }}</p>
+                            <p class="break-words text-xs text-muted-foreground">{{ row.package_name }}</p>
+                        </div>
+                        <Badge class="shrink-0" variant="secondary">{{ row.status_label }}</Badge>
+                    </div>
+                    <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                            <p class="font-medium text-muted-foreground">Waktu</p>
+                            <p class="mt-1 break-words text-foreground">{{ date(row.created_at) }}</p>
+                        </div>
+                        <div>
+                            <p class="font-medium text-muted-foreground">Provider</p>
+                            <p class="mt-1 break-words text-foreground">{{ row.provider_status || '—' }}</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 rounded-md border bg-muted/20 p-3 text-sm">
+                        <p class="break-words">{{ row.message || '—' }}</p>
+                    </div>
+                </article>
+                <div v-if="!recentTransactions.length" class="px-4 py-8 text-center text-sm text-muted-foreground">Belum ada transaksi Digiflazz.</div>
+            </div>
+
+            <div class="hidden overflow-x-auto md:block">
                 <Table class="min-w-[800px]">
                     <TableHeader>
                         <TableRow>
