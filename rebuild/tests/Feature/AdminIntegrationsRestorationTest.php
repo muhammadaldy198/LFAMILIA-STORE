@@ -114,14 +114,14 @@ class AdminIntegrationsRestorationTest extends TestCase
         $this->assertSame([], $resolved['config']);
         $this->assertFalse(app(PaymentRoutingService::class)->gatewayReady('MIDTRANS'));
 
-        IntegrationCredential::where('code', 'midtrans')->update([
-            'config_ciphertext' => [
-                'environment' => 'sandbox',
-                'profiles' => [
-                    'production' => ['server_key' => 'production-only-secret'],
-                ],
+        $credential = IntegrationCredential::where('code', 'midtrans')->firstOrFail();
+        $credential->config_ciphertext = [
+            'environment' => 'sandbox',
+            'profiles' => [
+                'production' => ['server_key' => 'production-only-secret'],
             ],
-        ]);
+        ];
+        $credential->save();
 
         $resolved = app(IntegrationRuntimeConfig::class)->resolve('midtrans');
         $this->assertSame('sandbox', $resolved['environment']);
