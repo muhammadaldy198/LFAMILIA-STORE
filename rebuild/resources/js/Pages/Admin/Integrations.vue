@@ -88,8 +88,6 @@ const statusLabel = (status) => ({
     OK: 'Berhasil',
 }[status] || 'Belum diketahui');
 
-const statusVariant = (status) => status === 'HEALTHY' ? 'secondary' : 'outline';
-
 const testedAt = (value) => {
     if (!value) return 'Belum pernah dites';
     const date = new Date(value);
