@@ -184,6 +184,7 @@ async function testConnection(item) {
 
         if (response.ok) {
             item.health = result;
+            item.connection_verified = result.verified === true;
         }
     } catch {
         item.result = { status: 'DOWN', message: 'Koneksi terputus. Coba lagi.' };
@@ -312,6 +313,35 @@ async function testConnection(item) {
                         <input v-model="item.is_active" type="checkbox" class="size-4">
                         Integrasi aktif
                     </label>
+                </div>
+
+                <div class="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    <div class="rounded-md border p-3">
+                        <p class="text-xs text-muted-foreground">Credential</p>
+                        <p class="mt-1 text-sm font-medium">
+                            {{ item.required_complete ? 'Configured' : 'Credential Missing' }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border p-3">
+                        <p class="text-xs text-muted-foreground">Connection</p>
+                        <p class="mt-1 text-sm font-medium">
+                            {{ item.connection_verified ? 'Connection Verified' : statusLabel(item.health?.status) }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border p-3">
+                        <p class="text-xs text-muted-foreground">Callback</p>
+                        <p class="mt-1 text-sm font-medium">
+                            {{ item.callback?.status === 'READY'
+                                ? 'Callback Ready'
+                                : item.callback?.status === 'NOT_REQUIRED'
+                                    ? 'Tidak diperlukan'
+                                    : 'Manual Action Required' }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border p-3">
+                        <p class="text-xs text-muted-foreground">E2E</p>
+                        <p class="mt-1 text-sm font-medium">{{ item.e2e_status }}</p>
+                    </div>
                 </div>
 
                 <div
