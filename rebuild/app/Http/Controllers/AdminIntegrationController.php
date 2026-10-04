@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -154,8 +155,6 @@ class AdminIntegrationController
             ];
         })->values();
 
-        $appUrl = rtrim((string) config('app.url'), '/');
-
         return Inertia::render('Admin/Integrations', [
             'integrations' => $integrations->all(),
             'summary' => [
@@ -170,10 +169,10 @@ class AdminIntegrationController
                 'configuration_complete' => $integrations->where('required_complete', true)->count(),
             ],
             'callbackUrls' => [
-                'midtrans' => $appUrl.'/api/payments/midtrans/notification',
-                'doku' => $appUrl.'/api/payments/doku/notification',
-                'digiflazz' => $appUrl.'/api/fulfillment/digiflazz/webhook',
-                'google' => $appUrl.'/auth/google/callback',
+                'midtrans' => $this->canonicalRouteUrl('api.payments.midtrans.notification'),
+                'doku' => $this->canonicalRouteUrl('api.payments.doku.notification'),
+                'digiflazz' => $this->canonicalRouteUrl('api.fulfillment.digiflazz.webhook'),
+                'google' => $this->canonicalRouteUrl('google.callback'),
             ],
         ]);
     }
@@ -683,6 +682,62 @@ class AdminIntegrationController
         ];
 
         return collect($existing)->except($reserved)->all();
+    }
+
+    /**
+     * @param  array<string,mixed>  $definition
+     * @param  array{required_complete:bool}  $profile
+     * @param  array<string,mixed>  $config
+     * @return array{required:bool,ready:bool,status:string,url:?string,message:string}
+     */
+    private function callbackReadiness(array $definition, array $profile, array $config): array
+    {
+        $callback = $definition['callback'] ?? null;
+        if (! is_array($callback)) {
+            return [
+                'required' => false,
+                'ready' => true,
+                'status' => 'NOT_REQUIRED',
+                'url' => null,
+                'message' => 'Integrasi ini tidak membutuhkan callback/redirect aplikasi.',
+            ];
+        }
+
+        $routeName = trim((string) ($callback['route'] ?? ''));
+        $url = $routeName !== '' && Route::has($routeName)
+            ? $this->canonicalRouteUrl($routeName)
+            : null;
+        $httpsReady = is_string($url) && str_starts_with(strtolower($url), 'https://');
+
+        $requiredFields = is_array($callback['required_fields'] ?? null)
+            ? $callback['required_fields']
+            : [];
+        $credentialsReady = collect($requiredFields)->every(function ($field) use ($config): bool {
+            $value = $config[(string) $field] ?? null;
+
+            return $value !== null && $value !== '' && $value !== [];
+        });
+
+        $ready = $httpsReady && $credentialsReady;
+
+        return [
+            'required' => true,
+            'ready' => $ready,
+            'status' => $ready ? 'READY' : 'ACTION_REQUIRED',
+            'url' => $url,
+            'message' => ! $httpsReady
+                ? 'Callback/redirect canonical belum tersedia melalui HTTPS.'
+                : ($credentialsReady
+                    ? 'Route callback tersedia melalui HTTPS dan kebutuhan verifikasi backend sudah dikonfigurasi.'
+                    : 'Route callback tersedia, tetapi credential verifikasi callback belum lengkap.'),
+        ];
+    }
+
+    private function canonicalRouteUrl(string $routeName): string
+    {
+        $path = route($routeName, [], false);
+
+        return rtrim((string) config('app.url'), '/').'/'.ltrim($path, '/');
     }
 
     private function ensureSuperAdmin(Request $request): void
