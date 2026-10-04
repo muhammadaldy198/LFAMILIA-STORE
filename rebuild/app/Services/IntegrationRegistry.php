@@ -15,7 +15,7 @@ class IntegrationRegistry
                 'group' => 'Provider',
                 'description' => 'Kredensial transaksi dan sinkronisasi produk Digiflazz.',
                 'default_environment' => 'test',
-                'credential_scope' => 'shared',
+                'credential_scope' => 'per_environment',
                 'environments' => [
                     'test' => [
                         'label' => 'DEVELOPMENT / TEST',
@@ -39,7 +39,7 @@ class IntegrationRegistry
                         'label' => 'API Key',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Kunci API buyer. Nilai lama tidak pernah dikirim kembali ke browser.',
+                        'help' => 'Kunci API buyer untuk environment yang sedang dipilih. Development dan Production disimpan terpisah.',
                     ],
                     'webhook_secret' => [
                         'label' => 'Rahasia webhook',
@@ -53,7 +53,7 @@ class IntegrationRegistry
                     'route' => 'api.fulfillment.digiflazz.webhook',
                     'required_fields' => ['webhook_secret'],
                 ],
-                'note' => 'Digiflazz memakai endpoint API yang sama. Mode Development/Test diterapkan melalui parameter testing resmi pada request transaksi.',
+                'note' => 'Digiflazz memakai endpoint API yang sama, tetapi Development dan Production menggunakan API key terpisah. Mode Development/Test juga menerapkan parameter testing resmi pada request transaksi.',
             ],
             'kokinpay' => [
                 'name' => 'Validasi Akun',
