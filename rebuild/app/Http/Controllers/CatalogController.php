@@ -28,13 +28,13 @@ class CatalogController
         ]);
         $search = trim($filters['q'] ?? '');
 
-        $categories = Category::where('is_active', true)->orderBy('sort_order')->get()
+        $categories = Category::with('media')->where('is_active', true)->orderBy('sort_order')->get()
             ->map(fn (Category $category): array => [
                 ...$category->only('name', 'slug', 'icon'),
                 'image_url' => $category->getFirstMediaUrl('image'),
             ]);
 
-        $products = Product::with('category')->where('is_active', true)
+        $products = Product::with(['category', 'media'])->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('is_active', true))
             ->whereHas('packages', fn ($query) => $query->where('is_active', true))
             ->when(($filters['category'] ?? null), fn ($query, $slug) => $query->whereHas('category',
@@ -50,7 +50,7 @@ class CatalogController
                 'image_url' => $product->getFirstMediaUrl('image'),
             ]);
 
-        $popularProducts = Product::with('category')
+        $popularProducts = Product::with(['category', 'media'])
             ->withCount(['reviews as active_reviews_count' => fn ($query) => $query->where('is_active', true)])
             ->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('is_active', true))
@@ -68,7 +68,7 @@ class CatalogController
                 'image_url' => $product->getFirstMediaUrl('image'),
             ]);
 
-        $assets = StoreAsset::where('is_active', true)->get()->keyBy('key');
+        $assets = StoreAsset::with('media')->where('is_active', true)->get()->keyBy('key');
         $banners = $content->homeBanners();
         if ($banners->isEmpty()) {
             $desktop = $assets->get('banner_desktop');
@@ -110,12 +110,12 @@ class CatalogController
         PaymentRoutingService $paymentRouting,
         StorefrontContentService $content,
     ): Response {
-        $product = Product::with('category')->where('slug', $slug)
+        $product = Product::with(['category', 'media'])->where('slug', $slug)
             ->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('is_active', true))
             ->firstOrFail();
 
-        $packages = ProductPackage::where('product_id', $product->id)
+        $packages = ProductPackage::with('media')->where('product_id', $product->id)
             ->where('is_active', true)
             ->orderByRaw('nominal_value IS NULL')
             ->orderBy('sort_order')->orderBy('nominal_value')->orderBy('id')->get()
