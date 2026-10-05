@@ -191,7 +191,7 @@ jobs:
           OPS_ENV_FILE=/tmp/lfamilia-ci-etc/ops.env bash deploy/restore-verify.sh
 
       - name: Run rebuild tests
-        run: vendor/bin/phpunit
+        run: vendor/bin/paratest -p8 --runner=WrapperRunner
 
       - name: Run M11 browser smoke
         run: bash tests/Browser/smoke.sh
