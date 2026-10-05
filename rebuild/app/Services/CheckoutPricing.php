@@ -40,7 +40,7 @@ class CheckoutPricing
         }
 
         $context = $contextQuery->first();
-        if (! $context) {
+        if (!$context) {
             throw ValidationException::withMessages([
                 'package_id' => 'Produk atau nominal tidak tersedia.',
             ]);
@@ -90,7 +90,7 @@ class CheckoutPricing
 
             return $item === null || app(DigiflazzCatalogService::class)->available($item);
         });
-        if (! $mapping) {
+        if (!$mapping) {
             throw ValidationException::withMessages([
                 'package_id' => 'Nominal sedang tidak tersedia untuk checkout.',
             ]);
@@ -222,7 +222,7 @@ class CheckoutPricing
         $results = [];
         foreach ($packageIds as $packageId) {
             $context = $contexts->get($packageId);
-            if (! $context) {
+            if (!$context) {
                 continue; // Package unavailable — skip (not in result)
             }
 
@@ -244,7 +244,7 @@ class CheckoutPricing
                 return $item === null || $digiflazzService->available($item);
             });
 
-            if (! $mapping) {
+            if (!$mapping) {
                 continue; // No valid mapping — skip
             }
 
