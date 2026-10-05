@@ -40,7 +40,7 @@ class CheckoutPricing
         }
 
         $context = $contextQuery->first();
-        if (!$context) {
+        if (! $context) {
             throw ValidationException::withMessages([
                 'package_id' => 'Produk atau nominal tidak tersedia.',
             ]);
@@ -90,7 +90,7 @@ class CheckoutPricing
 
             return $item === null || app(DigiflazzCatalogService::class)->available($item);
         });
-        if (!$mapping) {
+        if (! $mapping) {
             throw ValidationException::withMessages([
                 'package_id' => 'Nominal sedang tidak tersedia untuk checkout.',
             ]);
@@ -222,7 +222,7 @@ class CheckoutPricing
         $results = [];
         foreach ($packageIds as $packageId) {
             $context = $contexts->get($packageId);
-            if (!$context) {
+            if (! $context) {
                 continue; // Package unavailable — skip (not in result)
             }
 
@@ -235,16 +235,18 @@ class CheckoutPricing
                         ? (json_decode($candidate->fulfillment_config, true) ?: [])
                         : (is_array($candidate->fulfillment_config) ? $candidate->fulfillment_config : []);
                     $stockKey = trim((string) ($config['stock_key'] ?? ''));
+
                     return $stockKey !== '' && $voucherService->available($stockKey);
                 }
                 if ($candidate->provider_code !== 'DIGIFLAZZ') {
                     return true;
                 }
                 $item = $digiflazzItems->get($candidate->external_sku);
+
                 return $item === null || $digiflazzService->available($item);
             });
 
-            if (!$mapping) {
+            if (! $mapping) {
                 continue; // No valid mapping — skip
             }
 
@@ -286,7 +288,7 @@ class CheckoutPricing
 
     private function margin(int $cost, string $percent): int
     {
-        if (!preg_match('/^(\d+)(?:\.(\d{1,4}))?$/', $percent, $matches)) {
+        if (! preg_match('/^(\d+)(?:\.(\d{1,4}))?$/', $percent, $matches)) {
             throw ValidationException::withMessages(['package_id' => 'Konfigurasi margin tidak valid.']);
         }
 
