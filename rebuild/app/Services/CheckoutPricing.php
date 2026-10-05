@@ -129,6 +129,161 @@ class CheckoutPricing
         ];
     }
 
+    /**
+     * Batch version of forPackage() — fetches pricing for multiple packages
+     * in a constant number of queries instead of N+1.
+     *
+     * Unlike forPackage(), this does NOT throw for unavailable packages.
+     * Instead, unavailable packages are simply absent from the result map.
+     *
+     * @param int[] $packageIds
+     * @return array<int, array<string, mixed>> Map of package_id => quote array (only for available packages)
+     */
+    public function forPackages(array $packageIds): array
+    {
+        if (empty($packageIds)) {
+            return [];
+        }
+
+        $packageIds = array_values(array_unique(array_map('intval', $packageIds)));
+
+        // 1. Fetch all contexts in one query
+        $contexts = DB::table('product_packages as packages')
+            ->join('products', 'products.id', '=', 'packages.product_id')
+            ->join('categories', 'categories.id', '=', 'products.category_id')
+            ->whereIn('packages.id', $packageIds)
+            ->where('packages.is_active', true)
+            ->where('products.is_active', true)
+            ->where('categories.is_active', true)
+            ->select(
+                'packages.id as package_id',
+                'packages.code as package_code',
+                'packages.name as package_name',
+                'packages.nominal_value',
+                'packages.pricing_mode',
+                'packages.margin_percent as package_margin_percent',
+                'packages.margin_fixed_idr',
+                'packages.sell_price_idr',
+                'products.id as product_id',
+                'products.name as product_name',
+                'products.slug as product_slug',
+                'products.category_id',
+                'products.margin_percent',
+                'products.fulfillment_mode',
+                'categories.name as category_name'
+            )
+            ->get()
+            ->keyBy('package_id');
+
+        // 2. Fetch all mappings in one query
+        $allMappings = DB::table('provider_mappings as mappings')
+            ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+            ->whereIn('mappings.product_package_id', $packageIds)
+            ->where('mappings.is_active', true)
+            ->where('providers.is_active', true)
+            ->whereNotNull('mappings.cost_idr')
+            ->where('mappings.cost_idr', '>', 0)
+            ->where(function ($query): void {
+                $query->whereNull('mappings.max_price_idr')
+                    ->orWhereColumn('mappings.cost_idr', '<=', 'mappings.max_price_idr');
+            })
+            ->orderBy('mappings.priority')
+            ->orderBy('mappings.cost_idr')
+            ->orderBy('mappings.id')
+            ->select(
+                'mappings.product_package_id',
+                'mappings.id as mapping_id',
+                'mappings.external_sku',
+                'mappings.cost_idr',
+                'mappings.max_price_idr',
+                'mappings.fulfillment_config',
+                'providers.code as provider_code',
+                'providers.fulfillment_mode'
+            )
+            ->get()
+            ->groupBy('product_package_id');
+
+        // 3. Pre-fetch Digiflazz catalog items for all SKUs in one query
+        $allSkus = $allMappings->flatten(1)
+            ->where('provider_code', 'DIGIFLAZZ')
+            ->pluck('external_sku')
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $digiflazzItems = empty($allSkus) ? collect() : DB::table('digiflazz_catalog_items')
+            ->whereIn('buyer_sku_code', $allSkus)
+            ->get()
+            ->keyBy('buyer_sku_code');
+
+        $digiflazzService = app(DigiflazzCatalogService::class);
+        $voucherService = app(VoucherStockService::class);
+
+        $results = [];
+        foreach ($packageIds as $packageId) {
+            $context = $contexts->get($packageId);
+            if (! $context) {
+                continue; // Package unavailable — skip (not in result)
+            }
+
+            $candidates = ($allMappings->get($packageId) ?? collect())
+                ->filter(fn ($m) => $m->fulfillment_mode === $context->fulfillment_mode);
+
+            $mapping = $candidates->first(function (object $candidate) use ($digiflazzItems, $digiflazzService, $voucherService): bool {
+                if ($candidate->provider_code === 'VOUCHER_STOCK') {
+                    $config = is_string($candidate->fulfillment_config)
+                        ? (json_decode($candidate->fulfillment_config, true) ?: [])
+                        : (is_array($candidate->fulfillment_config) ? $candidate->fulfillment_config : []);
+                    $stockKey = trim((string) ($config['stock_key'] ?? ''));
+                    return $stockKey !== '' && $voucherService->available($stockKey);
+                }
+                if ($candidate->provider_code !== 'DIGIFLAZZ') {
+                    return true;
+                }
+                $item = $digiflazzItems->get($candidate->external_sku);
+                return $item === null || $digiflazzService->available($item);
+            });
+
+            if (! $mapping) {
+                continue; // No valid mapping — skip
+            }
+
+            $cost = (int) $mapping->cost_idr;
+            $percent = $context->pricing_mode === 'PERCENT' ? $context->package_margin_percent : $context->margin_percent;
+            $margin = match ($context->pricing_mode) {
+                'FIXED' => (int) $context->margin_fixed_idr,
+                'SELL_PRICE' => (int) $context->sell_price_idr - $cost,
+                default => $this->margin($cost, (string) $percent),
+            };
+            if ($margin < 0) {
+                continue; // Invalid margin — skip
+            }
+
+            $results[$packageId] = [
+                'product_id' => (int) $context->product_id,
+                'product_name' => $context->product_name,
+                'product_slug' => $context->product_slug,
+                'category_id' => (int) $context->category_id,
+                'category_name' => $context->category_name,
+                'fulfillment_mode' => $context->fulfillment_mode,
+                'margin_percent' => (string) $context->margin_percent,
+                'package_id' => (int) $context->package_id,
+                'package_code' => $context->package_code,
+                'package_name' => $context->package_name,
+                'nominal_value' => $context->nominal_value !== null ? (int) $context->nominal_value : null,
+                'provider_mapping_id' => (int) $mapping->mapping_id,
+                'provider_code' => $mapping->provider_code,
+                'provider_sku' => $mapping->external_sku,
+                'max_price_idr' => $mapping->max_price_idr !== null ? (int) $mapping->max_price_idr : null,
+                'cost_idr' => $cost,
+                'margin_idr' => $margin,
+                'subtotal_idr' => $cost + $margin,
+            ];
+        }
+
+        return $results;
+    }
+
     private function margin(int $cost, string $percent): int
     {
         if (! preg_match('/^(\d+)(?:\.(\d{1,4}))?$/', $percent, $matches)) {
