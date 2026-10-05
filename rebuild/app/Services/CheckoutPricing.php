@@ -286,7 +286,7 @@ class CheckoutPricing
 
     private function margin(int $cost, string $percent): int
     {
-        if (! preg_match('/^(\d+)(?:\.(\d{1,4}))?$/', $percent, $matches)) {
+        if (!preg_match('/^(\d+)(?:\.(\d{1,4}))?$/', $percent, $matches)) {
             throw ValidationException::withMessages(['package_id' => 'Konfigurasi margin tidak valid.']);
         }
 
