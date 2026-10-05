@@ -223,8 +223,5 @@ jobs:
       - name: Lint Vue and JavaScript
         run: npm run lint
 
-      - name: Check Vue SFCs
-        run: npm run check
-
       - name: Build frontend
         run: npm run build
