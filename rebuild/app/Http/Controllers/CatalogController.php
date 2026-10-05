@@ -115,27 +115,23 @@ class CatalogController
             ->whereHas('category', fn ($query) => $query->where('is_active', true))
             ->firstOrFail();
 
-        $packages = ProductPackage::with('media')->where('product_id', $product->id)
+        $packageModels = ProductPackage::with('media')->where('product_id', $product->id)
             ->where('is_active', true)
             ->orderByRaw('nominal_value IS NULL')
-            ->orderBy('sort_order')->orderBy('nominal_value')->orderBy('id')->get()
-            ->map(function (ProductPackage $package) use ($pricing): array {
-                try {
-                    $quote = $pricing->forPackage($package->id);
-                    $available = true;
-                    $price = $quote['subtotal_idr'];
-                } catch (ValidationException) {
-                    $available = false;
-                    $price = null;
-                }
+            ->orderBy('sort_order')->orderBy('nominal_value')->orderBy('id')->get();
 
-                return [
-                    ...$package->only('id', 'name', 'note', 'group_name', 'nominal_value'),
-                    'image_url' => $package->getFirstMediaUrl('image'),
-                    'is_available' => $available,
-                    'price_idr' => $price,
-                ];
-            });
+        $quotes = $pricing->forPackages($packageModels->pluck('id')->toArray());
+
+        $packages = $packageModels->map(function (ProductPackage $package) use ($quotes): array {
+            $quote = $quotes[$package->id] ?? null;
+
+            return [
+                ...$package->only('id', 'name', 'note', 'group_name', 'nominal_value'),
+                'image_url' => $package->getFirstMediaUrl('image'),
+                'is_available' => $quote !== null,
+                'price_idr' => $quote['subtotal_idr'] ?? null,
+            ];
+        });
 
         $user = auth('web')->user();
         $reviews = ProductReview::where('product_id', $product->id)->where('is_active', true)
