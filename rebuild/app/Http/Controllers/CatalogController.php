@@ -1,1 +1,221 @@
-PD9waHAKCm5hbWVzcGFjZSBBcHBcSHR0cFxDb250cm9sbGVyczsKCnVzZSBBcHBcTW9kZWxzXENhdGVnb3J5Owp1c2UgQXBwXE1vZGVsc1xQcm9kdWN0Owp1c2UgQXBwXE1vZGVsc1xQcm9kdWN0SW5wdXRGaWVsZDsKdXNlIEFwcFxNb2RlbHNcUHJvZHVjdFBhY2thZ2U7CnVzZSBBcHBcTW9kZWxzXFByb2R1Y3RSZXZpZXc7CnVzZSBBcHBcTW9kZWxzXFNhdmVkR2FtZUFjY291bnQ7CnVzZSBBcHBcTW9kZWxzXFN0b3JlQXNzZXQ7CnVzZSBBcHBcU2VydmljZXNcQ2hlY2tvdXRQcmljaW5nOwp1c2UgQXBwXFNlcnZpY2VzXFBheW1lbnRSb3V0aW5nU2VydmljZTsKdXNlIEFwcFxTZXJ2aWNlc1xTdG9yZWZyb250Q29udGVudFNlcnZpY2U7CnVzZSBJbGx1bWluYXRlXEh0dHBcUmVxdWVzdDsKdXNlIElsbHVtaW5hdGVcVmFsaWRhdGlvblxWYWxpZGF0aW9uRXhjZXB0aW9uOwp1c2UgSW5lcnRpYVxJbmVydGlhOwp1c2UgSW5lcnRpYVxSZXNwb25zZTsKCmNsYXNzIENhdGFsb2dDb250cm9sbGVyCnsKICAgIHB1YmxpYyBmdW5jdGlvbiBpbmRleChSZXF1ZXN0ICRyZXF1ZXN0LCBTdG9yZWZyb250Q29udGVudFNlcnZpY2UgJGNvbnRlbnQpOiBSZXNwb25zZQogICAgewogICAgICAgICRmaWx0ZXJzID0gJHJlcXVlc3QtPnZhbGlkYXRlKFsKICAgICAgICAgICAgJ3EnID0+IFsnbnVsbGFibGUnLCAnc3RyaW5nJywgJ21heDo4MCddLAogICAgICAgICAgICAnY2F0ZWdvcnknID0+IFsnbnVsbGFibGUnLCAnc3RyaW5nJywgJ21heDoyNTUnXSwKICAgICAgICAgICAgJ21vZGUnID0+IFsnbnVsbGFibGUnLCAnaW46bWFudWFsJ10sCiAgICAgICAgXSk7CiAgICAgICAgJHNlYXJjaCA9IHRyaW0oJGZpbHRlcnNbJ3EnXSA/PyAnJyk7CgogICAgICAgICRjYXRlZ29yaWVzID0gQ2F0ZWdvcnk6OndpdGgoJ21lZGlhJyktPndoZXJlKCdpc19hY3RpdmUnLCB0cnVlKS0+b3JkZXJCeSgnc29ydF9vcmRlcicpLT5nZXQoKQogICAgICAgICAgICAtPm1hcChmbiAoQ2F0ZWdvcnkgJGNhdGVnb3J5KTogYXJyYXkgPT4gWwogICAgICAgICAgICAgICAgLi4uJGNhdGVnb3J5LT5vbmx5KCduYW1lJywgJ3NsdWcnLCAnaWNvbicpLAogICAgICAgICAgICAgICAgJ2ltYWdlX3VybCcgPT4gJGNhdGVnb3J5LT5nZXRGaXJzdE1lZGlhVXJsKCdpbWFnZScpLAogICAgICAgICAgICBdKTsKCiAgICAgICAgJHByb2R1Y3RzID0gUHJvZHVjdDo6d2l0aChbJ2NhdGVnb3J5JywgJ21lZGlhJ10pLT53aGVyZSgnaXNfYWN0aXZlJywgdHJ1ZSkKICAgICAgICAgICAgLT53aGVyZUhhcygnY2F0ZWdvcnknLCBmbiAoJHF1ZXJ5KSA9PiAkcXVlcnktPndoZXJlKCdpc19hY3RpdmUnLCB0cnVlKSkKICAgICAgICAgICAgLT53aGVyZUhhcygncGFja2FnZXMnLCBmbiAoJHF1ZXJ5KSA9PiAkcXVlcnktPndoZXJlKCdpc19hY3RpdmUnLCB0cnVlKSkKICAgICAgICAgICAgLT53aGVuKCgkZmlsdGVyc1snY2F0ZWdvcnknXSA/PyBudWxsKSwgZm4gKCRxdWVyeSwgJHNsdWcpID0+ICRxdWVyeS0+d2hlcmVIYXMoJ2NhdGVnb3J5JywKICAgICAgICAgICAgICAgIGZuICgkY2F0ZWdvcnkpID0+ICRjYXRlZ29yeS0+d2hlcmUoJ3NsdWcnLCAkc2x1ZykpKQogICAgICAgICAgICAtPndoZW4oKCRmaWx0ZXJzWydtb2RlJ10gPz8gbnVsbCkgPT09ICdtYW51YWwnLCBmbiAoJHF1ZXJ5KSA9PiAkcXVlcnktPndoZXJlKCdmdWxmaWxsbWVudF9tb2RlJywgJ01BTlVBTCcpKQogICAgICAgICAgICAtPndoZW4oJHNlYXJjaCAhPT0gJycsIGZuICgkcXVlcnkpID0+ICRxdWVyeS0+d2hlcmUoJ25hbWUnLCAnbGlrZScsICclJy4kc2VhcmNoLiclJykpCiAgICAgICAgICAgIC0+b3JkZXJCeSgnc29ydF9vcmRlcicpLT5vcmRlckJ5KCduYW1lJyktPnBhZ2luYXRlKDI0KQogICAgICAgICAgICAtPndpdGhRdWVyeVN0cmluZygpCiAgICAgICAgICAgIC0+dGhyb3VnaChmbiAoUHJvZHVjdCAkcHJvZHVjdCk6IGFycmF5ID0+IFsKICAgICAgICAgICAgICAgIC4uLiRwcm9kdWN0LT5vbmx5KCduYW1lJywgJ3NsdWcnLCAnaW5pdGlhbHMnLCAnYWNjZW50X2NvbG9yJywgJ2luc3RhbnQnKSwKICAgICAgICAgICAgICAgICdjYXRlZ29yeV9uYW1lJyA9PiAkcHJvZHVjdC0+Y2F0ZWdvcnktPm5hbWUsCiAgICAgICAgICAgICAgICAnY2F0ZWdvcnlfc2x1ZycgPT4gJHByb2R1Y3QtPmNhdGVnb3J5LT5zbHVnLAogICAgICAgICAgICAgICAgJ2ltYWdlX3VybCcgPT4gJHByb2R1Y3QtPmdldEZpcnN0TWVkaWFVcmwoJ2ltYWdlJyksCiAgICAgICAgICAgIF0pOwoKICAgICAgICAkcG9wdWxhclByb2R1Y3RzID0gUHJvZHVjdDo6d2l0aChbJ2NhdGVnb3J5JywgJ21lZGlhJ10pCiAgICAgICAgICAgIC0+d2l0aENvdW50KFsncmV2aWV3cyBhcyBhY3RpdmVfcmV2aWV3c19jb3VudCcgPT4gZm4gKCRxdWVyeSkgPT4gJHF1ZXJ5LT53aGVyZSgnaXNfYWN0aXZlJywgdHJ1ZSldKQogICAgICAgICAgICAtPndoZXJlKCdpc19hY3RpdmUnLCB0cnVlKQogICAgICAgICAgICAtPndoZXJlSGFzKCdjYXRlZ29yeScsIGZuICgkcXVlcnkpID0+ICRxdWVyeS0+d2hlcmUoJ2lzX2FjdGl2ZScsIHRydWUpKQogICAgICAgICAgICAtPndoZXJlSGFzKCdwYWNrYWdlcycsIGZuICgkcXVlcnkpID0+ICRxdWVyeS0+d2hlcmUoJ2lzX2FjdGl2ZScsIHRydWUpKQogICAgICAgICAgICAtPm9yZGVyQnlEZXNjKCdwb3B1bGFyJykKICAgICAgICAgICAgLT5vcmRlckJ5RGVzYygnYWN0aXZlX3Jldmlld3NfY291bnQnKQogICAgICAgICAgICAtPm9yZGVyQnkoJ3NvcnRfb3JkZXInKQogICAgICAgICAgICAtPm9yZGVyQnkoJ25hbWUnKQogICAgICAgICAgICAtPmxpbWl0KDgpCiAgICAgICAgICAgIC0+Z2V0KCkKICAgICAgICAgICAgLT5tYXAoZm4gKFByb2R1Y3QgJHByb2R1Y3QpOiBhcnJheSA9PiBbCiAgICAgICAgICAgICAgICAuLi4kcHJvZHVjdC0+b25seSgnbmFtZScsICdzbHVnJywgJ3BvcHVsYXInLCAnaW5pdGlhbHMnLCAnYWNjZW50X2NvbG9yJywgJ2luc3RhbnQnKSwKICAgICAgICAgICAgICAgICdjYXRlZ29yeV9uYW1lJyA9PiAkcHJvZHVjdC0+Y2F0ZWdvcnktPm5hbWUsCiAgICAgICAgICAgICAgICAnY2F0ZWdvcnlfc2x1ZycgPT4gJHByb2R1Y3QtPmNhdGVnb3J5LT5zbHVnLAogICAgICAgICAgICAgICAgJ2ltYWdlX3VybCcgPT4gJHByb2R1Y3QtPmdldEZpcnN0TWVkaWFVcmwoJ2ltYWdlJyksCiAgICAgICAgICAgIF0pOwoKICAgICAgICAkYXNzZXRzID0gU3RvcmVBc3NldDo6d2l0aCgnbWVkaWEnKS0+d2hlcmUoJ2lzX2FjdGl2ZScsIHRydWUpLT5nZXQoKS0+a2V5QnkoJ2tleScpOwogICAgICAgICRiYW5uZXJzID0gJGNvbnRlbnQtPmhvbWVCYW5uZXJzKCk7CiAgICAgICAgaWYgKCRiYW5uZXJzLT5pc0VtcHR5KCkpIHsKICAgICAgICAgICAgJGRlc2t0b3AgPSAkYXNzZXRzLT5nZXQoJ2Jhbm5lcl9kZXNrdG9wJyk7CiAgICAgICAgICAgICRtb2JpbGUgPSAkYXNzZXRzLT5nZXQoJ2Jhbm5lcl9tb2JpbGUnKTsKICAgICAgICAgICAgaWYgKCRkZXNrdG9wIHx8ICRtb2JpbGUpIHsKICAgICAgICAgICAgICAgICRiYW5uZXJzID0gY29sbGVjdChbWwogICAgICAgICAgICAgICAgICAgICdpZCcgPT4gbnVsbCwKICAgICAgICAgICAgICAgICAgICAndGl0bGUnID0+ICdMRkFNSUxJQSBTVE9SRScsCiAgICAgICAgICAgICAgICAgICAgJ3N1YnRpdGxlJyA9PiBudWxsLAogICAgICAgICAgICAgICAgICAgICdjdGFfbGFiZWwnID0+IG51bGwsCiAgICAgICAgICAgICAgICAgICAgJ2N0YV9ocmVmJyA9PiAkZGVza3RvcD8tPnRhcmdldF91cmwgPzogJG1vYmlsZT8tPnRhcmdldF91cmwsCiAgICAgICAgICAgICAgICAgICAgJ3Nob3dfZGVza3RvcCcgPT4gdHJ1ZSwKICAgICAgICAgICAgICAgICAgICAnc2hvd19tb2JpbGUnID0+IHRydWUsCiAgICAgICAgICAgICAgICAgICAgJ3NvcnRfb3JkZXInID0+IDAsCiAgICAgICAgICAgICAgICAgICAgJ2Rlc2t0b3BfdXJsJyA9PiAkZGVza3RvcD8tPmdldEZpcnN0TWVkaWFVcmwoJ2ltYWdlJykgPzogJG1vYmlsZT8tPmdldEZpcnN0TWVkaWFVcmwoJ2ltYWdlJyksCiAgICAgICAgICAgICAgICAgICAgJ21vYmlsZV91cmwnID0+ICRtb2JpbGU/LT5nZXRGaXJzdE1lZGlhVXJsKCdpbWFnZScpID86ICRkZXNrdG9wPy0+Z2V0Rmlyc3RNZWRpYVVybCgnaW1hZ2UnKSwKICAgICAgICAgICAgICAgIF1dKTsKICAgICAgICAgICAgfQogICAgICAgIH0KCiAgICAgICAgcmV0dXJuIEluZXJ0aWE6OnJlbmRlcignQ2F0YWxvZy9JbmRleCcsIFsKICAgICAgICAgICAgJ2NhdGVnb3JpZXMnID0+ICRjYXRlZ29yaWVzLAogICAgICAgICAgICAncHJvZHVjdHMnID0+ICRwcm9kdWN0cywKICAgICAgICAgICAgJ3BvcHVsYXJQcm9kdWN0cycgPT4gJHBvcHVsYXJQcm9kdWN0cywKICAgICAgICAgICAgJ2ZpbHRlcnMnID0+ICRmaWx0ZXJzLAogICAgICAgICAgICAnbG9nb1VybCcgPT4gJGFzc2V0cy0+Z2V0KCdsb2dvJyk/LT5nZXRGaXJzdE1lZGlhVXJsKCdpbWFnZScpLAogICAgICAgICAgICAnZmF2aWNvblVybCcgPT4gJGFzc2V0cy0+Z2V0KCdmYXZpY29uJyk/LT5nZXRGaXJzdE1lZGlhVXJsKCdpbWFnZScpLAogICAgICAgICAgICAnYmFubmVycycgPT4gJGJhbm5lcnMsCiAgICAgICAgICAgICdwb3B1cHMnID0+ICRjb250ZW50LT5wb3B1cHMoKSwKICAgICAgICAgICAgJ25ld3MnID0+ICRjb250ZW50LT5uZXdzKDMpLAogICAgICAgICAgICAncmV2aWV3cycgPT4gJGNvbnRlbnQtPnJldmlld3MoNiksCiAgICAgICAgXSk7CiAgICB9CgogICAgcHVibGljIGZ1bmN0aW9uIHNob3coCiAgICAgICAgUmVxdWVzdCAkcmVxdWVzdCwKICAgICAgICBzdHJpbmcgJHNsdWcsCiAgICAgICAgQ2hlY2tvdXRQcmljaW5nICRwcmljaW5nLAogICAgICAgIFBheW1lbnRSb3V0aW5nU2VydmljZSAkcGF5bWVudFJvdXRpbmcsCiAgICAgICAgU3RvcmVmcm9udENvbnRlbnRTZXJ2aWNlICRjb250ZW50LAogICAgKTogUmVzcG9uc2UgewogICAgICAgICRwcm9kdWN0ID0gUHJvZHVjdDo6d2l0aChbJ2NhdGVnb3J5JywgJ21lZGlhJ10pLT53aGVyZSgnc2x1ZycsICRzbHVnKQogICAgICAgICAgICAtPndoZXJlKCdpc19hY3RpdmUnLCB0cnVlKQogICAgICAgICAgICAtPndoZXJlSGFzKCdjYXRlZ29yeScsIGZuICgkcXVlcnkpID0+ICRxdWVyeS0+d2hlcmUoJ2lzX2FjdGl2ZScsIHRydWUpKQogICAgICAgICAgICAtPmZpcnN0T3JGYWlsKCk7CgogICAgICAgICRwYWNrYWdlcyA9IFByb2R1Y3RQYWNrYWdlOjp3aXRoKCdtZWRpYScpLT53aGVyZSgncHJvZHVjdF9pZCcsICRwcm9kdWN0LT5pZCkKICAgICAgICAgICAgLT53aGVyZSgnaXNfYWN0aXZlJywgdHJ1ZSkKICAgICAgICAgICAgLT5vcmRlckJ5UmF3KCdub21pbmFsX3ZhbHVlIElTIE5VTEwnKQogICAgICAgICAgICAtPm9yZGVyQnkoJ3NvcnRfb3JkZXInKS0+b3JkZXJCeSgnbm9taW5hbF92YWx1ZScpLT5vcmRlckJ5KCdpZCcpLT5nZXQoKQogICAgICAgICAgICAtPm1hcChmdW5jdGlvbiAoUHJvZHVjdFBhY2thZ2UgJHBhY2thZ2UpIHVzZSAoJHByaWNpbmcpOiBhcnJheSB7CiAgICAgICAgICAgICAgICB0cnkgewogICAgICAgICAgICAgICAgICAgICRxdW90ZSA9ICRwcmljaW5nLT5mb3JQYWNrYWdlKCRwYWNrYWdlLT5pZCk7CiAgICAgICAgICAgICAgICAgICAgJGF2YWlsYWJsZSA9IHRydWU7CiAgICAgICAgICAgICAgICAgICAgJHByaWNlID0gJHF1b3RlWydzdWJ0b3RhbF9pZHInXTsKICAgICAgICAgICAgICAgIH0gY2F0Y2ggKFZhbGlkYXRpb25FeGNlcHRpb24pIHsKICAgICAgICAgICAgICAgICAgICAkYXZhaWxhYmxlID0gZmFsc2U7CiAgICAgICAgICAgICAgICAgICAgJHByaWNlID0gbnVsbDsKICAgICAgICAgICAgICAgIH0KCiAgICAgICAgICAgICAgICByZXR1cm4gWwogICAgICAgICAgICAgICAgICAgIC4uLiRwYWNrYWdlLT5vbmx5KCdpZCcsICduYW1lJywgJ25vdGUnLCAnZ3JvdXBfbmFtZScsICdub21pbmFsX3ZhbHVlJyksCiAgICAgICAgICAgICAgICAgICAgJ2ltYWdlX3VybCcgPT4gJHBhY2thZ2UtPmdldEZpcnN0TWVkaWFVcmwoJ2ltYWdlJyksCiAgICAgICAgICAgICAgICAgICAgJ2lzX2F2YWlsYWJsZScgPT4gJGF2YWlsYWJsZSwKICAgICAgICAgICAgICAgICAgICAncHJpY2VfaWRyJyA9PiAkcHJpY2UsCiAgICAgICAgICAgICAgICBdOwogICAgICAgICAgICB9KTsKCiAgICAgICAgJHVzZXIgPSBhdXRoKCd3ZWInKS0+dXNlcigpOwogICAgICAgICRyZXZpZXdzID0gUHJvZHVjdFJldmlldzo6d2hlcmUoJ3Byb2R1Y3RfaWQnLCAkcHJvZHVjdC0+aWQpLT53aGVyZSgnaXNfYWN0aXZlJywgdHJ1ZSkKICAgICAgICAgICAgLT53aGVyZShmbiAoJHF1ZXJ5KSA9PiAkcXVlcnktPndoZXJlTnVsbCgncHVibGlzaGVkX2F0JyktPm9yV2hlcmUoJ3B1Ymxpc2hlZF9hdCcsICc8PScsIG5vdygpKSkKICAgICAgICAgICAgLT5vcmRlckJ5RGVzYygncHVibGlzaGVkX2F0JyktPm9yZGVyQnlEZXNjKCdpZCcpLT5saW1pdCgzMCkKICAgICAgICAgICAgLT5nZXQoWydpZCcsICdkaXNwbGF5X25hbWUnLCAncmF0aW5nJywgJ3RpdGxlJywgJ2JvZHknLCAncHVibGlzaGVkX2F0JywgJ2NyZWF0ZWRfYXQnXSkKICAgICAgICAgICAgLT5tYXAoZm4gKFByb2R1Y3RSZXZpZXcgJHJldmlldyk6IGFycmF5ID0+IFsKICAgICAgICAgICAgICAgIC4uLiRyZXZpZXctPm9ubHkoJ2lkJywgJ2Rpc3BsYXlfbmFtZScsICdyYXRpbmcnLCAndGl0bGUnLCAnYm9keScpLAogICAgICAgICAgICAgICAgJ3B1Ymxpc2hlZF9hdCcgPT4gJHJldmlldy0+cHVibGlzaGVkX2F0Py0+dG9Jc284NjAxU3RyaW5nKCksCiAgICAgICAgICAgICAgICAnY3JlYXRlZF9hdCcgPT4gJHJldmlldy0+Y3JlYXRlZF9hdD8tPnRvSXNvODYwMVN0cmluZygpLAogICAgICAgICAgICAgICAgJ3ZlcmlmaWVkX3B1cmNoYXNlJyA9PiB0cnVlLAogICAgICAgICAgICBdKTsKICAgICAgICAkcmV2aWV3U3RhdHMgPSBQcm9kdWN0UmV2aWV3Ojp3aGVyZSgncHJvZHVjdF9pZCcsICRwcm9kdWN0LT5pZCktPndoZXJlKCdpc19hY3RpdmUnLCB0cnVlKQogICAgICAgICAgICAtPnNlbGVjdFJhdygnQ09VTlQoKikgYXMgdG90YWwsIENPQUxFU0NFKEFWRyhyYXRpbmcpLCAwKSBhcyBhdmVyYWdlJyktPmZpcnN0KCk7CiAgICAgICAgJHNhdmVkQWNjb3VudHMgPSAkdXNlciA/IFNhdmVkR2FtZUFjY291bnQ6OndoZXJlKCd1c2VyX2lkJywgJHVzZXItPmlkKQogICAgICAgICAgICAtPndoZXJlKCdwcm9kdWN0X2lkJywgJHByb2R1Y3QtPmlkKS0+b3JkZXJCeURlc2MoJ2lkJyktPmdldCgpCiAgICAgICAgICAgIC0+bWFwKGZuIChTYXZlZEdhbWVBY2NvdW50ICRzYXZlZCk6IGFycmF5ID0+IFsKICAgICAgICAgICAgICAgIC4uLiRzYXZlZC0+b25seSgnaWQnLCAnbGFiZWwnLCAnbmlja25hbWUnKSwKICAgICAgICAgICAgICAgICdjdXN0b21lcl9pbnB1dCcgPT4gJHNhdmVkLT5jdXN0b21lcl9pbnB1dCwKICAgICAgICAgICAgXSktPnZhbHVlcygpIDogY29sbGVjdCgpOwoKICAgICAgICByZXR1cm4gSW5lcnRpYTo6cmVuZGVyKCdDYXRhbG9nL1Nob3cnLCBbCiAgICAgICAgICAgICdwcm9kdWN0JyA9PiBbCiAgICAgICAgICAgICAgICAuLi4kcHJvZHVjdC0+b25seSgnaWQnLCAnbmFtZScsICdwdWJsaXNoZXInLCAnc2x1ZycsICdkZXNjcmlwdGlvbicsICduaWNrbmFtZV9jaGVja19lbmFibGVkJywKICAgICAgICAgICAgICAgICAgICAncGFja2FnZV90YWJzX2VuYWJsZWQnLCAncGFja2FnZV90YWJzJyksCiAgICAgICAgICAgICAgICAnY2F0ZWdvcnlfbmFtZScgPT4gJHByb2R1Y3QtPmNhdGVnb3J5LT5uYW1lLAogICAgICAgICAgICAgICAgJ2NhdGVnb3J5X3NsdWcnID0+ICRwcm9kdWN0LT5jYXRlZ29yeS0+c2x1ZywKICAgICAgICAgICAgICAgICdpbWFnZV91cmwnID0+ICRwcm9kdWN0LT5nZXRGaXJzdE1lZGlhVXJsKCdpbWFnZScpLAogICAgICAgICAgICAgICAgJ2Jhbm5lcl91cmwnID0+ICRwcm9kdWN0LT5nZXRGaXJzdE1lZGlhVXJsKCdiYW5uZXInKSwKICAgICAgICAgICAgICAgICdjaGVja291dF9ub21pbmFsX2Rlc2NyaXB0aW9uJyA9PiAkcHJvZHVjdC0+ZnVsZmlsbG1lbnRfbW9kZSA9PT0gJ01BTlVBTCcKICAgICAgICAgICAgICAgICAgICA/ICdQZXNhbmFuIGRpcHJvc2VzIGFkbWluIHNldGVsYWggcGVtYmF5YXJhbi4nCiAgICAgICAgICAgICAgICAgICAgOiAnUGVzYW5hbiBkaXByb3NlcyBvdG9tYXRpcyBzZXRlbGFoIHBlbWJheWFyYW4uJywKICAgICAgICAgICAgXSwKICAgICAgICAgICAgJ3BhY2thZ2VzJyA9PiAkcGFja2FnZXMsCiAgICAgICAgICAgICdmaWVsZHMnID0+IFByb2R1Y3RJbnB1dEZpZWxkOjp3aGVyZSgncHJvZHVjdF9pZCcsICRwcm9kdWN0LT5pZCktPm9yZGVyQnkoJ3NvcnRfb3JkZXInKQogICAgICAgICAgICAgICAgLT5nZXQoWydmaWVsZF9rZXknLCAnbGFiZWwnLCAncGxhY2Vob2xkZXInLCAndHlwZScsICdpc19yZXF1aXJlZCddKSwKICAgICAgICAgICAgJ2N1c3RvbWVyJyA9PiAkdXNlciA/IFsKICAgICAgICAgICAgICAgICduYW1lJyA9PiAkdXNlci0+bmFtZSwKICAgICAgICAgICAgICAgICdlbWFpbCcgPT4gJHVzZXItPmVtYWlsLAogICAgICAgICAgICAgICAgJ3Bob25lJyA9PiAkdXNlci0+cGhvbmUsCiAgICAgICAgICAgICAgICAnYmFsYW5jZV9pZHInID0+IChpbnQpICgkdXNlci0+d2FsbGV0Py0+YmFsYW5jZV9pZHIgPz8gMCksCiAgICAgICAgICAgIF0gOiBudWxsLAogICAgICAgICAgICAncGF5bWVudENoYW5uZWxzJyA9PiAkcGF5bWVudFJvdXRpbmctPnB1YmxpY09yZGVyQ2hhbm5lbHMoJHVzZXIpLAogICAgICAgICAgICAnbm90aWNlcycgPT4gJHByb2R1Y3QtPm5vdGljZXMoKS0+d2hlcmUoJ2lzX2FjdGl2ZScsIHRydWUpLT5vcmRlckJ5KCdzb3J0X29yZGVyJykKICAgICAgICAgICAgICAgIC0+Z2V0KFsnaWQnLCAndGl0bGUnLCAnYm9keSddKQogICAgICAgICAgICAgICAgLT5tYXAoZnVuY3Rpb24gKCRub3RpY2UpIHVzZSAoJHByb2R1Y3QpOiBhcnJheSB7CiAgICAgICAgICAgICAgICAgICAgJHpvbmUgPSBtYXRjaCAoJHByb2R1Y3QtPm1hbnVhbF90aW1lem9uZSkgewogICAgICAgICAgICAgICAgICAgICAgICAnQXNpYS9NYWthc3NhcicgPT4gJ1dJVEEnLAogICAgICAgICAgICAgICAgICAgICAgICAnQXNpYS9KYXlhcHVyYScgPT4gJ1dJVCcsCiAgICAgICAgICAgICAgICAgICAgICAgIGRlZmF1bHQgPT4gJ1dJQicsCiAgICAgICAgICAgICAgICAgICAgfTsKICAgICAgICAgICAgICAgICAgICAkcmVwbGFjZSA9IFsKICAgICAgICAgICAgICAgICAgICAgICAgJ3t7amFtX2J1a2F9fScgPT4gJHByb2R1Y3QtPm1hbnVhbF9vcGVuX3RpbWUgPzogJy0nLAogICAgICAgICAgICAgICAgICAgICAgICAne3tqYW1fdHV0dXB9fScgPT4gJHByb2R1Y3QtPm1hbnVhbF9jbG9zZV90aW1lID86ICctJywKICAgICAgICAgICAgICAgICAgICAgICAgJ3t7em9uYV93YWt0dX19JyA9PiAkem9uZSwKICAgICAgICAgICAgICAgICAgICBdOwoKICAgICAgICAgICAgICAgICAgICByZXR1cm4gWwogICAgICAgICAgICAgICAgICAgICAgICAnaWQnID0+IChpbnQpICRub3RpY2UtPmlkLAogICAgICAgICAgICAgICAgICAgICAgICAndGl0bGUnID0+IHN0cnRyKChzdHJpbmcpICRub3RpY2UtPnRpdGxlLCAkcmVwbGFjZSksCiAgICAgICAgICAgICAgICAgICAgICAgICdib2R5JyA9PiBzdHJ0cigoc3RyaW5nKSAkbm90aWNlLT5ib2R5LCAkcmVwbGFjZSksCiAgICAgICAgICAgICAgICAgICAgXTsKICAgICAgICAgICAgICAgIH0pLT52YWx1ZXMoKSwKICAgICAgICAgICAgJ3NhdmVkQWNjb3VudHMnID0+ICRzYXZlZEFjY291bnRzLAogICAgICAgICAgICAncmV2aWV3cycgPT4gJHJldmlld3MsCiAgICAgICAgICAgICdyZXZpZXdTdGF0cycgPT4gWwogICAgICAgICAgICAgICAgJ3RvdGFsJyA9PiAoaW50KSAoJHJldmlld1N0YXRzPy0+dG90YWwgPz8gMCksCiAgICAgICAgICAgICAgICAnYXZlcmFnZScgPT4gcm91bmQoKGZsb2F0KSAoJHJldmlld1N0YXRzPy0+YXZlcmFnZSA/PyAwKSwgMSksCiAgICAgICAgICAgIF0sCiAgICAgICAgICAgICdmYXFzJyA9PiAkY29udGVudC0+ZmFxcygpLT50YWtlKDYpLT52YWx1ZXMoKSwKICAgICAgICAgICAgJ2luaXRpYWxQYWNrYWdlSWQnID0+ICRyZXF1ZXN0LT5maWxsZWQoJ3BhY2thZ2UnKQogICAgICAgICAgICAgICAgPyAoc3RyaW5nKSAoJHBhY2thZ2VzLT5maXJzdChmbiAoYXJyYXkgJGl0ZW0pOiBib29sID0+ICRpdGVtWydpc19hdmFpbGFibGUnXSA9PT0gdHJ1ZQogICAgICAgICAgICAgICAgICAgICYmICgKICAgICAgICAgICAgICAgICAgICAgICAgKHN0cmluZykgJGl0ZW1bJ2lkJ10gPT09IChzdHJpbmcpICRyZXF1ZXN0LT5xdWVyeSgncGFja2FnZScpCiAgICAgICAgICAgICAgICAgICAgICAgIHx8IHN0cmNhc2VjbXAoKHN0cmluZykgJGl0ZW1bJ25hbWUnXSwgKHN0cmluZykgJHJlcXVlc3QtPnF1ZXJ5KCdwYWNrYWdlJykpID09PSAwCiAgICAgICAgICAgICAgICAgICAgKQogICAgICAgICAgICAgICAgKVsnaWQnXSA/PyAnJykKICAgICAgICAgICAgICAgIDogJycsCiAgICAgICAgICAgICdmYXZpY29uVXJsJyA9PiBTdG9yZUFzc2V0Ojp3aGVyZSgna2V5JywgJ2Zhdmljb24nKS0+d2hlcmUoJ2lzX2FjdGl2ZScsIHRydWUpCiAgICAgICAgICAgICAgICAtPmZpcnN0KCk/LT5nZXRGaXJzdE1lZGlhVXJsKCdpbWFnZScpLAogICAgICAgIF0pOwogICAgfQp9Cg==
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\ProductInputField;
+use App\Models\ProductPackage;
+use App\Models\ProductReview;
+use App\Models\SavedGameAccount;
+use App\Models\StoreAsset;
+use App\Services\CheckoutPricing;
+use App\Services\PaymentRoutingService;
+use App\Services\StorefrontContentService;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class CatalogController
+{
+    public function index(Request $request, StorefrontContentService $content): Response
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:80'],
+            'category' => ['nullable', 'string', 'max:255'],
+            'mode' => ['nullable', 'in:manual'],
+        ]);
+        $search = trim($filters['q'] ?? '');
+
+        $categories = Category::with('media')->where('is_active', true)->orderBy('sort_order')->get()
+            ->map(fn (Category $category): array => [
+                ...$category->only('name', 'slug', 'icon'),
+                'image_url' => $category->getFirstMediaUrl('image'),
+            ]);
+
+        $products = Product::with(['category', 'media'])->where('is_active', true)
+            ->whereHas('category', fn ($query) => $query->where('is_active', true))
+            ->whereHas('packages', fn ($query) => $query->where('is_active', true))
+            ->when(($filters['category'] ?? null), fn ($query, $slug) => $query->whereHas('category',
+                fn ($category) => $category->where('slug', $slug)))
+            ->when(($filters['mode'] ?? null) === 'manual', fn ($query) => $query->where('fulfillment_mode', 'MANUAL'))
+            ->when($search !== '', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
+            ->orderBy('sort_order')->orderBy('name')->paginate(24)
+            ->withQueryString()
+            ->through(fn (Product $product): array => [
+                ...$product->only('name', 'slug', 'initials', 'accent_color', 'instant'),
+                'category_name' => $product->category->name,
+                'category_slug' => $product->category->slug,
+                'image_url' => $product->getFirstMediaUrl('image'),
+            ]);
+
+        $popularProducts = Product::with(['category', 'media'])
+            ->withCount(['reviews as active_reviews_count' => fn ($query) => $query->where('is_active', true)])
+            ->where('is_active', true)
+            ->whereHas('category', fn ($query) => $query->where('is_active', true))
+            ->whereHas('packages', fn ($query) => $query->where('is_active', true))
+            ->orderByDesc('popular')
+            ->orderByDesc('active_reviews_count')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->limit(8)
+            ->get()
+            ->map(fn (Product $product): array => [
+                ...$product->only('name', 'slug', 'popular', 'initials', 'accent_color', 'instant'),
+                'category_name' => $product->category->name,
+                'category_slug' => $product->category->slug,
+                'image_url' => $product->getFirstMediaUrl('image'),
+            ]);
+
+        $assets = StoreAsset::with('media')->where('is_active', true)->get()->keyBy('key');
+        $banners = $content->homeBanners();
+        if ($banners->isEmpty()) {
+            $desktop = $assets->get('banner_desktop');
+            $mobile = $assets->get('banner_mobile');
+            if ($desktop || $mobile) {
+                $banners = collect([[
+                    'id' => null,
+                    'title' => 'LFAMILIA STORE',
+                    'subtitle' => null,
+                    'cta_label' => null,
+                    'cta_href' => $desktop?->target_url ?: $mobile?->target_url,
+                    'show_desktop' => true,
+                    'show_mobile' => true,
+                    'sort_order' => 0,
+                    'desktop_url' => $desktop?->getFirstMediaUrl('image') ?: $mobile?->getFirstMediaUrl('image'),
+                    'mobile_url' => $mobile?->getFirstMediaUrl('image') ?: $desktop?->getFirstMediaUrl('image'),
+                ]]);
+            }
+        }
+
+        return Inertia::render('Catalog/Index', [
+            'categories' => $categories,
+            'products' => $products,
+            'popularProducts' => $popularProducts,
+            'filters' => $filters,
+            'logoUrl' => $assets->get('logo')?->getFirstMediaUrl('image'),
+            'faviconUrl' => $assets->get('favicon')?->getFirstMediaUrl('image'),
+            'banners' => $banners,
+            'popups' => $content->popups(),
+            'news' => $content->news(3),
+            'reviews' => $content->reviews(6),
+        ]);
+    }
+
+    public function show(
+        Request $request,
+        string $slug,
+        CheckoutPricing $pricing,
+        PaymentRoutingService $paymentRouting,
+        StorefrontContentService $content,
+    ): Response {
+        $product = Product::with(['category', 'media'])->where('slug', $slug)
+            ->where('is_active', true)
+            ->whereHas('category', fn ($query) => $query->where('is_active', true))
+            ->firstOrFail();
+
+        $packages = ProductPackage::with('media')->where('product_id', $product->id)
+            ->where('is_active', true)
+            ->orderByRaw('nominal_value IS NULL')
+            ->orderBy('sort_order')->orderBy('nominal_value')->orderBy('id')->get()
+            ->map(function (ProductPackage $package) use ($pricing): array {
+                try {
+                    $quote = $pricing->forPackage($package->id);
+                    $available = true;
+                    $price = $quote['subtotal_idr'];
+                } catch (ValidationException) {
+                    $available = false;
+                    $price = null;
+                }
+
+                return [
+                    ...$package->only('id', 'name', 'note', 'group_name', 'nominal_value'),
+                    'image_url' => $package->getFirstMediaUrl('image'),
+                    'is_available' => $available,
+                    'price_idr' => $price,
+                ];
+            });
+
+        $user = auth('web')->user();
+        $reviews = ProductReview::where('product_id', $product->id)->where('is_active', true)
+            ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
+            ->orderByDesc('published_at')->orderByDesc('id')->limit(30)
+            ->get(['id', 'display_name', 'rating', 'title', 'body', 'published_at', 'created_at'])
+            ->map(fn (ProductReview $review): array => [
+                ...$review->only('id', 'display_name', 'rating', 'title', 'body'),
+                'published_at' => $review->published_at?->toIso8601String(),
+                'created_at' => $review->created_at?->toIso8601String(),
+                'verified_purchase' => true,
+            ]);
+        $reviewStats = ProductReview::where('product_id', $product->id)->where('is_active', true)
+            ->selectRaw('COUNT(*) as total, COALESCE(AVG(rating), 0) as average')->first();
+        $savedAccounts = $user ? SavedGameAccount::where('user_id', $user->id)
+            ->where('product_id', $product->id)->orderByDesc('id')->get()
+            ->map(fn (SavedGameAccount $saved): array => [
+                ...$saved->only('id', 'label', 'nickname'),
+                'customer_input' => $saved->customer_input,
+            ])->values() : collect();
+
+        return Inertia::render('Catalog/Show', [
+            'product' => [
+                ...$product->only('id', 'name', 'publisher', 'slug', 'description', 'nickname_check_enabled',
+                    'package_tabs_enabled', 'package_tabs'),
+                'category_name' => $product->category->name,
+                'category_slug' => $product->category->slug,
+                'image_url' => $product->getFirstMediaUrl('image'),
+                'banner_url' => $product->getFirstMediaUrl('banner'),
+                'checkout_nominal_description' => $product->fulfillment_mode === 'MANUAL'
+                    ? 'Pesanan diproses admin setelah pembayaran.'
+                    : 'Pesanan diproses otomatis setelah pembayaran.',
+            ],
+            'packages' => $packages,
+            'fields' => ProductInputField::where('product_id', $product->id)->orderBy('sort_order')
+                ->get(['field_key', 'label', 'placeholder', 'type', 'is_required']),
+            'customer' => $user ? [
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'balance_idr' => (int) ($user->wallet?->balance_idr ?? 0),
+            ] : null,
+            'paymentChannels' => $paymentRouting->publicOrderChannels($user),
+            'notices' => $product->notices()->where('is_active', true)->orderBy('sort_order')
+                ->get(['id', 'title', 'body'])
+                ->map(function ($notice) use ($product): array {
+                    $zone = match ($product->manual_timezone) {
+                        'Asia/Makassar' => 'WITA',
+                        'Asia/Jayapura' => 'WIT',
+                        default => 'WIB',
+                    };
+                    $replace = [
+                        '{{jam_buka}}' => $product->manual_open_time ?: '-',
+                        '{{jam_tutup}}' => $product->manual_close_time ?: '-',
+                        '{{zona_waktu}}' => $zone,
+                    ];
+
+                    return [
+                        'id' => (int) $notice->id,
+                        'title' => strtr((string) $notice->title, $replace),
+                        'body' => strtr((string) $notice->body, $replace),
+                    ];
+                })->values(),
+            'savedAccounts' => $savedAccounts,
+            'reviews' => $reviews,
+            'reviewStats' => [
+                'total' => (int) ($reviewStats?->total ?? 0),
+                'average' => round((float) ($reviewStats?->average ?? 0), 1),
+            ],
+            'faqs' => $content->faqs()->take(6)->values(),
+            'initialPackageId' => $request->filled('package')
+                ? (string) ($packages->first(fn (array $item): bool => $item['is_available'] === true
+                    && (
+                        (string) $item['id'] === (string) $request->query('package')
+                        || strcasecmp((string) $item['name'], (string) $request->query('package')) === 0
+                    )
+                )['id'] ?? '')
+                : '',
+            'faviconUrl' => StoreAsset::where('key', 'favicon')->where('is_active', true)
+                ->first()?->getFirstMediaUrl('image'),
+        ]);
+    }
+}
