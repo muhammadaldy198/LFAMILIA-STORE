@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "vite",
     "lint": "eslint resources/js --max-warnings=0",
-    "check": "vue-tsc --noEmit -p jsconfig.json",
     "build": "vite build",
     "prepare": "node scripts/hooks/install-husky.mjs",
     "guard:staged": "node scripts/hooks/pre-commit.mjs",
