@@ -16,7 +16,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
     use HasApiTokens, MustVerifyEmail, Notifiable, SoftDeletes;
 
     protected $fillable = [
-        'name', 'email', 'email_verified_at', 'phone', 'password', 'google_sub', 'membership_tier_code', 'membership_mode', 'membership_override_code', 'membership_progress_bonus_idr', 'leaderboard_opt_in',
+        'name', 'email', 'email_verified_at', 'phone', 'password', 'google_sub', 'leaderboard_opt_in',
     ];
 
     protected $hidden = ['password', 'remember_token', 'google_sub'];

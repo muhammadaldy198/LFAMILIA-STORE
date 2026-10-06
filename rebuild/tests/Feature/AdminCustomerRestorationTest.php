@@ -41,14 +41,20 @@ class AdminCustomerRestorationTest extends TestCase
 
     private function customer(array $overrides = []): User
     {
-        return User::create(array_replace([
+        $tier = $overrides['membership_tier_code'] ?? 'BASIC';
+        unset($overrides['membership_tier_code']);
+
+        $user = User::create(array_replace([
             'name' => 'Customer Test',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'email_verified_at' => now(),
             'phone' => '081234567890',
             'password' => Hash::make('VeryStrongCustomer123!'),
-            'membership_tier_code' => 'BASIC',
         ], $overrides));
+
+        $user->forceFill(['membership_tier_code' => $tier])->saveQuietly();
+
+        return $user;
     }
 
     public function test_customer_workspace_has_real_filters_summary_and_no_google_identifier_leak(): void

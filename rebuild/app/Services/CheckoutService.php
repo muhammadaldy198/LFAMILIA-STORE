@@ -446,7 +446,7 @@ class CheckoutService
         $value = (int) $voucher->discount_value;
         $afterMember = max(1, $price['subtotal_idr'] - max(0, $memberDiscountIdr));
         $discount = $type === 'PERCENT'
-            ? intdiv($afterMember * $value, 100)
+            ? intdiv($afterMember, 100) * $value + intdiv(($afterMember % 100) * $value, 100)
             : $value;
         if ($voucher->max_discount_idr !== null) {
             $discount = min($discount, (int) $voucher->max_discount_idr);

@@ -548,7 +548,7 @@ class AdminPanelRestorationTest extends TestCase
     {
         Queue::fake();
         $this->login();
-        $user = User::create(['name' => 'Support User', 'email' => bin2hex(random_bytes(4)).'@example.test', 'password' => bcrypt('support-password-123'), 'membership_tier_code' => 'BASIC']);
+        $user = tap(User::create(['name' => 'Support User', 'email' => bin2hex(random_bytes(4)).'@example.test', 'password' => bcrypt('support-password-123')]), fn ($u) => $u->forceFill(['membership_tier_code' => 'BASIC'])->saveQuietly());
         $id = DB::table('support_tickets')->insertGetId(['user_id' => $user->id, 'subject' => 'Help', 'message' => 'Help me', 'status' => 'OPEN', 'created_at' => now(), 'updated_at' => now()]);
         $this->put('/admin/support/'.$id, ['status' => 'IN_PROGRESS', 'reply' => 'Sedang kami periksa.'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('support_tickets', ['id' => $id, 'status' => 'IN_PROGRESS']);
@@ -561,7 +561,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->login();
         $product = $this->product();
         $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'HISTORY', 'name' => 'History']);
-        $user = User::create(['name' => 'History User', 'email' => bin2hex(random_bytes(4)).'@example.test', 'password' => bcrypt('history-password-123'), 'membership_tier_code' => 'BASIC']);
+        $user = tap(User::create(['name' => 'History User', 'email' => bin2hex(random_bytes(4)).'@example.test', 'password' => bcrypt('history-password-123')]), fn ($u) => $u->forceFill(['membership_tier_code' => 'BASIC'])->saveQuietly());
         $id = DB::table('orders')->insertGetId([
             'order_number' => 'HISTORY-'.bin2hex(random_bytes(4)), 'user_id' => $user->id,
             'product_id' => $product->id, 'product_package_id' => $package->id,
