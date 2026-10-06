@@ -15,11 +15,6 @@ class LoginRiskService
         return $this->failures($scope, $ip, $identity) >= self::THRESHOLD;
     }
 
-    public function isLockedOut(string $scope, ?string $ip, ?string $identity = null): bool
-    {
-        return (bool) Cache::get($this->lockoutKey($scope, $ip, $identity), false);
-    }
-
     public function recordFailure(string $scope, ?string $ip, ?string $identity = null): int
     {
         $key = $this->key($scope, $ip, $identity);
@@ -44,6 +39,11 @@ class LoginRiskService
     public function failures(string $scope, ?string $ip, ?string $identity = null): int
     {
         return (int) Cache::get($this->key($scope, $ip, $identity), 0);
+    }
+
+    public function isLockedOut(string $scope, ?string $ip, ?string $identity = null): bool
+    {
+        return (bool) Cache::get($this->lockoutKey($scope, $ip, $identity), false);
     }
 
     private function key(string $scope, ?string $ip, ?string $identity): string
