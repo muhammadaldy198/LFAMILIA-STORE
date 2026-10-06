@@ -7,7 +7,9 @@ use Illuminate\Support\Facades\Cache;
 class LoginRiskService
 {
     private const THRESHOLD = 3;
+
     private const LOCKOUT_THRESHOLD = 10;
+
     private const LOCKOUT_MINUTES = 15;
 
     public function requiresChallenge(string $scope, ?string $ip, ?string $identity = null): bool
@@ -22,7 +24,6 @@ class LoginRiskService
 
         $failures = (int) Cache::increment($key);
 
-        // Progressive lockout: 10 failures = 15 min lockout
         if ($failures >= self::LOCKOUT_THRESHOLD) {
             Cache::put($this->lockoutKey($scope, $ip, $identity), true, now()->addMinutes(self::LOCKOUT_MINUTES));
         }
