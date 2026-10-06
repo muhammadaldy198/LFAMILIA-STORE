@@ -1,12 +1,9 @@
 <script setup>
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
-import { Head, useForm, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Head, useForm } from '@inertiajs/vue3';
 
-const page = usePage();
-const intended = computed(() => page.props.intended || '/admin/panel');
-const form = useForm({ password: '', intended: intended.value });
+const form = useForm({ password: '' });
 const submit = () => form.post('/admin/password/confirm', {
     onFinish: () => form.reset('password'),
 });
