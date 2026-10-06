@@ -981,6 +981,7 @@ class PaymentTest extends TestCase
         ]);
 
         $this->actingAs($admin, 'admin')
+            ->withSession(['admin.password_confirmed_at' => time()])
             ->post('/admin/payments/manual/'.$paymentId.'/confirm')
             ->assertRedirect();
 
