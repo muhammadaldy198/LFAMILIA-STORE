@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AdminPermissionService;
 use App\Models\Product;
 use App\Models\ProductPackage;
 use App\Models\Provider;
@@ -128,7 +129,7 @@ class AdminDigiflazzController
             });
 
         $admin = $request->user('admin');
-        $connection = $monitor->connection(app(\App\Services\AdminPermissionService::class)->allows($admin, 'reports.finance'));
+        $connection = $monitor->connection(app(AdminPermissionService::class)->allows($admin, 'reports.finance'));
 
         return Inertia::render('Admin/Digiflazz', [
             'items' => $items,
@@ -144,7 +145,7 @@ class AdminDigiflazzController
             'monitorSettings' => $monitorSettings,
             'providerActive' => (bool) $provider?->is_active,
             'recentTransactions' => $monitor->recentTransactions(),
-            'canSeeBalance' => app(\App\Services\AdminPermissionService::class)->allows($admin, 'reports.finance'),
+            'canSeeBalance' => app(AdminPermissionService::class)->allows($admin, 'reports.finance'),
         ]);
     }
 
