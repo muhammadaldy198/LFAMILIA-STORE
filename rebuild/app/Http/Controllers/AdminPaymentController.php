@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AdminPermissionService;
 use App\Models\PaymentChannel;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
@@ -163,7 +164,7 @@ class AdminPaymentController
         $manualAsset = StoreAsset::where('key', 'manual_qris')->first();
 
         return Inertia::render('Admin/Payments', [
-            'isSuperAdmin' => app(\App\Services\AdminPermissionService::class)->allows($request->user('admin'), 'reports.finance'),
+            'isSuperAdmin' => app(AdminPermissionService::class)->allows($request->user('admin'), 'reports.finance'),
             'gateways' => $gateways,
             'channels' => $channels,
             'routes' => $routes,
