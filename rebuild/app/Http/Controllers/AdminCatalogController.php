@@ -32,7 +32,7 @@ class AdminCatalogController
         $stockCounts = app(VoucherStockService::class)->counts();
 
         return Inertia::render('Admin/Catalog', [
-            'categories' => Category::orderBy('sort_order')->get()->map(fn (Category $category): array => [
+            'categories' => Category::with('media')->orderBy('sort_order')->get()->map(fn (Category $category): array => [
                 ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),
             ]),
@@ -41,7 +41,7 @@ class AdminCatalogController
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get(['id', 'name', 'code', 'requires_server', 'requires_region_check']),
-            'products' => Product::with(['packages.mappings', 'fields', 'notices'])->orderBy('sort_order')->get()
+            'products' => Product::with(['media', 'packages.mappings', 'fields', 'notices'])->orderBy('sort_order')->get()
                 ->map(fn (Product $product): array => [
                     ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
                         'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
@@ -75,9 +75,15 @@ class AdminCatalogController
                     ])->all(),
                 ]),
             'defaultMargin' => json_decode((string) DB::table('system_settings')->where('key', 'catalog.default_margin_percent')->value('value'), true) ?? 0,
-            'digiflazzItems' => DB::table('digiflazz_catalog_items')->orderBy('category')->orderBy('brand')->orderBy('product_name')->get()
-                ->map(fn (object $item): array => [...((array) $item), 'available' => app(DigiflazzCatalogService::class)->available($item),
-                    'mapped' => ProviderMapping::where('external_sku', $item->buyer_sku_code)->whereIn('provider_id', Provider::where('code', 'DIGIFLAZZ')->pluck('id'))->exists()]),
+            'digiflazzItems' => (function () {
+                // N+1 fix: preload mapped SKUs sekali, bukan per item
+                $digiflazzIds = Provider::where('code', 'DIGIFLAZZ')->pluck('id');
+                $mappedSkus = ProviderMapping::whereIn('provider_id', $digiflazzIds)->pluck('external_sku')->flip()->all();
+
+                return DB::table('digiflazz_catalog_items')->orderBy('category')->orderBy('brand')->orderBy('product_name')->get()
+                    ->map(fn (object $item): array => [...((array) $item), 'available' => app(DigiflazzCatalogService::class)->available($item),
+                        'mapped' => isset($mappedSkus[$item->buyer_sku_code])]);
+            })(),
         ]);
     }
 
