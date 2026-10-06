@@ -159,8 +159,9 @@ class AdminPromotionController
                 return $id;
             }, 3);
         } catch (QueryException $e) {
-            // R1: Tangkap race condition duplicate (TOCTOU) jadi validation error
-            if ($e->getCode() === '23000') {
+            // R1: Tangkap race condition duplicate kode voucher saja (bukan FK violation)
+            $message = $e->getMessage();
+            if ($e->getCode() === '23000' && str_contains($message, 'vouchers') && str_contains($message, 'Duplicate entry')) {
                 throw ValidationException::withMessages(['code' => 'Kode voucher sudah digunakan.']);
             }
             throw $e;
@@ -213,8 +214,9 @@ class AdminPromotionController
             ]];
         }, 3);
         } catch (QueryException $e) {
-            // R1: Tangkap race condition duplicate (TOCTOU) jadi validation error
-            if ($e->getCode() === '23000') {
+            // R1: Tangkap race condition duplicate kode voucher saja (bukan FK violation)
+            $message = $e->getMessage();
+            if ($e->getCode() === '23000' && str_contains($message, 'vouchers') && str_contains($message, 'Duplicate entry')) {
                 throw ValidationException::withMessages(['code' => 'Kode voucher sudah digunakan.']);
             }
             throw $e;
