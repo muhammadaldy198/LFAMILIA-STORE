@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Services\AdminAuditService;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -146,25 +145,17 @@ class AdminPromotionController
         $data = $this->voucherData($request);
         [$voucher, $productIds, $categoryIds] = $this->splitVoucherData($data);
 
-        try {
-            $id = DB::transaction(function () use ($voucher, $productIds, $categoryIds): int {
-                $id = DB::table('vouchers')->insertGetId([
-                    ...$voucher,
-                    'code' => strtoupper($voucher['code']),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-                $this->syncScope($id, $productIds, $categoryIds);
+        $id = DB::transaction(function () use ($voucher, $productIds, $categoryIds): int {
+            $id = DB::table('vouchers')->insertGetId([
+                ...$voucher,
+                'code' => strtoupper($voucher['code']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->syncScope($id, $productIds, $categoryIds);
 
-                return $id;
-            }, 3);
-        } catch (QueryException $e) {
-            if ($this->isDuplicateVoucherCode($e)) {
-                throw ValidationException::withMessages(['code' => 'Kode voucher sudah digunakan.']);
-            }
-
-            throw $e;
-        }
+            return $id;
+        }, 3);
 
         $audit->record($request, 'voucher.created', 'voucher', $id, null, [
             ...$voucher,
@@ -180,45 +171,37 @@ class AdminPromotionController
         $data = $this->voucherData($request, $id);
         [$voucher, $productIds, $categoryIds] = $this->splitVoucherData($data);
 
-        try {
-            [$before, $after] = DB::transaction(function () use ($id, $voucher, $productIds, $categoryIds): array {
-                $current = DB::table('vouchers')->where('id', $id)->lockForUpdate()->first();
-                abort_unless($current, 404);
+        [$before, $after] = DB::transaction(function () use ($id, $voucher, $productIds, $categoryIds): array {
+            $current = DB::table('vouchers')->where('id', $id)->lockForUpdate()->first();
+            abort_unless($current, 404);
 
-                $activeReservations = $this->activeRedemptionCount($id);
-                if ($voucher['total_quota'] !== null && (int) $voucher['total_quota'] < $activeReservations) {
-                    throw ValidationException::withMessages([
-                        'total_quota' => 'Total kuota tidak boleh lebih kecil dari pemakaian dan reservasi yang masih aktif.',
-                    ]);
-                }
-
-                $before = [
-                    ...((array) $current),
-                    'product_ids' => DB::table('voucher_products')->where('voucher_id', $id)->orderBy('product_id')->pluck('product_id')->all(),
-                    'category_ids' => DB::table('voucher_categories')->where('voucher_id', $id)->orderBy('category_id')->pluck('category_id')->all(),
-                ];
-
-                DB::table('vouchers')->where('id', $id)->update([
-                    ...$voucher,
-                    'code' => strtoupper($voucher['code']),
-                    'updated_at' => now(),
+            $activeReservations = $this->activeRedemptionCount($id);
+            if ($voucher['total_quota'] !== null && (int) $voucher['total_quota'] < $activeReservations) {
+                throw ValidationException::withMessages([
+                    'total_quota' => 'Total kuota tidak boleh lebih kecil dari pemakaian dan reservasi yang masih aktif.',
                 ]);
-                $this->syncScope($id, $productIds, $categoryIds);
-
-                return [$before, [
-                    ...$voucher,
-                    'code' => strtoupper($voucher['code']),
-                    'product_ids' => $productIds,
-                    'category_ids' => $categoryIds,
-                ]];
-        }, 3);
-        } catch (QueryException $e) {
-            if ($this->isDuplicateVoucherCode($e)) {
-                throw ValidationException::withMessages(['code' => 'Kode voucher sudah digunakan.']);
             }
 
-            throw $e;
-        }
+            $before = [
+                ...((array) $current),
+                'product_ids' => DB::table('voucher_products')->where('voucher_id', $id)->orderBy('product_id')->pluck('product_id')->all(),
+                'category_ids' => DB::table('voucher_categories')->where('voucher_id', $id)->orderBy('category_id')->pluck('category_id')->all(),
+            ];
+
+            DB::table('vouchers')->where('id', $id)->update([
+                ...$voucher,
+                'code' => strtoupper($voucher['code']),
+                'updated_at' => now(),
+            ]);
+            $this->syncScope($id, $productIds, $categoryIds);
+
+            return [$before, [
+                ...$voucher,
+                'code' => strtoupper($voucher['code']),
+                'product_ids' => $productIds,
+                'category_ids' => $categoryIds,
+            ]];
+        }, 3);
 
         $audit->record($request, 'voucher.updated', 'voucher', $id, $before, $after);
 
@@ -280,17 +263,8 @@ class AdminPromotionController
             : 'Prioritas Populer Sekarang dilepas.');
     }
 
-    private function isDuplicateVoucherCode(QueryException $e): bool
-    {
-        // R1: Hanya tangkap duplicate kode voucher, bukan FK violation lain
-        return $e->getCode() === '23000'
-            && str_contains($e->getMessage(), 'Duplicate entry')
-            && str_contains($e->getMessage(), 'vouchers');
-    }
-
     private function voucherData(Request $request, ?int $ignoreId = null): array
     {
-        // R1: Normalisasi ke uppercase SEBELUM validasi unique
         $request->merge(['code' => strtoupper((string) $request->input('code'))]);
 
         $data = $request->validate([
