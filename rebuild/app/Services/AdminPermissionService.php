@@ -18,6 +18,7 @@ class AdminPermissionService
         'vouchers.manage' => 'Promo / voucher',
         'support.manage' => 'Layanan pelanggan',
         'reports.view' => 'Laporan',
+        'reports.finance' => 'Laporan finansial',
         'settings.manage' => 'Pengaturan non-secret',
         'notifications.view' => 'Notifikasi',
     ];
