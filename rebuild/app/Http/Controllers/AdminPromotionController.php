@@ -159,11 +159,10 @@ class AdminPromotionController
                 return $id;
             }, 3);
         } catch (QueryException $e) {
-            // R1: Tangkap race condition duplicate kode voucher saja (bukan FK violation)
-            $message = $e->getMessage();
-            if ($e->getCode() === '23000' && str_contains($message, 'vouchers') && str_contains($message, 'Duplicate entry')) {
+            if ($this->isDuplicateVoucherCode($e)) {
                 throw ValidationException::withMessages(['code' => 'Kode voucher sudah digunakan.']);
             }
+
             throw $e;
         }
 
@@ -214,11 +213,10 @@ class AdminPromotionController
                 ]];
         }, 3);
         } catch (QueryException $e) {
-            // R1: Tangkap race condition duplicate kode voucher saja (bukan FK violation)
-            $message = $e->getMessage();
-            if ($e->getCode() === '23000' && str_contains($message, 'vouchers') && str_contains($message, 'Duplicate entry')) {
+            if ($this->isDuplicateVoucherCode($e)) {
                 throw ValidationException::withMessages(['code' => 'Kode voucher sudah digunakan.']);
             }
+
             throw $e;
         }
 
@@ -280,6 +278,14 @@ class AdminPromotionController
         return back()->with('status', $after['popular']
             ? 'Produk diprioritaskan di Populer Sekarang.'
             : 'Prioritas Populer Sekarang dilepas.');
+    }
+
+    private function isDuplicateVoucherCode(QueryException $e): bool
+    {
+        // R1: Hanya tangkap duplicate kode voucher, bukan FK violation lain
+        return $e->getCode() === '23000'
+            && str_contains($e->getMessage(), 'Duplicate entry')
+            && str_contains($e->getMessage(), 'vouchers');
     }
 
     private function voucherData(Request $request, ?int $ignoreId = null): array
