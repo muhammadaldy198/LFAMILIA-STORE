@@ -265,6 +265,8 @@ class AdminPromotionController
 
     private function voucherData(Request $request, ?int $ignoreId = null): array
     {
+        $request->merge(['code' => strtoupper($request->input('code', ''))]);
+
         $data = $request->validate([
             'code' => ['required', 'string', 'max:40', 'regex:/^[A-Za-z0-9_-]+$/', Rule::unique('vouchers', 'code')->ignore($ignoreId)],
             'name' => ['required', 'string', 'min:2', 'max:100'],
