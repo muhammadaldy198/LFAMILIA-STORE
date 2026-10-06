@@ -67,10 +67,10 @@ class GoogleAuthTest extends TestCase
         $this->assertNull($user->phone);
         $this->get('/account')->assertRedirect(route('account.phone.edit'));
 
-        $this->put('/account/phone', ['phone' => 'invalid-phone'])->assertSessionHasErrors('phone');
+        $this->withSession(['auth.password_confirmed_at' => time()])->put('/account/phone', ['phone' => 'invalid-phone'])->assertSessionHasErrors('phone');
         $this->get('/account')->assertRedirect(route('account.phone.edit'));
 
-        $this->put('/account/phone', ['phone' => '081234567890'])->assertRedirect(route('account'));
+        $this->withSession(['auth.password_confirmed_at' => time()])->put('/account/phone', ['phone' => '081234567890'])->assertRedirect(route('account'));
         $this->get('/account')->assertOk();
     }
 }
