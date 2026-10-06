@@ -163,7 +163,7 @@ class AdminPaymentController
         $manualAsset = StoreAsset::where('key', 'manual_qris')->first();
 
         return Inertia::render('Admin/Payments', [
-            'isSuperAdmin' => $request->user('admin')?->role === 'SUPER_ADMIN',
+            'isSuperAdmin' => app(\App\Services\AdminPermissionService::class)->allows($request->user('admin'), 'reports.finance'),
             'gateways' => $gateways,
             'channels' => $channels,
             'routes' => $routes,
