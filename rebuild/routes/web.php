@@ -17,6 +17,7 @@ use App\Http\Controllers\AdminNicknameController;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\AdminOrderDetailController;
 use App\Http\Controllers\AdminOrdersController;
+use App\Http\Controllers\AdminPasswordConfirmController;
 use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\AdminPresentationController;
 use App\Http\Controllers\AdminPromotionController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerAccountController;
 use App\Http\Controllers\CustomerOrderController;
+use App\Http\Controllers\CustomerPasswordConfirmController;
 use App\Http\Controllers\CustomerPhoneController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\GuestOrderController;
@@ -115,8 +117,14 @@ Route::middleware('guest:web')->group(function (): void {
 });
 
 Route::middleware('auth:web')->group(function (): void {
+    Route::get('/user/confirm-password', [CustomerPasswordConfirmController::class, 'show'])
+        ->name('password.confirm');
+    Route::post('/user/confirm-password', [CustomerPasswordConfirmController::class, 'store'])
+        ->middleware('throttle:6,1')->name('password.confirm.store');
+
     Route::get('/account/phone', [CustomerPhoneController::class, 'edit'])->name('account.phone.edit');
-    Route::put('/account/phone', [CustomerPhoneController::class, 'update'])->name('account.phone.update');
+    Route::put('/account/phone', [CustomerPhoneController::class, 'update'])
+        ->middleware('password.confirm')->name('account.phone.update');
 
     Route::middleware(['phone.required', 'customer.activity'])->group(function (): void {
         Route::get('/account', [CustomerAccountController::class, 'dashboard'])->name('account');
@@ -126,7 +134,7 @@ Route::middleware('auth:web')->group(function (): void {
         Route::put('/account/password', [CustomerAccountController::class, 'password'])
             ->middleware('throttle:account-sensitive')->name('account.password.update');
         Route::delete('/account', [CustomerAccountController::class, 'destroy'])
-            ->middleware('throttle:account-sensitive')->name('account.destroy');
+            ->middleware(['throttle:account-sensitive', 'password.confirm'])->name('account.destroy');
         Route::get('/account/wallet', [CustomerAccountController::class, 'wallet'])->name('account.wallet');
         Route::post('/account/wallet/topups/quote', [WalletTopupController::class, 'quote'])
             ->middleware('throttle:wallet-topup')->name('account.wallet.topups.quote');
@@ -174,6 +182,11 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::get('/admin/search', AdminSearchController::class)->middleware('throttle:admin-sensitive')->name('admin.search');
     Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 
+    Route::get('/admin/password/confirm', [AdminPasswordConfirmController::class, 'show'])
+        ->name('admin.password.confirm');
+    Route::post('/admin/password/confirm', [AdminPasswordConfirmController::class, 'store'])
+        ->middleware('throttle:admin-login')->name('admin.password.confirm.store');
+
     Route::get('/admin/panel', AdminDashboardController::class)
         ->middleware('admin.permission:dashboard.view')->name('admin.panel');
 
@@ -203,7 +216,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         ->name('admin.payments.')->group(function (): void {
             Route::get('/', [AdminPaymentController::class, 'index'])->name('index');
             Route::post('/manual/{paymentId}/confirm', [AdminPaymentController::class, 'confirmManual'])
-                ->middleware('throttle:admin-sensitive')->name('manual.confirm');
+                ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('manual.confirm');
             Route::post('/manual-qris/image', [AdminPaymentController::class, 'uploadManualQris'])
                 ->middleware('throttle:admin-sensitive')->name('manual-qris.image');
             Route::put('/manual-qris', [AdminPaymentController::class, 'toggleManualQris'])
@@ -233,7 +246,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::put('/routes/{id}', [AdminPaymentController::class, 'updateRoute'])
                 ->middleware('throttle:admin-sensitive')->name('routes.update');
             Route::post('/refund-reviews/{topupId}/resolve', [AdminPaymentController::class, 'resolveTopupRefund'])
-                ->middleware('throttle:admin-sensitive')->name('refund-reviews.resolve');
+                ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('refund-reviews.resolve');
             Route::put('/settings', [AdminPaymentController::class, 'settings'])
                 ->middleware('throttle:admin-sensitive')->name('settings.update');
         });
@@ -344,7 +357,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::delete('/admin/customers/{userId}', [AdminCustomerController::class, 'destroy'])
             ->middleware('throttle:admin-sensitive')->name('admin.customers.destroy');
         Route::post('/admin/customers/{userId}/wallet', [AdminCustomerController::class, 'adjustWallet'])
-            ->middleware('throttle:admin-sensitive')->name('admin.customers.wallet');
+            ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('admin.customers.wallet');
         Route::put('/admin/customers/{userId}/membership', [AdminCustomerController::class, 'updateMembership'])
             ->middleware('throttle:admin-sensitive')->name('admin.customers.membership');
     });

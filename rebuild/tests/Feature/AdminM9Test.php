@@ -167,7 +167,7 @@ class AdminM9Test extends TestCase
 
         $admin = $this->admin(['dashboard.view', 'customers.view', 'customers.wallet']);
         $this->actingAs($admin, 'admin');
-        $this->post('/admin/customers/'.$user->id.'/wallet', [
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$user->id.'/wallet', [
             'amount_idr' => 5000,
             'reason' => 'Test',
             'idempotency_key' => 'admin-wallet-denied-0001',
@@ -182,14 +182,14 @@ class AdminM9Test extends TestCase
             'reason' => 'Koreksi saldo',
             'idempotency_key' => 'admin-wallet-idempotent-0001',
         ];
-        $this->post('/admin/customers/'.$user->id.'/wallet', $payload)->assertRedirect();
-        $this->post('/admin/customers/'.$user->id.'/wallet', $payload)->assertRedirect();
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$user->id.'/wallet', $payload)->assertRedirect();
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$user->id.'/wallet', $payload)->assertRedirect();
 
         $this->assertSame(5000, (int) DB::table('wallets')->where('user_id', $user->id)->value('balance_idr'));
         $this->assertSame(1, DB::table('wallet_ledger')
             ->where('idempotency_key', 'admin-wallet-idempotent-0001')->count());
 
-        $this->post('/admin/customers/'.$user->id.'/wallet', [
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$user->id.'/wallet', [
             'amount_idr' => -6000,
             'reason' => 'Tidak boleh negatif',
             'idempotency_key' => 'admin-wallet-negative-0001',

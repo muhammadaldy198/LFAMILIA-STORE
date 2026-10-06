@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsurePhone;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PublicAbuseProtection;
+use App\Http\Middleware\RequireAdminPasswordConfirm;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\TrackCustomerActivity;
 use Illuminate\Foundation\Application;
@@ -34,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.role' => EnsureAdminRole::class,
             'admin.permission' => EnsureAdminPermission::class,
             'admin.super' => EnsureSuperAdmin::class,
+            'admin.password.confirm' => RequireAdminPasswordConfirm::class,
             'customer.activity' => TrackCustomerActivity::class,
         ]);
     })

@@ -195,7 +195,7 @@ class AdminCustomerRestorationTest extends TestCase
 
         $this->get('/admin/customers')->assertOk();
 
-        $this->post('/admin/customers/'.$user->id.'/wallet', [
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$user->id.'/wallet', [
             'amount_idr' => 5000,
             'reason' => 'Koreksi saldo',
             'idempotency_key' => 'customer-denied-wallet-0001',
@@ -220,9 +220,9 @@ class AdminCustomerRestorationTest extends TestCase
             'idempotency_key' => 'customer-wallet-idempotent-0001',
         ];
 
-        $this->post('/admin/customers/'.$user->id.'/wallet', $payload)
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$user->id.'/wallet', $payload)
             ->assertRedirect()->assertSessionHasNoErrors();
-        $this->post('/admin/customers/'.$user->id.'/wallet', $payload)
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$user->id.'/wallet', $payload)
             ->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertSame(15000, (int) DB::table('wallets')->where('user_id', $user->id)->value('balance_idr'));
@@ -235,7 +235,7 @@ class AdminCustomerRestorationTest extends TestCase
             'target_id' => (string) $user->id,
         ]);
 
-        $this->post('/admin/customers/'.$user->id.'/wallet', [
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$user->id.'/wallet', [
             'amount_idr' => -20000,
             'reason' => 'Tidak boleh negatif',
             'idempotency_key' => 'customer-wallet-negative-0001',
