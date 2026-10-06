@@ -29,6 +29,13 @@ class AdminAuthController
         ]);
 
         $identity = strtolower(trim((string) $credentials['email']));
+
+        // S2: Progressive lockout — 10 failures = 15 min locked
+        if ($risk->isLockedOut('admin', $request->ip(), $identity)) {
+            throw ValidationException::withMessages([
+                'email' => 'Terlalu banyak percobaan gagal. Coba lagi dalam 15 menit.',
+            ]);
+        }
         if (! Auth::guard('admin')->attempt([
             ...$credentials,
             'is_active' => true,
