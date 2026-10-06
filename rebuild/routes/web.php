@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AdminAccessController;
-use App\Http\Controllers\AdminActivationController;
 use App\Http\Controllers\AdminAuditController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
@@ -168,9 +167,6 @@ Route::redirect('/panel', '/admin/panel', 302);
 Route::redirect('/panel/login', '/admin/login', 302);
 Route::redirect('/panel/admin', '/admin/panel', 302);
 Route::redirect('/panel/admin/login', '/admin/login', 302);
-
-Route::get('/admin/activate', [AdminActivationController::class, 'show'])->middleware('throttle:admin-login');
-Route::post('/admin/activate', [AdminActivationController::class, 'store'])->middleware('throttle:admin-login');
 
 Route::middleware('guest:admin')->group(function (): void {
     Route::get('/admin/login', [AdminAuthController::class, 'show'])->name('admin.login');

@@ -8,6 +8,7 @@ use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Services\AdminAuditService;
 use App\Services\AdminDigiflazzMonitorService;
+use App\Services\AdminPermissionService;
 use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
 use Illuminate\Http\RedirectResponse;
@@ -128,7 +129,7 @@ class AdminDigiflazzController
             });
 
         $admin = $request->user('admin');
-        $connection = $monitor->connection($admin?->role === 'SUPER_ADMIN');
+        $connection = $monitor->connection(app(AdminPermissionService::class)->allows($admin, 'reports.finance'));
 
         return Inertia::render('Admin/Digiflazz', [
             'items' => $items,
@@ -144,7 +145,7 @@ class AdminDigiflazzController
             'monitorSettings' => $monitorSettings,
             'providerActive' => (bool) $provider?->is_active,
             'recentTransactions' => $monitor->recentTransactions(),
-            'canSeeBalance' => $admin?->role === 'SUPER_ADMIN',
+            'canSeeBalance' => app(AdminPermissionService::class)->allows($admin, 'reports.finance'),
         ]);
     }
 

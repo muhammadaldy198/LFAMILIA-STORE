@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminAuditService;
+use App\Services\AdminPermissionService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -23,7 +24,7 @@ class AdminReportController
     public function index(Request $request): Response
     {
         [$filters, $from, $to] = $this->period($request);
-        $finance = $request->user('admin')->role === 'SUPER_ADMIN';
+        $finance = app(AdminPermissionService::class)->allows($request->user('admin'), 'reports.finance');
 
         $orders = fn (): Builder => DB::table('orders')
             ->whereBetween('created_at', [$from, $to]);
@@ -103,7 +104,7 @@ class AdminReportController
     public function export(Request $request, AdminAuditService $audit): StreamedResponse
     {
         [$filters, $from, $to] = $this->period($request);
-        $finance = $request->user('admin')->role === 'SUPER_ADMIN';
+        $finance = app(AdminPermissionService::class)->allows($request->user('admin'), 'reports.finance');
         $daily = $this->dailyRows($from, $to, $finance);
 
         $audit->record($request, 'report.exported', 'report', 'sales', null, [

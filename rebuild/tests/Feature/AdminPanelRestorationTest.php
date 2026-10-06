@@ -16,9 +16,7 @@ use App\Services\DigiflazzCatalogService;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
@@ -573,22 +571,6 @@ class AdminPanelRestorationTest extends TestCase
             'amount_idr' => 11000, 'status' => 'PAID', 'idempotency_key' => bin2hex(random_bytes(20)), 'created_at' => now(), 'updated_at' => now()]);
         $this->get('/admin/orders/'.$id)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('Admin/OrderDetail')->has('payments', 1)->etc());
         $this->get('/admin/customers/'.$user->id)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('Admin/CustomerDetail')->has('orders.data', 1)->etc());
-    }
-
-    public function test_admin_activation_is_single_use_and_login_redirects_to_panel(): void
-    {
-        $admin = AdminUser::create(['name' => 'Activation', 'email' => 'activation-'.bin2hex(random_bytes(4)).'@example.test',
-            'password' => bcrypt('before-password-123'), 'role' => 'SUPER_ADMIN', 'is_active' => true]);
-        $token = bin2hex(random_bytes(32));
-        $key = 'admin_activation:'.hash('sha256', $token);
-        Cache::put($key, ['id' => $admin->id, 'password_fingerprint' => hash('sha256', $admin->password)], now()->addMinutes(30));
-        $this->get('/admin/activate?token='.$token)->assertOk();
-        $this->post('/admin/activate', ['token' => $token, 'password' => 'new-password-123', 'password_confirmation' => 'new-password-123'])
-            ->assertRedirect('/admin/login')->assertSessionHasNoErrors();
-        $this->assertTrue(Hash::check('new-password-123', $admin->fresh()->password));
-        $this->post('/admin/activate', ['token' => $token, 'password' => 'other-password-123', 'password_confirmation' => 'other-password-123'])->assertStatus(410);
-        $this->post('/admin/login', ['email' => $admin->email, 'password' => 'new-password-123'])->assertRedirect('/admin/panel');
-        $this->get('/admin/panel')->assertOk();
     }
 
     public function test_reports_and_quick_reply_configuration_are_functional(): void

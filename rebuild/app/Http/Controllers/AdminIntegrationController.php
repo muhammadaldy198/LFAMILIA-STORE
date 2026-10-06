@@ -319,7 +319,7 @@ class AdminIntegrationController
             'is_active' => (bool) $record->is_active,
             'environment' => $environment,
             'cleared_secret_fields' => $clearSecrets,
-            'config_ciphertext' => $config,
+            'changed_fields' => array_keys($config),
         ]);
 
         return back()->with('status', 'Pengaturan '.$definition['name'].' berhasil disimpan.');
