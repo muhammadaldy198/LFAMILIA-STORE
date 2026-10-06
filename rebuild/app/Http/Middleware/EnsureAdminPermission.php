@@ -13,8 +13,9 @@ class EnsureAdminPermission
 
     public function handle(Request $request, Closure $next, string ...$permissions): Response
     {
+        // R3: Gunakan AND (every) bukan OR (contains) — semua permission harus dimiliki
         $allowed = collect($permissions)
-            ->contains(fn (string $permission): bool => $this->permissions->allows(
+            ->every(fn (string $permission): bool => $this->permissions->allows(
                 $request->user('admin'),
                 $permission
             ));
