@@ -30,6 +30,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerAccountController;
 use App\Http\Controllers\CustomerOrderController;
+use App\Http\Controllers\CustomerPasswordConfirmController;
 use App\Http\Controllers\CustomerPhoneController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\GuestOrderController;
@@ -116,6 +117,11 @@ Route::middleware('guest:web')->group(function (): void {
 });
 
 Route::middleware('auth:web')->group(function (): void {
+    Route::get('/user/confirm-password', [CustomerPasswordConfirmController::class, 'show'])
+        ->name('password.confirm');
+    Route::post('/user/confirm-password', [CustomerPasswordConfirmController::class, 'store'])
+        ->middleware('throttle:6,1')->name('password.confirm.store');
+
     Route::get('/account/phone', [CustomerPhoneController::class, 'edit'])->name('account.phone.edit');
     Route::put('/account/phone', [CustomerPhoneController::class, 'update'])
         ->middleware('password.confirm')->name('account.phone.update');
