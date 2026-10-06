@@ -128,7 +128,7 @@ class AdminDigiflazzController
             });
 
         $admin = $request->user('admin');
-        $connection = $monitor->connection($admin?->role === 'SUPER_ADMIN');
+        $connection = $monitor->connection(app(\App\Services\AdminPermissionService::class)->allows($admin, 'reports.finance'));
 
         return Inertia::render('Admin/Digiflazz', [
             'items' => $items,
@@ -144,7 +144,7 @@ class AdminDigiflazzController
             'monitorSettings' => $monitorSettings,
             'providerActive' => (bool) $provider?->is_active,
             'recentTransactions' => $monitor->recentTransactions(),
-            'canSeeBalance' => $admin?->role === 'SUPER_ADMIN',
+            'canSeeBalance' => app(\App\Services\AdminPermissionService::class)->allows($admin, 'reports.finance'),
         ]);
     }
 
