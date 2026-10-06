@@ -4,6 +4,7 @@ use App\Http\Middleware\AssignCorrelationId;
 use App\Http\Middleware\EnforceTrustedHost;
 use App\Http\Middleware\EnsureAdminPermission;
 use App\Http\Middleware\EnsureAdminRole;
+use App\Http\Middleware\RequireAdminPasswordConfirm;
 use App\Http\Middleware\EnsurePhone;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -34,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.role' => EnsureAdminRole::class,
             'admin.permission' => EnsureAdminPermission::class,
             'admin.super' => EnsureSuperAdmin::class,
+            'admin.password.confirm' => RequireAdminPasswordConfirm::class,
             'customer.activity' => TrackCustomerActivity::class,
         ]);
     })
