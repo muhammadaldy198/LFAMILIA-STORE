@@ -131,13 +131,13 @@ class CustomerAreaTest extends TestCase
         SupportTicket::create([
             'user_id' => $user->id, 'subject' => 'Help', 'message' => 'My account',
         ]);
-        $this->delete('/account', [
+        $this->withSession(['auth.password_confirmed_at' => time()])->delete('/account', [
             'confirmation' => 'HAPUS', 'password' => 'new-password-123',
         ])->assertSessionHasErrors('account');
         $this->assertNull($user->fresh()->deleted_at);
 
         SupportTicket::where('user_id', $user->id)->delete();
-        $this->delete('/account', [
+        $this->withSession(['auth.password_confirmed_at' => time()])->delete('/account', [
             'confirmation' => 'HAPUS', 'password' => 'new-password-123',
         ])->assertRedirect('/');
         $deleted = User::withTrashed()->findOrFail($user->id);
