@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\AdminPermissionService;
 use App\Services\AdminAuditService;
+use App\Services\AdminPermissionService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
