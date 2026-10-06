@@ -21,7 +21,7 @@ class AdminCustomerController
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
-            'tier' => ['nullable', 'string', 'max:20'],
+            'tier' => ['nullable', 'string', 'max:20', Rule::exists('membership_tiers', 'code')],
             'membership_mode' => ['nullable', Rule::in(['AUTO', 'MANUAL'])],
             'verification' => ['nullable', Rule::in(['verified', 'unverified'])],
             'activity' => ['nullable', Rule::in(['active_30d', 'inactive_30d'])],

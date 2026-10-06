@@ -13,14 +13,15 @@ class AdminAuthTest extends TestCase
 
     public function test_active_admin_uses_a_separate_guard(): void
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Operator',
             'email' => 'admin@example.test',
             'password' => Hash::make('secure-password-123'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'ADMIN',
             'permissions' => ['dashboard.view'],
             'is_active' => true,
-        ]);
+        ])->save());
 
         $this->post('/admin/login', [
             'email' => $admin->email,
@@ -36,20 +37,22 @@ class AdminAuthTest extends TestCase
 
     public function test_inactive_or_unsupported_role_is_rejected(): void
     {
-        AdminUser::create([
+        tap(AdminUser::create([
             'name' => 'Inactive',
             'email' => 'inactive@example.test',
             'password' => Hash::make('secure-password-123'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'ADMIN',
             'is_active' => false,
-        ]);
-        AdminUser::create([
+        ])->save());
+        tap(AdminUser::create([
             'name' => 'Unsupported',
             'email' => 'staff@example.test',
             'password' => Hash::make('secure-password-123'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'STAFF',
             'is_active' => true,
-        ]);
+        ])->save());
 
         $this->post('/admin/login', [
             'email' => 'inactive@example.test',

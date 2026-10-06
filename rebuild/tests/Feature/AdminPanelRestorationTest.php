@@ -29,11 +29,15 @@ class AdminPanelRestorationTest extends TestCase
 
     private function login(array $permissions = [], string $role = 'SUPER_ADMIN'): void
     {
-        $this->actingAs(AdminUser::create([
-            'name' => 'Restoration Test', 'email' => bin2hex(random_bytes(8)).'@example.test',
-            'password' => bcrypt('restoration-test-password'), 'role' => $role,
-            'permissions' => $permissions, 'is_active' => true,
-        ]), 'admin');
+        $this->actingAs(tap(AdminUser::create([
+            'name' => 'Restoration Test',
+            'email' => bin2hex(random_bytes(8)).'@example.test',
+            'password' => bcrypt('restoration-test-password'),
+        ]), fn ($admin) => $admin->forceFill([
+            'role' => $role,
+            'permissions' => $permissions,
+            'is_active' => true,
+        ])->save()), 'admin');
     }
 
     private function product(string $mode = 'AUTO_PROVIDER'): Product

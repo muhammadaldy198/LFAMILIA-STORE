@@ -971,14 +971,15 @@ class PaymentTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Admin Payment',
             'email' => 'payadmin@example.test',
             'password' => Hash::make('StrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'ADMIN',
             'permissions' => ['payments.manage'],
             'is_active' => true,
-        ]);
+        ])->save());
 
         $this->actingAs($admin, 'admin')
             ->withSession(['admin.password_confirmed_at' => time()])

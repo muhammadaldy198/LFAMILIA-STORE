@@ -25,14 +25,15 @@ class AdminPaymentRestorationTest extends TestCase
 
     private function login(string $role = 'ADMIN', array $permissions = ['payments.manage']): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Payment restoration',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => bcrypt('payment-restoration-only'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => $role,
             'permissions' => $permissions,
             'is_active' => true,
-        ]);
+        ])->save());
         $this->actingAs($admin, 'admin');
 
         return $admin;

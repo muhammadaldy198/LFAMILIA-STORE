@@ -98,6 +98,8 @@ class CustomerAccountController
             'password' => Hash::make($data['password']),
             'remember_token' => Str::random(60),
         ])->save();
+        // L8: Tendang sesi lain setelah ganti password
+        Auth::logoutOtherDevices($data['password']);
         $request->session()->regenerate();
         if (is_string($user->email)) {
             $emails->queue(

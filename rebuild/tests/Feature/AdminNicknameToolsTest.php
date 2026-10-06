@@ -18,14 +18,15 @@ class AdminNicknameToolsTest extends TestCase
 
     private function login(string $role = 'SUPER_ADMIN'): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Validation Admin',
             'email' => 'validation-'.bin2hex(random_bytes(5)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => $role,
             'permissions' => $role === 'ADMIN' ? ['dashboard.view'] : null,
             'is_active' => true,
-        ]);
+        ])->save());
 
         $this->actingAs($admin, 'admin');
 

@@ -21,14 +21,15 @@ class AdminIntegrationsRestorationTest extends TestCase
 
     private function loginSuperAdmin(): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Integration Owner',
             'email' => 'integration-owner-'.bin2hex(random_bytes(6)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'SUPER_ADMIN',
             'permissions' => null,
             'is_active' => true,
-        ]);
+        ])->save());
 
         $this->actingAs($admin, 'admin');
 
@@ -267,14 +268,15 @@ class AdminIntegrationsRestorationTest extends TestCase
 
     public function test_regular_admin_cannot_read_or_mutate_integration_credentials(): void
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Operational Admin',
             'email' => 'ops-'.bin2hex(random_bytes(6)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'ADMIN',
             'permissions' => ['settings.manage', 'payments.manage', 'providers.manage'],
             'is_active' => true,
-        ]);
+        ])->save());
         $this->actingAs($admin, 'admin');
 
         $this->get('/admin/integrations')->assertForbidden();

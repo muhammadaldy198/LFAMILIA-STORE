@@ -114,7 +114,7 @@ class AdminPromotionController
             ]);
 
         $summaryRows = DB::table('vouchers')
-            ->leftJoinSub($this->redemptionCounts($now), 'redemptions', 'redemptions.voucher_id', '=', 'vouchers.id')
+            ->leftJoinSub($redemptions, 'redemptions', 'redemptions.voucher_id', '=', 'vouchers.id')
             ->get([
                 'vouchers.id', 'vouchers.is_active', 'vouchers.starts_at', 'vouchers.ends_at', 'vouchers.total_quota',
                 DB::raw('COALESCE(redemptions.used_count, 0) as used_count'),

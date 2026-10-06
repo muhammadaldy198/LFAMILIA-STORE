@@ -24,11 +24,15 @@ class AdminOrdersRestorationTest extends TestCase
 
     private function login(string $role = 'SUPER_ADMIN', array $permissions = []): AdminUser
     {
-        $admin = AdminUser::create([
-            'name' => 'Order regression', 'email' => bin2hex(random_bytes(8)).'@example.test',
-            'password' => bcrypt('order-regression-only'), 'role' => $role,
-            'permissions' => $permissions, 'is_active' => true,
-        ]);
+        $admin = tap(AdminUser::create([
+            'name' => 'Order regression',
+            'email' => bin2hex(random_bytes(8)).'@example.test',
+            'password' => bcrypt('order-regression-only'),
+        ]), fn ($admin) => $admin->forceFill([
+            'role' => $role,
+            'permissions' => $permissions,
+            'is_active' => true,
+        ])->save());
         $this->actingAs($admin, 'admin');
 
         return $admin;

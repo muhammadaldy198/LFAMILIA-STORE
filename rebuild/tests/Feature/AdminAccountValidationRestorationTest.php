@@ -18,14 +18,15 @@ class AdminAccountValidationRestorationTest extends TestCase
 
     private function superAdmin(): AdminUser
     {
-        return AdminUser::create([
+        return tap(AdminUser::create([
             'name' => 'Account Validation Super',
             'email' => 'account-validation-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'SUPER_ADMIN',
             'permissions' => null,
             'is_active' => true,
-        ]);
+        ])->save());
     }
 
     private function productUsingCode(string $code): Product
@@ -237,14 +238,15 @@ class AdminAccountValidationRestorationTest extends TestCase
 
     public function test_regular_admin_cannot_mutate_account_validation_rules(): void
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Regular Admin',
             'email' => 'regular-validation-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'ADMIN',
             'permissions' => ['providers.manage'],
             'is_active' => true,
-        ]);
+        ])->save());
 
         $this->actingAs($admin, 'admin');
 

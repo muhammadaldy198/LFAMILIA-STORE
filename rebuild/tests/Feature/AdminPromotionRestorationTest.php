@@ -17,14 +17,15 @@ class AdminPromotionRestorationTest extends TestCase
 
     private function login(array $permissions = ['vouchers.manage'], string $role = 'ADMIN'): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Promo Test',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => Hash::make('promo-restoration-only'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => $role,
             'permissions' => $role === 'SUPER_ADMIN' ? null : $permissions,
             'is_active' => true,
-        ]);
+        ])->save());
         $this->actingAs($admin, 'admin');
 
         return $admin;

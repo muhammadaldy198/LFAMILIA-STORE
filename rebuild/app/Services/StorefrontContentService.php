@@ -114,7 +114,7 @@ class StorefrontContentService
             return collect();
         }
 
-        return NewsArticle::where('is_active', true)
+        return NewsArticle::with('media')->where('is_active', true)
             ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
             ->orderBy('sort_order')->orderByDesc('published_at')->orderByDesc('id')
             ->limit($limit)->get()

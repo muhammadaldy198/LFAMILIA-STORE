@@ -19,14 +19,15 @@ class AdminContentRestorationTest extends TestCase
 
     private function login(): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Content regression',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => bcrypt('content-regression-only'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'SUPER_ADMIN',
             'permissions' => [],
             'is_active' => true,
-        ]);
+        ])->save());
         $this->actingAs($admin, 'admin');
 
         return $admin;

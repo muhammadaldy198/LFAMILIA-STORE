@@ -195,13 +195,14 @@ class SecurityM10Test extends TestCase
 
     public function test_sensitive_admin_audit_uses_request_correlation_id(): void
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Correlation Super',
             'email' => 'correlation-super@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'SUPER_ADMIN',
             'is_active' => true,
-        ]);
+        ])->save());
         $this->actingAs($admin, 'admin');
 
         $this->withHeader('X-Request-ID', 'm10-correlation-request-001')
@@ -219,13 +220,14 @@ class SecurityM10Test extends TestCase
 
     public function test_secret_reveal_endpoint_is_not_exposed(): void
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Super Security',
             'email' => 'super-security@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'SUPER_ADMIN',
             'is_active' => true,
-        ]);
+        ])->save());
         IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
             'config_ciphertext' => ['server_key' => 'midtrans-secret-test'],
             'is_active' => true,

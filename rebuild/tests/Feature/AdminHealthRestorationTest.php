@@ -19,14 +19,15 @@ class AdminHealthRestorationTest extends TestCase
 
     private function login(string $role = 'SUPER_ADMIN'): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Health Test',
             'email' => 'health-'.bin2hex(random_bytes(6)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => $role,
             'permissions' => $role === 'SUPER_ADMIN' ? null : ['dashboard.view'],
             'is_active' => true,
-        ]);
+        ])->save());
 
         $this->actingAs($admin, 'admin');
 

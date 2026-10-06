@@ -20,26 +20,28 @@ class AdminM9Test extends TestCase
 
     private function admin(array $permissions = []): AdminUser
     {
-        return AdminUser::create([
+        return tap(AdminUser::create([
             'name' => 'Admin Test',
             'email' => 'admin-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'ADMIN',
             'permissions' => $permissions,
             'is_active' => true,
-        ]);
+        ])->save());
     }
 
     private function superAdmin(): AdminUser
     {
-        return AdminUser::create([
+        return tap(AdminUser::create([
             'name' => 'Super Test',
             'email' => 'super-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'SUPER_ADMIN',
             'permissions' => null,
             'is_active' => true,
-        ]);
+        ])->save());
     }
 
     public function test_admin_menu_includes_account_validation_and_no_staff_role(): void
@@ -54,14 +56,15 @@ class AdminM9Test extends TestCase
         ], collect($menu)->pluck('label')->all());
         $this->assertCount(18, $menu);
 
-        $unsupported = AdminUser::create([
+        $unsupported = tap(AdminUser::create([
             'name' => 'Unsupported Staff',
             'email' => 'unsupported-staff-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'STAFF',
             'permissions' => ['dashboard.view'],
             'is_active' => true,
-        ]);
+        ])->save());
         $this->assertFalse(app(AdminPermissionService::class)->allows($unsupported, 'dashboard.view'));
     }
 

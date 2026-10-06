@@ -26,14 +26,15 @@ class AdminDigiflazzRestorationTest extends TestCase
 
     private function login(string $role = 'SUPER_ADMIN', array $permissions = []): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Digiflazz regression',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => bcrypt('digiflazz-regression-only'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => $role,
             'permissions' => $permissions,
             'is_active' => true,
-        ]);
+        ])->save());
         $this->actingAs($admin, 'admin');
 
         return $admin;

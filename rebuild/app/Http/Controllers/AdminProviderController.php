@@ -22,10 +22,18 @@ class AdminProviderController
                 ? (int) $request->query('per_page', 25) : 25,
         ];
 
+        // L4: Preload agregat sekali pakai GROUP BY
+        $mappingCounts = DB::table('provider_mappings')
+            ->selectRaw('provider_id, COUNT(*) as total, SUM(is_active) as active')
+            ->groupBy('provider_id')->get()->keyBy('provider_id');
+        $attemptStats = DB::table('fulfillment_attempts')
+            ->selectRaw('provider_id, MAX(created_at) as last_at, SUM(status = "SUCCESS" AND created_at >= ?) as success_24h, SUM(status IN ("PENDING", "UNKNOWN", "SENDING")) as attention', [now()->subDay()])
+            ->groupBy('provider_id')->get()->keyBy('provider_id');
+
         $providers = DB::table('providers')->orderBy('sort_order')->orderBy('id')->get()
-            ->map(function (object $provider): array {
-                $attempts = DB::table('fulfillment_attempts')
-                    ->where('provider_id', $provider->id);
+            ->map(function (object $provider) use ($mappingCounts, $attemptStats): array {
+                $mc = $mappingCounts->get($provider->id);
+                $as = $attemptStats->get($provider->id);
 
                 return [
                     'id' => (int) $provider->id,
@@ -35,15 +43,11 @@ class AdminProviderController
                     'fulfillment_mode' => (string) $provider->fulfillment_mode,
                     'is_active' => (bool) $provider->is_active,
                     'sort_order' => (int) $provider->sort_order,
-                    'mapping_count' => DB::table('provider_mappings')
-                        ->where('provider_id', $provider->id)->count(),
-                    'active_mapping_count' => DB::table('provider_mappings')
-                        ->where('provider_id', $provider->id)->where('is_active', true)->count(),
-                    'last_attempt_at' => (clone $attempts)->max('created_at'),
-                    'success_24h' => (clone $attempts)->where('status', 'SUCCESS')
-                        ->where('created_at', '>=', now()->subDay())->count(),
-                    'attention_count' => (clone $attempts)
-                        ->whereIn('status', ['PENDING', 'UNKNOWN', 'SENDING'])->count(),
+                    'mapping_count' => (int) ($mc->total ?? 0),
+                    'active_mapping_count' => (int) ($mc->active ?? 0),
+                    'last_attempt_at' => $as->last_at ?? null,
+                    'success_24h' => (int) ($as->success_24h ?? 0),
+                    'attention_count' => (int) ($as->attention ?? 0),
                     'health' => $this->health((string) $provider->code, (bool) $provider->is_active),
                 ];
             })->values();

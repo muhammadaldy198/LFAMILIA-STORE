@@ -18,14 +18,15 @@ class AdminSupportRestorationTest extends TestCase
 
     private function login(array $permissions = ['support.manage'], string $role = 'ADMIN'): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => 'Support Admin',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => Hash::make('support-restoration-password'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => $role,
             'permissions' => $role === 'SUPER_ADMIN' ? null : $permissions,
             'is_active' => true,
-        ]);
+        ])->save());
         $this->actingAs($admin, 'admin');
 
         return $admin;

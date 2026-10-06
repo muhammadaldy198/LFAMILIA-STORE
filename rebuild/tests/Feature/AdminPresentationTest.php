@@ -16,11 +16,15 @@ class AdminPresentationTest extends TestCase
 
     private function admin(array $permissions = [], string $role = 'ADMIN'): AdminUser
     {
-        return AdminUser::create([
-            'name' => 'Content Admin', 'email' => 'presentation-'.bin2hex(random_bytes(4)).'@example.test',
-            'password' => Hash::make('StrongPassword123!'), 'role' => $role,
-            'permissions' => $permissions, 'is_active' => true,
-        ]);
+        return tap(AdminUser::create([
+            'name' => 'Content Admin',
+            'email' => 'presentation-'.bin2hex(random_bytes(4)).'@example.test',
+            'password' => Hash::make('StrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
+            'role' => $role,
+            'permissions' => $permissions,
+            'is_active' => true,
+        ])->save());
     }
 
     public function test_content_admin_saves_public_copy_and_independent_mobile_desktop_geometry(): void

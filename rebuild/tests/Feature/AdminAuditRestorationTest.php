@@ -15,14 +15,15 @@ class AdminAuditRestorationTest extends TestCase
 
     private function login(string $role = 'SUPER_ADMIN', array $permissions = []): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => $role === 'SUPER_ADMIN' ? 'Audit Owner' : 'Audit Admin',
             'email' => strtolower($role).'-'.bin2hex(random_bytes(5)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => $role,
             'permissions' => $role === 'SUPER_ADMIN' ? null : $permissions,
             'is_active' => true,
-        ]);
+        ])->save());
 
         $this->actingAs($admin, 'admin');
 
@@ -135,14 +136,15 @@ class AdminAuditRestorationTest extends TestCase
         DB::table('audit_logs')->delete();
         $owner = $this->login();
 
-        $other = AdminUser::create([
+        $other = tap(AdminUser::create([
             'name' => 'Operator Pencarian Audit',
             'email' => 'operator-audit-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => 'ADMIN',
             'permissions' => ['dashboard.view'],
             'is_active' => true,
-        ]);
+        ])->save());
 
         for ($index = 1; $index <= 30; $index++) {
             $this->insertAudit(

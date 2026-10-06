@@ -34,6 +34,18 @@ class PaymentStateService
             }
 
             if ($payment->status === 'REFUNDED') {
+                // L2: Notifikasi kalau ada PAID yang datang setelah refund
+                if ($incomingStatus === 'PAID') {
+                    $this->notifications->record(
+                        'payment.late_after_refund',
+                        'Pembayaran telat setelah refund',
+                        'Payment #'.$payment->id.' menerima PAID setelah REFUNDED. Perlu rekonsiliasi manual.',
+                        'WARNING',
+                        'payment',
+                        $payment->id
+                    );
+                }
+
                 return ['result' => 'IGNORED_FINAL', 'status' => 'REFUNDED'];
             }
             if ($payment->status === 'PAID' && $incomingStatus !== 'REFUNDED') {

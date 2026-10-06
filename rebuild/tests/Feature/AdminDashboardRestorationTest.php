@@ -22,11 +22,15 @@ class AdminDashboardRestorationTest extends TestCase
 
     private function login(string $role = 'SUPER_ADMIN', array $permissions = []): void
     {
-        $this->actingAs(AdminUser::create([
-            'name' => 'Dashboard regression', 'email' => bin2hex(random_bytes(8)).'@example.test',
-            'password' => bcrypt('dashboard-regression-only'), 'role' => $role,
-            'permissions' => $permissions, 'is_active' => true,
-        ]), 'admin');
+        $this->actingAs(tap(AdminUser::create([
+            'name' => 'Dashboard regression',
+            'email' => bin2hex(random_bytes(8)).'@example.test',
+            'password' => bcrypt('dashboard-regression-only'),
+        ]), fn ($admin) => $admin->forceFill([
+            'role' => $role,
+            'permissions' => $permissions,
+            'is_active' => true,
+        ])->save()), 'admin');
     }
 
     private function order(string $createdAt, string $status, int $total = 10000): int

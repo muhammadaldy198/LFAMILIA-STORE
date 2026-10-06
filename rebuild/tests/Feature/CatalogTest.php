@@ -25,13 +25,14 @@ class CatalogTest extends TestCase
 
     private function admin(string $role = 'SUPER_ADMIN'): AdminUser
     {
-        return AdminUser::create([
+        return tap(AdminUser::create([
             'name' => 'Catalog Admin',
             'email' => strtolower($role).'@example.test',
             'password' => Hash::make('secure-password-123'),
+        ]), fn ($admin) => $admin->forceFill([
             'role' => $role,
             'is_active' => true,
-        ]);
+        ])->save());
     }
 
     public function test_default_categories_are_extensible_and_exclude_ewallet(): void

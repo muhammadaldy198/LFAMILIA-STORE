@@ -127,7 +127,7 @@ class PaymentWebhookController
         abort_unless($payment, 404);
         abort_unless(app(MidtransStatusVerification::class)->amount($amount) === (int) $payment->amount_idr, 422);
 
-        $eventId = hash('sha256', $requestId);
+        $eventId = hash('sha256', implode('|', [$requestId, $transactionStatus]));
         $processed = DB::transaction(function () use (
             $payment,
             $eventId,

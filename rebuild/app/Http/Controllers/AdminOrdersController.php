@@ -42,7 +42,13 @@ class AdminOrdersController
             ->select('orders.*', 'products.name as product_name', 'packages.name as package_name',
                 'users.name as buyer_name', 'users.email as buyer_email', 'users.phone as buyer_phone',
                 'providers.code as provider_code', 'channels.name as channel_name', 'products.manual_instructions')
-            ->selectRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED')) as needs_attention");
+            ->leftJoinSub(
+                DB::table('fulfillment_attempts as fa')
+                    ->select('fa.order_id', 'fa.status')
+                    ->whereRaw('fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = fa.order_id)'),
+                'latest_attempt', 'latest_attempt.order_id', '=', 'orders.id'
+            )
+            ->selectRaw("latest_attempt.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED') as needs_attention");
         if ($q = trim((string) $request->query('q'))) {
             $query->where(function (Builder $query) use ($q): void {
                 foreach (['orders.order_number', 'users.name', 'users.email', 'users.phone', 'orders.guest_email',
@@ -53,7 +59,7 @@ class AdminOrdersController
         }
         if ($status = $request->query('status')) {
             if ($status === 'attention') {
-                $query->whereRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED'))");
+                $query->whereIn('latest_attempt.status', ['UNKNOWN', 'BLOCKED', 'MANUAL_FAILED']);
             } else {
                 $query->where('orders.status', $status);
             }
@@ -83,7 +89,7 @@ class AdminOrdersController
     {
         $query = $this->query($request);
         $counts = (clone $query)->reorder()->select('orders.status')->selectRaw('COUNT(*) as total')->groupBy('orders.status')->pluck('total', 'orders.status');
-        $attention = (clone $query)->whereRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED'))")->count();
+        $attention = (clone $query)->whereIn('latest_attempt.status', ['UNKNOWN', 'BLOCKED', 'MANUAL_FAILED'])->count();
         $rows = $query->orderByDesc('orders.id')->paginate((int) $request->query('per_page', 25))->withQueryString();
         $rows->through(fn (object $row): array => $presentation->row($row));
         $permissions = app(AdminPermissionService::class);
@@ -228,7 +234,7 @@ class AdminOrdersController
     {
         $payment = DB::table('payment_transactions')->where('order_id', $id)->orderByDesc('id')->first();
         abort_unless(DB::table('orders')->where('id', $id)->exists(), 404);
-        if (! $payment || $payment->gateway_code !== 'MIDTRANS' || ! in_array($payment->status, ['PENDING', 'CREATING', 'SENDING'], true)) {
+        if (! $payment || $payment->gateway_code !== 'MIDTRANS' || ! in_array($payment->status, ['PENDING', 'CREATING', 'SENDING', 'UNKNOWN'], true)) {
             throw ValidationException::withMessages(['payment' => 'Pembayaran ini tidak memerlukan pemeriksaan langsung. Pembayaran otomatis diperbarui setelah konfirmasi penyedia diterima.']);
         }
         try {

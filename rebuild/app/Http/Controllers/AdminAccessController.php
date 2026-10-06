@@ -121,14 +121,15 @@ class AdminAccessController
         $data = $this->validateAdmin($request, $permissions, null, true);
         $data = $this->normalizePermissions($data);
 
-        $admin = AdminUser::create([
+        $admin = tap(AdminUser::create([
             'name' => trim($data['name']),
             'email' => strtolower(trim($data['email'])),
             'password' => Hash::make($data['password']),
+        ]), fn (AdminUser $a) => $a->forceFill([
             'role' => $data['role'],
             'permissions' => $data['role'] === 'ADMIN' ? $data['permissions'] : null,
             'is_active' => $data['is_active'],
-        ]);
+        ])->save());
 
         $audit->record($request, 'admin.created', 'admin_user', $admin->id, null, $this->auditState($admin));
 
@@ -162,7 +163,7 @@ class AdminAccessController
 
         $before = $this->auditState($admin);
 
-        $admin->fill([
+        $admin->forceFill([
             'name' => trim($data['name']),
             'email' => strtolower(trim($data['email'])),
             'role' => $data['role'],
