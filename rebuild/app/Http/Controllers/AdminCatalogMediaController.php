@@ -34,7 +34,7 @@ class AdminCatalogMediaController
     public function store(Request $request, string $type, int $id, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate([
-            'image' => ['required', 'image', 'mimes:jpeg,png,webp,gif', 'max:5120'],
+            'image' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
             'collection' => ['required', Rule::in(
                 $type === 'product' ? ['image', 'banner']
                     : ($type === 'banner' ? ['desktop', 'mobile'] : ['image'])
