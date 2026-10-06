@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Services\AdminAuditService;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -145,17 +146,25 @@ class AdminPromotionController
         $data = $this->voucherData($request);
         [$voucher, $productIds, $categoryIds] = $this->splitVoucherData($data);
 
-        $id = DB::transaction(function () use ($voucher, $productIds, $categoryIds): int {
-            $id = DB::table('vouchers')->insertGetId([
-                ...$voucher,
-                'code' => strtoupper($voucher['code']),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            $this->syncScope($id, $productIds, $categoryIds);
+        try {
+            $id = DB::transaction(function () use ($voucher, $productIds, $categoryIds): int {
+                $id = DB::table('vouchers')->insertGetId([
+                    ...$voucher,
+                    'code' => strtoupper($voucher['code']),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $this->syncScope($id, $productIds, $categoryIds);
 
-            return $id;
-        }, 3);
+                return $id;
+            }, 3);
+        } catch (QueryException $e) {
+            // R1: Tangkap race condition duplicate (TOCTOU) jadi validation error
+            if ($e->getCode() === '23000') {
+                throw ValidationException::withMessages(['code' => 'Kode voucher sudah digunakan.']);
+            }
+            throw $e;
+        }
 
         $audit->record($request, 'voucher.created', 'voucher', $id, null, [
             ...$voucher,
@@ -171,7 +180,8 @@ class AdminPromotionController
         $data = $this->voucherData($request, $id);
         [$voucher, $productIds, $categoryIds] = $this->splitVoucherData($data);
 
-        [$before, $after] = DB::transaction(function () use ($id, $voucher, $productIds, $categoryIds): array {
+        try {
+            [$before, $after] = DB::transaction(function () use ($id, $voucher, $productIds, $categoryIds): array {
             $current = DB::table('vouchers')->where('id', $id)->lockForUpdate()->first();
             abort_unless($current, 404);
 
@@ -202,6 +212,13 @@ class AdminPromotionController
                 'category_ids' => $categoryIds,
             ]];
         }, 3);
+        } catch (QueryException $e) {
+            // R1: Tangkap race condition duplicate (TOCTOU) jadi validation error
+            if ($e->getCode() === '23000') {
+                throw ValidationException::withMessages(['code' => 'Kode voucher sudah digunakan.']);
+            }
+            throw $e;
+        }
 
         $audit->record($request, 'voucher.updated', 'voucher', $id, $before, $after);
 
@@ -265,6 +282,9 @@ class AdminPromotionController
 
     private function voucherData(Request $request, ?int $ignoreId = null): array
     {
+        // R1: Normalisasi ke uppercase SEBELUM validasi unique
+        $request->merge(['code' => strtoupper((string) $request->input('code'))]);
+
         $data = $request->validate([
             'code' => ['required', 'string', 'max:40', 'regex:/^[A-Za-z0-9_-]+$/', Rule::unique('vouchers', 'code')->ignore($ignoreId)],
             'name' => ['required', 'string', 'min:2', 'max:100'],
