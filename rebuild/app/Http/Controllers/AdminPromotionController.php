@@ -183,35 +183,35 @@ class AdminPromotionController
 
         try {
             [$before, $after] = DB::transaction(function () use ($id, $voucher, $productIds, $categoryIds): array {
-            $current = DB::table('vouchers')->where('id', $id)->lockForUpdate()->first();
-            abort_unless($current, 404);
+                $current = DB::table('vouchers')->where('id', $id)->lockForUpdate()->first();
+                abort_unless($current, 404);
 
-            $activeReservations = $this->activeRedemptionCount($id);
-            if ($voucher['total_quota'] !== null && (int) $voucher['total_quota'] < $activeReservations) {
-                throw ValidationException::withMessages([
-                    'total_quota' => 'Total kuota tidak boleh lebih kecil dari pemakaian dan reservasi yang masih aktif.',
+                $activeReservations = $this->activeRedemptionCount($id);
+                if ($voucher['total_quota'] !== null && (int) $voucher['total_quota'] < $activeReservations) {
+                    throw ValidationException::withMessages([
+                        'total_quota' => 'Total kuota tidak boleh lebih kecil dari pemakaian dan reservasi yang masih aktif.',
+                    ]);
+                }
+
+                $before = [
+                    ...((array) $current),
+                    'product_ids' => DB::table('voucher_products')->where('voucher_id', $id)->orderBy('product_id')->pluck('product_id')->all(),
+                    'category_ids' => DB::table('voucher_categories')->where('voucher_id', $id)->orderBy('category_id')->pluck('category_id')->all(),
+                ];
+
+                DB::table('vouchers')->where('id', $id)->update([
+                    ...$voucher,
+                    'code' => strtoupper($voucher['code']),
+                    'updated_at' => now(),
                 ]);
-            }
+                $this->syncScope($id, $productIds, $categoryIds);
 
-            $before = [
-                ...((array) $current),
-                'product_ids' => DB::table('voucher_products')->where('voucher_id', $id)->orderBy('product_id')->pluck('product_id')->all(),
-                'category_ids' => DB::table('voucher_categories')->where('voucher_id', $id)->orderBy('category_id')->pluck('category_id')->all(),
-            ];
-
-            DB::table('vouchers')->where('id', $id)->update([
-                ...$voucher,
-                'code' => strtoupper($voucher['code']),
-                'updated_at' => now(),
-            ]);
-            $this->syncScope($id, $productIds, $categoryIds);
-
-            return [$before, [
-                ...$voucher,
-                'code' => strtoupper($voucher['code']),
-                'product_ids' => $productIds,
-                'category_ids' => $categoryIds,
-            ]];
+                return [$before, [
+                    ...$voucher,
+                    'code' => strtoupper($voucher['code']),
+                    'product_ids' => $productIds,
+                    'category_ids' => $categoryIds,
+                ]];
         }, 3);
         } catch (QueryException $e) {
             // R1: Tangkap race condition duplicate kode voucher saja (bukan FK violation)
