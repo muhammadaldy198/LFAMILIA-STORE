@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\SitePopup;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -33,14 +34,12 @@ return new class extends Migration
 
         $keepPopupId = DB::table('site_popups')->orderBy('id')->value('id');
         if ($keepPopupId !== null) {
-            $duplicatePopupIds = DB::table('site_popups')->where('id', '!=', $keepPopupId)->pluck('id');
-            if ($duplicatePopupIds->isNotEmpty()) {
-                DB::table('media')
-                    ->where('model_type', 'App\\Models\\SitePopup')
-                    ->whereIn('model_id', $duplicatePopupIds)
-                    ->delete();
-                DB::table('site_popups')->whereIn('id', $duplicatePopupIds)->delete();
-            }
+            SitePopup::query()
+                ->whereKeyNot($keepPopupId)
+                ->with('media')
+                ->get()
+                ->each
+                ->delete();
         }
 
         Schema::table('site_popups', function (Blueprint $table): void {
