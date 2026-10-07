@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('orders', function (Blueprint $table): void {
-            $table->string('guest_phone_normalized', 20)->nullable()->after('guest_phone')->index();
+            $table->string('guest_phone_normalized', 32)->nullable()->after('guest_phone')->index();
         });
 
         DB::table('orders')->whereNotNull('guest_phone')->orderBy('id')->chunkById(500, function ($orders): void {
@@ -21,7 +21,7 @@ return new class extends Migration
         });
 
         Schema::table('users', function (Blueprint $table): void {
-            $table->string('phone_normalized', 20)->nullable()->after('phone')->index();
+            $table->string('phone_normalized', 32)->nullable()->after('phone')->index();
         });
 
         DB::table('users')->whereNotNull('phone')->orderBy('id')->chunkById(500, function ($users): void {
