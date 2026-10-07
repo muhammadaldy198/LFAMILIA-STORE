@@ -76,6 +76,7 @@ class SupportTicketController
                 ->leftJoin('admin_users', 'admin_users.id', '=', 'messages.admin_user_id')
                 ->where('messages.support_ticket_id', $record->id)
                 ->orderBy('messages.id')
+                ->limit(200)
                 ->get([
                     'messages.id', 'messages.sender_type', 'messages.message', 'messages.created_at',
                     'users.name as customer_name', 'admin_users.name as admin_name',

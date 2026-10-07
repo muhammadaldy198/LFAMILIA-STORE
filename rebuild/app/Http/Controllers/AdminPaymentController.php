@@ -55,25 +55,29 @@ class AdminPaymentController
                     ->where('is_active', true)->count(),
             ]);
 
-        $channels = PaymentChannel::query()->orderBy('sort_order')->orderBy('id')->get()
-            ->map(function (PaymentChannel $channel) use ($routing): array {
-                $routes = DB::table('payment_routes as routes')
-                    ->join('payment_gateways as gateways', 'gateways.id', '=', 'routes.payment_gateway_id')
-                    ->where('routes.payment_channel_id', $channel->id)
-                    ->orderBy('routes.priority')->orderBy('routes.id')
-                    ->get([
-                        'routes.id',
-                        'routes.provider_channel',
-                        'routes.priority',
-                        'routes.supports_order',
-                        'routes.supports_wallet_topup',
-                        'routes.is_active',
-                        'gateways.id as gateway_id',
-                        'gateways.code as gateway_code',
-                        'gateways.internal_name as gateway_name',
-                        'gateways.is_active as gateway_active',
-                        'gateways.is_maintenance as gateway_maintenance',
-                    ]);
+        $channels = PaymentChannel::query()->orderBy('sort_order')->orderBy('id')->with('media')->get();
+
+        $allRoutes = DB::table('payment_routes as routes')
+            ->join('payment_gateways as gateways', 'gateways.id', '=', 'routes.payment_gateway_id')
+            ->orderBy('routes.priority')->orderBy('routes.id')
+            ->get([
+                'routes.payment_channel_id',
+                'routes.id',
+                'routes.provider_channel',
+                'routes.priority',
+                'routes.supports_order',
+                'routes.supports_wallet_topup',
+                'routes.is_active',
+                'gateways.id as gateway_id',
+                'gateways.code as gateway_code',
+                'gateways.internal_name as gateway_name',
+                'gateways.is_active as gateway_active',
+                'gateways.is_maintenance as gateway_maintenance',
+            ])->groupBy('payment_channel_id');
+
+        $channels = $channels
+            ->map(function (PaymentChannel $channel) use ($routing, $allRoutes): array {
+                $routes = $allRoutes->get($channel->id, collect());
 
                 return [
                     'id' => (int) $channel->id,

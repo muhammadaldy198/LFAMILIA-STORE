@@ -6,6 +6,7 @@ use App\Services\Payment\DokuDirectGateway;
 use App\Services\Payment\ManualQrisGateway;
 use App\Services\Payment\MidtransGateway;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -333,6 +334,12 @@ class PaymentService
                     DB::table('payment_transactions')->where('id', $payment->id)->firstOrFail()
                 );
             }
+
+            Log::warning('Payment transaction marked UNKNOWN, needs manual reconciliation', [
+                'payment_transaction_id' => $payment->id,
+                'order_id' => $payment->order_id,
+                'gateway_code' => $payment->gateway_code,
+            ]);
 
             throw ValidationException::withMessages([
                 'payment' => 'Status pembuatan pembayaran belum dapat dipastikan. Jangan ulangi pembayaran; periksa status transaksi.',

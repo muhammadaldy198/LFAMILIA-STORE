@@ -34,11 +34,11 @@ class AdminContentController
             'assets' => StoreAsset::whereIn('key', [
                 'logo', 'favicon', 'banner_desktop', 'banner_mobile',
                 'footer_banner_desktop', 'footer_banner_mobile',
-            ])->orderBy('id')->get()->map(fn (StoreAsset $asset): array => [
+            ])->orderBy('id')->with('media')->get()->map(fn (StoreAsset $asset): array => [
                 ...$asset->only('id', 'key', 'target_url', 'is_active'),
                 'image_url' => $asset->getFirstMediaUrl('image'),
             ]),
-            'banners' => HomeBanner::orderBy('sort_order')->orderBy('id')->get()->map(fn (HomeBanner $banner): array => [
+            'banners' => HomeBanner::orderBy('sort_order')->orderBy('id')->with('media')->get()->map(fn (HomeBanner $banner): array => [
                 ...$banner->only(
                     'id', 'title', 'subtitle', 'cta_label', 'cta_href',
                     'show_desktop', 'show_mobile', 'sort_order', 'is_active'
@@ -46,11 +46,11 @@ class AdminContentController
                 'desktop_url' => $banner->getFirstMediaUrl('desktop'),
                 'mobile_url' => $banner->getFirstMediaUrl('mobile'),
             ]),
-            'popups' => SitePopup::orderBy('id')->limit(1)->get()->map(fn (SitePopup $popup): array => [
+            'popups' => SitePopup::orderBy('id')->limit(1)->with('media')->get()->map(fn (SitePopup $popup): array => [
                 ...$popup->toArray(),
                 'image_url' => $popup->getFirstMediaUrl('image'),
             ]),
-            'news' => NewsArticle::orderBy('sort_order')->orderByDesc('id')->get()->map(fn (NewsArticle $article): array => [
+            'news' => NewsArticle::orderBy('sort_order')->orderByDesc('id')->with('media')->get()->map(fn (NewsArticle $article): array => [
                 ...$article->only('id', 'slug', 'title', 'summary', 'body', 'source_label', 'sort_order', 'is_active'),
                 'published_at' => $article->published_at?->format('Y-m-d\TH:i'),
                 'image_url' => $article->getFirstMediaUrl('image'),
@@ -110,18 +110,21 @@ class AdminContentController
     public function storePopup(Request $request, AdminAuditService $audit): RedirectResponse
     {
         $data = $this->popupData($request);
-        $popup = SitePopup::orderBy('id')->first();
 
-        if ($popup) {
-            $before = $popup->toArray();
-            $popup->update($data);
-            SitePopup::where('id', '!=', $popup->id)->delete();
-            $audit->record($request, 'content.popup.updated', 'site_popup', $popup->id, $before, $popup->toArray());
+        $popup = DB::transaction(function () use ($data) {
+            DB::table('site_popups')->lockForUpdate()->get();
+            $existing = SitePopup::orderBy('id')->first();
 
-            return back();
-        }
+            if ($existing) {
+                $existing->update($data);
+                SitePopup::where('id', '!=', $existing->id)->delete();
 
-        $popup = SitePopup::create($data);
+                return $existing;
+            }
+
+            return SitePopup::create($data);
+        });
+
         $audit->record($request, 'content.popup.created', 'site_popup', $popup->id, null, $popup->toArray());
 
         return back();

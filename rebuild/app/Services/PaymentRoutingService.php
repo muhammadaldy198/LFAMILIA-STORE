@@ -16,23 +16,26 @@ class PaymentRoutingService
      */
     public function publicOrderChannels(?User $user): array
     {
+        $routes = [];
+
         return PaymentChannel::query()
             ->where('is_active', true)
             ->where('supports_order', true)
             ->orderBy('sort_order')
             ->orderBy('id')
+            ->with('media')
             ->get()
-            ->filter(function (PaymentChannel $channel): bool {
+            ->filter(function (PaymentChannel $channel) use (&$routes): bool {
                 try {
-                    $this->resolve((string) $channel->code, false, 'order');
+                    $routes[(string) $channel->code] = $this->resolve((string) $channel->code, false, 'order');
 
                     return true;
                 } catch (ValidationException) {
                     return false;
                 }
             })
-            ->map(function (PaymentChannel $channel) use ($user): array {
-                $route = $this->resolve((string) $channel->code, false, 'order');
+            ->map(function (PaymentChannel $channel) use ($user, &$routes): array {
+                $route = $routes[(string) $channel->code] ?? $this->resolve((string) $channel->code, false, 'order');
 
                 return [
                     'code' => (string) $channel->code,
@@ -52,15 +55,19 @@ class PaymentRoutingService
      */
     public function publicTopupChannels(): array
     {
+        $routes = [];
+
         return PaymentChannel::query()
             ->where('is_active', true)
             ->where('supports_wallet_topup', true)
             ->orderBy('sort_order')
             ->orderBy('id')
+            ->with('media')
             ->get()
-            ->filter(function (PaymentChannel $channel): bool {
+            ->filter(function (PaymentChannel $channel) use (&$routes): bool {
                 try {
                     $route = $this->resolve((string) $channel->code, false, 'topup');
+                    $routes[(string) $channel->code] = $route;
 
                     return ! in_array($route['gateway_code'], ['WALLET', 'MANUAL_QRIS'], true);
                 } catch (ValidationException) {

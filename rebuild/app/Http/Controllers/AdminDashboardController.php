@@ -72,17 +72,31 @@ class AdminDashboardController
 
         $recent = [];
         if ($canOrders) {
-            $recent = $period()->orderByDesc('created_at')->orderByDesc('id')->limit(8)->get()
-                ->map(function (object $order) use ($finance): array {
+            $recentOrders = $period()->orderByDesc('created_at')->orderByDesc('id')->limit(8)->get();
+            $orderIds = $recentOrders->pluck('id')->all();
+            $userIds = $recentOrders->pluck('user_id')->filter()->unique()->all();
+            $productIds = $recentOrders->pluck('product_id')->filter()->unique()->all();
+            $packageIds = $recentOrders->pluck('product_package_id')->filter()->unique()->all();
+
+            $paymentsByOrder = DB::table('payment_transactions')
+                ->whereIn('order_id', $orderIds)->orderByDesc('id')
+                ->get(['order_id', 'channel_code', 'status'])
+                ->keyBy('order_id');
+            $usersById = DB::table('users')->whereIn('id', $userIds)->pluck('name', 'id');
+            $productsById = DB::table('products')->whereIn('id', $productIds)->pluck('name', 'id');
+            $packagesById = DB::table('product_packages')->whereIn('id', $packageIds)->pluck('name', 'id');
+
+            $recent = $recentOrders
+                ->map(function (object $order) use ($finance, $paymentsByOrder, $usersById, $productsById, $packagesById): array {
                     $snapshot = json_decode($order->snapshot, true) ?: [];
-                    $payment = DB::table('payment_transactions')->where('order_id', $order->id)->orderByDesc('id')->first(['channel_code', 'status']);
-                    $buyer = $order->user_id ? DB::table('users')->where('id', $order->user_id)->value('name') : null;
+                    $payment = $paymentsByOrder->get($order->id);
+                    $buyer = $order->user_id ? ($usersById->get($order->user_id)) : null;
 
                     return [
                         'id' => $order->id, 'order_number' => $order->order_number, 'status' => $order->status,
                         'buyer_name' => $buyer ?: ($snapshot['buyer_name'] ?? 'Guest'),
-                        'product_name' => data_get($snapshot, 'product.name') ?: ($snapshot['product_name'] ?? DB::table('products')->where('id', $order->product_id)->value('name')),
-                        'package_name' => data_get($snapshot, 'package.name') ?: ($snapshot['package_name'] ?? DB::table('product_packages')->where('id', $order->product_package_id)->value('name')),
+                        'product_name' => data_get($snapshot, 'product.name') ?: ($snapshot['product_name'] ?? $productsById->get($order->product_id)),
+                        'package_name' => data_get($snapshot, 'package.name') ?: ($snapshot['package_name'] ?? $packagesById->get($order->product_package_id)),
                         'payment_channel' => $payment?->channel_code ?: ($snapshot['payment_channel_code'] ?? '—'),
                         'payment_status' => $payment?->status ?: ($order->paid_at ? 'PAID' : 'PENDING'),
                         'created_at' => Carbon::parse($order->created_at, config('app.timezone'))->toIso8601String(),

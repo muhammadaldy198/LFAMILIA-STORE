@@ -77,12 +77,15 @@ class GoogleAuthController
                 409, 'Akun sudah terhubung.');
 
             if (! $user) {
-                $user = User::create([
+                $user = new User([
                     'name' => (string) ($profile->getName() ?: $email),
                     'email' => $email,
+                ]);
+                $user->forceFill([
                     'email_verified_at' => now(),
                     'google_sub' => $subject,
                 ]);
+                $user->save();
                 $user->forceFill(['membership_tier_code' => 'BASIC'])->saveQuietly();
 
                 return $user;

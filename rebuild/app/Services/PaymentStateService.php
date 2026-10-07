@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\StartFulfillmentJob;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -34,6 +35,14 @@ class PaymentStateService
             }
 
             if ($payment->status === 'REFUNDED') {
+                if ($incomingStatus === 'PAID') {
+                    Log::warning('Payment webhook PAID arrived after REFUNDED', [
+                        'payment_transaction_id' => $paymentTransactionId,
+                        'order_id' => $payment->order_id,
+                        'gateway_code' => $payment->gateway_code,
+                    ]);
+                }
+
                 return ['result' => 'IGNORED_FINAL', 'status' => 'REFUNDED'];
             }
             if ($payment->status === 'PAID' && $incomingStatus !== 'REFUNDED') {

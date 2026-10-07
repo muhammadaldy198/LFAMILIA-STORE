@@ -50,7 +50,7 @@ class CustomerAccountController
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'phone' => ['required', 'regex:/^\+?[0-9]{8,16}$/'],
+            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{8,16}$/'],
             'current_password' => ['nullable', 'string'],
             'leaderboard_opt_in' => ['sometimes', 'boolean'],
         ]);
@@ -98,6 +98,7 @@ class CustomerAccountController
             'password' => Hash::make($data['password']),
             'remember_token' => Str::random(60),
         ])->save();
+        Auth::logoutOtherDevices($data['password']);
         $request->session()->regenerate();
         if (is_string($user->email)) {
             $emails->queue(

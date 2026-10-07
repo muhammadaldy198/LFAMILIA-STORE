@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\MembershipTier;
 use App\Services\AdminAuditService;
 use App\Services\CustomerAccountDeletion;
 use App\Services\CustomerCleanupService;
@@ -38,6 +39,10 @@ class AdminCustomerController
             'orders' => (string) ($filters['orders'] ?? ''),
             'per_page' => (int) ($filters['per_page'] ?? 25),
         ];
+
+        if ($filters['tier'] !== '' && !MembershipTier::where('code', $filters['tier'])->exists()) {
+            $filters['tier'] = '';
+        }
 
         $query = DB::table('users')
             ->leftJoin('wallets', 'wallets.user_id', '=', 'users.id')
@@ -197,10 +202,10 @@ class AdminCustomerController
             ]);
 
         $deletable = (int) ($wallet?->balance_idr ?? 0) === 0
-            && ! ($wallet && DB::table('wallet_ledger')->where('wallet_id', $wallet->id)->exists())
-            && ! DB::table('wallet_topups')->where('user_id', $userId)->exists()
-            && ! DB::table('orders')->where('user_id', $userId)->exists()
-            && ! DB::table('support_tickets')->where('user_id', $userId)->exists();
+            && !($wallet && DB::table('wallet_ledger')->where('wallet_id', $wallet->id)->exists())
+            && !DB::table('wallet_topups')->where('user_id', $userId)->exists()
+            && !DB::table('orders')->where('user_id', $userId)->exists()
+            && !DB::table('support_tickets')->where('user_id', $userId)->exists();
 
         return Inertia::render('Admin/CustomerDetail', [
             'isSuperAdmin' => $request->user('admin')?->role === 'SUPER_ADMIN',
@@ -376,7 +381,7 @@ class AdminCustomerController
         ]);
         $value = strtoupper(trim((string) $data['membership_tier_code']));
         if ($value !== 'AUTO'
-            && ! DB::table('membership_tiers')->where('code', $value)->where('is_active', true)->exists()) {
+            && !DB::table('membership_tiers')->where('code', $value)->where('is_active', true)->exists()) {
             throw ValidationException::withMessages([
                 'membership_tier_code' => 'Tier membership tidak valid.',
             ]);

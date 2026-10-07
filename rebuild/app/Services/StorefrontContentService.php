@@ -63,7 +63,7 @@ class StorefrontContentService
             return [];
         }
 
-        return StoreAsset::where('is_active', true)->get()->mapWithKeys(fn (StoreAsset $asset): array => [
+        return StoreAsset::where('is_active', true)->with('media')->get()->mapWithKeys(fn (StoreAsset $asset): array => [
             $asset->key => [
                 'url' => $asset->getFirstMediaUrl('image'),
                 'target' => $asset->target_url,
@@ -78,7 +78,7 @@ class StorefrontContentService
         }
 
         return HomeBanner::where('is_active', true)
-            ->orderBy('sort_order')->orderBy('id')->get()
+            ->orderBy('sort_order')->orderBy('id')->with('media')->get()
             ->map(fn (HomeBanner $banner): array => [
                 ...$banner->only(
                     'id', 'title', 'subtitle', 'cta_label', 'cta_href',
@@ -100,6 +100,7 @@ class StorefrontContentService
         return SitePopup::where('is_active', true)
             ->orderBy('sort_order')->orderBy('id')
             ->limit(1)
+            ->with('media')
             ->get([
                 'id', 'title', 'body', 'dismiss_days', 'sort_order',
             ])->map(fn (SitePopup $popup): array => [
@@ -117,7 +118,7 @@ class StorefrontContentService
         return NewsArticle::where('is_active', true)
             ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
             ->orderBy('sort_order')->orderByDesc('published_at')->orderByDesc('id')
-            ->limit($limit)->get()
+            ->limit($limit)->with('media')->get()
             ->map(fn (NewsArticle $article): array => [
                 ...$article->only('id', 'slug', 'title', 'summary', 'source_label'),
                 'published_at' => $article->published_at?->toIso8601String(),
