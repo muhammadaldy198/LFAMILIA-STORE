@@ -131,7 +131,7 @@ Route::middleware('auth:web')->group(function (): void {
         Route::put('/account/profile', [CustomerAccountController::class, 'update'])
             ->middleware('throttle:account-sensitive')->name('account.profile.update');
         Route::put('/account/password', [CustomerAccountController::class, 'password'])
-            ->middleware(['throttle:account-sensitive', 'password.confirm'])->name('account.password.update');
+            ->middleware('throttle:account-sensitive')->name('account.password.update');
         Route::delete('/account', [CustomerAccountController::class, 'destroy'])
             ->middleware(['throttle:account-sensitive', 'password.confirm'])->name('account.destroy');
         Route::get('/account/wallet', [CustomerAccountController::class, 'wallet'])->name('account.wallet');
