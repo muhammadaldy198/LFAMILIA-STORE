@@ -22,11 +22,37 @@ class AdminProviderController
                 ? (int) $request->query('per_page', 25) : 25,
         ];
 
-        $providers = DB::table('providers')->orderBy('sort_order')->orderBy('id')->get()
-            ->map(function (object $provider): array {
-                $attempts = DB::table('fulfillment_attempts')
-                    ->where('provider_id', $provider->id);
+        $mappingStats = DB::table('provider_mappings')
+            ->select('provider_id')
+            ->selectRaw('COUNT(*) as mapping_count')
+            ->selectRaw('SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_mapping_count')
+            ->groupBy('provider_id');
 
+        $attemptStats = DB::table('fulfillment_attempts')
+            ->select('provider_id')
+            ->selectRaw('MAX(created_at) as last_attempt_at')
+            ->selectRaw("SUM(CASE WHEN status = 'SUCCESS' AND created_at >= ? THEN 1 ELSE 0 END) as success_24h", [now()->subDay()])
+            ->selectRaw("SUM(CASE WHEN status IN ('PENDING','UNKNOWN','SENDING') THEN 1 ELSE 0 END) as attention_count")
+            ->groupBy('provider_id');
+
+        $digiflazzActive = DB::table('integration_credentials')
+            ->where('code', 'digiflazz')->where('is_active', true)->exists();
+        $digiflazzHealth = DB::table('system_settings')
+            ->where('key', 'integration.health.digiflazz')->value('value');
+
+        $providers = DB::table('providers')
+            ->leftJoinSub($mappingStats, 'mapping_stats', 'mapping_stats.provider_id', '=', 'providers.id')
+            ->leftJoinSub($attemptStats, 'attempt_stats', 'attempt_stats.provider_id', '=', 'providers.id')
+            ->orderBy('providers.sort_order')->orderBy('providers.id')
+            ->get([
+                'providers.*',
+                DB::raw('COALESCE(mapping_stats.mapping_count, 0) as mapping_count'),
+                DB::raw('COALESCE(mapping_stats.active_mapping_count, 0) as active_mapping_count'),
+                'attempt_stats.last_attempt_at',
+                DB::raw('COALESCE(attempt_stats.success_24h, 0) as success_24h'),
+                DB::raw('COALESCE(attempt_stats.attention_count, 0) as attention_count'),
+            ])
+            ->map(function (object $provider) use ($digiflazzActive, $digiflazzHealth): array {
                 return [
                     'id' => (int) $provider->id,
                     'code' => (string) $provider->code,
@@ -35,16 +61,12 @@ class AdminProviderController
                     'fulfillment_mode' => (string) $provider->fulfillment_mode,
                     'is_active' => (bool) $provider->is_active,
                     'sort_order' => (int) $provider->sort_order,
-                    'mapping_count' => DB::table('provider_mappings')
-                        ->where('provider_id', $provider->id)->count(),
-                    'active_mapping_count' => DB::table('provider_mappings')
-                        ->where('provider_id', $provider->id)->where('is_active', true)->count(),
-                    'last_attempt_at' => (clone $attempts)->max('created_at'),
-                    'success_24h' => (clone $attempts)->where('status', 'SUCCESS')
-                        ->where('created_at', '>=', now()->subDay())->count(),
-                    'attention_count' => (clone $attempts)
-                        ->whereIn('status', ['PENDING', 'UNKNOWN', 'SENDING'])->count(),
-                    'health' => $this->health((string) $provider->code, (bool) $provider->is_active),
+                    'mapping_count' => (int) $provider->mapping_count,
+                    'active_mapping_count' => (int) $provider->active_mapping_count,
+                    'last_attempt_at' => $provider->last_attempt_at,
+                    'success_24h' => (int) $provider->success_24h,
+                    'attention_count' => (int) $provider->attention_count,
+                    'health' => $this->health((string) $provider->code, (bool) $provider->is_active, $digiflazzActive, $digiflazzHealth),
                 ];
             })->values();
 
@@ -165,7 +187,7 @@ class AdminProviderController
         return back()->with('status', 'Pengaturan provider disimpan.');
     }
 
-    private function health(string $code, bool $active): array
+    private function health(string $code, bool $active, bool $digiflazzActive, mixed $digiflazzHealth): array
     {
         if (! $active) {
             return ['status' => 'INACTIVE', 'message' => 'Provider sedang dinonaktifkan.'];
@@ -175,15 +197,11 @@ class AdminProviderController
             return ['status' => 'READY', 'message' => 'Diproses langsung oleh sistem LFAMILIA.'];
         }
 
-        $integrationActive = DB::table('integration_credentials')
-            ->where('code', 'digiflazz')->where('is_active', true)->exists();
-        if (! $integrationActive) {
+        if (! $digiflazzActive) {
             return ['status' => 'NOT_CONFIGURED', 'message' => 'Kredensial Digiflazz belum diaktifkan di menu Integrasi.'];
         }
 
-        $stored = DB::table('system_settings')
-            ->where('key', 'integration.health.digiflazz')->value('value');
-        $health = is_string($stored) ? (json_decode($stored, true) ?: []) : [];
+        $health = is_string($digiflazzHealth) ? (json_decode($digiflazzHealth, true) ?: []) : [];
         $status = strtoupper((string) ($health['status'] ?? 'UNTESTED'));
 
         return [
