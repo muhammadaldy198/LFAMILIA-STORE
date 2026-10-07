@@ -272,6 +272,7 @@ class CheckoutService
                     'user_id' => $user?->id,
                     'guest_email' => $user ? null : Str::lower(trim((string) $data['guest_email'])),
                     'guest_phone' => $user ? null : $this->normalizePhone((string) $data['guest_phone']),
+                    'guest_phone_normalized' => $user ? null : $this->phoneDigits((string) $data['guest_phone']),
                     'product_id' => $price['product_id'],
                     'product_package_id' => $price['package_id'],
                     'provider_mapping_id' => $price['provider_mapping_id'],
@@ -535,6 +536,11 @@ class CheckoutService
     private function normalizePhone(string $phone): string
     {
         return preg_replace('/\s+/', '', trim($phone)) ?? '';
+    }
+
+    private function phoneDigits(string $phone): string
+    {
+        return preg_replace('/\D+/', '', $phone) ?? '';
     }
 
     private function orderNumber(): string
