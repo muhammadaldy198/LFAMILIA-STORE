@@ -131,7 +131,7 @@ Route::middleware('auth:web')->group(function (): void {
         Route::put('/account/profile', [CustomerAccountController::class, 'update'])
             ->middleware('throttle:account-sensitive')->name('account.profile.update');
         Route::put('/account/password', [CustomerAccountController::class, 'password'])
-            ->middleware('throttle:account-sensitive')->name('account.password.update');
+            ->middleware(['throttle:account-sensitive', 'password.confirm'])->name('account.password.update');
         Route::delete('/account', [CustomerAccountController::class, 'destroy'])
             ->middleware(['throttle:account-sensitive', 'password.confirm'])->name('account.destroy');
         Route::get('/account/wallet', [CustomerAccountController::class, 'wallet'])->name('account.wallet');
@@ -219,9 +219,9 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
                 ->middleware('throttle:admin-sensitive')->name('manual-qris.update');
 
             Route::put('/page-settings', [AdminPaymentController::class, 'pageSettings'])
-                ->name('page-settings.update');
+                ->middleware('throttle:admin-sensitive')->name('page-settings.update');
             Route::post('/page-settings/header', [AdminPaymentController::class, 'uploadPageHeader'])
-                ->name('page-settings.header');
+                ->middleware('throttle:admin-sensitive')->name('page-settings.header');
 
         });
 
@@ -385,9 +385,9 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::middleware('admin.permission:settings.manage')->group(function (): void {
         Route::get('/admin/settings', [AdminSettingsController::class, 'index'])->name('admin.settings');
         Route::put('/admin/settings', [AdminSettingsController::class, 'updateStore'])
-            ->name('admin.settings.update');
+            ->middleware('throttle:admin-sensitive')->name('admin.settings.update');
         Route::put('/admin/settings/membership/{code}', [AdminSettingsController::class, 'updateTier'])
-            ->name('admin.settings.membership.update');
+            ->middleware('throttle:admin-sensitive')->name('admin.settings.membership.update');
     });
 
     Route::middleware('admin.super')->group(function (): void {
