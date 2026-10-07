@@ -108,7 +108,7 @@ function supportPlacement(x, y, width, height) {
     return {
         side: x + width / 2 < window.innerWidth / 2 ? 'right' : 'left',
         vertical,
-        panelMaxHeight: Math.max(160, Math.min(panelMaxHeight, vertical === 'down' ? spaceBelow : spaceAbove)),
+        panelMaxHeight: Math.max(0, Math.min(panelMaxHeight, vertical === 'down' ? spaceBelow : spaceAbove)),
     };
 }
 
