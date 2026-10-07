@@ -120,8 +120,14 @@ class CustomerAreaTest extends TestCase
             'current_password' => 'wrong',
             'password' => 'new-password-123',
             'password_confirmation' => 'new-password-123',
+        ])->assertRedirect(route('password.confirm'));
+
+        $this->withSession(['auth.password_confirmed_at' => time()])->put('/account/password', [
+            'current_password' => 'wrong',
+            'password' => 'new-password-123',
+            'password_confirmation' => 'new-password-123',
         ])->assertSessionHasErrors('current_password');
-        $this->put('/account/password', [
+        $this->withSession(['auth.password_confirmed_at' => time()])->put('/account/password', [
             'current_password' => 'old-password-123',
             'password' => 'new-password-123',
             'password_confirmation' => 'new-password-123',
