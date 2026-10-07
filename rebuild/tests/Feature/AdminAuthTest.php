@@ -13,7 +13,7 @@ class AdminAuthTest extends TestCase
 
     public function test_active_admin_uses_a_separate_guard(): void
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Operator',
             'email' => 'admin@example.test',
             'password' => Hash::make('secure-password-123'),
@@ -36,14 +36,14 @@ class AdminAuthTest extends TestCase
 
     public function test_inactive_or_unsupported_role_is_rejected(): void
     {
-        AdminUser::create([
+        $this->createAdmin([
             'name' => 'Inactive',
             'email' => 'inactive@example.test',
             'password' => Hash::make('secure-password-123'),
             'role' => 'ADMIN',
             'is_active' => false,
         ]);
-        AdminUser::create([
+        $this->createAdmin([
             'name' => 'Unsupported',
             'email' => 'staff@example.test',
             'password' => Hash::make('secure-password-123'),
