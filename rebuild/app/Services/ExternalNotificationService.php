@@ -58,7 +58,7 @@ class ExternalNotificationService
             return null;
         }
 
-        return $this->attempt($id, 'discord', $url, fn () => Http::acceptJson()->timeout(8)->post($url, [
+        return $this->attempt($id, 'discord', $url, fn () => Http::acceptJson()->withOptions(['allow_redirects' => false])->timeout(8)->post($url, [
             'content' => mb_substr($text, 0, 1900),
             'allowed_mentions' => ['parse' => []],
         ]));
