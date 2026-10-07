@@ -31,6 +31,11 @@ return new class extends Migration
             }
         });
 
+        $keepPopupId = DB::table('site_popups')->orderBy('id')->value('id');
+        if ($keepPopupId !== null) {
+            DB::table('site_popups')->where('id', '!=', $keepPopupId)->delete();
+        }
+
         Schema::table('site_popups', function (Blueprint $table): void {
             $table->unsignedTinyInteger('singleton_key')->default(1)->unique();
         });
