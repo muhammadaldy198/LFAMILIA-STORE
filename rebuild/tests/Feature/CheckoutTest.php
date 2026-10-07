@@ -208,14 +208,14 @@ class CheckoutTest extends TestCase
             'code' => 'kokinpay',
             'config_ciphertext' => [
                 'api_key' => 'test-secret',
-                'base_url' => 'https://kokinpay.invalid',
+                'base_url' => 'https://example.com',
                 'nickname_path' => '/v1/check-nickname',
                 'region_path' => '/v1/check-region',
                 'pln_path' => '/v1/check-pln',
             ],
             'is_active' => true,
         ]);
-        Http::fake(['https://kokinpay.invalid/*' => Http::response(['status' => false], 503)]);
+        Http::fake(['https://example.com/*' => Http::response(['status' => false], 503)]);
 
         $response = $this->postJson('/checkout/orders', $this->guestPayload(
             $catalog['package_id'],
@@ -245,14 +245,14 @@ class CheckoutTest extends TestCase
             'code' => 'kokinpay',
             'config_ciphertext' => [
                 'api_key' => 'test-secret',
-                'base_url' => 'https://kokinpay.invalid',
+                'base_url' => 'https://example.com',
                 'nickname_path' => '/v1/check-nickname',
                 'region_path' => '/v1/check-region',
                 'pln_path' => '/v1/check-pln',
             ],
             'is_active' => true,
         ]);
-        Http::fake(['https://kokinpay.invalid/*' => Http::response(['status' => false], 400)]);
+        Http::fake(['https://example.com/*' => Http::response(['status' => false], 400)]);
 
         $this->postJson('/checkout/orders', $this->guestPayload(
             $catalog['package_id'],
