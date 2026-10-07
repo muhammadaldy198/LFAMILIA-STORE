@@ -163,7 +163,7 @@ class AdminNicknameToolsTest extends TestCase
             'code' => 'kokinpay',
             'config_ciphertext' => [
                 'api_key' => 'must-not-leak-secret',
-                'base_url' => 'https://validation.example.test',
+                'base_url' => 'https://example.com',
                 'nickname_path' => '/nickname',
                 'region_path' => '/region',
                 'pln_path' => '/pln',
@@ -174,6 +174,6 @@ class AdminNicknameToolsTest extends TestCase
         $response = $this->get('/admin/nickname-tools')->assertOk();
 
         $response->assertDontSee('must-not-leak-secret');
-        $response->assertSee('validation.example.test');
+        $response->assertSee('example.com');
     }
 }
