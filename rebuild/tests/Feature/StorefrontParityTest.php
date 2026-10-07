@@ -22,7 +22,7 @@ class StorefrontParityTest extends TestCase
 
     private function superAdmin(): AdminUser
     {
-        return AdminUser::create([
+        return $this->createAdmin([
             'name' => 'Parity Super',
             'email' => 'parity-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
