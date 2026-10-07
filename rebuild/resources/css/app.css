@@ -6023,3 +6023,122 @@
  .lf-admin-content .lf-admin-nominals{padding:0!important;background:transparent!important}
  .lf-admin-content [data-slot=card] header{flex-wrap:wrap}
 }
+
+
+/* Desktop UX parity: draggable support + clear first-open popup close control. */
+@media(min-width:641px){
+  .lf-live-support{
+    touch-action:none;
+    user-select:none;
+  }
+  .lf-live-support.is-dragged{
+    right:auto!important;
+    bottom:auto!important;
+  }
+  .lf-support-trigger{
+    width:54px;
+    height:54px;
+    touch-action:none;
+    user-select:none;
+    cursor:grab;
+  }
+  .lf-support-trigger:active{cursor:grabbing}
+  .lf-support-panel{
+    position:absolute;
+    right:0;
+    bottom:64px;
+    width:320px;
+    max-height:var(--lf-support-panel-max-height,min(430px,calc(100vh - 96px)));
+    margin:0;
+    overflow:auto;
+    border-radius:16px;
+    background:#06090e;
+  }
+  .lf-live-support.open-right .lf-support-panel{
+    left:0;
+    right:auto;
+  }
+  .lf-live-support.open-down .lf-support-panel{
+    top:64px;
+    bottom:auto;
+  }
+  .lf-support-panel header{padding:13px 15px}
+  .lf-support-panel header strong{font-size:14px}
+  .lf-support-panel header small{font-size:10px;line-height:1.4}
+  .lf-support-panel header button{
+    width:36px;
+    height:36px;
+    display:grid;
+    place-items:center;
+    flex:0 0 36px;
+    cursor:pointer;
+  }
+  .lf-support-panel>div{
+    display:grid;
+    gap:4px;
+    padding:8px;
+  }
+  .lf-support-panel>div>a{
+    display:grid!important;
+    grid-template-columns:36px minmax(0,1fr);
+    align-items:center!important;
+    gap:11px!important;
+    min-height:56px;
+    padding:9px 11px!important;
+    border-radius:10px;
+  }
+  .lf-support-panel>div>a>svg{
+    width:27px!important;
+    height:27px!important;
+    justify-self:center;
+  }
+  .lf-support-panel>div>a>span{
+    width:auto!important;
+    min-width:0!important;
+    display:block!important;
+    text-align:left!important;
+  }
+  .lf-support-panel>div>a strong{
+    display:block;
+    font-size:12px!important;
+    line-height:1.25;
+  }
+  .lf-support-panel>div>a small{
+    display:block;
+    margin-top:3px;
+    font-size:10px!important;
+    line-height:1.35;
+  }
+
+  .lf-home-popup{position:relative}
+  .lf-home-popup-close{
+    position:absolute;
+    top:14px;
+    right:14px;
+    z-index:3;
+    width:46px;
+    height:46px;
+    display:grid;
+    place-items:center;
+    padding:0;
+    border:2px solid rgba(220,183,131,.78);
+    border-radius:13px;
+    background:rgba(15,15,15,.78);
+    color:#f1d4aa;
+    font-size:30px;
+    line-height:1;
+    cursor:pointer;
+    box-shadow:0 8px 24px rgba(0,0,0,.28);
+  }
+  .lf-home-popup-close:hover{
+    background:rgba(220,183,131,.12);
+    border-color:#ead0a8;
+    color:#fff0d7;
+  }
+  .lf-home-popup-body{
+    padding-top:28px;
+  }
+  .lf-home-popup-body h2{
+    padding:0 52px;
+  }
+}

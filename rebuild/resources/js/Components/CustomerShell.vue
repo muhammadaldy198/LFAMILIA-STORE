@@ -3,7 +3,7 @@ import { useCustomerPresentation } from '../Composables/customerPresentation';
 const { customerText, sectionEnabled, presentationStyle } = useCustomerPresentation();
 
 import { Head, Link, usePage } from '@inertiajs/vue3';
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 defineProps({
     logoUrl: { type: String, default: '' },
@@ -83,21 +83,46 @@ function closeDrawer() { open.value = false; }
 watch(open, (value) => {
     document.documentElement.style.overflow = value ? 'hidden' : '';
 });
+onMounted(() => {
+    window.addEventListener('resize', clampSupportPosition);
+});
 onUnmounted(() => {
     document.documentElement.style.overflow = '';
     window.removeEventListener('pointermove', moveSupportDrag);
+    window.removeEventListener('resize', clampSupportPosition);
 });
 
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
-function startSupportDrag(event) {
-    if (window.innerWidth > 640) {
-        supportOpen.value = !supportOpen.value;
-        return;
-    }
+function supportPlacement(x, y, width, height) {
+    const panelOffset = window.innerWidth <= 640 ? 58 : 64;
+    const viewportMargin = 8;
+    const panelMaxHeight = Math.min(430, window.innerHeight * 0.7);
+    const spaceBelow = window.innerHeight - (y + panelOffset) - viewportMargin;
+    const spaceAbove = y + height - panelOffset - viewportMargin;
 
+    const vertical = spaceBelow >= panelMaxHeight || (spaceBelow >= spaceAbove && spaceAbove < panelMaxHeight) ? 'down' : 'up';
+
+    return {
+        side: x + width / 2 < window.innerWidth / 2 ? 'right' : 'left',
+        vertical,
+        panelMaxHeight: Math.max(0, Math.min(panelMaxHeight, vertical === 'down' ? spaceBelow : spaceAbove)),
+    };
+}
+
+function clampSupportPosition() {
+    if (!supportPosition.value) return;
+
+    const width = window.innerWidth <= 640 ? 48 : 54;
+    const height = width;
+    const x = clamp(supportPosition.value.x, 8, Math.max(8, window.innerWidth - width - 8));
+    const y = clamp(supportPosition.value.y, 68, Math.max(68, window.innerHeight - height - 14));
+    supportPosition.value = { x, y, ...supportPlacement(x, y, width, height) };
+}
+
+function startSupportDrag(event) {
     const trigger = event.currentTarget;
     const rect = trigger.getBoundingClientRect();
     supportDrag = {
@@ -129,8 +154,7 @@ function moveSupportDrag(event) {
     supportPosition.value = {
         x,
         y,
-        side: x < window.innerWidth / 2 ? 'right' : 'left',
-        vertical: y < window.innerHeight / 2 ? 'down' : 'up',
+        ...supportPlacement(x, y, supportDrag.width, supportDrag.height),
     };
     event.preventDefault();
 }
@@ -307,7 +331,7 @@ function endSupportDrag(event) {
             'open-right': supportPosition?.side === 'right',
             'open-down': supportPosition?.vertical === 'down',
         }"
-        :style="supportPosition ? { left: supportPosition.x + 'px', top: supportPosition.y + 'px', right: 'auto', bottom: 'auto' } : undefined"
+        :style="supportPosition ? { left: supportPosition.x + 'px', top: supportPosition.y + 'px', right: 'auto', bottom: 'auto', '--lf-support-panel-max-height': supportPosition.panelMaxHeight + 'px' } : undefined"
     >
         <div v-if="supportOpen" class="lf-support-panel">
             <header>
