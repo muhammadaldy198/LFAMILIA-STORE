@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\AdminUser;
 use App\Models\IntegrationCredential;
 use App\Models\User;
 use App\Services\AdminAuditService;
