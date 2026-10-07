@@ -41,13 +41,15 @@ Artisan::command('lfamilia:bootstrap-super-admin', function (): int {
         'password' => ['required', 'string', 'min:12', 'confirmed'],
     ])->validate();
 
-    AdminUser::create([
+    $admin = AdminUser::create([
         'name' => $data['name'],
         'email' => $data['email'],
         'password' => Hash::make($data['password']),
+    ]);
+    $admin->forceFill([
         'role' => 'SUPER_ADMIN',
         'is_active' => true,
-    ]);
+    ])->save();
 
     $this->info('Super Admin dibuat.');
 
