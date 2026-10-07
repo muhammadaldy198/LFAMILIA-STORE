@@ -23,6 +23,12 @@ class User extends Authenticatable implements MustVerifyEmailContract
 
     protected static function booted(): void
     {
+        static::creating(function (self $user): void {
+            if ($user->phone !== null && $user->phone_normalized === null) {
+                $user->phone_normalized = preg_replace('/[^0-9]+/', '', (string) $user->phone) ?: null;
+            }
+        });
+
         static::created(function (self $user): void {
             $user->wallet()->create();
         });
