@@ -52,6 +52,10 @@ class AdminCustomerRestorationTest extends TestCase
             'password' => Hash::make('VeryStrongCustomer123!'),
         ], $overrides));
 
+        $trusted = array_intersect_key($overrides, array_flip(['email_verified_at', 'google_sub']));
+        if ($trusted !== []) {
+            $user->forceFill($trusted);
+        }
         $user->forceFill(['membership_tier_code' => $tier])->saveQuietly();
 
         return $user;
