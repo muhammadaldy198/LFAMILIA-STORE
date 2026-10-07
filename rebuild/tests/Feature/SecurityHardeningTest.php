@@ -15,7 +15,7 @@ class SecurityHardeningTest extends TestCase
 
     public function test_customer_trust_fields_are_not_mass_assignable(): void
     {
-        $user = new User();
+        $user = new User;
 
         $this->assertFalse($user->isFillable('email_verified_at'));
         $this->assertFalse($user->isFillable('google_sub'));
@@ -23,7 +23,7 @@ class SecurityHardeningTest extends TestCase
 
     public function test_admin_privilege_fields_are_not_mass_assignable(): void
     {
-        $admin = new AdminUser();
+        $admin = new AdminUser;
 
         $this->assertFalse($admin->isFillable('role'));
         $this->assertFalse($admin->isFillable('permissions'));
