@@ -101,6 +101,19 @@ class CustomerAreaTest extends TestCase
         $this->assertSame(2, DB::table('wallets')->count());
     }
 
+    public function test_passwordless_customer_can_set_first_password(): void
+    {
+        $user = $this->customer('first-password@example.test');
+        $user->forceFill(['password' => null])->saveQuietly();
+
+        $this->actingAs($user, 'web')->put('/account/password', [
+            'password' => 'first-password-123',
+            'password_confirmation' => 'first-password-123',
+        ])->assertRedirect();
+
+        $this->assertTrue(Hash::check('first-password-123', $user->fresh()->password));
+    }
+
     public function test_profile_password_and_deletion_checks(): void
     {
         $user = $this->customer('profile@example.test');
