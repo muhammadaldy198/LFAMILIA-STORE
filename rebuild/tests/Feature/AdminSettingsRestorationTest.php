@@ -16,7 +16,7 @@ class AdminSettingsRestorationTest extends TestCase
 
     private function login(string $role = 'SUPER_ADMIN', array $permissions = ['settings.manage']): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Settings Test',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => Hash::make('settings-restoration-password'),
