@@ -103,9 +103,12 @@ function supportPlacement(x, y, width, height) {
     const spaceBelow = window.innerHeight - (y + panelOffset) - viewportMargin;
     const spaceAbove = y + height - panelOffset - viewportMargin;
 
+    const vertical = spaceBelow >= panelMaxHeight || (spaceBelow >= spaceAbove && spaceAbove < panelMaxHeight) ? 'down' : 'up';
+
     return {
         side: x + width / 2 < window.innerWidth / 2 ? 'right' : 'left',
-        vertical: spaceBelow >= panelMaxHeight || (spaceBelow >= spaceAbove && spaceAbove < panelMaxHeight) ? 'down' : 'up',
+        vertical,
+        panelMaxHeight: Math.max(160, Math.min(panelMaxHeight, vertical === 'down' ? spaceBelow : spaceAbove)),
     };
 }
 
@@ -328,7 +331,7 @@ function endSupportDrag(event) {
             'open-right': supportPosition?.side === 'right',
             'open-down': supportPosition?.vertical === 'down',
         }"
-        :style="supportPosition ? { left: supportPosition.x + 'px', top: supportPosition.y + 'px', right: 'auto', bottom: 'auto' } : undefined"
+        :style="supportPosition ? { left: supportPosition.x + 'px', top: supportPosition.y + 'px', right: 'auto', bottom: 'auto', '--lf-support-panel-max-height': supportPosition.panelMaxHeight + 'px' } : undefined"
     >
         <div v-if="supportOpen" class="lf-support-panel">
             <header>
