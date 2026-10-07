@@ -52,7 +52,7 @@ class AdminCustomerRestorationTest extends TestCase
             'password' => Hash::make('VeryStrongCustomer123!'),
         ], $overrides));
 
-        $trusted = array_intersect_key($overrides, array_flip(['email_verified_at', 'google_sub']));
+        $trusted = array_intersect_key($overrides, array_flip(['email_verified_at', 'google_sub', 'last_active_at']));
         if ($trusted !== []) {
             $user->forceFill($trusted);
         }
