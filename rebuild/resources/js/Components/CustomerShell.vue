@@ -102,9 +102,11 @@ function supportPlacement(x, y, width, height) {
     const spaceBelow = window.innerHeight - (y + height) - panelGap - 8;
     const spaceAbove = y - panelGap - 8;
 
+    const requiredPanelSpace = panelMaxHeight;
+
     return {
         side: x + width / 2 < window.innerWidth / 2 ? 'right' : 'left',
-        vertical: spaceBelow >= Math.min(panelMaxHeight, 260) || spaceBelow >= spaceAbove ? 'down' : 'up',
+        vertical: spaceBelow >= requiredPanelSpace || (spaceBelow >= spaceAbove && spaceAbove < requiredPanelSpace) ? 'down' : 'up',
     };
 }
 
