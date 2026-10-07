@@ -20,7 +20,11 @@ class CustomerPhoneController
             'phone' => ['required', 'string', 'regex:/^\\+?[0-9]{8,16}$/'],
         ]);
 
-        $request->user()->forceFill(['phone' => $data['phone']])->save();
+        $digits = preg_replace('/[^0-9]+/', '', $data['phone']) ?: null;
+        $request->user()->forceFill([
+            'phone' => $data['phone'],
+            'phone_normalized' => $digits,
+        ])->save();
 
         return redirect()->route('account');
     }
