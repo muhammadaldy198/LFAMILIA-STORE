@@ -28,7 +28,7 @@ class AccountValidationConfig
 
         if (
             $apiKey === ''
-            || ! str_starts_with(strtolower($baseUrl), 'https://')
+            || ! $this->validBaseUrl($baseUrl)
             || ! $this->validPath($nicknamePath)
             || ! $this->validPath($regionPath)
             || ! $this->validPath($plnPath)
@@ -72,7 +72,7 @@ class AccountValidationConfig
     {
         $url = rtrim(trim((string) $value), '/');
 
-        return str_starts_with(strtolower($url), 'https://') ? $url : null;
+        return $this->validBaseUrl($url) ? $url : null;
     }
 
     private function safePath(mixed $value): ?string
@@ -80,6 +80,36 @@ class AccountValidationConfig
         $path = trim((string) $value);
 
         return $this->validPath($path) ? $path : null;
+    }
+
+    private function validBaseUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+        if (! is_array($parts)
+            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || isset($parts['user'])
+            || isset($parts['pass'])
+            || isset($parts['query'])
+            || isset($parts['fragment'])
+            || ($parts['path'] ?? '') !== ''
+        ) {
+            return false;
+        }
+
+        $host = strtolower(rtrim((string) ($parts['host'] ?? ''), '.'));
+        if ($host === '' || $host === 'localhost' || str_ends_with($host, '.localhost') || str_ends_with($host, '.local')) {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return filter_var(
+                $host,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+            ) !== false;
+        }
+
+        return (bool) preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$/', $host);
     }
 
     private function validPath(string $path): bool
