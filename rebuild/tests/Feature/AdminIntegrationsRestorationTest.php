@@ -21,7 +21,7 @@ class AdminIntegrationsRestorationTest extends TestCase
 
     private function loginSuperAdmin(): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Integration Owner',
             'email' => 'integration-owner-'.bin2hex(random_bytes(6)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
@@ -267,7 +267,7 @@ class AdminIntegrationsRestorationTest extends TestCase
 
     public function test_regular_admin_cannot_read_or_mutate_integration_credentials(): void
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Operational Admin',
             'email' => 'ops-'.bin2hex(random_bytes(6)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
