@@ -51,6 +51,7 @@ class AdminManualOrderService
             $id = DB::table('orders')->insertGetId([
                 'order_number' => 'LF-M-'.strtoupper((string) Str::ulid()),
                 'guest_email' => $data['email'] ?: null, 'guest_phone' => $data['phone'],
+                'guest_phone_normalized' => preg_replace('/\\D+/', '', (string) $data['phone']) ?: null,
                 'product_id' => $product->id, 'product_package_id' => $package->id,
                 'provider_mapping_id' => $mapping->id, 'status' => 'PAID', 'currency' => 'IDR',
                 'customer_input' => json_encode(['destination' => $data['destination']], JSON_THROW_ON_ERROR),
