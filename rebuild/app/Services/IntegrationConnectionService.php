@@ -235,7 +235,7 @@ class IntegrationConnectionService
     private function discord(array $config): array
     {
         $url = trim((string) ($config['webhook_url'] ?? ''));
-        if (! str_starts_with(strtolower($url), 'https://')) {
+        if (! $this->validDiscordWebhook($url)) {
             return $this->notConfigured('Webhook URL Discord belum valid.');
         }
 
@@ -254,6 +254,26 @@ class IntegrationConnectionService
         return $response->successful()
             ? $this->verified('Webhook Discord terverifikasi tanpa mengirim notifikasi.')
             : $this->unverified('Webhook Discord merespons, tetapi tidak dapat diverifikasi dengan pasti.');
+    }
+
+    private function validDiscordWebhook(string $url): bool
+    {
+        $parts = parse_url($url);
+        if (! is_array($parts)
+            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || isset($parts['user'])
+            || isset($parts['pass'])
+            || isset($parts['fragment'])
+        ) {
+            return false;
+        }
+
+        $host = strtolower(rtrim((string) ($parts['host'] ?? ''), '.'));
+        if (! in_array($host, ['discord.com', 'www.discord.com', 'discordapp.com', 'www.discordapp.com'], true)) {
+            return false;
+        }
+
+        return (bool) preg_match('#^/api(?:/v\\d+)?/webhooks/[^/]+/[^/]+/?$#', (string) ($parts['path'] ?? ''));
     }
 
     private function isAuthenticationFailure(Response $response): bool
