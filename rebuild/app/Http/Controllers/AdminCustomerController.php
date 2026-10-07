@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Models\MembershipTier;
+use App\Models\User;
 use App\Services\AdminAuditService;
 use App\Services\CustomerAccountDeletion;
 use App\Services\CustomerCleanupService;
