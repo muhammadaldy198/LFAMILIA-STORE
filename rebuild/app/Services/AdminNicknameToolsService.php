@@ -107,6 +107,7 @@ class AdminNicknameToolsService
         $payload = $this->post(
             $this->config->endpoint($settings, 'pln_path'),
             $settings['api_key'],
+            $settings['resolved_ip'],
             ['customer_number' => $customerNumber],
         );
         $name = $this->firstString([
@@ -120,7 +121,7 @@ class AdminNicknameToolsService
         return $name;
     }
 
-    /** @return array{api_key:string,base_url:string,nickname_path:string,region_path:string,pln_path:string} */
+    /** @return array{api_key:string,base_url:string,resolved_ip:string,nickname_path:string,region_path:string,pln_path:string} */
     private function settings(): array
     {
         $settings = $this->config->active();
@@ -159,6 +160,7 @@ class AdminNicknameToolsService
         $payload = $this->post(
             $this->config->endpoint($settings, 'nickname_path'),
             $settings['api_key'],
+            $settings['resolved_ip'],
             [
                 'id' => $userId,
                 'game_code' => $gameCode,
@@ -187,6 +189,7 @@ class AdminNicknameToolsService
         $payload = $this->post(
             $this->config->endpoint($settings, 'region_path'),
             $settings['api_key'],
+            $settings['resolved_ip'],
             ['id' => $userId, 'server' => $server],
         );
 
@@ -197,10 +200,16 @@ class AdminNicknameToolsService
     }
 
     /** @return array<string,mixed> */
-    private function post(string $url, string $apiKey, array $body): array
+    private function post(string $url, string $apiKey, string $resolvedIp, array $body): array
     {
+        $host = (string) parse_url($url, PHP_URL_HOST);
+        $port = (int) (parse_url($url, PHP_URL_PORT) ?: 443);
+
         try {
-            $response = Http::acceptJson()->withOptions(['allow_redirects' => false])->timeout(8)->post($url, [
+            $response = Http::acceptJson()->withOptions([
+                'allow_redirects' => false,
+                'curl' => [CURLOPT_RESOLVE => [sprintf('%s:%d:%s', $host, $port, $resolvedIp)]],
+            ])->timeout(8)->post($url, [
                 'api_key' => $apiKey,
                 ...$body,
             ]);
