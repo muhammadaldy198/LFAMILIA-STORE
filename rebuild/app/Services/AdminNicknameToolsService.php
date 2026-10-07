@@ -200,7 +200,7 @@ class AdminNicknameToolsService
     private function post(string $url, string $apiKey, array $body): array
     {
         try {
-            $response = Http::acceptJson()->timeout(8)->post($url, [
+            $response = Http::acceptJson()->withOptions(['allow_redirects' => false])->timeout(8)->post($url, [
                 'api_key' => $apiKey,
                 ...$body,
             ]);
