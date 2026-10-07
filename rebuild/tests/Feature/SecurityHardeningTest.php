@@ -51,20 +51,20 @@ class SecurityHardeningTest extends TestCase
         }
     }
 
-    public function test_account_validation_accepts_normal_https_hostname(): void
+    public function test_account_validation_rejects_hostname_that_resolves_to_private_ip(): void
     {
         IntegrationCredential::create([
             'code' => 'kokinpay',
             'is_active' => true,
             'config_ciphertext' => [
                 'api_key' => 'test-secret',
-                'base_url' => 'https://validation.example.test',
+                'base_url' => 'https://localhost.localhost',
                 'nickname_path' => '/nickname',
                 'region_path' => '/region',
                 'pln_path' => '/pln',
             ],
         ]);
 
-        $this->assertNotNull(app(AccountValidationConfig::class)->active());
+        $this->assertNull(app(AccountValidationConfig::class)->active());
     }
 }
