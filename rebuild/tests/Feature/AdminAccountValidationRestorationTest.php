@@ -18,7 +18,7 @@ class AdminAccountValidationRestorationTest extends TestCase
 
     private function superAdmin(): AdminUser
     {
-        return AdminUser::create([
+        return $this->createAdmin([
             'name' => 'Account Validation Super',
             'email' => 'account-validation-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
@@ -237,7 +237,7 @@ class AdminAccountValidationRestorationTest extends TestCase
 
     public function test_regular_admin_cannot_mutate_account_validation_rules(): void
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Regular Admin',
             'email' => 'regular-validation-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
