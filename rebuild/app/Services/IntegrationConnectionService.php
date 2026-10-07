@@ -240,6 +240,7 @@ class IntegrationConnectionService
         }
 
         $response = Http::acceptJson()
+            ->withOptions(['allow_redirects' => false])
             ->connectTimeout(3)
             ->timeout(8)
             ->get($url);
