@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\AdminUser;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
