@@ -6048,7 +6048,7 @@
     right:0;
     bottom:64px;
     width:320px;
-    max-height:min(430px,70vh);
+    max-height:min(430px,calc(100vh - 96px));
     margin:0;
     overflow:auto;
     border-radius:16px;
