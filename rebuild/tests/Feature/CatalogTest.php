@@ -25,7 +25,7 @@ class CatalogTest extends TestCase
 
     private function admin(string $role = 'SUPER_ADMIN'): AdminUser
     {
-        return AdminUser::create([
+        return $this->createAdmin([
             'name' => 'Catalog Admin',
             'email' => strtolower($role).'@example.test',
             'password' => Hash::make('secure-password-123'),
