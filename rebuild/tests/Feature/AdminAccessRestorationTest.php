@@ -22,7 +22,7 @@ class AdminAccessRestorationTest extends TestCase
 
     private function admin(string $role = 'SUPER_ADMIN', array $overrides = []): AdminUser
     {
-        return AdminUser::create(array_replace([
+        return $this->createAdmin(array_replace([
             'name' => $role === 'SUPER_ADMIN' ? 'Owner Test' : 'Admin Test',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => Hash::make('access-restoration-password'),
