@@ -93,6 +93,7 @@ class StorefrontParityTest extends TestCase
             'order_number' => $number,
             'guest_email' => 'guest@example.test',
             'guest_phone' => $phone,
+            'guest_phone_normalized' => preg_replace('/[^0-9]+/', '', $phone),
             'product_id' => $product->id,
             'product_package_id' => $packageId,
             'status' => 'SUCCESS',
