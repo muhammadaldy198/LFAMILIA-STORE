@@ -971,7 +971,7 @@ class PaymentTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Admin Payment',
             'email' => 'payadmin@example.test',
             'password' => Hash::make('StrongPassword123!'),
