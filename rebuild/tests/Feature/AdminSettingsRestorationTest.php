@@ -35,7 +35,7 @@ class AdminSettingsRestorationTest extends TestCase
             'store_name' => 'LFAMILIA STORE TEST',
             'tagline' => 'Top up cepat untuk pengujian',
             'support_whatsapp' => '+6281234567890',
-            'instagram_url' => 'https://instagram.com/lfamilia.test',
+            'instagram_url' => 'https://instagram.com/lfamilia',
             'email' => 'support@example.test',
             'discord_url' => 'https://discord.gg/example',
             'support_url' => '/contact',
@@ -170,7 +170,8 @@ class AdminSettingsRestorationTest extends TestCase
         $this->login();
 
         $this->put('/admin/settings', $this->storePayload([
-            'instagram_url' => 'javascript:alert(1)',
+            'instagram_url' => 'https://evil.example/lfamilia',
+            'discord_url' => 'https://evil.example/invite',
             'support_url' => '//evil.example/path',
         ]))->assertSessionHasErrors(['instagram_url', 'support_url']);
     }
