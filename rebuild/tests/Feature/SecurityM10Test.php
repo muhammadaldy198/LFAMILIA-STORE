@@ -195,7 +195,7 @@ class SecurityM10Test extends TestCase
 
     public function test_sensitive_admin_audit_uses_request_correlation_id(): void
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Correlation Super',
             'email' => 'correlation-super@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
@@ -219,7 +219,7 @@ class SecurityM10Test extends TestCase
 
     public function test_secret_reveal_endpoint_is_not_exposed(): void
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Super Security',
             'email' => 'super-security@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
