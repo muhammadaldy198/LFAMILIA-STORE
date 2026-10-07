@@ -33,7 +33,14 @@ return new class extends Migration
 
         $keepPopupId = DB::table('site_popups')->orderBy('id')->value('id');
         if ($keepPopupId !== null) {
-            DB::table('site_popups')->where('id', '!=', $keepPopupId)->delete();
+            $duplicatePopupIds = DB::table('site_popups')->where('id', '!=', $keepPopupId)->pluck('id');
+            if ($duplicatePopupIds->isNotEmpty()) {
+                DB::table('media')
+                    ->where('model_type', 'App\\Models\\SitePopup')
+                    ->whereIn('model_id', $duplicatePopupIds)
+                    ->delete();
+                DB::table('site_popups')->whereIn('id', $duplicatePopupIds)->delete();
+            }
         }
 
         Schema::table('site_popups', function (Blueprint $table): void {
