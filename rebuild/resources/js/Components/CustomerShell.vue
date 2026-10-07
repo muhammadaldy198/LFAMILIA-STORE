@@ -96,12 +96,12 @@ function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
-function supportPlacement(x, y, width) {
+function supportPlacement(x, y, width, height) {
     const panelOffset = window.innerWidth <= 640 ? 58 : 64;
     const viewportMargin = 8;
     const panelMaxHeight = Math.min(430, window.innerHeight * 0.7);
     const spaceBelow = window.innerHeight - (y + panelOffset) - viewportMargin;
-    const spaceAbove = y - panelOffset - viewportMargin;
+    const spaceAbove = y + height - panelOffset - viewportMargin;
 
     return {
         side: x + width / 2 < window.innerWidth / 2 ? 'right' : 'left',
@@ -116,7 +116,7 @@ function clampSupportPosition() {
     const height = width;
     const x = clamp(supportPosition.value.x, 8, Math.max(8, window.innerWidth - width - 8));
     const y = clamp(supportPosition.value.y, 68, Math.max(68, window.innerHeight - height - 14));
-    supportPosition.value = { x, y, ...supportPlacement(x, y, width) };
+    supportPosition.value = { x, y, ...supportPlacement(x, y, width, height) };
 }
 
 function startSupportDrag(event) {
@@ -151,7 +151,7 @@ function moveSupportDrag(event) {
     supportPosition.value = {
         x,
         y,
-        ...supportPlacement(x, y, supportDrag.width),
+        ...supportPlacement(x, y, supportDrag.width, supportDrag.height),
     };
     event.preventDefault();
 }
