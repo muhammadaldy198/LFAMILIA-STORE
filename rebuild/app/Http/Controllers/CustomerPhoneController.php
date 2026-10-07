@@ -17,7 +17,7 @@ class CustomerPhoneController
     public function update(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'phone' => ['required', 'regex:/^\\+?[0-9]{8,16}$/'],
+            'phone' => ['required', 'string', 'regex:/^\\+?[0-9]{8,16}$/'],
         ]);
 
         $request->user()->forceFill(['phone' => $data['phone']])->save();
