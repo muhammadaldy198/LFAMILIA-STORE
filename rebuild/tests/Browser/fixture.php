@@ -25,12 +25,15 @@ Queue::fake();
 Http::preventStrayRequests();
 
 DB::transaction(function (): void {
-    AdminUser::updateOrCreate(['email' => 'browser-admin@example.test'], [
+    $browserAdmin = AdminUser::updateOrCreate(['email' => 'browser-admin@example.test'], [
         'name' => 'Browser Admin',
         'password' => Hash::make('Browser-admin-test-password-123'),
-        'role' => 'SUPER_ADMIN',
-        'is_active' => true,
     ]);
+    $browserAdmin->forceFill([
+        'role' => 'SUPER_ADMIN',
+        'permissions' => null,
+        'is_active' => true,
+    ])->save();
 
     User::updateOrCreate(['email' => 'browser-account@example.test'], [
         'name' => 'Browser Account',
