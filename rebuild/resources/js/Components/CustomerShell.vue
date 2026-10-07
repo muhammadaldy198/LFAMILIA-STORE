@@ -93,11 +93,6 @@ function clamp(value, min, max) {
 }
 
 function startSupportDrag(event) {
-    if (window.innerWidth > 640) {
-        supportOpen.value = !supportOpen.value;
-        return;
-    }
-
     const trigger = event.currentTarget;
     const rect = trigger.getBoundingClientRect();
     supportDrag = {
