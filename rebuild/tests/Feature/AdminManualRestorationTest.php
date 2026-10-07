@@ -22,7 +22,7 @@ class AdminManualRestorationTest extends TestCase
 
     private function login(array $permissions = [], string $role = 'SUPER_ADMIN'): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Manual regression',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => bcrypt('manual-regression-only'),
