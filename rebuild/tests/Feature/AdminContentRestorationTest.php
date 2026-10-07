@@ -19,7 +19,7 @@ class AdminContentRestorationTest extends TestCase
 
     private function login(): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Content regression',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => bcrypt('content-regression-only'),
