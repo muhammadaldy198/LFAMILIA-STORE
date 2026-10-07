@@ -17,7 +17,7 @@ class AdminPromotionRestorationTest extends TestCase
 
     private function login(array $permissions = ['vouchers.manage'], string $role = 'ADMIN'): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Promo Test',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => Hash::make('promo-restoration-only'),
