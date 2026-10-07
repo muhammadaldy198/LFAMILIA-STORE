@@ -26,7 +26,7 @@ class AdminCustomerRestorationTest extends TestCase
 
     private function login(string $role = 'ADMIN', array $permissions = ['customers.view']): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Customer restoration',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => Hash::make('customer-restoration-only'),
@@ -52,7 +52,10 @@ class AdminCustomerRestorationTest extends TestCase
             'password' => Hash::make('VeryStrongCustomer123!'),
         ], $overrides));
 
-        $user->forceFill(['membership_tier_code' => $tier])->saveQuietly();
+        $trusted = array_intersect_key(array_replace([
+            'email_verified_at' => now(),
+        ], $overrides), array_flip(['email_verified_at', 'google_sub', 'last_active_at']));
+        $user->forceFill(array_merge($trusted, ['membership_tier_code' => $tier]))->saveQuietly();
 
         return $user;
     }

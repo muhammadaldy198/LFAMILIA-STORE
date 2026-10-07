@@ -15,7 +15,7 @@ class AdminAuditRestorationTest extends TestCase
 
     private function login(string $role = 'SUPER_ADMIN', array $permissions = []): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => $role === 'SUPER_ADMIN' ? 'Audit Owner' : 'Audit Admin',
             'email' => strtolower($role).'-'.bin2hex(random_bytes(5)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
@@ -135,7 +135,7 @@ class AdminAuditRestorationTest extends TestCase
         DB::table('audit_logs')->delete();
         $owner = $this->login();
 
-        $other = AdminUser::create([
+        $other = $this->createAdmin([
             'name' => 'Operator Pencarian Audit',
             'email' => 'operator-audit-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),

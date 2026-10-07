@@ -54,11 +54,11 @@ class ExternalNotificationService
     {
         $config = $this->config('discord');
         $url = (string) ($config['webhook_url'] ?? '');
-        if (! $config || ! str_starts_with(strtolower($url), 'https://')) {
+        if (! $config || ! $this->validDiscordWebhook($url)) {
             return null;
         }
 
-        return $this->attempt($id, 'discord', $url, fn () => Http::acceptJson()->timeout(8)->post($url, [
+        return $this->attempt($id, 'discord', $url, fn () => Http::acceptJson()->withOptions(['allow_redirects' => false])->timeout(8)->post($url, [
             'content' => mb_substr($text, 0, 1900),
             'allowed_mentions' => ['parse' => []],
         ]));
@@ -123,6 +123,26 @@ class ExternalNotificationService
 
             return false;
         }
+    }
+
+    private function validDiscordWebhook(string $url): bool
+    {
+        $parts = parse_url(trim($url));
+        if (! is_array($parts)
+            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || isset($parts['user'])
+            || isset($parts['pass'])
+            || isset($parts['fragment'])
+        ) {
+            return false;
+        }
+
+        $host = strtolower(rtrim((string) ($parts['host'] ?? ''), '.'));
+        if (! in_array($host, ['discord.com', 'www.discord.com', 'discordapp.com', 'www.discordapp.com'], true)) {
+            return false;
+        }
+
+        return (bool) preg_match('#^/api(?:/v\\d+)?/webhooks/[^/]+/[^/]+/?$#', (string) ($parts['path'] ?? ''));
     }
 
     private function config(string $code): ?array

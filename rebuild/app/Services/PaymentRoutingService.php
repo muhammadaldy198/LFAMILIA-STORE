@@ -21,18 +21,14 @@ class PaymentRoutingService
             ->where('supports_order', true)
             ->orderBy('sort_order')
             ->orderBy('id')
+            ->with('media')
             ->get()
-            ->filter(function (PaymentChannel $channel): bool {
+            ->map(function (PaymentChannel $channel) use ($user): ?array {
                 try {
-                    $this->resolve((string) $channel->code, false, 'order');
-
-                    return true;
+                    $route = $this->resolve((string) $channel->code, false, 'order');
                 } catch (ValidationException) {
-                    return false;
+                    return null;
                 }
-            })
-            ->map(function (PaymentChannel $channel) use ($user): array {
-                $route = $this->resolve((string) $channel->code, false, 'order');
 
                 return [
                     'code' => (string) $channel->code,
@@ -44,7 +40,7 @@ class PaymentRoutingService
                     'fee_percent_bps' => (int) $channel->fee_percent_bps,
                     'available' => $route['gateway_code'] !== 'WALLET' || $user !== null,
                 ];
-            })->values()->all();
+            })->filter()->values()->all();
     }
 
     /**
@@ -57,24 +53,27 @@ class PaymentRoutingService
             ->where('supports_wallet_topup', true)
             ->orderBy('sort_order')
             ->orderBy('id')
+            ->with('media')
             ->get()
-            ->filter(function (PaymentChannel $channel): bool {
+            ->map(function (PaymentChannel $channel): ?array {
                 try {
                     $route = $this->resolve((string) $channel->code, false, 'topup');
-
-                    return ! in_array($route['gateway_code'], ['WALLET', 'MANUAL_QRIS'], true);
                 } catch (ValidationException) {
-                    return false;
+                    return null;
                 }
-            })
-            ->map(fn (PaymentChannel $channel): array => [
-                'code' => (string) $channel->code,
-                'name' => (string) $channel->name,
-                'description' => $channel->description ?: $this->defaultDescription((string) $channel->method),
-                'logo_url' => $channel->getFirstMediaUrl('logo') ?: null,
-                'fee_flat_idr' => (int) $channel->fee_flat_idr,
-                'fee_percent_bps' => (int) $channel->fee_percent_bps,
-            ])->values()->all();
+                if (in_array($route['gateway_code'], ['WALLET', 'MANUAL_QRIS'], true)) {
+                    return null;
+                }
+
+                return [
+                    'code' => (string) $channel->code,
+                    'name' => (string) $channel->name,
+                    'description' => $channel->description ?: $this->defaultDescription((string) $channel->method),
+                    'logo_url' => $channel->getFirstMediaUrl('logo') ?: null,
+                    'fee_flat_idr' => (int) $channel->fee_flat_idr,
+                    'fee_percent_bps' => (int) $channel->fee_percent_bps,
+                ];
+            })->filter()->values()->all();
     }
 
     /**

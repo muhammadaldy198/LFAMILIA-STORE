@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
@@ -22,7 +21,7 @@ class AdminDashboardRestorationTest extends TestCase
 
     private function login(string $role = 'SUPER_ADMIN', array $permissions = []): void
     {
-        $this->actingAs(AdminUser::create([
+        $this->actingAs($this->createAdmin([
             'name' => 'Dashboard regression', 'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => bcrypt('dashboard-regression-only'), 'role' => $role,
             'permissions' => $permissions, 'is_active' => true,

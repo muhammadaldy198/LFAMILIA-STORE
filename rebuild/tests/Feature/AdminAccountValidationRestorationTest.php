@@ -18,7 +18,7 @@ class AdminAccountValidationRestorationTest extends TestCase
 
     private function superAdmin(): AdminUser
     {
-        return AdminUser::create([
+        return $this->createAdmin([
             'name' => 'Account Validation Super',
             'email' => 'account-validation-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
@@ -195,7 +195,7 @@ class AdminAccountValidationRestorationTest extends TestCase
             [
                 'config_ciphertext' => [
                     'api_key' => 'test-secret',
-                    'base_url' => 'https://validation.example.test',
+                    'base_url' => 'https://example.com',
                     'nickname_path' => '/nickname',
                     'region_path' => '/region',
                     'pln_path' => '/pln',
@@ -205,11 +205,11 @@ class AdminAccountValidationRestorationTest extends TestCase
         );
 
         Http::fake([
-            'https://validation.example.test/nickname' => Http::response([
+            'https://example.com/nickname' => Http::response([
                 'status' => true,
                 'data' => ['nickname' => 'FreeFirePlayer'],
             ]),
-            'https://validation.example.test/region' => Http::response([
+            'https://example.com/region' => Http::response([
                 'status' => true,
                 'data' => ['region' => 'ID'],
             ]),
@@ -237,7 +237,7 @@ class AdminAccountValidationRestorationTest extends TestCase
 
     public function test_regular_admin_cannot_mutate_account_validation_rules(): void
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Regular Admin',
             'email' => 'regular-validation-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),

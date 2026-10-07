@@ -125,10 +125,12 @@ class AdminAccessController
             'name' => trim($data['name']),
             'email' => strtolower(trim($data['email'])),
             'password' => Hash::make($data['password']),
+        ]);
+        $admin->forceFill([
             'role' => $data['role'],
             'permissions' => $data['role'] === 'ADMIN' ? $data['permissions'] : null,
             'is_active' => $data['is_active'],
-        ]);
+        ])->save();
 
         $audit->record($request, 'admin.created', 'admin_user', $admin->id, null, $this->auditState($admin));
 
@@ -165,6 +167,8 @@ class AdminAccessController
         $admin->fill([
             'name' => trim($data['name']),
             'email' => strtolower(trim($data['email'])),
+        ]);
+        $admin->forceFill([
             'role' => $data['role'],
             'permissions' => $data['role'] === 'ADMIN' ? $data['permissions'] : null,
             'is_active' => $data['is_active'],

@@ -40,18 +40,13 @@ class PublicOrderTrackingController
             return response()->json(['message' => 'Masukkan invoice atau nomor WhatsApp yang valid.'], 422);
         }
 
-        $normalizedGuest = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(orders.guest_phone,''), '+', ''), '-', ''), ' ', ''), '.', ''), '(', ''), ')', ''), '/', '')";
-        $normalizedUser = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(users.phone,''), '+', ''), '-', ''), ' ', ''), '.', ''), '(', ''), ')', ''), '/', '')";
-
         $orders = DB::table('orders')
             ->leftJoin('users', 'users.id', '=', 'orders.user_id')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
-            ->where(function ($builder) use ($phones, $normalizedGuest, $normalizedUser): void {
-                foreach ($phones as $phone) {
-                    $builder->orWhereRaw($normalizedGuest.' = ?', [$phone])
-                        ->orWhereRaw($normalizedUser.' = ?', [$phone]);
-                }
+            ->where(function ($builder) use ($phones): void {
+                $builder->whereIn('orders.guest_phone_normalized', $phones)
+                    ->orWhereIn('users.phone_normalized', $phones);
             })
             ->orderByDesc('orders.id')->limit(25)
             ->get([

@@ -34,11 +34,11 @@ class AdminContentController
             'assets' => StoreAsset::whereIn('key', [
                 'logo', 'favicon', 'banner_desktop', 'banner_mobile',
                 'footer_banner_desktop', 'footer_banner_mobile',
-            ])->orderBy('id')->get()->map(fn (StoreAsset $asset): array => [
+            ])->with('media')->orderBy('id')->get()->map(fn (StoreAsset $asset): array => [
                 ...$asset->only('id', 'key', 'target_url', 'is_active'),
                 'image_url' => $asset->getFirstMediaUrl('image'),
             ]),
-            'banners' => HomeBanner::orderBy('sort_order')->orderBy('id')->get()->map(fn (HomeBanner $banner): array => [
+            'banners' => HomeBanner::with('media')->orderBy('sort_order')->orderBy('id')->get()->map(fn (HomeBanner $banner): array => [
                 ...$banner->only(
                     'id', 'title', 'subtitle', 'cta_label', 'cta_href',
                     'show_desktop', 'show_mobile', 'sort_order', 'is_active'
@@ -46,11 +46,11 @@ class AdminContentController
                 'desktop_url' => $banner->getFirstMediaUrl('desktop'),
                 'mobile_url' => $banner->getFirstMediaUrl('mobile'),
             ]),
-            'popups' => SitePopup::orderBy('id')->limit(1)->get()->map(fn (SitePopup $popup): array => [
+            'popups' => SitePopup::with('media')->orderBy('id')->limit(1)->get()->map(fn (SitePopup $popup): array => [
                 ...$popup->toArray(),
                 'image_url' => $popup->getFirstMediaUrl('image'),
             ]),
-            'news' => NewsArticle::orderBy('sort_order')->orderByDesc('id')->get()->map(fn (NewsArticle $article): array => [
+            'news' => NewsArticle::with('media')->orderBy('sort_order')->orderByDesc('id')->get()->map(fn (NewsArticle $article): array => [
                 ...$article->only('id', 'slug', 'title', 'summary', 'body', 'source_label', 'sort_order', 'is_active'),
                 'published_at' => $article->published_at?->format('Y-m-d\TH:i'),
                 'image_url' => $article->getFirstMediaUrl('image'),

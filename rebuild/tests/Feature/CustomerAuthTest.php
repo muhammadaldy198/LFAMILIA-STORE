@@ -32,6 +32,7 @@ class CustomerAuthTest extends TestCase
         $user = User::where('email', 'customer@example.test')->firstOrFail();
         $this->assertTrue(Hash::check('secure-password-123', $user->password));
         $this->assertSame('BASIC', $user->membership_tier_code);
+        $this->assertSame('081234567890', $user->phone_normalized);
         $this->assertAuthenticatedAs($user, 'web');
 
         $this->get('/admin/panel')->assertRedirect(route('admin.login'));

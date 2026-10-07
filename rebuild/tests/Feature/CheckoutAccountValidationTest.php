@@ -101,7 +101,7 @@ class CheckoutAccountValidationTest extends TestCase
             'code' => 'kokinpay',
             'config_ciphertext' => [
                 'api_key' => 'test-secret',
-                'base_url' => 'https://nickname.example.test',
+                'base_url' => 'https://example.com',
                 'nickname_path' => '/v1/check-nickname',
                 'region_path' => '/v1/check-region',
                 'pln_path' => '/v1/check-pln',
@@ -110,7 +110,7 @@ class CheckoutAccountValidationTest extends TestCase
         ]);
 
         Http::fake([
-            'https://nickname.example.test/*' => Http::response([
+            'https://example.com/*' => Http::response([
                 'status' => true,
                 'data' => [
                     'nickname' => 'AldayPlayer',
@@ -146,7 +146,7 @@ class CheckoutAccountValidationTest extends TestCase
             'code' => 'kokinpay',
             'config_ciphertext' => [
                 'api_key' => 'test-secret',
-                'base_url' => 'https://nickname.example.test',
+                'base_url' => 'https://example.com',
                 'nickname_path' => '/v1/check-nickname',
                 'region_path' => '/v1/check-region',
                 'pln_path' => '/v1/check-pln',
@@ -155,7 +155,7 @@ class CheckoutAccountValidationTest extends TestCase
         ]);
 
         Http::fake([
-            'https://nickname.example.test/*' => Http::response(['status' => false], 400),
+            'https://example.com/*' => Http::response(['status' => false], 400),
         ]);
 
         $this->postJson('/checkout/nickname', [
@@ -217,7 +217,7 @@ class CheckoutAccountValidationTest extends TestCase
             'code' => 'kokinpay',
             'config_ciphertext' => [
                 'api_key' => 'test-secret',
-                'base_url' => 'https://nickname.example.test',
+                'base_url' => 'https://example.com',
                 'nickname_path' => '/custom/nickname',
                 'region_path' => '/custom/region',
                 'pln_path' => '/custom/pln',
@@ -226,7 +226,7 @@ class CheckoutAccountValidationTest extends TestCase
         ]);
 
         Http::fake([
-            'https://nickname.example.test/custom/nickname' => Http::response([
+            'https://example.com/custom/nickname' => Http::response([
                 'status' => true,
                 'data' => ['nickname' => 'ConfigDriven'],
             ]),
@@ -239,7 +239,7 @@ class CheckoutAccountValidationTest extends TestCase
             ->assertJsonPath('verified', true)
             ->assertJsonPath('nickname', 'ConfigDriven');
 
-        Http::assertSent(fn ($request): bool => $request->url() === 'https://nickname.example.test/custom/nickname');
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://example.com/custom/nickname');
     }
 
     public function test_supported_game_with_empty_nickname_is_rejected(): void
@@ -254,7 +254,7 @@ class CheckoutAccountValidationTest extends TestCase
             'code' => 'kokinpay',
             'config_ciphertext' => [
                 'api_key' => 'test-secret',
-                'base_url' => 'https://nickname.example.test',
+                'base_url' => 'https://example.com',
                 'nickname_path' => '/v1/check-nickname',
                 'region_path' => '/v1/check-region',
                 'pln_path' => '/v1/check-pln',
@@ -263,7 +263,7 @@ class CheckoutAccountValidationTest extends TestCase
         ]);
 
         Http::fake([
-            'https://nickname.example.test/*' => Http::response([
+            'https://example.com/*' => Http::response([
                 'status' => true,
                 'data' => [],
             ]),

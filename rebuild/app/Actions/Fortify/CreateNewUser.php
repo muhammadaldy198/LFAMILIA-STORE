@@ -27,6 +27,7 @@ class CreateNewUser implements CreatesNewUsers
             'name' => $input['name'],
             'email' => $input['email'],
             'phone' => $input['phone'],
+            'phone_normalized' => preg_replace('/[^0-9]+/', '', (string) $input['phone']) ?: null,
             'password' => Hash::make($input['password']),
             'membership_tier_code' => 'BASIC',
         ]));

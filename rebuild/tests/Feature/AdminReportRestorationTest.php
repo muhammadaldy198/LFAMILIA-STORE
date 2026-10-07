@@ -15,7 +15,7 @@ class AdminReportRestorationTest extends TestCase
 
     private function login(string $role = 'SUPER_ADMIN', array $permissions = ['reports.view']): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Report Admin',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => Hash::make('report-restoration-password'),

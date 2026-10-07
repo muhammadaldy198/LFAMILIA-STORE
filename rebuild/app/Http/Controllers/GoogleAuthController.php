@@ -80,10 +80,12 @@ class GoogleAuthController
                 $user = User::create([
                     'name' => (string) ($profile->getName() ?: $email),
                     'email' => $email,
+                ]);
+                $user->forceFill([
                     'email_verified_at' => now(),
                     'google_sub' => $subject,
-                ]);
-                $user->forceFill(['membership_tier_code' => 'BASIC'])->saveQuietly();
+                    'membership_tier_code' => 'BASIC',
+                ])->saveQuietly();
 
                 return $user;
             }

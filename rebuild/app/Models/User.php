@@ -16,13 +16,19 @@ class User extends Authenticatable implements MustVerifyEmailContract
     use HasApiTokens, MustVerifyEmail, Notifiable, SoftDeletes;
 
     protected $fillable = [
-        'name', 'email', 'email_verified_at', 'phone', 'password', 'google_sub', 'leaderboard_opt_in',
+        'name', 'email', 'phone', 'password', 'leaderboard_opt_in',
     ];
 
     protected $hidden = ['password', 'remember_token', 'google_sub'];
 
     protected static function booted(): void
     {
+        static::creating(function (self $user): void {
+            if ($user->phone !== null && $user->phone_normalized === null) {
+                $user->phone_normalized = preg_replace('/[^0-9]+/', '', (string) $user->phone) ?: null;
+            }
+        });
+
         static::created(function (self $user): void {
             $user->wallet()->create();
         });

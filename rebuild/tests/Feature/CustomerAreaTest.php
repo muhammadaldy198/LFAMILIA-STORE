@@ -101,6 +101,19 @@ class CustomerAreaTest extends TestCase
         $this->assertSame(2, DB::table('wallets')->count());
     }
 
+    public function test_passwordless_customer_can_set_first_password(): void
+    {
+        $user = $this->customer('first-password@example.test');
+        $user->forceFill(['password' => null])->saveQuietly();
+
+        $this->actingAs($user, 'web')->put('/account/password', [
+            'password' => 'first-password-123',
+            'password_confirmation' => 'first-password-123',
+        ])->assertRedirect();
+
+        $this->assertTrue(Hash::check('first-password-123', $user->fresh()->password));
+    }
+
     public function test_profile_password_and_deletion_checks(): void
     {
         $user = $this->customer('profile@example.test');
@@ -121,7 +134,13 @@ class CustomerAreaTest extends TestCase
             'password' => 'new-password-123',
             'password_confirmation' => 'new-password-123',
         ])->assertSessionHasErrors('current_password');
-        $this->put('/account/password', [
+
+        $this->withSession(['auth.password_confirmed_at' => time()])->put('/account/password', [
+            'current_password' => 'wrong',
+            'password' => 'new-password-123',
+            'password_confirmation' => 'new-password-123',
+        ])->assertSessionHasErrors('current_password');
+        $this->withSession(['auth.password_confirmed_at' => time()])->put('/account/password', [
             'current_password' => 'old-password-123',
             'password' => 'new-password-123',
             'password_confirmation' => 'new-password-123',

@@ -21,14 +21,17 @@ class GuestSupportController
             ->first(['id', 'order_number']);
         $tickets = $order ? DB::table('support_tickets')
             ->whereNull('user_id')->where('order_id', $order->id)->orderByDesc('id')
-            ->get(['id', 'subject', 'message', 'status', 'created_at'])
-            ->map(function (object $ticket): object {
-                $ticket->messages = DB::table('support_ticket_messages')
-                    ->where('support_ticket_id', $ticket->id)->orderBy('id')
-                    ->get(['id', 'sender_type', 'message', 'created_at']);
-
-                return $ticket;
-            }) : [];
+            ->get(['id', 'subject', 'message', 'status', 'created_at']) : collect();
+        if ($tickets->isNotEmpty()) {
+            $messages = DB::table('support_ticket_messages')
+                ->whereIn('support_ticket_id', $tickets->pluck('id'))
+                ->orderBy('support_ticket_id')->orderBy('id')
+                ->get(['id', 'support_ticket_id', 'sender_type', 'message', 'created_at'])
+                ->groupBy('support_ticket_id');
+            $tickets->each(function (object $ticket) use ($messages): void {
+                $ticket->messages = $messages->get($ticket->id, collect())->values();
+            });
+        }
 
         return Inertia::render('Guest/Support', [
             'order' => $order ? ['order_number' => $order->order_number] : null,

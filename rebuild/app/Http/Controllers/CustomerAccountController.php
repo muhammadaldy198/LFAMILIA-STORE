@@ -67,6 +67,7 @@ class CustomerAccountController
             'name' => $data['name'],
             'email' => $email,
             'phone' => $data['phone'],
+            'phone_normalized' => preg_replace('/[^0-9]+/', '', $data['phone']) ?: null,
             'leaderboard_opt_in' => array_key_exists('leaderboard_opt_in', $data)
                 ? (bool) $data['leaderboard_opt_in']
                 : (bool) $user->leaderboard_opt_in,

@@ -73,6 +73,7 @@ class NicknameService
                     ...($server !== '' ? ['server' => $server] : []),
                 ],
                 $userField,
+                $settings['resolved_ip'],
             );
 
             $nickname = $this->firstString([
@@ -105,6 +106,7 @@ class NicknameService
                         'server' => $server,
                     ],
                     $serverField ?: $userField,
+                    $settings['resolved_ip'],
                 );
                 $country = $this->firstString([
                     data_get($regionData, 'data.region'),
@@ -133,10 +135,16 @@ class NicknameService
      * @param  array<string, string>  $body
      * @return array<string, mixed>
      */
-    private function post(string $url, array $body, string $field): array
+    private function post(string $url, array $body, string $field, string $resolvedIp): array
     {
+        $host = (string) parse_url($url, PHP_URL_HOST);
+        $port = (int) (parse_url($url, PHP_URL_PORT) ?: 443);
+
         try {
-            $response = Http::acceptJson()->timeout(8)->post($url, $body);
+            $response = Http::acceptJson()->withOptions([
+                'allow_redirects' => false,
+                'curl' => [CURLOPT_RESOLVE => [sprintf('%s:%d:%s', $host, $port, $resolvedIp)]],
+            ])->timeout(8)->post($url, $body);
         } catch (Throwable) {
             throw new NicknameServiceUnavailable;
         }

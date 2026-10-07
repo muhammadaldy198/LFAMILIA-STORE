@@ -20,7 +20,7 @@ class AdminM9Test extends TestCase
 
     private function admin(array $permissions = []): AdminUser
     {
-        return AdminUser::create([
+        return $this->createAdmin([
             'name' => 'Admin Test',
             'email' => 'admin-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
@@ -32,7 +32,7 @@ class AdminM9Test extends TestCase
 
     private function superAdmin(): AdminUser
     {
-        return AdminUser::create([
+        return $this->createAdmin([
             'name' => 'Super Test',
             'email' => 'super-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),
@@ -54,7 +54,7 @@ class AdminM9Test extends TestCase
         ], collect($menu)->pluck('label')->all());
         $this->assertCount(18, $menu);
 
-        $unsupported = AdminUser::create([
+        $unsupported = $this->createAdmin([
             'name' => 'Unsupported Staff',
             'email' => 'unsupported-staff-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('VeryStrongPassword123!'),

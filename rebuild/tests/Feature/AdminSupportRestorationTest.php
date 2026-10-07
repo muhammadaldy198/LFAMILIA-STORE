@@ -18,7 +18,7 @@ class AdminSupportRestorationTest extends TestCase
 
     private function login(array $permissions = ['support.manage'], string $role = 'ADMIN'): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Support Admin',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => Hash::make('support-restoration-password'),

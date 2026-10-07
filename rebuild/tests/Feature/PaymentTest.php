@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Jobs\SendTransactionalEmailJob;
-use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
@@ -971,7 +970,7 @@ class PaymentTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Admin Payment',
             'email' => 'payadmin@example.test',
             'password' => Hash::make('StrongPassword123!'),

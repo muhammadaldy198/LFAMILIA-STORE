@@ -63,7 +63,7 @@ class StorefrontContentService
             return [];
         }
 
-        return StoreAsset::where('is_active', true)->get()->mapWithKeys(fn (StoreAsset $asset): array => [
+        return StoreAsset::where('is_active', true)->with('media')->get()->mapWithKeys(fn (StoreAsset $asset): array => [
             $asset->key => [
                 'url' => $asset->getFirstMediaUrl('image'),
                 'target' => $asset->target_url,
@@ -78,6 +78,7 @@ class StorefrontContentService
         }
 
         return HomeBanner::where('is_active', true)
+            ->with('media')
             ->orderBy('sort_order')->orderBy('id')->get()
             ->map(fn (HomeBanner $banner): array => [
                 ...$banner->only(
@@ -98,6 +99,7 @@ class StorefrontContentService
         }
 
         return SitePopup::where('is_active', true)
+            ->with('media')
             ->orderBy('sort_order')->orderBy('id')
             ->limit(1)
             ->get([
@@ -115,6 +117,7 @@ class StorefrontContentService
         }
 
         return NewsArticle::where('is_active', true)
+            ->with('media')
             ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
             ->orderBy('sort_order')->orderByDesc('published_at')->orderByDesc('id')
             ->limit($limit)->get()

@@ -81,11 +81,22 @@ class AdminPromotionController
                 DB::raw('COALESCE(redemptions.active_count, 0) as active_count'),
             ])
             ->paginate($filters['per_page'], ['*'], 'voucher_page')
-            ->withQueryString()
-            ->through(fn (object $voucher): array => $this->voucherRow($voucher, $now));
+            ->withQueryString();
+
+        $voucherIds = collect($vouchers->items())->pluck('id');
+        $productScopes = DB::table('voucher_products')->whereIn('voucher_id', $voucherIds)
+            ->orderBy('product_id')->get(['voucher_id', 'product_id'])->groupBy('voucher_id');
+        $categoryScopes = DB::table('voucher_categories')->whereIn('voucher_id', $voucherIds)
+            ->orderBy('category_id')->get(['voucher_id', 'category_id'])->groupBy('voucher_id');
+        $vouchers->through(fn (object $voucher): array => $this->voucherRow(
+            $voucher,
+            $now,
+            $productScopes->get($voucher->id, collect())->pluck('product_id')->map(fn ($id): int => (int) $id)->all(),
+            $categoryScopes->get($voucher->id, collect())->pluck('category_id')->map(fn ($id): int => (int) $id)->all(),
+        ));
 
         $products = Product::query()
-            ->with('category')
+            ->with(['category', 'media'])
             ->withCount(['packages'])
             ->when($filters['popular_q'] !== '', function ($query) use ($filters): void {
                 $like = '%'.$filters['popular_q'].'%';
@@ -358,12 +369,8 @@ class AdminPromotionController
             })->count();
     }
 
-    private function voucherRow(object $voucher, Carbon $now): array
+    private function voucherRow(object $voucher, Carbon $now, array $productIds, array $categoryIds): array
     {
-        $productIds = DB::table('voucher_products')->where('voucher_id', $voucher->id)
-            ->orderBy('product_id')->pluck('product_id')->map(fn ($id): int => (int) $id)->all();
-        $categoryIds = DB::table('voucher_categories')->where('voucher_id', $voucher->id)
-            ->orderBy('category_id')->pluck('category_id')->map(fn ($id): int => (int) $id)->all();
 
         $remaining = $voucher->total_quota === null
             ? null

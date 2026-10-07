@@ -93,9 +93,17 @@ class AdminSettingsController
                 'max:32',
                 'regex:/^\+?[0-9][0-9\s\-]{7,30}$/',
             ],
-            'instagram_url' => ['nullable', 'url:http,https', 'max:500'],
+            'instagram_url' => ['nullable', 'url:https', 'max:500', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (filled($value) && ! $this->hostMatches((string) $value, ['instagram.com', 'www.instagram.com'])) {
+                    $fail('Tautan Instagram harus menggunakan domain instagram.com.');
+                }
+            }],
             'email' => ['nullable', 'email:rfc', 'max:255'],
-            'discord_url' => ['nullable', 'url:http,https', 'max:500'],
+            'discord_url' => ['nullable', 'url:https', 'max:500', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (filled($value) && ! $this->hostMatches((string) $value, ['discord.com', 'www.discord.com', 'discord.gg'])) {
+                    $fail('Tautan Discord harus menggunakan domain resmi Discord.');
+                }
+            }],
             'support_url' => [
                 'nullable',
                 'string',
@@ -343,6 +351,13 @@ class AdminSettingsController
     /**
      * @return array<string, mixed>
      */
+    private function hostMatches(string $url, array $allowed): bool
+    {
+        $host = strtolower(rtrim((string) parse_url($url, PHP_URL_HOST), '.'));
+
+        return in_array($host, $allowed, true);
+    }
+
     private function jsonArray(mixed $value): array
     {
         if (is_array($value)) {

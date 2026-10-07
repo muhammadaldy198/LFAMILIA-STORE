@@ -19,7 +19,7 @@ class AdminProviderRestorationTest extends TestCase
 
     private function login(array $permissions = ['providers.manage', 'catalog.manage']): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Provider regression',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => bcrypt('provider-regression-only'),

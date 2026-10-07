@@ -16,7 +16,7 @@ class AdminPresentationTest extends TestCase
 
     private function admin(array $permissions = [], string $role = 'ADMIN'): AdminUser
     {
-        return AdminUser::create([
+        return $this->createAdmin([
             'name' => 'Content Admin', 'email' => 'presentation-'.bin2hex(random_bytes(4)).'@example.test',
             'password' => Hash::make('StrongPassword123!'), 'role' => $role,
             'permissions' => $permissions, 'is_active' => true,
