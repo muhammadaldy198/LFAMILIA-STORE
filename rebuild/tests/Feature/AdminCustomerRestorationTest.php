@@ -26,7 +26,7 @@ class AdminCustomerRestorationTest extends TestCase
 
     private function login(string $role = 'ADMIN', array $permissions = ['customers.view']): AdminUser
     {
-        $admin = AdminUser::create([
+        $admin = $this->createAdmin([
             'name' => 'Customer restoration',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'password' => Hash::make('customer-restoration-only'),
