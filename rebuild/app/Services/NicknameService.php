@@ -136,7 +136,7 @@ class NicknameService
     private function post(string $url, array $body, string $field): array
     {
         try {
-            $response = Http::acceptJson()->timeout(8)->post($url, $body);
+            $response = Http::acceptJson()->withOptions(['allow_redirects' => false])->timeout(8)->post($url, $body);
         } catch (Throwable) {
             throw new NicknameServiceUnavailable;
         }
