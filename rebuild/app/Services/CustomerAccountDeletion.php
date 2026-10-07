@@ -37,6 +37,7 @@ class CustomerAccountDeletion
                 'email' => null,
                 'email_verified_at' => null,
                 'phone' => null,
+                'phone_normalized' => null,
                 'google_sub' => null,
                 'password' => null,
                 'remember_token' => null,
