@@ -79,6 +79,36 @@ class AdminOrderPresentation
         return is_array($value) ? $value : (json_decode((string) $value, true) ?: []);
     }
 
+    /**
+     * Load product field labels for a page (or export chunk) in one query.
+     *
+     * Previously row() queried product_input_fields for each distinct product.
+     */
+    public function preloadFieldLabels(iterable $rows): void
+    {
+        $missingProductIds = [];
+        foreach ($rows as $row) {
+            $id = (int) $row->product_id;
+            if (! array_key_exists($id, $this->fieldLabels)) {
+                $missingProductIds[$id] = $id;
+            }
+        }
+
+        if ($missingProductIds === []) {
+            return;
+        }
+
+        $labelsByProduct = DB::table('product_input_fields')
+            ->whereIn('product_id', array_values($missingProductIds))
+            ->get(['product_id', 'field_key', 'label'])
+            ->groupBy('product_id');
+
+        foreach ($missingProductIds as $id) {
+            $this->fieldLabels[$id] = $labelsByProduct->get($id, collect())
+                ->pluck('label', 'field_key')->all();
+        }
+    }
+
     public function row(object $row): array
     {
         $snapshot = $this->json($row->snapshot);
