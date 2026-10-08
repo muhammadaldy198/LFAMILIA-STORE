@@ -108,6 +108,29 @@ class AdminOrdersRestorationTest extends TestCase
                 'product_name' => $name,
             ]);
         }
+        // Manual orders intentionally share one internal catalog product.
+        // Create independent real catalog references to exercise batching.
+        $originalProductId = DB::table('orders')->where('id', $ids[0])->value('product_id');
+        $categoryId = DB::table('products')->where('id', $originalProductId)->value('category_id');
+        foreach ([1, 2] as $index) {
+            $product = \App\Models\Product::create([
+                'category_id' => $categoryId,
+                'slug' => 'order-label-batch-'.Str::lower(Str::random(16)),
+                'name' => 'Label batch fixture '.$index,
+                'fulfillment_mode' => 'MANUAL',
+                'is_active' => false,
+            ]);
+            $package = \App\Models\ProductPackage::create([
+                'product_id' => $product->id,
+                'code' => 'ORDER_LABEL_TEST',
+                'name' => 'Label batch package',
+                'is_active' => false,
+            ]);
+            DB::table('orders')->where('id', $ids[$index])->update([
+                'product_id' => $product->id,
+                'product_package_id' => $package->id,
+            ]);
+        }
         $this->assertSame(3, DB::table('orders')->whereIn('id', $ids)
             ->distinct()->count('product_id'));
 
