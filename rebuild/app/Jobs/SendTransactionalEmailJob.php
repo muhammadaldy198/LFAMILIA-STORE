@@ -51,21 +51,24 @@ class SendTransactionalEmailJob implements ShouldQueue
         $message = nl2br($escape($this->text), false);
         $url = 'https://lfamiliastore.my.id';
         $contact = $url.'/contact';
-        $logo = $url.'/brand/lfamilia-footer-desktop-wordmark.jpg';
+        $assets = app(\App\Services\StorefrontContentService::class)->assets();
+        $logo = $escape((string) ($assets['logo']['url'] ?? $url.'/brand/lfamilia-footer-desktop-wordmark.jpg'));
+        $footer = $escape((string) ($assets['footer_banner_desktop']['url'] ?? $url.'/brand/lfamilia-footer-desktop-wordmark.jpg'));
+        $footerMobile = $escape((string) ($assets['footer_banner_mobile']['url'] ?? $footer));
 
         return '<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             .'<title>'.$subject.'</title></head>'
-            .'<body style="margin:0;padding:24px 12px;background:#f3f5f9;color:#172033;font-family:Arial,Helvetica,sans-serif">'
+            .'<body style="margin:0;padding:24px 12px;background:#0b1019;color:#eaf2ff;font-family:Arial,Helvetica,sans-serif">'
             .'<div style="display:none;font-size:1px;color:#f3f5f9;max-height:0;overflow:hidden">'.$subject.'</div>'
-            .'<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;margin:auto;background:#fff;border-radius:16px;border:1px solid #e5e9f0">'
-            .'<tr><td style="padding:28px 30px 20px;border-bottom:1px solid #e5e9f0">'
-            .'<a href="'.$url.'" style="text-decoration:none;color:#172033"><img src="'.$logo.'" alt="LFAMILIA STORE" width="220" style="display:block;max-width:100%;height:auto;border:0"></a></td></tr>'
-            .'<tr><td style="padding:30px"><h1 style="font-size:23px;line-height:1.35;margin:0 0 20px;color:#172033">'.$subject.'</h1>'
-            .'<div style="font-size:15px;line-height:1.8;overflow-wrap:anywhere">'.$message.'</div>'
-            .'<p style="margin:28px 0 0"><a href="'.$url.'" style="display:inline-block;background:#172033;color:#fff;text-decoration:none;padding:13px 22px;border-radius:8px;font-size:14px;font-weight:bold">Kunjungi LFAMILIA STORE</a></p>'
-            .'</td></tr><tr><td style="padding:24px 30px;background:#f8fafc;border-top:1px solid #e5e9f0;border-radius:0 0 16px 16px">'
-            .'<p style="margin:0 0 10px;font-size:13px;color:#475569">Butuh bantuan? <a href="mailto:support@lfamiliastore.my.id" style="color:#172033">support@lfamiliastore.my.id</a> · <a href="'.$contact.'" style="color:#172033">Hubungi Kami</a></p>'
-            .'<p style="margin:0;font-size:12px;line-height:1.6;color:#64748b">Pesan otomatis dari LFAMILIA STORE. Jangan pernah membagikan kata sandi, PIN, atau OTP. &copy; '.date('Y').' LFAMILIA STORE.</p>'
+            .'<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;margin:auto;background:#111923;border-radius:14px;border:1px solid #263647">'
+            .'<tr><td style="padding:24px 24px 20px;text-align:center;border-bottom:1px solid #263647">'
+            .'<a href="'.$url.'" style="text-decoration:none;color:#172033"><img src="'.$logo.'" alt="LFAMILIA STORE" width="160" style="display:block;max-width:100%;height:auto;border:0;margin:0 auto"></a></td></tr>'
+            .'<tr><td style="padding:28px 24px"><h1 style="font-size:23px;line-height:1.35;margin:0 0 20px;color:#f8fafc">'.$subject.'</h1>'
+            .'<div style="font-size:15px;line-height:1.8;color:#e2e8f0;overflow-wrap:anywhere">'.$message.'</div>'
+            .'<p style="margin:28px 0 0"><a href="'.$url.'" style="display:inline-block;background:#16a6c9;color:#06141d;text-decoration:none;padding:13px 22px;border-radius:8px;font-size:14px;font-weight:bold">Kunjungi LFAMILIA STORE</a></p>'
+            .'</td></tr><tr><td style="padding:0;background:#0b1019"><a href="'.$url.'"><picture><source media="(max-width:480px)" srcset="'.$footerMobile.'"><img src="'.$footer.'" alt="LFAMILIA STORE" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0"></picture></a></td></tr><tr><td style="padding:20px 24px;background:#101722;border-top:1px solid #263647;border-radius:0 0 14px 14px">'
+            .'<p style="margin:0 0 10px;font-size:13px;color:#cbd5e1">Butuh bantuan? <a href="mailto:support@lfamiliastore.my.id" style="color:#67d9f5">support@lfamiliastore.my.id</a> · <a href="'.$contact.'" style="color:#67d9f5">Hubungi Kami</a></p>'
+            .'<p style="margin:0;font-size:12px;line-height:1.6;color:#94a3b8">Pesan otomatis dari LFAMILIA STORE. Jangan pernah membagikan kata sandi, PIN, atau OTP. &copy; '.date('Y').' LFAMILIA STORE.</p>'
             .'</td></tr></table></body></html>';
     }
 
