@@ -85,6 +85,7 @@ class AdminOrdersController
         $counts = (clone $query)->reorder()->select('orders.status')->selectRaw('COUNT(*) as total')->groupBy('orders.status')->pluck('total', 'orders.status');
         $attention = (clone $query)->whereRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED'))")->count();
         $rows = $query->orderByDesc('orders.id')->paginate((int) $request->query('per_page', 25))->withQueryString();
+        $presentation->preloadFieldLabels($rows->items());
         $rows->through(fn (object $row): array => $presentation->row($row));
         $permissions = app(AdminPermissionService::class);
         $canManage = $permissions->allows($request->user('admin'), 'fulfillment.manage');
@@ -127,6 +128,7 @@ class AdminOrdersController
             fwrite($stream, "\xEF\xBB\xBF");
             fputcsv($stream, ['Nomor pesanan', 'Pelanggan', 'Telepon', 'Email', 'Produk', 'Paket', 'Tujuan', 'Pembayaran', 'Penyedia', 'Total (Rp)', 'Status', 'Dibuat (WIB)'], ',', '"', '');
             $query->orderBy('orders.id')->chunk(200, function ($rows) use ($stream, $presentation): void {
+                $presentation->preloadFieldLabels($rows);
                 foreach ($rows as $row) {
                     $item = $presentation->row($row);
                     $cells = [$item['order_number'], $item['buyer_name'], $item['buyer_phone'], $item['buyer_email'],
