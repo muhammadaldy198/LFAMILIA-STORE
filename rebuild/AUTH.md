@@ -35,7 +35,7 @@ Tier ini dipakai untuk customer membership/benefit/pricing dan tidak memberi aks
 
 Application security middleware menambahkan header security, no-store/private untuk area sensitif, request correlation ID, rate limiting, dan challenge Turnstile bila integrasi aktif pada flow yang ditentukan.
 
-Password/remember token dirotasi sesuai flow reset/change yang diimplementasikan. Jangan mendokumentasikan credential atau session secret di repository.
+Password/remember token dirotasi sesuai flow reset/change yang diimplementasikan. Setelah perubahan/reset password, semua personal access token Sanctum customer dicabut. Browser session memakai fingerprint HMAC credential yang diperiksa pada setiap request web; session perangkat lain menjadi tidak valid setelah password berubah. Session browser yang sudah ada sebelum fitur ini diterapkan dan belum mempunyai fingerprint sengaja diarahkan login ulang pada request berikutnya. Perubahan password dari halaman Account menjaga session browser yang sedang digunakan, sedangkan session perangkat lain diputus. Jika browser yang sama masuk sebagai admin dan pelanggan, kedaluwarsa sesi pelanggan tidak membatalkan sesi admin; pemeriksaan fingerprint pelanggan dijalankan pada rute non-admin dan regenerasi sesi mempertahankan guard admin. Tidak ada perubahan pada mekanisme autentikasi guard Admin. Jangan mendokumentasikan credential atau session secret di repository.
 
 ## Credential boundary
 

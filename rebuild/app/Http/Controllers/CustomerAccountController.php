@@ -95,10 +95,15 @@ class CustomerAccountController
             throw ValidationException::withMessages(['current_password' => 'Kata sandi saat ini salah.']);
         }
 
-        $user->forceFill([
-            'password' => Hash::make($data['password']),
-            'remember_token' => Str::random(60),
-        ])->save();
+        DB::transaction(function () use ($user, $data): void {
+            $user->forceFill([
+                'password' => Hash::make($data['password']),
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            // Invalidate API tokens alongside other devices' web sessions.
+            $user->tokens()->delete();
+        });
         $request->session()->regenerate();
         if (is_string($user->email)) {
             $emails->queue(

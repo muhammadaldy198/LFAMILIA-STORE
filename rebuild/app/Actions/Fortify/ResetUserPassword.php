@@ -4,6 +4,7 @@ namespace App\Actions\Fortify;
 
 use App\Models\User;
 use App\Services\TransactionalEmailService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -17,10 +18,15 @@ class ResetUserPassword implements ResetsUserPasswords
             'password' => ['required', 'string', 'min:12', 'confirmed'],
         ])->validate();
 
-        $user->forceFill([
-            'password' => Hash::make($input['password']),
-            'remember_token' => Str::random(60),
-        ])->save();
+        DB::transaction(function () use ($user, $input): void {
+            $user->forceFill([
+                'password' => Hash::make($input['password']),
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            // Lost devices and Android tokens must not retain access after reset.
+            $user->tokens()->delete();
+        });
 
         if (is_string($user->email)) {
             app(TransactionalEmailService::class)->queue(
