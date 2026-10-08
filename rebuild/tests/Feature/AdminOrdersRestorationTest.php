@@ -8,6 +8,9 @@ use App\Jobs\SendTransactionalEmailJob;
 use App\Jobs\StartFulfillmentJob;
 use App\Models\AdminUser;
 use App\Models\IntegrationCredential;
+use App\Models\Product;
+use App\Models\ProductPackage;
+use App\Models\ProviderMapping;
 use App\Services\AdminManualOrderService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
@@ -96,6 +99,66 @@ class AdminOrdersRestorationTest extends TestCase
         $this->assertStringStartsWith("\xEF\xBB\xBF", $csv);
         $empty = $this->get('/admin/orders/export?selected[]=999999999')->assertOk()->streamedContent();
         $this->assertStringNotContainsString($row->order_number, $empty);
+    }
+
+    public function test_order_list_and_csv_export_batch_load_product_field_labels(): void
+    {
+        $admin = $this->login();
+        $ids = [];
+        foreach (['Batch Product Alpha', 'Batch Product Beta', 'Batch Product Gamma'] as $name) {
+            $ids[] = $this->order($admin, [
+                ...$this->data(),
+                'product_name' => $name,
+            ]);
+        }
+        // Manual orders intentionally share one internal catalog product.
+        // Create independent real catalog references to exercise batching.
+        $originalOrder = DB::table('orders')->where('id', $ids[0])->first();
+        $categoryId = DB::table('products')->where('id', $originalOrder->product_id)->value('category_id');
+        $manualProviderId = DB::table('provider_mappings')
+            ->where('id', $originalOrder->provider_mapping_id)->value('provider_id');
+        foreach ([1, 2] as $index) {
+            $product = Product::create([
+                'category_id' => $categoryId,
+                'slug' => 'order-label-batch-'.Str::lower(Str::random(16)),
+                'name' => 'Label batch fixture '.$index,
+                'fulfillment_mode' => 'MANUAL',
+                'is_active' => false,
+            ]);
+            $package = ProductPackage::create([
+                'product_id' => $product->id,
+                'code' => 'ORDER_LABEL_TEST',
+                'name' => 'Label batch package',
+                'is_active' => false,
+            ]);
+            $mapping = ProviderMapping::create([
+                'product_package_id' => $package->id,
+                'provider_id' => $manualProviderId,
+                'is_active' => false,
+            ]);
+            DB::table('orders')->where('id', $ids[$index])->update([
+                'product_id' => $product->id,
+                'product_package_id' => $package->id,
+                'provider_mapping_id' => $mapping->id,
+            ]);
+        }
+        $this->assertSame(3, DB::table('orders')->whereIn('id', $ids)
+            ->distinct()->count('product_id'));
+
+        $fieldLabelQueries = [];
+        DB::listen(function ($query) use (&$fieldLabelQueries): void {
+            if (str_contains(strtolower($query->sql), 'from `product_input_fields`')) {
+                $fieldLabelQueries[] = $query->sql;
+            }
+        });
+
+        $this->get('/admin/orders?per_page=25')->assertOk();
+        $this->assertCount(1, $fieldLabelQueries);
+
+        $fieldLabelQueries = [];
+        $this->get('/admin/orders/export?'.http_build_query(['selected' => $ids]))
+            ->assertOk()->streamedContent();
+        $this->assertCount(1, $fieldLabelQueries);
     }
 
     public function test_detail_includes_guest_contact_nullable_provider_attempt_delivery_and_translated_events(): void
