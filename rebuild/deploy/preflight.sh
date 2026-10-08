@@ -90,4 +90,16 @@ if [[ "${BACKUP_REQUIRE_REMOTE:-true}" == "true" ]]; then
     || { echo "rclone config is not readable" >&2; exit 1; }
 fi
 
+# Detect drift between tracked operational scripts and root-owned copies run by systemd.
+# Deployment intentionally does not overwrite privileged service scripts.
+for privileged_script in backup.sh restore-verify.sh; do
+  tracked_script="${APP_DIR}/deploy/${privileged_script}"
+  installed_script="/usr/local/lib/lfamilia/${privileged_script}"
+  if [[ ! -r "${installed_script}" ]]; then
+    echo "WARNING: Privileged script missing or unreadable: ${installed_script}" >&2
+  elif ! cmp -s "${tracked_script}" "${installed_script}"; then
+    echo "WARNING: Privileged script differs from repository: ${privileged_script}. Review and synchronize it separately before relying on the corresponding systemd service." >&2
+  fi
+done
+
 echo "M12 production preflight passed."
