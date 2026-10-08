@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendTransactionalEmailJob;
 use App\Models\IntegrationCredential;
 use App\Services\AdminAuditService;
 use App\Services\AdminNotificationService;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class AdminIntegrationController
 {
@@ -391,6 +393,44 @@ class AdminIntegrationController
 
         return response()->json($health)
             ->header('Cache-Control', 'no-store, private');
+    }
+
+    public function sendTestEmail(Request $request, AdminAuditService $audit): JsonResponse
+    {
+        $this->ensureSuperAdmin($request);
+        $validated = $request->validate([
+            'recipient' => ['required', 'email:rfc', 'max:254'],
+        ]);
+
+        $record = IntegrationCredential::where('code', 'resend')->where('is_active', true)->first();
+        $config = $record?->config_ciphertext;
+        if (! is_array($config) || empty($config['api_key']) || empty($config['from_email'])) {
+            return response()->json(['message' => 'Resend belum aktif atau belum lengkap.'], 422);
+        }
+
+        try {
+            (new SendTransactionalEmailJob(
+                strtolower($validated['recipient']),
+                'Tes Email LFAMILIA STORE',
+                "Halo!\n\nIni adalah email uji dari halaman Integrasi Resend LFAMILIA STORE.\n\nJika email ini diterima, layanan pengiriman email telah menerima permintaan uji.\n\nJangan balas pesan otomatis ini."
+            ))->handle();
+        } catch (Throwable $exception) {
+            $audit->record($request, 'integration.resend.test_email.failed', 'integration_credential', 'resend', null, [
+                'recipient' => strtolower($validated['recipient']),
+                'error_type' => class_basename($exception),
+            ]);
+
+            return response()->json(['message' => 'Pengiriman ditolak atau gagal. Periksa izin Sending Access, alamat pengirim, dan log server.'], 502);
+        }
+
+        $audit->record($request, 'integration.resend.test_email.sent', 'integration_credential', 'resend', null, [
+            'recipient' => strtolower($validated['recipient']),
+        ]);
+
+        return response()->json([
+            'status' => 'OK',
+            'message' => 'Resend menerima permintaan pengiriman email uji. Periksa kotak masuk dan folder spam.',
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     /**
