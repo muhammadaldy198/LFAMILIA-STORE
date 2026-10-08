@@ -10,7 +10,8 @@ source "${OPS_ENV_FILE}"
 : "${APP_SUBDIR:?APP_SUBDIR is required}"
 : "${PHP_BIN:?PHP_BIN is required}"
 : "${COMPOSER_BIN:?COMPOSER_BIN is required}"
-: "${NPM_BIN:?NPM_BIN is required}"\n: "${PHP_FPM_SERVICE:?PHP_FPM_SERVICE is required}"
+: "${NPM_BIN:?NPM_BIN is required}"
+: "${PHP_FPM_SERVICE:?PHP_FPM_SERVICE is required}"
 : "${MYSQL_DEFAULTS_FILE:?MYSQL_DEFAULTS_FILE is required}"
 : "${MYSQL_ADMIN_DEFAULTS_FILE:?MYSQL_ADMIN_DEFAULTS_FILE is required}"
 : "${BACKUP_DATABASE_NAME:?BACKUP_DATABASE_NAME is required}"
@@ -89,5 +90,17 @@ if [[ "${BACKUP_REQUIRE_REMOTE:-true}" == "true" ]]; then
   [[ -r "${RCLONE_CONFIG:?RCLONE_CONFIG is required}" ]] \
     || { echo "rclone config is not readable" >&2; exit 1; }
 fi
+
+# Detect drift between tracked operational scripts and root-owned copies run by systemd.
+# Deployment intentionally does not overwrite privileged service scripts.
+for privileged_script in backup.sh restore-verify.sh; do
+  tracked_script="${APP_DIR}/deploy/${privileged_script}"
+  installed_script="/usr/local/lib/lfamilia/${privileged_script}"
+  if [[ ! -r "${installed_script}" ]]; then
+    echo "WARNING: Privileged script missing or unreadable: ${installed_script}" >&2
+  elif ! cmp -s "${tracked_script}" "${installed_script}"; then
+    echo "WARNING: Privileged script differs from repository: ${privileged_script}. Review and synchronize it separately before relying on the corresponding systemd service." >&2
+  fi
+done
 
 echo "M12 production preflight passed."
