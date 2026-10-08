@@ -8,6 +8,9 @@ use App\Jobs\SendTransactionalEmailJob;
 use App\Jobs\StartFulfillmentJob;
 use App\Models\AdminUser;
 use App\Models\IntegrationCredential;
+use App\Models\Product;
+use App\Models\ProductPackage;
+use App\Models\ProviderMapping;
 use App\Services\AdminManualOrderService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
@@ -115,20 +118,20 @@ class AdminOrdersRestorationTest extends TestCase
         $manualProviderId = DB::table('provider_mappings')
             ->where('id', $originalOrder->provider_mapping_id)->value('provider_id');
         foreach ([1, 2] as $index) {
-            $product = \App\Models\Product::create([
+            $product = Product::create([
                 'category_id' => $categoryId,
                 'slug' => 'order-label-batch-'.Str::lower(Str::random(16)),
                 'name' => 'Label batch fixture '.$index,
                 'fulfillment_mode' => 'MANUAL',
                 'is_active' => false,
             ]);
-            $package = \App\Models\ProductPackage::create([
+            $package = ProductPackage::create([
                 'product_id' => $product->id,
                 'code' => 'ORDER_LABEL_TEST',
                 'name' => 'Label batch package',
                 'is_active' => false,
             ]);
-            $mapping = \App\Models\ProviderMapping::create([
+            $mapping = ProviderMapping::create([
                 'product_package_id' => $package->id,
                 'provider_id' => $manualProviderId,
                 'is_active' => false,
