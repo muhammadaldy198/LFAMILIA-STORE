@@ -36,7 +36,7 @@ class SendTransactionalEmailJob implements ShouldQueue
                 'to' => [$this->recipient],
                 'subject' => $this->subject,
                 'text' => $this->text,
-                'html' => $this->htmlBody(),
+                'html' => $this->htmlBody(app(\App\Services\StorefrontContentService::class)->assets()),
             ]);
 
         if (! $response->successful()) {
@@ -44,14 +44,13 @@ class SendTransactionalEmailJob implements ShouldQueue
         }
     }
 
-    private function htmlBody(): string
+    private function htmlBody(array $assets = []): string
     {
         $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $subject = $escape($this->subject);
         $message = nl2br($escape($this->text), false);
         $url = 'https://lfamiliastore.my.id';
         $contact = $url.'/contact';
-        $assets = app(\App\Services\StorefrontContentService::class)->assets();
         $logo = $escape((string) ($assets['logo']['url'] ?? $url.'/brand/lfamilia-footer-desktop-wordmark.jpg'));
         $footer = $escape((string) ($assets['footer_banner_desktop']['url'] ?? $url.'/brand/lfamilia-footer-desktop-wordmark.jpg'));
         $footerMobile = $escape((string) ($assets['footer_banner_mobile']['url'] ?? $footer));
