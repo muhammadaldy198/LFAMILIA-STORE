@@ -28,6 +28,9 @@ Urutan operasional yang aman:
 
 **Catatan aktual:** `deploy.sh` memanggil `preflight.sh`, tetapi tidak otomatis memanggil `backup.sh`. Karena itu backup-before-deploy adalah kewajiban runbook/operator, bukan safety net otomatis di script.
 
+**Sinkronisasi script systemd root-owned:** `deploy.sh` juga **tidak otomatis** memperbarui `/usr/local/lib/lfamilia/backup.sh` atau `restore-verify.sh`. Kedua copy tersebut dipasang oleh `install-systemd.sh`. `preflight.sh` sekarang memberi **WARNING** apabila salah satu script terpasang hilang atau berbeda dari source repository, tanpa mengubah file server. Setelah review, operator harus menyinkronkan script terkait secara terpisah dengan prosedur perubahan production dan kemudian menjalankan verifikasi. Jangan abaikan warning drift ketika mengaudit backup, dan jangan menganggap CI hijau berarti copy script privileged di VPS sudah terbaru.
+
+
 ## Apa yang dilakukan deploy.sh
 
 Script:
