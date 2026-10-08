@@ -402,6 +402,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::get('/admin/integrations', [AdminIntegrationController::class, 'index'])->name('admin.integrations');
         Route::put('/admin/integrations/{code}', [AdminIntegrationController::class, 'update'])
             ->middleware('throttle:admin-sensitive')->name('admin.integrations.update');
+        Route::post('/admin/integrations/resend/send-test-email', [AdminIntegrationController::class, 'sendTestEmail'])
+            ->middleware('throttle:3,1')->name('admin.integrations.resend.send-test-email');
         Route::post('/admin/integrations/{code}/test', [AdminIntegrationController::class, 'test'])
             ->middleware('throttle:admin-sensitive')->name('admin.integrations.test');
 
