@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendTransactionalEmailJob;
 use App\Models\IntegrationCredential;
 use App\Services\AdminAuditService;
 use App\Services\AdminNotificationService;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class AdminIntegrationController
 {
@@ -407,12 +409,12 @@ class AdminIntegrationController
         }
 
         try {
-            (new \App\Jobs\SendTransactionalEmailJob(
+            (new SendTransactionalEmailJob(
                 strtolower($validated['recipient']),
                 'Tes Email LFAMILIA STORE',
                 "Halo!\n\nIni adalah email uji dari halaman Integrasi Resend LFAMILIA STORE.\n\nJika email ini diterima, layanan pengiriman email telah menerima permintaan uji.\n\nJangan balas pesan otomatis ini."
             ))->handle();
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             $audit->record($request, 'integration.resend.test_email.failed', 'integration_credential', 'resend', null, [
                 'recipient' => strtolower($validated['recipient']),
                 'error_type' => class_basename($exception),
