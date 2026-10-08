@@ -16,6 +16,9 @@ const props = defineProps({
 
 const selectedCode = ref(props.integrations[0]?.code || '');
 const copiedCallback = ref('');
+const testRecipient = ref('');
+const testEmailBusy = ref(false);
+const testEmailResult = ref(null);
 
 const editableProfile = (profile = {}) => {
     const fields = (profile.fields || []).map((field) => ({ ...field }));
@@ -213,6 +216,32 @@ async function testConnection(item) {
         item.result = { status: 'DOWN', message: 'Koneksi terputus. Coba lagi.' };
     } finally {
         item.busy = false;
+    }
+}
+async function sendResendTestEmail() {
+    if (testEmailBusy.value || !testRecipient.value.trim()) return;
+    testEmailBusy.value = true;
+    testEmailResult.value = null;
+    try {
+        const response = await fetch('/admin/integrations/resend/send-test-email', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-XSRF-TOKEN': csrf(),
+            },
+            body: JSON.stringify({ recipient: testRecipient.value.trim() }),
+        });
+        const data = await response.json().catch(() => ({}));
+        testEmailResult.value = {
+            ok: response.ok,
+            message: response.ok ? data.message : (data.message || 'Pengiriman email uji gagal.'),
+        };
+    } catch {
+        testEmailResult.value = { ok: false, message: 'Koneksi terputus. Coba lagi.' };
+    } finally {
+        testEmailBusy.value = false;
     }
 }
 </script>
@@ -457,6 +486,21 @@ async function testConnection(item) {
                             <AdminSwitch v-model="item.config[field.key]" />
                         </label>
                     </template>
+                </div>
+
+                <div v-if="item.code === 'resend'" class="mt-5 rounded-md border p-4">
+                    <h3 class="font-semibold">Kirim Email Uji</h3>
+                    <p class="mt-1 text-sm text-muted-foreground">Uji pengiriman langsung menggunakan credential Resend yang tersimpan. Simpan perubahan integrasi terlebih dahulu. Pengiriman ini bukan simulasi dan akan mengirim email sungguhan.</p>
+                    <div class="mt-3 flex flex-wrap items-end gap-2">
+                        <label class="min-w-0 flex-1 space-y-1.5">
+                            <span class="text-sm font-medium">Email penerima</span>
+                            <Input v-model="testRecipient" type="email" autocomplete="email" placeholder="admin@example.com" />
+                        </label>
+                        <Button type="button" variant="outline" :disabled="testEmailBusy || !testRecipient.trim() || !item.is_active" @click="sendResendTestEmail">
+                            {{ testEmailBusy ? 'Mengirim…' : 'Kirim Email Uji' }}
+                        </Button>
+                    </div>
+                    <p v-if="testEmailResult" role="status" class="mt-3 text-sm" :class="testEmailResult.ok ? 'text-foreground' : 'text-destructive'">{{ testEmailResult.message }}</p>
                 </div>
 
                 <div class="mt-5 flex flex-wrap gap-2">
