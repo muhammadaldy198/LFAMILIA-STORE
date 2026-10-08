@@ -82,7 +82,8 @@ class AdminPaymentRestorationTest extends TestCase
         DB::listen(function ($query) use (&$routeQueries): void {
             $sql = strtolower($query->sql);
             if (str_contains($sql, 'from `payment_routes` as `routes`')
-                && str_contains($sql, 'join `payment_gateways` as `gateways`')) {
+                && str_contains($sql, 'join `payment_gateways` as `gateways`')
+                && ! str_contains($sql, 'join `payment_channels` as `channels`')) {
                 $routeQueries[] = $sql;
             }
         });
