@@ -107,8 +107,11 @@ class IntegrationConnectionService
             return $this->invalidCredential();
         }
         if ($response->status() === 403) {
+            // Sending-access keys are intentionally unable to list domains.
+            // A read-only probe cannot prove send permission; do not mislabel
+            // a scope restriction as an invalid credential or a healthy send.
             return $this->unverified(
-                'API key Resend dikonfigurasi, tetapi endpoint domain menolak scope ini. Sending-only key tidak dapat diverifikasi tanpa mengirim email.',
+                'API key Resend memiliki akses terbatas. Tes baca-saja tidak dapat memverifikasi izin kirim. Lakukan tes pengiriman email terpisah untuk memastikan.',
                 'PERMISSION_LIMITED'
             );
         }
