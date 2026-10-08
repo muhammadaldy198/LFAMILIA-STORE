@@ -88,6 +88,28 @@ class CustomerSessionSecurityTest extends TestCase
         $this->assertGuest('web');
     }
 
+    public function test_admin_session_is_unaffected_by_customer_session_stamp(): void
+    {
+        $admin = $this->createAdmin([
+            'name' => 'Session Security Admin',
+            'email' => 'session-admin@example.test',
+            'password' => Hash::make('secure-password-123'),
+            'role' => 'ADMIN',
+            'permissions' => ['dashboard.view'],
+            'is_active' => true,
+        ]);
+
+        $this->post('/admin/login', [
+            'email' => $admin->email,
+            'password' => 'secure-password-123',
+        ])->assertRedirect(route('admin.panel'));
+
+        $this->withSession(['security.customer_auth_fingerprint' => 'invalid-customer-stamp']);
+        $this->get('/admin/panel')->assertOk();
+        $this->assertAuthenticatedAs($admin, 'admin');
+        $this->assertGuest('web');
+    }
+
     public function test_legacy_browser_session_without_a_stamp_must_reauthenticate(): void
     {
         $this->customer();
