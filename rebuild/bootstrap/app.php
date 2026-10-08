@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AssignCorrelationId;
 use App\Http\Middleware\EnforceTrustedHost;
+use App\Http\Middleware\EnsureCustomerSessionFresh;
 use App\Http\Middleware\EnsureAdminPermission;
 use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsurePhone;
@@ -25,7 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append([AssignCorrelationId::class, EnforceTrustedHost::class, SecurityHeaders::class]);
-        $middleware->web(append: [PublicAbuseProtection::class, HandleInertiaRequests::class]);
+        $middleware->web(append: [PublicAbuseProtection::class, EnsureCustomerSessionFresh::class, HandleInertiaRequests::class]);
         $middleware->statefulApi();
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('admin/*')
             ? route('admin.login') : route('login'));
