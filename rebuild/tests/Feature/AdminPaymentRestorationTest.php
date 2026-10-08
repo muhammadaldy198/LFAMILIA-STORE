@@ -74,6 +74,32 @@ class AdminPaymentRestorationTest extends TestCase
                 }));
     }
 
+    public function test_payment_workspace_loads_gateway_and_channel_route_details_in_one_query(): void
+    {
+        $this->login();
+
+        $routeQueries = [];
+        DB::listen(function ($query) use (&$routeQueries): void {
+            $sql = strtolower($query->sql);
+            if (str_contains($sql, 'from `payment_routes` as `routes`')
+                && str_contains($sql, 'join `payment_gateways` as `gateways`')
+                && ! str_contains($sql, 'join `payment_channels` as `channels`')) {
+                $routeQueries[] = $sql;
+            }
+        });
+
+        $this->get('/admin/payments')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Admin/Payments')
+                ->has('gateways')
+                ->has('channels')
+                ->has('routes'));
+
+        // Additional gateways or channels must not multiply this lookup.
+        $this->assertCount(1, $routeQueries);
+    }
+
     public function test_payment_routing_and_channel_configuration_remain_super_admin_only(): void
     {
         $this->login('ADMIN');
