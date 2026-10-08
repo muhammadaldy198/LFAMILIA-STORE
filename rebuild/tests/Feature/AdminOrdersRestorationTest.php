@@ -98,6 +98,35 @@ class AdminOrdersRestorationTest extends TestCase
         $this->assertStringNotContainsString($row->order_number, $empty);
     }
 
+    public function test_order_list_and_csv_export_batch_load_product_field_labels(): void
+    {
+        $admin = $this->login();
+        $ids = [];
+        foreach (['Batch Product Alpha', 'Batch Product Beta', 'Batch Product Gamma'] as $name) {
+            $ids[] = $this->order($admin, [
+                ...$this->data(),
+                'product_name' => $name,
+            ]);
+        }
+        $this->assertSame(3, DB::table('orders')->whereIn('id', $ids)
+            ->distinct()->count('product_id'));
+
+        $fieldLabelQueries = [];
+        DB::listen(function ($query) use (&$fieldLabelQueries): void {
+            if (str_contains(strtolower($query->sql), 'from `product_input_fields`')) {
+                $fieldLabelQueries[] = $query->sql;
+            }
+        });
+
+        $this->get('/admin/orders?per_page=25')->assertOk();
+        $this->assertCount(1, $fieldLabelQueries);
+
+        $fieldLabelQueries = [];
+        $this->get('/admin/orders/export?'.http_build_query(['selected' => $ids]))
+            ->assertOk()->streamedContent();
+        $this->assertCount(1, $fieldLabelQueries);
+    }
+
     public function test_detail_includes_guest_contact_nullable_provider_attempt_delivery_and_translated_events(): void
     {
         $admin = $this->login();
