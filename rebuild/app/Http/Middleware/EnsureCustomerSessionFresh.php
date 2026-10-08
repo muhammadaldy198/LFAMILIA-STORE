@@ -13,7 +13,9 @@ class EnsureCustomerSessionFresh
 
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->hasSession()) {
+        // Admin routes authenticate with a separate guard; a stale customer
+        // session must not interrupt an administrator using the same browser.
+        if (! $request->hasSession() || $request->is('admin/*')) {
             return $next($request);
         }
 
@@ -30,8 +32,10 @@ class EnsureCustomerSessionFresh
             // once on deployment; otherwise inactive sessions could evade resets.
             if (! is_string($stored) || ! hash_equals($current, $stored)) {
                 $guard->logoutCurrentDevice();
-                $request->session()->invalidate();
-                $request->session()->regenerateToken();
+                $request->session()->forget(self::SESSION_KEY);
+                // Rotate and destroy the old session ID while preserving any
+                // independent admin-guard login in this browser.
+                $request->session()->regenerate(true);
 
                 return redirect()->guest(route('login'));
             }
