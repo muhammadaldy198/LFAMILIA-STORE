@@ -110,6 +110,41 @@ class CustomerSessionSecurityTest extends TestCase
         $this->assertGuest('web');
     }
 
+    public function test_expiring_customer_session_does_not_interrupt_admin_logged_into_same_browser(): void
+    {
+        $customer = $this->customer();
+        $this->logIn();
+        $this->get('/account')->assertOk();
+
+        $admin = $this->createAdmin([
+            'name' => 'Shared Browser Admin',
+            'email' => 'shared-browser-admin@example.test',
+            'password' => Hash::make('secure-password-123'),
+            'role' => 'ADMIN',
+            'permissions' => ['dashboard.view'],
+            'is_active' => true,
+        ]);
+
+        $this->post('/admin/login', [
+            'email' => $admin->email,
+            'password' => 'secure-password-123',
+        ])->assertRedirect(route('admin.panel'));
+
+        $this->assertAuthenticatedAs($customer, 'web');
+        $this->assertAuthenticatedAs($admin, 'admin');
+
+        // Another device rotated the customer credential in the meantime.
+        $this->withSession(['security.customer_auth_fingerprint' => 'stale-customer-stamp']);
+        $this->get('/admin/panel')->assertOk();
+        $this->assertAuthenticatedAs($admin, 'admin');
+
+        // Customer guard is invalidated without destroying the admin guard.
+        $this->get('/account')->assertRedirect(route('login'));
+        $this->assertGuest('web');
+        $this->get('/admin/panel')->assertOk();
+        $this->assertAuthenticatedAs($admin, 'admin');
+    }
+
     public function test_legacy_browser_session_without_a_stamp_must_reauthenticate(): void
     {
         $this->customer();
