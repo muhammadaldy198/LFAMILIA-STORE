@@ -18,6 +18,7 @@ use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -721,7 +722,18 @@ class PaymentTest extends TestCase
         $this->assertSame('PAID', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
 
         $states->apply($paymentId, 'REFUNDED');
-        $states->apply($paymentId, 'PAID');
+        Log::spy();
+        $ignored = $states->apply($paymentId, 'PAID');
+
+        $this->assertSame('IGNORED_FINAL', $ignored['result']);
+        Log::shouldHaveReceived('warning')->once()->with(
+            'Payment webhook PAID arrived after REFUNDED',
+            [
+                'payment_transaction_id' => $paymentId,
+                'order_id' => null,
+                'gateway_code' => 'MIDTRANS',
+            ]
+        );
 
         $this->assertSame(0, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
         $this->assertSame(1, DB::table('wallet_ledger')->where('source', 'REFUND')->count());
@@ -924,6 +936,7 @@ class PaymentTest extends TestCase
             'idempotency_key' => 'm7-uncertain-payment-0001',
             'access_code' => $checkout->json('access_code'),
         ];
+        Log::spy();
         $this->postJson('/payments/orders/'.$checkout->json('order_number'), $payload)
             ->assertUnprocessable()->assertJsonValidationErrors(['payment']);
 
@@ -932,6 +945,15 @@ class PaymentTest extends TestCase
 
         $orderId = DB::table('orders')->where('order_number', $checkout->json('order_number'))->value('id');
         $paymentId = DB::table('payment_transactions')->where('order_id', $orderId)->value('id');
+
+        Log::shouldHaveReceived('warning')->once()->with(
+            'Payment transaction marked UNKNOWN, needs manual reconciliation',
+            [
+                'payment_transaction_id' => $paymentId,
+                'order_id' => $orderId,
+                'gateway_code' => 'MIDTRANS',
+            ]
+        );
 
         $this->get('/payment?invoice='.urlencode((string) $checkout->json('order_number')).'&resume=1&transaction_status=settlement')
             ->assertOk()
