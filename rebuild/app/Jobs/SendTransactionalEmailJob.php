@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\IntegrationCredential;
+use App\Services\StorefrontContentService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Http;
@@ -36,7 +37,7 @@ class SendTransactionalEmailJob implements ShouldQueue
                 'to' => [$this->recipient],
                 'subject' => $this->subject,
                 'text' => $this->text,
-                'html' => $this->htmlBody(app(\App\Services\StorefrontContentService::class)->assets()),
+                'html' => $this->htmlBody(app(StorefrontContentService::class)->assets()),
             ]);
 
         if (! $response->successful()) {
