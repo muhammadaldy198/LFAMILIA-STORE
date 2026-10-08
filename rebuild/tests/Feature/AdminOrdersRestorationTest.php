@@ -110,8 +110,10 @@ class AdminOrdersRestorationTest extends TestCase
         }
         // Manual orders intentionally share one internal catalog product.
         // Create independent real catalog references to exercise batching.
-        $originalProductId = DB::table('orders')->where('id', $ids[0])->value('product_id');
-        $categoryId = DB::table('products')->where('id', $originalProductId)->value('category_id');
+        $originalOrder = DB::table('orders')->where('id', $ids[0])->first();
+        $categoryId = DB::table('products')->where('id', $originalOrder->product_id)->value('category_id');
+        $manualProviderId = DB::table('provider_mappings')
+            ->where('id', $originalOrder->provider_mapping_id)->value('provider_id');
         foreach ([1, 2] as $index) {
             $product = \App\Models\Product::create([
                 'category_id' => $categoryId,
@@ -126,9 +128,15 @@ class AdminOrdersRestorationTest extends TestCase
                 'name' => 'Label batch package',
                 'is_active' => false,
             ]);
+            $mapping = \App\Models\ProviderMapping::create([
+                'product_package_id' => $package->id,
+                'provider_id' => $manualProviderId,
+                'is_active' => false,
+            ]);
             DB::table('orders')->where('id', $ids[$index])->update([
                 'product_id' => $product->id,
                 'product_package_id' => $package->id,
+                'provider_mapping_id' => $mapping->id,
             ]);
         }
         $this->assertSame(3, DB::table('orders')->whereIn('id', $ids)
