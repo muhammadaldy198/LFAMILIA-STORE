@@ -77,7 +77,41 @@ class DigiflazzAutoSources
             app(AdminAuditService::class)->record($request, 'catalog.mapping.updated', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
         }
 
+        if ($automatic) {
+            $this->rankAutomaticSources($package, $this->key($first), $request);
+        }
+
         return $package;
+    }
+
+    /**
+     * Only sources explicitly managed by automatic grouping are reprioritized.
+     * Manual SKU mappings keep their existing priority and enabled state.
+     */
+    private function rankAutomaticSources(ProductPackage $package, string $groupKey, Request $request): void
+    {
+        $mappings = $package->mappings()->whereHas('provider', fn ($query) => $query->where('code', 'DIGIFLAZZ'))
+            ->get()
+            ->filter(fn (ProviderMapping $mapping): bool => data_get($mapping->fulfillment_config, 'auto_source_group') === $groupKey)
+            ->sort(fn (ProviderMapping $a, ProviderMapping $b): int =>
+                (int) (! $a->is_active) <=> (int) (! $b->is_active)
+                ?: (int) $a->cost_idr <=> (int) $b->cost_idr
+                ?: strcmp((string) $a->external_sku, (string) $b->external_sku)
+                ?: $a->id <=> $b->id
+            )->values();
+
+        foreach ($mappings as $position => $mapping) {
+            if ((int) $mapping->priority === $position) {
+                continue;
+            }
+
+            $before = $mapping->toArray();
+            $mapping->update(['priority' => $position]);
+            app(AdminAuditService::class)->record(
+                $request, 'catalog.fulfillment_source.priority_auto_ranked',
+                'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray()
+            );
+        }
     }
 
     public function orderProduct(Product $product): void
@@ -159,6 +193,9 @@ class DigiflazzAutoSources
                 ]);
                 app(AdminAuditService::class)->record($request, 'catalog.fulfillment_source.auto_attached', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
                 $added++;
+            }
+            if ($key) {
+                $this->rankAutomaticSources($package, (string) $key, $request);
             }
         }
 
