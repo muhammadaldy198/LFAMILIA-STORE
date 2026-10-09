@@ -494,6 +494,79 @@ class AdminIntegrationsRestorationTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_integration_summary_does_not_mark_safe_probe_limitations_as_connection_failures(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+        config(['app.url' => 'https://lfamilia.example.test']);
+
+        IntegrationCredential::create([
+            'code' => 'doku',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => [
+                        'client_id' => 'sandbox-client-id',
+                        'secret_key' => 'sandbox-doku-secret',
+                    ],
+                ],
+            ],
+        ]);
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'integration.health.doku'],
+            [
+                'value' => json_encode([
+                    'status' => 'DEGRADED',
+                    'reason' => 'SAFE_PROBE_UNAVAILABLE',
+                    'verified' => false,
+                    'environment' => 'sandbox',
+                    'tested_at' => now()->toIso8601String(),
+                ], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        $this->get('/admin/integrations')->assertOk()->assertInertia(
+            fn (Assert $page) => $page
+                ->where('summary.active', 1)
+                ->where('summary.healthy', 0)
+                ->where('summary.attention', 0)
+                ->where('summary.awaiting_verification', 1)
+                ->where('integrations', function ($integrations): bool {
+                    $doku = collect($integrations)->firstWhere('code', 'doku');
+
+                    return $doku['connection']['status'] === 'UNVERIFIED'
+                        && $doku['e2e']['status'] === 'NOT_RECORDED';
+                })
+        );
+    }
+
+    public function test_integration_summary_keeps_missing_credentials_actionable(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'doku',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => ['sandbox' => ['client_id' => 'missing-secret']],
+            ],
+        ]);
+
+        $this->get('/admin/integrations')->assertOk()->assertInertia(
+            fn (Assert $page) => $page
+                ->where('summary.active', 1)
+                ->where('summary.healthy', 0)
+                ->where('summary.attention', 1)
+                ->where('summary.awaiting_verification', 0)
+        );
+    }
+
     public function test_callback_readiness_requires_https_route_and_verification_credential(): void
     {
         $this->loginSuperAdmin();
@@ -517,7 +590,7 @@ class AdminIntegrationsRestorationTest extends TestCase
                 return $digiflazz['callback']['required'] === true
                     && $digiflazz['callback']['ready'] === false
                     && $digiflazz['callback']['status'] === 'NOT_READY'
-                    && $digiflazz['e2e']['label'] === 'DEFERRED TO TAHAP 9';
+                    && $digiflazz['e2e']['label'] === 'Hasil uji alur nyata belum tercatat';
             })
         );
 
