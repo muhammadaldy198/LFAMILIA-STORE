@@ -208,7 +208,6 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->get('/admin/digiflazz?per_page=500')->assertSessionHasErrors('per_page');
     }
 
-
     public function test_unmapped_supplier_skus_are_visible_by_default_and_mapped_scope_is_optional(): void
     {
         $this->login();
