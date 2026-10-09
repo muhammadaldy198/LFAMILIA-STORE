@@ -107,7 +107,7 @@ try {
                     let filtered=false;
                     for(let i=0;i<50;i++){
                         await pause(100);
-                        filtered=await evaluate(`(()=>{const p=JSON.parse(document.getElementById('app').dataset.page).props;return p.items.data.length>0&&p.filters.health===${JSON.stringify(health)}&&p.items.data.every(item=>item.health===${JSON.stringify(health)});})()`);
+                        filtered=await evaluate(`(()=>{const rows=[...document.querySelectorAll('[data-digiflazz-health]')].filter(e=>e.getBoundingClientRect().height>0);return new URLSearchParams(location.search).get('health')===${JSON.stringify(health)}&&rows.length>0&&rows.every(row=>row.dataset.digiflazzHealth===${JSON.stringify(health)});})()`);
                         if(filtered)break;
                     }
                     if(!filtered)throw Error('Digiflazz health filter failed: '+health);

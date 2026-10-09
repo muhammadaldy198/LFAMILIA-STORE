@@ -275,7 +275,7 @@ onUnmounted(() => {
 
         <Card class="overflow-hidden">
             <div class="divide-y md:hidden">
-                <details v-for="item in items.data" :key="item.id" class="group">
+                <details v-for="item in items.data" :key="item.id" :data-digiflazz-health="item.health" class="group">
                     <summary class="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3">
                         <div class="min-w-0">
                             <strong class="block truncate text-sm">{{ item.local_product_name || item.product_name }}</strong>
@@ -338,7 +338,7 @@ onUnmounted(() => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="item in items.data" :key="item.id">
+                        <TableRow v-for="item in items.data" :key="item.id" :data-digiflazz-health="item.health">
                             <TableCell class="align-top">
                                 <strong class="break-words">{{ item.local_product_name || item.product_name }}</strong>
                                 <p class="mt-1 break-words text-sm">{{ item.local_package_name || item.product_name }}</p>
