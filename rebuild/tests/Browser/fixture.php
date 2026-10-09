@@ -123,6 +123,20 @@ DB::transaction(function (): void {
         ]
     );
 
+    foreach (['BROWSER-IMPORT-200', 'BROWSER-IMPORT-300'] as $sku) {
+        DB::table('digiflazz_catalog_items')->updateOrInsert(
+            ['buyer_sku_code' => $sku],
+            [
+                'product_name' => $sku === 'BROWSER-IMPORT-200' ? 'Browser Import 200 Diamonds' : 'Browser Import 300 Diamonds',
+                'category' => 'Games', 'brand' => 'LFAMILIA Regression', 'type' => 'Umum',
+                'seller_name' => 'Seller fixture lokal', 'price_idr' => 20000, 'baseline_price_idr' => 20000,
+                'buyer_active' => true, 'seller_active' => true, 'unlimited_stock' => true,
+                'stock' => 0, 'multi' => false, 'start_cut_off' => '00:00', 'end_cut_off' => '00:00',
+                'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+            ]
+        );
+    }
+
     $largePackage = $product->packages()->updateOrCreate(
         ['code' => 'BROWSER-LARGE'],
         ['name' => 'Paket dengan nama sangat panjang untuk pemeriksaan mobile dan angka rupiah besar',
