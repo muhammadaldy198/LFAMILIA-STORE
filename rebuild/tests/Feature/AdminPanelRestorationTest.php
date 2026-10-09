@@ -180,7 +180,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
             'item_ids' => [$id], 'margin_percent' => 10, 'publish' => true,
         ])->assertSessionHasErrors('publish');
-        $this->assertFalse($provider->fresh()->is_active);
+        $this->assertSame(0, (int) $provider->fresh()->is_active);
         $this->assertSame(0, $product->packages()->count());
     }
 
