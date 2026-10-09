@@ -88,6 +88,11 @@ class AdminIntegrationController
                         ? (string) ($storedHealth['message'] ?? 'Belum pernah menjalankan Tes Koneksi.')
                         : 'Environment berubah. Tes koneksi sebelumnya tidak berlaku untuk environment ini.'));
 
+            if ($active && $currentProfile['required_complete'] && $healthMatchesEnvironment
+                && ($storedHealth['reason'] ?? null) === 'SAFE_PROBE_UNAVAILABLE') {
+                $message = 'Kredensial tersimpan. Tes koneksi otomatis tidak tersedia; verifikasi dilakukan saat fitur digunakan.';
+            }
+
             $environmentOptions = collect($environments)->map(
                 fn (array $metadata, string $value): array => [
                     'value' => $value,
@@ -138,13 +143,13 @@ class AdminIntegrationController
                     : 'Belum dikonfigurasi',
                 'credential' => [
                     'status' => $currentProfile['required_complete'] ? 'CONFIGURED' : 'MISSING',
-                    'label' => $currentProfile['required_complete'] ? 'Configured' : 'Credential Missing',
+                    'label' => $currentProfile['required_complete'] ? 'Configured' : 'Kredensial belum lengkap',
                 ],
                 'connection' => $connection,
                 'callback' => $callback,
                 'e2e' => [
-                    'status' => 'DEFERRED',
-                    'label' => 'DEFERRED TO TAHAP 9',
+                    'status' => 'NOT_RECORDED',
+                    'label' => 'Hasil uji transaksi belum dicatat',
                 ],
                 'readiness' => $readiness,
                 'health' => [
@@ -166,7 +171,7 @@ class AdminIntegrationController
                     ->filter(fn (array $item): bool => $item['is_active'] && $item['connection']['status'] === 'VERIFIED')
                     ->count(),
                 'attention' => $integrations
-                    ->filter(fn (array $item): bool => $item['is_active'] && $item['connection']['status'] !== 'VERIFIED')
+                    ->filter(fn (array $item): bool => $item['is_active'] && in_array($item['connection']['status'], ['FAILED', 'UNVERIFIED', 'NOT_CONFIGURED', 'NOT_TESTED'], true))
                     ->count(),
                 'configuration_complete' => $integrations->where('required_complete', true)->count(),
             ],
@@ -606,12 +611,14 @@ class AdminIntegrationController
             $status === 'HEALTHY' && $verified => 'VERIFIED',
             $status === 'HEALTHY' => 'UNVERIFIED',
             $status === 'DOWN' => 'FAILED',
+            $status === 'DEGRADED' && in_array($reason, ['SAFE_PROBE_UNAVAILABLE', 'PERMISSION_LIMITED'], true) => 'CONFIGURED',
             $status === 'DEGRADED' => 'UNVERIFIED',
             default => 'NOT_TESTED',
         };
 
         $label = match ($connectionStatus) {
-            'VERIFIED' => 'Connection Verified',
+            'VERIFIED' => 'Tes terakhir berhasil',
+            'CONFIGURED' => 'Tersimpan — tes otomatis tidak tersedia',
             'FAILED' => 'Koneksi bermasalah',
             'UNVERIFIED' => 'Belum dapat diverifikasi',
             'NOT_CONFIGURED' => 'Belum dikonfigurasi',
@@ -649,10 +656,11 @@ class AdminIntegrationController
         }
 
         return match ($connection['status'] ?? null) {
-            'VERIFIED' => ['status' => 'READY_FOR_E2E', 'label' => 'Siap untuk E2E'],
+            'VERIFIED' => ['status' => 'READY', 'label' => 'Koneksi terverifikasi'],
             'FAILED' => ['status' => 'BLOCKED', 'label' => 'Koneksi bermasalah'],
-            'UNVERIFIED' => ['status' => 'CONFIGURED', 'label' => 'Configured — E2E belum diverifikasi'],
-            default => ['status' => 'CONFIGURED_UNTESTED', 'label' => 'Configured — belum dites'],
+            'CONFIGURED' => ['status' => 'CONFIGURED', 'label' => 'Tersimpan — tes otomatis tidak tersedia'],
+            'UNVERIFIED' => ['status' => 'CONFIGURED', 'label' => 'Tersimpan — belum terverifikasi'],
+            default => ['status' => 'CONFIGURED_UNTESTED', 'label' => 'Tersimpan — belum dites'],
         };
     }
 

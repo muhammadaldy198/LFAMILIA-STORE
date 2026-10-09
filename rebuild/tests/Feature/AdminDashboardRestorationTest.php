@@ -106,7 +106,7 @@ class AdminDashboardRestorationTest extends TestCase
             ->where('metrics.digiflazz_balance', null)->where('digiflazzBalance.status', 'DOWN'));
     }
 
-    public function test_integration_status_never_claims_configured_or_stale_connections_are_online(): void
+    public function test_last_successful_integration_test_does_not_expire_after_fifteen_minutes(): void
     {
         $this->login();
         IntegrationCredential::updateOrCreate(['code' => 'doku'], ['is_active' => true, 'config_ciphertext' => ['secret_key' => 'never-display']]);
@@ -115,7 +115,7 @@ class AdminDashboardRestorationTest extends TestCase
         ]);
         $response = $this->get('/admin/panel')->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
-            ->where('integrations', fn ($rows) => collect($rows)->firstWhere('code', 'doku')['status'] === 'STALE'));
+            ->where('integrations', fn ($rows) => collect($rows)->firstWhere('code', 'doku')['status'] === 'HEALTHY'));
         $this->assertStringNotContainsString('never-display', $response->getContent());
         $this->get('/admin/panel?range=invalid')->assertSessionHasErrors('range');
     }

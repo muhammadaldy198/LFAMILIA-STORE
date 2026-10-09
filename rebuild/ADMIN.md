@@ -106,3 +106,11 @@ Cadangan otomatis aktif secara default pada impor. Tombol **Pilih semua hasil fi
 Sumber otomatis berprioritas sama; resolver existing memilih biaya terendah yang tersedia, lalu ID. Cadangan tetap tunduk pada batas harga snapshot dan aturan pending/unknown/failure; fitur ini tidak mengirim transaksi atau mengubah aturan failover.
 
 Nilai nominal angka diisi dari nama katalog pada impor. Urutan awal impor dan halaman customer memakai angka dari kecil ke besar (7, 10, 20, 100, 200, 2.000). Nama tanpa nilai angka memakai natural sort. Urutan manual editor tetap dapat disesuaikan, tetapi impor/pelengkapan ulang menyusun urutan awal menurut nominal. Halaman customer selalu memakai urutan nominal angka.
+
+## Status integrasi dan alur mulai jualan
+
+Hasil Tes Koneksi terakhir tidak kedaluwarsa setelah 15 menit. Waktu tes tetap ditampilkan; hasil tersimpan bukan pemantauan koneksi live. Perubahan kredensial/environment tetap membatalkan hasil sebelumnya. Kegagalan, konfigurasi tidak lengkap, maintenance, dan timestamp tidak valid tetap ditampilkan sesuai kondisi.
+
+Integrasi tanpa probe aman (SAFE_PROBE_UNAVAILABLE) atau dengan izin baca terbatas (PERMISSION_LIMITED) ditampilkan sebagai tersimpan dan belum terverifikasi, bukan kegagalan koneksi. Kondisi ini tidak masuk hitungan masalah System Health. Tidak ada klaim tes transaksi sudah lulus; teks milestone E2E statis dihapus dari panel.
+
+Panduan mulai jualan: hubungkan Digiflazz dan satu metode pembayaran, impor nominal, atur margin. Telegram, Discord, Google OAuth dan validasi nama akun merupakan fitur tambahan. Status panel tidak mengubah eligibility checkout, callback, pembayaran, atau fulfillment.

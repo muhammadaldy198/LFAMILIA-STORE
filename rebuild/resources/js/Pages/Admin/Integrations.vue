@@ -76,7 +76,7 @@ watch(() => props.integrations, (value) => {
 
 const activeCount = computed(() => items.filter((item) => item.is_active).length);
 const healthyCount = computed(() => items.filter((item) => item.is_active && item.connection?.status === 'VERIFIED').length);
-const attentionCount = computed(() => items.filter((item) => item.is_active && item.connection?.status !== 'VERIFIED').length);
+const attentionCount = computed(() => items.filter((item) => item.is_active && ['FAILED', 'UNVERIFIED', 'NOT_CONFIGURED', 'NOT_TESTED'].includes(item.connection?.status)).length);
 const completeCount = computed(() => items.filter((item) => item.required_complete).length);
 
 const csrf = () => decodeURIComponent(
@@ -84,8 +84,8 @@ const csrf = () => decodeURIComponent(
 );
 
 const statusLabel = (status) => ({
-    HEALTHY: 'Terverifikasi',
-    DEGRADED: 'Perlu diperiksa',
+    HEALTHY: 'Tes terakhir berhasil',
+    DEGRADED: 'Belum terverifikasi',
     DOWN: 'Bermasalah',
     NOT_CONFIGURED: 'Belum dikonfigurasi',
     UNTESTED: 'Belum dites',
@@ -194,16 +194,16 @@ async function testConnection(item) {
                     : result.status === 'DOWN'
                         ? 'FAILED'
                         : result.status === 'DEGRADED'
-                            ? 'UNVERIFIED'
+                            ? (['SAFE_PROBE_UNAVAILABLE', 'PERMISSION_LIMITED'].includes(result.reason) ? 'CONFIGURED' : 'UNVERIFIED')
                             : result.status === 'NOT_CONFIGURED'
                                 ? 'NOT_CONFIGURED'
                                 : 'NOT_TESTED',
                 label: result.verified === true
-                    ? 'Connection Verified'
+                    ? 'Tes terakhir berhasil'
                     : result.status === 'DOWN'
                         ? 'Koneksi bermasalah'
                         : result.status === 'DEGRADED'
-                            ? 'Belum dapat diverifikasi'
+                            ? (['SAFE_PROBE_UNAVAILABLE', 'PERMISSION_LIMITED'].includes(result.reason) ? 'Tersimpan — tes otomatis tidak tersedia' : 'Belum dapat diverifikasi')
                             : result.status === 'NOT_CONFIGURED'
                                 ? 'Belum dikonfigurasi'
                                 : 'Belum dites',
@@ -211,6 +211,7 @@ async function testConnection(item) {
                 tested_at: result.tested_at,
                 reason: result.reason,
             };
+            router.reload({ only: ['integrations', 'summary'], preserveScroll: true });
         }
     } catch {
         item.result = { status: 'DOWN', message: 'Koneksi terputus. Coba lagi.' };
@@ -262,6 +263,14 @@ async function sendResendTestEmail() {
                 </Button>
             </header>
 
+            <Card class="space-y-2 p-4">
+                <h2 class="font-semibold">Mulai jualan top up</h2>
+                <p class="text-sm">Hubungkan Digiflazz dan satu metode pembayaran, lalu impor nominal dan atur margin di menu Produk.</p>
+                <p class="text-sm text-muted-foreground">Telegram, Discord, login Google, dan validasi nama akun adalah fitur tambahan. Semua integrasi tidak harus aktif. Tes koneksi memeriksa akses layanan; hasil tes transaksi pelanggan dicatat terpisah.</p>
+                <Button variant="outline" as-child><Link href="/admin/catalog">Buka Produk</Link></Button>
+                <Button variant="outline" as-child><Link href="/admin/payments">Buka Pembayaran</Link></Button>
+            </Card>
+
             <div class="lf-admin-summary ">
                 <Card class="p-4">
                     <p class="text-xs text-muted-foreground">Total integrasi</p>
@@ -276,7 +285,7 @@ async function sendResendTestEmail() {
                     <p class="mt-2 text-2xl font-semibold">{{ healthyCount }}</p>
                 </Card>
                 <Card class="p-4">
-                    <p class="text-xs text-muted-foreground">Perlu diperiksa</p>
+                    <p class="text-xs text-muted-foreground">Butuh tindakan</p>
                     <p class="mt-2 text-2xl font-semibold">{{ attentionCount }}</p>
                 </Card>
                 <Card class="col-span-2 p-4 md:col-span-1">
@@ -383,10 +392,6 @@ async function sendResendTestEmail() {
                         <p class="mt-1 text-sm font-medium">
                             {{ item.callback?.label || 'Belum diketahui' }}
                         </p>
-                    </div>
-                    <div class="p-3">
-                        <p class="text-xs text-muted-foreground">E2E</p>
-                        <p class="mt-1 text-sm font-medium">{{ item.e2e?.label || 'DEFERRED TO TAHAP 9' }}</p>
                     </div>
                 </div>
 

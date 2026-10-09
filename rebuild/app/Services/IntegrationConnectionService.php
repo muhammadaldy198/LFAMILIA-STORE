@@ -28,7 +28,7 @@ class IntegrationConnectionService
                 ),
                 'resend' => $this->resend($config),
                 'google_oauth' => $this->unverified(
-                    'Credential Google OAuth dikonfigurasi. Validasi client dan redirect memerlukan alur OAuth pengguna dan ditunda ke Tahap 9.'
+                    'Credential Google OAuth dikonfigurasi. Validasi client dan redirect memerlukan alur OAuth pengguna melalui tombol login Google.'
                 ),
                 'turnstile' => $this->turnstile($config, $environment),
                 'telegram' => $this->telegram($config, $environment),
@@ -175,7 +175,7 @@ class IntegrationConnectionService
 
         if ($environment !== 'test') {
             return $this->unverified(
-                'Credential Turnstile Production dikonfigurasi. Production secret tidak dapat diuji dengan dummy token; challenge browser ditunda ke Tahap 9.'
+                'Credential Turnstile Production dikonfigurasi. Production secret tidak dapat diuji dengan dummy token; verifikasi dilakukan saat challenge digunakan di browser.'
             );
         }
 

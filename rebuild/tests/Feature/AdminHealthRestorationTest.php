@@ -111,7 +111,7 @@ class AdminHealthRestorationTest extends TestCase
                 ->where('checks.5.status', 'DEGRADED'));
     }
 
-    public function test_old_healthy_integration_check_is_marked_stale(): void
+    public function test_old_successful_integration_check_keeps_its_result(): void
     {
         $this->login();
         DB::table('failed_jobs')->delete();
@@ -134,12 +134,39 @@ class AdminHealthRestorationTest extends TestCase
         $response = $this->get('/admin/health')->assertOk();
 
         $response->assertInertia(fn (Assert $page) => $page
-            ->where('summary.overall', 'DEGRADED')
             ->where('integrations.0.code', 'digiflazz')
-            ->where('integrations.0.status', 'STALE')
-            ->where('integrations.0.message', 'Tes koneksi terakhir sudah lebih dari 15 menit.'));
+            ->where('integrations.0.status', 'HEALTHY')
+            ->where('integrations.0.message', 'Tes koneksi terakhir berhasil.'));
 
         $this->assertStringNotContainsString('stale-health-secret', $response->getContent());
+    }
+
+    public function test_probe_unavailable_is_not_reported_as_an_outage(): void
+    {
+        $this->login();
+        IntegrationCredential::updateOrCreate(['code' => 'doku'], [
+            'is_active' => true,
+            'config_ciphertext' => ['client_id' => 'fixture', 'secret_key' => 'fixture'],
+        ]);
+        DB::table('payment_gateways')->where('code', 'DOKU')->update(['is_maintenance' => false]);
+        $this->setSetting('integration.health.doku', [
+            'status' => 'DEGRADED',
+            'reason' => 'SAFE_PROBE_UNAVAILABLE',
+            'verified' => false,
+            'tested_at' => now()->toIso8601String(),
+        ]);
+        $this->get('/admin/health')->assertOk()->assertInertia(
+            fn (Assert $page) => $page->where('integrations.3.status', 'CONFIGURED')
+        );
+        $this->setSetting('integration.health.doku', [
+            'status' => 'DOWN',
+            'reason' => 'INVALID_CREDENTIAL',
+            'verified' => false,
+            'tested_at' => now()->toIso8601String(),
+        ]);
+        $this->get('/admin/health')->assertOk()->assertInertia(
+            fn (Assert $page) => $page->where('integrations.3.status', 'DOWN')->where('summary.overall', 'DOWN')
+        );
     }
 
     public function test_future_dated_healthy_integration_check_is_degraded(): void
