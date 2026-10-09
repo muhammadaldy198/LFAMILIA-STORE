@@ -70,7 +70,15 @@ class AdminProviderController
                 ];
             })->values();
 
+        // Rank across the full package, before search filters and pagination. The
+        // provider workspace must never mistake a raw priority 10 for position 10.
+        $sourcePositions = DB::table('provider_mappings')
+            ->where('is_active', true)
+            ->select('id')
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY product_package_id ORDER BY priority, cost_idr, id) as source_position');
+
         $mappings = DB::table('provider_mappings as mappings')
+            ->leftJoinSub($sourcePositions, 'source_positions', 'source_positions.id', '=', 'mappings.id')
             ->join('providers', 'providers.id', '=', 'mappings.provider_id')
             ->join('product_packages as packages', 'packages.id', '=', 'mappings.product_package_id')
             ->join('products', 'products.id', '=', 'packages.product_id')
@@ -100,6 +108,7 @@ class AdminProviderController
                 'mappings.cost_idr',
                 'mappings.max_price_idr',
                 'mappings.priority',
+                'source_positions.source_position',
                 'mappings.is_active',
                 'providers.id as provider_id',
                 'providers.code as provider_code',
@@ -122,6 +131,7 @@ class AdminProviderController
                 'cost_idr' => $row->cost_idr !== null ? (int) $row->cost_idr : null,
                 'max_price_idr' => $row->max_price_idr !== null ? (int) $row->max_price_idr : null,
                 'priority' => (int) $row->priority,
+                'source_position' => $row->source_position !== null ? (int) $row->source_position : null,
                 'nominal_value' => $row->nominal_value !== null ? (int) $row->nominal_value : null,
                 'is_active' => (bool) $row->is_active,
                 'provider_active' => (bool) $row->provider_active,
