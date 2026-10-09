@@ -80,6 +80,10 @@ class MidtransGateway
             ]),
         ];
 
+        if (! empty($context['finish_url'])) {
+            $payload['callbacks'] = ['finish' => (string) $context['finish_url']];
+        }
+
         $enabled = $context['route_configuration']['enabled_payments'] ?? null;
         if (is_array($enabled) && $enabled !== []) {
             $payload['enabled_payments'] = array_values(array_filter($enabled, 'is_string'));
