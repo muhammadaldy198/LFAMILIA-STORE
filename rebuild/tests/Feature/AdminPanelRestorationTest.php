@@ -330,9 +330,9 @@ class AdminPanelRestorationTest extends TestCase
     {
         $names = [100, 2000, 10, 200, 20, 7];
         $items = collect($names)->map(fn (int $value): object => (object) ['id' => $value, 'name' => 'Game '.$value.' Diamonds', 'nominal_value' => null]);
-        $ordered = app(\App\Services\CatalogNominalOrder::class)->sort($items);
+        $ordered = app(CatalogNominalOrder::class)->sort($items);
         $this->assertSame([7, 10, 20, 100, 200, 2000], $ordered->pluck('id')->all());
-        $this->assertSame(2000, app(\App\Services\CatalogNominalOrder::class)->value('Game 2.000 Diamonds', 'Game'));
+        $this->assertSame(2000, app(CatalogNominalOrder::class)->value('Game 2.000 Diamonds', 'Game'));
     }
 
     public function test_invalid_provider_response_is_atomic_and_does_not_reprice(): void
