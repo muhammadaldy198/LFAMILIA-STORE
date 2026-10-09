@@ -79,7 +79,7 @@ try {
                         await pointerClick(`[...document.querySelectorAll('button')].find(b=>b.getBoundingClientRect().height>0&&b.textContent.trim()==='Impor nominal Digiflazz')`);
                         if(!await evaluate(`document.querySelector('[data-testid="digiflazz-import"]')&&[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>/^Impor \\d+ nominal$/.test(b.textContent.trim()))?.disabled`))throw Error('Import picker missing or submit enabled without selection');
                         await pointerClick(`document.querySelector('[data-sku="${importSubmitted?'BROWSER-IMPORT-300':'BROWSER-IMPORT-200'}"] input')`);
-                        if(!await evaluate(`[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>b.textContent.trim()==='Impor 1 nominal'&&!b.disabled)`))throw Error('Selecting supplier SKU did not enable import');
+                        if(!await evaluate(`Boolean([...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>b.textContent.trim()==='Impor 1 nominal'&&!b.disabled))`))throw Error('Selecting supplier SKU did not enable import: '+JSON.stringify(await evaluate(`({checked:document.querySelector('[data-sku="${importSubmitted?'BROWSER-IMPORT-300':'BROWSER-IMPORT-200'}"] input')?.checked,buttons:[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].map(b=>({text:b.textContent.trim(),disabled:b.disabled}))})`)));
                         await inspect(width+'-import-picker');
                         if(!importSubmitted){
                             await pointerClick(`[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>b.textContent.trim()==='Impor 1 nominal')`);
