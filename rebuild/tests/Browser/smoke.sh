@@ -44,7 +44,8 @@ assert_page() {
   local width="$3"
   local height="$4"
   local output
-  output="$("$CHROME_BIN" \
+  # Prevent a stalled Chromium process from blocking GitHub CI indefinitely.
+  output="$(timeout --signal=TERM --kill-after=5s 30s "$CHROME_BIN" \
     --headless=new \
     --no-sandbox \
     --disable-gpu \
@@ -76,7 +77,9 @@ assert_page "/catalog/browser-checkout-game" "100 Diamonds" 1440 1000
 assert_page "/catalog/browser-checkout-game" "Ringkasan pesanan" 390 844
 assert_page "/catalog/browser-checkout-game" "Pakai Voucher" 390 844
 
-node tests/Browser/responsive.mjs "$CHROME_BIN"
-node tests/Browser/admin-ui.mjs "$CHROME_BIN"
+echo "Running responsive browser smoke (maximum 5 minutes)"
+timeout --signal=TERM --kill-after=10s 5m node tests/Browser/responsive.mjs "$CHROME_BIN"
+echo "Running admin browser smoke (maximum 9 minutes)"
+timeout --signal=TERM --kill-after=10s 9m node tests/Browser/admin-ui.mjs "$CHROME_BIN"
 
 echo "M11 browser smoke passed."
