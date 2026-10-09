@@ -239,10 +239,9 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         foreach (['all', 'mapped'] as $scope) {
             foreach (['healthy' => ['price-down'], 'warning' => ['cutoff', 'low-stock', 'price-up'], 'critical' => ['inactive']] as $health => $codes) {
-                $this->get('/admin/digiflazz?scope='.$scope.'&health='.$health.'&per_page=10')
-                    ->assertOk()->assertInertia(fn (Assert $page) => $page
-                        ->where('items.total', count($codes))
-                        ->where('items.data', fn ($items): bool => collect($items)->pluck('buyer_sku_code')->sort()->values()->all() === $codes)
+                $this->get('/admin/digiflazz?scope='.$scope.'&health='.$health.'&per_page=10')->assertOk()->assertInertia(fn (Assert $page) => $page
+                    ->where('items.total', count($codes))
+                    ->where('items.data', fn ($items): bool => collect($items)->pluck('buyer_sku_code')->sort()->values()->all() === $codes)
                         ->where('items.data', fn ($items): bool => collect($items)->every(fn ($item): bool => $item['health'] === $health)));
             }
         }
