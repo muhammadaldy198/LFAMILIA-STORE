@@ -170,9 +170,20 @@ class AdminIntegrationController
                 'healthy' => $integrations
                     ->filter(fn (array $item): bool => $item['is_active'] && $item['connection']['status'] === 'VERIFIED')
                     ->count(),
+                // Only count failures, missing credentials, or callbacks requiring a fix.
                 'attention' => $integrations
-                    ->filter(fn (array $item): bool => $item['is_active'] && in_array($item['connection']['status'], ['FAILED', 'UNVERIFIED', 'NOT_CONFIGURED', 'NOT_TESTED'], true))
-                    ->count(),
+                    ->filter(fn (array $item): bool => $item['is_active'] && (
+                        ! $item['required_complete']
+                        || $item['connection']['status'] === 'FAILED'
+                        || ($item['callback']['status'] ?? null) === 'NOT_READY'
+                    ))->count(),
+                // Safe read-only probes cannot verify every provider; these are not errors.
+                'awaiting_verification' => $integrations
+                    ->filter(fn (array $item): bool => $item['is_active']
+                        && $item['required_complete']
+                        && ($item['callback']['status'] ?? null) !== 'NOT_READY'
+                        && in_array($item['connection']['status'], ['CONFIGURED', 'UNVERIFIED', 'NOT_TESTED'], true)
+                    )->count(),
                 'configuration_complete' => $integrations->where('required_complete', true)->count(),
             ],
             'callbackUrls' => [

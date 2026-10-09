@@ -76,7 +76,12 @@ watch(() => props.integrations, (value) => {
 
 const activeCount = computed(() => items.filter((item) => item.is_active).length);
 const healthyCount = computed(() => items.filter((item) => item.is_active && item.connection?.status === 'VERIFIED').length);
-const attentionCount = computed(() => items.filter((item) => item.is_active && ['FAILED', 'UNVERIFIED', 'NOT_CONFIGURED', 'NOT_TESTED'].includes(item.connection?.status)).length);
+const requiresAction = (item) => item.is_active && (
+    !item.required_complete || item.connection?.status === 'FAILED' || item.callback?.status === 'NOT_READY'
+);
+const attentionCount = computed(() => items.filter(requiresAction).length);
+const awaitingCount = computed(() => items.filter((item) => item.is_active && !requiresAction(item)
+    && ['CONFIGURED', 'UNVERIFIED', 'NOT_TESTED'].includes(item.connection?.status)).length);
 const completeCount = computed(() => items.filter((item) => item.required_complete).length);
 
 const csrf = () => decodeURIComponent(
@@ -288,11 +293,20 @@ async function sendResendTestEmail() {
                     <p class="text-xs text-muted-foreground">Butuh tindakan</p>
                     <p class="mt-2 text-2xl font-semibold">{{ attentionCount }}</p>
                 </Card>
+                <Card class="p-4">
+                    <p class="text-xs text-muted-foreground">Belum terverifikasi</p>
+                    <p class="mt-2 text-2xl font-semibold">{{ awaitingCount }}</p>
+                </Card>
                 <Card class="col-span-2 p-4 md:col-span-1">
                     <p class="text-xs text-muted-foreground">Credential wajib lengkap</p>
                     <p class="mt-2 text-2xl font-semibold">{{ completeCount }}/{{ items.length }}</p>
                 </Card>
             </div>
+            <p class="text-xs text-muted-foreground">
+                Butuh tindakan = kredensial/callback bermasalah atau tes koneksi gagal.
+                Belum terverifikasi = penyedia tidak bisa dipastikan melalui tes otomatis; bukan berarti koneksi rusak.
+                Kamu tidak perlu mengulang Tes Koneksi terus-menerus.
+            </p>
 
             <Card class="p-4"><details>
                     <summary class="cursor-pointer font-semibold">Callback & Redirect</summary>
