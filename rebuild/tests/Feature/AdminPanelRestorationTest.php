@@ -164,7 +164,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->fakeCatalog([$this->row(), $this->row(['buyer_sku_code' => 'restore-unavailable', 'seller_product_status' => false])]);
         app(DigiflazzCatalogService::class)->sync();
         $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
-        $provider->update(['is_active' => true]);
+        $provider->forceFill(['is_active' => true])->save();
         $product = $this->product();
         $product->category->update(['is_active' => true]);
         $product->update(['is_active' => false]);
@@ -175,7 +175,7 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertSessionHasErrors('item_ids');
         $this->assertSame(0, $product->packages()->count());
         $this->assertFalse($product->fresh()->is_active);
-        $provider->update(['is_active' => false]);
+        $provider->forceFill(['is_active' => false])->save();
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
             'item_ids' => [$id], 'margin_percent' => 10, 'publish' => true,
