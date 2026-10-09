@@ -302,6 +302,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         foreach ([[], [$this->row(), $this->row(['buyer_sku_code' => 'bad-sku', 'price' => 0])], null] as $rows) {
             $this->fakeCatalog($rows ?? [$this->row()]);
             if ($rows === null) {
+                Http::swap(new Factory);
                 Http::fake(['https://digiflazz-monitor.test/v1/price-list' => Http::response(['data' => []], 503)]);
             }
             try {
