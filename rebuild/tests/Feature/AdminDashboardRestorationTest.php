@@ -115,9 +115,10 @@ class AdminDashboardRestorationTest extends TestCase
         ]);
         $response = $this->get('/admin/panel')->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
-            ->where('integrations', fn ($rows) => (
-                ($doku = collect($rows)->firstWhere('code', 'doku'))['status'] === 'HEALTHY'
-                && $doku['test_is_old'] === true
+            ->where('integrations', fn ($rows) => collect($rows)->contains(
+                fn ($row): bool => $row['code'] === 'doku'
+                    && $row['status'] === 'HEALTHY'
+                    && $row['test_is_old'] === true
             )));
         $this->assertStringNotContainsString('never-display', $response->getContent());
         $this->get('/admin/panel?range=invalid')->assertSessionHasErrors('range');
