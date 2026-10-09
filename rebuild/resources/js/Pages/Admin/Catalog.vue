@@ -88,6 +88,33 @@ const applyGlobalMargin=()=>{if(confirm('Terapkan margin global ke semua produk 
 const importForm = useForm({item_ids:[],margin_percent:props.defaultMargin||0});
 const importSearch=ref(''),importBrand=ref(''),showImport=ref(false);
 const importPage=ref(1);
+const importUrl = new URLSearchParams(page.url.split('?')[1] || '');
+const showCatalogImport = ref(importUrl.get('import') === 'digiflazz' || importUrl.has('import_sku'));
+const importProductId = ref('');
+const importableProducts = computed(() => products.value.filter(item => item.fulfillment_mode === 'AUTO_PROVIDER'));
+function openProductImport() {
+    const item = importableProducts.value.find(product => String(product.id) === String(importProductId.value));
+    if (!item) return;
+    editProduct(item);
+    editorTab.value = 'nominal';
+    showImport.value = true;
+    importForm.clearErrors();
+    importSearch.value = '';
+    importBrand.value = '';
+    importPage.value = 1;
+    const requestedSku = Number(new URLSearchParams(page.url.split('?')[1] || '').get('import_sku'));
+    const candidate = props.digiflazzItems.find(sku => sku.id === requestedSku && sku.available && !sku.mapped);
+    importForm.item_ids = candidate ? [candidate.id] : [];
+    showCatalogImport.value = false;
+}
+function toggleImport(item) {
+    showImport.value = !showImport.value;
+    if (showImport.value) {
+        importForm.clearErrors();
+        importForm.margin_percent = Number(item.margin_percent || 0);
+    }
+}
+
 const importBrands=computed(()=>[...new Set(props.digiflazzItems.map(i=>i.brand))].sort());
 const importMatches=computed(()=>props.digiflazzItems.filter(i=>!i.mapped && i.available && (!importBrand.value||i.brand===importBrand.value) && (!importSearch.value||[i.product_name,i.buyer_sku_code].join(' ').toLowerCase().includes(importSearch.value.toLowerCase()))));
 const importItems=computed(()=>importMatches.value.slice((importPage.value-1)*25,importPage.value*25));
@@ -292,7 +319,21 @@ const deleteNotice = (notice) => {
                     </div>
                     <div class="mt-3"><Button type="button" variant="outline" size="sm" @click="resetCatalogFilters">Hapus filter</Button></div>
                 </Card>
-                <Button type="button" variant="outline" @click="showCreateProduct = !showCreateProduct">{{ showCreateProduct ? 'Tutup formulir' : 'Tambah produk' }}</Button>
+                <div class="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" @click="showCreateProduct = !showCreateProduct">{{ showCreateProduct ? 'Tutup formulir' : 'Tambah produk' }}</Button>
+                    <Button v-if="tab === 'AUTO_PROVIDER'" type="button" variant="outline" @click="showCatalogImport = !showCatalogImport">Impor Digiflazz</Button>
+                </div>
+                <Card v-if="showCatalogImport && tab === 'AUTO_PROVIDER'" class="space-y-3 p-4" data-testid="catalog-import-target">
+                    <h3 class="font-semibold">Impor nominal Digiflazz</h3>
+                    <p class="text-sm text-muted-foreground">Pilih produk tujuan, lalu pilih SKU yang ingin diimpor. Jika produknya belum ada, buat lewat Tambah produk terlebih dahulu.</p>
+                    <label class="block text-sm">Produk tujuan
+                        <select v-model="importProductId" class="mt-1 block w-full rounded-md border p-2">
+                            <option value="">Pilih produk tujuan</option>
+                            <option v-for="product in importableProducts" :key="product.id" :value="product.id">{{ product.name }}</option>
+                        </select>
+                    </label>
+                    <Button type="button" :disabled="!importProductId" @click="openProductImport">Lanjut pilih SKU</Button>
+                </Card>
                 <form v-if="showCreateProduct" class="grid gap-3 md:grid-cols-3" @submit.prevent="productForm.fulfillment_mode = tab; productForm.post('/admin/catalog/products', { onSuccess: () => productForm.reset() })">
                     <label class="text-sm">Kategori<select v-model="productForm.category_id" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="">Pilih kategori</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select><span v-if="productForm.errors.category_id" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.category_id }}</span></label>
                     <label class="text-sm">Nama produk<Input v-model="productForm.name" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.name" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.name }}</span></label>
@@ -416,14 +457,16 @@ const deleteNotice = (notice) => {
 
                     </div>
                     <div v-show="editorTab==='nominal'" class="lf-admin-nominals space-y-3 rounded-md bg-slate-950 p-4">
-                        <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="font-semibold">Nominal / paket</h3><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="showImport=!showImport">Impor nominal Digiflazz</Button></div>
-                        <Card v-if="showImport && item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="font-semibold">Nominal / paket</h3><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="toggleImport(item)">Impor nominal Digiflazz</Button></div>
+                        <Card v-if="showImport && item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 p-4" data-testid="digiflazz-import">
                             <h4 class="font-semibold">Pilih SKU untuk {{item.name}}</h4>
                             <div class="grid gap-3 md:grid-cols-3"><label class="text-sm">Cari SKU<Input v-model="importSearch" class="mt-1"/></label><label class="text-sm">Merek<select v-model="importBrand" class="mt-1 block w-full rounded border p-2"><option value="">Semua brand</option><option v-for="brand in importBrands" :key="brand">{{brand}}</option></select></label><label class="text-sm">Margin nominal (%)<Input v-model.number="importForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/></label></div>
                             <p class="text-xs text-slate-500">Hanya SKU tersedia yang belum dipakai. Nominal hasil impor nonaktif sampai diperiksa.</p>
-                            <label v-for="sku in importItems" :key="sku.id" class="flex items-start gap-3 rounded border p-2 text-sm"><input v-model="importForm.item_ids" type="checkbox" :value="sku.id"><span>{{sku.product_name}}<small class="block">{{sku.buyer_sku_code}} · Rp{{Number(sku.price_idr).toLocaleString('id-ID')}}</small></span></label>
-                            <p v-if="!importMatches.length" class="text-sm">Belum ada SKU. Sinkronkan dahulu lewat menu Digiflazz.</p>
+                            <label v-for="sku in importItems" :key="sku.id" :data-sku="sku.buyer_sku_code" class="flex items-start gap-3 rounded border p-2 text-sm"><input v-model="importForm.item_ids" type="checkbox" :value="sku.id"><span>{{sku.product_name}}<small class="block">{{sku.buyer_sku_code}} · Rp{{Number(sku.price_idr).toLocaleString('id-ID')}}</small></span></label>
+                            <p v-if="!importMatches.length" class="text-sm">Tidak ada SKU tersedia yang sesuai dengan filter dan belum diimpor. Hapus filter atau sinkronkan daftar harga di menu Digiflazz.</p>
                             <div class="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" :disabled="importPage===1" @click="importPage--">Sebelumnya</Button><span class="text-sm">Halaman {{importPage}} / {{Math.max(1,Math.ceil(importMatches.length/25))}}</span><Button type="button" variant="outline" :disabled="importPage*25>=importMatches.length" @click="importPage++">Berikutnya</Button></div>
+                            <p v-if="Object.keys(importForm.errors).length" role="alert" class="text-sm text-destructive">{{ Object.values(importForm.errors).join(' · ') }}</p>
+                            <p v-if="!importForm.item_ids.length" class="text-sm text-muted-foreground">Centang minimal satu SKU untuk mengaktifkan tombol impor.</p>
                             <Button type="button" :disabled="importForm.processing||!importForm.item_ids.length" @click="importForm.post('/admin/catalog/products/'+item.id+'/import',{preserveScroll:true,onSuccess:()=>{importForm.item_ids=[];showImport=false;}})">Impor {{importForm.item_ids.length}} nominal</Button>
                         </Card>
                         <AdminResponsiveTable :mobile-columns="[0,2,5,6]"><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / Modal</TableHead><TableHead class="text-right">Harga jual</TableHead><TableHead>Margin</TableHead><TableHead class="text-right">Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody>
