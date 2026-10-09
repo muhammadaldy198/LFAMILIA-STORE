@@ -90,3 +90,9 @@ Respons gagal, format tidak valid, dan daftar lengkap kosong tidak menghapus dat
 Interval API diatur pada Pengaturan monitor & sinkron otomatis (minimal 5 menit). Halaman menampilkan waktu sinkron lengkap dan otomatis memuat ulang data tersimpan setiap 30 detik saat terlihat. Muat ulang layar tidak memanggil daftar harga API. Gunakan Sinkron daftar harga untuk pembaruan API manual. Katalog mengikuti respons API akun buyer, bukan scraping marketplace publik. Dokumentasi Digiflazz: https://developer.digiflazz.com/api/buyer/daftar-harga/.
 
 Filter Normal/Peringatan/Kritis memakai aritmetika desimal pada kolom harga unsigned agar harga turun tidak menyebabkan error MySQL.
+
+## Impor nominal langsung untuk dijual
+
+Pemilih SKU menyediakan **Langsung jual setelah impor** (aktif secara default). Satu submit mengimpor SKU yang tersedia dan masih segar, menyimpan margin serta format ID tujuan, dan mengaktifkan nominal, sumber Digiflazz, serta produk. Kategori dan integrasi Digiflazz harus sudah aktif; pengaturan tersebut tidak diaktifkan diam-diam. Nonaktifkan pilihan ini untuk menyimpan draf.
+
+Format tujuan diisi dari konfigurasi sumber existing, satu kolom pelanggan, atau format Mobile Legends yang dikenal (User ID diikuti Zone ID). Produk lain dengan beberapa kolom harus menetapkan format di pemilih SKU. Backend menolak placeholder asing, format kosong, dan kolom wajib yang terlewat. Tidak ada request pembayaran atau topup provider saat impor.

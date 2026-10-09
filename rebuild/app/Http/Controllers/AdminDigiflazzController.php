@@ -372,9 +372,16 @@ class AdminDigiflazzController
             'item_ids' => ['required', 'array', 'min:1', 'max:200'],
             'item_ids.*' => ['required', 'integer', 'distinct', 'exists:digiflazz_catalog_items,id'],
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
+            'publish' => ['sometimes', 'boolean'],
+            'customer_no_template' => ['nullable', 'string', 'max:500'],
         ]);
         DB::transaction(function () use ($request, $product, $service, $importer, $audit, $data): void {
-            $product->lockForUpdate()->findOrFail($product->id);
+            $product = $product->lockForUpdate()->findOrFail($product->id);
+            $publish = (bool) ($data['publish'] ?? false);
+            $template = $this->importCustomerTemplate($product, $data['customer_no_template'] ?? null, $publish);
+            if ($publish && (! $product->category->is_active || ! Provider::where('code', 'DIGIFLAZZ')->where('is_active', true)->exists())) {
+                throw ValidationException::withMessages(['publish' => 'Aktifkan kategori produk dan integrasi Digiflazz sebelum menjual.']);
+            }
             $order = (int) $product->packages()->max('sort_order') + 1;
             foreach (DB::table('digiflazz_catalog_items')->whereIn('id', $data['item_ids'])->lockForUpdate()->get() as $item) {
                 if (! $service->available($item) || now()->diffInHours($item->synced_at, true) > 24) {
@@ -395,18 +402,56 @@ class AdminDigiflazzController
                 $package = ProductPackage::create([
                     'product_id' => $product->id, 'code' => 'DF_'.substr(hash('sha256', $item->buyer_sku_code), 0, 20),
                     'name' => $item->product_name, 'group_name' => $item->type ?: null,
-                    'sort_order' => $order++, 'is_active' => false,
+                    'sort_order' => $order++, 'is_active' => $publish,
                     'pricing_mode' => 'PERCENT', 'margin_percent' => $data['margin_percent'],
                 ]);
                 try {
-                    $importer->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr);
+                    $mapping = $importer->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr);
+                    $before = $mapping->toArray();
+                    $mapping->update([
+                        'is_active' => $publish,
+                        'fulfillment_config' => $template === null ? null : ['customer_no_template' => $template],
+                    ]);
+                    $audit->record($request, 'catalog.mapping.updated', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
                 } catch (\InvalidArgumentException $exception) {
                     throw ValidationException::withMessages(['item_ids' => $exception->getMessage()]);
                 }
                 $audit->record($request, 'catalog.package.imported', 'product_package', $package->id, null, $package->toArray());
             }
+            if ($publish && ! $product->is_active) {
+                $before = $product->toArray();
+                $product->update(['is_active' => true]);
+                $audit->record($request, 'catalog.product.updated', 'product', $product->id, $before, $product->fresh()->toArray());
+            }
         }, 3);
 
-        return back()->with('status', 'Nominal diimpor. Periksa input customer dan aktifkan nominal serta mapping untuk menjual.');
+        return back()->with('status', ($data['publish'] ?? false)
+            ? 'Nominal berhasil diimpor dan sudah bisa dipilih di toko.'
+            : 'Nominal disimpan sebagai draf.');
+    }
+
+    private function importCustomerTemplate(Product $product, ?string $value, bool $publish): ?string
+    {
+        $fields = $product->fields()->orderBy('sort_order')->get();
+        $template = trim((string) $value);
+        if ($template === '' && $fields->count() === 1) {
+            $template = '{{'.$fields->first()->field_key.'}}';
+        }
+        if ($publish && ($fields->isEmpty() || $template === '')) {
+            throw ValidationException::withMessages(['customer_no_template' => 'Tentukan format ID tujuan agar nominal langsung bisa dijual.']);
+        }
+        if ($template === '') {
+            return null;
+        }
+        preg_match_all('/\{\{([a-z][a-z0-9_]*)\}\}/', $template, $matches);
+        $references = $matches[1] ?? [];
+        $remaining = preg_replace('/\{\{([a-z][a-z0-9_]*)\}\}/', '', $template);
+        if ($references === [] || array_diff($references, $fields->pluck('field_key')->all())
+            || str_contains($remaining, '{') || str_contains($remaining, '}')
+            || ($publish && array_diff($fields->where('is_required', true)->pluck('field_key')->all(), $references))) {
+            throw ValidationException::withMessages(['customer_no_template' => 'Format ID tujuan harus memakai kolom pelanggan yang benar dan menyertakan semua kolom wajib.']);
+        }
+
+        return $template;
     }
 }
