@@ -10,6 +10,7 @@ import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { byOrder, displayPosition } from '../../lib/ordering.js';
 
 const props = defineProps({
     isSuperAdmin: Boolean,
@@ -48,6 +49,12 @@ watch(() => props.gateways, (items) => {
 }, { deep: true });
 
 const routes = reactive(props.routes.map((item) => ({ ...item })));
+const methodPosition = (row) => displayPosition(props.channels, row, byOrder());
+const gatewayPosition = (row) => displayPosition(gateways, row, byOrder());
+const routePosition = (row) => displayPosition(
+    routes.filter((route) => route.payment_channel_id === row.payment_channel_id),
+    row, byOrder('priority'),
+);
 watch(() => props.routes, (items) => {
     routes.splice(0, routes.length, ...items.map((item) => ({ ...item })));
 }, { deep: true });
@@ -379,7 +386,7 @@ async function copy(value) {
                             <TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Jenis</TableHead><TableHead>Biaya customer</TableHead><TableHead>Kesiapan</TableHead><TableHead>Status</TableHead><TableHead class="text-right">Aksi</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 <TableRow v-for="channel in channels" :key="channel.id">
-                                    <TableCell><div class="flex min-w-[190px] items-center gap-3"><div class="grid size-10 shrink-0 place-items-center overflow-hidden rounded-md border bg-muted"><img v-if="channel.logo_url" :src="channel.logo_url" :alt="channel.name" class="size-full object-contain"><span v-else class="text-xs font-semibold">{{ channel.name.slice(0, 2).toUpperCase() }}</span></div><div><strong class="text-sm">{{ channel.name }}</strong><p class="mt-0.5 max-w-[260px] text-xs text-muted-foreground">{{ channel.description || channel.code }}</p></div></div></TableCell>
+                                    <TableCell><div class="flex min-w-[190px] items-center gap-3"><div class="grid size-10 shrink-0 place-items-center overflow-hidden rounded-md border bg-muted"><img v-if="channel.logo_url" :src="channel.logo_url" :alt="channel.name" class="size-full object-contain"><span v-else class="text-xs font-semibold">{{ channel.name.slice(0, 2).toUpperCase() }}</span></div><div><strong class="text-sm">{{ channel.name }}</strong><p class="text-[11px] text-muted-foreground">Posisi {{ methodPosition(channel) }} di pilihan pembayaran</p><p class="mt-0.5 max-w-[260px] text-xs text-muted-foreground">{{ channel.description || channel.code }}</p></div></div></TableCell>
                                     <TableCell>{{ methodLabel(channel.method) }}</TableCell>
                                     <TableCell><span v-if="Number(channel.fee_percent_bps || 0)">{{ (Number(channel.fee_percent_bps) / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 }) }}%</span><span v-if="Number(channel.fee_percent_bps || 0) && Number(channel.fee_flat_idr || 0)"> + </span><span v-if="Number(channel.fee_flat_idr || 0)">{{ money(channel.fee_flat_idr) }}</span><span v-if="!Number(channel.fee_percent_bps || 0) && !Number(channel.fee_flat_idr || 0)">Rp0</span></TableCell>
                                     <TableCell><div class="flex flex-wrap gap-1"><Badge :variant="channel.available_order ? 'secondary' : 'outline'">Pesanan {{ channel.available_order ? 'siap' : 'belum siap' }}</Badge><Badge v-if="channel.supports_wallet_topup" :variant="channel.available_topup ? 'secondary' : 'outline'">Top up {{ channel.available_topup ? 'siap' : 'belum siap' }}</Badge></div></TableCell>
@@ -396,7 +403,7 @@ async function copy(value) {
                     <label class="space-y-1"><span class="text-sm font-medium">Nama tampilan</span><Input v-model="channelEditor.name" maxlength="100" /></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Kode metode</span><Input v-model="channelEditor.code" maxlength="60" placeholder="contoh: qris" /></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Jenis</span><select v-model="channelEditor.method" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="QRIS">QRIS</option><option value="VIRTUAL_ACCOUNT">Virtual Account</option><option value="EWALLET">E-Wallet</option><option value="RETAIL">Gerai Retail</option><option value="WALLET">Saldo</option><option value="OTHER">Lainnya</option></select></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Urutan</span><Input v-model.number="channelEditor.sort_order" type="number" min="0" max="9999" /></label>
+                    <details class="space-y-1"><summary class="cursor-pointer text-sm font-medium">Urutan teknis (lanjutan)</summary><label class="mt-2 block text-xs">Skor urutan internal<Input v-model.number="channelEditor.sort_order" type="number" min="0" max="9999" /></label><p class="text-xs text-muted-foreground">Metode ditampilkan sebagai Posisi 1, 2, 3. Skor 10, 20, 30 boleh dibiarkan.</p></details>
                     <label class="space-y-1 md:col-span-2"><span class="text-sm font-medium">Deskripsi customer</span><Input v-model="channelEditor.description" maxlength="160" /></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Biaya persen (%)</span><Input v-model.number="channelEditor.fee_percent" type="number" min="0" max="99.99" step="0.01" /></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Biaya tetap (Rp)</span><Input v-model.number="channelEditor.fee_flat_idr" type="number" min="0" max="100000000" /></label>
@@ -407,13 +414,13 @@ async function copy(value) {
                 <div class="mt-4 flex justify-end gap-2"><Button variant="outline" @click="closeChannelEditor">Batal</Button><Button :disabled="saving === 'channel'" @click="saveChannel">{{ saving === 'channel' ? 'Menyimpan…' : 'Simpan metode' }}</Button></div>
             </Card></template>
         <template v-else-if="tab === 'gateways'">            <Card class="p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Gateway Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Status, maintenance, nama internal, dan urutan dikelola di sini. Secret tetap hanya di Integrasi.</p></div><Button v-if="isSuperAdmin" size="sm" variant="outline" as-child><Link href="/admin/integrations">Buka Integrasi</Link></Button></div>
+                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Gateway Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Urutan tampilan gateway dimulai dari Posisi 1. Urutan pemilihan gateway untuk transaksi berbeda dan dikelola di Routing. Secret tetap hanya di Integrasi.</p></div><Button v-if="isSuperAdmin" size="sm" variant="outline" as-child><Link href="/admin/integrations">Buka Integrasi</Link></Button></div>
                 <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div v-for="gateway in gateways" :key="gateway.id" class="rounded-md border p-3">
-                        <div class="flex items-start justify-between gap-2"><Badge :variant="['HEALTHY','INTERNAL'].includes(gateway.health?.status) ? 'secondary' : 'outline'">{{ healthLabel(gateway.health?.status) }}</Badge><span class="text-[11px] text-muted-foreground">{{ gateway.code }}</span></div>
+                        <div class="flex items-start justify-between gap-2"><Badge :variant="['HEALTHY','INTERNAL'].includes(gateway.health?.status) ? 'secondary' : 'outline'">{{ healthLabel(gateway.health?.status) }} · Posisi {{ gatewayPosition(gateway) }}</Badge><span class="text-[11px] text-muted-foreground">{{ gateway.code }}</span></div>
                         <p class="mt-2 min-h-8 text-xs text-muted-foreground">{{ gateway.health?.message }}</p><Badge class="mt-2" variant="outline">{{gateway.kind!=='EXTERNAL'?'Gateway internal':gateway.credential_configured?'Credential siap':'Credential belum siap'}}</Badge>
                         <label class="mt-3 block space-y-1"><span class="text-xs font-medium">Nama internal</span><Input v-model="gateway.internal_name" maxlength="100" :disabled="!isSuperAdmin" /></label>
-                        <label class="mt-3 block space-y-1"><span class="text-xs font-medium">Urutan</span><Input v-model.number="gateway.sort_order" type="number" min="0" max="9999" :disabled="!isSuperAdmin" /></label>
+                        <details class="mt-3"><summary class="cursor-pointer text-xs font-medium">Urutan teknis gateway</summary><label class="mt-2 block space-y-1 text-xs">Skor tampilan gateway<Input v-model.number="gateway.sort_order" type="number" min="0" max="9999" :disabled="!isSuperAdmin" /></label><p class="text-xs text-muted-foreground">Ini urutan daftar gateway, bukan prioritas routing transaksi.</p></details>
                         <div class="mt-3 space-y-2 text-sm"><label class="flex items-center gap-2"><AdminSwitch v-model="gateway.is_active" :disabled="!isSuperAdmin" />Aktif</label><label class="flex items-center gap-2"><AdminSwitch v-model="gateway.is_maintenance" :disabled="!isSuperAdmin" />Maintenance</label></div>
                         <p v-if="!gateway.credential_configured && gateway.kind === 'EXTERNAL'" class="mt-2 text-xs text-amber-600">Kredensial belum aktif.</p>
                         <Button v-if="isSuperAdmin" class="mt-3 w-full" size="sm" variant="outline" @click="saveGateway(gateway)">Simpan gateway</Button>
@@ -427,10 +434,10 @@ async function copy(value) {
                         </div>
                     </Card></template>
         <template v-else-if="tab === 'routing'">            <Card class="p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Routing Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Customer memilih metode. Sistem menentukan gateway berdasarkan routing aktif dan urutan gateway.</p></div><Button v-if="isSuperAdmin" size="sm" variant="outline" @click="showAdvancedRouting = !showAdvancedRouting">{{ showAdvancedRouting ? 'Tutup pengaturan' : 'Atur routing' }}</Button></div>
+                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Routing Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Customer memilih metode pembayaran. Posisi gateway dihitung mulai 1 untuk setiap metode. Hanya route yang aktif dan layak digunakan.</p></div><Button v-if="isSuperAdmin" size="sm" variant="outline" @click="showAdvancedRouting = !showAdvancedRouting">{{ showAdvancedRouting ? 'Tutup pengaturan' : 'Atur routing' }}</Button></div>
                 <div class="mt-4 overflow-x-auto">
-                    <AdminResponsiveTable :mobile-columns="[0,1,4,5]"><TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Gateway</TableHead><TableHead>Pesanan</TableHead><TableHead>Top up</TableHead><TableHead>Urutan Gateway</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-                    <TableBody><TableRow v-for="row in routes" :key="row.id"><TableCell>{{ row.channel_name }}</TableCell><TableCell>{{ row.gateway_name }}</TableCell><TableCell>{{ row.supports_order ? 'Ya' : 'Tidak' }}</TableCell><TableCell>{{ row.supports_wallet_topup ? 'Ya' : 'Tidak' }}</TableCell><TableCell>{{ row.priority }}</TableCell><TableCell><Badge :variant="row.is_active ? 'secondary' : 'outline'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge></TableCell></TableRow><TableRow v-if="!routes.length"><TableCell colspan="6" class="py-8 text-center text-muted-foreground">Belum ada routing pembayaran.</TableCell></TableRow></TableBody></AdminResponsiveTable>
+                    <AdminResponsiveTable :mobile-columns="[0,1,4,5]"><TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Gateway</TableHead><TableHead>Pesanan</TableHead><TableHead>Top up</TableHead><TableHead>Posisi untuk metode ini</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                    <TableBody><TableRow v-for="row in routes" :key="row.id"><TableCell>{{ row.channel_name }}</TableCell><TableCell>{{ row.gateway_name }}</TableCell><TableCell>{{ row.supports_order ? 'Ya' : 'Tidak' }}</TableCell><TableCell>{{ row.supports_wallet_topup ? 'Ya' : 'Tidak' }}</TableCell><TableCell>Posisi {{ routePosition(row) }}</TableCell><TableCell><Badge :variant="row.is_active ? 'secondary' : 'outline'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge></TableCell></TableRow><TableRow v-if="!routes.length"><TableCell colspan="6" class="py-8 text-center text-muted-foreground">Belum ada routing pembayaran.</TableCell></TableRow></TableBody></AdminResponsiveTable>
                 </div>
 
                 <div v-if="showAdvancedRouting && isSuperAdmin" class="mt-4 space-y-4 border-t pt-4">
@@ -438,7 +445,7 @@ async function copy(value) {
                     <div class="space-y-3">
                         <div v-for="row in routes" :key="'edit-' + row.id" class="grid gap-3 rounded-md border p-3 md:grid-cols-2 xl:grid-cols-6">
                             <div class="xl:col-span-2"><p class="text-sm font-medium">{{ row.channel_name }}</p><p class="text-xs text-muted-foreground">{{ row.gateway_name }}</p></div>
-                            <label class="space-y-1"><span class="text-xs font-medium">Urutan Gateway</span><Input v-model.number="row.priority" type="number" min="0" max="9999" /><span class="block text-[11px] text-muted-foreground">Angka lebih kecil digunakan lebih dahulu. Contoh: 10 sebelum 20.</span></label>
+                            <label class="space-y-1"><span class="text-xs font-medium">Skor routing teknis</span><Input v-model.number="row.priority" type="number" min="0" max="9999" /><span class="block text-[11px] text-muted-foreground">Posisi terlihat: {{ routePosition(row) }}. Skor kecil dipilih dahulu (10 sebelum 20); jangan ubah jika routing sudah benar.</span></label>
                             <div class="space-y-2 text-sm"><label class="flex items-center gap-2"><AdminSwitch v-model="row.supports_order" />Pesanan</label><label class="flex items-center gap-2"><AdminSwitch v-model="row.supports_wallet_topup" />Top up</label></div>
                             <div class="space-y-2 text-sm"><label class="flex items-center gap-2"><AdminSwitch v-model="row.is_active" />Aktif</label></div>
                             <div class="flex items-end justify-end"><Button size="sm" variant="outline" @click="saveRoute(row)">Simpan</Button></div>

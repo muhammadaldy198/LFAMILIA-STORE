@@ -12,6 +12,7 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
+import { byOrder, bySourcePriority, displayPosition } from '../../lib/ordering.js';
 
 const props = defineProps({
     categories: Array,
@@ -40,7 +41,19 @@ const cloneProducts = (items) => items.map((item) => ({
     notices: (item.notices || []).map((notice) => ({ ...notice })),
 }));
 const categories = ref(props.categories.map((item) => ({ ...item })));
+const categoryPosition = (row) => displayPosition(categories.value, row, byOrder());
 const products = ref(cloneProducts(props.products));
+const productPosition = (row) => displayPosition(
+    products.value.filter((item) => item.fulfillment_mode === row.fulfillment_mode), row,
+    (a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0)
+        || a.name.localeCompare(b.name, 'id-ID', { numeric: true })
+        || Number(a.id) - Number(b.id),
+);
+const packagePosition = (product, pack) => displayPosition(product.packages, pack, byOrder());
+const sourcePosition = (pack, mapping) => displayPosition(
+    pack.mappings.filter((entry) => entry.is_active),
+    mapping, bySourcePriority,
+);
 watch(() => props.categories, (items) => { categories.value = items.map((item) => ({ ...item })); });
 watch(() => props.products, (items) => { products.value = cloneProducts(items); });
 
@@ -81,8 +94,8 @@ const visibleProducts = computed(() => {
 watch([tab,catalogSearch,catalogCategory,catalogStatus,catalogSort,catalogPageSize], () => {catalogPage.value = 1;});
 const resetCatalogFilters=()=>{catalogSearch.value='';catalogCategory.value='';catalogStatus.value='';catalogSort.value='CUSTOM';catalogPageSize.value=25;catalogPage.value=1;};
 const categoryIconOptions=[['gamepad','Game'],['ticket','Voucher'],['play','Entertainment'],['smartphone','Pulsa / Data'],['zap','PLN / Listrik'],['grid','Umum']];
-const categoryForm = useForm({ name: '', slug: '', icon: 'grid', sort_order: 0 });
-const productForm = useForm({ category_id: '', name: '', slug: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: props.defaultMargin||0, sort_order: 0 });
+const categoryForm = useForm({ name: '', slug: '', icon: 'grid', sort_order: categories.value.length });
+const productForm = useForm({ category_id: '', name: '', slug: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: props.defaultMargin||0, sort_order: Math.max(-1, ...products.value.map((item) => Number(item.sort_order ?? 0))) + 1 });
 const globalMarginForm = useForm({margin_percent:props.defaultMargin||0});
 const applyGlobalMargin=()=>{if(confirm('Terapkan margin global ke semua produk otomatis? Produk manual dan margin khusus nominal tidak akan diubah.'))globalMarginForm.put('/admin/catalog/margin',{preserveScroll:true});};
 const autoSourcesForm = useForm({});
@@ -263,11 +276,7 @@ const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping
 const providerLabel = (mapping) => mapping.provider_name || mapping.provider_code || 'Provider';
 const fulfillmentRole = (pack, mapping) => {
     if (!mapping.is_active) return 'Nonaktif';
-    const active = [...pack.mappings]
-        .filter((entry) => entry.provider_code === mapping.provider_code && entry.is_active)
-        .sort((a, b) => Number(a.priority || 0) - Number(b.priority || 0)
-            || Number(a.cost_idr || 0) - Number(b.cost_idr || 0)
-            || Number(a.id) - Number(b.id));
+    const active = pack.mappings.filter((entry) => entry.is_active).sort(bySourcePriority);
     const index = active.findIndex((entry) => Number(entry.id) === Number(mapping.id));
     return index <= 0 ? 'Utama' : 'Cadangan ' + index;
 };
@@ -311,20 +320,22 @@ const deleteNotice = (notice) => {
             <nav class="lf-admin-tabs"><Button v-for="[key,label] in catalogTabs" :key="key" type="button" :class="{active:catalogTab===key}" @click="catalogTab=key">{{label}}</Button></nav>
             <section v-show="catalogTab === 'categories'" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Kategori</h2>
-                <form class="flex flex-wrap items-end gap-3" @submit.prevent="categoryForm.post('/admin/catalog/categories', { onSuccess: () => categoryForm.reset() })">
+                <p class="text-xs text-muted-foreground">Posisi ditampilkan mulai 1. Angka urutan teknis lama tetap disimpan agar tampilan toko tidak berubah tiba-tiba.</p>
+                <form class="flex flex-wrap items-end gap-3" @submit.prevent="categoryForm.post('/admin/catalog/categories', { onSuccess: () => { categoryForm.reset(); categoryForm.sort_order = categories.value.length; } })">
                     <label class="text-sm">Nama kategori<Input v-model="categoryForm.name" required class="mt-1 block rounded-md bg-slate-800 p-2" /><span v-if="categoryForm.errors.name" role="alert" class="text-sm font-normal text-destructive">{{ categoryForm.errors.name }}</span></label>
                     <label class="text-sm">Alamat kategori<Input v-model="categoryForm.slug" placeholder="Otomatis dari nama jika kosong" class="mt-1 block rounded-md bg-slate-800 p-2" /><span v-if="categoryForm.errors.slug" role="alert" class="text-sm font-normal text-destructive">{{ categoryForm.errors.slug }}</span></label>
                     <label class="text-sm">Ikon cadangan<select v-model="categoryForm.icon" class="mt-1 block rounded-md bg-slate-800 p-2"><option v-for="[value,label] in categoryIconOptions" :key="value" :value="value">{{label}}</option></select><span v-if="categoryForm.errors.icon" role="alert" class="text-sm font-normal text-destructive">{{ categoryForm.errors.icon }}</span></label>
-                    <label class="text-sm">Urutan<Input v-model.number="categoryForm.sort_order" type="number" min="0" required class="mt-1 block w-24 rounded-md bg-slate-800 p-2" /><span v-if="categoryForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ categoryForm.errors.sort_order }}</span></label>
+                    <details class="text-sm"><summary class="cursor-pointer">Urutan lanjutan</summary><label class="block mt-2">Skor urutan teknis<Input v-model.number="categoryForm.sort_order" type="number" min="0" required class="mt-1 block w-24 rounded-md bg-slate-800 p-2" /><span v-if="categoryForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ categoryForm.errors.sort_order }}</span></label></details>
                     <Button :disabled="categoryForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah</Button>
                     <span v-if="categoryForm.errors.name" class="text-sm text-red-300">{{ categoryForm.errors.name }}</span>
                 </form>
                 <div v-for="item in categories" :key="item.id" class="space-y-3 border-t border-slate-800 pt-3">
                     <div class="flex flex-wrap items-end gap-3">
+                        <span class="text-xs font-semibold text-slate-300">Posisi {{ categoryPosition(item) }}</span>
                         <label class="text-sm">Nama<Input v-model="item.name" class="mt-1 block rounded-md bg-slate-800 p-2" /></label>
                         <label class="text-sm">Alamat kategori<Input v-model="item.slug" class="mt-1 block rounded-md bg-slate-800 p-2" /></label>
                         <label class="text-sm">Ikon cadangan<select v-model="item.icon" class="mt-1 block rounded-md bg-slate-800 p-2"><option v-for="[value,label] in categoryIconOptions" :key="value" :value="value">{{label}}</option></select></label>
-                        <label class="text-sm">Urutan<Input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-24 rounded-md bg-slate-800 p-2" /></label>
+                        <details class="text-sm"><summary class="cursor-pointer">Ubah skor urutan (lanjutan)</summary><label class="mt-2 block">Skor teknis<Input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-24 rounded-md bg-slate-800 p-2" /></label></details>
                         <label class="flex gap-2 text-sm"><AdminSwitch v-model="item.is_active" />Aktif</label>
                         <Button type="button" class="rounded-md bg-slate-700 px-3 py-2 text-sm" @click="saveCategory(item)">Simpan</Button>
                         <Button type="button" class="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" @click="deleteCategory(item)">Hapus</Button>
@@ -366,14 +377,14 @@ const deleteNotice = (notice) => {
                     </label>
                     <Button type="button" :disabled="!importProductId" @click="openProductImport">Lanjut pilih SKU</Button>
                 </Card>
-                <form v-if="showCreateProduct" class="grid gap-3 md:grid-cols-3" @submit.prevent="productForm.fulfillment_mode = tab; productForm.post('/admin/catalog/products', { onSuccess: () => productForm.reset() })">
+                <form v-if="showCreateProduct" class="grid gap-3 md:grid-cols-3" @submit.prevent="productForm.fulfillment_mode = tab; productForm.post('/admin/catalog/products', { onSuccess: () => { productForm.reset(); productForm.sort_order = Math.max(-1, ...products.value.map((row) => Number(row.sort_order ?? 0))) + 1; } })">
                     <label class="text-sm">Kategori<select v-model="productForm.category_id" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="">Pilih kategori</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select><span v-if="productForm.errors.category_id" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.category_id }}</span></label>
                     <label class="text-sm">Nama produk<Input v-model="productForm.name" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.name" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.name }}</span></label>
                     <label class="text-sm">Alamat produk<Input v-model="productForm.slug" placeholder="Otomatis dari nama jika kosong" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.slug" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.slug }}</span></label>
                     <label class="text-sm">Publisher / merek<Input v-model="productForm.publisher" placeholder="Contoh: Moonton" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.publisher" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.publisher }}</span></label>
                     <label class="text-sm">Margin persen<Input v-model.number="productForm.margin_percent" type="number" step="0.0001" min="0" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.margin_percent" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.margin_percent }}</span></label>
                     <label class="text-sm md:col-span-2">Deskripsi<Textarea v-model="productForm.description" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.description" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.description }}</span></label>
-                    <label class="text-sm">Urutan<Input v-model.number="productForm.sort_order" type="number" min="0" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.sort_order }}</span></label>
+                    <details class="text-sm"><summary class="cursor-pointer">Urutan produk (lanjutan)</summary><label class="mt-2 block">Skor teknis<Input v-model.number="productForm.sort_order" type="number" min="0" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.sort_order }}</span></label></details>
                     <label v-if="tab === 'MANUAL'" class="text-sm md:col-span-3">Instruksi penanganan internal<Textarea v-model="productForm.manual_instructions" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.manual_instructions" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.manual_instructions }}</span></label>
                     <template v-if="tab === 'MANUAL'">
                         <label class="text-sm">Jam buka<Input v-model="productForm.manual_open_time" type="time" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.manual_open_time" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.manual_open_time }}</span></label>
@@ -387,7 +398,7 @@ const deleteNotice = (notice) => {
                         <span class="min-w-0">
                             <strong class="block truncate text-sm">{{ item.name }}</strong>
                             <small class="mt-0.5 block truncate text-muted-foreground">{{ categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori' }}<template v-if="item.publisher"> · {{ item.publisher }}</template></small>
-                            <small class="mt-1 block text-muted-foreground">{{ item.packages.length }} nominal · {{ item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis' }}</small>
+                            <small class="mt-1 block text-muted-foreground">Posisi {{ productPosition(item) }} · {{ item.packages.length }} nominal · {{ item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis' }}</small>
                         </span>
                         <span class="text-right">
                             <span class="block text-xs font-semibold" :class="item.is_active ? 'text-emerald-700' : 'text-slate-500'">{{ item.is_active ? 'Aktif' : 'Nonaktif' }}</span>
@@ -395,7 +406,7 @@ const deleteNotice = (notice) => {
                         </span>
                     </button>
                 </div>
-                <div class="hidden overflow-x-auto md:block"><Table class="min-w-[880px]"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Jenis</TableHead><TableHead>Nominal</TableHead><TableHead>Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id"><TableCell><strong>{{item.name}}</strong><small class="block text-muted-foreground">/{{item.slug}}<template v-if="item.publisher"> · {{item.publisher}}</template></small></TableCell><TableCell>{{categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori'}}</TableCell><TableCell>{{item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis'}}</TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>{{item.sort_order}}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" size="sm" @click="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table></div><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk yang sesuai dengan filter.</p>
+                <div class="hidden overflow-x-auto md:block"><Table class="min-w-[880px]"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Jenis</TableHead><TableHead>Nominal</TableHead><TableHead>Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id"><TableCell><strong>{{item.name}}</strong><small class="block text-muted-foreground">/{{item.slug}}<template v-if="item.publisher"> · {{item.publisher}}</template></small></TableCell><TableCell>{{categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori'}}</TableCell><TableCell>{{item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis'}}</TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>Posisi {{ productPosition(item) }}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" size="sm" @click="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table></div><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk yang sesuai dengan filter.</p>
                 <nav class="flex flex-wrap items-center justify-between gap-3"><span class="text-sm text-muted-foreground">{{matchingProducts.length}} produk · Halaman {{catalogPage}} dari {{totalCatalogPages}}</span><div class="flex gap-2"><Button type="button" variant="outline" :disabled="catalogPage <= 1" @click="catalogPage--">Sebelumnya</Button><Button type="button" variant="outline" :disabled="catalogPage >= totalCatalogPages" @click="catalogPage++">Berikutnya</Button></div></nav>
 
             </section>
@@ -422,7 +433,7 @@ const deleteNotice = (notice) => {
                         <label class="text-sm">Kategori<select v-model="item.category_id" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option></select></label>
                         <label class="text-sm">Jenis penanganan<select v-model="item.fulfillment_mode" :disabled="item.packages.length>0" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="AUTO_PROVIDER">Otomatis</option><option value="MANUAL">Manual</option></select><span v-if="item.packages.length>0" class="mt-1 block text-xs text-slate-500">Kosongkan nominal terlebih dahulu jika jenis penanganan memang perlu diubah.</span></label>
                         <label class="text-sm">Margin produk (%)<Input v-model.number="item.margin_percent" type="number" step="0.0001" min="0" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
-                        <label class="text-sm">Urutan<Input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
+                        <details class="text-sm"><summary class="cursor-pointer">Posisi {{ productPosition(item) }} · ubah skor teknis</summary><label class="mt-2 block">Skor urutan internal<Input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label></details>
                         <label class="text-sm md:col-span-3">Deskripsi<Textarea v-model="item.description" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
                         <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="item.is_active" /> Produk aktif</label>
                         <label v-if="item.fulfillment_mode === 'MANUAL'" class="text-sm md:col-span-4">Instruksi internal<Textarea v-model="item.manual_instructions" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
@@ -452,7 +463,7 @@ const deleteNotice = (notice) => {
 
                     </div>
                     <div v-if="editorTab==='fields'" class="space-y-3"><h3>Data Pelanggan</h3><p class="text-muted-foreground">Atur data yang diminta saat pelanggan membeli produk ini.</p><AdminCustomerFields :rows="fieldRows" :error="fieldsError" :saving="fieldsSaving" @move="moveField" @remove="index=>fieldRows.splice(index,1)" @add="addField" @save="saveFields" /></div>
-                    <div v-show="editorTab==='fulfillment'" class="space-y-4"><h3 class="font-semibold">Penanganan {{item.fulfillment_mode==='MANUAL'?'manual':'otomatis'}}</h3><p class="text-sm text-slate-500">Instruksi dan jam layanan dikelola pada Informasi. Sumber pemenuhan, prioritas, modal, dan format tujuan dikelola per nominal.</p><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="router.post('/admin/catalog/products/'+item.id+'/sync',{}, {preserveScroll:true})">Sinkron semua nominal produk</Button><AdminResponsiveTable :mobile-columns="[0,2,3]"><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / kode</TableHead><TableHead>Status koneksi</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="pack in visiblePackages(item)" :key="pack.id"><TableCell>{{pack.name}}</TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{providerLabel(mapping)}} · {{mapping.provider_code==='VOUCHER_STOCK' ? (mapping.stock_key||'-') : (mapping.external_sku||'Manual')}}</p></TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{mapping.is_active?'Aktif':'Nonaktif'}} · prioritas {{mapping.priority}}</p></TableCell><TableCell><Button type="button" variant="outline" @click="selectedPackageId=pack.id;editorTab='nominal'">Kelola sumber</Button></TableCell></TableRow></TableBody></AdminResponsiveTable></div>
+                    <div v-show="editorTab==='fulfillment'" class="space-y-4"><h3 class="font-semibold">Penanganan {{item.fulfillment_mode==='MANUAL'?'manual':'otomatis'}}</h3><p class="text-sm text-slate-500">Instruksi dan jam layanan dikelola pada Informasi. Sumber pemenuhan, prioritas, modal, dan format tujuan dikelola per nominal.</p><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="router.post('/admin/catalog/products/'+item.id+'/sync',{}, {preserveScroll:true})">Sinkron semua nominal produk</Button><AdminResponsiveTable :mobile-columns="[0,2,3]"><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / kode</TableHead><TableHead>Status koneksi</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="pack in visiblePackages(item)" :key="pack.id"><TableCell>{{pack.name}}</TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{providerLabel(mapping)}} · {{mapping.provider_code==='VOUCHER_STOCK' ? (mapping.stock_key||'-') : (mapping.external_sku||'Manual')}}</p></TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{ fulfillmentRole(pack,mapping) }}<span v-if="mapping.is_active"> · Posisi {{ sourcePosition(pack,mapping) }}</span></p></TableCell><TableCell><Button type="button" variant="outline" @click="selectedPackageId=pack.id;editorTab='nominal'">Kelola sumber</Button></TableCell></TableRow></TableBody></AdminResponsiveTable></div>
                     <div v-show="editorTab==='display'" class="space-y-4">
                     <div class="grid gap-3 md:grid-cols-2">
                         <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk / card</strong><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
@@ -513,7 +524,7 @@ const deleteNotice = (notice) => {
                             <TableRow v-for="(pack,index) in visiblePackages(item)" :key="pack.id" draggable="true" @dragstart="draggedPackageId=pack.id" @dragover.prevent @drop.prevent="dropPackage(item,(nominalPage-1)*25+index)">
                                 <TableCell><div class="flex items-center gap-2"><img v-if="pack.image_url" :src="pack.image_url" alt="" class="size-8 shrink-0 object-contain"><strong>{{pack.name}}</strong></div><p class="text-xs text-slate-500">{{pack.group_name||'-'}}</p></TableCell>
                                 <TableCell><p v-for="mapping in pack.mappings" :key="mapping.id" class="text-xs">{{ providerLabel(mapping) }}<span v-if="mapping.provider_code==='VOUCHER_STOCK'"> · {{ mapping.stock_key || '-' }}</span><span v-else-if="mapping.external_sku"> · {{ mapping.external_sku }}</span> · Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</p></TableCell>
-                                <TableCell class="text-right">{{previewPrice(pack,item)}}</TableCell><TableCell>{{pack.pricing_mode==='SELL_PRICE'?'Harga tetap':pack.pricing_mode==='FIXED'?'Rp'+Number(pack.margin_fixed_idr||0).toLocaleString('id-ID'):(pack.pricing_mode==='PERCENT'?pack.margin_percent:item.margin_percent)+'%'}}</TableCell><TableCell class="text-right">{{pack.sort_order}}</TableCell><TableCell>{{pack.is_active?'Aktif':'Nonaktif'}}</TableCell>
+                                <TableCell class="text-right">{{previewPrice(pack,item)}}</TableCell><TableCell>{{pack.pricing_mode==='SELL_PRICE'?'Harga tetap':pack.pricing_mode==='FIXED'?'Rp'+Number(pack.margin_fixed_idr||0).toLocaleString('id-ID'):(pack.pricing_mode==='PERCENT'?pack.margin_percent:item.margin_percent)+'%'}}</TableCell><TableCell class="text-right">Posisi {{ packagePosition(item, pack) }}</TableCell><TableCell>{{pack.is_active?'Aktif':'Nonaktif'}}</TableCell>
                                 <TableCell><div class="flex flex-wrap gap-2"><Button type="button" variant="outline" @click="editPackage(pack.id)">Edit nominal</Button></div></TableCell>
                             </TableRow>
                         </TableBody></AdminResponsiveTable>
@@ -528,7 +539,7 @@ const deleteNotice = (notice) => {
                                 <label class="text-xs">Badge<Input v-model="pack.note" maxlength="80" placeholder="Contoh: Populer" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Grup / Tabel<select v-if="item.package_tabs_enabled" v-model="pack.group_name" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="">Pilih tab</option><option v-for="tabName in item.package_tabs||[]" :key="tabName" :value="tabName">{{tabName}}</option></select><Input v-else v-model="pack.group_name" placeholder="Contoh: Diamonds" class="mt-1 block rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Nilai nominal<Input v-model.number="pack.nominal_value" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
-                                <label class="text-xs">Urutan<Input v-model.number="pack.sort_order" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
+                                <details class="text-xs"><summary class="cursor-pointer">Posisi {{ packagePosition(item,pack) }} · skor lanjutan</summary><label class="block mt-2">Skor teknis<Input v-model.number="pack.sort_order" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label></details>
                                 <label class="flex gap-2 text-xs"><AdminSwitch v-model="pack.is_active" />Aktif</label>
                                 <Button type="button" class="rounded bg-slate-700 px-3 py-2 text-xs" @click="savePackage(pack)">Simpan</Button>
                             </div>
@@ -544,13 +555,13 @@ const deleteNotice = (notice) => {
                                 <AdminMediaControl type="package" :id="pack.id" :url="pack.image_url" />
                             </div>
                             <div class="space-y-2 rounded-md border border-slate-800 p-3">
-                                <div><h4 class="text-sm font-semibold">Prioritas fulfillment</h4><p class="mt-1 text-[11px] text-slate-500">Angka lebih kecil dipakai lebih dulu. Sistem hanya pindah ke sumber berikutnya setelah kegagalan definitif. Pending, proses, timeout, atau status tidak pasti wajib direkonsiliasi dan tidak boleh langsung failover.</p></div>
-                                <div v-for="mapping in [...pack.mappings.filter((entry) => entry.provider_code !== 'VOUCHER_STOCK')].sort((a,b)=>Number(a.priority)-Number(b.priority)||Number(a.cost_idr||0)-Number(b.cost_idr||0))" :key="mapping.id" class="flex flex-wrap items-end gap-2 rounded border border-slate-800 p-2 text-xs text-slate-300">
-                                    <span class="min-w-40"><strong>{{ fulfillmentRole(pack, mapping) }} · Prioritas {{ mapping.priority }}</strong><br>{{ providerLabel(mapping) }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span><br><span class="text-slate-500">Modal Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</span></span>
+                                <div><h4 class="text-sm font-semibold">Sumber Top Up: Utama dan Cadangan</h4><p class="mt-1 text-[11px] text-slate-500">Posisi dimulai dari 1. Sumber utama digunakan pertama, cadangan hanya untuk kegagalan definitif. Pending, proses, timeout, atau status tidak pasti wajib direkonsiliasi, bukan langsung dikirim ulang.</p></div>
+                                <div v-for="mapping in [...pack.mappings.filter((entry) => entry.provider_code !== 'VOUCHER_STOCK')].sort(bySourcePriority)" :key="mapping.id" class="flex flex-wrap items-end gap-2 rounded border border-slate-800 p-2 text-xs text-slate-300">
+                                    <span class="min-w-40"><strong>{{ fulfillmentRole(pack, mapping) }}<template v-if="mapping.is_active"> · Posisi {{ sourcePosition(pack,mapping) }}</template></strong><br>{{ providerLabel(mapping) }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span><br><span class="text-slate-500">Modal Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</span></span>
                                     <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga</Button>
                                     <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                                     <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Format ID tujuan<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan kode kolom di dalam {{ }}.</span></label>
-                                    <label>Prioritas<Input v-model.number="mapping.priority" type="number" min="0" max="1000" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
+                                    <details class="text-xs"><summary class="cursor-pointer">Prioritas teknis (lanjutan)</summary><label class="mt-2 block">Skor internal<Input v-model.number="mapping.priority" type="number" min="0" max="1000" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label><p>Angka kecil dipilih lebih dulu. Pada sumber otomatis, skor dapat disusun ulang saat sinkronisasi.</p></details>
                                     <label class="flex gap-2"><AdminSwitch v-model="mapping.is_active" />Aktif</label>
                                     <Button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan sumber</Button>
                                 </div>
@@ -573,7 +584,7 @@ const deleteNotice = (notice) => {
                                 <div class="grid gap-3 md:grid-cols-4">
                                     <label class="text-xs">Kunci stok<Input v-model="pack.stock_form.stock_key" maxlength="100" placeholder="contoh: netflix-1bulan" class="mt-1" /></label>
                                     <label class="text-xs">Modal Rp<Input v-model.number="pack.stock_form.cost_idr" type="number" min="1" class="mt-1" /></label>
-                                    <label class="text-xs">Prioritas<Input v-model.number="pack.stock_form.priority" type="number" min="0" max="1000" class="mt-1" /></label>
+                                    <details class="text-xs"><summary class="cursor-pointer">Prioritas kode digital (lanjutan)</summary><label class="block mt-2">Skor internal<Input v-model.number="pack.stock_form.priority" type="number" min="0" max="1000" class="mt-1" /></label></details>
                                     <label class="flex items-center gap-2 self-end pb-2 text-xs"><AdminSwitch v-model="pack.stock_form.is_active" /> Aktif untuk checkout</label>
                                 </div>
                                 <div v-if="stockMapping(pack)?.stock_counts" class="flex flex-wrap gap-4 text-xs text-slate-300">
@@ -593,7 +604,7 @@ const deleteNotice = (notice) => {
                             <label class="text-xs">Badge<Input v-model="packageForm.note" maxlength="80" placeholder="Contoh: Populer" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                             <label class="text-xs">Grup / Tabel<select v-if="item.package_tabs_enabled" v-model="packageForm.group_name" required class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="">Pilih tab</option><option v-for="tabName in item.package_tabs||[]" :key="tabName" :value="tabName">{{tabName}}</option></select><Input v-else v-model="packageForm.group_name" placeholder="Contoh: Weekly / Diamonds" class="mt-1 block rounded bg-slate-800 p-2" /></label>
                             <label class="text-xs">Nilai nominal<Input v-model.number="packageForm.nominal_value" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
-                            <label class="text-xs">Urutan<Input v-model.number="packageForm.sort_order" type="number" min="0" required class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label>
+                            <details class="text-xs"><summary class="cursor-pointer">Urutan nominal (lanjutan)</summary><label class="mt-2 block">Skor teknis<Input v-model.number="packageForm.sort_order" type="number" min="0" required class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label></details>
                             <label v-if="item.fulfillment_mode === 'MANUAL'" class="text-xs">Modal Rp<Input v-model.number="packageForm.cost_idr" type="number" min="0" required class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                             <Button :disabled="packageForm.processing" class="rounded bg-cyan-400 px-3 py-2 text-xs font-semibold text-slate-950">Tambah nominal</Button>
                             <span v-if="Object.keys(packageForm.errors).length" class="text-xs text-red-300">{{ Object.values(packageForm.errors).join(' · ') }}</span>

@@ -220,6 +220,9 @@ jobs:
           HUSKY: 0
         run: npm ci
 
+      - name: Test 1-based admin ordering
+        run: node --test tests/Browser/ordering.test.mjs
+
       - name: Lint Vue and JavaScript
         run: npm run lint
 

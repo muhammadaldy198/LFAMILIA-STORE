@@ -33,6 +33,7 @@ class DigiflazzAutoSources
         $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
         $existing = ProviderMapping::where('provider_id', $provider->id)
             ->whereIn('external_sku', $items->pluck('buyer_sku_code'))->lockForUpdate()->get();
+        $existingBySku = $existing->keyBy('external_sku');
         $packageIds = $existing->pluck('product_package_id')->unique();
         if ($packageIds->count() > 1) {
             throw ValidationException::withMessages(['item_ids' => 'Sumber nominal yang sama sudah terpisah di beberapa nominal. Tidak ada sumber yang dipindahkan.']);
@@ -70,14 +71,51 @@ class DigiflazzAutoSources
                 $config['auto_source_group'] = $this->key($item);
             }
             $mapping->update([
-                'is_active' => $publish ?: $mapping->is_active,
+                // Do not silently reactivate an existing disabled SKU when
+                // the owner enables or refreshes auto-managed backups.
+                'is_active' => $automatic && $existingBySku->has($item->buyer_sku_code)
+                    ? (bool) $existingBySku->get($item->buyer_sku_code)->is_active
+                    : ($publish ?: $mapping->is_active),
                 'priority' => $automatic ? 0 : $mapping->priority,
                 'fulfillment_config' => $config ?: null,
             ]);
             app(AdminAuditService::class)->record($request, 'catalog.mapping.updated', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
         }
 
+        if ($automatic) {
+            $this->rankAutomaticSources($package, (int) $provider->id, $this->key($first), $request);
+        }
+
         return $package;
+    }
+
+    /**
+     * Only sources explicitly managed by automatic grouping are reprioritized.
+     * Manual SKU mappings keep their existing priority and enabled state.
+     */
+    private function rankAutomaticSources(ProductPackage $package, int $providerId, string $groupKey, Request $request): void
+    {
+        $mappings = $package->mappings()->where('provider_id', $providerId)
+            ->get()
+            ->filter(fn (ProviderMapping $mapping): bool => data_get($mapping->fulfillment_config, 'auto_source_group') === $groupKey)
+            ->sort(fn (ProviderMapping $a, ProviderMapping $b): int => (int) (! $a->is_active) <=> (int) (! $b->is_active)
+                ?: (int) $a->cost_idr <=> (int) $b->cost_idr
+                ?: strcmp((string) $a->external_sku, (string) $b->external_sku)
+                ?: $a->id <=> $b->id
+            )->values();
+
+        foreach ($mappings as $position => $mapping) {
+            if ((int) $mapping->priority === $position) {
+                continue;
+            }
+
+            $before = $mapping->toArray();
+            $mapping->update(['priority' => $position]);
+            app(AdminAuditService::class)->record(
+                $request, 'catalog.fulfillment_source.priority_auto_ranked',
+                'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray()
+            );
+        }
     }
 
     public function orderProduct(Product $product): void
@@ -159,6 +197,9 @@ class DigiflazzAutoSources
                 ]);
                 app(AdminAuditService::class)->record($request, 'catalog.fulfillment_source.auto_attached', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
                 $added++;
+            }
+            if ($key) {
+                $this->rankAutomaticSources($package, (int) $provider->id, (string) $key, $request);
             }
         }
 

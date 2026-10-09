@@ -9,6 +9,7 @@ import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { byOrder, displayPosition } from '../../lib/ordering.js';
 
 const props = defineProps({
     providers: { type: Array, default: () => [] },
@@ -18,6 +19,7 @@ const props = defineProps({
 });
 
 const rows = ref(props.providers.map((row) => ({ ...row })));
+const providerPosition = (row) => displayPosition(rows.value, row, byOrder());
 watch(() => props.providers, (value) => {
     rows.value = value.map((row) => ({ ...row }));
 }, { deep: true });
@@ -149,7 +151,7 @@ function saveProvider(row) {
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
-                                <strong class="truncate">{{ row.display_name }}</strong>
+                                <strong class="truncate">{{ row.display_name }}</strong><Badge variant="outline">Posisi {{ providerPosition(row) }}</Badge>
                                 <Badge :variant="healthVariant(row.health?.status)">{{ healthLabel(row.health?.status) }}</Badge>
                             </div>
                             <p class="mt-1 text-xs text-muted-foreground">
@@ -176,10 +178,7 @@ function saveProvider(row) {
                                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
                             />
                         </label>
-                        <label class="space-y-1">
-                            <span class="text-sm font-medium">Urutan tampilan</span>
-                            <Input v-model.number="row.sort_order" type="number" min="0" max="9999" />
-                        </label>
+                        <details><summary class="cursor-pointer text-sm font-medium">Skor urutan teknis (lanjutan)</summary><label class="mt-2 block space-y-1 text-sm"><span>Skor internal</span><Input v-model.number="row.sort_order" type="number" min="0" max="9999" /></label><p class="mt-1 text-xs text-muted-foreground">Yang terlihat di daftar adalah Posisi 1, 2, 3; skor teknis 0 atau 10 tidak berarti error.</p></details>
                     </div>
 
                     <div class="mt-4 grid grid-cols-2 gap-3 rounded-md border p-3 text-sm">
@@ -265,7 +264,7 @@ function saveProvider(row) {
                             <TableHead>SKU</TableHead>
                             <TableHead class="text-right">Harga modal</TableHead>
                             <TableHead class="text-right">Batas harga</TableHead>
-                            <TableHead class="text-right">Prioritas</TableHead>
+                            <TableHead class="text-right">Posisi sumber</TableHead>
                             <TableHead>Status</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -286,7 +285,7 @@ function saveProvider(row) {
                             <TableCell class="font-mono text-xs">{{ row.external_sku || '—' }}</TableCell>
                             <TableCell class="text-right">{{ money(row.cost_idr) }}</TableCell>
                             <TableCell class="text-right">{{ money(row.max_price_idr) }}</TableCell>
-                            <TableCell class="text-right">{{ row.priority }}</TableCell>
+                            <TableCell class="text-right">{{ row.source_position ? 'Posisi ' + row.source_position : 'Nonaktif' }}</TableCell>
                             <TableCell>
                                 <Badge :variant="row.is_active && row.product_active && row.package_active && row.provider_active ? 'secondary' : 'outline'">
                                     {{ row.is_active ? 'Aktif' : 'Nonaktif' }}

@@ -209,6 +209,7 @@ class AdminPanelRestorationTest extends TestCase
         foreach ($packages as $package) {
             $this->assertSame(2, $package->mappings()->count());
             $this->assertSame(2, $package->mappings()->where('is_active', true)->count());
+            $this->assertSame([0, 1], $package->mappings()->orderBy('priority')->pluck('priority')->map(fn ($value): int => (int) $value)->all());
             $this->assertSame((int) $package->nominal_value * 1100, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         }
         $response = $this->get('/catalog/'.$product->slug);
@@ -218,6 +219,53 @@ class AdminPanelRestorationTest extends TestCase
             $page->where('packages.1.nominal_value', 10);
             $page->where('packages.2.nominal_value', 20);
         });
+    }
+
+    public function test_auto_source_rank_uses_lowest_cost_and_preserves_disabled_backups(): void
+    {
+        $this->login();
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'rank-expensive', 'product_name' => 'Restore 10 Diamonds', 'price' => 10500]),
+            $this->row(['buyer_sku_code' => 'rank-cheap', 'product_name' => 'Restore 10 Diamonds', 'price' => 10000]),
+            $this->row(['buyer_sku_code' => 'rank-middle', 'product_name' => 'Restore 10 Diamonds', 'price' => 10200]),
+        ]);
+        app(DigiflazzCatalogService::class)->sync();
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->fields()->create([
+            'field_key' => 'destination', 'label' => 'ID tujuan',
+            'type' => 'text', 'is_required' => true, 'sort_order' => 0,
+        ]);
+        $skuId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'rank-expensive')->value('id');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$skuId], 'margin_percent' => 10, 'publish' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $package = $product->packages()->sole();
+        $this->assertSame(
+            ['rank-cheap', 'rank-middle', 'rank-expensive'],
+            $package->mappings()->orderBy('priority')->pluck('external_sku')->all()
+        );
+        $this->assertSame(
+            [0, 1, 2],
+            $package->mappings()->orderBy('priority')->pluck('priority')->map(fn ($value): int => (int) $value)->all()
+        );
+        $this->assertSame('rank-cheap', $package->mappings()->orderBy('priority')->firstOrFail()->external_sku);
+
+        $package->mappings()->where('external_sku', 'rank-cheap')->update(['is_active' => false]);
+        $this->post('/admin/catalog/products/'.$product->id.'/auto-sources')
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            ['rank-middle', 'rank-expensive', 'rank-cheap'],
+            $package->mappings()->orderBy('priority')->pluck('external_sku')->all()
+        );
+        $this->assertDatabaseHas('provider_mappings', [
+            'product_package_id' => $package->id, 'external_sku' => 'rank-cheap',
+            'is_active' => false, 'priority' => 2,
+        ]);
+        $this->assertSame(11220, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
     public function test_automatic_sources_do_not_merge_regions_variants_or_other_product_ownership(): void
