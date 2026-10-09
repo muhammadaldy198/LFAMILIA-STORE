@@ -764,5 +764,23 @@ class AdminIntegrationsRestorationTest extends TestCase
                 'reason' => 'PERMISSION_LIMITED',
                 'verified' => false,
             ]);
+
+        $this->get('/admin/integrations')->assertOk()->assertInertia(
+            fn (Assert $page) => $page
+                ->where('summary.active', 1)
+                ->where('summary.attention', 0)
+                ->where('summary.awaiting_verification', 1)
+        );
+
+        $credential = IntegrationCredential::where('code', 'resend')->firstOrFail();
+        $credential->config_ciphertext = ['api_key' => 'sending-only-key'];
+        $credential->save();
+
+        $this->get('/admin/integrations')->assertOk()->assertInertia(
+            fn (Assert $page) => $page
+                ->where('summary.active', 1)
+                ->where('summary.attention', 1)
+                ->where('summary.awaiting_verification', 0)
+        );
     }
 }
